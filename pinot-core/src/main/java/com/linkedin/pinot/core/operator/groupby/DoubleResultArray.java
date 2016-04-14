@@ -23,18 +23,20 @@ import java.util.Arrays;
 /**
  * Array of primitive doubles.
  */
-public class DoubleArray implements ResultArray {
+public class DoubleResultArray implements ResultArray {
   double[] _doubles;
+  private final double _defaultValue;
 
   /**
    * Constructor for the class.
    *
    * @param length
-   * @param value
+   * @param defaultValue
    */
-  public DoubleArray(int length, double value) {
+  public DoubleResultArray(int length, double defaultValue) {
     _doubles = new double[length];
-    setAll(value);
+    _defaultValue = defaultValue;
+    setAll(defaultValue);
   }
 
   /**
@@ -97,10 +99,14 @@ public class DoubleArray implements ResultArray {
   @Override
   public void expand(int newSize) {
     Preconditions.checkArgument(newSize > _doubles.length);
+    Preconditions.checkState(newSize <= ResultHolderFactory.MAX_NUM_GROUP_KEYS_FOR_ARRAY_BASED,
+        "Illegal request to expand DoubleArray beyond maximum limit (1M): " + newSize);
+
 
     double[] tmp = _doubles;
     _doubles = new double[newSize];
-    System.arraycopy(_doubles, 0, tmp, 0, tmp.length);
+    System.arraycopy(tmp, 0, _doubles, 0, tmp.length);
+    Arrays.fill(_doubles, tmp.length, newSize, _defaultValue);
   }
 
   /**
@@ -111,7 +117,7 @@ public class DoubleArray implements ResultArray {
    * @param end
    */
   @Override
-  public void copy(int position, DoubleArray that, int start, int end) {
+  public void copy(int position, DoubleResultArray that, int start, int end) {
     Preconditions.checkArgument((_doubles.length - position) >= (end - start));
     System.arraycopy(_doubles, position, that._doubles, start, end);
   }

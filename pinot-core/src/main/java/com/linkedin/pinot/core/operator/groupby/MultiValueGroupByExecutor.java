@@ -36,28 +36,64 @@ import java.util.Map;
 import java.util.Set;
 
 
+/**
+ * Aggregation Group By executor for multi-valued group-by columns.
+ * This implementation uses MultiValueGroupKeyGenerator to generate
+ * group keys, and uses Map (instead of array) to perform group by aggregation.
+ *
+ * The use of Map is to ensure handling of cases where cardinality product of
+ * multi-valued columns can grow to limits that are not practical for array-based
+ * storage.
+ */
 public class MultiValueGroupByExecutor implements GroupByExecutor {
 
-  private final List<AggregationFunctionContext> _aggrFuncContextList;
-  private final ResultHolder[] _resultHolderArray;
+  private final IndexSegment _indexSegment;
+  private final List<AggregationInfo> _aggregationsInfoList;
+  private final GroupBy _groupBy;
+
+  private List<AggregationFunctionContext> _aggrFuncContextList;
+  private ResultHolder[] _resultHolderArray;
   private MultiValueGroupKeyGenerator _groupKeyGenerator;
   private Map<String, int[]> _columnToDictArrayMap;
-  private final Map<String, double[]> _columnToValueArrayMap;
-  private boolean _init = false;
-  private boolean _finish = false;
+  private Map<String, double[]> _columnToValueArrayMap;
+
+  private boolean _inited = false;
+  private boolean _finished = false;
 
   /**
    * Constructor for the class.
+   * Just stores the passed in parameters into member variables.
+   * Actual initialization is performed within 'init' method.
    */
   public MultiValueGroupByExecutor(IndexSegment indexSegment, List<AggregationInfo> aggregationsInfoList,
       GroupBy groupBy) {
 
-    _groupKeyGenerator = new MultiValueGroupKeyGenerator(indexSegment, groupBy);
+    _indexSegment = indexSegment;
+    _aggregationsInfoList = aggregationsInfoList;
+    _groupBy = groupBy;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * Initializes the following:
+   * - List of AggregationFunctionContexts for the given query.
+   * - Group by key generator.
+   * - Various re-usable arrays that store dictionaries/values/results.
+   *
+   */
+  @Override
+  public void init() {
+    // Return if already initialized.
+    if (_inited) {
+      return;
+    }
+    _groupKeyGenerator = new MultiValueGroupKeyGenerator(_indexSegment, _groupBy);
     _aggrFuncContextList = new ArrayList<AggregationFunctionContext>();
     _columnToDictArrayMap = new HashMap<String, int[]>();
     _columnToValueArrayMap = new HashMap<String, double[]>();
 
-    for (AggregationInfo aggregationInfo : aggregationsInfoList) {
+    for (AggregationInfo aggregationInfo : _aggregationsInfoList) {
       String[] columns = aggregationInfo.getAggregationParams().get("column").trim().split(",");
 
       for (String column : columns) {
@@ -67,27 +103,20 @@ public class MultiValueGroupByExecutor implements GroupByExecutor {
         }
       }
       AggregationFunctionContext aggregationFunctionContext =
-          new AggregationFunctionContext(indexSegment, aggregationInfo.getAggregationType(), columns);
+          new AggregationFunctionContext(_indexSegment, aggregationInfo.getAggregationType(), columns);
       _aggrFuncContextList.add(aggregationFunctionContext);
     }
 
     _resultHolderArray = new ResultHolder[_aggrFuncContextList.size()];
     for (int i = 0; i < _aggrFuncContextList.size(); i++) {
       AggregationFunctionContext aggregationFunctionContext = _aggrFuncContextList.get(i);
-      String functionName = aggregationFunctionContext.getFunctionName();
+      AggregationFunction aggregationFunction = aggregationFunctionContext.getAggregationFunction();
 
-      double defaultValue = aggregationFunctionContext.getAggregationFunction().getDefaultValue();
       // Always get map based result holder, by passing MAX_VALUE.
-      _resultHolderArray[i] = ResultHolderFactory.getResultHolder(functionName, Integer.MAX_VALUE, defaultValue);
+      _resultHolderArray[i] =
+          ResultHolderFactory.getResultHolder(aggregationFunction, Integer.MAX_VALUE /* maxNumGroupKeys*/);
     }
-  }
-
-  /**
-   * {@inheritDoc}
-   */
-  @Override
-  public void init() {
-    _init = true;
+    _inited = true;
   }
 
   /**
@@ -98,9 +127,10 @@ public class MultiValueGroupByExecutor implements GroupByExecutor {
    */
   @Override
   public void process(int[] docIdSet, int startIndex, int length) {
-    Preconditions.checkState(_init, "process cannot be called before init.");
-
+    Preconditions.checkState(_inited, "process cannot be called before init.");
     fetchColumnValues(docIdSet, startIndex, length);
+
+    // Map from docId to int[] of group-keys for the docId.
     Int2ObjectOpenHashMap docIdToGroupKeys = _groupKeyGenerator.generateKeysForDocIdSet(docIdSet, startIndex, length);
 
     for (int i = 0; i < _aggrFuncContextList.size(); i++) {
@@ -120,7 +150,7 @@ public class MultiValueGroupByExecutor implements GroupByExecutor {
    */
   @Override
   public void finish() {
-    _finish = true;
+    _finished = true;
   }
 
   /**
@@ -129,7 +159,7 @@ public class MultiValueGroupByExecutor implements GroupByExecutor {
    */
   @Override
   public List<Map<String, Serializable>> getResult() {
-    Preconditions.checkState(_finish, "GetResult cannot be called before finish.");
+    Preconditions.checkState(_finished, "GetResult cannot be called before finish.");
     List<Map<String, Serializable>> result = new ArrayList<Map<String, Serializable>>(_aggrFuncContextList.size());
 
     for (int i = 0; i < _aggrFuncContextList.size(); i++) {

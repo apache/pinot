@@ -146,8 +146,10 @@ public class MultiValueGroupKeyGenerator implements GroupKeyGenerator {
    * @return
    */
   public Int2ObjectOpenHashMap generateKeysForDocIdSet(int[] docIdSet, int startIndex, int length) {
-    Int2ObjectOpenHashMap docIdToGroupKeysMap = new Int2ObjectOpenHashMap(length - startIndex);
-    for (int i = startIndex; i < length; ++i) {
+    Int2ObjectOpenHashMap docIdToGroupKeysMap = new Int2ObjectOpenHashMap(length);
+
+    int endIndex = startIndex + length - 1;
+    for (int i = startIndex; i <= endIndex; ++i) {
       int docId = docIdSet[i];
 
       // Note this is key in the map is the index not docId.
@@ -211,7 +213,7 @@ public class MultiValueGroupKeyGenerator implements GroupKeyGenerator {
    * @return
    */
   @Override
-  public int getMaxUniqueKeys() {
+  public int getNumGroupKeys() {
     return _uniqueGroupKeys.size();
   }
 

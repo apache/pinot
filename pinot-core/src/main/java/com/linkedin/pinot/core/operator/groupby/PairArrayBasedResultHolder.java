@@ -31,7 +31,7 @@ public class PairArrayBasedResultHolder implements ResultHolder<Pair> {
    *
    * @param resultHolderCapacity
    */
-  public PairArrayBasedResultHolder(DoubleLongArray resultArray, int resultHolderCapacity, double defaultValue) {
+  public PairArrayBasedResultHolder(DoubleLongResultArray resultArray, int resultHolderCapacity, double defaultValue) {
     _resultHolderCapacity = resultHolderCapacity;
     _defaultValue = defaultValue;
     _resultArray = resultArray;
@@ -42,7 +42,7 @@ public class PairArrayBasedResultHolder implements ResultHolder<Pair> {
    *
    * @param resultHolderCapacity
    */
-  public PairArrayBasedResultHolder(DoubleDoubleArray resultArray, int resultHolderCapacity, double defaultValue) {
+  public PairArrayBasedResultHolder(DoubleDoubleResultArray resultArray, int resultHolderCapacity, double defaultValue) {
     _resultHolderCapacity = resultHolderCapacity;
     _defaultValue = defaultValue;
     _resultArray = resultArray;

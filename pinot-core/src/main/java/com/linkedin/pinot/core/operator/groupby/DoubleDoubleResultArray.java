@@ -21,9 +21,11 @@ import com.linkedin.pinot.core.query.utils.Pair;
 import java.util.Arrays;
 
 
-public class DoubleDoubleArray implements ResultArray {
+public class DoubleDoubleResultArray implements ResultArray {
   private double[] _doubles1;
   private double[] _doubles2;
+
+  private double[] _defaultValues;
 
   /**
    * Constructor for the class.
@@ -31,9 +33,13 @@ public class DoubleDoubleArray implements ResultArray {
    * @param capacity
    * @param valuePair
    */
-  public DoubleDoubleArray(int capacity, Pair<Double, Double> valuePair) {
+  public DoubleDoubleResultArray(int capacity, Pair<Double, Double> valuePair) {
     _doubles1 = new double[capacity];
     _doubles2 = new double[capacity];
+
+    _defaultValues[0] = valuePair.getFirst();
+    _defaultValues[1] = valuePair.getSecond();
+
     setAll(valuePair);
   }
 
@@ -93,8 +99,8 @@ public class DoubleDoubleArray implements ResultArray {
 
   @Override
   public void expand(int newSize) {
-    _doubles1 = expandArray(_doubles1, newSize);
-    _doubles2 = expandArray(_doubles2, newSize);
+    _doubles1 = expandArray(_doubles1, newSize, _defaultValues[0]);
+    _doubles2 = expandArray(_doubles2, newSize, _defaultValues[1]);
 
   }
 
@@ -105,16 +111,17 @@ public class DoubleDoubleArray implements ResultArray {
    *
    * @param doubles
    */
-  private double[] expandArray(double[] doubles, int newSize) {
+  private double[] expandArray(double[] doubles, int newSize, double defaultValue) {
     Preconditions.checkArgument(newSize > doubles.length);
 
     double[] expanded = new double[newSize];
-    System.arraycopy(expanded, 0, doubles, 0, doubles.length);
+    System.arraycopy(doubles, 0, expanded, 0, doubles.length);
+    Arrays.fill(doubles, doubles.length, expanded.length, defaultValue);
     return expanded;
   }
 
   @Override
-  public void copy(int position, DoubleArray that, int start, int end) {
+  public void copy(int position, DoubleResultArray that, int start, int end) {
     throw new RuntimeException("Unsupported method copy from DoubleArray for class " + getClass().getName());
   }
 

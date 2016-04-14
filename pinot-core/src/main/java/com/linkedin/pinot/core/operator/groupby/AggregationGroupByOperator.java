@@ -172,26 +172,4 @@ public class AggregationGroupByOperator extends BaseOperator {
     _projectionOperator.close();
     return true;
   }
-
-
-  /**
-   * Returns true if fast aggregation (array based implementation of aggregation group by
-   * can be used:
-   * - Only 'sum', 'min' & 'max' aggregation functions are supported currently.
-   *
-   * @param brokerRequest
-   * @return
-   */
-  public static boolean isFitForAggregationFastAggregation(
-      BrokerRequest brokerRequest) {
-    for (AggregationInfo aggregationInfo : brokerRequest.getAggregationsInfo()) {
-      String aggregationType = aggregationInfo.getAggregationType();
-      if (!aggregationType.equalsIgnoreCase("sum") && !aggregationType.equalsIgnoreCase("min") &&
-          !aggregationType.equalsIgnoreCase("max") && !aggregationType.equalsIgnoreCase("avg")) {
-        return false;
-      }
-    }
-
-    return true;
-  }
 }

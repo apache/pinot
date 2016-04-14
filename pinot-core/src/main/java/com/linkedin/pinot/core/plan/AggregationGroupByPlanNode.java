@@ -15,25 +15,19 @@
  */
 package com.linkedin.pinot.core.plan;
 
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.MProjectionOperator;
 import com.linkedin.pinot.core.operator.groupby.AggregationGroupByOperator;
-import com.linkedin.pinot.core.operator.query.AggregationFunctionGroupByOperator;
-import com.linkedin.pinot.core.operator.query.MAggregationGroupByOperator;
-import com.linkedin.pinot.core.query.aggregation.AggregationFunctionUtils;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -90,4 +84,23 @@ public class AggregationGroupByPlanNode implements PlanNode {
     }
   }
 
+  /**
+   * Returns true AggregationGroupByPlanNode can serve the given BrokerRequest, false otherwise.
+   * - Only 'sum', 'min', 'max' & 'avg' aggregation functions are supported currently.
+   *   Returns false for other aggregation functions.
+   *
+   * @param brokerRequest
+   * @return
+   */
+  public static boolean isFitForAggregationFastAggregation(BrokerRequest brokerRequest) {
+    for (AggregationInfo aggregationInfo : brokerRequest.getAggregationsInfo()) {
+      String aggregationType = aggregationInfo.getAggregationType();
+      if (!aggregationType.equalsIgnoreCase("sum") && !aggregationType.equalsIgnoreCase("min") &&
+          !aggregationType.equalsIgnoreCase("max") && !aggregationType.equalsIgnoreCase("avg")) {
+        return false;
+      }
+    }
+
+    return true;
+  }
 }

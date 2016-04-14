@@ -41,22 +41,24 @@ import java.util.Set;
  * is within a threshold (1 million).
  */
 public class SingleValueGroupByExecutor implements GroupByExecutor {
-  private final ArrayList<AggregationFunctionContext> _aggrFuncContextList;
-  private final SingleValueGroupKeyGenerator _groupKeyGenerator;
+  private final IndexSegment _indexSegment;
+  private final List<AggregationInfo> _aggregationsInfoList;
+  private final GroupBy _groupBy;
+  private final int _maxNumGroupKeys;
+
+  private ArrayList<AggregationFunctionContext> _aggrFuncContextList;
+  private SingleValueGroupKeyGenerator _groupKeyGenerator;
 
   private String[] _groupByColumns;
   private int[] _docIdToGroupKey;
   private Map<String, int[]> _columnToDictArrayMap;
   private Map<String, double[]> _columnToValueArrayMap;
   private ResultHolder[] _resultHolderArray;
-  private boolean _init = false;
-  private boolean _finish = false;
+  private boolean _inited = false;
+  private boolean _finished = false;
 
   /**
-   * Constructor for the class. Initializes the following:
-   * - List of AggregationFunctionContexts for the given query.
-   * - Group by key generator.
-   * - Various re-usable arrays that store dictionaries/values/results.
+   * Constructor for the class.
    *
    * @param indexSegment
    * @param aggregationsInfoList
@@ -65,20 +67,40 @@ public class SingleValueGroupByExecutor implements GroupByExecutor {
    */
   public SingleValueGroupByExecutor(IndexSegment indexSegment, List<AggregationInfo> aggregationsInfoList,
       GroupBy groupBy, int maxNumGroupKeys) {
-
     Preconditions.checkNotNull(indexSegment);
     Preconditions.checkArgument((aggregationsInfoList != null) && (aggregationsInfoList.size() > 0));
     Preconditions.checkNotNull(groupBy);
     Preconditions.checkArgument(maxNumGroupKeys > 0);
 
-    List<String> groupByColumns = groupBy.getColumns();
+    _indexSegment = indexSegment;
+    _aggregationsInfoList = aggregationsInfoList;
+    _groupBy = groupBy;
+    _maxNumGroupKeys = maxNumGroupKeys;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * Initializes the following:
+   * - List of AggregationFunctionContexts for the given query.
+   * - Group by key generator.
+   * - Various re-usable arrays that store dictionaries/values/results.
+   */
+  @Override
+  public void init() {
+    // Returned if already initialized.
+    if (_inited) {
+      return;
+    }
+
+    List<String> groupByColumns = _groupBy.getColumns();
     _groupByColumns = groupByColumns.toArray(new String[groupByColumns.size()]);
 
-    _aggrFuncContextList = new ArrayList<AggregationFunctionContext>(aggregationsInfoList.size());
+    _aggrFuncContextList = new ArrayList<AggregationFunctionContext>(_aggregationsInfoList.size());
     _columnToDictArrayMap = new HashMap<String, int[]>();
     _columnToValueArrayMap = new HashMap<String, double[]>();
 
-    for (AggregationInfo aggregationInfo : aggregationsInfoList) {
+    for (AggregationInfo aggregationInfo : _aggregationsInfoList) {
       String[] columns = aggregationInfo.getAggregationParams().get("column").trim().split(",");
 
       for (String column : columns) {
@@ -89,31 +111,22 @@ public class SingleValueGroupByExecutor implements GroupByExecutor {
       }
 
       AggregationFunctionContext aggregationFunctionContext =
-          new AggregationFunctionContext(indexSegment, aggregationInfo.getAggregationType(), columns);
+          new AggregationFunctionContext(_indexSegment, aggregationInfo.getAggregationType(), columns);
       _aggrFuncContextList.add(aggregationFunctionContext);
     }
 
-    int resultHolderSize = Math.min(maxNumGroupKeys, ResultHolderFactory.MAX_NUM_GROUP_KEYS_FOR_ARRAY_BASED);
-    _groupKeyGenerator = new SingleValueGroupKeyGenerator(indexSegment, _groupByColumns, resultHolderSize);
+    _groupKeyGenerator = new SingleValueGroupKeyGenerator(_indexSegment, _groupByColumns, _maxNumGroupKeys);
     _resultHolderArray = new ResultHolder[_aggrFuncContextList.size()];
 
     for (int i = 0; i < _aggrFuncContextList.size(); i++) {
       AggregationFunctionContext aggregationFunctionContext = _aggrFuncContextList.get(i);
-      String functionName = aggregationFunctionContext.getFunctionName();
+      AggregationFunction aggregationFunction = aggregationFunctionContext.getAggregationFunction();
 
-      double defaultValue = aggregationFunctionContext.getAggregationFunction().getDefaultValue();
-      _resultHolderArray[i] = ResultHolderFactory.getResultHolder(functionName, maxNumGroupKeys, defaultValue);
+      _resultHolderArray[i] = ResultHolderFactory.getResultHolder(aggregationFunction, _maxNumGroupKeys);
     }
 
     _docIdToGroupKey = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-  }
-
-  /**
-   * {@inheritDoc}
-   */
-  @Override
-  public void init() {
-    _init = true;
+    _inited = true;
   }
 
   /**
@@ -125,11 +138,11 @@ public class SingleValueGroupByExecutor implements GroupByExecutor {
    */
   @Override
   public void process(int[] docIdSet, int startIndex, int length) {
-    Preconditions.checkState(_init, "process cannot be called before init.");
+    Preconditions.checkState(_inited, "process cannot be called before init.");
     Preconditions.checkArgument(length <= _docIdToGroupKey.length);
 
     _groupKeyGenerator.generateKeysForDocIdSet(docIdSet, startIndex, length, _docIdToGroupKey);
-    int maxUniqueKeys = _groupKeyGenerator.getMaxUniqueKeys();
+    int numGroupKeys = _groupKeyGenerator.getNumGroupKeys();
 
     fetchColumnValues(docIdSet, startIndex, length);
 
@@ -137,7 +150,7 @@ public class SingleValueGroupByExecutor implements GroupByExecutor {
       AggregationFunctionContext aggrFuncContext = _aggrFuncContextList.get(i);
 
       String[] aggrColumns = aggrFuncContext.getAggregationColumns();
-      _resultHolderArray[i].ensureCapacity(maxUniqueKeys);
+      _resultHolderArray[i].ensureCapacity(numGroupKeys);
 
       for (int j = 0; j < aggrColumns.length; j++) {
         String aggrColumn = aggrColumns[j];
@@ -152,7 +165,7 @@ public class SingleValueGroupByExecutor implements GroupByExecutor {
    */
   @Override
   public void finish() {
-    _finish = true;
+    _finished = true;
   }
 
   /**
@@ -163,7 +176,7 @@ public class SingleValueGroupByExecutor implements GroupByExecutor {
    */
   @Override
   public List<Map<String, Serializable>> getResult() {
-    Preconditions.checkState(_finish, "GetResult cannot be called before finish.");
+    Preconditions.checkState(_finished, "GetResult cannot be called before finish.");
     List<Map<String, Serializable>> result = new ArrayList<Map<String, Serializable>>(_aggrFuncContextList.size());
 
     for (int i = 0; i < _aggrFuncContextList.size(); i++) {

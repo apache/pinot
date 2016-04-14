@@ -25,6 +25,7 @@ import java.util.List;
  * Class to implement the 'min' aggregation function.
  */
 public class MinAggregationFunction implements AggregationFunction {
+  private static final String FUNCTION_NAME = "min";
   private static final double DEFAULT_VALUE = Double.POSITIVE_INFINITY;
   private static final ResultDataType _resultDataType = ResultDataType.DOUBLE;
 
@@ -125,5 +126,14 @@ public class MinAggregationFunction implements AggregationFunction {
   @Override
   public ResultDataType getResultDataType() {
     return _resultDataType;
+  }
+
+  /**
+   * {@inheritDoc}
+   * @return
+   */
+  @Override
+  public String getName() {
+    return FUNCTION_NAME;
   }
 }

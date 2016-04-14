@@ -15,11 +15,13 @@
  */
 package com.linkedin.pinot.core.operator.groupby;
 
+import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunction;
 import com.linkedin.pinot.core.query.utils.Pair;
 
 
 public class ResultHolderFactory {
   public static final int MAX_NUM_GROUP_KEYS_FOR_ARRAY_BASED = 1000000;
+  public static final int INITIAL_RESULT_HOLDER_CAPACITY = 10000;
 
   /**
    * Creates and returns the appropriate implementation of ResultHolder,
@@ -31,19 +33,24 @@ public class ResultHolderFactory {
    * @param maxNumResults
    * @return
    */
-  public static ResultHolder getResultHolder(String functionName, long maxNumResults, double defaultValue) {
+  public static ResultHolder getResultHolder(AggregationFunction function, long maxNumResults) {
+    String functionName = function.getName();
+    double defaultValue = function.getDefaultValue();
 
     if (maxNumResults <= MAX_NUM_GROUP_KEYS_FOR_ARRAY_BASED) {
+      int initialCapacity = (int) Math.min(maxNumResults, INITIAL_RESULT_HOLDER_CAPACITY);
+
       switch (functionName.toLowerCase()) {
         case "sum":
         case "min":
         case "max":
-          DoubleArray doubleArray = new DoubleArray((int) maxNumResults, defaultValue);
-          return new DoubleArrayBasedResultHolder(doubleArray, (int) maxNumResults, defaultValue);
+          DoubleResultArray doubleResultArray = new DoubleResultArray(initialCapacity, defaultValue);
+          return new DoubleArrayBasedResultHolder(doubleResultArray, initialCapacity, (int) maxNumResults, defaultValue);
 
         case "avg":
-          DoubleLongArray doubleLongArray = new DoubleLongArray((int) maxNumResults, new Pair<Double, Long>(0.0, 0L));
-          return new PairArrayBasedResultHolder(doubleLongArray, (int) maxNumResults, defaultValue);
+          DoubleLongResultArray
+              doubleLongResultArray = new DoubleLongResultArray(initialCapacity, new Pair<Double, Long>(0.0, 0L));
+          return new PairArrayBasedResultHolder(doubleLongResultArray, initialCapacity, defaultValue);
 
         default:
           throw new RuntimeException("Aggregation function not implemented in ResultHolder: " + functionName);

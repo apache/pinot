@@ -25,6 +25,7 @@ import java.util.List;
  * Class to perform the 'sum' aggregation function.
  */
 public class SumAggregationFunction implements AggregationFunction {
+  private static final String FUNCTION_NAME = "sum";
   private static final double DEFAULT_VALUE = 0.0;
   private static final ResultDataType _resultDataType = ResultDataType.DOUBLE;
 
@@ -110,6 +111,15 @@ public class SumAggregationFunction implements AggregationFunction {
   @Override
   public ResultDataType getResultDataType() {
     return _resultDataType;
+  }
+
+  /**
+   * {@inheritDoc}
+   * @return
+   */
+  @Override
+  public String getName() {
+    return FUNCTION_NAME;
   }
 
   /**

@@ -54,5 +54,5 @@ public interface GroupKeyGenerator {
    * Return the maximum number of unique group keys.
    * @return
    */
-  int getMaxUniqueKeys();
+  int getNumGroupKeys();
 }

@@ -25,6 +25,7 @@ import java.util.List;
  * Aggregation function to perform the 'max' operation.
  */
 public class MaxAggregationFunction implements AggregationFunction {
+  private static final String FUNCTION_NAME = "max";
   private static final double DEFAULT_VALUE = Double.NEGATIVE_INFINITY;
   private static final ResultDataType _resultDataType = ResultDataType.DOUBLE;
 
@@ -127,5 +128,14 @@ public class MaxAggregationFunction implements AggregationFunction {
   @Override
   public ResultDataType getResultDataType() {
     return _resultDataType;
+  }
+
+  /**
+   * {@inheritDoc}
+   * @return
+   */
+  @Override
+  public String getName() {
+    return FUNCTION_NAME;
   }
 }

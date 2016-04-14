@@ -39,6 +39,7 @@ import java.util.Map;
  *
  */
 public class SingleValueGroupKeyGenerator implements GroupKeyGenerator {
+  private static final int INVALID_ID = -1;
 
   public enum STORAGE_TYPE {
     ARRAY_BASED,
@@ -46,7 +47,6 @@ public class SingleValueGroupKeyGenerator implements GroupKeyGenerator {
   }
 
   private final String[] _groupByColumns;
-  private int _groupByCapacity;
 
   private final BlockSingleValIterator[] _singleValIterators;
   private final Dictionary[] _dictionaries;
@@ -64,7 +64,6 @@ public class SingleValueGroupKeyGenerator implements GroupKeyGenerator {
   private boolean[] _uniqueGroupKeysFlag;
 
   // For MAP_BASED storage type.
-  private int[] _idToGroupKey;
   private Long2IntOpenHashMap _groupKeyToId;
 
   /**
@@ -72,39 +71,36 @@ public class SingleValueGroupKeyGenerator implements GroupKeyGenerator {
    *
    * @param indexSegment
    * @param groupByColumns
+   * @param maxNumGroupKeys
    */
-  SingleValueGroupKeyGenerator(IndexSegment indexSegment, String[] groupByColumns, int groupByCapacity) {
+  SingleValueGroupKeyGenerator(IndexSegment indexSegment, String[] groupByColumns, int maxNumGroupKeys) {
     _groupByColumns = groupByColumns;
-    _groupByCapacity = groupByCapacity;
 
     _singleValIterators = new BlockSingleValIterator[groupByColumns.length];
     _dictionaries = new Dictionary[groupByColumns.length];
     _cardinalities = new int[groupByColumns.length];
-
     _isSingleValueArray = new boolean[groupByColumns.length];
 
-    int maxCardinalityProduct = 1;
     for (int i = 0; i < groupByColumns.length; i++) {
       DataSource dataSource = indexSegment.getDataSource(_groupByColumns[i]);
       _singleValIterators[i] = (BlockSingleValIterator) dataSource.nextBlock().getBlockValueSet().iterator();
-      _dictionaries[i] = dataSource.getDictionary();
 
+      _dictionaries[i] = dataSource.getDictionary();
       _cardinalities[i] = dataSource.getDataSourceMetadata().cardinality();
-      maxCardinalityProduct = maxCardinalityProduct * _cardinalities[i];
       _isSingleValueArray[i] = (dataSource.getDataSourceMetadata().isSingleValue()) ? true : false;
     }
 
     _numUniqueGroupKeys = 0;
-    if (maxCardinalityProduct <= groupByCapacity) {
+    if (maxNumGroupKeys <= ResultHolderFactory.INITIAL_RESULT_HOLDER_CAPACITY) {
       _storageType = STORAGE_TYPE.ARRAY_BASED;
+      _uniqueGroupKeysFlag = new boolean[maxNumGroupKeys];
     } else {
       _storageType = STORAGE_TYPE.MAP_BASED;
       _groupKeyToId = new Long2IntOpenHashMap();
+      _groupKeyToId.defaultReturnValue(INVALID_ID);
     }
 
     _reusableGroupByValuesArray = new int[groupByColumns.length];
-    _uniqueGroupKeysFlag = new boolean[groupByCapacity];
-    _idToGroupKey = new int[groupByCapacity];
   }
 
   /**
@@ -170,7 +166,8 @@ public class SingleValueGroupKeyGenerator implements GroupKeyGenerator {
    */
   @Override
   public void generateKeysForDocIdSet(int[] docIdSet, int startIndex, int length, int[] docIdToGroupKey) {
-    for (int i = startIndex; i < length; ++i) {
+    int endIndex = startIndex + length - 1;
+    for (int i = startIndex; i <= endIndex; ++i) {
       int docId = docIdSet[i];
       docIdToGroupKey[i] = generateKeyForDocId(docId);
     }
@@ -224,18 +221,8 @@ public class SingleValueGroupKeyGenerator implements GroupKeyGenerator {
    * @return
    */
   @Override
-  public int getMaxUniqueKeys() {
-    return Math.max(_numUniqueGroupKeys, _groupByCapacity);
-  }
-
-  /**
-   * Expand the _idToGroupKey storage by 2x.
-   */
-  private void expandGroupKeyStorage() {
-    int[] tmp = _idToGroupKey;
-    _idToGroupKey = new int[tmp.length * 2];
-    _groupByCapacity = _idToGroupKey.length;
-    System.arraycopy(tmp, 0, _idToGroupKey, 0, tmp.length);
+  public int getNumGroupKeys() {
+    return _numUniqueGroupKeys;
   }
 
   /**
@@ -259,14 +246,10 @@ public class SingleValueGroupKeyGenerator implements GroupKeyGenerator {
       groupKey = rawKey;
 
     } else {
-      // If we have seen more group keys than the storage capacity, expand the storage.
-      if (_numUniqueGroupKeys >= _groupByCapacity) {
-        expandGroupKeyStorage();
-      }
 
-      if (!_groupKeyToId.containsKey(rawKey)) {
+      groupKey = _groupKeyToId.get(rawKey);
+      if (groupKey == INVALID_ID) {
         groupKey = _groupKeyToId.size();
-        _idToGroupKey[groupKey] = rawKey;
         _groupKeyToId.put(rawKey, groupKey);
         _numUniqueGroupKeys++;
       } else {

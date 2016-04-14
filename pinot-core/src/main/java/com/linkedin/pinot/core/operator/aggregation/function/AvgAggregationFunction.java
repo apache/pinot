@@ -26,6 +26,7 @@ import java.util.List;
  * Class to implement the 'avg' aggregation function.
  */
 public class AvgAggregationFunction implements AggregationFunction {
+  private static final String FUNCTION_NAME = "avg";
   private static final double DEFAULT_VALUE = 0.0;
   private static final AggregationFunction.ResultDataType RESULT_DATA_TYPE = ResultDataType.AVERAGE_PAIR;
 
@@ -123,6 +124,11 @@ public class AvgAggregationFunction implements AggregationFunction {
   @Override
   public AggregationFunction.ResultDataType getResultDataType() {
     return RESULT_DATA_TYPE;
+  }
+
+  @Override
+  public String getName() {
+    return FUNCTION_NAME;
   }
 
   /**

@@ -19,17 +19,20 @@ package com.linkedin.pinot.core.operator.groupby;
  * Result Holder implemented using DoubleArray.
  */
 public class DoubleArrayBasedResultHolder implements ResultHolder {
-  private ResultArray _resultArray;
+  private DoubleResultArray _resultArray;
   private int _resultHolderCapacity;
+  private int _maxGroupKeys;
   private double _defaultValue;
 
   /**
    * Constructor for the class.
    *
-   * @param resultHolderCapacity
+   * @param initialCapacity
    */
-  public DoubleArrayBasedResultHolder(DoubleArray resultArray, int resultHolderCapacity, double defaultValue) {
-    _resultHolderCapacity = resultHolderCapacity;
+  public DoubleArrayBasedResultHolder(DoubleResultArray resultArray, int initialCapacity, int maxGroupKeys,
+      double defaultValue) {
+    _resultHolderCapacity = initialCapacity;
+    _maxGroupKeys = maxGroupKeys;
     _defaultValue = defaultValue;
     _resultArray = resultArray;
   }
@@ -43,6 +46,9 @@ public class DoubleArrayBasedResultHolder implements ResultHolder {
   public void ensureCapacity(int maxUniqueKeys) {
     if (maxUniqueKeys > _resultHolderCapacity) {
       _resultHolderCapacity = Math.max(_resultHolderCapacity * 2, maxUniqueKeys);
+
+      // Cap the growth to maximum possible number of group keys
+      _resultHolderCapacity = Math.min(_resultHolderCapacity, _maxGroupKeys);
       _resultArray.expand(_resultHolderCapacity);
     }
   }

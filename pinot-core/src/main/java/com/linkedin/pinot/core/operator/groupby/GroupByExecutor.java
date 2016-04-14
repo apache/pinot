@@ -46,8 +46,8 @@ public interface GroupByExecutor {
   void finish();
 
   /**
-   * Returns the result of group-by aggregation, assumes that 'process' has
-   * already been called.
+   * Returns the result of group-by aggregation, ensures that 'finish' has been
+   * called before calling getResult().
    *
    * @return
    */

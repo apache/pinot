@@ -59,9 +59,11 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
         PlanNode aggregationGroupByPlanNode;
         if (indexSegment instanceof IndexSegmentImpl) {
 
-          // New (and fast) implementation of aggregation group by operator is currently turned OFF.
+          // AggregationGroupByPlanNode is the new implementation of group-by aggregations, and is currently turned OFF.
+          // Once all feature and perf testing is performed, the code will be turned ON, and this 'if' check will
+          // be removed.
           boolean useAggregationGroupByPlanNode = false;
-          if (useAggregationGroupByPlanNode) {
+          if (useAggregationGroupByPlanNode && AggregationGroupByPlanNode.isFitForAggregationFastAggregation(brokerRequest)) {
             aggregationGroupByPlanNode = new AggregationGroupByPlanNode(indexSegment, brokerRequest,
                 AggregationGroupByImplementationType.Dictionary);
           } else {

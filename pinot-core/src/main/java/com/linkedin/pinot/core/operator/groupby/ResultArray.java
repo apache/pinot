@@ -89,7 +89,7 @@ public interface ResultArray {
    * @param start
    * @param end
    */
-  void copy(int position, DoubleArray that, int start, int end);
+  void copy(int position, DoubleResultArray that, int start, int end);
 
   /**
    * Copies the array of ResultType into the current object.

@@ -85,4 +85,10 @@ public interface AggregationFunction {
    * @return
    */
   ResultDataType getResultDataType();
+
+  /**
+   * Returns the name of the aggregation function.
+   * @return
+   */
+  String getName();
 }

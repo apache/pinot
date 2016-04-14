@@ -24,13 +24,20 @@ import java.util.Arrays;
 /**
  * ResultArray implementation using Pair of Double and Long.
  */
-public class DoubleLongArray implements ResultArray {
+public class DoubleLongResultArray implements ResultArray {
   private double[] _doubles;
   private long[] _longs;
 
-  public DoubleLongArray(int capacity, Pair<Double, Long> valuePair) {
+  private double _doubleDefault;
+  private long _longDefault;
+
+  public DoubleLongResultArray(int capacity, Pair<Double, Long> valuePair) {
     _doubles = new double[capacity];
     _longs = new long[capacity];
+
+    _doubleDefault = valuePair.getFirst();
+    _longDefault = valuePair.getSecond();
+
     setAll(valuePair);
   }
 
@@ -100,18 +107,18 @@ public class DoubleLongArray implements ResultArray {
     Preconditions.checkArgument(newSize > _doubles.length);
 
     double[] tmp = _doubles;
-    int newLength = 2 * tmp.length;
-
-    _doubles = new double[newLength];
-    System.arraycopy(_doubles, 0, tmp, 0, tmp.length);
+    _doubles = new double[newSize];
+    System.arraycopy(tmp, 0, _doubles, 0, tmp.length);
+    Arrays.fill(_doubles, tmp.length, _doubles.length, _doubleDefault);
 
     long[] tmp1 = _longs;
     _longs = new long[newSize];
-    System.arraycopy(_longs, 0, tmp1, 0, tmp1.length);
+    System.arraycopy(tmp1, 0, _longs, 0, tmp1.length);
+    Arrays.fill(_longs, tmp1.length, _longs.length, _longDefault);
   }
 
   @Override
-  public void copy(int position, DoubleArray that, int start, int end) {
+  public void copy(int position, DoubleResultArray that, int start, int end) {
     throw new RuntimeException("Unsupported method 'copy' from DoubleArray for class " + getClass().getName());
   }
 
