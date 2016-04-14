@@ -191,6 +191,7 @@ public class CommonConstants {
     public static final String DEFAULT_SEGMENT_LOAD_MAX_RETRY_COUNT = "5";
     public static final String DEFAULT_SEGMENT_LOAD_MIN_RETRY_DELAY_MILLIS = "60000";
     public static final String DEFAULT_HELIX_FLAPPING_TIMEWINDOW_MS = "0";
+    public static final String PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY = "pinot.server.segment.fetcher";
   }
 
   public static class Metric {
