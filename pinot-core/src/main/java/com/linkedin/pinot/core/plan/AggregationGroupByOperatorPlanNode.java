@@ -54,6 +54,7 @@ public class AggregationGroupByOperatorPlanNode implements PlanNode {
         getAggregationGroupByRelatedColumns(), new DocIdSetPlanNode(_indexSegment, _brokerRequest));
     for (int i = 0; i < _brokerRequest.getAggregationsInfo().size(); ++i) {
       AggregationInfo aggregationInfo = _brokerRequest.getAggregationsInfo().get(i);
+      AggregationFunctionUtils.ensureAggregationColumnsAreSingleValued(aggregationInfo, _indexSegment);
       boolean hasDictionary = AggregationFunctionUtils
           .isAggregationFunctionWithDictionary(aggregationInfo, _indexSegment);
       _aggregationFunctionGroupByPlanNodes

@@ -58,4 +58,15 @@ public class AggregationFunctionUtils {
     }
     return hasDictionary;
   }
+
+  public static void ensureAggregationColumnsAreSingleValued(AggregationInfo aggregationInfo, IndexSegment indexSegment) {
+    if (!aggregationInfo.getAggregationType().equalsIgnoreCase("count")) {
+      String[] columns = aggregationInfo.getAggregationParams().get("column").trim().split(",");
+      for (String column : columns) {
+        if (!indexSegment.getDataSource(column).getDataSourceMetadata().isSingleValue()) {
+          throw new RuntimeException("Unsupported aggregation on multi value column: " + column);
+        }
+      }
+    }
+  }
 }

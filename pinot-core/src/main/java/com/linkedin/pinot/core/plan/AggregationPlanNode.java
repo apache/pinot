@@ -52,6 +52,7 @@ public class AggregationPlanNode implements PlanNode {
         new DocIdSetPlanNode(_indexSegment, _brokerRequest));
     for (int i = 0; i < _brokerRequest.getAggregationsInfo().size(); ++i) {
       AggregationInfo aggregationInfo = _brokerRequest.getAggregationsInfo().get(i);
+      AggregationFunctionUtils.ensureAggregationColumnsAreSingleValued(aggregationInfo, _indexSegment);
       boolean hasDictionary = AggregationFunctionUtils.isAggregationFunctionWithDictionary(aggregationInfo, _indexSegment);
       _aggregationFunctionPlanNodes.add(new AggregationFunctionPlanNode(aggregationInfo, _projectionPlanNode, hasDictionary));
     }
