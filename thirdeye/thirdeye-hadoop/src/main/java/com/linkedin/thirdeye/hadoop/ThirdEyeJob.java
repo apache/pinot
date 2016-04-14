@@ -21,6 +21,8 @@ import com.linkedin.thirdeye.hadoop.push.SegmentPushPhase;
 import com.linkedin.thirdeye.hadoop.push.SegmentPushPhaseConstants;
 import com.linkedin.thirdeye.hadoop.segment.create.SegmentCreationPhaseConstants;
 import com.linkedin.thirdeye.hadoop.segment.create.SegmentCreationPhaseJob;
+import com.linkedin.thirdeye.hadoop.topk.TopKPhaseConstants;
+import com.linkedin.thirdeye.hadoop.topk.TopKPhaseJob;
 
 /**
  * Wrapper to manage segment create and segment push jobs for thirdeye
@@ -46,6 +48,40 @@ public class ThirdEyeJob {
 
   private enum PhaseSpec {
 
+    TOPK {
+      @Override
+      Class<?> getKlazz() {
+        return TopKPhaseJob.class;
+      }
+
+      @Override
+      String getDescription() {
+        return "Topk";
+      }
+
+      @Override
+      Properties getJobProperties(Properties inputConfig, String root, String collection,
+          DateTime minTime, DateTime maxTime, String inputPaths)
+              throws Exception {
+        Properties config = new Properties();
+
+        config.setProperty(TopKPhaseConstants.TOPK_ROLLUP_PHASE_SCHEMA_PATH.toString(),
+            getSchemaPath(root, collection));
+
+        config.setProperty(TopKPhaseConstants.TOPK_ROLLUP_PHASE_CONFIG_PATH.toString(),
+            getConfigPath(root, collection));
+
+        config.setProperty(TopKPhaseConstants.TOPK_ROLLUP_PHASE_INPUT_PATH.toString(),
+            inputPaths);
+
+        config.setProperty(TopKPhaseConstants.TOPK_ROLLUP_PHASE_OUTPUT_PATH.toString(),
+            getIndexDir(root, collection, minTime, maxTime) + File.separator
+                + TOPK.getName());
+
+
+        return config;
+      }
+    },
     SEGMENT_CREATION {
       @Override
       Class<?> getKlazz() {

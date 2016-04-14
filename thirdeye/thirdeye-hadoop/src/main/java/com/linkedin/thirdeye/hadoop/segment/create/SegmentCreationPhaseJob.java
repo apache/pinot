@@ -22,7 +22,7 @@ import static com.linkedin.thirdeye.hadoop.segment.create.SegmentCreationPhaseCo
 import static com.linkedin.thirdeye.hadoop.segment.create.SegmentCreationPhaseConstants.SEGMENT_CREATION_SCHEDULE;
 import static com.linkedin.thirdeye.hadoop.segment.create.SegmentCreationPhaseConstants.SEGMENT_CREATION_SCHEMA_PATH;
 import static com.linkedin.thirdeye.hadoop.segment.create.SegmentCreationPhaseConstants.SEGMENT_CREATION_SEGMENT_TABLE_NAME;
-import static com.linkedin.thirdeye.hadoop.segment.create.SegmentCreationPhaseConstants.SEGMENT_CREATION_STARTREE_CONFIG;
+import static com.linkedin.thirdeye.hadoop.segment.create.SegmentCreationPhaseConstants.SEGMENT_CREATION_THIRDEYE_CONFIG;
 import static com.linkedin.thirdeye.hadoop.segment.create.SegmentCreationPhaseConstants.SEGMENT_CREATION_WALLCLOCK_END_TIME;
 import static com.linkedin.thirdeye.hadoop.segment.create.SegmentCreationPhaseConstants.SEGMENT_CREATION_WALLCLOCK_START_TIME;
 
@@ -51,7 +51,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.thirdeye.api.StarTreeConfig;
+import com.linkedin.thirdeye.hadoop.ThirdEyeConfig;
 import com.linkedin.thirdeye.hadoop.util.ThirdeyePinotSchemaUtils;
 
 
@@ -88,7 +88,7 @@ public class SegmentCreationPhaseJob extends Configured {
     LOGGER.info("Schema path : {}", schemaPath);
     String configPath = getAndSetConfiguration(configuration, SEGMENT_CREATION_CONFIG_PATH);
     LOGGER.info("Config path : {}", configPath);
-    StarTreeConfig starTreeConfig = StarTreeConfig.decode(fs.open(new Path(configPath)));
+    ThirdEyeConfig thirdeyeConfig = ThirdEyeConfig.decode(fs.open(new Path(configPath)));
     Schema dataSchema = ThirdeyePinotSchemaUtils.createSchema(configPath);
     LOGGER.info("Data schema : {}", dataSchema);
     String inputSegmentDir = getAndSetConfiguration(configuration, SEGMENT_CREATION_INPUT_PATH);
@@ -161,7 +161,7 @@ public class SegmentCreationPhaseJob extends Configured {
 
     job.getConfiguration().setInt(JobContext.NUM_MAPS, inputDataFiles.size());
     job.getConfiguration().set(SEGMENT_CREATION_DATA_SCHEMA.toString(), OBJECT_MAPPER.writeValueAsString(dataSchema));
-    job.getConfiguration().set(SEGMENT_CREATION_STARTREE_CONFIG.toString(), OBJECT_MAPPER.writeValueAsString(starTreeConfig));
+    job.getConfiguration().set(SEGMENT_CREATION_THIRDEYE_CONFIG.toString(), OBJECT_MAPPER.writeValueAsString(thirdeyeConfig));
 
     job.setMaxReduceAttempts(1);
     job.setMaxMapAttempts(0);
