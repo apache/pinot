@@ -32,10 +32,9 @@ import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadataLoader;
 import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.FileUploadUtils;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-
+import com.linkedin.pinot.server.segment.fetcher.SegmentFetcherFactory;
 
 public class SegmentFetcherAndLoader {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentFetcherAndLoader.class);
@@ -74,6 +73,8 @@ public class SegmentFetcherAndLoader {
       // Keep the default value
     }
     _segmentLoadMinRetryDelayMs = minRetryDelayMillis;
+
+    SegmentFetcherFactory.initSegmentFetcherFactory(pinotHelixProperties);
   }
 
   public void addOrReplaceOfflineSegment(String tableName, String segmentId, boolean retryOnFailure) {
@@ -130,7 +131,7 @@ public class SegmentFetcherAndLoader {
       // that we have is different from that in zookeeper.
       if (isNewSegmentMetadata(localSegmentMetadata, segmentMetadataForCheck, segmentId, tableName)) {
         if (localSegmentMetadata == null) {
-          LOGGER .info("Loading new segment {} of table {} from controller", segmentId, tableName);
+          LOGGER.info("Loading new segment {} of table {} from controller", segmentId, tableName);
         } else {
           LOGGER.info("Trying to refresh segment {} of table {} with new data.", segmentId, tableName);
         }
@@ -158,7 +159,7 @@ public class SegmentFetcherAndLoader {
                 + (retryCount + 1) + " of " + maxRetryCount, e);
 
             // Do we need to wait for the next retry attempt?
-            if (retryCount < maxRetryCount-1) {
+            if (retryCount < maxRetryCount - 1) {
               // Exponentially back off, wait for (minDuration + attemptDurationMillis) *
               // 1.0..(2^retryCount)+1.0
               double maxRetryDurationMultiplier = Math.pow(2.0, (retryCount + 1));
@@ -215,48 +216,38 @@ public class SegmentFetcherAndLoader {
       throws Exception {
     File tempSegmentFile = null;
     File tempFile = null;
-    if (uri.startsWith("hdfs:")) {
-      throw new UnsupportedOperationException("Not implemented yet");
-    } else {
-      try {
-        tempSegmentFile = new File(_dataManager.getSegmentFileDirectory() + "/"
-            + tableName + "/temp_" + segmentId + "_" + System.currentTimeMillis());
-        if (uri.startsWith("http:") || uri.startsWith("https:")) {
-          tempFile = new File(_dataManager.getSegmentFileDirectory(), segmentId + ".tar.gz");
-          final long httpGetResponseContentLength = FileUploadUtils.getFile(uri, tempFile);
-          LOGGER.info("Downloaded file from " + uri + " to " + tempFile
-              + "; Http GET response content length: " + httpGetResponseContentLength
-              + ", Length of downloaded file : " + tempFile.length() + " for segment " + segmentId + " of table "
-              + tableName);
-          LOGGER.info("Trying to uncompress segment tar file from " + tempFile + " to "
-              + tempSegmentFile + " for table " + tableName);
-          TarGzCompressionUtils.unTar(tempFile, tempSegmentFile);
-          FileUtils.deleteQuietly(tempFile);
-        } else {
-          TarGzCompressionUtils.unTar(new File(uri), tempSegmentFile);
-        }
-        final File segmentDir = new File(new File(_dataManager.getSegmentDataDirectory(), tableName), segmentId);
-        Thread.sleep(1000);
-        if (segmentDir.exists()) {
-          LOGGER.info("Deleting the directory {} and recreating it again table {} ", segmentDir.getAbsolutePath(), tableName);
-          FileUtils.deleteDirectory(segmentDir);
-        }
-        LOGGER.info("Move the dir - " + tempSegmentFile.listFiles()[0] + " to "
-            + segmentDir.getAbsolutePath() + " for " + segmentId + " of table " + tableName);
-        FileUtils.moveDirectory(tempSegmentFile.listFiles()[0], segmentDir);
-        FileUtils.deleteDirectory(tempSegmentFile);
-        Thread.sleep(1000);
-        LOGGER.info("Was able to succesfully rename the dir to match the segment {} for table {}", segmentId, tableName);
+    try {
+      tempSegmentFile = new File(_dataManager.getSegmentFileDirectory() + "/"
+          + tableName + "/temp_" + segmentId + "_" + System.currentTimeMillis());
+      tempFile = new File(_dataManager.getSegmentFileDirectory(), segmentId + ".tar.gz");
+      SegmentFetcherFactory.getSegmentFetcherBasedOnURI(uri).fetchSegmentToLocal(uri, tempFile);
+      LOGGER.info("Downloaded file from {} to {}; Length of downloaded file: {}; segmentName: {}; table: {}", uri, tempFile,
+          tempFile.length(), segmentId, tableName);
+      LOGGER.info("Trying to uncompress segment tar file from {} to {} for table {}", tempFile, tempSegmentFile, tableName);
 
-        new File(segmentDir, "finishedLoading").createNewFile();
-        return segmentDir.getAbsolutePath();
-      } catch (Exception e) {
-        FileUtils.deleteQuietly(tempSegmentFile);
-        FileUtils.deleteQuietly(tempFile);
-        LOGGER.error("Caught exception downloading segment {} for table {}", segmentId, tableName, e);
-        Utils.rethrowException(e);
-        throw new AssertionError("Should not reach this");
+      TarGzCompressionUtils.unTar(tempFile, tempSegmentFile);
+      FileUtils.deleteQuietly(tempFile);
+      final File segmentDir = new File(new File(_dataManager.getSegmentDataDirectory(), tableName), segmentId);
+      Thread.sleep(1000);
+      if (segmentDir.exists()) {
+        LOGGER.info("Deleting the directory {} and recreating it again table {} ", segmentDir.getAbsolutePath(), tableName);
+        FileUtils.deleteDirectory(segmentDir);
       }
+      LOGGER.info("Move the dir - " + tempSegmentFile.listFiles()[0] + " to "
+          + segmentDir.getAbsolutePath() + " for " + segmentId + " of table " + tableName);
+      FileUtils.moveDirectory(tempSegmentFile.listFiles()[0], segmentDir);
+      FileUtils.deleteDirectory(tempSegmentFile);
+      Thread.sleep(1000);
+      LOGGER.info("Was able to succesfully rename the dir to match the segment {} for table {}", segmentId, tableName);
+
+      new File(segmentDir, "finishedLoading").createNewFile();
+      return segmentDir.getAbsolutePath();
+    } catch (Exception e) {
+      FileUtils.deleteQuietly(tempSegmentFile);
+      FileUtils.deleteQuietly(tempFile);
+      LOGGER.error("Caught exception downloading segment {} for table {}", segmentId, tableName, e);
+      Utils.rethrowException(e);
+      throw new AssertionError("Should not reach this");
     }
   }
 
