@@ -41,7 +41,7 @@ public class VerifySegmentState extends AbstractBaseCommand implements Command {
   @Option(name = "-clusterName", required = true, metaVar = "<String>", usage = "Helix cluster name")
   String clusterName;
 
-  @Option(name = "-tablePrefix", required = false, metaVar = "<String>", usage = "Table prefix")
+  @Option(name = "-tablePrefix", required = false, metaVar = "<String>", usage = "Table name prefix. (Ex: myTable, my or myTable_OFFLINE)")
   String tablePrefix = "";
 
   @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
