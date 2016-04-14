@@ -351,7 +351,6 @@ public class TopKPhaseJob extends Configured {
         }
       }
       if (!isPassThreshold) {
-        LOGGER.info("No metric passed threshold");
         return;
       }
       dimensionNameToValuesMap.get(dimensionName).put(dimensionValue, aggMetricValues);
@@ -380,10 +379,10 @@ public class TopKPhaseJob extends Configured {
       }
 
       if (topkDimensionValues.getTopKDimensions().size() > 0) {
-        LOGGER.info("Writing top k values to {}",TOPK_ROLLUP_PHASE_OUTPUT_PATH.toString());
+        String topkValuesPath = configuration.get(TOPK_ROLLUP_PHASE_OUTPUT_PATH.toString());
+        LOGGER.info("Writing top k values to {}",topkValuesPath);
         FSDataOutputStream topKDimensionValuesOutputStream =
-            fileSystem.create(new Path(configuration.get(TOPK_ROLLUP_PHASE_OUTPUT_PATH.toString())
-                + File.separator + TOPK_VALUES_FILE));
+            fileSystem.create(new Path(topkValuesPath + File.separator + TOPK_VALUES_FILE));
         OBJECT_MAPPER.writeValue(topKDimensionValuesOutputStream, topkDimensionValues);
         topKDimensionValuesOutputStream.close();
       }
