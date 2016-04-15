@@ -138,8 +138,9 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
         for (String instanceId : instancesInResource) {
           InstanceZKMetadata instanceZKMetadata = _pinotHelixResourceManager.getInstanceZKMetadata(instanceId);
           String groupId = instanceZKMetadata.getGroupId(resource);
+          String partitionId = instanceZKMetadata.getPartition(resource);
           listOfSegmentsToAddToInstances.add(new Pair<String, String>(
-                  SegmentNameBuilder.Realtime.build(groupId, SegmentNameBuilder.Realtime.ALL_PARTITIONS,
+                  SegmentNameBuilder.Realtime.build(groupId, partitionId,
                       String.valueOf(System.currentTimeMillis())), instanceId));
         }
       } else {
@@ -162,8 +163,9 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
         for (String instanceId : instancesToAssignRealtimeSegment) {
           InstanceZKMetadata instanceZKMetadata = _pinotHelixResourceManager.getInstanceZKMetadata(instanceId);
           String groupId = instanceZKMetadata.getGroupId(resource);
+          String partitionId = instanceZKMetadata.getPartition(resource);
           listOfSegmentsToAddToInstances.add(new Pair<String, String>(
-                  SegmentNameBuilder.Realtime.build(groupId, SegmentNameBuilder.Realtime.ALL_PARTITIONS, String.valueOf(System.currentTimeMillis())), instanceId));
+                  SegmentNameBuilder.Realtime.build(groupId, partitionId, String.valueOf(System.currentTimeMillis())), instanceId));
         }
       }
     }
