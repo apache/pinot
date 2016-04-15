@@ -19,10 +19,10 @@ package com.linkedin.thirdeye.hadoop.topk;
  * This class contains the properties to be set for topk phase
  */
 public enum TopKPhaseConstants {
-  TOPK_ROLLUP_PHASE_INPUT_PATH("topk.rollup.phase.input.path"),
-  TOPK_ROLLUP_PHASE_OUTPUT_PATH("topk.rollup.phase.output.path"),
-  TOPK_ROLLUP_PHASE_CONFIG_PATH("topk.rollup.phase.config.path"),
-  TOPK_ROLLUP_PHASE_SCHEMA_PATH("topk.rollup.phase.schema.path");
+  TOPK_PHASE_INPUT_PATH("topk.phase.input.path"),
+  TOPK_PHASE_SCHEMA_PATH("topk.phase.schema.path"),
+  TOPK_PHASE_OUTPUT_PATH("topk.phase.output.path"),
+  TOPK_PHASE_THIRDEYE_CONFIG("topk.rollup.phase.thirdeye.config");
 
   String name;
 

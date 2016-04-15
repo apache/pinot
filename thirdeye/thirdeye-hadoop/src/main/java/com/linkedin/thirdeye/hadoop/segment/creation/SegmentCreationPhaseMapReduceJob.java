@@ -15,11 +15,9 @@
  */
 package com.linkedin.thirdeye.hadoop.segment.creation;
 
-import static com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants.SEGMENT_CREATION_CONFIG_PATH;
 import static com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants.SEGMENT_CREATION_DATA_SCHEMA;
 import static com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants.SEGMENT_CREATION_OUTPUT_PATH;
 import static com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants.SEGMENT_CREATION_SCHEDULE;
-import static com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants.SEGMENT_CREATION_SEGMENT_TABLE_NAME;
 import static com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants.SEGMENT_CREATION_THIRDEYE_CONFIG;
 import static com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants.SEGMENT_CREATION_WALLCLOCK_END_TIME;
 import static com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants.SEGMENT_CREATION_WALLCLOCK_START_TIME;
@@ -102,10 +100,10 @@ public class SegmentCreationPhaseMapReduceJob {
       properties = context.getConfiguration();
 
       outputPath = properties.get(SEGMENT_CREATION_OUTPUT_PATH.toString());
-      tableName = properties.get(SEGMENT_CREATION_SEGMENT_TABLE_NAME.toString());
 
       schema = OBJECT_MAPPER.readValue(properties.get(SEGMENT_CREATION_DATA_SCHEMA.toString()), Schema.class);
       thirdeyeConfig = OBJECT_MAPPER.readValue(properties.get(SEGMENT_CREATION_THIRDEYE_CONFIG.toString()), ThirdEyeConfig.class);
+      tableName = thirdeyeConfig.getCollection();
 
       segmentWallClockStartTime = Long.valueOf(properties.get(SEGMENT_CREATION_WALLCLOCK_START_TIME.toString()));
       segmentWallClockEndTime = Long.valueOf(properties.get(SEGMENT_CREATION_WALLCLOCK_END_TIME.toString()));

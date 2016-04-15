@@ -18,7 +18,6 @@ package com.linkedin.thirdeye.hadoop.push;
 import static com.linkedin.thirdeye.hadoop.push.SegmentPushPhaseConstants.SEGMENT_PUSH_CONTROLLER_HOSTS;
 import static com.linkedin.thirdeye.hadoop.push.SegmentPushPhaseConstants.SEGMENT_PUSH_CONTROLLER_PORT;
 import static com.linkedin.thirdeye.hadoop.push.SegmentPushPhaseConstants.SEGMENT_PUSH_INPUT_PATH;
-import static com.linkedin.thirdeye.hadoop.push.SegmentPushPhaseConstants.SEGMENT_PUSH_TABLENAME;
 
 import java.io.FileInputStream;
 import java.io.InputStream;
@@ -33,6 +32,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.utils.FileUploadUtils;
+import com.linkedin.thirdeye.hadoop.ThirdEyeConfigConstants;
 
 public class SegmentPushPhase  extends Configured {
 
@@ -64,7 +64,7 @@ public class SegmentPushPhase  extends Configured {
     LOGGER.info("Segment path : {}", segmentPath);
     hosts = getAndSetConfiguration(configuration, SEGMENT_PUSH_CONTROLLER_HOSTS).split(",");
     port = getAndSetConfiguration(configuration, SEGMENT_PUSH_CONTROLLER_PORT);
-    tablename = getAndSetConfiguration(configuration, SEGMENT_PUSH_TABLENAME);
+    tablename = getAndCheck(ThirdEyeConfigConstants.THIRDEYE_TABLE_NAME.toString());
 
     Path path = new Path(segmentPath);
     FileStatus[] fileStatusArr = fs.globStatus(path);

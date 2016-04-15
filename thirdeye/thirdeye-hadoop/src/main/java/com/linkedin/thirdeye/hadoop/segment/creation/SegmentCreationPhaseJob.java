@@ -15,13 +15,11 @@
  */
 package com.linkedin.thirdeye.hadoop.segment.creation;
 
-import static com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants.SEGMENT_CREATION_CONFIG_PATH;
 import static com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants.SEGMENT_CREATION_DATA_SCHEMA;
 import static com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants.SEGMENT_CREATION_INPUT_PATH;
 import static com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants.SEGMENT_CREATION_OUTPUT_PATH;
 import static com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants.SEGMENT_CREATION_SCHEDULE;
 import static com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants.SEGMENT_CREATION_SCHEMA_PATH;
-import static com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants.SEGMENT_CREATION_SEGMENT_TABLE_NAME;
 import static com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants.SEGMENT_CREATION_THIRDEYE_CONFIG;
 import static com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants.SEGMENT_CREATION_WALLCLOCK_END_TIME;
 import static com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants.SEGMENT_CREATION_WALLCLOCK_START_TIME;
@@ -86,10 +84,8 @@ public class SegmentCreationPhaseJob extends Configured {
 
     String schemaPath = getAndSetConfiguration(configuration, SEGMENT_CREATION_SCHEMA_PATH);
     LOGGER.info("Schema path : {}", schemaPath);
-    String configPath = getAndSetConfiguration(configuration, SEGMENT_CREATION_CONFIG_PATH);
-    LOGGER.info("Config path : {}", configPath);
-    ThirdEyeConfig thirdeyeConfig = ThirdEyeConfig.decode(fs.open(new Path(configPath)));
-    Schema dataSchema = ThirdeyePinotSchemaUtils.createSchema(configPath);
+    ThirdEyeConfig thirdeyeConfig = ThirdEyeConfig.fromProperties(props);
+    Schema dataSchema = ThirdeyePinotSchemaUtils.createSchema(thirdeyeConfig);
     LOGGER.info("Data schema : {}", dataSchema);
     String inputSegmentDir = getAndSetConfiguration(configuration, SEGMENT_CREATION_INPUT_PATH);
     LOGGER.info("Input path : {}", inputSegmentDir);
@@ -97,8 +93,6 @@ public class SegmentCreationPhaseJob extends Configured {
     LOGGER.info("Output path : {}", outputDir);
     Path stagingDir = new Path(outputDir, TEMP);
     LOGGER.info("Staging dir : {}", stagingDir);
-    String tableName = getAndSetConfiguration(configuration, SEGMENT_CREATION_SEGMENT_TABLE_NAME);
-    LOGGER.info("Segment table name : {}", tableName);
     String segmentWallClockStart = getAndSetConfiguration(configuration, SEGMENT_CREATION_WALLCLOCK_START_TIME);
     LOGGER.info("Segment wallclock start time : {}", segmentWallClockStart);
     String segmentWallClockEnd = getAndSetConfiguration(configuration, SEGMENT_CREATION_WALLCLOCK_END_TIME);

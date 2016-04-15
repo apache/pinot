@@ -19,8 +19,7 @@ public enum SegmentPushPhaseConstants {
 
   SEGMENT_PUSH_INPUT_PATH("segment.push.input.path"),
   SEGMENT_PUSH_CONTROLLER_HOSTS("segment.push.controller.hosts"),
-  SEGMENT_PUSH_CONTROLLER_PORT("segment.push.controller.port"),
-  SEGMENT_PUSH_TABLENAME("segment.push.tablename");
+  SEGMENT_PUSH_CONTROLLER_PORT("segment.push.controller.port");
 
   String name;
 

@@ -18,26 +18,36 @@ package com.linkedin.thirdeye.hadoop;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.concurrent.TimeUnit;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.linkedin.thirdeye.api.DimensionSpec;
 import com.linkedin.thirdeye.api.MetricSpec;
+import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.api.SplitSpec;
+import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
+import com.linkedin.thirdeye.api.TopKDimensionSpec;
 import com.linkedin.thirdeye.api.TopKRollupSpec;
 
 public final class ThirdEyeConfig {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper(new YAMLFactory());
+  private static final String FIELD_SEPARATOR = ",";
+  private static final String DEFAULT_TIME_TYPE = "HOURS";
+  private static final String DEFAULT_TIME_SIZE = "1";
 
   private String collection;
   private List<DimensionSpec> dimensions;
   private List<MetricSpec> metrics;
   private TimeSpec time = new TimeSpec();
   private TopKRollupSpec topKRollup = new TopKRollupSpec();
-
   private SplitSpec split = new SplitSpec();
 
   public ThirdEyeConfig() {
@@ -180,6 +190,112 @@ public final class ThirdEyeConfig {
 
   public static ThirdEyeConfig decode(InputStream inputStream) throws IOException {
     return OBJECT_MAPPER.readValue(inputStream, ThirdEyeConfig.class);
+  }
+
+  public static ThirdEyeConfig fromProperties(Properties props) {
+
+    // collection
+    String collection = getAndCheck(props,
+        ThirdEyeConfigConstants.THIRDEYE_TABLE_NAME.toString());
+
+    // dimensions
+    String[] dimensionNames = getAndCheck(props,
+        ThirdEyeConfigConstants.THIRDEYE_DIMENSION_NAMES.toString()).split(FIELD_SEPARATOR);
+    List<DimensionSpec> dimensions = new ArrayList<>();
+    for (String dimension : dimensionNames) {
+      dimensions.add(new DimensionSpec(dimension));
+    }
+
+    // metrics
+    String[] metricNames = getAndCheck(props,
+        ThirdEyeConfigConstants.THIRDEYE_METRIC_NAMES.toString()).split(FIELD_SEPARATOR);
+    String[] metricTypes = getAndCheck(props,
+        ThirdEyeConfigConstants.THIRDEYE_METRIC_TYPES.toString()).split(FIELD_SEPARATOR);
+    if (metricNames.length != metricTypes.length) {
+      throw new IllegalStateException("Number of metric names provided "
+          + "should be same as number of metric types");
+    }
+    List<MetricSpec> metrics = new ArrayList<>();
+    for (int i = 0; i < metricNames.length; i++) {
+      metrics.add(new MetricSpec(metricNames[i], MetricType.valueOf(metricTypes[i])));
+    }
+
+    // time
+    String timeColumnName = getAndCheck(props,
+        ThirdEyeConfigConstants.THIRDEYE_TIMECOLUMN_NAME.toString());
+    String timeColumnType = getAndCheck(props,
+        ThirdEyeConfigConstants.THIRDEYE_TIMECOLUMN_TYPE.toString(), DEFAULT_TIME_TYPE);
+    String timeColumnSize = getAndCheck(props,
+        ThirdEyeConfigConstants.THIRDEYE_TIMECOLUMN_SIZE.toString(), DEFAULT_TIME_SIZE);
+    TimeGranularity timeGranularity = new TimeGranularity(Integer.parseInt(timeColumnSize), TimeUnit.valueOf(timeColumnType));
+    TimeSpec time = new TimeSpec(timeColumnName, null, timeGranularity, null);
+
+    // split
+    String splitThreshold = getAndCheck(props,
+        ThirdEyeConfigConstants.THIRDEYE_SPLIT_THRESHOLD.toString(), null);
+    SplitSpec split = null;
+    if (splitThreshold != null) {
+      String splitOrder = getAndCheck(props,
+          ThirdEyeConfigConstants.THIRDEYE_SPLIT_ORDER.toString(), null);
+      List<String> splitOrderList = null;
+      if (splitOrder != null) {
+        splitOrderList = Arrays.asList(splitOrder.split(FIELD_SEPARATOR));
+      }
+      split = new SplitSpec(Integer.parseInt(splitThreshold), splitOrderList);
+    }
+
+    // topk
+    TopKRollupSpec topKRollup = null;
+    String thresholdMetricNames = getAndCheck(props, ThirdEyeConfigConstants.THIRDEYE_TOPK_THRESHOLD_METRIC_NAMES.toString(), null);
+    String metricThresholdValues = getAndCheck(props, ThirdEyeConfigConstants.THIRDEYE_TOPK_METRIC_THRESHOLD_VALUES.toString(), null);
+    Map<String, Double> threshold = null;
+    if (thresholdMetricNames != null && metricThresholdValues != null) {
+      String[] thresholdMetrics = thresholdMetricNames.split(FIELD_SEPARATOR);
+      String[] thresholdValues = metricThresholdValues.split(FIELD_SEPARATOR);
+      if (thresholdMetrics.length != thresholdValues.length) {
+        throw new IllegalStateException("Number of threshold metric names should be same as threshold values");
+      }
+      threshold = new HashMap<>();
+      for (int i = 0; i < thresholdMetrics.length; i++) {
+        threshold.put(thresholdMetrics[i], Double.parseDouble(thresholdValues[i]));
+      }
+    }
+    String topKDimensionNames = getAndCheck(props, ThirdEyeConfigConstants.THIRDEYE_TOPK_DIMENSION_NAMES.toString(), null);
+    String topKDimensionMetricNames = getAndCheck(props, ThirdEyeConfigConstants.THIRDEYE_TOPK_DIMENSION_METRICNAMES.toString(), null);
+    String topKDimensionKValues = getAndCheck(props, ThirdEyeConfigConstants.THIRDEYE_TOPK_DIMENSION_KVALUES.toString(), null);
+    List<TopKDimensionSpec> topKDimensionSpec = null;
+    if (topKDimensionNames != null && topKDimensionMetricNames != null && topKDimensionKValues != null) {
+      String[] topKDimensions = topKDimensionNames.split(FIELD_SEPARATOR);
+      String[] topKMetrics = topKDimensionMetricNames.split(FIELD_SEPARATOR);
+      String[] topKValues = topKDimensionKValues.split(FIELD_SEPARATOR);
+      if ((topKDimensions.length != topKMetrics.length) || (topKDimensions.length != topKValues.length)) {
+        throw new IllegalStateException("Number of topk dimension names, metric names and values should be the same");
+      }
+      topKDimensionSpec = new ArrayList<>();
+      for (int i = 0; i < topKDimensions.length; i++) {
+        topKDimensionSpec.add(new TopKDimensionSpec(topKDimensions[i], Integer.parseInt(topKValues[i]), topKMetrics[i]));
+      }
+    }
+    if (threshold != null || topKDimensionSpec != null) {
+      topKRollup = new TopKRollupSpec();
+      topKRollup.setThreshold(threshold);
+      topKRollup.setTopKDimensionSpec(topKDimensionSpec);
+    }
+
+    return new ThirdEyeConfig(collection, dimensions, metrics, time, topKRollup, split);
+  }
+
+  private static String getAndCheck(Properties props, String propName) {
+    String propValue = props.getProperty(propName);
+    if (propValue == null) {
+      throw new IllegalArgumentException(propName + " required property");
+    }
+    return propValue;
+  }
+
+  private static String getAndCheck(Properties props, String propName, String defaultValue) {
+    String propValue = props.getProperty(propName, defaultValue);
+    return propValue;
   }
 
 }

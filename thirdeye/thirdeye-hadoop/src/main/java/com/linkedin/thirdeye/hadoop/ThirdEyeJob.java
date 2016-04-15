@@ -65,16 +65,13 @@ public class ThirdEyeJob {
               throws Exception {
         Properties config = new Properties();
 
-        config.setProperty(TopKPhaseConstants.TOPK_ROLLUP_PHASE_SCHEMA_PATH.toString(),
+        config.setProperty(TopKPhaseConstants.TOPK_PHASE_SCHEMA_PATH.toString(),
             getSchemaPath(root, collection));
 
-        config.setProperty(TopKPhaseConstants.TOPK_ROLLUP_PHASE_CONFIG_PATH.toString(),
-            getConfigPath(root, collection));
-
-        config.setProperty(TopKPhaseConstants.TOPK_ROLLUP_PHASE_INPUT_PATH.toString(),
+        config.setProperty(TopKPhaseConstants.TOPK_PHASE_INPUT_PATH.toString(),
             inputPaths);
 
-        config.setProperty(TopKPhaseConstants.TOPK_ROLLUP_PHASE_OUTPUT_PATH.toString(),
+        config.setProperty(TopKPhaseConstants.TOPK_PHASE_OUTPUT_PATH.toString(),
             getIndexDir(root, collection, minTime, maxTime) + File.separator
                 + TOPK.getName());
 
@@ -100,14 +97,9 @@ public class ThirdEyeJob {
 
         config.setProperty(SegmentCreationPhaseConstants.SEGMENT_CREATION_SCHEMA_PATH.toString(),
             getSchemaPath(root, collection));
-        config.setProperty(SegmentCreationPhaseConstants.SEGMENT_CREATION_CONFIG_PATH.toString(),
-            getConfigPath(root, collection));
-
         config.setProperty(SegmentCreationPhaseConstants.SEGMENT_CREATION_INPUT_PATH.toString(), inputPaths);
         config.setProperty(SegmentCreationPhaseConstants.SEGMENT_CREATION_OUTPUT_PATH.toString(),
             getIndexDir(root, collection, minTime, maxTime) + File.separator + SEGMENT_CREATION.getName());
-        config.setProperty(SegmentCreationPhaseConstants.SEGMENT_CREATION_SEGMENT_TABLE_NAME.toString(),
-            collection);
         config.setProperty(SegmentCreationPhaseConstants.SEGMENT_CREATION_WALLCLOCK_START_TIME.toString(),
             String.valueOf(minTime.getMillis()));
         config.setProperty(SegmentCreationPhaseConstants.SEGMENT_CREATION_WALLCLOCK_END_TIME.toString(),
@@ -141,8 +133,6 @@ public class ThirdEyeJob {
             inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_PINOT_CONTROLLER_HOSTS.getName()));
         config.setProperty(SegmentPushPhaseConstants.SEGMENT_PUSH_CONTROLLER_PORT.toString(),
             inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_PINOT_CONTROLLER_PORT.getName()));
-        config.setProperty(SegmentPushPhaseConstants.SEGMENT_PUSH_TABLENAME.toString(),
-            inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_COLLECTION.getName()));
         return config;
       }
     };
@@ -163,11 +153,6 @@ public class ThirdEyeJob {
       return getCollectionDir(root, collection) + File.separator
           + "data_" + StarTreeConstants.DATE_TIME_FORMATTER.print(minTime) + "_"
           + StarTreeConstants.DATE_TIME_FORMATTER.print(maxTime);
-    }
-
-    String getConfigPath(String root, String collection) {
-      return getCollectionDir(root, collection) + File.separator
-          + StarTreeConstants.CONFIG_FILE_NAME;
     }
 
     String getSchemaPath(String root, String collection) {
@@ -239,6 +224,9 @@ public class ThirdEyeJob {
 
     Properties jobProperties = phaseSpec.getJobProperties(inputConfig, root, collection,
         minTime, maxTime, inputPaths);
+    for (Object key : inputConfig.keySet()) {
+      jobProperties.setProperty(key.toString(), inputConfig.getProperty(key.toString()));
+    }
 
     // Instantiate the job
     Constructor<Configured> constructor = (Constructor<Configured>) phaseSpec.getKlazz()

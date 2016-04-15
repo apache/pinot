@@ -15,10 +15,10 @@
  */
 package com.linkedin.thirdeye.hadoop.topk;
 
-import static com.linkedin.thirdeye.hadoop.topk.TopKPhaseConstants.TOPK_ROLLUP_PHASE_CONFIG_PATH;
-import static com.linkedin.thirdeye.hadoop.topk.TopKPhaseConstants.TOPK_ROLLUP_PHASE_INPUT_PATH;
-import static com.linkedin.thirdeye.hadoop.topk.TopKPhaseConstants.TOPK_ROLLUP_PHASE_OUTPUT_PATH;
-import static com.linkedin.thirdeye.hadoop.topk.TopKPhaseConstants.TOPK_ROLLUP_PHASE_SCHEMA_PATH;
+import static com.linkedin.thirdeye.hadoop.topk.TopKPhaseConstants.TOPK_PHASE_INPUT_PATH;
+import static com.linkedin.thirdeye.hadoop.topk.TopKPhaseConstants.TOPK_PHASE_OUTPUT_PATH;
+import static com.linkedin.thirdeye.hadoop.topk.TopKPhaseConstants.TOPK_PHASE_SCHEMA_PATH;
+import static com.linkedin.thirdeye.hadoop.topk.TopKPhaseConstants.TOPK_PHASE_THIRDEYE_CONFIG;
 
 import java.io.File;
 import java.io.IOException;
@@ -127,10 +127,8 @@ public class TopKPhaseJob extends Configured {
     public void setup(Context context) throws IOException, InterruptedException {
       LOGGER.info("TopKRollupPhaseOneJob.TopKRollupPhaseOneMapper.setup()");
       Configuration configuration = context.getConfiguration();
-      FileSystem fileSystem = FileSystem.get(configuration);
-      Path configPath = new Path(configuration.get(TOPK_ROLLUP_PHASE_CONFIG_PATH.toString()));
       try {
-        thirdeyeConfig = ThirdEyeConfig.decode(fileSystem.open(configPath));
+        thirdeyeConfig = OBJECT_MAPPER.readValue(configuration.get(TOPK_PHASE_THIRDEYE_CONFIG.toString()), ThirdEyeConfig.class);
         config = TopKPhaseConfig.fromThirdEyeConfig(thirdeyeConfig);
         dimensionNames = config.getDimensionNames();
         metricNames = config.getMetricNames();
@@ -223,10 +221,8 @@ public class TopKPhaseJob extends Configured {
     public void setup(Context context) throws IOException, InterruptedException {
       LOGGER.info("TopKRollupPhaseOneJob.TopKRollupPhaseOneCombiner.setup()");
       Configuration configuration = context.getConfiguration();
-      FileSystem fileSystem = FileSystem.get(configuration);
-      Path configPath = new Path(configuration.get(TOPK_ROLLUP_PHASE_CONFIG_PATH.toString()));
       try {
-        thirdeyeConfig = ThirdEyeConfig.decode(fileSystem.open(configPath));
+        thirdeyeConfig = OBJECT_MAPPER.readValue(configuration.get(TOPK_PHASE_THIRDEYE_CONFIG.toString()), ThirdEyeConfig.class);
         config = TopKPhaseConfig.fromThirdEyeConfig(thirdeyeConfig);
         metricTypes = config.getMetricTypes();
         numMetrics = metricTypes.size();
@@ -288,9 +284,8 @@ public class TopKPhaseJob extends Configured {
 
       configuration = context.getConfiguration();
       fileSystem = FileSystem.get(configuration);
-      Path configPath = new Path(configuration.get(TOPK_ROLLUP_PHASE_CONFIG_PATH.toString()));
       try {
-        thirdeyeConfig = ThirdEyeConfig.decode(fileSystem.open(configPath));
+        thirdeyeConfig = OBJECT_MAPPER.readValue(configuration.get(TOPK_PHASE_THIRDEYE_CONFIG.toString()), ThirdEyeConfig.class);
         config = TopKPhaseConfig.fromThirdEyeConfig(thirdeyeConfig);
         metricThresholds = config.getMetricThresholds();
         topKDimensionSpecMap = config.getTopKDimensionSpec();
@@ -384,7 +379,7 @@ public class TopKPhaseJob extends Configured {
       }
 
       if (topkDimensionValues.getTopKDimensions().size() > 0) {
-        String topkValuesPath = configuration.get(TOPK_ROLLUP_PHASE_OUTPUT_PATH.toString());
+        String topkValuesPath = configuration.get(TOPK_PHASE_OUTPUT_PATH.toString());
         LOGGER.info("Writing top k values to {}",topkValuesPath);
         FSDataOutputStream topKDimensionValuesOutputStream =
             fileSystem.create(new Path(topkValuesPath + File.separator + TOPK_VALUES_FILE));
@@ -403,18 +398,15 @@ public class TopKPhaseJob extends Configured {
     FileSystem fs = FileSystem.get(configuration);
 
     // Input schema
-    Path schemaPath = new Path(getAndSetConfiguration(configuration, TOPK_ROLLUP_PHASE_SCHEMA_PATH));
+    Path schemaPath = new Path(getAndSetConfiguration(configuration, TOPK_PHASE_SCHEMA_PATH));
     FSDataInputStream schemaStream = fs.open(schemaPath);
     Schema inputSchema = new Schema.Parser().parse(schemaStream);
 
     // Input Path
-    String inputPathDir = getAndSetConfiguration(configuration, TOPK_ROLLUP_PHASE_INPUT_PATH);
-
-    // Config path
-    getAndSetConfiguration(configuration, TOPK_ROLLUP_PHASE_CONFIG_PATH);
+    String inputPathDir = getAndSetConfiguration(configuration, TOPK_PHASE_INPUT_PATH);
 
     // Output path
-    Path outputPath = new Path(getAndSetConfiguration(configuration, TOPK_ROLLUP_PHASE_OUTPUT_PATH));
+    Path outputPath = new Path(getAndSetConfiguration(configuration, TOPK_PHASE_OUTPUT_PATH));
     LOGGER.info("Input path dir: " + inputPathDir);
     for (String inputPath : inputPathDir.split(",")) {
       LOGGER.info("Adding input:" + inputPath);
@@ -425,6 +417,9 @@ public class TopKPhaseJob extends Configured {
       fs.delete(outputPath, true);
     }
     FileOutputFormat.setOutputPath(job, outputPath);
+
+    ThirdEyeConfig thirdeyeConfig = ThirdEyeConfig.fromProperties(props);
+    job.getConfiguration().set(TOPK_PHASE_THIRDEYE_CONFIG.toString(), OBJECT_MAPPER.writeValueAsString(thirdeyeConfig));
 
     // Map config
     job.setMapperClass(TopKPhaseMapper.class);
