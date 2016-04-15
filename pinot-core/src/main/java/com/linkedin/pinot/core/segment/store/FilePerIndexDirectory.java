@@ -16,6 +16,7 @@
 
 package com.linkedin.pinot.core.segment.store;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
@@ -62,8 +63,8 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
   @Override
   public PinotDataBuffer newForwardIndexBuffer(String column, int sizeBytes)
       throws IOException {
-    String fwdIndexFilename = metadata.getForwardIndexFileName(column, metadata.getVersion());
-    return mapForWrites(fwdIndexFilename, sizeBytes, "forward_index.writer");
+    IndexKey key = new IndexKey(column, ColumnIndexType.FORWARD_INDEX);
+    return getWriteBufferFor(key, sizeBytes);
   }
 
   @Override
@@ -76,14 +77,13 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
   @Override
   public PinotDataBuffer newInvertedIndexBuffer(String column, int sizeBytes)
       throws IOException {
-    String invertedIndexFname = metadata.getBitmapInvertedIndexFileName(column, metadata.getVersion());
-    return mapForWrites(invertedIndexFname, sizeBytes, "inverted_index.writer");
+    IndexKey key = new IndexKey(column, ColumnIndexType.INVERTED_INDEX);
+    return getWriteBufferFor(key, sizeBytes);
   }
 
   @Override
   public boolean hasIndexFor(String column, ColumnIndexType type) {
-    String filename = getFilenameFor(column, type);
-    File indexFile = new File(filename);
+    File indexFile = getFileFor(column, type);
     return indexFile.exists();
   }
 
@@ -95,13 +95,24 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
     indexBuffers = null;
   }
 
+  @Override
+  public void removeIndex(String columnName, ColumnIndexType indexType) {
+    File indexFile = getFileFor(columnName, indexType);
+    indexFile.delete();
+  }
+
+  @Override
+  public boolean isIndexRemovalSupported() {
+    return true;
+  }
+
   private PinotDataBuffer getReadBufferFor(IndexKey key)
       throws IOException {
     if (indexBuffers.containsKey(key)) {
       return indexBuffers.get(key).duplicate();
     }
 
-    String filename = getFilenameFor(key.name, key.type);
+    File filename = getFileFor(key.name, key.type);
     PinotDataBuffer buffer = mapForReads(filename, key.type.toString() + ".reader");
     indexBuffers.put(key, buffer);
     return buffer.duplicate();
@@ -113,47 +124,50 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
       return indexBuffers.get(key).duplicate();
     }
 
-    String filename = getFilenameFor(key.name, key.type);
+    File filename = getFileFor(key.name, key.type);
     PinotDataBuffer buffer = mapForWrites(filename, sizeBytes, key.type.toString() + ".writer");
     indexBuffers.put(key, buffer);
     return buffer.duplicate();
   }
 
-  private String getFilenameFor(String column, ColumnIndexType indexType) {
+  @VisibleForTesting
+  File getFileFor(String column, ColumnIndexType indexType) {
+    String filename;
     switch (indexType) {
       case DICTIONARY:
-        return metadata.getDictionaryFileName(column, metadata.getVersion());
+        filename = metadata.getDictionaryFileName(column, metadata.getVersion());
+        break;
       case FORWARD_INDEX:
-        return metadata.getForwardIndexFileName(column, metadata.getVersion());
+        filename = metadata.getForwardIndexFileName(column, metadata.getVersion());
+        break;
       case INVERTED_INDEX:
-        return metadata.getBitmapInvertedIndexFileName(column, metadata.getVersion());
+        filename = metadata.getBitmapInvertedIndexFileName(column, metadata.getVersion());
+        break;
       default:
         throw new UnsupportedOperationException("Unknown index type: " + indexType.toString());
     }
+    return new File(segmentDirectory, filename);
   }
 
-  private PinotDataBuffer mapForWrites(String filename, int sizeBytes, String context)
+  private PinotDataBuffer mapForWrites(File file, int sizeBytes, String context)
       throws IOException {
-    Preconditions.checkNotNull(filename);
+    Preconditions.checkNotNull(file);
     Preconditions.checkArgument(sizeBytes >= 0 && sizeBytes < Integer.MAX_VALUE,
-        "File size must be less than 2GB, file: " + filename);
-
-    File f = new File(segmentDirectory, filename);
-    Preconditions.checkState(!f.exists(), "File: " + filename + " already exists");
-    String allocContext = allocationContext(f, context);
+        "File size must be less than 2GB, file: " + file);
+    Preconditions.checkState(!file.exists(), "File: " + file + " already exists");
+    String allocContext = allocationContext(file, context);
 
     // always mmap for writes
-    return PinotDataBuffer.fromFile(f, 0, sizeBytes, ReadMode.mmap, FileChannel.MapMode.READ_WRITE, allocContext);
+    return PinotDataBuffer.fromFile(file, 0, sizeBytes, ReadMode.mmap,
+        FileChannel.MapMode.READ_WRITE, allocContext);
   }
 
-  private PinotDataBuffer mapForReads(String fileName, String context)
+  private PinotDataBuffer mapForReads(File file, String context)
       throws IOException {
-    Preconditions.checkNotNull(fileName);
+    Preconditions.checkNotNull(file);
     Preconditions.checkNotNull(context);
-
-    File file = new File(segmentDirectory, fileName);
-    Preconditions.checkArgument(file.exists(), "File: " + fileName + " must exist");
-    Preconditions.checkArgument(file.isFile(), "File: " + fileName + " must be a regular file");
+    Preconditions.checkArgument(file.exists(), "File: " + file + " must exist");
+    Preconditions.checkArgument(file.isFile(), "File: " + file + " must be a regular file");
 
     String allocationContext = allocationContext(file, context);
     return PinotDataBuffer

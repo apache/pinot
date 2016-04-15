@@ -21,6 +21,7 @@ import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 import org.apache.commons.configuration.ConfigurationException;
 
 
@@ -109,7 +110,7 @@ public abstract class SegmentDirectory implements AutoCloseable {
    * Get the path/URL for the directory
    * @return
    */
-  public abstract String getPath();
+  public abstract Path getPath();
 
 
   /**
@@ -158,6 +159,12 @@ public abstract class SegmentDirectory implements AutoCloseable {
         throws IOException;
 
     /**
+     * Check if the removal of index is a supported operation
+     * @return true if the index removal is supported
+     */
+    public abstract boolean isIndexRemovalSupported();
+
+    /**
      * Removes an existing column index from directory
      * @param columnName column name
      * @param indexType column index type
@@ -188,6 +195,10 @@ public abstract class SegmentDirectory implements AutoCloseable {
         throws IOException;
 
     abstract void abort();
+
+    public SegmentDirectory toSegmentDirectory() {
+      return SegmentDirectory.this;
+    }
 
     public abstract String toString();
   }

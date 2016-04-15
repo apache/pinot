@@ -109,7 +109,7 @@ public class ColumnIndexDirectoryTestHelper {
           @Override
           public String answer(InvocationOnMock invocationOnMock)
               throws Throwable {
-            return invocationOnMock.getArguments()[0] + ".dictionary";
+            return invocationOnMock.getArguments()[0] + ".dict";
           }
         });
     when(meta.getForwardIndexFileName(anyString(), anyString()))
@@ -117,7 +117,7 @@ public class ColumnIndexDirectoryTestHelper {
           @Override
           public String answer(InvocationOnMock invocationOnMock)
               throws Throwable {
-            return invocationOnMock.getArguments()[0] + ".fwd.index";
+            return invocationOnMock.getArguments()[0] + ".fwd";
           }
         });
 

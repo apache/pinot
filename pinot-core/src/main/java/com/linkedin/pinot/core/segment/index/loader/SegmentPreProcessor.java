@@ -57,6 +57,8 @@ public class SegmentPreProcessor {
       IndexLoadingConfigMetadata indexConfig) {
     Preconditions.checkNotNull(indexDir);
     Preconditions.checkNotNull(metadata);
+    Preconditions.checkState(indexDir.exists(), "Segment directory: {} does not exist", indexDir);;
+    Preconditions.checkState(indexDir.isDirectory(), "Segment path: {} is not a directory", indexDir);
 
     this.indexDir = indexDir;
     this.metadata = metadata;
@@ -116,10 +118,10 @@ public class SegmentPreProcessor {
       throws IOException {
     String segmentName = segmentWriter.toString();
     String column = columnMetadata.getColumnName();
-    File inProgress = new File(column + "_inv.inprogress");
+    File inProgress = new File(segmentWriter.toSegmentDirectory().getPath().toFile(),
+        column + "_inv.inprogress");
 
-    // returning inverted index from file only when marker file does not exist and inverted file
-    // exist
+    // returning existing inverted index only if the marker file does not exist
     if (!inProgress.exists() && segmentWriter.hasIndexFor(column, ColumnIndexType.INVERTED_INDEX)) {
       LOGGER.info("Found inverted index for segment: {}, colummn {}, loading it", segmentName, column);
       return;
@@ -155,15 +157,41 @@ public class SegmentPreProcessor {
     }
     creator.seal();
     File invertedIndexFile = creator.getInvertedIndexFile();
-    // HACK HACK
+    // Inverted index creation does not know the size upfront so
+    // we create it in a temporary file and then move to the main
+    // file. For v1/v2 format, this is an overkill but it's required
+    // to avoid corruption of v3 format
     File tempFile = new File(invertedIndexFile + ".temp");
     if (tempFile.exists()) {
       FileUtils.deleteQuietly(tempFile);
     }
     FileUtils.moveFile(invertedIndexFile, tempFile);
     PinotDataBuffer newIndexBuffer = null;
+
     try {
-      newIndexBuffer = segmentWriter.newIndexFor(column, ColumnIndexType.INVERTED_INDEX, (int) tempFile.length());
+      if (segmentWriter.hasIndexFor(column, ColumnIndexType.INVERTED_INDEX)) {
+        PinotDataBuffer tempBuffer = segmentWriter.getIndexFor(column, ColumnIndexType.INVERTED_INDEX);
+
+        // almost always we will have matching size since segment data is immutable
+        // but it's good to double check
+        if (tempBuffer.size() == tempFile.length()) {
+          newIndexBuffer = tempBuffer;
+        } else {
+          if (segmentWriter.isIndexRemovalSupported()) {
+            segmentWriter.removeIndex(column, ColumnIndexType.INVERTED_INDEX);
+            newIndexBuffer = segmentWriter.newIndexFor(column, ColumnIndexType.INVERTED_INDEX, (int) tempFile.length());
+          } else {
+            LOGGER.error("Segment: {} already has inverted index that can not be removed. Throwing exception to discard and download segment",
+                segmentWriter);
+            throw new IllegalStateException("Inverted Index exists and can not be removed for segment: " +
+                segmentWriter +
+                ". Throwing exception to download fresh segment");
+          }
+        }
+      } else { // there was no index earlier
+        newIndexBuffer = segmentWriter.newIndexFor(column,
+            ColumnIndexType.INVERTED_INDEX, (int) tempFile.length());
+      }
       newIndexBuffer.readFrom(tempFile);
     } finally {
       if (newIndexBuffer != null) {

@@ -118,7 +118,6 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     return allocNewBufferInternal(column, ColumnIndexType.DICTIONARY, sizeBytes, "dictionary.create");
   }
 
-
   @Override
   public PinotDataBuffer newForwardIndexBuffer(String column, int sizeBytes)
       throws IOException {
@@ -258,7 +257,6 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
       offsetAccum.add(offsetEntry.getKey());
     }
 
-
     if (offsetAccum.size() > 0) {
       mapAndSliceFile(indexStartMap, offsetAccum, offsetAccum.get(0) + runningSize);
     }
@@ -323,6 +321,17 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     }
     columnEntries.clear();
     allocBuffers.clear();
+  }
+
+  @Override
+  public void removeIndex(String columnName, ColumnIndexType indexType) {
+    throw new UnsupportedOperationException("Index removal is not supported for single file index format. Requested colum: "
+        + columnName + " indexType: " + indexType);
+  }
+
+  @Override
+  public boolean isIndexRemovalSupported() {
+    return false;
   }
 
   @Override

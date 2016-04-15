@@ -27,6 +27,7 @@ import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -64,6 +65,11 @@ public class FilePerIndexDirectoryTest {
       throws IOException {
     FileUtils.deleteQuietly(segmentDir);
     Assert.assertFalse(segmentDir.exists());
+  }
+
+  @AfterClass
+  public void tearDownClass() {
+    FileUtils.deleteQuietly(TEST_DIRECTORY);
   }
 
   @Test
@@ -142,6 +148,31 @@ public class FilePerIndexDirectoryTest {
         new FilePerIndexDirectory(segmentDir, segmentMetadata, ReadMode.mmap);
         PinotDataBuffer buffer = fpiDirectory.getDictionaryBufferFor("noSuchColumn")) {
 
+    }
+  }
+
+  @Test
+  public void testHasIndex()
+      throws IOException {
+    try (FilePerIndexDirectory fpiDirectory =
+        new FilePerIndexDirectory(segmentDir, segmentMetadata, ReadMode.mmap)) {
+      PinotDataBuffer buffer = fpiDirectory.newDictionaryBuffer("foo", 1024);
+      buffer.putInt(0, 100);
+      Assert.assertTrue(fpiDirectory.hasIndexFor("foo", ColumnIndexType.DICTIONARY));
+    }
+  }
+
+  @Test
+  public void testRemoveIndex()
+      throws IOException {
+    try (FilePerIndexDirectory fpi = new FilePerIndexDirectory(segmentDir, segmentMetadata, ReadMode.mmap)) {
+      try (PinotDataBuffer buffer = fpi.newForwardIndexBuffer("col1", 1024)) {}
+      try (PinotDataBuffer buffer = fpi.newDictionaryBuffer("col2", 100)) {}
+      Assert.assertTrue(fpi.getFileFor("col1", ColumnIndexType.FORWARD_INDEX).exists());
+      Assert.assertTrue(fpi.getFileFor("col2", ColumnIndexType.DICTIONARY).exists());
+      Assert.assertTrue(fpi.isIndexRemovalSupported());
+      fpi.removeIndex("col1", ColumnIndexType.FORWARD_INDEX);
+      Assert.assertFalse(fpi.getFileFor("col1", ColumnIndexType.FORWARD_INDEX).exists());
     }
   }
 

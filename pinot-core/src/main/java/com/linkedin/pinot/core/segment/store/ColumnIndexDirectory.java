@@ -126,6 +126,21 @@ abstract class ColumnIndexDirectory implements AutoCloseable {
    */
   public abstract boolean hasIndexFor(String column, ColumnIndexType type);
 
+  /**
+   * Remove the specified index
+   * @param columnName column name
+   * @param indexType index type
+   */
+  public abstract void removeIndex(String columnName, ColumnIndexType indexType);
+
+  /**
+   * Check if the implementation supports removing existing index
+   * @return true if the index removal is supported
+   */
+  public abstract boolean isIndexRemovalSupported();
+
   @Override
   public abstract void close();
+
+
 }

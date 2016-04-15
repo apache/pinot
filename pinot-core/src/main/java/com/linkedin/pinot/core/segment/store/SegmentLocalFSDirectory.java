@@ -23,6 +23,7 @@ import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 import org.apache.commons.configuration.ConfigurationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,8 +62,8 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
   }
 
   @Override
-  public String getPath() {
-    return segmentDirectory.getPath();
+  public Path getPath() {
+    return segmentDirectory.toPath();
   }
 
   public Reader createReader()
@@ -192,9 +193,13 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
     }
 
     @Override
+    public boolean isIndexRemovalSupported() {
+      return columnIndexDirectory.isIndexRemovalSupported();
+    }
+
+    @Override
     public void removeIndex(String columnName, ColumnIndexType indexType) {
-      // TODO
-      throw new UnsupportedOperationException("Unimplemented method");
+      columnIndexDirectory.removeIndex(columnName, indexType);
     }
 
      private PinotDataBuffer getNewIndexBuffer(IndexKey key, long sizeBytes)

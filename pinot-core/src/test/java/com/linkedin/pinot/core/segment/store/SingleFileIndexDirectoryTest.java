@@ -29,6 +29,7 @@ import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -68,6 +69,11 @@ public class SingleFileIndexDirectoryTest {
   @AfterMethod
   public void tearDownTest()
       throws IOException {
+  }
+
+  @AfterClass
+  public void tearDownClass() {
+    FileUtils.deleteQuietly(TEST_DIRECTORY);
   }
 
   void writeMetadata() throws ConfigurationException {
@@ -110,12 +116,14 @@ public class SingleFileIndexDirectoryTest {
   @Test
   public void testMmapLargeBuffer()
       throws Exception {
+
     testMultipleRW(ReadMode.mmap, 6, 4L * ONE_MB);
   }
 
   @Test
   public void testLargeRWDirectBuffer()
       throws Exception {
+
     testMultipleRW(ReadMode.heap, 6, 3L * ONE_MB);
   }
 
@@ -172,10 +180,21 @@ public class SingleFileIndexDirectoryTest {
   @Test(expectedExceptions = RuntimeException.class)
   public void testMissingIndex()
       throws IOException, ConfigurationException {
-    SingleFileIndexDirectory columnDirectory =
-        new SingleFileIndexDirectory(segmentDir, segmentMetadata, ReadMode.mmap);
-    try (PinotDataBuffer buffer = columnDirectory.getDictionaryBufferFor("column1")) {
+    try (SingleFileIndexDirectory columnDirectory =
+        new SingleFileIndexDirectory(segmentDir, segmentMetadata, ReadMode.mmap)) {
+      try (PinotDataBuffer buffer = columnDirectory.getDictionaryBufferFor("column1")) {
 
+      }
+    }
+  }
+
+  @Test(expectedExceptions =  UnsupportedOperationException.class)
+  public void testRemoveIndex()
+      throws IOException, ConfigurationException {
+    try (SingleFileIndexDirectory sfd = new SingleFileIndexDirectory(segmentDir, segmentMetadata, ReadMode.mmap)) {
+      try (PinotDataBuffer buffer = sfd.newDictionaryBuffer("col1", 1024)) { }
+      Assert.assertFalse(sfd.isIndexRemovalSupported());
+      sfd.removeIndex("col1", ColumnIndexType.DICTIONARY);
     }
   }
 }

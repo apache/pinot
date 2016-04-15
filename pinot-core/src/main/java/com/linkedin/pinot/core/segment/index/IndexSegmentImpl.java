@@ -60,7 +60,7 @@ public class IndexSegmentImpl implements IndexSegment {
     this.segmentMetadata = segmentMetadata;
     this.indexContainerMap = columnIndexContainerMap;
     this.starTree = starTree;
-    LOGGER.info("Successfully loaded the index segment : " + segmentDirectory.getPath());
+    LOGGER.info("Successfully loaded the index segment : " + segmentDirectory);
   }
 
   public ImmutableDictionaryReader getDictionaryFor(String column) {
@@ -87,7 +87,7 @@ public class IndexSegmentImpl implements IndexSegment {
 
   @Override
   public String getAssociatedDirectory() {
-    return segmentDirectory.getPath();
+    return segmentDirectory.getPath().toString();
   }
 
   @Override
@@ -134,7 +134,7 @@ public class IndexSegmentImpl implements IndexSegment {
     try {
       segmentDirectory.close();
     } catch (Exception e) {
-      LOGGER.error("Failed to close segment directory: {}. Continuing with error.", segmentDirectory.getPath(), e);
+      LOGGER.error("Failed to close segment directory: {}. Continuing with error.", segmentDirectory, e);
     }
     indexContainerMap.clear();
   }
