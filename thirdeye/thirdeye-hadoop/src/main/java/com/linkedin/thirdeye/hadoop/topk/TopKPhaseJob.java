@@ -12,12 +12,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.PriorityQueue;
 import java.util.Properties;
 
 import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.api.TopKDimensionSpec;
 import com.linkedin.thirdeye.hadoop.ThirdEyeConfig;
+import com.linkedin.thirdeye.hadoop.util.ThirdeyeAggregateMetricUtils;
 
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericRecord;
@@ -41,12 +41,35 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.collect.MinMaxPriorityQueue;
 
 /**
- * Map Input = Input from avro Key:(Avro record), value:(null)
- * Map Output = Key:(dimensionName, dimensionValue) Value:(Number[] metricValues)
- * Reduce Output = null
- * Reduce generates a file with top k values for specified dimensions
+ * This phase reads avro input, and produces a file with top k values for dimensions
+ *
+ * Map:
+ * Map phase reads avro records, and for each record emits
+ * Key=(Dimension name, Dimension Value) Value=(Metrics)
+ * For each record, map also emits a
+ * Key=(ALL, ALL) Value=(Metrics)
+ * This is used for computing the metric sums in the reduce phase
+ *
+ * Combine:
+ * Combine phase receives Key=(DimensionName, DimensionValue)
+ * from each map, and aggregates the metric values. This phase
+ * helps in reducing the traffic sent to reducer
+ *
+ * Reduce:
+ * We strictly use just 1 reducer.
+ * Reduce phase receives Key=(DimensionName, DimensionValue)
+ * and aggregates the metric values
+ * The very first key received is (ALL, ALL) with total metric sum
+ * These metric sums are used to check metric thresholds of other
+ * (dimensionName, dimensionValue) pairs. If none of the metric
+ * thresholds pass, the pair is discarded.
+ * In the cleanup, top k dimension values are picked for each dimension
+ * based on the metric value
+ * The top k dimension values for each dimension are written to a file
+ *
  */
 public class TopKPhaseJob extends Configured {
   private static final Logger LOGGER = LoggerFactory.getLogger(TopKPhaseJob.class);
@@ -71,7 +94,7 @@ public class TopKPhaseJob extends Configured {
     this.props = props;
   }
 
-  public static class TopKRollupPhaseOneMapper
+  public static class TopKPhaseMapper
       extends Mapper<AvroKey<GenericRecord>, NullWritable, BytesWritable, BytesWritable> {
 
     private TopKPhaseConfig config;
@@ -171,7 +194,7 @@ public class TopKPhaseJob extends Configured {
     }
   }
 
-  public static class TopKRollupPhaseCombiner
+  public static class TopKPhaseCombiner
     extends Reducer<BytesWritable, BytesWritable, BytesWritable, BytesWritable> {
 
     private TopKPhaseConfig config;
@@ -210,27 +233,7 @@ public class TopKPhaseJob extends Configured {
       for (BytesWritable value : values) {
         TopKPhaseMapOutputValue valWrapper = TopKPhaseMapOutputValue.fromBytes(value.getBytes(), metricTypes);
         Number[] metricValues = valWrapper.getMetricValues();
-        for (int i = 0; i < numMetrics; i++) {
-          MetricType metricType = metricTypes.get(i);
-          switch (metricType) {
-            case SHORT:
-              aggMetricValues[i] = aggMetricValues[i].shortValue() + metricValues[i].shortValue();
-              break;
-            case INT:
-              aggMetricValues[i] = aggMetricValues[i].intValue() + metricValues[i].intValue();
-              break;
-            case FLOAT:
-              aggMetricValues[i] = aggMetricValues[i].floatValue() + metricValues[i].floatValue();
-              break;
-            case DOUBLE:
-              aggMetricValues[i] = aggMetricValues[i].doubleValue() + metricValues[i].doubleValue();
-              break;
-            case LONG:
-            default:
-              aggMetricValues[i] = aggMetricValues[i].longValue() + metricValues[i].longValue();
-              break;
-          }
-        }
+        ThirdeyeAggregateMetricUtils.aggregate(metricTypes, aggMetricValues, metricValues);
       }
 
       TopKPhaseMapOutputValue valWrapper = new TopKPhaseMapOutputValue(aggMetricValues, metricTypes);
@@ -241,7 +244,7 @@ public class TopKPhaseJob extends Configured {
     }
   }
 
-  public static class TopKRollupPhaseOneReducer
+  public static class TopKPhaseReducer
       extends Reducer<BytesWritable, BytesWritable, NullWritable, NullWritable> {
 
     private FileSystem fileSystem;
@@ -249,8 +252,8 @@ public class TopKPhaseJob extends Configured {
 
     private ThirdEyeConfig thirdeyeConfig;
     private TopKPhaseConfig config;
-    List<String> dimensionNames;
-    List<String> metricNames;
+    private List<String> dimensionNames;
+    private List<String> metricNames;
     private List<MetricType> metricTypes;
     private Map<String, Integer> metricToIndexMapping;
     private int numMetrics;
@@ -260,6 +263,7 @@ public class TopKPhaseJob extends Configured {
     private Map<String, Map<String, Number[]>> dimensionNameToValuesMap;
     private TopKDimensionValues topkDimensionValues;
     private Map<String, Double> metricThresholds;
+    private Map<String, Integer> thresholdPassCount;
     private Map<String, TopKDimensionSpec> topKDimensionSpecMap;
 
     @Override
@@ -286,8 +290,10 @@ public class TopKPhaseJob extends Configured {
         keyWritable = new BytesWritable();
         valWritable = new BytesWritable();
         dimensionNameToValuesMap = new HashMap<>();
+        thresholdPassCount = new HashMap<>();
         for (String dimension : dimensionNames) {
           dimensionNameToValuesMap.put(dimension, new HashMap<String, Number[]>());
+          thresholdPassCount.put(dimension, 0);
         }
         topkDimensionValues = new TopKDimensionValues();
       } catch (Exception e) {
@@ -309,28 +315,9 @@ public class TopKPhaseJob extends Configured {
       for (BytesWritable value : values) {
         TopKPhaseMapOutputValue valWrapper = TopKPhaseMapOutputValue.fromBytes(value.getBytes(), metricTypes);
         Number[] metricValues = valWrapper.getMetricValues();
-        for (int i = 0; i < numMetrics; i++) {
-          MetricType metricType = metricTypes.get(i);
-          switch (metricType) {
-            case SHORT:
-              aggMetricValues[i] = aggMetricValues[i].shortValue() + metricValues[i].shortValue();
-              break;
-            case INT:
-              aggMetricValues[i] = aggMetricValues[i].intValue() + metricValues[i].intValue();
-              break;
-            case FLOAT:
-              aggMetricValues[i] = aggMetricValues[i].floatValue() + metricValues[i].floatValue();
-              break;
-            case DOUBLE:
-              aggMetricValues[i] = aggMetricValues[i].doubleValue() + metricValues[i].doubleValue();
-              break;
-            case LONG:
-            default:
-              aggMetricValues[i] = aggMetricValues[i].longValue() + metricValues[i].longValue();
-              break;
-          }
-        }
+        ThirdeyeAggregateMetricUtils.aggregate(metricTypes, aggMetricValues, metricValues);
       }
+
       // Metric sums case
       if (dimensionName.equals(TOPK_ALL_DIMENSION_NAME) && dimensionValue.equals(TOPK_ALL_DIMENSION_VALUE)) {
         LOGGER.info("Setting metric sums");
@@ -338,6 +325,7 @@ public class TopKPhaseJob extends Configured {
         metricSums = Arrays.copyOf(aggMetricValues, numMetrics);
         return;
       }
+
       // Check metric percentage threshold
       boolean isPassThreshold = false;
       for (int i = 0; i < numMetrics; i++) {
@@ -347,6 +335,7 @@ public class TopKPhaseJob extends Configured {
         double metricThresholdPercentage = metricThresholds.get(metric);
         if (metricValue > (metricSum * metricThresholdPercentage / 100)) {
           isPassThreshold = true;
+          thresholdPassCount.put(dimensionName, thresholdPassCount.get(dimensionName) + 1);
           break;
         }
       }
@@ -358,19 +347,20 @@ public class TopKPhaseJob extends Configured {
 
     @Override
     protected void cleanup(Context context) throws IOException, InterruptedException {
+
       for (String dimension : dimensionNames) {
+
+        LOGGER.info("{} records passed metric threshold for dimension {}", thresholdPassCount.get(dimension), dimension);
 
         TopKDimensionSpec topkSpec = topKDimensionSpecMap.get(dimension);
         if (topkSpec != null && topkSpec.getDimensionName() != null && topkSpec.getMetricName() != null && topkSpec.getTop() != 0) {
-          LOGGER.info("Dimension : {} Metric : {} Top : {}", topkSpec.getDimensionName(), topkSpec.getMetricName(), topkSpec.getTop() );
+
+          LOGGER.info("Picking Top {} values based on Metric {}", topkSpec.getTop(), topkSpec.getMetricName());
+          MinMaxPriorityQueue<DimensionValueMetricPair> topKQueue = MinMaxPriorityQueue.maximumSize(topkSpec.getTop()).create();
 
           Map<String, Number[]> dimensionToMetricsMap = dimensionNameToValuesMap.get(dimension);
-          PriorityQueue<DimensionValueMetricPair> topKQueue = new PriorityQueue<>();
           for (Entry<String, Number[]> entry : dimensionToMetricsMap.entrySet()) {
             topKQueue.add(new DimensionValueMetricPair(entry.getKey(), entry.getValue()[metricToIndexMapping.get(topkSpec.getMetricName())]));
-            if (topKQueue.size() > topkSpec.getTop()) {
-              topKQueue.remove();
-            }
           }
           for (DimensionValueMetricPair pair : topKQueue) {
             topkDimensionValues.addValue(dimension, pair.getDimensionValue());
@@ -422,17 +412,17 @@ public class TopKPhaseJob extends Configured {
     FileOutputFormat.setOutputPath(job, outputPath);
 
     // Map config
-    job.setMapperClass(TopKRollupPhaseOneMapper.class);
+    job.setMapperClass(TopKPhaseMapper.class);
     AvroJob.setInputKeySchema(job, inputSchema);
     job.setInputFormatClass(AvroKeyInputFormat.class);
     job.setMapOutputKeyClass(BytesWritable.class);
     job.setMapOutputValueClass(BytesWritable.class);
 
     // Combiner
-    job.setCombinerClass(TopKRollupPhaseCombiner.class);
+    job.setCombinerClass(TopKPhaseCombiner.class);
 
      // Reduce config
-    job.setReducerClass(TopKRollupPhaseOneReducer.class);
+    job.setReducerClass(TopKPhaseReducer.class);
     job.setOutputKeyClass(NullWritable.class);
     job.setOutputValueClass(NullWritable.class);
     job.setNumReduceTasks(1);

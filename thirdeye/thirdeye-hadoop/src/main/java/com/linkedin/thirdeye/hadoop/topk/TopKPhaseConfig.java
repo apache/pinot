@@ -11,6 +11,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * This class contains the config needed by TopKPhase
+ * and the methods to obtain the config from the ThirdEyeConfig
+ */
 public class TopKPhaseConfig {
   private List<String> dimensionNames;
   private List<String> metricNames;
@@ -60,6 +64,12 @@ public class TopKPhaseConfig {
     return topKDimensionSpec;
   }
 
+  /**
+   * This method generates necessary top k config for TopKPhase job from
+   * ThirdEye config
+   * @param config
+   * @return
+   */
   public static TopKPhaseConfig fromThirdEyeConfig(ThirdEyeConfig config) {
 
     List<String> metricNames = new ArrayList<String>(config.getMetrics().size());

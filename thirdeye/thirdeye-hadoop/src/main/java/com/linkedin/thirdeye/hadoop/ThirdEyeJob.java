@@ -19,8 +19,8 @@ import org.slf4j.LoggerFactory;
 import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.hadoop.push.SegmentPushPhase;
 import com.linkedin.thirdeye.hadoop.push.SegmentPushPhaseConstants;
-import com.linkedin.thirdeye.hadoop.segment.create.SegmentCreationPhaseConstants;
-import com.linkedin.thirdeye.hadoop.segment.create.SegmentCreationPhaseJob;
+import com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants;
+import com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseJob;
 import com.linkedin.thirdeye.hadoop.topk.TopKPhaseConstants;
 import com.linkedin.thirdeye.hadoop.topk.TopKPhaseJob;
 
@@ -77,7 +77,6 @@ public class ThirdEyeJob {
         config.setProperty(TopKPhaseConstants.TOPK_ROLLUP_PHASE_OUTPUT_PATH.toString(),
             getIndexDir(root, collection, minTime, maxTime) + File.separator
                 + TOPK.getName());
-
 
         return config;
       }

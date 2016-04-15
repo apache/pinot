@@ -1,13 +1,12 @@
 package com.linkedin.thirdeye.hadoop.topk;
 
-import java.util.Arrays;
-
+/**
+ * Class to manage dimension value and metric values pairs
+ */
 public class DimensionValueMetricPair implements Comparable<DimensionValueMetricPair>{
-
 
   private String dimensionValue;
   private Number metricValue;
-
 
   public DimensionValueMetricPair(String dimensionValue, Number metricValue) {
     this.dimensionValue = dimensionValue;
@@ -30,7 +29,7 @@ public class DimensionValueMetricPair implements Comparable<DimensionValueMetric
 
   @Override
   public int compareTo(DimensionValueMetricPair other) {
-    return this.metricValue.intValue() - other.metricValue.intValue();
+    return other.metricValue.intValue() - this.metricValue.intValue();
   }
 
   @Override

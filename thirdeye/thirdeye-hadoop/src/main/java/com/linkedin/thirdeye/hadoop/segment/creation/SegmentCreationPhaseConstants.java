@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.hadoop.segment.create;
+package com.linkedin.thirdeye.hadoop.segment.creation;
 
 public enum SegmentCreationPhaseConstants {
 

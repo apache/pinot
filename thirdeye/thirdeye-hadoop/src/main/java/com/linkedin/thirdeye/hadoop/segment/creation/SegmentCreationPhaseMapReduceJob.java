@@ -13,16 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.thirdeye.hadoop.segment.create;
+package com.linkedin.thirdeye.hadoop.segment.creation;
 
-import static com.linkedin.thirdeye.hadoop.segment.create.SegmentCreationPhaseConstants.SEGMENT_CREATION_CONFIG_PATH;
-import static com.linkedin.thirdeye.hadoop.segment.create.SegmentCreationPhaseConstants.SEGMENT_CREATION_DATA_SCHEMA;
-import static com.linkedin.thirdeye.hadoop.segment.create.SegmentCreationPhaseConstants.SEGMENT_CREATION_OUTPUT_PATH;
-import static com.linkedin.thirdeye.hadoop.segment.create.SegmentCreationPhaseConstants.SEGMENT_CREATION_SCHEDULE;
-import static com.linkedin.thirdeye.hadoop.segment.create.SegmentCreationPhaseConstants.SEGMENT_CREATION_SEGMENT_TABLE_NAME;
-import static com.linkedin.thirdeye.hadoop.segment.create.SegmentCreationPhaseConstants.SEGMENT_CREATION_THIRDEYE_CONFIG;
-import static com.linkedin.thirdeye.hadoop.segment.create.SegmentCreationPhaseConstants.SEGMENT_CREATION_WALLCLOCK_END_TIME;
-import static com.linkedin.thirdeye.hadoop.segment.create.SegmentCreationPhaseConstants.SEGMENT_CREATION_WALLCLOCK_START_TIME;
+import static com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants.SEGMENT_CREATION_CONFIG_PATH;
+import static com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants.SEGMENT_CREATION_DATA_SCHEMA;
+import static com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants.SEGMENT_CREATION_OUTPUT_PATH;
+import static com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants.SEGMENT_CREATION_SCHEDULE;
+import static com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants.SEGMENT_CREATION_SEGMENT_TABLE_NAME;
+import static com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants.SEGMENT_CREATION_THIRDEYE_CONFIG;
+import static com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants.SEGMENT_CREATION_WALLCLOCK_END_TIME;
+import static com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants.SEGMENT_CREATION_WALLCLOCK_START_TIME;
 
 import java.io.File;
 import java.io.IOException;
