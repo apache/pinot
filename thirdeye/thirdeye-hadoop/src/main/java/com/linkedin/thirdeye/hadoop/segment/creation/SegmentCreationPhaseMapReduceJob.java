@@ -103,6 +103,7 @@ public class SegmentCreationPhaseMapReduceJob {
 
       schema = OBJECT_MAPPER.readValue(properties.get(SEGMENT_CREATION_DATA_SCHEMA.toString()), Schema.class);
       thirdeyeConfig = OBJECT_MAPPER.readValue(properties.get(SEGMENT_CREATION_THIRDEYE_CONFIG.toString()), ThirdEyeConfig.class);
+      LOGGER.info(thirdeyeConfig.encode());
       tableName = thirdeyeConfig.getCollection();
 
       segmentWallClockStartTime = Long.valueOf(properties.get(SEGMENT_CREATION_WALLCLOCK_START_TIME.toString()));
