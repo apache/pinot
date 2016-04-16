@@ -24,16 +24,14 @@ import com.linkedin.pinot.core.query.utils.Pair;
 public class PairArrayBasedResultHolder implements ResultHolder<Pair> {
   private ResultArray _resultArray;
   private int _resultHolderCapacity;
-  private double _defaultValue;
 
   /**
    * Constructor for the class, taking ResultArray of type DoubleLongArray.
    *
    * @param resultHolderCapacity
    */
-  public PairArrayBasedResultHolder(DoubleLongResultArray resultArray, int resultHolderCapacity, double defaultValue) {
+  public PairArrayBasedResultHolder(DoubleLongResultArray resultArray, int resultHolderCapacity) {
     _resultHolderCapacity = resultHolderCapacity;
-    _defaultValue = defaultValue;
     _resultArray = resultArray;
   }
 
@@ -42,9 +40,8 @@ public class PairArrayBasedResultHolder implements ResultHolder<Pair> {
    *
    * @param resultHolderCapacity
    */
-  public PairArrayBasedResultHolder(DoubleDoubleResultArray resultArray, int resultHolderCapacity, double defaultValue) {
+  public PairArrayBasedResultHolder(DoubleDoubleResultArray resultArray, int resultHolderCapacity) {
     _resultHolderCapacity = resultHolderCapacity;
-    _defaultValue = defaultValue;
     _resultArray = resultArray;
   }
 
@@ -94,6 +91,6 @@ public class PairArrayBasedResultHolder implements ResultHolder<Pair> {
 
   @Override
   public void putValueForKey(long groupKey, Pair pair) {
-    _resultArray.set(pair, (int) groupKey);
+    _resultArray.set((int) groupKey, pair);
   }
 }

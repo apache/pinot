@@ -51,7 +51,7 @@ public class DoubleResultArray implements ResultArray {
   }
 
   @Override
-  public void set(Pair pair, int index) {
+  public void set(int index, Pair pair) {
     throw new RuntimeException("Unsupported method set(Object, index) for class: " + getClass().getName());
   }
 

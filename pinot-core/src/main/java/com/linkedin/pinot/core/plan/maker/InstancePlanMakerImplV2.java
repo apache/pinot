@@ -15,10 +15,6 @@
  */
 package com.linkedin.pinot.core.plan.maker;
 
-import com.linkedin.pinot.common.request.AggregationInfo;
-import com.linkedin.pinot.common.request.GroupBy;
-import com.linkedin.pinot.core.common.DataSourceMetadata;
-import com.linkedin.pinot.core.operator.groupby.AggregationGroupByOperator;
 import com.linkedin.pinot.core.plan.AggregationGroupByPlanNode;
 import java.util.List;
 import java.util.concurrent.ExecutorService;

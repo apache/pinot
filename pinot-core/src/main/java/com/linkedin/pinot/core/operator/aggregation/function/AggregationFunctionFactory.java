@@ -15,18 +15,16 @@
  */
 package com.linkedin.pinot.core.operator.aggregation.function;
 
-import com.linkedin.pinot.common.request.AggregationInfo;
-import java.util.List;
-
-
 /**
  * Factory class to create instances of aggregation function of the given name.
  */
 public class AggregationFunctionFactory {
+  public static final String COUNT_AGGREGATION_FUNCTION = "count";
   public static final String SUM_AGGREGATION_FUNCTION = "sum";
   public static final String MAX_AGGREGATION_FUNCTION = "max";
   public static final String MIN_AGGREGATION_FUNCTION = "min";
   public static final String AVG_AGGREGATION_FUNCTION = "avg";
+  public static final String RANGE_AGGREGATION_FUNCTION = "minmaxrange";
 
   /**
    * Given the name of aggregation function, create and return a new instance
@@ -39,6 +37,10 @@ public class AggregationFunctionFactory {
     AggregationFunction function;
 
     switch (functionName.toLowerCase()) {
+      case COUNT_AGGREGATION_FUNCTION:
+        function = new CountAggregationFunction();
+        break;
+
       case SUM_AGGREGATION_FUNCTION:
         function = new SumAggregationFunction();
         break;
@@ -53,6 +55,10 @@ public class AggregationFunctionFactory {
 
       case AVG_AGGREGATION_FUNCTION:
         function = new AvgAggregationFunction();
+        break;
+
+      case RANGE_AGGREGATION_FUNCTION:
+        function = new RangeAggregationFunction();
         break;
 
       default:

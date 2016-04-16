@@ -18,11 +18,13 @@ package com.linkedin.pinot.core.operator.groupby;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.GroupBy;
+import com.linkedin.pinot.common.utils.primitive.MutableLongValue;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunction;
 import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
 import com.linkedin.pinot.core.query.aggregation.function.AvgAggregationFunction;
+import com.linkedin.pinot.core.query.aggregation.function.MinMaxRangeAggregationFunction;
 import com.linkedin.pinot.core.query.utils.Pair;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import java.io.Serializable;
@@ -148,14 +150,19 @@ public class SingleValueGroupByExecutor implements GroupByExecutor {
 
     for (int i = 0; i < _aggrFuncContextList.size(); i++) {
       AggregationFunctionContext aggrFuncContext = _aggrFuncContextList.get(i);
-
-      String[] aggrColumns = aggrFuncContext.getAggregationColumns();
       _resultHolderArray[i].ensureCapacity(numGroupKeys);
 
-      for (int j = 0; j < aggrColumns.length; j++) {
-        String aggrColumn = aggrColumns[j];
-        double[] valueArray = _columnToValueArrayMap.get(aggrColumn);
-        aggrFuncContext.apply(length, _docIdToGroupKey, _resultHolderArray[i], valueArray);
+      // For count, no need to fetch value array.
+      if (aggrFuncContext.getFunctionName().equalsIgnoreCase("count")) {
+        aggrFuncContext.apply(length, _docIdToGroupKey, _resultHolderArray[i]);
+      } else {
+        String[] aggrColumns = aggrFuncContext.getAggregationColumns();
+
+        for (int j = 0; j < aggrColumns.length; j++) {
+          String aggrColumn = aggrColumns[j];
+          double[] valueArray = _columnToValueArrayMap.get(aggrColumn);
+          aggrFuncContext.apply(length, _docIdToGroupKey, _resultHolderArray[i], valueArray);
+        }
       }
     }
   }
@@ -211,15 +218,25 @@ public class SingleValueGroupByExecutor implements GroupByExecutor {
 
     Serializable resultForGroupKey;
     switch (resultDataType) {
+      case LONG:
+        resultForGroupKey = new MutableLongValue((long) resultHolder.getDoubleResult(idKeyPair.getFirst()));
+        break;
+
       case DOUBLE:
         resultForGroupKey = resultHolder.getDoubleResult(idKeyPair.getFirst());
         break;
 
       case AVERAGE_PAIR:
-        resultForGroupKey = (AvgAggregationFunction.AvgPair) resultHolder.getResult(idKeyPair.getFirst());
+        Pair<Double, Long> doubleLongPair = (Pair<Double, Long>) resultHolder.getResult(idKeyPair.getFirst());
+        resultForGroupKey = new AvgAggregationFunction.AvgPair(doubleLongPair.getFirst(), doubleLongPair.getSecond());
         break;
 
       case RANGE_PAIR:
+        Pair<Double, Double> doubleDoublePair = (Pair<Double, Double>) resultHolder.getResult(idKeyPair.getFirst());
+        resultForGroupKey = new MinMaxRangeAggregationFunction.MinMaxRangePair(doubleDoublePair.getFirst(),
+            doubleDoublePair.getSecond());
+        break;
+
       default:
         throw new RuntimeException(
             "Unsupported result data type RANGE_PAIR in class " + getClass().getName());
@@ -238,21 +255,23 @@ public class SingleValueGroupByExecutor implements GroupByExecutor {
     Set<String> columnsLoaded = new HashSet();
 
     for (AggregationFunctionContext aggrFuncContext : _aggrFuncContextList) {
-      String[] aggrColumns = aggrFuncContext.getAggregationColumns();
+      if (!aggrFuncContext.getFunctionName().equalsIgnoreCase("count")) {
+        String[] aggrColumns = aggrFuncContext.getAggregationColumns();
 
-      for (int i = 0; i < aggrColumns.length; i++) {
-        String aggrColumn = aggrColumns[i];
+        for (int i = 0; i < aggrColumns.length; i++) {
+          String aggrColumn = aggrColumns[i];
 
-        if (!columnsLoaded.contains(aggrColumn)) {
-          int[] dictIdArray = _columnToDictArrayMap.get(aggrColumn);
-          BlockValSet blockValSet = aggrFuncContext.getBlockValSet(i);
+          if (!columnsLoaded.contains(aggrColumn)) {
+            int[] dictIdArray = _columnToDictArrayMap.get(aggrColumn);
+            BlockValSet blockValSet = aggrFuncContext.getBlockValSet(i);
 
-          blockValSet.readIntValues(docIdSet, startIndex, length, dictIdArray, startIndex);
-          columnsLoaded.add(aggrColumn);
+            blockValSet.readIntValues(docIdSet, startIndex, length, dictIdArray, startIndex);
+            columnsLoaded.add(aggrColumn);
 
-          Dictionary dictionary = aggrFuncContext.getDictionary(i);
-          double[] valueArray = _columnToValueArrayMap.get(aggrColumn);
-          dictionary.readDoubleValues(dictIdArray, startIndex, length, valueArray, startIndex);
+            Dictionary dictionary = aggrFuncContext.getDictionary(i);
+            double[] valueArray = _columnToValueArrayMap.get(aggrColumn);
+            dictionary.readDoubleValues(dictIdArray, startIndex, length, valueArray, startIndex);
+          }
         }
       }
     }

@@ -28,6 +28,7 @@ import java.util.Objects;
 public interface AggregationFunction {
 
   enum ResultDataType {
+    LONG,
     DOUBLE,
     AVERAGE_PAIR,
     RANGE_PAIR

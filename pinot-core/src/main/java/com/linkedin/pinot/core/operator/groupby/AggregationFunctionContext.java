@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.operator.groupby;
 
+import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
@@ -45,7 +46,12 @@ public class AggregationFunctionContext {
    */
   AggregationFunctionContext(IndexSegment indexSegment, String aggFuncName, String[] columns) {
     _aggFuncName = aggFuncName;
+    _aggregationFunction = AggregationFunctionFactory.getAggregationFunction(_aggFuncName);
     _aggrColumns = columns;
+
+    if (_aggFuncName.equalsIgnoreCase("count")) {
+      return;
+    }
 
     _blockSingleValSet = new BlockValSet[columns.length];
     _dictionaries = new Dictionary[columns.length];
@@ -55,8 +61,6 @@ public class AggregationFunctionContext {
       _dictionaries[i] = dataSource.getDictionary();
       _blockSingleValSet[i] = dataSource.getNextBlock().getBlockValueSet();
     }
-
-    _aggregationFunction = AggregationFunctionFactory.getAggregationFunction(_aggFuncName);
   }
 
   /**

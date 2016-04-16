@@ -16,7 +16,6 @@
 package com.linkedin.pinot.core.operator.groupby;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.core.query.aggregation.function.AvgAggregationFunction;
 import com.linkedin.pinot.core.query.utils.Pair;
 import java.util.Arrays;
 
@@ -30,6 +29,8 @@ public class DoubleLongResultArray implements ResultArray {
 
   private double _doubleDefault;
   private long _longDefault;
+
+  private final Pair<Double, Long> _reusablePair = new Pair<>(0.0, 0L);
 
   public DoubleLongResultArray(int capacity, Pair<Double, Long> valuePair) {
     _doubles = new double[capacity];
@@ -49,11 +50,11 @@ public class DoubleLongResultArray implements ResultArray {
   /**
    * {@inheritDoc}
    *
-   * @param pair
    * @param index
+   * @param pair
    */
   @Override
-  public void set(Pair pair, int index) {
+  public void set(int index, Pair pair) {
     _doubles[index] = (double) pair.getFirst();
     _longs[index] = (long) pair.getSecond();
   }
@@ -86,8 +87,10 @@ public class DoubleLongResultArray implements ResultArray {
    * @return
    */
   @Override
-  public AvgAggregationFunction.AvgPair getResult(int index) {
-    return new AvgAggregationFunction.AvgPair(_doubles[index], _longs[index]);
+  public Pair<Double, Long> getResult(int index) {
+    _reusablePair.setFirst(_doubles[index]);
+    _reusablePair.setSecond(_longs[index]);
+    return _reusablePair;
   }
 
   /**

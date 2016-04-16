@@ -35,10 +35,10 @@ public interface ResultArray {
   /**
    * Set the pair value at index, (for result arrays that are pair).
    *
-   * @param pair
    * @param index
+   * @param pair
    */
-  void set(Pair pair, int index);
+  void set(int index, Pair pair);
 
   /**
    * Set all values in the array

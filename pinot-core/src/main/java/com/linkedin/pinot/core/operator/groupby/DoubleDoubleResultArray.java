@@ -16,7 +16,6 @@
 package com.linkedin.pinot.core.operator.groupby;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.core.query.aggregation.function.MinMaxRangeAggregationFunction;
 import com.linkedin.pinot.core.query.utils.Pair;
 import java.util.Arrays;
 
@@ -25,7 +24,10 @@ public class DoubleDoubleResultArray implements ResultArray {
   private double[] _doubles1;
   private double[] _doubles2;
 
-  private double[] _defaultValues;
+  private double _default1;
+  private double _default2;
+
+  private final Pair<Double, Double> _reusablePair = new Pair<>(0.0, 0.0);
 
   /**
    * Constructor for the class.
@@ -37,8 +39,8 @@ public class DoubleDoubleResultArray implements ResultArray {
     _doubles1 = new double[capacity];
     _doubles2 = new double[capacity];
 
-    _defaultValues[0] = valuePair.getFirst();
-    _defaultValues[1] = valuePair.getSecond();
+    _default1 = valuePair.getFirst();
+    _default2 = valuePair.getSecond();
 
     setAll(valuePair);
   }
@@ -46,11 +48,11 @@ public class DoubleDoubleResultArray implements ResultArray {
   /**
    * {@inheritDoc}
    *
-   * @param valuePair
    * @param index
+   * @param valuePair
    */
   @Override
-  public void set(Pair valuePair, int index) {
+  public void set(int index, Pair valuePair) {
     _doubles1[index] = (double) valuePair.getFirst();
     _doubles2[index] = (double) valuePair.getSecond();
   }
@@ -88,8 +90,10 @@ public class DoubleDoubleResultArray implements ResultArray {
    * @return
    */
   @Override
-  public MinMaxRangeAggregationFunction.MinMaxRangePair getResult(int index) {
-    return new MinMaxRangeAggregationFunction.MinMaxRangePair(_doubles1[index], _doubles2[index]);
+  public Pair<Double, Double> getResult(int index) {
+    _reusablePair.setFirst(_doubles1[index]);
+    _reusablePair.setSecond(_doubles2[index]);
+    return _reusablePair;
   }
 
   @Override
@@ -99,9 +103,8 @@ public class DoubleDoubleResultArray implements ResultArray {
 
   @Override
   public void expand(int newSize) {
-    _doubles1 = expandArray(_doubles1, newSize, _defaultValues[0]);
-    _doubles2 = expandArray(_doubles2, newSize, _defaultValues[1]);
-
+    _doubles1 = expandArray(_doubles1, newSize, _default1);
+    _doubles2 = expandArray(_doubles2, newSize, _default2);
   }
 
   /**
@@ -116,7 +119,7 @@ public class DoubleDoubleResultArray implements ResultArray {
 
     double[] expanded = new double[newSize];
     System.arraycopy(doubles, 0, expanded, 0, doubles.length);
-    Arrays.fill(doubles, doubles.length, expanded.length, defaultValue);
+    Arrays.fill(expanded, doubles.length, expanded.length, defaultValue);
     return expanded;
   }
 

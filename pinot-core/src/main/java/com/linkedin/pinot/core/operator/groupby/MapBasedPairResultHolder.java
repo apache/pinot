@@ -22,10 +22,8 @@ import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 public class MapBasedPairResultHolder implements ResultHolder<Pair> {
 
   private Long2ObjectOpenHashMap _resultMap;
-  private double _defaultValue;
 
-  public MapBasedPairResultHolder(double defaultValue) {
-    _defaultValue = defaultValue;
+  public MapBasedPairResultHolder() {
     _resultMap = new Long2ObjectOpenHashMap();
   }
 

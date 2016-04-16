@@ -95,8 +95,9 @@ public class AggregationGroupByPlanNode implements PlanNode {
   public static boolean isFitForAggregationFastAggregation(BrokerRequest brokerRequest) {
     for (AggregationInfo aggregationInfo : brokerRequest.getAggregationsInfo()) {
       String aggregationType = aggregationInfo.getAggregationType();
-      if (!aggregationType.equalsIgnoreCase("sum") && !aggregationType.equalsIgnoreCase("min") &&
-          !aggregationType.equalsIgnoreCase("max") && !aggregationType.equalsIgnoreCase("avg")) {
+      if (!aggregationType.equalsIgnoreCase("count") && !aggregationType.equalsIgnoreCase("sum")
+          && !aggregationType.equalsIgnoreCase("min") && !aggregationType.equalsIgnoreCase("max")
+          && !aggregationType.equalsIgnoreCase("avg") && !aggregationType.equalsIgnoreCase("minmaxrange")) {
         return false;
       }
     }
