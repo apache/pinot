@@ -15,30 +15,36 @@
  */
 package com.linkedin.pinot.common.metrics;
 
-import com.yammer.metrics.core.MetricsRegistry;
+import com.linkedin.pinot.common.Utils;
 
 
 /**
- * Broker metrics utility class, which provides facilities to log the execution performance of queries.
- *
- */
-public class BrokerMetrics extends AbstractMetrics<BrokerQueryPhase, BrokerMeter, BrokerGauge, BrokerTimer> {
+* Enumeration containing all the timers exposed by the Pinot server.
+*
+*/
+public enum ServerTimer implements AbstractMetrics.Timer {
+  CURRENT_MSG_EVENT_TIMESTAMP_LAG("currentMsgEventTimestampLag", false);
+
+  private final String timerName;
+  private final boolean global;
+
+  ServerTimer(String unit, boolean global) {
+    this.global = global;
+    this.timerName = Utils.toCamelCase(name().toLowerCase());
+  }
+
+  @Override
+  public String getTimerName() {
+    return timerName;
+  }
+
   /**
-   * Constructs the broker metrics.
+   * Returns true if the timer is global (not attached to a particular resource)
    *
-   * @param metricsRegistry The metric registry used to register timers and meters.
+   * @return true if the timer is global
    */
-  public BrokerMetrics(MetricsRegistry metricsRegistry) {
-    super("pinot.broker.", metricsRegistry, BrokerMetrics.class);
-  }
-
   @Override
-  protected BrokerQueryPhase[] getQueryPhases() {
-    return BrokerQueryPhase.values();
-  }
-
-  @Override
-  protected BrokerMeter[] getMeters() {
-    return BrokerMeter.values();
+  public boolean isGlobal() {
+    return global;
   }
 }
