@@ -31,7 +31,7 @@ import org.testng.annotations.Test;
 public class HugeByteBufferTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(HugeByteBufferTest.class);
 
-  @Test
+  @Test(enabled = false)
   public void testLoadGet() {
     HugeByteBuffer buffer = HugeByteBuffer.allocateDirect(3L * PinotDataBufferTest.ONE_GB);
     PinotDataBufferTest.loadVerifyAllTypes(buffer);
@@ -39,7 +39,7 @@ public class HugeByteBufferTest {
 
   }
 
-  @Test
+  @Test(enabled = false)
   public void testBulkGetPut() {
     HugeByteBuffer buffer = HugeByteBuffer.allocateDirect(3L * PinotDataBufferTest.ONE_GB);
 

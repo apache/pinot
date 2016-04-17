@@ -24,7 +24,7 @@ import org.testng.annotations.Test;
 public class PinotLByteBufferTest {
   private static Logger LOGGER = LoggerFactory.getLogger(PinotLByteBufferTest.class);
 
-  @Test
+  @Test(enabled = false)
   public void testLoadGet() {
     PinotLByteBuffer buffer = PinotLByteBuffer.allocateDirect(3L * PinotDataBufferTest.ONE_GB);
     PinotDataBufferTest.loadVerifyAllTypes(buffer);
