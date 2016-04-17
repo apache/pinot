@@ -205,7 +205,7 @@ public class PinotDataBufferTest {
     return data;
   }
 
-  @Test
+  @Test(enabled =  false)
   public void testReadWriteFile()
       throws IOException {
     final int[] data = generateNumbers(10_000_000, -1);
@@ -237,7 +237,7 @@ public class PinotDataBufferTest {
     heapReadBuf.close();
   }
 
-  @Test
+  @Test (enabled = false)
   public void testView() {
     PinotDataBuffer buffer = PinotDataBuffer.allocateDirect(0);
     PinotDataBuffer view = buffer.view(0, 0);
