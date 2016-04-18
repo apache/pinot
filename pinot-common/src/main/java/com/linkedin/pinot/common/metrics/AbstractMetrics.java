@@ -35,7 +35,7 @@ import com.yammer.metrics.core.MetricsRegistry;
  *
  */
 public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M extends AbstractMetrics.Meter, G extends
-    AbstractMetrics.Gauge> {
+    AbstractMetrics.Gauge, T extends AbstractMetrics.Timer> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(AbstractMetrics.class);
 
@@ -73,6 +73,12 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     boolean isGlobal();
   }
 
+  public interface Timer {
+    String getTimerName();
+
+    boolean isGlobal();
+  }
+
   /**
    * Logs the timing of a query phase.
    *
@@ -82,10 +88,33 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    */
   public void addPhaseTiming(final BrokerRequest request, final QP phase, final long nanos) {
     final String fullTimerName = buildMetricName(request, phase.getQueryPhaseName());
-    final MetricName metricName = new MetricName(_clazz, fullTimerName);
+    addValueToTimer(fullTimerName, nanos, TimeUnit.NANOSECONDS);
+  }
 
-    MetricsHelper.newTimer(_metricsRegistry, metricName, TimeUnit.MILLISECONDS, TimeUnit.SECONDS).update(nanos,
-        TimeUnit.NANOSECONDS);
+  /**
+   * Logs the timing for a table
+   *
+   * @param tableName The table associated with this timer
+   * @param timerName The name of timer
+   * @param duration The log time duration time value
+   * @param timeUnit The log time duration time unit
+   */
+  public void addTimeredTableValue(final String tableName, ServerTimer timer, final long duration, final TimeUnit timeUnit) {
+    final String fullTimerName = _metricPrefix + tableName + "." + timer.getTimerName();
+    addValueToTimer(fullTimerName, duration, timeUnit);
+  }
+
+  /**
+   * Logs the timing for a metric
+   *
+   * @param fullTimerName The full name of timer
+   * @param duration The log time duration time value
+   * @param timeUnit The log time duration time unit
+   */
+  private void addValueToTimer(String fullTimerName, final long duration, final TimeUnit timeUnit) {
+    final MetricName metricName = new MetricName(_clazz, fullTimerName);
+    MetricsHelper.newTimer(_metricsRegistry, metricName, TimeUnit.MILLISECONDS, TimeUnit.SECONDS).update(duration,
+        timeUnit);
   }
 
   /**

@@ -15,8 +15,6 @@
  */
 package com.linkedin.pinot.core.realtime.impl;
 
-import com.linkedin.pinot.common.metrics.ServerMeter;
-import com.linkedin.pinot.common.metrics.ServerMetrics;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -25,16 +23,22 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+
 import org.joda.time.DateTime;
 import org.joda.time.Interval;
 import org.roaringbitmap.IntIterator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import com.linkedin.pinot.common.metrics.ServerMeter;
+import com.linkedin.pinot.common.metrics.ServerMetrics;
+import com.linkedin.pinot.common.metrics.ServerTimer;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.time.TimeConverter;
 import com.linkedin.pinot.common.utils.time.TimeConverterProvider;
@@ -72,6 +76,8 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
   private final Map<String, RealtimeInvertedIndex> invertedIndexMap;
 
   private final TimeConverter timeConverter;
+  private final TimeConverter toSecondsTimeConverter;
+
   private AtomicInteger docIdGenerator;
   private String incomingTimeColumnName;
   private String outgoingTimeColumnName;
@@ -124,7 +130,8 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     // docId generator and tiem granularity converter
     docIdGenerator = new AtomicInteger(-1);
     timeConverter = TimeConverterProvider.getTimeConverterFromGranularitySpecs(schema);
-
+    toSecondsTimeConverter = TimeConverterProvider.getToSecondsTimeConverterFromGranularitySpecs(schema);
+    
     // forward index and inverted index setup
     columnIndexReaderWriterMap = new HashMap<String, DataFileReader>();
     invertedIndexMap = new HashMap<String, RealtimeInvertedIndex>();
@@ -245,6 +252,12 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     minTimeVal = Math.min(minTimeVal, timeValue);
     maxTimeVal = Math.max(maxTimeVal, timeValue);
 
+    try {
+      long msgEventTimeLagInSeconds = System.currentTimeMillis() / 1000 - (long) toSecondsTimeConverter.convert(timeValueObj);
+      serverMetrics.addTimeredTableValue(tableAndStreamName, ServerTimer.CURRENT_MSG_EVENT_TIMESTAMP_LAG, msgEventTimeLagInSeconds, TimeUnit.SECONDS);
+    } catch(Exception e) {
+      // Swallow exceptions.
+    }
     // also lets collect all dicIds to update inverted index later
     Map<String, Object> rawRowToDicIdMap = new HashMap<String, Object>();
 
