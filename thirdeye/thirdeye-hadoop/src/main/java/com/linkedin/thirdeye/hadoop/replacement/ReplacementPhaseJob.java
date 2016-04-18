@@ -299,6 +299,7 @@ public class ReplacementPhaseJob extends Configured {
     fieldAssembler = fieldAssembler.name(timeColumnName).type().longType().noDefault();
 
     outputSchema = fieldAssembler.endRecord();
+    LOGGER.info("New schema {}", outputSchema.toString(true));
 
     return outputSchema;
   }
