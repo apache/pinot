@@ -93,13 +93,13 @@ public class FilePerIndexDirectoryTest {
   @Test
   public void testMmapLargeBuffer()
       throws Exception {
-    testMultipleRW(ReadMode.mmap, 6, 3L * ONE_GB);
+    testMultipleRW(ReadMode.mmap, 6, 3L * ONE_MB);
   }
 
   @Test
   public void testLargeRWDirectBuffer()
       throws Exception {
-    testMultipleRW(ReadMode.heap, 6, 3L * ONE_GB);
+    testMultipleRW(ReadMode.heap, 6, 3L * ONE_MB);
   }
 
   @Test

@@ -110,20 +110,20 @@ public class SingleFileIndexDirectoryTest {
   @Test
   public void testMmapLargeBuffer()
       throws Exception {
-    testMultipleRW(ReadMode.mmap, 6, 4L * ONE_GB);
+    testMultipleRW(ReadMode.mmap, 6, 4L * ONE_MB);
   }
 
   @Test
   public void testLargeRWDirectBuffer()
       throws Exception {
-    testMultipleRW(ReadMode.heap, 6, 3L * ONE_GB);
+    testMultipleRW(ReadMode.heap, 6, 3L * ONE_MB);
   }
 
   @Test
   public void testModeChange()
       throws Exception {
     // first verify it all works for one mode
-    long size = 2L * ONE_GB;
+    long size = 2L * ONE_MB;
     testMultipleRW(ReadMode.heap, 6, size);
     ColumnIndexDirectory columnDirectory = null;
     try {
