@@ -381,8 +381,8 @@ public class TopKPhaseJob extends Configured {
       if (topkDimensionValues.getTopKDimensions().size() > 0) {
         String topkValuesPath = configuration.get(TOPK_PHASE_OUTPUT_PATH.toString());
         LOGGER.info("Writing top k values to {}",topkValuesPath);
-        FSDataOutputStream topKDimensionValuesOutputStream =
-            fileSystem.create(new Path(topkValuesPath + File.separator + TOPK_VALUES_FILE));
+        FSDataOutputStream topKDimensionValuesOutputStream = fileSystem.create(
+            new Path(topkValuesPath + File.separator + TOPK_VALUES_FILE));
         OBJECT_MAPPER.writeValue(topKDimensionValuesOutputStream, topkDimensionValues);
         topKDimensionValuesOutputStream.close();
       }

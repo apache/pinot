@@ -19,6 +19,8 @@ import org.slf4j.LoggerFactory;
 import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.hadoop.push.SegmentPushPhase;
 import com.linkedin.thirdeye.hadoop.push.SegmentPushPhaseConstants;
+import com.linkedin.thirdeye.hadoop.replacement.ReplacementPhaseConstants;
+import com.linkedin.thirdeye.hadoop.replacement.ReplacementPhaseJob;
 import com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants;
 import com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseJob;
 import com.linkedin.thirdeye.hadoop.topk.TopKPhaseConstants;
@@ -32,6 +34,8 @@ public class ThirdEyeJob {
 
   private static final String USAGE = "usage: phase_name job.properties";
   private static final String AVRO_SCHEMA = "schema.avsc";
+  private static final String REPLACEMENT_AVRO_SCHEMA = "replacement_schema.avsc";
+  private static final String TOPK_VALUES_FILE = "topk_values";
 
   private final String phaseName;
   private final Properties inputConfig;
@@ -78,6 +82,43 @@ public class ThirdEyeJob {
         return config;
       }
     },
+    REPLACEMENT {
+      @Override
+      Class<?> getKlazz() {
+        return ReplacementPhaseJob.class;
+      }
+
+      @Override
+      String getDescription() {
+        return "Adds new columns for dimensions with topk";
+      }
+
+      @Override
+      Properties getJobProperties(Properties inputConfig, String root, String collection,
+          DateTime minTime, DateTime maxTime, String inputPaths)
+              throws Exception {
+        Properties config = new Properties();
+
+        config.setProperty(ReplacementPhaseConstants.REPLACEMENT_PHASE_INPUT_SCHEMA_PATH.toString(),
+            getSchemaPath(root, collection));
+
+        config.setProperty(ReplacementPhaseConstants.REPLACEMENT_PHASE_INPUT_PATH.toString(),
+            inputPaths);
+
+        config.setProperty(ReplacementPhaseConstants.REPLACEMENT_PHASE_OUTPUT_SCHEMA_PATH.toString(),
+            getIndexDir(root, collection, minTime, maxTime));
+
+        config.setProperty(ReplacementPhaseConstants.REPLACEMENT_PHASE_OUTPUT_PATH.toString(),
+            getIndexDir(root, collection, minTime, maxTime) + File.separator
+              + REPLACEMENT.getName());
+
+        config.setProperty(ReplacementPhaseConstants.REPLACEMENT_PHASE_TOPK_PATH.toString(),
+            getIndexDir(root, collection, minTime, maxTime) + File.separator
+                + TOPK.getName() + File.separator + TOPK_VALUES_FILE);
+
+        return config;
+      }
+    },
     SEGMENT_CREATION {
       @Override
       Class<?> getKlazz() {
@@ -96,8 +137,10 @@ public class ThirdEyeJob {
         Properties config = new Properties();
 
         config.setProperty(SegmentCreationPhaseConstants.SEGMENT_CREATION_SCHEMA_PATH.toString(),
-            getSchemaPath(root, collection));
-        config.setProperty(SegmentCreationPhaseConstants.SEGMENT_CREATION_INPUT_PATH.toString(), inputPaths);
+            getIndexDir(root, collection, minTime, maxTime) + File.separator + REPLACEMENT_AVRO_SCHEMA);
+        config.setProperty(SegmentCreationPhaseConstants.SEGMENT_CREATION_INPUT_PATH.toString(),
+            getIndexDir(root, collection, minTime, maxTime)
+            + File.separator + REPLACEMENT.getName());
         config.setProperty(SegmentCreationPhaseConstants.SEGMENT_CREATION_OUTPUT_PATH.toString(),
             getIndexDir(root, collection, minTime, maxTime) + File.separator + SEGMENT_CREATION.getName());
         config.setProperty(SegmentCreationPhaseConstants.SEGMENT_CREATION_WALLCLOCK_START_TIME.toString(),
@@ -158,6 +201,7 @@ public class ThirdEyeJob {
     String getSchemaPath(String root, String collection) {
       return getCollectionDir(root, collection) + File.separator + AVRO_SCHEMA;
     }
+
   }
 
   private static void usage() {

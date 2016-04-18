@@ -85,6 +85,7 @@ public class SegmentCreationPhaseJob extends Configured {
     String schemaPath = getAndSetConfiguration(configuration, SEGMENT_CREATION_SCHEMA_PATH);
     LOGGER.info("Schema path : {}", schemaPath);
     ThirdEyeConfig thirdeyeConfig = ThirdEyeConfig.fromProperties(props);
+    LOGGER.info("ThirdEyeConfig {}", thirdeyeConfig.encode());
     Schema dataSchema = ThirdeyePinotSchemaUtils.createSchema(thirdeyeConfig);
     LOGGER.info("Data schema : {}", dataSchema);
     String inputSegmentDir = getAndSetConfiguration(configuration, SEGMENT_CREATION_INPUT_PATH);
