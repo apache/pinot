@@ -81,7 +81,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       _segmentPrunerService = new SegmentPrunerServiceImpl(_queryExecutorConfig.getPrunerConfig());
     }
     LOGGER.info("Trying to build QueryPlanMaker");
-    _planMaker = new InstancePlanMakerImplV2();
+    _planMaker = new InstancePlanMakerImplV2(_queryExecutorConfig);
     LOGGER.info("Trying to build QueryExecutorTimer");
   }
 
