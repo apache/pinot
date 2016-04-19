@@ -37,6 +37,7 @@ import org.codehaus.jackson.map.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.StarTreeIndexSpec;
 import com.linkedin.pinot.common.utils.SegmentNameBuilder;
@@ -102,7 +103,8 @@ public class SegmentCreationPhaseMapReduceJob {
       outputPath = properties.get(SEGMENT_CREATION_OUTPUT_PATH.toString());
 
       schema = OBJECT_MAPPER.readValue(properties.get(SEGMENT_CREATION_DATA_SCHEMA.toString()), Schema.class);
-      thirdeyeConfig = OBJECT_MAPPER.readValue(properties.get(SEGMENT_CREATION_THIRDEYE_CONFIG.toString()), ThirdEyeConfig.class);
+      thirdeyeConfig = new com.fasterxml.jackson.databind.ObjectMapper(new YAMLFactory())
+        .readValue(properties.get(SEGMENT_CREATION_THIRDEYE_CONFIG.toString()), ThirdEyeConfig.class);
       LOGGER.info(thirdeyeConfig.encode());
       tableName = thirdeyeConfig.getCollection();
 
