@@ -40,15 +40,15 @@ import org.testng.annotations.Test;
  */
 public class ChaosMonkeyIntegrationTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(ChaosMonkeyIntegrationTest.class);
-  private List<Process> _processes = new ArrayList<Process>();
-  private String AVRO_DIR = "/tmp/temp-avro-" + getClass().getName();
-  private String SEGMENT_DIR = "/tmp/temp-segment-" + getClass().getName();
   private static final String TOTAL_RECORD_COUNT = "1000";
   private static final String SEGMENT_COUNT = "25";
+  private final List<Process> _processes = new ArrayList<>();
+  private final String AVRO_DIR = "/tmp/temp-avro-" + getClass().getName();
+  private final String SEGMENT_DIR = "/tmp/temp-segment-" + getClass().getName();
 
   private Process runAdministratorCommand(String[] args) {
     String classpath = System.getProperty("java.class.path");
-    List<String> completeArgs = new ArrayList<String>();
+    List<String> completeArgs = new ArrayList<>();
     completeArgs.add("java");
     completeArgs.add("-Xms4G");
     completeArgs.add("-Xmx4G");
@@ -69,7 +69,7 @@ public class ChaosMonkeyIntegrationTest {
     }
   }
 
-  private static void sendSignalToProcess(Process process, Signal signal) {
+  private void sendSignalToProcess(Process process, Signal signal) {
     int processPid = getProcessPid(process);
     if (processPid != -1) {
       LOGGER.info("Sending signal {} to process {}", signal.intValue(), processPid);
@@ -77,7 +77,7 @@ public class ChaosMonkeyIntegrationTest {
     }
   }
 
-  private static int getProcessPid(Process process) {
+  private int getProcessPid(Process process) {
     Class<? extends Process> clazz = process.getClass();
     try {
       Field field = clazz.getDeclaredField("pid");
@@ -87,32 +87,6 @@ public class ChaosMonkeyIntegrationTest {
       return -1;
     } catch (IllegalAccessException e) {
       return -1;
-    }
-  }
-
-  private void kill(Process process) {
-    try {
-      synchronized (_processes) {
-        _processes.remove(process);
-      }
-      process.destroy();
-      process.waitFor();
-    } catch (InterruptedException e) {
-      // Ignored
-    }
-  }
-
-  private void sleep(long millis) {
-    long wakeTime = System.currentTimeMillis() + millis;
-    while (System.currentTimeMillis() < wakeTime) {
-      long timeToSleepFor = wakeTime - System.currentTimeMillis();
-      if (0 < timeToSleepFor) {
-        try {
-          Thread.sleep(timeToSleepFor);
-        } catch (InterruptedException e) {
-          // Ignored
-        }
-      }
     }
   }
 
@@ -186,7 +160,7 @@ public class ChaosMonkeyIntegrationTest {
     testFreezeZookeeper(10000L);
   }
 
-  @Test(enabled = false)
+  @Test
   public void testLongZookeeperFreeze() throws Exception {
     testFreezeZookeeper(60000L);
   }
@@ -195,46 +169,37 @@ public class ChaosMonkeyIntegrationTest {
     System.out.println("System.getProperty(\"java.class.path\") = " + System.getProperty("java.class.path"));
 
     Process zookeeper = startZookeeper();
-    sleep(1000L);
+    startController();
+    Thread.sleep(3000L);
 
-    Process controller = startController();
-    sleep(1000L);
-
-    Process server = startServer();
-    sleep(1000L);
-
-    Process broker = startBroker();
-    sleep(1000L);
+    startServer();
+    startBroker();
+    Thread.sleep(3000L);
 
     createTable();
     generateData();
     convertData();
     uploadData();
-
-    sleep(5000L);
+    Thread.sleep(5000L);
 
     long timeInTwoMinutes = System.currentTimeMillis() + 120000L;
     int currentRecordCount = countRecords();
     int expectedRecordCount = Integer.parseInt(TOTAL_RECORD_COUNT);
     while (currentRecordCount != expectedRecordCount && System.currentTimeMillis() < timeInTwoMinutes) {
-      sleep(1000L);
-      try {
-        currentRecordCount = countRecords();
-      } catch (Exception e) {
-        currentRecordCount = 0;
-      }
+      Thread.sleep(1000L);
+      currentRecordCount = countRecords();
     }
     Assert.assertEquals(currentRecordCount, expectedRecordCount, "All segments did not load within 120 seconds");
 
     sendSignalToProcess(zookeeper, Signal.SIGSTOP);
-    sleep(freezeLength);
+    Thread.sleep(freezeLength);
     sendSignalToProcess(zookeeper, Signal.SIGCONT);
-    sleep(5000L);
+    Thread.sleep(5000L);
 
     timeInTwoMinutes = System.currentTimeMillis() + 120000L;
     currentRecordCount = countRecords();
     while (currentRecordCount != expectedRecordCount && System.currentTimeMillis() < timeInTwoMinutes) {
-      sleep(1000L);
+      Thread.sleep(1000L);
       currentRecordCount = countRecords();
     }
     Assert.assertEquals(currentRecordCount, expectedRecordCount,
@@ -243,11 +208,8 @@ public class ChaosMonkeyIntegrationTest {
 
   @AfterMethod
   public void tearDown() {
-    synchronized (_processes) {
-      for (Process process : _processes) {
-        process.destroy();
-      }
-      _processes.clear();
+    for (Process process : _processes) {
+      process.destroy();
     }
     FileUtils.deleteQuietly(new File(AVRO_DIR));
     FileUtils.deleteQuietly(new File(SEGMENT_DIR));
