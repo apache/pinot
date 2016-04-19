@@ -77,7 +77,7 @@ public abstract class PinotDataBuffer implements AutoCloseable {
       throws IOException {
     Preconditions.checkNotNull(file, "Index file can not be null");
     if (readMode == ReadMode.heap) {
-      return loadFromFile(file, startPosition, length, openMode, context);
+      return loadFromFile(file, startPosition, length, context);
     } else if (readMode == ReadMode.mmap) {
       return mapFromFile(file, startPosition, length, openMode, context);
     } else {
@@ -95,13 +95,12 @@ public abstract class PinotDataBuffer implements AutoCloseable {
     }
   }
 
-  private static PinotDataBuffer loadFromFile(File file, long startPosition, long length, FileChannel.MapMode openMode,
-      String context)
+  private static PinotDataBuffer loadFromFile(File file, long startPosition, long length, String context)
       throws IOException {
     if (USE_LBUFFER) {
-      return PinotLByteBuffer.loadFromFile(file, startPosition, length, openMode, context);
+      return PinotLByteBuffer.loadFromFile(file, startPosition, length, context);
     } else {
-      return PinotByteBuffer.loadFromFile(file, startPosition, length, openMode, context);
+      return PinotByteBuffer.loadFromFile(file, startPosition, length, context);
     }
   }
 

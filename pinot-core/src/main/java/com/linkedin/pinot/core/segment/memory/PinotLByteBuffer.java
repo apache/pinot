@@ -86,7 +86,7 @@ public class PinotLByteBuffer extends PinotDataBuffer {
       throws IOException {
     Preconditions.checkNotNull(file, "Index file can not be null");
     if (readMode == ReadMode.heap) {
-      return loadFromFile(file, startPosition, length, openMode, context);
+      return loadFromFile(file, startPosition, length, context);
     } else if (readMode == ReadMode.mmap) {
       return mapFromFile(file, startPosition, length, openMode, context);
     } else {
@@ -110,8 +110,7 @@ public class PinotLByteBuffer extends PinotDataBuffer {
     return buf;
   }
 
-  static PinotLByteBuffer loadFromFile(File file, long startPosition, long length, FileChannel.MapMode openMode,
-      String context)
+  static PinotLByteBuffer loadFromFile(File file, long startPosition, long length, String context)
       throws IOException {
     // TODO: track memory
     LBuffer buf = new LBuffer(length);
@@ -382,19 +381,20 @@ public class PinotLByteBuffer extends PinotDataBuffer {
       throws IOException {
 
     long bufPosition = 0;
-    RandomAccessFile raf = new RandomAccessFile(file, "rw");
-    // arbitrary size..somewhat conservative to avoid impacting
-    // jvm configurations
-    int readSize = 10 * 1024 * 1024;
-    // TODO: track memory
-    ByteBuffer readBuffer = ByteBuffer.allocateDirect(readSize);
-    long endPosition = startPosition + length;
-    for (long offset = startPosition; offset < endPosition;) {
-      int bytesRead = raf.getChannel().read(readBuffer, offset);
-      this.readFrom(readBuffer, 0, bufPosition, bytesRead);
-      readBuffer.clear();
-      bufPosition += bytesRead;
-      offset += bytesRead;
+    try (RandomAccessFile raf = new RandomAccessFile(file, "rw")) {
+      // arbitrary size..somewhat conservative to avoid impacting
+      // jvm configurations
+      int readSize = 10 * 1024 * 1024;
+      // TODO: track memory
+      ByteBuffer readBuffer = ByteBuffer.allocateDirect(readSize);
+      long endPosition = startPosition + length;
+      for (long offset = startPosition; offset < endPosition; ) {
+        int bytesRead = raf.getChannel().read(readBuffer, offset);
+        this.readFrom(readBuffer, 0, bufPosition, bytesRead);
+        readBuffer.clear();
+        bufPosition += bytesRead;
+        offset += bytesRead;
+      }
     }
   }
 

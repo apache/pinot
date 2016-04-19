@@ -63,7 +63,7 @@ public class PinotByteBuffer extends PinotDataBuffer {
       throws IOException {
 
     if (readMode == ReadMode.heap) {
-      return PinotByteBuffer.loadFromFile(file, startPosition, length, openMode, context);
+      return PinotByteBuffer.loadFromFile(file, startPosition, length, context);
     } else if (readMode == ReadMode.mmap) {
       return PinotByteBuffer.mapFromFile(file, startPosition, length, openMode, context);
     } else {
@@ -101,19 +101,16 @@ public class PinotByteBuffer extends PinotDataBuffer {
     return pbb;
   }
 
-  static PinotDataBuffer loadFromFile(File file, long startPosition, long length, FileChannel.MapMode openMode,
-      String context)
+  static PinotDataBuffer loadFromFile(File file, long startPosition, long length, String context)
       throws IOException {
     Preconditions.checkArgument(length >= 0 && length < Integer.MAX_VALUE);
     Preconditions.checkNotNull(file);
     Preconditions.checkArgument(startPosition >= 0);
     Preconditions.checkNotNull(context);
+    Preconditions.checkState(file.exists(), "File: {} does not exist", file);
+    Preconditions.checkState(file.isFile(), "File: {} is not a regular file", file);
 
     PinotByteBuffer buffer = allocateDirect((int)length, file.toString()  + "-" + context);
-
-    if (openMode == FileChannel.MapMode.READ_WRITE && !file.exists()) {
-      file.createNewFile();
-    }
 
     buffer.readFrom(file, startPosition, length);
     return buffer;
