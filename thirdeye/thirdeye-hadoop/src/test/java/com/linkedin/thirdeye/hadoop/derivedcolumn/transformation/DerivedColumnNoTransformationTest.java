@@ -46,6 +46,11 @@ import com.linkedin.thirdeye.hadoop.ThirdEyeConfigConstants;
 import com.linkedin.thirdeye.hadoop.derivedcolumn.transformation.DerivedColumnTransformationPhaseConstants;
 import com.linkedin.thirdeye.hadoop.derivedcolumn.transformation.DerivedColumnTransformationPhaseJob.DerivedColumnTransformationPhaseMapper;
 
+/**
+ * This test, tests the scenario of derived column transformation,
+ * where the original schema and new schema are identical,
+ * as there are no values in the topk file
+ */
 public class DerivedColumnNoTransformationTest {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 

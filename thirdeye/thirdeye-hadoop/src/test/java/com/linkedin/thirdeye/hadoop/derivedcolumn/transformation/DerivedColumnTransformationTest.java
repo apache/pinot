@@ -46,6 +46,10 @@ import com.linkedin.thirdeye.hadoop.ThirdEyeConfigConstants;
 import com.linkedin.thirdeye.hadoop.derivedcolumn.transformation.DerivedColumnTransformationPhaseConstants;
 import com.linkedin.thirdeye.hadoop.derivedcolumn.transformation.DerivedColumnTransformationPhaseJob.DerivedColumnTransformationPhaseMapper;
 
+/**
+ * This test will test mapper of DerivedColumnTransformation phase,
+ * to see if new columns have been added according to the topk values file
+ */
 public class DerivedColumnTransformationTest {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
