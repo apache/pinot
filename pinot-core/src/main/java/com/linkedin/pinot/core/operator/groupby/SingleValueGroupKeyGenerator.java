@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.operator.groupby;
 
+import com.google.common.base.Preconditions;
 import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
@@ -104,7 +105,7 @@ public class SingleValueGroupKeyGenerator implements GroupKeyGenerator {
   }
 
   /**
-   * Generate group by key for a given array of column values, and corresponding
+   * Generate group-by key for a given array of column values, and corresponding
    * column cardinality.
    *
    *
@@ -112,8 +113,8 @@ public class SingleValueGroupKeyGenerator implements GroupKeyGenerator {
    * @param cardinalities
    * @return
    */
-  private static int generateGroupKey(int[] values, int[] cardinalities) {
-    int groupKey = 0;
+  public static long generateRawKey(int[] values, int[] cardinalities) {
+    long groupKey = 0;
     for (int i = 0; i < values.length; i++) {
       groupKey = groupKey * cardinalities[i] + values[i];
     }
@@ -124,21 +125,26 @@ public class SingleValueGroupKeyGenerator implements GroupKeyGenerator {
    * Decode the individual column values from a given group by key and the individual
    * column cardinalities.
    *
-   * @param groupKey
+   * @param rawGroupKey
    * @param cardinalities
    * @param decoded
    */
-  private static void decodeGroupKey(long groupKey, int[] cardinalities, int[] decoded) {
+  public static void decodeRawGroupKey(long rawGroupKey, int[] cardinalities, int[] decoded) {
     int length = cardinalities.length;
 
     for (int i = length - 1; i >= 0; --i) {
-      decoded[i] = (int) (groupKey % cardinalities[i]);
-      groupKey = groupKey / cardinalities[i];
+      decoded[i] = (int) (rawGroupKey % cardinalities[i]);
+      rawGroupKey = rawGroupKey / cardinalities[i];
     }
   }
 
   /**
    * {@inheritDoc}
+   *
+   * The group-by key generated is always 'int'. For array-based storage, the rawKey is
+   * guaranteed to be < 10K. And for map-based storage, we map the rawKey to an index,
+   * which is also guaranteed to fit in 'int'.
+   *
    * @param docId
    * @return
    */
@@ -153,8 +159,8 @@ public class SingleValueGroupKeyGenerator implements GroupKeyGenerator {
       }
     }
 
-    int rawKey = generateGroupKey(_reusableGroupByValuesArray, _cardinalities);
-    return saveGroupKey(rawKey);
+    long rawKey = generateRawKey(_reusableGroupByValuesArray, _cardinalities);
+    return updateRawKeyToGroupKeyMapping(rawKey);
   }
 
   /**
@@ -181,7 +187,7 @@ public class SingleValueGroupKeyGenerator implements GroupKeyGenerator {
    * @return
    */
   private String dictIdToStringGroupKey(long groupKey) {
-    decodeGroupKey(groupKey, _cardinalities, _reusableGroupByValuesArray);
+    decodeRawGroupKey(groupKey, _cardinalities, _reusableGroupByValuesArray);
 
     // Special case one group by column for performance.
     if (_groupByColumns.length == 1) {
@@ -236,14 +242,17 @@ public class SingleValueGroupKeyGenerator implements GroupKeyGenerator {
    * @param rawKey
    * @return
    */
-  private int saveGroupKey(int rawKey) {
+  private int updateRawKeyToGroupKeyMapping(long rawKey) {
     int groupKey;
     if (_storageType == STORAGE_TYPE.ARRAY_BASED) {
-      if (_uniqueGroupKeysFlag[rawKey] == false) {
-        _uniqueGroupKeysFlag[rawKey] = true;
+      Preconditions.checkState(rawKey < _uniqueGroupKeysFlag.length);
+
+      int intRawKey = (int) rawKey;
+      if (_uniqueGroupKeysFlag[intRawKey] == false) {
+        _uniqueGroupKeysFlag[intRawKey] = true;
         _numUniqueGroupKeys++;
       }
-      groupKey = rawKey;
+      groupKey = intRawKey;
 
     } else {
 
