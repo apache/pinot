@@ -326,12 +326,13 @@ public class PinotByteBuffer extends PinotDataBuffer {
   @Override
   protected void readFrom(File file, long startPosition, long length)
       throws IOException {
-    RandomAccessFile raf = new RandomAccessFile(file, "r");
-    raf.getChannel().position(startPosition);
-    ByteBuffer dup = buffer.duplicate();
-    dup.position(0);
-    dup.limit((int)length);
-    raf.getChannel().read(dup, startPosition);
+    try (RandomAccessFile raf = new RandomAccessFile(file, "r") ) {
+      raf.getChannel().position(startPosition);
+      ByteBuffer dup = buffer.duplicate();
+      dup.position(0);
+      dup.limit((int) length);
+      raf.getChannel().read(dup, startPosition);
+    }
   }
 
   @Override
