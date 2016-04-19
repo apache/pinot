@@ -19,9 +19,9 @@ package com.linkedin.pinot.tools.query.comparison;
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import java.io.File;
@@ -38,7 +38,7 @@ import org.apache.commons.io.FileUtils;
  * Given a segments directory, pick a random segment and read the dictionaries for all dimension columns.
  */
 public class SegmentInfoProvider {
-  static final String TMP_DIR = System.getProperty("java.io.tmpdir");
+  private static final String TMP_DIR = System.getProperty("java.io.tmpdir");
   private static final String SEGMENT_INFO_PROVIDER = "segmentInfoProvider";
   private final String _segmentDirName;
 
@@ -59,10 +59,10 @@ public class SegmentInfoProvider {
 
     _segmentDirName = segmentDirName;
     File segmentsDir = new File(_segmentDirName);
-    HashMap<String, Set<String>> uniqueColumnValues = new HashMap<>();
 
     Set<String> uniqueDimensions = new HashSet<>();
     Set<String> uniqueMetrics = new HashSet<>();
+    Map<String, Set<String>> uniqueColumnValues = new HashMap<>();
 
     for (File segment : segmentsDir.listFiles()) {
       readOneSegment(segment, uniqueDimensions, uniqueMetrics, uniqueColumnValues);
@@ -70,11 +70,10 @@ public class SegmentInfoProvider {
 
     _dimensionColumns = new ArrayList<>(uniqueDimensions);
     _metricColumns = new ArrayList<>(uniqueMetrics);
-    _columnValuesMap = new HashMap<>(_dimensionColumns.size());
+    _columnValuesMap = new HashMap<>(uniqueColumnValues.size());
 
     for (Map.Entry<String, Set<String>> entry : uniqueColumnValues.entrySet()) {
-      Set<String> values = entry.getValue();
-      _columnValuesMap.put(entry.getKey(), new ArrayList<>(values));
+      _columnValuesMap.put(entry.getKey(), new ArrayList<>(entry.getValue()));
     }
   }
 
@@ -105,15 +104,13 @@ public class SegmentInfoProvider {
       segmentDir = segmentFile;
     }
 
-    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(segmentDir);
+    IndexSegmentImpl indexSegment = (IndexSegmentImpl) Loaders.IndexSegment.load(segmentDir, ReadMode.heap);
+    SegmentMetadata segmentMetadata = indexSegment.getSegmentMetadata();
     Schema schema = segmentMetadata.getSchema();
 
-    List<String> dimensionColumns = schema.getDimensionNames();
-    uniqueDimensions.addAll(dimensionColumns);
+    uniqueDimensions.addAll(schema.getDimensionNames());
     uniqueMetrics.addAll(schema.getMetricNames());
 
-    IndexSegmentImpl indexSegment = (IndexSegmentImpl) Loaders.IndexSegment.load(segmentDir, ReadMode.heap);
-    Map<String, Dictionary> dictionaryMap = new HashMap<>();
     for (DimensionFieldSpec fieldSpec : schema.getDimensionFieldSpecs()) {
       if (!fieldSpec.isSingleValueField()) {
         continue;
@@ -121,18 +118,17 @@ public class SegmentInfoProvider {
 
       String column = fieldSpec.getName();
       Dictionary dictionary = indexSegment.getDictionaryFor(column);
-      dictionaryMap.put(column, dictionary);
-    }
 
-    for (String column : dimensionColumns) {
-      Dictionary dictionary = dictionaryMap.get(column);
-      int numValues = dictionary.length();
-
-      Set<String> values = new HashSet<>();
-      for (int i = 0; i < numValues; ++i) {
-        values.add(dictionary.get(i).toString());
+      Set<String> values = columnValuesMap.get(column);
+      if (values == null) {
+        values = new HashSet<>();
+        columnValuesMap.put(column, values);
       }
-      columnValuesMap.put(column, values);
+
+      int length = dictionary.length();
+      for (int i = 0; i < length; i++) {
+        values.add(dictionary.getStringValue(i));
+      }
     }
 
     if (tmpDir != null) {
