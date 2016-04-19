@@ -112,6 +112,7 @@ public class SegmentInfoProvider {
     uniqueDimensions.addAll(dimensionColumns);
     uniqueMetrics.addAll(schema.getMetricNames());
 
+    IndexSegmentImpl indexSegment = (IndexSegmentImpl) Loaders.IndexSegment.load(segmentDir, ReadMode.heap);
     Map<String, Dictionary> dictionaryMap = new HashMap<>();
     for (DimensionFieldSpec fieldSpec : schema.getDimensionFieldSpecs()) {
       if (!fieldSpec.isSingleValueField()) {
@@ -119,7 +120,6 @@ public class SegmentInfoProvider {
       }
 
       String column = fieldSpec.getName();
-      IndexSegmentImpl indexSegment = (IndexSegmentImpl) Loaders.IndexSegment.load(segmentDir, ReadMode.heap);
       Dictionary dictionary = indexSegment.getDictionaryFor(column);
       dictionaryMap.put(column, dictionary);
     }
