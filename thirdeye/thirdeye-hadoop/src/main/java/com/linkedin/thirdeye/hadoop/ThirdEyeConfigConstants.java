@@ -15,7 +15,9 @@ public enum ThirdEyeConfigConstants {
   THIRDEYE_TOPK_METRIC_THRESHOLD_VALUES("thirdeye.topk.metric.threshold.values"),
   THIRDEYE_TOPK_DIMENSION_NAMES("thirdeye.topk.dimension.names"),
   THIRDEYE_TOPK_DIMENSION_KVALUES("thirdeye.topk.dimension.kvalues"),
-  THIRDEYE_TOPK_DIMENSION_METRICNAMES("thirdeye.topk.dimension.metricnames");
+  THIRDEYE_TOPK_DIMENSION_METRICNAMES("thirdeye.topk.dimension.metricnames"),
+  THIRDEYE_WHITELIST_DIMENSION_NAMES("thirdeye.whitelist.dimension.names"),
+  THIRDEYE_WHITELIST_DIMENSION("thirdeye.whitelist.dimension");
 
   String name;
 

@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
+import java.util.Set;
 
 import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.api.TopKDimensionSpec;
@@ -276,6 +277,7 @@ public class TopKPhaseJob extends Configured {
     private Map<String, Double> metricThresholds;
     private Map<String, Integer> thresholdPassCount;
     private Map<String, TopKDimensionSpec> topKDimensionSpecMap;
+    private Map<String, Set<String>> whitelist;
 
     @Override
     public void setup(Context context) throws IOException, InterruptedException {
@@ -292,13 +294,15 @@ public class TopKPhaseJob extends Configured {
         dimensionNames = config.getDimensionNames();
         metricNames = config.getMetricNames();
         metricTypes = config.getMetricTypes();
+        whitelist = config.getWhitelist();
+
         numMetrics = metricNames.size();
+
         metricToIndexMapping = new HashMap<>();
         for (int i = 0; i < numMetrics; i ++) {
           metricToIndexMapping.put(metricNames.get(i), i);
         }
-        keyWritable = new BytesWritable();
-        valWritable = new BytesWritable();
+
         dimensionNameToValuesMap = new HashMap<>();
         thresholdPassCount = new HashMap<>();
         for (String dimension : dimensionNames) {
@@ -306,6 +310,10 @@ public class TopKPhaseJob extends Configured {
           thresholdPassCount.put(dimension, 0);
         }
         topkDimensionValues = new TopKDimensionValues();
+
+        keyWritable = new BytesWritable();
+        valWritable = new BytesWritable();
+
       } catch (Exception e) {
         throw new IOException(e);
       }
@@ -362,6 +370,7 @@ public class TopKPhaseJob extends Configured {
 
         LOGGER.info("{} records passed metric threshold for dimension {}", thresholdPassCount.get(dimension), dimension);
 
+        // Get top k
         TopKDimensionSpec topkSpec = topKDimensionSpecMap.get(dimension);
         if (topkSpec != null && topkSpec.getDimensionName() != null && topkSpec.getMetricName() != null && topkSpec.getTop() != 0) {
 
@@ -376,6 +385,13 @@ public class TopKPhaseJob extends Configured {
             topkDimensionValues.addValue(dimension, pair.getDimensionValue());
           }
         }
+
+        // Get whitelist
+        Set<String> whitelistValues = whitelist.get(dimension);
+        if (whitelistValues != null) {
+          topkDimensionValues.addAllValues(dimension, whitelistValues);
+        }
+
       }
 
       if (topkDimensionValues.getTopKDimensions().size() > 0) {

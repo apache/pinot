@@ -13,12 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.thirdeye.hadoop.replacement;
+package com.linkedin.thirdeye.hadoop.derivedcolumn.transformation;
 
 import com.linkedin.thirdeye.api.DimensionSpec;
 import com.linkedin.thirdeye.api.MetricSpec;
 import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.api.TopKDimensionSpec;
+import com.linkedin.thirdeye.api.TopKRollupSpec;
 import com.linkedin.thirdeye.hadoop.ThirdEyeConfig;
 
 import java.util.ArrayList;
@@ -27,17 +28,17 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * This class contains the config needed by ReplacementPhase
+ * This class contains the config needed by TopKColumnTransformation
  * and the methods to obtain the config from the ThirdEyeConfig
  */
-public class ReplacementPhaseConfig {
+public class DerivedColumnTransformationPhaseConfig {
   private List<String> dimensionNames;
   private List<String> metricNames;
   private List<MetricType> metricTypes;
   private String timeColumnName;
   private Set<String> topKDimensionNames;
 
-  public ReplacementPhaseConfig() {
+  public DerivedColumnTransformationPhaseConfig() {
 
   }
 
@@ -46,7 +47,7 @@ public class ReplacementPhaseConfig {
    * @param metricNames
    * @param metricTypes
    */
-  public ReplacementPhaseConfig(List<String> dimensionNames, List<String> metricNames,
+  public DerivedColumnTransformationPhaseConfig(List<String> dimensionNames, List<String> metricNames,
       List<MetricType> metricTypes, String timeColumnName, Set<String> topKDimensionNames) {
     super();
     this.dimensionNames = dimensionNames;
@@ -76,7 +77,7 @@ public class ReplacementPhaseConfig {
     return topKDimensionNames;
   }
 
-  public static ReplacementPhaseConfig fromThirdEyeConfig(ThirdEyeConfig config) {
+  public static DerivedColumnTransformationPhaseConfig fromThirdEyeConfig(ThirdEyeConfig config) {
 
     List<String> metricNames = new ArrayList<String>(config.getMetrics().size());
     List<MetricType> metricTypes = new ArrayList<MetricType>(config.getMetrics().size());
@@ -93,11 +94,14 @@ public class ReplacementPhaseConfig {
     String timeColumnName = config.getTime().getColumnName();
 
     Set<String> topKDimensionNames = new HashSet<>();
-    for (TopKDimensionSpec topKDimensionSpec : config.getTopKRollup().getTopKDimensionSpec()) {
-      topKDimensionNames.add(topKDimensionSpec.getDimensionName());
+    TopKRollupSpec topKRollupSpec = config.getTopKRollup();
+    if (topKRollupSpec != null && topKRollupSpec.getTopKDimensionSpec() != null) {
+      for (TopKDimensionSpec topKDimensionSpec : topKRollupSpec.getTopKDimensionSpec()) {
+        topKDimensionNames.add(topKDimensionSpec.getDimensionName());
+      }
     }
 
-    return new ReplacementPhaseConfig(dimensionNames, metricNames, metricTypes, timeColumnName, topKDimensionNames);
+    return new DerivedColumnTransformationPhaseConfig(dimensionNames, metricNames, metricTypes, timeColumnName, topKDimensionNames);
   }
 
 }

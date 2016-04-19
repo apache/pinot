@@ -19,12 +19,17 @@ import com.linkedin.thirdeye.api.DimensionSpec;
 import com.linkedin.thirdeye.api.MetricSpec;
 import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.api.TopKDimensionSpec;
+import com.linkedin.thirdeye.api.TopKRollupSpec;
 import com.linkedin.thirdeye.hadoop.ThirdEyeConfig;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
 
 /**
  * This class contains the config needed by TopKPhase
@@ -36,8 +41,10 @@ public class TopKPhaseConfig {
   private List<MetricType> metricTypes;
   private Map<String, Double> metricThresholds;
   private Map<String, TopKDimensionSpec> topKDimensionSpec;
+  private Map<String, Set<String>> whitelist;
 
-  private static double DEFAULT_METRIC_THRESHOLD = 0.01;
+  private static final double DEFAULT_METRIC_THRESHOLD = 0.01;
+  private static final String FIELD_SEPARATOR = ",";
 
   public TopKPhaseConfig() {
 
@@ -48,15 +55,17 @@ public class TopKPhaseConfig {
    * @param metricNames
    * @param metricTypes
    * @param metricThresholds
+   * @param whitelist
    */
   public TopKPhaseConfig(List<String> dimensionNames, List<String> metricNames, List<MetricType> metricTypes,
-      Map<String, Double> metricThresholds, Map<String, TopKDimensionSpec> topKDimensionSpec) {
+      Map<String, Double> metricThresholds, Map<String, TopKDimensionSpec> topKDimensionSpec, Map<String, Set<String>> whitelist) {
     super();
     this.dimensionNames = dimensionNames;
     this.metricNames = metricNames;
     this.metricTypes = metricTypes;
     this.metricThresholds = metricThresholds;
     this.topKDimensionSpec = topKDimensionSpec;
+    this.whitelist = whitelist;
   }
 
   public List<String> getDimensionNames() {
@@ -79,6 +88,10 @@ public class TopKPhaseConfig {
     return topKDimensionSpec;
   }
 
+  public Map<String, Set<String>> getWhitelist() {
+    return whitelist;
+  }
+
   /**
    * This method generates necessary top k config for TopKPhase job from
    * ThirdEye config
@@ -99,24 +112,36 @@ public class TopKPhaseConfig {
       dimensionNames.add(dimensionSpec.getName());
     }
 
+    TopKRollupSpec topKRollupSpec = config.getTopKRollup();
     Map<String, Double> metricThresholds = new HashMap<>();
-    if (config.getTopKRollup() != null && config.getTopKRollup().getThreshold() != null) {
-      metricThresholds = config.getTopKRollup().getThreshold();
-    }
-    for (String metric : metricNames) {
-      if (metricThresholds.get(metric) == null) {
-        metricThresholds.put(metric, DEFAULT_METRIC_THRESHOLD);
-      }
-    }
-
     Map<String, TopKDimensionSpec> topKDimensionSpec = new HashMap<>();
-    if (config.getTopKRollup() != null && config.getTopKRollup().getTopKDimensionSpec() != null) {
-      for (TopKDimensionSpec topkSpec : config.getTopKRollup().getTopKDimensionSpec()) {
-        topKDimensionSpec.put(topkSpec.getDimensionName(), topkSpec);
+    Map<String, Set<String>> whitelist = new HashMap<>();
+
+    if (topKRollupSpec != null) {
+      if (topKRollupSpec.getThreshold() != null) {
+        metricThresholds = topKRollupSpec.getThreshold();
+      }
+      for (String metric : metricNames) {
+        if (metricThresholds.get(metric) == null) {
+          metricThresholds.put(metric, DEFAULT_METRIC_THRESHOLD);
+        }
+      }
+
+      if (topKRollupSpec.getTopKDimensionSpec() != null) {
+        for (TopKDimensionSpec topkSpec : topKRollupSpec.getTopKDimensionSpec()) {
+          topKDimensionSpec.put(topkSpec.getDimensionName(), topkSpec);
+        }
+      }
+
+      if (topKRollupSpec.getExceptions() != null) {
+        for (Entry<String, String> entry : topKRollupSpec.getExceptions().entrySet()) {
+          String[] whitelistValues = entry.getValue().split(FIELD_SEPARATOR);
+          whitelist.put(entry.getKey(), new HashSet<String>(Arrays.asList(whitelistValues)));
+        }
       }
     }
 
-    return new TopKPhaseConfig(dimensionNames, metricNames, metricTypes, metricThresholds, topKDimensionSpec);
+    return new TopKPhaseConfig(dimensionNames, metricNames, metricTypes, metricThresholds, topKDimensionSpec, whitelist);
   }
 
 

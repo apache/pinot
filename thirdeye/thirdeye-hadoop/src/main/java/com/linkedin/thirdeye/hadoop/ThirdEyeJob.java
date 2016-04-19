@@ -17,10 +17,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.thirdeye.api.StarTreeConstants;
+import com.linkedin.thirdeye.hadoop.derivedcolumn.transformation.DerivedColumnTransformationPhaseConstants;
+import com.linkedin.thirdeye.hadoop.derivedcolumn.transformation.DerivedColumnTransformationPhaseJob;
 import com.linkedin.thirdeye.hadoop.push.SegmentPushPhase;
 import com.linkedin.thirdeye.hadoop.push.SegmentPushPhaseConstants;
-import com.linkedin.thirdeye.hadoop.replacement.ReplacementPhaseConstants;
-import com.linkedin.thirdeye.hadoop.replacement.ReplacementPhaseJob;
 import com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants;
 import com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseJob;
 import com.linkedin.thirdeye.hadoop.topk.TopKPhaseConstants;
@@ -34,7 +34,7 @@ public class ThirdEyeJob {
 
   private static final String USAGE = "usage: phase_name job.properties";
   private static final String AVRO_SCHEMA = "schema.avsc";
-  private static final String REPLACEMENT_AVRO_SCHEMA = "replacement_schema.avsc";
+  private static final String TRANSFORMATION_SCHEMA = "transformation_schema.avsc";
   private static final String TOPK_VALUES_FILE = "topk_values";
 
   private final String phaseName;
@@ -82,15 +82,15 @@ public class ThirdEyeJob {
         return config;
       }
     },
-    REPLACEMENT {
+    DERIVED_COLUMN_TRANSFORMATION {
       @Override
       Class<?> getKlazz() {
-        return ReplacementPhaseJob.class;
+        return DerivedColumnTransformationPhaseJob.class;
       }
 
       @Override
       String getDescription() {
-        return "Adds new columns for dimensions with topk";
+        return "Adds new columns for dimensions with topk or whitelist";
       }
 
       @Override
@@ -99,20 +99,20 @@ public class ThirdEyeJob {
               throws Exception {
         Properties config = new Properties();
 
-        config.setProperty(ReplacementPhaseConstants.REPLACEMENT_PHASE_INPUT_SCHEMA_PATH.toString(),
+        config.setProperty(DerivedColumnTransformationPhaseConstants.DERIVED_COLUMN_TRANSFORMATION_PHASE_INPUT_SCHEMA_PATH.toString(),
             getSchemaPath(root, collection));
 
-        config.setProperty(ReplacementPhaseConstants.REPLACEMENT_PHASE_INPUT_PATH.toString(),
+        config.setProperty(DerivedColumnTransformationPhaseConstants.DERIVED_COLUMN_TRANSFORMATION_PHASE_INPUT_PATH.toString(),
             inputPaths);
 
-        config.setProperty(ReplacementPhaseConstants.REPLACEMENT_PHASE_OUTPUT_SCHEMA_PATH.toString(),
+        config.setProperty(DerivedColumnTransformationPhaseConstants.DERIVED_COLUMN_TRANSFORMATION_PHASE_OUTPUT_SCHEMA_PATH.toString(),
             getIndexDir(root, collection, minTime, maxTime));
 
-        config.setProperty(ReplacementPhaseConstants.REPLACEMENT_PHASE_OUTPUT_PATH.toString(),
+        config.setProperty(DerivedColumnTransformationPhaseConstants.DERIVED_COLUMN_TRANSFORMATION_PHASE_OUTPUT_PATH.toString(),
             getIndexDir(root, collection, minTime, maxTime) + File.separator
-              + REPLACEMENT.getName());
+              + DERIVED_COLUMN_TRANSFORMATION.getName());
 
-        config.setProperty(ReplacementPhaseConstants.REPLACEMENT_PHASE_TOPK_PATH.toString(),
+        config.setProperty(DerivedColumnTransformationPhaseConstants.DERIVED_COLUMN_TRANSFORMATION_PHASE_TOPK_PATH.toString(),
             getIndexDir(root, collection, minTime, maxTime) + File.separator
                 + TOPK.getName() + File.separator + TOPK_VALUES_FILE);
 
@@ -137,10 +137,10 @@ public class ThirdEyeJob {
         Properties config = new Properties();
 
         config.setProperty(SegmentCreationPhaseConstants.SEGMENT_CREATION_SCHEMA_PATH.toString(),
-            getIndexDir(root, collection, minTime, maxTime) + File.separator + REPLACEMENT_AVRO_SCHEMA);
+            getIndexDir(root, collection, minTime, maxTime) + File.separator + TRANSFORMATION_SCHEMA);
         config.setProperty(SegmentCreationPhaseConstants.SEGMENT_CREATION_INPUT_PATH.toString(),
             getIndexDir(root, collection, minTime, maxTime)
-            + File.separator + REPLACEMENT.getName());
+            + File.separator + DERIVED_COLUMN_TRANSFORMATION.getName());
         config.setProperty(SegmentCreationPhaseConstants.SEGMENT_CREATION_OUTPUT_PATH.toString(),
             getIndexDir(root, collection, minTime, maxTime) + File.separator + SEGMENT_CREATION.getName());
         config.setProperty(SegmentCreationPhaseConstants.SEGMENT_CREATION_WALLCLOCK_START_TIME.toString(),

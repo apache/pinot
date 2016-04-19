@@ -40,6 +40,7 @@ import com.linkedin.thirdeye.api.TopKRollupSpec;
 public final class ThirdEyeConfig {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper(new YAMLFactory());
   private static final String FIELD_SEPARATOR = ",";
+  private static final String CONFIG_JOINER = ".";
   private static final String DEFAULT_TIME_TYPE = "HOURS";
   private static final String DEFAULT_TIME_SIZE = "1";
 
@@ -246,6 +247,7 @@ public final class ThirdEyeConfig {
 
     // topk
     TopKRollupSpec topKRollup = null;
+
     String thresholdMetricNames = getAndCheck(props, ThirdEyeConfigConstants.THIRDEYE_TOPK_THRESHOLD_METRIC_NAMES.toString(), null);
     String metricThresholdValues = getAndCheck(props, ThirdEyeConfigConstants.THIRDEYE_TOPK_METRIC_THRESHOLD_VALUES.toString(), null);
     Map<String, Double> threshold = null;
@@ -260,6 +262,7 @@ public final class ThirdEyeConfig {
         threshold.put(thresholdMetrics[i], Double.parseDouble(thresholdValues[i]));
       }
     }
+
     String topKDimensionNames = getAndCheck(props, ThirdEyeConfigConstants.THIRDEYE_TOPK_DIMENSION_NAMES.toString(), null);
     String topKDimensionMetricNames = getAndCheck(props, ThirdEyeConfigConstants.THIRDEYE_TOPK_DIMENSION_METRICNAMES.toString(), null);
     String topKDimensionKValues = getAndCheck(props, ThirdEyeConfigConstants.THIRDEYE_TOPK_DIMENSION_KVALUES.toString(), null);
@@ -276,10 +279,26 @@ public final class ThirdEyeConfig {
         topKDimensionSpec.add(new TopKDimensionSpec(topKDimensions[i], Integer.parseInt(topKValues[i]), topKMetrics[i]));
       }
     }
-    if (threshold != null || topKDimensionSpec != null) {
+
+    Map<String, String> whitelist = null;
+    String whitelistDimensions = getAndCheck(props, ThirdEyeConfigConstants.THIRDEYE_WHITELIST_DIMENSION_NAMES.toString(), null);
+    if (whitelistDimensions != null && whitelistDimensions.split(FIELD_SEPARATOR).length > 0) {
+      whitelist = new HashMap<>();
+      for (String dimension : whitelistDimensions.split(FIELD_SEPARATOR)) {
+        String dimensionWhitelist = getAndCheck(props,
+            ThirdEyeConfigConstants.THIRDEYE_WHITELIST_DIMENSION.toString()
+            + CONFIG_JOINER + dimension, null);
+        if (dimensionWhitelist != null) {
+          whitelist.put(dimension, dimensionWhitelist);
+        }
+      }
+    }
+
+    if (threshold != null || topKDimensionSpec != null || whitelist != null) {
       topKRollup = new TopKRollupSpec();
       topKRollup.setThreshold(threshold);
       topKRollup.setTopKDimensionSpec(topKDimensionSpec);
+      topKRollup.setExceptions(whitelist);
     }
 
     return new ThirdEyeConfig(collection, dimensions, metrics, time, topKRollup, split);
@@ -296,6 +315,29 @@ public final class ThirdEyeConfig {
   private static String getAndCheck(Properties props, String propName, String defaultValue) {
     String propValue = props.getProperty(propName, defaultValue);
     return propValue;
+  }
+
+  public static void main(String[] args) throws IOException {
+    Properties props = new Properties();
+    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_TABLE_NAME.toString(), "collection");
+    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_DIMENSION_NAMES.toString(), "d1,d2,d3");
+    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_METRIC_NAMES.toString(), "m1,m2,m3");
+    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_METRIC_TYPES.toString(), "LONG,FLOAT,INT");
+    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_TIMECOLUMN_NAME.toString(), "t1");
+    //props.setProperty(ThirdEyeConfigConstants.THIRDEYE_TIMECOLUMN_TYPE.toString(), "DAYS");
+    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_TIMECOLUMN_SIZE.toString(), "10");
+    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_SPLIT_THRESHOLD.toString(), "1000");
+    //props.setProperty(ThirdEyeConfigConstants.THIRDEYE_SPLIT_ORDER.toString(), "d1,d2,d3");
+    //props.setProperty(ThirdEyeConfigConstants.THIRDEYE_TOPK_THRESHOLD_METRIC_NAMES.toString(), "m1");
+    //props.setProperty(ThirdEyeConfigConstants.THIRDEYE_TOPK_METRIC_THRESHOLD_VALUES.toString(), "0.02");
+    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_TOPK_DIMENSION_NAMES.toString(), "d2,d3");
+    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_TOPK_DIMENSION_METRICNAMES.toString(), "m1,m1");
+    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_TOPK_DIMENSION_KVALUES.toString(), "20,5");
+    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_WHITELIST_DIMENSION_NAMES.toString(), "d1,d2");
+    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_WHITELIST_DIMENSION.toString() + "d1", "x,y,z");
+    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_WHITELIST_DIMENSION.toString() + "d2", "a,b,c,d");
+    ThirdEyeConfig copy = ThirdEyeConfig.fromProperties(props);
+    System.out.println(copy.encode());
   }
 
 }

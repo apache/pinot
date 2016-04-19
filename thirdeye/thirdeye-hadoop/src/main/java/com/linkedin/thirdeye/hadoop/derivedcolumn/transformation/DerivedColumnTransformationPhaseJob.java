@@ -13,14 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.thirdeye.hadoop.replacement;
+package com.linkedin.thirdeye.hadoop.derivedcolumn.transformation;
 
-import static com.linkedin.thirdeye.hadoop.replacement.ReplacementPhaseConstants.REPLACEMENT_PHASE_INPUT_PATH;
-import static com.linkedin.thirdeye.hadoop.replacement.ReplacementPhaseConstants.REPLACEMENT_PHASE_INPUT_SCHEMA_PATH;
-import static com.linkedin.thirdeye.hadoop.replacement.ReplacementPhaseConstants.REPLACEMENT_PHASE_OUTPUT_PATH;
-import static com.linkedin.thirdeye.hadoop.replacement.ReplacementPhaseConstants.REPLACEMENT_PHASE_OUTPUT_SCHEMA_PATH;
-import static com.linkedin.thirdeye.hadoop.replacement.ReplacementPhaseConstants.REPLACEMENT_PHASE_THIRDEYE_CONFIG;
-import static com.linkedin.thirdeye.hadoop.replacement.ReplacementPhaseConstants.REPLACEMENT_PHASE_TOPK_PATH;
+import static com.linkedin.thirdeye.hadoop.derivedcolumn.transformation.DerivedColumnTransformationPhaseConstants.DERIVED_COLUMN_TRANSFORMATION_PHASE_INPUT_PATH;
+import static com.linkedin.thirdeye.hadoop.derivedcolumn.transformation.DerivedColumnTransformationPhaseConstants.DERIVED_COLUMN_TRANSFORMATION_PHASE_INPUT_SCHEMA_PATH;
+import static com.linkedin.thirdeye.hadoop.derivedcolumn.transformation.DerivedColumnTransformationPhaseConstants.DERIVED_COLUMN_TRANSFORMATION_PHASE_OUTPUT_PATH;
+import static com.linkedin.thirdeye.hadoop.derivedcolumn.transformation.DerivedColumnTransformationPhaseConstants.DERIVED_COLUMN_TRANSFORMATION_PHASE_OUTPUT_SCHEMA_PATH;
+import static com.linkedin.thirdeye.hadoop.derivedcolumn.transformation.DerivedColumnTransformationPhaseConstants.DERIVED_COLUMN_TRANSFORMATION_PHASE_THIRDEYE_CONFIG;
+import static com.linkedin.thirdeye.hadoop.derivedcolumn.transformation.DerivedColumnTransformationPhaseConstants.DERIVED_COLUMN_TRANSFORMATION_PHASE_TOPK_PATH;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -34,6 +34,7 @@ import java.util.Set;
 import com.linkedin.thirdeye.api.MetricSpec;
 import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.api.TopKDimensionSpec;
+import com.linkedin.thirdeye.api.TopKRollupSpec;
 import com.linkedin.thirdeye.hadoop.ThirdEyeConfig;
 import com.linkedin.thirdeye.hadoop.topk.TopKDimensionValues;
 
@@ -64,16 +65,20 @@ import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-
-public class ReplacementPhaseJob extends Configured {
-  private static final Logger LOGGER = LoggerFactory.getLogger(ReplacementPhaseJob.class);
+/**
+ * This phase will add a new column for every column that has topk/whitelist config
+ * The new column added will be called column_raw (containing all values) and
+ * column will contain only topk+whitelist values
+ */
+public class DerivedColumnTransformationPhaseJob extends Configured {
+  private static final Logger LOGGER = LoggerFactory.getLogger(DerivedColumnTransformationPhaseJob.class);
 
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static final String RAW_DIMENSION_SUFFIX = "_raw";
   private static final String OTHER = "other";
   private static final String EMPTY_STRING = "";
   private static final Number EMPTY_NUMBER = 0;
-  private static final String REPLACEMENT_AVRO_SCHEMA = "replacement_schema.avsc";
+  private static final String TRANSFORMATION_SCHEMA = "transformation_schema.avsc";
 
   private String name;
   private Properties props;
@@ -82,18 +87,18 @@ public class ReplacementPhaseJob extends Configured {
    * @param name
    * @param props
    */
-  public ReplacementPhaseJob(String name, Properties props) {
+  public DerivedColumnTransformationPhaseJob(String name, Properties props) {
     super(new Configuration());
     this.name = name;
     this.props = props;
   }
 
-  public static class ReplacementPhaseMapper
+  public static class DerivedColumnTransformationPhaseMapper
       extends Mapper<AvroKey<GenericRecord>, NullWritable, AvroKey<GenericRecord>, NullWritable> {
 
     private Schema outputSchema;
     private ThirdEyeConfig thirdeyeConfig;
-    private ReplacementPhaseConfig replacementPhaseConfig;
+    private DerivedColumnTransformationPhaseConfig config;
     private List<String> dimensionsNames;
     private List<String> metricNames;
     private List<MetricType> metricTypes;
@@ -104,29 +109,31 @@ public class ReplacementPhaseJob extends Configured {
 
     @Override
     public void setup(Context context) throws IOException, InterruptedException {
-      LOGGER.info("ReplacementPhaseJob.ReplacementPhaseMapper.setup()");
+      LOGGER.info("DerivedColumnTransformationPhaseJob.DerivedColumnTransformationPhaseMapper.setup()");
       Configuration configuration = context.getConfiguration();
       FileSystem fs = FileSystem.get(configuration);
 
-      thirdeyeConfig = OBJECT_MAPPER.readValue(configuration.get(REPLACEMENT_PHASE_THIRDEYE_CONFIG.toString()), ThirdEyeConfig.class);
-      replacementPhaseConfig = ReplacementPhaseConfig.fromThirdEyeConfig(thirdeyeConfig);
-      dimensionsNames = replacementPhaseConfig.getDimensionNames();
-      metricNames = replacementPhaseConfig.getMetricNames();
-      metricTypes = replacementPhaseConfig.getMetricTypes();
-      timeColumnName = replacementPhaseConfig.getTimeColumnName();
-      topKDimensionNames = replacementPhaseConfig.getTopKDimensionNames();
+      thirdeyeConfig = OBJECT_MAPPER.readValue(configuration.get(DERIVED_COLUMN_TRANSFORMATION_PHASE_THIRDEYE_CONFIG.toString()), ThirdEyeConfig.class);
+      config = DerivedColumnTransformationPhaseConfig.fromThirdEyeConfig(thirdeyeConfig);
+      dimensionsNames = config.getDimensionNames();
+      metricNames = config.getMetricNames();
+      metricTypes = config.getMetricTypes();
+      timeColumnName = config.getTimeColumnName();
+      topKDimensionNames = config.getTopKDimensionNames();
 
-      Path outputSchemaPath = new Path(configuration.get(REPLACEMENT_PHASE_OUTPUT_SCHEMA_PATH.toString())
-          + File.separator + REPLACEMENT_AVRO_SCHEMA);
+      Path outputSchemaPath = new Path(configuration.get(DERIVED_COLUMN_TRANSFORMATION_PHASE_OUTPUT_SCHEMA_PATH.toString())
+          + File.separator + TRANSFORMATION_SCHEMA);
       FSDataInputStream outputSchemaStream = fs.open(outputSchemaPath);
       outputSchema = new Schema.Parser().parse(outputSchemaStream);
       outputSchemaStream.close();
 
-      Path topKPath = new Path(configuration.get(REPLACEMENT_PHASE_TOPK_PATH.toString()));
-      FSDataInputStream topkValuesStream = fs.open(topKPath);
-      topKDimensionValues = OBJECT_MAPPER.readValue(topkValuesStream, TopKDimensionValues.class);
-      topkValuesStream.close();
-
+      Path topKPath = new Path(configuration.get(DERIVED_COLUMN_TRANSFORMATION_PHASE_TOPK_PATH.toString()));
+      topKDimensionValues = new TopKDimensionValues();
+      if (fs.exists(topKPath)) {
+        FSDataInputStream topkValuesStream = fs.open(topKPath);
+        topKDimensionValues = OBJECT_MAPPER.readValue(topkValuesStream, TopKDimensionValues.class);
+        topkValuesStream.close();
+      }
       topKDimensionsMap = topKDimensionValues.getTopKDimensions();
     }
 
@@ -145,7 +152,7 @@ public class ReplacementPhaseJob extends Configured {
       for (String dimension : dimensionsNames) {
         String dimensionName = dimension;
         String dimensionValue = getDimensionFromRecord(inputRecord, dimension);
-        // add column for topk
+        // add column for topk + whitelist
         if (topKDimensionsMap.containsKey(dimensionName)) {
           if (topKDimensionsMap.get(dimensionName).contains(dimensionValue)) {
             outputRecord.put(dimensionName, dimensionValue);
@@ -195,18 +202,18 @@ public class ReplacementPhaseJob extends Configured {
   public Job run() throws Exception {
     Job job = Job.getInstance(getConf());
     job.setJobName(name);
-    job.setJarByClass(ReplacementPhaseJob.class);
+    job.setJarByClass(DerivedColumnTransformationPhaseJob.class);
 
     Configuration configuration = job.getConfiguration();
     FileSystem fs = FileSystem.get(configuration);
 
     // Input schema
-    Path inputSchemaPath = new Path(getAndSetConfiguration(configuration, REPLACEMENT_PHASE_INPUT_SCHEMA_PATH));
+    Path inputSchemaPath = new Path(getAndSetConfiguration(configuration, DERIVED_COLUMN_TRANSFORMATION_PHASE_INPUT_SCHEMA_PATH));
     FSDataInputStream inputSchemaStream = fs.open(inputSchemaPath);
     Schema inputSchema = new Schema.Parser().parse(inputSchemaStream);
 
     // Input Path
-    String inputPathDir = getAndSetConfiguration(configuration, REPLACEMENT_PHASE_INPUT_PATH);
+    String inputPathDir = getAndSetConfiguration(configuration, DERIVED_COLUMN_TRANSFORMATION_PHASE_INPUT_PATH);
     LOGGER.info("Input path dir: " + inputPathDir);
     for (String inputPath : inputPathDir.split(",")) {
       LOGGER.info("Adding input:" + inputPath);
@@ -215,10 +222,10 @@ public class ReplacementPhaseJob extends Configured {
     }
 
     // Topk path
-    getAndSetConfiguration(configuration, REPLACEMENT_PHASE_TOPK_PATH);
+    getAndSetConfiguration(configuration, DERIVED_COLUMN_TRANSFORMATION_PHASE_TOPK_PATH);
 
     // Output path
-    Path outputPath = new Path(getAndSetConfiguration(configuration, REPLACEMENT_PHASE_OUTPUT_PATH));
+    Path outputPath = new Path(getAndSetConfiguration(configuration, DERIVED_COLUMN_TRANSFORMATION_PHASE_OUTPUT_PATH));
     if (fs.exists(outputPath)) {
       fs.delete(outputPath, true);
     }
@@ -226,18 +233,19 @@ public class ReplacementPhaseJob extends Configured {
 
     // ThirdEye Config
     ThirdEyeConfig thirdeyeConfig = ThirdEyeConfig.fromProperties(props);
-    job.getConfiguration().set(REPLACEMENT_PHASE_THIRDEYE_CONFIG.toString(), OBJECT_MAPPER.writeValueAsString(thirdeyeConfig));
+    job.getConfiguration().set(DERIVED_COLUMN_TRANSFORMATION_PHASE_THIRDEYE_CONFIG.toString(),
+        OBJECT_MAPPER.writeValueAsString(thirdeyeConfig));
 
     // Output schema
-    Path outputSchemaPath = new Path(getAndSetConfiguration(configuration, REPLACEMENT_PHASE_OUTPUT_SCHEMA_PATH)
-        + File.separator + REPLACEMENT_AVRO_SCHEMA);
+    Path outputSchemaPath = new Path(getAndSetConfiguration(configuration, DERIVED_COLUMN_TRANSFORMATION_PHASE_OUTPUT_SCHEMA_PATH)
+        + File.separator + TRANSFORMATION_SCHEMA);
     Schema outputSchema = newSchema(thirdeyeConfig, inputSchema);
     FSDataOutputStream outputSchemaStream = fs.create(outputSchemaPath);
     outputSchemaStream.writeBytes(outputSchema.toString(true));
     outputSchemaStream.close();
 
     // Map config
-    job.setMapperClass(ReplacementPhaseMapper.class);
+    job.setMapperClass(DerivedColumnTransformationPhaseMapper.class);
     AvroJob.setInputKeySchema(job, inputSchema);
     job.setInputFormatClass(AvroKeyInputFormat.class);
     job.setMapOutputKeyClass(AvroKey.class);
@@ -253,22 +261,32 @@ public class ReplacementPhaseJob extends Configured {
   }
 
 
-  private Schema newSchema(ThirdEyeConfig thirdeyeConfig, Schema inputSchema) {
+  public Schema newSchema(ThirdEyeConfig thirdeyeConfig, Schema inputSchema) {
     Schema outputSchema = null;
 
-    Set<String> topkDimensionSet = new HashSet<>();
-    List<TopKDimensionSpec> topKDimensionSpecs = thirdeyeConfig.getTopKRollup().getTopKDimensionSpec();
-    for (TopKDimensionSpec topKDimensionSpec : topKDimensionSpecs) {
-      String dimension = topKDimensionSpec.getDimensionName();
-      topkDimensionSet.add(dimension);
-    }
+    Set<String> transformDimensionSet = new HashSet<>();
+    TopKRollupSpec topkRollupSpec = thirdeyeConfig.getTopKRollup();
 
+    if (topkRollupSpec != null) {
+      List<TopKDimensionSpec> topKDimensionSpecs = topkRollupSpec.getTopKDimensionSpec();
+      if (topKDimensionSpecs != null) {
+        for (TopKDimensionSpec topKDimensionSpec : topKDimensionSpecs) {
+          String dimension = topKDimensionSpec.getDimensionName();
+          transformDimensionSet.add(dimension);
+        }
+      }
+      Map<String, String> whitelist = topkRollupSpec.getExceptions();
+      if (whitelist != null) {
+        transformDimensionSet.addAll(whitelist.keySet());
+      }
+
+    }
     RecordBuilder<Schema> recordBuilder = SchemaBuilder.record(inputSchema.getName());
     FieldAssembler<Schema> fieldAssembler = recordBuilder.fields();
 
     for (String dimension : thirdeyeConfig.getDimensionNames()) {
       fieldAssembler = fieldAssembler.name(dimension).type().nullable().stringType().noDefault();
-      if (topkDimensionSet.contains(dimension)) {
+      if (transformDimensionSet.contains(dimension)) {
         fieldAssembler = fieldAssembler.name(dimension + RAW_DIMENSION_SUFFIX).type().nullable().stringType().noDefault();
       }
     }
@@ -305,7 +323,7 @@ public class ReplacementPhaseJob extends Configured {
   }
 
   private String getAndSetConfiguration(Configuration configuration,
-      ReplacementPhaseConstants constant) {
+      DerivedColumnTransformationPhaseConstants constant) {
     String value = getAndCheck(constant.toString());
     configuration.set(constant.toString(), value);
     return value;
@@ -326,7 +344,7 @@ public class ReplacementPhaseJob extends Configured {
 
     Properties props = new Properties();
     props.load(new FileInputStream(args[0]));
-    ReplacementPhaseJob job = new ReplacementPhaseJob("replacement_job", props);
+    DerivedColumnTransformationPhaseJob job = new DerivedColumnTransformationPhaseJob("derived_column_transformation_job", props);
     job.run();
   }
 

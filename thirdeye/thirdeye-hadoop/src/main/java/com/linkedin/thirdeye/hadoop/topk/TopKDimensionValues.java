@@ -51,6 +51,13 @@ public class TopKDimensionValues {
     topKDimensions.get(dimension).add(value);
   }
 
+  public void addAllValues(String dimension, Set<String> values) {
+    if (topKDimensions.get(dimension) == null) {
+      topKDimensions.put(dimension, new HashSet<String>());
+    }
+    topKDimensions.get(dimension).addAll(values);
+  }
+
   /**
    * Add all top k values for all dimensions from a TopKDimensionValues object
    * @param valuesFile
