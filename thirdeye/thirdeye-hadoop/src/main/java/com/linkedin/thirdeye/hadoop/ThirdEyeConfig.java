@@ -317,27 +317,4 @@ public final class ThirdEyeConfig {
     return propValue;
   }
 
-  public static void main(String[] args) throws IOException {
-    Properties props = new Properties();
-    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_TABLE_NAME.toString(), "collection");
-    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_DIMENSION_NAMES.toString(), "d1,d2,d3");
-    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_METRIC_NAMES.toString(), "m1,m2,m3");
-    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_METRIC_TYPES.toString(), "LONG,FLOAT,INT");
-    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_TIMECOLUMN_NAME.toString(), "t1");
-    //props.setProperty(ThirdEyeConfigConstants.THIRDEYE_TIMECOLUMN_TYPE.toString(), "DAYS");
-    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_TIMECOLUMN_SIZE.toString(), "10");
-    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_SPLIT_THRESHOLD.toString(), "1000");
-    //props.setProperty(ThirdEyeConfigConstants.THIRDEYE_SPLIT_ORDER.toString(), "d1,d2,d3");
-    //props.setProperty(ThirdEyeConfigConstants.THIRDEYE_TOPK_THRESHOLD_METRIC_NAMES.toString(), "m1");
-    //props.setProperty(ThirdEyeConfigConstants.THIRDEYE_TOPK_METRIC_THRESHOLD_VALUES.toString(), "0.02");
-    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_TOPK_DIMENSION_NAMES.toString(), "d2,d3");
-    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_TOPK_DIMENSION_METRICNAMES.toString(), "m1,m1");
-    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_TOPK_DIMENSION_KVALUES.toString(), "20,5");
-    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_WHITELIST_DIMENSION_NAMES.toString(), "d1,d2");
-    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_WHITELIST_DIMENSION.toString() + "d1", "x,y,z");
-    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_WHITELIST_DIMENSION.toString() + "d2", "a,b,c,d");
-    ThirdEyeConfig copy = ThirdEyeConfig.fromProperties(props);
-    System.out.println(copy.encode());
-  }
-
 }
