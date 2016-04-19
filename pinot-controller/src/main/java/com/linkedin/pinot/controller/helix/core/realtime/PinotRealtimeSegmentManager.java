@@ -137,6 +137,13 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
         // Assign a new segment to all server instances
         for (String instanceId : instancesInResource) {
           InstanceZKMetadata instanceZKMetadata = _pinotHelixResourceManager.getInstanceZKMetadata(instanceId);
+
+          if (instanceZKMetadata == null) {
+            LOGGER.warn("Instance {} has no associated instance metadata in ZK, ignoring for segment assignment.",
+                instanceId);
+            continue;
+          }
+
           String groupId = instanceZKMetadata.getGroupId(resource);
           String partitionId = instanceZKMetadata.getPartition(resource);
           listOfSegmentsToAddToInstances.add(new Pair<String, String>(
