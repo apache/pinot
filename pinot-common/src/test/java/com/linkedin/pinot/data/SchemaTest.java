@@ -97,5 +97,17 @@ public class SchemaTest {
       Schema schema = mapper.readValue(validSchema, Schema.class);
       Assert.assertFalse(schema.validate(LOGGER));
     }
+
+    {
+      singleValueDim = "true";
+      singleValueMetric = "true";
+      dimType = "\"BOOLEAN\"";
+      metricType = "\"LONG\"";
+
+      String validSchema = makeSchema();
+      Schema schema = mapper.readValue(validSchema, Schema.class);
+      Assert.assertTrue(schema.validate(LOGGER));
+    }
+
   }
 }

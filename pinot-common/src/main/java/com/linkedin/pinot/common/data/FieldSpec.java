@@ -29,6 +29,7 @@ public abstract class FieldSpec {
   private static final Long DEFAULT_DIM_NULL_VALUE_OF_LONG = Long.valueOf(Long.MIN_VALUE);
   private static final Float DEFAULT_DIM_NULL_VALUE_OF_FLOAT = Float.valueOf(Float.NEGATIVE_INFINITY);
   private static final Double DEFAULT_DIM_NULL_VALUE_OF_DOUBLE = Double.valueOf(Double.NEGATIVE_INFINITY);
+  private static final String DEFAULT_DIM_NULL_VALUE_OF_BOOLEAN = "null";
 
   private static final Integer DEFAULT_METRIC_NULL_VALUE_OF_INT = Integer.valueOf(0);
   private static final Long DEFAULT_METRIC_NULL_VALUE_OF_LONG = Long.valueOf(0);
@@ -154,6 +155,9 @@ public abstract class FieldSpec {
         case STRING:
         case STRING_ARRAY:
           defaultNullObj = value;
+          break;
+        case BOOLEAN:
+          defaultNullObj = new Boolean(Boolean.valueOf(value)).toString();
           break;
         default:
           throw new UnsupportedOperationException("Default null value not supported for field type " + getDataType());
@@ -366,6 +370,8 @@ public abstract class FieldSpec {
           case STRING:
           case STRING_ARRAY:
             return DEFAULT_DIM_NULL_VALUE_OF_STRING;
+          case BOOLEAN:
+            return DEFAULT_DIM_NULL_VALUE_OF_BOOLEAN;
           default:
             throw new UnsupportedOperationException(
                 "Unknown default null value for dimension/time column of data type " + dataType);

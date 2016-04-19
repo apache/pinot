@@ -53,6 +53,13 @@ public class FieldSpecTest {
     fieldSpec.setDelimiter(";");
     Assert.assertEquals("< data type : STRING , field type : DIMENSION, multi value column, delimeter : ; >",
         fieldSpec.toString());
+
+    fieldSpec.setDataType(DataType.BOOLEAN);
+    fieldSpec.setFieldType(FieldType.DIMENSION);
+    fieldSpec.setSingleValueField(true);
+    fieldSpec.setDelimiter("+");
+    Assert.assertEquals("< data type : BOOLEAN , field type : DIMENSION, single value column, delimeter : + >",
+        fieldSpec.toString());
   }
 
   @Test
@@ -60,7 +67,9 @@ public class FieldSpecTest {
     Schema schema =
         new SchemaBuilder().addSingleValueDimension("svDimension", DataType.INT)
             .addMultiValueDimension("mvDimension", DataType.STRING, ",").addMetric("metric", DataType.INT)
-            .addTime("incomingTime", TimeUnit.DAYS, DataType.LONG).build();
+            .addTime("incomingTime", TimeUnit.DAYS, DataType.LONG)
+            .addSingleValueDimension("boolDimension", DataType.BOOLEAN)
+            .build();
 
     System.out.println(schema);
 
@@ -76,6 +85,9 @@ public class FieldSpecTest {
 
     Assert.assertEquals(schema.getFieldSpecFor("incomingTime").isSingleValueField(), true);
     Assert.assertEquals(schema.getFieldSpecFor("incomingTime").getDataType(), DataType.LONG);
+
+    Assert.assertEquals(schema.getFieldSpecFor("boolDimension").getDataType(), DataType.BOOLEAN);
+    Assert.assertEquals("null", schema.getFieldSpecFor("boolDimension").getDefaultNullValue());
 
   }
 }
