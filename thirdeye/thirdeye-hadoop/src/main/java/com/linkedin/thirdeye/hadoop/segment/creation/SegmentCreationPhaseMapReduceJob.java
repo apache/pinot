@@ -46,7 +46,7 @@ import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import com.linkedin.thirdeye.api.StarTreeConstants;
-import com.linkedin.thirdeye.hadoop.ThirdEyeConfig;
+import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfig;
 
 
 public class SegmentCreationPhaseMapReduceJob {

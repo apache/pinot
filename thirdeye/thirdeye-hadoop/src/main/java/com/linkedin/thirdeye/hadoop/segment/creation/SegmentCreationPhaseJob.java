@@ -49,7 +49,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.thirdeye.hadoop.ThirdEyeConfig;
+import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfig;
 import com.linkedin.thirdeye.hadoop.util.ThirdeyePinotSchemaUtils;
 
 

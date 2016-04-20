@@ -18,9 +18,9 @@ package com.linkedin.thirdeye.hadoop.derivedcolumn.transformation;
 import com.linkedin.thirdeye.api.DimensionSpec;
 import com.linkedin.thirdeye.api.MetricSpec;
 import com.linkedin.thirdeye.api.MetricType;
-import com.linkedin.thirdeye.api.TopKDimensionSpec;
-import com.linkedin.thirdeye.api.TopKRollupSpec;
-import com.linkedin.thirdeye.hadoop.ThirdEyeConfig;
+import com.linkedin.thirdeye.api.TopKDimensionToMetricsSpec;
+import com.linkedin.thirdeye.api.TopkWhitelistSpec;
+import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfig;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -36,7 +36,6 @@ public class DerivedColumnTransformationPhaseConfig {
   private List<String> metricNames;
   private List<MetricType> metricTypes;
   private String timeColumnName;
-  private Set<String> topKDimensionNames;
 
   public DerivedColumnTransformationPhaseConfig() {
 
@@ -48,13 +47,12 @@ public class DerivedColumnTransformationPhaseConfig {
    * @param metricTypes
    */
   public DerivedColumnTransformationPhaseConfig(List<String> dimensionNames, List<String> metricNames,
-      List<MetricType> metricTypes, String timeColumnName, Set<String> topKDimensionNames) {
+      List<MetricType> metricTypes, String timeColumnName) {
     super();
     this.dimensionNames = dimensionNames;
     this.metricNames = metricNames;
     this.metricTypes = metricTypes;
     this.timeColumnName = timeColumnName;
-    this.topKDimensionNames = topKDimensionNames;
   }
 
   public List<String> getDimensionNames() {
@@ -73,12 +71,9 @@ public class DerivedColumnTransformationPhaseConfig {
     return timeColumnName;
   }
 
-  public Set<String> getTopKDimensionNames() {
-    return topKDimensionNames;
-  }
-
   public static DerivedColumnTransformationPhaseConfig fromThirdEyeConfig(ThirdEyeConfig config) {
 
+    // metrics
     List<String> metricNames = new ArrayList<String>(config.getMetrics().size());
     List<MetricType> metricTypes = new ArrayList<MetricType>(config.getMetrics().size());
     for (MetricSpec spec : config.getMetrics()) {
@@ -86,22 +81,16 @@ public class DerivedColumnTransformationPhaseConfig {
       metricTypes.add(spec.getType());
     }
 
+    // dimensions
     List<String> dimensionNames = new ArrayList<String>(config.getDimensions().size());
     for (DimensionSpec dimensionSpec : config.getDimensions()) {
       dimensionNames.add(dimensionSpec.getName());
     }
 
+    // time
     String timeColumnName = config.getTime().getColumnName();
 
-    Set<String> topKDimensionNames = new HashSet<>();
-    TopKRollupSpec topKRollupSpec = config.getTopKRollup();
-    if (topKRollupSpec != null && topKRollupSpec.getTopKDimensionSpec() != null) {
-      for (TopKDimensionSpec topKDimensionSpec : topKRollupSpec.getTopKDimensionSpec()) {
-        topKDimensionNames.add(topKDimensionSpec.getDimensionName());
-      }
-    }
-
-    return new DerivedColumnTransformationPhaseConfig(dimensionNames, metricNames, metricTypes, timeColumnName, topKDimensionNames);
+    return new DerivedColumnTransformationPhaseConfig(dimensionNames, metricNames, metricTypes, timeColumnName);
   }
 
 }

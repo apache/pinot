@@ -24,8 +24,8 @@ import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.thirdeye.hadoop.ThirdEyeConfig;
-import com.linkedin.thirdeye.hadoop.ThirdEyeConfigConstants;
+import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfig;
+import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfigConstants;
 import com.linkedin.thirdeye.hadoop.util.ThirdeyePinotSchemaUtils;
 
 public class ThirdeyePinotSchemaUtilsTest {

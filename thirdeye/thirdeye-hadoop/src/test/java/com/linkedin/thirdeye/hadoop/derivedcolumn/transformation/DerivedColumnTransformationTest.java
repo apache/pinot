@@ -41,8 +41,8 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkedin.thirdeye.hadoop.ThirdEyeConfig;
-import com.linkedin.thirdeye.hadoop.ThirdEyeConfigConstants;
+import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfig;
+import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfigConstants;
 import com.linkedin.thirdeye.hadoop.derivedcolumn.transformation.DerivedColumnTransformationPhaseConstants;
 import com.linkedin.thirdeye.hadoop.derivedcolumn.transformation.DerivedColumnTransformationPhaseJob.DerivedColumnTransformationPhaseMapper;
 
@@ -145,8 +145,8 @@ public class DerivedColumnTransformationTest {
     props.setProperty(ThirdEyeConfigConstants.THIRDEYE_METRIC_TYPES.toString(), "INT,INT");
     props.setProperty(ThirdEyeConfigConstants.THIRDEYE_TIMECOLUMN_NAME.toString(), "hoursSinceEpoch");
     props.setProperty(ThirdEyeConfigConstants.THIRDEYE_TOPK_DIMENSION_NAMES.toString(), "d2,");
-    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_TOPK_DIMENSION_METRICNAMES.toString(), "m1");
-    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_TOPK_DIMENSION_KVALUES.toString(), "1");
+    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_TOPK_METRICS.toString() + ".d2", "m1");
+    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_TOPK_KVALUES.toString() + ".d2", "1");
 
     ThirdEyeConfig thirdeyeConfig = ThirdEyeConfig.fromProperties(props);
     configuration.set(DerivedColumnTransformationPhaseConstants.DERIVED_COLUMN_TRANSFORMATION_PHASE_THIRDEYE_CONFIG.toString(),
@@ -189,7 +189,7 @@ public class DerivedColumnTransformationTest {
           datum.getSchema().getField("d2_raw") != null, true);
       String d2 = (String) datum.get("d2");
       String d2_raw = (String) datum.get("d2_raw");
-      Assert.assertEquals("Incorrect topk column transformation", (d2_raw.equals("pqr1") && d2.equals("other")) || (d2_raw.equals("pqr2") && d2.equals(d2_raw)), true);
+      Assert.assertEquals("Incorrect topk column transformation", (d2_raw.equals("pqr1") && d2.equals("other")) || (d2_raw.equals("pqr2") && d2.equals("pqr2")), true);
     }
   }
 

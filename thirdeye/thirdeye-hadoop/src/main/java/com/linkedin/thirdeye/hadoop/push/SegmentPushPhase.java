@@ -32,7 +32,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.utils.FileUploadUtils;
-import com.linkedin.thirdeye.hadoop.ThirdEyeConfigConstants;
+import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfigConstants;
 
 public class SegmentPushPhase  extends Configured {
 

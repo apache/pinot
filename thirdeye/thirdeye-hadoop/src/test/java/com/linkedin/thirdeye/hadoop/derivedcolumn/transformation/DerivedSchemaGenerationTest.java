@@ -23,8 +23,8 @@ import org.testng.Assert;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
-import com.linkedin.thirdeye.hadoop.ThirdEyeConfig;
-import com.linkedin.thirdeye.hadoop.ThirdEyeConfigConstants;
+import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfig;
+import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfigConstants;
 
 public class DerivedSchemaGenerationTest {
   private static final String SCHEMA_FILE = "schema.avsc";
@@ -55,8 +55,8 @@ public class DerivedSchemaGenerationTest {
         "Input schema should be same as output schema if no topk/whitelist in config");
 
     props.setProperty(ThirdEyeConfigConstants.THIRDEYE_TOPK_DIMENSION_NAMES.toString(), "d2,");
-    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_TOPK_DIMENSION_METRICNAMES.toString(), "m1");
-    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_TOPK_DIMENSION_KVALUES.toString(), "1");
+    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_TOPK_METRICS.toString() + ".d2", "m1");
+    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_TOPK_KVALUES.toString() + ".d2", "1");
     props.setProperty(ThirdEyeConfigConstants.THIRDEYE_WHITELIST_DIMENSION_NAMES.toString(), "d2,d3");
     props.setProperty(ThirdEyeConfigConstants.THIRDEYE_WHITELIST_DIMENSION.toString() + ".d2" , "a,b,c");
     props.setProperty(ThirdEyeConfigConstants.THIRDEYE_WHITELIST_DIMENSION.toString() + ".d3", "x,y");

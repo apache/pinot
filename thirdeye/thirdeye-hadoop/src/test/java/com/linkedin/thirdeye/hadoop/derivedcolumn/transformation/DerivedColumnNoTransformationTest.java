@@ -41,8 +41,8 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkedin.thirdeye.hadoop.ThirdEyeConfig;
-import com.linkedin.thirdeye.hadoop.ThirdEyeConfigConstants;
+import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfig;
+import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfigConstants;
 import com.linkedin.thirdeye.hadoop.derivedcolumn.transformation.DerivedColumnTransformationPhaseConstants;
 import com.linkedin.thirdeye.hadoop.derivedcolumn.transformation.DerivedColumnTransformationPhaseJob.DerivedColumnTransformationPhaseMapper;
 

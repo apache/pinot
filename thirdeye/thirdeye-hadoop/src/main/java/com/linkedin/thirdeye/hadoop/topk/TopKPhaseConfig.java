@@ -18,9 +18,9 @@ package com.linkedin.thirdeye.hadoop.topk;
 import com.linkedin.thirdeye.api.DimensionSpec;
 import com.linkedin.thirdeye.api.MetricSpec;
 import com.linkedin.thirdeye.api.MetricType;
-import com.linkedin.thirdeye.api.TopKDimensionSpec;
-import com.linkedin.thirdeye.api.TopKRollupSpec;
-import com.linkedin.thirdeye.hadoop.ThirdEyeConfig;
+import com.linkedin.thirdeye.api.TopKDimensionToMetricsSpec;
+import com.linkedin.thirdeye.api.TopkWhitelistSpec;
+import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfig;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -40,7 +40,7 @@ public class TopKPhaseConfig {
   private List<String> metricNames;
   private List<MetricType> metricTypes;
   private Map<String, Double> metricThresholds;
-  private Map<String, TopKDimensionSpec> topKDimensionSpec;
+  private Map<String, TopKDimensionToMetricsSpec> topKDimensionToMetricsSpec;
   private Map<String, Set<String>> whitelist;
 
   private static final double DEFAULT_METRIC_THRESHOLD = 0.01;
@@ -58,13 +58,13 @@ public class TopKPhaseConfig {
    * @param whitelist
    */
   public TopKPhaseConfig(List<String> dimensionNames, List<String> metricNames, List<MetricType> metricTypes,
-      Map<String, Double> metricThresholds, Map<String, TopKDimensionSpec> topKDimensionSpec, Map<String, Set<String>> whitelist) {
+      Map<String, Double> metricThresholds, Map<String, TopKDimensionToMetricsSpec> topKDimensionToMetricsSpec, Map<String, Set<String>> whitelist) {
     super();
     this.dimensionNames = dimensionNames;
     this.metricNames = metricNames;
     this.metricTypes = metricTypes;
     this.metricThresholds = metricThresholds;
-    this.topKDimensionSpec = topKDimensionSpec;
+    this.topKDimensionToMetricsSpec = topKDimensionToMetricsSpec;
     this.whitelist = whitelist;
   }
 
@@ -84,8 +84,8 @@ public class TopKPhaseConfig {
     return metricThresholds;
   }
 
-  public Map<String, TopKDimensionSpec> getTopKDimensionSpec() {
-    return topKDimensionSpec;
+  public Map<String, TopKDimensionToMetricsSpec> getTopKDimensionToMetricsSpec() {
+    return topKDimensionToMetricsSpec;
   }
 
   public Map<String, Set<String>> getWhitelist() {
@@ -100,6 +100,7 @@ public class TopKPhaseConfig {
    */
   public static TopKPhaseConfig fromThirdEyeConfig(ThirdEyeConfig config) {
 
+    //metrics
     List<String> metricNames = new ArrayList<String>(config.getMetrics().size());
     List<MetricType> metricTypes = new ArrayList<MetricType>(config.getMetrics().size());
     for (MetricSpec spec : config.getMetrics()) {
@@ -107,19 +108,22 @@ public class TopKPhaseConfig {
       metricTypes.add(spec.getType());
     }
 
+    // dimensions
     List<String> dimensionNames = new ArrayList<String>(config.getDimensions().size());
     for (DimensionSpec dimensionSpec : config.getDimensions()) {
       dimensionNames.add(dimensionSpec.getName());
     }
 
-    TopKRollupSpec topKRollupSpec = config.getTopKRollup();
+    TopkWhitelistSpec topKWhitelist = config.getTopKWhitelist();
     Map<String, Double> metricThresholds = new HashMap<>();
-    Map<String, TopKDimensionSpec> topKDimensionSpec = new HashMap<>();
+    Map<String, TopKDimensionToMetricsSpec> topKDimensionToMetricsSpec = new HashMap<>();
     Map<String, Set<String>> whitelist = new HashMap<>();
 
-    if (topKRollupSpec != null) {
-      if (topKRollupSpec.getThreshold() != null) {
-        metricThresholds = topKRollupSpec.getThreshold();
+    // topk
+    if (topKWhitelist != null) {
+      // metric thresholds
+      if (topKWhitelist.getThreshold() != null) {
+        metricThresholds = topKWhitelist.getThreshold();
       }
       for (String metric : metricNames) {
         if (metricThresholds.get(metric) == null) {
@@ -127,21 +131,23 @@ public class TopKPhaseConfig {
         }
       }
 
-      if (topKRollupSpec.getTopKDimensionSpec() != null) {
-        for (TopKDimensionSpec topkSpec : topKRollupSpec.getTopKDimensionSpec()) {
-          topKDimensionSpec.put(topkSpec.getDimensionName(), topkSpec);
+      // topk
+      if (topKWhitelist.getTopKDimensionToMetricsSpec() != null) {
+        for (TopKDimensionToMetricsSpec topkSpec : topKWhitelist.getTopKDimensionToMetricsSpec()) {
+          topKDimensionToMetricsSpec.put(topkSpec.getDimensionName(), topkSpec);
         }
       }
 
-      if (topKRollupSpec.getExceptions() != null) {
-        for (Entry<String, String> entry : topKRollupSpec.getExceptions().entrySet()) {
+      // whitelist
+      if (topKWhitelist.getWhitelist() != null) {
+        for (Entry<String, String> entry : topKWhitelist.getWhitelist().entrySet()) {
           String[] whitelistValues = entry.getValue().split(FIELD_SEPARATOR);
           whitelist.put(entry.getKey(), new HashSet<String>(Arrays.asList(whitelistValues)));
         }
       }
     }
 
-    return new TopKPhaseConfig(dimensionNames, metricNames, metricTypes, metricThresholds, topKDimensionSpec, whitelist);
+    return new TopKPhaseConfig(dimensionNames, metricNames, metricTypes, metricThresholds, topKDimensionToMetricsSpec, whitelist);
   }
 
 

@@ -33,9 +33,9 @@ import java.util.Set;
 
 import com.linkedin.thirdeye.api.MetricSpec;
 import com.linkedin.thirdeye.api.MetricType;
-import com.linkedin.thirdeye.api.TopKDimensionSpec;
-import com.linkedin.thirdeye.api.TopKRollupSpec;
-import com.linkedin.thirdeye.hadoop.ThirdEyeConfig;
+import com.linkedin.thirdeye.api.TopKDimensionToMetricsSpec;
+import com.linkedin.thirdeye.api.TopkWhitelistSpec;
+import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfig;
 import com.linkedin.thirdeye.hadoop.topk.TopKDimensionValues;
 
 import org.apache.avro.Schema;
@@ -101,8 +101,6 @@ public class DerivedColumnTransformationPhaseJob extends Configured {
     private DerivedColumnTransformationPhaseConfig config;
     private List<String> dimensionsNames;
     private List<String> metricNames;
-    private List<MetricType> metricTypes;
-    private Set<String> topKDimensionNames;
     private TopKDimensionValues topKDimensionValues;
     private Map<String, Set<String>> topKDimensionsMap;
     private String timeColumnName;
@@ -117,9 +115,7 @@ public class DerivedColumnTransformationPhaseJob extends Configured {
       config = DerivedColumnTransformationPhaseConfig.fromThirdEyeConfig(thirdeyeConfig);
       dimensionsNames = config.getDimensionNames();
       metricNames = config.getMetricNames();
-      metricTypes = config.getMetricTypes();
       timeColumnName = config.getTimeColumnName();
-      topKDimensionNames = config.getTopKDimensionNames();
 
       Path outputSchemaPath = new Path(configuration.get(DERIVED_COLUMN_TRANSFORMATION_PHASE_OUTPUT_SCHEMA_PATH.toString())
           + File.separator + TRANSFORMATION_SCHEMA);
@@ -154,7 +150,8 @@ public class DerivedColumnTransformationPhaseJob extends Configured {
         String dimensionValue = getDimensionFromRecord(inputRecord, dimension);
         // add column for topk + whitelist
         if (topKDimensionsMap.containsKey(dimensionName)) {
-          if (topKDimensionsMap.get(dimensionName).contains(dimensionValue)) {
+          Set<String> topKDimensionValues = topKDimensionsMap.get(dimensionName);
+          if (topKDimensionValues != null && topKDimensionValues.contains(dimensionValue)) {
             outputRecord.put(dimensionName, dimensionValue);
           } else {
             outputRecord.put(dimensionName, OTHER);
@@ -235,6 +232,7 @@ public class DerivedColumnTransformationPhaseJob extends Configured {
     ThirdEyeConfig thirdeyeConfig = ThirdEyeConfig.fromProperties(props);
     job.getConfiguration().set(DERIVED_COLUMN_TRANSFORMATION_PHASE_THIRDEYE_CONFIG.toString(),
         OBJECT_MAPPER.writeValueAsString(thirdeyeConfig));
+    LOGGER.info("ThirdEyeConfig {}", thirdeyeConfig);
 
     // Output schema
     Path outputSchemaPath = new Path(getAndSetConfiguration(configuration, DERIVED_COLUMN_TRANSFORMATION_PHASE_OUTPUT_SCHEMA_PATH)
@@ -265,25 +263,25 @@ public class DerivedColumnTransformationPhaseJob extends Configured {
     Schema outputSchema = null;
 
     Set<String> transformDimensionSet = new HashSet<>();
-    TopKRollupSpec topkRollupSpec = thirdeyeConfig.getTopKRollup();
+    TopkWhitelistSpec topkWhitelist = thirdeyeConfig.getTopKWhitelist();
 
-    if (topkRollupSpec != null) {
-      List<TopKDimensionSpec> topKDimensionSpecs = topkRollupSpec.getTopKDimensionSpec();
-      if (topKDimensionSpecs != null) {
-        for (TopKDimensionSpec topKDimensionSpec : topKDimensionSpecs) {
-          String dimension = topKDimensionSpec.getDimensionName();
-          transformDimensionSet.add(dimension);
+    // gather topk + whitelist columns
+    if (topkWhitelist != null) {
+      List<TopKDimensionToMetricsSpec> topKDimensionToMetricsSpecs = topkWhitelist.getTopKDimensionToMetricsSpec();
+      if (topKDimensionToMetricsSpecs != null) {
+        for (TopKDimensionToMetricsSpec topKDimensionToMetricsSpec : topKDimensionToMetricsSpecs) {
+          transformDimensionSet.add(topKDimensionToMetricsSpec.getDimensionName());
         }
       }
-      Map<String, String> whitelist = topkRollupSpec.getExceptions();
+      Map<String, String> whitelist = topkWhitelist.getWhitelist();
       if (whitelist != null) {
         transformDimensionSet.addAll(whitelist.keySet());
       }
-
     }
     RecordBuilder<Schema> recordBuilder = SchemaBuilder.record(inputSchema.getName());
     FieldAssembler<Schema> fieldAssembler = recordBuilder.fields();
 
+    // add new column for topk + whitelist columns
     for (String dimension : thirdeyeConfig.getDimensionNames()) {
       fieldAssembler = fieldAssembler.name(dimension).type().nullable().stringType().noDefault();
       if (transformDimensionSet.contains(dimension)) {

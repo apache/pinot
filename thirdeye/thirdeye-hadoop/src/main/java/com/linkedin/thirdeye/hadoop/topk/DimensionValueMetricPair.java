@@ -49,7 +49,7 @@ public class DimensionValueMetricPair implements Comparable<DimensionValueMetric
 
   @Override
   public String toString() {
-    return "DimensionValueMetricPair [dimensionValue=" + dimensionValue + ", metricValue=" + metricValue + "]";
+    return "[" + dimensionValue + "=" + metricValue + "]";
   }
 
 

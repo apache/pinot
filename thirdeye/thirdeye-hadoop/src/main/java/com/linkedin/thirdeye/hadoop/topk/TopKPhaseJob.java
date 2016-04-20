@@ -31,8 +31,8 @@ import java.util.Properties;
 import java.util.Set;
 
 import com.linkedin.thirdeye.api.MetricType;
-import com.linkedin.thirdeye.api.TopKDimensionSpec;
-import com.linkedin.thirdeye.hadoop.ThirdEyeConfig;
+import com.linkedin.thirdeye.api.TopKDimensionToMetricsSpec;
+import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfig;
 import com.linkedin.thirdeye.hadoop.util.ThirdeyeAggregateMetricUtils;
 
 import org.apache.avro.Schema;
@@ -276,7 +276,7 @@ public class TopKPhaseJob extends Configured {
     private TopKDimensionValues topkDimensionValues;
     private Map<String, Double> metricThresholds;
     private Map<String, Integer> thresholdPassCount;
-    private Map<String, TopKDimensionSpec> topKDimensionSpecMap;
+    private Map<String, TopKDimensionToMetricsSpec> topKDimensionToMetricsSpecMap;
     private Map<String, Set<String>> whitelist;
 
     @Override
@@ -290,7 +290,7 @@ public class TopKPhaseJob extends Configured {
         thirdeyeConfig = OBJECT_MAPPER.readValue(configuration.get(TOPK_PHASE_THIRDEYE_CONFIG.toString()), ThirdEyeConfig.class);
         config = TopKPhaseConfig.fromThirdEyeConfig(thirdeyeConfig);
         metricThresholds = config.getMetricThresholds();
-        topKDimensionSpecMap = config.getTopKDimensionSpec();
+        topKDimensionToMetricsSpecMap = config.getTopKDimensionToMetricsSpec();
         dimensionNames = config.getDimensionNames();
         metricNames = config.getMetricNames();
         metricTypes = config.getMetricTypes();
@@ -371,24 +371,33 @@ public class TopKPhaseJob extends Configured {
         LOGGER.info("{} records passed metric threshold for dimension {}", thresholdPassCount.get(dimension), dimension);
 
         // Get top k
-        TopKDimensionSpec topkSpec = topKDimensionSpecMap.get(dimension);
-        if (topkSpec != null && topkSpec.getDimensionName() != null && topkSpec.getMetricName() != null && topkSpec.getTop() != 0) {
+        TopKDimensionToMetricsSpec topkSpec = topKDimensionToMetricsSpecMap.get(dimension);
+        if (topkSpec != null && topkSpec.getDimensionName() != null && topkSpec.getTopk() != null) {
 
-          LOGGER.info("Picking Top {} values based on Metric {}", topkSpec.getTop(), topkSpec.getMetricName());
-          MinMaxPriorityQueue<DimensionValueMetricPair> topKQueue = MinMaxPriorityQueue.maximumSize(topkSpec.getTop()).create();
+          // Get top k for each metric specified
+          Map<String, Integer> topkMetricsMap = topkSpec.getTopk();
+          for (Entry<String, Integer> topKEntry : topkMetricsMap.entrySet()) {
 
-          Map<String, Number[]> dimensionToMetricsMap = dimensionNameToValuesMap.get(dimension);
-          for (Entry<String, Number[]> entry : dimensionToMetricsMap.entrySet()) {
-            topKQueue.add(new DimensionValueMetricPair(entry.getKey(), entry.getValue()[metricToIndexMapping.get(topkSpec.getMetricName())]));
-          }
-          for (DimensionValueMetricPair pair : topKQueue) {
-            topkDimensionValues.addValue(dimension, pair.getDimensionValue());
+            String metric = topKEntry.getKey();
+            int k = topKEntry.getValue();
+            MinMaxPriorityQueue<DimensionValueMetricPair> topKQueue = MinMaxPriorityQueue.maximumSize(k).create();
+
+            Map<String, Number[]> dimensionToMetricsMap = dimensionNameToValuesMap.get(dimension);
+            for (Entry<String, Number[]> entry : dimensionToMetricsMap.entrySet()) {
+              topKQueue.add(new DimensionValueMetricPair(entry.getKey(), entry.getValue()[metricToIndexMapping.get(metric)]));
+            }
+            LOGGER.info("Picking Top {} values for {} based on Metric {} : {}", k, dimension, metric, topKQueue);
+            for (DimensionValueMetricPair pair : topKQueue) {
+              topkDimensionValues.addValue(dimension, pair.getDimensionValue());
+            }
+
           }
         }
 
         // Get whitelist
         Set<String> whitelistValues = whitelist.get(dimension);
         if (whitelistValues != null) {
+          LOGGER.info("Adding whitelist values for {} : {}", dimension, whitelistValues);
           topkDimensionValues.addAllValues(dimension, whitelistValues);
         }
 
@@ -435,6 +444,7 @@ public class TopKPhaseJob extends Configured {
     FileOutputFormat.setOutputPath(job, outputPath);
 
     ThirdEyeConfig thirdeyeConfig = ThirdEyeConfig.fromProperties(props);
+    LOGGER.info("Thirdeye Config {}", thirdeyeConfig.encode());
     job.getConfiguration().set(TOPK_PHASE_THIRDEYE_CONFIG.toString(), OBJECT_MAPPER.writeValueAsString(thirdeyeConfig));
 
     // Map config

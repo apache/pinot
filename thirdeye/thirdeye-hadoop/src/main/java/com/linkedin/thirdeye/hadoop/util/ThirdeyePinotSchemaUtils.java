@@ -34,7 +34,7 @@ import com.linkedin.pinot.common.data.TimeGranularitySpec;
 import com.linkedin.thirdeye.api.DimensionSpec;
 import com.linkedin.thirdeye.api.MetricSpec;
 import com.linkedin.thirdeye.api.StarTreeConstants;
-import com.linkedin.thirdeye.hadoop.ThirdEyeConfig;
+import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfig;
 
 public class ThirdeyePinotSchemaUtils {
 
