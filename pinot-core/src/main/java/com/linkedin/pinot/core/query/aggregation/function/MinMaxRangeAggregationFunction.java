@@ -170,6 +170,7 @@ public class MinMaxRangeAggregationFunction implements AggregationFunction<MinMa
 
   public static class MinMaxRangePair extends Pair<Double, Double>
       implements Comparable<MinMaxRangePair>, Serializable {
+    private static final long serialVersionUID = 498953067962085988L;
     public MinMaxRangePair(Double first, Double second) {
       super(first, second);
     }

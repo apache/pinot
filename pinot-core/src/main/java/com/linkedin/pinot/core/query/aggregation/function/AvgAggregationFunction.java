@@ -165,6 +165,7 @@ public class AvgAggregationFunction implements AggregationFunction<AvgPair, Doub
   }
 
   public static class AvgPair extends Pair<Double, Long> implements Comparable<AvgPair>, Serializable {
+    private static final long serialVersionUID = 7037868338412612822L;
     public AvgPair(Double first, Long second) {
       super(first, second);
     }
