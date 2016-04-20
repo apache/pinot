@@ -34,6 +34,8 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.codehaus.jackson.map.ObjectMapper;
+import org.joda.time.format.DateTimeFormat;
+import org.joda.time.format.DateTimeFormatter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,7 +47,6 @@ import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfig;
 
 
@@ -55,6 +56,7 @@ public class SegmentCreationPhaseMapReduceJob {
     private static Logger LOGGER = LoggerFactory.getLogger(SegmentCreationPhaseMapReduceJob.class);
     private static ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static String SEGMENT_JOINER = "_";
+    private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormat.forPattern("YYYY-MM-dd-HHmmss");
 
     private Configuration properties;
 
@@ -181,8 +183,8 @@ public class SegmentCreationPhaseMapReduceJob {
       segmentGeneratorConfig.setSegmentNamePostfix(seqId);
       segmentGeneratorConfig.setOutDir(localDiskSegmentDirectory);
       segmentGeneratorConfig.setEnableStarTreeIndex(true);
-      String minTime = StarTreeConstants.DATE_TIME_FORMATTER.print(segmentWallClockStartTime);
-      String maxTime = StarTreeConstants.DATE_TIME_FORMATTER.print(segmentWallClockEndTime);
+      String minTime = DATE_TIME_FORMATTER.print(segmentWallClockStartTime);
+      String maxTime = DATE_TIME_FORMATTER.print(segmentWallClockEndTime);
       segmentGeneratorConfig.setSegmentName(SegmentNameBuilder
           .buildBasic(tableName + SEGMENT_JOINER + segmentSchedule, minTime, maxTime, seqId));
 

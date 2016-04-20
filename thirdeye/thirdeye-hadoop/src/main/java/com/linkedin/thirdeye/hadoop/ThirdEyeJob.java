@@ -12,11 +12,12 @@ import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.JobStatus;
 import org.joda.time.DateTime;
+import org.joda.time.format.DateTimeFormat;
+import org.joda.time.format.DateTimeFormatter;
 import org.joda.time.format.ISODateTimeFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.hadoop.derivedcolumn.transformation.DerivedColumnTransformationPhaseConstants;
 import com.linkedin.thirdeye.hadoop.derivedcolumn.transformation.DerivedColumnTransformationPhaseJob;
 import com.linkedin.thirdeye.hadoop.push.SegmentPushPhase;
@@ -36,6 +37,7 @@ public class ThirdEyeJob {
   private static final String AVRO_SCHEMA = "schema.avsc";
   private static final String TRANSFORMATION_SCHEMA = "transformation_schema.avsc";
   private static final String TOPK_VALUES_FILE = "topk_values";
+  public static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormat.forPattern("YYYY-MM-dd-HHmmss");
 
   private final String phaseName;
   private final Properties inputConfig;
@@ -194,8 +196,8 @@ public class ThirdEyeJob {
     String getIndexDir(String root, String collection, DateTime minTime,
         DateTime maxTime) throws IOException {
       return getCollectionDir(root, collection) + File.separator
-          + "data_" + StarTreeConstants.DATE_TIME_FORMATTER.print(minTime) + "_"
-          + StarTreeConstants.DATE_TIME_FORMATTER.print(maxTime);
+          + "data_" + DATE_TIME_FORMATTER.print(minTime) + "_"
+          + DATE_TIME_FORMATTER.print(maxTime);
     }
 
     String getSchemaPath(String root, String collection) {

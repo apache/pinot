@@ -17,7 +17,7 @@ package com.linkedin.thirdeye.hadoop.util;
 
 import java.util.List;
 
-import com.linkedin.thirdeye.api.MetricType;
+import com.linkedin.thirdeye.hadoop.config.MetricType;
 
 public class ThirdeyeAggregateMetricUtils {
 

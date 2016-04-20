@@ -15,11 +15,11 @@
  */
 package com.linkedin.thirdeye.hadoop.topk;
 
-import com.linkedin.thirdeye.api.DimensionSpec;
-import com.linkedin.thirdeye.api.MetricSpec;
-import com.linkedin.thirdeye.api.MetricType;
-import com.linkedin.thirdeye.api.TopKDimensionToMetricsSpec;
-import com.linkedin.thirdeye.api.TopkWhitelistSpec;
+import com.linkedin.thirdeye.hadoop.config.DimensionSpec;
+import com.linkedin.thirdeye.hadoop.config.MetricSpec;
+import com.linkedin.thirdeye.hadoop.config.MetricType;
+import com.linkedin.thirdeye.hadoop.config.TopKDimensionToMetricsSpec;
+import com.linkedin.thirdeye.hadoop.config.TopkWhitelistSpec;
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfig;
 
 import java.util.ArrayList;

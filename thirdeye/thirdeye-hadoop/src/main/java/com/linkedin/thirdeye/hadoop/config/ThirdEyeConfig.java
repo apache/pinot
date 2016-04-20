@@ -28,14 +28,14 @@ import java.util.concurrent.TimeUnit;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
-import com.linkedin.thirdeye.api.DimensionSpec;
-import com.linkedin.thirdeye.api.MetricSpec;
-import com.linkedin.thirdeye.api.MetricType;
-import com.linkedin.thirdeye.api.SplitSpec;
-import com.linkedin.thirdeye.api.TimeGranularity;
-import com.linkedin.thirdeye.api.TimeSpec;
-import com.linkedin.thirdeye.api.TopKDimensionToMetricsSpec;
-import com.linkedin.thirdeye.api.TopkWhitelistSpec;
+import com.linkedin.thirdeye.hadoop.config.DimensionSpec;
+import com.linkedin.thirdeye.hadoop.config.MetricSpec;
+import com.linkedin.thirdeye.hadoop.config.MetricType;
+import com.linkedin.thirdeye.hadoop.config.SplitSpec;
+import com.linkedin.thirdeye.hadoop.config.TimeGranularity;
+import com.linkedin.thirdeye.hadoop.config.TimeSpec;
+import com.linkedin.thirdeye.hadoop.config.TopKDimensionToMetricsSpec;
+import com.linkedin.thirdeye.hadoop.config.TopkWhitelistSpec;
 
 public final class ThirdEyeConfig {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper(new YAMLFactory());

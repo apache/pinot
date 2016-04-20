@@ -31,15 +31,14 @@ import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.TimeFieldSpec;
 import com.linkedin.pinot.common.data.TimeGranularitySpec;
-import com.linkedin.thirdeye.api.DimensionSpec;
-import com.linkedin.thirdeye.api.MetricSpec;
-import com.linkedin.thirdeye.api.StarTreeConstants;
+import com.linkedin.thirdeye.hadoop.config.DimensionSpec;
+import com.linkedin.thirdeye.hadoop.config.MetricSpec;
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfig;
 
 public class ThirdeyePinotSchemaUtils {
 
   private static Logger LOGGER = LoggerFactory.getLogger(ThirdeyePinotSchemaUtils.class);
-
+  private static final String AUTO_METRIC_COUNT = "__COUNT";
 
   public static Schema createSchema(ThirdEyeConfig thirdeyeConfig) {
     Schema schema = new Schema();
@@ -55,7 +54,7 @@ public class ThirdeyePinotSchemaUtils {
     for (MetricSpec metricSpec : thirdeyeConfig.getMetrics()) {
       FieldSpec fieldSpec = new MetricFieldSpec();
       String metricName = metricSpec.getName();
-      if (metricName.equals(StarTreeConstants.AUTO_METRIC_COUNT)) {
+      if (metricName.equals(AUTO_METRIC_COUNT)) {
         countIncluded = true;
       }
       fieldSpec.setName(metricName);
@@ -66,7 +65,7 @@ public class ThirdeyePinotSchemaUtils {
     }
     if (!countIncluded) {
       FieldSpec fieldSpec = new MetricFieldSpec();
-      String metricName = StarTreeConstants.AUTO_METRIC_COUNT;
+      String metricName = AUTO_METRIC_COUNT;
       fieldSpec.setName(metricName);
       fieldSpec.setFieldType(FieldType.METRIC);
       fieldSpec.setDataType(DataType.LONG);

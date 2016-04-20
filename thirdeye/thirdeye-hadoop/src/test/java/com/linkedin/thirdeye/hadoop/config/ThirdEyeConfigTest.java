@@ -9,9 +9,9 @@ import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import com.linkedin.thirdeye.api.MetricType;
-import com.linkedin.thirdeye.api.TopKDimensionToMetricsSpec;
-import com.linkedin.thirdeye.api.TopkWhitelistSpec;
+import com.linkedin.thirdeye.hadoop.config.MetricType;
+import com.linkedin.thirdeye.hadoop.config.TopKDimensionToMetricsSpec;
+import com.linkedin.thirdeye.hadoop.config.TopkWhitelistSpec;
 
 public class ThirdEyeConfigTest {
 
