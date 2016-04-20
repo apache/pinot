@@ -56,7 +56,7 @@ public class RealtimeSchemaChangeIntegrationTest extends RealtimeClusterIntegrat
     updateSchema(schemaFile, schema.getSchemaName());
   }
 
-  @Test
+  @Test(enabled = false)
   public void testForColumnPartialPresence() throws Exception {
     // Count the number of rows
     JSONObject response = postQuery("select count(*) from 'mytable'");
@@ -80,26 +80,31 @@ public class RealtimeSchemaChangeIntegrationTest extends RealtimeClusterIntegrat
   }
 
   @Override
+  @Test(enabled = false)
   public void testHardcodedQuerySet() throws Exception {
     // Ignored
   }
 
   @Override
+  @Test(enabled = false)
   public void testGeneratedQueries() throws Exception {
     // Ignored
   }
 
   @Override
+  @Test(enabled = false)
   public void testSingleQuery() throws Exception {
     // Ignored
   }
 
   @Override
+  @Test(enabled = false)
   public void testMultipleQueries() throws Exception {
     // Ignored
   }
 
   @Override
+  @Test(enabled = false)
   public void testGeneratedQueriesWithMultivalues() throws Exception {
     // Ignored
   }
