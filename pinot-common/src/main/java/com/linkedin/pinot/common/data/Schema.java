@@ -26,8 +26,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.collections.Predicate;
 import org.apache.helix.ZNRecord;
 import org.codehaus.jackson.JsonNode;
 import org.codehaus.jackson.JsonParseException;
@@ -283,13 +281,22 @@ public class Schema {
     for (FieldSpec fieldSpec : fieldSpecs) {
       Object o = null;
       try {
+        if (fieldSpec.getDataType().equals(DataType.BOOLEAN) && fieldSpec.getFieldType().equals(FieldType.METRIC)) {
+          ctxLogger.error("Boolean field {} cannot be a metric ", fieldSpec.getName());
+          isValid = false;
+          continue;
+        }
         o = fieldSpec.getDefaultNullValue();
       } catch (Exception e) {
       }
       if (o == null) {
-        ctxLogger.error("Field {} of type {} does not have a default value", fieldSpec.getName(),
-            fieldSpec.getFieldType());
-        isValid = false;
+        if (fieldSpec.getDataType().equals(DataType.BOOLEAN)) {
+          ctxLogger.warn("Ignoring field {} of type {} does not have a default value", fieldSpec.getName(),
+              fieldSpec.getFieldType());
+        } else {
+          ctxLogger.error("Field {} of type {} does not have a default value", fieldSpec.getName(), fieldSpec.getFieldType());
+          isValid = false;
+        }
       }
     }
     return isValid;
