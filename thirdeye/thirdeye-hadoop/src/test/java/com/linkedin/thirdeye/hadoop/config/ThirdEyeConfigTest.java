@@ -121,8 +121,8 @@ public class ThirdEyeConfigTest {
   public void testTimeConfig() throws IllegalArgumentException {
     boolean failed = false;
     Assert.assertEquals(thirdeyeConfig.getTime().getColumnName(), "t1", "Incorrect time column name");
-    Assert.assertEquals(thirdeyeConfig.getTime().getBucket().getSize(), 10, "Incorrect time size");
-    Assert.assertEquals(thirdeyeConfig.getTime().getBucket().getUnit(), TimeUnit.DAYS, "Incorrect time unit");
+    Assert.assertEquals(thirdeyeConfig.getTime().getTimeGranularity().getSize(), 10, "Incorrect time size");
+    Assert.assertEquals(thirdeyeConfig.getTime().getTimeGranularity().getUnit(), TimeUnit.DAYS, "Incorrect time unit");
 
     try {
       props.remove(ThirdEyeConfigConstants.THIRDEYE_TIMECOLUMN_NAME.toString());
@@ -137,8 +137,8 @@ public class ThirdEyeConfigTest {
     props.remove(ThirdEyeConfigConstants.THIRDEYE_TIMECOLUMN_TYPE.toString());
 
     config = ThirdEyeConfig.fromProperties(props);
-    Assert.assertEquals(config.getTime().getBucket().getSize(), 1, "Incorrect default time size");
-    Assert.assertEquals(config.getTime().getBucket().getUnit(), TimeUnit.HOURS, "Incorrect default time unit");
+    Assert.assertEquals(config.getTime().getTimeGranularity().getSize(), 1, "Incorrect default time size");
+    Assert.assertEquals(config.getTime().getTimeGranularity().getUnit(), TimeUnit.HOURS, "Incorrect default time unit");
   }
 
   @Test

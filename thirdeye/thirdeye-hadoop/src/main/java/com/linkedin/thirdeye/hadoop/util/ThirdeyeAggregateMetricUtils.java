@@ -19,8 +19,17 @@ import java.util.List;
 
 import com.linkedin.thirdeye.hadoop.config.MetricType;
 
+/**
+ * Class to aggregate metric values
+ */
 public class ThirdeyeAggregateMetricUtils {
 
+  /**
+   * Aggregates an array of metricValues into an aggregate array
+   * @param metricTypes - metric types array
+   * @param aggMetricValues - aggregated metric values
+   * @param metricValues - metric values to add
+   */
   public static void aggregate(List<MetricType> metricTypes, Number[] aggMetricValues, Number[] metricValues) {
     int numMetrics = aggMetricValues.length;
     for (int i = 0; i < numMetrics; i++) {

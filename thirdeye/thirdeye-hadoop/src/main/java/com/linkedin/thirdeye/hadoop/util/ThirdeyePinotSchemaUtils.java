@@ -35,11 +35,24 @@ import com.linkedin.thirdeye.hadoop.config.DimensionSpec;
 import com.linkedin.thirdeye.hadoop.config.MetricSpec;
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfig;
 
+/**
+ * This class contains the methods needed to transform
+ * a ThirdEyeConfig into a Pinot Schema
+ */
 public class ThirdeyePinotSchemaUtils {
 
   private static Logger LOGGER = LoggerFactory.getLogger(ThirdeyePinotSchemaUtils.class);
   private static final String AUTO_METRIC_COUNT = "__COUNT";
 
+  /**
+   * Transforms the thirdeyeConfig to pinot schema
+   * Adds default __COUNT metric if not already present
+   * Adds additional columns for all dimensions which
+   * are wither specified as topk or whitelist
+   * and hence have a transformed new column_raw
+   * @param thirdeyeConfig
+   * @return
+   */
   public static Schema createSchema(ThirdEyeConfig thirdeyeConfig) {
     Schema schema = new Schema();
     for (DimensionSpec dimensionSpec : thirdeyeConfig.getDimensions()) {
@@ -74,13 +87,13 @@ public class ThirdeyePinotSchemaUtils {
     }
     TimeGranularitySpec incoming =
         new TimeGranularitySpec(DataType.LONG,
-            thirdeyeConfig.getTime().getBucket().getSize(),
-            thirdeyeConfig.getTime().getBucket().getUnit(),
+            thirdeyeConfig.getTime().getTimeGranularity().getSize(),
+            thirdeyeConfig.getTime().getTimeGranularity().getUnit(),
             thirdeyeConfig.getTime().getColumnName());
     TimeGranularitySpec outgoing =
         new TimeGranularitySpec(DataType.LONG,
-            thirdeyeConfig.getTime().getBucket().getSize(),
-            thirdeyeConfig.getTime().getBucket().getUnit(),
+            thirdeyeConfig.getTime().getTimeGranularity().getSize(),
+            thirdeyeConfig.getTime().getTimeGranularity().getUnit(),
             thirdeyeConfig.getTime().getColumnName());
 
     FieldSpec fieldSpec = new TimeFieldSpec(incoming, outgoing);

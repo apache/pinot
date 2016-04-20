@@ -17,6 +17,9 @@ package com.linkedin.thirdeye.hadoop.topk;
 
 /**
  * Class to manage dimension value and metric values pairs
+ * The order of elements is determined based on the metric value -
+ * Lesser metric value is treated as greater in ordering,
+ * so that it gets removed from the fixed size PriorityQueue first
  */
 public class DimensionValueMetricPair implements Comparable<DimensionValueMetricPair>{
 

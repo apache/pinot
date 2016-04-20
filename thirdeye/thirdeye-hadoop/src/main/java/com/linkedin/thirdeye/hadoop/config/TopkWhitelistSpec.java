@@ -20,9 +20,9 @@ import java.util.Map;
 
 /**
  * Config class to define topk and whitelist
- * threshold: dimension values which do not satisfy metric thresholds will be ignored
- * topKDimensionToMetricsSpec: list of dimension and a map of metric to topk value for that dimension
- * whitelist: values to whitelist for given dimension
+ * @param threshold - dimension values which do not satisfy metric thresholds will be ignored
+ * @param topKDimensionToMetricsSpec - list of dimension and a map of metric to topk value for that dimension
+ * @param whitelist - values to whitelist for given dimension
  */
 public class TopkWhitelistSpec {
 

@@ -1,5 +1,8 @@
 package com.linkedin.thirdeye.hadoop.config;
 
+/**
+ * Class for representing all property names used in thirdeye-hadoop jobs
+ */
 public enum ThirdEyeConfigConstants {
 
   /** Pinot table name */

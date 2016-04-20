@@ -20,6 +20,8 @@ import java.util.Map;
 /**
  * This class manages config for dimension with topk
  * config defined on multiple metrics
+ * @param dimensionName - The dimension of this topk config
+ * @param topk - map of metric name to k value
  */
 public class TopKDimensionToMetricsSpec {
 
