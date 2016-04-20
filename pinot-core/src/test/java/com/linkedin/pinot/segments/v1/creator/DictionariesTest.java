@@ -403,4 +403,102 @@ public class DictionariesTest {
     dictionaryCreator.close();
     FileUtils.deleteQuietly(indexDir);
   }
+
+  /**
+   * Tests SegmentDictionaryCreator for case when there is only one string
+   * and it is empty
+   *
+   * This test asserts that the padded length of the empty string is 1
+   * in actual padded dictionary), and not 0.
+   *
+   * @throws Exception
+   */
+  @Test
+  public void testSingleEmptyString()
+      throws Exception {
+    File indexDir = new File("/tmp/dict.test");
+    FieldSpec fieldSpec = new DimensionFieldSpec("test", DataType.STRING, true, "\t");
+
+    String[] inputStrings = new String[1];
+    String[] paddedStrings = new String[1];
+
+    try {
+      inputStrings[0] = "";
+      Arrays.sort(inputStrings); // Sorted order: {""}
+
+      SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(false, inputStrings, fieldSpec, indexDir);
+      dictionaryCreator.build();
+
+      // Get the padded string as stored in the dictionary.
+      int targetPaddedLength = dictionaryCreator.getStringColumnMaxLength();
+      Assert.assertTrue(targetPaddedLength == 1);
+      for (int i = 0; i < inputStrings.length; i++) {
+        paddedStrings[i] = SegmentDictionaryCreator.getPaddedString(inputStrings[i], targetPaddedLength);
+      }
+      Arrays.sort(paddedStrings); // Sorted Order: {"%"}
+
+      // Assert that indexOfSV for un-padded string returns the index of the corresponding padded string.
+      for (int i = 0; i < inputStrings.length; i++) {
+        int paddedIndex = dictionaryCreator.indexOfSV(inputStrings[i]);
+        Assert.assertTrue(paddedStrings[paddedIndex].equals(
+            SegmentDictionaryCreator.getPaddedString(inputStrings[i], targetPaddedLength)));
+      }
+
+      // Verify that empty string got padded
+      Assert.assertTrue(paddedStrings[0].equals("%"));
+      dictionaryCreator.close();
+    } catch (Exception e) {
+        throw e;
+    } finally {
+      FileUtils.deleteQuietly(indexDir);
+    }
+  }
+  /**
+   * Tests SegmentDictionaryCreator for case when there is only one string
+   * and it is "null"
+   *
+   * This test asserts that the padded length of the null string is 4
+   *
+   * @throws Exception
+   */
+  @Test
+  public void testSingleNullString()
+      throws Exception {
+    File indexDir = new File("/tmp/dict.test");
+    FieldSpec fieldSpec = new DimensionFieldSpec("test", DataType.STRING, true, "\t");
+
+    String[] inputStrings = new String[1];
+    String[] paddedStrings = new String[1];
+
+    inputStrings[0] = "null";
+    Arrays.sort(inputStrings); // Sorted order: {"null"}
+
+    try {
+      SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(false, inputStrings, fieldSpec, indexDir);
+      dictionaryCreator.build();
+
+      // Get the padded string as stored in the dictionary.
+      int targetPaddedLength = dictionaryCreator.getStringColumnMaxLength();
+      Assert.assertTrue(targetPaddedLength == 4);
+      for (int i = 0; i < inputStrings.length; i++) {
+        paddedStrings[i] = SegmentDictionaryCreator.getPaddedString(inputStrings[i], targetPaddedLength);
+      }
+      Arrays.sort(paddedStrings); // Sorted Order: {"null"}
+
+      // Assert that indexOfSV for un-padded string returns the index of the corresponding padded string.
+      for (int i = 0; i < inputStrings.length; i++) {
+        int paddedIndex = dictionaryCreator.indexOfSV(inputStrings[i]);
+        Assert.assertTrue(paddedStrings[paddedIndex].equals(
+            SegmentDictionaryCreator.getPaddedString(inputStrings[i], targetPaddedLength)));
+      }
+
+      // Verify that the string "null" did not get changed
+      Assert.assertTrue(paddedStrings[0].equals("null"));
+      dictionaryCreator.close();
+    } catch (Exception e) {
+      throw e;
+    } finally {
+      FileUtils.deleteQuietly(indexDir);
+    }
+  }
 }

@@ -156,6 +156,7 @@ public class SegmentDictionaryCreator implements Closeable {
       case STRING:
       case BOOLEAN:
         Object[] sortedObjects = (Object[]) sortedList;
+        stringColumnMaxLength = 1; // make sure that there is non-zero sized dictionary JIRA:PINOT-2947
         for (final Object e : sortedObjects) {
           String val = e.toString();
           int length = val.getBytes(utf8CharSet).length;
