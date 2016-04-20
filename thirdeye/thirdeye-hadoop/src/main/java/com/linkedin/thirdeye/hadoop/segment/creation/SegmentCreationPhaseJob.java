@@ -52,7 +52,9 @@ import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfig;
 import com.linkedin.thirdeye.hadoop.util.ThirdeyePinotSchemaUtils;
 
-
+/**
+ * This class contains the job that generates pinot segments with star tree index
+ */
 public class SegmentCreationPhaseJob extends Configured {
 
   private static final String TEMP = "temp";

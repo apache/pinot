@@ -15,6 +15,9 @@
  */
 package com.linkedin.thirdeye.hadoop.push;
 
+/**
+ * Class containing properties to be set for segment push
+ */
 public enum SegmentPushPhaseConstants {
 
   SEGMENT_PUSH_INPUT_PATH("segment.push.input.path"),

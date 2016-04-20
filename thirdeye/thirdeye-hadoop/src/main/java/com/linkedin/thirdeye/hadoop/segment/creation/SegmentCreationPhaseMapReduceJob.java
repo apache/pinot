@@ -49,7 +49,10 @@ import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfig;
 
-
+/**
+ * Mapper class for SegmentCreation job, which sets configs required for
+ * segment greneration with star tree index
+ */
 public class SegmentCreationPhaseMapReduceJob {
 
   public static class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritable, Text> {

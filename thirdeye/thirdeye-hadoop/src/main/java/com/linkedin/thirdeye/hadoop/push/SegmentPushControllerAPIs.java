@@ -34,6 +34,10 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Joiner;
 
+/**
+ * Contains APIs which can be used for segment operations
+ * such as listing, deleting overlap
+ */
 public class SegmentPushControllerAPIs {
 
   private static Logger LOGGER = LoggerFactory.getLogger(SegmentPushControllerAPIs.class);

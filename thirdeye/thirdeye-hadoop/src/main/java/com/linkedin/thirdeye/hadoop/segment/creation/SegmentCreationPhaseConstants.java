@@ -15,6 +15,9 @@
  */
 package com.linkedin.thirdeye.hadoop.segment.creation;
 
+/**
+ * Properties to be set for the segment creation phase
+ */
 public enum SegmentCreationPhaseConstants {
 
   SEGMENT_CREATION_SCHEMA_PATH("segment.creation.schema.path"),
