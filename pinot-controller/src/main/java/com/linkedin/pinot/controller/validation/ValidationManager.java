@@ -140,59 +140,57 @@ public class ValidationManager {
         }
 
         // Calculate missing segments only for offline tables
-        if (TableNameBuilder.getTableTypeFromTableName(tableName) != TableType.OFFLINE) {
-          int missingSegmentCount = 0;
+        int missingSegmentCount = 0;
 
-          // Compute the missing segments if there are at least two
-          if (2 < segmentMetadataList.size()) {
-            List<Interval> segmentIntervals = new ArrayList<Interval>();
-            for (SegmentMetadata segmentMetadata : segmentMetadataList) {
-              Interval timeInterval = segmentMetadata.getTimeInterval();
-              if (timeInterval != null && TimeUtils.timeValueInValidRange(timeInterval.getStartMillis()) && TimeUtils
-                      .timeValueInValidRange(timeInterval.getEndMillis())) {
-                segmentIntervals.add(timeInterval);
-              }
-            }
-
-            List<Interval> missingIntervals = computeMissingIntervals(segmentIntervals, segmentMetadataList.get(0).getTimeGranularity());
-            missingSegmentCount = missingIntervals.size();
-
-            for (Interval missingInterval : missingIntervals) {
-              LOGGER.warn("Missing data in table {} for time interval {}", tableName, missingInterval);
-            }
-          }
-
-          // Update the gauge that contains the number of missing segments
-          _validationMetrics.updateMissingSegmentsGauge(tableName, missingSegmentCount);
-
-          // Compute the max segment end time and max segment push time
-          long maxSegmentEndTime = Long.MIN_VALUE;
-          long maxSegmentPushTime = Long.MIN_VALUE;
-
+        // Compute the missing segments if there are at least two
+        if (2 < segmentMetadataList.size()) {
+          List<Interval> segmentIntervals = new ArrayList<Interval>();
           for (SegmentMetadata segmentMetadata : segmentMetadataList) {
-            Interval segmentInterval = segmentMetadata.getTimeInterval();
-
-            if (segmentInterval != null && maxSegmentEndTime < segmentInterval.getEndMillis()) {
-              maxSegmentEndTime = segmentInterval.getEndMillis();
-            }
-
-            long segmentPushTime = segmentMetadata.getPushTime();
-            long segmentRefreshTime = segmentMetadata.getRefreshTime();
-            long segmentUpdateTime = Math.max(segmentPushTime, segmentRefreshTime);
-
-            if (maxSegmentPushTime < segmentUpdateTime) {
-              maxSegmentPushTime = segmentUpdateTime;
+            Interval timeInterval = segmentMetadata.getTimeInterval();
+            if (timeInterval != null && TimeUtils.timeValueInValidRange(timeInterval.getStartMillis()) && TimeUtils
+                    .timeValueInValidRange(timeInterval.getEndMillis())) {
+              segmentIntervals.add(timeInterval);
             }
           }
 
-          // Update the gauges that contain the delay between the current time and last segment end time
-          _validationMetrics.updateOfflineSegmentDelayGauge(tableName, maxSegmentEndTime);
-          _validationMetrics.updateLastPushTimeGauge(tableName, maxSegmentPushTime);
-          // Update the gauge to contain the total document count in the segments
-          _validationMetrics.updateTotalDocumentsGauge(tableName, computeRealtimeTotalDocumentInSegments(segmentMetadataList));
-          // Update the gauge to contain the total number of segments for this table
-          _validationMetrics.updateSegmentCountGauge(tableName, segmentMetadataList.size());
+          List<Interval> missingIntervals = computeMissingIntervals(segmentIntervals, segmentMetadataList.get(0).getTimeGranularity());
+          missingSegmentCount = missingIntervals.size();
+
+          for (Interval missingInterval : missingIntervals) {
+            LOGGER.warn("Missing data in table {} for time interval {}", tableName, missingInterval);
+          }
         }
+
+        // Update the gauge that contains the number of missing segments
+        _validationMetrics.updateMissingSegmentsGauge(tableName, missingSegmentCount);
+
+        // Compute the max segment end time and max segment push time
+        long maxSegmentEndTime = Long.MIN_VALUE;
+        long maxSegmentPushTime = Long.MIN_VALUE;
+
+        for (SegmentMetadata segmentMetadata : segmentMetadataList) {
+          Interval segmentInterval = segmentMetadata.getTimeInterval();
+
+          if (segmentInterval != null && maxSegmentEndTime < segmentInterval.getEndMillis()) {
+            maxSegmentEndTime = segmentInterval.getEndMillis();
+          }
+
+          long segmentPushTime = segmentMetadata.getPushTime();
+          long segmentRefreshTime = segmentMetadata.getRefreshTime();
+          long segmentUpdateTime = Math.max(segmentPushTime, segmentRefreshTime);
+
+          if (maxSegmentPushTime < segmentUpdateTime) {
+            maxSegmentPushTime = segmentUpdateTime;
+          }
+        }
+
+        // Update the gauges that contain the delay between the current time and last segment end time
+        _validationMetrics.updateOfflineSegmentDelayGauge(tableName, maxSegmentEndTime);
+        _validationMetrics.updateLastPushTimeGauge(tableName, maxSegmentPushTime);
+        // Update the gauge to contain the total document count in the segments
+        _validationMetrics.updateTotalDocumentsGauge(tableName, computeRealtimeTotalDocumentInSegments(segmentMetadataList));
+        // Update the gauge to contain the total number of segments for this table
+        _validationMetrics.updateSegmentCountGauge(tableName, segmentMetadataList.size());
       }
     }
     LOGGER.info("Validation completed");
