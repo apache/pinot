@@ -27,12 +27,11 @@ import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.JobStatus;
 import org.joda.time.DateTime;
-import org.joda.time.format.DateTimeFormat;
-import org.joda.time.format.DateTimeFormatter;
 import org.joda.time.format.ISODateTimeFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.thirdeye.hadoop.config.ThirdEyeConstants;
 import com.linkedin.thirdeye.hadoop.derivedcolumn.transformation.DerivedColumnTransformationPhaseConstants;
 import com.linkedin.thirdeye.hadoop.derivedcolumn.transformation.DerivedColumnTransformationPhaseJob;
 import com.linkedin.thirdeye.hadoop.push.SegmentPushPhase;
@@ -49,16 +48,12 @@ public class ThirdEyeJob {
   private static final Logger LOGGER = LoggerFactory.getLogger(ThirdEyeJob.class);
 
   private static final String USAGE = "usage: phase_name job.properties";
-  private static final String AVRO_SCHEMA = "schema.avsc";
-  private static final String TRANSFORMATION_SCHEMA = "transformation_schema.avsc";
-  private static final String TOPK_VALUES_FILE = "topk_values";
-  public static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormat.forPattern("YYYY-MM-dd-HHmmss");
 
   private final String phaseName;
   private final Properties inputConfig;
 
   public ThirdEyeJob(String jobName, Properties config) {
-    String phaseFromConfig = config.getProperty(ThirdEyeJobConstants.THIRDEYE_PHASE.getName());
+    String phaseFromConfig = config.getProperty(ThirdEyeJobProperties.THIRDEYE_PHASE.getName());
     if (phaseFromConfig != null) {
       this.phaseName = phaseFromConfig;
     } else {
@@ -131,7 +126,7 @@ public class ThirdEyeJob {
 
         config.setProperty(DerivedColumnTransformationPhaseConstants.DERIVED_COLUMN_TRANSFORMATION_PHASE_TOPK_PATH.toString(),
             getIndexDir(root, collection, minTime, maxTime) + File.separator
-                + TOPK.getName() + File.separator + TOPK_VALUES_FILE);
+                + TOPK.getName() + File.separator + ThirdEyeConstants.TOPK_VALUES_FILE);
 
         return config;
       }
@@ -154,7 +149,7 @@ public class ThirdEyeJob {
         Properties config = new Properties();
 
         config.setProperty(SegmentCreationPhaseConstants.SEGMENT_CREATION_SCHEMA_PATH.toString(),
-            getIndexDir(root, collection, minTime, maxTime) + File.separator + TRANSFORMATION_SCHEMA);
+            getIndexDir(root, collection, minTime, maxTime) + File.separator + ThirdEyeConstants.TRANSFORMATION_SCHEMA);
         config.setProperty(SegmentCreationPhaseConstants.SEGMENT_CREATION_INPUT_PATH.toString(),
             getIndexDir(root, collection, minTime, maxTime)
             + File.separator + DERIVED_COLUMN_TRANSFORMATION.getName());
@@ -165,7 +160,7 @@ public class ThirdEyeJob {
         config.setProperty(SegmentCreationPhaseConstants.SEGMENT_CREATION_WALLCLOCK_END_TIME.toString(),
             String.valueOf(maxTime.getMillis()));
 
-        String schedule = inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_FLOW_SCHEDULE.getName());
+        String schedule = inputConfig.getProperty(ThirdEyeJobProperties.THIRDEYE_FLOW_SCHEDULE.getName());
         config.setProperty(SegmentCreationPhaseConstants.SEGMENT_CREATION_SCHEDULE.toString(), schedule);
         return config;
       }
@@ -190,9 +185,9 @@ public class ThirdEyeJob {
         config.setProperty(SegmentPushPhaseConstants.SEGMENT_PUSH_INPUT_PATH.toString(),
             getIndexDir(root, collection, minTime, maxTime) + File.separator + SEGMENT_CREATION.getName());
         config.setProperty(SegmentPushPhaseConstants.SEGMENT_PUSH_CONTROLLER_HOSTS.toString(),
-            inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_PINOT_CONTROLLER_HOSTS.getName()));
+            inputConfig.getProperty(ThirdEyeJobProperties.THIRDEYE_PINOT_CONTROLLER_HOSTS.getName()));
         config.setProperty(SegmentPushPhaseConstants.SEGMENT_PUSH_CONTROLLER_PORT.toString(),
-            inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_PINOT_CONTROLLER_PORT.getName()));
+            inputConfig.getProperty(ThirdEyeJobProperties.THIRDEYE_PINOT_CONTROLLER_PORT.getName()));
         return config;
       }
     };
@@ -211,12 +206,12 @@ public class ThirdEyeJob {
     String getIndexDir(String root, String collection, DateTime minTime,
         DateTime maxTime) throws IOException {
       return getCollectionDir(root, collection) + File.separator
-          + "data_" + DATE_TIME_FORMATTER.print(minTime) + "_"
-          + DATE_TIME_FORMATTER.print(maxTime);
+          + "data_" + ThirdEyeConstants.DATE_TIME_FORMATTER.print(minTime) + "_"
+          + ThirdEyeConstants.DATE_TIME_FORMATTER.print(maxTime);
     }
 
     String getSchemaPath(String root, String collection) {
-      return getCollectionDir(root, collection) + File.separator + AVRO_SCHEMA;
+      return getCollectionDir(root, collection) + File.separator + ThirdEyeConstants.AVRO_SCHEMA;
     }
 
   }
@@ -243,7 +238,7 @@ public class ThirdEyeJob {
 
   private void setMapreduceConfig(Configuration configuration) {
     String mapreduceConfig =
-        inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_MR_CONF.getName());
+        inputConfig.getProperty(ThirdEyeJobProperties.THIRDEYE_MR_CONF.getName());
     if (mapreduceConfig != null && !mapreduceConfig.isEmpty()) {
       String[] options = mapreduceConfig.split(",");
       for (String option : options) {
@@ -268,17 +263,17 @@ public class ThirdEyeJob {
     }
 
     // Get root, collection, input paths
-    String root = getAndCheck(ThirdEyeJobConstants.THIRDEYE_ROOT.getName(), inputConfig);
+    String root = getAndCheck(ThirdEyeJobProperties.THIRDEYE_ROOT.getName(), inputConfig);
     String collection =
-        getAndCheck(ThirdEyeJobConstants.THIRDEYE_COLLECTION.getName(), inputConfig);
-    String inputPaths = getAndCheck(ThirdEyeJobConstants.INPUT_PATHS.getName(), inputConfig);
+        getAndCheck(ThirdEyeJobProperties.THIRDEYE_COLLECTION.getName(), inputConfig);
+    String inputPaths = getAndCheck(ThirdEyeJobProperties.INPUT_PATHS.getName(), inputConfig);
 
     // Get min / max time
     DateTime minTime;
     DateTime maxTime;
 
-    String minTimeProp = inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_TIME_MIN.getName());
-    String maxTimeProp = inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_TIME_MAX.getName());
+    String minTimeProp = inputConfig.getProperty(ThirdEyeJobProperties.THIRDEYE_TIME_MIN.getName());
+    String maxTimeProp = inputConfig.getProperty(ThirdEyeJobProperties.THIRDEYE_TIME_MAX.getName());
 
     minTime = ISODateTimeFormat.dateTimeParser().parseDateTime(minTimeProp);
     maxTime = ISODateTimeFormat.dateTimeParser().parseDateTime(maxTimeProp);

@@ -262,12 +262,12 @@ public final class ThirdEyeConfig {
 
   private static Map<String, String> getWhitelistFromProperties(Properties props) {
     Map<String, String> whitelist = null;
-    String whitelistDimensions = getAndCheck(props, ThirdEyeConfigConstants.THIRDEYE_WHITELIST_DIMENSION_NAMES.toString(), null);
+    String whitelistDimensions = getAndCheck(props, ThirdEyeConfigProperties.THIRDEYE_WHITELIST_DIMENSION_NAMES.toString(), null);
     if (whitelistDimensions != null && whitelistDimensions.split(FIELD_SEPARATOR).length > 0) {
       whitelist = new HashMap<>();
       for (String dimension : whitelistDimensions.split(FIELD_SEPARATOR)) {
         String dimensionWhitelist = getAndCheck(props,
-            ThirdEyeConfigConstants.THIRDEYE_WHITELIST_DIMENSION.toString() + CONFIG_JOINER + dimension);
+            ThirdEyeConfigProperties.THIRDEYE_WHITELIST_DIMENSION.toString() + CONFIG_JOINER + dimension);
         whitelist.put(dimension, dimensionWhitelist);
       }
     }
@@ -276,15 +276,15 @@ public final class ThirdEyeConfig {
 
   private static List<TopKDimensionToMetricsSpec> getTopKDimensionToMetricsSpecFromProperties(Properties props) {
     List<TopKDimensionToMetricsSpec> topKDimensionToMetricsSpec = null;
-    String topKDimensionNames = getAndCheck(props, ThirdEyeConfigConstants.THIRDEYE_TOPK_DIMENSION_NAMES.toString(), null);
+    String topKDimensionNames = getAndCheck(props, ThirdEyeConfigProperties.THIRDEYE_TOPK_DIMENSION_NAMES.toString(), null);
     if (topKDimensionNames != null && topKDimensionNames.split(FIELD_SEPARATOR).length > 0) {
       topKDimensionToMetricsSpec = new ArrayList<>();
       for (String dimension : topKDimensionNames.split(FIELD_SEPARATOR)) {
         String[] topKDimensionMetrics = getAndCheck(props,
-            ThirdEyeConfigConstants.THIRDEYE_TOPK_METRICS.toString() + CONFIG_JOINER + dimension)
+            ThirdEyeConfigProperties.THIRDEYE_TOPK_METRICS.toString() + CONFIG_JOINER + dimension)
             .split(FIELD_SEPARATOR);
         String[] topKDimensionKValues = getAndCheck(props,
-            ThirdEyeConfigConstants.THIRDEYE_TOPK_KVALUES.toString() + CONFIG_JOINER + dimension)
+            ThirdEyeConfigProperties.THIRDEYE_TOPK_KVALUES.toString() + CONFIG_JOINER + dimension)
             .split(FIELD_SEPARATOR);
         if (topKDimensionMetrics.length != topKDimensionKValues.length) {
           throw new IllegalStateException("Number of topk metric names and kvalues should be same for a dimension");
@@ -301,8 +301,8 @@ public final class ThirdEyeConfig {
 
   private static Map<String, Double> getThresholdFromProperties(Properties props) {
     Map<String, Double> threshold = null;
-    String thresholdMetricNames = getAndCheck(props, ThirdEyeConfigConstants.THIRDEYE_TOPK_THRESHOLD_METRIC_NAMES.toString(), null);
-    String metricThresholdValues = getAndCheck(props, ThirdEyeConfigConstants.THIRDEYE_TOPK_METRIC_THRESHOLD_VALUES.toString(), null);
+    String thresholdMetricNames = getAndCheck(props, ThirdEyeConfigProperties.THIRDEYE_TOPK_THRESHOLD_METRIC_NAMES.toString(), null);
+    String metricThresholdValues = getAndCheck(props, ThirdEyeConfigProperties.THIRDEYE_TOPK_METRIC_THRESHOLD_VALUES.toString(), null);
     if (thresholdMetricNames != null && metricThresholdValues != null) {
       String[] thresholdMetrics = thresholdMetricNames.split(FIELD_SEPARATOR);
       String[] thresholdValues = metricThresholdValues.split(FIELD_SEPARATOR);
@@ -320,10 +320,10 @@ public final class ThirdEyeConfig {
   private static SplitSpec getSplitFromProperties(Properties props) {
     SplitSpec split = null;
     String splitThreshold = getAndCheck(props,
-        ThirdEyeConfigConstants.THIRDEYE_SPLIT_THRESHOLD.toString(), null);
+        ThirdEyeConfigProperties.THIRDEYE_SPLIT_THRESHOLD.toString(), null);
     if (splitThreshold != null) {
       String splitOrder = getAndCheck(props,
-          ThirdEyeConfigConstants.THIRDEYE_SPLIT_ORDER.toString(), null);
+          ThirdEyeConfigProperties.THIRDEYE_SPLIT_ORDER.toString(), null);
       List<String> splitOrderList = null;
       if (splitOrder != null) {
         splitOrderList = Arrays.asList(splitOrder.split(FIELD_SEPARATOR));
@@ -335,11 +335,11 @@ public final class ThirdEyeConfig {
 
   private static TimeSpec getTimeFromProperties(Properties props) {
     String timeColumnName = getAndCheck(props,
-        ThirdEyeConfigConstants.THIRDEYE_TIMECOLUMN_NAME.toString());
+        ThirdEyeConfigProperties.THIRDEYE_TIMECOLUMN_NAME.toString());
     String timeColumnType = getAndCheck(props,
-        ThirdEyeConfigConstants.THIRDEYE_TIMECOLUMN_TYPE.toString(), DEFAULT_TIME_TYPE);
+        ThirdEyeConfigProperties.THIRDEYE_TIMECOLUMN_TYPE.toString(), DEFAULT_TIME_TYPE);
     String timeColumnSize = getAndCheck(props,
-        ThirdEyeConfigConstants.THIRDEYE_TIMECOLUMN_SIZE.toString(), DEFAULT_TIME_SIZE);
+        ThirdEyeConfigProperties.THIRDEYE_TIMECOLUMN_SIZE.toString(), DEFAULT_TIME_SIZE);
     TimeGranularity timeGranularity = new TimeGranularity(Integer.parseInt(timeColumnSize), TimeUnit.valueOf(timeColumnType));
     TimeSpec time = new TimeSpec(timeColumnName, timeGranularity);
     return time;
@@ -348,9 +348,9 @@ public final class ThirdEyeConfig {
   private static List<MetricSpec> getMetricsFromProperties(Properties props) {
     List<MetricSpec> metrics = new ArrayList<>();
     String[] metricNames = getAndCheck(props,
-        ThirdEyeConfigConstants.THIRDEYE_METRIC_NAMES.toString()).split(FIELD_SEPARATOR);
+        ThirdEyeConfigProperties.THIRDEYE_METRIC_NAMES.toString()).split(FIELD_SEPARATOR);
     String[] metricTypes = getAndCheck(props,
-        ThirdEyeConfigConstants.THIRDEYE_METRIC_TYPES.toString()).split(FIELD_SEPARATOR);
+        ThirdEyeConfigProperties.THIRDEYE_METRIC_TYPES.toString()).split(FIELD_SEPARATOR);
     if (metricNames.length != metricTypes.length) {
       throw new IllegalStateException("Number of metric names provided "
           + "should be same as number of metric types");
@@ -364,7 +364,7 @@ public final class ThirdEyeConfig {
   private static List<DimensionSpec> getDimensionFromProperties(Properties props) {
     List<DimensionSpec> dimensions = new ArrayList<>();
     String[] dimensionNames = getAndCheck(props,
-        ThirdEyeConfigConstants.THIRDEYE_DIMENSION_NAMES.toString()).split(FIELD_SEPARATOR);
+        ThirdEyeConfigProperties.THIRDEYE_DIMENSION_NAMES.toString()).split(FIELD_SEPARATOR);
     for (String dimension : dimensionNames) {
       dimensions.add(new DimensionSpec(dimension));
     }
@@ -373,7 +373,7 @@ public final class ThirdEyeConfig {
 
   private static String getCollectionFromProperties(Properties props) {
     String collection = getAndCheck(props,
-        ThirdEyeConfigConstants.THIRDEYE_TABLE_NAME.toString());
+        ThirdEyeConfigProperties.THIRDEYE_TABLE_NAME.toString());
     return collection;
   }
 

@@ -16,6 +16,7 @@
 package com.linkedin.thirdeye.hadoop.util;
 
 import java.io.IOException;
+import java.util.Set;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -34,6 +35,7 @@ import com.linkedin.pinot.common.data.TimeGranularitySpec;
 import com.linkedin.thirdeye.hadoop.config.DimensionSpec;
 import com.linkedin.thirdeye.hadoop.config.MetricSpec;
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfig;
+import com.linkedin.thirdeye.hadoop.config.ThirdEyeConstants;
 
 /**
  * This class contains the methods needed to transform
@@ -42,7 +44,6 @@ import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfig;
 public class ThirdeyePinotSchemaUtils {
 
   private static Logger LOGGER = LoggerFactory.getLogger(ThirdeyePinotSchemaUtils.class);
-  private static final String AUTO_METRIC_COUNT = "__COUNT";
 
   /**
    * Transforms the thirdeyeConfig to pinot schema
@@ -55,19 +56,32 @@ public class ThirdeyePinotSchemaUtils {
    */
   public static Schema createSchema(ThirdEyeConfig thirdeyeConfig) {
     Schema schema = new Schema();
+
+    Set<String> transformDimensions = thirdeyeConfig.getTransformDimensions();
     for (DimensionSpec dimensionSpec : thirdeyeConfig.getDimensions()) {
       FieldSpec fieldSpec = new DimensionFieldSpec();
-      fieldSpec.setName(dimensionSpec.getName());
+      String dimensionName = dimensionSpec.getName();
+      fieldSpec.setName(dimensionName);
       fieldSpec.setFieldType(FieldType.DIMENSION);
       fieldSpec.setDataType(DataType.STRING);
       fieldSpec.setSingleValueField(true);
-      schema.addField(dimensionSpec.getName(), fieldSpec);
+      schema.addField(dimensionName, fieldSpec);
+
+      if (transformDimensions.contains(dimensionName)) {
+        fieldSpec = new DimensionFieldSpec();
+        dimensionName = dimensionName + ThirdEyeConstants.RAW_DIMENSION_SUFFIX;
+        fieldSpec.setName(dimensionName);
+        fieldSpec.setFieldType(FieldType.DIMENSION);
+        fieldSpec.setDataType(DataType.STRING);
+        fieldSpec.setSingleValueField(true);
+        schema.addField(dimensionName, fieldSpec);
+      }
     }
     boolean countIncluded = false;
     for (MetricSpec metricSpec : thirdeyeConfig.getMetrics()) {
       FieldSpec fieldSpec = new MetricFieldSpec();
       String metricName = metricSpec.getName();
-      if (metricName.equals(AUTO_METRIC_COUNT)) {
+      if (metricName.equals(ThirdEyeConstants.AUTO_METRIC_COUNT)) {
         countIncluded = true;
       }
       fieldSpec.setName(metricName);
@@ -78,7 +92,7 @@ public class ThirdeyePinotSchemaUtils {
     }
     if (!countIncluded) {
       FieldSpec fieldSpec = new MetricFieldSpec();
-      String metricName = AUTO_METRIC_COUNT;
+      String metricName = ThirdEyeConstants.AUTO_METRIC_COUNT;
       fieldSpec.setName(metricName);
       fieldSpec.setFieldType(FieldType.METRIC);
       fieldSpec.setDataType(DataType.LONG);

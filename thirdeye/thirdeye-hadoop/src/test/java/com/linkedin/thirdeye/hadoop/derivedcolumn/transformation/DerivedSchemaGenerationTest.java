@@ -24,7 +24,7 @@ import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfig;
-import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfigConstants;
+import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfigProperties;
 
 public class DerivedSchemaGenerationTest {
   private static final String SCHEMA_FILE = "schema.avsc";
@@ -39,11 +39,11 @@ public class DerivedSchemaGenerationTest {
     inputSchema = new Schema.Parser().parse(ClassLoader.getSystemResourceAsStream(SCHEMA_FILE));
 
     props = new Properties();
-    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_TABLE_NAME.toString(), "collection");
-    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_DIMENSION_NAMES.toString(), "d1,d2,d3");
-    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_METRIC_NAMES.toString(), "m1,m2");
-    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_METRIC_TYPES.toString(), "INT,INT");
-    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_TIMECOLUMN_NAME.toString(), "hoursSinceEpoch");
+    props.setProperty(ThirdEyeConfigProperties.THIRDEYE_TABLE_NAME.toString(), "collection");
+    props.setProperty(ThirdEyeConfigProperties.THIRDEYE_DIMENSION_NAMES.toString(), "d1,d2,d3");
+    props.setProperty(ThirdEyeConfigProperties.THIRDEYE_METRIC_NAMES.toString(), "m1,m2");
+    props.setProperty(ThirdEyeConfigProperties.THIRDEYE_METRIC_TYPES.toString(), "INT,INT");
+    props.setProperty(ThirdEyeConfigProperties.THIRDEYE_TIMECOLUMN_NAME.toString(), "hoursSinceEpoch");
 
   }
 
@@ -54,12 +54,12 @@ public class DerivedSchemaGenerationTest {
     Assert.assertEquals(inputSchema.getFields().size(), outputSchema.getFields().size(),
         "Input schema should be same as output schema if no topk/whitelist in config");
 
-    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_TOPK_DIMENSION_NAMES.toString(), "d2,");
-    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_TOPK_METRICS.toString() + ".d2", "m1");
-    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_TOPK_KVALUES.toString() + ".d2", "1");
-    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_WHITELIST_DIMENSION_NAMES.toString(), "d2,d3");
-    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_WHITELIST_DIMENSION.toString() + ".d2" , "a,b,c");
-    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_WHITELIST_DIMENSION.toString() + ".d3", "x,y");
+    props.setProperty(ThirdEyeConfigProperties.THIRDEYE_TOPK_DIMENSION_NAMES.toString(), "d2,");
+    props.setProperty(ThirdEyeConfigProperties.THIRDEYE_TOPK_METRICS.toString() + ".d2", "m1");
+    props.setProperty(ThirdEyeConfigProperties.THIRDEYE_TOPK_KVALUES.toString() + ".d2", "1");
+    props.setProperty(ThirdEyeConfigProperties.THIRDEYE_WHITELIST_DIMENSION_NAMES.toString(), "d2,d3");
+    props.setProperty(ThirdEyeConfigProperties.THIRDEYE_WHITELIST_DIMENSION.toString() + ".d2" , "a,b,c");
+    props.setProperty(ThirdEyeConfigProperties.THIRDEYE_WHITELIST_DIMENSION.toString() + ".d3", "x,y");
 
     thirdeyeConfig = ThirdEyeConfig.fromProperties(props);
     outputSchema = job.newSchema(thirdeyeConfig, inputSchema);

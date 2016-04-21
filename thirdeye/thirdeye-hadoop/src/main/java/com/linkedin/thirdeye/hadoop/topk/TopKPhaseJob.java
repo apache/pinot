@@ -31,6 +31,7 @@ import java.util.Properties;
 import java.util.Set;
 
 import com.linkedin.thirdeye.hadoop.config.MetricType;
+import com.linkedin.thirdeye.hadoop.config.ThirdEyeConstants;
 import com.linkedin.thirdeye.hadoop.config.TopKDimensionToMetricsSpec;
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfig;
 import com.linkedin.thirdeye.hadoop.util.ThirdeyeAggregateMetricUtils;
@@ -93,9 +94,6 @@ public class TopKPhaseJob extends Configured {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static final String TOPK_ALL_DIMENSION_NAME = "0";
   private static final String TOPK_ALL_DIMENSION_VALUE = "0";
-  private static final String EMPTY_STRING = "";
-  private static final Number EMPTY_NUMBER = 0;
-  private static final String TOPK_VALUES_FILE = "topk_values";
 
   private String name;
   private Properties props;
@@ -189,7 +187,7 @@ public class TopKPhaseJob extends Configured {
     private String getDimensionFromRecord(GenericRecord record, String dimensionName) {
       String dimensionValue = (String) record.get(dimensionName);
       if (dimensionValue == null) {
-        dimensionValue = EMPTY_STRING;
+        dimensionValue = ThirdEyeConstants.EMPTY_STRING;
       }
       return dimensionValue;
     }
@@ -197,7 +195,7 @@ public class TopKPhaseJob extends Configured {
     private Number getMetricFromRecord(GenericRecord record, String metricName) {
       Number metricValue = (Number) record.get(metricName);
       if (metricValue == null) {
-        metricValue = EMPTY_NUMBER;
+        metricValue = ThirdEyeConstants.EMPTY_NUMBER;
       }
       return metricValue;
     }
@@ -407,7 +405,7 @@ public class TopKPhaseJob extends Configured {
         String topkValuesPath = configuration.get(TOPK_PHASE_OUTPUT_PATH.toString());
         LOGGER.info("Writing top k values to {}",topkValuesPath);
         FSDataOutputStream topKDimensionValuesOutputStream = fileSystem.create(
-            new Path(topkValuesPath + File.separator + TOPK_VALUES_FILE));
+            new Path(topkValuesPath + File.separator + ThirdEyeConstants.TOPK_VALUES_FILE));
         OBJECT_MAPPER.writeValue(topKDimensionValuesOutputStream, topkDimensionValues);
         topKDimensionValuesOutputStream.close();
       }

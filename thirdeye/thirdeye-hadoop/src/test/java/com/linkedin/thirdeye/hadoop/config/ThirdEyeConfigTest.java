@@ -22,28 +22,28 @@ public class ThirdEyeConfigTest {
   @BeforeClass
   public void setup() {
     props = new Properties();
-    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_TABLE_NAME.toString(), "collection");
-    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_DIMENSION_NAMES.toString(), "d1,d2,d3");
-    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_METRIC_NAMES.toString(), "m1,m2,m3");
-    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_METRIC_TYPES.toString(), "LONG,FLOAT,INT");
-    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_TIMECOLUMN_NAME.toString(), "t1");
-    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_TIMECOLUMN_TYPE.toString(), "DAYS");
-    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_TIMECOLUMN_SIZE.toString(), "10");
-    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_SPLIT_THRESHOLD.toString(), "1000");
-    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_SPLIT_ORDER.toString(), "d1,d2,d3");
+    props.setProperty(ThirdEyeConfigProperties.THIRDEYE_TABLE_NAME.toString(), "collection");
+    props.setProperty(ThirdEyeConfigProperties.THIRDEYE_DIMENSION_NAMES.toString(), "d1,d2,d3");
+    props.setProperty(ThirdEyeConfigProperties.THIRDEYE_METRIC_NAMES.toString(), "m1,m2,m3");
+    props.setProperty(ThirdEyeConfigProperties.THIRDEYE_METRIC_TYPES.toString(), "LONG,FLOAT,INT");
+    props.setProperty(ThirdEyeConfigProperties.THIRDEYE_TIMECOLUMN_NAME.toString(), "t1");
+    props.setProperty(ThirdEyeConfigProperties.THIRDEYE_TIMECOLUMN_TYPE.toString(), "DAYS");
+    props.setProperty(ThirdEyeConfigProperties.THIRDEYE_TIMECOLUMN_SIZE.toString(), "10");
+    props.setProperty(ThirdEyeConfigProperties.THIRDEYE_SPLIT_THRESHOLD.toString(), "1000");
+    props.setProperty(ThirdEyeConfigProperties.THIRDEYE_SPLIT_ORDER.toString(), "d1,d2,d3");
 
-    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_TOPK_THRESHOLD_METRIC_NAMES.toString(), "m1,m3");
-    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_TOPK_METRIC_THRESHOLD_VALUES.toString(), "0.02,0.1");
+    props.setProperty(ThirdEyeConfigProperties.THIRDEYE_TOPK_THRESHOLD_METRIC_NAMES.toString(), "m1,m3");
+    props.setProperty(ThirdEyeConfigProperties.THIRDEYE_TOPK_METRIC_THRESHOLD_VALUES.toString(), "0.02,0.1");
 
-    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_TOPK_DIMENSION_NAMES.toString(), "d2,d3");
-    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_TOPK_METRICS.toString() + ".d2", "m1,m2");
-    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_TOPK_KVALUES.toString() + ".d2", "20,30");
-    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_TOPK_METRICS.toString() + ".d3", "m1");
-    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_TOPK_KVALUES.toString() + ".d3", "50");
+    props.setProperty(ThirdEyeConfigProperties.THIRDEYE_TOPK_DIMENSION_NAMES.toString(), "d2,d3");
+    props.setProperty(ThirdEyeConfigProperties.THIRDEYE_TOPK_METRICS.toString() + ".d2", "m1,m2");
+    props.setProperty(ThirdEyeConfigProperties.THIRDEYE_TOPK_KVALUES.toString() + ".d2", "20,30");
+    props.setProperty(ThirdEyeConfigProperties.THIRDEYE_TOPK_METRICS.toString() + ".d3", "m1");
+    props.setProperty(ThirdEyeConfigProperties.THIRDEYE_TOPK_KVALUES.toString() + ".d3", "50");
 
-    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_WHITELIST_DIMENSION_NAMES.toString(), "d1,d2");
-    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_WHITELIST_DIMENSION.toString() + ".d1", "x,y");
-    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_WHITELIST_DIMENSION.toString() + ".d2", "a");
+    props.setProperty(ThirdEyeConfigProperties.THIRDEYE_WHITELIST_DIMENSION_NAMES.toString(), "d1,d2");
+    props.setProperty(ThirdEyeConfigProperties.THIRDEYE_WHITELIST_DIMENSION.toString() + ".d1", "x,y");
+    props.setProperty(ThirdEyeConfigProperties.THIRDEYE_WHITELIST_DIMENSION.toString() + ".d2", "a");
 
     thirdeyeConfig = ThirdEyeConfig.fromProperties(props);
 
@@ -55,10 +55,10 @@ public class ThirdEyeConfigTest {
   public void testTableNameConfig() throws IllegalArgumentException {
     Assert.assertEquals("collection", thirdeyeConfig.getCollection(), "Collection name not correctly set");
     try {
-      props.remove(ThirdEyeConfigConstants.THIRDEYE_TABLE_NAME.toString());
+      props.remove(ThirdEyeConfigProperties.THIRDEYE_TABLE_NAME.toString());
       config = ThirdEyeConfig.fromProperties(props);
     } finally {
-      props.setProperty(ThirdEyeConfigConstants.THIRDEYE_TABLE_NAME.toString(), "collection");
+      props.setProperty(ThirdEyeConfigProperties.THIRDEYE_TABLE_NAME.toString(), "collection");
     }
   }
 
@@ -68,10 +68,10 @@ public class ThirdEyeConfigTest {
     Assert.assertEquals(new String[]{"d1", "d2", "d3"}, thirdeyeConfig.getDimensionNames().toArray(), "Incorrect dimensions");
 
     try {
-      props.remove(ThirdEyeConfigConstants.THIRDEYE_DIMENSION_NAMES.toString());
+      props.remove(ThirdEyeConfigProperties.THIRDEYE_DIMENSION_NAMES.toString());
       config = ThirdEyeConfig.fromProperties(props);
     } finally {
-      props.setProperty(ThirdEyeConfigConstants.THIRDEYE_DIMENSION_NAMES.toString(), "d1,d2,d3");
+      props.setProperty(ThirdEyeConfigProperties.THIRDEYE_DIMENSION_NAMES.toString(), "d1,d2,d3");
     }
   }
 
@@ -88,31 +88,31 @@ public class ThirdEyeConfigTest {
     Assert.assertEquals(actualMetricTypes, new MetricType[]{MetricType.LONG, MetricType.FLOAT, MetricType.INT}, "Incorrect metric specs");
 
     try {
-      props.remove(ThirdEyeConfigConstants.THIRDEYE_METRIC_NAMES.toString());
+      props.remove(ThirdEyeConfigProperties.THIRDEYE_METRIC_NAMES.toString());
       config = ThirdEyeConfig.fromProperties(props);
     } catch (IllegalArgumentException e) {
       failed = true;
-      props.setProperty(ThirdEyeConfigConstants.THIRDEYE_METRIC_NAMES.toString(), "m1,m2,m3");
+      props.setProperty(ThirdEyeConfigProperties.THIRDEYE_METRIC_NAMES.toString(), "m1,m2,m3");
     }
     Assert.assertTrue(failed, "Expected exception due to missing metric names property");
 
     failed = false;
     try {
-      props.remove(ThirdEyeConfigConstants.THIRDEYE_METRIC_TYPES.toString());
+      props.remove(ThirdEyeConfigProperties.THIRDEYE_METRIC_TYPES.toString());
       config = ThirdEyeConfig.fromProperties(props);
     } catch (IllegalArgumentException e) {
       failed = true;
-      props.setProperty(ThirdEyeConfigConstants.THIRDEYE_METRIC_TYPES.toString(), "LONG,FLOAT,INT");
+      props.setProperty(ThirdEyeConfigProperties.THIRDEYE_METRIC_TYPES.toString(), "LONG,FLOAT,INT");
     }
     Assert.assertTrue(failed, "Expected exception due to missing metric types property");
 
     failed = false;
     try {
-      props.setProperty(ThirdEyeConfigConstants.THIRDEYE_METRIC_NAMES.toString(), "m1,m2");
+      props.setProperty(ThirdEyeConfigProperties.THIRDEYE_METRIC_NAMES.toString(), "m1,m2");
       config = ThirdEyeConfig.fromProperties(props);
     } catch (IllegalStateException e) {
       failed = true;
-      props.setProperty(ThirdEyeConfigConstants.THIRDEYE_METRIC_NAMES.toString(), "m1,m2,m3");
+      props.setProperty(ThirdEyeConfigProperties.THIRDEYE_METRIC_NAMES.toString(), "m1,m2,m3");
     }
     Assert.assertTrue(failed, "Expecetd exception due to inequal number of metric names and types in properties");
   }
@@ -125,16 +125,16 @@ public class ThirdEyeConfigTest {
     Assert.assertEquals(thirdeyeConfig.getTime().getTimeGranularity().getUnit(), TimeUnit.DAYS, "Incorrect time unit");
 
     try {
-      props.remove(ThirdEyeConfigConstants.THIRDEYE_TIMECOLUMN_NAME.toString());
+      props.remove(ThirdEyeConfigProperties.THIRDEYE_TIMECOLUMN_NAME.toString());
       config = ThirdEyeConfig.fromProperties(props);
     } catch (IllegalArgumentException e) {
       failed = true;
-      props.setProperty(ThirdEyeConfigConstants.THIRDEYE_TIMECOLUMN_NAME.toString(), "t1");
+      props.setProperty(ThirdEyeConfigProperties.THIRDEYE_TIMECOLUMN_NAME.toString(), "t1");
     }
     Assert.assertTrue(failed, "Expected exception due to missing time column property");
 
-    props.remove(ThirdEyeConfigConstants.THIRDEYE_TIMECOLUMN_SIZE.toString());
-    props.remove(ThirdEyeConfigConstants.THIRDEYE_TIMECOLUMN_TYPE.toString());
+    props.remove(ThirdEyeConfigProperties.THIRDEYE_TIMECOLUMN_SIZE.toString());
+    props.remove(ThirdEyeConfigProperties.THIRDEYE_TIMECOLUMN_TYPE.toString());
 
     config = ThirdEyeConfig.fromProperties(props);
     Assert.assertEquals(config.getTime().getTimeGranularity().getSize(), 1, "Incorrect default time size");
@@ -146,7 +146,7 @@ public class ThirdEyeConfigTest {
     Assert.assertEquals(thirdeyeConfig.getSplit().getThreshold(), 1000, "Incorrect split threshold");
     Assert.assertEquals(thirdeyeConfig.getSplit().getOrder().toArray(), new String[]{"d1", "d2", "d3"}, "Incorrect split order");
 
-    props.remove(ThirdEyeConfigConstants.THIRDEYE_SPLIT_THRESHOLD.toString());
+    props.remove(ThirdEyeConfigProperties.THIRDEYE_SPLIT_THRESHOLD.toString());
     config = ThirdEyeConfig.fromProperties(props);
     Assert.assertEquals(config.getSplit(), null, "Default split should be null");
   }
@@ -161,14 +161,14 @@ public class ThirdEyeConfigTest {
     Assert.assertEquals(threshold.size(), 2, "Incorrect metric thresholds size");
     Assert.assertEquals(threshold.get("m1") == 0.02 && threshold.get("m3") == 0.1, true, "Incorrect metric thresholds config");
     try {
-      props.setProperty(ThirdEyeConfigConstants.THIRDEYE_TOPK_METRIC_THRESHOLD_VALUES.toString(), "0.1");
+      props.setProperty(ThirdEyeConfigProperties.THIRDEYE_TOPK_METRIC_THRESHOLD_VALUES.toString(), "0.1");
       config = ThirdEyeConfig.fromProperties(props);
     } catch (IllegalStateException e) {
       failed = true;
     }
     Assert.assertTrue(failed, "Expected exception due to unequal number of metrics and threshold");
-    props.remove(ThirdEyeConfigConstants.THIRDEYE_TOPK_METRIC_THRESHOLD_VALUES.toString());
-    props.remove(ThirdEyeConfigConstants.THIRDEYE_TOPK_THRESHOLD_METRIC_NAMES.toString());
+    props.remove(ThirdEyeConfigProperties.THIRDEYE_TOPK_METRIC_THRESHOLD_VALUES.toString());
+    props.remove(ThirdEyeConfigProperties.THIRDEYE_TOPK_THRESHOLD_METRIC_NAMES.toString());
     config = ThirdEyeConfig.fromProperties(props);
     Assert.assertEquals(config.getTopKWhitelist().getThreshold(), null, "Default threshold config should be null");
 
@@ -177,7 +177,7 @@ public class ThirdEyeConfigTest {
     Assert.assertEquals(whitelist.size(), 2, "Incorrect size of whitelist dimensions");
     Assert.assertEquals(whitelist.get("d1"), "x,y", "Incorrect whitelist config");
     Assert.assertEquals(whitelist.get("d2"), "a", "Incorrect whitelist config");
-    props.remove(ThirdEyeConfigConstants.THIRDEYE_WHITELIST_DIMENSION_NAMES.toString());
+    props.remove(ThirdEyeConfigProperties.THIRDEYE_WHITELIST_DIMENSION_NAMES.toString());
     config = ThirdEyeConfig.fromProperties(props);
     Assert.assertEquals(config.getTopKWhitelist().getWhitelist(), null, "Default whitelist config should be null");
 
@@ -195,14 +195,14 @@ public class ThirdEyeConfigTest {
         && topkSpec.getTopk().get("m1") == 50, true, "Incorrect topk config");
     failed = false;
     try {
-      props.setProperty(ThirdEyeConfigConstants.THIRDEYE_TOPK_METRICS.toString() + ".d3", "m1");
-      props.setProperty(ThirdEyeConfigConstants.THIRDEYE_TOPK_KVALUES.toString() + ".d3", "50,50");
+      props.setProperty(ThirdEyeConfigProperties.THIRDEYE_TOPK_METRICS.toString() + ".d3", "m1");
+      props.setProperty(ThirdEyeConfigProperties.THIRDEYE_TOPK_KVALUES.toString() + ".d3", "50,50");
       config = ThirdEyeConfig.fromProperties(props);
     } catch (IllegalStateException e) {
       failed = true;
     }
     Assert.assertTrue(failed, "Expecetd exception due to inequal number of metrics and kvalues for dimension");
-    props.remove(ThirdEyeConfigConstants.THIRDEYE_TOPK_DIMENSION_NAMES.toString());
+    props.remove(ThirdEyeConfigProperties.THIRDEYE_TOPK_DIMENSION_NAMES.toString());
     config = ThirdEyeConfig.fromProperties(props);
     Assert.assertEquals(config.getTopKWhitelist(), null, "Default topk should be null");
 

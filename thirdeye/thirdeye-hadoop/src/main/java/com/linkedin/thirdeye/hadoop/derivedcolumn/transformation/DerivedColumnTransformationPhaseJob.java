@@ -33,6 +33,7 @@ import java.util.Set;
 
 import com.linkedin.thirdeye.hadoop.config.MetricSpec;
 import com.linkedin.thirdeye.hadoop.config.MetricType;
+import com.linkedin.thirdeye.hadoop.config.ThirdEyeConstants;
 import com.linkedin.thirdeye.hadoop.config.TopKDimensionToMetricsSpec;
 import com.linkedin.thirdeye.hadoop.config.TopkWhitelistSpec;
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfig;
@@ -74,11 +75,6 @@ public class DerivedColumnTransformationPhaseJob extends Configured {
   private static final Logger LOGGER = LoggerFactory.getLogger(DerivedColumnTransformationPhaseJob.class);
 
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-  private static final String RAW_DIMENSION_SUFFIX = "_raw";
-  private static final String OTHER = "other";
-  private static final String EMPTY_STRING = "";
-  private static final Number EMPTY_NUMBER = 0;
-  private static final String TRANSFORMATION_SCHEMA = "transformation_schema.avsc";
 
   private String name;
   private Properties props;
@@ -118,7 +114,7 @@ public class DerivedColumnTransformationPhaseJob extends Configured {
       timeColumnName = config.getTimeColumnName();
 
       Path outputSchemaPath = new Path(configuration.get(DERIVED_COLUMN_TRANSFORMATION_PHASE_OUTPUT_SCHEMA_PATH.toString())
-          + File.separator + TRANSFORMATION_SCHEMA);
+          + File.separator + ThirdEyeConstants.TRANSFORMATION_SCHEMA);
       FSDataInputStream outputSchemaStream = fs.open(outputSchemaPath);
       outputSchema = new Schema.Parser().parse(outputSchemaStream);
       outputSchemaStream.close();
@@ -154,9 +150,9 @@ public class DerivedColumnTransformationPhaseJob extends Configured {
           if (topKDimensionValues != null && topKDimensionValues.contains(dimensionValue)) {
             outputRecord.put(dimensionName, dimensionValue);
           } else {
-            outputRecord.put(dimensionName, OTHER);
+            outputRecord.put(dimensionName, ThirdEyeConstants.OTHER);
           }
-          dimensionName = dimension + RAW_DIMENSION_SUFFIX;
+          dimensionName = dimension + ThirdEyeConstants.RAW_DIMENSION_SUFFIX;
         }
         outputRecord.put(dimensionName, dimensionValue);
       }
@@ -176,7 +172,7 @@ public class DerivedColumnTransformationPhaseJob extends Configured {
     private String getDimensionFromRecord(GenericRecord record, String dimensionName) {
       String dimensionValue = (String) record.get(dimensionName);
       if (dimensionValue == null) {
-        dimensionValue = EMPTY_STRING;
+        dimensionValue = ThirdEyeConstants.EMPTY_STRING;
       }
       return dimensionValue;
     }
@@ -184,7 +180,7 @@ public class DerivedColumnTransformationPhaseJob extends Configured {
     private Number getMetricFromRecord(GenericRecord record, String metricName) {
       Number metricValue = (Number) record.get(metricName);
       if (metricValue == null) {
-        metricValue = EMPTY_NUMBER;
+        metricValue = ThirdEyeConstants.EMPTY_NUMBER;
       }
       return metricValue;
     }
@@ -236,7 +232,7 @@ public class DerivedColumnTransformationPhaseJob extends Configured {
 
     // Output schema
     Path outputSchemaPath = new Path(getAndSetConfiguration(configuration, DERIVED_COLUMN_TRANSFORMATION_PHASE_OUTPUT_SCHEMA_PATH)
-        + File.separator + TRANSFORMATION_SCHEMA);
+        + File.separator + ThirdEyeConstants.TRANSFORMATION_SCHEMA);
     Schema outputSchema = newSchema(thirdeyeConfig, inputSchema);
     FSDataOutputStream outputSchemaStream = fs.create(outputSchemaPath);
     outputSchemaStream.writeBytes(outputSchema.toString(true));
@@ -285,7 +281,7 @@ public class DerivedColumnTransformationPhaseJob extends Configured {
     for (String dimension : thirdeyeConfig.getDimensionNames()) {
       fieldAssembler = fieldAssembler.name(dimension).type().nullable().stringType().noDefault();
       if (transformDimensionSet.contains(dimension)) {
-        fieldAssembler = fieldAssembler.name(dimension + RAW_DIMENSION_SUFFIX).type().nullable().stringType().noDefault();
+        fieldAssembler = fieldAssembler.name(dimension + ThirdEyeConstants.RAW_DIMENSION_SUFFIX).type().nullable().stringType().noDefault();
       }
     }
 

@@ -15,7 +15,7 @@
  */
 package com.linkedin.thirdeye.hadoop;
 
-public enum ThirdEyeJobConstants {
+public enum ThirdEyeJobProperties {
   THIRDEYE_FLOW_SCHEDULE("thirdeye.flow.schedule"), // HOURLY, DAILY
   THIRDEYE_PHASE("thirdeye.phase"), // segment_creation, segment_push
   THIRDEYE_ROOT("thirdeye.root"),
@@ -29,7 +29,7 @@ public enum ThirdEyeJobConstants {
 
   private final String propertyName;
 
-  ThirdEyeJobConstants(String propertyName) {
+  ThirdEyeJobProperties(String propertyName) {
     this.propertyName = propertyName;
   }
 

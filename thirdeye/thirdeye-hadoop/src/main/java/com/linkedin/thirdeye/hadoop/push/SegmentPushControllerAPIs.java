@@ -33,6 +33,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Joiner;
+import com.linkedin.thirdeye.hadoop.config.ThirdEyeConstants;
 
 /**
  * Contains APIs which can be used for segment operations
@@ -51,7 +52,6 @@ public class SegmentPushControllerAPIs {
   private static String TABLES_ENDPOINT = "tables/";
   private static String DROP_PARAMETERS = "?state=drop";
   private static String UTF_8 = "UTF-8";
-  private static String SEGMENT_JOINER = "_";
   private static long TIMEOUT = 120000;
   private static String SUCCESS = "success";
 
@@ -100,10 +100,10 @@ public class SegmentPushControllerAPIs {
 
   private String getOverlapPattern(String segmentName, String tablename) {
     String pattern = null;
-    String[] tokens = segmentName.split(SEGMENT_JOINER);
+    String[] tokens = segmentName.split(ThirdEyeConstants.SEGMENT_JOINER);
     if (tokens.length > 2 && tokens[2].lastIndexOf("-") != -1) {
       String datePrefix = tokens[2].substring(0, tokens[2].lastIndexOf("-"));
-      pattern = Joiner.on(SEGMENT_JOINER).join(tablename, HOURLY_SCHEDULE, datePrefix);
+      pattern = Joiner.on(ThirdEyeConstants.SEGMENT_JOINER).join(tablename, HOURLY_SCHEDULE, datePrefix);
     }
     return pattern;
   }

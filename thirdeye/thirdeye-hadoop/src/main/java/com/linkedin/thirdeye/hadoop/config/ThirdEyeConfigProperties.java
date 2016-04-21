@@ -18,7 +18,7 @@ package com.linkedin.thirdeye.hadoop.config;
 /**
  * Class for representing all property names used in thirdeye-hadoop jobs
  */
-public enum ThirdEyeConfigConstants {
+public enum ThirdEyeConfigProperties {
 
   /** Pinot table name */
   THIRDEYE_TABLE_NAME("thirdeye.table.name"),
@@ -73,7 +73,7 @@ public enum ThirdEyeConfigConstants {
 
   String name;
 
-  ThirdEyeConfigConstants(String name) {
+  ThirdEyeConfigProperties(String name) {
     this.name = name;
   }
 

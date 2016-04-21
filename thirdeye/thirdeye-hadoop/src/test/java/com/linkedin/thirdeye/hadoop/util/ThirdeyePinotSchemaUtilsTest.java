@@ -25,7 +25,7 @@ import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfig;
-import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfigConstants;
+import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfigProperties;
 import com.linkedin.thirdeye.hadoop.util.ThirdeyePinotSchemaUtils;
 
 public class ThirdeyePinotSchemaUtilsTest {
@@ -36,11 +36,19 @@ public class ThirdeyePinotSchemaUtilsTest {
   @BeforeTest
   public void setup() {
     props = new Properties();
-    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_TABLE_NAME.toString(), "collection");
-    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_DIMENSION_NAMES.toString(), "d1,d2,d3");
-    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_METRIC_NAMES.toString(), "m1,m2");
-    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_METRIC_TYPES.toString(), "INT,INT");
-    props.setProperty(ThirdEyeConfigConstants.THIRDEYE_TIMECOLUMN_NAME.toString(), "hoursSinceEpoch");
+    props.setProperty(ThirdEyeConfigProperties.THIRDEYE_TABLE_NAME.toString(), "collection");
+    props.setProperty(ThirdEyeConfigProperties.THIRDEYE_DIMENSION_NAMES.toString(), "d1,d2,d3");
+    props.setProperty(ThirdEyeConfigProperties.THIRDEYE_METRIC_NAMES.toString(), "m1,m2");
+    props.setProperty(ThirdEyeConfigProperties.THIRDEYE_METRIC_TYPES.toString(), "INT,INT");
+    props.setProperty(ThirdEyeConfigProperties.THIRDEYE_TIMECOLUMN_NAME.toString(), "hoursSinceEpoch");
+
+    props.setProperty(ThirdEyeConfigProperties.THIRDEYE_TOPK_DIMENSION_NAMES.toString(), "d2");
+    props.setProperty(ThirdEyeConfigProperties.THIRDEYE_TOPK_METRICS.toString() + ".d2", "m1,m2");
+    props.setProperty(ThirdEyeConfigProperties.THIRDEYE_TOPK_KVALUES.toString() + ".d2", "20,30");
+
+    props.setProperty(ThirdEyeConfigProperties.THIRDEYE_WHITELIST_DIMENSION_NAMES.toString(), "d1,d2");
+    props.setProperty(ThirdEyeConfigProperties.THIRDEYE_WHITELIST_DIMENSION.toString() + ".d1", "x,y");
+    props.setProperty(ThirdEyeConfigProperties.THIRDEYE_WHITELIST_DIMENSION.toString() + ".d2", "a");
 
     thirdeyeConfig = ThirdEyeConfig.fromProperties(props);
   }
@@ -49,8 +57,8 @@ public class ThirdeyePinotSchemaUtilsTest {
   public void testThirdeyeConfigToPinotSchemaGeneration() throws Exception {
     Schema schema = ThirdeyePinotSchemaUtils.createSchema(thirdeyeConfig);
 
-    Assert.assertEquals(schema.getAllFieldSpecs().size(), 7, "Incorrect pinot schema fields list size");
-    List<String> dimensions = Arrays.asList("d1", "d2", "d3");
+    Assert.assertEquals(schema.getAllFieldSpecs().size(), 9, "Incorrect pinot schema fields list size");
+    List<String> dimensions = Arrays.asList("d1", "d1_raw", "d2", "d2_raw", "d3");
     Assert.assertEquals(schema.getDimensionNames().containsAll(dimensions), true,
         "New schema dimensions " + schema.getDimensionNames() + " is missing dimensions");
 
