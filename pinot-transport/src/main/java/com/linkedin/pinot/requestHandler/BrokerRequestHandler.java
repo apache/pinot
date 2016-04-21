@@ -33,6 +33,7 @@ import com.linkedin.pinot.common.response.BrokerResponseFactory;
 import com.linkedin.pinot.common.response.BrokerResponseFactory.ResponseType;
 import com.linkedin.pinot.common.response.ProcessingException;
 import com.linkedin.pinot.common.response.ServerInstance;
+import com.linkedin.pinot.common.response.broker.BrokerResponseNative;
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.pql.parsers.Pql2Compiler;
 import com.linkedin.pinot.routing.RoutingTable;
@@ -114,8 +115,6 @@ public class BrokerRequestHandler {
     LOGGER.info("Query string for requestId {}: {}", requestId, pql);
     boolean isTraceEnabled = false;
 
-    final BrokerResponseFactory.ResponseType responseType = BrokerResponseFactory.getResponseType(request);
-
     if (request.has("trace")) {
       try {
         isTraceEnabled = Boolean.parseBoolean(request.getString("trace"));
@@ -134,14 +133,9 @@ public class BrokerRequestHandler {
       if (isTraceEnabled) {
         brokerRequest.setEnableTrace(true);
       }
-
-      if (request.has(BROKER_RESPONSE_TYPE)) {
-        brokerRequest.setResponseFormat(request.getString(BROKER_RESPONSE_TYPE));
-      } else {
-        brokerRequest.setResponseFormat(ResponseType.BROKER_RESPONSE_TYPE_JSON.name());
-      }
+      brokerRequest.setResponseFormat(ResponseType.BROKER_RESPONSE_TYPE_NATIVE.name());
     } catch (Exception e) {
-      BrokerResponse brokerResponse = BrokerResponseFactory.get(responseType);
+      BrokerResponse brokerResponse = new BrokerResponseNative();
       brokerResponse.setExceptions(Arrays.asList(QueryException.getException(QueryException.PQL_PARSING_ERROR, e)));
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1);
       return brokerResponse;
