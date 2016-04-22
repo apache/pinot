@@ -64,8 +64,8 @@ public class DoubleArrayBasedResultHolder implements ResultHolder {
    * @return
    */
   @Override
-  public double getDoubleResult(long groupKey) {
-    return _resultArray.getDoubleResult((int) groupKey);
+  public double getDoubleResult(int groupKey) {
+    return _resultArray.getDoubleResult(groupKey);
   }
 
   @Override

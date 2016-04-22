@@ -17,7 +17,6 @@ package com.linkedin.pinot.core.operator.aggregation.function;
 
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.core.operator.groupby.ResultHolder;
-import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import java.util.List;
 
 
@@ -58,7 +57,8 @@ public class MinAggregationFunction implements AggregationFunction {
    * @param valueArray
    */
   @Override
-  public void apply(int length, int[] groupKeys, ResultHolder resultHolder, double[]... valueArray) {
+  public void applySV(int length, int[] groupKeys, ResultHolder resultHolder, double[]... valueArray) {
+    Preconditions.checkArgument(valueArray.length == 1);
     Preconditions.checkState(length <= valueArray[0].length);
 
     for (int i = 0; i < length; i++) {
@@ -72,21 +72,19 @@ public class MinAggregationFunction implements AggregationFunction {
    * {@inheritDoc}
    *
    * @param length
-   * @param valueArrayIndexToGroupKeys
+   * @param docIdToGroupKeys
    * @param resultHolder
    * @param valueArray
    */
   @Override
-  public void apply(int length, Int2ObjectOpenHashMap valueArrayIndexToGroupKeys, ResultHolder resultHolder,
-      double[] valueArray) {
-    Preconditions.checkState(length <= valueArray.length);
+  public void applyMV(int length, int[][] docIdToGroupKeys, ResultHolder resultHolder, double[]... valueArray) {
+    Preconditions.checkArgument(valueArray.length == 1);
+    Preconditions.checkState(length <= valueArray[0].length);
 
     for (int i = 0; i < length; ++i) {
-      long[] groupKeys = (long[]) valueArrayIndexToGroupKeys.get(i);
-
-      for (long groupKey : groupKeys) {
+      for (int groupKey : docIdToGroupKeys[i]) {
         double oldValue = resultHolder.getDoubleResult(groupKey);
-        double newValue = Math.min(oldValue, valueArray[i]);
+        double newValue = Math.min(oldValue, valueArray[0][i]);
         resultHolder.putValueForKey(groupKey, newValue);
       }
     }

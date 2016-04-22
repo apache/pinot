@@ -99,9 +99,6 @@ public class DoubleResultArray implements ResultArray {
   @Override
   public void expand(int newSize) {
     Preconditions.checkArgument(newSize > _doubles.length);
-    Preconditions.checkState(newSize <= ResultHolderFactory.MAX_NUM_GROUP_KEYS_FOR_ARRAY_BASED,
-        "Illegal request to expand DoubleArray beyond maximum limit (1M): " + newSize);
-
 
     double[] tmp = _doubles;
     _doubles = new double[newSize];

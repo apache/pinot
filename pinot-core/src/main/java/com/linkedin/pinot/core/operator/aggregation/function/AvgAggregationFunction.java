@@ -18,7 +18,6 @@ package com.linkedin.pinot.core.operator.aggregation.function;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.core.operator.groupby.ResultHolder;
 import com.linkedin.pinot.core.query.utils.Pair;
-import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import java.util.List;
 
 
@@ -61,17 +60,13 @@ public class AvgAggregationFunction implements AggregationFunction {
    * @param valueArray
    */
   @Override
-  public void apply(int length, int[] groupKeys, ResultHolder resultHolder, double[]... valueArray) {
+  public void applySV(int length, int[] groupKeys, ResultHolder resultHolder, double[]... valueArray) {
+    Preconditions.checkArgument(valueArray.length == 1);
     Preconditions.checkState(length <= valueArray[0].length);
 
     for (int i = 0; i < length; i++) {
       int groupKey = groupKeys[i];
       Pair<Double, Long> avgValue = (Pair<Double, Long>) resultHolder.getResult(groupKey);
-
-      if (avgValue == null) {
-        avgValue = new com.linkedin.pinot.core.query.aggregation.function.AvgAggregationFunction.AvgPair(0.0, 0L);
-      }
-
       avgValue.setFirst(avgValue.getFirst() + valueArray[0][i]);
       avgValue.setSecond(avgValue.getSecond() + 1);
       resultHolder.putValueForKey(groupKey, avgValue);
@@ -82,25 +77,19 @@ public class AvgAggregationFunction implements AggregationFunction {
    * {@inheritDoc}
    *
    * @param length
-   * @param valueArrayIndexToGroupKeys
+   * @param docIdToGroupKeys
    * @param resultHolder
    * @param valueArray
    */
   @Override
-  public void apply(int length, Int2ObjectOpenHashMap valueArrayIndexToGroupKeys, ResultHolder resultHolder,
-      double[] valueArray) {
-    Preconditions.checkState(length <= valueArray.length);
+  public void applyMV(int length, int[][] docIdToGroupKeys, ResultHolder resultHolder, double[]... valueArray) {
+    Preconditions.checkArgument(valueArray.length == 1);
+    Preconditions.checkState(length <= valueArray[0].length);
 
     for (int i = 0; i < length; ++i) {
-      long[] groupKeys = (long[]) valueArrayIndexToGroupKeys.get(i);
-
-      for (long groupKey : groupKeys) {
+      for (int groupKey : docIdToGroupKeys[i]) {
         Pair<Double, Long> avgValue = (Pair<Double, Long>) resultHolder.getResult(groupKey);
-
-        if (avgValue == null) {
-          avgValue = new com.linkedin.pinot.core.query.aggregation.function.AvgAggregationFunction.AvgPair(0.0, 0L);
-        }
-        avgValue.setFirst(avgValue.getFirst() + valueArray[i]);
+        avgValue.setFirst(avgValue.getFirst() + valueArray[0][i]);
         avgValue.setSecond(avgValue.getSecond() + 1);
         resultHolder.putValueForKey(groupKey, avgValue);
       }

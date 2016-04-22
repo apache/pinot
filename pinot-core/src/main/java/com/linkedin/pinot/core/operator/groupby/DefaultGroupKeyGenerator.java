@@ -16,6 +16,8 @@
 package com.linkedin.pinot.core.operator.groupby;
 
 import com.google.common.base.Preconditions;
+import com.linkedin.pinot.core.common.Block;
+import com.linkedin.pinot.core.common.BlockMultiValIterator;
 import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
@@ -24,7 +26,9 @@ import com.linkedin.pinot.core.query.utils.Pair;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
+import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 
 
@@ -39,7 +43,7 @@ import java.util.Map;
  * indices, and returns the latter. Keeps a mapping between the two internally.
  *
  */
-public class SingleValueGroupKeyGenerator implements GroupKeyGenerator {
+public class DefaultGroupKeyGenerator implements GroupKeyGenerator {
   private static final int INVALID_ID = -1;
 
   public enum STORAGE_TYPE {
@@ -50,14 +54,17 @@ public class SingleValueGroupKeyGenerator implements GroupKeyGenerator {
   private final String[] _groupByColumns;
 
   private final BlockSingleValIterator[] _singleValIterators;
+  private final BlockMultiValIterator[] _multiValIterators;
+
   private final Dictionary[] _dictionaries;
   private final int[] _cardinalities;
 
   // A reusable array of number of group by columns size,
   // to avoid creating int[] objects with each call.
   private final int[] _reusableGroupByValuesArray;
+  private final int[][] _multiValueResulableArray;
 
-  private final boolean[] _isSingleValueArray;
+  private final boolean[] _isSingleValueGroupByColumn;
   private STORAGE_TYPE _storageType;
   private int _numUniqueGroupKeys;
 
@@ -74,21 +81,35 @@ public class SingleValueGroupKeyGenerator implements GroupKeyGenerator {
    * @param groupByColumns
    * @param maxNumGroupKeys
    */
-  SingleValueGroupKeyGenerator(IndexSegment indexSegment, String[] groupByColumns, int maxNumGroupKeys) {
+  DefaultGroupKeyGenerator(IndexSegment indexSegment, String[] groupByColumns, int maxNumGroupKeys) {
     _groupByColumns = groupByColumns;
 
-    _singleValIterators = new BlockSingleValIterator[groupByColumns.length];
-    _dictionaries = new Dictionary[groupByColumns.length];
-    _cardinalities = new int[groupByColumns.length];
-    _isSingleValueArray = new boolean[groupByColumns.length];
+    int numGroupByColumns = groupByColumns.length;
+    _multiValueResulableArray = new int[numGroupByColumns][];
 
-    for (int i = 0; i < groupByColumns.length; i++) {
+    _singleValIterators = new BlockSingleValIterator[numGroupByColumns];
+    _multiValIterators = new BlockMultiValIterator[numGroupByColumns];
+
+    _dictionaries = new Dictionary[numGroupByColumns];
+    _cardinalities = new int[numGroupByColumns];
+    _isSingleValueGroupByColumn = new boolean[numGroupByColumns];
+
+    for (int i = 0; i < numGroupByColumns; i++) {
       DataSource dataSource = indexSegment.getDataSource(_groupByColumns[i]);
-      _singleValIterators[i] = (BlockSingleValIterator) dataSource.nextBlock().getBlockValueSet().iterator();
 
       _dictionaries[i] = dataSource.getDictionary();
       _cardinalities[i] = dataSource.getDataSourceMetadata().cardinality();
-      _isSingleValueArray[i] = (dataSource.getDataSourceMetadata().isSingleValue()) ? true : false;
+      _isSingleValueGroupByColumn[i] = (dataSource.getDataSourceMetadata().isSingleValue()) ? true : false;
+
+      Block block = dataSource.nextBlock();
+
+      if (_isSingleValueGroupByColumn[i]) {
+        _singleValIterators[i] = (BlockSingleValIterator) block.getBlockValueSet().iterator();
+      } else {
+        int maxNumberOfMultiValues = block.getMetadata().getMaxNumberOfMultiValues();
+        _multiValueResulableArray[i] = new int[maxNumberOfMultiValues];
+        _multiValIterators[i] = (BlockMultiValIterator) block.getBlockValueSet().iterator();
+      }
     }
 
     _numUniqueGroupKeys = 0;
@@ -101,7 +122,7 @@ public class SingleValueGroupKeyGenerator implements GroupKeyGenerator {
       _groupKeyToId.defaultReturnValue(INVALID_ID);
     }
 
-    _reusableGroupByValuesArray = new int[groupByColumns.length];
+    _reusableGroupByValuesArray = new int[numGroupByColumns];
   }
 
   /**
@@ -151,7 +172,7 @@ public class SingleValueGroupKeyGenerator implements GroupKeyGenerator {
   @Override
   public int generateKeyForDocId(int docId) {
     for (int i = 0; i < _groupByColumns.length; i++) {
-      if (_isSingleValueArray[i]) {
+      if (_isSingleValueGroupByColumn[i]) {
         _singleValIterators[i].skipTo(docId);
         _reusableGroupByValuesArray[i] = _singleValIterators[i].nextIntVal();
       } else {
@@ -176,6 +197,77 @@ public class SingleValueGroupKeyGenerator implements GroupKeyGenerator {
     for (int i = startIndex; i <= endIndex; ++i) {
       int docId = docIdSet[i];
       docIdToGroupKey[i] = generateKeyForDocId(docId);
+    }
+  }
+
+  /**
+   * Given a docId, generate and return an array of unique group by keys, based on the
+   * values of group by columns of the record of given docId.
+   *
+   * @param docId
+   * @return
+   */
+  public int[] generateKeysForDocId(int docId) {
+    List<Long> groupByKeys = new ArrayList<>();
+    groupByKeys.add(0l);
+
+    for (int i = 0; i < _groupByColumns.length; i++) {
+      if (_isSingleValueGroupByColumn[i]) {
+        BlockSingleValIterator blockValIterator = _singleValIterators[i];
+        blockValIterator.skipTo(docId);
+        int dictId = blockValIterator.nextIntVal();
+
+        for (int j = 0; j < groupByKeys.size(); j++) {
+          groupByKeys.set(j, groupByKeys.get(j) * _cardinalities[i] + dictId);
+        }
+      } else {
+        BlockMultiValIterator blockValIterator = _multiValIterators[i];
+        blockValIterator.skipTo(docId);
+        int numMultiValues = blockValIterator.nextIntVal(_multiValueResulableArray[i]);
+
+        int originalSize = groupByKeys.size();
+        for (int j = 0; j < numMultiValues - 1; ++j) {
+          for (int k = 0; k < originalSize; k++) {
+            groupByKeys.add(groupByKeys.get(k));
+          }
+        }
+
+        for (int j = 0; j < numMultiValues; j++) {
+          for (int k = 0; k < originalSize; k++) {
+            int index = j * originalSize + k;
+            groupByKeys.set(index, (groupByKeys.get(index) * _cardinalities[i]) + _multiValueResulableArray[i][j]);
+          }
+        }
+      }
+    }
+
+    int numGroupKeys = groupByKeys.size();
+    int[] groupKeys = new int[numGroupKeys];
+    for (int i = 0; i < numGroupKeys; i++) {
+      int groupKey = updateRawKeyToGroupKeyMapping(groupByKeys.get(i));
+      groupKeys[i] = groupKey;
+    }
+    return groupKeys;
+  }
+
+  /**
+   * Given a docIdSet, return a map containing array of group by keys for each docId.
+   * The key in the map returned is indexed from startIndex to startIndex + length.
+   *
+   * @param docIdSet
+   * @param startIndex
+   * @param length
+   * @return
+   */
+  @Override
+  public void generateKeysForDocIdSet(int[] docIdSet, int startIndex, int length, int[][] docIdToGroupKeys) {
+
+    int endIndex = startIndex + length - 1;
+    for (int i = startIndex; i <= endIndex; ++i) {
+      int docId = docIdSet[i];
+
+      // Note this is key in the map is the index not docId.
+      docIdToGroupKeys[i] = generateKeysForDocId(docId);
     }
   }
 
@@ -213,7 +305,7 @@ public class SingleValueGroupKeyGenerator implements GroupKeyGenerator {
    * @return
    */
   @Override
-  public Iterator<Pair<Long, String>> getUniqueGroupKeys() {
+  public Iterator<Pair<Integer, String>> getUniqueGroupKeys() {
     if (_storageType == STORAGE_TYPE.ARRAY_BASED) {
       return new ArrayBasedGroupKeyIterator();
     } else {
@@ -271,9 +363,9 @@ public class SingleValueGroupKeyGenerator implements GroupKeyGenerator {
   /**
    * Inner class to implement group by key iterator for ARRAY_BASED storage.
    */
-  private class ArrayBasedGroupKeyIterator implements Iterator<Pair<Long, String>> {
+  private class ArrayBasedGroupKeyIterator implements Iterator<Pair<Integer, String>> {
     int index = 0;
-    Pair<Long, String> ret = new Pair<Long, String>(-1L, null);
+    Pair<Integer, String> ret = new Pair<Integer, String>(INVALID_ID, null);
 
     @Override
     public boolean hasNext() {
@@ -287,9 +379,9 @@ public class SingleValueGroupKeyGenerator implements GroupKeyGenerator {
     }
 
     @Override
-    public Pair<Long, String> next() {
+    public Pair<Integer, String> next() {
       String stringGroupKey = dictIdToStringGroupKey(index);
-      ret.setFirst((long) index++);
+      ret.setFirst(index++);
       ret.setSecond(stringGroupKey);
       return ret;
     }
@@ -303,13 +395,13 @@ public class SingleValueGroupKeyGenerator implements GroupKeyGenerator {
   /**
    * Inner class to implement group by keys iterator for MAP_BASED storage.
    */
-  private class MapBasedGroupKeyIterator implements Iterator<Pair<Long, String>> {
+  private class MapBasedGroupKeyIterator implements Iterator<Pair<Integer, String>> {
     private final ObjectIterator<Map.Entry<Long, Integer>> _iterator;
-    Pair<Long, String> ret;
+    Pair<Integer, String> ret;
 
     public MapBasedGroupKeyIterator(ObjectIterator<Map.Entry<Long, Integer>> iterator) {
       _iterator = iterator;
-      ret = new Pair<Long, String>(-1L, null);
+      ret = new Pair<Integer, String>(INVALID_ID, null);
     }
 
     @Override
@@ -318,14 +410,14 @@ public class SingleValueGroupKeyGenerator implements GroupKeyGenerator {
     }
 
     @Override
-    public Pair<Long, String> next() {
+    public Pair<Integer, String> next() {
       Map.Entry<Long, Integer> entry = _iterator.next();
 
       long groupKey = entry.getKey().longValue();
       int groupId = entry.getValue().intValue();
 
       String stringGroupKey = dictIdToStringGroupKey(groupKey);
-      ret.setFirst((long) groupId);
+      ret.setFirst(groupId);
       ret.setSecond(stringGroupKey);
       return ret;
     }

@@ -31,8 +31,8 @@ public class GroupByExecutorFactory {
    * Returns the appropriate implementation of GroupByExecutor based on
    * pre-defined criteria.
    *
-   * Returns SingleValueGroupByExecutor if all group by columns are single-valued,
-   * returns MultiValueGroupByExecutor otherwise.
+   * Returns DefaultGroupByExecutor currently. May return other implementations
+   * in future, if necessary.
    *
    * @param indexSegment
    * @param aggregationInfoList
@@ -41,33 +41,8 @@ public class GroupByExecutorFactory {
    */
   public static GroupByExecutor getGroupByExecutor(IndexSegment indexSegment, List<AggregationInfo> aggregationInfoList,
       GroupBy groupBy) {
-
-    if (hasMultiValueGroupByColumns(indexSegment, groupBy)) {
-      return new MultiValueGroupByExecutor(indexSegment, aggregationInfoList, groupBy);
-    } else {
-      int maxNumGroupKeys = computeMaxNumGroupKeys(indexSegment, groupBy);
-      return new SingleValueGroupByExecutor(indexSegment, aggregationInfoList, groupBy, maxNumGroupKeys);
-    }
-  }
-
-  /**
-   * Returns true if any of the group-by columns are multi-valued, false otherwise.
-   *
-   * @param indexSegment
-   * @param groupBy
-   * @return
-   */
-  private static boolean hasMultiValueGroupByColumns(IndexSegment indexSegment, GroupBy groupBy) {
-    for (String column : groupBy.getColumns()) {
-      DataSource dataSource = indexSegment.getDataSource(column);
-      DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
-
-      // For multi-valued group by columns, return max.
-      if (!dataSourceMetadata.isSingleValue()) {
-        return true;
-      }
-    }
-    return false;
+    int maxNumGroupKeys = computeMaxNumGroupKeys(indexSegment, groupBy);
+    return new DefaultGroupByExecutor(indexSegment, aggregationInfoList, groupBy, maxNumGroupKeys);
   }
 
   /**

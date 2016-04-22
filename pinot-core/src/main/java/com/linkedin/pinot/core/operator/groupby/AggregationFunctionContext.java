@@ -15,14 +15,12 @@
  */
 package com.linkedin.pinot.core.operator.groupby;
 
-import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunction;
 import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunctionFactory;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
-import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 
 
 /**
@@ -124,23 +122,22 @@ public class AggregationFunctionContext {
    * @param resultHolder
    * @param valueArray
    */
-  public void apply(int length, int[] docIdToGroupKey, ResultHolder resultHolder,
+  public void applySV(int length, int[] docIdToGroupKey, ResultHolder resultHolder,
       double[]... valueArray) {
-    _aggregationFunction.apply(length, docIdToGroupKey, resultHolder, valueArray);
+    _aggregationFunction.applySV(length, docIdToGroupKey, resultHolder, valueArray);
   }
 
   /**
    * Apply the aggregation function for the column, given
    * - Values array
-   * - Group by keys each value belongs to (valueArrayIndexToGroupKeys)
+   * - Group by keys each value belongs to (docIdToGroupKeys)
    *
    * @param length
-   * @param valueArrayIndexToGroupKeys
+   * @param docIdToGroupKeys
    * @param resultHolder
    * @param valueArray
    */
-  public void apply(int length, Int2ObjectOpenHashMap valueArrayIndexToGroupKeys, ResultHolder resultHolder,
-      double[] valueArray) {
-    _aggregationFunction.apply(length, valueArrayIndexToGroupKeys, resultHolder, valueArray);
+  public void applyMV(int length, int[][] docIdToGroupKeys, ResultHolder resultHolder, double[]... valueArray) {
+    _aggregationFunction.applyMV(length, docIdToGroupKeys, resultHolder, valueArray);
   }
 }

@@ -59,7 +59,7 @@ public class PairArrayBasedResultHolder implements ResultHolder<Pair> {
   }
 
   @Override
-  public double getDoubleResult(long groupKey) {
+  public double getDoubleResult(int groupKey) {
     throw new RuntimeException("Unsupported method 'getDoubleResult' for class " + getClass().getName());
   }
 

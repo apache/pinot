@@ -20,6 +20,8 @@ import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.GroupBy;
 import com.linkedin.pinot.common.utils.primitive.MutableLongValue;
 import com.linkedin.pinot.core.common.BlockValSet;
+import com.linkedin.pinot.core.common.DataSource;
+import com.linkedin.pinot.core.common.DataSourceMetadata;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunction;
 import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
@@ -27,7 +29,6 @@ import com.linkedin.pinot.core.query.aggregation.function.AvgAggregationFunction
 import com.linkedin.pinot.core.query.aggregation.function.MinMaxRangeAggregationFunction;
 import com.linkedin.pinot.core.query.utils.Pair;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
-import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -39,40 +40,52 @@ import java.util.Set;
 
 
 /**
- * Aggregation Group By executor for multi-valued group-by columns.
- * This implementation uses MultiValueGroupKeyGenerator to generate
- * group keys, and uses Map (instead of array) to perform group by aggregation.
- *
- * The use of Map is to ensure handling of cases where cardinality product of
- * multi-valued columns can grow to limits that are not practical for array-based
- * storage.
+ * This class implements group by aggregation.
+ * It is optimized for performance, and uses the best possible algorithm/datastructure
+ * for a given query based on the following parameters:
+ * - Maximum number of group keys possible.
+ * - Single/Multi valued columns.
  */
-public class MultiValueGroupByExecutor implements GroupByExecutor {
-
+public class DefaultGroupByExecutor implements GroupByExecutor {
   private final IndexSegment _indexSegment;
   private final List<AggregationInfo> _aggregationsInfoList;
   private final GroupBy _groupBy;
+  private final int _maxNumGroupKeys;
 
-  private List<AggregationFunctionContext> _aggrFuncContextList;
-  private ResultHolder[] _resultHolderArray;
-  private MultiValueGroupKeyGenerator _groupKeyGenerator;
+  private ArrayList<AggregationFunctionContext> _aggrFuncContextList;
+  private GroupKeyGenerator _groupKeyGenerator;
+
+  private String[] _groupByColumns;
+  private int[] _docIdToSVGroupKey;
+  private int[][] _docIdToMVGroupKey;
+
   private Map<String, int[]> _columnToDictArrayMap;
   private Map<String, double[]> _columnToValueArrayMap;
+  private ResultHolder[] _resultHolderArray;
 
+  private boolean _hasMultiValuedColumns = false;
   private boolean _inited = false;
   private boolean _finished = false;
 
   /**
    * Constructor for the class.
-   * Just stores the passed in parameters into member variables.
-   * Actual initialization is performed within 'init' method.
+   *
+   * @param indexSegment
+   * @param aggregationsInfoList
+   * @param groupBy
+   * @param maxNumGroupKeys
    */
-  public MultiValueGroupByExecutor(IndexSegment indexSegment, List<AggregationInfo> aggregationsInfoList,
-      GroupBy groupBy) {
+  public DefaultGroupByExecutor(IndexSegment indexSegment, List<AggregationInfo> aggregationsInfoList, GroupBy groupBy,
+      int maxNumGroupKeys) {
+    Preconditions.checkNotNull(indexSegment);
+    Preconditions.checkArgument((aggregationsInfoList != null) && (aggregationsInfoList.size() > 0));
+    Preconditions.checkNotNull(groupBy);
+    Preconditions.checkArgument(maxNumGroupKeys > 0);
 
     _indexSegment = indexSegment;
     _aggregationsInfoList = aggregationsInfoList;
     _groupBy = groupBy;
+    _maxNumGroupKeys = maxNumGroupKeys;
   }
 
   /**
@@ -82,16 +95,18 @@ public class MultiValueGroupByExecutor implements GroupByExecutor {
    * - List of AggregationFunctionContexts for the given query.
    * - Group by key generator.
    * - Various re-usable arrays that store dictionaries/values/results.
-   *
    */
   @Override
   public void init() {
-    // Return if already initialized.
+    // Returned if already initialized.
     if (_inited) {
       return;
     }
-    _groupKeyGenerator = new MultiValueGroupKeyGenerator(_indexSegment, _groupBy);
-    _aggrFuncContextList = new ArrayList<AggregationFunctionContext>();
+
+    List<String> groupByColumns = _groupBy.getColumns();
+    _groupByColumns = groupByColumns.toArray(new String[groupByColumns.size()]);
+
+    _aggrFuncContextList = new ArrayList<AggregationFunctionContext>(_aggregationsInfoList.size());
     _columnToDictArrayMap = new HashMap<String, int[]>();
     _columnToValueArrayMap = new HashMap<String, double[]>();
 
@@ -104,50 +119,79 @@ public class MultiValueGroupByExecutor implements GroupByExecutor {
           _columnToValueArrayMap.put(column, new double[DocIdSetPlanNode.MAX_DOC_PER_CALL]);
         }
       }
+
       AggregationFunctionContext aggregationFunctionContext =
           new AggregationFunctionContext(_indexSegment, aggregationInfo.getAggregationType(), columns);
       _aggrFuncContextList.add(aggregationFunctionContext);
     }
 
+    _hasMultiValuedColumns = hasMultiValueGroupByColumns(_indexSegment, _groupByColumns);
+    _groupKeyGenerator = new DefaultGroupKeyGenerator(_indexSegment, _groupByColumns, _maxNumGroupKeys);
+
     _resultHolderArray = new ResultHolder[_aggrFuncContextList.size()];
     for (int i = 0; i < _aggrFuncContextList.size(); i++) {
       AggregationFunctionContext aggregationFunctionContext = _aggrFuncContextList.get(i);
       AggregationFunction aggregationFunction = aggregationFunctionContext.getAggregationFunction();
+      _resultHolderArray[i] = ResultHolderFactory.getResultHolder(aggregationFunction, _maxNumGroupKeys);
+    }
 
-      // Always get map based result holder, by passing MAX_VALUE.
-      _resultHolderArray[i] =
-          ResultHolderFactory.getResultHolder(aggregationFunction, Integer.MAX_VALUE /* maxNumGroupKeys*/);
+    if (_hasMultiValuedColumns) {
+      _docIdToMVGroupKey = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+    } else {
+      _docIdToSVGroupKey = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
     }
     _inited = true;
   }
 
   /**
-   * {@inheritDoc}
+   * Process the provided set of docId's to perform the requested aggregation-group-by-operation.
+   *
    * @param docIdSet
    * @param startIndex
    * @param length
    */
   @Override
   public void process(int[] docIdSet, int startIndex, int length) {
-    Preconditions.checkState(_inited, "process cannot be called before init.");
-    fetchColumnValues(docIdSet, startIndex, length);
+    Preconditions.checkState(_inited, "Method 'process' cannot be called before init.");
 
-    // Map from docId to int[] of group-keys for the docId.
-    Int2ObjectOpenHashMap docIdToGroupKeys = _groupKeyGenerator.generateKeysForDocIdSet(docIdSet, startIndex, length);
+    generateGroupKeysForDocIdSet(docIdSet, startIndex, length);
+    int numGroupKeys = _groupKeyGenerator.getNumGroupKeys();
+
+    fetchColumnValues(docIdSet, startIndex, length);
 
     for (int i = 0; i < _aggrFuncContextList.size(); i++) {
       AggregationFunctionContext aggrFuncContext = _aggrFuncContextList.get(i);
+      _resultHolderArray[i].ensureCapacity(numGroupKeys);
+      aggregateColumn(aggrFuncContext, _resultHolderArray[i], length);
+    }
+  }
 
-      // For count, no need to fetch value array.
-      if (aggrFuncContext.getFunctionName().equalsIgnoreCase("count")) {
-        aggrFuncContext.apply(length, docIdToGroupKeys, _resultHolderArray[i], null);
+  /**
+   * Helper method to perform aggregation for a given column.
+   *
+   * @param aggrFuncContext
+   * @param resultHolder
+   * @param length
+   */
+  private void aggregateColumn(AggregationFunctionContext aggrFuncContext, ResultHolder resultHolder, int length) {
+    // For count, no need to fetch value array.
+    if (aggrFuncContext.getFunctionName().equalsIgnoreCase("count")) {
+      if (_hasMultiValuedColumns) {
+        aggrFuncContext.applyMV(length, _docIdToMVGroupKey, resultHolder);
       } else {
-        String[] aggrColumns = aggrFuncContext.getAggregationColumns();
+        aggrFuncContext.applySV(length, _docIdToSVGroupKey, resultHolder);
+      }
+    } else {
+      String[] aggrColumns = aggrFuncContext.getAggregationColumns();
 
-        for (int j = 0; j < aggrColumns.length; j++) {
-          String aggrColumn = aggrColumns[j];
-          double[] valueArray = _columnToValueArrayMap.get(aggrColumn);
-          aggrFuncContext.apply(length, docIdToGroupKeys, _resultHolderArray[i], valueArray);
+      for (int j = 0; j < aggrColumns.length; j++) {
+        String aggrColumn = aggrColumns[j];
+        double[] valueArray = _columnToValueArrayMap.get(aggrColumn);
+
+        if (_hasMultiValuedColumns) {
+          aggrFuncContext.applyMV(length, _docIdToMVGroupKey, resultHolder, valueArray);
+        } else {
+          aggrFuncContext.applySV(length, _docIdToSVGroupKey, resultHolder, valueArray);
         }
       }
     }
@@ -162,7 +206,9 @@ public class MultiValueGroupByExecutor implements GroupByExecutor {
   }
 
   /**
-   * {@inheritDoc}
+   * Return the final result of the aggregation-group-by operation.
+   * This method should be called after all docIdSets have been 'processed'.
+   *
    * @return
    */
   @Override
@@ -174,14 +220,14 @@ public class MultiValueGroupByExecutor implements GroupByExecutor {
       result.add(new HashMap<String, Serializable>());
     }
 
-    Iterator<Pair<Long, String>> groupKeys = _groupKeyGenerator.getUniqueGroupKeys();
+    Iterator<Pair<Integer, String>> groupKeys = _groupKeyGenerator.getUniqueGroupKeys();
     while (groupKeys.hasNext()) {
-      Pair<Long, String> idKeyPair = groupKeys.next();
+      Pair<Integer, String> idKeyPair = groupKeys.next();
       String stringGroupKey = idKeyPair.getSecond();
 
       for (int i = 0; i < _aggrFuncContextList.size(); i++) {
-        AggregationFunction.ResultDataType resultDataType =
-            _aggrFuncContextList.get(i).getAggregationFunction().getResultDataType();
+        AggregationFunction aggregationFunction = _aggrFuncContextList.get(i).getAggregationFunction();
+        AggregationFunction.ResultDataType resultDataType = aggregationFunction.getResultDataType();
 
         Serializable resultForGroupKey = getResultForKey(idKeyPair, _resultHolderArray[i], resultDataType);
         result.get(i).put(stringGroupKey, resultForGroupKey);
@@ -197,7 +243,7 @@ public class MultiValueGroupByExecutor implements GroupByExecutor {
    * @param resultDataType
    * @return
    */
-  private Serializable getResultForKey(Pair<Long, String> idKeyPair, ResultHolder resultHolder,
+  private Serializable getResultForKey(Pair<Integer, String> idKeyPair, ResultHolder resultHolder,
       AggregationFunction.ResultDataType resultDataType) {
 
     Serializable resultForGroupKey;
@@ -222,7 +268,8 @@ public class MultiValueGroupByExecutor implements GroupByExecutor {
         break;
 
       default:
-        throw new RuntimeException("Unsupported result data type RANGE_PAIR in class " + getClass().getName());
+        throw new RuntimeException(
+            "Unsupported result data type RANGE_PAIR in class " + getClass().getName());
     }
     return resultForGroupKey;
   }
@@ -257,6 +304,44 @@ public class MultiValueGroupByExecutor implements GroupByExecutor {
           }
         }
       }
+    }
+  }
+
+  /**
+   * Returns true if any of the group-by columns are multi-valued, false otherwise.
+   *
+   * @param indexSegment
+   * @param groupByColumns
+   * @return
+   */
+  private static boolean hasMultiValueGroupByColumns(IndexSegment indexSegment, String[] groupByColumns) {
+    for (String groupByColumn : groupByColumns) {
+      DataSource dataSource = indexSegment.getDataSource(groupByColumn);
+      DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
+
+      if (!dataSourceMetadata.isSingleValue()) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Generate group keys for the given docIdSet. For single valued columns, each docId has one group key,
+   * but for multi-valued columns, each docId could have more than one group key.
+   *
+   * For SV keys: _docIdToSVGroupKey mapping is updated.
+   * For MV keys: _docIdToMVGroupKey mapping is updated.
+   *
+   * @param docIdSet
+   * @param startIndex
+   * @param length
+   */
+  private void generateGroupKeysForDocIdSet(int[] docIdSet, int startIndex, int length) {
+    if (_hasMultiValuedColumns) {
+      _groupKeyGenerator.generateKeysForDocIdSet(docIdSet, startIndex, length, _docIdToMVGroupKey);
+    } else {
+      _groupKeyGenerator.generateKeysForDocIdSet(docIdSet, startIndex, length, _docIdToSVGroupKey);
     }
   }
 }

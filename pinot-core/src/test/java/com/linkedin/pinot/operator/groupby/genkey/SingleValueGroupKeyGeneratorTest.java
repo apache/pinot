@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.operator.groupby.genkey;
 
-import com.linkedin.pinot.core.operator.groupby.SingleValueGroupKeyGenerator;
+import com.linkedin.pinot.core.operator.groupby.DefaultGroupKeyGenerator;
 import java.util.Random;
 import org.testng.Assert;
 import org.testng.annotations.BeforeSuite;
@@ -52,8 +52,8 @@ public class SingleValueGroupKeyGeneratorTest {
         values[j] = Math.abs(_random.nextInt()) % cardinalities[j];
       }
 
-      long groupKey = SingleValueGroupKeyGenerator.generateRawKey(values, cardinalities);
-      SingleValueGroupKeyGenerator.decodeRawGroupKey(groupKey, cardinalities, decoded);
+      long groupKey = DefaultGroupKeyGenerator.generateRawKey(values, cardinalities);
+      DefaultGroupKeyGenerator.decodeRawGroupKey(groupKey, cardinalities, decoded);
 
       for (int j = 0; j < numValues; j++) {
         Assert.assertEquals(values[j], decoded[j], "Actual : " + decoded[j] + " Expected: " + values[j]);

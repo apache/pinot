@@ -16,7 +16,6 @@
 package com.linkedin.pinot.core.operator.aggregation.function;
 
 import com.linkedin.pinot.core.operator.groupby.ResultHolder;
-import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import java.util.List;
 
 
@@ -54,7 +53,7 @@ public class CountAggregationFunction implements AggregationFunction {
    * @param valueArray
    */
   @Override
-  public void apply(int length, int[] groupKeys, ResultHolder resultHolder, double[]... valueArray) {
+  public void applySV(int length, int[] groupKeys, ResultHolder resultHolder, double[]... valueArray) {
     for (int i = 0; i < length; i++) {
       int groupKey = groupKeys[i];
       double oldValue = resultHolder.getDoubleResult(groupKey);
@@ -66,17 +65,14 @@ public class CountAggregationFunction implements AggregationFunction {
    * {@inheritDoc}
    *
    * @param length
-   * @param valueArrayIndexToGroupKeys
+   * @param docIdToGroupKey
    * @param resultHolder
    * @param valueArray
    */
   @Override
-  public void apply(int length, Int2ObjectOpenHashMap valueArrayIndexToGroupKeys, ResultHolder resultHolder,
-      double[] valueArray) {
+  public void applyMV(int length, int[][] docIdToGroupKey, ResultHolder resultHolder, double[]... valueArray) {
     for (int i = 0; i < length; ++i) {
-      long[] groupKeys = (long[]) valueArrayIndexToGroupKeys.get(i);
-
-      for (long groupKey : groupKeys) {
+      for (int groupKey : docIdToGroupKey[i]) {
         double oldValue = resultHolder.getDoubleResult(groupKey);
         resultHolder.putValueForKey(groupKey, oldValue + 1);
       }

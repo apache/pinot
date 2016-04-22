@@ -45,10 +45,21 @@ public interface GroupKeyGenerator {
   void generateKeysForDocIdSet(int[] docIdSet, int startIndex, int length, int[] docIdToGroupKey);
 
   /**
+   * Generate group-by keys for the given docId set, and return a map of docId to int[] of group keys.
+   * This interface is for multi-valued columns, where a docId can have multiple group keys.
+   *
+   * @param docIdSet
+   * @param startIndex
+   * @param length
+   * @return
+   */
+  void generateKeysForDocIdSet(int[] docIdSet, int startIndex, int length, int[][] docIdToGroupKeys);
+
+  /**
    * Returns an array
    * @return
    */
-  Iterator<Pair<Long, String>> getUniqueGroupKeys();
+  Iterator<Pair<Integer, String>> getUniqueGroupKeys();
 
   /**
    * Return the maximum number of unique group keys.

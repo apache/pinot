@@ -17,7 +17,6 @@ package com.linkedin.pinot.core.operator.groupby;
 
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.request.AggregationInfo;
-import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.GroupBy;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;

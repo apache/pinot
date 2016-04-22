@@ -16,10 +16,7 @@
 package com.linkedin.pinot.core.operator.aggregation.function;
 
 import com.linkedin.pinot.core.operator.groupby.ResultHolder;
-import com.linkedin.pinot.core.query.utils.Pair;
-import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import java.util.List;
-import java.util.Objects;
 
 
 /**
@@ -44,26 +41,28 @@ public interface AggregationFunction {
 
   /**
    * Perform a group-by aggregation on the given set of values, and the group key to which
-   * each index corresponds to.
-   *
-   * @param length
-   * @param valueArrayIndexToGroupKeys
-   * @param resultHolder
-   * @param valueArray
-   */
-  void apply(int length, Int2ObjectOpenHashMap valueArrayIndexToGroupKeys, ResultHolder resultHolder,
-      double[] valueArray);
-
-  /**
-   * Perform a group-by aggregation on the given set of values, and the group key to which
-   * each index corresponds to.
+   * each index corresponds to. This method is for single-valued group by column(s) case, where
+   * each docId has only one group key. This mapping is passed in via the docIdToGroupKey parameter.
    *
    * @param length
    * @param docIdToGroupKey
    * @param resultHolder
    * @param valueArray
    */
-  void apply(int length, int[] docIdToGroupKey, ResultHolder resultHolder, double[]... valueArray);
+  void applySV(int length, int[] docIdToGroupKey, ResultHolder resultHolder, double[]... valueArray);
+
+  /**
+   * Perform a group-by aggregation on the given set of values, and the group key to which
+   * each index corresponds to. This method is for multi-valued group by column(s) case, where
+   * each docId can have multiple group keys. This mapping is passed in via the
+   * docIdToGroupKeys parameter.
+   *
+   * @param length
+   * @param docIdToGroupKeys
+   * @param resultHolder
+   * @param valueArray
+   */
+  void applyMV(int length, int[][] docIdToGroupKeys, ResultHolder resultHolder, double[]... valueArray);
 
   /**
    * Reduce the aggregation. For example, in case of avg/range being performed

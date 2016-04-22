@@ -34,7 +34,7 @@ public interface ResultHolder<ResultType> {
    * @param groupKey
    * @return
    */
-  double getDoubleResult(long groupKey);
+  double getDoubleResult(int groupKey);
 
   /**
    * Returns the result (ResultType) for the given group key.
