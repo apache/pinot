@@ -624,8 +624,12 @@
             <!-- Do not set argLine here, it will break the code coverage plugin. Set it in the properties section. -->
             <forkCount>1</forkCount>
             <reuseForks>false</reuseForks>
-            <!-- 30 minutes -->
+            <!-- 60 minutes -->
             <forkedProcessTimeoutInSeconds>3600</forkedProcessTimeoutInSeconds>
+            <!-- Disable zookeeper force sync -->
+            <systemPropertyVariables>
+              <zookeeper.forceSync>no</zookeeper.forceSync>
+            </systemPropertyVariables>
           </configuration>
         </plugin>
         <plugin>

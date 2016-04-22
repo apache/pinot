@@ -166,9 +166,9 @@ public class ChaosMonkeyIntegrationTest {
   }
 
   public void testFreezeZookeeper(long freezeLength) throws Exception {
-    System.out.println("System.getProperty(\"java.class.path\") = " + System.getProperty("java.class.path"));
-
     Process zookeeper = startZookeeper();
+    Thread.sleep(1000L);
+
     startController();
     Thread.sleep(3000L);
 
