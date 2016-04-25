@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.core.data.extractors;
 
+import com.linkedin.pinot.common.data.TimeFieldSpec;
+import com.linkedin.pinot.common.data.TimeGranularitySpec;
 import com.linkedin.pinot.core.data.GenericRow;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
@@ -74,7 +76,7 @@ public class PlainFieldExtractorTest {
     Object[] objectArray = new Object[numberOfTypes];
     int i = 0;
     for (DataType dataType : DataType.values()) {
-      schemaArray[i] = new SchemaBuilder().addSingleValueDimension(columnName, dataType).build();
+      schemaArray[i] = new SchemaBuilder().setSchemaName("automatedTestSchema").addSingleValueDimension(columnName, dataType).build();
       i++;
     }
 
@@ -141,5 +143,37 @@ public class PlainFieldExtractorTest {
         LOGGER.debug("Old value {}, new value {}", objectArray[j], row.getValue(columnName));
       }
     }
+  }
+
+  @Test
+  public void timeSpecTest()
+      throws Exception {
+    Schema schema = new SchemaBuilder().addSingleValueDimension("svDimensionInt", DataType.INT)
+        .addSingleValueDimension("svDimensionDouble", DataType.DOUBLE)
+        .addMultiValueDimension("mvDimension", DataType.STRING, ",")
+        .addMetric("metric", DataType.INT)
+        .build();
+    TimeFieldSpec timeSpec = new TimeFieldSpec();
+    TimeGranularitySpec timeGranularitySpec = new TimeGranularitySpec(DataType.LONG, TimeUnit.DAYS , "incoming");
+    timeSpec.setIncomingGranularitySpec(timeGranularitySpec);
+    timeSpec.setOutgoingGranularitySpec(timeGranularitySpec);
+    schema.setTimeFieldSpec(timeSpec);
+    PlainFieldExtractor extractor = (PlainFieldExtractor) FieldExtractorFactory.getPlainFieldExtractor(schema);
+    GenericRow row = new GenericRow();
+    Map<String, Object> fieldMap = new HashMap<String, Object>();
+    Short shortObj = new Short((short) 5);
+    fieldMap.put("svDimensionInt", shortObj);
+    Float floatObj = new Float((float) 3.2);
+    fieldMap.put("svDimensionDouble", floatObj);
+    Double doubleObj = new Double((double) 34.5);
+    fieldMap.put("metric", doubleObj);
+    row.init(fieldMap);
+    extractor.transform(row);
+    Assert.assertTrue(row.getValue("svDimensionInt") instanceof Integer);
+    Assert.assertTrue(row.getValue("svDimensionDouble") instanceof Double);
+    Assert.assertTrue(row.getValue("mvDimension") != null);
+    Assert.assertTrue(row.getValue("metric") instanceof Integer);
+    Assert.assertTrue((Integer) row.getValue("metric") == 34);
+    Assert.assertTrue(row.getValue("incoming") != null);
   }
 }

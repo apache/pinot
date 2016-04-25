@@ -79,8 +79,7 @@ public class AvroRecordReader extends BaseRecordReader {
       _dataStream =
           new DataFileStream<GenericRecord>(new FileInputStream(file), new GenericDatumReader<GenericRecord>());
     }
-
-    updateSchema(_schemaExtractor.getSchema());
+    validateSchema(_schemaExtractor.getSchema());
   }
 
   @Override
@@ -149,15 +148,19 @@ public class AvroRecordReader extends BaseRecordReader {
     return _schemaExtractor.getSchema();
   }
 
-  private void updateSchema(Schema schema) {
+  private void validateSchema(Schema schema) {
     for (final FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
-      try {
-        fieldSpec.setDataType(getColumnType(_dataStream.getSchema().getField(fieldSpec.getName())));
-        fieldSpec.setSingleValueField(isSingleValueField(_dataStream.getSchema().getField(fieldSpec.getName())));
-        schema.addField(fieldSpec.getName(), fieldSpec);
-      } catch (Exception e) {
-        LOGGER.warn("Caught exception while converting Avro field {} of type {}, field will not be in schema.",
-            fieldSpec.getName(), fieldSpec.getDataType());
+        Field fieldStream = _dataStream.getSchema().getField(fieldSpec.getName());
+        if (fieldStream == null) {
+          LOGGER.warn("Pinot field {} absent in Avro Schema", fieldSpec.getName());
+        } else if (fieldSpec.getDataType() != getColumnType(fieldStream)) {
+          LOGGER.warn("Pinot field {} of type {} mismatches with corresponding field in Avro Schema of type {}",
+              fieldSpec.getName(), fieldSpec.getDataType(), getColumnType(fieldStream));
+        }
+        else if (fieldSpec.isSingleValueField() != isSingleValueField(fieldStream)) {
+          LOGGER.warn("{} -valued Pinot field {} mismatches with corresponding {} -valued field in Avro Schema",
+              fieldSpec.isSingleValueField() ? "Single" : "Multi", fieldSpec.getName(),
+              isSingleValueField(fieldStream)? "Single" : "Multi");
       }
     }
   }

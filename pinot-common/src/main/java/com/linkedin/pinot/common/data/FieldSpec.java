@@ -132,34 +132,18 @@ public abstract class FieldSpec {
       this.defaultNullValue = null;
       return;
     }
+    PinotDataType source, dest;
+    source = PinotDataType.STRING;
+    dest = PinotDataType.getPinotDataType(this);
+    if (source == dest) {
+      this.defaultNullValue = value;
+      return;
+    }
     Object defaultNullObj;
     try {
-      switch (getDataType()) {
-        case INT:
-        case INT_ARRAY:
-          defaultNullObj = new Integer(Integer.valueOf(value));
-          break;
-        case LONG:
-        case LONG_ARRAY:
-          defaultNullObj = new Long(Long.valueOf(value));
-          break;
-        case FLOAT:
-        case FLOAT_ARRAY:
-          defaultNullObj = new Float(Float.valueOf(value));
-          break;
-        case DOUBLE:
-        case DOUBLE_ARRAY:
-          defaultNullObj = new Double(Double.valueOf(value));
-          break;
-        case STRING:
-        case STRING_ARRAY:
-          defaultNullObj = value;
-          break;
-        default:
-          throw new UnsupportedOperationException("Default null value not supported for field type " + getDataType());
-      }
-    } catch (NumberFormatException e) {
-      throw new UnsupportedOperationException("Cannot set default null value", e);
+      defaultNullObj = dest.convert(((Object) value), source);
+    } catch (Exception e) {
+      defaultNullObj = null;
     }
     this.defaultNullValue = defaultNullObj;
   }

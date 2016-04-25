@@ -1863,11 +1863,7 @@ public enum PinotDataType {
 
   public static PinotDataType getPinotDataType(FieldSpec fieldSpec) {
     PinotDataType retval = OBJECT;
-    if (fieldSpec.dataType == null) {
-      // Only happens in ChaosMonkey test
-      return retval;
-    }
-    switch (fieldSpec.dataType) {
+    switch (fieldSpec.getDataType()) {
       case BOOLEAN:
         retval = PinotDataType.BOOLEAN;
         break;
