@@ -49,6 +49,13 @@ public class KafkaAvroMessageDecoder implements KafkaMessageDecoder {
   private DecoderFactory decoderFactory;
   private AvroRecordToPinotRowGenerator avroRecordConvetrer;
 
+  private static final int MAGIC_BYTE_LENGTH = 1;
+  private static final int SCHEMA_HASH_LENGTH = 16;
+  private static final int HEADER_LENGTH = MAGIC_BYTE_LENGTH + SCHEMA_HASH_LENGTH;
+
+  private static final int SCHEMA_HASH_START_OFFSET = MAGIC_BYTE_LENGTH;
+  private static final int SCHEMA_HASH_END_OFFSET = SCHEMA_HASH_START_OFFSET + SCHEMA_HASH_LENGTH;
+
   @Override
   public void init(Map<String, String> props, Schema indexingSchema, String topicName) throws Exception {
     for (String key : props.keySet()) {
@@ -76,10 +83,7 @@ public class KafkaAvroMessageDecoder implements KafkaMessageDecoder {
       return null;
     }
 
-    // can use the md5 hash to fetch id specific schema
-    // will implement that later
-    byte[] md5 = new byte[16];
-    md5 = Arrays.copyOfRange(payload, 1, 1 + md5.length);
+    byte[] md5 = Arrays.copyOfRange(payload, SCHEMA_HASH_START_OFFSET, SCHEMA_HASH_END_OFFSET);
 
     String md5String = hex(md5);
     org.apache.avro.Schema schema = null;
@@ -94,12 +98,11 @@ public class KafkaAvroMessageDecoder implements KafkaMessageDecoder {
         LOGGER.error("error fetching schema from md5 String", e);
       }
     }
-    int start = 1 + md5.length;
-    int length = payload.length - 1 - md5.length;
     DatumReader<Record> reader = new GenericDatumReader<Record>(schema);
     try {
       GenericData.Record avroRecord =
-          reader.read(null, decoderFactory.createBinaryDecoder(payload, start, length, null));
+          reader.read(null, decoderFactory.createBinaryDecoder(payload, HEADER_LENGTH,
+              payload.length - HEADER_LENGTH, null));
       return avroRecordConvetrer.transform(avroRecord, schema);
     } catch (IOException e) {
       LOGGER.error("Caught exception while reading message", e);
