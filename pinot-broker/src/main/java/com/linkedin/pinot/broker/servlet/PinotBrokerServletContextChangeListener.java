@@ -15,20 +15,22 @@
  */
 package com.linkedin.pinot.broker.servlet;
 
-import com.linkedin.pinot.common.metrics.BrokerMetrics;
 import javax.servlet.ServletContextEvent;
 import javax.servlet.ServletContextListener;
 
+import com.linkedin.pinot.broker.cache.BrokerCache;
+import com.linkedin.pinot.common.metrics.BrokerMetrics;
 import com.linkedin.pinot.requestHandler.BrokerRequestHandler;
 
-
 public class PinotBrokerServletContextChangeListener implements ServletContextListener {
-  private BrokerRequestHandler requestHandler;
-  private BrokerMetrics _brokerMetrics;
+  private final BrokerRequestHandler _requestHandler;
+  private final BrokerMetrics _brokerMetrics;
+  private final BrokerCache _brokerCache;
 
-  public PinotBrokerServletContextChangeListener(BrokerRequestHandler handler, BrokerMetrics brokerMetrics) {
-    this.requestHandler = handler;
+  public PinotBrokerServletContextChangeListener(BrokerRequestHandler requestHandler, BrokerMetrics brokerMetrics, BrokerCache brokerCache) {
+    _requestHandler = requestHandler;
     _brokerMetrics = brokerMetrics;
+    _brokerCache = brokerCache;
   }
 
   @Override
@@ -38,8 +40,9 @@ public class PinotBrokerServletContextChangeListener implements ServletContextLi
 
   @Override
   public void contextInitialized(ServletContextEvent sce) {
-    sce.getServletContext().setAttribute(BrokerRequestHandler.class.toString(), requestHandler);
+    sce.getServletContext().setAttribute(BrokerRequestHandler.class.toString(), _requestHandler);
     sce.getServletContext().setAttribute(BrokerMetrics.class.toString(), _brokerMetrics);
+    sce.getServletContext().setAttribute(BrokerCache.class.toString(), _brokerCache);
   }
 
 }

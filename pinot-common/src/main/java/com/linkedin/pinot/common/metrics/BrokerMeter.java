@@ -27,6 +27,8 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
   UNCAUGHT_POST_EXCEPTIONS("exceptions", true),
   HEALTHCHECK_BAD_CALLS("healthcheck", true),
   HEALTHCHECK_OK_CALLS("healthcheck", true),
+  CACHE_MISSED("cachemissed", true),
+  CACHE_HIT("cachehit", true),
   QUERIES("queries", false),
   REQUEST_COMPILATION_EXCEPTIONS("exceptions", true),
   REQUEST_FETCH_EXCEPTIONS("exceptions", false),

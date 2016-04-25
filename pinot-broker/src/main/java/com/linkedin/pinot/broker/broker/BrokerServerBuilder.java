@@ -16,6 +16,9 @@
 package com.linkedin.pinot.broker.broker;
 
 import com.linkedin.pinot.broker.broker.helix.LiveInstancesChangeListenerImpl;
+import com.linkedin.pinot.broker.cache.BrokerCache;
+import com.linkedin.pinot.broker.cache.BrokerCacheConfigs;
+import com.linkedin.pinot.broker.cache.BrokerCacheProvider;
 import com.linkedin.pinot.broker.servlet.PinotBrokerHealthCheckServlet;
 import com.linkedin.pinot.broker.servlet.PinotBrokerRoutingTableDebugServlet;
 import com.linkedin.pinot.broker.servlet.PinotBrokerServletContextChangeListener;
@@ -58,7 +61,6 @@ import org.eclipse.jetty.webapp.WebAppContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
 /**
  * Aug 4, 2014
  */
@@ -67,6 +69,7 @@ public class BrokerServerBuilder {
   private static final String CLIENT_CONFIG_PREFIX = "pinot.broker.client";
   private static final String METRICS_CONFIG_PREFIX = "pinot.broker.metrics";
   private static final String BROKER_TIME_OUT_CONFIG = "pinot.broker.timeoutMs";
+  private static final String CACHE_CONFIG_PREFIX = "pinot.broker.cache";
 
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerServerBuilder.class);
   private static final long DEFAULT_BROKER_TIME_OUT_MS = 10 * 1000L;
@@ -91,6 +94,7 @@ public class BrokerServerBuilder {
 
   // Broker Request Handler
   private BrokerRequestHandler _requestHandler;
+  private BrokerCache _brokerCache;
 
   private Server _server;
   private final Configuration _config;
@@ -107,8 +111,10 @@ public class BrokerServerBuilder {
   // Running State Of broker
   private AtomicReference<State> _state = new AtomicReference<State>();
 
-  public BrokerServerBuilder(Configuration configuration, HelixExternalViewBasedRouting helixExternalViewBasedRouting,
-      TimeBoundaryService timeBoundaryService, LiveInstancesChangeListenerImpl listener) throws ConfigurationException {
+  public BrokerServerBuilder(Configuration configuration,
+      HelixExternalViewBasedRouting helixExternalViewBasedRouting,
+      TimeBoundaryService timeBoundaryService, LiveInstancesChangeListenerImpl listener)
+          throws ConfigurationException {
     _config = configuration;
     _routingTable = helixExternalViewBasedRouting;
     _timeBoundaryService = timeBoundaryService;
@@ -136,7 +142,8 @@ public class BrokerServerBuilder {
     final NettyClientMetrics clientMetrics = new NettyClientMetrics(_registry, "client_");
 
     // Setup Netty Connection Pool
-    _resourceManager = new PooledNettyClientResourceManager(_eventLoopGroup, new HashedWheelTimer(), clientMetrics);
+    _resourceManager = new PooledNettyClientResourceManager(_eventLoopGroup, new HashedWheelTimer(),
+        clientMetrics);
     _poolTimeoutExecutor = new ScheduledThreadPoolExecutor(50);
     // _requestSenderPool = MoreExecutors.sameThreadExecutor();
     final ConnectionPoolConfig cfg = conf.getConnPool();
@@ -145,8 +152,10 @@ public class BrokerServerBuilder {
 
     ConnectionPoolConfig connPoolCfg = conf.getConnPool();
 
-    _connPool = new KeyedPoolImpl<ServerInstance, NettyClientConnection>(connPoolCfg.getMinConnectionsPerServer(),
-        connPoolCfg.getMaxConnectionsPerServer(), connPoolCfg.getIdleTimeoutMs(), connPoolCfg.getMaxBacklogPerServer(),
+    _connPool = new KeyedPoolImpl<ServerInstance, NettyClientConnection>(
+        connPoolCfg.getMinConnectionsPerServer(),
+        connPoolCfg.getMaxConnectionsPerServer(), connPoolCfg.getIdleTimeoutMs(),
+        connPoolCfg.getMaxBacklogPerServer(),
         _resourceManager, _poolTimeoutExecutor, _requestSenderPool, _registry);
     // MoreExecutors.sameThreadExecutor(), _registry);
     _resourceManager.setPool(_connPool);
@@ -169,15 +178,30 @@ public class BrokerServerBuilder {
       try {
         brokerTimeOutMs = _config.getLong(BROKER_TIME_OUT_CONFIG);
       } catch (Exception e) {
-        LOGGER.warn("Caught exception while reading broker timeout from config, using default value", e);
+        LOGGER.warn(
+            "Caught exception while reading broker timeout from config, using default value", e);
       }
     }
-    LOGGER.info("Broker timeout is - " + brokerTimeOutMs + " ms");
+    LOGGER.info("Broker timeout is - {} ms", brokerTimeOutMs);
 
     ReduceServiceRegistry reduceServiceRegistry = buildReduceServiceRegistry();
     _requestHandler = new BrokerRequestHandler(_routingTable, _timeBoundaryService, _scatterGather,
         reduceServiceRegistry, _brokerMetrics, brokerTimeOutMs);
 
+    BrokerCacheConfigs brokerCacheConfigs =
+        new BrokerCacheConfigs(_config.subset(CACHE_CONFIG_PREFIX));
+    LOGGER.info("Trying to create broker cache with configs: \n{}",
+        brokerCacheConfigs.toString());
+    _brokerCache = BrokerCacheProvider.getBrokerCache(brokerCacheConfigs);
+    LOGGER.info("Created broker cache: {}", _brokerCache);
+    try {
+      LOGGER.info("Trying to init broker cache.");
+      _brokerCache.init(_requestHandler, brokerCacheConfigs, _brokerMetrics);
+      LOGGER.info("Initialized broker cache {}", _brokerCache);
+    } catch (Exception e) {
+      LOGGER.error("Failed to init broker cache, start without broker cache!", e);
+      _brokerCache = null;
+    }
     LOGGER.info("Network initialized !!");
   }
 
@@ -215,7 +239,8 @@ public class BrokerServerBuilder {
       context.setResourceBase("");
     }
 
-    context.addEventListener(new PinotBrokerServletContextChangeListener(_requestHandler, _brokerMetrics));
+    context.addEventListener(
+        new PinotBrokerServletContextChangeListener(_requestHandler, _brokerMetrics, _brokerCache));
     context.setAttribute(BrokerServerBuilder.class.toString(), this);
     _server.setHandler(context);
   }

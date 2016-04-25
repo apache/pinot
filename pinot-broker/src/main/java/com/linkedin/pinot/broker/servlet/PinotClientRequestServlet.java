@@ -29,6 +29,7 @@ import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.pinot.broker.cache.BrokerCache;
 import com.linkedin.pinot.common.metrics.BrokerMeter;
 import com.linkedin.pinot.common.metrics.BrokerMetrics;
 import com.linkedin.pinot.common.response.BrokerResponse;
@@ -42,26 +43,23 @@ public class PinotClientRequestServlet extends HttpServlet {
 
   private BrokerRequestHandler broker;
   private BrokerMetrics brokerMetrics;
+  private BrokerCache brokerCache;
 
   @Override
   public void init(ServletConfig config) throws ServletException {
     broker = (BrokerRequestHandler) config.getServletContext().getAttribute(BrokerRequestHandler.class.toString());
     brokerMetrics = (BrokerMetrics) config.getServletContext().getAttribute(BrokerMetrics.class.toString());
+    brokerCache = (BrokerCache) config.getServletContext().getAttribute(BrokerCache.class.toString());
   }
 
   @Override
   protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
     try {
-      resp.setCharacterEncoding("UTF-8");
-      BrokerResponse brokerResponse = broker.handleRequest(new JSONObject(req.getParameter("bql")));
-      String jsonString = brokerResponse.toJsonString();
-      resp.getOutputStream().print(jsonString);
-      resp.getOutputStream().flush();
-      resp.getOutputStream().close();
+      JSONObject jsonRequest = new JSONObject(req.getParameter("bql"));
+      BrokerResponse brokerResponse = getBrokerResponse(jsonRequest);
+      setBrokerResponse(resp, brokerResponse.toJsonString());
     } catch (final Exception e) {
-      resp.getOutputStream().print(e.getMessage());
-      resp.getOutputStream().flush();
-      resp.getOutputStream().close();
+      setErrorResponse(resp, e);
       LOGGER.error("Caught exception while processing GET request", e);
       brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_GET_EXCEPTIONS, 1);
     }
@@ -70,19 +68,38 @@ public class PinotClientRequestServlet extends HttpServlet {
   @Override
   protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
     try {
-      resp.setCharacterEncoding("UTF-8");
-      BrokerResponse brokerResponse = broker.handleRequest(extractJSON(req));
-      String jsonString = brokerResponse.toJsonString();
-      resp.getOutputStream().print(jsonString);
-      resp.getOutputStream().flush();
-      resp.getOutputStream().close();
+      JSONObject jsonRequest = extractJSON(req);
+      BrokerResponse brokerResponse = getBrokerResponse(jsonRequest);
+      setBrokerResponse(resp, brokerResponse.toJsonString());
     } catch (final Exception e) {
-      resp.getOutputStream().print(e.getMessage());
-      resp.getOutputStream().flush();
-      resp.getOutputStream().close();
+      setErrorResponse(resp, e);
       LOGGER.error("Caught exception while processing POST request", e);
       brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_POST_EXCEPTIONS, 1);
     }
+  }
+
+  private void setBrokerResponse(HttpServletResponse resp, String jsonString) throws IOException {
+    resp.setCharacterEncoding("UTF-8");
+    resp.getOutputStream().print(jsonString);
+    resp.getOutputStream().flush();
+    resp.getOutputStream().close();
+  }
+
+  private void setErrorResponse(HttpServletResponse resp, final Exception e) throws IOException {
+    resp.setCharacterEncoding("UTF-8");
+    resp.getOutputStream().print(e.getMessage());
+    resp.getOutputStream().flush();
+    resp.getOutputStream().close();
+  }
+
+  private BrokerResponse getBrokerResponse(JSONObject jsonRequest) throws Exception {
+    BrokerResponse brokerResponse;
+    if (brokerCache == null) {
+      brokerResponse = this.broker.handleRequest(jsonRequest);
+    } else {
+      brokerResponse = this.brokerCache.handleRequest(jsonRequest);
+    }
+    return brokerResponse;
   }
 
   private JSONObject extractJSON(HttpServletRequest req) throws IOException, JSONException {
