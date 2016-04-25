@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import com.linkedin.pinot.core.query.pruner.ValidSegmentPruner;
 import java.util.Iterator;
 
 import org.apache.commons.configuration.PropertiesConfiguration;
@@ -117,9 +118,11 @@ public class FileBasedServerBrokerStarters {
     serverConfiguration.addProperty("pinot.server.instance.segment.metadata.loader.class",
         ColumnarSegmentMetadataLoader.class.getName());
     serverConfiguration.addProperty("pinot.server.query.executor.pruner.class",
-        StringUtil.join(",", TimeSegmentPruner.class.getSimpleName(), DataSchemaSegmentPruner.class.getSimpleName()));
+        StringUtil.join(",", TimeSegmentPruner.class.getSimpleName(), DataSchemaSegmentPruner.class.getSimpleName(),
+            ValidSegmentPruner.class.getSimpleName()));
     serverConfiguration.addProperty("pinot.server.query.executor.pruner.TimeSegmentPruner.id", "0");
     serverConfiguration.addProperty("pinot.server.query.executor.pruner.DataSchemaSegmentPruner.id", "1");
+    serverConfiguration.addProperty("pinot.server.query.executor.pruner.ValidSegmentPruner.id", "2");
     serverConfiguration.addProperty("pinot.server.query.executor.class", ServerQueryExecutorV1Impl.class.getName());
     serverConfiguration.addProperty("pinot.server.requestHandlerFactory.class",
         SimpleRequestHandlerFactory.class.getName());

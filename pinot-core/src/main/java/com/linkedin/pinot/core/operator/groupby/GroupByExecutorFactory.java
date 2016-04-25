@@ -21,12 +21,16 @@ import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.DataSourceMetadata;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
  * Factory class for creating GroupByExecutor of different types.
  */
 public class GroupByExecutorFactory {
+  private static final Logger LOGGER = LoggerFactory.getLogger(GroupByExecutor.class);
+
   /**
    * Returns the appropriate implementation of GroupByExecutor based on
    * pre-defined criteria.
@@ -66,12 +70,20 @@ public class GroupByExecutorFactory {
         return Integer.MAX_VALUE;
       }
 
-      // Protecting against overflow.
       int cardinality = dataSourceMetadata.cardinality();
+
+      // If zero/negative cardinality found (due to bad segment), log and continue. The group by executor
+      // will return an empty block and the bad segment will be handled gracefully.
+      if (cardinality <= 0) {
+        LOGGER.error("Zero/Negative cardinality for column {} in segment {}", column, indexSegment.getSegmentName());
+        cardinality = 1;
+      }
+
+      // Protecting against overflow.
       if (maxGroupKeys > (Integer.MAX_VALUE / cardinality)) {
         return Integer.MAX_VALUE;
       }
-      maxGroupKeys *= dataSourceMetadata.cardinality();
+      maxGroupKeys *= cardinality;
     }
 
     return maxGroupKeys;

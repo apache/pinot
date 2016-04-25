@@ -34,6 +34,7 @@ public class SegmentPrunerProvider {
   static {
     keyToFunction.put("timesegmentpruner", TimeSegmentPruner.class);
     keyToFunction.put("dataschemasegmentpruner", DataSchemaSegmentPruner.class);
+    keyToFunction.put("validsegmentpruner", ValidSegmentPruner.class);
   }
 
   public static SegmentPruner getSegmentPruner(String prunerClassName, Configuration segmentPrunerConfig) {
