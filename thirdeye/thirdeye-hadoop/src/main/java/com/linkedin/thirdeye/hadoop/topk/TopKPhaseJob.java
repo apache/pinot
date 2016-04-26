@@ -17,7 +17,6 @@ package com.linkedin.thirdeye.hadoop.topk;
 
 import static com.linkedin.thirdeye.hadoop.topk.TopKPhaseConstants.TOPK_PHASE_INPUT_PATH;
 import static com.linkedin.thirdeye.hadoop.topk.TopKPhaseConstants.TOPK_PHASE_OUTPUT_PATH;
-import static com.linkedin.thirdeye.hadoop.topk.TopKPhaseConstants.TOPK_PHASE_SCHEMA_PATH;
 import static com.linkedin.thirdeye.hadoop.topk.TopKPhaseConstants.TOPK_PHASE_THIRDEYE_CONFIG;
 
 import java.io.File;
@@ -36,14 +35,11 @@ import com.linkedin.thirdeye.hadoop.config.TopKDimensionToMetricsSpec;
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfig;
 import com.linkedin.thirdeye.hadoop.util.ThirdeyeAggregateMetricUtils;
 
-import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.mapred.AvroKey;
-import org.apache.avro.mapreduce.AvroJob;
 import org.apache.avro.mapreduce.AvroKeyInputFormat;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
-import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -420,34 +416,30 @@ public class TopKPhaseJob extends Configured {
     Configuration configuration = job.getConfiguration();
     FileSystem fs = FileSystem.get(configuration);
 
-    // Input schema
-    Path schemaPath = new Path(getAndSetConfiguration(configuration, TOPK_PHASE_SCHEMA_PATH));
-    FSDataInputStream schemaStream = fs.open(schemaPath);
-    Schema inputSchema = new Schema.Parser().parse(schemaStream);
-
-    // Input Path
+     // Input Path
     String inputPathDir = getAndSetConfiguration(configuration, TOPK_PHASE_INPUT_PATH);
-
-    // Output path
-    Path outputPath = new Path(getAndSetConfiguration(configuration, TOPK_PHASE_OUTPUT_PATH));
     LOGGER.info("Input path dir: " + inputPathDir);
     for (String inputPath : inputPathDir.split(",")) {
       LOGGER.info("Adding input:" + inputPath);
       Path input = new Path(inputPath);
       FileInputFormat.addInputPath(job, input);
     }
+
+    // Output path
+    Path outputPath = new Path(getAndSetConfiguration(configuration, TOPK_PHASE_OUTPUT_PATH));
+    LOGGER.info("Output path dir: " + outputPath.toString());
     if (fs.exists(outputPath)) {
       fs.delete(outputPath, true);
     }
     FileOutputFormat.setOutputPath(job, outputPath);
 
+    // ThirdEyeConfig
     ThirdEyeConfig thirdeyeConfig = ThirdEyeConfig.fromProperties(props);
     LOGGER.info("Thirdeye Config {}", thirdeyeConfig.encode());
     job.getConfiguration().set(TOPK_PHASE_THIRDEYE_CONFIG.toString(), OBJECT_MAPPER.writeValueAsString(thirdeyeConfig));
 
     // Map config
     job.setMapperClass(TopKPhaseMapper.class);
-    AvroJob.setInputKeySchema(job, inputSchema);
     job.setInputFormatClass(AvroKeyInputFormat.class);
     job.setMapOutputKeyClass(BytesWritable.class);
     job.setMapOutputValueClass(BytesWritable.class);

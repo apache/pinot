@@ -15,7 +15,6 @@
  */
 package com.linkedin.thirdeye.hadoop.segment.creation;
 
-import static com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants.SEGMENT_CREATION_DATA_SCHEMA;
 import static com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants.SEGMENT_CREATION_OUTPUT_PATH;
 import static com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants.SEGMENT_CREATION_SCHEDULE;
 import static com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants.SEGMENT_CREATION_THIRDEYE_CONFIG;
@@ -33,10 +32,10 @@ import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
-import org.codehaus.jackson.map.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.StarTreeIndexSpec;
@@ -47,6 +46,7 @@ import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfig;
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConstants;
+import com.linkedin.thirdeye.hadoop.util.ThirdeyePinotSchemaUtils;
 
 /**
  * Mapper class for SegmentCreation job, which sets configs required for
@@ -56,7 +56,7 @@ public class SegmentCreationPhaseMapReduceJob {
 
   public static class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritable, Text> {
     private static Logger LOGGER = LoggerFactory.getLogger(SegmentCreationPhaseMapReduceJob.class);
-    private static ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static ObjectMapper OBJECT_MAPPER = new ObjectMapper(new YAMLFactory());
 
     private Configuration properties;
 
@@ -104,10 +104,9 @@ public class SegmentCreationPhaseMapReduceJob {
 
       outputPath = properties.get(SEGMENT_CREATION_OUTPUT_PATH.toString());
 
-      schema = OBJECT_MAPPER.readValue(properties.get(SEGMENT_CREATION_DATA_SCHEMA.toString()), Schema.class);
-      thirdeyeConfig = new com.fasterxml.jackson.databind.ObjectMapper(new YAMLFactory())
-        .readValue(properties.get(SEGMENT_CREATION_THIRDEYE_CONFIG.toString()), ThirdEyeConfig.class);
+      thirdeyeConfig = OBJECT_MAPPER.readValue(properties.get(SEGMENT_CREATION_THIRDEYE_CONFIG.toString()), ThirdEyeConfig.class);
       LOGGER.info(thirdeyeConfig.encode());
+      schema = ThirdeyePinotSchemaUtils.createSchema(thirdeyeConfig);
       tableName = thirdeyeConfig.getCollection();
 
       segmentWallClockStartTime = Long.valueOf(properties.get(SEGMENT_CREATION_WALLCLOCK_START_TIME.toString()));
@@ -190,8 +189,10 @@ public class SegmentCreationPhaseMapReduceJob {
 
       // Set star tree config
       StarTreeIndexSpec starTreeIndexSpec = new StarTreeIndexSpec();
-      starTreeIndexSpec.setMaxLeafRecords(thirdeyeConfig.getSplit().getThreshold());
-      starTreeIndexSpec.setDimensionsSplitOrder(thirdeyeConfig.getSplit().getOrder());
+      if (thirdeyeConfig.getSplit() != null) {
+        starTreeIndexSpec.setMaxLeafRecords(thirdeyeConfig.getSplit().getThreshold());
+        starTreeIndexSpec.setDimensionsSplitOrder(thirdeyeConfig.getSplit().getOrder());
+      }
       segmentGeneratorConfig.setStarTreeIndexSpec(starTreeIndexSpec);
 
       // Generate segment

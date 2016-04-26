@@ -15,11 +15,9 @@
  */
 package com.linkedin.thirdeye.hadoop.segment.creation;
 
-import static com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants.SEGMENT_CREATION_DATA_SCHEMA;
 import static com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants.SEGMENT_CREATION_INPUT_PATH;
 import static com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants.SEGMENT_CREATION_OUTPUT_PATH;
 import static com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants.SEGMENT_CREATION_SCHEDULE;
-import static com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants.SEGMENT_CREATION_SCHEMA_PATH;
 import static com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants.SEGMENT_CREATION_THIRDEYE_CONFIG;
 import static com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants.SEGMENT_CREATION_WALLCLOCK_END_TIME;
 import static com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants.SEGMENT_CREATION_WALLCLOCK_START_TIME;
@@ -44,13 +42,11 @@ import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
-import org.codehaus.jackson.map.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.common.data.Schema;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfig;
-import com.linkedin.thirdeye.hadoop.util.ThirdeyePinotSchemaUtils;
 
 /**
  * This class contains the job that generates pinot segments with star tree index
@@ -84,12 +80,8 @@ public class SegmentCreationPhaseJob extends Configured {
 
     Configuration configuration = job.getConfiguration();
 
-    String schemaPath = getAndSetConfiguration(configuration, SEGMENT_CREATION_SCHEMA_PATH);
-    LOGGER.info("Schema path : {}", schemaPath);
     ThirdEyeConfig thirdeyeConfig = ThirdEyeConfig.fromProperties(props);
     LOGGER.info("ThirdEyeConfig {}", thirdeyeConfig.encode());
-    Schema dataSchema = ThirdeyePinotSchemaUtils.createSchema(thirdeyeConfig);
-    LOGGER.info("Data schema : {}", dataSchema);
     String inputSegmentDir = getAndSetConfiguration(configuration, SEGMENT_CREATION_INPUT_PATH);
     LOGGER.info("Input path : {}", inputSegmentDir);
     String outputDir = getAndSetConfiguration(configuration, SEGMENT_CREATION_OUTPUT_PATH);
@@ -157,7 +149,6 @@ public class SegmentCreationPhaseJob extends Configured {
     FileOutputFormat.setOutputPath(job, new Path(stagingDir + "/output/"));
 
     job.getConfiguration().setInt(JobContext.NUM_MAPS, inputDataFiles.size());
-    job.getConfiguration().set(SEGMENT_CREATION_DATA_SCHEMA.toString(), OBJECT_MAPPER.writeValueAsString(dataSchema));
     job.getConfiguration().set(SEGMENT_CREATION_THIRDEYE_CONFIG.toString(), OBJECT_MAPPER.writeValueAsString(thirdeyeConfig));
 
     job.setMaxReduceAttempts(1);

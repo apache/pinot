@@ -43,6 +43,7 @@ import org.junit.Test;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfig;
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfigProperties;
+import com.linkedin.thirdeye.hadoop.config.ThirdEyeConstants;
 import com.linkedin.thirdeye.hadoop.derivedcolumn.transformation.DerivedColumnTransformationPhaseConstants;
 import com.linkedin.thirdeye.hadoop.derivedcolumn.transformation.DerivedColumnTransformationPhaseJob.DerivedColumnTransformationPhaseMapper;
 
@@ -56,10 +57,8 @@ public class DerivedColumnNoTransformationTest {
 
   private static final String HADOOP_IO_SERIALIZATION = "io.serializations";
 
-  private static final String SCHEMA_FILE = "schema.avsc";
-  private static final String TOPK_FILE = "no_topk_values";
-  private static final String OUTPUT_SCHEMA_FOLDER = "notransformation";
-  private static final String TRANSFORMATION_SCHEMA = "transformation_schema.avsc";
+  private static final String AVRO_SCHEMA = "schema.avsc";
+  private static final String NO_TRANSFORMATION_SCHEMA = "no_transformation_schema.avsc";
   private String outputPath;
 
   Properties props = new Properties();
@@ -92,7 +91,7 @@ public class DerivedColumnNoTransformationTest {
     Configuration conf = mapDriver.getConfiguration();
     conf.set("io.serializations", "org.apache.hadoop.io.serializer.JavaSerialization,"
         + "org.apache.hadoop.io.serializer.WritableSerialization");
-    Schema outputSchema = new Schema.Parser().parse(ClassLoader.getSystemResourceAsStream(OUTPUT_SCHEMA_FOLDER + File.separator + TRANSFORMATION_SCHEMA));
+    Schema outputSchema = new Schema.Parser().parse(ClassLoader.getSystemResourceAsStream(NO_TRANSFORMATION_SCHEMA));
 
     String[] currentSerializations = conf.getStrings(HADOOP_IO_SERIALIZATION);
     String[] finalSerializations = new String[currentSerializations.length + 1];
@@ -108,7 +107,7 @@ public class DerivedColumnNoTransformationTest {
   }
 
   private List<GenericRecord> generateTestData() throws Exception {
-    Schema schema = new Schema.Parser().parse(ClassLoader.getSystemResourceAsStream(SCHEMA_FILE));
+    Schema schema = new Schema.Parser().parse(ClassLoader.getSystemResourceAsStream(AVRO_SCHEMA));
     List<GenericRecord> inputRecords = new ArrayList<GenericRecord>();
 
     GenericRecord input = new GenericData.Record(schema);
@@ -150,15 +149,15 @@ public class DerivedColumnNoTransformationTest {
     configuration.set(DerivedColumnTransformationPhaseConstants.DERIVED_COLUMN_TRANSFORMATION_PHASE_THIRDEYE_CONFIG.toString(),
         OBJECT_MAPPER.writeValueAsString(thirdeyeConfig));
 
-    Schema inputSchema = new Schema.Parser().parse(ClassLoader.getSystemResourceAsStream(SCHEMA_FILE));
+    Schema inputSchema = new Schema.Parser().parse(ClassLoader.getSystemResourceAsStream(AVRO_SCHEMA));
     setUpAvroSerialization(mapDriver.getConfiguration(), inputSchema);
 
-    configuration.set(DerivedColumnTransformationPhaseConstants.DERIVED_COLUMN_TRANSFORMATION_PHASE_OUTPUT_SCHEMA_PATH.toString(),
-        ClassLoader.getSystemResource(OUTPUT_SCHEMA_FOLDER).toString());
-
+    Schema outputSchema = new Schema.Parser().parse(ClassLoader.getSystemResourceAsStream(NO_TRANSFORMATION_SCHEMA));
+    configuration.set(DerivedColumnTransformationPhaseConstants.DERIVED_COLUMN_TRANSFORMATION_PHASE_OUTPUT_SCHEMA.toString(),
+        outputSchema.toString());
 
     configuration.set(DerivedColumnTransformationPhaseConstants.DERIVED_COLUMN_TRANSFORMATION_PHASE_TOPK_PATH.toString(),
-        TOPK_FILE);
+        ThirdEyeConstants.TOPK_VALUES_FILE);
 
     TemporaryPath tmpPath = new TemporaryPath();
     outputPath = tmpPath.toString();

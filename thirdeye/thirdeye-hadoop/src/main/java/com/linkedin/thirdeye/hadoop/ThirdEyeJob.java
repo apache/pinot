@@ -81,12 +81,8 @@ public class ThirdEyeJob {
               throws Exception {
         Properties config = new Properties();
 
-        config.setProperty(TopKPhaseConstants.TOPK_PHASE_SCHEMA_PATH.toString(),
-            getSchemaPath(root, collection));
-
         config.setProperty(TopKPhaseConstants.TOPK_PHASE_INPUT_PATH.toString(),
             inputPaths);
-
         config.setProperty(TopKPhaseConstants.TOPK_PHASE_OUTPUT_PATH.toString(),
             getIndexDir(root, collection, minTime, maxTime) + File.separator
                 + TOPK.getName());
@@ -111,19 +107,13 @@ public class ThirdEyeJob {
               throws Exception {
         Properties config = new Properties();
 
-        config.setProperty(DerivedColumnTransformationPhaseConstants.DERIVED_COLUMN_TRANSFORMATION_PHASE_INPUT_SCHEMA_PATH.toString(),
-            getSchemaPath(root, collection));
-
         config.setProperty(DerivedColumnTransformationPhaseConstants.DERIVED_COLUMN_TRANSFORMATION_PHASE_INPUT_PATH.toString(),
             inputPaths);
-
-        config.setProperty(DerivedColumnTransformationPhaseConstants.DERIVED_COLUMN_TRANSFORMATION_PHASE_OUTPUT_SCHEMA_PATH.toString(),
+        config.setProperty(DerivedColumnTransformationPhaseConstants.DERIVED_COLUMN_TRANSFORMATION_PHASE_OUTPUT_SCHEMA.toString(),
             getIndexDir(root, collection, minTime, maxTime));
-
         config.setProperty(DerivedColumnTransformationPhaseConstants.DERIVED_COLUMN_TRANSFORMATION_PHASE_OUTPUT_PATH.toString(),
             getIndexDir(root, collection, minTime, maxTime) + File.separator
               + DERIVED_COLUMN_TRANSFORMATION.getName());
-
         config.setProperty(DerivedColumnTransformationPhaseConstants.DERIVED_COLUMN_TRANSFORMATION_PHASE_TOPK_PATH.toString(),
             getIndexDir(root, collection, minTime, maxTime) + File.separator
                 + TOPK.getName() + File.separator + ThirdEyeConstants.TOPK_VALUES_FILE);
@@ -148,8 +138,6 @@ public class ThirdEyeJob {
               throws Exception {
         Properties config = new Properties();
 
-        config.setProperty(SegmentCreationPhaseConstants.SEGMENT_CREATION_SCHEMA_PATH.toString(),
-            getIndexDir(root, collection, minTime, maxTime) + File.separator + ThirdEyeConstants.TRANSFORMATION_SCHEMA);
         config.setProperty(SegmentCreationPhaseConstants.SEGMENT_CREATION_INPUT_PATH.toString(),
             getIndexDir(root, collection, minTime, maxTime)
             + File.separator + DERIVED_COLUMN_TRANSFORMATION.getName());
@@ -208,10 +196,6 @@ public class ThirdEyeJob {
       return getCollectionDir(root, collection) + File.separator
           + "data_" + ThirdEyeConstants.DATE_TIME_FORMATTER.print(minTime) + "_"
           + ThirdEyeConstants.DATE_TIME_FORMATTER.print(maxTime);
-    }
-
-    String getSchemaPath(String root, String collection) {
-      return getCollectionDir(root, collection) + File.separator + ThirdEyeConstants.AVRO_SCHEMA;
     }
 
   }

@@ -21,9 +21,8 @@ package com.linkedin.thirdeye.hadoop.derivedcolumn.transformation;
 public enum DerivedColumnTransformationPhaseConstants {
   DERIVED_COLUMN_TRANSFORMATION_PHASE_INPUT_PATH("derived.column.transformation.phase.input.path"),
   DERIVED_COLUMN_TRANSFORMATION_PHASE_TOPK_PATH("derived.column.transformation.phase.topk.path"),
-  DERIVED_COLUMN_TRANSFORMATION_PHASE_INPUT_SCHEMA_PATH("derived.column.transformation.phase.input.schema.path"),
   DERIVED_COLUMN_TRANSFORMATION_PHASE_OUTPUT_PATH("derived.column.transformation.phase.output.path"),
-  DERIVED_COLUMN_TRANSFORMATION_PHASE_OUTPUT_SCHEMA_PATH("derived.column.transformation.phase.output.schema.path"),
+  DERIVED_COLUMN_TRANSFORMATION_PHASE_OUTPUT_SCHEMA("derived.column.transformation.phase.output.schema"),
   DERIVED_COLUMN_TRANSFORMATION_PHASE_THIRDEYE_CONFIG("derived.column.transformation.phase.thirdeye.config");
 
   String name;

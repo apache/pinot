@@ -27,7 +27,7 @@ import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfig;
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfigProperties;
 
 public class DerivedSchemaGenerationTest {
-  private static final String SCHEMA_FILE = "schema.avsc";
+  private static final String AVRO_SCHEMA = "schema.avsc";
 
   DerivedColumnTransformationPhaseJob job = new DerivedColumnTransformationPhaseJob("derived_column_transformation", null);
   Schema inputSchema;
@@ -36,7 +36,7 @@ public class DerivedSchemaGenerationTest {
 
   @BeforeTest
   public void setup() throws IOException {
-    inputSchema = new Schema.Parser().parse(ClassLoader.getSystemResourceAsStream(SCHEMA_FILE));
+    inputSchema = new Schema.Parser().parse(ClassLoader.getSystemResourceAsStream(AVRO_SCHEMA));
 
     props = new Properties();
     props.setProperty(ThirdEyeConfigProperties.THIRDEYE_TABLE_NAME.toString(), "collection");
@@ -50,7 +50,7 @@ public class DerivedSchemaGenerationTest {
   @Test
   public void testDerivedColumnsSchemaGeneration() throws Exception{
     ThirdEyeConfig thirdeyeConfig = ThirdEyeConfig.fromProperties(props);
-    Schema outputSchema = job.newSchema(thirdeyeConfig, inputSchema);
+    Schema outputSchema = job.newSchema(thirdeyeConfig);
     Assert.assertEquals(inputSchema.getFields().size(), outputSchema.getFields().size(),
         "Input schema should be same as output schema if no topk/whitelist in config");
 
@@ -62,7 +62,7 @@ public class DerivedSchemaGenerationTest {
     props.setProperty(ThirdEyeConfigProperties.THIRDEYE_WHITELIST_DIMENSION.toString() + ".d3", "x,y");
 
     thirdeyeConfig = ThirdEyeConfig.fromProperties(props);
-    outputSchema = job.newSchema(thirdeyeConfig, inputSchema);
+    outputSchema = job.newSchema(thirdeyeConfig);
     Assert.assertEquals(inputSchema.getFields().size() + 2, outputSchema.getFields().size(),
         "Input schema should not be same as output schema if topk/whitelist in config");
 

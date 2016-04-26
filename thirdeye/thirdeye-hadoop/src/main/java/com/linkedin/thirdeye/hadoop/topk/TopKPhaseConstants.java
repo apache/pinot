@@ -20,7 +20,6 @@ package com.linkedin.thirdeye.hadoop.topk;
  */
 public enum TopKPhaseConstants {
   TOPK_PHASE_INPUT_PATH("topk.phase.input.path"),
-  TOPK_PHASE_SCHEMA_PATH("topk.phase.schema.path"),
   TOPK_PHASE_OUTPUT_PATH("topk.phase.output.path"),
   TOPK_PHASE_THIRDEYE_CONFIG("topk.rollup.phase.thirdeye.config");
 
