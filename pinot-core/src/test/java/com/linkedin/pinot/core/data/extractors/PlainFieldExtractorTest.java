@@ -118,9 +118,20 @@ public class PlainFieldExtractorTest {
           // Checking operations on null
           Assert.assertEquals(extractor.getTotalNulls(), 1);
         } else if ((i == 0) && (j != 0)) {
-          // Checking Boolean to non-Boolean conversions
-           Assert.assertEquals(extractor.getTotalErrors(), 1);
-           Assert.assertEquals(extractor.getTotalConversions(), 1);
+          // Checking non-Boolean to Boolean conversions
+          if (j == 8) {
+            // String to Boolean conversion
+            Assert.assertEquals(extractor.getTotalErrors(), 0);
+            Assert.assertEquals(extractor.getTotalConversions(), 1);
+          } else{
+            Assert.assertEquals(extractor.getTotalErrors(), 1);
+            Assert.assertEquals(extractor.getTotalConversions(), 1);
+          }
+        }
+        if ((i == 8) && (j == 0)) {
+          // Boolean to String conversion
+          Assert.assertEquals(extractor.getTotalErrors(), 0);
+          Assert.assertEquals(extractor.getTotalConversions(), 1);
         }
         LOGGER.debug("Number of Error {}", extractor.getTotalErrors());
         LOGGER.debug("Number of rows with Null columns {}", extractor.getTotalNulls());

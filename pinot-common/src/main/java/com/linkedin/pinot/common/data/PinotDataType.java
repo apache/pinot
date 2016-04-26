@@ -59,7 +59,7 @@ public enum PinotDataType {
       return null;
     }
     public String toString(Object d) {
-      return null;
+      return d.toString();
     }
     public Byte[] toByteArray(Object d) {
       return null;
@@ -756,7 +756,7 @@ public enum PinotDataType {
   },
   STRING {
     public Boolean toBoolean(Object d) {
-      return null;
+      return Boolean.parseBoolean((String) d);
     }
 
     public Byte toByte(Object d) {
