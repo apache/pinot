@@ -32,7 +32,8 @@ public class ResultHolderFactory {
   public static ResultHolder getResultHolder(AggregationFunction function, long maxNumResults) {
     String functionName = function.getName();
 
-    int initialCapacity = (int) Math.min(maxNumResults, INITIAL_RESULT_HOLDER_CAPACITY);
+    int capacityCap = maxNumResults > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) maxNumResults;
+    int initialCapacity = Math.min(capacityCap, INITIAL_RESULT_HOLDER_CAPACITY);
 
     switch (functionName.toLowerCase()) {
       case "count":
@@ -41,17 +42,16 @@ public class ResultHolderFactory {
       case "max":
         double defaultValue = function.getDefaultValue();
         DoubleResultArray doubleResultArray = new DoubleResultArray(initialCapacity, defaultValue);
-        return new DoubleArrayBasedResultHolder(doubleResultArray, initialCapacity, (int) maxNumResults, defaultValue);
+        return new DoubleArrayBasedResultHolder(doubleResultArray, initialCapacity, capacityCap);
 
       case "avg":
-        DoubleLongResultArray doubleLongResultArray =
-            new DoubleLongResultArray(initialCapacity, new Pair<Double, Long>(0.0, 0L));
-        return new PairArrayBasedResultHolder(doubleLongResultArray, initialCapacity);
+        DoubleLongResultArray doubleLongResultArray = new DoubleLongResultArray(initialCapacity, new Pair<>(0.0, 0L));
+        return new PairArrayBasedResultHolder(doubleLongResultArray, initialCapacity, capacityCap);
 
       case "minmaxrange":
         DoubleDoubleResultArray doubleDoubleResultArray = new DoubleDoubleResultArray(initialCapacity,
-            new Pair<Double, Double>(Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY));
-        return new PairArrayBasedResultHolder(doubleDoubleResultArray, initialCapacity);
+            new Pair<>(Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY));
+        return new PairArrayBasedResultHolder(doubleDoubleResultArray, initialCapacity, capacityCap);
 
       default:
         throw new RuntimeException("Aggregation function not implemented in ResultHolder: " + functionName);

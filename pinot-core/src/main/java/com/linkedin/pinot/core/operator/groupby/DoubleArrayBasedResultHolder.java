@@ -21,34 +21,33 @@ package com.linkedin.pinot.core.operator.groupby;
 public class DoubleArrayBasedResultHolder implements ResultHolder {
   private DoubleResultArray _resultArray;
   private int _resultHolderCapacity;
-  private int _maxGroupKeys;
-  private double _defaultValue;
+  private final int _maxCapacity;
 
   /**
    * Constructor for the class.
    *
+   * @param resultArray
    * @param initialCapacity
+   * @param maxCapacity
    */
-  public DoubleArrayBasedResultHolder(DoubleResultArray resultArray, int initialCapacity, int maxGroupKeys,
-      double defaultValue) {
-    _resultHolderCapacity = initialCapacity;
-    _maxGroupKeys = maxGroupKeys;
-    _defaultValue = defaultValue;
+  public DoubleArrayBasedResultHolder(DoubleResultArray resultArray, int initialCapacity, int maxCapacity) {
     _resultArray = resultArray;
+    _resultHolderCapacity = initialCapacity;
+    _maxCapacity = maxCapacity;
   }
 
   /**
    * {@inheritDoc}
    *
-   * @param maxUniqueKeys
+   * @param capacity
    */
   @Override
-  public void ensureCapacity(int maxUniqueKeys) {
-    if (maxUniqueKeys > _resultHolderCapacity) {
-      _resultHolderCapacity = Math.max(_resultHolderCapacity * 2, maxUniqueKeys);
+  public void ensureCapacity(int capacity) {
+    if (capacity > _resultHolderCapacity) {
+      _resultHolderCapacity = Math.max(_resultHolderCapacity * 2, capacity);
 
       // Cap the growth to maximum possible number of group keys
-      _resultHolderCapacity = Math.min(_resultHolderCapacity, _maxGroupKeys);
+      _resultHolderCapacity = Math.min(_resultHolderCapacity, _maxCapacity);
       _resultArray.expand(_resultHolderCapacity);
     }
   }

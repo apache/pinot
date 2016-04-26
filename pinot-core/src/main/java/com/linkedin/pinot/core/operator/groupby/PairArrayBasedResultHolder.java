@@ -24,36 +24,33 @@ import com.linkedin.pinot.core.query.utils.Pair;
 public class PairArrayBasedResultHolder implements ResultHolder<Pair> {
   private ResultArray _resultArray;
   private int _resultHolderCapacity;
+  private final int _capacityCap;
 
   /**
-   * Constructor for the class, taking ResultArray of type DoubleLongArray.
+   * Constructor for the class.
    *
-   * @param resultHolderCapacity
+   * @param resultArray
+   * @param initialCapacity
+   * @param capacityCap
    */
-  public PairArrayBasedResultHolder(DoubleLongResultArray resultArray, int resultHolderCapacity) {
-    _resultHolderCapacity = resultHolderCapacity;
+  public PairArrayBasedResultHolder(ResultArray resultArray, int initialCapacity, int capacityCap) {
     _resultArray = resultArray;
-  }
-
-  /**
-   * Constructor for the class, taking ResultArray of type DoubleDoubleArray.
-   *
-   * @param resultHolderCapacity
-   */
-  public PairArrayBasedResultHolder(DoubleDoubleResultArray resultArray, int resultHolderCapacity) {
-    _resultHolderCapacity = resultHolderCapacity;
-    _resultArray = resultArray;
+    _resultHolderCapacity = initialCapacity;
+    _capacityCap = capacityCap;
   }
 
   /**
    * {@inheritDoc}
    *
-   * @param maxUniqueKeys
+   * @param capacity
    */
   @Override
-  public void ensureCapacity(int maxUniqueKeys) {
-    if (maxUniqueKeys > _resultHolderCapacity) {
-      _resultHolderCapacity = Math.max(_resultHolderCapacity * 2, maxUniqueKeys);
+  public void ensureCapacity(int capacity) {
+    if (capacity > _resultHolderCapacity) {
+      _resultHolderCapacity = Math.max(_resultHolderCapacity * 2, capacity);
+
+      // Cap the growth to maximum possible number of group keys
+      _resultHolderCapacity = Math.min(_resultHolderCapacity, _capacityCap);
       _resultArray.expand(_resultHolderCapacity);
     }
   }
