@@ -15,11 +15,14 @@
  */
 package com.linkedin.pinot.server.starter.helix;
 
+import java.util.Iterator;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.data.manager.config.InstanceDataManagerConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -28,7 +31,7 @@ import com.linkedin.pinot.core.data.manager.config.InstanceDataManagerConfig;
  *
  */
 public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig {
-
+  private static final Logger LOGGER = LoggerFactory.getLogger(HelixInstanceDataManagerConfig.class);
   private static final String INSTANCE_SEGMENT_METADATA_LOADER_CLASS = "segment.metadata.loader.class";
   // Key of instance id
   public static final String INSTANCE_ID = "id";
@@ -52,6 +55,12 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
 
   public HelixInstanceDataManagerConfig(Configuration serverConfig) throws ConfigurationException {
     _instanceDataManagerConfiguration = serverConfig;
+    Iterator keysIterator = serverConfig.getKeys();
+    while (keysIterator.hasNext()) {
+      String key = (String) keysIterator.next();
+      LOGGER.info("InstanceDataManagerConfig, key: {} , value: {}",  key,
+          serverConfig.getProperty(key));
+    }
     checkRequiredKeys();
   }
 
@@ -112,6 +121,7 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
     configString += "\n\tBootstrap Segment Dir: " + getInstanceBootstrapSegmentDir();
     configString += "\n\tSegment Metadata Loader Clas: " + getSegmentMetadataLoaderClass();
     configString += "\n\tRead Mode: " + getReadMode();
+    configString += "\n\tSegment format version: " + getSegmentFormatVersion();
     return configString;
   }
 }

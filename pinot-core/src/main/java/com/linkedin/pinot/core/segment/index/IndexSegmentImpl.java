@@ -24,7 +24,6 @@ import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.IndexType;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.io.reader.DataFileReader;
 import com.linkedin.pinot.core.segment.index.column.ColumnIndexContainer;
 import com.linkedin.pinot.core.segment.index.data.source.ColumnDataSourceImpl;
@@ -39,15 +38,8 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
-/**
- * Nov 12, 2014
- */
-
 public class IndexSegmentImpl implements IndexSegment {
   private static final Logger LOGGER = LoggerFactory.getLogger(IndexSegmentImpl.class);
-
-  public static final SegmentVersion EXPECTED_SEGMENT_VERSION = SegmentVersion.v1;
 
   private SegmentDirectory segmentDirectory;
   private final SegmentMetadataImpl segmentMetadata;

@@ -15,16 +15,17 @@
  */
 package com.linkedin.pinot.server.starter.helix;
 
-import java.util.Iterator;
-
-import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.PropertiesConfiguration;
-
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.server.conf.ServerConf;
+import java.util.Iterator;
+import org.apache.commons.configuration.Configuration;
+import org.apache.commons.configuration.PropertiesConfiguration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class DefaultHelixStarterServerConfig {
+  private static final Logger LOGGER = LoggerFactory.getLogger(DefaultHelixStarterServerConfig.class);
 
   public static ServerConf getDefaultHelixServerConfig(Configuration externalConfigs) {
     Configuration defaultConfigs = loadDefaultServerConf();
@@ -33,6 +34,7 @@ public class DefaultHelixStarterServerConfig {
     while (iterable.hasNext()) {
       String key = iterable.next();
       defaultConfigs.setProperty(key, externalConfigs.getProperty(key));
+      LOGGER.info("External config key: {}, value: {}", key, externalConfigs.getProperty(key));
     }
     return new ServerConf(defaultConfigs);
   }
@@ -50,6 +52,8 @@ public class DefaultHelixStarterServerConfig {
         CommonConstants.Server.DEFAULT_DATA_MANAGER_CLASS);
     serverConf.addProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_SEGMENT_METADATA_LOADER_CLASS,
         CommonConstants.Server.DEFAULT_SEGMENT_METADATA_LOADER_CLASS);
+    serverConf.addProperty(CommonConstants.Server.CONFIG_OF_SEGMENT_FORMAT_VERSION,
+        CommonConstants.Server.DEFAULT_SEGMENT_FORMAT_VERSION);
 
     // query executor parameters
     serverConf.addProperty(CommonConstants.Server.CONFIG_OF_QUERY_EXECUTOR_PRUNER_CLASS, " DataSchemaSegmentPruner,TimeSegmentPruner,ValidSegmentPruner");

@@ -18,6 +18,7 @@ package com.linkedin.pinot.core.segment.index.loader;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
 import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
@@ -101,18 +102,10 @@ public class Loaders {
 
     private static SegmentVersion getSegmentVersionToLoad(IndexLoadingConfigMetadata indexLoadingConfigMetadata) {
       if (indexLoadingConfigMetadata == null) {
-        return IndexSegmentImpl.EXPECTED_SEGMENT_VERSION;
+        return SegmentVersion.fromStringOrDefault(CommonConstants.Server.DEFAULT_SEGMENT_FORMAT_VERSION);
       }
-
       String versionName = indexLoadingConfigMetadata.segmentVersionToLoad();
-      try {
-        SegmentVersion versionToLoad = SegmentVersion.valueOf(versionName);
-        return versionToLoad;
-      } catch (IllegalArgumentException e) {
-        LOGGER.error("Invalid configuration for segment version, value: {}. Attempting to continue with default version",
-            versionName, e);
-        return IndexSegmentImpl.EXPECTED_SEGMENT_VERSION;
-      }
+      return SegmentVersion.fromStringOrDefault(versionName);
     }
   }
 }

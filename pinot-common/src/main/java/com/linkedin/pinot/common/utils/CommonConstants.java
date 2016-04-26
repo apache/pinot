@@ -172,7 +172,7 @@ public class CommonConstants {
     public static final String CONFIG_OF_SEGMENT_LOAD_MAX_RETRY_COUNT = "pinot.server.segment.loadMaxRetryCount";
     public static final String CONFIG_OF_SEGMENT_LOAD_MIN_RETRY_DELAY_MILLIS =
         "pinot.server.segment.minRetryDelayMillis";
-
+    public static final String CONFIG_OF_SEGMENT_FORMAT_VERSION = "pinot.server.instance.segment.format.version";
     public static final String CONFIG_OF_HELIX_FLAPPING_TIMEWINDOW_MS = "pinot.server.flapping.timeWindowMs";
 
     public static final String DEFAULT_ADMIN_API_PORT = "8097";
@@ -192,6 +192,7 @@ public class CommonConstants {
     public static final String DEFAULT_SEGMENT_LOAD_MIN_RETRY_DELAY_MILLIS = "60000";
     public static final String DEFAULT_HELIX_FLAPPING_TIMEWINDOW_MS = "0";
     public static final String PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY = "pinot.server.segment.fetcher";
+    public static final String DEFAULT_SEGMENT_FORMAT_VERSION = "v1";
   }
 
   public static class Metric {

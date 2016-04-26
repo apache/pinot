@@ -202,7 +202,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       throws ConfigurationException {
     TableDataManagerConfig tableDataManagerConfig = getDefaultHelixTableDataManagerConfig(tableName);
     if (tableConfig != null) {
-      tableDataManagerConfig.overrideConfigs(tableConfig);
+      tableDataManagerConfig.overrideConfigs(tableName, tableConfig);
     }
     TableDataManager tableDataManager = TableDataManagerProvider.getTableDataManager(tableDataManagerConfig);
     tableDataManager.start();

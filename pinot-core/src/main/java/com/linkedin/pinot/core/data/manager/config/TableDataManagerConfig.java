@@ -15,23 +15,25 @@
  */
 package com.linkedin.pinot.core.data.manager.config;
 
-import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.ConfigurationException;
-import org.apache.commons.configuration.PropertiesConfiguration;
-
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
+import org.apache.commons.configuration.Configuration;
+import org.apache.commons.configuration.ConfigurationException;
+import org.apache.commons.configuration.PropertiesConfiguration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
  * The config used for TableDataManager.
- *
- *
  */
 public class TableDataManagerConfig {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(TableDataManagerConfig.class);
 
   private static final String TABLE_DATA_MANAGER_NUM_QUERY_EXECUTOR_THREADS = "numQueryExecutorThreads";
   private static final String TABLE_DATA_MANAGER_TYPE = "dataManagerType";
@@ -103,13 +105,33 @@ public class TableDataManagerConfig {
     return tableDataManagerConfig;
   }
 
-  public void overrideConfigs(AbstractTableConfig tableConfig) {
+  public void overrideConfigs(String tableName, AbstractTableConfig tableConfig) {
     _tableDataManagerConfig.setProperty(READ_MODE, tableConfig.getIndexingConfig().getLoadMode().toLowerCase());
     _tableDataManagerConfig.setProperty(TABLE_DATA_MANAGER_NAME, tableConfig.getTableName());
     _tableDataManagerConfig.setProperty(IndexLoadingConfigMetadata.getKeyOfLoadingInvertedIndex(),
         tableConfig.getIndexingConfig().getInvertedIndexColumns());
-    _tableDataManagerConfig.setProperty(IndexLoadingConfigMetadata.KEY_OF_SEGMENT_FORMAT_VERSION,
-        tableConfig.getIndexingConfig().getSegmentFormatVersion());
+    String segmentVersionKey = IndexLoadingConfigMetadata.KEY_OF_SEGMENT_FORMAT_VERSION;
+    // Server configuration is always to DEFAULT or configured value
+    // Apply table configuration only if the server configuration is set with table config
+    // overriding server config
+    //
+    // Server config not set means table config has no impact. This provides additional
+    // security from inadvertent changes as both config will need to be enabled for the
+    // change to take effect
+    SegmentVersion tableConfigVersion =
+        SegmentVersion.fromStringOrDefault(tableConfig.getIndexingConfig().getSegmentFormatVersion());
+    SegmentVersion serverConfigVersion =
+        SegmentVersion.fromStringOrDefault(_tableDataManagerConfig.getString(
+            IndexLoadingConfigMetadata.KEY_OF_SEGMENT_FORMAT_VERSION));
+    // override server based configuration with table level configuration iff table configuration
+    // is less than server configuration
+    if (SegmentVersion.compare(tableConfigVersion, serverConfigVersion) < 0) {
+      LOGGER.info("Overriding server segment format version: {} with table version: {} for table: {}",
+          serverConfigVersion, tableConfigVersion, tableName);
+      _tableDataManagerConfig.setProperty(segmentVersionKey, tableConfig.getIndexingConfig().getSegmentFormatVersion());
+    } else {
+      LOGGER.info("Loading table: {} with server configured segment format version: {}", tableName, serverConfigVersion);
+    }
   }
 
   public IndexLoadingConfigMetadata getIndexLoadingConfigMetadata() {
