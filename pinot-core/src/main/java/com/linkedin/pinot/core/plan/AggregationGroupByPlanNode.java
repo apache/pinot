@@ -86,8 +86,7 @@ public class AggregationGroupByPlanNode implements PlanNode {
 
   /**
    * Returns true AggregationGroupByPlanNode can serve the given BrokerRequest, false otherwise.
-   * - Only 'sum', 'min', 'max' & 'avg' aggregation functions are supported currently.
-   *   Returns false for other aggregation functions.
+   * All aggregation functions except 'percentileest' are supported currently.
    *
    * @param brokerRequest
    * @return

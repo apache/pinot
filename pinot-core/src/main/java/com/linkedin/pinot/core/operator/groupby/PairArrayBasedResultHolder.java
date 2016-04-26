@@ -59,8 +59,20 @@ public class PairArrayBasedResultHolder implements ResultHolder<Pair> {
   }
 
   @Override
+  public double getDoubleResult() {
+    Preconditions.checkState(_resultHolderCapacity == 1);
+    return _resultArray.getDoubleResult(0);
+  }
+
+  @Override
   public double getDoubleResult(int groupKey) {
     throw new RuntimeException("Unsupported method 'getDoubleResult' for class " + getClass().getName());
+  }
+
+  @Override
+  public Pair getResult() {
+    Preconditions.checkState(_resultHolderCapacity == 1);
+    return _resultArray.getResult(0);
   }
 
   /**
@@ -78,6 +90,18 @@ public class PairArrayBasedResultHolder implements ResultHolder<Pair> {
     return _resultArray.getResult((int) groupKey);
   }
 
+  @Override
+  public void setValue(double newValue) {
+    throw new RuntimeException(
+        "Unsupported method 'setValue' (with primitive double value) for class " + getClass().getName());
+  }
+
+  @Override
+  public void setValue(Pair newValue) {
+    Preconditions.checkState(_resultHolderCapacity == 1);
+    _resultArray.set(0, newValue);
+  }
+
   /**
    * {@inheritDoc}
    *
@@ -85,12 +109,12 @@ public class PairArrayBasedResultHolder implements ResultHolder<Pair> {
    * @param newValue
    */
   @Override
-  public void putValueForKey(long groupKey, double newValue) {
-    throw new RuntimeException("Unsupported method 'putValueForKey (of double Type) for class " + getClass().getName());
+  public void setValueForKey(long groupKey, double newValue) {
+    throw new RuntimeException("Unsupported method 'setValueForKey (of double Type) for class " + getClass().getName());
   }
 
   @Override
-  public void putValueForKey(long groupKey, Pair pair) {
+  public void setValueForKey(long groupKey, Pair pair) {
     _resultArray.set((int) groupKey, pair);
   }
 }

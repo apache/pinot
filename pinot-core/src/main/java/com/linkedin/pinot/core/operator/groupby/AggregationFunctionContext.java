@@ -41,7 +41,7 @@ public class AggregationFunctionContext {
    * @param aggFuncName
    * @param columns
    */
-  AggregationFunctionContext(IndexSegment indexSegment, String aggFuncName, String[] columns) {
+  public AggregationFunctionContext(IndexSegment indexSegment, String aggFuncName, String[] columns) {
     _aggFuncName = aggFuncName.toLowerCase();
     _aggregationFunction = AggregationFunctionFactory.getAggregationFunction(_aggFuncName);
     _aggrColumns = columns;
@@ -121,8 +121,8 @@ public class AggregationFunctionContext {
    * @param resultHolder
    * @param valueArray
    */
-  public void applySV(int length, int[] docIdToGroupKey, ResultHolder resultHolder, double[]... valueArray) {
-    _aggregationFunction.applySV(length, docIdToGroupKey, resultHolder, valueArray);
+  public void aggregateGroupBySV(int length, int[] docIdToGroupKey, ResultHolder resultHolder, double[]... valueArray) {
+    _aggregationFunction.aggregateGroupBySV(length, docIdToGroupKey, resultHolder, valueArray);
   }
 
   /**
@@ -135,7 +135,12 @@ public class AggregationFunctionContext {
    * @param resultHolder
    * @param valueArray
    */
-  public void applyMV(int length, int[][] docIdToGroupKeys, ResultHolder resultHolder, double[]... valueArray) {
-    _aggregationFunction.applyMV(length, docIdToGroupKeys, resultHolder, valueArray);
+  public void aggregateGroupByMV(int length, int[][] docIdToGroupKeys, ResultHolder resultHolder,
+      double[]... valueArray) {
+    _aggregationFunction.aggregateGroupByMV(length, docIdToGroupKeys, resultHolder, valueArray);
+  }
+
+  public void aggregate(int length, ResultHolder resultHolder, double[]... valuesToAggregate) {
+    _aggregationFunction.aggregate(length, resultHolder, valuesToAggregate);
   }
 }

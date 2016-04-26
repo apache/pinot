@@ -15,8 +15,7 @@
  */
 package com.linkedin.pinot.core.operator.groupby;
 
-import com.clearspring.analytics.util.Preconditions;
-
+import com.google.common.base.Preconditions;
 
 /**
  * Result Holder implemented using DoubleArray.
@@ -57,6 +56,11 @@ public class DoubleArrayBasedResultHolder implements ResultHolder {
     }
   }
 
+  @Override
+  public double getDoubleResult() {
+    return _resultArray.getDoubleResult(0);
+  }
+
   /**
    * {@inheritDoc}
    *
@@ -73,9 +77,26 @@ public class DoubleArrayBasedResultHolder implements ResultHolder {
   }
 
   @Override
+  public Object getResult() {
+    throw new RuntimeException(
+        "Unsupported method getResult (returning Object) for class " + getClass().getName());  }
+
+  @Override
   public Object getResult(long groupKey) {
     throw new RuntimeException(
         "Unsupported method getResult (returning Object) for class " + getClass().getName());
+  }
+
+  @Override
+  public void setValue(double newValue) {
+    Preconditions.checkState(_resultHolderCapacity == 1);
+    _resultArray.set(0, newValue);
+  }
+
+  @Override
+  public void setValue(Object newValue) {
+    throw new RuntimeException(
+        "Unsupported method 'setValue' (with Object param) for class " + getClass().getName());
   }
 
   /**
@@ -85,13 +106,13 @@ public class DoubleArrayBasedResultHolder implements ResultHolder {
    * @param newValue
    */
   @Override
-  public void putValueForKey(long groupKey, double newValue) {
+  public void setValueForKey(long groupKey, double newValue) {
     _resultArray.set((int) groupKey, newValue);
   }
 
   @Override
-  public void putValueForKey(long groupKey, Object newValue) {
+  public void setValueForKey(long groupKey, Object newValue) {
     throw new RuntimeException(
-        "Unsupported method 'putValueForKey' (with Object param) for class " + getClass().getName());
+        "Unsupported method 'setValueForKey' (with Object param) for class " + getClass().getName());
   }
 }

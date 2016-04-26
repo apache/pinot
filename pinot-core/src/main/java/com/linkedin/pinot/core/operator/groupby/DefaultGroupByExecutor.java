@@ -17,7 +17,6 @@ package com.linkedin.pinot.core.operator.groupby;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.GroupBy;
 import com.linkedin.pinot.common.utils.primitive.MutableLongValue;
@@ -191,9 +190,9 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     switch (aggrFuncName) {
       case AggregationFunctionFactory.COUNT_AGGREGATION_FUNCTION:
         if (_hasMultiValuedColumns) {
-          aggrFuncContext.applyMV(length, _docIdToMVGroupKey, resultHolder);
+          aggrFuncContext.aggregateGroupByMV(length, _docIdToMVGroupKey, resultHolder);
         } else {
-          aggrFuncContext.applySV(length, _docIdToSVGroupKey, resultHolder);
+          aggrFuncContext.aggregateGroupBySV(length, _docIdToSVGroupKey, resultHolder);
         }
         return;
 
@@ -201,9 +200,9 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
       case AggregationFunctionFactory.DISTINCTCOUNTHLL_AGGREGATION_FUNCTION:
         fetchColumnValueHashCodes(aggrColumn, aggrFuncContext.getDictionary(0), length);
         if (_hasMultiValuedColumns) {
-          aggrFuncContext.applyMV(length, _docIdToMVGroupKey, resultHolder, _hashCodeArray);
+          aggrFuncContext.aggregateGroupByMV(length, _docIdToMVGroupKey, resultHolder, _hashCodeArray);
         } else {
-          aggrFuncContext.applySV(length, _docIdToSVGroupKey, resultHolder, _hashCodeArray);
+          aggrFuncContext.aggregateGroupBySV(length, _docIdToSVGroupKey, resultHolder, _hashCodeArray);
         }
         return;
 
@@ -211,9 +210,9 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
         double[] valueArray = _columnToValueArrayMap.get(aggrColumn);
 
         if (_hasMultiValuedColumns) {
-          aggrFuncContext.applyMV(length, _docIdToMVGroupKey, resultHolder, valueArray);
+          aggrFuncContext.aggregateGroupByMV(length, _docIdToMVGroupKey, resultHolder, valueArray);
         } else {
-          aggrFuncContext.applySV(length, _docIdToSVGroupKey, resultHolder, valueArray);
+          aggrFuncContext.aggregateGroupBySV(length, _docIdToSVGroupKey, resultHolder, valueArray);
         }
     }
   }
@@ -250,7 +249,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
         AggregationFunction aggregationFunction = _aggrFuncContextList.get(i).getAggregationFunction();
         AggregationFunction.ResultDataType resultDataType = aggregationFunction.getResultDataType();
 
-        Serializable resultForGroupKey = getResultForKey(idKeyPair, _resultHolderArray[i], resultDataType);
+        Serializable resultForGroupKey = getResultForKey(idKeyPair.getFirst(), _resultHolderArray[i], resultDataType);
         result.get(i).put(stringGroupKey, resultForGroupKey);
       }
     }
@@ -260,37 +259,37 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
   /**
    * Returns result for the given key.
    *
-   * @param idKeyPair
+   * @param groupKey
    * @param resultDataType
    * @return
    */
-  private Serializable getResultForKey(Pair<Integer, String> idKeyPair, ResultHolder resultHolder,
+  private Serializable getResultForKey(int groupKey, ResultHolder resultHolder,
       AggregationFunction.ResultDataType resultDataType) {
 
     switch (resultDataType) {
       case LONG:
-        return new MutableLongValue((long) resultHolder.getDoubleResult(idKeyPair.getFirst()));
+        return new MutableLongValue((long) resultHolder.getDoubleResult(groupKey));
 
       case DOUBLE:
-        return resultHolder.getDoubleResult(idKeyPair.getFirst());
+        return resultHolder.getDoubleResult(groupKey);
 
       case AVERAGE_PAIR:
-        Pair<Double, Long> doubleLongPair = (Pair<Double, Long>) resultHolder.getResult(idKeyPair.getFirst());
+        Pair<Double, Long> doubleLongPair = (Pair<Double, Long>) resultHolder.getResult(groupKey);
         return new AvgAggregationFunction.AvgPair(doubleLongPair.getFirst(), doubleLongPair.getSecond());
 
       case MINMAXRANGE_PAIR:
-        Pair<Double, Double> doubleDoublePair = (Pair<Double, Double>) resultHolder.getResult(idKeyPair.getFirst());
+        Pair<Double, Double> doubleDoublePair = (Pair<Double, Double>) resultHolder.getResult(groupKey);
         return new MinMaxRangeAggregationFunction.MinMaxRangePair(doubleDoublePair.getFirst(),
             doubleDoublePair.getSecond());
 
       case DISTINCTCOUNT_SET:
-        return (IntOpenHashSet) resultHolder.getResult(idKeyPair.getFirst());
+        return (IntOpenHashSet) resultHolder.getResult(groupKey);
 
       case DISTINCTCOUNTHLL_HYPERLOGLOG:
-        return (HyperLogLog) resultHolder.getResult(idKeyPair.getFirst());
+        return (HyperLogLog) resultHolder.getResult(groupKey);
 
       case PERCENTILE_LIST:
-        return (DoubleArrayList) resultHolder.getResult(idKeyPair.getFirst());
+        return (DoubleArrayList) resultHolder.getResult(groupKey);
 
       default:
         throw new RuntimeException(

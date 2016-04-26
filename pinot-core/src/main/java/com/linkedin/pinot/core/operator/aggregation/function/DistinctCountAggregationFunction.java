@@ -33,11 +33,11 @@ public class DistinctCountAggregationFunction implements AggregationFunction {
    *
    * {@inheritDoc}
    *
-   * @param values
+   * @param valueArray
    * @return
    */
   @Override
-  public double aggregate(double[] values) {
+  public void aggregate(int length, ResultHolder resultHolders, double[]... valueArray) {
     throw new RuntimeException("Unsupported method aggregate(double[] values) for class " + getClass().getName());
   }
 
@@ -53,7 +53,7 @@ public class DistinctCountAggregationFunction implements AggregationFunction {
    * @param valueArray
    */
   @Override
-  public void applySV(int length, int[] groupKeys, ResultHolder resultHolder, double[]... valueArray) {
+  public void aggregateGroupBySV(int length, int[] groupKeys, ResultHolder resultHolder, double[]... valueArray) {
     Preconditions.checkArgument(valueArray.length == 1);
     Preconditions.checkState(length <= valueArray[0].length);
 
@@ -62,7 +62,7 @@ public class DistinctCountAggregationFunction implements AggregationFunction {
       IntOpenHashSet valueSet = (IntOpenHashSet) resultHolder.getResult(groupKey);
       if (valueSet == null) {
         valueSet = new IntOpenHashSet();
-        resultHolder.putValueForKey(groupKey, valueSet);
+        resultHolder.setValueForKey(groupKey, valueSet);
       }
       valueSet.add((int) valueArray[0][i]);
     }
@@ -77,7 +77,8 @@ public class DistinctCountAggregationFunction implements AggregationFunction {
    * @param valueArray
    */
   @Override
-  public void applyMV(int length, int[][] docIdToGroupKeys, ResultHolder resultHolder, double[]... valueArray) {
+  public void aggregateGroupByMV(int length, int[][] docIdToGroupKeys, ResultHolder resultHolder,
+      double[]... valueArray) {
     Preconditions.checkArgument(valueArray.length == 1);
     Preconditions.checkState(length <= valueArray[0].length);
 
@@ -87,7 +88,7 @@ public class DistinctCountAggregationFunction implements AggregationFunction {
         IntOpenHashSet valueSet = (IntOpenHashSet) resultHolder.getResult(groupKey);
         if (valueSet == null) {
           valueSet = new IntOpenHashSet();
-          resultHolder.putValueForKey(groupKey, valueSet);
+          resultHolder.setValueForKey(groupKey, valueSet);
         }
         valueSet.add(value);
       }

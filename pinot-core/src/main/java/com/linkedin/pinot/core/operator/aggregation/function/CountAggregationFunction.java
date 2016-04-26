@@ -34,12 +34,13 @@ public class CountAggregationFunction implements AggregationFunction {
    *
    * {@inheritDoc}
    *
-   * @param values
+   * @param length
+   * @param valueArray
    * @return
    */
   @Override
-  public double aggregate(double[] values) {
-    return values.length;
+  public void aggregate(int length, ResultHolder resultHolder, double[]... valueArray) {
+    resultHolder.setValue(resultHolder.getDoubleResult() + length);
   }
 
   /**
@@ -54,13 +55,13 @@ public class CountAggregationFunction implements AggregationFunction {
    * @param valueArray
    */
   @Override
-  public void applySV(int length, int[] groupKeys, ResultHolder resultHolder, double[]... valueArray) {
+  public void aggregateGroupBySV(int length, int[] groupKeys, ResultHolder resultHolder, double[]... valueArray) {
     Preconditions.checkArgument(valueArray.length == 0);
 
     for (int i = 0; i < length; i++) {
       int groupKey = groupKeys[i];
       double oldValue = resultHolder.getDoubleResult(groupKey);
-      resultHolder.putValueForKey(groupKey, (oldValue + 1));
+      resultHolder.setValueForKey(groupKey, (oldValue + 1));
     }
   }
 
@@ -73,13 +74,13 @@ public class CountAggregationFunction implements AggregationFunction {
    * @param valueArray
    */
   @Override
-  public void applyMV(int length, int[][] docIdToGroupKey, ResultHolder resultHolder, double[]... valueArray) {
+  public void aggregateGroupByMV(int length, int[][] docIdToGroupKey, ResultHolder resultHolder,
+      double[]... valueArray) {
     Preconditions.checkArgument(valueArray.length == 0);
-
     for (int i = 0; i < length; ++i) {
       for (int groupKey : docIdToGroupKey[i]) {
         double oldValue = resultHolder.getDoubleResult(groupKey);
-        resultHolder.putValueForKey(groupKey, oldValue + 1);
+        resultHolder.setValueForKey(groupKey, oldValue + 1);
       }
     }
   }

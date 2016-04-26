@@ -32,18 +32,30 @@ public class MinAggregationFunction implements AggregationFunction {
    * Performs the 'sum' aggregation function on the input array.
    * Returns {@value #DEFAULT_VALUE} if input array is empty.
    *
+   * While the interface allows for variable number of valueArrays, we do not support
+   * multiple columns within one aggregation function right now.
+   *
    * {@inheritDoc}
-   * @param values
+   *
+   * @param length
+   * @param valueArray
    * @return
    */
   @Override
-  public double aggregate(double[] values) {
-    double ret = DEFAULT_VALUE;
+  public void aggregate(int length, ResultHolder resultHolder, double[]... valueArray) {
+    Preconditions.checkArgument(valueArray.length == 1);
+    Preconditions.checkState(length <= valueArray[0].length);
 
-    for (int i = 0; i < values.length; i++) {
-      ret = Math.min(ret, values[i]);
+    double min = DEFAULT_VALUE;
+    for (int i = 0; i < length; i++) {
+      if (valueArray[0][i] < min) {
+        min = valueArray[0][i];
+      }
     }
-    return ret;
+    double oldValue = resultHolder.getDoubleResult();
+    if (min < oldValue) {
+      resultHolder.setValue(min);
+    }
   }
 
   /**
@@ -57,14 +69,16 @@ public class MinAggregationFunction implements AggregationFunction {
    * @param valueArray
    */
   @Override
-  public void applySV(int length, int[] groupKeys, ResultHolder resultHolder, double[]... valueArray) {
+  public void aggregateGroupBySV(int length, int[] groupKeys, ResultHolder resultHolder, double[]... valueArray) {
     Preconditions.checkArgument(valueArray.length == 1);
     Preconditions.checkState(length <= valueArray[0].length);
 
     for (int i = 0; i < length; i++) {
       int groupKey = groupKeys[i];
       double oldValue = resultHolder.getDoubleResult(groupKey);
-      resultHolder.putValueForKey(groupKey, Math.min(oldValue, valueArray[0][i]));
+      if (valueArray[0][i] < oldValue) {
+        resultHolder.setValueForKey(groupKey, valueArray[0][i]);
+      }
     }
   }
 
@@ -77,15 +91,17 @@ public class MinAggregationFunction implements AggregationFunction {
    * @param valueArray
    */
   @Override
-  public void applyMV(int length, int[][] docIdToGroupKeys, ResultHolder resultHolder, double[]... valueArray) {
+  public void aggregateGroupByMV(int length, int[][] docIdToGroupKeys, ResultHolder resultHolder,
+      double[]... valueArray) {
     Preconditions.checkArgument(valueArray.length == 1);
     Preconditions.checkState(length <= valueArray[0].length);
 
     for (int i = 0; i < length; ++i) {
       for (int groupKey : docIdToGroupKeys[i]) {
         double oldValue = resultHolder.getDoubleResult(groupKey);
-        double newValue = Math.min(oldValue, valueArray[0][i]);
-        resultHolder.putValueForKey(groupKey, newValue);
+        if (valueArray[0][i] < oldValue) {
+          resultHolder.setValueForKey(groupKey, valueArray[0][i]);
+        }
       }
     }
   }
@@ -102,7 +118,9 @@ public class MinAggregationFunction implements AggregationFunction {
 
     for (Object object : combinedResult) {
       double result = (Double) object;
-      reducedResult = Math.min(result, reducedResult);
+      if (result < reducedResult) {
+        reducedResult = result;
+      }
     }
     return reducedResult;
   }

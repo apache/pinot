@@ -21,6 +21,7 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.plan.AggregationGroupByImplementationType;
 import com.linkedin.pinot.core.plan.AggregationGroupByOperatorPlanNode;
 import com.linkedin.pinot.core.plan.AggregationGroupByPlanNode;
+import com.linkedin.pinot.core.plan.AggregationOperatorPlanNode;
 import com.linkedin.pinot.core.plan.AggregationPlanNode;
 import com.linkedin.pinot.core.plan.CombinePlanNode;
 import com.linkedin.pinot.core.plan.GlobalPlanImplV0;
@@ -72,8 +73,11 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     if (brokerRequest.isSetAggregationsInfo()) {
       if (!brokerRequest.isSetGroupBy()) {
         // Only Aggregation
-        final PlanNode aggregationPlanNode = new AggregationPlanNode(indexSegment, brokerRequest);
-        return aggregationPlanNode;
+        if (useNewAggregationOperator(brokerRequest)) {
+          return new AggregationPlanNode(indexSegment, brokerRequest);
+        } else {
+          return new AggregationOperatorPlanNode(indexSegment, brokerRequest);
+        }
       } else {
         // Aggregation GroupBy
         PlanNode aggregationGroupByPlanNode;
@@ -82,7 +86,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
           // AggregationGroupByPlanNode is the new implementation of group-by aggregations, and is currently turned OFF.
           // Once all feature and perf testing is performed, the code will be turned ON, and this 'if' check will
           // be removed.
-          if (useNewAggreagationGroupByOperator(brokerRequest)) {
+          if (useNewAggregationGroupByOperator(brokerRequest)) {
             aggregationGroupByPlanNode = new AggregationGroupByPlanNode(indexSegment, brokerRequest,
                 AggregationGroupByImplementationType.Dictionary);
           } else {
@@ -110,14 +114,26 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   }
 
   /**
-   * Temporary method to check if the new implementation of AggregationGroupBy can be used.
-   * This method will be removed once the new implementation ofAggregationGroupBy is turned
+   * Temporary method to check if the new implementation of Aggregation can be used.
+   * This method will be removed once the new implementation of AggregationOperator is turned
    * ON by default.
    *
    * @param brokerRequest
    * @return
    */
-  private boolean useNewAggreagationGroupByOperator(BrokerRequest brokerRequest) {
+  private boolean useNewAggregationOperator(BrokerRequest brokerRequest) {
+    return _enableNewAggreagationGroupBy && AggregationPlanNode.isFitForAggregationFastAggregation(brokerRequest);
+  }
+
+  /**
+   * Temporary method to check if the new implementation of AggregationGroupBy can be used.
+   * This method will be removed once the new implementation of AggregationGroupByOperator is turned
+   * ON by default.
+   *
+   * @param brokerRequest
+   * @return
+   */
+  private boolean useNewAggregationGroupByOperator(BrokerRequest brokerRequest) {
     return _enableNewAggreagationGroupBy && AggregationGroupByPlanNode
         .isFitForAggregationFastAggregation(brokerRequest);
   }

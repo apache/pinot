@@ -33,19 +33,28 @@ public class AvgAggregationFunction implements AggregationFunction {
    * Performs 'sum' aggregation on the input array.
    * Returns {@value #DEFAULT_VALUE} if the input array is empty.
    *
+   * While the interface allows for variable number of valueArrays, we do not support
+   * multiple columns within one aggregation function right now.
+   *
    * {@inheritDoc}
    *
-   * @param values
+   * @param length
+   * @param valueArray
    * @return
    */
   @Override
-  public double aggregate(double[] values) {
-    double sum = 0.0;
+  public void aggregate(int length, ResultHolder resultHolder, double[]... valueArray) {
+    Preconditions.checkArgument(valueArray.length == 1);
+    Preconditions.checkState(length <= valueArray[0].length);
 
-    for (double value : values) {
-      sum += value;
+    double sum = 0.0;
+    for (int i = 0; i < length; i++) {
+      sum += valueArray[0][i];
     }
-    return (sum / values.length);
+    Pair<Double, Long> avgPair = (Pair<Double, Long>) resultHolder.getResult();
+    avgPair.setFirst(avgPair.getFirst() + sum);
+    avgPair.setSecond(avgPair.getSecond() + length);
+    resultHolder.setValue(avgPair);
   }
 
   /**
@@ -60,7 +69,7 @@ public class AvgAggregationFunction implements AggregationFunction {
    * @param valueArray
    */
   @Override
-  public void applySV(int length, int[] groupKeys, ResultHolder resultHolder, double[]... valueArray) {
+  public void aggregateGroupBySV(int length, int[] groupKeys, ResultHolder resultHolder, double[]... valueArray) {
     Preconditions.checkArgument(valueArray.length == 1);
     Preconditions.checkState(length <= valueArray[0].length);
 
@@ -69,7 +78,7 @@ public class AvgAggregationFunction implements AggregationFunction {
       Pair<Double, Long> avgValue = (Pair<Double, Long>) resultHolder.getResult(groupKey);
       avgValue.setFirst(avgValue.getFirst() + valueArray[0][i]);
       avgValue.setSecond(avgValue.getSecond() + 1);
-      resultHolder.putValueForKey(groupKey, avgValue);
+      resultHolder.setValueForKey(groupKey, avgValue);
     }
   }
 
@@ -82,7 +91,8 @@ public class AvgAggregationFunction implements AggregationFunction {
    * @param valueArray
    */
   @Override
-  public void applyMV(int length, int[][] docIdToGroupKeys, ResultHolder resultHolder, double[]... valueArray) {
+  public void aggregateGroupByMV(int length, int[][] docIdToGroupKeys, ResultHolder resultHolder,
+      double[]... valueArray) {
     Preconditions.checkArgument(valueArray.length == 1);
     Preconditions.checkState(length <= valueArray[0].length);
 
@@ -91,7 +101,7 @@ public class AvgAggregationFunction implements AggregationFunction {
         Pair<Double, Long> avgValue = (Pair<Double, Long>) resultHolder.getResult(groupKey);
         avgValue.setFirst(avgValue.getFirst() + valueArray[0][i]);
         avgValue.setSecond(avgValue.getSecond() + 1);
-        resultHolder.putValueForKey(groupKey, avgValue);
+        resultHolder.setValueForKey(groupKey, avgValue);
       }
     }
   }

@@ -22,6 +22,7 @@ import java.util.List;
 
 /**
  * Aggregation function to perform the 'max' operation.
+ *
  */
 public class MaxAggregationFunction implements AggregationFunction {
   private static final String FUNCTION_NAME = AggregationFunctionFactory.MAX_AGGREGATION_FUNCTION;
@@ -29,22 +30,34 @@ public class MaxAggregationFunction implements AggregationFunction {
   private static final ResultDataType _resultDataType = ResultDataType.DOUBLE;
 
   /**
-   * Given an array of double values, returns the max value from the array.
+   * Given an array of double valueArray, returns the max value from the array.
    * Returns {@value #DEFAULT_VALUE} if the input array is empty.
+   *
+   * While the interface allows for variable number of valueArrays, we do not support
+   * multiple columns within one aggregation function right now.
    *
    * {@inheritDoc}
    *
-   * @param values
+   * @param length
+   * @param valueArray
    * @return
    */
   @Override
-  public double aggregate(double[] values) {
-    double ret = DEFAULT_VALUE;
+  public void aggregate(int length, ResultHolder resultHolder, double[]... valueArray) {
+    Preconditions.checkArgument(valueArray.length == 1);
+    Preconditions.checkState(length <= valueArray[0].length);
 
-    for (int i = 0; i < values.length; i++) {
-      ret = Math.max(ret, values[i]);
+    double max = DEFAULT_VALUE;
+    for (int i = 0; i < length; i++) {
+      if (valueArray[0][i] > max) {
+        max = valueArray[0][i];
+      }
     }
-    return ret;
+
+    double oldValue = resultHolder.getDoubleResult();
+    if (max > oldValue) {
+      resultHolder.setValue(max);
+    }
   }
 
   /**
@@ -59,14 +72,16 @@ public class MaxAggregationFunction implements AggregationFunction {
    * @param valueArray
    */
   @Override
-  public void applySV(int length, int[] groupKeys, ResultHolder resultHolder, double[]... valueArray) {
+  public void aggregateGroupBySV(int length, int[] groupKeys, ResultHolder resultHolder, double[]... valueArray) {
     Preconditions.checkArgument(valueArray.length == 1);
     Preconditions.checkState(length <= valueArray[0].length);
 
     for (int i = 0; i < length; i++) {
       int groupKey = groupKeys[i];
       double oldValue = resultHolder.getDoubleResult(groupKey);
-      resultHolder.putValueForKey(groupKey, Math.max(oldValue, valueArray[0][i]));
+      if (valueArray[0][i] > oldValue) {
+        resultHolder.setValueForKey(groupKey, valueArray[0][i]);
+      }
     }
   }
 
@@ -79,15 +94,16 @@ public class MaxAggregationFunction implements AggregationFunction {
    * @param valueArray
    */
   @Override
-  public void applyMV(int length, int[][] docIdToGroupKey, ResultHolder resultHolder, double[]... valueArray) {
+  public void aggregateGroupByMV(int length, int[][] docIdToGroupKey, ResultHolder resultHolder, double[]... valueArray) {
     Preconditions.checkArgument(valueArray.length == 1);
     Preconditions.checkState(length <= valueArray[0].length);
 
     for (int i = 0; i < length; ++i) {
       for (int groupKey : docIdToGroupKey[i]) {
         double oldValue = resultHolder.getDoubleResult(groupKey);
-        double newValue = Math.max(oldValue, valueArray[0][i]);
-        resultHolder.putValueForKey(groupKey, newValue);
+        if (valueArray[0][i] > oldValue) {
+          resultHolder.setValueForKey(groupKey, valueArray[0][i]);
+        }
       }
     }
   }
@@ -104,7 +120,9 @@ public class MaxAggregationFunction implements AggregationFunction {
 
     for (Object object : combinedResult) {
       double result = (Double) object;
-      reducedResult = Math.max(result, reducedResult);
+      if (result > reducedResult) {
+        reducedResult = result;
+      }
     }
     return reducedResult;
   }

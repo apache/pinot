@@ -60,6 +60,11 @@ public class ObjectArrayBasedResultHolder implements ResultHolder {
     }
   }
 
+  @Override
+  public double getDoubleResult() {
+    throw new RuntimeException("Method 'getDoubleResult()' not supported for class " + getClass().getName());
+  }
+
   /**
    * {@inheritDoc}
    *
@@ -77,8 +82,23 @@ public class ObjectArrayBasedResultHolder implements ResultHolder {
   }
 
   @Override
+  public Object getResult() {
+    throw new RuntimeException("Method 'getDoubleResult()' not supported for class " + getClass().getName());
+  }
+
+  @Override
   public Object getResult(long groupKey) {
     return _resultArray[(int) groupKey];
+  }
+
+  @Override
+  public void setValue(double newValue) {
+    throw new RuntimeException("Method 'getDoubleResult()' not supported for class " + getClass().getName());
+  }
+
+  @Override
+  public void setValue(Object newValue) {
+    throw new RuntimeException("Method 'getDoubleResult()' not supported for class " + getClass().getName());
   }
 
   /**
@@ -88,13 +108,13 @@ public class ObjectArrayBasedResultHolder implements ResultHolder {
    * @param newValue
    */
   @Override
-  public void putValueForKey(long groupKey, double newValue) {
+  public void setValueForKey(long groupKey, double newValue) {
     throw new RuntimeException(
         "Unsupported method 'putValueForKey' (with double param) for class " + getClass().getName());
   }
 
   @Override
-  public void putValueForKey(long groupKey, Object newValue) {
+  public void setValueForKey(long groupKey, Object newValue) {
     _resultArray[(int) groupKey] = newValue;
   }
 }

@@ -32,19 +32,24 @@ public class SumAggregationFunction implements AggregationFunction {
    * Performs 'sum' aggregation on the input array.
    * Returns {@value #DEFAULT_VALUE} if the input array is empty.
    *
+   * While the interface allows for variable number of valueArrays, we do not support
+   * multiple columns within one aggregation function right now.
    * {@inheritDoc}
    *
-   * @param values
+   * @param length
+   * @param valueArray
    * @return
    */
   @Override
-  public double aggregate(double[] values) {
-    double sum = 0.0;
+  public void aggregate(int length, ResultHolder resultHolder, double[]... valueArray) {
+    Preconditions.checkArgument(valueArray.length == 1);
+    Preconditions.checkState(length <= valueArray[0].length);
 
-    for (double value : values) {
-      sum += value;
+    double sum = 0.0;
+    for (int i = 0; i < length; i++) {
+      sum += valueArray[0][i];
     }
-    return sum;
+    resultHolder.setValue(resultHolder.getDoubleResult() + sum);
   }
 
   /**
@@ -59,14 +64,14 @@ public class SumAggregationFunction implements AggregationFunction {
    * @param valueArray
    */
   @Override
-  public void applySV(int length, int[] groupKeys, ResultHolder resultHolder, double[]... valueArray) {
+  public void aggregateGroupBySV(int length, int[] groupKeys, ResultHolder resultHolder, double[]... valueArray) {
     Preconditions.checkArgument(valueArray.length == 1);
     Preconditions.checkState(length <= valueArray[0].length);
 
     for (int i = 0; i < length; i++) {
       int groupKey = groupKeys[i];
       double oldValue = resultHolder.getDoubleResult(groupKey);
-      resultHolder.putValueForKey(groupKey, (oldValue + valueArray[0][i]));
+      resultHolder.setValueForKey(groupKey, (oldValue + valueArray[0][i]));
     }
   }
 
@@ -79,7 +84,7 @@ public class SumAggregationFunction implements AggregationFunction {
    * @param valueArray
    */
   @Override
-  public void applyMV(int length, int[][] docIdToGroupKey, ResultHolder resultHolder, double[]... valueArray) {
+  public void aggregateGroupByMV(int length, int[][] docIdToGroupKey, ResultHolder resultHolder, double[]... valueArray) {
     Preconditions.checkArgument(valueArray.length == 1);
     Preconditions.checkState(length <= valueArray[0].length);
 
@@ -87,7 +92,7 @@ public class SumAggregationFunction implements AggregationFunction {
       for (int groupKey : docIdToGroupKey[i]) {
         double oldValue = resultHolder.getDoubleResult(groupKey);
         double newValue = oldValue + valueArray[0][i];
-        resultHolder.putValueForKey(groupKey, newValue);
+        resultHolder.setValueForKey(groupKey, newValue);
       }
     }
   }

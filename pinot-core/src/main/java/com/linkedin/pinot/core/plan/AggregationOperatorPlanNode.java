@@ -15,32 +15,37 @@
  */
 package com.linkedin.pinot.core.plan;
 
-import com.linkedin.pinot.common.request.AggregationInfo;
-import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.core.common.Operator;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.operator.MProjectionOperator;
-import com.linkedin.pinot.core.operator.aggregation.AggregationOperator;
-import com.linkedin.pinot.core.query.aggregation.AggregationFunctionUtils;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.pinot.common.request.AggregationInfo;
+import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.core.common.Operator;
+import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.operator.MProjectionOperator;
+import com.linkedin.pinot.core.operator.query.BAggregationFunctionOperator;
+import com.linkedin.pinot.core.operator.query.MAggregationOperator;
+import com.linkedin.pinot.core.query.aggregation.AggregationFunctionUtils;
 
-public class AggregationPlanNode implements PlanNode {
+
+/**
+ * AggregationOperatorPlanNode takes care of how to apply an aggregation query to an IndexSegment.
+ */
+public class AggregationOperatorPlanNode implements PlanNode {
   private static final Logger LOGGER = LoggerFactory.getLogger("QueryPlanLog");
-
   private final IndexSegment _indexSegment;
   private final BrokerRequest _brokerRequest;
   private final List<AggregationFunctionPlanNode> _aggregationFunctionPlanNodes =
       new ArrayList<AggregationFunctionPlanNode>();
   private final ProjectionPlanNode _projectionPlanNode;
 
-  public AggregationPlanNode(IndexSegment indexSegment, BrokerRequest query) {
+  public AggregationOperatorPlanNode(IndexSegment indexSegment, BrokerRequest query) {
     _indexSegment = indexSegment;
     _brokerRequest = query;
     _projectionPlanNode = new ProjectionPlanNode(_indexSegment, getAggregationRelatedColumns(),
@@ -53,6 +58,10 @@ public class AggregationPlanNode implements PlanNode {
     }
   }
 
+  /**
+   * Returns an array of aggregation columns.
+   * @return
+   */
   private String[] getAggregationRelatedColumns() {
     Set<String> aggregationRelatedColumns = new HashSet<String>();
     for (AggregationInfo aggregationInfo : _brokerRequest.getAggregationsInfo()) {
@@ -64,12 +73,24 @@ public class AggregationPlanNode implements PlanNode {
     return aggregationRelatedColumns.toArray(new String[0]);
   }
 
+  /**
+   * Returns the MAggregationOperator that performs aggregation.
+   * @return
+   */
   @Override
   public Operator run() {
-    MProjectionOperator projectionOperator = (MProjectionOperator) _projectionPlanNode.run();
-    return new AggregationOperator(_indexSegment, _brokerRequest.getAggregationsInfo(), projectionOperator);
+    List<BAggregationFunctionOperator> aggregationFunctionOperatorList = new ArrayList<BAggregationFunctionOperator>();
+    for (AggregationFunctionPlanNode aggregationFunctionPlanNode : _aggregationFunctionPlanNodes) {
+      aggregationFunctionOperatorList.add((BAggregationFunctionOperator) aggregationFunctionPlanNode.run());
+    }
+    return new MAggregationOperator(_indexSegment, _brokerRequest.getAggregationsInfo(),
+        (MProjectionOperator) _projectionPlanNode.run(), aggregationFunctionOperatorList);
   }
 
+  /**
+   * Debug method to show the query plan.
+   * @param prefix
+   */
   @Override
   public void showTree(String prefix) {
     LOGGER.debug(prefix + "Inner-Segment Plan Node :");
@@ -83,22 +104,4 @@ public class AggregationPlanNode implements PlanNode {
 
   }
 
-  /**
-   * Returns true AggregationGroupByPlanNode can serve the given BrokerRequest, false otherwise.
-   * - Only 'sum', 'min', 'max' & 'avg' aggregation functions are supported currently.
-   *
-   * @param brokerRequest
-   * @return
-   */
-  public static boolean isFitForAggregationFastAggregation(BrokerRequest brokerRequest) {
-    for (AggregationInfo aggregationInfo : brokerRequest.getAggregationsInfo()) {
-      String aggregationType = aggregationInfo.getAggregationType();
-
-      if (aggregationType.equalsIgnoreCase("sum") || aggregationType.equalsIgnoreCase("min") ||
-          aggregationType.equalsIgnoreCase("max") || aggregationType.equals("avg")) {
-        return true;
-      }
-    }
-    return false;
-  }
 }

@@ -56,11 +56,11 @@ public class PercentileAggregationFunction implements AggregationFunction {
    *
    * {@inheritDoc}
    *
-   * @param values
+   * @param valueArray
    * @return
    */
   @Override
-  public double aggregate(double[] values) {
+  public void aggregate(int length, ResultHolder resultHolders, double[]... valueArray) {
     throw new RuntimeException("Unsupported method aggregate(double[] values) for class " + getClass().getName());
   }
 
@@ -76,7 +76,7 @@ public class PercentileAggregationFunction implements AggregationFunction {
    * @param valueArray
    */
   @Override
-  public void applySV(int length, int[] groupKeys, ResultHolder resultHolder, double[]... valueArray) {
+  public void aggregateGroupBySV(int length, int[] groupKeys, ResultHolder resultHolder, double[]... valueArray) {
     Preconditions.checkArgument(valueArray.length == 1);
     Preconditions.checkState(length <= valueArray[0].length);
 
@@ -85,7 +85,7 @@ public class PercentileAggregationFunction implements AggregationFunction {
       DoubleArrayList valueList = (DoubleArrayList) resultHolder.getResult(groupKey);
       if (valueList == null) {
         valueList = new DoubleArrayList();
-        resultHolder.putValueForKey(groupKey, valueList);
+        resultHolder.setValueForKey(groupKey, valueList);
       }
       valueList.add(valueArray[0][i]);
     }
@@ -100,7 +100,7 @@ public class PercentileAggregationFunction implements AggregationFunction {
    * @param valueArray
    */
   @Override
-  public void applyMV(int length, int[][] docIdToGroupKeys, ResultHolder resultHolder, double[]... valueArray) {
+  public void aggregateGroupByMV(int length, int[][] docIdToGroupKeys, ResultHolder resultHolder, double[]... valueArray) {
     Preconditions.checkArgument(valueArray.length == 1);
     Preconditions.checkState(length <= valueArray[0].length);
 
@@ -110,7 +110,7 @@ public class PercentileAggregationFunction implements AggregationFunction {
         DoubleArrayList valueList = (DoubleArrayList) resultHolder.getResult(groupKey);
         if (valueList == null) {
           valueList = new DoubleArrayList();
-          resultHolder.putValueForKey(groupKey, valueList);
+          resultHolder.setValueForKey(groupKey, valueList);
         }
         valueList.add(value);
       }
