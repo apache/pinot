@@ -19,22 +19,21 @@ import com.clearspring.analytics.util.Preconditions;
 
 
 /**
- * Result Holder implemented using DoubleArray.
+ * Result Holder implemented using ObjectArray.
  */
-public class DoubleArrayBasedResultHolder implements ResultHolder {
-  private DoubleResultArray _resultArray;
+public class ObjectArrayBasedResultHolder implements ResultHolder {
+  private Object[] _resultArray;
   private int _resultHolderCapacity;
-  private final int _maxCapacity;
+  private int _maxCapacity;
 
   /**
    * Constructor for the class.
    *
-   * @param resultArray
    * @param initialCapacity
    * @param maxCapacity
    */
-  public DoubleArrayBasedResultHolder(DoubleResultArray resultArray, int initialCapacity, int maxCapacity) {
-    _resultArray = resultArray;
+  public ObjectArrayBasedResultHolder(int initialCapacity, int maxCapacity) {
+    _resultArray = new Object[initialCapacity];
     _resultHolderCapacity = initialCapacity;
     _maxCapacity = maxCapacity;
   }
@@ -49,11 +48,15 @@ public class DoubleArrayBasedResultHolder implements ResultHolder {
     Preconditions.checkArgument(capacity <= _maxCapacity);
 
     if (capacity > _resultHolderCapacity) {
+      int copyLength = _resultHolderCapacity;
       _resultHolderCapacity = Math.max(_resultHolderCapacity * 2, capacity);
 
       // Cap the growth to maximum possible number of group keys
       _resultHolderCapacity = Math.min(_resultHolderCapacity, _maxCapacity);
-      _resultArray.expand(_resultHolderCapacity);
+
+      Object[] current = _resultArray;
+      _resultArray = new Object[_resultHolderCapacity];
+      System.arraycopy(current, 0, _resultArray, 0, copyLength);
     }
   }
 
@@ -69,13 +72,13 @@ public class DoubleArrayBasedResultHolder implements ResultHolder {
    */
   @Override
   public double getDoubleResult(int groupKey) {
-    return _resultArray.getDoubleResult(groupKey);
+    throw new RuntimeException(
+        "Unsupported method getDoubleResult (returning double) for class " + getClass().getName());
   }
 
   @Override
   public Object getResult(long groupKey) {
-    throw new RuntimeException(
-        "Unsupported method getResult (returning Object) for class " + getClass().getName());
+    return _resultArray[(int) groupKey];
   }
 
   /**
@@ -86,12 +89,12 @@ public class DoubleArrayBasedResultHolder implements ResultHolder {
    */
   @Override
   public void putValueForKey(long groupKey, double newValue) {
-    _resultArray.set((int) groupKey, newValue);
+    throw new RuntimeException(
+        "Unsupported method 'putValueForKey' (with double param) for class " + getClass().getName());
   }
 
   @Override
   public void putValueForKey(long groupKey, Object newValue) {
-    throw new RuntimeException(
-        "Unsupported method 'putValueForKey' (with Object param) for class " + getClass().getName());
+    _resultArray[(int) groupKey] = newValue;
   }
 }

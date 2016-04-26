@@ -28,7 +28,10 @@ public interface AggregationFunction {
     LONG,
     DOUBLE,
     AVERAGE_PAIR,
-    RANGE_PAIR
+    MINMAXRANGE_PAIR,
+    DISTINCTCOUNT_SET,
+    DISTINCTCOUNTHLL_HYPERLOGLOG,
+    PERCENTILE_LIST
   }
 
   /**

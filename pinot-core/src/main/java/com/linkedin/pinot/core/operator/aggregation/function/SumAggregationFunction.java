@@ -24,7 +24,7 @@ import java.util.List;
  * Class to perform the 'sum' aggregation function.
  */
 public class SumAggregationFunction implements AggregationFunction {
-  private static final String FUNCTION_NAME = "sum";
+  private static final String FUNCTION_NAME = AggregationFunctionFactory.SUM_AGGREGATION_FUNCTION;
   private static final double DEFAULT_VALUE = 0.0;
   private static final ResultDataType _resultDataType = ResultDataType.DOUBLE;
 

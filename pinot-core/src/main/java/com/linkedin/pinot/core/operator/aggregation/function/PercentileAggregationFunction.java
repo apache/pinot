@@ -18,20 +18,41 @@ package com.linkedin.pinot.core.operator.aggregation.function;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.core.operator.groupby.ResultHolder;
 import com.linkedin.pinot.core.query.utils.Pair;
+import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import java.util.List;
 
 
 /**
- * Class to implement the 'avg' aggregation function.
+ * Class to implement the 'percentileXX' aggregation function.
  */
-public class AvgAggregationFunction implements AggregationFunction {
-  private static final String FUNCTION_NAME = AggregationFunctionFactory.AVG_AGGREGATION_FUNCTION;
-  private static final double DEFAULT_VALUE = 0.0;
-  private static final AggregationFunction.ResultDataType RESULT_DATA_TYPE = ResultDataType.AVERAGE_PAIR;
+public class PercentileAggregationFunction implements AggregationFunction {
+  private final String FUNCTION_NAME;
+  private static final ResultDataType RESULT_DATA_TYPE = ResultDataType.PERCENTILE_LIST;
+  private final int _percentile;
+
+  public PercentileAggregationFunction(int percentile) {
+    switch (percentile) {
+      case 50:
+        FUNCTION_NAME = AggregationFunctionFactory.PERCENTILE50_AGGREGATION_FUNCTION;
+        break;
+      case 90:
+        FUNCTION_NAME = AggregationFunctionFactory.PERCENTILE90_AGGREGATION_FUNCTION;
+        break;
+      case 95:
+        FUNCTION_NAME = AggregationFunctionFactory.PERCENTILE95_AGGREGATION_FUNCTION;
+        break;
+      case 99:
+        FUNCTION_NAME = AggregationFunctionFactory.PERCENTILE99_AGGREGATION_FUNCTION;
+        break;
+      default:
+        throw new RuntimeException("Invalid percentile for PercentileAggregationFunction: " + percentile);
+    }
+    _percentile = percentile;
+  }
 
   /**
-   * Performs 'sum' aggregation on the input array.
-   * Returns {@value #DEFAULT_VALUE} if the input array is empty.
+   * Performs 'percentile' aggregation on the input array.
    *
    * {@inheritDoc}
    *
@@ -40,12 +61,7 @@ public class AvgAggregationFunction implements AggregationFunction {
    */
   @Override
   public double aggregate(double[] values) {
-    double sum = 0.0;
-
-    for (double value : values) {
-      sum += value;
-    }
-    return (sum / values.length);
+    throw new RuntimeException("Unsupported method aggregate(double[] values) for class " + getClass().getName());
   }
 
   /**
@@ -66,10 +82,12 @@ public class AvgAggregationFunction implements AggregationFunction {
 
     for (int i = 0; i < length; i++) {
       int groupKey = groupKeys[i];
-      Pair<Double, Long> avgValue = (Pair<Double, Long>) resultHolder.getResult(groupKey);
-      avgValue.setFirst(avgValue.getFirst() + valueArray[0][i]);
-      avgValue.setSecond(avgValue.getSecond() + 1);
-      resultHolder.putValueForKey(groupKey, avgValue);
+      DoubleArrayList valueList = (DoubleArrayList) resultHolder.getResult(groupKey);
+      if (valueList == null) {
+        valueList = new DoubleArrayList();
+        resultHolder.putValueForKey(groupKey, valueList);
+      }
+      valueList.add(valueArray[0][i]);
     }
   }
 
@@ -87,11 +105,14 @@ public class AvgAggregationFunction implements AggregationFunction {
     Preconditions.checkState(length <= valueArray[0].length);
 
     for (int i = 0; i < length; ++i) {
+      double value = valueArray[0][i];
       for (int groupKey : docIdToGroupKeys[i]) {
-        Pair<Double, Long> avgValue = (Pair<Double, Long>) resultHolder.getResult(groupKey);
-        avgValue.setFirst(avgValue.getFirst() + valueArray[0][i]);
-        avgValue.setSecond(avgValue.getSecond() + 1);
-        resultHolder.putValueForKey(groupKey, avgValue);
+        DoubleArrayList valueList = (DoubleArrayList) resultHolder.getResult(groupKey);
+        if (valueList == null) {
+          valueList = new DoubleArrayList();
+          resultHolder.putValueForKey(groupKey, valueList);
+        }
+        valueList.add(value);
       }
     }
   }
@@ -103,7 +124,7 @@ public class AvgAggregationFunction implements AggregationFunction {
    */
   @Override
   public double getDefaultValue() {
-    return DEFAULT_VALUE;
+    throw new RuntimeException("Unsupported method getDefaultValue() for class " + getClass().getName());
   }
 
   /**
@@ -111,7 +132,7 @@ public class AvgAggregationFunction implements AggregationFunction {
    * @return
    */
   @Override
-  public AggregationFunction.ResultDataType getResultDataType() {
+  public ResultDataType getResultDataType() {
     return RESULT_DATA_TYPE;
   }
 
@@ -128,20 +149,7 @@ public class AvgAggregationFunction implements AggregationFunction {
    */
   @Override
   public Double reduce(List<Object> combinedResult) {
-    double reducedSumResult = 0;
-    long reducedCntResult = 0;
-
-    for (Object object : combinedResult) {
-      Pair resultPair = (Pair) object;
-      reducedSumResult += (double) resultPair.getFirst();
-      reducedCntResult += (long) resultPair.getSecond();
-    }
-
-    if (reducedCntResult > 0) {
-      double avgResult = reducedSumResult / reducedCntResult;
-      return avgResult;
-    } else {
-      return DEFAULT_VALUE;
-    }
+    throw new RuntimeException(
+        "Unsupported method reduce(List<Object> combinedResult for class " + getClass().getName());
   }
 }

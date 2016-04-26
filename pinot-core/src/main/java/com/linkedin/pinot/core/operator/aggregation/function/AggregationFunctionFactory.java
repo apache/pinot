@@ -20,11 +20,21 @@ package com.linkedin.pinot.core.operator.aggregation.function;
  */
 public class AggregationFunctionFactory {
   public static final String COUNT_AGGREGATION_FUNCTION = "count";
-  public static final String SUM_AGGREGATION_FUNCTION = "sum";
   public static final String MAX_AGGREGATION_FUNCTION = "max";
   public static final String MIN_AGGREGATION_FUNCTION = "min";
+  public static final String SUM_AGGREGATION_FUNCTION = "sum";
   public static final String AVG_AGGREGATION_FUNCTION = "avg";
-  public static final String RANGE_AGGREGATION_FUNCTION = "minmaxrange";
+  public static final String MINMAXRANGE_AGGREGATION_FUNCTION = "minmaxrange";
+  public static final String DISTINCTCOUNT_AGGREGATION_FUNCTION = "distinctcount";
+  public static final String DISTINCTCOUNTHLL_AGGREGATION_FUNCTION = "distinctcounthll";
+  public static final String PERCENTILE50_AGGREGATION_FUNCTION = "percentile50";
+  public static final String PERCENTILE90_AGGREGATION_FUNCTION = "percentile90";
+  public static final String PERCENTILE95_AGGREGATION_FUNCTION = "percentile95";
+  public static final String PERCENTILE99_AGGREGATION_FUNCTION = "percentile99";
+  public static final String PERCENTILEEST50_AGGREGATION_FUNCTION = "percentileest50";
+  public static final String PERCENTILEEST90_AGGREGATION_FUNCTION = "percentileest90";
+  public static final String PERCENTILEEST95_AGGREGATION_FUNCTION = "percentileest95";
+  public static final String PERCENTILEEST99_AGGREGATION_FUNCTION = "percentileest99";
 
   /**
    * Given the name of aggregation function, create and return a new instance
@@ -34,37 +44,45 @@ public class AggregationFunctionFactory {
    * @return
    */
   public static AggregationFunction getAggregationFunction(String functionName) {
-    AggregationFunction function;
-
     switch (functionName.toLowerCase()) {
       case COUNT_AGGREGATION_FUNCTION:
-        function = new CountAggregationFunction();
-        break;
-
-      case SUM_AGGREGATION_FUNCTION:
-        function = new SumAggregationFunction();
-        break;
+        return new CountAggregationFunction();
 
       case MIN_AGGREGATION_FUNCTION:
-        function = new MinAggregationFunction();
-        break;
+        return new MinAggregationFunction();
 
       case MAX_AGGREGATION_FUNCTION:
-        function = new MaxAggregationFunction();
-        break;
+        return new MaxAggregationFunction();
+
+      case SUM_AGGREGATION_FUNCTION:
+        return new SumAggregationFunction();
 
       case AVG_AGGREGATION_FUNCTION:
-        function = new AvgAggregationFunction();
-        break;
+        return new AvgAggregationFunction();
 
-      case RANGE_AGGREGATION_FUNCTION:
-        function = new RangeAggregationFunction();
-        break;
+      case MINMAXRANGE_AGGREGATION_FUNCTION:
+        return new MinMaxRangeAggregationFunction();
+
+      case DISTINCTCOUNT_AGGREGATION_FUNCTION:
+        return new DistinctCountAggregationFunction();
+
+      case DISTINCTCOUNTHLL_AGGREGATION_FUNCTION:
+        return new DistinctCountHLLAggregationFunction();
+
+      case PERCENTILE50_AGGREGATION_FUNCTION:
+        return new PercentileAggregationFunction(50);
+
+      case PERCENTILE90_AGGREGATION_FUNCTION:
+        return new PercentileAggregationFunction(90);
+
+      case PERCENTILE95_AGGREGATION_FUNCTION:
+        return new PercentileAggregationFunction(95);
+
+      case PERCENTILE99_AGGREGATION_FUNCTION:
+        return new PercentileAggregationFunction(99);
 
       default:
         throw new RuntimeException("Unsupported aggregation function: " + functionName);
     }
-
-    return function;
   }
 }

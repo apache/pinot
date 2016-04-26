@@ -16,6 +16,7 @@
 package com.linkedin.pinot.core.operator.groupby;
 
 import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunction;
+import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunctionFactory;
 import com.linkedin.pinot.core.query.utils.Pair;
 
 
@@ -36,25 +37,25 @@ public class ResultHolderFactory {
     int initialCapacity = Math.min(capacityCap, INITIAL_RESULT_HOLDER_CAPACITY);
 
     switch (functionName.toLowerCase()) {
-      case "count":
-      case "sum":
-      case "min":
-      case "max":
+      case AggregationFunctionFactory.COUNT_AGGREGATION_FUNCTION:
+      case AggregationFunctionFactory.MAX_AGGREGATION_FUNCTION:
+      case AggregationFunctionFactory.MIN_AGGREGATION_FUNCTION:
+      case AggregationFunctionFactory.SUM_AGGREGATION_FUNCTION:
         double defaultValue = function.getDefaultValue();
         DoubleResultArray doubleResultArray = new DoubleResultArray(initialCapacity, defaultValue);
         return new DoubleArrayBasedResultHolder(doubleResultArray, initialCapacity, capacityCap);
 
-      case "avg":
+      case AggregationFunctionFactory.AVG_AGGREGATION_FUNCTION:
         DoubleLongResultArray doubleLongResultArray = new DoubleLongResultArray(initialCapacity, new Pair<>(0.0, 0L));
         return new PairArrayBasedResultHolder(doubleLongResultArray, initialCapacity, capacityCap);
 
-      case "minmaxrange":
+      case AggregationFunctionFactory.MINMAXRANGE_AGGREGATION_FUNCTION:
         DoubleDoubleResultArray doubleDoubleResultArray = new DoubleDoubleResultArray(initialCapacity,
             new Pair<>(Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY));
         return new PairArrayBasedResultHolder(doubleDoubleResultArray, initialCapacity, capacityCap);
 
       default:
-        throw new RuntimeException("Aggregation function not implemented in ResultHolder: " + functionName);
+        return new ObjectArrayBasedResultHolder(initialCapacity, (int) maxNumResults);
     }
   }
 }

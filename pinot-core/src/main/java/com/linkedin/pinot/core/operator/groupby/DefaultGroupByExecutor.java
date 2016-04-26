@@ -15,7 +15,9 @@
  */
 package com.linkedin.pinot.core.operator.groupby;
 
+import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.GroupBy;
 import com.linkedin.pinot.common.utils.primitive.MutableLongValue;
@@ -24,11 +26,14 @@ import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.DataSourceMetadata;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunction;
+import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunctionFactory;
 import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
 import com.linkedin.pinot.core.query.aggregation.function.AvgAggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.function.MinMaxRangeAggregationFunction;
 import com.linkedin.pinot.core.query.utils.Pair;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -59,8 +64,11 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
   private int[] _docIdToSVGroupKey;
   private int[][] _docIdToMVGroupKey;
 
+  private Set<String> _columnsLoaded;
   private Map<String, int[]> _columnToDictArrayMap;
   private Map<String, double[]> _columnToValueArrayMap;
+  private double[] _hashCodeArray;
+
   private ResultHolder[] _resultHolderArray;
 
   private boolean _hasMultiValuedColumns = false;
@@ -107,6 +115,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     _groupByColumns = groupByColumns.toArray(new String[groupByColumns.size()]);
 
     _aggrFuncContextList = new ArrayList<AggregationFunctionContext>(_aggregationsInfoList.size());
+    _columnsLoaded = new HashSet<>();
     _columnToDictArrayMap = new HashMap<String, int[]>();
     _columnToValueArrayMap = new HashMap<String, double[]>();
 
@@ -114,7 +123,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
       String[] columns = aggregationInfo.getAggregationParams().get("column").trim().split(",");
 
       for (String column : columns) {
-        if (!_columnToDictArrayMap.containsKey(column)) {
+        if (!column.equals("*") && !_columnToDictArrayMap.containsKey(column)) {
           _columnToDictArrayMap.put(column, new int[DocIdSetPlanNode.MAX_DOC_PER_CALL]);
           _columnToValueArrayMap.put(column, new double[DocIdSetPlanNode.MAX_DOC_PER_CALL]);
         }
@@ -157,7 +166,8 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     generateGroupKeysForDocIdSet(docIdSet, startIndex, length);
     int numGroupKeys = _groupKeyGenerator.getNumGroupKeys();
 
-    fetchColumnValues(docIdSet, startIndex, length);
+    fetchColumnDictIds(docIdSet, startIndex, length);
+    fetchColumnValues(startIndex, length);
 
     for (int i = 0; i < _aggrFuncContextList.size(); i++) {
       AggregationFunctionContext aggrFuncContext = _aggrFuncContextList.get(i);
@@ -174,18 +184,30 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
    * @param length
    */
   private void aggregateColumn(AggregationFunctionContext aggrFuncContext, ResultHolder resultHolder, int length) {
-    // For count, no need to fetch value array.
-    if (aggrFuncContext.getFunctionName().equalsIgnoreCase("count")) {
-      if (_hasMultiValuedColumns) {
-        aggrFuncContext.applyMV(length, _docIdToMVGroupKey, resultHolder);
-      } else {
-        aggrFuncContext.applySV(length, _docIdToSVGroupKey, resultHolder);
-      }
-    } else {
-      String[] aggrColumns = aggrFuncContext.getAggregationColumns();
+    String aggrFuncName = aggrFuncContext.getFunctionName();
+    String[] aggrColumns = aggrFuncContext.getAggregationColumns();
+    Preconditions.checkState(aggrColumns.length == 1);
+    String aggrColumn = aggrColumns[0];
+    switch (aggrFuncName) {
+      case AggregationFunctionFactory.COUNT_AGGREGATION_FUNCTION:
+        if (_hasMultiValuedColumns) {
+          aggrFuncContext.applyMV(length, _docIdToMVGroupKey, resultHolder);
+        } else {
+          aggrFuncContext.applySV(length, _docIdToSVGroupKey, resultHolder);
+        }
+        return;
 
-      for (int j = 0; j < aggrColumns.length; j++) {
-        String aggrColumn = aggrColumns[j];
+      case AggregationFunctionFactory.DISTINCTCOUNT_AGGREGATION_FUNCTION:
+      case AggregationFunctionFactory.DISTINCTCOUNTHLL_AGGREGATION_FUNCTION:
+        fetchColumnValueHashCodes(aggrColumn, aggrFuncContext.getDictionary(0), length);
+        if (_hasMultiValuedColumns) {
+          aggrFuncContext.applyMV(length, _docIdToMVGroupKey, resultHolder, _hashCodeArray);
+        } else {
+          aggrFuncContext.applySV(length, _docIdToSVGroupKey, resultHolder, _hashCodeArray);
+        }
+        return;
+
+      default:
         double[] valueArray = _columnToValueArrayMap.get(aggrColumn);
 
         if (_hasMultiValuedColumns) {
@@ -193,7 +215,6 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
         } else {
           aggrFuncContext.applySV(length, _docIdToSVGroupKey, resultHolder, valueArray);
         }
-      }
     }
   }
 
@@ -246,63 +267,114 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
   private Serializable getResultForKey(Pair<Integer, String> idKeyPair, ResultHolder resultHolder,
       AggregationFunction.ResultDataType resultDataType) {
 
-    Serializable resultForGroupKey;
     switch (resultDataType) {
       case LONG:
-        resultForGroupKey = new MutableLongValue((long) resultHolder.getDoubleResult(idKeyPair.getFirst()));
-        break;
+        return new MutableLongValue((long) resultHolder.getDoubleResult(idKeyPair.getFirst()));
 
       case DOUBLE:
-        resultForGroupKey = resultHolder.getDoubleResult(idKeyPair.getFirst());
-        break;
+        return resultHolder.getDoubleResult(idKeyPair.getFirst());
 
       case AVERAGE_PAIR:
         Pair<Double, Long> doubleLongPair = (Pair<Double, Long>) resultHolder.getResult(idKeyPair.getFirst());
-        resultForGroupKey = new AvgAggregationFunction.AvgPair(doubleLongPair.getFirst(), doubleLongPair.getSecond());
-        break;
+        return new AvgAggregationFunction.AvgPair(doubleLongPair.getFirst(), doubleLongPair.getSecond());
 
-      case RANGE_PAIR:
+      case MINMAXRANGE_PAIR:
         Pair<Double, Double> doubleDoublePair = (Pair<Double, Double>) resultHolder.getResult(idKeyPair.getFirst());
-        resultForGroupKey = new MinMaxRangeAggregationFunction.MinMaxRangePair(doubleDoublePair.getFirst(),
+        return new MinMaxRangeAggregationFunction.MinMaxRangePair(doubleDoublePair.getFirst(),
             doubleDoublePair.getSecond());
-        break;
+
+      case DISTINCTCOUNT_SET:
+        return (IntOpenHashSet) resultHolder.getResult(idKeyPair.getFirst());
+
+      case DISTINCTCOUNTHLL_HYPERLOGLOG:
+        return (HyperLogLog) resultHolder.getResult(idKeyPair.getFirst());
+
+      case PERCENTILE_LIST:
+        return (DoubleArrayList) resultHolder.getResult(idKeyPair.getFirst());
 
       default:
         throw new RuntimeException(
-            "Unsupported result data type RANGE_PAIR in class " + getClass().getName());
+            "Unsupported result data type in class " + getClass().getName());
     }
-    return resultForGroupKey;
   }
 
   /**
-   * Fetch values (dictId's) for the given docIdSet for all aggregation columns.
+   * Fetch dictId's for the given docIdSet for all aggregation columns except count.
    *
    * @param docIdSet
    * @param startIndex
    * @param length
    */
-  private void fetchColumnValues(int[] docIdSet, int startIndex, int length) {
-    Set<String> columnsLoaded = new HashSet();
-
+  private void fetchColumnDictIds(int[] docIdSet, int startIndex, int length) {
+    _columnsLoaded.clear();
     for (AggregationFunctionContext aggrFuncContext : _aggrFuncContextList) {
-      if (!aggrFuncContext.getFunctionName().equalsIgnoreCase("count")) {
+      String aggrFuncName = aggrFuncContext.getFunctionName();
+      if (!aggrFuncName.equals(AggregationFunctionFactory.COUNT_AGGREGATION_FUNCTION)) {
         String[] aggrColumns = aggrFuncContext.getAggregationColumns();
-
         for (int i = 0; i < aggrColumns.length; i++) {
           String aggrColumn = aggrColumns[i];
 
-          if (!columnsLoaded.contains(aggrColumn)) {
+          if (!_columnsLoaded.contains(aggrColumn)) {
             int[] dictIdArray = _columnToDictArrayMap.get(aggrColumn);
             BlockValSet blockValSet = aggrFuncContext.getBlockValSet(i);
-
             blockValSet.readIntValues(docIdSet, startIndex, length, dictIdArray, startIndex);
-            columnsLoaded.add(aggrColumn);
-
-            Dictionary dictionary = aggrFuncContext.getDictionary(i);
-            double[] valueArray = _columnToValueArrayMap.get(aggrColumn);
-            dictionary.readDoubleValues(dictIdArray, startIndex, length, valueArray, startIndex);
+            _columnsLoaded.add(aggrColumn);
           }
         }
+      }
+    }
+  }
+
+  /**
+   * Fetch values for all aggregation columns except count and distinctcount according to the dictId's that fetched in
+   * method fetchColumnDictIds.
+   *
+   * @param startIndex
+   * @param length
+   */
+  private void fetchColumnValues(int startIndex, int length) {
+    _columnsLoaded.clear();
+    for (AggregationFunctionContext aggrFuncContext : _aggrFuncContextList) {
+      String aggrFuncName = aggrFuncContext.getFunctionName();
+      if (!aggrFuncName.equals(AggregationFunctionFactory.COUNT_AGGREGATION_FUNCTION)
+          && !aggrFuncName.equals(AggregationFunctionFactory.DISTINCTCOUNT_AGGREGATION_FUNCTION)
+          && !aggrFuncName.equals(AggregationFunctionFactory.DISTINCTCOUNTHLL_AGGREGATION_FUNCTION)) {
+        String[] aggrColumns = aggrFuncContext.getAggregationColumns();
+        for (int i = 0; i < aggrColumns.length; i++) {
+          String aggrColumn = aggrColumns[i];
+
+          if (!_columnsLoaded.contains(aggrColumn)) {
+            Dictionary dictionary = aggrFuncContext.getDictionary(i);
+            double[] valueArray = _columnToValueArrayMap.get(aggrColumn);
+            dictionary.readDoubleValues(_columnToDictArrayMap.get(aggrColumn), startIndex, length, valueArray,
+                startIndex);
+            _columnsLoaded.add(aggrColumn);
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Fetch value hashcodes for the given aggregation column and dictionary. This method is called on distinctcount
+   * aggregation function.
+   *
+   * @param aggrColumn
+   * @param dictionary
+   * @param length
+   */
+  private void fetchColumnValueHashCodes(String aggrColumn, Dictionary dictionary, int length) {
+    int[] dictIdArray = _columnToDictArrayMap.get(aggrColumn);
+    if (_hashCodeArray == null) {
+      _hashCodeArray = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    }
+
+    for (int i = 0; i < length; i++) {
+      int dictId = dictIdArray[i];
+      if (dictId == Dictionary.NULL_VALUE_INDEX) {
+        _hashCodeArray[i] = Integer.MIN_VALUE;
+      } else {
+        _hashCodeArray[i] = dictionary.get(dictId).hashCode();
       }
     }
   }

@@ -27,13 +27,12 @@ import com.linkedin.pinot.core.segment.index.readers.Dictionary;
  * This class caches miscellaneous data to perform efficient aggregation.
  */
 public class AggregationFunctionContext {
+  private final String _aggFuncName;
   private final AggregationFunction _aggregationFunction;
+  private final String[] _aggrColumns;
 
-  String _aggFuncName;
-  String[] _aggrColumns;
-
-  BlockValSet[] _blockSingleValSet;
-  Dictionary[] _dictionaries;
+  private BlockValSet[] _blockSingleValSet;
+  private Dictionary[] _dictionaries;
 
   /**
    * Constructor for the class.
@@ -43,11 +42,11 @@ public class AggregationFunctionContext {
    * @param columns
    */
   AggregationFunctionContext(IndexSegment indexSegment, String aggFuncName, String[] columns) {
-    _aggFuncName = aggFuncName;
+    _aggFuncName = aggFuncName.toLowerCase();
     _aggregationFunction = AggregationFunctionFactory.getAggregationFunction(_aggFuncName);
     _aggrColumns = columns;
 
-    if (_aggFuncName.equalsIgnoreCase("count")) {
+    if (_aggFuncName.equals(AggregationFunctionFactory.COUNT_AGGREGATION_FUNCTION)) {
       return;
     }
 
@@ -122,8 +121,7 @@ public class AggregationFunctionContext {
    * @param resultHolder
    * @param valueArray
    */
-  public void applySV(int length, int[] docIdToGroupKey, ResultHolder resultHolder,
-      double[]... valueArray) {
+  public void applySV(int length, int[] docIdToGroupKey, ResultHolder resultHolder, double[]... valueArray) {
     _aggregationFunction.applySV(length, docIdToGroupKey, resultHolder, valueArray);
   }
 

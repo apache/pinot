@@ -17,20 +17,19 @@ package com.linkedin.pinot.core.operator.aggregation.function;
 
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.core.operator.groupby.ResultHolder;
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import java.util.List;
 
 
 /**
- * Class to perform the 'count' aggregation function.
+ * Class to implement the 'distinctcount' aggregation function.
  */
-public class CountAggregationFunction implements AggregationFunction {
-  private static final String FUNCTION_NAME = AggregationFunctionFactory.COUNT_AGGREGATION_FUNCTION;
-  private static final double DEFAULT_VALUE = 0.0;
-  private static final ResultDataType _resultDataType = ResultDataType.LONG;
+public class DistinctCountAggregationFunction implements AggregationFunction {
+  private static final String FUNCTION_NAME = AggregationFunctionFactory.DISTINCTCOUNT_AGGREGATION_FUNCTION;
+  private static final ResultDataType RESULT_DATA_TYPE = ResultDataType.DISTINCTCOUNT_SET;
 
   /**
-   * Performs 'count' aggregation on the input array.
-   * Returns {@value #DEFAULT_VALUE} if the input array is empty.
+   * Performs 'distinctcount' aggregation on the input array.
    *
    * {@inheritDoc}
    *
@@ -39,7 +38,7 @@ public class CountAggregationFunction implements AggregationFunction {
    */
   @Override
   public double aggregate(double[] values) {
-    return values.length;
+    throw new RuntimeException("Unsupported method aggregate(double[] values) for class " + getClass().getName());
   }
 
   /**
@@ -55,12 +54,17 @@ public class CountAggregationFunction implements AggregationFunction {
    */
   @Override
   public void applySV(int length, int[] groupKeys, ResultHolder resultHolder, double[]... valueArray) {
-    Preconditions.checkArgument(valueArray.length == 0);
+    Preconditions.checkArgument(valueArray.length == 1);
+    Preconditions.checkState(length <= valueArray[0].length);
 
     for (int i = 0; i < length; i++) {
       int groupKey = groupKeys[i];
-      double oldValue = resultHolder.getDoubleResult(groupKey);
-      resultHolder.putValueForKey(groupKey, (oldValue + 1));
+      IntOpenHashSet valueSet = (IntOpenHashSet) resultHolder.getResult(groupKey);
+      if (valueSet == null) {
+        valueSet = new IntOpenHashSet();
+        resultHolder.putValueForKey(groupKey, valueSet);
+      }
+      valueSet.add((int) valueArray[0][i]);
     }
   }
 
@@ -68,18 +72,24 @@ public class CountAggregationFunction implements AggregationFunction {
    * {@inheritDoc}
    *
    * @param length
-   * @param docIdToGroupKey
+   * @param docIdToGroupKeys
    * @param resultHolder
    * @param valueArray
    */
   @Override
-  public void applyMV(int length, int[][] docIdToGroupKey, ResultHolder resultHolder, double[]... valueArray) {
-    Preconditions.checkArgument(valueArray.length == 0);
+  public void applyMV(int length, int[][] docIdToGroupKeys, ResultHolder resultHolder, double[]... valueArray) {
+    Preconditions.checkArgument(valueArray.length == 1);
+    Preconditions.checkState(length <= valueArray[0].length);
 
-    for (int i = 0; i < length; ++i) {
-      for (int groupKey : docIdToGroupKey[i]) {
-        double oldValue = resultHolder.getDoubleResult(groupKey);
-        resultHolder.putValueForKey(groupKey, oldValue + 1);
+    for (int i = 0; i < length; i++) {
+      int value = (int) valueArray[0][i];
+      for (int groupKey : docIdToGroupKeys[i]) {
+        IntOpenHashSet valueSet = (IntOpenHashSet) resultHolder.getResult(groupKey);
+        if (valueSet == null) {
+          valueSet = new IntOpenHashSet();
+          resultHolder.putValueForKey(groupKey, valueSet);
+        }
+        valueSet.add(value);
       }
     }
   }
@@ -91,7 +101,7 @@ public class CountAggregationFunction implements AggregationFunction {
    */
   @Override
   public double getDefaultValue() {
-    return DEFAULT_VALUE;
+    throw new RuntimeException("Unsupported method getDefaultValue() for class " + getClass().getName());
   }
 
   /**
@@ -100,13 +110,9 @@ public class CountAggregationFunction implements AggregationFunction {
    */
   @Override
   public ResultDataType getResultDataType() {
-    return _resultDataType;
+    return RESULT_DATA_TYPE;
   }
 
-  /**
-   * {@inheritDoc}
-   * @return
-   */
   @Override
   public String getName() {
     return FUNCTION_NAME;
@@ -120,12 +126,7 @@ public class CountAggregationFunction implements AggregationFunction {
    */
   @Override
   public Double reduce(List<Object> combinedResult) {
-    double reducedResult = DEFAULT_VALUE;
-
-    for (Object object : combinedResult) {
-      double result = (Double) object;
-      reducedResult += result;
-    }
-    return reducedResult;
+    throw new RuntimeException(
+        "Unsupported method reduce(List<Object> combinedResult for class " + getClass().getName());
   }
 }

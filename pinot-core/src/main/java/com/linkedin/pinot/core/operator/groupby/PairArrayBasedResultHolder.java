@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.operator.groupby;
 
+import com.google.common.base.Preconditions;
 import com.linkedin.pinot.core.query.utils.Pair;
 
 
@@ -24,19 +25,19 @@ import com.linkedin.pinot.core.query.utils.Pair;
 public class PairArrayBasedResultHolder implements ResultHolder<Pair> {
   private ResultArray _resultArray;
   private int _resultHolderCapacity;
-  private final int _capacityCap;
+  private final int _maxCapacity;
 
   /**
    * Constructor for the class.
    *
    * @param resultArray
    * @param initialCapacity
-   * @param capacityCap
+   * @param maxCapacity
    */
-  public PairArrayBasedResultHolder(ResultArray resultArray, int initialCapacity, int capacityCap) {
+  public PairArrayBasedResultHolder(ResultArray resultArray, int initialCapacity, int maxCapacity) {
     _resultArray = resultArray;
     _resultHolderCapacity = initialCapacity;
-    _capacityCap = capacityCap;
+    _maxCapacity = maxCapacity;
   }
 
   /**
@@ -46,11 +47,13 @@ public class PairArrayBasedResultHolder implements ResultHolder<Pair> {
    */
   @Override
   public void ensureCapacity(int capacity) {
+    Preconditions.checkArgument(capacity <= _maxCapacity);
+
     if (capacity > _resultHolderCapacity) {
       _resultHolderCapacity = Math.max(_resultHolderCapacity * 2, capacity);
 
       // Cap the growth to maximum possible number of group keys
-      _resultHolderCapacity = Math.min(_resultHolderCapacity, _capacityCap);
+      _resultHolderCapacity = Math.min(_resultHolderCapacity, _maxCapacity);
       _resultArray.expand(_resultHolderCapacity);
     }
   }

@@ -15,21 +15,22 @@
  */
 package com.linkedin.pinot.core.operator.aggregation.function;
 
+import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.core.operator.groupby.ResultHolder;
-import com.linkedin.pinot.core.query.utils.Pair;
 import java.util.List;
 
 
 /**
- * Class to implement the 'range' aggregation function.
+ * Class to implement the 'distinctcounthll' aggregation function.
  */
-public class RangeAggregationFunction implements AggregationFunction {
-  private static final String FUNCTION_NAME = "minmaxrange";
-  private static final ResultDataType RESULT_DATA_TYPE = ResultDataType.RANGE_PAIR;
+public class DistinctCountHLLAggregationFunction implements AggregationFunction {
+  private static final String FUNCTION_NAME = AggregationFunctionFactory.DISTINCTCOUNTHLL_AGGREGATION_FUNCTION;
+  private static final ResultDataType RESULT_DATA_TYPE = ResultDataType.DISTINCTCOUNTHLL_HYPERLOGLOG;
+  public static final int DEFAULT_BIT_SIZE = 10;
 
   /**
-   * Performs 'range' aggregation on the input array.
+   * Performs 'distinctcounthll' aggregation on the input array.
    *
    * {@inheritDoc}
    *
@@ -59,22 +60,12 @@ public class RangeAggregationFunction implements AggregationFunction {
 
     for (int i = 0; i < length; i++) {
       int groupKey = groupKeys[i];
-      Pair<Double, Double> rangeValue = (Pair<Double, Double>) resultHolder.getResult(groupKey);
-      double value = valueArray[0][i];
-
-      if (rangeValue == null) {
-        rangeValue =
-            new com.linkedin.pinot.core.query.aggregation.function.MinMaxRangeAggregationFunction.MinMaxRangePair(value,
-                value);
-      } else {
-        if (value < rangeValue.getFirst()) {
-          rangeValue.setFirst(value);
-        }
-        if (value > rangeValue.getSecond()) {
-          rangeValue.setSecond(value);
-        }
+      HyperLogLog hll = (HyperLogLog) resultHolder.getResult(groupKey);
+      if (hll == null) {
+        hll = new HyperLogLog(DEFAULT_BIT_SIZE);
+        resultHolder.putValueForKey(groupKey, hll);
       }
-      resultHolder.putValueForKey(groupKey, rangeValue);
+      hll.offer((int) valueArray[0][i]);
     }
   }
 
@@ -91,25 +82,15 @@ public class RangeAggregationFunction implements AggregationFunction {
     Preconditions.checkArgument(valueArray.length == 1);
     Preconditions.checkState(length <= valueArray[0].length);
 
-    for (int i = 0; i < length; ++i) {
-      double value = valueArray[0][i];
-
+    for (int i = 0; i < length; i++) {
+      int value = (int) valueArray[0][i];
       for (int groupKey : docIdToGroupKeys[i]) {
-        Pair<Double, Double> rangeValue = (Pair<Double, Double>) resultHolder.getResult(groupKey);
-
-        if (rangeValue == null) {
-          rangeValue =
-              new com.linkedin.pinot.core.query.aggregation.function.MinMaxRangeAggregationFunction.MinMaxRangePair(
-                  value, value);
-        } else {
-          if (value < rangeValue.getFirst()) {
-            rangeValue.setFirst(value);
-          }
-          if (value > rangeValue.getSecond()) {
-            rangeValue.setSecond(value);
-          }
+        HyperLogLog hll = (HyperLogLog) resultHolder.getResult(groupKey);
+        if (hll == null) {
+          hll = new HyperLogLog(DEFAULT_BIT_SIZE);
+          resultHolder.putValueForKey(groupKey, hll);
         }
-        resultHolder.putValueForKey(groupKey, rangeValue);
+        hll.offer(value);
       }
     }
   }

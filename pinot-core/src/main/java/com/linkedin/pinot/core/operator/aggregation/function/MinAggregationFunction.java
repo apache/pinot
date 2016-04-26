@@ -24,7 +24,7 @@ import java.util.List;
  * Class to implement the 'min' aggregation function.
  */
 public class MinAggregationFunction implements AggregationFunction {
-  private static final String FUNCTION_NAME = "min";
+  private static final String FUNCTION_NAME = AggregationFunctionFactory.MIN_AGGREGATION_FUNCTION;
   private static final double DEFAULT_VALUE = Double.POSITIVE_INFINITY;
   private static final ResultDataType _resultDataType = ResultDataType.DOUBLE;
 
