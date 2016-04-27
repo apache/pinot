@@ -81,6 +81,18 @@ public class AggregationFunctionFactory {
       case PERCENTILE99_AGGREGATION_FUNCTION:
         return new PercentileAggregationFunction(99);
 
+      case PERCENTILEEST50_AGGREGATION_FUNCTION:
+        return new PercentileestAggregationFunction(50);
+
+      case PERCENTILEEST90_AGGREGATION_FUNCTION:
+        return new PercentileestAggregationFunction(90);
+
+      case PERCENTILEEST95_AGGREGATION_FUNCTION:
+        return new PercentileestAggregationFunction(95);
+
+      case PERCENTILEEST99_AGGREGATION_FUNCTION:
+        return new PercentileestAggregationFunction(99);
+
       default:
         throw new RuntimeException("Unsupported aggregation function: " + functionName);
     }

@@ -37,8 +37,8 @@ public class SumAggregationFunction implements AggregationFunction {
    * {@inheritDoc}
    *
    * @param length
+   * @param resultHolder
    * @param valueArray
-   * @return
    */
   @Override
   public void aggregate(int length, ResultHolder resultHolder, double[]... valueArray) {

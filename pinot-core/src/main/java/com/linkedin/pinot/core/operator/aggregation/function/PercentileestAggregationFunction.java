@@ -17,19 +17,42 @@ package com.linkedin.pinot.core.operator.aggregation.function;
 
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.core.operator.groupby.ResultHolder;
-import com.linkedin.pinot.core.query.utils.Pair;
+import com.linkedin.pinot.core.query.aggregation.function.quantile.digest.QuantileDigest;
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import java.util.List;
 
 
 /**
- * Class to implement the 'minmaxrange' aggregation function.
+ * Class to implement the 'percentileestXX' aggregation function.
  */
-public class MinMaxRangeAggregationFunction implements AggregationFunction {
-  private static final String FUNCTION_NAME = AggregationFunctionFactory.MINMAXRANGE_AGGREGATION_FUNCTION;
-  private static final ResultDataType RESULT_DATA_TYPE = ResultDataType.MINMAXRANGE_PAIR;
+public class PercentileestAggregationFunction implements AggregationFunction {
+  private final String FUNCTION_NAME;
+  private static final ResultDataType RESULT_DATA_TYPE = ResultDataType.PERCENTILEEST_QUANTILEDIGEST;
+  private static final double DEFAULT_MAX_ERROR = 0.05;
+  private final int _percentile;
+
+  public PercentileestAggregationFunction(int percentile) {
+    switch (percentile) {
+      case 50:
+        FUNCTION_NAME = AggregationFunctionFactory.PERCENTILEEST50_AGGREGATION_FUNCTION;
+        break;
+      case 90:
+        FUNCTION_NAME = AggregationFunctionFactory.PERCENTILEEST90_AGGREGATION_FUNCTION;
+        break;
+      case 95:
+        FUNCTION_NAME = AggregationFunctionFactory.PERCENTILEEST95_AGGREGATION_FUNCTION;
+        break;
+      case 99:
+        FUNCTION_NAME = AggregationFunctionFactory.PERCENTILEEST99_AGGREGATION_FUNCTION;
+        break;
+      default:
+        throw new RuntimeException("Invalid percentile for PercentileAggregationFunction: " + percentile);
+    }
+    _percentile = percentile;
+  }
 
   /**
-   * Performs 'minmaxrange' aggregation on the input array.
+   * Performs 'percentileest' aggregation on the input array.
    *
    * {@inheritDoc}
    *
@@ -43,15 +66,12 @@ public class MinMaxRangeAggregationFunction implements AggregationFunction {
     Preconditions.checkState(length <= valueArray[0].length);
 
     for (int i = 0; i < length; i++) {
-      Pair<Double, Double> rangeValue = (Pair<Double, Double>) resultHolder.getResult();
-      double value = valueArray[0][i];
-      if (value < rangeValue.getFirst()) {
-        rangeValue.setFirst(value);
+      QuantileDigest digest = (QuantileDigest) resultHolder.getResult();
+      if (digest == null) {
+        digest = new QuantileDigest(DEFAULT_MAX_ERROR);
+        resultHolder.setValue(digest);
       }
-      if (value > rangeValue.getSecond()) {
-        rangeValue.setSecond(value);
-      }
-      resultHolder.setValue(rangeValue);
+      digest.add((long) valueArray[0][i]);
     }
   }
 
@@ -73,15 +93,12 @@ public class MinMaxRangeAggregationFunction implements AggregationFunction {
 
     for (int i = 0; i < length; i++) {
       int groupKey = groupKeys[i];
-      Pair<Double, Double> rangeValue = (Pair<Double, Double>) resultHolder.getResult(groupKey);
-      double value = valueArray[0][i];
-      if (value < rangeValue.getFirst()) {
-        rangeValue.setFirst(value);
+      QuantileDigest digest = (QuantileDigest) resultHolder.getResult(groupKey);
+      if (digest == null) {
+        digest = new QuantileDigest(DEFAULT_MAX_ERROR);
+        resultHolder.setValueForKey(groupKey, digest);
       }
-      if (value > rangeValue.getSecond()) {
-        rangeValue.setSecond(value);
-      }
-      resultHolder.setValueForKey(groupKey, rangeValue);
+      digest.add((long) valueArray[0][i]);
     }
   }
 
@@ -94,22 +111,19 @@ public class MinMaxRangeAggregationFunction implements AggregationFunction {
    * @param valueArray
    */
   @Override
-  public void aggregateGroupByMV(int length, int[][] docIdToGroupKeys, ResultHolder resultHolder,
-      double[]... valueArray) {
+  public void aggregateGroupByMV(int length, int[][] docIdToGroupKeys, ResultHolder resultHolder, double[]... valueArray) {
     Preconditions.checkArgument(valueArray.length == 1);
     Preconditions.checkState(length <= valueArray[0].length);
 
-    for (int i = 0; i < length; ++i) {
-      double value = valueArray[0][i];
+    for (int i = 0; i < length; i++) {
+      long value = (long) valueArray[0][i];
       for (int groupKey : docIdToGroupKeys[i]) {
-        Pair<Double, Double> rangeValue = (Pair<Double, Double>) resultHolder.getResult(groupKey);
-        if (value < rangeValue.getFirst()) {
-          rangeValue.setFirst(value);
+        QuantileDigest digest = (QuantileDigest) resultHolder.getResult(groupKey);
+        if (digest == null) {
+          digest = new QuantileDigest(DEFAULT_MAX_ERROR);
+          resultHolder.setValueForKey(groupKey, digest);
         }
-        if (value > rangeValue.getSecond()) {
-          rangeValue.setSecond(value);
-        }
-        resultHolder.setValueForKey(groupKey, rangeValue);
+        digest.add(value);
       }
     }
   }

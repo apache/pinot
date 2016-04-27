@@ -29,7 +29,7 @@ public class MinAggregationFunction implements AggregationFunction {
   private static final ResultDataType _resultDataType = ResultDataType.DOUBLE;
 
   /**
-   * Performs the 'sum' aggregation function on the input array.
+   * Performs 'min' aggregation function on the input array.
    * Returns {@value #DEFAULT_VALUE} if input array is empty.
    *
    * While the interface allows for variable number of valueArrays, we do not support
@@ -38,8 +38,8 @@ public class MinAggregationFunction implements AggregationFunction {
    * {@inheritDoc}
    *
    * @param length
+   * @param resultHolder
    * @param valueArray
-   * @return
    */
   @Override
   public void aggregate(int length, ResultHolder resultHolder, double[]... valueArray) {

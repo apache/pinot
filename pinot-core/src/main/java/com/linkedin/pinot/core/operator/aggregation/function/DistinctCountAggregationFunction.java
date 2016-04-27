@@ -33,12 +33,23 @@ public class DistinctCountAggregationFunction implements AggregationFunction {
    *
    * {@inheritDoc}
    *
+   * @param length
+   * @param resultHolder
    * @param valueArray
-   * @return
    */
   @Override
-  public void aggregate(int length, ResultHolder resultHolders, double[]... valueArray) {
-    throw new RuntimeException("Unsupported method aggregate(double[] values) for class " + getClass().getName());
+  public void aggregate(int length, ResultHolder resultHolder, double[]... valueArray) {
+    Preconditions.checkArgument(valueArray.length == 1);
+    Preconditions.checkState(length <= valueArray[0].length);
+
+    for (int i = 0; i < length; i++) {
+      IntOpenHashSet valueSet = (IntOpenHashSet) resultHolder.getResult();
+      if (valueSet == null) {
+        valueSet = new IntOpenHashSet();
+        resultHolder.setValue(valueSet);
+      }
+      valueSet.add((int) valueArray[0][i]);
+    }
   }
 
   /**
@@ -128,6 +139,6 @@ public class DistinctCountAggregationFunction implements AggregationFunction {
   @Override
   public Double reduce(List<Object> combinedResult) {
     throw new RuntimeException(
-        "Unsupported method reduce(List<Object> combinedResult for class " + getClass().getName());
+        "Unsupported method reduce(List<Object> combinedResult) for class " + getClass().getName());
   }
 }

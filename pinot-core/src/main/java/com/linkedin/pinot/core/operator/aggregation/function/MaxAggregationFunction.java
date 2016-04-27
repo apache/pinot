@@ -30,7 +30,7 @@ public class MaxAggregationFunction implements AggregationFunction {
   private static final ResultDataType _resultDataType = ResultDataType.DOUBLE;
 
   /**
-   * Given an array of double valueArray, returns the max value from the array.
+   * Performs 'max' aggregation on the input array.
    * Returns {@value #DEFAULT_VALUE} if the input array is empty.
    *
    * While the interface allows for variable number of valueArrays, we do not support
@@ -39,8 +39,8 @@ public class MaxAggregationFunction implements AggregationFunction {
    * {@inheritDoc}
    *
    * @param length
+   * @param resultHolder
    * @param valueArray
-   * @return
    */
   @Override
   public void aggregate(int length, ResultHolder resultHolder, double[]... valueArray) {

@@ -84,21 +84,4 @@ public class AggregationGroupByPlanNode implements PlanNode {
     }
   }
 
-  /**
-   * Returns true AggregationGroupByPlanNode can serve the given BrokerRequest, false otherwise.
-   * All aggregation functions except 'percentileest' are supported currently.
-   *
-   * @param brokerRequest
-   * @return
-   */
-  public static boolean isFitForAggregationFastAggregation(BrokerRequest brokerRequest) {
-    for (AggregationInfo aggregationInfo : brokerRequest.getAggregationsInfo()) {
-      String aggregationType = aggregationInfo.getAggregationType();
-      if (aggregationType.toLowerCase().startsWith("percentileest")) {
-        return false;
-      }
-    }
-
-    return true;
-  }
 }

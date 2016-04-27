@@ -35,11 +35,14 @@ public class CountAggregationFunction implements AggregationFunction {
    * {@inheritDoc}
    *
    * @param length
+   * @param resultHolder
    * @param valueArray
-   * @return
    */
   @Override
   public void aggregate(int length, ResultHolder resultHolder, double[]... valueArray) {
+    // Should never call count with a valueArray.
+    Preconditions.checkArgument(valueArray.length == 0);
+
     resultHolder.setValue(resultHolder.getDoubleResult() + length);
   }
 

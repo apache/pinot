@@ -56,12 +56,23 @@ public class PercentileAggregationFunction implements AggregationFunction {
    *
    * {@inheritDoc}
    *
+   * @param length
+   * @param resultHolder
    * @param valueArray
-   * @return
    */
   @Override
-  public void aggregate(int length, ResultHolder resultHolders, double[]... valueArray) {
-    throw new RuntimeException("Unsupported method aggregate(double[] values) for class " + getClass().getName());
+  public void aggregate(int length, ResultHolder resultHolder, double[]... valueArray) {
+    Preconditions.checkArgument(valueArray.length == 1);
+    Preconditions.checkState(length <= valueArray[0].length);
+
+    for (int i = 0; i < length; i++) {
+      DoubleArrayList valueList = (DoubleArrayList) resultHolder.getResult();
+      if (valueList == null) {
+        valueList = new DoubleArrayList();
+        resultHolder.setValue(valueList);
+      }
+      valueList.add(valueArray[0][i]);
+    }
   }
 
   /**
@@ -150,6 +161,6 @@ public class PercentileAggregationFunction implements AggregationFunction {
   @Override
   public Double reduce(List<Object> combinedResult) {
     throw new RuntimeException(
-        "Unsupported method reduce(List<Object> combinedResult for class " + getClass().getName());
+        "Unsupported method reduce(List<Object> combinedResult) for class " + getClass().getName());
   }
 }

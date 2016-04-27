@@ -29,6 +29,7 @@ import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunction
 import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
 import com.linkedin.pinot.core.query.aggregation.function.AvgAggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.function.MinMaxRangeAggregationFunction;
+import com.linkedin.pinot.core.query.aggregation.function.quantile.digest.QuantileDigest;
 import com.linkedin.pinot.core.query.utils.Pair;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
@@ -290,6 +291,9 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
 
       case PERCENTILE_LIST:
         return (DoubleArrayList) resultHolder.getResult(groupKey);
+
+      case PERCENTILEEST_QUANTILEDIGEST:
+        return (QuantileDigest) resultHolder.getResult(groupKey);
 
       default:
         throw new RuntimeException(

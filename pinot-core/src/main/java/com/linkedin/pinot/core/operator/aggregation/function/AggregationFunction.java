@@ -31,17 +31,18 @@ public interface AggregationFunction {
     MINMAXRANGE_PAIR,
     DISTINCTCOUNT_SET,
     DISTINCTCOUNTHLL_HYPERLOGLOG,
-    PERCENTILE_LIST
+    PERCENTILE_LIST,
+    PERCENTILEEST_QUANTILEDIGEST
   }
 
   /**
    * Performs aggregation on the input array of values.
    *
    * @param length
+   * @param resultHolder
    * @param valueArray
-   * @return
    */
-  void aggregate(int length, ResultHolder resultHolders, double[]... valueArray);
+  void aggregate(int length, ResultHolder resultHolder, double[]... valueArray);
 
   /**
    * Perform a group-by aggregation on the given set of values, and the group key to which

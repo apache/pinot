@@ -30,7 +30,7 @@ public class AvgAggregationFunction implements AggregationFunction {
   private static final AggregationFunction.ResultDataType RESULT_DATA_TYPE = ResultDataType.AVERAGE_PAIR;
 
   /**
-   * Performs 'sum' aggregation on the input array.
+   * Performs 'avg' aggregation on the input array.
    * Returns {@value #DEFAULT_VALUE} if the input array is empty.
    *
    * While the interface allows for variable number of valueArrays, we do not support
@@ -39,8 +39,8 @@ public class AvgAggregationFunction implements AggregationFunction {
    * {@inheritDoc}
    *
    * @param length
+   * @param resultHolder
    * @param valueArray
-   * @return
    */
   @Override
   public void aggregate(int length, ResultHolder resultHolder, double[]... valueArray) {

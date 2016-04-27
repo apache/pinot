@@ -55,7 +55,7 @@ public class ResultHolderFactory {
         return new PairArrayBasedResultHolder(doubleDoubleResultArray, initialCapacity, capacityCap);
 
       default:
-        return new ObjectArrayBasedResultHolder(initialCapacity, (int) maxNumResults);
+        return new ObjectArrayBasedResultHolder(initialCapacity, capacityCap);
     }
   }
 }

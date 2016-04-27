@@ -86,7 +86,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
           // AggregationGroupByPlanNode is the new implementation of group-by aggregations, and is currently turned OFF.
           // Once all feature and perf testing is performed, the code will be turned ON, and this 'if' check will
           // be removed.
-          if (useNewAggregationGroupByOperator(brokerRequest)) {
+          if (_enableNewAggreagationGroupBy) {
             aggregationGroupByPlanNode = new AggregationGroupByPlanNode(indexSegment, brokerRequest,
                 AggregationGroupByImplementationType.Dictionary);
           } else {
@@ -123,19 +123,6 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
    */
   private boolean useNewAggregationOperator(BrokerRequest brokerRequest) {
     return _enableNewAggreagationGroupBy && AggregationPlanNode.isFitForAggregationFastAggregation(brokerRequest);
-  }
-
-  /**
-   * Temporary method to check if the new implementation of AggregationGroupBy can be used.
-   * This method will be removed once the new implementation of AggregationGroupByOperator is turned
-   * ON by default.
-   *
-   * @param brokerRequest
-   * @return
-   */
-  private boolean useNewAggregationGroupByOperator(BrokerRequest brokerRequest) {
-    return _enableNewAggreagationGroupBy && AggregationGroupByPlanNode
-        .isFitForAggregationFastAggregation(brokerRequest);
   }
 
   @Override
