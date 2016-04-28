@@ -28,6 +28,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
 
+import org.apache.avro.Schema;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -47,6 +48,8 @@ import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfig;
+import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfigProperties;
+import com.linkedin.thirdeye.hadoop.util.ThirdeyeAvroUtils;
 
 /**
  * This class contains the job that generates pinot segments with star tree index
@@ -80,10 +83,15 @@ public class SegmentCreationPhaseJob extends Configured {
 
     Configuration configuration = job.getConfiguration();
 
-    ThirdEyeConfig thirdeyeConfig = ThirdEyeConfig.fromProperties(props);
-    LOGGER.info("ThirdEyeConfig {}", thirdeyeConfig.encode());
     String inputSegmentDir = getAndSetConfiguration(configuration, SEGMENT_CREATION_INPUT_PATH);
     LOGGER.info("Input path : {}", inputSegmentDir);
+    Schema avroSchema = ThirdeyeAvroUtils.getSchema(inputSegmentDir);
+    LOGGER.info("Schema : {}", avroSchema);
+    String metricTypesProperty = ThirdeyeAvroUtils.getMetricTypesProperty(
+        props.getProperty(ThirdEyeConfigProperties.THIRDEYE_METRIC_NAMES.toString()), avroSchema);
+    props.setProperty(ThirdEyeConfigProperties.THIRDEYE_METRIC_TYPES.toString(), metricTypesProperty);
+    ThirdEyeConfig thirdeyeConfig = ThirdEyeConfig.fromProperties(props);
+    LOGGER.info("ThirdEyeConfig {}", thirdeyeConfig.encode());
     String outputDir = getAndSetConfiguration(configuration, SEGMENT_CREATION_OUTPUT_PATH);
     LOGGER.info("Output path : {}", outputDir);
     Path stagingDir = new Path(outputDir, TEMP);

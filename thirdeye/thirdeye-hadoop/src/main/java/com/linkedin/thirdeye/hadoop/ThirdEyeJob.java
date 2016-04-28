@@ -115,8 +115,7 @@ public class ThirdEyeJob {
             getIndexDir(root, collection, minTime, maxTime) + File.separator
               + DERIVED_COLUMN_TRANSFORMATION.getName());
         config.setProperty(DerivedColumnTransformationPhaseConstants.DERIVED_COLUMN_TRANSFORMATION_PHASE_TOPK_PATH.toString(),
-            getIndexDir(root, collection, minTime, maxTime) + File.separator
-                + TOPK.getName() + File.separator + ThirdEyeConstants.TOPK_VALUES_FILE);
+            getIndexDir(root, collection, minTime, maxTime) + File.separator + TOPK.getName());
 
         return config;
       }

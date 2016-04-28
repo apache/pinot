@@ -30,11 +30,14 @@ import java.util.Properties;
 import java.util.Set;
 
 import com.linkedin.thirdeye.hadoop.config.MetricType;
+import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfigProperties;
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConstants;
 import com.linkedin.thirdeye.hadoop.config.TopKDimensionToMetricsSpec;
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfig;
 import com.linkedin.thirdeye.hadoop.util.ThirdeyeAggregateMetricUtils;
+import com.linkedin.thirdeye.hadoop.util.ThirdeyeAvroUtils;
 
+import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.mapred.AvroKey;
 import org.apache.avro.mapreduce.AvroKeyInputFormat;
@@ -120,7 +123,7 @@ public class TopKPhaseJob extends Configured {
 
     @Override
     public void setup(Context context) throws IOException, InterruptedException {
-      LOGGER.info("TopKRollupPhaseOneJob.TopKRollupPhaseOneMapper.setup()");
+      LOGGER.info("TopKPhaseJob.TopKPhaseMapper.setup()");
       Configuration configuration = context.getConfiguration();
       try {
         thirdeyeConfig = OBJECT_MAPPER.readValue(configuration.get(TOPK_PHASE_THIRDEYE_CONFIG.toString()), ThirdEyeConfig.class);
@@ -214,7 +217,7 @@ public class TopKPhaseJob extends Configured {
 
     @Override
     public void setup(Context context) throws IOException, InterruptedException {
-      LOGGER.info("TopKRollupPhaseOneJob.TopKRollupPhaseOneCombiner.setup()");
+      LOGGER.info("TopKPhaseJob.TopKPhaseCombiner.setup()");
       Configuration configuration = context.getConfiguration();
       try {
         thirdeyeConfig = OBJECT_MAPPER.readValue(configuration.get(TOPK_PHASE_THIRDEYE_CONFIG.toString()), ThirdEyeConfig.class);
@@ -276,7 +279,7 @@ public class TopKPhaseJob extends Configured {
     @Override
     public void setup(Context context) throws IOException, InterruptedException {
 
-      LOGGER.info("TopKRollupPhaseOneJob.TopKRollupPhaseOneReducer.setup()");
+      LOGGER.info("TopKPhaseJob.TopKPhaseReducer.setup()");
 
       configuration = context.getConfiguration();
       fileSystem = FileSystem.get(configuration);
@@ -416,10 +419,13 @@ public class TopKPhaseJob extends Configured {
     Configuration configuration = job.getConfiguration();
     FileSystem fs = FileSystem.get(configuration);
 
+    // Properties
+    LOGGER.info("Properties {}", props);
+
      // Input Path
     String inputPathDir = getAndSetConfiguration(configuration, TOPK_PHASE_INPUT_PATH);
     LOGGER.info("Input path dir: " + inputPathDir);
-    for (String inputPath : inputPathDir.split(",")) {
+    for (String inputPath : inputPathDir.split(ThirdEyeConstants.FIELD_SEPARATOR)) {
       LOGGER.info("Adding input:" + inputPath);
       Path input = new Path(inputPath);
       FileInputFormat.addInputPath(job, input);
@@ -433,7 +439,14 @@ public class TopKPhaseJob extends Configured {
     }
     FileOutputFormat.setOutputPath(job, outputPath);
 
+    // Schema
+    Schema avroSchema = ThirdeyeAvroUtils.getSchema(inputPathDir);
+    LOGGER.info("Schema : {}", avroSchema.toString(true));
+
     // ThirdEyeConfig
+    String metricTypesProperty = ThirdeyeAvroUtils.getMetricTypesProperty(
+        props.getProperty(ThirdEyeConfigProperties.THIRDEYE_METRIC_NAMES.toString()), avroSchema);
+    props.setProperty(ThirdEyeConfigProperties.THIRDEYE_METRIC_TYPES.toString(), metricTypesProperty);
     ThirdEyeConfig thirdeyeConfig = ThirdEyeConfig.fromProperties(props);
     LOGGER.info("Thirdeye Config {}", thirdeyeConfig.encode());
     job.getConfiguration().set(TOPK_PHASE_THIRDEYE_CONFIG.toString(), OBJECT_MAPPER.writeValueAsString(thirdeyeConfig));
@@ -457,6 +470,7 @@ public class TopKPhaseJob extends Configured {
 
     return job;
   }
+
 
   private String getAndSetConfiguration(Configuration configuration,
       TopKPhaseConstants constant) {

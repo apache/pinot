@@ -59,6 +59,7 @@ public class DerivedColumnNoTransformationTest {
 
   private static final String AVRO_SCHEMA = "schema.avsc";
   private static final String NO_TRANSFORMATION_SCHEMA = "no_transformation_schema.avsc";
+  private static final String TOPK_PATH = "topk_path";
   private String outputPath;
 
   Properties props = new Properties();
@@ -157,7 +158,7 @@ public class DerivedColumnNoTransformationTest {
         outputSchema.toString());
 
     configuration.set(DerivedColumnTransformationPhaseConstants.DERIVED_COLUMN_TRANSFORMATION_PHASE_TOPK_PATH.toString(),
-        ThirdEyeConstants.TOPK_VALUES_FILE);
+        TOPK_PATH);
 
     TemporaryPath tmpPath = new TemporaryPath();
     outputPath = tmpPath.toString();

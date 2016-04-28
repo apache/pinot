@@ -21,6 +21,7 @@ import static com.linkedin.thirdeye.hadoop.derivedcolumn.transformation.DerivedC
 import static com.linkedin.thirdeye.hadoop.derivedcolumn.transformation.DerivedColumnTransformationPhaseConstants.DERIVED_COLUMN_TRANSFORMATION_PHASE_THIRDEYE_CONFIG;
 import static com.linkedin.thirdeye.hadoop.derivedcolumn.transformation.DerivedColumnTransformationPhaseConstants.DERIVED_COLUMN_TRANSFORMATION_PHASE_TOPK_PATH;
 
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.HashSet;
@@ -31,11 +32,13 @@ import java.util.Set;
 
 import com.linkedin.thirdeye.hadoop.config.MetricSpec;
 import com.linkedin.thirdeye.hadoop.config.MetricType;
+import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfigProperties;
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConstants;
 import com.linkedin.thirdeye.hadoop.config.TopKDimensionToMetricsSpec;
 import com.linkedin.thirdeye.hadoop.config.TopkWhitelistSpec;
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfig;
 import com.linkedin.thirdeye.hadoop.topk.TopKDimensionValues;
+import com.linkedin.thirdeye.hadoop.util.ThirdeyeAvroUtils;
 
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaBuilder;
@@ -112,7 +115,8 @@ public class DerivedColumnTransformationPhaseJob extends Configured {
 
       outputSchema = new Schema.Parser().parse(configuration.get(DERIVED_COLUMN_TRANSFORMATION_PHASE_OUTPUT_SCHEMA.toString()));
 
-      Path topKPath = new Path(configuration.get(DERIVED_COLUMN_TRANSFORMATION_PHASE_TOPK_PATH.toString()));
+      Path topKPath = new Path(configuration.get(DERIVED_COLUMN_TRANSFORMATION_PHASE_TOPK_PATH.toString())
+          + File.separator + ThirdEyeConstants.TOPK_VALUES_FILE);
       topKDimensionValues = new TopKDimensionValues();
       if (fs.exists(topKPath)) {
         FSDataInputStream topkValuesStream = fs.open(topKPath);
@@ -214,7 +218,14 @@ public class DerivedColumnTransformationPhaseJob extends Configured {
     }
     FileOutputFormat.setOutputPath(job, outputPath);
 
-    // ThirdEye Config
+    // Schema
+    Schema avroSchema = ThirdeyeAvroUtils.getSchema(inputPathDir);
+    LOGGER.info("Schema : {}", avroSchema.toString(true));
+
+    // ThirdEyeConfig
+    String metricTypesProperty = ThirdeyeAvroUtils.getMetricTypesProperty(
+        props.getProperty(ThirdEyeConfigProperties.THIRDEYE_METRIC_NAMES.toString()), avroSchema);
+    props.setProperty(ThirdEyeConfigProperties.THIRDEYE_METRIC_TYPES.toString(), metricTypesProperty);
     ThirdEyeConfig thirdeyeConfig = ThirdEyeConfig.fromProperties(props);
     job.getConfiguration().set(DERIVED_COLUMN_TRANSFORMATION_PHASE_THIRDEYE_CONFIG.toString(),
         OBJECT_MAPPER.writeValueAsString(thirdeyeConfig));
