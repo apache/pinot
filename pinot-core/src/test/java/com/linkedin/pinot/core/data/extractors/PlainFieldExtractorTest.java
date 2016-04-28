@@ -36,7 +36,6 @@ import com.linkedin.pinot.common.data.Schema.SchemaBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
 public class PlainFieldExtractorTest {
   @Test
   public void simpleTest()
@@ -56,6 +55,8 @@ public class PlainFieldExtractorTest {
     fieldMap.put("svDimensionDouble", floatObj);
     Double doubleObj = new Double((double) 34.5);
     fieldMap.put("metric", doubleObj);
+    long currentDaysSinceEpoch = System.currentTimeMillis() / 1000 / 60 / 60 / 24;
+    fieldMap.put("incomingTime", currentDaysSinceEpoch);
     row.init(fieldMap);
     extractor.transform(row);
     Assert.assertTrue(row.getValue("svDimensionInt") instanceof Integer);
@@ -63,7 +64,7 @@ public class PlainFieldExtractorTest {
     Assert.assertTrue(row.getValue("mvDimension") != null);
     Assert.assertTrue(row.getValue("metric") instanceof Integer);
     Assert.assertTrue((Integer) row.getValue("metric") == 34);
-    Assert.assertTrue(row.getValue("incomingTime") != null);
+    Assert.assertTrue((Long) row.getValue("incomingTime") == currentDaysSinceEpoch);
   }
 
   @Test
@@ -125,7 +126,7 @@ public class PlainFieldExtractorTest {
             // String to Boolean conversion
             Assert.assertEquals(extractor.getTotalErrors(), 0);
             Assert.assertEquals(extractor.getTotalConversions(), 1);
-          } else{
+          } else {
             Assert.assertEquals(extractor.getTotalErrors(), 1);
             Assert.assertEquals(extractor.getTotalConversions(), 1);
           }
@@ -154,7 +155,7 @@ public class PlainFieldExtractorTest {
         .addMetric("metric", DataType.INT)
         .build();
     TimeFieldSpec timeSpec = new TimeFieldSpec();
-    TimeGranularitySpec timeGranularitySpec = new TimeGranularitySpec(DataType.LONG, TimeUnit.DAYS , "incoming");
+    TimeGranularitySpec timeGranularitySpec = new TimeGranularitySpec(DataType.LONG, TimeUnit.DAYS, "incoming");
     timeSpec.setIncomingGranularitySpec(timeGranularitySpec);
     timeSpec.setOutgoingGranularitySpec(timeGranularitySpec);
     schema.setTimeFieldSpec(timeSpec);
@@ -175,5 +176,41 @@ public class PlainFieldExtractorTest {
     Assert.assertTrue(row.getValue("metric") instanceof Integer);
     Assert.assertTrue((Integer) row.getValue("metric") == 34);
     Assert.assertTrue(row.getValue("incoming") != null);
+  }
+
+  @Test
+  public void inNoutTimeSpecTest()
+      throws Exception {
+    Schema schema = new SchemaBuilder().addSingleValueDimension("svDimensionInt", DataType.INT)
+        .addSingleValueDimension("svDimensionDouble", DataType.DOUBLE)
+        .addMultiValueDimension("mvDimension", DataType.STRING, ",")
+        .addMetric("metric", DataType.INT)
+        .build();
+    TimeFieldSpec timeSpec = new TimeFieldSpec();
+    TimeGranularitySpec incomingTimeGranularitySpec = new TimeGranularitySpec(DataType.LONG, TimeUnit.DAYS, "incoming");
+    TimeGranularitySpec outgoingTimeGranularitySpec = new TimeGranularitySpec(DataType.LONG, TimeUnit.HOURS, "outgoing");
+    timeSpec.setIncomingGranularitySpec(incomingTimeGranularitySpec);
+    timeSpec.setOutgoingGranularitySpec(outgoingTimeGranularitySpec);
+    schema.setTimeFieldSpec(timeSpec);
+    PlainFieldExtractor extractor = (PlainFieldExtractor) FieldExtractorFactory.getPlainFieldExtractor(schema);
+    GenericRow row = new GenericRow();
+    Map<String, Object> fieldMap = new HashMap<String, Object>();
+    Short shortObj = new Short((short) 5);
+    fieldMap.put("svDimensionInt", shortObj);
+    Float floatObj = new Float((float) 3.2);
+    fieldMap.put("svDimensionDouble", floatObj);
+    Double doubleObj = new Double((double) 34.5);
+    fieldMap.put("metric", doubleObj);
+    long currentDaysSinceEpoch = System.currentTimeMillis() / 1000 / 60 / 60 / 24;
+    fieldMap.put("incoming", currentDaysSinceEpoch);
+    row.init(fieldMap);
+    extractor.transform(row);
+    Assert.assertTrue(row.getValue("svDimensionInt") instanceof Integer);
+    Assert.assertTrue(row.getValue("svDimensionDouble") instanceof Double);
+    Assert.assertTrue(row.getValue("mvDimension") != null);
+    Assert.assertTrue(row.getValue("metric") instanceof Integer);
+    Assert.assertTrue((Integer) row.getValue("metric") == 34);
+    Assert.assertTrue(row.getValue("incoming") == null);
+    Assert.assertEquals(((Long) row.getValue("outgoing")).longValue(), currentDaysSinceEpoch * 24);
   }
 }

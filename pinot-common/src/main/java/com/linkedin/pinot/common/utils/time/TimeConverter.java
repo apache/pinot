@@ -15,21 +15,24 @@
  */
 package com.linkedin.pinot.common.utils.time;
 
-import org.joda.time.DateTime;
+import com.linkedin.pinot.common.data.TimeGranularitySpec;
 
-
+/**
+ * TimeConverter to convert inputTimeValue whose spec is defined by incomingGranularitySpec to
+ * outgoingGranularitySpec
+ */
 public interface TimeConverter {
   /**
-   *
-   * @param o
-   * @return
+   * @param incomingGranularitySpec
+   * @param outgoingGranularitySpec
    */
-  public Object convert(Object o);
+  void init(TimeGranularitySpec incomingGranularitySpec,
+      TimeGranularitySpec outgoingGranularitySpec);
 
   /**
-   *
-   * @param incoming
-   * @return
+   * @param incoming time value based on incoming time spec
+   * @return time value based on outgoing time spec
    */
-  public DateTime getDataTimeFrom(Object incoming);
+  Object convert(Object inputTimeValue);
+
 }

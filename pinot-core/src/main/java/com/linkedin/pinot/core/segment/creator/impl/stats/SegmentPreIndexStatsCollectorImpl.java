@@ -85,7 +85,9 @@ public class SegmentPreIndexStatsCollectorImpl implements SegmentPreIndexStatsCo
   @Override
   public void collectRow(GenericRow row) throws Exception {
     for (final String column : row.getFieldNames()) {
-      columnStatsCollectorMap.get(column).collect(row.getValue(column));
+      if (columnStatsCollectorMap.containsKey(column)) {
+        columnStatsCollectorMap.get(column).collect(row.getValue(column));
+      }
     }
   }
 
