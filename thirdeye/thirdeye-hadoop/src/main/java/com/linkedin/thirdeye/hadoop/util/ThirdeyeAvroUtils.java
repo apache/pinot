@@ -30,8 +30,11 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Joiner;
+import com.google.common.collect.Lists;
 import com.linkedin.pinot.core.data.readers.AvroRecordReader;
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConstants;
 
@@ -41,6 +44,7 @@ import com.linkedin.thirdeye.hadoop.config.ThirdEyeConstants;
  */
 public class ThirdeyeAvroUtils {
 
+  private static Logger LOGGER = LoggerFactory.getLogger(ThirdeyeAvroUtils.class);
   /**
    * extracts avro schema from avro file
    * @param avroFile
@@ -105,12 +109,29 @@ public class ThirdeyeAvroUtils {
    * @param avroSchema
    * @return
    */
-  public static String getMetricTypesProperty(String metricNamesProperty, Schema avroSchema) {
-    List<String> metricTypes = new ArrayList<>();
-    for (String metricName : metricNamesProperty.split(ThirdEyeConstants.FIELD_SEPARATOR)) {
-      metricTypes.add(ThirdeyeAvroUtils.getDataTypeForField(metricName, avroSchema));
+  public static String getMetricTypesProperty(String metricNamesProperty, String metricTypesProperty, Schema avroSchema) {
+    List<String> metricTypesFromSchema = new ArrayList<>();
+    List<String> metricNamesFromConfig = Lists.newArrayList(metricNamesProperty.split(ThirdEyeConstants.FIELD_SEPARATOR));
+    for (String metricName : metricNamesFromConfig) {
+      metricTypesFromSchema.add(ThirdeyeAvroUtils.getDataTypeForField(metricName, avroSchema));
     }
-    return Joiner.on(ThirdEyeConstants.FIELD_SEPARATOR).join(metricTypes);
+    String validatedMetricTypesProperty = Joiner.on(ThirdEyeConstants.FIELD_SEPARATOR).join(metricTypesFromSchema);
+    if (metricTypesProperty != null) {
+      List<String> metricTypesFromConfig = Lists.newArrayList(metricTypesProperty.split(ThirdEyeConstants.FIELD_SEPARATOR));
+      if (metricTypesFromConfig.size() == metricTypesFromSchema.size()) {
+        for (int i = 0; i < metricNamesFromConfig.size(); i++) {
+          String metricName = metricNamesFromConfig.get(i);
+          String metricTypeFromConfig = metricTypesFromConfig.get(i);
+          String metricTypeFromSchema = metricTypesFromSchema.get(i);
+          if (!metricTypeFromConfig.equals(metricTypeFromSchema)) {
+            LOGGER.warn("MetricType {} defined in config for metric {}, does not match dataType {} from avro schema",
+                metricTypeFromConfig, metricName, metricTypeFromSchema);
+          }
+        }
+        validatedMetricTypesProperty = metricTypesProperty;
+      }
+    }
+    return validatedMetricTypesProperty;
   }
 
 }

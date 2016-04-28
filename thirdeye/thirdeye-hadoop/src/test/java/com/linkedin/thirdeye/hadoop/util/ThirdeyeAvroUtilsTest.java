@@ -18,8 +18,11 @@ public class ThirdeyeAvroUtilsTest {
 
   @Test
   public void testGetMetricTypes() throws Exception{
-    String metricTypesProperty = ThirdeyeAvroUtils.getMetricTypesProperty("m1,m2", avroSchema);
+    String metricTypesProperty = ThirdeyeAvroUtils.getMetricTypesProperty("m1,m2", null, avroSchema);
     Assert.assertEquals(metricTypesProperty, "INT,INT", "Metric property not extracted correctly");
+
+    metricTypesProperty = ThirdeyeAvroUtils.getMetricTypesProperty("m1,m2", "INT,LONG", avroSchema);
+    Assert.assertEquals(metricTypesProperty, "INT,LONG", "Metric property not extracted correctly");
   }
 
   @Test

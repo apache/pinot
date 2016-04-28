@@ -224,12 +224,13 @@ public class DerivedColumnTransformationPhaseJob extends Configured {
 
     // ThirdEyeConfig
     String metricTypesProperty = ThirdeyeAvroUtils.getMetricTypesProperty(
-        props.getProperty(ThirdEyeConfigProperties.THIRDEYE_METRIC_NAMES.toString()), avroSchema);
+        props.getProperty(ThirdEyeConfigProperties.THIRDEYE_METRIC_NAMES.toString()),
+        props.getProperty(ThirdEyeConfigProperties.THIRDEYE_METRIC_TYPES.toString()), avroSchema);
     props.setProperty(ThirdEyeConfigProperties.THIRDEYE_METRIC_TYPES.toString(), metricTypesProperty);
     ThirdEyeConfig thirdeyeConfig = ThirdEyeConfig.fromProperties(props);
     job.getConfiguration().set(DERIVED_COLUMN_TRANSFORMATION_PHASE_THIRDEYE_CONFIG.toString(),
         OBJECT_MAPPER.writeValueAsString(thirdeyeConfig));
-    LOGGER.info("ThirdEyeConfig {}", thirdeyeConfig);
+    LOGGER.info("ThirdEyeConfig {}", thirdeyeConfig.encode());
 
     // New schema
     Schema outputSchema = newSchema(thirdeyeConfig);

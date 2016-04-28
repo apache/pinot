@@ -88,7 +88,8 @@ public class SegmentCreationPhaseJob extends Configured {
     Schema avroSchema = ThirdeyeAvroUtils.getSchema(inputSegmentDir);
     LOGGER.info("Schema : {}", avroSchema);
     String metricTypesProperty = ThirdeyeAvroUtils.getMetricTypesProperty(
-        props.getProperty(ThirdEyeConfigProperties.THIRDEYE_METRIC_NAMES.toString()), avroSchema);
+        props.getProperty(ThirdEyeConfigProperties.THIRDEYE_METRIC_NAMES.toString()),
+        props.getProperty(ThirdEyeConfigProperties.THIRDEYE_METRIC_TYPES.toString()), avroSchema);
     props.setProperty(ThirdEyeConfigProperties.THIRDEYE_METRIC_TYPES.toString(), metricTypesProperty);
     ThirdEyeConfig thirdeyeConfig = ThirdEyeConfig.fromProperties(props);
     LOGGER.info("ThirdEyeConfig {}", thirdeyeConfig.encode());
