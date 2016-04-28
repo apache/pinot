@@ -242,7 +242,9 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
 
     public void close() {
       segmentLock.unlock();
-      columnIndexDirectory.close();
+      if (columnIndexDirectory != null) {
+        columnIndexDirectory.close();
+      }
       columnIndexDirectory = null;
     }
 
