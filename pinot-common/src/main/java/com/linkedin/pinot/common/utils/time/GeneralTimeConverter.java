@@ -21,38 +21,37 @@ import org.joda.time.DateTime;
 
 import com.linkedin.pinot.common.data.TimeGranularitySpec;
 
-
-public class MillisToHoursTimeConverter implements TimeConverter {
+public class GeneralTimeConverter implements TimeConverter {
 
   TimeGranularitySpec incoming;
   TimeGranularitySpec outgoing;
 
-  public MillisToHoursTimeConverter(TimeGranularitySpec incoming, TimeGranularitySpec outgoing) {
+  public GeneralTimeConverter(TimeGranularitySpec incoming, TimeGranularitySpec outgoing) {
     this.incoming = incoming;
     this.outgoing = outgoing;
   }
 
   @Override
   public Object convert(Object incomingTime) {
-    long incomingInLong = -1;
-    switch (incoming.getDataType()) {
-      case INT:
-        incomingInLong = ((Integer) incomingTime).longValue();
-        break;
-      case LONG:
-        incomingInLong = (Long) incomingTime;
-    }
-    return TimeUnit.MILLISECONDS.toHours(incomingInLong);
+    return toValueFromDateTime(getDateTimeFrom(incomingTime));
   }
 
   @Override
-  public DateTime getDataTimeFrom(Object o) {
-    long incoming;
-    if (o instanceof Integer) {
-      incoming = ((Integer) o).longValue();
-    } else {
-      incoming = (Long) o;
+  public DateTime getDateTimeFrom(Object o) {
+    if (o == null) {
+      return new DateTime(0);
     }
-    return new DateTime(TimeUnit.HOURS.toMillis(incoming));
+    long incoming;
+    if (o instanceof Number) {
+      incoming = ((Number) o).longValue();
+    } else {
+      incoming = Long.valueOf(o.toString());
+    }
+    return new DateTime(this.incoming.getTimeType().toMillis(incoming));
+  }
+
+  @Override
+  public Object toValueFromDateTime(DateTime dt) {
+    return outgoing.getTimeType().convert(dt.getMillis(), TimeUnit.MILLISECONDS);
   }
 }

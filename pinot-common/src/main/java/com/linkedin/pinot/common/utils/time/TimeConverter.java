@@ -17,19 +17,23 @@ package com.linkedin.pinot.common.utils.time;
 
 import org.joda.time.DateTime;
 
-
 public interface TimeConverter {
   /**
-   *
-   * @param o
-   * @return
+   * @param incoming time value based on incoming time spec
+   * @return time value based on outgoing time spec
    */
-  public Object convert(Object o);
+  Object convert(Object o);
 
   /**
-   *
-   * @param incoming
-   * @return
+   * @param incoming timeValue based on incoming time spec
+   * @return Converted DateTime value
    */
-  public DateTime getDataTimeFrom(Object incoming);
+  DateTime getDateTimeFrom(Object incoming);
+
+  /**
+   * @param dt DateTime value
+   * @return time value based on outgoing time type
+   */
+  Object toValueFromDateTime(DateTime dt);
+
 }

@@ -21,7 +21,6 @@ import org.joda.time.DateTime;
 
 import com.linkedin.pinot.common.data.TimeGranularitySpec;
 
-
 public class NoOpTimeConverter implements TimeConverter {
   TimeGranularitySpec incomingTimeGranularitySpec;
   TimeGranularitySpec outgoingTimeGranularitySpec;
@@ -37,25 +36,35 @@ public class NoOpTimeConverter implements TimeConverter {
   }
 
   @Override
-  public DateTime getDataTimeFrom(Object o) {
+  public DateTime getDateTimeFrom(Object o) {
+    if (o == null) {
+      return new DateTime(0);
+    }
     long incoming = -1;
-    if (o instanceof Integer) {
-      incoming = ((Integer) o).longValue();
+    if (o instanceof Number) {
+      incoming = ((Number) o).longValue();
+    } else {
+      incoming = Long.valueOf(o.toString());
     }
     switch (incomingTimeGranularitySpec.getTimeType()) {
-      case HOURS:
-        long millisFromHours = TimeUnit.HOURS.toMillis(incoming);
-        return new DateTime(millisFromHours);
-      case DAYS:
-        long millisFromDays = TimeUnit.DAYS.toMillis(incoming);
-        return new DateTime(millisFromDays);
-      case MILLISECONDS:
-        return new DateTime(incoming);
-      case MINUTES:
-        long millisFromMinutes = TimeUnit.MINUTES.toMillis(incoming);
-        return new DateTime(millisFromMinutes);
-      default:
-        return null;
+    case HOURS:
+      long millisFromHours = TimeUnit.HOURS.toMillis(incoming);
+      return new DateTime(millisFromHours);
+    case DAYS:
+      long millisFromDays = TimeUnit.DAYS.toMillis(incoming);
+      return new DateTime(millisFromDays);
+    case MILLISECONDS:
+      return new DateTime(incoming);
+    case MINUTES:
+      long millisFromMinutes = TimeUnit.MINUTES.toMillis(incoming);
+      return new DateTime(millisFromMinutes);
+    default:
+      return null;
     }
+  }
+
+  @Override
+  public Object toValueFromDateTime(DateTime dt) {
+    return outgoingTimeGranularitySpec.getTimeType().convert(dt.getMillis(), TimeUnit.MILLISECONDS);
   }
 }
