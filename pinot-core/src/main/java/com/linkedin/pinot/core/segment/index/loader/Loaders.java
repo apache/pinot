@@ -71,8 +71,9 @@ public class Loaders {
       metadata = new SegmentMetadataImpl(segmentDirectoryPath);
 
       // add or removes indexes based on indexLoadingConfigurationMetadata
-      SegmentPreProcessor preProcessor = new SegmentPreProcessor(segmentDirectoryPath, metadata, indexLoadingConfigMetadata);
-      preProcessor.process();
+      try (SegmentPreProcessor preProcessor = new SegmentPreProcessor(segmentDirectoryPath, metadata, indexLoadingConfigMetadata)) {
+        preProcessor.process();
+      }
 
       SegmentDirectory segmentDirectory = SegmentDirectory.createFromLocalFS(segmentDirectoryPath, metadata, readMode);
 

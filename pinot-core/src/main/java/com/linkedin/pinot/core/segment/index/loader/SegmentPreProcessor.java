@@ -44,7 +44,7 @@ import org.slf4j.LoggerFactory;
  * mmap()'s the segment and performs any pre-processing to generate inverted index
  * This can be slow
  */
-public class SegmentPreProcessor {
+public class SegmentPreProcessor implements AutoCloseable {
   private static Logger LOGGER = LoggerFactory.getLogger(SegmentPreProcessor.class);
 
   private final File indexDir;
@@ -227,4 +227,9 @@ public class SegmentPreProcessor {
     return invertedIndexColumnConfig;
   }
 
+  @Override
+  public void close()
+      throws Exception {
+    segmentDirectory.close();
+  }
 }
