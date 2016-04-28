@@ -23,3 +23,7 @@ script:
   - cd $PINOT_MODULE
   - cp ../.travis_cmd.sh .
   - bash .travis_cmd.sh
+
+branches:
+  only:
+    - master
