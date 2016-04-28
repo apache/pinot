@@ -24,7 +24,7 @@ import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnMultiVa
 
 public class MultiValueDictionaryTest {
   private static final String COL_NAME = "greek";
-  private static int NROWS = 100000;
+  private static int NROWS = 10000;
   private static int MAX_N_VALUES = 999;
 
   @Test
