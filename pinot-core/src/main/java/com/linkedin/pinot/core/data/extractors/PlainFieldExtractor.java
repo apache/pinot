@@ -15,23 +15,23 @@
  */
 package com.linkedin.pinot.core.data.extractors;
 
-import com.linkedin.pinot.core.data.readers.AvroRecordReader;
 import java.util.HashMap;
 import java.util.Map;
 
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.PinotDataType;
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.data.TimeFieldSpec;
+import com.linkedin.pinot.common.data.TimeGranularitySpec;
+import com.linkedin.pinot.common.utils.time.TimeConverter;
+import com.linkedin.pinot.common.utils.time.TimeConverterProvider;
 import com.linkedin.pinot.core.data.GenericRow;
 import java.lang.reflect.Method;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
 /**
  * This implementation will only inject columns inside the Schema.
- *
- *
  */
 public class PlainFieldExtractor implements FieldExtractor {
 
@@ -46,12 +46,28 @@ public class PlainFieldExtractor implements FieldExtractor {
   private static final Logger LOGGER = LoggerFactory.getLogger(PlainFieldExtractor.class);
   private Map<String, PinotDataType> _columnType;
   private Map<String, PinotDataType> _typeMap;
+  private TimeConverter _timeConverter;
+  private String _incomingTimeColumnName;
+  private String _outGoingTimeColumnName;
 
   // Made public so it can be used in Pinot Admin code.
   public PlainFieldExtractor(Schema schema) {
     _schema = schema;
     initErrorCount();
     initColumnTypes();
+    initTimeConverters();
+  }
+
+  private void initTimeConverters() {
+    TimeFieldSpec timeFieldSpec = _schema.getTimeFieldSpec();
+    if (timeFieldSpec != null) {
+      _incomingTimeColumnName = timeFieldSpec.getIncomingTimeColumnName();
+      _outGoingTimeColumnName = timeFieldSpec.getOutGoingTimeColumnName();
+      TimeGranularitySpec incomingGranularitySpec = timeFieldSpec.getIncomingGranularitySpec();
+      TimeGranularitySpec outgoingGranularitySpec = timeFieldSpec.getOutgoingGranularitySpec();
+      _timeConverter = TimeConverterProvider.getTimeConverter(incomingGranularitySpec,
+          outgoingGranularitySpec);
+    }
   }
 
   private void initErrorCount() {
@@ -113,7 +129,23 @@ public class PlainFieldExtractor implements FieldExtractor {
       boolean hasNull = false;
       boolean hasConversion = false;
       for (String column : _schema.getColumnNames()) {
-        Object value = row.getValue(column);
+        // Adding outgoing time column to fieldMap;
+        Object value;
+        // _schema.getTimeColumnName() will give outgoing time column name.
+        if (column.equals(_schema.getTimeColumnName())) {
+          value = row.getValue(_incomingTimeColumnName);
+          // For null time value, will let the rest code to handle
+          if (value != null) {
+            try {
+              value = _timeConverter.convert(value);
+            } catch (Exception e) {
+              LOGGER.error("Got exception during converter incoming time value: " + value, e);
+              value = null;
+            }
+          }
+        } else {
+          value = row.getValue(column);
+        }
         FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
         PinotDataType dest = _columnType.get(column);
         PinotDataType source;
@@ -125,7 +157,7 @@ public class PlainFieldExtractor implements FieldExtractor {
           String typeName = (value.getClass().getCanonicalName());
           if ((typeName.equals("java.lang.Object[]")) && ((Object[]) value).length != 0) {
             typeName = ((Object[]) value)[0].getClass().getCanonicalName();
-            typeName = typeName+"[]";
+            typeName = typeName + "[]";
           }
           source = _typeMap.get(typeName);
           if (source == null) {
@@ -159,7 +191,9 @@ public class PlainFieldExtractor implements FieldExtractor {
               value = fieldSpec.getDefaultNullValue();
             } else {
               // A multi-value field was null.
-              value = new Object[]{fieldSpec.getDefaultNullValue()};
+              value = new Object[] {
+                  fieldSpec.getDefaultNullValue()
+              };
             }
           } catch (UnsupportedOperationException e) {
             // Already has value as null
