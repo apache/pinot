@@ -54,6 +54,7 @@ public class SegmentPushControllerAPIs {
   private static String UTF_8 = "UTF-8";
   private static long TIMEOUT = 120000;
   private static String SUCCESS = "success";
+  private static String DATE_JOINER = "-";
 
   SegmentPushControllerAPIs(String[] controllerHosts, String controllerPort) {
     this.controllerHosts = controllerHosts;
@@ -87,23 +88,33 @@ public class SegmentPushControllerAPIs {
     if (pattern != null) {
       LOGGER.info("Finding segments overlapping to {} with pattern {}", segmentName, pattern);
       List<String> allSegments = getAllSegments(tablename, segmentName);
+      overlappingSegments = getOverlappingSegments(allSegments, pattern);
+    }
+    return overlappingSegments;
+  }
 
-      for (String segment : allSegments) {
-        if (segment.startsWith(pattern)) {
-          LOGGER.info("Found overlapping segment {}", segment);
-          overlappingSegments.add(segment);
-        }
+  public List<String> getOverlappingSegments(List<String> allSegments, String pattern) {
+    List<String> overlappingSegments = new ArrayList<>();
+    for (String segment : allSegments) {
+      if (segment.startsWith(pattern)) {
+        LOGGER.info("Found overlapping segment {}", segment);
+        overlappingSegments.add(segment);
       }
     }
     return overlappingSegments;
   }
 
-  private String getOverlapPattern(String segmentName, String tablename) {
+  public String getOverlapPattern(String segmentName, String tablename) {
     String pattern = null;
+    // segment name format: table[_*]Name_schedule_startDate_endDate
     String[] tokens = segmentName.split(ThirdEyeConstants.SEGMENT_JOINER);
-    if (tokens.length > 2 && tokens[2].lastIndexOf("-") != -1) {
-      String datePrefix = tokens[2].substring(0, tokens[2].lastIndexOf("-"));
-      pattern = Joiner.on(ThirdEyeConstants.SEGMENT_JOINER).join(tablename, HOURLY_SCHEDULE, datePrefix);
+    int size = tokens.length;
+    if (size > 3) {
+      String startDateToken = tokens[size - 2];
+      if (startDateToken.lastIndexOf(DATE_JOINER) != -1) {
+        String datePrefix = startDateToken.substring(0, startDateToken.lastIndexOf(DATE_JOINER));
+        pattern = Joiner.on(ThirdEyeConstants.SEGMENT_JOINER).join(tablename, HOURLY_SCHEDULE, datePrefix);
+      }
     }
     return pattern;
   }
