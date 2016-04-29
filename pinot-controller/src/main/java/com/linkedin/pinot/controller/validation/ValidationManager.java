@@ -188,7 +188,7 @@ public class ValidationManager {
         _validationMetrics.updateOfflineSegmentDelayGauge(tableName, maxSegmentEndTime);
         _validationMetrics.updateLastPushTimeGauge(tableName, maxSegmentPushTime);
         // Update the gauge to contain the total document count in the segments
-        _validationMetrics.updateTotalDocumentsGauge(tableName, computeRealtimeTotalDocumentInSegments(segmentMetadataList));
+        _validationMetrics.updateTotalDocumentsGauge(tableName, computeOfflineTotalDocumentInSegments(segmentMetadataList));
         // Update the gauge to contain the total number of segments for this table
         _validationMetrics.updateSegmentCountGauge(tableName, segmentMetadataList.size());
       }
