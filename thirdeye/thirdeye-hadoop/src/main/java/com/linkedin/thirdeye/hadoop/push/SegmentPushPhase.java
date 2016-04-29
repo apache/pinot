@@ -65,7 +65,7 @@ public class SegmentPushPhase  extends Configured {
 
     String segmentPath = getAndSetConfiguration(configuration, SEGMENT_PUSH_INPUT_PATH);
     LOGGER.info("Segment path : {}", segmentPath);
-    hosts = getAndSetConfiguration(configuration, SEGMENT_PUSH_CONTROLLER_HOSTS).split(",");
+    hosts = getAndSetConfiguration(configuration, SEGMENT_PUSH_CONTROLLER_HOSTS).split(ThirdEyeConstants.FIELD_SEPARATOR);
     port = getAndSetConfiguration(configuration, SEGMENT_PUSH_CONTROLLER_PORT);
     tablename = getAndCheck(ThirdEyeConfigProperties.THIRDEYE_TABLE_NAME.toString());
 
@@ -113,7 +113,7 @@ public class SegmentPushPhase  extends Configured {
         if (fileName.lastIndexOf(ThirdEyeConstants.SEGMENT_JOINER) != -1) {
           segmentName = fileName.substring(0, fileName.lastIndexOf(ThirdEyeConstants.SEGMENT_JOINER));
         }
-        LOGGER.info("******** Upoading file: {} to Host: {} and Port: {} *******", fileName, host, port);
+        LOGGER.info("******** Uploading file: {} to Host: {} and Port: {} *******", fileName, host, port);
         try {
           int responseCode = FileUploadUtils.sendSegmentFile(host, port, fileName, inputStream, length);
           LOGGER.info("Response code: {}", responseCode);
@@ -123,7 +123,7 @@ public class SegmentPushPhase  extends Configured {
           }
 
         } catch (Exception e) {
-          LOGGER.error("******** Error Upoading file: {} to Host: {} and Port: {}  *******", fileName, host, port);
+          LOGGER.error("******** Error Uploading file: {} to Host: {} and Port: {}  *******", fileName, host, port);
           LOGGER.error("Caught exception during upload", e);
           throw new RuntimeException("Got Error during send tar files to push hosts!");
         }
