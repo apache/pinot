@@ -193,6 +193,7 @@ public class SegmentCreationPhaseMapReduceJob {
         starTreeIndexSpec.setMaxLeafRecords(thirdeyeConfig.getSplit().getThreshold());
         starTreeIndexSpec.setDimensionsSplitOrder(thirdeyeConfig.getSplit().getOrder());
       }
+      starTreeIndexSpec.setSkipMaterializationForDimensions(thirdeyeConfig.getTransformDimensions());
       segmentGeneratorConfig.setStarTreeIndexSpec(starTreeIndexSpec);
 
       // Generate segment
