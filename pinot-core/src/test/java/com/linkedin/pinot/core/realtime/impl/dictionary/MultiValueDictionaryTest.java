@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.realtime.impl.dictionary;
 
+import java.util.Random;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
@@ -24,22 +25,25 @@ import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnMultiVa
 
 public class MultiValueDictionaryTest {
   private static final String COL_NAME = "greek";
-  private static int NROWS = 10000;
-  private static int MAX_N_VALUES = 999;
+  private static final int NROWS = 1000;
+  private static final int MAX_N_VALUES = FixedByteSingleColumnMultiValueReaderWriter.DEFAULT_MAX_NUMBER_OF_MULTIVALUES;
+  private static final long RANDOM_SEED = System.nanoTime();
 
   @Test
-  public void testMultiValueIndexing() throws Exception {
+  public void testMultiValueIndexing()
+      throws Exception {
     final FieldSpec mvIntFs = new DimensionFieldSpec(COL_NAME, FieldSpec.DataType.LONG, false);
     final LongMutableDictionary dict = new LongMutableDictionary(mvIntFs);
-    final FixedByteSingleColumnMultiValueReaderWriter indexer = new FixedByteSingleColumnMultiValueReaderWriter(NROWS,
-        Integer.SIZE / 8, FixedByteSingleColumnMultiValueReaderWriter.DEFAULT_MAX_NUMBER_OF_MULTIVALUES);
+    final FixedByteSingleColumnMultiValueReaderWriter indexer =
+        new FixedByteSingleColumnMultiValueReaderWriter(NROWS, Integer.SIZE / 8, MAX_N_VALUES);
 
     // Insert rows into the indexer and dictionary
+    Random random = new Random(RANDOM_SEED);
     for (int row = 0; row < NROWS; row++) {
-      int nValues = (row % MAX_N_VALUES) + 1;
+      int nValues = Math.abs(random.nextInt()) % MAX_N_VALUES;
       Long[] val = new Long[nValues];
       for (int i = 0; i < nValues; i++) {
-        val[i] = (long)row * i;
+        val[i] = random.nextLong();
       }
       dict.index(val);
       int dictIds[] = new int[nValues];
@@ -50,14 +54,17 @@ public class MultiValueDictionaryTest {
     }
 
     // Read back rows and make sure that the values are good.
+    random = new Random(RANDOM_SEED);
     final int[] dictIds = new int[MAX_N_VALUES];
     for (int row = 0; row < NROWS; row++) {
       int nValues = indexer.getIntArray(row, dictIds);
-      Assert.assertEquals(nValues, (row % MAX_N_VALUES)+1, "Mismatching number of values");
+      Assert.assertEquals(nValues, Math.abs(random.nextInt()) % MAX_N_VALUES,
+          "Mismatching number of values, random seed is: " + RANDOM_SEED);
 
       for (int i = 0; i < nValues; i++) {
         Long val = dict.getLongValue(dictIds[i]);
-        Assert.assertEquals(val.longValue(), (long)row * i, "Value mismatch at row " + row);
+        Assert.assertEquals(val.longValue(), random.nextLong(),
+            "Value mismatch at row " + row + ", random seed is: " + RANDOM_SEED);
       }
     }
   }
