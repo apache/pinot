@@ -38,6 +38,7 @@ import com.linkedin.pinot.core.data.manager.offline.AbstractTableDataManager;
 import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
+import com.linkedin.pinot.core.realtime.impl.kafka.KafkaConsumerManager;
 
 
 // TODO Use the refcnt object inside SegmentDataManager
@@ -60,6 +61,7 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
     for (SegmentDataManager segmentDataManager :_segmentsMap.values() ) {
       segmentDataManager.destroy();
     }
+    KafkaConsumerManager.closeAllConsumers();
   }
 
   protected void doInit() {

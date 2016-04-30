@@ -150,4 +150,30 @@ public class KafkaConsumerManager {
       }.start();
     }
   }
+
+  public static void closeAllConsumers() {
+    try {
+      // Shutdown all consumers
+      synchronized (KafkaConsumerManager.class) {
+        LOGGER.info("Trying to shutdown all the kafka consumers");
+        Iterator<ConsumerAndIterator> consumerIterator =
+            CONSUMER_AND_ITERATOR_FOR_CONFIG.values().iterator();
+
+        while (consumerIterator.hasNext()) {
+          ConsumerAndIterator consumerAndIterator = consumerIterator.next();
+          LOGGER.info("Trying to shutdown consumer/iterator {}", consumerAndIterator.getId());
+          try {
+            consumerAndIterator.getConsumer().shutdown();
+          } catch (Exception e) {
+            LOGGER.warn("Caught exception while shutting down Kafka consumer with id {}", consumerAndIterator.getId(), e);
+          }
+          consumerIterator.remove();
+        }
+        CONSUMER_AND_ITERATOR_FOR_CONFIG.clear();
+        CONSUMER_RELEASE_TIME.clear();
+      }
+    } catch (Exception e) {
+      LOGGER.warn("Caught exception during shutting down all kafka consumers", e);
+    }
+  }
 }
