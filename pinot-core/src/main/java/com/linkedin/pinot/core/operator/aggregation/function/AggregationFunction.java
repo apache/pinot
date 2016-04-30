@@ -15,7 +15,8 @@
  */
 package com.linkedin.pinot.core.operator.aggregation.function;
 
-import com.linkedin.pinot.core.operator.groupby.ResultHolder;
+import com.linkedin.pinot.core.operator.aggregation.AggregationResultHolder;
+import com.linkedin.pinot.core.operator.groupby.GroupByResultHolder;
 import java.util.List;
 
 
@@ -42,7 +43,7 @@ public interface AggregationFunction {
    * @param resultHolder
    * @param valueArray
    */
-  void aggregate(int length, ResultHolder resultHolder, double[]... valueArray);
+  void aggregate(int length, AggregationResultHolder resultHolder, double[]... valueArray);
 
   /**
    * Perform a group-by aggregation on the given set of values, and the group key to which
@@ -54,7 +55,7 @@ public interface AggregationFunction {
    * @param resultHolder
    * @param valueArray
    */
-  void aggregateGroupBySV(int length, int[] docIdToGroupKey, ResultHolder resultHolder, double[]... valueArray);
+  void aggregateGroupBySV(int length, int[] docIdToGroupKey, GroupByResultHolder resultHolder, double[]... valueArray);
 
   /**
    * Perform a group-by aggregation on the given set of values, and the group key to which
@@ -67,7 +68,8 @@ public interface AggregationFunction {
    * @param resultHolder
    * @param valueArray
    */
-  void aggregateGroupByMV(int length, int[][] docIdToGroupKeys, ResultHolder resultHolder, double[]... valueArray);
+  void aggregateGroupByMV(int length, int[][] docIdToGroupKeys, GroupByResultHolder resultHolder,
+      double[]... valueArray);
 
   /**
    * Reduce the aggregation. For example, in case of avg/range being performed

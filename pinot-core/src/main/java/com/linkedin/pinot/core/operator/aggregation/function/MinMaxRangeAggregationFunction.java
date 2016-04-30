@@ -16,7 +16,8 @@
 package com.linkedin.pinot.core.operator.aggregation.function;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.core.operator.groupby.ResultHolder;
+import com.linkedin.pinot.core.operator.aggregation.AggregationResultHolder;
+import com.linkedin.pinot.core.operator.groupby.GroupByResultHolder;
 import com.linkedin.pinot.core.query.utils.Pair;
 import java.util.List;
 
@@ -38,20 +39,34 @@ public class MinMaxRangeAggregationFunction implements AggregationFunction {
    * @param valueArray
    */
   @Override
-  public void aggregate(int length, ResultHolder resultHolder, double[]... valueArray) {
+  public void aggregate(int length, AggregationResultHolder resultHolder, double[]... valueArray) {
     Preconditions.checkArgument(valueArray.length == 1);
     Preconditions.checkState(length <= valueArray[0].length);
 
+    double min = Double.POSITIVE_INFINITY;
+    double max = Double.NEGATIVE_INFINITY;
+
     for (int i = 0; i < length; i++) {
-      Pair<Double, Double> rangeValue = (Pair<Double, Double>) resultHolder.getResult();
       double value = valueArray[0][i];
-      if (value < rangeValue.getFirst()) {
-        rangeValue.setFirst(value);
+      if (value < min) {
+        min = value;
       }
-      if (value > rangeValue.getSecond()) {
-        rangeValue.setSecond(value);
+      if (value > max) {
+        max = value;
       }
+    }
+
+    Pair<Double, Double> rangeValue = (Pair<Double, Double>) resultHolder.getResult();
+    if (rangeValue == null) {
+      rangeValue = new Pair<>(min, max);
       resultHolder.setValue(rangeValue);
+    } else {
+      if (min < rangeValue.getFirst()) {
+        rangeValue.setFirst(min);
+      }
+      if (max > rangeValue.getSecond()) {
+        rangeValue.setSecond(max);
+      }
     }
   }
 
@@ -67,7 +82,8 @@ public class MinMaxRangeAggregationFunction implements AggregationFunction {
    * @param valueArray
    */
   @Override
-  public void aggregateGroupBySV(int length, int[] groupKeys, ResultHolder resultHolder, double[]... valueArray) {
+  public void aggregateGroupBySV(int length, int[] groupKeys, GroupByResultHolder resultHolder,
+      double[]... valueArray) {
     Preconditions.checkArgument(valueArray.length == 1);
     Preconditions.checkState(length <= valueArray[0].length);
 
@@ -94,7 +110,7 @@ public class MinMaxRangeAggregationFunction implements AggregationFunction {
    * @param valueArray
    */
   @Override
-  public void aggregateGroupByMV(int length, int[][] docIdToGroupKeys, ResultHolder resultHolder,
+  public void aggregateGroupByMV(int length, int[][] docIdToGroupKeys, GroupByResultHolder resultHolder,
       double[]... valueArray) {
     Preconditions.checkArgument(valueArray.length == 1);
     Preconditions.checkState(length <= valueArray[0].length);

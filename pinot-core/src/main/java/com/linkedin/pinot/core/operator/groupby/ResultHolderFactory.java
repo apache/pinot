@@ -15,22 +15,51 @@
  */
 package com.linkedin.pinot.core.operator.groupby;
 
+import com.linkedin.pinot.core.operator.aggregation.AggregationResultHolder;
+import com.linkedin.pinot.core.operator.aggregation.DoubleAggregationResultHolder;
+import com.linkedin.pinot.core.operator.aggregation.ObjectAggregationResultHolder;
 import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunction;
 import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunctionFactory;
-import com.linkedin.pinot.core.query.utils.Pair;
 
 
+/**
+ * Factory class to create ResultHolder appropriate for a given function.
+ * Supports both, AggregationResultHolder as well as GroupByResultHolder.
+ */
 public class ResultHolderFactory {
   public static final int INITIAL_RESULT_HOLDER_CAPACITY = 10000;
 
   /**
-   * Creates and returns the appropriate implementation of ResultHolder,
+   * Creates and returns the appropriate implementation of AggregationResultHolder,
    * based on aggregation function.
    *
+   * @param function
+   * @return
+   */
+  public static AggregationResultHolder getAggregationResultHolder(AggregationFunction function) {
+    String functionName = function.getName();
+
+    switch (functionName.toLowerCase()) {
+      case AggregationFunctionFactory.COUNT_AGGREGATION_FUNCTION:
+      case AggregationFunctionFactory.MAX_AGGREGATION_FUNCTION:
+      case AggregationFunctionFactory.MIN_AGGREGATION_FUNCTION:
+      case AggregationFunctionFactory.SUM_AGGREGATION_FUNCTION:
+        return new DoubleAggregationResultHolder(function.getDefaultValue());
+
+      default:
+        return new ObjectAggregationResultHolder();
+    }
+  }
+
+  /**
+   * Creates and returns the appropriate implementation of GroupByResultHolder,
+   * based on aggregation function.
+   *
+   * @param function
    * @param maxNumResults
    * @return
    */
-  public static ResultHolder getResultHolder(AggregationFunction function, long maxNumResults) {
+  public static GroupByResultHolder getGroupByResultHolder(AggregationFunction function, long maxNumResults) {
     String functionName = function.getName();
 
     int capacityCap = maxNumResults > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) maxNumResults;
@@ -41,21 +70,10 @@ public class ResultHolderFactory {
       case AggregationFunctionFactory.MAX_AGGREGATION_FUNCTION:
       case AggregationFunctionFactory.MIN_AGGREGATION_FUNCTION:
       case AggregationFunctionFactory.SUM_AGGREGATION_FUNCTION:
-        double defaultValue = function.getDefaultValue();
-        DoubleResultArray doubleResultArray = new DoubleResultArray(initialCapacity, defaultValue);
-        return new DoubleArrayBasedResultHolder(doubleResultArray, initialCapacity, capacityCap);
-
-      case AggregationFunctionFactory.AVG_AGGREGATION_FUNCTION:
-        DoubleLongResultArray doubleLongResultArray = new DoubleLongResultArray(initialCapacity, new Pair<>(0.0, 0L));
-        return new PairArrayBasedResultHolder(doubleLongResultArray, initialCapacity, capacityCap);
-
-      case AggregationFunctionFactory.MINMAXRANGE_AGGREGATION_FUNCTION:
-        DoubleDoubleResultArray doubleDoubleResultArray = new DoubleDoubleResultArray(initialCapacity,
-            new Pair<>(Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY));
-        return new PairArrayBasedResultHolder(doubleDoubleResultArray, initialCapacity, capacityCap);
+        return new DoubleGroupByResultHolder(initialCapacity, capacityCap, function.getDefaultValue());
 
       default:
-        return new ObjectArrayBasedResultHolder(initialCapacity, capacityCap);
+        return new ObjectGroupByResultHolder(initialCapacity, capacityCap);
     }
   }
 }

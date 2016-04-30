@@ -18,6 +18,7 @@ package com.linkedin.pinot.core.operator.groupby;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.operator.aggregation.AggregationResultHolder;
 import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunction;
 import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunctionFactory;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
@@ -106,41 +107,5 @@ public class AggregationFunctionContext {
    */
   public Dictionary getDictionary(int index) {
     return _dictionaries[index];
-  }
-
-  /**
-   * Apply the aggregation function for the column, given:
-   * - Valid integer value that can be indexed into _aggrColumns
-   * - Mapping array of docId to groupKey
-   * - Array containing values for individual docIds, for the column.
-   *
-   * Result is populated in the passed in resultHolder.
-   *
-   * @param length
-   * @param docIdToGroupKey
-   * @param resultHolder
-   * @param valueArray
-   */
-  public void aggregateGroupBySV(int length, int[] docIdToGroupKey, ResultHolder resultHolder, double[]... valueArray) {
-    _aggregationFunction.aggregateGroupBySV(length, docIdToGroupKey, resultHolder, valueArray);
-  }
-
-  /**
-   * Apply the aggregation function for the column, given
-   * - Values array
-   * - Group by keys each value belongs to (docIdToGroupKeys)
-   *
-   * @param length
-   * @param docIdToGroupKeys
-   * @param resultHolder
-   * @param valueArray
-   */
-  public void aggregateGroupByMV(int length, int[][] docIdToGroupKeys, ResultHolder resultHolder,
-      double[]... valueArray) {
-    _aggregationFunction.aggregateGroupByMV(length, docIdToGroupKeys, resultHolder, valueArray);
-  }
-
-  public void aggregate(int length, ResultHolder resultHolder, double[]... valuesToAggregate) {
-    _aggregationFunction.aggregate(length, resultHolder, valuesToAggregate);
   }
 }

@@ -23,7 +23,6 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunction;
 import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunctionFactory;
 import com.linkedin.pinot.core.operator.groupby.AggregationFunctionContext;
-import com.linkedin.pinot.core.operator.groupby.ResultHolder;
 import com.linkedin.pinot.core.operator.groupby.ResultHolderFactory;
 import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
 import com.linkedin.pinot.core.query.aggregation.function.AvgAggregationFunction;
@@ -56,7 +55,7 @@ public class DefaultAggregationExecutor implements AggregationExecutor {
   private Map<String, double[]> _columnToValueArrayMap;
 
   // Array of result holders, one for each aggregation.
-  private ResultHolder[] _resultHolderArray;
+  private AggregationResultHolder[] _resultHolderArray;
 
   boolean _inited = false;
   boolean _finished = false;
@@ -91,11 +90,11 @@ public class DefaultAggregationExecutor implements AggregationExecutor {
       _aggrFuncContextList.add(aggregationFunctionContext);
     }
 
-    _resultHolderArray = new ResultHolder[_aggrFuncContextList.size()];
+    _resultHolderArray = new AggregationResultHolder[_aggrFuncContextList.size()];
     for (int i = 0; i < _aggrFuncContextList.size(); i++) {
       AggregationFunctionContext aggregationFunctionContext = _aggrFuncContextList.get(i);
       AggregationFunction aggregationFunction = aggregationFunctionContext.getAggregationFunction();
-      _resultHolderArray[i] = ResultHolderFactory.getResultHolder(aggregationFunction, 1 /* maxNumGroupKeys */);
+      _resultHolderArray[i] = ResultHolderFactory.getAggregationResultHolder(aggregationFunction);
     }
     _inited = true;
   }
@@ -120,7 +119,9 @@ public class DefaultAggregationExecutor implements AggregationExecutor {
 
       for (String column : aggregationFunctionContext.getAggregationColumns()) {
         double[] valuesToAggregate = _columnToValueArrayMap.get(column);
-        aggregationFunctionContext.aggregate(length, _resultHolderArray[i], valuesToAggregate);
+
+        AggregationFunction function = aggregationFunctionContext.getAggregationFunction();
+        function.aggregate(length, _resultHolderArray[i], valuesToAggregate);
       }
     }
   }
@@ -163,7 +164,7 @@ public class DefaultAggregationExecutor implements AggregationExecutor {
    * @param resultDataType
    * @return
    */
-  private Serializable getAggregationResult(ResultHolder resultHolder,
+  private Serializable getAggregationResult(AggregationResultHolder resultHolder,
       AggregationFunction.ResultDataType resultDataType) {
 
     Serializable result;

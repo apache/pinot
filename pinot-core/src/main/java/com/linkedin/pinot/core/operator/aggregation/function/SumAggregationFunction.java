@@ -16,7 +16,8 @@
 package com.linkedin.pinot.core.operator.aggregation.function;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.core.operator.groupby.ResultHolder;
+import com.linkedin.pinot.core.operator.aggregation.AggregationResultHolder;
+import com.linkedin.pinot.core.operator.groupby.GroupByResultHolder;
 import java.util.List;
 
 
@@ -41,7 +42,7 @@ public class SumAggregationFunction implements AggregationFunction {
    * @param valueArray
    */
   @Override
-  public void aggregate(int length, ResultHolder resultHolder, double[]... valueArray) {
+  public void aggregate(int length, AggregationResultHolder resultHolder, double[]... valueArray) {
     Preconditions.checkArgument(valueArray.length == 1);
     Preconditions.checkState(length <= valueArray[0].length);
 
@@ -64,7 +65,8 @@ public class SumAggregationFunction implements AggregationFunction {
    * @param valueArray
    */
   @Override
-  public void aggregateGroupBySV(int length, int[] groupKeys, ResultHolder resultHolder, double[]... valueArray) {
+  public void aggregateGroupBySV(int length, int[] groupKeys, GroupByResultHolder resultHolder,
+      double[]... valueArray) {
     Preconditions.checkArgument(valueArray.length == 1);
     Preconditions.checkState(length <= valueArray[0].length);
 
@@ -84,7 +86,8 @@ public class SumAggregationFunction implements AggregationFunction {
    * @param valueArray
    */
   @Override
-  public void aggregateGroupByMV(int length, int[][] docIdToGroupKey, ResultHolder resultHolder, double[]... valueArray) {
+  public void aggregateGroupByMV(int length, int[][] docIdToGroupKey, GroupByResultHolder resultHolder,
+      double[]... valueArray) {
     Preconditions.checkArgument(valueArray.length == 1);
     Preconditions.checkState(length <= valueArray[0].length);
 

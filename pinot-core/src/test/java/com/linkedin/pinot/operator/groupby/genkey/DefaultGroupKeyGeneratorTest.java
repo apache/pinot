@@ -26,7 +26,7 @@ import org.testng.annotations.Test;
  * Test for group-by key generator.
  */
 @Test
-public class SingleValueGroupKeyGeneratorTest {
+public class DefaultGroupKeyGeneratorTest {
 
   private Random _random;
 

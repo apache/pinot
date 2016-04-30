@@ -16,28 +16,35 @@
 package com.linkedin.pinot.core.operator.groupby;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.core.query.utils.Pair;
+import java.util.Arrays;
 
 
 /**
- * ResultHolder implementation using Pair.
+ * Result Holder implemented using DoubleArray.
  */
-public class PairArrayBasedResultHolder implements ResultHolder<Pair> {
-  private ResultArray _resultArray;
+public class DoubleGroupByResultHolder implements GroupByResultHolder {
+  private double[] _resultArray;
+  private final double _defaultValue;
+
   private int _resultHolderCapacity;
   private final int _maxCapacity;
 
   /**
    * Constructor for the class.
    *
-   * @param resultArray
    * @param initialCapacity
    * @param maxCapacity
+   * @param defaultValue
    */
-  public PairArrayBasedResultHolder(ResultArray resultArray, int initialCapacity, int maxCapacity) {
-    _resultArray = resultArray;
+  public DoubleGroupByResultHolder(int initialCapacity, int maxCapacity, double defaultValue) {
     _resultHolderCapacity = initialCapacity;
+    _defaultValue = defaultValue;
     _maxCapacity = maxCapacity;
+
+    _resultArray = new double[initialCapacity];
+    if (defaultValue != 0.0) {
+      Arrays.fill(_resultArray, defaultValue);
+    }
   }
 
   /**
@@ -50,29 +57,20 @@ public class PairArrayBasedResultHolder implements ResultHolder<Pair> {
     Preconditions.checkArgument(capacity <= _maxCapacity);
 
     if (capacity > _resultHolderCapacity) {
+      int copyLength = _resultHolderCapacity;
       _resultHolderCapacity = Math.max(_resultHolderCapacity * 2, capacity);
 
       // Cap the growth to maximum possible number of group keys
       _resultHolderCapacity = Math.min(_resultHolderCapacity, _maxCapacity);
-      _resultArray.expand(_resultHolderCapacity);
+
+      double[] current = _resultArray;
+      _resultArray = new double[_resultHolderCapacity];
+      System.arraycopy(current, 0, _resultArray, 0, copyLength);
+
+      if (_defaultValue != 0.0) {
+        Arrays.fill(_resultArray, copyLength, _resultHolderCapacity, _defaultValue);
+      }
     }
-  }
-
-  @Override
-  public double getDoubleResult() {
-    Preconditions.checkState(_resultHolderCapacity == 1);
-    return _resultArray.getDoubleResult(0);
-  }
-
-  @Override
-  public double getDoubleResult(int groupKey) {
-    throw new RuntimeException("Unsupported method 'getDoubleResult' for class " + getClass().getName());
-  }
-
-  @Override
-  public Pair getResult() {
-    Preconditions.checkState(_resultHolderCapacity == 1);
-    return _resultArray.getResult(0);
   }
 
   /**
@@ -86,20 +84,14 @@ public class PairArrayBasedResultHolder implements ResultHolder<Pair> {
    * @return
    */
   @Override
-  public Pair getResult(long groupKey) {
-    return _resultArray.getResult((int) groupKey);
+  public double getDoubleResult(int groupKey) {
+    return _resultArray[groupKey];
   }
 
   @Override
-  public void setValue(double newValue) {
+  public Object getResult(int groupKey) {
     throw new RuntimeException(
-        "Unsupported method 'setValue' (with primitive double value) for class " + getClass().getName());
-  }
-
-  @Override
-  public void setValue(Pair newValue) {
-    Preconditions.checkState(_resultHolderCapacity == 1);
-    _resultArray.set(0, newValue);
+        "Unsupported method getResult (returning Object) for class " + getClass().getName());
   }
 
   /**
@@ -109,12 +101,13 @@ public class PairArrayBasedResultHolder implements ResultHolder<Pair> {
    * @param newValue
    */
   @Override
-  public void setValueForKey(long groupKey, double newValue) {
-    throw new RuntimeException("Unsupported method 'setValueForKey (of double Type) for class " + getClass().getName());
+  public void setValueForKey(int groupKey, double newValue) {
+    _resultArray[groupKey] = newValue;
   }
 
   @Override
-  public void setValueForKey(long groupKey, Pair pair) {
-    _resultArray.set((int) groupKey, pair);
+  public void setValueForKey(int groupKey, Object newValue) {
+    throw new RuntimeException(
+        "Unsupported method 'setValueForKey' (with Object param) for class " + getClass().getName());
   }
 }

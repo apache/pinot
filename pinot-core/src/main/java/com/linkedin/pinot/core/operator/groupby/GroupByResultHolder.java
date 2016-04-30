@@ -15,22 +15,25 @@
  */
 package com.linkedin.pinot.core.operator.groupby;
 
-public interface ResultHolder<ResultType> {
+/**
+ * Interface for ResultHolder to store results of GroupByAggregation.
+ */
+public interface GroupByResultHolder {
 
   /**
-   * Increase internal storage if needed to store the required number
-   * of unique group keys.
+   * Stores the given value (of type double) for the given groupKey.
    *
-   * @param maxUniqueKeys
+   * @param groupKey
+   * @param value
    */
-  void ensureCapacity(int maxUniqueKeys);
+  void setValueForKey(int groupKey, double value);
 
   /**
-   * Returns the double result. This version is for aggregation functions
-   * without group by.
-   * @return
+   * Store the given value (of type ResultType) for the given groupKey.
+   * @param groupKey
+   * @param value
    */
-  double getDoubleResult();
+  void setValueForKey(int groupKey, Object value);
 
   /**
    * Returns the result (double) for the given group by key.
@@ -44,13 +47,6 @@ public interface ResultHolder<ResultType> {
   double getDoubleResult(int groupKey);
 
   /**
-   * Returns the result (ResultType) of aggregation. This version is
-   * for aggregation without group by.
-   * @return
-   */
-  ResultType getResult();
-
-  /**
    * Returns the result (ResultType) for the given group key.
    * If the group key does not exist in the result holder, returns the
    * defaultValue it was initialized with (default value of the aggregation
@@ -59,32 +55,14 @@ public interface ResultHolder<ResultType> {
    * @param groupKey
    * @return
    */
-  ResultType getResult(long groupKey);
+  Object getResult(int groupKey);
+
 
   /**
-   * Set the result value. This is for aggregation functions without group by.
-   * @param newValue
-   */
-  void setValue(double newValue);
-
-  /**
-   * Set the result value. This is for aggregation functions without group by.
-   * @param newValue
-   */
-  void setValue(ResultType newValue);
-
-  /**
-   * Stores the given value (of type double) for the given groupKey.
+   * Increase internal storage if needed to store the required number
+   * of unique group keys.
    *
-   * @param groupKey
-   * @param newValue
+   * @param capacity
    */
-  void setValueForKey(long groupKey, double newValue);
-
-  /**
-   * Store the given value (of type ResultType) for the given groupKey.
-   * @param groupKey
-   * @param newValue
-   */
-  void setValueForKey(long groupKey, ResultType newValue);
+  void ensureCapacity(int capacity);
 }

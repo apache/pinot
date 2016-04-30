@@ -69,7 +69,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
   private Map<String, double[]> _columnToValueArrayMap;
   private double[] _hashCodeArray;
 
-  private ResultHolder[] _resultHolderArray;
+  private GroupByResultHolder[] _resultHolderArray;
 
   private boolean _hasMultiValuedColumns = false;
   private boolean _inited = false;
@@ -137,11 +137,11 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     _hasMultiValuedColumns = hasMultiValueGroupByColumns(_indexSegment, _groupByColumns);
     _groupKeyGenerator = new DefaultGroupKeyGenerator(_indexSegment, _groupByColumns, _maxNumGroupKeys);
 
-    _resultHolderArray = new ResultHolder[_aggrFuncContextList.size()];
+    _resultHolderArray = new GroupByResultHolder[_aggrFuncContextList.size()];
     for (int i = 0; i < _aggrFuncContextList.size(); i++) {
       AggregationFunctionContext aggregationFunctionContext = _aggrFuncContextList.get(i);
       AggregationFunction aggregationFunction = aggregationFunctionContext.getAggregationFunction();
-      _resultHolderArray[i] = ResultHolderFactory.getResultHolder(aggregationFunction, _maxNumGroupKeys);
+      _resultHolderArray[i] = ResultHolderFactory.getGroupByResultHolder(aggregationFunction, _maxNumGroupKeys);
     }
 
     if (_hasMultiValuedColumns) {
@@ -183,17 +183,21 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
    * @param resultHolder
    * @param length
    */
-  private void aggregateColumn(AggregationFunctionContext aggrFuncContext, ResultHolder resultHolder, int length) {
+  private void aggregateColumn(AggregationFunctionContext aggrFuncContext, GroupByResultHolder resultHolder,
+      int length) {
+    AggregationFunction function = aggrFuncContext.getAggregationFunction();
     String aggrFuncName = aggrFuncContext.getFunctionName();
     String[] aggrColumns = aggrFuncContext.getAggregationColumns();
+
     Preconditions.checkState(aggrColumns.length == 1);
     String aggrColumn = aggrColumns[0];
+
     switch (aggrFuncName) {
       case AggregationFunctionFactory.COUNT_AGGREGATION_FUNCTION:
         if (_hasMultiValuedColumns) {
-          aggrFuncContext.aggregateGroupByMV(length, _docIdToMVGroupKey, resultHolder);
+          function.aggregateGroupByMV(length, _docIdToMVGroupKey, resultHolder);
         } else {
-          aggrFuncContext.aggregateGroupBySV(length, _docIdToSVGroupKey, resultHolder);
+          function.aggregateGroupBySV(length, _docIdToSVGroupKey, resultHolder);
         }
         return;
 
@@ -201,9 +205,9 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
       case AggregationFunctionFactory.DISTINCTCOUNTHLL_AGGREGATION_FUNCTION:
         fetchColumnValueHashCodes(aggrColumn, aggrFuncContext.getDictionary(0), length);
         if (_hasMultiValuedColumns) {
-          aggrFuncContext.aggregateGroupByMV(length, _docIdToMVGroupKey, resultHolder, _hashCodeArray);
+          function.aggregateGroupByMV(length, _docIdToMVGroupKey, resultHolder, _hashCodeArray);
         } else {
-          aggrFuncContext.aggregateGroupBySV(length, _docIdToSVGroupKey, resultHolder, _hashCodeArray);
+          function.aggregateGroupBySV(length, _docIdToSVGroupKey, resultHolder, _hashCodeArray);
         }
         return;
 
@@ -211,9 +215,9 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
         double[] valueArray = _columnToValueArrayMap.get(aggrColumn);
 
         if (_hasMultiValuedColumns) {
-          aggrFuncContext.aggregateGroupByMV(length, _docIdToMVGroupKey, resultHolder, valueArray);
+          function.aggregateGroupByMV(length, _docIdToMVGroupKey, resultHolder, valueArray);
         } else {
-          aggrFuncContext.aggregateGroupBySV(length, _docIdToSVGroupKey, resultHolder, valueArray);
+          function.aggregateGroupBySV(length, _docIdToSVGroupKey, resultHolder, valueArray);
         }
     }
   }
@@ -264,7 +268,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
    * @param resultDataType
    * @return
    */
-  private Serializable getResultForKey(int groupKey, ResultHolder resultHolder,
+  private Serializable getResultForKey(int groupKey, GroupByResultHolder resultHolder,
       AggregationFunction.ResultDataType resultDataType) {
 
     switch (resultDataType) {

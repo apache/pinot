@@ -15,8 +15,9 @@
  */
 package com.linkedin.pinot.query.aggregation.function;
 
+import com.linkedin.pinot.core.operator.aggregation.AggregationResultHolder;
 import com.linkedin.pinot.core.operator.aggregation.function.MinAggregationFunction;
-import com.linkedin.pinot.core.operator.groupby.ResultHolder;
+import com.linkedin.pinot.core.operator.groupby.GroupByResultHolder;
 import com.linkedin.pinot.core.operator.groupby.ResultHolderFactory;
 import it.unimi.dsi.fastutil.ints.Int2DoubleOpenHashMap;
 import java.util.Map;
@@ -60,7 +61,7 @@ public class MinAggregationFunctionTest {
     }
 
     MinAggregationFunction minAggregationFunction = new MinAggregationFunction();
-    ResultHolder resultHolder = ResultHolderFactory.getResultHolder(minAggregationFunction, 1 /* MinNumResults */);
+    AggregationResultHolder resultHolder = ResultHolderFactory.getAggregationResultHolder(minAggregationFunction);
 
     minAggregationFunction.aggregate(NUM_VALUES_TO_AGGREGATE, resultHolder, valuesToAggregate);
     double actual = resultHolder.getDoubleResult();
@@ -95,7 +96,8 @@ public class MinAggregationFunctionTest {
     }
 
     MinAggregationFunction minAggregationFunction = new MinAggregationFunction();
-    ResultHolder resultHolder = ResultHolderFactory.getResultHolder(minAggregationFunction, MAX_NUM_GROUP_KEYS);
+    GroupByResultHolder resultHolder =
+        ResultHolderFactory.getGroupByResultHolder(minAggregationFunction, MAX_NUM_GROUP_KEYS);
 
     minAggregationFunction.aggregateGroupBySV(NUM_VALUES_TO_AGGREGATE, groupKeysForValues, resultHolder,
         valuesToAggregate);

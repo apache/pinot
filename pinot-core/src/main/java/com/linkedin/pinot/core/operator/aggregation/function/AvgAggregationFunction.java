@@ -16,7 +16,8 @@
 package com.linkedin.pinot.core.operator.aggregation.function;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.core.operator.groupby.ResultHolder;
+import com.linkedin.pinot.core.operator.aggregation.AggregationResultHolder;
+import com.linkedin.pinot.core.operator.groupby.GroupByResultHolder;
 import com.linkedin.pinot.core.query.utils.Pair;
 import java.util.List;
 
@@ -43,18 +44,22 @@ public class AvgAggregationFunction implements AggregationFunction {
    * @param valueArray
    */
   @Override
-  public void aggregate(int length, ResultHolder resultHolder, double[]... valueArray) {
+  public void aggregate(int length, AggregationResultHolder resultHolder, double[]... valueArray) {
     Preconditions.checkArgument(valueArray.length == 1);
     Preconditions.checkState(length <= valueArray[0].length);
 
     double sum = 0.0;
-    for (int i = 0; i < length; i++) {
+    for (int i = 0; i < length; ++i) {
       sum += valueArray[0][i];
     }
-    Pair<Double, Long> avgPair = (Pair<Double, Long>) resultHolder.getResult();
-    avgPair.setFirst(avgPair.getFirst() + sum);
-    avgPair.setSecond(avgPair.getSecond() + length);
-    resultHolder.setValue(avgPair);
+    Pair<Double, Long> avgValue = (Pair<Double, Long>) resultHolder.getResult();
+    if (avgValue == null) {
+      avgValue = new Pair<>(sum, (long) length);
+      resultHolder.setValue(avgValue);
+    } else {
+      avgValue.setFirst(avgValue.getFirst() + sum);
+      avgValue.setSecond(avgValue.getSecond() + length);
+    }
   }
 
   /**
@@ -69,16 +74,22 @@ public class AvgAggregationFunction implements AggregationFunction {
    * @param valueArray
    */
   @Override
-  public void aggregateGroupBySV(int length, int[] groupKeys, ResultHolder resultHolder, double[]... valueArray) {
+  public void aggregateGroupBySV(int length, int[] groupKeys, GroupByResultHolder resultHolder,
+      double[]... valueArray) {
     Preconditions.checkArgument(valueArray.length == 1);
     Preconditions.checkState(length <= valueArray[0].length);
 
-    for (int i = 0; i < length; i++) {
+    for (int i = 0; i < length; ++i) {
       int groupKey = groupKeys[i];
+      double value = valueArray[0][i];
       Pair<Double, Long> avgValue = (Pair<Double, Long>) resultHolder.getResult(groupKey);
-      avgValue.setFirst(avgValue.getFirst() + valueArray[0][i]);
-      avgValue.setSecond(avgValue.getSecond() + 1);
-      resultHolder.setValueForKey(groupKey, avgValue);
+      if (avgValue == null) {
+        avgValue = new Pair<>(value, 1L);
+        resultHolder.setValueForKey(groupKey, avgValue);
+      } else {
+        avgValue.setFirst(avgValue.getFirst() + valueArray[0][i]);
+        avgValue.setSecond(avgValue.getSecond() + 1);
+      }
     }
   }
 
@@ -91,17 +102,22 @@ public class AvgAggregationFunction implements AggregationFunction {
    * @param valueArray
    */
   @Override
-  public void aggregateGroupByMV(int length, int[][] docIdToGroupKeys, ResultHolder resultHolder,
+  public void aggregateGroupByMV(int length, int[][] docIdToGroupKeys, GroupByResultHolder resultHolder,
       double[]... valueArray) {
     Preconditions.checkArgument(valueArray.length == 1);
     Preconditions.checkState(length <= valueArray[0].length);
 
     for (int i = 0; i < length; ++i) {
+      double value = valueArray[0][i];
       for (int groupKey : docIdToGroupKeys[i]) {
         Pair<Double, Long> avgValue = (Pair<Double, Long>) resultHolder.getResult(groupKey);
-        avgValue.setFirst(avgValue.getFirst() + valueArray[0][i]);
-        avgValue.setSecond(avgValue.getSecond() + 1);
-        resultHolder.setValueForKey(groupKey, avgValue);
+        if (avgValue == null) {
+          avgValue = new Pair<>(value, 1L);
+          resultHolder.setValueForKey(groupKey, avgValue);
+        } else {
+          avgValue.setFirst(avgValue.getFirst() + valueArray[0][i]);
+          avgValue.setSecond(avgValue.getSecond() + 1);
+        }
       }
     }
   }

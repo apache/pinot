@@ -15,8 +15,9 @@
  */
 package com.linkedin.pinot.query.aggregation.function;
 
+import com.linkedin.pinot.core.operator.aggregation.AggregationResultHolder;
 import com.linkedin.pinot.core.operator.aggregation.function.SumAggregationFunction;
-import com.linkedin.pinot.core.operator.groupby.ResultHolder;
+import com.linkedin.pinot.core.operator.groupby.GroupByResultHolder;
 import com.linkedin.pinot.core.operator.groupby.ResultHolderFactory;
 import it.unimi.dsi.fastutil.ints.Int2DoubleOpenHashMap;
 import java.util.Map;
@@ -58,7 +59,7 @@ public class SumAggregationFunctionTest {
     }
 
     SumAggregationFunction sumAggregationFunction = new SumAggregationFunction();
-    ResultHolder resultHolder = ResultHolderFactory.getResultHolder(sumAggregationFunction, 1 /* maxNumResults */);
+    AggregationResultHolder resultHolder = ResultHolderFactory.getAggregationResultHolder(sumAggregationFunction);
 
     sumAggregationFunction.aggregate(NUM_VALUES_TO_AGGREGATE, resultHolder, valuesToAggregate);
     double actual = resultHolder.getDoubleResult();
@@ -94,7 +95,8 @@ public class SumAggregationFunctionTest {
     }
 
     SumAggregationFunction sumAggregationFunction = new SumAggregationFunction();
-    ResultHolder resultHolder = ResultHolderFactory.getResultHolder(sumAggregationFunction, MAX_NUM_GROUP_KEYS);
+    GroupByResultHolder resultHolder =
+        ResultHolderFactory.getGroupByResultHolder(sumAggregationFunction, MAX_NUM_GROUP_KEYS);
 
     sumAggregationFunction.aggregateGroupBySV(NUM_VALUES_TO_AGGREGATE, groupKeysForValues, resultHolder,
         valuesToAggregate);
