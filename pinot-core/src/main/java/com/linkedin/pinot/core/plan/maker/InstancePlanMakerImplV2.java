@@ -47,7 +47,7 @@ import org.slf4j.LoggerFactory;
 public class InstancePlanMakerImplV2 implements PlanMaker {
   private static final Logger LOGGER = LoggerFactory.getLogger(InstancePlanMakerImplV2.class);
   private static final String NEW_AGGREGATION_GROUPBY_STRING = "new.aggregation.groupby";
-  private boolean _enableNewAggreagationGroupBy = true;
+  private boolean _enableNewAggreagationGroupBy = false;
 
   /**
    * Default constructor.
