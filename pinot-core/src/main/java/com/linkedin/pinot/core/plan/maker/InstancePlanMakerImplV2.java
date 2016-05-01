@@ -63,7 +63,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
    * @param queryExecutorConfig
    */
   public InstancePlanMakerImplV2(QueryExecutorConfig queryExecutorConfig) {
-    _enableNewAggreagationGroupBy = queryExecutorConfig.getConfig().getBoolean(NEW_AGGREGATION_GROUPBY_STRING, true);
+    _enableNewAggreagationGroupBy = queryExecutorConfig.getConfig().getBoolean(NEW_AGGREGATION_GROUPBY_STRING, false);
     LOGGER.info("New AggregationGroupBy operator: {}", (_enableNewAggreagationGroupBy) ? "Enabled" : "Disabled");
   }
 
