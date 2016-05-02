@@ -39,21 +39,16 @@ public class AggregationGroupByPlanNode implements PlanNode {
   private final IndexSegment _indexSegment;
   private final BrokerRequest _brokerRequest;
   private final ProjectionPlanNode _projectionPlanNode;
-  private final List<AggregationFunctionGroupByPlanNode> _aggregationFunctionGroupByPlanNodes =
-      new ArrayList<AggregationFunctionGroupByPlanNode>();
-  private final AggregationGroupByImplementationType _aggregationGroupByImplementationType;
 
-  public AggregationGroupByPlanNode(IndexSegment indexSegment, BrokerRequest query,
-      AggregationGroupByImplementationType aggregationGroupByImplementationType) {
+  public AggregationGroupByPlanNode(IndexSegment indexSegment, BrokerRequest query) {
     _indexSegment = indexSegment;
     _brokerRequest = query;
-    _aggregationGroupByImplementationType = aggregationGroupByImplementationType;
     _projectionPlanNode = new ProjectionPlanNode(_indexSegment, getAggregationGroupByRelatedColumns(),
         new DocIdSetPlanNode(_indexSegment, _brokerRequest, 5000));
   }
 
   private String[] getAggregationGroupByRelatedColumns() {
-    Set<String> aggregationGroupByRelatedColumns = new HashSet<String>();
+    Set<String> aggregationGroupByRelatedColumns = new HashSet<>();
     for (AggregationInfo aggregationInfo : _brokerRequest.getAggregationsInfo()) {
       if (aggregationInfo.getAggregationType().equalsIgnoreCase("count")) {
         continue;
@@ -62,7 +57,7 @@ public class AggregationGroupByPlanNode implements PlanNode {
       aggregationGroupByRelatedColumns.addAll(Arrays.asList(columns.split(",")));
     }
     aggregationGroupByRelatedColumns.addAll(_brokerRequest.getGroupBy().getColumns());
-    return aggregationGroupByRelatedColumns.toArray(new String[0]);
+    return aggregationGroupByRelatedColumns.toArray(new String[aggregationGroupByRelatedColumns.size()]);
   }
 
   @Override
@@ -78,10 +73,7 @@ public class AggregationGroupByPlanNode implements PlanNode {
     LOGGER.debug(prefix + "Operator: MAggregationGroupByOperator");
     LOGGER.debug(prefix + "Argument 0: Projection - ");
     _projectionPlanNode.showTree(prefix + "    ");
-    for (int i = 0; i < _brokerRequest.getAggregationsInfo().size(); ++i) {
-      LOGGER.debug(prefix + "Argument " + (i + 1) + ": AggregationGroupBy  - ");
-      _aggregationFunctionGroupByPlanNodes.get(i).showTree(prefix + "    ");
-    }
+    LOGGER.debug(prefix + "Argument 1: AggregationGroupBy");
   }
 
 }

@@ -71,7 +71,6 @@ import com.linkedin.pinot.core.query.reduce.DefaultReduceService;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
-import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.util.DoubleComparisonUtil;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
@@ -91,7 +90,6 @@ public class AggregationGroupByOperatorTest {
   public static IndexSegment _indexSegment;
   private static List<SegmentDataManager> _indexSegmentList;
 
-  public static AggregationInfo _paramsInfo;
   public static List<AggregationInfo> _aggregationInfos;
   public static int _numAggregations = 7;
 
@@ -140,7 +138,7 @@ public class AggregationGroupByOperatorTest {
     LOGGER.debug("built at : {}", INDEX_DIR.getAbsolutePath());
     final File indexSegmentDir = new File(INDEX_DIR, driver.getSegmentName());
     _indexSegment = ColumnarSegmentLoader.load(indexSegmentDir, ReadMode.heap);
-    _medataMap = ((SegmentMetadataImpl) ((IndexSegmentImpl) _indexSegment).getSegmentMetadata()).getColumnMetadataMap();
+    _medataMap = ((SegmentMetadataImpl) _indexSegment.getSegmentMetadata()).getColumnMetadataMap();
   }
 
   public void setupQuery() {
@@ -335,34 +333,11 @@ public class AggregationGroupByOperatorTest {
     final PlanMaker instancePlanMaker = new InstancePlanMakerImplV2();
     final PlanNode rootPlanNode = instancePlanMaker.makeInnerSegmentPlan(_indexSegment, brokerRequest);
     rootPlanNode.showTree("");
-    // UAggregationGroupByOperator operator = (UAggregationGroupByOperator) rootPlanNode.run();
-    final MAggregationGroupByOperator operator = (MAggregationGroupByOperator) rootPlanNode.run();
-    final IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
+    final IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) rootPlanNode.run().nextBlock();
     LOGGER.debug("RunningTime : {}", resultBlock.getTimeUsedMs());
     LOGGER.debug("NumDocsScanned : {}", resultBlock.getNumDocsScanned());
     LOGGER.debug("TotalDocs : {}", resultBlock.getTotalRawDocs());
 
-    /*
-    final AggregationGroupByOperatorService aggregationGroupByOperatorService =
-        new AggregationGroupByOperatorService(_aggregationInfos, brokerRequest.getGroupBy());
-
-    final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
-    instanceResponseMap.put(new ServerInstance("localhost:0000"), resultBlock.getAggregationGroupByResultDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:1111"), resultBlock.getAggregationGroupByResultDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:2222"), resultBlock.getAggregationGroupByResultDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:3333"), resultBlock.getAggregationGroupByResultDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:4444"), resultBlock.getAggregationGroupByResultDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:5555"), resultBlock.getAggregationGroupByResultDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:6666"), resultBlock.getAggregationGroupByResultDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:7777"), resultBlock.getAggregationGroupByResultDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:8888"), resultBlock.getAggregationGroupByResultDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:9999"), resultBlock.getAggregationGroupByResultDataTable());
-    final List<Map<String, Serializable>> reducedResults =
-        aggregationGroupByOperatorService.reduceGroupByOperators(instanceResponseMap);
-
-    final List<JSONObject> jsonResult = aggregationGroupByOperatorService.renderGroupByOperators(reducedResults);
-    LOGGER.debug("Result {}", jsonResult);
-    */
     logJsonResult(brokerRequest, resultBlock);
   }
 
@@ -372,9 +347,7 @@ public class AggregationGroupByOperatorTest {
     final PlanMaker instancePlanMaker = new InstancePlanMakerImplV2();
     final PlanNode rootPlanNode = instancePlanMaker.makeInnerSegmentPlan(_indexSegment, brokerRequest);
     rootPlanNode.showTree("");
-    // UAggregationGroupByOperator operator = (UAggregationGroupByOperator) rootPlanNode.run();
-    final MAggregationGroupByOperator operator = (MAggregationGroupByOperator) rootPlanNode.run();
-    final IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
+    final IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) rootPlanNode.run().nextBlock();
     LOGGER.debug("RunningTime : {}", resultBlock.getTimeUsedMs());
     LOGGER.debug("NumDocsScanned : {}", resultBlock.getNumDocsScanned());
     LOGGER.debug("TotalDocs : {}", resultBlock.getTotalRawDocs());

@@ -36,7 +36,7 @@ import java.util.Map;
  * Class for generating group-by keys for a given list of group-by columns.
  * Uses dictionary id's to generate group-by keys.
  *
- * If maximum number of possible group keys are less than a threshold (1M),
+ * If maximum number of possible group keys are less than a threshold (10K),
  * returns the group key generated based on dictionary id's for the group by columns.
  *
  * For larger values, maps the actual generated group by keys onto contiguous

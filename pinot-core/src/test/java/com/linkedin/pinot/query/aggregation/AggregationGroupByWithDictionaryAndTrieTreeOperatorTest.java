@@ -69,7 +69,6 @@ import com.linkedin.pinot.core.query.reduce.DefaultReduceService;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
-import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.util.DoubleComparisonUtil;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
@@ -89,7 +88,6 @@ public class AggregationGroupByWithDictionaryAndTrieTreeOperatorTest {
   public static IndexSegment _indexSegment;
   private static List<SegmentDataManager> _indexSegmentList;
 
-  public static AggregationInfo _paramsInfo;
   public static List<AggregationInfo> _aggregationInfos;
   public static int _numAggregations = 6;
 
@@ -130,7 +128,7 @@ public class AggregationGroupByWithDictionaryAndTrieTreeOperatorTest {
     LOGGER.debug("built at : {}", INDEX_DIR.getAbsolutePath());
     final File indexSegmentDir = new File(INDEX_DIR, driver.getSegmentName());
     _indexSegment = ColumnarSegmentLoader.load(indexSegmentDir, ReadMode.heap);
-    _medataMap = ((SegmentMetadataImpl) ((IndexSegmentImpl) _indexSegment).getSegmentMetadata()).getColumnMetadataMap();
+    _medataMap = ((SegmentMetadataImpl) _indexSegment.getSegmentMetadata()).getColumnMetadataMap();
   }
 
   public void setupQuery() {
@@ -268,8 +266,7 @@ public class AggregationGroupByWithDictionaryAndTrieTreeOperatorTest {
     final PlanMaker instancePlanMaker = new InstancePlanMakerImplV2();
     final PlanNode rootPlanNode = instancePlanMaker.makeInnerSegmentPlan(_indexSegment, brokerRequest);
     rootPlanNode.showTree("");
-    final MAggregationGroupByOperator operator = (MAggregationGroupByOperator) rootPlanNode.run();
-    final IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
+    final IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) rootPlanNode.run().nextBlock();
     LOGGER.debug("RunningTime : {}", resultBlock.getTimeUsedMs());
     LOGGER.debug("NumDocsScanned : {}", resultBlock.getNumDocsScanned());
     LOGGER.debug("TotalDocs : {}", resultBlock.getTotalRawDocs());
@@ -301,8 +298,7 @@ public class AggregationGroupByWithDictionaryAndTrieTreeOperatorTest {
     final PlanMaker instancePlanMaker = new InstancePlanMakerImplV2();
     final PlanNode rootPlanNode = instancePlanMaker.makeInnerSegmentPlan(_indexSegment, brokerRequest);
     rootPlanNode.showTree("");
-    final MAggregationGroupByOperator operator = (MAggregationGroupByOperator) rootPlanNode.run();
-    final IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
+    final IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) rootPlanNode.run().nextBlock();
     LOGGER.debug("RunningTime : {}", resultBlock.getTimeUsedMs());
     LOGGER.debug("NumDocsScanned : {}", resultBlock.getNumDocsScanned());
     LOGGER.debug("TotalDocs : {}", resultBlock.getTotalRawDocs());

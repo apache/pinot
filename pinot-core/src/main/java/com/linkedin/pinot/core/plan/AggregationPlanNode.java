@@ -80,25 +80,5 @@ public class AggregationPlanNode implements PlanNode {
       LOGGER.debug(prefix + "Argument " + (i + 1) + ": Aggregation  - ");
       _aggregationFunctionPlanNodes.get(i).showTree(prefix + "    ");
     }
-
-  }
-
-  /**
-   * Returns true AggregationGroupByPlanNode can serve the given BrokerRequest, false otherwise.
-   * - Only 'sum', 'min', 'max' & 'avg' aggregation functions are supported currently.
-   *
-   * @param brokerRequest
-   * @return
-   */
-  public static boolean isFitForAggregationFastAggregation(BrokerRequest brokerRequest) {
-    for (AggregationInfo aggregationInfo : brokerRequest.getAggregationsInfo()) {
-      String aggregationType = aggregationInfo.getAggregationType();
-
-      if (aggregationType.equalsIgnoreCase("sum") || aggregationType.equalsIgnoreCase("min") ||
-          aggregationType.equalsIgnoreCase("max") || aggregationType.equals("avg")) {
-        return true;
-      }
-    }
-    return false;
   }
 }

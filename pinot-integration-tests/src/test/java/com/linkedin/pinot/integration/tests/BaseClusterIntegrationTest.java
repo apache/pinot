@@ -209,7 +209,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
       // Run the query
       JSONObject response = postQuery(pqlQuery);
       if (response.getJSONArray("exceptions").length() > 0) {
-        String processingException = (String) response.getJSONArray("exceptions").get(0);
+        String processingException = response.getJSONArray("exceptions").get(0).toString();
         if (GATHER_FAILED_QUERIES) {
           saveFailedQuery(pqlQuery, sqlQueries, "Got exceptions in pql query " + pqlQuery + ", got " + response + " " +
               processingException);

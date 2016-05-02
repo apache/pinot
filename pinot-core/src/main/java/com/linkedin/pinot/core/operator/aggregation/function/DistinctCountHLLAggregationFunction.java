@@ -44,12 +44,13 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction 
     Preconditions.checkArgument(valueArray.length == 1);
     Preconditions.checkState(length <= valueArray[0].length);
 
+    HyperLogLog hll = (HyperLogLog) resultHolder.getResult();
+    if (hll == null) {
+      hll = new HyperLogLog(DEFAULT_BIT_SIZE);
+      resultHolder.setValue(hll);
+    }
+
     for (int i = 0; i < length; i++) {
-      HyperLogLog hll = (HyperLogLog) resultHolder.getResult();
-      if (hll == null) {
-        hll = new HyperLogLog(DEFAULT_BIT_SIZE);
-        resultHolder.setValue(hll);
-      }
       hll.offer((int) valueArray[0][i]);
     }
   }

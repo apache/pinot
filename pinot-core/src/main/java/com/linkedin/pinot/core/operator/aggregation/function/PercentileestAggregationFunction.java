@@ -28,7 +28,7 @@ import java.util.List;
 public class PercentileestAggregationFunction implements AggregationFunction {
   private final String FUNCTION_NAME;
   private static final ResultDataType RESULT_DATA_TYPE = ResultDataType.PERCENTILEEST_QUANTILEDIGEST;
-  private static final double DEFAULT_MAX_ERROR = 0.05;
+  public static final double DEFAULT_MAX_ERROR = 0.05;
   private final int _percentile;
 
   public PercentileestAggregationFunction(int percentile) {
@@ -65,12 +65,13 @@ public class PercentileestAggregationFunction implements AggregationFunction {
     Preconditions.checkArgument(valueArray.length == 1);
     Preconditions.checkState(length <= valueArray[0].length);
 
+    QuantileDigest digest = (QuantileDigest) resultHolder.getResult();
+    if (digest == null) {
+      digest = new QuantileDigest(DEFAULT_MAX_ERROR);
+      resultHolder.setValue(digest);
+    }
+
     for (int i = 0; i < length; i++) {
-      QuantileDigest digest = (QuantileDigest) resultHolder.getResult();
-      if (digest == null) {
-        digest = new QuantileDigest(DEFAULT_MAX_ERROR);
-        resultHolder.setValue(digest);
-      }
       digest.add((long) valueArray[0][i]);
     }
   }

@@ -43,12 +43,13 @@ public class DistinctCountAggregationFunction implements AggregationFunction {
     Preconditions.checkArgument(valueArray.length == 1);
     Preconditions.checkState(length <= valueArray[0].length);
 
+    IntOpenHashSet valueSet = (IntOpenHashSet) resultHolder.getResult();
+    if (valueSet == null) {
+      valueSet = new IntOpenHashSet();
+      resultHolder.setValue(valueSet);
+    }
+
     for (int i = 0; i < length; i++) {
-      IntOpenHashSet valueSet = (IntOpenHashSet) resultHolder.getResult();
-      if (valueSet == null) {
-        valueSet = new IntOpenHashSet();
-        resultHolder.setValue(valueSet);
-      }
       valueSet.add((int) valueArray[0][i]);
     }
   }

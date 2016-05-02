@@ -73,7 +73,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     if (brokerRequest.isSetAggregationsInfo()) {
       if (!brokerRequest.isSetGroupBy()) {
         // Only Aggregation
-        if (useNewAggregationOperator(brokerRequest)) {
+        if (_enableNewAggreagationGroupBy) {
           return new AggregationPlanNode(indexSegment, brokerRequest);
         } else {
           return new AggregationOperatorPlanNode(indexSegment, brokerRequest);
@@ -83,20 +83,19 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
         PlanNode aggregationGroupByPlanNode;
         if (indexSegment instanceof IndexSegmentImpl) {
 
-          // AggregationGroupByPlanNode is the new implementation of group-by aggregations, and is currently turned OFF.
-          // Once all feature and perf testing is performed, the code will be turned ON, and this 'if' check will
-          // be removed.
-          if (_enableNewAggreagationGroupBy) {
-            aggregationGroupByPlanNode = new AggregationGroupByPlanNode(indexSegment, brokerRequest,
-                AggregationGroupByImplementationType.Dictionary);
-          } else {
-            if (isGroupKeyFitForLong(indexSegment, brokerRequest)) {
-              aggregationGroupByPlanNode = new AggregationGroupByOperatorPlanNode(indexSegment, brokerRequest,
-                  AggregationGroupByImplementationType.Dictionary);
+          if (isGroupKeyFitForLong(indexSegment, brokerRequest)) {
+            // AggregationGroupByPlanNode is the new implementation of group-by aggregations, and is currently turned OFF.
+            // Once all feature and perf testing is performed, the code will be turned ON, and this 'if' check will
+            // be removed.
+            if (_enableNewAggreagationGroupBy) {
+              aggregationGroupByPlanNode = new AggregationGroupByPlanNode(indexSegment, brokerRequest);
             } else {
               aggregationGroupByPlanNode = new AggregationGroupByOperatorPlanNode(indexSegment, brokerRequest,
-                  AggregationGroupByImplementationType.DictionaryAndTrie);
+                  AggregationGroupByImplementationType.Dictionary);
             }
+          } else {
+            aggregationGroupByPlanNode = new AggregationGroupByOperatorPlanNode(indexSegment, brokerRequest,
+                AggregationGroupByImplementationType.DictionaryAndTrie);
           }
         } else {
           aggregationGroupByPlanNode =
@@ -111,18 +110,6 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
       return selectionPlanNode;
     }
     throw new UnsupportedOperationException("The query contains no aggregation or selection!");
-  }
-
-  /**
-   * Temporary method to check if the new implementation of Aggregation can be used.
-   * This method will be removed once the new implementation of AggregationOperator is turned
-   * ON by default.
-   *
-   * @param brokerRequest
-   * @return
-   */
-  private boolean useNewAggregationOperator(BrokerRequest brokerRequest) {
-    return _enableNewAggreagationGroupBy && AggregationPlanNode.isFitForAggregationFastAggregation(brokerRequest);
   }
 
   @Override

@@ -31,7 +31,8 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.json.JSONArray;
 import org.json.JSONException;
-import org.testng.Assert;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -54,10 +55,7 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
-import com.linkedin.pinot.core.operator.query.MAggregationGroupByOperator;
-import com.linkedin.pinot.core.operator.query.MAggregationOperator;
 import com.linkedin.pinot.core.operator.query.MSelectionOnlyOperator;
-import com.linkedin.pinot.core.operator.query.MSelectionOrderByOperator;
 import com.linkedin.pinot.core.plan.Plan;
 import com.linkedin.pinot.core.plan.PlanNode;
 import com.linkedin.pinot.core.plan.maker.InstancePlanMakerImplV2;
@@ -69,19 +67,29 @@ import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 import com.linkedin.pinot.util.TestUtils;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+
 import static org.testng.Assert.assertEquals;
 
 
 public class PlanMakerTest {
+  private static final Logger LOGGER = LoggerFactory.getLogger(PlanMakerTest.class);
 
-  private final String LARGE_AVRO_DATA = "data/simpleData2000001.avro";
-  private final String SMALL_AVRO_DATA = "data/simpleData200001.avro";
+  private static final String LARGE_AVRO_DATA = "data/simpleData2000001.avro";
+  private static final String SMALL_AVRO_DATA = "data/simpleData200001.avro";
   private static File INDEX_DIR = new File(FileUtils.getTempDirectory() + File.separator + "TestPlanMaker");
   private static File INDEXES_DIR = new File(FileUtils.getTempDirectory() + File.separator + "TestPlanMakerList");
 
-  private static BrokerRequest _brokerRequest;
-  private static IndexSegment _indexSegment;
-  private static List<IndexSegment> _indexSegmentList = new ArrayList<IndexSegment>();
+  private static final int COUNT_AGGREGATION_INDEX = 0;
+  private static final int SUM_AGGREGATION_INDEX = 1;
+  private static final int MAX_AGGREGATION_INDEX = 2;
+  private static final int MIN_AGGREGATION_INDEX = 3;
+  private static final int AVG_AGGREGATION_INDEX = 4;
+  private static final int DISTINCT_DIM0_AGGREGATION_INDEX = 5;
+  private static final int DISTINCT_DIM1_AGGREGATION_INDEX = 6;
+
+  private BrokerRequest _brokerRequest;
+  private IndexSegment _indexSegment;
+  private List<IndexSegment> _indexSegmentList = new ArrayList<>();
 
   @BeforeClass
   public void setup() {
@@ -92,7 +100,6 @@ public class PlanMakerTest {
     } catch (Exception e) {
       e.printStackTrace();
     }
-
   }
 
   @AfterClass
@@ -110,7 +117,6 @@ public class PlanMakerTest {
     if (INDEXES_DIR.exists()) {
       FileUtils.deleteQuietly(INDEXES_DIR);
     }
-
   }
 
   private void setupSegment() throws Exception {
@@ -129,7 +135,7 @@ public class PlanMakerTest {
     driver.init(config);
     driver.build();
 
-    System.out.println("built at : " + INDEX_DIR.getAbsolutePath());
+    LOGGER.debug("built at: {}", INDEX_DIR.getAbsolutePath());
     final File indexSegmentDir = new File(INDEX_DIR, driver.getSegmentName());
     _indexSegment = ColumnarSegmentLoader.load(indexSegmentDir, ReadMode.mmap);
   }
@@ -153,7 +159,7 @@ public class PlanMakerTest {
       driver.init(config);
       driver.build();
 
-      System.out.println("built at : " + segmentDir.getAbsolutePath());
+      LOGGER.debug("built at: {}", segmentDir.getAbsolutePath());
       _indexSegmentList.add(ColumnarSegmentLoader.load(new File(segmentDir, driver.getSegmentName()), ReadMode.mmap));
     }
   }
@@ -164,22 +170,17 @@ public class PlanMakerTest {
     PlanMaker instancePlanMaker = new InstancePlanMakerImplV2();
     PlanNode rootPlanNode = instancePlanMaker.makeInnerSegmentPlan(_indexSegment, brokerRequest);
     rootPlanNode.showTree("");
-    MAggregationOperator operator = (MAggregationOperator) rootPlanNode.run();
-    IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
-    System.out.println(resultBlock.getAggregationResult().get(0));
-    System.out.println(resultBlock.getAggregationResult().get(1));
-    System.out.println(resultBlock.getAggregationResult().get(2));
-    System.out.println(resultBlock.getAggregationResult().get(3));
-    System.out.println(resultBlock.getAggregationResult().get(4));
-    System.out.println(resultBlock.getAggregationResult().get(5));
-    System.out.println(resultBlock.getAggregationResult().get(6));
-    Assert.assertEquals(((Number)resultBlock.getAggregationResult().get(0)).longValue(), 2000001L);
-    Assert.assertEquals(resultBlock.getAggregationResult().get(1), 2000001000000.0);
-    Assert.assertEquals(resultBlock.getAggregationResult().get(2), 2000000.0);
-    Assert.assertEquals(resultBlock.getAggregationResult().get(3), 0.0);
-    Assert.assertEquals(Double.parseDouble(resultBlock.getAggregationResult().get(4).toString()), 1000000.0);
-    Assert.assertEquals(((IntOpenHashSet) resultBlock.getAggregationResult().get(5)).size(), 10);
-    Assert.assertEquals(((IntOpenHashSet) resultBlock.getAggregationResult().get(6)).size(), 100);
+    IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) rootPlanNode.run().nextBlock();
+    for (int i = 0; i < 7; i++) {
+      LOGGER.debug(resultBlock.getAggregationResult().get(i).toString());
+    }
+    assertEquals(((Number) resultBlock.getAggregationResult().get(0)).longValue(), 2000001L);
+    assertEquals(resultBlock.getAggregationResult().get(1), 2000001000000.0);
+    assertEquals(resultBlock.getAggregationResult().get(2), 2000000.0);
+    assertEquals(resultBlock.getAggregationResult().get(3), 0.0);
+    assertEquals(Double.parseDouble(resultBlock.getAggregationResult().get(4).toString()), 1000000.0);
+    assertEquals(((IntOpenHashSet) resultBlock.getAggregationResult().get(5)).size(), 10);
+    assertEquals(((IntOpenHashSet) resultBlock.getAggregationResult().get(6)).size(), 100);
   }
 
   @Test
@@ -196,15 +197,13 @@ public class PlanMakerTest {
     PlanMaker instancePlanMaker = new InstancePlanMakerImplV2();
     PlanNode rootPlanNode = instancePlanMaker.makeInnerSegmentPlan(_indexSegment, brokerRequest);
     rootPlanNode.showTree("");
-    //USelectionOperator operator = (USelectionOperator) rootPlanNode.run();
-    MSelectionOrderByOperator operator = (MSelectionOrderByOperator) rootPlanNode.run();
-    IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
+    IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) rootPlanNode.run().nextBlock();
     PriorityQueue<Serializable[]> retPriorityQueue = (PriorityQueue<Serializable[]>) resultBlock.getSelectionResult();
     while (!retPriorityQueue.isEmpty()) {
       Serializable[] row = retPriorityQueue.poll();
-      System.out.println(Arrays.toString(row));
-      Assert.assertEquals(row[0], 9);
-      Assert.assertEquals(row[1], 99);
+      LOGGER.debug(Arrays.toString(row));
+      assertEquals(row[0], 9);
+      assertEquals(row[1], 99);
     }
   }
 
@@ -221,10 +220,10 @@ public class PlanMakerTest {
     ArrayList<Serializable[]> retList = (ArrayList<Serializable[]>) resultBlock.getSelectionResult();
     int i = 0;
     for (Serializable[] row : retList) {
-      System.out.println(Arrays.toString(row));
-      Assert.assertEquals(row[0], (i % 10));
-      Assert.assertEquals(row[1], i);
-      Assert.assertEquals(row[2], i);
+      LOGGER.debug(Arrays.toString(row));
+      assertEquals(row[0], (i % 10));
+      assertEquals(row[1], i);
+      assertEquals(row[2], i);
       i++;
     }
   }
@@ -243,111 +242,97 @@ public class PlanMakerTest {
     PlanMaker instancePlanMaker = new InstancePlanMakerImplV2();
     PlanNode rootPlanNode = instancePlanMaker.makeInnerSegmentPlan(_indexSegment, brokerRequest);
     rootPlanNode.showTree("");
-    MAggregationGroupByOperator operator = (MAggregationGroupByOperator) rootPlanNode.run();
-    IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
-    System.out.println("RunningTime : " + resultBlock.getTimeUsedMs());
-    System.out.println("NumDocsScanned : " + resultBlock.getNumDocsScanned());
-    System.out.println("TotalDocs : " + resultBlock.getTotalRawDocs());
-    //    System.out.println(resultBlock.getAggregationGroupByResult().get("0.0"));
+    IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) rootPlanNode.run().nextBlock();
+    LOGGER.debug("RunningTime: {}", resultBlock.getTimeUsedMs());
+    LOGGER.debug("NumDocsScanned: {}", resultBlock.getNumDocsScanned());
+    LOGGER.debug("TotalDocs: {}", resultBlock.getTotalRawDocs());
     List<Map<String, Serializable>> combinedGroupByResult = resultBlock.getAggregationGroupByOperatorResult();
-    //    Assert.assertEquals(20000001L, resultBlock.getAggregationResult().get(0));
-    //    Assert.assertEquals(200000010000000.0, resultBlock.getAggregationResult().get(1));
-    //    Assert.assertEquals(20000000.0, resultBlock.getAggregationResult().get(2));
-    //    Assert.assertEquals(0.0, resultBlock.getAggregationResult().get(3));
-    int i = 0;
-    Map<String, Serializable> singleGroupByResult = combinedGroupByResult.get(i);
+
+    Map<String, Serializable> singleGroupByResult = combinedGroupByResult.get(COUNT_AGGREGATION_INDEX);
     for (String keyString : singleGroupByResult.keySet()) {
       if (keyString.equals("0")) {
         Serializable resultList = singleGroupByResult.get(keyString);
-        System.out.println("grouped key : " + keyString + ", value : " + resultList);
+        LOGGER.debug("grouped key: {}, value: {}", keyString, resultList);
         assertEquals(200001, ((Number) resultList).longValue());
       } else {
         Serializable resultList = singleGroupByResult.get(keyString);
-        System.out.println("grouped key : " + keyString + ", value : " + resultList);
+        LOGGER.debug("grouped key: {}, value: {}", keyString, resultList);
         assertEquals(200000, ((Number) resultList).longValue());
       }
     }
 
-    i = 1;
-    singleGroupByResult = combinedGroupByResult.get(i);
+    singleGroupByResult = combinedGroupByResult.get(SUM_AGGREGATION_INDEX);
     for (String keyString : singleGroupByResult.keySet()) {
       if (keyString.equals("0")) {
         Serializable resultList = singleGroupByResult.get(keyString);
-        System.out.println("grouped key : " + keyString + ", value : " + resultList);
+        LOGGER.debug("grouped key: {}, value: {}", keyString, resultList);
         double expectedSumValue =
             ((Double.parseDouble(keyString) + 2000000 + Double.parseDouble(keyString)) * 200001) / 2;
         assertEquals(expectedSumValue, ((Double) resultList).doubleValue());
       } else {
         Serializable resultList = singleGroupByResult.get(keyString);
-        System.out.println("grouped key : " + keyString + ", value : " + resultList);
+        LOGGER.debug("grouped key: {}, value: {}", keyString, resultList);
         double expectedSumValue =
             (((Double.parseDouble(keyString) + 2000000) - 10) + Double.parseDouble(keyString)) * 100000;
         assertEquals(expectedSumValue, ((Double) resultList).doubleValue());
       }
     }
 
-    i = 2;
-    singleGroupByResult = combinedGroupByResult.get(i);
+    singleGroupByResult = combinedGroupByResult.get(MAX_AGGREGATION_INDEX);
     for (String keyString : singleGroupByResult.keySet()) {
       if (keyString.equals("0")) {
         Serializable resultList = singleGroupByResult.get(keyString);
-        System.out.println("grouped key : " + keyString + ", value : " + resultList);
+        LOGGER.debug("grouped key: {}, value: {}", keyString, resultList);
         assertEquals(2000000 + Double.parseDouble(keyString), ((Double) resultList).doubleValue());
-
       } else {
         Serializable resultList = singleGroupByResult.get(keyString);
-        System.out.println("grouped key : " + keyString + ", value : " + resultList);
+        LOGGER.debug("grouped key: {}, value: {}", keyString, resultList);
         assertEquals((2000000 - 10) + Double.parseDouble(keyString), ((Double) resultList).doubleValue());
-
       }
     }
 
-    i = 3;
-    singleGroupByResult = combinedGroupByResult.get(i);
+    singleGroupByResult = combinedGroupByResult.get(MIN_AGGREGATION_INDEX);
     for (String keyString : singleGroupByResult.keySet()) {
       if (keyString.equals("0")) {
         Serializable resultList = singleGroupByResult.get(keyString);
-        System.out.println("grouped key : " + keyString + ", value : " + resultList);
+        LOGGER.debug("grouped key: {}, value: {}", keyString, resultList);
         assertEquals(Double.parseDouble(keyString), ((Double) resultList).doubleValue());
       } else {
         Serializable resultList = singleGroupByResult.get(keyString);
-        System.out.println("grouped key : " + keyString + ", value : " + resultList);
+        LOGGER.debug("grouped key: {}, value: {}", keyString, resultList);
         assertEquals(Double.parseDouble(keyString), ((Double) resultList).doubleValue());
       }
     }
 
-    i = 4;
-    singleGroupByResult = combinedGroupByResult.get(i);
+    singleGroupByResult = combinedGroupByResult.get(AVG_AGGREGATION_INDEX);
     for (String keyString : singleGroupByResult.keySet()) {
       if (keyString.equals("0")) {
         Serializable resultList = singleGroupByResult.get(keyString);
 
-        System.out.println("grouped key : " + keyString + ", value : " + resultList);
+        LOGGER.debug("grouped key: {}, value: {}", keyString, resultList);
         double expectedAvgValue =
             ((Double.parseDouble(keyString) + 2000000 + Double.parseDouble(keyString)) * 200001) / 2 / 200001;
         assertEquals(expectedAvgValue, Double.parseDouble((resultList.toString())));
       } else {
         Serializable resultList = singleGroupByResult.get(keyString);
-        System.out.println("grouped key : " + keyString + ", value : " + resultList);
+        LOGGER.debug("grouped key: {}, value: {}", keyString, resultList);
         double expectedAvgValue =
             ((((Double.parseDouble(keyString) + 2000000) - 10) + Double.parseDouble(keyString)) * 100000) / 200000;
         assertEquals(expectedAvgValue, Double.parseDouble((resultList.toString())));
       }
     }
 
-    i = 5;
-    singleGroupByResult = combinedGroupByResult.get(i);
+    singleGroupByResult = combinedGroupByResult.get(DISTINCT_DIM0_AGGREGATION_INDEX);
     for (String keyString : singleGroupByResult.keySet()) {
       Serializable resultList = singleGroupByResult.get(keyString);
-      System.out.println("grouped key : " + keyString + ", value : " + resultList);
+      LOGGER.debug("grouped key: {}, value: {}", keyString, resultList);
       assertEquals(1, ((IntOpenHashSet) resultList).size());
     }
 
-    i = 6;
-    singleGroupByResult = combinedGroupByResult.get(i);
+    singleGroupByResult = combinedGroupByResult.get(DISTINCT_DIM1_AGGREGATION_INDEX);
     for (String keyString : singleGroupByResult.keySet()) {
       Serializable resultList = singleGroupByResult.get(keyString);
-      System.out.println("grouped key : " + keyString + ", value : " + resultList);
+      LOGGER.debug("grouped key: {}, value: {}", keyString, resultList);
       assertEquals(10, ((IntOpenHashSet) resultList).size());
     }
   }
@@ -361,16 +346,15 @@ public class PlanMakerTest {
     PlanMaker instancePlanMaker = new InstancePlanMakerImplV2();
     PlanNode rootPlanNode = instancePlanMaker.makeInnerSegmentPlan(_indexSegment, brokerRequest);
     rootPlanNode.showTree("");
-    MAggregationGroupByOperator operator = (MAggregationGroupByOperator) rootPlanNode.run();
-    IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
-    System.out.println("RunningTime : " + resultBlock.getTimeUsedMs());
-    System.out.println("NumDocsScanned : " + resultBlock.getNumDocsScanned());
-    System.out.println("TotalDocs : " + resultBlock.getTotalRawDocs());
+    IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) rootPlanNode.run().nextBlock();
+    LOGGER.debug("RunningTime: {}", resultBlock.getTimeUsedMs());
+    LOGGER.debug("NumDocsScanned: {}", resultBlock.getNumDocsScanned());
+    LOGGER.debug("TotalDocs: {}", resultBlock.getTotalRawDocs());
     List<Map<String, Serializable>> combinedGroupByResult = resultBlock.getAggregationGroupByOperatorResult();
     for (int i = 0; i < combinedGroupByResult.size(); ++i) {
-      System.out.println("function : " + brokerRequest.getAggregationsInfo().get(i));
+      LOGGER.debug("function: {}", brokerRequest.getAggregationsInfo().get(i));
       for (String keyString : combinedGroupByResult.get(i).keySet()) {
-        System.out.println("grouped key : " + keyString + ", value : " + combinedGroupByResult.get(i).get(keyString));
+        LOGGER.debug("grouped key: {}, value: {}", keyString, combinedGroupByResult.get(i).get(keyString));
       }
     }
   }
@@ -382,16 +366,19 @@ public class PlanMakerTest {
     brokerRequest.setSelections(null);
     brokerRequest.setSelectionsIsSet(false);
     ExecutorService executorService = Executors.newCachedThreadPool(new NamedThreadFactory("test-plan-maker"));
-    Plan globalPlan = instancePlanMaker.makeInterSegmentPlan(makeSegMgrList(_indexSegmentList), brokerRequest, executorService, 150000);
+    Plan globalPlan =
+        instancePlanMaker.makeInterSegmentPlan(makeSegMgrList(_indexSegmentList), brokerRequest, executorService,
+            150000);
     globalPlan.print();
-    System.out.println("/////////////////////////////////////////////////////////////////////////////");
     brokerRequest = setFilterQuery(brokerRequest);
-    globalPlan = instancePlanMaker.makeInterSegmentPlan(makeSegMgrList(_indexSegmentList), brokerRequest, executorService, 150000);
+    globalPlan =
+        instancePlanMaker.makeInterSegmentPlan(makeSegMgrList(_indexSegmentList), brokerRequest, executorService,
+            150000);
     globalPlan.print();
   }
 
   private List<SegmentDataManager> makeSegMgrList(List<IndexSegment> indexSegmentList) {
-    List<SegmentDataManager> segMgrList = new ArrayList(indexSegmentList.size());
+    List<SegmentDataManager> segMgrList = new ArrayList<>(indexSegmentList.size());
     for (IndexSegment segment : indexSegmentList) {
       segMgrList.add(new OfflineSegmentDataManager(segment));
     }
@@ -403,30 +390,32 @@ public class PlanMakerTest {
     PlanMaker instancePlanMaker = new InstancePlanMakerImplV2();
     BrokerRequest brokerRequest = _brokerRequest.deepCopy();
     ExecutorService executorService = Executors.newCachedThreadPool(new NamedThreadFactory("test-plan-maker"));
-    Plan globalPlan = instancePlanMaker.makeInterSegmentPlan(makeSegMgrList(_indexSegmentList), brokerRequest, executorService, 150000);
+    Plan globalPlan =
+        instancePlanMaker.makeInterSegmentPlan(makeSegMgrList(_indexSegmentList), brokerRequest, executorService,
+            150000);
     globalPlan.print();
     globalPlan.execute();
     DataTable instanceResponse = globalPlan.getInstanceResponse();
-    System.out.println(instanceResponse.getLong(0, 0));
-    System.out.println(instanceResponse.getDouble(0, 1));
-    System.out.println(instanceResponse.getDouble(0, 2));
-    System.out.println(instanceResponse.getDouble(0, 3));
-    System.out.println(instanceResponse.getObject(0, 4).toString());
-    System.out.println(instanceResponse.getObject(0, 5).toString());
-    System.out.println(instanceResponse.getObject(0, 6).toString());
-    System.out.println("Query time: " + instanceResponse.getMetadata().get("timeUsedMs"));
-    Assert.assertEquals(200001L * _indexSegmentList.size(), instanceResponse.getLong(0, 0));
-    Assert.assertEquals(20000100000.0 * _indexSegmentList.size(), instanceResponse.getDouble(0, 1));
-    Assert.assertEquals(200000.0, instanceResponse.getDouble(0, 2));
-    Assert.assertEquals(0.0, instanceResponse.getDouble(0, 3));
-    Assert.assertEquals(100000.0, Double.parseDouble(instanceResponse.getObject(0, 4).toString()));
-    Assert.assertEquals(10, ((IntOpenHashSet) instanceResponse.getObject(0, 5)).size());
-    Assert.assertEquals(100, ((IntOpenHashSet) instanceResponse.getObject(0, 6)).size());
+    LOGGER.debug(Long.toString(instanceResponse.getLong(0, 0)));
+    LOGGER.debug(Double.toString(instanceResponse.getDouble(0, 1)));
+    LOGGER.debug(Double.toString(instanceResponse.getDouble(0, 2)));
+    LOGGER.debug(Double.toString(instanceResponse.getDouble(0, 3)));
+    LOGGER.debug(instanceResponse.getObject(0, 4).toString());
+    LOGGER.debug(instanceResponse.getObject(0, 5).toString());
+    LOGGER.debug(instanceResponse.getObject(0, 6).toString());
+    LOGGER.debug("Query time: {}", instanceResponse.getMetadata().get("timeUsedMs"));
+    assertEquals(200001L * _indexSegmentList.size(), instanceResponse.getLong(0, 0));
+    assertEquals(20000100000.0 * _indexSegmentList.size(), instanceResponse.getDouble(0, 1));
+    assertEquals(200000.0, instanceResponse.getDouble(0, 2));
+    assertEquals(0.0, instanceResponse.getDouble(0, 3));
+    assertEquals(100000.0, Double.parseDouble(instanceResponse.getObject(0, 4).toString()));
+    assertEquals(10, ((IntOpenHashSet) instanceResponse.getObject(0, 5)).size());
+    assertEquals(100, ((IntOpenHashSet) instanceResponse.getObject(0, 6)).size());
     DefaultReduceService reduceService = new DefaultReduceService();
     Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     instanceResponseMap.put(new ServerInstance("localhost:1111"), instanceResponse);
     BrokerResponseJSON brokerResponse = reduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
-    System.out.println(brokerResponse.getAggregationResults());
+    LOGGER.debug(brokerResponse.getAggregationResults().toString());
   }
 
   @Test
@@ -434,43 +423,44 @@ public class PlanMakerTest {
     PlanMaker instancePlanMaker = new InstancePlanMakerImplV2();
     BrokerRequest brokerRequest = getAggregationGroupByNoFilterBrokerRequest();
     ExecutorService executorService = Executors.newCachedThreadPool(new NamedThreadFactory("test-plan-maker"));
-    Plan globalPlan = instancePlanMaker.makeInterSegmentPlan(makeSegMgrList(_indexSegmentList), brokerRequest, executorService, 150000);
+    Plan globalPlan =
+        instancePlanMaker.makeInterSegmentPlan(makeSegMgrList(_indexSegmentList), brokerRequest, executorService,
+            150000);
     globalPlan.print();
     globalPlan.execute();
     DataTable instanceResponse = globalPlan.getInstanceResponse();
 
-    System.out.println(instanceResponse);
+    LOGGER.debug(instanceResponse.toString());
     List<DataTable> instanceResponseList = new ArrayList<DataTable>();
     instanceResponseList.add(instanceResponse);
 
     List<Map<String, Serializable>> combinedGroupByResult =
         AggregationGroupByOperatorService.transformDataTableToGroupByResult(instanceResponse);
-    int i = 0;
-    Map<String, Serializable> singleGroupByResult = combinedGroupByResult.get(i);
+
+    Map<String, Serializable> singleGroupByResult = combinedGroupByResult.get(COUNT_AGGREGATION_INDEX);
     for (String keyString : singleGroupByResult.keySet()) {
       if (keyString.equals("0")) {
         Serializable resultList = singleGroupByResult.get(keyString);
-        System.out.println("grouped key : " + keyString + ", value : " + resultList);
+        LOGGER.debug("grouped key: {}, value: {}", keyString, resultList);
         assertEquals(400020, ((Number) resultList).longValue());
       } else {
         Serializable resultList = singleGroupByResult.get(keyString);
-        System.out.println("grouped key : " + keyString + ", value : " + resultList);
+        LOGGER.debug("grouped key: {}, value: {}", keyString, resultList);
         assertEquals(400000, ((Number) resultList).longValue());
       }
     }
 
-    i = 1;
-    singleGroupByResult = combinedGroupByResult.get(i);
+    singleGroupByResult = combinedGroupByResult.get(SUM_AGGREGATION_INDEX);
     for (String keyString : singleGroupByResult.keySet()) {
       if (keyString.equals("0")) {
         Serializable resultList = singleGroupByResult.get(keyString);
-        System.out.println("grouped key : " + keyString + ", value : " + resultList);
+        LOGGER.debug("grouped key: {}, value: {}", keyString, resultList);
         double expectedSumValue =
             (((Double.parseDouble(keyString) + 200000 + Double.parseDouble(keyString)) * 20001) / 2) * 20;
         assertEquals(expectedSumValue, ((Double) resultList).doubleValue());
       } else {
         Serializable resultList = singleGroupByResult.get(keyString);
-        System.out.println("grouped key : " + keyString + ", value : " + resultList);
+        LOGGER.debug("grouped key: {}, value: {}", keyString, resultList);
         double expectedSumValue =
             (((Double.parseDouble(keyString) + 200000) - 10) + Double.parseDouble(keyString)) * 10000 * 20;
 
@@ -478,69 +468,62 @@ public class PlanMakerTest {
       }
     }
 
-    i = 2;
-    singleGroupByResult = combinedGroupByResult.get(i);
+    singleGroupByResult = combinedGroupByResult.get(MAX_AGGREGATION_INDEX);
     for (String keyString : singleGroupByResult.keySet()) {
       if (keyString.equals("0")) {
         Serializable resultList = singleGroupByResult.get(keyString);
-        System.out.println("grouped key : " + keyString + ", value : " + resultList);
+        LOGGER.debug("grouped key: {}, value: {}", keyString, resultList);
         assertEquals(200000 + Double.parseDouble(keyString), ((Double) resultList).doubleValue());
-
       } else {
         Serializable resultList = singleGroupByResult.get(keyString);
-        System.out.println("grouped key : " + keyString + ", value : " + resultList);
+        LOGGER.debug("grouped key: {}, value: {}", keyString, resultList);
         assertEquals((200000 - 10) + Double.parseDouble(keyString), ((Double) resultList).doubleValue());
-
       }
     }
 
-    i = 3;
-    singleGroupByResult = combinedGroupByResult.get(i);
+    singleGroupByResult = combinedGroupByResult.get(MIN_AGGREGATION_INDEX);
     for (String keyString : singleGroupByResult.keySet()) {
       if (keyString.equals("0")) {
         Serializable resultList = singleGroupByResult.get(keyString);
-        System.out.println("grouped key : " + keyString + ", value : " + resultList);
+        LOGGER.debug("grouped key: {}, value: {}", keyString, resultList);
         assertEquals(Double.parseDouble(keyString), ((Double) resultList).doubleValue());
       } else {
         Serializable resultList = singleGroupByResult.get(keyString);
-        System.out.println("grouped key : " + keyString + ", value : " + resultList);
+        LOGGER.debug("grouped key: {}, value: {}", keyString, resultList);
         assertEquals(Double.parseDouble(keyString), ((Double) resultList).doubleValue());
       }
     }
 
-    i = 4;
-    singleGroupByResult = combinedGroupByResult.get(i);
+    singleGroupByResult = combinedGroupByResult.get(AVG_AGGREGATION_INDEX);
     for (String keyString : singleGroupByResult.keySet()) {
       if (keyString.equals("0")) {
         Serializable resultList = singleGroupByResult.get(keyString);
 
-        System.out.println("grouped key : " + keyString + ", value : " + resultList);
+        LOGGER.debug("grouped key: {}, value: {}", keyString, resultList);
         double expectedAvgValue =
             ((((Double.parseDouble(keyString) + 200000 + Double.parseDouble(keyString)) * 20001) / 2) * 20) / 400020;
         assertEquals(expectedAvgValue, Double.parseDouble((resultList.toString())));
       } else {
         Serializable resultList = singleGroupByResult.get(keyString);
-        System.out.println("grouped key : " + keyString + ", value : " + resultList);
+        LOGGER.debug("grouped key: {}, value: {}", keyString, resultList);
         double expectedAvgValue =
             ((((Double.parseDouble(keyString) + 200000) - 10) + Double.parseDouble(keyString)) * 10000 * 20) / 400000;
         assertEquals(expectedAvgValue, Double.parseDouble((resultList.toString())));
       }
     }
 
-    i = 5;
-    singleGroupByResult = combinedGroupByResult.get(i);
+    singleGroupByResult = combinedGroupByResult.get(DISTINCT_DIM0_AGGREGATION_INDEX);
     for (String keyString : singleGroupByResult.keySet()) {
       Serializable resultList = singleGroupByResult.get(keyString);
-      System.out.println("grouped key : " + keyString + ", value : " + resultList);
+      LOGGER.debug("grouped key: {}, value: {}", keyString, resultList);
       int expectedAvgValue = 1;
       assertEquals(expectedAvgValue, ((IntOpenHashSet) resultList).size());
     }
 
-    i = 6;
-    singleGroupByResult = combinedGroupByResult.get(i);
+    singleGroupByResult = combinedGroupByResult.get(DISTINCT_DIM1_AGGREGATION_INDEX);
     for (String keyString : singleGroupByResult.keySet()) {
       Serializable resultList = singleGroupByResult.get(keyString);
-      System.out.println("grouped key : " + keyString + ", value : " + resultList);
+      LOGGER.debug("grouped key: {}, value: {}", keyString, resultList);
       int expectedAvgValue = 10;
       assertEquals(expectedAvgValue, ((IntOpenHashSet) resultList).size());
     }
@@ -549,13 +532,13 @@ public class PlanMakerTest {
     Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
     BrokerResponseJSON brokerResponse = defaultReduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
-    System.out.println(new JSONArray(brokerResponse.getAggregationResults()));
-    System.out.println("Time used : " + brokerResponse.getTimeUsedMs());
-
+    LOGGER.debug(new JSONArray(brokerResponse.getAggregationResults()).toString());
+    LOGGER.debug("Time used: {}", brokerResponse.getTimeUsedMs());
   }
 
   @Test
-  public void testInterSegmentSelectionPlanMaker() throws JSONException {
+  public void testInterSegmentSelectionPlanMaker()
+      throws JSONException {
     PlanMaker instancePlanMaker = new InstancePlanMakerImplV2();
     BrokerRequest brokerRequest = _brokerRequest.deepCopy();
     brokerRequest.setAggregationsInfo(null);
@@ -564,11 +547,14 @@ public class PlanMakerTest {
     brokerRequest.getSelections().setOffset(0);
     brokerRequest.getSelections().setSize(20);
     ExecutorService executorService = Executors.newCachedThreadPool(new NamedThreadFactory("test-plan-maker"));
-    Plan globalPlan = instancePlanMaker.makeInterSegmentPlan(makeSegMgrList(_indexSegmentList), brokerRequest, executorService, 150000);
+    Plan globalPlan =
+        instancePlanMaker.makeInterSegmentPlan(makeSegMgrList(_indexSegmentList), brokerRequest, executorService,
+            150000);
     globalPlan.print();
-    System.out.println("/////////////////////////////////////////////////////////////////////////////");
     brokerRequest = setFilterQuery(brokerRequest);
-    globalPlan = instancePlanMaker.makeInterSegmentPlan(makeSegMgrList(_indexSegmentList), brokerRequest, executorService, 150000);
+    globalPlan =
+        instancePlanMaker.makeInterSegmentPlan(makeSegMgrList(_indexSegmentList), brokerRequest, executorService,
+            150000);
     globalPlan.print();
     globalPlan.execute();
     DataTable instanceResponse = globalPlan.getInstanceResponse();
@@ -579,17 +565,16 @@ public class PlanMakerTest {
     instanceResponseMap.put(new ServerInstance("localhost:1111"), instanceResponse);
 
     BrokerResponseJSON brokerResponse = defaultReduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
-    System.out.println(brokerResponse.getSelectionResults());
-    System.out.println("TimeUsedMs : " + brokerResponse.getTimeUsedMs());
-    System.out.println(brokerResponse);
+    LOGGER.debug(brokerResponse.getSelectionResults().toString());
+    LOGGER.debug("Time used: {}", brokerResponse.getTimeUsedMs());
+    LOGGER.debug(brokerResponse.toString());
     JSONArray selectionResultsArray = brokerResponse.getSelectionResults().getJSONArray("results");
     for (int j = 0; j < selectionResultsArray.length(); ++j) {
-      System.out.println(selectionResultsArray.getJSONArray(j));
-      Assert.assertEquals(selectionResultsArray.getJSONArray(j).getInt(0), 1);
-      Assert.assertEquals(selectionResultsArray.getJSONArray(j).getInt(1), 91);
-      Assert.assertEquals(selectionResultsArray.getJSONArray(j).getInt(2) % 100, 91);
+      LOGGER.debug(selectionResultsArray.getJSONArray(j).toString());
+      assertEquals(selectionResultsArray.getJSONArray(j).getInt(0), 1);
+      assertEquals(selectionResultsArray.getJSONArray(j).getInt(1), 91);
+      assertEquals(selectionResultsArray.getJSONArray(j).getInt(2) % 100, 91);
     }
-
   }
 
   @Test
@@ -603,11 +588,14 @@ public class PlanMakerTest {
     brokerRequest.getSelections().setOffset(0);
     brokerRequest.getSelections().setSize(20);
     ExecutorService executorService = Executors.newCachedThreadPool(new NamedThreadFactory("test-plan-maker"));
-    Plan globalPlan = instancePlanMaker.makeInterSegmentPlan(makeSegMgrList(_indexSegmentList), brokerRequest, executorService, 150000);
+    Plan globalPlan =
+        instancePlanMaker.makeInterSegmentPlan(makeSegMgrList(_indexSegmentList), brokerRequest, executorService,
+            150000);
     globalPlan.print();
-    System.out.println("/////////////////////////////////////////////////////////////////////////////");
     brokerRequest = setFilterQuery(brokerRequest);
-    globalPlan = instancePlanMaker.makeInterSegmentPlan(makeSegMgrList(_indexSegmentList), brokerRequest, executorService, 150000);
+    globalPlan =
+        instancePlanMaker.makeInterSegmentPlan(makeSegMgrList(_indexSegmentList), brokerRequest, executorService,
+            150000);
     globalPlan.print();
     globalPlan.execute();
     DataTable instanceResponse = globalPlan.getInstanceResponse();
@@ -618,13 +606,13 @@ public class PlanMakerTest {
     instanceResponseMap.put(new ServerInstance("localhost:1111"), instanceResponse);
 
     BrokerResponseJSON brokerResponse = defaultReduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
-    System.out.println(brokerResponse.getSelectionResults());
-    System.out.println("TimeUsedMs : " + brokerResponse.getTimeUsedMs());
-    System.out.println(brokerResponse);
+    LOGGER.debug(brokerResponse.getSelectionResults().toString());
+    LOGGER.debug("TimeUsedMs: {}", brokerResponse.getTimeUsedMs());
+    LOGGER.debug(brokerResponse.toString());
 
     JSONArray selectionResultsArray = brokerResponse.getSelectionResults().getJSONArray("results");
     for (int j = 0; j < selectionResultsArray.length(); ++j) {
-      Assert.assertEquals(selectionResultsArray.getJSONArray(j).getInt(0), 1);
+      assertEquals(selectionResultsArray.getJSONArray(j).getInt(0), 1);
     }
   }
 
@@ -839,7 +827,5 @@ public class PlanMakerTest {
       jsonFilePW.println(s);
     }
     jsonFilePW.close();
-
   }
-
 }

@@ -65,7 +65,6 @@ import com.linkedin.pinot.core.query.reduce.DefaultReduceService;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
-import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.util.DoubleComparisonUtil;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
@@ -84,7 +83,6 @@ public class AggregationQueriesTest {
   public static IndexSegment _indexSegment;
   private static List<SegmentDataManager> _indexSegmentList;
 
-  public static AggregationInfo _paramsInfo;
   public static List<AggregationInfo> _aggregationInfos;
   public static int _numAggregations = 7;
 
@@ -132,7 +130,7 @@ public class AggregationQueriesTest {
     LOGGER.debug("built at : {}", INDEX_DIR.getAbsolutePath());
     final File indexSegmentDir = new File(INDEX_DIR, driver.getSegmentName());
     _indexSegment = ColumnarSegmentLoader.load(indexSegmentDir, ReadMode.heap);
-    _medataMap = ((SegmentMetadataImpl) ((IndexSegmentImpl) _indexSegment).getSegmentMetadata()).getColumnMetadataMap();
+    _medataMap = ((SegmentMetadataImpl) _indexSegment.getSegmentMetadata()).getColumnMetadataMap();
   }
 
   private void setupSegmentList(int numberOfSegments) throws Exception {
@@ -238,9 +236,7 @@ public class AggregationQueriesTest {
     final PlanMaker instancePlanMaker = new InstancePlanMakerImplV2();
     final PlanNode rootPlanNode = instancePlanMaker.makeInnerSegmentPlan(_indexSegment, brokerRequest);
     rootPlanNode.showTree("");
-    // UAggregationGroupByOperator operator = (UAggregationGroupByOperator) rootPlanNode.run();
-    final MAggregationOperator operator = (MAggregationOperator) rootPlanNode.run();
-    final IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
+    final IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) rootPlanNode.run().nextBlock();
     LOGGER.debug("RunningTime : {}", resultBlock.getTimeUsedMs());
     LOGGER.debug("NumDocsScanned : {}", resultBlock.getNumDocsScanned());
     LOGGER.debug("TotalDocs : {}", resultBlock.getTotalRawDocs());
@@ -275,9 +271,7 @@ public class AggregationQueriesTest {
     final PlanMaker instancePlanMaker = new InstancePlanMakerImplV2();
     final PlanNode rootPlanNode = instancePlanMaker.makeInnerSegmentPlan(_indexSegment, brokerRequest);
     rootPlanNode.showTree("");
-    // UAggregationGroupByOperator operator = (UAggregationGroupByOperator) rootPlanNode.run();
-    final MAggregationOperator operator = (MAggregationOperator) rootPlanNode.run();
-    final IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
+    final IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) rootPlanNode.run().nextBlock();
     LOGGER.debug("RunningTime : {}", resultBlock.getTimeUsedMs());
     LOGGER.debug("NumDocsScanned : {}", resultBlock.getNumDocsScanned());
     LOGGER.debug("TotalDocs : {}", resultBlock.getTotalRawDocs());
@@ -327,17 +321,17 @@ public class AggregationQueriesTest {
 
     Assert.assertEquals("max_met_impressionCount", brokerResponse.getAggregationResults().get(2).getString("function")
         .toString());
-    Assert.assertEquals(0, DoubleComparisonUtil.defaultDoubleCompare(8637957270245934100.0, 
+    Assert.assertEquals(0, DoubleComparisonUtil.defaultDoubleCompare(8637957270245934100.0,
         Double.parseDouble(brokerResponse.getAggregationResults().get(2).getString("value"))));
 
     Assert.assertEquals("min_met_impressionCount", brokerResponse.getAggregationResults().get(3).getString("function")
         .toString());
-    Assert.assertEquals(0, DoubleComparisonUtil.defaultDoubleCompare(614819680033322500.0, 
+    Assert.assertEquals(0, DoubleComparisonUtil.defaultDoubleCompare(614819680033322500.0,
         Double.parseDouble(brokerResponse.getAggregationResults().get(3).getString("value"))));
 
     Assert.assertEquals("avg_met_impressionCount", brokerResponse.getAggregationResults().get(4).getString("function")
         .toString());
-    Assert.assertEquals(0, DoubleComparisonUtil.defaultDoubleCompare(6718981331945402400.0, 
+    Assert.assertEquals(0, DoubleComparisonUtil.defaultDoubleCompare(6718981331945402400.0,
         Double.parseDouble(brokerResponse.getAggregationResults().get(4).getString("value"))));
 
     Assert.assertEquals("distinctCount_column12",

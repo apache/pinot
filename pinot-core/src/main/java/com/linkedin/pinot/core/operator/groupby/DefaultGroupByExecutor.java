@@ -52,6 +52,8 @@ import java.util.Set;
  * - Single/Multi valued columns.
  */
 public class DefaultGroupByExecutor implements GroupByExecutor {
+  private static final String COLUMN_STAR = "*";
+
   private final IndexSegment _indexSegment;
   private final List<AggregationInfo> _aggregationsInfoList;
   private final GroupBy _groupBy;
@@ -123,7 +125,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
       String[] columns = aggregationInfo.getAggregationParams().get("column").trim().split(",");
 
       for (String column : columns) {
-        if (!column.equals("*") && !_columnToDictArrayMap.containsKey(column)) {
+        if (!column.equals(COLUMN_STAR) && !_columnToDictArrayMap.containsKey(column)) {
           _columnToDictArrayMap.put(column, new int[DocIdSetPlanNode.MAX_DOC_PER_CALL]);
           _columnToValueArrayMap.put(column, new double[DocIdSetPlanNode.MAX_DOC_PER_CALL]);
         }
@@ -170,9 +172,8 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     fetchColumnValues(startIndex, length);
 
     for (int i = 0; i < _aggrFuncContextList.size(); i++) {
-      AggregationFunctionContext aggrFuncContext = _aggrFuncContextList.get(i);
       _resultHolderArray[i].ensureCapacity(numGroupKeys);
-      aggregateColumn(aggrFuncContext, _resultHolderArray[i], length);
+      aggregateColumn(_aggrFuncContextList.get(i), _resultHolderArray[i], length);
     }
   }
 
@@ -301,7 +302,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
 
       default:
         throw new RuntimeException(
-            "Unsupported result data type in class " + getClass().getName());
+            "Unsupported result data type " + resultDataType + " in class " + getClass().getName());
     }
   }
 

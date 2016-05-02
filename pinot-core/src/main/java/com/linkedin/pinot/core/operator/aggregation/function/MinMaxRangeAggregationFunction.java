@@ -89,15 +89,19 @@ public class MinMaxRangeAggregationFunction implements AggregationFunction {
 
     for (int i = 0; i < length; i++) {
       int groupKey = groupKeys[i];
-      Pair<Double, Double> rangeValue = (Pair<Double, Double>) resultHolder.getResult(groupKey);
       double value = valueArray[0][i];
-      if (value < rangeValue.getFirst()) {
-        rangeValue.setFirst(value);
+      Pair<Double, Double> rangeValue = (Pair<Double, Double>) resultHolder.getResult(groupKey);
+      if (rangeValue == null) {
+        rangeValue = new Pair<>(value, value);
+        resultHolder.setValueForKey(groupKey, rangeValue);
+      } else {
+        if (value < rangeValue.getFirst()) {
+          rangeValue.setFirst(value);
+        }
+        if (value > rangeValue.getSecond()) {
+          rangeValue.setSecond(value);
+        }
       }
-      if (value > rangeValue.getSecond()) {
-        rangeValue.setSecond(value);
-      }
-      resultHolder.setValueForKey(groupKey, rangeValue);
     }
   }
 
@@ -119,13 +123,17 @@ public class MinMaxRangeAggregationFunction implements AggregationFunction {
       double value = valueArray[0][i];
       for (int groupKey : docIdToGroupKeys[i]) {
         Pair<Double, Double> rangeValue = (Pair<Double, Double>) resultHolder.getResult(groupKey);
-        if (value < rangeValue.getFirst()) {
-          rangeValue.setFirst(value);
+        if (rangeValue == null) {
+          rangeValue = new Pair<>(value, value);
+          resultHolder.setValueForKey(groupKey, rangeValue);
+        } else {
+          if (value < rangeValue.getFirst()) {
+            rangeValue.setFirst(value);
+          }
+          if (value > rangeValue.getSecond()) {
+            rangeValue.setSecond(value);
+          }
         }
-        if (value > rangeValue.getSecond()) {
-          rangeValue.setSecond(value);
-        }
-        resultHolder.setValueForKey(groupKey, rangeValue);
       }
     }
   }

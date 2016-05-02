@@ -47,6 +47,8 @@ public class AggregationOperator extends BaseOperator {
   private IndexSegment _indexSegment;
   private int _nextBlockCallCounter = 0;
 
+  private int[] _reusableDocIdSet;
+
   /**
    * Constructor for the class.
    *
@@ -121,16 +123,16 @@ public class AggregationOperator extends BaseOperator {
    * @return
    */
   private int processBlock(int numDocsScanned, ProjectionBlock currentBlock, Block block) {
-    int[] docIdSet;
-
     if (block instanceof DocIdSetBlock) {
       DocIdSetBlock docIdSetBlock = (DocIdSetBlock) block;
-      docIdSet = docIdSetBlock.getDocIdSet();
+      int length = docIdSetBlock.getSearchableLength();
 
-      _aggregationExecutor.aggregate(docIdSet, 0, docIdSetBlock.getSearchableLength());
-      numDocsScanned += ((DocIdSetBlock) block).getSearchableLength();
+      _aggregationExecutor.aggregate(docIdSetBlock.getDocIdSet(), 0, length);
+      numDocsScanned += length;
     } else {
-      docIdSet = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+      if (_reusableDocIdSet == null) {
+        _reusableDocIdSet = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+      }
 
       BlockDocIdSet blockDocIdSet = currentBlock.getBlockDocIdSet();
       BlockDocIdIterator iterator = blockDocIdSet.iterator();
@@ -138,16 +140,16 @@ public class AggregationOperator extends BaseOperator {
       int docId;
       int pos = 0;
       while ((docId = iterator.next()) != Constants.EOF) {
-        docIdSet[pos++] = docId;
-        if (pos == docIdSet.length) {
+        _reusableDocIdSet[pos++] = docId;
+        if (pos == DocIdSetPlanNode.MAX_DOC_PER_CALL) {
           numDocsScanned += pos;
+          _aggregationExecutor.aggregate(_reusableDocIdSet, 0, pos);
           pos = 0;
-          _aggregationExecutor.aggregate(docIdSet, 0, pos);
         }
       }
 
       if (pos > 0) {
-        _aggregationExecutor.aggregate(docIdSet, 0, pos);
+        _aggregationExecutor.aggregate(_reusableDocIdSet, 0, pos);
         numDocsScanned += pos;
       }
     }

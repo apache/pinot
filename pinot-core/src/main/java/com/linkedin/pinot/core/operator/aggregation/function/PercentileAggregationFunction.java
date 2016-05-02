@@ -64,12 +64,13 @@ public class PercentileAggregationFunction implements AggregationFunction {
     Preconditions.checkArgument(valueArray.length == 1);
     Preconditions.checkState(length <= valueArray[0].length);
 
+    DoubleArrayList valueList = (DoubleArrayList) resultHolder.getResult();
+    if (valueList == null) {
+      valueList = new DoubleArrayList();
+      resultHolder.setValue(valueList);
+    }
+
     for (int i = 0; i < length; i++) {
-      DoubleArrayList valueList = (DoubleArrayList) resultHolder.getResult();
-      if (valueList == null) {
-        valueList = new DoubleArrayList();
-        resultHolder.setValue(valueList);
-      }
       valueList.add(valueArray[0][i]);
     }
   }
