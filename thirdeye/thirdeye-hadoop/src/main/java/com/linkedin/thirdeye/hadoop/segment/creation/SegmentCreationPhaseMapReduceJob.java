@@ -23,6 +23,10 @@ import static com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhase
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
@@ -193,7 +197,11 @@ public class SegmentCreationPhaseMapReduceJob {
         starTreeIndexSpec.setMaxLeafRecords(thirdeyeConfig.getSplit().getThreshold());
         starTreeIndexSpec.setDimensionsSplitOrder(thirdeyeConfig.getSplit().getOrder());
       }
-      starTreeIndexSpec.setSkipMaterializationForDimensions(thirdeyeConfig.getTransformDimensions());
+      Set<String> skipMaterializationForDimensions = new HashSet<>();
+      for (String transformDimension : thirdeyeConfig.getTransformDimensions()) {
+        skipMaterializationForDimensions.add(transformDimension + ThirdEyeConstants.RAW_DIMENSION_SUFFIX);
+      }
+      starTreeIndexSpec.setSkipMaterializationForDimensions(skipMaterializationForDimensions);
       segmentGeneratorConfig.setStarTreeIndexSpec(starTreeIndexSpec);
 
       // Generate segment
