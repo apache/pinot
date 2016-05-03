@@ -65,6 +65,12 @@ public interface BrokerResponse {
   long getNumDocsScanned();
 
   /**
+   * Return the total number of documents within the table hit.
+   * @return
+   */
+  long getTotalDocs();
+
+  /**
    * Return the number of exceptions recorded in the response.
    * @return
    */
