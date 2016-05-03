@@ -197,4 +197,6 @@ public class SingleFileIndexDirectoryTest {
       sfd.removeIndex("col1", ColumnIndexType.DICTIONARY);
     }
   }
+
+
 }

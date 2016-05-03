@@ -87,6 +87,7 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
     return indexFile.exists();
   }
 
+
   @Override
   public void close() {
     for (Map.Entry<IndexKey, PinotDataBuffer> keyBuffers : indexBuffers.entrySet()) {

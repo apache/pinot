@@ -17,6 +17,7 @@
 package com.linkedin.pinot.core.segment.store;
 
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
+import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import java.io.File;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

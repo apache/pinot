@@ -18,9 +18,14 @@ package com.linkedin.pinot.core.segment.store;
 
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
+import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,7 +50,9 @@ public class SegmentLocalFSDirectoryTest {
   }
 
   @AfterClass
-  public void tearDown() {
+  public void tearDown()
+      throws Exception {
+    segmentDirectory.close();
     FileUtils.deleteQuietly(TEST_DIRECTORY);
   }
 
@@ -101,17 +108,40 @@ public class SegmentLocalFSDirectoryTest {
   @Test
   public void testWriteAndReadBackData()
       throws java.lang.Exception {
-    SegmentLocalFSDirectory.Writer writer = segmentDirectory.createWriter();
-    Assert.assertNotNull(writer);
-    PinotDataBuffer buffer = writer.newIndexFor("newColumn", ColumnIndexType.FORWARD_INDEX, 1024);
-    loadData(buffer);
-    writer.saveAndClose();
-
-    SegmentDirectory.Reader reader = segmentDirectory.createReader();
-    Assert.assertNotNull(reader);
-    PinotDataBuffer newDataBuffer = reader.getIndexFor("newColumn", ColumnIndexType.FORWARD_INDEX);
-    verifyData(newDataBuffer);
+    try (SegmentLocalFSDirectory.Writer writer = segmentDirectory.createWriter() ) {
+      Assert.assertNotNull(writer);
+      PinotDataBuffer buffer = writer.newIndexFor("newColumn", ColumnIndexType.FORWARD_INDEX, 1024);
+      loadData(buffer);
+      writer.saveAndClose();
+    }
+    try (SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
+      Assert.assertNotNull(reader);
+      PinotDataBuffer newDataBuffer = reader.getIndexFor("newColumn", ColumnIndexType.FORWARD_INDEX);
+      verifyData(newDataBuffer);
+    }
   }
 
+  @Test
+  public void testStarTree()
+      throws IOException, ConfigurationException {
+    Assert.assertFalse(segmentDirectory.hasStarTree());
+    FileUtils.touch(new File(segmentDirectory.getPath().toFile(), V1Constants.STAR_TREE_INDEX_FILE));
+    String data = "This is star tree";
+    try (SegmentDirectory.Writer writer = segmentDirectory.createWriter();
+        OutputStream starTreeOstream = writer.starTreeOutputStream() ) {
+      starTreeOstream.write(data.getBytes());
+    }
+    try (SegmentDirectory.Reader reader = segmentDirectory.createReader();
+        InputStream starTreeIstream = reader.getStarTreeStream()) {
+      byte[] fileDataBytes = new byte[data.length()];
+        starTreeIstream.read(fileDataBytes, 0, fileDataBytes.length);
+      String fileData = new String(fileDataBytes);
+      Assert.assertEquals(fileData, data);
+    }
+    try (SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
+      writer.removeStarTree();
+      Assert.assertFalse(segmentDirectory.hasStarTree());
+    }
+  }
 
 }

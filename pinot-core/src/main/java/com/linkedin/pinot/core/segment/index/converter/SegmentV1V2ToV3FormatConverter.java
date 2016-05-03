@@ -29,6 +29,8 @@ import com.linkedin.pinot.core.segment.store.SegmentDirectoryPaths;
 import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.attribute.PosixFilePermission;
@@ -37,10 +39,14 @@ import java.util.Set;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * {@inheritDoc}
+ */
 public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
   private static Logger LOGGER = LoggerFactory.getLogger(SegmentV1V2ToV3FormatConverter.class);
   private static final String V3_TEMP_DIR_SUFFIX = ".v3.tmp";
@@ -120,9 +126,22 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
         for (String column : allColumns) {
           copyExistingInvertedIndex(v2DataReader, v3DataWriter, column);
         }
+        copyStarTree(v2DataReader, v3DataWriter);
         v3DataWriter.saveAndClose();
       }
     }
+  }
+
+  private void copyStarTree(SegmentDirectory.Reader v2DataReader, SegmentDirectory.Writer v3DataWriter)
+      throws IOException {
+    if (! v2DataReader.hasStarTree()) {
+      return;
+    }
+
+    InputStream v2StarTreeStream = v2DataReader.getStarTreeStream();
+    OutputStream v3StarTreeStream = v3DataWriter.starTreeOutputStream();
+
+    IOUtils.copy(v2StarTreeStream, v3StarTreeStream);
   }
 
   private void copyDictionary(SegmentDirectory.Reader reader,

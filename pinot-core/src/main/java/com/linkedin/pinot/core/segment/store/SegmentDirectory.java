@@ -21,6 +21,8 @@ import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.file.Path;
 import org.apache.commons.configuration.ConfigurationException;
 
@@ -128,6 +130,17 @@ public abstract class SegmentDirectory implements AutoCloseable {
     public abstract PinotDataBuffer getIndexFor(String column, ColumnIndexType type)
         throws IOException;
 
+    /**
+     * Get StarTree index as InputStream
+     * @return InputStream representing serialized version of star tree.
+     */
+    public abstract InputStream getStarTreeStream();
+
+    /**
+     * Check if the segment has star tree
+     */
+    public abstract boolean hasStarTree();
+
     public abstract boolean hasIndexFor(String column, ColumnIndexType type);
 
     @Override
@@ -159,6 +172,12 @@ public abstract class SegmentDirectory implements AutoCloseable {
         throws IOException;
 
     /**
+     * Create star tree output stream
+     * @return Output stream to write serialized version of star tree
+     */
+    public abstract OutputStream starTreeOutputStream();
+
+    /**
      * Check if the removal of index is a supported operation
      * @return true if the index removal is supported
      */
@@ -170,6 +189,11 @@ public abstract class SegmentDirectory implements AutoCloseable {
      * @param indexType column index type
      */
     public abstract void removeIndex(String columnName, ColumnIndexType indexType);
+
+    /**
+     * Remove existing star tree
+     */
+    public abstract void removeStarTree();
 
     /**
      * Save all the write and delete operations and close writer

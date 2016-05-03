@@ -18,10 +18,13 @@ package com.linkedin.pinot.core.segment.store;
 
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.File;
 import java.io.IOException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -29,6 +32,7 @@ import java.io.IOException;
  *
  */
 abstract class ColumnIndexDirectory implements AutoCloseable {
+  private static final Logger LOGGER = LoggerFactory.getLogger(ColumnIndexDirectory.class);
 
   protected File segmentDirectory;
   protected SegmentMetadataImpl metadata;
@@ -142,5 +146,9 @@ abstract class ColumnIndexDirectory implements AutoCloseable {
   @Override
   public abstract void close();
 
+  protected File starTreeIndexFile() {
+    // this is not version dependent for now
+    return new File(segmentDirectory, V1Constants.STAR_TREE_INDEX_FILE);
+  }
 
 }

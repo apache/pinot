@@ -20,7 +20,6 @@ import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.column.ColumnIndexContainer;
@@ -30,7 +29,6 @@ import com.linkedin.pinot.core.segment.store.SegmentDirectory;
 import com.linkedin.pinot.core.segment.store.SegmentDirectoryPaths;
 import com.linkedin.pinot.core.startree.StarTree;
 import java.io.File;
-import java.io.FileInputStream;
 import java.util.HashMap;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -78,17 +76,17 @@ public class Loaders {
       SegmentDirectory segmentDirectory = SegmentDirectory.createFromLocalFS(segmentDirectoryPath, metadata, readMode);
 
       Map<String, ColumnIndexContainer> indexContainerMap = new HashMap<String, ColumnIndexContainer>();
+      SegmentDirectory.Reader segmentReader = segmentDirectory.createReader();
       for (String column : metadata.getColumnMetadataMap().keySet()) {
-        indexContainerMap.put(column, ColumnIndexContainer.init(segmentDirectory.createReader(),
+        indexContainerMap.put(column, ColumnIndexContainer.init(segmentReader,
             metadata.getColumnMetadataFor(column), indexLoadingConfigMetadata));
       }
 
-      // The star tree index (if available)
+      // load star tree index if it exists
       StarTree starTree = null;
-      if (metadata.hasStarTree()) {
-        File starTreeFile = new File(indexDir, V1Constants.STAR_TREE_INDEX_FILE);
-        LOGGER.debug("Loading star tree index file {}", starTreeFile);
-        starTree = StarTree.fromBytes(new FileInputStream(starTreeFile));
+      if (segmentReader.hasStarTree()) {
+        LOGGER.debug("Loading star tree for segment: {}", segmentDirectory);
+        starTree = StarTree.fromBytes(segmentReader.getStarTreeStream());
       }
       return new IndexSegmentImpl(segmentDirectory, metadata, indexContainerMap, starTree);
     }

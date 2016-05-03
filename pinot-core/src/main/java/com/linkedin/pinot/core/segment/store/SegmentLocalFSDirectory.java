@@ -19,14 +19,21 @@ package com.linkedin.pinot.core.segment.store;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
+import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.file.Path;
 import org.apache.commons.configuration.ConfigurationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 
 class SegmentLocalFSDirectory extends SegmentDirectory {
   private static Logger LOGGER = LoggerFactory.getLogger(SegmentLocalFSDirectory.class);
@@ -76,11 +83,11 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
     return null;
   }
 
-
   public Writer createWriter()
       throws IOException {
 
     if (segmentLock.tryWriteLock()) {
+      loadData();
       return new Writer();
     }
 
@@ -135,6 +142,11 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
     }
   }
 
+  protected File starTreeIndexFile() {
+    // this is not version dependent for now
+    return new File(segmentDirectory, V1Constants.STAR_TREE_INDEX_FILE);
+  }
+
   private PinotDataBuffer getIndexForColumn(String column, ColumnIndexType type)
       throws IOException {
     switch (type) {
@@ -153,12 +165,42 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
     return columnIndexDirectory.hasIndexFor(column, type);
   }
 
+  private InputStream getStarTreeStream() {
+    File starTreeFile = starTreeIndexFile();
+    Preconditions.checkState(starTreeFile.exists(), "Star tree file for segment: {} does not exist");
+    Preconditions.checkState(starTreeFile.isFile(), "Star tree file: {} for segment: {} is not a regular file");
+
+    try {
+      return new FileInputStream(starTreeFile);
+    } catch (FileNotFoundException e) {
+      // we should not reach here
+      LOGGER.error("Star tree file for segment: {} is not found", segmentDirectory, e);
+      throw new IllegalStateException("Star tree file for segment: " + segmentDirectory +
+          " is not found", e);
+    }
+  }
+
+  public boolean hasStarTree() {
+    return starTreeIndexFile().exists();
+  }
+
+  /***************************  SegmentDirectory Reader *********************/
   public class Reader extends SegmentDirectory.Reader {
 
     @Override
     public PinotDataBuffer getIndexFor(String column, ColumnIndexType type)
         throws IOException {
       return getIndexForColumn(column, type);
+    }
+
+    @Override
+    public InputStream getStarTreeStream() {
+      return SegmentLocalFSDirectory.this.getStarTreeStream();
+    }
+
+    @Override
+    public boolean hasStarTree() {
+      return SegmentLocalFSDirectory.this.hasStarTree();
     }
 
     @Override
@@ -178,6 +220,7 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
     }
   }
 
+  /***************************  SegmentDirectory Writer *********************/
   // TODO: thread-safety. Single writer may be shared
   // by multiple threads. This is not our typical use-case
   // but it's nice to have interface guarantee that.
@@ -193,8 +236,29 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
     }
 
     @Override
+    public OutputStream starTreeOutputStream() {
+      // this checks about file's existence and if it's a regular file
+      try {
+        return new FileOutputStream(starTreeIndexFile());
+      } catch (FileNotFoundException e) {
+        LOGGER.error("Failed to open star tree output stream for segment: {}", segmentDirectory, e);
+        throw new RuntimeException("Failed to open star tree output stream for segment: " + segmentDirectory, e);
+      }
+    }
+
+    @Override
     public boolean isIndexRemovalSupported() {
       return columnIndexDirectory.isIndexRemovalSupported();
+    }
+
+    @Override
+    public InputStream getStarTreeStream() {
+      return SegmentLocalFSDirectory.this.getStarTreeStream();
+    }
+
+    @Override
+    public boolean hasStarTree() {
+      return SegmentLocalFSDirectory.this.hasStarTree();
     }
 
     @Override
@@ -202,7 +266,12 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
       columnIndexDirectory.removeIndex(columnName, indexType);
     }
 
-     private PinotDataBuffer getNewIndexBuffer(IndexKey key, long sizeBytes)
+    @Override
+    public void removeStarTree() {
+      starTreeIndexFile().delete();
+    }
+
+    private PinotDataBuffer getNewIndexBuffer(IndexKey key, long sizeBytes)
         throws IOException {
       ColumnIndexType indexType = key.type;
       switch (indexType) {
@@ -265,7 +334,7 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
    * allows the thread hold write lock to create readers.
    * We want to prevent that.
    */
-  class SegmentLock implements AutoCloseable{
+  class SegmentLock implements AutoCloseable {
     int readers = 0;
     int writers = 0;
 
@@ -291,7 +360,6 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
       } else if (readers > 0) {
         --readers;
       }
-
     }
 
     public void close() {

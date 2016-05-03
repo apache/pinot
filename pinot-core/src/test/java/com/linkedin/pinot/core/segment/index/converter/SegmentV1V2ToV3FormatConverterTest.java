@@ -71,6 +71,9 @@ public class SegmentV1V2ToV3FormatConverterTest {
     driver.init(config);
     driver.build();
     segmentDirectory = new File(INDEX_DIR, driver.getSegmentName());
+    File starTreeFile = new File(segmentDirectory, V1Constants.STAR_TREE_INDEX_FILE);
+    FileUtils.touch(starTreeFile);
+    FileUtils.writeStringToFile(starTreeFile, "This is a star tree index");
     Configuration tableConfig = new PropertiesConfiguration();
     tableConfig.addProperty(IndexLoadingConfigMetadata.KEY_OF_SEGMENT_FORMAT_VERSION, "v1");
     v1LoadingConfig = new IndexLoadingConfigMetadata(tableConfig);
@@ -98,11 +101,14 @@ public class SegmentV1V2ToV3FormatConverterTest {
     Assert.assertTrue(v3Location.exists());
     Assert.assertTrue(v3Location.isDirectory());
     FileTime afterConversionTime = Files.getLastModifiedTime(v3Location.toPath());
+    Assert.assertTrue(new File(v3Location, V1Constants.STAR_TREE_INDEX_FILE).exists());
 
     SegmentMetadataImpl metadata = new SegmentMetadataImpl(v3Location);
     Assert.assertEquals(metadata.getVersion(), SegmentVersion.v3.toString());
     Assert.assertTrue(new File(v3Location, V1Constants.SEGMENT_CREATION_META).exists());
-
+    // Drop the star tree index file because it has invalid data
+    new File(v3Location, V1Constants.STAR_TREE_INDEX_FILE).delete();
+    new File(segmentDirectory, V1Constants.STAR_TREE_INDEX_FILE).delete();
 
     // verify that the segment loads correctly. This is necessary and sufficient
     // full proof way to ensure that segment is correctly translated
