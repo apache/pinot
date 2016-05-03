@@ -142,6 +142,11 @@ public class ThirdEyeJob {
               throws Exception {
         Properties config = new Properties();
 
+        Path aggOutputPath = new Path(getIndexDir(root, collection, minTime, maxTime) + File.separator + AGGREGATION.getName());
+        FileSystem fs = FileSystem.get(new Configuration());
+        if (fs.exists(aggOutputPath)) {
+          inputPaths = aggOutputPath.toString();
+        }
         config.setProperty(DerivedColumnTransformationPhaseConstants.DERIVED_COLUMN_TRANSFORMATION_PHASE_INPUT_PATH.toString(),
             inputPaths);
         config.setProperty(DerivedColumnTransformationPhaseConstants.DERIVED_COLUMN_TRANSFORMATION_PHASE_OUTPUT_SCHEMA.toString(),
