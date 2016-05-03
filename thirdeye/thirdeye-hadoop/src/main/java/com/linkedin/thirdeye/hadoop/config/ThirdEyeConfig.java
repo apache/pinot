@@ -58,6 +58,7 @@ public final class ThirdEyeConfig {
   private String collection;
   private List<DimensionSpec> dimensions;
   private List<MetricSpec> metrics;
+  private TimeSpec inputTime = new TimeSpec();
   private TimeSpec time = new TimeSpec();
   private TopkWhitelistSpec topKWhitelist = new TopkWhitelistSpec();
   private SplitSpec split = new SplitSpec();
@@ -66,10 +67,11 @@ public final class ThirdEyeConfig {
   }
 
   public ThirdEyeConfig(String collection, List<DimensionSpec> dimensions,
-      List<MetricSpec> metrics, TimeSpec time, TopkWhitelistSpec topKWhitelist, SplitSpec split) {
+      List<MetricSpec> metrics, TimeSpec inputTime, TimeSpec time, TopkWhitelistSpec topKWhitelist, SplitSpec split) {
     this.collection = collection;
     this.dimensions = dimensions;
     this.metrics = metrics;
+    this.inputTime = inputTime;
     this.time = time;
     this.topKWhitelist = topKWhitelist;
     this.split = split;
@@ -103,6 +105,10 @@ public final class ThirdEyeConfig {
       results.add(metricSpec.getName());
     }
     return results;
+  }
+
+  public TimeSpec getInputTime() {
+    return inputTime;
   }
 
   public TimeSpec getTime() {
@@ -148,6 +154,7 @@ public final class ThirdEyeConfig {
     private String collection;
     private List<DimensionSpec> dimensions;
     private List<MetricSpec> metrics;
+    private TimeSpec inputTime = new TimeSpec();
     private TimeSpec time = new TimeSpec();
     private TopkWhitelistSpec topKWhitelist = new TopkWhitelistSpec();
     private SplitSpec split = new SplitSpec();
@@ -177,6 +184,10 @@ public final class ThirdEyeConfig {
     public Builder setMetrics(List<MetricSpec> metrics) {
       this.metrics = metrics;
       return this;
+    }
+
+    public TimeSpec getInputTime() {
+      return inputTime;
     }
 
     public TimeSpec getTime() {
@@ -219,7 +230,7 @@ public final class ThirdEyeConfig {
         throw new IllegalArgumentException("Must provide metric specs");
       }
 
-      return new ThirdEyeConfig(collection, dimensions, metrics, time, topKWhitelist, split);
+      return new ThirdEyeConfig(collection, dimensions, metrics, inputTime, time, topKWhitelist, split);
     }
   }
 
@@ -237,10 +248,11 @@ public final class ThirdEyeConfig {
     String collection = getCollectionFromProperties(props);
     List<DimensionSpec> dimensions = getDimensionFromProperties(props);
     List<MetricSpec> metrics = getMetricsFromProperties(props);
+    TimeSpec inputTime = getInputTimeFromProperties(props);
     TimeSpec time = getTimeFromProperties(props);
     SplitSpec split = getSplitFromProperties(props);
     TopkWhitelistSpec topKWhitelist = getTopKWhitelistFromProperties(props);
-    ThirdEyeConfig thirdeyeConfig = new ThirdEyeConfig(collection, dimensions, metrics, time, topKWhitelist, split);
+    ThirdEyeConfig thirdeyeConfig = new ThirdEyeConfig(collection, dimensions, metrics, inputTime, time, topKWhitelist, split);
     return thirdeyeConfig;
   }
 
@@ -343,6 +355,22 @@ public final class ThirdEyeConfig {
     TimeGranularity timeGranularity = new TimeGranularity(Integer.parseInt(timeColumnSize), TimeUnit.valueOf(timeColumnType));
     TimeSpec time = new TimeSpec(timeColumnName, timeGranularity);
     return time;
+  }
+
+
+  private static TimeSpec getInputTimeFromProperties(Properties props) {
+    TimeSpec inputTime = null;
+    String timeColumnName = getAndCheck(props,
+        ThirdEyeConfigProperties.THIRDEYE_TIMECOLUMN_NAME.toString());
+    String timeColumnType = getAndCheck(props,
+          ThirdEyeConfigProperties.THIRDEYE_INPUT_TIMECOLUMN_TYPE.toString(), null);
+    String timeColumnSize = getAndCheck(props,
+          ThirdEyeConfigProperties.THIRDEYE_INPUT_TIMECOLUMN_SIZE.toString(), null);
+    if (timeColumnType != null && timeColumnSize != null) {
+      TimeGranularity timeGranularity = new TimeGranularity(Integer.parseInt(timeColumnSize), TimeUnit.valueOf(timeColumnType));
+      inputTime = new TimeSpec(timeColumnName, timeGranularity);
+    }
+    return inputTime;
   }
 
   private static List<MetricSpec> getMetricsFromProperties(Properties props) {

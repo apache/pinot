@@ -121,6 +121,7 @@ public class ThirdEyeConfigTest {
   public void testTimeConfig() throws IllegalArgumentException {
     boolean failed = false;
     Assert.assertEquals(thirdeyeConfig.getTime().getColumnName(), "t1", "Incorrect time column name");
+    Assert.assertNull(thirdeyeConfig.getInputTime(), "Incorrect input time column name");
     Assert.assertEquals(thirdeyeConfig.getTime().getTimeGranularity().getSize(), 10, "Incorrect time size");
     Assert.assertEquals(thirdeyeConfig.getTime().getTimeGranularity().getUnit(), TimeUnit.DAYS, "Incorrect time unit");
 

@@ -35,6 +35,12 @@ public enum ThirdEyeConfigProperties {
   /** Time column name */
   THIRDEYE_TIMECOLUMN_NAME("thirdeye.timecolumn.name"),
 
+  /** Time input column type before aggregation (HOURS, DAYS etc) */
+  THIRDEYE_INPUT_TIMECOLUMN_TYPE("thirdeye.input.timecolumn.type"),
+
+  /** Time input bucket size before aggregation*/
+  THIRDEYE_INPUT_TIMECOLUMN_SIZE("thirdeye.input.timecolumn.size"),
+
   /** Time column type (HOURS, DAYS etc) */
   THIRDEYE_TIMECOLUMN_TYPE("thirdeye.timecolumn.type"),
 

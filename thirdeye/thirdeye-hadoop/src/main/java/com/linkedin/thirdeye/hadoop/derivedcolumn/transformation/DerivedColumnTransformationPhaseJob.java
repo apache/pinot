@@ -140,7 +140,7 @@ public class DerivedColumnTransformationPhaseJob extends Configured {
       // dimensions
       for (String dimension : dimensionsNames) {
         String dimensionName = dimension;
-        String dimensionValue = getDimensionFromRecord(inputRecord, dimension);
+        String dimensionValue = ThirdeyeAvroUtils.getDimensionFromRecord(inputRecord, dimension);
         // add column for topk + whitelist
         if (topKDimensionsMap.containsKey(dimensionName)) {
           Set<String> topKDimensionValues = topKDimensionsMap.get(dimensionName);
@@ -156,32 +156,15 @@ public class DerivedColumnTransformationPhaseJob extends Configured {
 
       // metrics
       for (String metric : metricNames) {
-        outputRecord.put(metric, getMetricFromRecord(inputRecord, metric));
+        outputRecord.put(metric, ThirdeyeAvroUtils.getMetricFromRecord(inputRecord, metric));
       }
 
       // time
-      outputRecord.put(timeColumnName, getMetricFromRecord(inputRecord, timeColumnName));
+      outputRecord.put(timeColumnName, ThirdeyeAvroUtils.getMetricFromRecord(inputRecord, timeColumnName));
 
       AvroKey<GenericRecord> outputKey = new AvroKey<GenericRecord>(outputRecord);
       context.write(outputKey , NullWritable.get());
     }
-
-    private String getDimensionFromRecord(GenericRecord record, String dimensionName) {
-      String dimensionValue = (String) record.get(dimensionName);
-      if (dimensionValue == null) {
-        dimensionValue = ThirdEyeConstants.EMPTY_STRING;
-      }
-      return dimensionValue;
-    }
-
-    private Number getMetricFromRecord(GenericRecord record, String metricName) {
-      Number metricValue = (Number) record.get(metricName);
-      if (metricValue == null) {
-        metricValue = ThirdEyeConstants.EMPTY_NUMBER;
-      }
-      return metricValue;
-    }
-
 
     @Override
     public void cleanup(Context context) throws IOException, InterruptedException {

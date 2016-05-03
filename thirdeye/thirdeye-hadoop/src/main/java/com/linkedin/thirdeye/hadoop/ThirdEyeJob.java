@@ -24,6 +24,8 @@ import java.util.Properties;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.JobStatus;
 import org.joda.time.DateTime;
@@ -31,6 +33,8 @@ import org.joda.time.format.ISODateTimeFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.thirdeye.hadoop.aggregation.AggregationPhaseConstants;
+import com.linkedin.thirdeye.hadoop.aggregation.AggregationPhaseJob;
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConstants;
 import com.linkedin.thirdeye.hadoop.derivedcolumn.transformation.DerivedColumnTransformationPhaseConstants;
 import com.linkedin.thirdeye.hadoop.derivedcolumn.transformation.DerivedColumnTransformationPhaseJob;
@@ -64,6 +68,32 @@ public class ThirdEyeJob {
 
   private enum PhaseSpec {
 
+    AGGREGATION {
+      @Override
+      Class<?> getKlazz() {
+        return AggregationPhaseJob.class;
+      }
+
+      @Override
+      String getDescription() {
+        return "Aggregates input avro data to another time granularity";
+      }
+
+      @Override
+      Properties getJobProperties(Properties inputConfig, String root, String collection,
+          DateTime minTime, DateTime maxTime, String inputPaths)
+              throws Exception {
+        Properties config = new Properties();
+
+        config.setProperty(AggregationPhaseConstants.AGG_PHASE_INPUT_PATH.toString(),
+            inputPaths);
+        config.setProperty(AggregationPhaseConstants.AGG_PHASE_OUTPUT_PATH.toString(),
+            getIndexDir(root, collection, minTime, maxTime) + File.separator
+                + AGGREGATION.getName());
+
+        return config;
+      }
+    },
     TOPK {
       @Override
       Class<?> getKlazz() {
@@ -81,6 +111,11 @@ public class ThirdEyeJob {
               throws Exception {
         Properties config = new Properties();
 
+        Path aggOutputPath = new Path(getIndexDir(root, collection, minTime, maxTime) + File.separator + AGGREGATION.getName());
+        FileSystem fs = FileSystem.get(new Configuration());
+        if (fs.exists(aggOutputPath)) {
+          inputPaths = aggOutputPath.toString();
+        }
         config.setProperty(TopKPhaseConstants.TOPK_PHASE_INPUT_PATH.toString(),
             inputPaths);
         config.setProperty(TopKPhaseConstants.TOPK_PHASE_OUTPUT_PATH.toString(),

@@ -159,7 +159,7 @@ public class TopKPhaseJob extends Configured {
       Number[] metricValues = new Number[numMetrics];
       for (int i = 0; i < numMetrics; i++) {
         String metricName = metricNames.get(i);
-        Number metricValue = getMetricFromRecord(inputRecord, metricName);
+        Number metricValue = ThirdeyeAvroUtils.getMetricFromRecord(inputRecord, metricName);
         metricValues[i] = metricValue;
       }
       TopKPhaseMapOutputValue valWrapper = new TopKPhaseMapOutputValue(metricValues, metricTypes);
@@ -168,7 +168,7 @@ public class TopKPhaseJob extends Configured {
 
       // read dimensions
       for (String dimensionName : dimensionNames) {
-        String dimensionValue = getDimensionFromRecord(inputRecord, dimensionName);
+        String dimensionValue = ThirdeyeAvroUtils.getDimensionFromRecord(inputRecord, dimensionName);
 
         TopKPhaseMapOutputKey keyWrapper = new TopKPhaseMapOutputKey(dimensionName, dimensionValue);
         byte[] keyBytes = keyWrapper.toBytes();
@@ -180,23 +180,6 @@ public class TopKPhaseJob extends Configured {
         keyWritable.set(keyBytes, 0, keyBytes.length);
         context.write(keyWritable, valWritable);
       }
-    }
-
-
-    private String getDimensionFromRecord(GenericRecord record, String dimensionName) {
-      String dimensionValue = (String) record.get(dimensionName);
-      if (dimensionValue == null) {
-        dimensionValue = ThirdEyeConstants.EMPTY_STRING;
-      }
-      return dimensionValue;
-    }
-
-    private Number getMetricFromRecord(GenericRecord record, String metricName) {
-      Number metricValue = (Number) record.get(metricName);
-      if (metricValue == null) {
-        metricValue = ThirdEyeConstants.EMPTY_NUMBER;
-      }
-      return metricValue;
     }
 
     @Override

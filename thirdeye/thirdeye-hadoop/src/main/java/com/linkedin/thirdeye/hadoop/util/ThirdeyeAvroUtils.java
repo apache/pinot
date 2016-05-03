@@ -134,4 +134,20 @@ public class ThirdeyeAvroUtils {
     return validatedMetricTypesProperty;
   }
 
+  public static String getDimensionFromRecord(GenericRecord record, String dimensionName) {
+    String dimensionValue = (String) record.get(dimensionName);
+    if (dimensionValue == null) {
+      dimensionValue = ThirdEyeConstants.EMPTY_STRING;
+    }
+    return dimensionValue;
+  }
+
+  public static Number getMetricFromRecord(GenericRecord record, String metricName) {
+    Number metricValue = (Number) record.get(metricName);
+    if (metricValue == null) {
+      metricValue = ThirdEyeConstants.EMPTY_NUMBER;
+    }
+    return metricValue;
+  }
+
 }
