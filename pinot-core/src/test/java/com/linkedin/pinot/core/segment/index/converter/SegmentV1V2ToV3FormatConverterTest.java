@@ -100,7 +100,6 @@ public class SegmentV1V2ToV3FormatConverterTest {
     File v3Location = SegmentDirectoryPaths.segmentDirectoryFor(segmentDirectory, SegmentVersion.v3);
     Assert.assertTrue(v3Location.exists());
     Assert.assertTrue(v3Location.isDirectory());
-    FileTime afterConversionTime = Files.getLastModifiedTime(v3Location.toPath());
     Assert.assertTrue(new File(v3Location, V1Constants.STAR_TREE_INDEX_FILE).exists());
 
     SegmentMetadataImpl metadata = new SegmentMetadataImpl(v3Location);
@@ -109,6 +108,7 @@ public class SegmentV1V2ToV3FormatConverterTest {
     // Drop the star tree index file because it has invalid data
     new File(v3Location, V1Constants.STAR_TREE_INDEX_FILE).delete();
     new File(segmentDirectory, V1Constants.STAR_TREE_INDEX_FILE).delete();
+    FileTime afterConversionTime = Files.getLastModifiedTime(v3Location.toPath());
 
     // verify that the segment loads correctly. This is necessary and sufficient
     // full proof way to ensure that segment is correctly translated
@@ -120,7 +120,6 @@ public class SegmentV1V2ToV3FormatConverterTest {
 
     FileTime afterLoadTime = Files.getLastModifiedTime(v3Location.toPath());
     Assert.assertEquals(afterConversionTime, afterLoadTime);
-
     // check that the loader can load original segment
     IndexSegment v2IndexSegment = Loaders.IndexSegment.load(segmentDirectory, ReadMode.mmap, v1LoadingConfig);
     Assert.assertNotNull(v2IndexSegment);
