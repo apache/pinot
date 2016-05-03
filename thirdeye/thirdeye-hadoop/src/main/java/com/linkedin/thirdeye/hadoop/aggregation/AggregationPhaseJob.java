@@ -56,6 +56,13 @@ import com.linkedin.thirdeye.hadoop.util.ThirdeyeAvroUtils;
 
 import static com.linkedin.thirdeye.hadoop.aggregation.AggregationPhaseConstants.*;
 
+/**
+ * Buckets input avro data according to granularity specified in config and aggregates metrics
+ * Mapper:
+ * Converts time column into bucket granularity
+ * Reducer:
+ * Aggregates all records with same dimensions in one time bucket
+ */
 public class AggregationPhaseJob extends Configured {
   private static final Logger LOGGER = LoggerFactory.getLogger(AggregationPhaseJob.class);
 

@@ -24,6 +24,10 @@ import com.linkedin.thirdeye.hadoop.config.MetricType;
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfig;
 import com.linkedin.thirdeye.hadoop.config.TimeSpec;
 
+/**
+ * This class contains the config needed by aggregation
+ * and the methods to obtain the config from the ThirdEyeConfig
+ */
 public class AggregationPhaseConfig {
   private List<String> dimensionNames;
   private List<String> metricNames;
