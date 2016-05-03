@@ -24,6 +24,7 @@ import static com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhase
 import java.io.File;
 import java.io.IOException;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import org.apache.commons.io.FileUtils;
@@ -129,8 +130,8 @@ public class SegmentCreationPhaseMapReduceJob {
 
       LOGGER.info("*********************************************************************");
       LOGGER.info("mapper input : {}", value);
-      LOGGER.info("PATH_TO_OUTPUT : {}", outputPath);
-      LOGGER.info("TABLE_NAME : {}", tableName);
+      LOGGER.info("Path to output : {}", outputPath);
+      LOGGER.info("Table name : {}", tableName);
       LOGGER.info("num lines : {}", lineSplits.length);
 
       for (String split : lineSplits) {
@@ -147,8 +148,6 @@ public class SegmentCreationPhaseMapReduceJob {
       LOGGER.info("input data file path : {}", inputFilePath);
       LOGGER.info("local hdfs segment tar path: {}", localHdfsSegmentTarPath);
       LOGGER.info("local disk segment path: {}", localDiskSegmentDirectory);
-      LOGGER.info("local disk segment tar path: {}", localDiskSegmentTarPath);
-      LOGGER.info("data schema: {}", localDiskSegmentTarPath);
       LOGGER.info("*********************************************************************");
 
       try {
@@ -177,30 +176,53 @@ public class SegmentCreationPhaseMapReduceJob {
       LOGGER.info("Data schema is : {}", schema);
 
       // Set segment generator config
+      LOGGER.info("*********************************************************************");
       SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(schema);
       segmentGeneratorConfig.setTableName(tableName);
       segmentGeneratorConfig.setInputFilePath(new File(dataPath, hdfsDataPath.getName()).getAbsolutePath());
+      LOGGER.info("Setting input path {}", segmentGeneratorConfig.getInputFilePath());
       segmentGeneratorConfig.setFormat(FileFormat.AVRO);
       segmentGeneratorConfig.setSegmentNamePostfix(seqId);
       segmentGeneratorConfig.setOutDir(localDiskSegmentDirectory);
       segmentGeneratorConfig.setEnableStarTreeIndex(true);
+      LOGGER.info("Setting enableStarTreeIndex");
       String minTime = ThirdEyeConstants.DATE_TIME_FORMATTER.print(segmentWallClockStartTime);
       String maxTime = ThirdEyeConstants.DATE_TIME_FORMATTER.print(segmentWallClockEndTime);
+      LOGGER.info("Wall clock time : min {} max {}", minTime, maxTime);
       segmentGeneratorConfig.setSegmentName(SegmentNameBuilder
           .buildBasic(tableName + ThirdEyeConstants.SEGMENT_JOINER + segmentSchedule, minTime, maxTime, seqId));
+      LOGGER.info("Setting segment name {}", segmentGeneratorConfig.getSegmentName());
 
       // Set star tree config
       StarTreeIndexSpec starTreeIndexSpec = new StarTreeIndexSpec();
-      if (thirdeyeConfig.getSplit() != null) {
-        starTreeIndexSpec.setMaxLeafRecords(thirdeyeConfig.getSplit().getThreshold());
-        starTreeIndexSpec.setDimensionsSplitOrder(thirdeyeConfig.getSplit().getOrder());
-      }
+
+      // _raw dimensions should not be in star tree split order
+      // if a dimension has a _raw column, we will include only
+      // the column with topk, and skip _raw column for materialization in star tree
       Set<String> skipMaterializationForDimensions = new HashSet<>();
-      for (String transformDimension : thirdeyeConfig.getTransformDimensions()) {
-        skipMaterializationForDimensions.add(transformDimension + ThirdEyeConstants.RAW_DIMENSION_SUFFIX);
+      Set<String> transformDimensionsSet = thirdeyeConfig.getTransformDimensions();
+      LOGGER.info("Dimensions with _raw column {}", transformDimensionsSet);
+      for (String transformDimension : transformDimensionsSet) {
+        String rawDimension = transformDimension + ThirdEyeConstants.RAW_DIMENSION_SUFFIX;
+        skipMaterializationForDimensions.add(rawDimension);
+        LOGGER.info("Adding {} to skipMaterialization set", rawDimension);
       }
       starTreeIndexSpec.setSkipMaterializationForDimensions(skipMaterializationForDimensions);
+      LOGGER.info("Setting skipMaterializationForDimensions {}", skipMaterializationForDimensions);
+
+      if (thirdeyeConfig.getSplit() != null) {
+        starTreeIndexSpec.setMaxLeafRecords(thirdeyeConfig.getSplit().getThreshold());
+        LOGGER.info("Setting split threshold to {}", starTreeIndexSpec.getMaxLeafRecords());
+        List<String> splitOrder = thirdeyeConfig.getSplit().getOrder();
+        if (splitOrder != null) {
+          LOGGER.info("Removing from splitOrder, any dimensions which are also in skipMaterializationForDimensions");
+          splitOrder.removeAll(skipMaterializationForDimensions);
+          starTreeIndexSpec.setDimensionsSplitOrder(splitOrder);
+        }
+        LOGGER.info("Setting splitOrder {}", splitOrder);
+      }
       segmentGeneratorConfig.setStarTreeIndexSpec(starTreeIndexSpec);
+      LOGGER.info("*********************************************************************");
 
       // Generate segment
       SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
