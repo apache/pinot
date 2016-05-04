@@ -270,8 +270,17 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
           V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.HAS_DICTIONARY),
           String.valueOf(columnIndexCreationInfo.isCreateDictionary()));
 
+// TODO: after fixing the server-side dependency on HAS_INVERTED_INDEX and deployed, set HAS_INVERTED_INDEX properly
+// The hasInvertedIndex flag in segment metadata is picked up in ColumnMetadata, and will be used during the query
+// plan phase. If it is set to false, then inverted indexes are not used in queries even if they are created via table
+// configs on segment load. So, we set it to true here for now, until we fix the server to update the value inside
+// ColumnMetadata, export information to the query planner that the inverted index available is current and can be used.
+//
+//      properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, HAS_INVERTED_INDEX),
+//          String.valueOf(config.getInvertedIndexCreationColumns().contains(column)));
+
       properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, HAS_INVERTED_INDEX),
-          String.valueOf(config.getInvertedIndexCreationColumns().contains(column)));
+          String.valueOf(true));
 
       properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, IS_SINGLE_VALUED),
           String.valueOf(schema.getFieldSpecFor(column).isSingleValueField()));
