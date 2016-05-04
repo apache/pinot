@@ -197,9 +197,12 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
 
     FileFormat configFormat = segmentGeneratorConfig.getFormat();
     if (_format == null) {
+      if (configFormat == null) {
+        throw new RuntimeException("Format cannot be null in config file.");
+      }
       _format = configFormat;
     } else {
-      if (configFormat != _format) {
+      if (configFormat != _format && configFormat != FileFormat.AVRO) {
         LOGGER.warn("Find format conflict in command line and config file, use config in command line: {}", _format);
       }
     }
