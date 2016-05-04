@@ -1,1 +1,0 @@
-INSERT INTO `%s`(%s) VALUES(%s) ON DUPLICATE KEY UPDATE delta=VALUES(delta);

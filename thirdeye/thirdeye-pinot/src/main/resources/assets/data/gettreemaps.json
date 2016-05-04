@@ -1,0 +1,271 @@
+{
+    "ClickRev": {
+        "dimensions": ["Status", "OperatingSystem", "DeviceChannel"],
+        "baseline_total": 34987.302,
+        "current_total":40313.286,
+        "tooltip": [
+            ["id", "metric", "dimension", "cellvalue", "baseline_value", "current_value", "baseline_ratio", "current_ratio", "delta_percent_change", "contribution_difference", "volume_difference"],
+            ["0", "ClickRev", "Status", "1", 24662.654871487997, 31607.47983568935, 0.8996085182130453, 0.8815727725346136, 0.2815927563512283, -0.0180357456784317, 0.2533232422806556],
+            ["1", "ClickRev", "Status", "4", 2553.2330197111196, 4090.6487885090683, 0.0931331272113105, 0.1140933922191221, 0.6021447149277023, 0.0209602650078115, 0.05607962033498],
+
+            ["2", "ClickRev", "OperatingSystem", "iOS", 11483.788766613767, 16018.474385362942, 0.4189501014373748, 0.4468088184247188, 0.3948771360139117, 0.0278587169873439, 0.1654338161883284],
+            ["3", "ClickRev", "OperatingSystem", "UNKOWN", 9164.589687106874, 10409.098785214457, 0.3343413795809048, 0.2903445744706897, 0.1357953973496937, -0.0439968051102151, 0.0454020204906337],
+            ["4", "ClickRev", "OperatingSystem", "Android", 6116.42652608431, 8421.402925444776, 0.2231386840715002, 0.2349010898337928, 0.3768501737952036, 0.0117624057622927, 0.0840898518727779],
+            ["5", "ClickRev", "OperatingSystem", "OTHERS", 646.0697931431027, 1001.8704513626966, 0.0235698349102201, 0.0279455172707987, 0.5507155140138009, 0.0043756823605786, 0.0129802737478023],
+
+            ["6", "ClickRev", "DeviceChannel", "Mobile", 17285.775296085136, 24144.38213109908, 0.6306174260861084, 0.6734675595229502, 0.3967775073743596, 0.0428501334368419, 0.2502148104292805],
+            ["7", "ClickRev", "DeviceChannel", "OTHERS", 5500.725712413367, 5736.441464678749, 0.2006767663555949, 0.1600085358402002, 0.0428517553117488, -0.0406682305153948, 0.0085993516886229],
+            ["8", "ClickRev", "DeviceChannel", "Desktop", 3057.1405081725766, 4004.889019715991, 0.1115302059308843, 0.1117097476184457, 0.3100114335634303, 0.0001795416875614, 0.034575639026258],
+            ["9", "ClickRev", "DeviceChannel", "Tablet", 994.911592080467, 1285.6927920252124, 0.0362962364507371, 0.0358622714899042, 0.2922683806876656, -0.0004339649608329, 0.0106082422525136],
+            ["10", "ClickRev", "DeviceChannel", "CHANNEL_ID_LINKEDIN_SPONSORED_JYMBII_JOBSHOME", 417.7165543255864, 474.51686615859046, 0.0152390814881192, 0.0132358622419532, 0.1359781201985388, -0.002003219246166, 0.0020721816543068],
+
+            ["11", "ClickRev", "ClickType", "1", 27410.87477294806, 35850.84654738486, 0.9998543316146673, 0.9999581617343228, 0.3079059622995416, 0.0001038301196555, 0.3078611101351791],
+
+            ["12", "ClickRev", "ClickTag", "SCIN_VIEW_CONTENT", 13727.0671862647, 19026.521154048154, 0.5007890955677204, 0.5307133020945649, 0.3860587185794565, 0.0299242065268445, 0.1933339965134391],
+            ["13", "ClickRev", "ClickTag", "CAMPAIGN", 6073.04737660987, 6395.596685963181, 0.2215561315322704, 0.1783945792607708, 0.0531116076247977, -0.0431615522714996, 0.01176720232481],
+            ["14", "ClickRev", "ClickTag", "SCIN_VIEW_SOCIAL_ENGAGEMENT_CHARGABLE", 2992.187875581889, 4799.377221919096, 0.1091606123615907, 0.1338706804475496, 0.6039692096492317, 0.0247100680859588, 0.0659296487728561],
+            ["15", "ClickRev", "ClickTag", "SCIN_VIEW_COMPANY", 2630.264862765489, 3046.8743755014552, 0.095956983662605, 0.0849875154684097, 0.1583907075798969, -0.0109694681941953, 0.0151986945395526],
+            ["16", "ClickRev", "ClickTag", "SCIN_VIEW_UPDATE", 1439.1605188339859, 2075.310556399195, 0.052503268529551, 0.0578873515205899, 0.442028550144372, 0.0053840829910389, 0.023207943665958],
+            ["17", "ClickRev", "ClickTag", "SCIN_VIEW_SPONSORED_JOB", 442.3284568841411, 392.04327469907946, 0.0161369697446022, 0.0109353979739616, -0.1136829010262679, -0.0052015717706406, -0.0018344975343395],
+
+            ["18", "ClickRev", "CampaignType", "SPONSORED_STATUS_UPDATES_V2", 20850.709144609045, 29023.496037050594, 0.7606728832013316, 0.8095623627377833, 0.3919668552162709, 0.0488894795364516, 0.2981585578767197],
+            ["19", "ClickRev", "CampaignType", "TEXT_AD", 5410.543985451226, 5623.223788501253, 0.1973867682176609, 0.156850516237292, 0.0393083955369212, -0.0405362519803689, 0.0077589571588544],
+            ["20", "ClickRev", "CampaignType", "SJYMBII", 1149.6216428877851, 1204.1267218330265, 0.0419403485810075, 0.0335871210249249, 0.0474113194392615, -0.0083532275560826, 0.0019884472639681],
+
+            ["21", "ClickRev", "Application", "Voyager", 15946.241261658864, 22333.574792207342, 0.5817487181181208, 0.6229580872710648, 0.400554176105825, 0.041209369152944, 0.2330218784864237],
+            ["22", "ClickRev", "Application", "LinkedIn", 11445.673426489244, 13467.63643546807, 0.4175595825123044, 0.3756574176754122, 0.1766574087549366, -0.0419021648368921, 0.0737649938474168]
+
+        ],
+
+        "dim_0_data_0": [
+            [{
+                "v": "uniqueID",
+                "f": "displayValue"
+            }, "Parent", "current ratio (size)", "delta (color)"],
+            [{
+                "v": "ClickRev_Status",
+                "f": "Status"
+            }, null, 0, 0],
+            [{
+                "v": "0",
+                "f": "1 (28%)"
+            }, "ClickRev_Status", 31607.47983568935, 28.159275635123],
+            [{
+                "v": "1",
+                "f": "4 (60%)"
+            }, "ClickRev_Status", 4090.6487885090683, 60.21447149277]
+        ],
+
+        "dim_0_data_1": [
+            [{
+                "v": "uniqueID",
+                "f": "displayValue"
+            }, "Parent", "current ratio (size)", "delta (color)"],
+            [{
+                "v": "ClickRev_Status",
+                "f": "Status"
+            }, null, 0, 0],
+            [{
+                "v": "0",
+                "f": "1 (-2%)"
+            }, "ClickRev_Status", 31607.47983568935, -1.803574567843],
+            [{
+                "v": "1",
+                "f": "4 (2%)"
+            }, "ClickRev_Status", 4090.6487885090683, 2.096026500781]
+        ],
+
+        "dim_0_data_2": [
+            [{
+                "v": "uniqueID",
+                "f": "displayValue"
+            }, "Parent", "current ratio (size)", "delta (color)"],
+            [{
+                "v": "ClickRev_Status",
+                "f": "Status"
+            }, null, 0, 0],
+            [{
+                "v": "0",
+                "f": "1 (25%)"
+            }, "ClickRev_Status", 31607.47983568935, 25.332324228066],
+            [{
+                "v": "1",
+                "f": "4 (6%)"
+            }, "ClickRev_Status", 4090.6487885090683, 5.607962033498]
+        ],
+
+        "dim_1_data_0": [
+            [{
+                "v": "uniqueID",
+                "f": "displayValue"
+            }, "Parent", "current ratio (size)", "delta (color)"],
+            [{
+                "v": "ClickRev_OperatingSystem",
+                "f": "OperatingSystem"
+            }, null, 0, 1],
+            [{
+                "v": "2",
+                "f": "iOS (13%)"
+            }, "ClickRev_OperatingSystem", 17436.064114889166, 13.314812707875],
+            [{
+                "v": "3",
+                "f": "UNKOWN (4%)"
+            }, "ClickRev_OperatingSystem", 11762.864681322462, 4.063589611918],
+            [{
+                "v": "4",
+                "f": "Android (37%)"
+            }, "ClickRev_OperatingSystem", 9699.201076205214, 36.769829128915],
+            [{
+                "v": "5",
+                "f": "OTHERS (17%)"
+            }, "ClickRev_OperatingSystem", 1415.1558876516276, 17.453353544372]
+        ],
+
+        "dim_1_data_1": [
+            [{
+                "v": "uniqueID",
+                "f": "displayValue"
+            }, "Parent", "current ratio (size)", "delta (color)"],
+            [{
+                "v": "ClickRev_OperatingSystem",
+                "f": "OperatingSystem"
+            }, null, 0, 1],
+            [{
+                "v": "2",
+                "f": "iOS (-1%)"
+            }, "ClickRev_OperatingSystem", 17436.064114889166, -0.728195342097],
+            [{
+                "v": "3",
+                "f": "UNKOWN (-3%)"
+            }, "ClickRev_OperatingSystem", 11762.864681322462, -3.128906103081],
+            [{
+                "v": "4",
+                "f": "Android (4%)"
+            }, "ClickRev_OperatingSystem", 9699.201076205214, 3.790430207336],
+            [{
+                "v": "5",
+                "f": "OTHERS (0%)"
+            }, "ClickRev_OperatingSystem", 1415.1558876516276, 0.066671237843]
+        ],
+        "dim_1_data_2": [
+            [{
+                "v": "uniqueID",
+                "f": "displayValue"
+            }, "Parent", "current ratio (size)", "delta (color)"],
+            [{
+                "v": "ClickRev_OperatingSystem",
+                "f": "OperatingSystem"
+            }, null, 0, 1],
+            [{
+                "v": "2",
+                "f": "iOS (6%)"
+            }, "ClickRev_OperatingSystem", 17436.064114889166, 5.85580195094],
+            [{
+                "v": "3",
+                "f": "UNKOWN (1%)"
+            }, "ClickRev_OperatingSystem", 11762.864681322462, 1.312845699957],
+            [{
+                "v": "4",
+                "f": "Android (7%)"
+            }, "ClickRev_OperatingSystem", 9699.201076205214, 7.452926124395],
+            [{
+                "v": "5",
+                "f": "OTHERS (1%)"
+            }, "ClickRev_OperatingSystem", 1415.1558876516276, 0.60104542184]
+        ],
+
+
+        "dim_2_data_0": [
+            [{
+                "v": "uniqueID",
+                "f": "displayValue"
+            }, "Parent", "current ratio (size)", "delta (color)"],
+            [{
+                "v": "ClickRev_DeviceChannel",
+                "f": "DeviceChannel"
+            }, null, 0, 2],
+            [{
+                "v": "6",
+                "f": "Mobile (21%)"
+            }, "ClickRev_DeviceChannel", 27239.614754248898, 20.538907860983],
+            [{
+                "v": "7",
+                "f": "OTHERS (-3%)"
+            }, "ClickRev_DeviceChannel", 6637.751289171378, -3.406527586368],
+            [{
+                "v": "8",
+                "f": "Desktop (24%)"
+            }, "ClickRev_DeviceChannel", 4179.191475088904, 23.92426330646],
+            [{
+                "v": "9",
+                "f": "Tablet (21%)"
+            }, "ClickRev_DeviceChannel", 1345.5418775436071, 21.269865648106],
+            [{
+                "v": "10",
+                "f": "CHANNEL_ID_LINKEDIN_SPONSORED_JYMBII_JOBSHOME (-16%)"
+            }, "ClickRev_DeviceChannel", 574.4077517884032, -16.448173047829]
+
+        ],
+        "dim_2_data_1": [
+            [{
+                "v": "uniqueID",
+                "f": "displayValue"
+            }, "Parent", "current ratio (size)", "delta (color)"],
+            [{
+                "v": "ClickRev_DeviceChannel",
+                "f": "DeviceChannel"
+            }, null, 0, 2],
+            [{
+                "v": "6",
+                "f": "Mobile (3%)"
+            }, "ClickRev_DeviceChannel", 27239.614754248898, 2.980122154534],
+            [{
+                "v": "7",
+                "f": "OTHERS (-3%)"
+            }, "ClickRev_DeviceChannel", 6637.751289171378, -3.175542756805],
+            [{
+                "v": "8",
+                "f": "Desktop (1%)"
+            }, "ClickRev_DeviceChannel", 4179.191475088904, 0.727929036689],
+            [{
+                "v": "9",
+                "f": "Tablet (0%)"
+            }, "ClickRev_DeviceChannel", 1345.5418775436071, 0.166438500248],
+            [{
+                "v": "10",
+                "f": "CHANNEL_ID_LINKEDIN_SPONSORED_JYMBII_JOBSHOME (-1%)"
+            }, "ClickRev_DeviceChannel", 574.4077517884032, -0.540101112547]
+
+        ],
+        "dim_2_data_2": [
+            [{
+                "v": "uniqueID",
+                "f": "displayValue"
+            }, "Parent", "current ratio (size)", "delta (color)"],
+            [{
+                "v": "ClickRev_DeviceChannel",
+                "f": "DeviceChannel"
+            }, null, 0, 2],
+            [{
+                "v": "6",
+                "f": "Mobile (13%)"
+            }, "ClickRev_DeviceChannel", 27239.614754248898, 13.266018594443],
+            [{
+                "v": "7",
+                "f": "OTHERS (-1%)"
+            }, "ClickRev_DeviceChannel", 6637.751289171378, -0.669074770005],
+            [{
+                "v": "8",
+                "f": "Desktop (2%)"
+            }, "ClickRev_DeviceChannel", 4179.191475088904, 2.306025169954],
+            [{
+                "v": "9",
+                "f": "Tablet (1%)"
+            }, "ClickRev_DeviceChannel", 1345.5418775436071, 0.674525877138],
+            [{
+                "v": "10",
+                "f": "CHANNEL_ID_LINKEDIN_SPONSORED_JYMBII_JOBSHOME (-0%)"
+            }, "ClickRev_DeviceChannel", 574.4077517884032, -0.323200150383]
+        ]
+    }
+}
