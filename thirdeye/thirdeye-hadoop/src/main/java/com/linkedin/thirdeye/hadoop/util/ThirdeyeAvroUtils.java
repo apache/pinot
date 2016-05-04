@@ -45,6 +45,7 @@ import com.linkedin.thirdeye.hadoop.config.ThirdEyeConstants;
 public class ThirdeyeAvroUtils {
 
   private static Logger LOGGER = LoggerFactory.getLogger(ThirdeyeAvroUtils.class);
+  private static String AVRO_SUFFIX = ".avro";
   /**
    * extracts avro schema from avro file
    * @param avroFile
@@ -94,7 +95,8 @@ public class ThirdeyeAvroUtils {
     for (String input : inputPathDir.split(ThirdEyeConstants.FIELD_SEPARATOR)) {
       Path inputPath = new Path(input);
       for (FileStatus fileStatus : fs.listStatus(inputPath)) {
-        if (fileStatus.isFile()) {
+        if (fileStatus.isFile() && fileStatus.getPath().getName().endsWith(AVRO_SUFFIX)) {
+          LOGGER.info("Extracting schema from {}", fileStatus.getPath());
           avroSchema = extractSchemaFromAvro(fileStatus.getPath());
           break;
         }
