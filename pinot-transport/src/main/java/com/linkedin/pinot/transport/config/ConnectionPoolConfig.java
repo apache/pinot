@@ -16,7 +16,8 @@
 package com.linkedin.pinot.transport.config;
 
 import org.apache.commons.configuration.Configuration;
-
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class ConnectionPoolConfig {
 
@@ -55,6 +56,8 @@ public class ConnectionPoolConfig {
   // Idle Timeout (ms) for reaping idle connections
   private long _idleTimeoutMs;
 
+  private static final Logger LOGGER = LoggerFactory.getLogger(ConnectionPoolConfig.class);
+
   public ConnectionPoolConfig() {
     _threadPool = new ThreadPoolConfig();
     _minConnectionsPerServer = DEFAULT_MIN_CONNECTIONS_PER_SERVER;
@@ -83,6 +86,15 @@ public class ConnectionPoolConfig {
     if (cfg.containsKey(MAX_BACKLOG_PER_SERVER_KEY)) {
       _maxBacklogPerServer = cfg.getInt(MAX_BACKLOG_PER_SERVER_KEY);
     }
+
+    LOGGER.info(toString());
+  }
+
+  public String toString() {
+    return "threadPool = "+_threadPool+", idleTimeoutMs = "+_idleTimeoutMs+
+            ", minConnectionsPerServer = "+_minConnectionsPerServer+
+            ", maxConnectionsPerServer = "+_maxConnectionsPerServer+
+            ", maxBacklogPerServer = "+_maxBacklogPerServer;
   }
 
   public ThreadPoolConfig getThreadPool() {
