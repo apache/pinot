@@ -33,7 +33,13 @@ public class ReduceServiceRegistry {
     _registry = new HashMap<BrokerResponseFactory.ResponseType, ReduceService<? extends BrokerResponse>>();
   }
 
-  public void register(BrokerResponseFactory.ResponseType responseType,
+  /**
+   * Register the ReduceService for the given broker response type.
+   *
+   * @param responseType BrokerResponseType for which to register the reduce service.
+   * @param reduceService Reduce service to register
+   */
+  public synchronized void register(BrokerResponseFactory.ResponseType responseType,
       ReduceService<? extends BrokerResponse> reduceService) {
     _registry.put(responseType, reduceService);
   }
