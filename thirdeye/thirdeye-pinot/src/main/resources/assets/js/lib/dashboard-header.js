@@ -23,7 +23,7 @@
     });
 
     //Advanced settings
-    $("#main-view").on("click",".close-btn", function(){
+    $("#main-view").on("click",".close-dropdown-btn", function(){
         closeClosestDropDown(this)
     });
 

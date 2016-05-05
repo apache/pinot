@@ -43,7 +43,7 @@ $("#main-view").on("click","#sum-detail button",function() {
 
 						var detailsCells = document
 								.getElementsByClassName("details-cell");
-						// For testing
+						//Alert
 						if (detailsCells.length > 1000) {
 							console.log('details cells to paint:')
 							console.log(detailsCells.length)
@@ -62,7 +62,7 @@ $("#main-view").on("click","#sum-detail button",function() {
 					}
 				});
 
-/** Overview, tabular related listeners * */
+/** Dashboard and tabular related listeners * */
 
 // Click metric name in the table
 $("#main-view").on("click", ".metric-label", function() {
@@ -92,13 +92,26 @@ $("#main-view").on("click", "#funnels-table .heat-map-cell", function() {
 	hash.aggTimeGranularity = "aggregateAll"
 	cellObj = $(this)
 	var timeIndex = cellObj.attr("timeIndex")
-	
-
 	var timeBucketForColumnIndex = $("#timebuckets>span")[timeIndex]
 
-	currentStartUTC = $($("span", timeBucketForColumnIndex)[0]).text().trim();
-	currentEndUTC = $($("span", timeBucketForColumnIndex)[1]).text().trim();
-	baselineStartUTC = $($("span", timeBucketForColumnIndex)[2]).text().trim();
+    var currentStartUTC;
+    var baselineStartUTC;
+    var currentEndUTC;
+    var baselineEndUTC;
+
+    var currentSection = $(this).closest(".display-chart-section")
+    if( $(".cumulative", currentSection).is(':checked') ){
+
+        var firstTimeBucketInRow = $("#timebuckets>span")[0]
+        currentStartUTC = $($("span", firstTimeBucketInRow)[0]).text().trim();
+        baselineStartUTC = $($("span", firstTimeBucketInRow)[2]).text().trim();
+
+    }else{
+       currentStartUTC = $($("span", timeBucketForColumnIndex)[0]).text().trim();
+       baselineStartUTC = $($("span", timeBucketForColumnIndex)[2]).text().trim();
+    }
+
+    currentEndUTC = $($("span", timeBucketForColumnIndex)[1]).text().trim();
 	baselineEndUTC = $($("span", timeBucketForColumnIndex)[3]).text().trim();
 
 	hash.baselineStart = baselineStartUTC;
@@ -115,4 +128,8 @@ $("#main-view").on("click", "#funnels-table .heat-map-cell", function() {
     // update the form area and trigger the ajax call
     window.location.hash = encodeHashParameters(hash);
 
+})
+
+$("#main-view").on("click", ".close-btn", function() {
+    $(this).hide();
 })

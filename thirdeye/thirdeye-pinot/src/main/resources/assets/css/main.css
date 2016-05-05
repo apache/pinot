@@ -47,6 +47,16 @@ ul, ol{
     content: "+";
 }
 
+.tip-to-user{
+    position: relative;
+    font-size: 12px;
+    z-index: 5;
+}
+
+.tip-to-user i{
+    float: right;
+}
+
 .checkbox-type-button,
 .radio-type-button{
     -webkit-appearance: none;
@@ -494,6 +504,11 @@ body a{
 .metric-time-series-legend label,
 .dimension-time-series-legend label{
     border-bottom: 1px solid #ddd;
+}
+
+#funnel-table-msg{
+    width: 670px;
+    float: right;
 }
 
 

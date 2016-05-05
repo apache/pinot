@@ -59,7 +59,7 @@
                 <div id="{{tabName}}-add-filter" class="add-filter add-btn uk-display-inline-block" rel="{{tabName}}" data-uk-dropdown="{mode:'click'}">
                     <button class="uk-button uk-button-primary" type="button"><i class="uk-icon-plus"></i></button>
                     <div id="{{tabName}}-filter-panel" class="filter-panel uk-dropdown" style="width:420px; display:none;">
-                        <i class="close-btn uk-icon-close" style="position: absolute; right:5px; top: 5px;"></i>
+                        <i class="close-dropdown-btn uk-icon-close" style="position: absolute; right:5px; top: 5px;"></i>
                         <a href="#" class="uk-dropdown-close">
                             <button id="{{tabName}}-apply-filter-btn" class="apply-filter-btn uk-button uk-button-primary"  rel="{{tabName}}"  style="float:right; margin: 5px;" disabled>Apply
                             </button>
@@ -104,7 +104,7 @@
                     </div>
                     <div class="uk-dropdown" style="positon: absolute; top:0; left: 0; width:420px;">
                         <div>
-                            <i class="close-btn uk-icon-close" style="position: absolute; right:5px; top: 5px;"></i>
+                            <i class="close-dropdown-btn uk-icon-close" style="position: absolute; right:5px; top: 5px;"></i>
                             <span class="bold-label">Date Range:</span>
                             <select class="current-date-range-selector" rel="{{tabName}}">
                                 <option class="current-date-range-option" value="custom">Custom</option>
@@ -180,7 +180,7 @@
             <div id="{{tabName}}-time-input-form-error" class="time-input-form-error uk-alert uk-alert-danger uk-form-row hidden">
                 <p></p>
             </div>
-            <div id="{{tabName}}-time-input-form-tip" class="uk-alert uk-alert-success uk-form-row hidden">
+            <div id="{{tabName}}-form-tip" class="uk-alert uk-form-row hidden">
                 <p></p>
             </div>
 

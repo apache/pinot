@@ -32,7 +32,7 @@
                     </div>
                     <div class="uk-dropdown" style="positon: absolute; top:0; left: 0; width:420px;">
                         <div>
-                            <i class="close-btn uk-icon-close" style="position: absolute; right:5px; top: 5px;"></i>
+                            <i class="close-dropdown-btn uk-icon-close" style="position: absolute; right:5px; top: 5px;"></i>
                             <span class="bold-label">Date Range:</span>
                             <select class="current-date-range-selector" rel="{{tabName}}">
                                 <option class="current-date-range-option" value="custom">Custom</option>
