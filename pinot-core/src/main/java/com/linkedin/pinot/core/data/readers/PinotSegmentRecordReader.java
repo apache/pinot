@@ -42,8 +42,8 @@ import com.linkedin.pinot.core.io.reader.SingleColumnMultiValueReader;
 import com.linkedin.pinot.core.io.reader.SingleColumnSingleValueReader;
 import com.linkedin.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
 import com.linkedin.pinot.core.io.reader.impl.SortedForwardIndexReader;
+import com.linkedin.pinot.core.io.reader.impl.v1.FixedBitMultiValueReader;
 import com.linkedin.pinot.core.io.reader.impl.v1.FixedBitSingleValueReader;
-import com.linkedin.pinot.core.io.reader.impl.v2.FixedBitMultiValueReader;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
@@ -156,9 +156,6 @@ public class PinotSegmentRecordReader extends BaseRecordReader {
           pinotDictionaryBufferMap.put(column, new StringDictionary(dictionaryBuffer, columnMetadataFor));
           break;
         case INT_ARRAY:
-          int[] intArray = new int[columnMetadataFor.getMaxNumberOfMultiValues()];
-          multiValueArrayMap.put(column, intArray);
-          break;
         case BYTE:
         case BYTE_ARRAY:
         case CHAR:
@@ -173,6 +170,10 @@ public class PinotSegmentRecordReader extends BaseRecordReader {
         default:
           LOGGER.error("Unsupported data type {}", dataType);
           break;
+      }
+      if (!isSingleValueMap.get(column)) {
+        int[] intArray = new int[columnMetadataFor.getMaxNumberOfMultiValues()];
+        multiValueArrayMap.put(column, intArray);
       }
       columnDataTypeMap.put(column, dataType);
     }
