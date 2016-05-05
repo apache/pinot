@@ -225,7 +225,7 @@ public abstract class FieldSpec {
         return LONG;
       }
 
-      if (type == Type.STRING || type == Type.BOOLEAN) {
+      if (type == Type.ENUM || type == Type.STRING || type == Type.BOOLEAN) {
         return STRING;
       }
 
@@ -237,7 +237,7 @@ public abstract class FieldSpec {
         return DOUBLE;
       }
 
-      throw new UnsupportedOperationException(type.toString());
+      throw new UnsupportedOperationException("Unsupported DataType " + type.toString());
     }
 
     /**

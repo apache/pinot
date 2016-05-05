@@ -92,6 +92,8 @@ public abstract class HybridClusterScanComparisonIntegrationTest extends HybridC
   private boolean _logMatchingResults = false;
   private ThreadPoolExecutor _queryExecutor;
   protected List<String> invertedIndexColumns = new ArrayList<String>();
+  protected boolean _createSegmentsInParallel = false;
+  protected int _nQueriesRead = -1;
 
   @AfterClass
   @Override
@@ -127,7 +129,7 @@ public abstract class HybridClusterScanComparisonIntegrationTest extends HybridC
     Schema schema = Schema.fromFile(schemaFile);
     addSchema(schemaFile, schema.getSchemaName());
     addHybridTable(tableName, timeColumnName, timeColumnType, kafkaZkUrl, kafkaTopic, schema.getSchemaName(),
-        "TestTenant", "TestTenant", avroFile, sortedColumn, invertedIndexColumns);
+        "TestTenant", "TestTenant", avroFile, sortedColumn, invertedIndexColumns, "MMAP");
   }
 
   @Override
@@ -167,11 +169,18 @@ public abstract class HybridClusterScanComparisonIntegrationTest extends HybridC
     final List<File> realtimeAvroFiles = getRealtimeAvroFiles(avroFiles);
 
     // Create segments from Avro data
-    ExecutorService executor = Executors.newSingleThreadExecutor();
+    ExecutorService executor;
+    if (_createSegmentsInParallel) {
+      executor = Executors.newCachedThreadPool();
+    } else {
+      executor = Executors.newSingleThreadExecutor();
+
+    }
     Future<Map<File, File>> offlineAvroToSegmentMapFuture =
-        buildSegmentsFromAvro(offlineAvroFiles, executor, 0, _offlineSegmentDir, _offlineTarDir, "mytable", false);
+        buildSegmentsFromAvro(offlineAvroFiles, executor, 0, _offlineSegmentDir, _offlineTarDir, "mytable", false, _schema);
     Future<Map<File, File>> realtimeAvroToSegmentMapFuture =
-        buildSegmentsFromAvro(realtimeAvroFiles, executor, 0, _realtimeSegmentDir, _realtimeTarDir, "mytable", false);
+        buildSegmentsFromAvro(realtimeAvroFiles, executor, 0, _realtimeSegmentDir, _realtimeTarDir, "mytable", false,
+            _schema);
 
     // Initialize query generator
     setupQueryGenerator(avroFiles, executor);
@@ -246,6 +255,10 @@ public abstract class HybridClusterScanComparisonIntegrationTest extends HybridC
     });
   }
 
+  protected long getStabilizationTimeMs() {
+    return 120000L;
+  }
+
   protected void runQuery(String pqlQuery, ScanBasedQueryProcessor scanBasedQueryProcessor, boolean displayStatus)
       throws Exception {
     QueryResponse scanResponse = scanBasedQueryProcessor.processQuery(pqlQuery);
@@ -280,7 +293,7 @@ public abstract class HybridClusterScanComparisonIntegrationTest extends HybridC
 
     int totalQueries = _successfulQueries.get() + _failedQueries.get();
 
-    if (displayStatus || totalQueries % 1000 == 0) {
+    if (displayStatus || totalQueries % 5000 == 0) {
       doDisplayStatus(totalQueries);
     }
   }
@@ -292,8 +305,7 @@ public abstract class HybridClusterScanComparisonIntegrationTest extends HybridC
     LOGGER.info("Query failure percentage {}% (empty result {}%, rate {} queries/s)",
         _failedQueries.get() * 100.0 / (_failedQueries.get() + _successfulQueries.get()),
         _emptyResults.get() * 100.00 / (_failedQueries.get() + _successfulQueries.get()),
-        nQueries * 1000.0 / (nowMs-startTimeMs)
-    );
+        nQueries * 1000.0 / (nowMs - startTimeMs));
   }
 
   @Override
@@ -330,7 +342,7 @@ public abstract class HybridClusterScanComparisonIntegrationTest extends HybridC
       }
 
       // Push avro for the new segment
-      LOGGER.info("Pushing Avro file {}", avroFile);
+      LOGGER.info("Pushing Avro file {} into Kafka", avroFile);
       pushAvroIntoKafka(Collections.singletonList(avroFile), KafkaStarterUtils.DEFAULT_KAFKA_BROKER, KAFKA_TOPIC);
 
       // Configure the scan based comparator to use the distinct union of the offline and realtime segments
@@ -339,20 +351,36 @@ public abstract class HybridClusterScanComparisonIntegrationTest extends HybridC
       QueryResponse queryResponse = _scanBasedQueryProcessor.processQuery("select count(*) from mytable");
 
       int expectedRecordCount = queryResponse.getNumDocsScanned();
-      waitForRecordCountToStabilizeToExpectedCount(expectedRecordCount, System.currentTimeMillis() + 120000L);
+      waitForRecordCountToStabilizeToExpectedCount(expectedRecordCount, System.currentTimeMillis() + getStabilizationTimeMs());
 
       // Run the actual tests
+      LOGGER.info("Running queries");
       testMethod.call();
 
       if (useMultipleThreads) {
-        _queryExecutor.shutdown();
-        _queryExecutor.awaitTermination(5, TimeUnit.MINUTES);
-        int totalQueries = _failedQueries.get() + _successfulQueries.get();
-        doDisplayStatus(totalQueries);
+        if (_nQueriesRead == -1) {
+          _queryExecutor.shutdown();
+          _queryExecutor.awaitTermination(5, TimeUnit.MINUTES);
+        } else {
+          int totalQueries = _failedQueries.get() + _successfulQueries.get();
+          while (totalQueries < _nQueriesRead) {
+            LOGGER.info("Completed " + totalQueries + " out of " + _nQueriesRead + " - waiting");
+            Uninterruptibles.sleepUninterruptibly(20, TimeUnit.SECONDS);
+            totalQueries = _failedQueries.get() + _successfulQueries.get();
+          }
+          if (totalQueries > _nQueriesRead) {
+            throw new RuntimeException("Executed " + totalQueries + " more than " + _nQueriesRead);
+          }
+          _queryExecutor.shutdown();
+        }
       }
+      int totalQueries = _failedQueries.get() + _successfulQueries.get();
+      doDisplayStatus(totalQueries);
 
       // Release resources
       _scanBasedQueryProcessor.close();
+      _fileWriter.write("Status after push of " + avroFile + ":" + System.currentTimeMillis() +
+          ":Executed " + _nQueriesRead + " queries, " + _failedQueries + " failures," + _emptyResults.get() + " empty results");
     }
   }
 
@@ -390,6 +418,18 @@ public abstract class HybridClusterScanComparisonIntegrationTest extends HybridC
     _scanBasedQueryProcessor = new ScanBasedQueryProcessor(_unpackedSegments.getAbsolutePath());
   }
 
+  protected int getNumSuccesfulQueries() {
+    return _successfulQueries.get();
+  }
+
+  protected int getNumFailedQueries() {
+    return _failedQueries.get();
+  }
+
+  protected int getNumEmptyResults() {
+    return _emptyResults.get();
+  }
+
   @Override
   @Test(enabled = false)
   public void testMultipleQueries() throws Exception {
@@ -415,7 +455,7 @@ public abstract class HybridClusterScanComparisonIntegrationTest extends HybridC
     // Recreate the realtime table
     addRealtimeTable("mytable", "DaysSinceEpoch", "daysSinceEpoch", 900, "Days", KafkaStarterUtils.DEFAULT_ZK_STR,
         KAFKA_TOPIC, _schema.getSchemaName(), "TestTenant", "TestTenant",
-        _realtimeAvroToSegmentMap.keySet().iterator().next(), 1000000, getSortedColumn(), new ArrayList<String>());
+        _realtimeAvroToSegmentMap.keySet().iterator().next(), 1000000, getSortedColumn(), new ArrayList<String>(), null);
   }
 
   @Override

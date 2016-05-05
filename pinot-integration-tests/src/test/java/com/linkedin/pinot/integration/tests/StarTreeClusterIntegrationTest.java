@@ -119,7 +119,7 @@ public class StarTreeClusterIntegrationTest extends ClusterTest {
 
     ExecutorService executor = Executors.newCachedThreadPool();
     BaseClusterIntegrationTest.buildSegmentsFromAvro(avroFiles, executor, 0, _segmentsDir,
-        _tarredSegmentsDir, tableName, starTree);
+        _tarredSegmentsDir, tableName, starTree, null);
 
     executor.shutdown();
     executor.awaitTermination(TIMEOUT_IN_SECONDS, TimeUnit.SECONDS);

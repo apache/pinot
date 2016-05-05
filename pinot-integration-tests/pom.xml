@@ -43,6 +43,25 @@
           </execution>
         </executions>
       </plugin>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>appassembler-maven-plugin</artifactId>
+        <configuration>
+          <programs>
+            <program>
+              <mainClass>com.linkedin.pinot.integration.tests.HybridScanBasedCommandLineTestRunner</mainClass>
+              <name>pinot-hybrid-cluster-test</name>
+              <jvmSettings>
+                <initialMemorySize>4G</initialMemorySize>
+                <maxMemorySize>4G</maxMemorySize>
+                <extraArguments>
+                  <extraArgument>-XX:MaxDirectMemorySize=30g</extraArgument>
+                </extraArguments>
+              </jvmSettings>
+            </program>
+          </programs>
+        </configuration>
+      </plugin>
     </plugins>
   </build>
   <dependencies>
@@ -67,7 +86,6 @@
       <artifactId>pinot-server</artifactId>
       <version>${project.version}</version>
       <type>test-jar</type>
-      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>com.linkedin.pinot</groupId>
@@ -78,28 +96,24 @@
       <artifactId>pinot-controller</artifactId>
       <version>${project.version}</version>
       <type>test-jar</type>
-      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>com.linkedin.pinot</groupId>
       <artifactId>pinot-common</artifactId>
       <version>${project.version}</version>
       <type>test-jar</type>
-      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>com.linkedin.pinot</groupId>
       <artifactId>pinot-broker</artifactId>
       <version>${project.version}</version>
       <type>test-jar</type>
-      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>com.linkedin.pinot</groupId>
       <artifactId>pinot-core</artifactId>
       <version>${project.version}</version>
       <type>test-jar</type>
-      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>com.linkedin.pinot</groupId>
@@ -108,7 +122,6 @@
     <dependency>
       <groupId>org.testng</groupId>
       <artifactId>testng</artifactId>
-      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>commons-lang</groupId>

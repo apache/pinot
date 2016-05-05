@@ -17,23 +17,14 @@ package com.linkedin.pinot.integration.tests;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.sql.DriverManager;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.io.FileUtils;
-import org.apache.helix.ExternalViewChangeListener;
-import org.apache.helix.HelixManager;
-import org.apache.helix.HelixManagerFactory;
-import org.apache.helix.InstanceType;
-import org.apache.helix.NotificationContext;
-import org.apache.helix.model.ExternalView;
 import org.json.JSONArray;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,7 +34,6 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.utils.FileUploadUtils;
-import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.util.TestUtils;
 
 /**
@@ -103,7 +93,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
     setupH2AndInsertAvro(avroFiles, executor);
 
     // Create segments from Avro data
-    buildSegmentsFromAvro(avroFiles, executor, 0, _segmentDir, _tarDir, "mytable", false);
+    buildSegmentsFromAvro(avroFiles, executor, 0, _segmentDir, _tarDir, "mytable", false, null);
 
     // Initialize query generator
     setupQueryGenerator(avroFiles, executor);

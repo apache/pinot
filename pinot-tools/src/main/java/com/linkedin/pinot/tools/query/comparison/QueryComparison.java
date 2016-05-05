@@ -251,6 +251,9 @@ public class QueryComparison {
 
   public static boolean compareAggregation(JSONObject actualJson, JSONObject expectedJson)
       throws JSONException {
+    if (!actualJson.has(AGGREGATION_RESULTS) && !expectedJson.has(AGGREGATION_RESULTS)) {
+      return true;
+    }
     JSONArray actualAggregation = actualJson.getJSONArray(AGGREGATION_RESULTS);
     if (actualAggregation.length() == 0) {
       return !expectedJson.has(AGGREGATION_RESULTS);

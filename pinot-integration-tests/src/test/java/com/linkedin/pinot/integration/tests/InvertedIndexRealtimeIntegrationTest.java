@@ -34,6 +34,6 @@ public class InvertedIndexRealtimeIntegrationTest extends RealtimeClusterIntegra
     Schema schema = Schema.fromFile(getSchemaFile());
     super.addRealtimeTable(tableName, timeColumnName, timeColumnType, retentionDays, retentionTimeUnit, kafkaZkUrl,
         kafkaTopic, schemaName, serverTenant, brokerTenant, avroFile, realtimeSegmentFlushSize, sortedColumn,
-        schema.getDimensionNames());
+        schema.getDimensionNames(), null);
   }
 }

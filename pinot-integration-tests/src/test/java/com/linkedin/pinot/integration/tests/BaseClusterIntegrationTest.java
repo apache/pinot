@@ -362,7 +362,6 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         }
       } else {
         // Don't compare selection results for now
-        LOGGER.warn("Skipping comparison since there are no aggregation columns");
       }
     } catch (JSONException exception) {
       if (GATHER_FAILED_QUERIES) {
@@ -530,7 +529,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
             messagesToWrite.add(data);
             messagesInThisBatch++;
             if (MAX_MESSAGES_PER_BATCH <= messagesInThisBatch) {
-              LOGGER.info("Sending a batch of {} records to Kafka", messagesInThisBatch);
+              LOGGER.debug("Sending a batch of {} records to Kafka", messagesInThisBatch);
               messagesInThisBatch = 0;
               producer.send(messagesToWrite);
               messagesToWrite.clear();
@@ -694,7 +693,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   public static Future<Map<File, File>> buildSegmentsFromAvro(final List<File> avroFiles, Executor executor, int baseSegmentIndex,
-      final File baseDirectory, final File segmentTarDir, final String tableName, final boolean createStarTreeIndex) {
+      final File baseDirectory, final File segmentTarDir, final String tableName, final boolean createStarTreeIndex,
+      final com.linkedin.pinot.common.data.Schema inputPinotSchema) {
     int segmentCount = avroFiles.size();
     LOGGER.info("Building " + segmentCount + " segments in parallel");
     List<ListenableFutureTask<Pair<File, File>>> futureTasks = new ArrayList<ListenableFutureTask<Pair<File,File>>>();
@@ -713,7 +713,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
             File outputDir = new File(baseDirectory, "segment-" + segmentNumber);
             final File inputAvroFile = avroFiles.get(segmentIndex);
             final SegmentGeneratorConfig genConfig = SegmentTestUtils
-                .getSegmentGenSpecWithSchemAndProjectedColumns(inputAvroFile, outputDir, TimeUnit.DAYS, tableName);
+                .getSegmentGenSpecWithSchemAndProjectedColumns(inputAvroFile, outputDir, TimeUnit.DAYS, tableName, inputPinotSchema);
 
             if (createStarTreeIndex) {
               final File pinotSchemaFile = new File(TestUtils.getFileFromResourceUrl(
@@ -721,6 +721,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
               com.linkedin.pinot.common.data.Schema pinotSchema =
                   com.linkedin.pinot.common.data.Schema.fromFile(pinotSchemaFile);
               genConfig.setSchema(pinotSchema);
+            } else if (inputPinotSchema != null) {
+              genConfig.setSchema(inputPinotSchema);
             }
 
             genConfig.setSegmentNamePostfix(Integer.toString(segmentNumber));
@@ -785,8 +787,10 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
       if (expectedRecordCount > pinotRecordCount) {
         final long now = System.currentTimeMillis();
-        Assert.assertTrue(now < deadlineMs, "Failed to read " + expectedRecordCount + " records within the deadline (deadline="
-            + deadlineMs + "ms,now="  + now + "ms,NumRecordsRead=" + pinotRecordCount + ")");
+        if (now > deadlineMs) {
+          Assert.fail("Failed to read " + expectedRecordCount + " records within the deadline (deadline=" + deadlineMs + "ms,now="
+                  + now + "ms,NumRecordsRead=" + pinotRecordCount + ")");
+        }
       }
     } while (pinotRecordCount < expectedRecordCount);
 
@@ -927,7 +931,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         LOGGER.debug("Trying to send query : {}", query);
         runQuery(query, Collections.singletonList(query.replace("'mytable'", "mytable")));
       } catch (Exception e) {
-        LOGGER.error("Getting erro for query : {}", query);
+        LOGGER.error("Getting error for query : {}", query, e);
       }
 
     }

@@ -169,7 +169,7 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
     boolean isValid = true;
     if (!sortedColumns.isEmpty()) {
       final String sortedColumn = sortedColumns.get(0);
-      if (sortedColumns.size() > 0) {
+      if (sortedColumns.size() > 1) {
         LOGGER.warn("More than one sorted column configured. Using {}", sortedColumn);
       }
       FieldSpec fieldSpec = schema.getFieldSpecFor(sortedColumn);

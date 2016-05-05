@@ -29,8 +29,13 @@ import com.linkedin.pinot.core.indexsegment.utils.AvroUtils;
 public class SegmentTestUtils {
 
   public static SegmentGeneratorConfig getSegmentGenSpecWithSchemAndProjectedColumns(File inputAvro, File outputDir,
-      TimeUnit timeUnit, String clusterName) throws IOException {
-    Schema schema = AvroUtils.extractSchemaFromAvro(inputAvro);
+      TimeUnit timeUnit, String clusterName, Schema inputPinotSchema) throws IOException {
+    Schema schema;
+    if (inputPinotSchema == null) {
+      schema = AvroUtils.extractSchemaFromAvro(inputAvro);
+    } else {
+      schema = inputPinotSchema;
+    }
     SegmentGeneratorConfig segmentGenSpec = new SegmentGeneratorConfig(schema);
     segmentGenSpec.setInputFilePath(inputAvro.getAbsolutePath());
     segmentGenSpec.setSegmentTimeUnit(timeUnit);

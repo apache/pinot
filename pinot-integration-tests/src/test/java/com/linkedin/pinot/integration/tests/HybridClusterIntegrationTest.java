@@ -116,7 +116,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
 
     // Create Pinot table
     addHybridTable("mytable", "DaysSinceEpoch", "daysSinceEpoch", KafkaStarterUtils.DEFAULT_ZK_STR, KAFKA_TOPIC,
-        schema.getSchemaName(), TENANT_NAME, TENANT_NAME, avroFiles.get(0), sortedColumn, invertedIndexColumns);
+        schema.getSchemaName(), TENANT_NAME, TENANT_NAME, avroFiles.get(0), sortedColumn, invertedIndexColumns, null);
     LOGGER.info("Running with Sorted column=" + sortedColumn + " and inverted index columns = " + invertedIndexColumns);
 
     // Create a subset of the first 8 segments (for offline) and the last 6 segments (for realtime)
@@ -129,7 +129,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
 
     // Create segments from Avro data
     LOGGER.info("Creating offline segments from avro files " + offlineAvroFiles);
-    buildSegmentsFromAvro(offlineAvroFiles, executor, 0, _segmentDir, _tarDir, "mytable", false);
+    buildSegmentsFromAvro(offlineAvroFiles, executor, 0, _segmentDir, _tarDir, "mytable", false, null);
 
     // Initialize query generator
     setupQueryGenerator(avroFiles, executor);

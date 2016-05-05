@@ -15,34 +15,40 @@
  */
 package com.linkedin.pinot.core.data.extractors;
 
-import com.linkedin.pinot.common.data.TimeFieldSpec;
-import com.linkedin.pinot.common.data.TimeGranularitySpec;
-import com.linkedin.pinot.core.data.GenericRow;
-import java.io.ByteArrayOutputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import org.testng.Assert;
-import org.testng.annotations.Test;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.data.DimensionFieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.common.data.FieldSpec.FieldType;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.data.Schema.SchemaBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testng.Assert;
+import org.testng.annotations.Test;
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.data.Schema.SchemaBuilder;
+import com.linkedin.pinot.common.data.TimeFieldSpec;
+import com.linkedin.pinot.common.data.TimeGranularitySpec;
+import com.linkedin.pinot.core.data.GenericRow;
 
 public class PlainFieldExtractorTest {
+  private class AnyClassWithToString {
+    private final int _n;
+    public AnyClassWithToString(int n) {
+      _n = n;
+    }
+    @Override
+    public String toString() {
+      return Integer.toString(_n);
+    }
+  }
+
   @Test
   public void simpleTest()
       throws Exception {
     Schema schema = new SchemaBuilder().addSingleValueDimension("svDimensionInt", DataType.INT)
         .addSingleValueDimension("svDimensionDouble", DataType.DOUBLE)
+        .addSingleValueDimension("someClassObject", DataType.STRING)
         .addMultiValueDimension("mvDimension", DataType.STRING, ",")
+        .addMultiValueDimension("mvClassObject", DataType.STRING, ",")
         .addMetric("metric", DataType.INT)
         .addTime("incomingTime", TimeUnit.DAYS, DataType.LONG)
         .build();
@@ -57,6 +63,19 @@ public class PlainFieldExtractorTest {
     fieldMap.put("metric", doubleObj);
     long currentDaysSinceEpoch = System.currentTimeMillis() / 1000 / 60 / 60 / 24;
     fieldMap.put("incomingTime", currentDaysSinceEpoch);
+
+    final int value = 89;
+    {
+      AnyClassWithToString obj = new AnyClassWithToString(value);
+      fieldMap.put("someClassObject", value);
+    }
+    {
+      Object[] obj = new Object[2];
+      obj[0] = new AnyClassWithToString(value);
+      obj[1] = new AnyClassWithToString(value+1);
+      fieldMap.put("mvClassObject", obj);
+    }
+
     row.init(fieldMap);
     extractor.transform(row);
     Assert.assertTrue(row.getValue("svDimensionInt") instanceof Integer);
@@ -65,6 +84,12 @@ public class PlainFieldExtractorTest {
     Assert.assertTrue(row.getValue("metric") instanceof Integer);
     Assert.assertTrue((Integer) row.getValue("metric") == 34);
     Assert.assertTrue((Long) row.getValue("incomingTime") == currentDaysSinceEpoch);
+    Assert.assertTrue(Integer.toString(value).equals(row.getValue("someClassObject")));
+    Assert.assertTrue(row.getValue("mvClassObject") instanceof  String[]);
+    String[] strings = (String[])row.getValue("mvClassObject");
+    Assert.assertEquals(strings.length, 2);
+    Assert.assertEquals(Integer.toString(value), strings[0]);
+    Assert.assertEquals(Integer.toString(value+1), strings[1]);
   }
 
   @Test

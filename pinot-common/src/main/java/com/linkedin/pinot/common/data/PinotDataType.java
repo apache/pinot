@@ -15,8 +15,6 @@
  */
 package com.linkedin.pinot.common.data;
 
-import com.linkedin.pinot.common.data.FieldSpec;
-
 /**
  *  A {@code PinotDataType} represents the value of a row from a recordReader
  *  and provides utility methods to convert across types if applicable.
@@ -943,7 +941,7 @@ public enum PinotDataType {
     }
 
     public String toString(Object d) {
-      return (String) ((Object) d);
+      return d.toString();
     }
 
     public Object toObject(Object d) {
@@ -979,7 +977,20 @@ public enum PinotDataType {
     }
 
     public String[] toStringArray(Object d) {
-      return (String[]) ((Object) d);
+      String[] result = null;
+      if (d instanceof Object[]) {
+        Object[] darr = (Object[])d;
+        result = new String[darr.length];
+        for (int i = 0; i < darr.length; ++i) {
+          if (darr[i] != null) {
+            result[i] = darr[i].toString();
+          }
+        }
+      } else {
+        result = new String[1];
+        result[0] = d.toString();
+      }
+      return result;
     }
 
     public Object convert(Object d, PinotDataType u) {

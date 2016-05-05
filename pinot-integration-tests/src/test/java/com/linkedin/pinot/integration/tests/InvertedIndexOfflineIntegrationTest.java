@@ -30,7 +30,8 @@ public class InvertedIndexOfflineIntegrationTest extends OfflineClusterIntegrati
   protected void setUpTable(File schemaFile, int numBroker, int numOffline) throws Exception {
     addSchema(schemaFile, "schemaFile");
     Schema schema = Schema.fromFile(schemaFile);
-    addOfflineTable("mytable", "DaysSinceEpoch", "daysSinceEpoch", 3000, "DAYS", null, null, schema.getDimensionNames());
+    addOfflineTable("mytable", "DaysSinceEpoch", "daysSinceEpoch", 3000, "DAYS", null, null, schema.getDimensionNames(),
+        null);
   }
 
 }
