@@ -18,6 +18,7 @@ package com.linkedin.pinot.broker.servlet;
 import java.io.BufferedReader;
 import java.io.IOException;
 
+import java.io.PrintWriter;
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
@@ -51,17 +52,18 @@ public class PinotClientRequestServlet extends HttpServlet {
 
   @Override
   protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+    resp.setCharacterEncoding("UTF-8");
+    PrintWriter writer = resp.getWriter();
     try {
-      resp.setCharacterEncoding("UTF-8");
       BrokerResponse brokerResponse = broker.handleRequest(new JSONObject(req.getParameter("bql")));
       String jsonString = brokerResponse.toJsonString();
-      resp.getOutputStream().print(jsonString);
-      resp.getOutputStream().flush();
-      resp.getOutputStream().close();
+      writer.print(jsonString);
+      writer.flush();
+      writer.close();
     } catch (final Exception e) {
-      resp.getOutputStream().print(e.getMessage());
-      resp.getOutputStream().flush();
-      resp.getOutputStream().close();
+      writer.print(e.getMessage());
+      writer.flush();
+      writer.close();
       LOGGER.error("Caught exception while processing GET request", e);
       brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_GET_EXCEPTIONS, 1);
     }
@@ -69,17 +71,18 @@ public class PinotClientRequestServlet extends HttpServlet {
 
   @Override
   protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+    resp.setCharacterEncoding("UTF-8");
+    PrintWriter writer = resp.getWriter();
     try {
-      resp.setCharacterEncoding("UTF-8");
       BrokerResponse brokerResponse = broker.handleRequest(extractJSON(req));
       String jsonString = brokerResponse.toJsonString();
-      resp.getOutputStream().print(jsonString);
-      resp.getOutputStream().flush();
-      resp.getOutputStream().close();
+      writer.print(jsonString);
+      writer.flush();
+      writer.close();
     } catch (final Exception e) {
-      resp.getOutputStream().print(e.getMessage());
-      resp.getOutputStream().flush();
-      resp.getOutputStream().close();
+      writer.print(e.getMessage());
+      writer.flush();
+      writer.close();
       LOGGER.error("Caught exception while processing POST request", e);
       brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_POST_EXCEPTIONS, 1);
     }
