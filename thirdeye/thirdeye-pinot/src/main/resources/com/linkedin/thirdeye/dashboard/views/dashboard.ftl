@@ -13,6 +13,7 @@
 				<li id="dashboard-header-tab" class="header-tab" rel="dashboard"><a href="#">Dashboard</a></li>
 				<li id="compare-header-tab" class="header-tab" rel="compare"><a href="#">Time over time comparison</a></li>
 				<li id="timeseries-header-tab" class="header-tab" rel="timeseries"><a href="#">Timeseries</a></li>
+				<li id="anomalies-header-tab" class="header-tab" rel="anomalies"><a href="#">Anomalies</a></li>
 			</ul>
 		</div>
 	</nav>
@@ -21,6 +22,7 @@
 		<li id="dashboard"></li>
 		<li id="compare"></li>
 		<li id="timeseries"></li>
+		<li id="anomalies"></li>
 	</ul>
 </div>
 

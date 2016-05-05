@@ -4,6 +4,9 @@
         var url="/dashboard/data/heatmap?" + window.location.hash.substring(1);
         getData(url).done(function(data) {
 
+            console.log("heatmap data:" )
+            console.log(data )
+
             /* Handelbars template for treemap table */
             var result_treemap_template = HandleBarsTemplates.template_treemap(data)
             $("#"+ hash.view +"-display-chart-section").html(result_treemap_template);

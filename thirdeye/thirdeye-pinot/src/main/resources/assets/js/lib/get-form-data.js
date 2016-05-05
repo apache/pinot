@@ -10,7 +10,6 @@ function getDataSetList(){
 
         //populate dataset from hash and get related dashboard list
         if (hash.hasOwnProperty('dataset')){
-            // Todo: get that dataset
             $($(".dataset-option[value='"+ hash.dataset +"']")[0]).click();
         }
     });

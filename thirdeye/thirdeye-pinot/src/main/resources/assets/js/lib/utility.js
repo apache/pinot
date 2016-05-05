@@ -124,6 +124,11 @@ function populateTodayDateTime(){
 
 function updateDashboardFormFromHash(){
 
+    //Preselect dataset if present in hash
+    if (!hash.hasOwnProperty('dataset')){
+        $(".selected-dataset").text("Select dataset");
+    }
+
     //Preselect header-tab if present in hash
     if (hash.hasOwnProperty('view')){
         $(".header-tab[rel='"+ hash.view +"']").click();

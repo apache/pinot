@@ -151,7 +151,7 @@
                             <button class="time-input-form-gran-hours-copy baseline-aggregate-copy  radio-type-button uk-active" rel="{{tabName}}" type="button" unit="HOURS" value="3600000">HOUR</button>
                             <button class="time-input-form-gran-days-copy baseline-aggregate-copy radio-type-button" rel="{{tabName}}" type="button" unit="DAYS" value="86400000">DAY</button>
                             {{#if showAggregateAllGranularity}}
-                            <button class="time-input-form-gran-aggregate-all-copy baseline-aggregate-copy radio-type-button" rel="{{tabName}}" type="button" unit="aggregateAll" value="0">Overall timerange</button>
+                            <button class="time-input-form-gran-aggregate-all-copy baseline-aggregate-copy radio-type-button" rel="{{tabName}}" type="button" unit="aggregateAll" value="0">Aggregate all</button>
                             {{/if}}
                         </div>
                         <div class="time-input-logic-error uk-alert uk-alert-danger hidden" rel="{{tabName}}">
@@ -173,7 +173,7 @@
                     <button class="time-input-form-gran-hours baseline-aggregate radio-type-button uk-active" rel="{{tabName}}" type="button" unit="HOURS" value="3600000">HOUR</button>
                     <button class="time-input-form-gran-days baseline-aggregate radio-type-button" rel="{{tabName}}" unit="DAYS" type="button" value="86400000">DAY</button>
                     {{#if showAggregateAllGranularity}}
-                    <button class="time-input-form-gran-aggregate-all baseline-aggregate radio-type-button" rel="{{tabName}}" unit="aggregateAll" type="button" value="0">Overall timerange</button>
+                    <button class="time-input-form-gran-aggregate-all baseline-aggregate radio-type-button" rel="{{tabName}}" unit="aggregateAll" type="button" value="0">Aggregate all</button>
                     {{/if}}
                 </div>
             </div>

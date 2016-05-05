@@ -308,7 +308,7 @@ body a{
 }
 
 .display-chart-section{
-    min-height: 500px;
+    min-height: 600px;
     overflow: scroll;
     padding: 12px;
 }
@@ -600,7 +600,7 @@ body a{
     border: 1px solid #ddd;
     height: auto;
     margin: 0 0 15px;
-    padding: 10px 0 0 12px;
+    padding: 5px 12px;
     width: 100%;
     border-bottom: 1px solid #ddd;
 }
@@ -622,9 +622,8 @@ body a{
 .title-stat {
     font-size: 12px;
     font-weight: 800;
-    text-align: center;
-    padding: 5px; 
-
+    text-align: start;
+    padding: 5px;
 }
 
 

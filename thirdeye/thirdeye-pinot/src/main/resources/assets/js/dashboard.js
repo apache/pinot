@@ -23,6 +23,14 @@ $(document).ready( function() {
     var result_tab_template = HandleBarsTemplates.template_tab(timseries_tab_options)
     $("#timeseries").append(result_tab_template);
 
+    //ANOMALIES
+    var anomalies_tab_options = {
+        tabName: "anomalies"
+    }
+    var result_tab_template = HandleBarsTemplates.template_tab(anomalies_tab_options)
+    $("#anomalies").append(result_tab_template);
+
+
     /** Handelbars template for forms on tabs* */
     //DASHBOARD
     var dasboard_section_options = {
@@ -62,10 +70,27 @@ $(document).ready( function() {
         showTimeSelection: true,
         showAggregateAllGranularity: false,
         needComparisonTimeRange: false
-    } 
+    }
 
     var result_form_template = HandleBarsTemplates.template_form(timseries_section_options)
     $("#timeseries-section #form-area").append(result_form_template);
+
+    //ANOMALIES
+    var anomalies_section_options = {
+        tabName: "anomalies",
+        showDashboardSelection: false,
+        showMetricSelection: true,
+        showDimensionSelection: true,
+        showFilterSelection: true,
+        showTimeSelection: true,
+        showAggregateAllGranularity: true,
+        needComparisonTimeRange: true
+    }
+
+
+
+    var result_form_template = HandleBarsTemplates.template_form(anomalies_section_options)
+    $("#anomalies-section #form-area").append(result_form_template);
 
     //Global object with the query params
     hash = parseHashParameters(window.location.hash);
@@ -119,11 +144,15 @@ $(document).ready( function() {
                                 getTabular();
                             }
                         }
+                    break;
+                    case "anomalies":
+
+                        getAnomalies()
                         break;
                     default://dashboard tab
 
-                        getCustomDashboard();
-                        break;
+                    getCustomDashboard();
+                    break;
                 }
 
             }

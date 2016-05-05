@@ -5,18 +5,33 @@
             <div class="dimension-heat-map-treemap-section">
                 <div class="title-box">
                     <table>
-                        <tbody><tr>
-                            <th colspan="4"><p>metric: <b>{{metricName}}</b></p></th>
+                        <tbody>
+                        <tr>
+                            <th>BASELINE</th>
+                            <th><b>Start:</b></th>
+                            <td class="baseline-date-time">{{displayDate  @root/summary/simpleFields/baselineStart}}</td>
+                            <th><b>End:</b></th>
+                            <td class="baseline-date-time">{{displayDate  @root/summary/simpleFields/baselineEnd}}</td>
+                        </tr>
+                        <tr>
+                            <th>CURRENT</th>
+                            <th><b>Start:</b></th>
+                            <td class="current-date-time">{{displayDate  @root/summary/simpleFields/currentStart}}</td>
+                            <th><b>End:</b></th>
+                            <td class="current-date-time">{{displayDate  @root/summary/simpleFields/currentEnd}}</td>
+                        </tr>
+                        <tr><td colspan="5" style="border-bottom: 1px solid #ddd;"></td></tr>
+
+
+                        <tr>
+                            <th>Metric:</th>
                             <th> Baseline Total:</th>
                             <th> Current Total:</th>
                             <th> Delta Value:</th>
                             <th> Delta (%):</th>
                         </tr>
                         <tr>
-                            <th>Start: </th>
-                            <td class="title-stat baseline-date-time">{{displayDate  @root/summary/simpleFields/baselineStart}}</td>
-                            <th> End: </th>
-                            <td class="title-stat current-date-time">{{displayDate @root/summary/simpleFields/currentStart}}</td>
+                            <td class="title-stat">{{metricName}}</td>
                             <td class="title-stat baseline-total">{{@root/summary/simpleFields/baselineTotal}}</td>
                             <td class="title-stat current-total">{{@root/summary/simpleFields/currentTotal}}</td>
                             <td class="title-stat delta-value">{{@root/summary/simpleFields/deltaChange}} </td>

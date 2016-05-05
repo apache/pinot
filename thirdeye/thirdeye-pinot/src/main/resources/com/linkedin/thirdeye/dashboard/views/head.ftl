@@ -57,6 +57,7 @@
     <script src="../../../assets/js/lib/contributors.js" defer></script>
     <script src="../../../assets/js/lib/heatmap.js" defer></script>
     <script src="../../../assets/js/lib/timeseries.js" defer></script>
+    <script src="../../../assets/js/lib/anomalies.js" defer></script>
     <script src="../../../assets/js/lib/custom-dashboard.js" defer></script>
     <script src="../../../assets/js/lib/handlebars-methods.js" defer></script>
     <script src="../../../assets/js/lib/dashboard-header.js" defer></script>
