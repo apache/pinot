@@ -250,7 +250,7 @@ public class PinotSegmentRecordReader extends BaseRecordReader {
           dictionaryId = svSortedReader.getInt(docNumber);
         }
         if (dictionary == null) {
-          throw new IllegalStateException("Dictionary no found for " + column);
+          throw new IllegalStateException("Dictionary not found for " + column);
         }
         fields.put(column, dictionary.get(dictionaryId));
 
