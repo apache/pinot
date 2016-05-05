@@ -60,7 +60,7 @@ public class PinotSegmentConverter extends AbstractBaseAdminCommand implements C
 
   @Override
   public String description() {
-    return "Converting Avro schema to Pinot schema.";
+    return "Converting pinot segment to another format such as AVRO/CSV/JSON";
   }
 
   @Override
