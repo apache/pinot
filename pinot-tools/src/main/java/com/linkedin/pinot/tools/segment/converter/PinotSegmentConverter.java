@@ -51,9 +51,13 @@ public class PinotSegmentConverter extends AbstractBaseAdminCommand implements C
       PinotSegmentToAvroConverter pinotSegmentToAvroConverter = new PinotSegmentToAvroConverter(segmentIndexDir, outputDir);
       pinotSegmentToAvroConverter.convert();
     } else if (fileFormat.equals(FileFormat.CSV.toString())) {
-
+      LOGGER.error("FileFormat CSV not currently supported");
     } else if (fileFormat.equals(FileFormat.JSON.toString())) {
-
+      LOGGER.info("FileFormat JSON not currently supported");
+    } else if (fileFormat.equals(FileFormat.GZIPPED_AVRO)){
+      LOGGER.info("FileFormat GZIPPED_AVRO not currently supported");
+    } else {
+      LOGGER.info("Unknown FileFormat {} must be one of ", fileFormat, FileFormat.values());
     }
     return false;
   }

@@ -19,10 +19,13 @@ import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.configuration.ConfigurationException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
@@ -46,6 +49,7 @@ import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import com.linkedin.pinot.core.segment.index.readers.DoubleDictionary;
 import com.linkedin.pinot.core.segment.index.readers.FloatDictionary;
+import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 import com.linkedin.pinot.core.segment.index.readers.IntDictionary;
 import com.linkedin.pinot.core.segment.index.readers.LongDictionary;
 import com.linkedin.pinot.core.segment.index.readers.StringDictionary;
@@ -55,9 +59,11 @@ import com.linkedin.pinot.core.segment.store.SegmentDirectory;
 import com.linkedin.pinot.core.segment.store.SegmentDirectory.Reader;
 
 /**
- * Record reader to read pinot segment and generate GenericRow
+ * Record reader to read pinot segment and generate GenericRows
  */
 public class PinotSegmentRecordReader extends BaseRecordReader {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(PinotSegmentRecordReader.class);
 
   private SegmentMetadataImpl segmentMetadata;
   private int totalDocs;
@@ -68,6 +74,7 @@ public class PinotSegmentRecordReader extends BaseRecordReader {
   private Map<String, SortedForwardIndexReader> singleValueSortedReaderMap;
 
   private Map<String, Dictionary> pinotDictionaryBufferMap;
+
   private Map<String, DataType> columnDataTypeMap;
   private Map<String, Object> multiValueArrayMap;
 
@@ -164,6 +171,7 @@ public class PinotSegmentRecordReader extends BaseRecordReader {
         case SHORT_ARRAY:
         case STRING_ARRAY:
         default:
+          LOGGER.error("Unsupported data type {}", dataType);
           break;
       }
       columnDataTypeMap.put(column, dataType);
@@ -229,7 +237,7 @@ public class PinotSegmentRecordReader extends BaseRecordReader {
     for (String column : columns) {
 
       if (isSingleValueMap.get(column)) { // Single value
-        Dictionary dictionary;
+        Dictionary dictionary = null;
         int dictionaryId;
 
         if (!isSortedMap.get(column)) {
@@ -241,41 +249,11 @@ public class PinotSegmentRecordReader extends BaseRecordReader {
           dictionary = pinotDictionaryBufferMap.get(column);
           dictionaryId = svSortedReader.getInt(docNumber);
         }
-
-        switch (columnDataTypeMap.get(column)) {
-          case BOOLEAN:
-            fields.put(column, dictionary.get(dictionaryId));
-            break;
-          case DOUBLE:
-            fields.put(column, dictionary.get(dictionaryId));
-            break;
-          case FLOAT:
-            fields.put(column, dictionary.get(dictionaryId));
-            break;
-          case INT:
-            fields.put(column, dictionary.get(dictionaryId));
-            break;
-          case LONG:
-            fields.put(column, dictionary.get(dictionaryId));
-            break;
-          case STRING:
-            fields.put(column, dictionary.get(dictionaryId));
-            break;
-          case BYTE:
-          case BYTE_ARRAY:
-          case CHAR:
-          case CHAR_ARRAY:
-          case DOUBLE_ARRAY:
-          case FLOAT_ARRAY:
-          case INT_ARRAY:
-          case LONG_ARRAY:
-          case OBJECT:
-          case SHORT:
-          case SHORT_ARRAY:
-          case STRING_ARRAY:
-          default:
-            break;
+        if (dictionary == null) {
+          throw new IllegalStateException("Dictionary no found for " + column);
         }
+        fields.put(column, dictionary.get(dictionaryId));
+
       } else { // Multi value
         SingleColumnMultiValueReader mvReader = multiValueReaderMap.get(column);
         int[] dictionaryIdArray = (int[]) multiValueArrayMap.get(column);
@@ -298,7 +276,31 @@ public class PinotSegmentRecordReader extends BaseRecordReader {
 
   @Override
   public void close() throws Exception {
-
+    for (Entry<String, Dictionary> entry : pinotDictionaryBufferMap.entrySet()) {
+      ImmutableDictionaryReader dictionary = (ImmutableDictionaryReader) entry.getValue();
+      if (dictionary != null) {
+        dictionary.close();
+      }
+    }
+    for (Entry<String, SingleColumnSingleValueReader> entry : singleValueReaderMap.entrySet()) {
+      SingleColumnSingleValueReader reader = entry.getValue();
+      if (reader != null) {
+        reader.close();
+      }
+    }
+    for (Entry<String, SortedForwardIndexReader> entry : singleValueSortedReaderMap.entrySet()) {
+      SortedForwardIndexReader reader = entry.getValue();
+      if (reader != null) {
+        reader.close();
+      }
+    }
+    for (Entry<String, SingleColumnMultiValueReader> entry : multiValueReaderMap.entrySet()) {
+      SingleColumnMultiValueReader reader = entry.getValue();
+      if (reader != null) {
+        reader.close();
+      }
+    }
+    segmentMetadata.close();
   }
 
 }
