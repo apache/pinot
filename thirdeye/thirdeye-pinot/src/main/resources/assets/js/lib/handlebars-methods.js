@@ -21,10 +21,10 @@ $(document).ready(function() {
         //too long name would return infinity
         var hexStr;
         if (Number.isFinite(parseInt(name, 36) + 16777216)){
-            hexStr =  (parseInt(name, 36) + 16777216).toString(16).substr(2,6);
+            hexStr =  (parseInt(name, 36) + 16777216).toString(16).substr(0,6);
         }else{
             name =  name.substr(-2) + name.substr(-2) + name.substr(-2);
-            hexStr =  (parseInt(name, 36) + 16777216).toString(16).substr(2,6);
+            hexStr =  (parseInt(name, 36) + 16777216).toString(16).substr(0,6);
         }
 
         var color = "#" + hexStr

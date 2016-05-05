@@ -630,11 +630,19 @@ function selectCurrentDateRange(target){
         case "today":
 
             var today = moment().format("YYYY-MM-DD");
+            
             var hh = moment().format("HH");
 
             // set the input field values
             $(".current-start-date-input[rel='"+ currentTab +"']").val(today);
-            $(".current-end-date-input[rel='"+ currentTab +"']").val(today);
+            if(hh >0){
+              $(".current-end-date-input[rel='"+ currentTab +"']").val(today);
+            } else{
+              var yesterday = moment().add(-1, 'days').format("YYYY-MM-DD");
+              $(".current-end-date-input[rel='"+ currentTab +"']").val(today);
+            }
+            
+            
             $(".current-start-time-input[rel='"+ currentTab +"']").val("00:00");
             $(".current-end-time-input[rel='"+ currentTab +"']").val(hh+":00");
 
@@ -943,10 +951,10 @@ function colorByName(name){
     //too long name would return infinity
     var hexStr;
     if (Number.isFinite(parseInt(name, 36) + 16777216)){
-        hexStr =  (parseInt(name, 36) + 16777216).toString(16).substr(2,6);
+        hexStr =  (parseInt(name, 36) + 16777216).toString(16).substr(0,6);
     }else{
         name =  name.substr(-2) + name.substr(-2) + name.substr(-2);
-        hexStr =  (parseInt(name, 36) + 16777216).toString(16).substr(2,6)
+        hexStr =  (parseInt(name, 36) + 16777216).toString(16).substr(0,6)
     }
 
 
