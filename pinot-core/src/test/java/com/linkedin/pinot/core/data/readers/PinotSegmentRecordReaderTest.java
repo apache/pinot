@@ -55,11 +55,17 @@ public class PinotSegmentRecordReaderTest {
   private List<GenericRow> rows;
   private TestRecordReader recordReader;
 
+  private static String D_SV_1 = "d_sv_1";
+  private static String D_MV_1 = "d_mv_1";
+  private static String M1 = "m1";
+  private static String M2 = "m2";
+  private static String TIME = "t";
+
 
   @BeforeClass
   public void setup() throws Exception {
     segmentName = "pinotSegmentRecordReaderTest";
-    schema = createSchema();
+    schema = createPinotSchema();
     segmentOutputDir = Files.createTempDir().toString();
     segmentIndexDir = new File(segmentOutputDir, segmentName);
     rows = createTestData();
@@ -74,15 +80,15 @@ public class PinotSegmentRecordReaderTest {
     Map<String, Object> fields;
     for (int i = 0; i < 10000; i++) {
       fields = new HashMap<>();
-      fields.put("d1", "d1_" + RandomStringUtils.randomAlphabetic(2));
+      fields.put(D_SV_1, D_SV_1 + "_" + RandomStringUtils.randomAlphabetic(2));
       Object[] d2Array = new Object[5];
       for (int j = 0; j < 5; j++) {
-        d2Array[j] = "d2_" + j + "_" + RandomStringUtils.randomAlphabetic(2);
+        d2Array[j] = D_MV_1 + "_" + j + "_" + RandomStringUtils.randomAlphabetic(2);
       }
-      fields.put("d2", d2Array);
-      fields.put("m1", Math.abs(random.nextInt()));
-      fields.put("m2", Math.abs(random.nextFloat()));
-      fields.put("t", Math.abs(random.nextLong()));
+      fields.put(D_MV_1, d2Array);
+      fields.put(M1, Math.abs(random.nextInt()));
+      fields.put(M2, Math.abs(random.nextFloat()));
+      fields.put(TIME, Math.abs(random.nextLong()));
 
       GenericRow row = new GenericRow();
       row.init(fields);
@@ -91,20 +97,20 @@ public class PinotSegmentRecordReaderTest {
     return rows;
   }
 
-  private Schema createSchema() {
+  private Schema createPinotSchema() {
     Schema testSchema = new Schema();
     testSchema.setSchemaName("schema");
     FieldSpec spec;
-    spec = new DimensionFieldSpec("d1", DataType.STRING, true);
-    testSchema.addField("d1", spec);
-    spec = new DimensionFieldSpec("d2", DataType.STRING, false, ",");
-    testSchema.addField("d2", spec);
-    spec = new MetricFieldSpec("m1", DataType.INT);
-    testSchema.addField("m1", spec);
-    spec = new MetricFieldSpec("m2", DataType.FLOAT);
-    testSchema.addField("m2", spec);
-    spec = new TimeFieldSpec(new TimeGranularitySpec(DataType.LONG, TimeUnit.HOURS, "t"));
-    testSchema.addField("t", spec);
+    spec = new DimensionFieldSpec(D_SV_1, DataType.STRING, true);
+    testSchema.addField(D_SV_1, spec);
+    spec = new DimensionFieldSpec(D_MV_1, DataType.STRING, false, ",");
+    testSchema.addField(D_MV_1, spec);
+    spec = new MetricFieldSpec(M1, DataType.INT);
+    testSchema.addField(M1, spec);
+    spec = new MetricFieldSpec(M2, DataType.FLOAT);
+    testSchema.addField(M2, spec);
+    spec = new TimeFieldSpec(new TimeGranularitySpec(DataType.LONG, TimeUnit.HOURS, TIME));
+    testSchema.addField(TIME, spec);
     return testSchema;
   }
 
@@ -139,11 +145,11 @@ public class PinotSegmentRecordReaderTest {
     for (int i = 0; i < outputRows.size(); i++) {
       GenericRow outputRow = outputRows.get(i);
       GenericRow row = rows.get(i);
-      Assert.assertEquals(outputRow.getValue("d1"), row.getValue("d1"));
-      Assert.assertEquals(outputRow.getValue("d2"), row.getValue("d2"));
-      Assert.assertEquals(outputRow.getValue("m1"), row.getValue("m1"));
-      Assert.assertEquals(outputRow.getValue("m2"), row.getValue("m2"));
-      Assert.assertEquals(outputRow.getValue("t"), row.getValue("t"));
+      Assert.assertEquals(outputRow.getValue(D_SV_1), row.getValue(D_SV_1));
+      Assert.assertEquals(outputRow.getValue(D_MV_1), row.getValue(D_MV_1));
+      Assert.assertEquals(outputRow.getValue(M1), row.getValue(M1));
+      Assert.assertEquals(outputRow.getValue(M2), row.getValue(M2));
+      Assert.assertEquals(outputRow.getValue(TIME), row.getValue(TIME));
     }
   }
 

@@ -53,11 +53,11 @@ public class PinotSegmentConverter extends AbstractBaseAdminCommand implements C
     } else if (fileFormat.equals(FileFormat.CSV.toString())) {
       LOGGER.error("FileFormat CSV not currently supported");
     } else if (fileFormat.equals(FileFormat.JSON.toString())) {
-      LOGGER.info("FileFormat JSON not currently supported");
+      LOGGER.error("FileFormat JSON not currently supported");
     } else if (fileFormat.equals(FileFormat.GZIPPED_AVRO)){
-      LOGGER.info("FileFormat GZIPPED_AVRO not currently supported");
+      LOGGER.error("FileFormat GZIPPED_AVRO not currently supported");
     } else {
-      LOGGER.info("Unknown FileFormat {} must be one of ", fileFormat, FileFormat.values());
+      LOGGER.error("Unknown FileFormat {} must be one of {}", fileFormat, FileFormat.values());
     }
     return false;
   }
