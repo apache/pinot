@@ -89,10 +89,10 @@ $(document).ready( function() {
         updateDashboardFormFromHash();
 
 
-        //Todo: check what is opening the uikit popups and close them accordingly
         //close uikit dropdown
         $("[data-uk-dropdown]").removeClass("uk-open");
         $("[data-uk-dropdown]").attr("aria-expanded", false);
+        $(".uk-dropdown").hide();
 
         //If hash has dataset and (dashboard or (view & metric )trigger form submit
         if( hash.hasOwnProperty("dataset")){

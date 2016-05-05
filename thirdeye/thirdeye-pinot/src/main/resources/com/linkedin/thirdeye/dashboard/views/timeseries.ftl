@@ -30,17 +30,14 @@
     <div id="timeseries-time-series-legend" class="timeseries-legend-sub-box uk-display-inline-block" style="width:250px;">
         {{#with timeSeriesData}}
         {{#each this as |Index label|}}
-
-        {{#if_eq label "time"}}
-        {{else}}
-        <label class="legend-item" value="{{label}}">
-            <table>
+        <label class="legend-item  {{hide_if_eq label 'time'}}" value="{{label}}">
+            <table  data-uk-tooltip title="{{label}}">
                 <tr>
                     <td>
-                        <input class="time-series-checkbox" type="checkbox" value="{{label}}" color="{{colorById @index @root/timeSeriesData}}">
+                        <input class="time-series-checkbox" type="checkbox" value="{{label}}" color="{{colorByName label}}">
                     </td>
                     <td>
-                        <div class="legend-color uk-display-inline-block" style="width: 10px; height: 10px; background:{{colorById @index @root/timeSeriesData}}" color="{{colorById @index @root/timeSeriesData}}" ></div>
+                        <div class="legend-color uk-display-inline-block" style="width: 10px; height: 10px; background:{{colorByName label}}" color="{{colorByName label}}" ></div>
                     </td>
                     <td class="legend-label-value-td">
                         {{label}}
@@ -48,7 +45,6 @@
                 </tr>
             </table>
         </label>
-        {{/if_eq}}
 
         {{/each}}
         {{/with}}

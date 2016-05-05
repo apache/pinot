@@ -6,6 +6,8 @@ $("#main-view").on("click",".form-submit-btn",function(){
     //Close uikit dropdowns
     $("[data-uk-dropdown]").removeClass("uk-open");
     $("[data-uk-dropdown]").attr("aria-expanded", false);
+    $(".uk-dropdown").hide();
+
 
     //Update hash
     //update hash.dateset

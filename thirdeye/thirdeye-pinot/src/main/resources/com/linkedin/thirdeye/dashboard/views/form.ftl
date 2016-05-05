@@ -35,7 +35,7 @@
                         </ul>
                     </div>
                 </div>
-                <ul class="selected-metrics-list" rel="{{tabName}}">
+                <ul class="selected-metrics-list" rel="{{tabName}}" >
                 </ul>
             </div>
 			{{/if}}

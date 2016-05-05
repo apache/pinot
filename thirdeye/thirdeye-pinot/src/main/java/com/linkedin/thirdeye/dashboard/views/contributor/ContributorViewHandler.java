@@ -264,8 +264,21 @@ public class ContributorViewHandler
 
       @Override
       public int compare(String o1, String o2) {
-        Double d1 = currentValuesMap.get(o1);
-        Double d2 = currentValuesMap.get(o2);
+        double d1 = 0;
+        if (currentValuesMap.get(o1) != null) {
+          d1 += currentValuesMap.get(o1);
+        }
+        if (baselineValuesMap.get(o1) != null) {
+          d1 += baselineValuesMap.get(o1);
+        }
+        double d2 = 0;
+        if (currentValuesMap.get(o2) != null) {
+          d2 += currentValuesMap.get(o2);
+        }
+        if (baselineValuesMap.get(o2) != null) {
+          d2 += baselineValuesMap.get(o2);
+        }
+
         return Double.compare(d1, d2) * -1;
       }
 

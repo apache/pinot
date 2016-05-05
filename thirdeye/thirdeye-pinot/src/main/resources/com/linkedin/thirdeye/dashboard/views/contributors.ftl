@@ -8,7 +8,7 @@
             <div class="dimension-section-wrapper" rel="{{dimensionName}}" metric="{{metricName}}" style="vertical-align: top; ">
                 <p class="dimension-title hidden"> {{dimensionName}}</p>
 
-                <div class="dimension-timeseries-section clear-fix uk-margin-large-bottom" dimension="{{dimensionName}}" style="width: 100%">
+                <div class="dimension-timeseries-section clear-fix uk-margin-large-bottom" dimension="{{dimensionName}}" style="width: 100%; position: relative;">
                     {{#with @root/timeBuckets}}
                     <div  class="title-box full-width">
                         <table title="{{displayDate this.baselineUTC}}">
@@ -58,7 +58,10 @@
                             {{#lookupDimValues @root/dimensionValuesMap dimName=dimensionName}}
                             {{#each this as |dimValue dimensionValueIndex|}}
                             <label rel="{{metricName}}" dimension="{{dimensionName}}" value="{{dimValue}}">
-                                <input class="time-series-dimension-checkbox" type="checkbox" dimension="{{dimensionName}}" metric="{{metricName}}" value="{{dimValue}}" color="{{colorById dimensionValueIndex @root/dimensions.length}}"> <div class="legend-color uk-display-inline-block" style="width: 10px; height: 10px; background:{{colorById dimensionValueIndex @root/dimensions.length}}" color="{{colorById dimensionValueIndex @root/dimensions.length}}" ></div> {{displayDimensionValue dimValue}}
+                                <input class="time-series-dimension-checkbox" type="checkbox" dimension="{{dimensionName}}" metric="{{metricName}}" value="{{dimValue}}" color="{{colorByIdContributors dimensionValueIndex @root/dimensionValuesMap name=dimValue dimName= dimensionName}}">
+                                <div class="legend-color uk-display-inline-block" style="width: 10px; height: 10px; background:{{colorByIdContributors dimensionValueIndex @root/dimensionValuesMap name=dimValue dimName= dimensionName}}" color="{{colorByIdContributors dimensionValueIndex @root/dimensionValuesMap name=dimValue dimName= dimensionName}}">
+                                </div>
+                                {{displayDimensionValue dimValue}}
                             </label>
                             {{/each}}
                             {{/lookupDimValues}}

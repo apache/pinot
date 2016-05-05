@@ -44,12 +44,18 @@ function drawTimeSeries(ajaxData) {
 	}
 	lineChartData["time"] = xTicksCurrent;
 	barChartData["time"] = xTicksCurrent;
-	var colorArray;
-	if (metrics.length < 10) {
-		colorArray = d3.scale.category10().range();
-	} else {
-		colorArray = d3.scale.category20().range();
-	}
+    var colorArray;
+    if (metrics.length < 10) {
+        colorArray = d3.scale.category10().range();
+    }else if(metrics.length < 20) {
+         colorArray = d3.scale.category20().range();
+    }else {
+      colorArray = [];
+      for(i=0,len=metrics.length; i<len;i++){
+        colorArray.push( colorByName(metrics[i]) );
+       }
+    }
+
 	for (var i = 0, mlen = metrics.length; i < mlen; i++) {
 		var metricBaselineData = [];
 		var metricCurrentData = [];

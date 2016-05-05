@@ -19,12 +19,23 @@ function getTimeSeries() {
 
 function renderTimeSeriesUsingC3(d){  //time-series-area
 	//var data = JSON.parse(d);
-	var chart = c3.generate({
+
+    var colors = {};
+    var IdArray = Object.keys(d.timeSeriesData)
+    var numIds = IdArray.length;
+    //Only color by name works since it's a hash.map
+    // Todo: we can change the data type in be so the d3.scale.category10().range() is working
+    for(key in d.timeSeriesData){
+        colors[key] = colorByName(key);
+    }
+
+    var chart = c3.generate({
 	    bindto: '#time-series-area',
 	    data: {
 	      x : 'time',	
 	      json : d["timeSeriesData"],
-	      type: 'area-spline'
+	      type: 'area-spline',
+          colors : colors
 	    },
 	    axis : {
 	    	x: {

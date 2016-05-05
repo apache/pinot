@@ -89,11 +89,19 @@ function renderContributionTimeSeries(ajaxData) {
       barChartData[metricName][dimensionName] = {};
       var dimensionValueArray = ajaxData["dimensionValuesMap"][dimensionName];
       var colorArray;
-      if (dimensionValueArray.length < 10) {
-        colorArray = d3.scale.category10().range();
-      } else {
-        colorArray = d3.scale.category20().range();
-      }
+        if (dimensionValueArray.length < 10) {
+            colorArray = d3.scale.category10().range();
+        } else if(dimensionValueArray.length < 20) {
+            colorArray = d3.scale.category20().range();
+        }else {
+
+            colorArray = [];
+            for(i=0,len=dimensionValueArray.length; i<len;i++){
+                colorArray.push( colorByName(dimensionValueArray[i]) );
+            }
+        }
+
+
       var colors = {};
       for (var dimensionValIndex = 0; dimensionValIndex < dimensionValueArray.length; dimensionValIndex++) {
         dimensionValue = dimensionValueArray[dimensionValIndex]

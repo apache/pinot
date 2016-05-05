@@ -293,6 +293,11 @@ function updateDashboardFormFromHash(){
         updateFilterSelection(filterParams)
 
     }
+
+    //Close dropdown
+    $("[data-uk-dropdown]").removeClass("uk-open");
+    $("[data-uk-dropdown]").attr("aria-expanded", false);
+    $(".uk-dropdown").hide();
 }
 
 /** DASHBOARD FORM RELATED METHODS **/
@@ -421,7 +426,7 @@ function selectMetric(target){
 
     //Update selectors
     $(target).hide();
-    $(".selected-metrics-list[rel='"+ hash.view +"']").append("<li class='added-item remove-selection' rel='"+ param + "' value='"+ value +"'><a href='#'>" + $(target).text() +  "<i class='uk-icon-close'></i></a></li>");
+    $(".selected-metrics-list[rel='"+ hash.view +"']").append("<li class='added-item uk-button remove-selection' rel='"+ param + "' value='"+ value +"'><a href='#'>" + $(target).text() +  "<i class='uk-icon-close'></i></a></li>");
 
     //Enable Go btn
     enableFormSubmit()
@@ -450,7 +455,7 @@ function selectDimension(target){
     //Update selectors
     $(target).attr("selected", true);
     $(target).hide();
-    $(".selected-dimensions-list[rel='"+ hash.view +"']").append("<li class='added-item remove-selection' rel='"+ param + "' value='"+ value +"'><a href='#'>" + $(target).text() +  "<i class='uk-icon-close'></i></a></li>");
+    $(".selected-dimensions-list[rel='"+ hash.view +"']").append("<li class='added-item  uk-button remove-selection' rel='"+ param + "' value='"+ value +"'><a href='#'>" + $(target).text() +  "<i class='uk-icon-close'></i></a></li>");
 
 }
 
@@ -553,7 +558,7 @@ function applyFilterSelection(){
     //append new labels
     var html = "";
     for(k in labels){
-        html +=  "<li class='added-filter remove-filter-selection' tab="+ hash.view +" rel='" + k + "' value='" + labels[k] + "' title='" + k + ": " + decodeURIComponent(labels[k]) +  "'>" + k + ": " + decodeURIComponent(labels[k]) + "<i class='uk-icon-close'></i></li>";
+        html +=  "<li class='added-filter uk-button remove-filter-selection' tab="+ hash.view +" rel='" + k + "' value='" + labels[k] + "' title='" + k + ": " + decodeURIComponent(labels[k]) +  "'>" + k + ": " + decodeURIComponent(labels[k]) + "<i class='uk-icon-close'></i></li>";
     }
 
     $(".selected-filters-list[rel='"+ hash.view +"']").append(html);
@@ -912,6 +917,44 @@ function  applyTimeRangeSelection(target) {
     $(target).attr("disabled", true);
     enableFormSubmit()
 }
+
+
+
+/** CHART RELATED METHODS **/
+
+
+//Turn name into hexadecimal colorcode
+function colorByName(name){
+
+    if(name == "?"){
+        name = "other"
+    }else if(name == ""){
+        name = "unknown"
+    }
+    //remove non alphanumeric characters
+    name = name.replace(/\W+/g, "")
+
+    //multiple short name would
+    if(name.length < 4){
+        name = name + name + name;
+        name=  name.substr(-2) + name.substr(-2) + name.substr(-2);
+    }
+
+    //too long name would return infinity
+    var hexStr;
+    if (Number.isFinite(parseInt(name, 36) + 16777216)){
+        hexStr =  (parseInt(name, 36) + 16777216).toString(16).substr(2,6);
+    }else{
+        name =  name.substr(-2) + name.substr(-2) + name.substr(-2);
+        hexStr =  (parseInt(name, 36) + 16777216).toString(16).substr(2,6)
+    }
+
+
+    var color = "#" + hexStr
+
+    return color
+}
+
 
 /** DATE, TIME RELATED METHODS **/
 

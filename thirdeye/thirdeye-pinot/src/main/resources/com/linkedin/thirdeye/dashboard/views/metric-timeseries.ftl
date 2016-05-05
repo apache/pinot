@@ -32,13 +32,13 @@
             <div id="metric-time-series-legend" class="timeseries-legend-sub-box uk-display-inline-block" style="width:250px;">
                 {{#each metrics as |metricName metricIndex|}}
                 <label class="legend-item" value="{{metricName}}">
-                    <table>
+                    <table  data-uk-tooltip title="{{metricName}}">
                         <tr>
                             <td>
-                                <input class="time-series-metric-checkbox" type="checkbox" value="{{metricName}}" color="{{colorById metricIndex ../metrics.length}}">
+                                <input class="time-series-metric-checkbox" type="checkbox" value="{{metricName}}" color="{{colorById metricIndex ../metrics.length  name= metricName}}">
                             </td>
                             <td>
-                                <div class="legend-color uk-display-inline-block" style="width: 10px; height: 10px; background:{{colorById metricIndex ../metrics.length}}" color="{{colorById metricIndex ../metrics.length}}" ></div>
+                                <div class="legend-color uk-display-inline-block" style="width: 10px; height: 10px; background:{{colorById metricIndex ../metrics.length  name= metricName}}" color="{{colorById metricIndex ../metrics.length  name= metricName}}" ></div>
                             </td>
                             <td class="legend-label-value-td">
                                 {{metricName}}
