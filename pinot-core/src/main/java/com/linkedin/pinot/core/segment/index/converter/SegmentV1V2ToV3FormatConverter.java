@@ -172,7 +172,7 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
       throws IOException {
 
     PinotDataBuffer oldBuffer = reader.getIndexFor(column, indexType);
-    Preconditions.checkState(oldBuffer.size() > 0 && oldBuffer.size() < Integer.MAX_VALUE,
+    Preconditions.checkState(oldBuffer.size() >= 0 && oldBuffer.size() < Integer.MAX_VALUE,
         "Buffer sizes of greater than 2GB is not supported. segment: " + reader.toString() +
             ", column: " + column);
     PinotDataBuffer newDictBuffer =

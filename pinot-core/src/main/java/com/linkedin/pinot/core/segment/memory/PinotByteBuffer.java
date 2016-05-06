@@ -275,7 +275,7 @@ public class PinotByteBuffer extends PinotDataBuffer {
   public PinotDataBuffer view(long start, long end) {
     Preconditions.checkArgument(start >= 0 && start <= buffer.limit(),
         "View start position is not valid, start: {}, end: {}, buffer limit: {}", start, end, buffer.limit());
-    Preconditions.checkArgument(end == 0 || (end > 0 && end > start && end <= buffer.limit()),
+    Preconditions.checkArgument(end >= start && end <= buffer.limit(),
         "View end position is not valid, start: {}, end: {}, buffer limit: {}", start, end, buffer.limit());
 
     ByteBuffer bb = this.buffer.duplicate();
