@@ -424,7 +424,7 @@ function selectMetric(target){
     }
 
     //Hide alert
-    if( $("#"+ hash.view +"-time-input-form-error p").html().trim() == "Please select at least 1 metric."){
+    if( $("#"+ hash.view +"-time-input-form-error p").html() && $("#"+ hash.view +"-time-input-form-error p").html().trim() == "Please select at least 1 metric."){
         $("#"+ hash.view +"-time-input-form-error").hide()
     }
 

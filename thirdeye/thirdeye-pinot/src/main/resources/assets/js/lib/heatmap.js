@@ -1,286 +1,236 @@
-    //Treemap section
-    function getHeatmap(){
+function getHeatmap() {
 
-        var url="/dashboard/data/heatmap?" + window.location.hash.substring(1);
-        getData(url).done(function(data) {
-
-            console.log("heatmap data:" )
-            console.log(data )
-
-            /* Handelbars template for treemap table */
-            var result_treemap_template = HandleBarsTemplates.template_treemap(data)
-            $("#"+ hash.view +"-display-chart-section").html(result_treemap_template);
-
-            function drawChart(){
-
-                var options = {
-                    maxDepth: 2,
-                    minColorValue: -25,
-                    maxColorValue: 25,
-                    minColor: '#f00',
-                    midColor: '#ddd',
-                    maxColor: '#00f',
-                    headerHeight: 0,
-                    fontColor: '#000',
-                    showScale: false,
-                    highlightOnMouseOver: true//,
-                    //generateTooltip : showTreeMapTooltip
-                }
-
-                var numMetrics = data["metrics"].length
-                for(var m =0; m< numMetrics;m++){
-                	var metric = data["metrics"][m];
-                	var len = data["dimensions"].length
-                    for(var d= 0; d<len; d++){
-                    	var dimension = data["dimensions"][d];
-                        var Treemap = {};
-
-                        //Turn arrays into dataTables
-                        Treemap["formattedData_metric_" + metric + "_dim_" + d + "_treemap_0"] = new google.visualization.DataTable();
+    //Todo: add the real endpoint
+    var url = "/dashboard/data/heatmap?" + window.location.hash.substring(1);
+    getData(url).done(function(data) {
 
 
-                        //Add cloumns
-                        Treemap["formattedData_metric_" + metric + "_dim_" + d + "_treemap_0"].addColumn('string','{ "v": "uniqueID", "f": "displayValue"}');
-                        Treemap["formattedData_metric_" + metric + "_dim_" + d + "_treemap_0"].addColumn('string', 'Parent');
-                        Treemap["formattedData_metric_" + metric + "_dim_" + d + "_treemap_0"].addColumn('number', 'current ratio (size)');
-                        Treemap["formattedData_metric_" + metric + "_dim_" + d + "_treemap_0"].addColumn('number', 'delta (color)');
+        renderD3heatmap(data);
 
-                        //Add first row
-                        var parentRow =  metric +"_" + dimension ;
-                        Treemap["formattedData_metric_" + metric + "_dim_" + d + "_treemap_0"].addRow([ parentRow , null, 0, 0 ]);
+        heatMapEventListeners()
 
-                        Treemap["formattedData_metric_" + metric + "_dim_" + d + "_treemap_1"] = new google.visualization.DataTable();
+    });
+};
 
-                        //Add cloumns
-                        Treemap["formattedData_metric_" + metric + "_dim_" + d + "_treemap_1"].addColumn('string','{ "v": "uniqueID", "f": "displayValue"}');
-                        Treemap["formattedData_metric_" + metric + "_dim_" + d + "_treemap_1"].addColumn('string', 'Parent');
-                        Treemap["formattedData_metric_" + metric + "_dim_" + d + "_treemap_1"].addColumn('number', 'current ratio (size)');
-                        Treemap["formattedData_metric_" + metric + "_dim_" + d + "_treemap_1"].addColumn('number', 'delta (color)');
+function renderD3heatmap(data) {
 
-                        //Add first row
-                        Treemap["formattedData_metric_" + metric + "_dim_" + d + "_treemap_1"].addRow([ parentRow , null, 0, 0 ]);
-                        
+    /* Handelbars template for treemap table */
+    var result_treemap_template = HandleBarsTemplates.template_treemap(data)
+    $("#"+ hash.view +"-display-chart-section").html(result_treemap_template);
 
-                        Treemap["formattedData_metric_" + metric + "_dim_" + d + "_treemap_2"] = new google.visualization.DataTable();
+    var numMetrics = data["metrics"].length
+    for(var m =0; m< numMetrics;m++) {
+        var metric = data["metrics"][m];
 
-                        //Add cloumns
-                        Treemap["formattedData_metric_" + metric + "_dim_" + d + "_treemap_2"].addColumn('string','{ "v": "uniqueID", "f": "displayValue"}');
-                        Treemap["formattedData_metric_" + metric + "_dim_" + d + "_treemap_2"].addColumn('string', 'Parent');
-                        Treemap["formattedData_metric_" + metric + "_dim_" + d + "_treemap_2"].addColumn('number', 'current ratio (size)');
-                        Treemap["formattedData_metric_" + metric + "_dim_" + d + "_treemap_2"].addColumn('number', 'delta (color)');
-
-                        //Add first row
-                        Treemap["formattedData_metric_" + metric + "_dim_" + d + "_treemap_2"].addRow([ parentRow , null, 0, 0 ]);
+        var numDimensions = data["dimensions"].length
+        for (var d = 0; d < numDimensions; d++) {
+            var dimension = data["dimensions"][d];
 
 
-                        var dimensionData = data["data"][metric + "." + dimension]["responseData"]
-                        var schema = data["data"][metric + "." + dimension]["schema"]["columnsToIndexMapping"]
-                        var numDimValues = dimensionData.length;
-                        for(valId = 0;valId<numDimValues;valId++){
-
-                            var vVal = '' + m*d + valId;
-                            var dimensionValue = dimensionData[valId][schema["dimensionValue"]]
-                            if(dimensionValue == ""){
-                                dimensionValue = "UNKNOWN";
-                            };
-
-                        	var fVal_0;
-                        	if(dimensionData[valId][schema["percentageChange"]] >= 0){
-                        		fVal_0 = dimensionValue + " ( +" + dimensionData[valId][schema["percentageChange"]] + "%)"
-                        	} else{
-                        		fVal_0 = dimensionValue + " ( " + dimensionData[valId][schema["percentageChange"]] + "%)"
-                        	}
-                        	var fVal_1;
-                        	if(dimensionData[valId][schema["contributionDifference"]] >= 0) {
-                        		fVal_1 = dimensionValue + " (" + dimensionData[valId][schema["baselineContribution"]] + " +" + dimensionData[valId][schema["contributionDifference"]] + "%)";
-                        	} else {
-                        		fVal_1 = dimensionValue + " (" + dimensionData[valId][schema["baselineContribution"]] + "  " + dimensionData[valId][schema["contributionDifference"]] + "%)";
-                        	}
-                        	var fVal_2;
-                        	if(dimensionData[valId][schema["contributionToOverallChange"]] >= 0) {
-                        		fVal_2 = dimensionValue + " ( +" + dimensionData[valId][schema["contributionToOverallChange"]] + "%)";
-                        	} else{
-                        		fVal_2 = dimensionValue + " (" + dimensionData[valId][schema["contributionToOverallChange"]] + "%)";
-                        	}
-
-                            var parent = metric + "_" + dimension;
-                            var color_0 = parseFloat(dimensionData[valId][schema["deltaColor"]])
-                            var size_0 = parseFloat(dimensionData[valId][schema["deltaSize"]])
-
-                            var color_1 = parseFloat(dimensionData[valId][schema["contributionColor"]])
-                            var size_1 = parseFloat(dimensionData[valId][schema["contributionSize"]])
-
-                            var color_2 = parseFloat(dimensionData[valId][schema["contributionToOverallColor"]])
-                            var size_2 = parseFloat(dimensionData[valId][schema["contributionToOverallSize"]])
-
-                            fv = {'v': vVal , 'f' :fVal_0};
-                        	Treemap["formattedData_metric_" + metric + "_dim_" + d + "_treemap_0"].addRow([fv, parent, size_0, color_0 ]);
-                            fv = {'v': vVal , 'f' :fVal_1 };
-                        	Treemap["formattedData_metric_" + metric + "_dim_" + d + "_treemap_1"].addRow([fv, parent, size_1, color_1]);
-                            fv = {'v': vVal , 'f' :fVal_2};
-                        	Treemap["formattedData_metric_" + metric + "_dim_" + d + "_treemap_2"].addRow([fv, parent, size_2, color_2]);
-                        }
-
-                        //Get the id of each placeholder on the page
-                        Treemap["placeHolderID" + 0] = 'metric_' + metric + '_dim_' + d + '_treemap_0';
-                        Treemap["placeHolderID" + 1] = 'metric_' + metric + '_dim_' + d + '_treemap_1';
-                        Treemap["placeHolderID" + 2] = 'metric_' + metric + '_dim_' + d + '_treemap_2';
+            var dimensionData = data["data"][metric + "." + dimension]["responseData"]
+            var schema = data["data"][metric + "." + dimension]["schema"]["columnsToIndexMapping"]
 
 
-                        //pass the placeholders into the google chart treemap compiler
-                        Treemap["metric_" + metric + "_dim_" + d + "_treemap_0"] = new google.visualization.TreeMap(document.getElementById(Treemap["placeHolderID" + 0]));
-                        Treemap["metric_" + metric + "_dim_" + d + "_treemap_1"] = new google.visualization.TreeMap(document.getElementById(Treemap["placeHolderID" + 1]));
-                        Treemap["metric_" + metric + "_dim_" + d + "_treemap_2"] = new google.visualization.TreeMap(document.getElementById(Treemap["placeHolderID" + 2]));
+            //PARSE DATA
+            var root_0 = {}
+            var root_1 = {}
+            var root_2 = {}
+            root_0.name = dimension;
+            root_1.name = dimension;
+            root_2.name = dimension;
 
+            var children_0 = [];
+            var children_1 = [];
+            var children_2 = [];
+            var numDimValues = dimensionData.length;
+            for(valId = 0;valId<numDimValues;valId++){
 
-                        //pass the datatables and the options object into the google treemap compiler
-                        Treemap["metric_" + metric + "_dim_" + d + "_treemap_0"].draw(Treemap["formattedData_metric_" + metric + "_dim_" + d + "_treemap_0"], options);
-                        Treemap["metric_" + metric + "_dim_" + d + "_treemap_1"].draw(Treemap["formattedData_metric_" + metric + "_dim_" + d + "_treemap_1"], options);
-                        Treemap["metric_" + metric + "_dim_" + d + "_treemap_2"].draw(Treemap["formattedData_metric_" + metric + "_dim_" + d + "_treemap_2"], options);
-
-                        //Treemap["metric_"+ metric + "_tooltipData"] = google.visualization.arrayToDataTable(data[metric]["tooltip"])
-
-                        //For tooltip:
-                        //Treemap["dataTable"] = google.visualization.arrayToDataTable(data[metric]["tooltip"])
-                    }
-
-                    function showTreeMapTooltip(row, size, value){
-
-                        var currentTable = $(this.ma).attr('id');
-
-                        var tableMetricDim = currentTable.substr(0, currentTable.length -10);
-                        var dataMode = currentTable.substr(currentTable.length -1, 1);
-                        var dataTable = tableMetricDim; //+ '_data_' + dataMode
-                        var indexStr =  Treemap[ dataTable ].getValue(row, 0);
-                        if(isNaN(indexStr)){
-                            return "";
-                        }
-                        var index = Number(indexStr)
-
-                        //Tooltip Data columns
-                        //['id',  'metric','dimension','cellvalue','baseline_value', 'current_value','baseline_ratio', 'current_ratio','delta_percent_change', 'contribution_difference', 'volume_difference' ],
-                        var cellValue = Tooltip.tooltipData.getValue(Number(index), 3) == "" ? "unknown" : Tooltip.tooltipData.getValue(Number(index), 3)
-                        var baseline = (Tooltip.tooltipData.getValue(Number(index), 4)).toFixed(2).replace(/\.?0+$/,'')
-                        var current = (Tooltip.tooltipData.getValue(Number(index), 5)).toFixed(2).replace(/\.?0+$/,'')
-                        var deltaValue = (current - baseline).toFixed(2).replace(/\.?0+$/,'')
-                        var currentRatio = (Tooltip.tooltipData.getValue(Number(index), 7) * 100).toFixed(2).replace(/\.?0+$/,'');
-                        var contributionDifference = (Tooltip.tooltipData.getValue(Number(index), 9) * 100).toFixed(2).replace(/\.?0+$/,'');
-                        return '<div class="treemap-tooltip">' +
-                            '<table>' +
-                            '<tr><td>value : </td><td><a class="tooltip-link" href="#" rel="'+ Tooltip.tooltipData.getValue(Number(index), 2) +'">' +  cellValue + '</a></td></tr>' +
-                            '<tr><td>baseline value : </td><td>' +  baseline + '</td></tr>' +
-                            '<tr><td>current value : </td><td>'+ current + '</td></tr>' +
-                            '<tr><td>delta value : </td><td>' + deltaValue + '</td></tr>' +
-                            '<tr><td>delta (%) : </td><td>' + (Tooltip.tooltipData.getValue(Number(index), 8) *100).toFixed(2) + '</td></tr>' +
-                            '<tr><td>change in contribution (%) : </td><td>' + currentRatio +'(' + contributionDifference +')' + '</td></tr>' +
-                            '</table>' +
-                            '</div>'
-                    }
-                }
-
-                //After all the content loaded set the fontcolor of the cells based on the brightness of the background color
-                function fontColorOverride(cell) {
-
-                    var cellObj = $(cell);
-                    var hex = cellObj.attr("fill");
-
-                    var colorIsLight = function (r, g, b) {
-                        // Counting the perceptive luminance
-                        // human eye favors green color...
-                        var a = 1 - (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-                        return (a < 0.5);
-                    }
-
-
-                    function hexToRgb(hex) {
-                        // Expand shorthand form (e.g. "03F") to full form (e.g. "0033FF")
-                        var shorthandRegex = /^#?([a-f\d])([a-f\d])([a-f\d])$/i;
-                        hex = hex.replace(shorthandRegex, function (m, r, g, b) {
-                            return r + r + g + g + b + b;
-                        });
-
-                        var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-                        return result ? {
-                            r: parseInt(result[1], 16),
-                            g: parseInt(result[2], 16),
-                            b: parseInt(result[3], 16)
-                        } : null;
-                    }
-
-                    if (hexToRgb(hex)) {
-                        var textColor = colorIsLight(hexToRgb(hex).r, hexToRgb(hex).g, hexToRgb(hex).b) ? '#000000' : '#ffffff';
-                        cellObj.next('text').attr('fill', textColor);
-                    }
-
+                var dimensionValue = dimensionData[valId][schema["dimensionValue"]]
+                //Todo: remove this "" handler once backend is adding it to other
+                if(dimensionValue == ""){
+                    dimensionValue = "UNKNOWN";
                 };
-                var area = $("#"+ hash.view +"-display-chart-section");
-                $("rect", area).each( function(index,cell){
-                    fontColorOverride(cell);
-                });
 
-                $("g", area).on("mouseout", function(event){
-                    if($(event.currentTarget).prop("tagName") === "g"){
-                        fontColorOverride($("rect", event.currentTarget));
-                    }
-                });
+                var color_0 =  parseFloat(dimensionData[valId][schema["deltaColor"]]); //percentageChange
+                var color_1 =  parseFloat(dimensionData[valId][schema["contributionColor"]]); //baselineContribution
+                var color_2 =  parseFloat(dimensionData[valId][schema["contributionToOverallColor"]]); // contributionToOverallChange
+
+                var delta_0 =  parseFloat(dimensionData[valId][schema["percentageChange"]]);
+                var delta_1 =  parseFloat(dimensionData[valId][schema["baselineContribution"]]);
+                var delta_2 =  parseFloat(dimensionData[valId][schema["contributionToOverallChange"]]);
+
+                var opacity_0 = parseFloat("0." + Math.abs(Math.round(color_0)));
+                var opacity_1 = parseFloat("0." + Math.abs(Math.round(color_1)));
+                var opacity_2 = parseFloat("0." + Math.abs(Math.round(color_2)));
+
+                var fontColor_0 = opacity_0 < 0.3 ? '#000000' : '#ffffff';
+                var fontColor_1 = opacity_1 < 0.3 ? '#000000' : '#ffffff';
+                var fontColor_2 = opacity_2 < 0.3 ? '#000000' : '#ffffff';
+
+                var backgroundColor_0 =  Math.round(color_0) < 0 ? "rgba(255,0,0, " + opacity_0 + ")" :  ( Math.round(color_0) > 0 ? "rgba(0,0,255," + opacity_0 + ")" : "rgba(221,221,221,1)");
+                var backgroundColor_1 =  Math.round(color_1) < 0 ? "rgba(255,0,0, " + opacity_1 + ")" :  ( Math.round(color_1) > 0 ? "rgba(0,0,255," + opacity_1 + ")" : "rgba(221,221,221,1)");
+                var backgroundColor_2 =  Math.round(color_2) < 0 ? "rgba(255,0,0, " + opacity_2 + ")" :  ( Math.round(color_2) > 0 ? "rgba(0,0,255," + opacity_2 + ")" : "rgba(221,221,221,1)");
+
+                var label_0 = delta_0 <= 0 ? dimensionValue +" (" + delta_0 + "%)" : dimensionValue +" (+" + delta_0 + "%)";
+                var label_1 = delta_1 <= 0 ? dimensionValue +" (" + delta_1 + "%)" : dimensionValue +" (+" + delta_1 + "%)";
+                var label_2 = delta_2 <= 0 ? dimensionValue +" (" + delta_2 + "%)" : dimensionValue +" (+" + delta_2 + "%)";
+
+
+                var size = parseFloat(dimensionData[valId][schema["deltaSize"]]);
+
+                //Todo: add proper tooltip
+                var tooltip = "value: " + dimensionValue+ ",                                                                       "+
+                    "baseline value: " + dimensionData[valId][schema["baselineValue"]] + ",                                                                "+
+                    "current value: " +  dimensionData[valId][schema["currentValue"]] + ",                                                "+
+                    "delta: " + dimensionData[valId][schema["percentageChange"]] + "%" + ",                                                  "+
+                    "change in contribution (%): " +  dimensionData[valId][schema["contributionDifference"]];
+
+
+//                var tooltip = "<table><tbody><tr><td>value : </td><td>" + dimensionValue+ "</td></tr>" +
+//                    "<tr><td>baseline value : </td><td>" + dimensionData[valId][schema["baselineValue"]] + "</td></tr>" +
+//                    "<tr><td>current value : </td><td>" + dimensionData[valId][schema["currentValue"]] + "</td></tr>" +
+//                    "<tr><td>delta value : </td><td></td></tr>" +
+//                    "<tr><td>delta: </td><td>" + dimensionData[valId][schema["percentageChange"]] + "%" + "</td></tr>" +
+//                    "<tr><td>change in contribution (%) : </td><td>" + dimensionData[valId][schema["contributionDifference"]] + "</td></tr>" +
+//                    "</tbody></table>"
+                children_0.push({ "name": dimensionValue  ,"size": size, "label": label_0, "bgcolor": backgroundColor_0, "color": fontColor_0, "tooltip": tooltip});
+                children_1.push({ "name": dimensionValue ,"size": size, "label": label_1, "bgcolor": backgroundColor_1, "color": fontColor_1, "tooltip": tooltip});
+                children_2.push({ "name": dimensionValue ,"size": size, "label": label_2, "bgcolor": backgroundColor_2, "color": fontColor_2, "tooltip": tooltip});
+
             }
-            drawChart();
+            root_0.children = children_0;
+            root_1.children = children_1;
+            root_2.children = children_2;
 
-            //Treemap eventlisteners
+            //CHART LAYOUT
+            var margin = {top: 0, right: 0, bottom: 5, left: 0};
+            var width = 0.65 * window.innerWidth;
+            var height = window.innerHeight * 0.7 / numDimensions;
 
-            $(".dimension-treemap-mode").click(function() {
 
-                var currentMode = $(this).attr('mode');
-                var currentMetricArea = $(this).closest(".dimension-heat-map-treemap-section");
+            var placeholder_0 = '#metric_' + metric + '_dim_' + d + '_treemap_0'
+            var placeholder_1 = '#metric_' + metric + '_dim_' + d + '_treemap_1'
+            var placeholder_2 = '#metric_' + metric + '_dim_' + d + '_treemap_2'
 
-                // Display related treemap
-                $(".treemap-container", currentMetricArea ).hide();
-                $($(".treemap-container", currentMetricArea )[currentMode]).show();
+            //DRAW TREEMAP
+            function drawTreemap(root, placeholder){
+                var treemap = d3.layout.treemap()
+                    .size([width, height])
+                    .sticky(true)
+                    .sort(function(a,b) {
+                       return a.value - b.value;
+                    })
+                    .value(function (d) {
+                        return d.size;
+                    });
 
-                //Change icon on the radio buttons
-                $('.dimension-treemap-mode i', currentMetricArea ).removeClass("uk-icon-eye");
-                $('.dimension-treemap-mode i', currentMetricArea ).addClass("uk-icon-eye-slash");
-                $('i', this).removeClass("uk-icon-eye-slash");
-                $('i', this).addClass("uk-icon-eye");
-            });
+                var div = d3.select(placeholder).append("div")//placeholder:
+                    .style("position", "relative")
+                    .style("width", width + "px")
+                    .style("height", (height + margin.top + margin.bottom) + "px")
+                    .style("left", margin.left + "px")
+                    .style("top", margin.top + "px");
 
-            //Set initial view
+                var node = div.datum(root).selectAll(".node")
+                    .data(treemap.nodes)
+                    .enter().append("div")
+                    .attr("class", "node")
+                    .attr("data-dimension", function (d) {
+                        return root.name
+                    })
+                    .attr("id", function (d) {return d.name})
+                    .attr("data-uk-tooltip", true)
+                    .attr("title", function (d) {return d.tooltip})
+                    .call(position)
+                    .style("background", function (d) {return d.children ? null : d.bgcolor})
+                    .style("text-align", "center")
+                    .style("color", function (d) {return d.color})
+                    .style("font-size", "12px")
+                    .text(function (d) {
+                        return d.children ? null : d.label
+                    });
 
-            //Preselect treeemap mode on pageload (mode 0 = Percentage Change)
-            $(".dimension-treemap-mode[mode = '0']").click()
-
-            //Indicate baseline total value increase/decrease with red/blue colors next to the title of the table and the treemap
-            $(".title-box .delta-ratio, .title-box .delta-value").each(function(index, currentDelta){
-
-                var delta = $(currentDelta).html().trim().replace(/[\$,]/g, '') * 1
-
-                if ( delta != 0 && !isNaN(delta)){
-                    var color = delta > 0 ? "blue plus-symbol" : "red"
-
-                    $(currentDelta).addClass(color)
+                function position() {
+                    this.style("left", function (d) {
+                        return d.x + "px";
+                    })
+                        .style("top", function (d) {
+                            return d.y + "px";
+                        })
+                        .style("width", function (d) {
+                            return Math.max(0, d.dx - 1) + "px";
+                        })
+                        .style("height", function (d) {
+                            return Math.max(0, d.dy - 1) + "px";
+                        });
                 }
-            })
+            }
 
-        });
+            drawTreemap(root_0, placeholder_0 )
+            drawTreemap(root_1, placeholder_1 )
+            drawTreemap(root_2, placeholder_2 )
 
-        //Clicking a hetamap cell should fix the value in the filter
-//        $("#main-view").on("click", "rect", function(){
-//
-//            var label = $(this).next().html();
-//            var  dimensionValue = label.split(" (")[0];
-//            var dimension = $(this).closest(".dimension-treemap").prevAll("td.treemap-display-tbl-dim").text();
-//            var filters = readFiltersAppliedInCurrentView("compare");
-//            filters[dimension] = [dimensionValue];
-//
-//            updateFilterSelection(filters);
-//            hash.filters = encodeURIComponent(JSON.stringify(filters));
-//            hash.view = "compare";
-//            hash.aggTimeGranularity = "aggregateAll";
-//            //update hash will trigger window.onhashchange event:
-//            //update the form area and trigger the ajax call
-//         window.location.hash = encodeHashParameters(hash);
-//        })
+        }
+    }
+}
 
+function heatMapEventListeners(){
+    //Treemap eventlisteners
 
+    $(".dimension-treemap-mode").click(function() {
 
-    };
+        var currentMode = $(this).attr('mode');
+        var currentMetricArea = $(this).closest(".dimension-heat-map-treemap-section");
+
+        // Display related treemap
+        $(".treemap-container", currentMetricArea ).hide();
+        $($(".treemap-container", currentMetricArea )[currentMode]).show();
+
+        //Change icon on the radio buttons
+        $('.dimension-treemap-mode i', currentMetricArea ).removeClass("uk-icon-eye");
+        $('.dimension-treemap-mode i', currentMetricArea ).addClass("uk-icon-eye-slash");
+        $('i', this).removeClass("uk-icon-eye-slash");
+        $('i', this).addClass("uk-icon-eye");
+    });
+
+    //Set initial view
+
+    //Preselect treeemap mode on pageload (mode 0 = Percentage Change)
+    $(".dimension-treemap-mode[mode = '0']").click()
+
+    //Indicate baseline total value increase/decrease with red/blue colors next to the title of the table and the treemap
+    $(".title-box .delta-ratio, .title-box .delta-value").each(function(index, currentDelta){
+
+        var delta = $(currentDelta).html().trim().replace(/[\$,]/g, '') * 1
+
+        if ( delta != 0 && !isNaN(delta)){
+            var color = delta > 0 ? "blue plus-symbol" : "red"
+
+            $(currentDelta).addClass(color)
+        }
+    })
+
+    //Clicking a hetamap cell should fix the value in the filter
+        $("#"+ hash.view +"-display-chart-section").on("click", "div.node", function(){
+
+            var  dimensionValue = $(this).attr("id");
+            if(dimensionValue.toLowerCase() == "other" ||  dimensionValue.toLowerCase() == "unknown") {
+                alert("'Other' or 'unknown' value cannot be the filter.");
+            }else{
+
+                var dimension = $(this).attr("data-dimension")
+                var filters = readFiltersAppliedInCurrentView(hash.view);
+                filters[dimension] = [dimensionValue];
+
+                updateFilterSelection(filters);
+
+                hash.filters = encodeURIComponent(JSON.stringify(filters));
+                hash.aggTimeGranularity = "aggregateAll";
+
+                //update hash will trigger window.onhashchange event:
+                //update the form area and trigger the ajax call
+                window.location.hash = encodeHashParameters(hash);
+            }
+        })
+
+}

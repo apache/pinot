@@ -120,7 +120,7 @@ body a{
 }
 
 #form-area{
-    background-color: rgb(247, 247, 247);
+    background-color: rgb(250, 250, 250);
     padding: 20px 10px 20px 45px;
 }
 
@@ -199,18 +199,8 @@ body a{
      background-color: #f5f5f5;
 }
 
-
-.selected-dimensions-list,
-.selected-metrics-list,
-.selected-filters-list{
-    background-color: #fff;
-    margin:0px;
-}
-
 .added-item{
-    margin-left: 5px;
-    margin-top: 5px;
-    margin-bottom: 5px;
+    margin: 5px 0 5px 5px;
 }
 
 .remove-selection,
@@ -282,7 +272,7 @@ body a{
 }
 
 .added-filter{
-    margin-left: 5px;
+    margin: 5px 0 5px 5px;
 }
 
 
@@ -297,7 +287,7 @@ body a{
 
 #display-chart-area{
     margin: 0;
-    min-height: 500px;
+    min-height: 900px;
 }
 
 .loader{
@@ -700,6 +690,31 @@ path {
     top: 10px;
     left: 0;
 }
+
+/*D3 TREEMAP*/
+
+#anomalies-display-chart-section{
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    margin: auto;
+    position: relative;
+    width: 960px;
+}
+
+#anomalies-display-chart-section form {
+    position: absolute;
+    right: 10px;
+    top: 10px;
+}
+
+.node {
+    border: solid 1px white;
+    font: 10px sans-serif;
+    line-height: 12px;
+    overflow: hidden;
+    position: absolute;
+    text-indent: 2px;
+}
+
 
 /*c3*/
 [class*=baseline]{

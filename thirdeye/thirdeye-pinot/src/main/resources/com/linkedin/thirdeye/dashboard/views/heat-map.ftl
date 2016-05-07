@@ -57,7 +57,7 @@
                     <table class="treemap-display-tbl" style="position: relative; width: 100%;">
                         {{#each @root/dimensions as |dimensionName dimensionIndex|}}
                         <tr style="position: relative; width: 100%;">
-                            <td class="treemap-display-tbl-dim"><div style="text-align: left;">{{dimensionName}}</div></td><td id="metric_{{metricName}}_dim_{{dimensionIndex}}_treemap_0" class="dimension-treemap" rel="{{dimensionName}}" style="position: relative; left: 0px; top: 0px; width: 100%; height: 100px;"></td>
+                            <td class="treemap-display-tbl-dim"><div style="text-align: left;">{{dimensionName}}</div></td><td id="metric_{{metricName}}_dim_{{dimensionIndex}}_treemap_0" class="dimension-treemap" rel="{{dimensionName}}" style="position: relative; left: 0px; top: 0px; width: 100%;"></td>
                         </tr>
                         {{/each}}
                     </table>
@@ -67,7 +67,7 @@
                     <table class="treemap-display-tbl" style="position: relative; width: 100%;">
                         {{#each @root/dimensions as |dimensionName dimensionIndex|}}
                         <tr style="position: relative; width: 100%;">
-                            <td class="treemap-display-tbl-dim"><div style="text-align: left;">{{dimensionName}}</div></td><td id="metric_{{metricName}}_dim_{{dimensionIndex}}_treemap_1" class="dimension-treemap" rel="{{dimensionName}}" style="position: relative; left: 0px; top: 0px; width: 100%; height: 100px;" ></td>
+                            <td class="treemap-display-tbl-dim"><div style="text-align: left;">{{dimensionName}}</div></td><td id="metric_{{metricName}}_dim_{{dimensionIndex}}_treemap_1" class="dimension-treemap" rel="{{dimensionName}}" style="position: relative; left: 0px; top: 0px; width: 100%;" ></td>
                         </tr>
                         {{/each}}
                     </table>
@@ -77,7 +77,7 @@
                     <table class="treemap-display-tbl" style="position: relative; width: 100%;">
                         {{#each @root/dimensions as |dimensionName dimensionIndex|}}
                         <tr style="position: relative; width: 100%;">
-                            <td class="treemap-display-tbl-dim"><div style="text-align: left;">{{dimensionName}}</div></td><td id="metric_{{metricName}}_dim_{{dimensionIndex}}_treemap_2" class="dimension-treemap" rel="{{dimensionName}}" style="position: relative; left: 0px; top: 0px; width: 100%; height: 100px;" ></td>
+                            <td class="treemap-display-tbl-dim"><div style="text-align: left;">{{dimensionName}}</div></td><td id="metric_{{metricName}}_dim_{{dimensionIndex}}_treemap_2" class="dimension-treemap" rel="{{dimensionName}}" style="position: relative; left: 0px; top: 0px; width: 100%;" ></td>
                         </tr>
                         {{/each}}
                     </table>

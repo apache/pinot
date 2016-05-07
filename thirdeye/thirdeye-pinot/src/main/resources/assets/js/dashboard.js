@@ -30,7 +30,6 @@ $(document).ready( function() {
     var result_tab_template = HandleBarsTemplates.template_tab(anomalies_tab_options)
     $("#anomalies").append(result_tab_template);
 
-
     /** Handelbars template for forms on tabs* */
     //DASHBOARD
     var dasboard_section_options = {
@@ -87,10 +86,9 @@ $(document).ready( function() {
         needComparisonTimeRange: true
     }
 
-
-
     var result_form_template = HandleBarsTemplates.template_form(anomalies_section_options)
     $("#anomalies-section #form-area").append(result_form_template);
+
 
     //Global object with the query params
     hash = parseHashParameters(window.location.hash);
@@ -125,6 +123,9 @@ $(document).ready( function() {
             if( hash.hasOwnProperty("dashboard") || hash.hasOwnProperty("metrics") ){
 
                 switch (hash.view) {
+                    case "d3heatmap":
+                        getD3heatmap();
+                    break;
                     case "timeseries":
 
                         getTimeSeries();
