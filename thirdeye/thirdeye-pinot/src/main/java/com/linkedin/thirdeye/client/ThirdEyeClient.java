@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.client;
 import java.util.List;
 
 import com.linkedin.thirdeye.api.CollectionSchema;
+import com.linkedin.thirdeye.detector.ThirdEyeDetectorConfiguration;
 
 public interface ThirdEyeClient {
 

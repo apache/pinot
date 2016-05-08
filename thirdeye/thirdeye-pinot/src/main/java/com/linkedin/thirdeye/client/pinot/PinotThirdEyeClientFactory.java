@@ -6,13 +6,18 @@ import static com.linkedin.thirdeye.client.pinot.PinotThirdEyeClient.CONTROLLER_
 import static com.linkedin.thirdeye.client.pinot.PinotThirdEyeClient.FIXED_COLLECTIONS_PROPERTY_KEY;
 import static com.linkedin.thirdeye.client.pinot.PinotThirdEyeClient.TAG_PROPERTY_KEY;
 
+import java.io.File;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClient;
-
+import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
+import com.linkedin.thirdeye.detector.ThirdEyeDetectorConfiguration;
 
 /**
  * See
@@ -20,15 +25,20 @@ import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClient;
  * @author jteoh
  */
 public class PinotThirdEyeClientFactory {
+
+  private static final Logger LOG = LoggerFactory.getLogger(PinotThirdEyeClient.class);
+
   public static final String ZK_URL_PROPERTY_KEY = "zkUrl";
 
   public ThirdEyeClient getRawClient(Properties props) {
-    if (!props.containsKey(CONTROLLER_HOST_PROPERTY_KEY) || !props.containsKey(CONTROLLER_PORT_PROPERTY_KEY)
+    if (!props.containsKey(CONTROLLER_HOST_PROPERTY_KEY)
+        || !props.containsKey(CONTROLLER_PORT_PROPERTY_KEY)
         || !props.containsKey(ZK_URL_PROPERTY_KEY) || !props.containsKey(CLUSTER_NAME_PROPERTY_KEY)
         || !props.containsKey(TAG_PROPERTY_KEY)) {
-      throw new IllegalArgumentException("Config file must contain mappings for " + CONTROLLER_HOST_PROPERTY_KEY + ", "
-          + CONTROLLER_PORT_PROPERTY_KEY + ", " + ZK_URL_PROPERTY_KEY + ", " + CLUSTER_NAME_PROPERTY_KEY + " and "
-          + TAG_PROPERTY_KEY + " : " + props);
+      throw new IllegalArgumentException(
+          "Config file must contain mappings for " + CONTROLLER_HOST_PROPERTY_KEY + ", "
+              + CONTROLLER_PORT_PROPERTY_KEY + ", " + ZK_URL_PROPERTY_KEY + ", "
+              + CLUSTER_NAME_PROPERTY_KEY + " and " + TAG_PROPERTY_KEY + " : " + props);
     }
     String controllerHost = props.getProperty(CONTROLLER_HOST_PROPERTY_KEY);
     int controllerPort = Integer.parseInt(props.getProperty(CONTROLLER_PORT_PROPERTY_KEY));
@@ -43,6 +53,16 @@ public class PinotThirdEyeClientFactory {
       client.setFixedCollections(collections);
     }
     return client;
+  }
+
+  public static ThirdEyeClient createThirdEyeClient(ThirdEyeConfiguration config) throws Exception {
+    File clientConfigDir = new File(config.getRootDir(), "client-config");
+    File clientConfigFile = new File(clientConfigDir, config.getClient() + ".yml");
+    PinotThirdEyeClientConfig thirdEyeClientConfig =
+        PinotThirdEyeClientConfig.fromFile(clientConfigFile);
+    LOG.info("Loaded client config:{}", thirdEyeClientConfig);
+    ThirdEyeClient thirdEyeClient = PinotThirdEyeClient.fromClientConfig(thirdEyeClientConfig);
+    return thirdEyeClient;
   }
 
 }

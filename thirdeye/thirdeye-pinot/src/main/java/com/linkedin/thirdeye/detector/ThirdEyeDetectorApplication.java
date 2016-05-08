@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.detector;
 
+import java.io.File;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -20,8 +21,12 @@ import com.linkedin.thirdeye.client.QueryCache;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.client.comparison.TimeOnTimeComparisonHandler;
 import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClient;
+import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClientConfig;
+import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClientFactory;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesHandler;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesResponseConverter;
+import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
+import com.linkedin.thirdeye.dashboard.ThirdEyeDashboardApplication;
 import com.linkedin.thirdeye.detector.api.AnomalyFunctionRelation;
 import com.linkedin.thirdeye.detector.api.AnomalyFunctionSpec;
 import com.linkedin.thirdeye.detector.api.AnomalyResult;
@@ -74,12 +79,15 @@ public class ThirdEyeDetectorApplication extends Application<ThirdEyeDetectorCon
       };
 
   public static void main(final String[] args) throws Exception {
-    new ThirdEyeDetectorApplication().run(args);
+    String thirdEyeConfigDir = args[0];
+    System.setProperty("dw.rootDir", thirdEyeConfigDir);
+    String detectorApplicationConfigFile = thirdEyeConfigDir +"/" + "detector.yml";
+    new ThirdEyeDetectorApplication().run(new String[]{"server", detectorApplicationConfigFile});
   }
 
   @Override
   public String getName() {
-    return "ThirdEyeDetector";
+    return "Thirdeye Detector";
   }
 
   @Override
@@ -110,20 +118,14 @@ public class ThirdEyeDetectorApplication extends Application<ThirdEyeDetectorCon
     final AnomalyFunctionRelationDAO anomalyFunctionRelationDAO =
         new AnomalyFunctionRelationDAO(hibernate.getSessionFactory());
 
-    LOG.info("Loading client configs from: {}", config.getClientConfigRoot());
-    // TODO fix this up to be more standardized
-    // ThirdEye client
-    final ThirdEyeClient thirdEyeClient =
-        // CollectionMapThirdEyeClient.fromFolder(config.getClientConfigRoot());
-        PinotThirdEyeClient.getDefaultTestClient(); // TODO make this configurable
+    LOG.info("Loading configs from: {}", config.getRootDir());
+    final ThirdEyeClient thirdEyeClient = PinotThirdEyeClientFactory.createThirdEyeClient(config);
     QueryCache queryCache = new QueryCache(thirdEyeClient, Executors.newFixedThreadPool(10));
     final TimeSeriesHandler timeSeriesHandler = new TimeSeriesHandler(queryCache);
     TimeOnTimeComparisonHandler timeOnTimeComparisonHandler =
         new TimeOnTimeComparisonHandler(queryCache);
     TimeSeriesResponseConverter timeSeriesResponseConverter =
         TimeSeriesResponseConverter.getInstance();
-    // LOG.info("CollectionMapThirdEyeClient loaded: {}", thirdEyeClient.getCollections());
-    // TODO fix logging
     environment.lifecycle().manage(new Managed() {
       @Override
       public void start() throws Exception {

@@ -1,15 +1,23 @@
 package com.linkedin.thirdeye.dashboard;
 
+import java.io.File;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.thirdeye.client.QueryCache;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClient;
+import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClientConfig;
+import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClientFactory;
+import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
 import com.linkedin.thirdeye.dashboard.configs.AbstractConfigDAO;
 import com.linkedin.thirdeye.dashboard.configs.DashboardConfig;
 import com.linkedin.thirdeye.dashboard.configs.FileBasedConfigDAOFactory;
 import com.linkedin.thirdeye.dashboard.resources.DashboardResource;
+import com.linkedin.thirdeye.detector.ThirdEyeDetectorApplication;
 
 import io.dropwizard.Application;
 import io.dropwizard.assets.AssetsBundle;
@@ -17,18 +25,20 @@ import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
 import io.dropwizard.views.ViewBundle;
 
-public class ThirdEyeDashboard extends Application<ThirdEyeDashboardConfig> {
-  public ThirdEyeDashboard() {
+public class ThirdEyeDashboardApplication extends Application<ThirdEyeDashboardConfiguration> {
+  private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeDashboardApplication.class);
+
+  public ThirdEyeDashboardApplication() {
 
   }
 
   @Override
   public String getName() {
-    return "thirdeye";
+    return "Thirdeye Dashboard";
   }
 
   @Override
-  public void initialize(Bootstrap<ThirdEyeDashboardConfig> bootstrap) {
+  public void initialize(Bootstrap<ThirdEyeDashboardConfiguration> bootstrap) {
     bootstrap.addBundle(new ViewBundle());
     bootstrap.addBundle(new HelperBundle());
     bootstrap.addBundle(new AssetsBundle("/assets", "/assets"));
@@ -40,8 +50,8 @@ public class ThirdEyeDashboard extends Application<ThirdEyeDashboardConfig> {
   }
 
   @Override
-  public void run(ThirdEyeDashboardConfig config, Environment env) throws Exception {
-    ThirdEyeClient thirdEyeClient = createThirdEyeClient(config);
+  public void run(ThirdEyeDashboardConfiguration config, Environment env) throws Exception {
+    ThirdEyeClient thirdEyeClient = PinotThirdEyeClientFactory.createThirdEyeClient(config);
     ExecutorService queryExecutor = env.lifecycle().executorService("query_executor").build();
     QueryCache queryCache = createQueryCache(thirdEyeClient, queryExecutor);
     AbstractConfigDAO<DashboardConfig> configDAO = getDashboardConfig(config);
@@ -55,26 +65,21 @@ public class ThirdEyeDashboard extends Application<ThirdEyeDashboardConfig> {
     return queryCache;
   }
 
-  private ThirdEyeClient createThirdEyeClient(ThirdEyeDashboardConfig config) {
-    return PinotThirdEyeClient.getDefaultTestClient(); // TODO make this
-                                                // configurable - I'd recommend extending the
-                                                // multiple-client implementation and retrieving
-                                                // configurations from the central database
-                                                // (CollectionMapThirdEyeClient)
-  }
 
-  private AbstractConfigDAO<DashboardConfig> getDashboardConfig(ThirdEyeDashboardConfig config) {
-    String rootDirectory = "/tmp/config_root_dir";
-    FileBasedConfigDAOFactory configDAOFactory = new FileBasedConfigDAOFactory(rootDirectory);
+
+  private AbstractConfigDAO<DashboardConfig> getDashboardConfig(
+      ThirdEyeDashboardConfiguration config) {
+    String configRootDir = config.getRootDir();
+    String dashboardConfigDir = configRootDir + "/dashboard-config";
+    FileBasedConfigDAOFactory configDAOFactory = new FileBasedConfigDAOFactory(dashboardConfigDir);
     AbstractConfigDAO<DashboardConfig> configDAO = configDAOFactory.getDashboardConfigDAO();
     return configDAO;
   }
 
   public static void main(String[] args) throws Exception {
-    // TODO: Get config from a file
-    new ThirdEyeDashboard().run(new String[] {
-      "server"
-    });
+    String thirdEyeConfigDir = args[0];
+    System.setProperty("dw.rootDir", thirdEyeConfigDir);
+    String dashboardApplicationConfigFile = thirdEyeConfigDir +"/" + "dashboard.yml";
+    new ThirdEyeDashboardApplication().run(new String[]{"server", dashboardApplicationConfigFile});
   }
-
 }

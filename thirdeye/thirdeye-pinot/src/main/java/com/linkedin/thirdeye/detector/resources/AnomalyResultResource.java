@@ -41,7 +41,7 @@ public class AnomalyResultResource {
   @DELETE
   @Timed
   @UnitOfWork
-  @Path("/{id}")
+  @Path("/id/{id}")
   public Response delete(@PathParam("id") Long id) {
     dao.delete(id);
     return Response.noContent().build();
@@ -50,7 +50,7 @@ public class AnomalyResultResource {
   @GET
   @Timed
   @UnitOfWork
-  @Path("/{id}")
+  @Path("/id/{id}")
   public AnomalyResult findById(@PathParam("id") Long id) {
     AnomalyResult result = dao.findById(id);
     if (result == null) {
@@ -62,7 +62,17 @@ public class AnomalyResultResource {
   @GET
   @Timed
   @UnitOfWork
-  @Path("/{collection}/{startIsoTime}")
+  @Path("/collection/{collection}")
+  public List<AnomalyResult> find(@PathParam("collection") String collection) {
+    DateTime endTime = DateTime.now();
+    DateTime startTime = endTime.minusDays(7);
+    return dao.findAllByCollectionAndTime(collection, startTime, endTime);
+  }
+
+  @GET
+  @Timed
+  @UnitOfWork
+  @Path("/collection/{collection}/{startIsoTime}")
   public List<AnomalyResult> find(@PathParam("collection") String collection,
       @PathParam("startIsoTime") String startIsoTime) {
     DateTime startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startIsoTime);
@@ -73,7 +83,7 @@ public class AnomalyResultResource {
   @GET
   @Timed
   @UnitOfWork
-  @Path("/{collection}/{startIsoTime}/{endIsoTime}")
+  @Path("/collection/{collection}/{startIsoTime}/{endIsoTime}")
   public List<AnomalyResult> find(@PathParam("collection") String collection,
       @PathParam("startIsoTime") String startIsoTime, @PathParam("endIsoTime") String endIsoTime) {
     DateTime startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startIsoTime);

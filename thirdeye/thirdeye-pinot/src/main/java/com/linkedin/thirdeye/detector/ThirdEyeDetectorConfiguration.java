@@ -4,18 +4,12 @@ import javax.validation.Valid;
 import javax.validation.constraints.NotNull;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
 
 import io.dropwizard.Configuration;
 import io.dropwizard.db.DataSourceFactory;
 
-public class ThirdEyeDetectorConfiguration extends Configuration {
-  @Valid
-  @NotNull
-  private String clientConfigRoot;
-
-  @Valid
-  @NotNull
-  private String functionConfigPath;
+public class ThirdEyeDetectorConfiguration extends ThirdEyeConfiguration {
 
   @Valid
   @NotNull
@@ -26,19 +20,7 @@ public class ThirdEyeDetectorConfiguration extends Configuration {
     return database;
   }
 
-  public String getClientConfigRoot() {
-    return clientConfigRoot;
-  }
-
-  public void setClientConfigRoot(String clientConfigRoot) {
-    this.clientConfigRoot = clientConfigRoot;
-  }
-
   public String getFunctionConfigPath() {
-    return functionConfigPath;
-  }
-
-  public void setFunctionConfigPath(String functionConfigPath) {
-    this.functionConfigPath = functionConfigPath;
+    return getRootDir() + "/detector-config/anomaly-functions/functions.properties";
   }
 }

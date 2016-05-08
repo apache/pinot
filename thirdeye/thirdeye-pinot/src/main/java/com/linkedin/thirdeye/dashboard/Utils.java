@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.dashboard;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -27,8 +28,12 @@ import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.client.MetricExpression;
 import com.linkedin.thirdeye.client.MetricFunction;
 import com.linkedin.thirdeye.client.QueryCache;
+import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.client.ThirdEyeRequest;
 import com.linkedin.thirdeye.client.ThirdEyeRequest.ThirdEyeRequestBuilder;
+import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClient;
+import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClientConfig;
+import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
 import com.linkedin.thirdeye.client.ThirdEyeResponse;
 import com.linkedin.thirdeye.dashboard.configs.AbstractConfigDAO;
 import com.linkedin.thirdeye.dashboard.configs.DashboardConfig;

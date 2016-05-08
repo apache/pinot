@@ -147,8 +147,9 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
     zkClient.waitUntilConnected();
     ZKHelixAdmin helixAdmin = new ZKHelixAdmin(zkClient);
     List<String> thirdeyeBrokerList = helixAdmin.getInstancesInClusterWithTag(clusterName, tag);
-    if(thirdeyeBrokerList.size() ==0){
-      throw new RuntimeException("No brokers available with tag:"+ tag);
+    LOG.info("Found brokers:{} with tag:{}", thirdeyeBrokerList, tag);
+    if (thirdeyeBrokerList.size() == 0) {
+      throw new RuntimeException("No brokers available with tag:" + tag);
     }
     String[] thirdeyeBrokers = new String[thirdeyeBrokerList.size()];
     for (int i = 0; i < thirdeyeBrokerList.size(); i++) {
@@ -178,6 +179,11 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
     }
     return new PinotThirdEyeClient(connection, properties.getProperty(CONTROLLER_HOST_PROPERTY_KEY),
         Integer.valueOf(properties.getProperty(CONTROLLER_PORT_PROPERTY_KEY)), null);
+  }
+
+  public static ThirdEyeClient fromClientConfig(PinotThirdEyeClientConfig config) {
+    return fromZookeeper(config.getControllerHost(), config.getControllerPort(),
+        config.getZookeeperUrl(), config.getClusterName(), config.getTag());
   }
 
   @Override
@@ -427,8 +433,8 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
       if (propertyStore != null) {
         List<Stat> stats = new ArrayList<>();
         int options = AccessOption.PERSISTENT;
-        List<ZNRecord> zkSegmentDataList = propertyStore.getChildren(
-             "/SEGMENTS/" + collection + "_OFFLINE", stats, options);
+        List<ZNRecord> zkSegmentDataList =
+            propertyStore.getChildren("/SEGMENTS/" + collection + "_OFFLINE", stats, options);
         for (ZNRecord record : zkSegmentDataList) {
           try {
             long endTime = Long.parseLong(record.getSimpleField("segment.end.time"));
@@ -452,16 +458,16 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
   /** TESTING ONLY - WE SHOULD NOT BE USING THIS. */
   @Deprecated
   public static PinotThirdEyeClient getDefaultTestClient() {
-    //  TODO REPLACE WITH CONFIGS
+    // TODO REPLACE WITH CONFIGS
     String controllerHost = "lva1-app0086.corp.linkedin.com";
     int controllerPort = 11984;
-    String zkUrl =  "zk-lva1-pinot.corp.linkedin.com:12913/pinot-cluster";//"zk-lva1-pinot.corp:12913/pinot-cluster";
+    String zkUrl = "zk-lva1-pinot.corp.linkedin.com:12913/pinot-cluster";// "zk-lva1-pinot.corp:12913/pinot-cluster";
     String clusterName = "mpSprintDemoCluster";
-    String tag ="thirdeye_BROKER";
+    String tag = "thirdeye_BROKER";
     return fromZookeeper(controllerHost, controllerPort, zkUrl, clusterName, tag);
-     
-//    return fromHostList(controllerHost, controllerPort,
-//        "lva1-app0437.corp.linkedin.com:7001");
+
+    // return fromHostList(controllerHost, controllerPort,
+    // "lva1-app0437.corp.linkedin.com:7001");
   }
 
   public static void main(String[] args) throws Exception {

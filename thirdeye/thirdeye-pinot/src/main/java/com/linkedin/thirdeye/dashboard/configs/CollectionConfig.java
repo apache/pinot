@@ -1,18 +1,33 @@
 package com.linkedin.thirdeye.dashboard.configs;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-
 public class CollectionConfig extends AbstractConfig {
   String collectionName;
+
+  boolean isActive = true;
 
   public CollectionConfig() {
 
   }
 
-  @Override
-  public String toJSON() throws Exception{
-    return OBJECT_MAPPER.defaultPrettyPrintingWriter().writeValueAsString(this);
+  public String getCollectionName() {
+    return collectionName;
+  }
 
+  public void setCollectionName(String collectionName) {
+    this.collectionName = collectionName;
+  }
+
+  public boolean isActive() {
+    return isActive;
+  }
+
+  public void setActive(boolean isActive) {
+    this.isActive = isActive;
+  }
+
+  @Override
+  public String toJSON() throws Exception {
+    return OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(this);
   }
 
 }
