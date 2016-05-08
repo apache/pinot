@@ -19,20 +19,27 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Random;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import junit.framework.Assert;
 
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
+import org.apache.avro.generic.GenericData.Record;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.hadoop.io.AvroSerialization;
 import org.apache.avro.mapred.AvroKey;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.NullWritable;
+import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mrunit.mapreduce.MapDriver;
 import org.apache.hadoop.mrunit.testutil.TemporaryPath;
 import org.apache.hadoop.mrunit.types.Pair;
@@ -45,13 +52,15 @@ import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfig;
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfigProperties;
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConstants;
 import com.linkedin.thirdeye.hadoop.derivedcolumn.transformation.DerivedColumnTransformationPhaseConstants;
-import com.linkedin.thirdeye.hadoop.derivedcolumn.transformation.DerivedColumnTransformationPhaseJob.DerivedColumnTransformationPhaseMapper;
+import com.linkedin.thirdeye.hadoop.topk.TopKDimensionValues;
+import com.linkedin.thirdeye.hadoop.util.ThirdeyeAvroUtils;
 
 /**
  * This test, tests the scenario of derived column transformation,
  * where the original schema and new schema are identical,
  * as there are no values in the topk file
  */
+
 public class DerivedColumnNoTransformationTest {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
@@ -73,7 +82,6 @@ public class DerivedColumnNoTransformationTest {
     return TimeUnit.SECONDS.toHours(unixtime);
   }
 
-
   private void setUpAvroSerialization(Configuration conf, Schema inputSchema) {
     String[] currentSerializations = conf.getStrings(HADOOP_IO_SERIALIZATION);
     String[] finalSerializations = new String[currentSerializations.length + 1];
@@ -85,8 +93,8 @@ public class DerivedColumnNoTransformationTest {
     AvroSerialization.addToConfiguration(conf);
     AvroSerialization.setKeyWriterSchema(conf, inputSchema);
     AvroSerialization.setValueWriterSchema(conf, Schema.create(Schema.Type.NULL));
-  }
 
+  }
 
   private void resetAvroSerialization() throws IOException {
     Configuration conf = mapDriver.getConfiguration();
@@ -134,11 +142,12 @@ public class DerivedColumnNoTransformationTest {
 
   @Before
   public void setUp() throws Exception {
-    DerivedColumnTransformationPhaseMapper mapper = new DerivedColumnTransformationPhaseMapper();
+    DerivedColumnNoTransformationPhaseMapper mapper = new DerivedColumnNoTransformationPhaseMapper();
     mapDriver = MapDriver.newMapDriver(mapper);
     Configuration configuration = mapDriver.getConfiguration();
     configuration.set("io.serializations", "org.apache.hadoop.io.serializer.JavaSerialization,"
         + "org.apache.hadoop.io.serializer.WritableSerialization");
+
 
     props.setProperty(ThirdEyeConfigProperties.THIRDEYE_TABLE_NAME.toString(), "collection");
     props.setProperty(ThirdEyeConfigProperties.THIRDEYE_DIMENSION_NAMES.toString(), "d1,d2,d3");
@@ -163,7 +172,6 @@ public class DerivedColumnNoTransformationTest {
     TemporaryPath tmpPath = new TemporaryPath();
     outputPath = tmpPath.toString();
     configuration.set(DerivedColumnTransformationPhaseConstants.DERIVED_COLUMN_TRANSFORMATION_PHASE_OUTPUT_PATH.toString(), outputPath);
-
   }
 
   @Test
@@ -190,11 +198,92 @@ public class DerivedColumnNoTransformationTest {
     }
   }
 
-
   @After
   public void cleanUp() throws IOException {
 
     File f = new File(outputPath);
     FileUtils.deleteDirectory(f);
+  }
+
+  public static class DerivedColumnNoTransformationPhaseMapper
+  extends Mapper<AvroKey<GenericRecord>, NullWritable, AvroKey<GenericRecord>, NullWritable> {
+
+    private Schema outputSchema;
+    private ThirdEyeConfig thirdeyeConfig;
+    private DerivedColumnTransformationPhaseConfig config;
+    private List<String> dimensionsNames;
+    private List<String> metricNames;
+    private TopKDimensionValues topKDimensionValues;
+    private Map<String, Set<String>> topKDimensionsMap;
+    private String timeColumnName;
+
+    @Override
+    public void setup(Context context) throws IOException, InterruptedException {
+      Configuration configuration = context.getConfiguration();
+      FileSystem fs = FileSystem.get(configuration);
+
+      thirdeyeConfig = OBJECT_MAPPER.readValue(configuration.get(DerivedColumnTransformationPhaseConstants.DERIVED_COLUMN_TRANSFORMATION_PHASE_THIRDEYE_CONFIG.toString()), ThirdEyeConfig.class);
+      config = DerivedColumnTransformationPhaseConfig.fromThirdEyeConfig(thirdeyeConfig);
+      dimensionsNames = config.getDimensionNames();
+      metricNames = config.getMetricNames();
+      timeColumnName = config.getTimeColumnName();
+
+      outputSchema = new Schema.Parser().parse(configuration.get(DerivedColumnTransformationPhaseConstants.DERIVED_COLUMN_TRANSFORMATION_PHASE_OUTPUT_SCHEMA.toString()));
+
+      Path topKPath = new Path(configuration.get(DerivedColumnTransformationPhaseConstants.DERIVED_COLUMN_TRANSFORMATION_PHASE_TOPK_PATH.toString())
+          + File.separator + ThirdEyeConstants.TOPK_VALUES_FILE);
+      topKDimensionValues = new TopKDimensionValues();
+      if (fs.exists(topKPath)) {
+        FSDataInputStream topkValuesStream = fs.open(topKPath);
+        topKDimensionValues = OBJECT_MAPPER.readValue(topkValuesStream, TopKDimensionValues.class);
+        topkValuesStream.close();
+      }
+      topKDimensionsMap = topKDimensionValues.getTopKDimensions();
+    }
+
+
+    @Override
+    public void map(AvroKey<GenericRecord> key, NullWritable value, Context context)
+        throws IOException, InterruptedException {
+
+      // input record
+      GenericRecord inputRecord = key.datum();
+
+      // output record
+      GenericRecord outputRecord = new Record(outputSchema);
+
+      // dimensions
+      for (String dimension : dimensionsNames) {
+        String dimensionName = dimension;
+        String dimensionValue = ThirdeyeAvroUtils.getDimensionFromRecord(inputRecord, dimension);
+        // add column for topk + whitelist
+        if (topKDimensionsMap.containsKey(dimensionName)) {
+          Set<String> topKDimensionValues = topKDimensionsMap.get(dimensionName);
+          if (topKDimensionValues != null && topKDimensionValues.contains(dimensionValue)) {
+            outputRecord.put(dimensionName, dimensionValue);
+          } else {
+            outputRecord.put(dimensionName, ThirdEyeConstants.OTHER);
+          }
+          dimensionName = dimension + ThirdEyeConstants.RAW_DIMENSION_SUFFIX;
+        }
+        outputRecord.put(dimensionName, dimensionValue);
+      }
+
+      // metrics
+      for (String metric : metricNames) {
+        outputRecord.put(metric, ThirdeyeAvroUtils.getMetricFromRecord(inputRecord, metric));
+      }
+
+      // time
+      outputRecord.put(timeColumnName, ThirdeyeAvroUtils.getMetricFromRecord(inputRecord, timeColumnName));
+
+      AvroKey<GenericRecord> outputKey = new AvroKey<GenericRecord>(outputRecord);
+      context.write(outputKey, NullWritable.get());
+    }
+
+    @Override
+    public void cleanup(Context context) throws IOException, InterruptedException {
+
+    }
   }
 }

@@ -20,6 +20,7 @@ import static com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhase
 import static com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants.SEGMENT_CREATION_THIRDEYE_CONFIG;
 import static com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants.SEGMENT_CREATION_WALLCLOCK_END_TIME;
 import static com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants.SEGMENT_CREATION_WALLCLOCK_START_TIME;
+import static com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants.SEGMENT_CREATION_BACKFILL;
 
 import java.io.File;
 import java.io.IOException;
@@ -82,6 +83,7 @@ public class SegmentCreationPhaseMapReduceJob {
     private Long segmentWallClockStartTime;
     private Long segmentWallClockEndTime;
     private String segmentSchedule;
+    private boolean isBackfill;
 
     @Override
     public void setup(Context context) throws IOException, InterruptedException {
@@ -115,6 +117,7 @@ public class SegmentCreationPhaseMapReduceJob {
       segmentWallClockStartTime = Long.valueOf(properties.get(SEGMENT_CREATION_WALLCLOCK_START_TIME.toString()));
       segmentWallClockEndTime = Long.valueOf(properties.get(SEGMENT_CREATION_WALLCLOCK_END_TIME.toString()));
       segmentSchedule = properties.get(SEGMENT_CREATION_SCHEDULE.toString());
+      isBackfill = Boolean.valueOf(properties.get(SEGMENT_CREATION_BACKFILL.toString()));
     }
 
     @Override
@@ -189,9 +192,21 @@ public class SegmentCreationPhaseMapReduceJob {
       String minTime = ThirdEyeConstants.DATE_TIME_FORMATTER.print(segmentWallClockStartTime);
       String maxTime = ThirdEyeConstants.DATE_TIME_FORMATTER.print(segmentWallClockEndTime);
       LOGGER.info("Wall clock time : min {} max {}", minTime, maxTime);
-      segmentGeneratorConfig.setSegmentName(SegmentNameBuilder
-          .buildBasic(tableName + ThirdEyeConstants.SEGMENT_JOINER + segmentSchedule, minTime, maxTime, seqId));
+      LOGGER.info("isBackfill : {}", isBackfill);
+      if (isBackfill) {
+        // if case of backfill, we have to ensure that segment name is same as original segment name
+        // we are retaining the segment name through the  backfill and derived_column_transformation phases
+        // in the output files generated
+        // backfill will generated original_segment_name.avro
+        // derived_column_transformation will generate original_segment_name-m-00000.avro etc
+        String segmentName = hdfsDataPath.getName().split("-(m|r)-[0-9]{5}")[0];
+        segmentGeneratorConfig.setSegmentName(segmentName);
+      } else {
+        segmentGeneratorConfig.setSegmentName(SegmentNameBuilder
+            .buildBasic(tableName + ThirdEyeConstants.SEGMENT_JOINER + segmentSchedule, minTime, maxTime, seqId));
+      }
       LOGGER.info("Setting segment name {}", segmentGeneratorConfig.getSegmentName());
+
 
       // Set star tree config
       StarTreeIndexSpec starTreeIndexSpec = new StarTreeIndexSpec();

@@ -51,6 +51,7 @@ import org.apache.avro.mapred.AvroKey;
 import org.apache.avro.mapreduce.AvroJob;
 import org.apache.avro.mapreduce.AvroKeyInputFormat;
 import org.apache.avro.mapreduce.AvroKeyOutputFormat;
+import org.apache.avro.mapreduce.AvroMultipleOutputs;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -60,7 +61,9 @@ import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.input.FileSplit;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+import org.apache.hadoop.mapreduce.lib.output.LazyOutputFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -101,11 +104,19 @@ public class DerivedColumnTransformationPhaseJob extends Configured {
     private Map<String, Set<String>> topKDimensionsMap;
     private String timeColumnName;
 
+    private AvroMultipleOutputs avroMultipleOutputs;
+    String inputFileName;
+
     @Override
     public void setup(Context context) throws IOException, InterruptedException {
       LOGGER.info("DerivedColumnTransformationPhaseJob.DerivedColumnTransformationPhaseMapper.setup()");
       Configuration configuration = context.getConfiguration();
       FileSystem fs = FileSystem.get(configuration);
+
+      FileSplit fileSplit = (FileSplit) context.getInputSplit();
+      inputFileName = fileSplit.getPath().getName();
+      inputFileName = inputFileName.substring(0, inputFileName.lastIndexOf(ThirdEyeConstants.AVRO_SUFFIX));
+      LOGGER.info("split name:" + inputFileName);
 
       thirdeyeConfig = OBJECT_MAPPER.readValue(configuration.get(DERIVED_COLUMN_TRANSFORMATION_PHASE_THIRDEYE_CONFIG.toString()), ThirdEyeConfig.class);
       config = DerivedColumnTransformationPhaseConfig.fromThirdEyeConfig(thirdeyeConfig);
@@ -124,6 +135,8 @@ public class DerivedColumnTransformationPhaseJob extends Configured {
         topkValuesStream.close();
       }
       topKDimensionsMap = topKDimensionValues.getTopKDimensions();
+
+      avroMultipleOutputs = new AvroMultipleOutputs(context);
     }
 
 
@@ -163,7 +176,7 @@ public class DerivedColumnTransformationPhaseJob extends Configured {
       outputRecord.put(timeColumnName, ThirdeyeAvroUtils.getMetricFromRecord(inputRecord, timeColumnName));
 
       AvroKey<GenericRecord> outputKey = new AvroKey<GenericRecord>(outputRecord);
-      context.write(outputKey , NullWritable.get());
+      avroMultipleOutputs.write(outputKey, NullWritable.get(), inputFileName);
     }
 
     @Override
@@ -225,7 +238,8 @@ public class DerivedColumnTransformationPhaseJob extends Configured {
     job.setMapOutputKeyClass(AvroKey.class);
     job.setMapOutputValueClass(NullWritable.class);
     AvroJob.setOutputKeySchema(job, outputSchema);
-    job.setOutputFormatClass(AvroKeyOutputFormat.class);
+    LazyOutputFormat.setOutputFormatClass(job, AvroKeyOutputFormat.class);
+    AvroMultipleOutputs.addNamedOutput(job, "avro", AvroKeyOutputFormat.class, outputSchema);
 
     job.setNumReduceTasks(0);
 

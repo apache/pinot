@@ -23,6 +23,10 @@ import java.util.zip.GZIPInputStream;
 
 import org.apache.avro.Schema;
 import org.apache.avro.Schema.Field;
+import org.apache.avro.SchemaBuilder;
+import org.apache.avro.SchemaBuilder.BaseFieldTypeBuilder;
+import org.apache.avro.SchemaBuilder.FieldAssembler;
+import org.apache.avro.SchemaBuilder.RecordBuilder;
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
@@ -35,6 +39,8 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Joiner;
 import com.google.common.collect.Lists;
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.core.data.readers.AvroRecordReader;
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConstants;
 
@@ -45,7 +51,6 @@ import com.linkedin.thirdeye.hadoop.config.ThirdEyeConstants;
 public class ThirdeyeAvroUtils {
 
   private static Logger LOGGER = LoggerFactory.getLogger(ThirdeyeAvroUtils.class);
-  private static String AVRO_SUFFIX = ".avro";
   /**
    * extracts avro schema from avro file
    * @param avroFile
@@ -57,6 +62,51 @@ public class ThirdeyeAvroUtils {
     DataFileStream<GenericRecord> dataStreamReader = getAvroReader(avroFile);
     Schema avroSchema = dataStreamReader.getSchema();
     dataStreamReader.close();
+    return avroSchema;
+  }
+
+  /**
+   * Constructs an avro schema from a pinot schema
+   * @param schema
+   * @return
+   */
+  public static Schema constructAvroSchemaFromPinotSchema(com.linkedin.pinot.common.data.Schema schema) {
+    Schema avroSchema = null;
+
+    RecordBuilder<Schema> recordBuilder = SchemaBuilder.record("record");
+    FieldAssembler<Schema> fieldAssembler = recordBuilder.fields();
+
+    for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+      String fieldName = fieldSpec.getName();
+      DataType dataType = fieldSpec.getDataType();
+      BaseFieldTypeBuilder<Schema> baseFieldTypeBuilder = fieldAssembler.name(fieldName).type().nullable();
+      switch (dataType) {
+        case BOOLEAN:
+          fieldAssembler = baseFieldTypeBuilder.booleanType().noDefault();
+          break;
+        case DOUBLE:
+          fieldAssembler = baseFieldTypeBuilder.doubleType().noDefault();
+          break;
+        case FLOAT:
+          fieldAssembler = baseFieldTypeBuilder.floatType().noDefault();
+          break;
+        case INT:
+          fieldAssembler = baseFieldTypeBuilder.intType().noDefault();
+          break;
+        case LONG:
+          fieldAssembler = baseFieldTypeBuilder.longType().noDefault();
+          break;
+        case STRING:
+          fieldAssembler = baseFieldTypeBuilder.stringType().noDefault();
+          break;
+        default:
+          break;
+      }
+    }
+
+    avroSchema = fieldAssembler.endRecord();
+    LOGGER.info("Avro Schema {}", avroSchema.toString(true));
+
     return avroSchema;
   }
 
@@ -95,7 +145,7 @@ public class ThirdeyeAvroUtils {
     for (String input : inputPathDir.split(ThirdEyeConstants.FIELD_SEPARATOR)) {
       Path inputPath = new Path(input);
       for (FileStatus fileStatus : fs.listStatus(inputPath)) {
-        if (fileStatus.isFile() && fileStatus.getPath().getName().endsWith(AVRO_SUFFIX)) {
+        if (fileStatus.isFile() && fileStatus.getPath().getName().endsWith(ThirdEyeConstants.AVRO_SUFFIX)) {
           LOGGER.info("Extracting schema from {}", fileStatus.getPath());
           avroSchema = extractSchemaFromAvro(fileStatus.getPath());
           break;

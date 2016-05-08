@@ -13,24 +13,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.thirdeye.hadoop.segment.creation;
+package com.linkedin.thirdeye.hadoop.backfill;
 
 /**
- * Properties to be set for the segment creation phase
+ * This class contains the properties to be set for backfill phase
  */
-public enum SegmentCreationPhaseConstants {
+public enum BackfillPhaseConstants {
 
-  SEGMENT_CREATION_INPUT_PATH("segment.creation.input.path"),
-  SEGMENT_CREATION_OUTPUT_PATH("segment.creation.output.path"),
-  SEGMENT_CREATION_THIRDEYE_CONFIG("segment.creation.thirdeye.config"),
-  SEGMENT_CREATION_WALLCLOCK_START_TIME("segment.creation.wallclock.start.time"),
-  SEGMENT_CREATION_WALLCLOCK_END_TIME("segment.creation.wallclock.end.time"),
-  SEGMENT_CREATION_SCHEDULE("segment.creation.schedule"),
-  SEGMENT_CREATION_BACKFILL("segment.creation.backfill");
+  BACKFILL_PHASE_CONTROLLER_HOST("backfill.phase.controller.host"),
+  BACKFILL_PHASE_CONTROLLER_PORT("backfill.phase.controller.port"),
+  BACKFILL_PHASE_START_TIME("backfill.phase.start.time"),
+  BACKFILL_PHASE_END_TIME("backfill.phase.end.time"),
+  BACKFILL_PHASE_TABLE_NAME("backfill.phase.table.name"),
+  BACKFILL_PHASE_OUTPUT_PATH("backfill.phase.output.path");
 
   String name;
 
-  SegmentCreationPhaseConstants(String name) {
+  BackfillPhaseConstants(String name) {
     this.name = name;
   }
 

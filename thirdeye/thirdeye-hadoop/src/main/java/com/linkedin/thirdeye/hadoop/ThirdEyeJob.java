@@ -35,6 +35,8 @@ import org.slf4j.LoggerFactory;
 
 import com.linkedin.thirdeye.hadoop.aggregation.AggregationPhaseConstants;
 import com.linkedin.thirdeye.hadoop.aggregation.AggregationPhaseJob;
+import com.linkedin.thirdeye.hadoop.backfill.BackfillPhaseConstants;
+import com.linkedin.thirdeye.hadoop.backfill.BackfillPhaseJob;
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConstants;
 import com.linkedin.thirdeye.hadoop.derivedcolumn.transformation.DerivedColumnTransformationPhaseConstants;
 import com.linkedin.thirdeye.hadoop.derivedcolumn.transformation.DerivedColumnTransformationPhaseJob;
@@ -68,6 +70,40 @@ public class ThirdEyeJob {
 
   private enum PhaseSpec {
 
+    BACKFILL {
+      @Override
+      Class<?> getKlazz() {
+        return BackfillPhaseJob.class;
+      }
+
+      @Override
+      String getDescription() {
+        return "Backfills older pinot segments with star tree index and topk information";
+      }
+
+      @Override
+      Properties getJobProperties(Properties inputConfig, String root, String collection,
+          DateTime minTime, DateTime maxTime, String inputPaths)
+              throws Exception {
+        Properties config = new Properties();
+
+        config.setProperty(BackfillPhaseConstants.BACKFILL_PHASE_CONTROLLER_HOST.toString(),
+            inputConfig.getProperty(ThirdEyeJobProperties.THIRDEYE_PINOT_CONTROLLER_HOSTS.getName()));
+        config.setProperty(BackfillPhaseConstants.BACKFILL_PHASE_CONTROLLER_PORT.toString(),
+            inputConfig.getProperty(ThirdEyeJobProperties.THIRDEYE_PINOT_CONTROLLER_PORT.getName()));
+
+        config.setProperty(BackfillPhaseConstants.BACKFILL_PHASE_START_TIME.toString(),
+            inputConfig.getProperty(ThirdEyeJobProperties.THIRDEYE_BACKFILL_START_TIME.getName()));
+        config.setProperty(BackfillPhaseConstants.BACKFILL_PHASE_END_TIME.toString(),
+            inputConfig.getProperty(ThirdEyeJobProperties.THIRDEYE_BACKFILL_END_TIME.getName()));
+
+        config.setProperty(BackfillPhaseConstants.BACKFILL_PHASE_OUTPUT_PATH.toString(),
+            getIndexDir(root, collection, minTime, maxTime) + File.separator + BACKFILL.getName());
+        config.setProperty(BackfillPhaseConstants.BACKFILL_PHASE_TABLE_NAME.toString(), collection);
+
+        return config;
+      }
+    },
     AGGREGATION {
       @Override
       Class<?> getKlazz() {

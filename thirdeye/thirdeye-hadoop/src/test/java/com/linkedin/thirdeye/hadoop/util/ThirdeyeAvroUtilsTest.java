@@ -1,9 +1,19 @@
 package com.linkedin.thirdeye.hadoop.util;
 
+import java.util.concurrent.TimeUnit;
+
 import org.apache.avro.Schema;
+import org.apache.avro.Schema.Field;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import com.linkedin.pinot.common.data.DimensionFieldSpec;
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import com.linkedin.pinot.common.data.MetricFieldSpec;
+import com.linkedin.pinot.common.data.TimeFieldSpec;
+import com.linkedin.pinot.common.data.TimeGranularitySpec;
 
 public class ThirdeyeAvroUtilsTest {
 
@@ -33,6 +43,27 @@ public class ThirdeyeAvroUtilsTest {
     Assert.assertEquals(type, "LONG", "Data type not extracted correctly for hoursSinceEpoch");
     type = ThirdeyeAvroUtils.getDataTypeForField("m1", avroSchema);
     Assert.assertEquals(type, "INT", "Data type not extracted correctly for m1");
+  }
+
+  @Test
+  public void testConstructAvroSchemaFromPinotSchema() throws Exception {
+    com.linkedin.pinot.common.data.Schema pinotSchema = new com.linkedin.pinot.common.data.Schema();
+
+    pinotSchema.setSchemaName("test");
+    FieldSpec spec = new DimensionFieldSpec("d1", DataType.STRING, true);
+    pinotSchema.addField("d1", spec);
+    spec = new MetricFieldSpec("m1", DataType.DOUBLE);
+    pinotSchema.addField("m1", spec);
+    spec = new TimeFieldSpec(new TimeGranularitySpec(DataType.LONG, TimeUnit.HOURS, "t"));
+    pinotSchema.addField("t", spec);
+
+    Schema avroSchema = ThirdeyeAvroUtils.constructAvroSchemaFromPinotSchema(pinotSchema);
+    String dType = ThirdeyeAvroUtils.getDataTypeForField("d1", avroSchema);
+    Assert.assertEquals(dType, "STRING", "Avro schema constructed incorrectly");
+    dType = ThirdeyeAvroUtils.getDataTypeForField("m1", avroSchema);
+    Assert.assertEquals(dType, "DOUBLE", "Avro schema constructed incorrectly");
+    dType = ThirdeyeAvroUtils.getDataTypeForField("t", avroSchema);
+    Assert.assertEquals(dType, "LONG", "Avro schema constructed incorrectly");
   }
 
 }

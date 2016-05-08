@@ -25,7 +25,9 @@ public enum ThirdEyeJobProperties {
   INPUT_PATHS("input.paths"),
   THIRDEYE_MR_CONF("thirdeye.mr.conf"),
   THIRDEYE_PINOT_CONTROLLER_HOSTS("thirdeye.pinot.controller.hosts"),
-  THIRDEYE_PINOT_CONTROLLER_PORT("thirdeye.pinot.controller.port");
+  THIRDEYE_PINOT_CONTROLLER_PORT("thirdeye.pinot.controller.port"),
+  THIRDEYE_BACKFILL_START_TIME("thirdeye.backfill.start.time"),
+  THIRDEYE_BACKFILL_END_TIME("thirdeye.backfill.end.time");
 
   private final String propertyName;
 

@@ -21,6 +21,7 @@ import static com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhase
 import static com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants.SEGMENT_CREATION_THIRDEYE_CONFIG;
 import static com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants.SEGMENT_CREATION_WALLCLOCK_END_TIME;
 import static com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants.SEGMENT_CREATION_WALLCLOCK_START_TIME;
+import static com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants.SEGMENT_CREATION_BACKFILL;
 
 import java.io.FileInputStream;
 import java.util.ArrayList;
@@ -57,6 +58,7 @@ import com.linkedin.thirdeye.hadoop.util.ThirdeyeAvroUtils;
 public class SegmentCreationPhaseJob extends Configured {
 
   private static final String TEMP = "temp";
+  private static final String DEFAULT_BACKFILL = "false";
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentCreationPhaseJob.class);
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -103,6 +105,9 @@ public class SegmentCreationPhaseJob extends Configured {
     LOGGER.info("Segment wallclock end time : {}", segmentWallClockEnd);
     String schedule = getAndSetConfiguration(configuration, SEGMENT_CREATION_SCHEDULE);
     LOGGER.info("Segment schedule : {}", schedule);
+    String isBackfill = props.getProperty(SEGMENT_CREATION_BACKFILL.toString(), DEFAULT_BACKFILL);
+    configuration.set(SEGMENT_CREATION_BACKFILL.toString(), isBackfill);
+    LOGGER.info("Is Backfill : {}", configuration.get(SEGMENT_CREATION_BACKFILL.toString()));
 
     // Create temporary directory
     if (fs.exists(stagingDir)) {
