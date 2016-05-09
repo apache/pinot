@@ -144,6 +144,7 @@
                         </div>
                         {{/if}}
 
+                        {{#if showGranularity}}
                         <label class="uk-form-label">
                             Granularity
                         </label>
@@ -154,6 +155,7 @@
                             <button class="time-input-form-gran-aggregate-all-copy baseline-aggregate-copy radio-type-button" rel="{{tabName}}" type="button" unit="aggregateAll" value="0">Aggregate all</button>
                             {{/if}}
                         </div>
+                        {{/if}}
                         <div class="time-input-logic-error uk-alert uk-alert-danger hidden" rel="{{tabName}}">
                             <p></p>
                         </div>

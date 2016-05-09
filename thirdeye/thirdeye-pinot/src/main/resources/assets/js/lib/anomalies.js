@@ -2,22 +2,22 @@ function getAnomalies() {
   dashboardName = "Default_All_Metrics_Dashboard";
   baselineStart = moment(parseInt(hash.currentStart)).add(-7, 'days')
   baselineEnd = moment(parseInt(hash.currentEnd)).add(-7, 'days')
-  aggTimeGranularity = "DAYS";
-  metrics = "guestInvitationsSubmitted";
+  aggTimeGranularity = "HOURS";
+  
+  
   var timeSeriesUrl = "/dashboard/data/tabular?" + window.location.hash.substring(1)  //
-  + "&baselineStart=" + baselineStart + "&baselineEnd=" + baselineEnd + "&dashboard=" + dashboardName  //
-  + "&aggTimeGranularity=" + aggTimeGranularity + "&metrics=" + metrics;
+  + "&baselineStart=" + baselineStart + "&baselineEnd=" + baselineEnd   //
+  + "&aggTimeGranularity=" + aggTimeGranularity ;
+  
+  
   var anomaliesUrl = "/anomaly-results/collection/" + hash.dataset;
-
-  getData(timeSeriesUrl).done(function(data) {
-    renderAnomalyTabular(data);
-    getData(anomaliesUrl).done(function(data) {
-      renderAnomalies(data);
+  
+  getData(anomaliesUrl).done(function(anomalyData) {
+    getData(timeSeriesUrl).done(function(timeSeriesData) {
+      renderAnomalyTabular(timeSeriesData, anomalyData);
+      renderAnomalies(anomalyData);
     });
   });
-
-  // Todo: add the real endpoint
-
 };
 
 function renderAnomalies(data) {
@@ -30,15 +30,22 @@ function renderAnomalies(data) {
   var result_anomalies_template = HandleBarsTemplates.template_anomalies(data);
   $("#" + hash.view + "-display-table-section").append(result_anomalies_template);
 
+
+  //Eventlisteners
+  $("#" + hash.view + "-display-table-section").on("click",".checkbox-cell", function(){
+        //var metric = $(this).attr("value");
+        // $(".time-series-metric-checkbox[value='"+ metric +"']")
+  })
+
 }
 
-function renderAnomalyTabular(data) {
+function renderAnomalyTabular(timeSeriesData, anomalyData) {
   $("#"+  hash.view  +"-display-chart-section").empty();
   /* Handelbars template for time series legend */
-  var result_metric_time_series_section = HandleBarsTemplates.template_metric_time_series_section_anomaly(data);
+  var result_metric_time_series_section = HandleBarsTemplates.template_metric_time_series_section_anomaly(timeSeriesData);
   $("#" + hash.view + "-display-chart-section").append(result_metric_time_series_section);
 
-  drawAnomalyTimeSeries(data)
+  drawAnomalyTimeSeries(timeSeriesData, anomalyData)
 
   /* Handelbars template for funnel table */
   // var result_funnels_template =
@@ -49,7 +56,7 @@ function renderAnomalyTabular(data) {
   // formatMillisToTZ();
 }
 var lineChart;
-function drawAnomalyTimeSeries(ajaxData) {
+function drawAnomalyTimeSeries(ajaxData, anomalyData) {
 
   // Metric(s)
   var metrics = ajaxData["metrics"]
@@ -62,10 +69,18 @@ function drawAnomalyTimeSeries(ajaxData) {
   var colors = {};
   var chartTypes = {};
   var axes = {};
+  var regions = [];
   for (var t = 0, len = ajaxData["timeBuckets"].length; t < len; t++) {
     var timeBucket = ajaxData["timeBuckets"][t]["currentStart"]
+    var currentEnd = ajaxData["timeBuckets"][t]["currentEnd"]
     xTicksBaseline.push(timeBucket)
     xTicksCurrent.push(timeBucket)
+  }
+  for(var i=0;i<anomalyData.length;i++){
+    anomaly = anomalyData[i];
+    anomalyStart = anomaly.startTimeUtc
+    anomalyEnd = anomaly.endTimeUtc
+    regions.push({axis: 'x', start: anomalyStart, end: anomalyEnd, class: 'regionX'})
   }
   lineChartData["time"] = xTicksCurrent;
   barChartData["time"] = xTicksCurrent;
@@ -99,6 +114,8 @@ function drawAnomalyTimeSeries(ajaxData) {
     colors[metrics[i] + "-baseline"] = colorArray[i];
     colors[metrics[i] + "-current"] = colorArray[i];
     colors[metrics[i] + "-delta"] = colorArray[i];
+
+
     // chartTypes[metrics[i] + "-current"] = 'spline';
     // chartTypes[metrics[i] + "-baseline"] = 'spline';
     // chartTypes[metrics[i] + "-delta"] = 'bar';
@@ -126,6 +143,7 @@ function drawAnomalyTimeSeries(ajaxData) {
         type : 'timeseries'
       }
     },
+    regions: regions,
     legend : {
       show : false
     },
@@ -136,6 +154,9 @@ function drawAnomalyTimeSeries(ajaxData) {
       y : {
         show : false
       }
+    }, 
+    point: {
+      show: false
     }
   });
   var barChart = c3.generate({

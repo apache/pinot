@@ -287,7 +287,7 @@ body a{
 
 #display-chart-area{
     margin: 0;
-    min-height: 900px;
+    min-height: 400px;
 }
 
 .loader{
@@ -308,7 +308,7 @@ body a{
 }
 
 .display-chart-section{
-    min-height: 600px;
+    min-height: 300px;
     overflow: scroll;
     padding: 12px;
 }
@@ -656,6 +656,10 @@ body a{
 }
 
 /* Anommalies view related*/
+#anomalies-table{
+    width:100%;
+    border: 1px solid #444;
+}
 
 #anomalies-table .metric-label:hover,
 #anomalies-table .heat-map-cell:hover{
@@ -745,3 +749,6 @@ path {
 [class*=baseline]{
   stroke-dasharray: 5,5;
 }
+
+
+

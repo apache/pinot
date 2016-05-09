@@ -3,6 +3,7 @@
         <table id="anomalies-table" class="uk-table">
             <thead>
             <tr>
+                <th></th>
                 <th class="border-left">Anomaly ID</th>
                 <th class="border-left">Metric</th>
                 <th class="border-left">Start time</th>
@@ -17,6 +18,7 @@
             <tbody class="">
             {{#each this as |anomalyData anomalyIndex|}}
             <tr>
+                <td class="checkbox-cell"><input type="checkbox" value="{{anomalyData/metric}}"  checked="checked"></td>
                 <td class="border-left">{{anomalyData/id}}</td>
                 <td class="metric-label border-left">{{anomalyData/metric}}</td>
                 <td class="border-left">{{millisToDate anomalyData/startTimeUtc}}</td>

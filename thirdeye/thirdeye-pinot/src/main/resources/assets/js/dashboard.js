@@ -81,7 +81,7 @@ $(document).ready( function() {
     var anomalies_section_options = {
         tabName: "anomalies",
         showDashboardSelection: false,
-        showMetricSelection: false,
+        showMetricSelection: true,
         showDimensionSelection: false,
         showFilterSelection: false,
         showTimeSelection: true,
@@ -145,6 +145,10 @@ $(document).ready( function() {
                             }
                         }
                     break;
+                    case "anomalies":
+                      console.log("getAnomalies")
+                      getAnomalies();
+                      break;
                     default://dashboard tab
 
                     getCustomDashboard();
@@ -152,8 +156,7 @@ $(document).ready( function() {
                 }
 
             }else{
-                console.log("getAnomalies")
-                getAnomalies()
+                
             }
         }
     }
