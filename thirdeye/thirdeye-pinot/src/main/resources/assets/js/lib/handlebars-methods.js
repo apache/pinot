@@ -228,6 +228,9 @@ $(document).ready(function() {
     var source_time_series_template =  $("#time-series-template").html();
     HandleBarsTemplates.template_time_series = Handlebars.compile(source_time_series_template);
 
+    var source_metric_time_series_section_anomaly = $("#metric-time-series-section-anomaly-template").html();
+    HandleBarsTemplates.template_metric_time_series_section_anomaly = Handlebars.compile(source_metric_time_series_section_anomaly);
+
     var source_anomalies_template = $("#anomalies-template").html();
     HandleBarsTemplates.template_anomalies = Handlebars.compile(source_anomalies_template);
 })

@@ -1,160 +1,239 @@
 function getAnomalies() {
+  dashboardName = "Default_All_Metrics_Dashboard";
+  baselineStart = moment(parseInt(hash.currentStart)).add(-7, 'days')
+  baselineEnd = moment(parseInt(hash.currentEnd)).add(-7, 'days')
+  aggTimeGranularity = "DAYS";
+  metrics = "guestInvitationsSubmitted";
+  var timeSeriesUrl = "/dashboard/data/tabular?" + window.location.hash.substring(1)  //
+  + "&baselineStart=" + baselineStart + "&baselineEnd=" + baselineEnd + "&dashboard=" + dashboardName  //
+  + "&aggTimeGranularity=" + aggTimeGranularity + "&metrics=" + metrics;
+  var anomaliesUrl = "/anomaly-results/collection/" + hash.dataset;
 
-    //Todo: add the real endpoint
-//    var url = "/api/anomaly-results/collection/thirdeyeAbook"
-//    getData(url).done(function(data) {
-//        renderAnomalies(data);
-//    });
-    var data = [
-        {
-            id: 53,
-            functionId: 1,
-            functionType: "SCAN_STATISTICS",
-            functionProperties: "functionName=abook_scan_target_down;targetPattern=DOWN;complementaryPattern=UP;targetLevel=0.0;complementaryLevel=0.1;seasonal=168;numSimulations=500;minWindowLength=1;bootstrap=false;maxWindowLength=100000;enableSTL=true;pValueThreshold=0.01;monitoringWindow=72",
-            collection: "thirdeyeAbook",
-            startTimeUtc: 1462172400000,
-            endTimeUtc: 1462215600000,
-            dimensions: "*,*,*,*,*,*,*,*,*,*,*",
-            metric: "guestInvitationsSubmitted",
-            score: 0,
-            weight: -0.2681636837740775,
-            properties: "max_likelihood=42.15392904017426;complementary_pattern=UP;target_level=0.0;insert_time=1462233622234;complementary_level=0.1;target_pattern=DOWN",
-            message: null,
-            creationTimeUtc: 1462233622234,
-            filters: null
-        },
-        {
-            id: 54,
-            functionId: 1,
-            functionType: "SCAN_STATISTICS",
-            functionProperties: "functionName=abook_scan_target_down;targetPattern=DOWN;complementaryPattern=UP;targetLevel=0.0;complementaryLevel=0.1;seasonal=168;numSimulations=500;minWindowLength=1;bootstrap=false;maxWindowLength=100000;enableSTL=true;pValueThreshold=0.01;monitoringWindow=72",
-            collection: "thirdeyeAbook",
-            startTimeUtc: 1462287600000,
-            endTimeUtc: 1462287600000,
-            dimensions: "*,*,*,*,*,*,*,*,*,*,*",
-            metric: "guestInvitationsSubmitted",
-            score: 0,
-            weight: -0.8483997471588596,
-            properties: "max_likelihood=30.219873846539485;complementary_pattern=UP;target_level=0.0;insert_time=1462320022157;complementary_level=0.1;target_pattern=DOWN",
-            message: null,
-            creationTimeUtc: 1462320022157,
-            filters: null
-        },
-        {
-            id: 55,
-            functionId: 1,
-            functionType: "SCAN_STATISTICS",
-            functionProperties: "functionName=abook_scan_target_down;targetPattern=DOWN;complementaryPattern=UP;targetLevel=0.0;complementaryLevel=0.1;seasonal=168;numSimulations=500;minWindowLength=1;bootstrap=false;maxWindowLength=100000;enableSTL=true;pValueThreshold=0.01;monitoringWindow=72",
-            collection: "thirdeyeAbook",
-            startTimeUtc: 1462287600000,
-            endTimeUtc: 1462287600000,
-            dimensions: "*,*,*,*,*,*,*,*,*,*,*",
-            metric: "guestInvitationsSubmitted",
-            score: 0,
-            weight: -0.7558306331988652,
-            properties: "max_likelihood=22.232265178853595;complementary_pattern=UP;target_level=0.0;insert_time=1462406422563;complementary_level=0.1;target_pattern=DOWN",
-            message: null,
-            creationTimeUtc: 1462406422563,
-            filters: null
-        },
-        {
-            id: 56,
-            functionId: 1,
-            functionType: "SCAN_STATISTICS",
-            functionProperties: "functionName=abook_scan_target_down;targetPattern=DOWN;complementaryPattern=UP;targetLevel=0.0;complementaryLevel=0.1;seasonal=168;numSimulations=500;minWindowLength=1;bootstrap=false;maxWindowLength=100000;enableSTL=true;pValueThreshold=0.01;monitoringWindow=72",
-            collection: "thirdeyeAbook",
-            startTimeUtc: 1462287600000,
-            endTimeUtc: 1462287600000,
-            dimensions: "*,*,*,*,*,*,*,*,*,*,*",
-            metric: "guestInvitationsSubmitted",
-            score: 0,
-            weight: -0.7490763196026473,
-            properties: "max_likelihood=21.393158898360525;complementary_pattern=UP;target_level=0.0;insert_time=1462492823389;complementary_level=0.1;target_pattern=DOWN",
-            message: null,
-            creationTimeUtc: 1462492823389,
-            filters: null
-        },
-        {
-            id: 57,
-            functionId: 2,
-            functionType: "SCAN_STATISTICS",
-            functionProperties: "functionName=abook_scan_complementary_up;targetPattern=UP;complementaryPattern=DOWN;targetLevel=0.1;complementaryLevel=0.0;seasonal=168;numSimulations=500;minWindowLength=1;bootstrap=false;maxWindowLength=100000;enableSTL=true;pValueThreshold=0.01;monitoringWindow=72",
-            collection: "thirdeyeAbook",
-            startTimeUtc: 1462237200000,
-            endTimeUtc: 1462284000000,
-            dimensions: "*,*,*,*,*,*,*,*,*,*,*",
-            metric: "guestInvitationsSubmitted",
-            score: 0.006,
-            weight: 0.13456578903297278,
-            properties: "max_likelihood=7.555141976430605;complementary_pattern=DOWN;target_level=0.1;insert_time=1462492823390;complementary_level=0.0;target_pattern=UP",
-            message: null,
-            creationTimeUtc: 1462492823390,
-            filters: null
-        },
-        {
-            id: 58,
-            functionId: 1,
-            functionType: "SCAN_STATISTICS",
-            functionProperties: "functionName=abook_scan_target_down;targetPattern=DOWN;complementaryPattern=UP;targetLevel=0.0;complementaryLevel=0.1;seasonal=168;numSimulations=500;minWindowLength=1;bootstrap=false;maxWindowLength=100000;enableSTL=true;pValueThreshold=0.01;monitoringWindow=72",
-            collection: "thirdeyeAbook",
-            startTimeUtc: 1462449600000,
-            endTimeUtc: 1462564800000,
-            dimensions: "*,*,*,*,*,*,*,*,*,*,*",
-            metric: "guestInvitationsSubmitted",
-            score: 0.002,
-            weight: -0.07167628495693656,
-            properties: "max_likelihood=8.993432234457941;complementary_pattern=UP;target_level=0.0;insert_time=1462579224697;complementary_level=0.1;target_pattern=DOWN",
-            message: "Severity: -0.072, score: 0.002",
-            creationTimeUtc: 1462579224697,
-            filters: null
-        },
-        {
-            id: 59,
-            functionId: 1,
-            functionType: "SCAN_STATISTICS",
-            functionProperties: "functionName=abook_scan_target_down;targetPattern=DOWN;complementaryPattern=UP;targetLevel=0.0;complementaryLevel=0.1;seasonal=168;numSimulations=500;minWindowLength=1;bootstrap=false;maxWindowLength=100000;enableSTL=true;pValueThreshold=0.01;monitoringWindow=72",
-            collection: "thirdeyeAbook",
-            startTimeUtc: 1462449600000,
-            endTimeUtc: 1462474800000,
-            dimensions: "*,*,*,*,*,*,*,*,*,*,*",
-            metric: "guestInvitationsSubmitted",
-            score: 0.002,
-            weight: -0.13348671417334246,
-            properties: "max_likelihood=9.689816953246918;complementary_pattern=UP;target_level=0.0;insert_time=1462665623686;complementary_level=0.1;target_pattern=DOWN",
-            message: "Severity: -0.133, score: 0.002",
-            creationTimeUtc: 1462665623686,
-            filters: null
-        },
-        {
-            id: 60,
-            functionId: 1,
-            functionType: "SCAN_STATISTICS",
-            functionProperties: "functionName=abook_scan_target_down;targetPattern=DOWN;complementaryPattern=UP;targetLevel=0.0;complementaryLevel=0.1;seasonal=168;numSimulations=500;minWindowLength=1;bootstrap=false;maxWindowLength=100000;enableSTL=true;pValueThreshold=0.01;monitoringWindow=72",
-            collection: "thirdeyeAbook",
-            startTimeUtc: 1462626000000,
-            endTimeUtc: 1462737600000,
-            dimensions: "*,*,*,*,*,*,*,*,*,*,*",
-            metric: "guestInvitationsSubmitted",
-            score: 0,
-            weight: -0.07062230128944169,
-            properties: "max_likelihood=10.956304526792337;complementary_pattern=UP;target_level=0.0;insert_time=1462752020417;complementary_level=0.1;target_pattern=DOWN",
-            message: "Severity: -0.071, score: 0.000",
-            creationTimeUtc: 1462752020417,
-            filters: null
-        }
-    ]
+  getData(timeSeriesUrl).done(function(data) {
+    renderAnomalyTabular(data);
+    getData(anomaliesUrl).done(function(data) {
+      renderAnomalies(data);
+    });
+  });
 
-    renderAnomalies(data);
+  // Todo: add the real endpoint
+
 };
 
 function renderAnomalies(data) {
 
+  console.log("anomalies data")
+  console.log(data)
+  $("#"+  hash.view  +"-display-table-section").empty();
 
-    console.log("anomalies data")
-    console.log(data)
+  /* Handelbars template for funnel table */
+  var result_anomalies_template = HandleBarsTemplates.template_anomalies(data);
+  $("#" + hash.view + "-display-table-section").append(result_anomalies_template);
 
-    /* Handelbars template for funnel table */
-    var result_anomalies_template = HandleBarsTemplates.template_anomalies(data);
-    $("#"+ hash.view +"-display-chart-section").append(result_anomalies_template);
+}
+
+function renderAnomalyTabular(data) {
+  $("#"+  hash.view  +"-display-chart-section").empty();
+  /* Handelbars template for time series legend */
+  var result_metric_time_series_section = HandleBarsTemplates.template_metric_time_series_section_anomaly(data);
+  $("#" + hash.view + "-display-chart-section").append(result_metric_time_series_section);
+
+  drawAnomalyTimeSeries(data)
+
+  /* Handelbars template for funnel table */
+  // var result_funnels_template =
+  // HandleBarsTemplates.template_funnels_table(data);
+  // $("#" + hash.view +
+  // "-display-chart-section").append(result_funnels_template);
+  // calcHeatMapBG("tabular");
+  // formatMillisToTZ();
+}
+var lineChart;
+function drawAnomalyTimeSeries(ajaxData) {
+
+  // Metric(s)
+  var metrics = ajaxData["metrics"]
+  var lineChartData = {};
+  var barChartData = {};
+  var dateTimeformat = (hash.hasOwnProperty("aggTimeGranularity") && hash.aggTimeGranularity.toLowerCase().indexOf("days") > -1) ? "MM-DD" : "h a";
+  var xTickFormat = dateTimeformat;
+  var xTicksBaseline = [];
+  var xTicksCurrent = [];
+  var colors = {};
+  var chartTypes = {};
+  var axes = {};
+  for (var t = 0, len = ajaxData["timeBuckets"].length; t < len; t++) {
+    var timeBucket = ajaxData["timeBuckets"][t]["currentStart"]
+    xTicksBaseline.push(timeBucket)
+    xTicksCurrent.push(timeBucket)
+  }
+  lineChartData["time"] = xTicksCurrent;
+  barChartData["time"] = xTicksCurrent;
+  var colorArray;
+  if (metrics.length < 10) {
+    colorArray = d3.scale.category10().range();
+  } else if (metrics.length < 20) {
+    colorArray = d3.scale.category20().range();
+  } else {
+    colorArray = [];
+    for (i = 0, len = metrics.length; i < len; i++) {
+      colorArray.push(colorByName(metrics[i]));
+    }
+  }
+
+  for (var i = 0, mlen = metrics.length; i < mlen; i++) {
+    var metricBaselineData = [];
+    var metricCurrentData = [];
+    var deltaPercentageData = [];
+    for (var t = 0, len = ajaxData["timeBuckets"].length; t < len; t++) {
+      var baselineValue = ajaxData["data"][metrics[i]]["responseData"][t][0];
+      var currentValue = ajaxData["data"][metrics[i]]["responseData"][t][1];
+      var deltaPercentage = parseInt(ajaxData["data"][metrics[i]]["responseData"][t][2] * 100);
+      metricBaselineData.push(baselineValue);
+      metricCurrentData.push(currentValue);
+      deltaPercentageData.push(deltaPercentage);
+    }
+    lineChartData[metrics[i] + "-baseline"] = metricBaselineData;
+    lineChartData[metrics[i] + "-current"] = metricCurrentData;
+    barChartData[metrics[i] + "-delta"] = deltaPercentageData;
+    colors[metrics[i] + "-baseline"] = colorArray[i];
+    colors[metrics[i] + "-current"] = colorArray[i];
+    colors[metrics[i] + "-delta"] = colorArray[i];
+    // chartTypes[metrics[i] + "-current"] = 'spline';
+    // chartTypes[metrics[i] + "-baseline"] = 'spline';
+    // chartTypes[metrics[i] + "-delta"] = 'bar';
+    // axes[metrics[i] + "-current"] = 'y';
+    // axes[metrics[i] + "-baseline"] = 'y';
+    // axes[metrics[i] + "-delta"] = 'y2';
+  }
+
+  lineChart = c3.generate({
+    bindto : '#anomaly-linechart-placeholder',
+    padding : {
+      top : 0,
+      right : 100,
+      bottom : 0,
+      left : 100
+    },
+    data : {
+      x : 'time',
+      json : lineChartData,
+      type : 'spline',
+      colors : colors
+    },
+    axis : {
+      x : {
+        type : 'timeseries'
+      }
+    },
+    legend : {
+      show : false
+    },
+    grid : {
+      x : {
+        show : false
+      },
+      y : {
+        show : false
+      }
+    }
+  });
+  var barChart = c3.generate({
+
+    bindto : '#anomaly-barchart-placeholder',
+    padding : {
+      top : 0,
+      right : 100,
+      bottom : 0,
+      left : 100
+    },
+    data : {
+      x : 'time',
+      json : barChartData,
+      type : 'spline',
+      colors : colors,
+    },
+    axis : {
+      x : {
+        label : {
+          text : "Time"
+        },
+        type : 'timeseries'
+      },
+      y : {
+        label : {
+          text : "% change",
+          position : 'outer-middle'
+        }
+      }
+    },
+    legend : {
+      show : false
+    },
+    grid : {
+      x : {
+
+      },
+      y : {
+        lines : [ {
+          value : 0
+        } ]
+      }
+    },
+    bar : {
+      width : {
+        ratio : .5
+      }
+    }
+  });
+
+  ids = [];
+  for (var i = 0; i < metrics.length; i++) {
+    ids.push(i);
+  }
+
+  lineChart.hide();
+  barChart.hide();
+  // Clicking the checkbox of the timeseries legend will redraw the timeseries
+  // with the selected elements
+  $("#metric-time-series-legend").on("click", '.time-series-metric-checkbox', function() {
+    var checkbox = this;
+    var checkboxObj = $(checkbox);
+    metricName = checkboxObj.val();
+    if (checkboxObj.is(':checked')) {
+
+      lineChart.show(metricName + "-current");
+      lineChart.show(metricName + "-baseline");
+      barChart.show(metricName + "-delta");
+    } else {
+      lineChart.hide(metricName + "-current");
+      lineChart.hide(metricName + "-baseline");
+      barChart.hide(metricName + "-delta");
+    }
+  });
+
+  // Select all / deselect all metrics option
+  $("#main-view").on("click", ".time-series-metric-select-all-checkbox", function() {
+
+    // if select all is checked
+    if ($(this).is(':checked')) {
+      // trigger click on each unchecked checkbox
+      $(".time-series-metric-checkbox").each(function(index, checkbox) {
+        if (!$(checkbox).is(':checked')) {
+          $(checkbox).click();
+        }
+      })
+    } else {
+      // trigger click on each checked checkbox
+      $(".time-series-metric-checkbox").each(function(index, checkbox) {
+        if ($(checkbox).is(':checked')) {
+          $(checkbox).click();
+        }
+      })
+    }
+  });
+
+  // Preselect first metric
+  $($(".time-series-metric-checkbox")[0]).click();
 
 }

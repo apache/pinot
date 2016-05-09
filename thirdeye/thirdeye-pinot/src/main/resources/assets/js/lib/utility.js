@@ -24,7 +24,9 @@ function getData(url){
         beforeSend: showLoader()
     }).always(function(){
       hideLoader();
-      $("#"+  hash.view  +"-display-chart-section").empty();
+      if(hash.view != "anomalies"){
+        $("#"+  hash.view  +"-display-chart-section").empty();
+      }
     })
 }
 

@@ -168,13 +168,13 @@ $("#main-view").on("click",".form-submit-btn",function(){
     }
 
     errorAlert.hide()
-
-    console.log("hash before submit")
-    console.log(hash)
+    if(hash.view == "anomalies"){
+      hash.rand = (Math.random() + "").substring(3,6);
+    }
     //window.location.hash change triggers window.onhashchange event
     // that contains the ajax requests
     window.location.hash = encodeHashParameters(hash);
 
     //Disable form submit
-    $("#" + hash.view + "-form-submit").prop("disabled", true);
+    //$("#" + hash.view + "-form-submit").prop("disabled", true);
 });
