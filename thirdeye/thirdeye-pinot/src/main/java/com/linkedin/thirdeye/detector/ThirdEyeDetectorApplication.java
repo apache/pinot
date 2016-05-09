@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.detector;
 
-import java.io.File;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -20,23 +19,11 @@ import org.slf4j.LoggerFactory;
 import com.linkedin.thirdeye.client.QueryCache;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.client.comparison.TimeOnTimeComparisonHandler;
-import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClient;
-import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClientConfig;
 import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClientFactory;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesHandler;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesResponseConverter;
-import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
-import com.linkedin.thirdeye.dashboard.ThirdEyeDashboardApplication;
-import com.linkedin.thirdeye.detector.api.AnomalyFunctionRelation;
+import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
 import com.linkedin.thirdeye.detector.api.AnomalyFunctionSpec;
-import com.linkedin.thirdeye.detector.api.AnomalyResult;
-import com.linkedin.thirdeye.detector.api.ContextualEvent;
-import com.linkedin.thirdeye.detector.api.EmailConfiguration;
-import com.linkedin.thirdeye.detector.db.AnomalyFunctionRelationDAO;
-import com.linkedin.thirdeye.detector.db.AnomalyFunctionSpecDAO;
-import com.linkedin.thirdeye.detector.db.AnomalyResultDAO;
-import com.linkedin.thirdeye.detector.db.ContextualEventDAO;
-import com.linkedin.thirdeye.detector.db.EmailConfigurationDAO;
 import com.linkedin.thirdeye.detector.db.HibernateSessionWrapper;
 import com.linkedin.thirdeye.detector.driver.AnomalyDetectionJobManager;
 import com.linkedin.thirdeye.detector.email.EmailReportJobManager;
@@ -50,10 +37,8 @@ import com.linkedin.thirdeye.detector.resources.EmailReportResource;
 import com.linkedin.thirdeye.detector.resources.MetricsGraphicsTimeSeriesResource;
 import com.linkedin.thirdeye.detector.task.EmailReportJobManagerTask;
 
-import io.dropwizard.Application;
 import io.dropwizard.assets.AssetsBundle;
 import io.dropwizard.db.DataSourceFactory;
-import io.dropwizard.hibernate.HibernateBundle;
 import io.dropwizard.jetty.ConnectorFactory;
 import io.dropwizard.jetty.HttpConnectorFactory;
 import io.dropwizard.lifecycle.Managed;
@@ -65,19 +50,8 @@ import io.dropwizard.server.SimpleServerFactory;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
 
-public class ThirdEyeDetectorApplication extends Application<ThirdEyeDetectorConfiguration> {
+public class ThirdEyeDetectorApplication extends BaseThirdEyeApplication<ThirdEyeDetectorConfiguration> {
   private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeDetectorApplication.class);
-
-  private final HibernateBundle<ThirdEyeDetectorConfiguration> hibernate =
-      new HibernateBundle<ThirdEyeDetectorConfiguration>(AnomalyFunctionSpec.class,
-          AnomalyFunctionRelation.class, AnomalyResult.class, ContextualEvent.class,
-          EmailConfiguration.class) {
-        @Override
-        public DataSourceFactory getDataSourceFactory(ThirdEyeDetectorConfiguration config) {
-          return config.getDatabase();
-        }
-      };
-
   public static void main(final String[] args) throws Exception {
     String thirdEyeConfigDir = args[0];
     System.setProperty("dw.rootDir", thirdEyeConfigDir);
@@ -99,7 +73,7 @@ public class ThirdEyeDetectorApplication extends Application<ThirdEyeDetectorCon
       }
     });
 
-    bootstrap.addBundle(hibernate);
+    bootstrap.addBundle(hibernateBundle);
 
     bootstrap.addBundle(new AssetsBundle("/assets/", "/", "index.html"));
   }
@@ -108,16 +82,7 @@ public class ThirdEyeDetectorApplication extends Application<ThirdEyeDetectorCon
   public void run(final ThirdEyeDetectorConfiguration config, final Environment environment)
       throws Exception {
     // DAO
-    final AnomalyFunctionSpecDAO anomalyFunctionSpecDAO =
-        new AnomalyFunctionSpecDAO(hibernate.getSessionFactory());
-    final AnomalyResultDAO anomalyResultDAO = new AnomalyResultDAO(hibernate.getSessionFactory());
-    final ContextualEventDAO contextualEventDAO =
-        new ContextualEventDAO(hibernate.getSessionFactory());
-    final EmailConfigurationDAO emailConfigurationDAO =
-        new EmailConfigurationDAO(hibernate.getSessionFactory());
-    final AnomalyFunctionRelationDAO anomalyFunctionRelationDAO =
-        new AnomalyFunctionRelationDAO(hibernate.getSessionFactory());
-
+    super.initDetectorRelatedDAO();
     LOG.info("Loading configs from: {}", config.getRootDir());
     final ThirdEyeClient thirdEyeClient = PinotThirdEyeClientFactory.createThirdEyeClient(config);
     QueryCache queryCache = new QueryCache(thirdEyeClient, Executors.newFixedThreadPool(10));
@@ -161,14 +126,14 @@ public class ThirdEyeDetectorApplication extends Application<ThirdEyeDetectorCon
     // ThirdEye driver
     final AnomalyDetectionJobManager jobManager = new AnomalyDetectionJobManager(quartzScheduler,
         timeSeriesHandler, timeSeriesResponseConverter, anomalyFunctionSpecDAO,
-        anomalyFunctionRelationDAO, anomalyResultDAO, hibernate.getSessionFactory(),
+        anomalyFunctionRelationDAO, anomalyResultDAO, hibernateBundle.getSessionFactory(),
         environment.metrics(), anomalyFunctionFactory);
 
     // Start all active jobs on startup
     environment.lifecycle().manage(new Managed() {
       @Override
       public void start() throws Exception {
-        new HibernateSessionWrapper<Void>(hibernate.getSessionFactory())
+        new HibernateSessionWrapper<Void>(hibernateBundle.getSessionFactory())
             .execute(new Callable<Void>() {
               @Override
               public Void call() throws Exception {
@@ -212,7 +177,7 @@ public class ThirdEyeDetectorApplication extends Application<ThirdEyeDetectorCon
 
     final EmailReportJobManager emailReportJobManager =
         new EmailReportJobManager(quartzScheduler, emailConfigurationDAO, anomalyResultDAO,
-            hibernate.getSessionFactory(), applicationPort, timeOnTimeComparisonHandler);
+            hibernateBundle.getSessionFactory(), applicationPort, timeOnTimeComparisonHandler);
 
     environment.lifecycle().addServerLifecycleListener(new ServerLifecycleListener() {
       @Override
@@ -242,7 +207,7 @@ public class ThirdEyeDetectorApplication extends Application<ThirdEyeDetectorCon
 
         // Start the email report job manager once we know the application port
         try {
-          new HibernateSessionWrapper<Void>(hibernate.getSessionFactory())
+          new HibernateSessionWrapper<Void>(hibernateBundle.getSessionFactory())
               .execute(new Callable<Void>() {
                 @Override
                 public Void call() throws Exception {
@@ -271,7 +236,7 @@ public class ThirdEyeDetectorApplication extends Application<ThirdEyeDetectorCon
 
     // Tasks
     environment.admin().addTask(
-        new EmailReportJobManagerTask(emailReportJobManager, hibernate.getSessionFactory()));
+        new EmailReportJobManagerTask(emailReportJobManager, hibernateBundle.getSessionFactory()));
   }
 
   public static int getApplicationPortNumber(ThirdEyeDetectorConfiguration config) {

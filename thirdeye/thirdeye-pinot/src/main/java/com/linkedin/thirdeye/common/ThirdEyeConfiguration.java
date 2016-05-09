@@ -1,6 +1,12 @@
 package com.linkedin.thirdeye.common;
 
+import javax.validation.Valid;
+import javax.validation.constraints.NotNull;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import io.dropwizard.Configuration;
+import io.dropwizard.db.DataSourceFactory;
 
 public abstract class ThirdEyeConfiguration extends Configuration {
   /**
@@ -20,10 +26,18 @@ public abstract class ThirdEyeConfiguration extends Configuration {
    */
   private String configStoreType = "FILE";
 
+  @Valid
+  @NotNull
+  private final DataSourceFactory database = new DataSourceFactory();
+  
   public ThirdEyeConfiguration() {
 
   }
 
+  @JsonProperty("database")
+  public DataSourceFactory getDatabase() {
+    return database;
+  }
   public String getRootDir() {
     return rootDir;
   }
