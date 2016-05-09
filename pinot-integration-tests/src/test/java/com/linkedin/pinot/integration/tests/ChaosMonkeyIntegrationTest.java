@@ -155,12 +155,12 @@ public class ChaosMonkeyIntegrationTest {
     return connection.execute("select count(*) from myTable").getResultSet(0).getInt(0);
   }
 
-  @Test
+  @Test(enabled = false)
   public void testShortZookeeperFreeze() throws Exception {
     testFreezeZookeeper(10000L);
   }
 
-  @Test
+  @Test(enabled = false)
   public void testLongZookeeperFreeze() throws Exception {
     testFreezeZookeeper(60000L);
   }
