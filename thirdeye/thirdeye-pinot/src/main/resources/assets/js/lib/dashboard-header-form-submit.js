@@ -16,42 +16,43 @@ $("#main-view").on("click",".form-submit-btn",function(){
         hash.dateset= selectedDateset;
     }
 
-    //update hash.dashboard
-    if(currentTab == "dashboard"){
-       hash.dashboard = $("#selected-dashboard").attr("value");
-    }
+        //update hash.dashboard
+        delete hash.dashboard
+        if (currentTab == "dashboard") {
+            hash.dashboard = $("#selected-dashboard").attr("value");
+        }
 
-    //update hash.metrics
-    delete hash.metrics
-    var selectedMetrics = $(".view-metric-selector[rel='"+ currentTab +"'] .added-item");
+        //update hash.metrics
+        delete hash.metrics
+        var selectedMetrics = $(".view-metric-selector[rel='" + currentTab + "'] .added-item");
 
-    var numSelectedMetrics = selectedMetrics.length;
-    var metricAry = [];
-    for(var i = 0; i<numSelectedMetrics ;i++){
-        metricAry.push( selectedMetrics[i].getAttribute("value"));
-    }
-    if(numSelectedMetrics > 0) {
-        hash.metrics = metricAry.toString();
-    }
+        var numSelectedMetrics = selectedMetrics.length;
+        var metricAry = [];
+        for (var i = 0; i < numSelectedMetrics; i++) {
+            metricAry.push(selectedMetrics[i].getAttribute("value"));
+        }
+        if (numSelectedMetrics > 0) {
+            hash.metrics = metricAry.toString();
+        }
 
-    //update hash.dimensions
-    delete  hash.dimensions
-    var selectedDimensions = $(".view-dimension-selector[rel='"+ currentTab +"'] .added-item");
-    var numSelectedDimensions = selectedDimensions.length;
-    var dimensionAry = [];
-    for(var i = 0; i<numSelectedDimensions ;i++){
-        dimensionAry.push(selectedDimensions[i].getAttribute("value"));
-    }
-    if(numSelectedDimensions > 0){
-        hash.dimensions = dimensionAry.toString();
-    }
-    hash.compareMode = $(".compare-mode[rel='"+ currentTab +"']").html().trim();
+        //update hash.dimensions
+        delete  hash.dimensions
+        var selectedDimensions = $(".view-dimension-selector[rel='" + currentTab + "'] .added-item");
+        var numSelectedDimensions = selectedDimensions.length;
+        var dimensionAry = [];
+        for (var i = 0; i < numSelectedDimensions; i++) {
+            dimensionAry.push(selectedDimensions[i].getAttribute("value"));
+        }
+        if (numSelectedDimensions > 0) {
+            hash.dimensions = dimensionAry.toString();
+        }
+        hash.compareMode = $(".compare-mode[rel='" + currentTab + "']").html().trim();
 
 
-    //update hash.filters
-    delete  hash.filters
-    var filters = readFiltersAppliedInCurrentView(currentTab);
-    hash.filters = encodeURIComponent(JSON.stringify(filters));
+        //update hash.filters
+        delete  hash.filters
+        var filters = readFiltersAppliedInCurrentView(currentTab);
+        hash.filters = encodeURIComponent(JSON.stringify(filters));
 
 
 
@@ -91,10 +92,14 @@ $("#main-view").on("click",".form-submit-btn",function(){
 
     //Todo: support timezone selection
 
-    // Aggregate
-    //var aggregateSize = 1;
-    var aggregateUnit = $(".baseline-aggregate.uk-active[rel='"+ currentTab +"']").attr("unit");
-    hash.aggTimeGranularity = aggregateUnit;
+
+    //If the form has aggregate selector
+    if( $(".baseline-aggregate[rel='"+ currentTab +"']").length > 0 ) {
+        // Aggregate
+        //var aggregateSize = 1;
+        var aggregateUnit = $(".baseline-aggregate.uk-active[rel='" + currentTab + "']").attr("unit");
+        hash.aggTimeGranularity = aggregateUnit;
+    }
 
     // DateTimes
     var currentStartDate = $(".current-start-date[rel='"+ currentTab +"']").text();
@@ -127,14 +132,9 @@ $("#main-view").on("click",".form-submit-btn",function(){
 
     //Check if baseline date range is present unless the viewtype is timeseries
     switch(hash.view) {
+        case "anomalies":
         case "timeseries":
-            //remove the baseline date range
-            $(".baseline-start-date[rel='"+ currentTab +"']").text("");
-            $(".baseline-end-time[rel='"+ currentTab +"']").text("");
-            $(".baseline-start-date[rel='"+ currentTab +"']").text("");
-            $(".baseline-end-time[rel='"+ currentTab +"']").text("");
-            $(".comparison-display[rel='"+ currentTab +"']").hide();
-            break;
+        break;
         case "compare":
         default: //when dashboard
             if($(".baseline-start-date[rel='"+ currentTab +"']").text().length == 0 || $(".baseline-end-date[rel='"+ currentTab +"']").text().length == 0){
@@ -169,6 +169,8 @@ $("#main-view").on("click",".form-submit-btn",function(){
 
     errorAlert.hide()
 
+    console.log("hash before submit")
+    console.log(hash)
     //window.location.hash change triggers window.onhashchange event
     // that contains the ajax requests
     window.location.hash = encodeHashParameters(hash);

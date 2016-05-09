@@ -133,6 +133,21 @@ $(document).ready(function() {
         return moment(date).tz(tz).format('YYYY-MM-DD h a z');
     });
 
+    //takes utc timestamp (milliseconds ie. 1462626000000), returns date and time in users tz
+    Handlebars.registerHelper('millisToDate', function(millis) {
+
+        millis = parseInt(millis)
+        var tz = getTimeZone();
+        return moment(millis).tz(tz).format('YYYY-MM-DD h a z');
+    });
+
+    Handlebars.registerHelper('parse', function(str, prop) {
+        str = str.replace("/;/g", ',');
+        console.log("str", str)
+        var obj = JSON.parse(str)
+        return obj[prop];
+    });
+
     /* Add details-cell or heatmap-cell class to cells */
     Handlebars.registerHelper('classify', function (index) {
         if ((index + 1) % 3 == 0) {
@@ -212,4 +227,7 @@ $(document).ready(function() {
     
     var source_time_series_template =  $("#time-series-template").html();
     HandleBarsTemplates.template_time_series = Handlebars.compile(source_time_series_template);
+
+    var source_anomalies_template = $("#anomalies-template").html();
+    HandleBarsTemplates.template_anomalies = Handlebars.compile(source_anomalies_template);
 })

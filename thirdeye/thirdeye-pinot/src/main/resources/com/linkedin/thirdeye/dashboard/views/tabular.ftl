@@ -27,7 +27,7 @@
                 <tr>
                     <th class="border-left">Time</th>
                     {{#each timeBuckets as |timeBucket timeBucketIndex|}}
-                    <th class="table-time-cell border-left" currentStartUTC="{{timeBucket.currentStart}}" colspan="1">this</th>
+                    <th class="table-time-cell border-left" currentStartUTC="{{timeBucket.currentStart}}" colspan="1"></th>
                     {{/each}}
                 </tr>
                 <!-- Subheader -->

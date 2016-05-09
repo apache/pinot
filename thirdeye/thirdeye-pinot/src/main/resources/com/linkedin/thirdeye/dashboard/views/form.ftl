@@ -165,6 +165,7 @@
                 </div>
             </div>
             <p class="compare-mode uk-form-row hidden" rel="{{tabName}}" ></p>
+            {{#if showGranularity}}
             <div class="uk-form-row">
                 <label class="uk-form-label">
                     Granularity
@@ -177,6 +178,8 @@
                     {{/if}}
                 </div>
             </div>
+            {{/if}}
+
             <div id="{{tabName}}-time-input-form-error" class="time-input-form-error uk-alert uk-alert-danger uk-form-row hidden">
                 <p></p>
             </div>

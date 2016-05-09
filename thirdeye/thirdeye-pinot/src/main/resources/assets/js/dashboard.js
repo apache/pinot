@@ -39,6 +39,7 @@ $(document).ready( function() {
         showDimensionSelection: false,
         showFilterSelection: false,
         showTimeSelection: true,
+        showGranularity: true,
         showAggregateAllGranularity: false,
         needComparisonTimeRange: true
     } 
@@ -53,6 +54,7 @@ $(document).ready( function() {
         showDimensionSelection: true,
         showFilterSelection: true,
         showTimeSelection: true,
+        showGranularity: true,
         showAggregateAllGranularity: true,
         needComparisonTimeRange: true
     } 
@@ -67,6 +69,7 @@ $(document).ready( function() {
         showDimensionSelection: true,
         showFilterSelection: true,
         showTimeSelection: true,
+        showGranularity: true,
         showAggregateAllGranularity: false,
         needComparisonTimeRange: false
     }
@@ -78,12 +81,13 @@ $(document).ready( function() {
     var anomalies_section_options = {
         tabName: "anomalies",
         showDashboardSelection: false,
-        showMetricSelection: true,
-        showDimensionSelection: true,
-        showFilterSelection: true,
+        showMetricSelection: false,
+        showDimensionSelection: false,
+        showFilterSelection: false,
         showTimeSelection: true,
-        showAggregateAllGranularity: true,
-        needComparisonTimeRange: true
+        showGranularity: false,
+        showAggregateAllGranularity: false,
+        needComparisonTimeRange: false
     }
 
     var result_form_template = HandleBarsTemplates.template_form(anomalies_section_options)
@@ -120,42 +124,36 @@ $(document).ready( function() {
         //If hash has dataset and (dashboard or (view & metric )trigger form submit
         if( hash.hasOwnProperty("dataset")){
 
-            if( hash.hasOwnProperty("dashboard") || hash.hasOwnProperty("metrics") ){
 
+            if( hash.hasOwnProperty("dashboard") || hash.hasOwnProperty("metrics") ){
+                console.log("hash changed")
                 switch (hash.view) {
-                    case "d3heatmap":
-                        getD3heatmap();
-                    break;
                     case "timeseries":
 
                         getTimeSeries();
                         break;
                     case "compare":
-
                         if (hash.aggTimeGranularity.toLowerCase() == "aggregateall") {
-
                             getHeatmap();
                             //else aggTimeGranularity == HOURS or DAY
                         } else if (hash.hasOwnProperty("metrics")) {
 
                             if (hash.hasOwnProperty("dimensions")) {
-
                                 getContributors();
                             } else {
                                 getTabular();
                             }
                         }
                     break;
-                    case "anomalies":
-
-                        getAnomalies()
-                        break;
                     default://dashboard tab
 
                     getCustomDashboard();
                     break;
                 }
 
+            }else{
+                console.log("getAnomalies")
+                getAnomalies()
             }
         }
     }

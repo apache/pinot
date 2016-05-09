@@ -35,6 +35,7 @@
     <#include "heat-map.ftl">
     <#include "contributors.ftl">
     <#include "timeseries.ftl">
+    <#include "anomalies.ftl">
 
 
 </body>

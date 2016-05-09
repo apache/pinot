@@ -655,6 +655,31 @@ body a{
    max-height: 350px;
 }
 
+/* Anommalies view related*/
+
+#anomalies-table .metric-label:hover,
+#anomalies-table .heat-map-cell:hover{
+    cursor : pointer;
+    text-decoration: underline;
+}
+
+#anomalies-table thead{
+    border-top: 1px solid #666;
+}
+
+#anomalies-table td,
+#anomalies-table th{
+    line-height: 8px;
+    font-size: 10px;
+    padding: 6px;
+    font-family: Arial, sans-serif;
+    color: #000;
+    vertical-align: middle;
+    text-align: center;
+    border-bottom: 1px solid #666;
+
+}
+
 
 /* D3 START*/
 path { 
