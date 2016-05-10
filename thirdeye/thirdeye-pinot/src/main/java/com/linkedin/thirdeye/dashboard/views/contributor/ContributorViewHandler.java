@@ -79,16 +79,13 @@ public class ContributorViewHandler
       dimensionsToGroupBy = Lists.newArrayList(allDimensions.get(0));
     }
     List<MetricExpression> metricExpressions = request.getMetricExpressions();
-    List<MetricFunction> metricFunctions =
-        Utils.computeMetricFunctionsFromExpressions(metricExpressions);
-
     comparisonRequest.setCollectionName(collection);
     comparisonRequest.setBaselineStart(baselineStart);
     comparisonRequest.setBaselineEnd(baselineEnd);
     comparisonRequest.setCurrentStart(currentStart);
     comparisonRequest.setCurrentEnd(currentEnd);
     comparisonRequest.setFilterSet(filters);
-    comparisonRequest.setMetricFunctions(metricFunctions);
+    comparisonRequest.setMetricExpressions(metricExpressions);
     comparisonRequest.setAggregationTimeGranularity(request.getTimeGranularity());
     comparisonRequest.setGroupByDimensions(dimensionsToGroupBy);
     return comparisonRequest;

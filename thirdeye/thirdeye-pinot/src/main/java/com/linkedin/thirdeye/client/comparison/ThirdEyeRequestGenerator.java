@@ -6,8 +6,10 @@ import java.util.List;
 import org.joda.time.DateTime;
 
 import com.linkedin.thirdeye.api.TimeGranularity;
+import com.linkedin.thirdeye.client.MetricFunction;
 import com.linkedin.thirdeye.client.ThirdEyeRequest;
 import com.linkedin.thirdeye.client.ThirdEyeRequest.ThirdEyeRequestBuilder;
+import com.linkedin.thirdeye.dashboard.Utils;
 
 import static com.linkedin.thirdeye.client.comparison.TimeOnTimeConstants.*;
 
@@ -58,7 +60,10 @@ public class ThirdEyeRequestGenerator {
     requestBuilder.setCollection(comparisonRequest.getCollectionName());
     requestBuilder.setFilterSet(comparisonRequest.getFilterSet());
     requestBuilder.setFilterClause(comparisonRequest.getFilterClause());
-    requestBuilder.setMetricFunctions(comparisonRequest.getMetricFunctions());
+
+    List<MetricFunction> metricFunctionsFromExpressions =
+        Utils.computeMetricFunctionsFromExpressions(comparisonRequest.getMetricExpressions());
+    requestBuilder.setMetricFunctions(metricFunctionsFromExpressions);
 
     // REQUEST to get total value with out break down.
     requestBuilder.setStartTimeInclusive(start);

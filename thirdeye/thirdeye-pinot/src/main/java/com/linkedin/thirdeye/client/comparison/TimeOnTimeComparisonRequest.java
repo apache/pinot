@@ -8,13 +8,14 @@ import org.joda.time.DateTime;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.api.TimeGranularity;
+import com.linkedin.thirdeye.client.MetricExpression;
 import com.linkedin.thirdeye.client.MetricFunction;
 
 public class TimeOnTimeComparisonRequest {
 
   private String collectionName;
 
-  private List<MetricFunction> metricFunctions;
+  private List<MetricExpression> metricExpressions;
 
   private List<String> groupByDimensions;
 
@@ -61,7 +62,7 @@ public class TimeOnTimeComparisonRequest {
       this.aggregationTimeGranularity = new TimeGranularity(
           that.aggregationTimeGranularity.getSize(), that.aggregationTimeGranularity.getUnit());
     }
-    this.metricFunctions = new ArrayList<>(that.metricFunctions);
+    this.metricExpressions = new ArrayList<>(that.metricExpressions);
   }
 
   public TimeOnTimeComparisonRequest() {
@@ -75,14 +76,14 @@ public class TimeOnTimeComparisonRequest {
     this.collectionName = collectionName;
   }
 
-  public List<MetricFunction> getMetricFunctions() {
-    return metricFunctions;
+  public List<MetricExpression> getMetricExpressions() {
+    return metricExpressions;
   }
-
-  public void setMetricFunctions(List<MetricFunction> metricFunctions) {
-    this.metricFunctions = metricFunctions;
+  
+  public void setMetricExpressions(List<MetricExpression> metricExpressions) {
+    this.metricExpressions = metricExpressions;
   }
-
+  
   public List<String> getGroupByDimensions() {
     return groupByDimensions;
   }

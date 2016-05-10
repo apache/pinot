@@ -9,9 +9,11 @@ import org.joda.time.DateTime;
 
 import com.google.common.collect.Lists;
 import com.linkedin.thirdeye.api.TimeGranularity;
+import com.linkedin.thirdeye.client.MetricExpression;
 import com.linkedin.thirdeye.client.MetricFunction;
 import com.linkedin.thirdeye.client.QueryCache;
 import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClient;
+import com.linkedin.thirdeye.dashboard.Utils;
 
 /** Manual test for verifying code works as expected (ie without exceptions thrown) */
 public class TimeOnTimeTest {
@@ -27,9 +29,9 @@ public class TimeOnTimeTest {
     // QueryCache queryCache = new QueryCache(pinotThirdEyeClient, Executors.newCachedThreadPool());
 
     TimeOnTimeComparisonRequest comparisonRequest;
-    // comparisonRequest = generateGroupByTimeRequest();
-    // comparisonRequest = generateGroupByDimensionRequest();
-    comparisonRequest = generateGroupByTimeAndDimension();
+     comparisonRequest = generateGroupByTimeRequest();
+//     comparisonRequest = generateGroupByDimensionRequest();
+//    comparisonRequest = generateGroupByTimeAndDimension();
 
     TimeOnTimeComparisonHandler handler = new TimeOnTimeComparisonHandler(queryCache);
     // long start;
@@ -58,14 +60,16 @@ public class TimeOnTimeTest {
     TimeOnTimeComparisonRequest comparisonRequest = new TimeOnTimeComparisonRequest();
     String collection = "thirdeyeAbook_OFFLINE";
     comparisonRequest.setCollectionName(collection);
-    comparisonRequest.setBaselineStart(new DateTime(2016, 1, 1, 00, 00));
-    comparisonRequest.setBaselineEnd(new DateTime(2016, 1, 2, 00, 00));
+    comparisonRequest.setBaselineStart(new DateTime(2016, 4, 1, 00, 00));
+    comparisonRequest.setBaselineEnd(new DateTime(2016, 4, 2, 00, 00));
 
-    comparisonRequest.setCurrentStart(new DateTime(2016, 1, 8, 00, 00));
-    comparisonRequest.setCurrentEnd(new DateTime(2016, 1, 9, 00, 00));
+    comparisonRequest.setCurrentStart(new DateTime(2016, 4, 8, 00, 00));
+    comparisonRequest.setCurrentEnd(new DateTime(2016, 4, 9, 00, 00));
     List<MetricFunction> metricFunctions = new ArrayList<>();
     metricFunctions.add(new MetricFunction(MetricFunction.SUM, "__COUNT"));
-    comparisonRequest.setMetricFunctions(metricFunctions);
+    List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metricFunctions);
+    metricExpressions.add(new MetricExpression("submit_rate", "submits/impressions"));
+    comparisonRequest.setMetricExpressions(metricExpressions);
     comparisonRequest.setAggregationTimeGranularity(new TimeGranularity(1, TimeUnit.HOURS));
     return comparisonRequest;
   }
@@ -75,17 +79,17 @@ public class TimeOnTimeTest {
     TimeOnTimeComparisonRequest comparisonRequest = new TimeOnTimeComparisonRequest();
     String collection = "thirdeyeAbook_OFFLINE";
     comparisonRequest.setCollectionName(collection);
-    comparisonRequest.setBaselineStart(new DateTime(2016, 1, 1, 00, 00));
-    comparisonRequest.setBaselineEnd(new DateTime(2016, 1, 1, 01, 00));
+    comparisonRequest.setBaselineStart(new DateTime(2016, 4, 1, 00, 00));
+    comparisonRequest.setBaselineEnd(new DateTime(2016, 4, 1, 01, 00));
 
-    comparisonRequest.setCurrentStart(new DateTime(2016, 1, 8, 00, 00));
-    comparisonRequest.setCurrentEnd(new DateTime(2016, 1, 8, 01, 00));
+    comparisonRequest.setCurrentStart(new DateTime(2016, 4, 8, 00, 00));
+    comparisonRequest.setCurrentEnd(new DateTime(2016, 4, 8, 01, 00));
     comparisonRequest.setGroupByDimensions(
         Lists.newArrayList("browserName", "contactsOrigin", "deviceName", "continent",
             "countryCode", "environment", "locale", "osName", "pageKey", "source", "sourceApp"));
     List<MetricFunction> metricFunctions = new ArrayList<>();
     metricFunctions.add(new MetricFunction(MetricFunction.SUM, "__COUNT"));
-    comparisonRequest.setMetricFunctions(metricFunctions);
+    comparisonRequest.setMetricExpressions(Utils.convertToMetricExpressions(metricFunctions));
     comparisonRequest.setAggregationTimeGranularity(null);
     return comparisonRequest;
   }
@@ -95,11 +99,11 @@ public class TimeOnTimeTest {
     TimeOnTimeComparisonRequest comparisonRequest = new TimeOnTimeComparisonRequest();
     String collection = "thirdeyeAbook_OFFLINE";
     comparisonRequest.setCollectionName(collection);
-    comparisonRequest.setBaselineStart(new DateTime(2016, 1, 1, 00, 00));
-    comparisonRequest.setBaselineEnd(new DateTime(2016, 1, 2, 00, 00));
+    comparisonRequest.setBaselineStart(new DateTime(2016, 4, 1, 00, 00));
+    comparisonRequest.setBaselineEnd(new DateTime(2016, 4, 2, 00, 00));
 
-    comparisonRequest.setCurrentStart(new DateTime(2016, 1, 8, 00, 00));
-    comparisonRequest.setCurrentEnd(new DateTime(2016, 1, 9, 00, 00));
+    comparisonRequest.setCurrentStart(new DateTime(2016, 4, 8, 00, 00));
+    comparisonRequest.setCurrentEnd(new DateTime(2016, 4, 9, 00, 00));
     comparisonRequest.setGroupByDimensions(
         Lists.newArrayList("browserName", "contactsOrigin", "deviceName", "continent",
             "countryCode", "environment", "locale", "osName", "pageKey", "source", "sourceApp"));
@@ -107,7 +111,7 @@ public class TimeOnTimeTest {
 
     List<MetricFunction> metricFunctions = new ArrayList<>();
     metricFunctions.add(new MetricFunction(MetricFunction.SUM, "__COUNT"));
-    comparisonRequest.setMetricFunctions(metricFunctions);
+    comparisonRequest.setMetricExpressions(Utils.convertToMetricExpressions(metricFunctions));
     comparisonRequest.setAggregationTimeGranularity(new TimeGranularity(1, TimeUnit.HOURS));
     return comparisonRequest;
   }

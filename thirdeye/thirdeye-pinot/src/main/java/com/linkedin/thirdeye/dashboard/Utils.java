@@ -202,7 +202,7 @@ public class Utils {
       }
       return multimap;
     } catch (IOException e) {
-      LOG.error("Error parsing filter json:{} message:{}",filterJson, e.getMessage());
+      LOG.error("Error parsing filter json:{} message:{}", filterJson, e.getMessage());
     }
     return multimap;
   }
@@ -253,5 +253,14 @@ public class Utils {
       timeGranularity = new TimeGranularity(1, TimeUnit.valueOf(aggTimeGranularity));
     }
     return timeGranularity;
+  }
+
+  public static List<MetricExpression> convertToMetricExpressions(
+      List<MetricFunction> metricFunctions) {
+    List<MetricExpression> metricExpressions = new ArrayList<>();
+    for (MetricFunction function : metricFunctions) {
+      metricExpressions.add(new MetricExpression(function.getMetricName()));
+    }
+    return metricExpressions;
   }
 }

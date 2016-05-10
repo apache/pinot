@@ -58,7 +58,7 @@ public class HeatMapViewHandler implements ViewHandler<HeatMapViewRequest, HeatM
     comparisonRequest.setCurrentEnd(currentEnd);
     comparisonRequest.setGroupByDimensions(dimensionsToGroupBy);
 
-    comparisonRequest.setMetricFunctions(metricFunctions);
+    comparisonRequest.setMetricExpressions(metricExpressions);
     comparisonRequest.setAggregationTimeGranularity(null);
     return comparisonRequest;
   }

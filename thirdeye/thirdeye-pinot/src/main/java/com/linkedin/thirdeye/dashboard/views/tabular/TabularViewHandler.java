@@ -79,7 +79,7 @@ public class TabularViewHandler implements ViewHandler<TabularViewRequest, Tabul
     comparisonRequest.setCurrentStart(currentStart);
     comparisonRequest.setCurrentEnd(currentEnd);
     comparisonRequest.setFilterSet(filters);
-    comparisonRequest.setMetricFunctions(metricFunctions);
+    comparisonRequest.setMetricExpressions(metricExpressions);
     comparisonRequest.setAggregationTimeGranularity(request.getTimeGranularity());
     return comparisonRequest;
   }

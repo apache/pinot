@@ -31,6 +31,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.thirdeye.api.TimeGranularity;
+import com.linkedin.thirdeye.client.MetricExpression;
 import com.linkedin.thirdeye.client.MetricFunction;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.client.comparison.TimeOnTimeComparisonHandler;
@@ -275,15 +276,14 @@ public class EmailReportJob implements Job {
       comparisonRequest.setCurrentStart(start);
       comparisonRequest.setCurrentEnd(end);
 
-      List<MetricFunction> metricFunctions = new ArrayList<>();
-      metricFunctions.add(new MetricFunction(MetricFunction.SUM, config.getMetric())); // TODO avoid
-                                                                                       // hardcoding
-                                                                                       // SUM?
-      comparisonRequest.setMetricFunctions(metricFunctions);
+      List<MetricExpression> metricExpressions = new ArrayList<>();
+      MetricExpression expression = new MetricExpression(config.getMetric());
+      metricExpressions.add(expression);
+      comparisonRequest.setMetricExpressions(metricExpressions);
       comparisonRequest.setAggregationTimeGranularity(bucketGranularity);
-      System.out.println("Starting...");
+      LOG.info("Starting...");
       TimeOnTimeComparisonResponse response = timeOnTimeComparisonHandler.handle(comparisonRequest);
-      System.out.println("Done!");
+      LOG.info("Done!");
       return response;
     } catch (Exception e) {
       throw new JobExecutionException(e);

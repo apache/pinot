@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.client.comparison;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -13,12 +14,14 @@ import org.joda.time.DateTime;
 
 import com.google.common.collect.Range;
 import com.linkedin.thirdeye.api.TimeGranularity;
+import com.linkedin.thirdeye.client.MetricExpression;
 import com.linkedin.thirdeye.client.QueryCache;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.client.ThirdEyeRequest;
 import com.linkedin.thirdeye.client.ThirdEyeRequest.ThirdEyeRequestBuilder;
 import com.linkedin.thirdeye.client.ThirdEyeResponse;
 import com.linkedin.thirdeye.client.TimeRangeUtils;
+import com.linkedin.thirdeye.client.comparison.Row.Metric;
 
 public class TimeOnTimeComparisonHandler {
   private final QueryCache queryCache;
@@ -81,16 +84,48 @@ public class TimeOnTimeComparisonHandler {
         responseMap.put(entry.getKey(), entry.getValue().get(60, TimeUnit.SECONDS));
       }
       if (hasGroupByDimensions) {
-        rows.addAll(TimeOnTimeResponseParser
-            .parseGroupByDimensionResponse(comparisonRequests.get(i), responseMap));
+        List<Row> rowList = TimeOnTimeResponseParser
+            .parseGroupByDimensionResponse(comparisonRequests.get(i), responseMap);
+        rows.addAll(rowList);
       } else {
-        rows.add(TimeOnTimeResponseParser.parseAggregationOnlyResponse(comparisonRequests.get(i),
-            responseMap));
+        Row row = TimeOnTimeResponseParser.parseAggregationOnlyResponse(comparisonRequests.get(i),
+            responseMap);
+        rows.add(row);
       }
     }
-    for (Row row : rows) {
-      // System.out.println(row);
+    // compute list of derived expressions
+    List<MetricExpression> derivedMetricExpressions = new ArrayList<>();
+    for (MetricExpression expression : comparisonRequest.getMetricExpressions()) {
+      if (expression.computeMetricFunctions().size() > 1) {
+        derivedMetricExpressions.add(expression);
+      }
     }
+
+    // add metric expressions
+    if (derivedMetricExpressions.size() > 0) {
+      Map<String, Double> baselineValueContext = new HashMap<>();
+      Map<String, Double> currentValueContext = new HashMap<>();
+      for (Row row : rows) {
+        baselineValueContext.clear();
+        currentValueContext.clear();
+        List<Metric> metrics = row.getMetrics();
+        // baseline value
+        for (Metric metric : metrics) {
+          baselineValueContext.put(metric.getMetricName(), metric.getBaselineValue());
+          currentValueContext.put(metric.getMetricName(), metric.getCurrentValue());
+        }
+        for (MetricExpression expression : derivedMetricExpressions) {
+          String derivedMetricExpression = expression.getExpression();
+          double derivedMetricBaselineValue =
+              MetricExpression.evaluateExpression(derivedMetricExpression, baselineValueContext);
+          double currentMetricBaselineValue =
+              MetricExpression.evaluateExpression(derivedMetricExpression, baselineValueContext);
+          row.getMetrics().add(new Metric(expression.getEspressionName(),
+              derivedMetricBaselineValue, currentMetricBaselineValue));
+        }
+      }
+    }
+
     return new TimeOnTimeComparisonResponse(rows);
   }
 
