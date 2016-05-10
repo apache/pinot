@@ -64,7 +64,7 @@ public class DoubleAggregationResultHolder implements AggregationResultHolder {
    * @return
    */
   @Override
-  public Object getResult() {
+  public <T> T getResult() {
     throw new RuntimeException("Method 'getResult' not supported for class " + getClass().getName());
   }
 }

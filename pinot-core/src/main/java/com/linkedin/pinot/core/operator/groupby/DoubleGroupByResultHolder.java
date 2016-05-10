@@ -89,7 +89,7 @@ public class DoubleGroupByResultHolder implements GroupByResultHolder {
   }
 
   @Override
-  public Object getResult(int groupKey) {
+  public <T> T getResult(int groupKey) {
     throw new RuntimeException(
         "Unsupported method getResult (returning Object) for class " + getClass().getName());
   }

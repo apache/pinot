@@ -29,8 +29,8 @@ public class ObjectGroupByResultHolder implements GroupByResultHolder {
   /**
    * Constructor for the class.
    *
-   * @param initialCapacity
-   * @param maxCapacity
+   * @param initialCapacity Initial capacity of result holder
+   * @param maxCapacity Max capacity of result holder
    */
   public ObjectGroupByResultHolder(int initialCapacity, int maxCapacity) {
     _resultArray = new Object[initialCapacity];
@@ -77,8 +77,9 @@ public class ObjectGroupByResultHolder implements GroupByResultHolder {
   }
 
   @Override
-  public Object getResult(int groupKey) {
-    return _resultArray[groupKey];
+  @SuppressWarnings("unchecked")
+  public <T> T getResult(int groupKey) {
+    return (T) _resultArray[groupKey];
   }
 
   /**

@@ -53,7 +53,8 @@ public class ObjectAggregationResultHolder implements AggregationResultHolder {
    * @return
    */
   @Override
-  public Object getResult() {
-    return _value;
+  @SuppressWarnings("unchecked")
+  public <T> T getResult() {
+    return (T) _value;
   }
 }

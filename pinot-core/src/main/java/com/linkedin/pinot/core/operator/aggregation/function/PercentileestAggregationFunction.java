@@ -65,7 +65,7 @@ public class PercentileestAggregationFunction implements AggregationFunction {
     Preconditions.checkArgument(valueArray.length == 1);
     Preconditions.checkState(length <= valueArray[0].length);
 
-    QuantileDigest digest = (QuantileDigest) resultHolder.getResult();
+    QuantileDigest digest = resultHolder.getResult();
     if (digest == null) {
       digest = new QuantileDigest(DEFAULT_MAX_ERROR);
       resultHolder.setValue(digest);
@@ -95,7 +95,7 @@ public class PercentileestAggregationFunction implements AggregationFunction {
 
     for (int i = 0; i < length; i++) {
       int groupKey = groupKeys[i];
-      QuantileDigest digest = (QuantileDigest) resultHolder.getResult(groupKey);
+      QuantileDigest digest = resultHolder.getResult(groupKey);
       if (digest == null) {
         digest = new QuantileDigest(DEFAULT_MAX_ERROR);
         resultHolder.setValueForKey(groupKey, digest);
@@ -121,7 +121,7 @@ public class PercentileestAggregationFunction implements AggregationFunction {
     for (int i = 0; i < length; i++) {
       long value = (long) valueArray[0][i];
       for (int groupKey : docIdToGroupKeys[i]) {
-        QuantileDigest digest = (QuantileDigest) resultHolder.getResult(groupKey);
+        QuantileDigest digest = resultHolder.getResult(groupKey);
         if (digest == null) {
           digest = new QuantileDigest(DEFAULT_MAX_ERROR);
           resultHolder.setValueForKey(groupKey, digest);

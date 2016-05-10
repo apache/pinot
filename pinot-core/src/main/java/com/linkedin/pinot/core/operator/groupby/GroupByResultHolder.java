@@ -55,7 +55,7 @@ public interface GroupByResultHolder {
    * @param groupKey
    * @return
    */
-  Object getResult(int groupKey);
+  <T> T getResult(int groupKey);
 
 
   /**

@@ -113,7 +113,7 @@ public class DefaultGroupKeyGenerator implements GroupKeyGenerator {
     }
 
     _numUniqueGroupKeys = 0;
-    if (maxNumGroupKeys <= ResultHolderFactory.INITIAL_RESULT_HOLDER_CAPACITY) {
+    if (maxNumGroupKeys <= ResultHolderFactory.MAX_INITIAL_RESULT_HOLDER_CAPACITY) {
       _storageType = STORAGE_TYPE.ARRAY_BASED;
       _uniqueGroupKeysFlag = new boolean[maxNumGroupKeys];
     } else {

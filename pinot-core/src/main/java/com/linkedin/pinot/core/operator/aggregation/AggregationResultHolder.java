@@ -43,5 +43,5 @@ public interface AggregationResultHolder {
    * Returns the result of aggregation.
    * @return
    */
-  Object getResult();
+  <T> T getResult();
 }

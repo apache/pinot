@@ -56,7 +56,7 @@ public class MinMaxRangeAggregationFunction implements AggregationFunction {
       }
     }
 
-    Pair<Double, Double> rangeValue = (Pair<Double, Double>) resultHolder.getResult();
+    Pair<Double, Double> rangeValue = resultHolder.getResult();
     if (rangeValue == null) {
       rangeValue = new Pair<>(min, max);
       resultHolder.setValue(rangeValue);
@@ -90,7 +90,7 @@ public class MinMaxRangeAggregationFunction implements AggregationFunction {
     for (int i = 0; i < length; i++) {
       int groupKey = groupKeys[i];
       double value = valueArray[0][i];
-      Pair<Double, Double> rangeValue = (Pair<Double, Double>) resultHolder.getResult(groupKey);
+      Pair<Double, Double> rangeValue = resultHolder.getResult(groupKey);
       if (rangeValue == null) {
         rangeValue = new Pair<>(value, value);
         resultHolder.setValueForKey(groupKey, rangeValue);
@@ -122,7 +122,7 @@ public class MinMaxRangeAggregationFunction implements AggregationFunction {
     for (int i = 0; i < length; ++i) {
       double value = valueArray[0][i];
       for (int groupKey : docIdToGroupKeys[i]) {
-        Pair<Double, Double> rangeValue = (Pair<Double, Double>) resultHolder.getResult(groupKey);
+        Pair<Double, Double> rangeValue = resultHolder.getResult(groupKey);
         if (rangeValue == null) {
           rangeValue = new Pair<>(value, value);
           resultHolder.setValueForKey(groupKey, rangeValue);

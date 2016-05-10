@@ -27,7 +27,7 @@ import java.util.List;
 public class MinAggregationFunction implements AggregationFunction {
   private static final String FUNCTION_NAME = AggregationFunctionFactory.MIN_AGGREGATION_FUNCTION;
   private static final double DEFAULT_VALUE = Double.POSITIVE_INFINITY;
-  private static final ResultDataType _resultDataType = ResultDataType.DOUBLE;
+  private static final ResultDataType RESULT_DATA_TYPE = ResultDataType.DOUBLE;
 
   /**
    * Performs 'min' aggregation function on the input array.
@@ -143,7 +143,7 @@ public class MinAggregationFunction implements AggregationFunction {
    */
   @Override
   public ResultDataType getResultDataType() {
-    return _resultDataType;
+    return RESULT_DATA_TYPE;
   }
 
   /**

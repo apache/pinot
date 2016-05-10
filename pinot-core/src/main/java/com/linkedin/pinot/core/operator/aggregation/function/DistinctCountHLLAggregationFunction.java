@@ -44,7 +44,7 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction 
     Preconditions.checkArgument(valueArray.length == 1);
     Preconditions.checkState(length <= valueArray[0].length);
 
-    HyperLogLog hll = (HyperLogLog) resultHolder.getResult();
+    HyperLogLog hll = resultHolder.getResult();
     if (hll == null) {
       hll = new HyperLogLog(DEFAULT_BIT_SIZE);
       resultHolder.setValue(hll);
@@ -74,7 +74,7 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction 
 
     for (int i = 0; i < length; i++) {
       int groupKey = groupKeys[i];
-      HyperLogLog hll = (HyperLogLog) resultHolder.getResult(groupKey);
+      HyperLogLog hll = resultHolder.getResult(groupKey);
       if (hll == null) {
         hll = new HyperLogLog(DEFAULT_BIT_SIZE);
         resultHolder.setValueForKey(groupKey, hll);
@@ -100,7 +100,7 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction 
     for (int i = 0; i < length; i++) {
       int value = (int) valueArray[0][i];
       for (int groupKey : docIdToGroupKeys[i]) {
-        HyperLogLog hll = (HyperLogLog) resultHolder.getResult(groupKey);
+        HyperLogLog hll = resultHolder.getResult(groupKey);
         if (hll == null) {
           hll = new HyperLogLog(DEFAULT_BIT_SIZE);
           resultHolder.setValueForKey(groupKey, hll);

@@ -27,7 +27,7 @@ import java.util.List;
 public class CountAggregationFunction implements AggregationFunction {
   private static final String FUNCTION_NAME = AggregationFunctionFactory.COUNT_AGGREGATION_FUNCTION;
   private static final double DEFAULT_VALUE = 0.0;
-  private static final ResultDataType _resultDataType = ResultDataType.LONG;
+  private static final ResultDataType RESULT_DATA_TYPE = ResultDataType.LONG;
 
   /**
    * Performs 'count' aggregation on the input array.
@@ -106,7 +106,7 @@ public class CountAggregationFunction implements AggregationFunction {
    */
   @Override
   public ResultDataType getResultDataType() {
-    return _resultDataType;
+    return RESULT_DATA_TYPE;
   }
 
   /**

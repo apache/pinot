@@ -43,7 +43,7 @@ public class DistinctCountAggregationFunction implements AggregationFunction {
     Preconditions.checkArgument(valueArray.length == 1);
     Preconditions.checkState(length <= valueArray[0].length);
 
-    IntOpenHashSet valueSet = (IntOpenHashSet) resultHolder.getResult();
+    IntOpenHashSet valueSet = resultHolder.getResult();
     if (valueSet == null) {
       valueSet = new IntOpenHashSet();
       resultHolder.setValue(valueSet);
@@ -73,7 +73,7 @@ public class DistinctCountAggregationFunction implements AggregationFunction {
 
     for (int i = 0; i < length; i++) {
       int groupKey = groupKeys[i];
-      IntOpenHashSet valueSet = (IntOpenHashSet) resultHolder.getResult(groupKey);
+      IntOpenHashSet valueSet = resultHolder.getResult(groupKey);
       if (valueSet == null) {
         valueSet = new IntOpenHashSet();
         resultHolder.setValueForKey(groupKey, valueSet);
@@ -99,7 +99,7 @@ public class DistinctCountAggregationFunction implements AggregationFunction {
     for (int i = 0; i < length; i++) {
       int value = (int) valueArray[0][i];
       for (int groupKey : docIdToGroupKeys[i]) {
-        IntOpenHashSet valueSet = (IntOpenHashSet) resultHolder.getResult(groupKey);
+        IntOpenHashSet valueSet = resultHolder.getResult(groupKey);
         if (valueSet == null) {
           valueSet = new IntOpenHashSet();
           resultHolder.setValueForKey(groupKey, valueSet);

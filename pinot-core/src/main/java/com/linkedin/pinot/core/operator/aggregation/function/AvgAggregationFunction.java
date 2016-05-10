@@ -28,7 +28,7 @@ import java.util.List;
 public class AvgAggregationFunction implements AggregationFunction {
   private static final String FUNCTION_NAME = AggregationFunctionFactory.AVG_AGGREGATION_FUNCTION;
   private static final double DEFAULT_VALUE = 0.0;
-  private static final AggregationFunction.ResultDataType RESULT_DATA_TYPE = ResultDataType.AVERAGE_PAIR;
+  private static final ResultDataType RESULT_DATA_TYPE = ResultDataType.AVERAGE_PAIR;
 
   /**
    * Performs 'avg' aggregation on the input array.
@@ -52,7 +52,7 @@ public class AvgAggregationFunction implements AggregationFunction {
     for (int i = 0; i < length; ++i) {
       sum += valueArray[0][i];
     }
-    Pair<Double, Long> avgValue = (Pair<Double, Long>) resultHolder.getResult();
+    Pair<Double, Long> avgValue = resultHolder.getResult();
     if (avgValue == null) {
       avgValue = new Pair<>(sum, (long) length);
       resultHolder.setValue(avgValue);
@@ -82,7 +82,7 @@ public class AvgAggregationFunction implements AggregationFunction {
     for (int i = 0; i < length; ++i) {
       int groupKey = groupKeys[i];
       double value = valueArray[0][i];
-      Pair<Double, Long> avgValue = (Pair<Double, Long>) resultHolder.getResult(groupKey);
+      Pair<Double, Long> avgValue = resultHolder.getResult(groupKey);
       if (avgValue == null) {
         avgValue = new Pair<>(value, 1L);
         resultHolder.setValueForKey(groupKey, avgValue);
@@ -110,7 +110,7 @@ public class AvgAggregationFunction implements AggregationFunction {
     for (int i = 0; i < length; ++i) {
       double value = valueArray[0][i];
       for (int groupKey : docIdToGroupKeys[i]) {
-        Pair<Double, Long> avgValue = (Pair<Double, Long>) resultHolder.getResult(groupKey);
+        Pair<Double, Long> avgValue = resultHolder.getResult(groupKey);
         if (avgValue == null) {
           avgValue = new Pair<>(value, 1L);
           resultHolder.setValueForKey(groupKey, avgValue);
@@ -164,8 +164,7 @@ public class AvgAggregationFunction implements AggregationFunction {
     }
 
     if (reducedCntResult > 0) {
-      double avgResult = reducedSumResult / reducedCntResult;
-      return avgResult;
+      return reducedSumResult / reducedCntResult;
     } else {
       return DEFAULT_VALUE;
     }

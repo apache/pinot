@@ -64,7 +64,7 @@ public class PercentileAggregationFunction implements AggregationFunction {
     Preconditions.checkArgument(valueArray.length == 1);
     Preconditions.checkState(length <= valueArray[0].length);
 
-    DoubleArrayList valueList = (DoubleArrayList) resultHolder.getResult();
+    DoubleArrayList valueList = resultHolder.getResult();
     if (valueList == null) {
       valueList = new DoubleArrayList();
       resultHolder.setValue(valueList);
@@ -94,7 +94,7 @@ public class PercentileAggregationFunction implements AggregationFunction {
 
     for (int i = 0; i < length; i++) {
       int groupKey = groupKeys[i];
-      DoubleArrayList valueList = (DoubleArrayList) resultHolder.getResult(groupKey);
+      DoubleArrayList valueList = resultHolder.getResult(groupKey);
       if (valueList == null) {
         valueList = new DoubleArrayList();
         resultHolder.setValueForKey(groupKey, valueList);
@@ -120,7 +120,7 @@ public class PercentileAggregationFunction implements AggregationFunction {
     for (int i = 0; i < length; ++i) {
       double value = valueArray[0][i];
       for (int groupKey : docIdToGroupKeys[i]) {
-        DoubleArrayList valueList = (DoubleArrayList) resultHolder.getResult(groupKey);
+        DoubleArrayList valueList = resultHolder.getResult(groupKey);
         if (valueList == null) {
           valueList = new DoubleArrayList();
           resultHolder.setValueForKey(groupKey, valueList);

@@ -27,14 +27,17 @@ import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunction
  * Supports both, AggregationResultHolder as well as GroupByResultHolder.
  */
 public class ResultHolderFactory {
-  public static final int INITIAL_RESULT_HOLDER_CAPACITY = 10000;
+  private ResultHolderFactory() {
+  }
+
+  public static final int MAX_INITIAL_RESULT_HOLDER_CAPACITY = 10000;
 
   /**
    * Creates and returns the appropriate implementation of AggregationResultHolder,
    * based on aggregation function.
    *
-   * @param function
-   * @return
+   * @param function Aggregation function
+   * @return Appropriate aggregation result holder
    */
   public static AggregationResultHolder getAggregationResultHolder(AggregationFunction function) {
     String functionName = function.getName();
@@ -55,15 +58,15 @@ public class ResultHolderFactory {
    * Creates and returns the appropriate implementation of GroupByResultHolder,
    * based on aggregation function.
    *
-   * @param function
-   * @param maxNumResults
-   * @return
+   * @param function Aggregation function
+   * @param maxNumResults Max number of results
+   * @return Appropriate group by result holder
    */
   public static GroupByResultHolder getGroupByResultHolder(AggregationFunction function, long maxNumResults) {
     String functionName = function.getName();
 
     int capacityCap = maxNumResults > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) maxNumResults;
-    int initialCapacity = Math.min(capacityCap, INITIAL_RESULT_HOLDER_CAPACITY);
+    int initialCapacity = Math.min(capacityCap, MAX_INITIAL_RESULT_HOLDER_CAPACITY);
 
     switch (functionName.toLowerCase()) {
       case AggregationFunctionFactory.COUNT_AGGREGATION_FUNCTION:
