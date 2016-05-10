@@ -59,11 +59,25 @@ public interface GroupKeyGenerator {
    * Returns an array
    * @return
    */
-  Iterator<Pair<Integer, String>> getUniqueGroupKeys();
+  Iterator<GroupKey> getUniqueGroupKeys();
 
   /**
    * Return the maximum number of unique group keys.
    * @return
    */
   int getNumGroupKeys();
+
+  /**
+   * This class encapsulates the group Id and the string group key.
+   */
+  class GroupKey extends Pair<Integer, String> {
+
+    public GroupKey(Integer first, String second) {
+      super(first, second);
+    }
+
+    public String getStringKey() {
+      return getSecond();
+    }
+  }
 }

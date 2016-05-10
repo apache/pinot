@@ -15,11 +15,6 @@
  */
 package com.linkedin.pinot.core.operator.groupby;
 
-import java.io.Serializable;
-import java.util.List;
-import java.util.Map;
-
-
 /**
  * Interface class for executing the actual group-by operation.
  */
@@ -51,5 +46,5 @@ public interface GroupByExecutor {
    *
    * @return
    */
-  List<Map<String, Serializable>> getResult();
+  AggregationGroupByResult getResult();
 }

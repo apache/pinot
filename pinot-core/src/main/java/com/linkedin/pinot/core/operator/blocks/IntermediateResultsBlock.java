@@ -15,12 +15,6 @@
  */
 package com.linkedin.pinot.core.operator.blocks;
 
-import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
-
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.response.ProcessingException;
@@ -35,9 +29,15 @@ import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Predicate;
+import com.linkedin.pinot.core.operator.groupby.AggregationGroupByResult;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionUtils;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorUtils;
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 
 
@@ -56,6 +56,7 @@ public class IntermediateResultsBlock implements Block {
   private long _timeUsedMs;
   private long _totalRawDocs;
   private List<Map<String, Serializable>> _aggregationGroupByOperatorResult;
+  private AggregationGroupByResult _aggregationGroupByResult;
   private DataSchema _dataSchema;
   private Collection<Serializable[]> _selectionResult;
 
@@ -70,10 +71,32 @@ public class IntermediateResultsBlock implements Block {
     _aggregationResultList = aggregationResult;
   }
 
+  /**
+   * Constructor for the class when group-by results are provided in a list of Maps containing
+   * group-by keys and aggregation values.
+   *
+   * @param aggregationFunctionList List of aggregation functions in the query
+   * @param aggregationGroupByResults Result of aggregation group-by.
+   * @param isGroupByResults
+   */
   public IntermediateResultsBlock(List<AggregationFunction> aggregationFunctionList,
       List<Map<String, Serializable>> aggregationGroupByResults, boolean isGroupByResults) {
     _aggregationFunctionList = aggregationFunctionList;
     _aggregationGroupByOperatorResult = aggregationGroupByResults;
+    _aggregationGroupByResult = null;
+  }
+
+  /**
+   * Constructor of the class when group-by results are provided in {@link AggregationGroupByResult}
+   *
+   * @param aggregationFunctions List of aggregation functions in the query
+   * @param aggregationGroupByResults Result of aggregation group-by.
+   */
+  public IntermediateResultsBlock(List<AggregationFunction> aggregationFunctions,
+      AggregationGroupByResult aggregationGroupByResults) {
+    _aggregationFunctionList = aggregationFunctions;
+    _aggregationGroupByResult = aggregationGroupByResults;
+    _aggregationGroupByOperatorResult = null;
   }
 
   public IntermediateResultsBlock(Exception e) {
@@ -281,8 +304,12 @@ public class IntermediateResultsBlock implements Block {
     return _selectionResult;
   }
 
-  public void setAggregationGroupByResult1(List<Map<String, Serializable>> combineAggregationGroupByResults1) {
+  public void setAggregationGroupByResult(List<Map<String, Serializable>> combineAggregationGroupByResults1) {
     _aggregationGroupByOperatorResult = combineAggregationGroupByResults1;
 
+  }
+
+  public AggregationGroupByResult getAggregationGroupByResult() {
+    return _aggregationGroupByResult;
   }
 }

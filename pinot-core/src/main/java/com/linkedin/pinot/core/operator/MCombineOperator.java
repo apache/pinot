@@ -80,7 +80,7 @@ public class MCombineOperator extends BaseOperator {
   private static int MIN_SEGMENTS_PER_THREAD = 10;
 
   private IntermediateResultsBlock _mergedBlock;
-  
+
   static {
     int numCores = Runtime.getRuntime().availableProcessors();
     MIN_THREADS_PER_QUERY = Math.max(1, (int)(numCores * .5));
@@ -268,7 +268,7 @@ public class MCombineOperator extends BaseOperator {
         new AggregationGroupByOperatorService(brokerRequest.getAggregationsInfo(), brokerRequest.getGroupBy());
     List<Map<String, Serializable>> trimmedResults =
         aggregationGroupByOperatorService.trimToSize(mergedBlock.getAggregationGroupByOperatorResult());
-    mergedBlock.setAggregationGroupByResult1(trimmedResults);
+    mergedBlock.setAggregationGroupByResult(trimmedResults);
   }
 
   @Override

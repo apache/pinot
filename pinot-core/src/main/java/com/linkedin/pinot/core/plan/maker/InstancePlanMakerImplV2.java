@@ -47,7 +47,7 @@ import org.slf4j.LoggerFactory;
 public class InstancePlanMakerImplV2 implements PlanMaker {
   private static final Logger LOGGER = LoggerFactory.getLogger(InstancePlanMakerImplV2.class);
   private static final String NEW_AGGREGATION_GROUPBY_STRING = "new.aggregation.groupby";
-  private boolean _enableNewAggreagationGroupBy = false;
+  private boolean _enableNewAggregationGroupBy = false;
 
   /**
    * Default constructor.
@@ -63,8 +63,8 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
    * @param queryExecutorConfig
    */
   public InstancePlanMakerImplV2(QueryExecutorConfig queryExecutorConfig) {
-    _enableNewAggreagationGroupBy = queryExecutorConfig.getConfig().getBoolean(NEW_AGGREGATION_GROUPBY_STRING, false);
-    LOGGER.info("New AggregationGroupBy operator: {}", (_enableNewAggreagationGroupBy) ? "Enabled" : "Disabled");
+    _enableNewAggregationGroupBy = queryExecutorConfig.getConfig().getBoolean(NEW_AGGREGATION_GROUPBY_STRING, false);
+    LOGGER.info("New AggregationGroupBy operator: {}", (_enableNewAggregationGroupBy) ? "Enabled" : "Disabled");
   }
 
   @Override
@@ -73,7 +73,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     if (brokerRequest.isSetAggregationsInfo()) {
       if (!brokerRequest.isSetGroupBy()) {
         // Only Aggregation
-        if (_enableNewAggreagationGroupBy) {
+        if (_enableNewAggregationGroupBy) {
           return new AggregationPlanNode(indexSegment, brokerRequest);
         } else {
           return new AggregationOperatorPlanNode(indexSegment, brokerRequest);
@@ -87,7 +87,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
             // AggregationGroupByPlanNode is the new implementation of group-by aggregations, and is currently turned OFF.
             // Once all feature and perf testing is performed, the code will be turned ON, and this 'if' check will
             // be removed.
-            if (_enableNewAggreagationGroupBy) {
+            if (_enableNewAggregationGroupBy) {
               aggregationGroupByPlanNode = new AggregationGroupByPlanNode(indexSegment, brokerRequest);
             } else {
               aggregationGroupByPlanNode = new AggregationGroupByOperatorPlanNode(indexSegment, brokerRequest,
@@ -116,7 +116,8 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   public Plan makeInterSegmentPlan(List<SegmentDataManager> segmentDataManagers, BrokerRequest brokerRequest,
       ExecutorService executorService, long timeOutMs) {
     final InstanceResponsePlanNode rootNode = new InstanceResponsePlanNode();
-    final CombinePlanNode combinePlanNode = new CombinePlanNode(brokerRequest, executorService, timeOutMs);
+    final CombinePlanNode combinePlanNode = new CombinePlanNode(brokerRequest, executorService, timeOutMs,
+        _enableNewAggregationGroupBy);
     rootNode.setPlanNode(combinePlanNode);
     for (final SegmentDataManager segmentDataManager : segmentDataManagers) {
       combinePlanNode.addPlanNode(makeInnerSegmentPlan(segmentDataManager.getSegment(), brokerRequest));

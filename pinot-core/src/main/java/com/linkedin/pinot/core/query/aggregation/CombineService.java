@@ -20,11 +20,15 @@ import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.response.ProcessingException;
 import com.linkedin.pinot.common.utils.DataTableBuilder;
 import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
+import com.linkedin.pinot.core.operator.groupby.AggregationGroupByResult;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorService;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorUtils;
+import com.linkedin.pinot.core.query.utils.Pair;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -65,7 +69,7 @@ public class CombineService {
     if (brokerRequest.isSetAggregationsInfo()) {
       if (brokerRequest.isSetGroupBy()) {
         // Combine AggregationGroupBy
-        mergedBlock.setAggregationGroupByResult1(combineAggregationGroupByResults1(brokerRequest,
+        mergedBlock.setAggregationGroupByResult(combineAggregationGroupByResults1(brokerRequest,
             mergedBlock.getAggregationGroupByOperatorResult(), blockToMerge.getAggregationGroupByOperatorResult()));
       } else {
         // Combine Aggregations

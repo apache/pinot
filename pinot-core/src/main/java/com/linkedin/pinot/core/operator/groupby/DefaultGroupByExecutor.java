@@ -15,11 +15,9 @@
  */
 package com.linkedin.pinot.core.operator.groupby;
 
-import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.GroupBy;
-import com.linkedin.pinot.common.utils.primitive.MutableLongValue;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.DataSourceMetadata;
@@ -27,18 +25,10 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunction;
 import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunctionFactory;
 import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
-import com.linkedin.pinot.core.query.aggregation.function.AvgAggregationFunction;
-import com.linkedin.pinot.core.query.aggregation.function.MinMaxRangeAggregationFunction;
-import com.linkedin.pinot.core.query.aggregation.function.quantile.digest.QuantileDigest;
-import com.linkedin.pinot.core.query.utils.Pair;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
-import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
-import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -238,72 +228,18 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
    * @return
    */
   @Override
-  public List<Map<String, Serializable>> getResult() {
+  public AggregationGroupByResult getResult() {
     Preconditions.checkState(_finished, "GetResult cannot be called before finish.");
-    List<Map<String, Serializable>> result = new ArrayList<Map<String, Serializable>>(_aggrFuncContextList.size());
+    int numAggregationFunctions = _aggrFuncContextList.size();
 
-    for (int i = 0; i < _aggrFuncContextList.size(); i++) {
-      result.add(new HashMap<String, Serializable>());
+    AggregationFunction.ResultDataType resultDataTypeArray[] =
+        new AggregationFunction.ResultDataType[numAggregationFunctions];
+
+    for (int i = 0; i < numAggregationFunctions; i++) {
+      AggregationFunction aggregationFunction = _aggrFuncContextList.get(i).getAggregationFunction();
+      resultDataTypeArray[i] = aggregationFunction.getResultDataType();
     }
-
-    Iterator<Pair<Integer, String>> groupKeys = _groupKeyGenerator.getUniqueGroupKeys();
-    while (groupKeys.hasNext()) {
-      Pair<Integer, String> idKeyPair = groupKeys.next();
-      String stringGroupKey = idKeyPair.getSecond();
-
-      for (int i = 0; i < _aggrFuncContextList.size(); i++) {
-        AggregationFunction aggregationFunction = _aggrFuncContextList.get(i).getAggregationFunction();
-        AggregationFunction.ResultDataType resultDataType = aggregationFunction.getResultDataType();
-
-        Serializable resultForGroupKey = getResultForKey(idKeyPair.getFirst(), _resultHolderArray[i], resultDataType);
-        result.get(i).put(stringGroupKey, resultForGroupKey);
-      }
-    }
-    return result;
-  }
-
-  /**
-   * Returns result for the given key.
-   *
-   * @param groupKey
-   * @param resultDataType
-   * @return
-   */
-  private Serializable getResultForKey(int groupKey, GroupByResultHolder resultHolder,
-      AggregationFunction.ResultDataType resultDataType) {
-
-    switch (resultDataType) {
-      case LONG:
-        return new MutableLongValue((long) resultHolder.getDoubleResult(groupKey));
-
-      case DOUBLE:
-        return resultHolder.getDoubleResult(groupKey);
-
-      case AVERAGE_PAIR:
-        Pair<Double, Long> doubleLongPair = (Pair<Double, Long>) resultHolder.getResult(groupKey);
-        return new AvgAggregationFunction.AvgPair(doubleLongPair.getFirst(), doubleLongPair.getSecond());
-
-      case MINMAXRANGE_PAIR:
-        Pair<Double, Double> doubleDoublePair = (Pair<Double, Double>) resultHolder.getResult(groupKey);
-        return new MinMaxRangeAggregationFunction.MinMaxRangePair(doubleDoublePair.getFirst(),
-            doubleDoublePair.getSecond());
-
-      case DISTINCTCOUNT_SET:
-        return (IntOpenHashSet) resultHolder.getResult(groupKey);
-
-      case DISTINCTCOUNTHLL_HYPERLOGLOG:
-        return (HyperLogLog) resultHolder.getResult(groupKey);
-
-      case PERCENTILE_LIST:
-        return (DoubleArrayList) resultHolder.getResult(groupKey);
-
-      case PERCENTILEEST_QUANTILEDIGEST:
-        return (QuantileDigest) resultHolder.getResult(groupKey);
-
-      default:
-        throw new RuntimeException(
-            "Unsupported result data type " + resultDataType + " in class " + getClass().getName());
-    }
+    return new AggregationGroupByResult(_groupKeyGenerator, _resultHolderArray, resultDataTypeArray);
   }
 
   /**
@@ -344,9 +280,9 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     _columnsLoaded.clear();
     for (AggregationFunctionContext aggrFuncContext : _aggrFuncContextList) {
       String aggrFuncName = aggrFuncContext.getFunctionName();
-      if (!aggrFuncName.equals(AggregationFunctionFactory.COUNT_AGGREGATION_FUNCTION)
-          && !aggrFuncName.equals(AggregationFunctionFactory.DISTINCTCOUNT_AGGREGATION_FUNCTION)
-          && !aggrFuncName.equals(AggregationFunctionFactory.DISTINCTCOUNTHLL_AGGREGATION_FUNCTION)) {
+      if (!aggrFuncName.equals(AggregationFunctionFactory.COUNT_AGGREGATION_FUNCTION) && !aggrFuncName.equals(
+          AggregationFunctionFactory.DISTINCTCOUNT_AGGREGATION_FUNCTION) && !aggrFuncName.equals(
+          AggregationFunctionFactory.DISTINCTCOUNTHLL_AGGREGATION_FUNCTION)) {
         String[] aggrColumns = aggrFuncContext.getAggregationColumns();
         for (int i = 0; i < aggrColumns.length; i++) {
           String aggrColumn = aggrColumns[i];

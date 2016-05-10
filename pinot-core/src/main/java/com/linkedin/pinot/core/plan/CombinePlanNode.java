@@ -15,21 +15,20 @@
  */
 package com.linkedin.pinot.core.plan;
 
+import com.linkedin.pinot.common.exception.QueryException;
+import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.core.common.Operator;
+import com.linkedin.pinot.core.operator.MCombineGroupByOperator;
+import com.linkedin.pinot.core.operator.MCombineOperator;
+import com.linkedin.pinot.core.util.trace.TraceRunnable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.linkedin.pinot.common.exception.QueryException;
-import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.core.common.Operator;
-import com.linkedin.pinot.core.operator.MCombineOperator;
-import com.linkedin.pinot.core.util.trace.TraceRunnable;
 
 
 /**
@@ -43,12 +42,14 @@ public class CombinePlanNode implements PlanNode {
   private final BrokerRequest _brokerRequest;
   private final ExecutorService _executorService;
   private final long _timeOutMs;
+  private final boolean _enableNewAggreagationGroupBy;
 
-  public CombinePlanNode(BrokerRequest brokerRequest, ExecutorService executorService, long timeOutMs) {
+  public CombinePlanNode(BrokerRequest brokerRequest, ExecutorService executorService, long timeOutMs,
+      boolean enableNewAggreagationGroupBy) {
     _brokerRequest = brokerRequest;
     _executorService = executorService;
     _timeOutMs = timeOutMs;
-
+    _enableNewAggreagationGroupBy = enableNewAggreagationGroupBy;
   }
 
   public void addPlanNode(PlanNode planNode) {
@@ -93,11 +94,30 @@ public class CombinePlanNode implements PlanNode {
         throw new RuntimeException(QueryException.COMBINE_SEGMENT_PLAN_TIMEOUT_ERROR);
       }
     }
-    MCombineOperator mCombineOperator =
-        new MCombineOperator(retOperators, _executorService, _timeOutMs, _brokerRequest);
+    Operator mCombineOperator = getCombineOperator(retOperators);
     long end = System.currentTimeMillis();
     LOGGER.debug("CombinePlanNode.run took: " + (end - start));
     return mCombineOperator;
+  }
+
+  /**
+   * This method returns the appropriate combine operator as per the requirement:
+   * - If new implementation of aggregation group-by is enabled, and this is a group-by
+   *   query, then returns MCombineGroupByOperator.
+   * - Returns the MCombineOperator, otherwise.
+   *
+   * This is a temporary method until, the new group-by implementation is completely turned ON,
+   * and will be removed after that.
+   *
+   * @param retOperators
+   * @return
+   */
+  private Operator getCombineOperator(List<Operator> retOperators) {
+    if (_enableNewAggreagationGroupBy && _brokerRequest.isSetAggregationsInfo()
+        && _brokerRequest.getGroupBy() != null) {
+      return new MCombineGroupByOperator(retOperators, _executorService, _timeOutMs, _brokerRequest);
+    }
+    return new MCombineOperator(retOperators, _executorService, _timeOutMs, _brokerRequest);
   }
 
   @Override

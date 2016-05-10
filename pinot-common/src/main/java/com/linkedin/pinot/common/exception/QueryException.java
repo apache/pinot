@@ -35,6 +35,7 @@ public class QueryException {
   public static final int INTERNAL_ERROR_CODE = 450;
   public static final int MERGE_RESPONSE_ERROR_CODE = 500;
   public static final int FEDERATED_BROKER_UNAVAILABLE_ERROR_CODE = 550;
+  public static final int COMBINE_GROUP_BY_EXCEPTION_ERROR_CODE = 600;
   public static final int UNKNOWN_ERROR_CODE = 1000;
 
   public static final ProcessingException JSON_PARSING_ERROR = new ProcessingException(JSON_PARSING_ERROR_CODE);
@@ -56,6 +57,9 @@ public class QueryException {
   public static final ProcessingException MERGE_RESPONSE_ERROR = new ProcessingException(MERGE_RESPONSE_ERROR_CODE);
   public static final ProcessingException FEDERATED_BROKER_UNAVAILABLE_ERROR =
       new ProcessingException(FEDERATED_BROKER_UNAVAILABLE_ERROR_CODE);
+  public static final ProcessingException COMBINE_GROUP_BY_EXCEPTION_ERROR =
+      new ProcessingException(COMBINE_GROUP_BY_EXCEPTION_ERROR_CODE);
+
   public static final ProcessingException UNKNOWN_ERROR = new ProcessingException(UNKNOWN_ERROR_CODE);
 
   static {

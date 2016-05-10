@@ -31,9 +31,7 @@ import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
 import com.linkedin.pinot.core.operator.docidsets.DocIdSetBlock;
 import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionFactory;
-import java.io.Serializable;
 import java.util.List;
-import java.util.Map;
 
 
 /**
@@ -101,10 +99,10 @@ public class AggregationGroupByOperator extends BaseOperator {
     }
     _groupByExecutor.finish();
 
-    List<Map<String, Serializable>> aggregationGroupByResults = _groupByExecutor.getResult();
+    AggregationGroupByResult aggregationGroupByResult = _groupByExecutor.getResult();
     final IntermediateResultsBlock resultBlock =
         new IntermediateResultsBlock(AggregationFunctionFactory.getAggregationFunction(_aggregationInfoList),
-            aggregationGroupByResults, true /* isGroupByResult */);
+            aggregationGroupByResult);
 
     resultBlock.setNumDocsScanned(numDocsScanned);
     resultBlock.setTotalRawDocs(_indexSegment.getSegmentMetadata().getTotalRawDocs());

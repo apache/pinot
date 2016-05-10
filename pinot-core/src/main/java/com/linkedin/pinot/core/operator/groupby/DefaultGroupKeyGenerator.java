@@ -305,7 +305,7 @@ public class DefaultGroupKeyGenerator implements GroupKeyGenerator {
    * @return
    */
   @Override
-  public Iterator<Pair<Integer, String>> getUniqueGroupKeys() {
+  public Iterator<GroupKey> getUniqueGroupKeys() {
     if (_storageType == STORAGE_TYPE.ARRAY_BASED) {
       return new ArrayBasedGroupKeyIterator();
     } else {
@@ -363,9 +363,9 @@ public class DefaultGroupKeyGenerator implements GroupKeyGenerator {
   /**
    * Inner class to implement group by key iterator for ARRAY_BASED storage.
    */
-  private class ArrayBasedGroupKeyIterator implements Iterator<Pair<Integer, String>> {
+  private class ArrayBasedGroupKeyIterator implements Iterator<GroupKey> {
     int index = 0;
-    Pair<Integer, String> ret = new Pair<Integer, String>(INVALID_ID, null);
+    GroupKey _groupKey = new GroupKey(INVALID_ID, null);
 
     @Override
     public boolean hasNext() {
@@ -379,11 +379,11 @@ public class DefaultGroupKeyGenerator implements GroupKeyGenerator {
     }
 
     @Override
-    public Pair<Integer, String> next() {
+    public GroupKey next() {
       String stringGroupKey = dictIdToStringGroupKey(index);
-      ret.setFirst(index++);
-      ret.setSecond(stringGroupKey);
-      return ret;
+      _groupKey.setFirst(index++);
+      _groupKey.setSecond(stringGroupKey);
+      return _groupKey;
     }
 
     @Override
@@ -395,13 +395,13 @@ public class DefaultGroupKeyGenerator implements GroupKeyGenerator {
   /**
    * Inner class to implement group by keys iterator for MAP_BASED storage.
    */
-  private class MapBasedGroupKeyIterator implements Iterator<Pair<Integer, String>> {
+  private class MapBasedGroupKeyIterator implements Iterator<GroupKey> {
     private final ObjectIterator<Map.Entry<Long, Integer>> _iterator;
-    Pair<Integer, String> ret;
+    GroupKey _groupKey;
 
     public MapBasedGroupKeyIterator(ObjectIterator<Map.Entry<Long, Integer>> iterator) {
       _iterator = iterator;
-      ret = new Pair<Integer, String>(INVALID_ID, null);
+      _groupKey = new GroupKey(INVALID_ID, null);
     }
 
     @Override
@@ -410,16 +410,16 @@ public class DefaultGroupKeyGenerator implements GroupKeyGenerator {
     }
 
     @Override
-    public Pair<Integer, String> next() {
+    public GroupKey next() {
       Map.Entry<Long, Integer> entry = _iterator.next();
 
       long groupKey = entry.getKey().longValue();
       int groupId = entry.getValue().intValue();
 
       String stringGroupKey = dictIdToStringGroupKey(groupKey);
-      ret.setFirst(groupId);
-      ret.setSecond(stringGroupKey);
-      return ret;
+      _groupKey.setFirst(groupId);
+      _groupKey.setSecond(stringGroupKey);
+      return _groupKey;
     }
 
     @Override
