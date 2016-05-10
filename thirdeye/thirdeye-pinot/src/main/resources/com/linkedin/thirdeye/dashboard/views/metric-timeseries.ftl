@@ -82,15 +82,15 @@
         <div class="clear-fix" style="clear: both">
         <div id='anomaly-linechart-placeholder' style='display: inline-block; width:83%; height: 300px; '></div>
         <div class="timeseries-legend-box" style="display: inline-block">
-            <label style="display: block;"><input class="time-series-metric-select-all-checkbox" type="checkbox">Select All
+            <label style="display: block;"><input class="anomalies-time-series-select-all-checkbox" type="checkbox">Select All
             </label>
-            <div id="metric-time-series-legend" class="timeseries-legend-sub-box uk-display-inline-block" style="width:250px;">
+            <div id="anomalies-time-series-legend" class="timeseries-legend-sub-box uk-display-inline-block" style="width:250px;">
                 {{#each metrics as |metricName metricIndex|}}
                 <label class="legend-item" value="{{metricName}}">
                     <table  data-uk-tooltip title="{{metricName}}">
                         <tr>
                             <td>
-                                <input class="time-series-metric-checkbox" type="checkbox" value="{{metricName}}" color="{{colorById metricIndex ../metrics.length  name= metricName}}">
+                                <input class="anomalies-time-series-checkbox" type="checkbox" value="{{metricName}}" color="{{colorById metricIndex ../metrics.length  name= metricName}}">
                             </td>
                             <td>
                                 <div class="legend-color uk-display-inline-block" style="width: 10px; height: 10px; background:{{colorById metricIndex ../metrics.length  name= metricName}}" color="{{colorById metricIndex ../metrics.length  name= metricName}}" ></div>

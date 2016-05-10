@@ -30,31 +30,18 @@ function renderAnomalies(data) {
   var result_anomalies_template = HandleBarsTemplates.template_anomalies(data);
   $("#" + hash.view + "-display-table-section").append(result_anomalies_template);
 
-
-  //Eventlisteners
-  $("#" + hash.view + "-display-table-section").on("click",".checkbox-cell", function(){
-        //var metric = $(this).attr("value");
-        // $(".time-series-metric-checkbox[value='"+ metric +"']")
-  })
-
 }
 
 function renderAnomalyTabular(timeSeriesData, anomalyData) {
   $("#"+  hash.view  +"-display-chart-section").empty();
+
   /* Handelbars template for time series legend */
   var result_metric_time_series_section = HandleBarsTemplates.template_metric_time_series_section_anomaly(timeSeriesData);
   $("#" + hash.view + "-display-chart-section").append(result_metric_time_series_section);
 
-  drawAnomalyTimeSeries(timeSeriesData, anomalyData)
-
-  /* Handelbars template for funnel table */
-  // var result_funnels_template =
-  // HandleBarsTemplates.template_funnels_table(data);
-  // $("#" + hash.view +
-  // "-display-chart-section").append(result_funnels_template);
-  // calcHeatMapBG("tabular");
-  // formatMillisToTZ();
+  drawAnomalyTimeSeries(timeSeriesData, anomalyData);
 }
+
 var lineChart;
 function drawAnomalyTimeSeries(ajaxData, anomalyData) {
 
@@ -114,14 +101,6 @@ function drawAnomalyTimeSeries(ajaxData, anomalyData) {
     colors[metrics[i] + "-baseline"] = colorArray[i];
     colors[metrics[i] + "-current"] = colorArray[i];
     colors[metrics[i] + "-delta"] = colorArray[i];
-
-
-    // chartTypes[metrics[i] + "-current"] = 'spline';
-    // chartTypes[metrics[i] + "-baseline"] = 'spline';
-    // chartTypes[metrics[i] + "-delta"] = 'bar';
-    // axes[metrics[i] + "-current"] = 'y';
-    // axes[metrics[i] + "-baseline"] = 'y';
-    // axes[metrics[i] + "-delta"] = 'y2';
   }
 
   lineChart = c3.generate({
@@ -217,7 +196,7 @@ function drawAnomalyTimeSeries(ajaxData, anomalyData) {
   barChart.hide();
   // Clicking the checkbox of the timeseries legend will redraw the timeseries
   // with the selected elements
-  $("#metric-time-series-legend").on("click", '.time-series-metric-checkbox', function() {
+  $("#anomalies-time-series-legend").on("click", '.anomalies-time-series-checkbox', function() {
     var checkbox = this;
     var checkboxObj = $(checkbox);
     metricName = checkboxObj.val();
@@ -234,19 +213,19 @@ function drawAnomalyTimeSeries(ajaxData, anomalyData) {
   });
 
   // Select all / deselect all metrics option
-  $("#main-view").on("click", ".time-series-metric-select-all-checkbox", function() {
+  $("#main-view").on("change", ".anomalies-time-series-select-all-checkbox", function() {
 
     // if select all is checked
     if ($(this).is(':checked')) {
       // trigger click on each unchecked checkbox
-      $(".time-series-metric-checkbox").each(function(index, checkbox) {
+      $(".anomalies-time-series-checkbox").each(function(index, checkbox) {
         if (!$(checkbox).is(':checked')) {
           $(checkbox).click();
         }
       })
     } else {
       // trigger click on each checked checkbox
-      $(".time-series-metric-checkbox").each(function(index, checkbox) {
+      $(".anomalies-time-series-checkbox").each(function(index, checkbox) {
         if ($(checkbox).is(':checked')) {
           $(checkbox).click();
         }
@@ -255,6 +234,5 @@ function drawAnomalyTimeSeries(ajaxData, anomalyData) {
   });
 
   // Preselect first metric
-  $($(".time-series-metric-checkbox")[0]).click();
-
+  $($(".anomalies-time-series-checkbox")[0]).click();
 }

@@ -56,7 +56,7 @@ function renderD3heatmap(data) {
                 var color_2 =  parseFloat(dimensionData[valId][schema["contributionToOverallColor"]]); // contributionToOverallChange
 
                 var delta_0 =  parseFloat(dimensionData[valId][schema["percentageChange"]]);
-                var delta_1 =  parseFloat(dimensionData[valId][schema["baselineContribution"]]);
+                var delta_1 =  parseFloat(dimensionData[valId][schema["contributionDifference"]]);
                 var delta_2 =  parseFloat(dimensionData[valId][schema["contributionToOverallChange"]]);
 
                 var opacity_0 = parseFloat("0." + Math.abs(Math.round(color_0)));
