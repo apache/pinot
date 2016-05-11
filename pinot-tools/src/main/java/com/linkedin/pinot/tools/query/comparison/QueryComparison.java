@@ -107,12 +107,10 @@ public class QueryComparison {
 
   private void runFunctionMode()
       throws Exception {
-    BufferedReader queryReader = null;
     BufferedReader resultReader = null;
-    try {
-      ScanBasedQueryProcessor scanBasedQueryProcessor = null;
-      queryReader = new BufferedReader(new FileReader(_queryFile));
+    ScanBasedQueryProcessor scanBasedQueryProcessor = null;
 
+    try (BufferedReader queryReader = new BufferedReader(new FileReader(_queryFile))) {
       if (_resultFile == null) {
         scanBasedQueryProcessor = new ScanBasedQueryProcessor(_segmentsDir.getAbsolutePath());
       } else {
@@ -127,41 +125,52 @@ public class QueryComparison {
           continue;
         }
 
+        JSONObject expectedJson = null;
         try {
-          JSONObject expectedJson;
-
           if (resultReader != null) {
             expectedJson = new JSONObject(resultReader.readLine());
           } else {
             QueryResponse expectedResponse = scanBasedQueryProcessor.processQuery(query);
             expectedJson = new JSONObject(new ObjectMapper().writeValueAsString(expectedResponse));
           }
-
-          JSONObject actualJson = new JSONObject(_clusterStarter.query(query));
-
-          if (compare(actualJson, expectedJson)) {
-            ++passed;
-            LOGGER.info("Comparison PASSED: Id: {} actual Time: {} ms expected Time: {} ms Docs Scanned: {}", total,
-                actualJson.get(TIME_USED_MS), expectedJson.get(TIME_USED_MS), actualJson.get(NUM_DOCS_SCANNED));
-            LOGGER.debug("actual Response: {}", actualJson);
-            LOGGER.debug("expected Response: {}", expectedJson);
-          } else {
-            LOGGER.error("Comparison FAILED: {}", query);
-            LOGGER.info("actual Response: {}", actualJson);
-            LOGGER.info("expected Response: {}", expectedJson);
-          }
         } catch (Exception e) {
-          LOGGER.error("Exception caught while processing query: '{}'", query, e);
-        } finally {
-          ++total;
+          LOGGER.error("Comparison FAILED: Id: {} Exception caught while getting expected response for query: '{}'",
+              total, query, e);
         }
+
+        JSONObject actualJson = null;
+        if (expectedJson != null) {
+          try {
+            actualJson = new JSONObject(_clusterStarter.query(query));
+          } catch (Exception e) {
+            LOGGER.error("Comparison FAILED: Id: {} Exception caught while running query: '{}'", total, query, e);
+          }
+        }
+
+        if (expectedJson != null && actualJson != null) {
+          try {
+            if (compare(actualJson, expectedJson)) {
+              passed++;
+              LOGGER.info("Comparison PASSED: Id: {} actual Time: {} ms expected Time: {} ms Docs Scanned: {}", total,
+                  actualJson.get(TIME_USED_MS), expectedJson.get(TIME_USED_MS), actualJson.get(NUM_DOCS_SCANNED));
+              LOGGER.debug("actual Response: {}", actualJson);
+              LOGGER.debug("expected Response: {}", expectedJson);
+            } else {
+              LOGGER.error("Comparison FAILED: Id: {} query: {}", query);
+              LOGGER.info("actual Response: {}", actualJson);
+              LOGGER.info("expected Response: {}", expectedJson);
+            }
+          } catch (Exception e) {
+            LOGGER.error("Comparison FAILED: Id: {} Exception caught while comparing query: '{}' actual response: {}, expected response: {}",
+                total, query, actualJson, expectedJson, e);
+          }
+        }
+
+        total++;
       }
 
       LOGGER.info("Total {} out of {} queries passed.", passed, total);
     } finally {
-      if (queryReader != null) {
-        queryReader.close();
-      }
       if (resultReader != null) {
         resultReader.close();
       }
@@ -468,10 +477,6 @@ public class QueryComparison {
     return sb.toString();
   }
 
-  private static boolean compareAsString(String actualString, String expectedString) {
-    return (actualString.equals(expectedString));
-  }
-
   private static boolean isNumeric(String str) {
     if (str == null) {
       return false;
@@ -483,16 +488,6 @@ public class QueryComparison {
       return false;
     }
     return true;
-  }
-
-  private static boolean compareAsNumber(String actualString, String expectedString) {
-    try {
-      double actualVal = Double.parseDouble(actualString);
-      double expectedVal = Double.parseDouble(expectedString);
-      return (fuzzyEqual(actualVal, expectedVal));
-    } catch (NumberFormatException nfe) {
-      return false;
-    }
   }
 
   private static boolean compareLists(JSONArray actualList, JSONArray expectedList,
