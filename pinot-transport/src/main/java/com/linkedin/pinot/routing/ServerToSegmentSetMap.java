@@ -15,7 +15,10 @@
  */
 package com.linkedin.pinot.routing;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -41,7 +44,7 @@ import com.linkedin.pinot.transport.common.SegmentIdSet;
 public class ServerToSegmentSetMap {
   private static final ObjectMapper mapper = new ObjectMapper();
   private static final Logger logger = LoggerFactory.getLogger(ServerToSegmentSetMap.class);
-  
+
   private Map<String, Set<String>> _serverToSegmentSetMap;
   private Map<ServerInstance, SegmentIdSet> _routingTable;
 
@@ -87,9 +90,18 @@ public class ServerToSegmentSetMap {
       JSONObject ret = new JSONObject();
       for (ServerInstance i : _routingTable.keySet()) {
         JSONArray serverInstanceSegmentList = new JSONArray();
+        List<String> sortedSegmentIds = new ArrayList<>();
+
         for (SegmentId segmentId : _routingTable.get(i).getSegments()) {
-          serverInstanceSegmentList.put(segmentId.getSegmentId());
+          sortedSegmentIds.add(segmentId.getSegmentId());
         }
+
+        Collections.sort(sortedSegmentIds);
+
+        for (String sortedSegmentId : sortedSegmentIds) {
+          serverInstanceSegmentList.put(sortedSegmentId);
+        }
+
         ret.put(i.toString(), serverInstanceSegmentList);
       }
       return ret.toString();
