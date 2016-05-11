@@ -60,9 +60,8 @@ public class ControllerExternalViewChangeListener implements ExternalViewChangeL
             nReplicas++;
           }
         }
-        if (nReplicas <= 1){
+        if (nReplicas < 1) {
           // Not enough replicas
-          LOGGER.warn("Partition {} of table {} only has {} replicas", partitionName, tableName, nReplicas);
           numBelowReplicationThreshold++;
         }
       }
