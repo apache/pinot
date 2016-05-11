@@ -13,18 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.server.segment.fetcher;
+package com.linkedin.pinot.common.segment.fetcher;
 
 import java.io.File;
 import java.util.Map;
 
-import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class LocalFileSegmentFetcher implements SegmentFetcher {
+import com.linkedin.pinot.common.utils.FileUploadUtils;
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(LocalFileSegmentFetcher.class);
+public class HttpSegmentFetcher implements SegmentFetcher {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(HttpSegmentFetcher.class);
 
   @Override
   public void init(Map<String, String> configs) {
@@ -32,7 +33,8 @@ public class LocalFileSegmentFetcher implements SegmentFetcher {
 
   @Override
   public void fetchSegmentToLocal(String uri, File tempFile) throws Exception {
-    FileUtils.copyFile(new File(uri), tempFile);
-    LOGGER.info("Copy file from {} to {}; Length of file: {}", uri, tempFile, tempFile.length());
+    final long httpGetResponseContentLength = FileUploadUtils.getFile(uri, tempFile);
+    LOGGER.info("Downloaded file from {} to {}; Length of httpGetResponseContent: {}; Length of downloaded file: {}", uri, tempFile,
+        httpGetResponseContentLength, tempFile.length());
   }
 }
