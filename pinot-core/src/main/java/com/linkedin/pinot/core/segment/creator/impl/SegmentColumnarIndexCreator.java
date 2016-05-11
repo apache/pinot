@@ -31,6 +31,7 @@ import com.linkedin.pinot.core.segment.creator.impl.fwd.MultiValueUnsortedForwar
 import com.linkedin.pinot.core.segment.creator.impl.fwd.SingleValueSortedForwardIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.fwd.SingleValueUnsortedForwardIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.inv.OffHeapBitmapInvertedIndexCreator;
+import com.linkedin.pinot.core.segment.creator.impl.stats.StringColumnPreIndexStatsCollector;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
@@ -67,6 +68,10 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   private int totalDocs;
   private int totalRawDocs;
   private int totalAggDocs;
+  private int totalErrors;
+  private int totalNulls;
+  private int totalConversions;
+  private int totalNullCols;
   private int docIdCounter;
   private Map<String, Map<Object, Object>> dictionaryCache = new HashMap<String, Map<Object, Object>>();
 
@@ -94,6 +99,10 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     this.totalDocs = segmentIndexCreationInfo.getTotalDocs();
     this.totalAggDocs = segmentIndexCreationInfo.getTotalAggDocs();
     this.totalRawDocs = segmentIndexCreationInfo.getTotalRawDocs();
+    this.totalErrors = segmentIndexCreationInfo.getTotalErrors();
+    this.totalNulls = segmentIndexCreationInfo.getTotalNulls();
+    this.totalConversions = segmentIndexCreationInfo.getTotalConversions();
+    this.totalNullCols = segmentIndexCreationInfo.getTotalNullCols();
 
     // Initialize and build dictionaries
     for (final FieldSpec spec : schema.getAllFieldSpecs()) {
@@ -206,6 +215,10 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     properties.setProperty(SEGMENT_TOTAL_AGGREGATE_DOCS, String.valueOf(totalAggDocs));
     properties.setProperty(SEGMENT_TOTAL_DOCS, String.valueOf(totalDocs));
     properties.setProperty(STAR_TREE_ENABLED, String.valueOf(config.isEnableStarTreeIndex()));
+    properties.setProperty(SEGMENT_TOTAL_ERRORS, String.valueOf(totalErrors));
+    properties.setProperty(SEGMENT_TOTAL_NULLS, String.valueOf(totalNulls));
+    properties.setProperty(SEGMENT_TOTAL_CONVERSIONS, String.valueOf(totalConversions));
+    properties.setProperty(SEGMENT_TOTAL_NULL_COLS, String.valueOf(totalNullCols));
     String timeColumn = config.getTimeColumnName();
 
     StarTreeIndexSpec starTreeIndexSpec = config.getStarTreeIndexSpec();

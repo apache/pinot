@@ -73,7 +73,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   SegmentPreIndexStatsCollector statsCollector;
   Map<String, ColumnIndexCreationInfo> indexCreationInfoMap;
   SegmentCreator indexCreator;
-  SegmentIndexCreationInfo segementIndexCreationInfo;
+  SegmentIndexCreationInfo segmentIndexCreationInfo;
   Schema dataSchema;
   PlainFieldExtractor extractor;
   int totalDocs = 0;
@@ -107,7 +107,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     statsCollector.init();
 
     // Initialize index creation
-    segementIndexCreationInfo = new SegmentIndexCreationInfo();
+    segmentIndexCreationInfo = new SegmentIndexCreationInfo();
     indexCreationInfoMap = new HashMap<String, ColumnIndexCreationInfo>();
 
     // Check if has star tree
@@ -194,7 +194,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     LOGGER.info("Collected stats for {} raw documents, {} aggregated documents", totalRawDocs, totalAggDocs);
     long statCollectionFinishTime = System.currentTimeMillis();
     // Initialize the index creation using the per-column statistics information
-    indexCreator.init(config, segementIndexCreationInfo, indexCreationInfoMap, dataSchema, tempIndexDir);
+    indexCreator.init(config, segmentIndexCreationInfo, indexCreationInfoMap, dataSchema, tempIndexDir);
 
     //iterate over the data again,
     Iterator<GenericRow> allRowsIterator = starTreeBuilder.iterator(0,
@@ -296,7 +296,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     LOGGER.info("Collected stats for {} documents", totalDocs);
 
     // Initialize the index creation using the per-column statistics information
-    indexCreator.init(config, segementIndexCreationInfo, indexCreationInfoMap, dataSchema, tempIndexDir);
+    indexCreator.init(config, segmentIndexCreationInfo, indexCreationInfoMap, dataSchema, tempIndexDir);
 
     // Build the index
     recordReader.rewind();
@@ -439,10 +439,14 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
               statsCollector.getColumnProfileFor(column).getTotalNumberOfEntries(),
               statsCollector.getColumnProfileFor(column).getMaxNumberOfMultiValues()));
     }
-    segementIndexCreationInfo.setTotalDocs(totalDocs);
-    segementIndexCreationInfo.setTotalRawDocs(totalRawDocs);
-    segementIndexCreationInfo.setTotalAggDocs(totalAggDocs);
-    segementIndexCreationInfo.setStarTreeEnabled(createStarTree);
+    segmentIndexCreationInfo.setTotalDocs(totalDocs);
+    segmentIndexCreationInfo.setTotalRawDocs(totalRawDocs);
+    segmentIndexCreationInfo.setTotalAggDocs(totalAggDocs);
+    segmentIndexCreationInfo.setStarTreeEnabled(createStarTree);
+    segmentIndexCreationInfo.setTotalConversions(extractor.getTotalConversions());
+    segmentIndexCreationInfo.setTotalErrors(extractor.getTotalErrors());
+    segmentIndexCreationInfo.setTotalNullCols(extractor.getTotalNullCols());
+    segmentIndexCreationInfo.setTotalNulls(extractor.getTotalNulls());
   }
 
   @Override

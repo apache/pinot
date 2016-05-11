@@ -115,6 +115,10 @@ public class V1Constants {
       public static final String SEGMENT_TOTAL_AGGREGATE_DOCS = "segment.total.aggregate.docs";
       public static final String SEGMENT_CRC = "segment.crc";
       public static final String SEGMENT_CREATION_TIME = "segment.creation.time";
+      public static final String SEGMENT_TOTAL_ERRORS = "segment.total.errors";
+      public static final String SEGMENT_TOTAL_NULLS = "segment.total.nulls";
+      public static final String SEGMENT_TOTAL_CONVERSIONS = "segment.total.conversions";
+      public static final String SEGMENT_TOTAL_NULL_COLS = "segment.total.null.cols";
 
       // not using currently
       public static final String SEGMENT_INDEX_TYPE = "segment.index.type";
