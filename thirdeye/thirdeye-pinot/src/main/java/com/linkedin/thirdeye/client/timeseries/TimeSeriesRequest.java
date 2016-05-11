@@ -16,7 +16,7 @@ import com.linkedin.thirdeye.client.TimeRangeUtils;
 
 public class TimeSeriesRequest {
   private String collectionName;
-  private List<MetricFunction> metricFunctions;
+  private List<MetricExpression> metricExpressions;
   /**
    * Dimensions to group by. multiple dimensions will generate multiple client requests, as opposed
    * to a single request grouped by multiple dimensions (not supported).
@@ -46,8 +46,8 @@ public class TimeSeriesRequest {
   /** TODO use builder pattern? */
   public TimeSeriesRequest(TimeSeriesRequest timeSeriesRequest) {
     this.collectionName = timeSeriesRequest.collectionName;
-    if (timeSeriesRequest.metricFunctions != null) {
-      this.metricFunctions = new ArrayList<>(timeSeriesRequest.metricFunctions);
+    if (timeSeriesRequest.metricExpressions != null) {
+      this.metricExpressions = new ArrayList<>(timeSeriesRequest.metricExpressions);
     }
     if (timeSeriesRequest.groupByDimensions != null) {
       this.groupByDimensions = new ArrayList<>(timeSeriesRequest.groupByDimensions);
@@ -73,12 +73,12 @@ public class TimeSeriesRequest {
     this.collectionName = collectionName;
   }
 
-  public List<MetricFunction> getMetricFunctions() {
-    return metricFunctions;
+  public List<MetricExpression> getMetricExpressions() {
+    return metricExpressions;
   }
 
-  public void setMetricFunctions(List<MetricFunction> metricFunctions) {
-    this.metricFunctions = metricFunctions;
+  public void setMetricExpressions(List<MetricExpression> metricExpressions) {
+    this.metricExpressions = metricExpressions;
   }
 
   public List<String> getGroupByDimensions() {
@@ -140,16 +140,9 @@ public class TimeSeriesRequest {
   @Override
   public String toString() {
     return MoreObjects.toStringHelper(this).add("collectionName", collectionName)
-        .add("metricFunctions", metricFunctions).add("groupByDimensions", groupByDimensions)
+        .add("metricExpressions", metricExpressions).add("groupByDimensions", groupByDimensions)
         .add("filterSet", filterSet).add("filterClause", filterClause).add("start", start)
         .add("end", end).add("aggregationTimeGranularity", aggregationTimeGranularity).toString();
   }
 
-  public void setMetricExpressions(List<MetricExpression> metricExpressions) {
-    List<MetricFunction> metricFunctions = new ArrayList<>();
-    for (MetricExpression expression : metricExpressions) {
-      metricFunctions.addAll(expression.computeMetricFunctions());
-    }
-    setMetricFunctions(metricFunctions);
-  }
 }

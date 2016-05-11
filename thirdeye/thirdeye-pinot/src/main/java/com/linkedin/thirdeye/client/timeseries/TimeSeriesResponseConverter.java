@@ -61,7 +61,7 @@ public class TimeSeriesResponseConverter {
       for (TimeSeriesRow timeSeriesRow : entry.getValue()) {
         long timestamp = timeSeriesRow.getStart();
         for (TimeSeriesMetric metric : timeSeriesRow.getMetrics()) {
-          String metricName = metric.getMetricFunction().getMetricName();
+          String metricName = metric.getMetricName();
           Double value = metric.getValue();
           metricTimeSeries.increment(timestamp, metricName, value);
         }

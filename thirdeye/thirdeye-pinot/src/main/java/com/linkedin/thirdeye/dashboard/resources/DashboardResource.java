@@ -462,7 +462,7 @@ public class DashboardResource {
       for (int i = 0; i < response.getNumRows(); i++) {
         TimeSeriesRow timeSeriesRow = response.getRow(i);
         for (TimeSeriesMetric metricTimeSeries : timeSeriesRow.getMetrics()) {
-          String key = metricTimeSeries.getMetricFunction().getMetricName();
+          String key = metricTimeSeries.getMetricName();
           if (timeSeriesRow.getDimensionName() != null
               && timeSeriesRow.getDimensionName().trim().length() > 0) {
             key = key + "|" + timeSeriesRow.getDimensionName() + "|"

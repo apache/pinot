@@ -113,8 +113,8 @@ public class TimeSeriesRow implements Comparable<TimeSeriesRow> {
       this.dimensionValue = dimensionValue;
     }
 
-    public void addMetric(MetricFunction metricFunction, double value) {
-      this.metrics.add(new TimeSeriesMetric(metricFunction, value));
+    public void addMetric(String metricName, double value) {
+      this.metrics.add(new TimeSeriesMetric(metricName, value));
     }
 
     public void addMetrics(TimeSeriesMetric... metrics) {
@@ -135,24 +135,24 @@ public class TimeSeriesRow implements Comparable<TimeSeriesRow> {
   }
 
   public static class TimeSeriesMetric implements Comparable<TimeSeriesMetric> {
-    private final MetricFunction metricFunction; // TODO metric function?
+    private final String metricName; 
     private final Double value;
 
-    public TimeSeriesMetric(MetricFunction metricFunction, Double value) {
-      this.metricFunction = metricFunction;
+    public TimeSeriesMetric(String metricName, Double value) {
+      this.metricName = metricName;
       this.value = value;
     }
 
     @Override
     public int compareTo(TimeSeriesMetric otherMetric) {
       // shouldn't ever need to compare by value
-      return this.metricFunction.compareTo(otherMetric.metricFunction);
+      return this.metricName.compareTo(otherMetric.metricName);
     }
 
-    public MetricFunction getMetricFunction() {
-      return metricFunction;
+    public String getMetricName() {
+      return metricName;
     }
-
+    
     public Double getValue() {
       return value;
     }

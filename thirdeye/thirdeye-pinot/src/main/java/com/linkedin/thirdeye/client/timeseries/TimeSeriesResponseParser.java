@@ -91,7 +91,7 @@ public class TimeSeriesResponseParser {
     for (Entry<MetricFunction, Double> entry : metrics.entrySet()) {
       MetricFunction metricFunction = entry.getKey();
       Double value = entry.getValue();
-      rowBuilder.addMetric(metricFunction, value);
+      rowBuilder.addMetric(metricFunction.getMetricName(), value);
     }
   }
 
@@ -124,7 +124,7 @@ public class TimeSeriesResponseParser {
         for (String dimensionValue : map.keySet()) {
           Double value = map.get(dimensionValue);
           TimeSeriesRow.Builder rowBuilder = rowBuilderCache.get(dimensionName, dimensionValue);
-          rowBuilder.addMetric(metricFunction, value);
+          rowBuilder.addMetric(metricFunction.getMetricName(), value);
         }
         metricSumFromGroupByResponse.put(metricFunction, dimensionName, dimensionSum);
       }
@@ -150,7 +150,7 @@ public class TimeSeriesResponseParser {
         // only add OTHER group if the sum is different from the total.
         if (difference > 0) {
           Builder builder = rowBuilderCache.get(dimensionName, OTHER);
-          builder.addMetric(metricFunction, difference);
+          builder.addMetric(metricFunction.getMetricName(), difference);
         }
       }
     }

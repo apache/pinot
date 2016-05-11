@@ -4,24 +4,25 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import com.linkedin.thirdeye.client.MetricExpression;
 import com.linkedin.thirdeye.client.MetricFunction;
 
 public class TimeSeriesResponse {
   private final int numRows;
-  private final List<MetricFunction> metricFunctions;
+  private final List<MetricExpression> metricExpressions;
   private final List<String> metrics;
   private final List<String> dimensionNames;
   private final List<TimeSeriesRow> rows;
 
-  public TimeSeriesResponse(List<MetricFunction> metricFunctions, List<String> dimensionNames,
+  public TimeSeriesResponse(List<MetricExpression> metricExpressions, List<String> dimensionNames,
       List<TimeSeriesRow> rows) {
     rows = new ArrayList<>(rows);
     Collections.sort(rows);
     this.rows = Collections.unmodifiableList(rows);
-    this.metricFunctions = metricFunctions;
+    this.metricExpressions = metricExpressions;
     metrics = new ArrayList<>();
-    for (MetricFunction function : metricFunctions) {
-      metrics.add(function.getMetricName());
+    for (MetricExpression expression : metricExpressions) {
+      metrics.add(expression.getEspressionName());
     }
     this.dimensionNames = dimensionNames;
     numRows = rows.size();
@@ -31,14 +32,14 @@ public class TimeSeriesResponse {
     return numRows;
   }
 
-  public List<MetricFunction> getMetricFunctions() {
-    return metricFunctions;
-  }
-
   public List<String> getMetrics() {
     return metrics;
   }
 
+  public List<MetricExpression> getMetricExpressions() {
+    return metricExpressions;
+  }
+  
   public List<String> getDimensionNames() {
     return dimensionNames;
   }

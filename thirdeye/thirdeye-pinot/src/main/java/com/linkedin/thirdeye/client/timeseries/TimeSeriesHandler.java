@@ -14,11 +14,15 @@ import org.apache.commons.collections.CollectionUtils;
 import org.joda.time.DateTime;
 
 import com.google.common.collect.Range;
+import com.linkedin.thirdeye.client.MetricExpression;
 import com.linkedin.thirdeye.client.MetricFunction;
 import com.linkedin.thirdeye.client.QueryCache;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.client.ThirdEyeRequest;
 import com.linkedin.thirdeye.client.ThirdEyeResponse;
+import com.linkedin.thirdeye.client.comparison.Row;
+import com.linkedin.thirdeye.client.comparison.Row.Metric;
+import com.linkedin.thirdeye.client.timeseries.TimeSeriesRow.TimeSeriesMetric;
 
 public class TimeSeriesHandler {
   private static final int DEFAULT_QUERY_TIMEOUT = 60;
@@ -74,9 +78,33 @@ public class TimeSeriesHandler {
             responseParser.parseAggregationOnlyResponse(subTimeSeriesRequest, queryResponseMap));
       }
     }
-
-    List<MetricFunction> metricFunctions = timeSeriesRequest.getMetricFunctions();
-    return new TimeSeriesResponse(metricFunctions, groupByDimensions, rows);
+    List<MetricExpression> metricExpressions = timeSeriesRequest.getMetricExpressions();
+    // compute list of derived expressions
+    List<MetricExpression> derivedMetricExpressions = new ArrayList<>();
+    for (MetricExpression expression : metricExpressions) {
+      if (expression.computeMetricFunctions().size() > 1) {
+        derivedMetricExpressions.add(expression);
+      }
+    }
+    // add metric expressions
+    if (derivedMetricExpressions.size() > 0) {
+      Map<String, Double> metricValueContext = new HashMap<>();
+      for (TimeSeriesRow row : rows) {
+        metricValueContext.clear();
+        List<TimeSeriesMetric> metrics = row.getMetrics();
+        for (TimeSeriesMetric metric : metrics) {
+          metricValueContext.put(metric.getMetricName(), metric.getValue());
+        }
+        for (MetricExpression expression : derivedMetricExpressions) {
+          String derivedMetricExpression = expression.getExpression();
+          double derivedMetricValue =
+              MetricExpression.evaluateExpression(derivedMetricExpression, metricValueContext);
+          row.getMetrics()
+              .add(new TimeSeriesMetric(expression.getEspressionName(), derivedMetricValue));
+        }
+      }
+    }
+    return new TimeSeriesResponse(metricExpressions, groupByDimensions, rows);
   }
 
   /**

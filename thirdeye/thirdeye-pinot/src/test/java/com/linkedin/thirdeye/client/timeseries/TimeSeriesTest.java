@@ -10,9 +10,11 @@ import org.joda.time.DateTime;
 
 import com.google.common.collect.Lists;
 import com.linkedin.thirdeye.api.TimeGranularity;
+import com.linkedin.thirdeye.client.MetricExpression;
 import com.linkedin.thirdeye.client.MetricFunction;
 import com.linkedin.thirdeye.client.QueryCache;
 import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClient;
+import com.linkedin.thirdeye.dashboard.Utils;
 
 /** Manual test for verifying code works as expected (ie without exceptions thrown) */
 public class TimeSeriesTest {
@@ -71,7 +73,8 @@ public class TimeSeriesTest {
 
     List<MetricFunction> metricFunctions = new ArrayList<>();
     metricFunctions.add(DEFAULT_METRIC_FUNCTION);
-    timeSeriesRequest.setMetricFunctions(metricFunctions);
+    List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metricFunctions);
+    timeSeriesRequest.setMetricExpressions(metricExpressions );
     timeSeriesRequest.setAggregationTimeGranularity(new TimeGranularity(1, TimeUnit.HOURS));
     return timeSeriesRequest;
   }
@@ -85,7 +88,8 @@ public class TimeSeriesTest {
     timeSeriesRequest.setGroupByDimensions(ABOOK_DIMENSIONS);
     List<MetricFunction> metricFunctions = new ArrayList<>();
     metricFunctions.add(DEFAULT_METRIC_FUNCTION);
-    timeSeriesRequest.setMetricFunctions(metricFunctions);
+    List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metricFunctions);
+    timeSeriesRequest.setMetricExpressions(metricExpressions );
     timeSeriesRequest.setAggregationTimeGranularity(null);
     return timeSeriesRequest;
   }
@@ -98,7 +102,8 @@ public class TimeSeriesTest {
     timeSeriesRequest.setGroupByDimensions(ABOOK_DIMENSIONS);
     List<MetricFunction> metricFunctions = new ArrayList<>();
     metricFunctions.add(DEFAULT_METRIC_FUNCTION);
-    timeSeriesRequest.setMetricFunctions(metricFunctions);
+    List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metricFunctions);
+    timeSeriesRequest.setMetricExpressions(metricExpressions );
     timeSeriesRequest.setAggregationTimeGranularity(new TimeGranularity(1, TimeUnit.HOURS));
     return timeSeriesRequest;
   }

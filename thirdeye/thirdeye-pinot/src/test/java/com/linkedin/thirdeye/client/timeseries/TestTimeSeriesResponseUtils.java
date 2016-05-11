@@ -17,9 +17,11 @@ import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.MetricSchema;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.MetricType;
+import com.linkedin.thirdeye.client.MetricExpression;
 import com.linkedin.thirdeye.client.MetricFunction;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesRow.Builder;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesRow.TimeSeriesMetric;
+import com.linkedin.thirdeye.dashboard.Utils;
 
 public class TestTimeSeriesResponseUtils {
   private static final TimeSeriesResponseConverter converter =
@@ -107,7 +109,8 @@ public class TestTimeSeriesResponseUtils {
                 metricFunction.toString()) % 1000); // doesn't matter, the test is that values are
                                                     // consistent between data
                                                     // structures.
-            TimeSeriesMetric timeSeriesMetric = new TimeSeriesMetric(metricFunction, value);
+            TimeSeriesMetric timeSeriesMetric =
+                new TimeSeriesMetric(metricFunction.getMetricName(), value);
             timeSeriesMetrics.add(timeSeriesMetric);
           }
           if (groupTimeSeriesMetricsIntoRow) {
@@ -155,7 +158,7 @@ public class TestTimeSeriesResponseUtils {
       this.metricFunctions = metricFunctions;
       List<String> metricNames = new ArrayList<>();
       for (MetricFunction metricFunction : metricFunctions) {
-        metricNames.add(metricFunction.toString());
+        metricNames.add(metricFunction.getMetricName());
       }
       this.metricNames = metricNames;
       this.metricSchema =
@@ -184,8 +187,7 @@ public class TestTimeSeriesResponseUtils {
         Assert.assertTrue(dimensions.contains(dimensionName));
       }
       for (TimeSeriesMetric metric : timeSeriesMetrics) {
-        Assert.assertTrue(metricFunctions.contains(metric.getMetricFunction()));
-        Assert.assertTrue(metricNames.contains(metric.getMetricFunction().toString()));
+        Assert.assertTrue(metricNames.contains(metric.getMetricName()));
       }
 
     }
@@ -205,13 +207,13 @@ public class TestTimeSeriesResponseUtils {
         DateTime end, TimeSeriesMetric... timeSeriesMetrics) {
       long timeWindow = start.getMillis();
       for (TimeSeriesMetric metric : timeSeriesMetrics) {
-        metricTimeSeries.increment(timeWindow, metric.getMetricFunction().toString(),
-            metric.getValue());
+        metricTimeSeries.increment(timeWindow, metric.getMetricName(), metric.getValue());
       }
     }
 
     private TimeSeriesResponse getResponse() {
-      return new TimeSeriesResponse(metricFunctions, dimensions, timeSeriesRows);
+      List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metricFunctions);
+      return new TimeSeriesResponse(metricExpressions, dimensions, timeSeriesRows);
     }
 
     private Map<DimensionKey, MetricTimeSeries> getMap() {
