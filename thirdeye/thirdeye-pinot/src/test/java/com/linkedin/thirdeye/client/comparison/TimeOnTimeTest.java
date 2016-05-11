@@ -12,6 +12,7 @@ import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.client.MetricExpression;
 import com.linkedin.thirdeye.client.MetricFunction;
 import com.linkedin.thirdeye.client.QueryCache;
+import com.linkedin.thirdeye.client.comparison.Row.Metric;
 import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClient;
 import com.linkedin.thirdeye.dashboard.Utils;
 
@@ -29,9 +30,9 @@ public class TimeOnTimeTest {
     // QueryCache queryCache = new QueryCache(pinotThirdEyeClient, Executors.newCachedThreadPool());
 
     TimeOnTimeComparisonRequest comparisonRequest;
-     comparisonRequest = generateGroupByTimeRequest();
-//     comparisonRequest = generateGroupByDimensionRequest();
-//    comparisonRequest = generateGroupByTimeAndDimension();
+    comparisonRequest = generateGroupByTimeRequest();
+    // comparisonRequest = generateGroupByDimensionRequest();
+    // comparisonRequest = generateGroupByTimeAndDimension();
 
     TimeOnTimeComparisonHandler handler = new TimeOnTimeComparisonHandler(queryCache);
     // long start;
@@ -49,6 +50,10 @@ public class TimeOnTimeTest {
     TimeOnTimeComparisonResponse response = handler.handle(comparisonRequest);
     long end = System.currentTimeMillis();
     System.out.println("Time taken:" + (end - start));
+    for (Metric metric : response.getRow(0).getMetrics()) {
+      System.out.print(metric.getMetricName() + "\t\t");
+    }
+    System.out.println();
     for (int i = 0; i < response.getNumRows(); i++) {
       System.out.println(response.getRow(i));
     }

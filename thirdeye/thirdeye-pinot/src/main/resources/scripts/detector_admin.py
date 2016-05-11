@@ -167,6 +167,13 @@ def add_jobs_subparser(subparsers):
     adhoc_parser.add_argument('--end', help='end time in IS08601 or as daysago(#)', required=False)
     adhoc_parser.set_defaults(func=adhoc_job)
 
+    from_file_parser = jobs_subparsers.add_parser('from_file', help='send adhoc function spec from a file configuration')
+    from_file_parser.add_argument('inps', nargs='+', help='JSON files specifying function spec to be created', metavar='file_paths')
+    from_file_parser.add_argument('--id', help='id of existing function to group anomalies under', required=True)
+    from_file_parser.add_argument('--start', help='start time in IS08601 or as daysago(#)', required=False)
+    from_file_parser.add_argument('--end', help='end time in IS08601 or as daysago(#)', required=False)
+    from_file_parser.set_defaults(func=test_function_spec_from_file)
+
     disable_parser = jobs_subparsers.add_parser('disable', help='disable job schedule')
     disable_parser.add_argument('inps', type=int, nargs='+', help='job ids', metavar='ids')
     disable_parser.set_defaults(func=disable_job)
@@ -197,7 +204,7 @@ def add_email_reports_subparser(subparsers):
 
     from_file_parser = email_reports_subparser.add_parser('from_file', help='send adhoc email report from a file configuration')
     from_file_parser.add_argument('inps', nargs='+', help='JSON files specifying email reports to be created', metavar='file_paths')
-    from_file_parser.set_defaults(func=execute_email_report_from_file)
+    from_file_parser.set_defaults(func=test_email_config_from_file)
 
     delete_parser = email_reports_subparser.add_parser('delete', help='delete an email report')
     delete_parser.add_argument('inps', type=int, nargs='+', help='email_report ids', metavar='ids')
@@ -267,6 +274,8 @@ def delete_msg_success(entity):
 def create_msg_success(entity):
     return action_msg_generator(entity, 'created')
 
+def submit_msg_success(entity):
+    return action_msg_generator(entity, 'submitted')
 
 def convert_to_iso(s):
     result = None
@@ -381,6 +390,23 @@ def adhoc_job(id, start=None, end=None):
 
 @MultipleInps
 @Request
+def test_function_spec_from_file(file_path, id, start=None, end=None):
+    with open(file_path, 'r') as f:
+        data = f.read()
+    params = {'name': file_path, 'id': id}
+    if start and end:
+        start = convert_to_iso(start)
+        end = convert_to_iso(end)
+        params['start'] = start
+        params['end'] = end
+        print "Testing adhoc function_spec from file_path %s on window %s to %s" % (file_path, start, end)
+    else:
+        print "Testing adhoc function_spec from file_path %s" % file_path
+    return 'POST', JOBS_ENDPOINT + "from-file?" + urllib.urlencode(params), {'data': data, 'print_result': submit_msg_success('adhoc function spec')}
+
+
+@MultipleInps
+@Request
 def disable_job(id):
     print "Disabling job id %d" % id
     return 'DELETE', JOBS_ENDPOINT + str(id)
@@ -418,14 +444,14 @@ def create_email_report_helper(result):
         reset_email_scheduler()
     return None
 
+
 @MultipleInps
 @Request
-def execute_email_report_from_file(file_path):
-    print "Submitting adhoc email report from file_path %s" % file_path
+def test_email_config_from_file(file_path):
+    print "Testing adhoc email report from file_path %s" % file_path
     with open(file_path, 'r') as f:
         data = f.read()
-    return 'POST', EMAIL_REPORTS_ENDPOINT + 'from-file?' + urllib.urlencode({'name':file_path}), {'data': data, 'print_result': True}
-
+    return 'POST', EMAIL_REPORTS_ENDPOINT  + "from-file?" + urllib.urlencode({'name': file_path}), {'data': data, 'print_result': submit_msg_success('adhoc email report')}    
 
 
 @MultipleInps
@@ -466,12 +492,16 @@ def show_anomaly_results_for_collection(collection, start, end=None):
     return 'GET', url, {'print_result': True}
 
 """ Initialization code """
+hosts = ["localhost" ]
+
 
 def extract_host():
     if len(sys.argv) > 1:
         host = sys.argv[1]
     else:
-        host = "localhost"
+        host = hosts[0] # default
+    if host not in hosts:
+        print 'WARNING: host "', host, '"is not officially supported'
     return host
 
 

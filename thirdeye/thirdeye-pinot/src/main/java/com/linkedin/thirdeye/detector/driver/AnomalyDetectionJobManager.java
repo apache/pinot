@@ -165,7 +165,7 @@ public class AnomalyDetectionJobManager {
    * Available for testing, but anomalies need to be created with a valid anomaly function ID
    * (foreign key constraint).
    */
-  void runAdhocFile(String filePath, int existingFunctionId, String windowStartIsoString,
+  public void runAdhocFile(String filePath, int existingFunctionId, String windowStartIsoString,
       String windowEndIsoString) throws Exception {
     synchronized (sync) {
       File file = new File(filePath);
@@ -174,15 +174,20 @@ public class AnomalyDetectionJobManager {
       }
       AnomalyFunctionSpec spec = reader.readValue(file, AnomalyFunctionSpec.class);
       spec.setId(existingFunctionId);
-      AnomalyFunction anomalyFunction = anomalyFunctionFactory.fromSpec(spec);
-
-      String triggerKey = String.format("file-based_anomaly_function_trigger_%s", filePath);
-      Trigger trigger = TriggerBuilder.newTrigger().withIdentity(triggerKey).startNow().build();
-
-      String jobKey = String.format("file-based_anomaly_function_job_%s", filePath);
-      buildAndScheduleJob(jobKey, trigger, anomalyFunction, spec, windowStartIsoString,
-          windowEndIsoString);
+      runAdhocConfig(spec, windowStartIsoString, windowEndIsoString, filePath);
     }
+  }
+
+  public void runAdhocConfig(AnomalyFunctionSpec spec, String windowStartIsoString,
+      String windowEndIsoString, String executionName) throws Exception, SchedulerException {
+    AnomalyFunction anomalyFunction = anomalyFunctionFactory.fromSpec(spec);
+
+    String triggerKey = String.format("file-based_anomaly_function_trigger_%s", executionName);
+    Trigger trigger = TriggerBuilder.newTrigger().withIdentity(triggerKey).startNow().build();
+
+    String jobKey = String.format("file-based_anomaly_function_job_%s", executionName);
+    buildAndScheduleJob(jobKey, trigger, anomalyFunction, spec, windowStartIsoString,
+        windowEndIsoString);
   }
 
   public static void main(String[] args) throws Exception {
@@ -191,7 +196,9 @@ public class AnomalyDetectionJobManager {
           "Arguments must be configYml functionSpecPath [startISO endISO, both hour aligned]");
       System.exit(1);
     }
-    String configPath = args[0];
+    String thirdEyeConfigDir = args[0];
+    System.setProperty("dw.rootDir", thirdEyeConfigDir);
+    String detectorApplicationConfigFile = thirdEyeConfigDir + "/" + "detector.yml";
     String filePath = args[1];
     String startISO = null;
     String endISO = null;
@@ -205,9 +212,10 @@ public class AnomalyDetectionJobManager {
           .toString();
       endISO = now.toString();
     }
-
-    new TestAnomalyApplication(filePath, startISO, endISO, TestType.FUNCTION).run(new String[] {
-        "server", configPath
+    int existingFunctionId = 1;
+    new TestAnomalyApplication(filePath, startISO, endISO, TestType.FUNCTION, existingFunctionId)
+        .run(new String[] {
+            "server", detectorApplicationConfigFile
     });
   }
 

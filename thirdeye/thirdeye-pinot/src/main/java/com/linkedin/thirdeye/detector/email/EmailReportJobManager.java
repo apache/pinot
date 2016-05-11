@@ -120,11 +120,13 @@ public class EmailReportJobManager implements Managed {
 
   public void runAdhocConfig(EmailConfiguration emailConfig, String executionName)
       throws Exception {
-    String triggerKey = String.format("adhoc_config-based_email_trigger_%s", executionName);
-    Trigger trigger = TriggerBuilder.newTrigger().withIdentity(triggerKey).startNow().build();
+    synchronized (sync) {
+      String triggerKey = String.format("adhoc_config-based_email_trigger_%s", executionName);
+      Trigger trigger = TriggerBuilder.newTrigger().withIdentity(triggerKey).startNow().build();
 
-    String jobKey = String.format("adhoc_config-based_email_job_%s", executionName);
-    buildAndScheduleJob(emailConfig, trigger, jobKey);
+      String jobKey = String.format("adhoc_config-based_email_job_%s", executionName);
+      buildAndScheduleJob(emailConfig, trigger, jobKey);
+    }
   }
 
   private void buildAndScheduleJob(EmailConfiguration emailConfig, Trigger trigger, String jobKey)
@@ -147,11 +149,13 @@ public class EmailReportJobManager implements Managed {
       System.err.println("Arguments must be configYml emailConfigPath");
       System.exit(1);
     }
-    String configPath = args[0];
+    String thirdEyeConfigDir = args[0];
+    System.setProperty("dw.rootDir", thirdEyeConfigDir);
+    String detectorApplicationConfigFile = thirdEyeConfigDir + "/" + "detector.yml";
     String filePath = args[1];
 
-    new TestAnomalyApplication(filePath, null, null, TestType.EMAIL).run(new String[] {
-        "server", configPath
+    new TestAnomalyApplication(filePath, null, null, TestType.EMAIL, -1).run(new String[] {
+        "server", detectorApplicationConfigFile
     });
   }
 }

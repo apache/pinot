@@ -47,7 +47,7 @@ public class EmailReportResource {
       throws Exception {
     configuration.setId(-1);
     manager.runAdhocConfig(configuration, name);
-    return Response.ok().build();
+    return Response.ok(name).build();
   }
 
   @POST

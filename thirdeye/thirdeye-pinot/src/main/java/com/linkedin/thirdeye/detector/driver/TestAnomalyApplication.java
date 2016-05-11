@@ -63,14 +63,16 @@ public class TestAnomalyApplication extends Application<ThirdEyeDetectorConfigur
       };
   private final String filePath, startISO, endISO;
   private final TestType testType;
+  private final int impersonatedId;
 
-  public TestAnomalyApplication(String filePath, String startISO, String endISO, TestType testType)
-      throws Exception {
+  public TestAnomalyApplication(String filePath, String startISO, String endISO, TestType testType,
+      int impersonatedId) throws Exception {
     this.filePath = filePath;
     TimeGranularity timeGranularity = new TimeGranularity(1, TimeUnit.HOURS);
     this.startISO = truncateBy(startISO, timeGranularity);
     this.endISO = truncateBy(endISO, timeGranularity);
     this.testType = testType;
+    this.impersonatedId = impersonatedId;
   }
 
   @Override
@@ -108,6 +110,7 @@ public class TestAnomalyApplication extends Application<ThirdEyeDetectorConfigur
     });
 
     if (testType == TestType.FUNCTION) {
+      int existingFunctionId = this.impersonatedId;
       // function
       final AnomalyFunctionSpecDAO anomalyFunctionSpecDAO =
           new AnomalyFunctionSpecDAO(hibernate.getSessionFactory());
@@ -126,7 +129,7 @@ public class TestAnomalyApplication extends Application<ThirdEyeDetectorConfigur
           anomalyFunctionRelationDAO, anomalyResultDAO, hibernate.getSessionFactory(),
           environment.metrics(), anomalyFunctionFactory);
 
-      jobManager.runAdhocFile(filePath, 1, startISO, endISO);
+      jobManager.runAdhocFile(filePath, existingFunctionId, startISO, endISO);
     } else if (testType == TestType.EMAIL) {
 
       final TimeOnTimeComparisonHandler timeOnTimeComparisonHandler =

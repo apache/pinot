@@ -4,6 +4,7 @@ import java.util.List;
 
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
+import javax.ws.rs.NotFoundException;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
@@ -12,6 +13,7 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import com.linkedin.thirdeye.detector.api.AnomalyFunctionSpec;
 import com.linkedin.thirdeye.detector.db.AnomalyFunctionSpecDAO;
 import com.linkedin.thirdeye.detector.driver.AnomalyDetectionJobManager;
 
@@ -42,6 +44,20 @@ public class AnomalyDetectionJobResource {
     specDAO.toggleActive(id, true);
     manager.start(id);
     return Response.ok().build();
+  }
+
+  @POST
+  @UnitOfWork
+  @Path("/from-file")
+  public Response testFile(AnomalyFunctionSpec spec, @QueryParam("id") Long existingFunctionId,
+      @QueryParam("start") String start, @QueryParam("end") String end,
+      @QueryParam("name") String name) throws Exception {
+    if (existingFunctionId == null || specDAO.findById(existingFunctionId) == null) {
+      throw new NotFoundException();
+    }
+    spec.setId(existingFunctionId);
+    manager.runAdhocConfig(spec, start, end, name);
+    return Response.ok(name).build();
   }
 
   @POST

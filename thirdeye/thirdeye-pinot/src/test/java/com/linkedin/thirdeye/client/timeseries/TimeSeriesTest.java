@@ -14,6 +14,7 @@ import com.linkedin.thirdeye.client.MetricExpression;
 import com.linkedin.thirdeye.client.MetricFunction;
 import com.linkedin.thirdeye.client.QueryCache;
 import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClient;
+import com.linkedin.thirdeye.client.timeseries.TimeSeriesRow.TimeSeriesMetric;
 import com.linkedin.thirdeye.dashboard.Utils;
 
 /** Manual test for verifying code works as expected (ie without exceptions thrown) */
@@ -25,7 +26,9 @@ public class TimeSeriesTest {
   private static final String COUNT = "__COUNT";
   private static final MetricFunction DEFAULT_METRIC_FUNCTION =
       new MetricFunction(MetricFunction.SUM, COUNT);
-  private static final DateTime START = new DateTime(2016, 1, 1, 00, 00);
+  private static final MetricExpression SUBMIT_RATE_EXPRESSION =
+      new MetricExpression("submit_rate", "submits/impressions");
+  private static final DateTime START = new DateTime(2016, 4, 1, 00, 00);
 
   public static void main(String[] args) throws Exception {
     URL resource = null;// = System.class.get.getResource("log4j.properties");
@@ -38,18 +41,22 @@ public class TimeSeriesTest {
     // configurable
 
     QueryCache queryCache = new QueryCache(pinotThirdEyeClient, Executors.newFixedThreadPool(10));
-
-    for (TimeSeriesRequest timeSeriesRequest : new TimeSeriesRequest[] {
-        generateGroupByTimeRequest(), generateGroupByDimensionRequest(),
-        generateGroupByTimeAndDimension()
-    }) {
+    TimeSeriesRequest[] requests = new TimeSeriesRequest[] {
+        generateGroupByTimeRequest(),
+        // generateGroupByDimensionRequest(),
+        // generateGroupByTimeAndDimension()
+    };
+    for (TimeSeriesRequest timeSeriesRequest : requests) {
       try {
         TimeSeriesHandler handler = new TimeSeriesHandler(queryCache);
         long start = System.currentTimeMillis();
         TimeSeriesResponse response = handler.handle(timeSeriesRequest);
         long end = System.currentTimeMillis();
         System.out.println("Time taken:" + (end - start));
-        System.out.println("Time taken:" + (end - start));
+        for (TimeSeriesMetric metric : response.getRow(0).getMetrics()) {
+          System.out.print(metric.getMetricName() + "\t\t");
+        }
+        System.out.println();
         for (int i = 0; i < response.getNumRows(); i++) {
           System.out.println(response.getRow(i));
         }
@@ -74,7 +81,8 @@ public class TimeSeriesTest {
     List<MetricFunction> metricFunctions = new ArrayList<>();
     metricFunctions.add(DEFAULT_METRIC_FUNCTION);
     List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metricFunctions);
-    timeSeriesRequest.setMetricExpressions(metricExpressions );
+    metricExpressions.add(SUBMIT_RATE_EXPRESSION);
+    timeSeriesRequest.setMetricExpressions(metricExpressions);
     timeSeriesRequest.setAggregationTimeGranularity(new TimeGranularity(1, TimeUnit.HOURS));
     return timeSeriesRequest;
   }
@@ -89,7 +97,7 @@ public class TimeSeriesTest {
     List<MetricFunction> metricFunctions = new ArrayList<>();
     metricFunctions.add(DEFAULT_METRIC_FUNCTION);
     List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metricFunctions);
-    timeSeriesRequest.setMetricExpressions(metricExpressions );
+    timeSeriesRequest.setMetricExpressions(metricExpressions);
     timeSeriesRequest.setAggregationTimeGranularity(null);
     return timeSeriesRequest;
   }
@@ -103,7 +111,7 @@ public class TimeSeriesTest {
     List<MetricFunction> metricFunctions = new ArrayList<>();
     metricFunctions.add(DEFAULT_METRIC_FUNCTION);
     List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metricFunctions);
-    timeSeriesRequest.setMetricExpressions(metricExpressions );
+    timeSeriesRequest.setMetricExpressions(metricExpressions);
     timeSeriesRequest.setAggregationTimeGranularity(new TimeGranularity(1, TimeUnit.HOURS));
     return timeSeriesRequest;
   }

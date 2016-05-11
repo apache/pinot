@@ -5,9 +5,11 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 
 import org.apache.commons.collections.map.MultiKeyMap;
 
@@ -19,6 +21,10 @@ import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesRow.TimeSeriesMetric;
 
+/**
+ * Util class to support the older ThirdEyeClient API for time series responses. See
+ * {@link #toMap(TimeSeriesResponse, List)}
+ */
 public class TimeSeriesResponseConverter {
   private static final TimeSeriesResponseConverter instance = new TimeSeriesResponseConverter();
 
@@ -40,6 +46,7 @@ public class TimeSeriesResponseConverter {
     DimensionKeyGenerator dimensionKeyGenerator = new DimensionKeyGenerator(schemaDimensions);
 
     List<String> metrics = new ArrayList<>(response.getMetrics());
+    Set<String> metricSet = new HashSet<>(metrics);
     List<MetricType> types = Collections.nCopies(metrics.size(), MetricType.DOUBLE);
     MetricSchema metricSchema = new MetricSchema(metrics, types);
 
@@ -62,8 +69,12 @@ public class TimeSeriesResponseConverter {
         long timestamp = timeSeriesRow.getStart();
         for (TimeSeriesMetric metric : timeSeriesRow.getMetrics()) {
           String metricName = metric.getMetricName();
-          Double value = metric.getValue();
-          metricTimeSeries.increment(timestamp, metricName, value);
+          // Only add the row metric if it's listed in the response object. The row metric may
+          // contain additional info, eg the raw metrics required for calculating derived ones.
+          if (metricSet.contains(metricName)) {
+            Double value = metric.getValue();
+            metricTimeSeries.increment(timestamp, metricName, value);
+          }
         }
       }
     }
