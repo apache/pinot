@@ -30,8 +30,7 @@
                 	var len = data["dimensions"].length
                     for(var d= 0; d<len; d++){
                     	var dimension = data["dimensions"][d];
-                        console.log("dimension:")
-                        console.log(dimension)
+
                         var Treemap = {};
 
                         //Turn arrays into dataTables
@@ -73,11 +72,9 @@
 
 
                         var dimensionData = data["data"][metric + "." + dimension]["responseData"]
-                        console.log("dimensionData:")
-                        console.log(dimensionData)
+
                         var schema = data["data"][metric + "." + dimension]["schema"]["columnsToIndexMapping"]
-                        console.log("schema:")
-                        console.log(schema)
+
                         var numDimValues = dimensionData.length;
                         for(valId = 0;valId<numDimValues;valId++){
 

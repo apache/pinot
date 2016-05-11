@@ -50,13 +50,16 @@ function renderTimeSeriesUsingC3(d){  //time-series-area
 
     chart.hide();
     $("#timeseries-time-series-legend").on("click",'.time-series-checkbox', function() {
+
         var checkbox = this;
         var checkboxObj = $(checkbox);
         var line = checkboxObj.val();
         if (checkboxObj.is(':checked')) {
             chart.show(line)
+
         } else {
             chart.hide(line)
+
         }
     });
 
@@ -82,5 +85,7 @@ function renderTimeSeriesUsingC3(d){  //time-series-area
     });
 
     //Preselect first item
-    $($(".time-series-checkbox")[0]).click();
+    var currentView = $("#" + hash.view + "-display-chart-section");
+    var index = $($(".time-series-checkbox",currentView)[0]).val() == "time" ? 1 : 0;
+    $($(".time-series-checkbox",currentView)[index]).click();
 }

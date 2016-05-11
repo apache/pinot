@@ -146,6 +146,9 @@ function renderD3heatmap(data) {
                     .style("text-align", "center")
                     .style("color", function (d) {return d.color})
                     .style("font-size", "12px")
+                    .style("display", "flex")
+                    .style("align-items", "center")
+                    .style("justify-content", "center")
                     .text(function (d) {
                         return d.children ? null : d.label
                     });

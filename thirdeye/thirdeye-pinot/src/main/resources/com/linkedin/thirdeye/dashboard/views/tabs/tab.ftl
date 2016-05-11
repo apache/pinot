@@ -12,7 +12,6 @@
                 <i class="uk-icon-spinner uk-icon-spin uk-icon-large"></i>
             </div>
             <section id="{{tabName}}-display-chart-section" class="display-chart-section"></section>
-            <section id="{{tabName}}-display-table-section" class="display-chart-section"></section>
         </div>
     </div>
 

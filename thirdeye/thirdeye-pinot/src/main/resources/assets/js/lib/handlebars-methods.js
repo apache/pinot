@@ -143,7 +143,6 @@ $(document).ready(function() {
 
     Handlebars.registerHelper('parse', function(str, prop) {
         str = str.replace("/;/g", ',');
-        console.log("str", str)
         var obj = JSON.parse(str)
         return obj[prop];
     });
@@ -224,13 +223,17 @@ $(document).ready(function() {
 
     var source_metric_time_series_section = $("#metric-time-series-section-template").html();
     HandleBarsTemplates.template_metric_time_series_section = Handlebars.compile(source_metric_time_series_section);
+
+    /* var source_metric_time_series_section_anomaly = $("#metric-time-series-section-anomaly-template").html();
+    HandleBarsTemplates.template_metric_time_series_section_anomaly = Handlebars.compile(source_metric_time_series_section_anomaly);*/
     
     var source_time_series_template =  $("#time-series-template").html();
     HandleBarsTemplates.template_time_series = Handlebars.compile(source_time_series_template);
 
-    var source_metric_time_series_section_anomaly = $("#metric-time-series-section-anomaly-template").html();
-    HandleBarsTemplates.template_metric_time_series_section_anomaly = Handlebars.compile(source_metric_time_series_section_anomaly);
-
     var source_anomalies_template = $("#anomalies-template").html();
     HandleBarsTemplates.template_anomalies = Handlebars.compile(source_anomalies_template);
+
+
+
+
 })

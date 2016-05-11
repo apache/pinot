@@ -1,6 +1,6 @@
     /**--- 4) Eventlisteners ---**/
 
-    /** Dashboard Header related eventlisteners **/
+    /** Dashboard Form related eventlisteners **/
 
     //Prevent jumping view when anchors are clicked
     $("#main-view").on("click","a[href='#']", function(event){
@@ -46,6 +46,11 @@
     /** Dimension selection **/
     $("#main-view").on("click",".dimension-option", function(){
        selectDimension(this)
+    })
+
+    /** Dimension select all **/
+    $("#main-view").on("click",".dropdown-toggle-all", function(){
+        toggleAllDimensions(this)
     })
 
     /** Remove selected Metric or Dimension item **/

@@ -7,7 +7,7 @@
 <div id="main-view">
 	<nav class="tm-navbar uk-navbar uk-navbar-attached">
 		<div class="uk-container uk-container-center">
-            <a class="uk-navbar-brand brand" href="/dashboard#">Third Eye</a>
+            <a class="uk-navbar-brand brand" href="/dashboard#">ThirdEye</a>
 
 			<ul class="header-tabs uk-navbar-nav uk-hidden-small" data-uk-switcher="{connect:'#tabs'}">
 				<li id="dashboard-header-tab" class="header-tab" rel="dashboard"><a href="#">Dashboard</a></li>

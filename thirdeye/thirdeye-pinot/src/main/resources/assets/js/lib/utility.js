@@ -12,12 +12,14 @@ function getData(url){
                 var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' })
                 warning.append($('<p></p>', { html: 'No data available. (Error code: 404)' }))
                 $("#"+  hash.view  +"-chart-area-error").append(warning)
+                return
             },
             500: function() {
                 $("#"+  hash.view  +"-chart-area-error").empty()
                 var error = $('<div></div>', { class: 'uk-alert uk-alert-danger' })
                 error.append($('<p></p>', { html: 'Internal server error' }))
                 $("#"+  hash.view  +"-chart-area-error").append(error)
+                return
             }
         }
         ,
@@ -464,6 +466,10 @@ function selectDimension(target){
     $(target).hide();
     $(".selected-dimensions-list[rel='"+ hash.view +"']").append("<li class='added-item  uk-button remove-selection' rel='"+ param + "' value='"+ value +"'><a href='#'>" + $(target).text() +  "<i class='uk-icon-close'></i></a></li>");
 
+}
+
+function toggleAllDimensions(target){
+    //Todo:
 }
 
 function removeSelection(target){
@@ -1144,6 +1150,9 @@ function transformUTCToTZ() {
     });
     $(".table-time-cell").each(function (i, cell) {
         var dateTimeFormat = "h a";
+        if(hash.hasOwnProperty("aggTimeGranularity") && hash.aggTimeGranularity == "DAYS"){
+            dateTimeFormat = "MM-DD h a"
+        }
 
         transformUTCMillisToTZTime(cell, dateTimeFormat);
     });

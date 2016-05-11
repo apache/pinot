@@ -287,7 +287,7 @@ body a{
 
 #display-chart-area{
     margin: 0;
-    min-height: 400px;
+    min-height: 700px;
 }
 
 .loader{
@@ -299,6 +299,7 @@ body a{
     margin:0px;
     background-color: rgba(148, 148, 148, 0.7);
     z-index: 999;
+    min-height:700px;
 }
 
 .loader i{
@@ -443,6 +444,20 @@ body a{
 
 /** Tabular view related styling **/
 
+#linechart-placeholder {
+    display: inline-block;
+    width: 83%;
+    height: 300px;
+}
+
+
+#barchart-placeholder {
+    display: inline-block;
+    width: 83%;
+    height: 150px;
+}
+
+
 .chart.legend span {
     display: inline-block;
     margin-right: 5px; 
@@ -460,6 +475,7 @@ body a{
     display: inline-block;
     position: absolute;
     top: 70px;
+    right:10px;
 }
 
 .timeseries-legend-sub-box{
@@ -537,7 +553,7 @@ body a{
 
 }
 
-/*Override ui-kit css*/
+
 .date-time-selector-box{
     background-color: #fff;
     border: 2px solid #efefef;
@@ -656,6 +672,18 @@ body a{
 }
 
 /* Anommalies view related*/
+#linechart-placeholder {
+    display: inline-block;
+    width: 83%;
+    height: 300px;
+
+}
+
+
+#anomalies-display-chart-section #barchart-placeholder {
+    display: none;
+}
+
 #anomalies-table{
     width:100%;
     border: 1px solid #444;

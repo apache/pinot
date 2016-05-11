@@ -49,6 +49,7 @@
                         </ul>
                     </div>
                 </div>
+                <a class="dropdown-toggle-all hidden" rel="{{tabName}}" href="#">Select All</a>
                 <ul class="selected-dimensions-list" rel="{{tabName}}">
                 </ul>
             </div>

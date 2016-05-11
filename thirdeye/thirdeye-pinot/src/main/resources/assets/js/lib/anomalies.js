@@ -14,29 +14,17 @@ function getAnomalies() {
   
   getData(anomaliesUrl).done(function(anomalyData) {
     getData(timeSeriesUrl).done(function(timeSeriesData) {
-      renderAnomalyTabular(timeSeriesData, anomalyData);
-      renderAnomalies(anomalyData);
+      renderAnomalyLineChart(timeSeriesData, anomalyData);
+      renderAnomalyTable(anomalyData);
     });
   });
 };
 
-function renderAnomalies(data) {
-
-  console.log("anomalies data")
-  console.log(data)
-  $("#"+  hash.view  +"-display-table-section").empty();
-
-  /* Handelbars template for funnel table */
-  var result_anomalies_template = HandleBarsTemplates.template_anomalies(data);
-  $("#" + hash.view + "-display-table-section").append(result_anomalies_template);
-
-}
-
-function renderAnomalyTabular(timeSeriesData, anomalyData) {
+function renderAnomalyLineChart(timeSeriesData, anomalyData) {
   $("#"+  hash.view  +"-display-chart-section").empty();
 
   /* Handelbars template for time series legend */
-  var result_metric_time_series_section = HandleBarsTemplates.template_metric_time_series_section_anomaly(timeSeriesData);
+  var result_metric_time_series_section = HandleBarsTemplates.template_metric_time_series_section(timeSeriesData);
   $("#" + hash.view + "-display-chart-section").append(result_metric_time_series_section);
 
   drawAnomalyTimeSeries(timeSeriesData, anomalyData);
@@ -45,10 +33,11 @@ function renderAnomalyTabular(timeSeriesData, anomalyData) {
 var lineChart;
 function drawAnomalyTimeSeries(ajaxData, anomalyData) {
 
+  var currentView = $("#" + hash.view + "-display-chart-section");
+  var lineChartPlaceholder = $("#linechart-placeholder", currentView)[0];
   // Metric(s)
-  var metrics = ajaxData["metrics"]
+  var metrics = ajaxData["metrics"];
   var lineChartData = {};
-  var barChartData = {};
   var dateTimeformat = (hash.hasOwnProperty("aggTimeGranularity") && hash.aggTimeGranularity.toLowerCase().indexOf("days") > -1) ? "MM-DD" : "h a";
   var xTickFormat = dateTimeformat;
   var xTicksBaseline = [];
@@ -70,7 +59,7 @@ function drawAnomalyTimeSeries(ajaxData, anomalyData) {
     regions.push({axis: 'x', start: anomalyStart, end: anomalyEnd, class: 'regionX'})
   }
   lineChartData["time"] = xTicksCurrent;
-  barChartData["time"] = xTicksCurrent;
+
   var colorArray;
   if (metrics.length < 10) {
     colorArray = d3.scale.category10().range();
@@ -97,14 +86,14 @@ function drawAnomalyTimeSeries(ajaxData, anomalyData) {
     }
     lineChartData[metrics[i] + "-baseline"] = metricBaselineData;
     lineChartData[metrics[i] + "-current"] = metricCurrentData;
-    barChartData[metrics[i] + "-delta"] = deltaPercentageData;
+
     colors[metrics[i] + "-baseline"] = colorArray[i];
     colors[metrics[i] + "-current"] = colorArray[i];
-    colors[metrics[i] + "-delta"] = colorArray[i];
+
   }
 
   lineChart = c3.generate({
-    bindto : '#anomaly-linechart-placeholder',
+    bindto : lineChartPlaceholder,
     padding : {
       top : 0,
       right : 100,
@@ -138,101 +127,60 @@ function drawAnomalyTimeSeries(ajaxData, anomalyData) {
       show: false
     }
   });
-  var barChart = c3.generate({
 
-    bindto : '#anomaly-barchart-placeholder',
-    padding : {
-      top : 0,
-      right : 100,
-      bottom : 0,
-      left : 100
-    },
-    data : {
-      x : 'time',
-      json : barChartData,
-      type : 'spline',
-      colors : colors,
-    },
-    axis : {
-      x : {
-        label : {
-          text : "Time"
-        },
-        type : 'timeseries'
-      },
-      y : {
-        label : {
-          text : "% change",
-          position : 'outer-middle'
-        }
-      }
-    },
-    legend : {
-      show : false
-    },
-    grid : {
-      x : {
-
-      },
-      y : {
-        lines : [ {
-          value : 0
-        } ]
-      }
-    },
-    bar : {
-      width : {
-        ratio : .5
-      }
-    }
-  });
-
-  ids = [];
-  for (var i = 0; i < metrics.length; i++) {
-    ids.push(i);
-  }
 
   lineChart.hide();
-  barChart.hide();
-  // Clicking the checkbox of the timeseries legend will redraw the timeseries
-  // with the selected elements
-  $("#anomalies-time-series-legend").on("click", '.anomalies-time-series-checkbox', function() {
-    var checkbox = this;
-    var checkboxObj = $(checkbox);
-    metricName = checkboxObj.val();
-    if (checkboxObj.is(':checked')) {
 
-      lineChart.show(metricName + "-current");
-      lineChart.show(metricName + "-baseline");
-      barChart.show(metricName + "-delta");
-    } else {
-      lineChart.hide(metricName + "-current");
-      lineChart.hide(metricName + "-baseline");
-      barChart.hide(metricName + "-delta");
-    }
-  });
 
-  // Select all / deselect all metrics option
-  $("#main-view").on("change", ".anomalies-time-series-select-all-checkbox", function() {
+    //EventListeners
 
-    // if select all is checked
-    if ($(this).is(':checked')) {
-      // trigger click on each unchecked checkbox
-      $(".anomalies-time-series-checkbox").each(function(index, checkbox) {
-        if (!$(checkbox).is(':checked')) {
-          $(checkbox).click();
+    // Clicking the checkbox of the timeseries legend will redraw the timeseries
+    // with the selected elements
+    currentView.on("click",'.time-series-metric-checkbox', function() {
+
+        var checkbox = this;
+        var checkboxObj = $(checkbox);
+        metricName = checkboxObj.val();
+        if (checkboxObj.is(':checked')) {
+
+            lineChart.show(metricName + "-current");
+            lineChart.show(metricName + "-baseline");
+        } else {
+
+            lineChart.hide(metricName + "-current");
+            lineChart.hide(metricName + "-baseline");
         }
-      })
-    } else {
-      // trigger click on each checked checkbox
-      $(".anomalies-time-series-checkbox").each(function(index, checkbox) {
-        if ($(checkbox).is(':checked')) {
-          $(checkbox).click();
-        }
-      })
-    }
-  });
+    });
 
-  // Preselect first metric
-  $($(".anomalies-time-series-checkbox")[0]).click();
+    //Select all / deselect all metrics option
+    currentView.on("click",".time-series-metric-select-all-checkbox", function(){
+
+        //if select all is checked
+        if($(this).is(':checked')){
+            //trigger click on each unchecked checkbox
+            $(".time-series-metric-checkbox", currentView).each(function(index, checkbox) {
+                if (!$(checkbox).is(':checked')) {
+                    $(checkbox).click();
+                }
+            })
+        }else{
+            //trigger click on each checked checkbox
+            $(".time-series-metric-checkbox", currentView).each(function(index, checkbox) {
+                if ($(checkbox).is(':checked')) {
+                    $(checkbox).click();
+                }
+            })
+        }
+    });
+
+    //Preselect first metric
+    $($(".time-series-metric-checkbox", currentView)[0]).click();
+}
+
+function renderAnomalyTable(data) {
+
+    /* Handelbars template for table */
+    var result_anomalies_template = HandleBarsTemplates.template_anomalies(data);
+    $("#" + hash.view + "-display-chart-section").append(result_anomalies_template);
+
 }

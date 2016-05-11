@@ -126,7 +126,7 @@ $(document).ready( function() {
 
 
             if( hash.hasOwnProperty("dashboard") || hash.hasOwnProperty("metrics") ){
-                console.log("hash changed")
+
                 switch (hash.view) {
                     case "timeseries":
 
@@ -146,7 +146,6 @@ $(document).ready( function() {
                         }
                     break;
                     case "anomalies":
-                      console.log("getAnomalies")
                       getAnomalies();
                       break;
                     default://dashboard tab

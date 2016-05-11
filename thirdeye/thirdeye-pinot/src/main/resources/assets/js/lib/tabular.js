@@ -25,6 +25,11 @@ function renderTabular(data) {
 var lineChart;
 function drawTimeSeries(ajaxData) {
 
+
+    var currentView = $("#" + hash.view + "-display-chart-section")
+    var lineChartPlaceholder = $("#linechart-placeholder", currentView)[0];
+
+
 	// Metric(s)
 	var metrics = ajaxData["metrics"]
 	var lineChartData = {};
@@ -83,7 +88,7 @@ function drawTimeSeries(ajaxData) {
 	}
 
 	lineChart = c3.generate({
-		bindto : '#linechart-placeholder',
+		bindto : lineChartPlaceholder,
 		padding : {
 			top : 0,
 			right : 100,
@@ -126,7 +131,7 @@ function drawTimeSeries(ajaxData) {
 			x : 'time',
 			json : barChartData,
 			type : 'spline',
-			colors : colors,
+			colors : colors
 		},
 		axis : {
 			x : {
@@ -170,9 +175,13 @@ function drawTimeSeries(ajaxData) {
 
 	lineChart.hide();
 	barChart.hide();
+
+    //EventListeners
+    var currentView = $("#" + hash.view + "-display-chart-section")
+
 	// Clicking the checkbox of the timeseries legend will redraw the timeseries
 	// with the selected elements
-	$("#metric-time-series-legend").on("click",'.time-series-metric-checkbox', function() {
+	$("#metric-time-series-legend", currentView).on("click",'.time-series-metric-checkbox', function() {
        var checkbox = this;
        var checkboxObj = $(checkbox);
             metricName = checkboxObj.val();
@@ -189,19 +198,19 @@ function drawTimeSeries(ajaxData) {
     });
 
     //Select all / deselect all metrics option
-    $("#main-view").on("click",".time-series-metric-select-all-checkbox", function(){
+    currentView.on("click",".time-series-metric-select-all-checkbox", function(){
 
         //if select all is checked
         if($(this).is(':checked')){
             //trigger click on each unchecked checkbox
-            $(".time-series-metric-checkbox").each(function(index, checkbox) {
+            $(".time-series-metric-checkbox", currentView).each(function(index, checkbox) {
                 if (!$(checkbox).is(':checked')) {
                     $(checkbox).click();
                 }
             })
         }else{
             //trigger click on each checked checkbox
-            $(".time-series-metric-checkbox").each(function(index, checkbox) {
+            $(".time-series-metric-checkbox", currentView).each(function(index, checkbox) {
                 if ($(checkbox).is(':checked')) {
                     $(checkbox).click();
                 }
@@ -210,6 +219,6 @@ function drawTimeSeries(ajaxData) {
     });
 
     //Preselect first metric
-	$($(".time-series-metric-checkbox")[0]).click();
+	$($(".time-series-metric-checkbox", currentView)[0]).click();
 
 }
