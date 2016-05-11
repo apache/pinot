@@ -13,15 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.server.segment.fetcher;
+package com.linkedin.pinot.common.segment.fetcher;
 
 import java.io.File;
 import java.util.Map;
 
-public interface SegmentFetcher {
+import org.apache.commons.io.FileUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-  void init(Map<String, String> configs);
+public class LocalFileSegmentFetcher implements SegmentFetcher {
 
-  void fetchSegmentToLocal(String uri, File tempFile) throws Exception;
+  private static final Logger LOGGER = LoggerFactory.getLogger(LocalFileSegmentFetcher.class);
 
+  @Override
+  public void init(Map<String, String> configs) {
+  }
+
+  @Override
+  public void fetchSegmentToLocal(String uri, File tempFile) throws Exception {
+    FileUtils.copyFile(new File(uri), tempFile);
+    LOGGER.info("Copy file from {} to {}; Length of file: {}", uri, tempFile, tempFile.length());
+  }
 }
