@@ -453,6 +453,39 @@ public class DictionariesTest {
       FileUtils.deleteQuietly(indexDir);
     }
   }
+
+  /**
+   * Tests SegmentDictionaryCreator for case when there is one empty string
+   * and a string with a single padding character
+   *
+   * This test asserts that the padded length of the empty string is 1
+   * in actual padded dictionary), and not 0.
+   *
+   * @throws Exception
+   */
+  @Test
+  public void testPaddedConflict()
+      throws Exception {
+    File indexDir = new File("/tmp/dict.test");
+    FieldSpec fieldSpec = new DimensionFieldSpec("test", DataType.STRING, true, "\t");
+
+    String[] inputStrings = new String[2];
+    String[] paddedStrings = new String[2];
+
+    try {
+      inputStrings[0] = "";
+      inputStrings[1] = "%";
+      Arrays.sort(inputStrings); // Sorted order: {"", "%"}
+      SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(false, inputStrings, fieldSpec, indexDir);
+      dictionaryCreator.build();
+    } catch (Exception e) {
+      Assert.assertEquals(e.getMessage(),
+          "Number of entries in dictionary != number of unique values in the data in column test");
+    } finally {
+      FileUtils.deleteQuietly(indexDir);
+    }
+  }
+
   /**
    * Tests SegmentDictionaryCreator for case when there is only one string
    * and it is "null"

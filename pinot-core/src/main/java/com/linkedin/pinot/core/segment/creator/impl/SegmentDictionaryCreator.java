@@ -178,6 +178,11 @@ public class SegmentDictionaryCreator implements Closeable {
           assert (revised[i].getBytes(utf8CharSet).length == stringColumnMaxLength);
           revisedMap.put(revised[i], toWrite);
         }
+        if (revisedMap.size() != sortedObjects.length) {
+          // Two strings map to the same padded string in the current column
+          throw new RuntimeException("Number of entries in dictionary != number of unique values in the data in column "
+              + spec.getName());
+        }
         Arrays.sort(revised);
 
         stringValueToIndexMap = new Object2IntOpenHashMap<>(rowCount);
