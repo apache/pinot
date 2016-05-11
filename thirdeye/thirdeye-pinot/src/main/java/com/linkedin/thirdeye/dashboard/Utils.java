@@ -198,7 +198,12 @@ public class Utils {
 
       map = OBJECT_MAPPER.readValue(filterJson, valueTypeRef);
       for (Map.Entry<String, ArrayList<String>> entry : map.entrySet()) {
-        multimap.putAll(entry.getKey(), entry.getValue());
+        ArrayList<String> valueList = entry.getValue();
+        ArrayList<String> trimmedList = new ArrayList<>();
+        for(String value:valueList){
+          trimmedList.add(value.trim());
+        }
+        multimap.putAll(entry.getKey(), trimmedList);
       }
       return multimap;
     } catch (IOException e) {

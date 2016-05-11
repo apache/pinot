@@ -95,11 +95,11 @@ public class PqlUtils {
       if (values.isEmpty()) {
         continue;
       } else if (values.size() == 1) {
-        component = EQUALS.join(key, String.format("'%s'", values.iterator().next()));
+        component = EQUALS.join(key, String.format("'%s'", values.iterator().next().trim()));
       } else {
         List<String> quotedValues = new ArrayList<>(values.size());
         for (String value : values) {
-          quotedValues.add(String.format("'%s'", value));
+          quotedValues.add(String.format("'%s'", value.trim()));
         }
         component = String.format("%s IN (%s)", key, COMMA.join(quotedValues));
       }

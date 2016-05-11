@@ -450,6 +450,7 @@ public class DashboardResource {
       TimeSeriesResponse response = handler.handle(request);
       JSONObject timeseriesMap = new JSONObject();
       JSONArray timeValueArray = new JSONArray();
+      TreeSet<String> keys= new TreeSet<>();
       TreeSet<Long> times = new TreeSet<>();
       for (int i = 0; i < response.getNumRows(); i++) {
         TimeSeriesRow timeSeriesRow = response.getRow(i);
@@ -472,6 +473,7 @@ public class DashboardResource {
           if (!timeseriesMap.has(key)) {
             valueArray = new JSONArray();
             timeseriesMap.put(key, valueArray);
+            keys.add(key);
           } else {
             valueArray = timeseriesMap.getJSONArray(key);
           }
@@ -480,6 +482,7 @@ public class DashboardResource {
       }
       JSONObject jsonResponseObject = new JSONObject();
       jsonResponseObject.put("timeSeriesData", timeseriesMap);
+      jsonResponseObject.put("keys", new JSONArray(keys));
       jsonResponse = jsonResponseObject.toString();
     } catch (Exception e) {
       throw e;
