@@ -84,9 +84,11 @@ public class KafkaHighLevelConsumerStreamProvider implements StreamProvider {
         // Log every minute or 100k events
         if (now - lastLogTime > 60000 || currentCount - lastCount >= 100000) {
           if (lastCount == 0) {
-            INSTANCE_LOGGER.info("Consumed {} events from kafka", currentCount);
+            INSTANCE_LOGGER.info("Consumed {} events from kafka stream {}", currentCount,
+                this.streamProviderConfig.getStreamName());
           } else {
-            INSTANCE_LOGGER.info("Consumed {} events from kafka (rate:{}/s)", currentCount - lastCount,
+            INSTANCE_LOGGER.info("Consumed {} events from kafka stream {} (rate:{}/s)", currentCount - lastCount,
+                this.streamProviderConfig.getStreamName(),
                 (float) (currentCount - lastCount) * 1000 / (now - lastLogTime));
           }
           lastCount = currentCount;

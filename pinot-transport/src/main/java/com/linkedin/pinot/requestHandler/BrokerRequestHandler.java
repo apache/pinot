@@ -163,8 +163,8 @@ public class BrokerRequestHandler {
     resp.setTimeUsedMs(queryProcessingTimeInMillis);
 
     LOGGER.debug("Broker Response : {}", resp);
-    LOGGER.info("ResponseTimes for requestId:{}, total time:{} scatterGatherStats: {}", requestId,
-        queryProcessingTimeInMillis, scatterGatherStats);
+    LOGGER.info("ResponseTimes for requestId:{}, table:{}, total time:{}, scanned docs:{}, total docs:{}, scatterGatherStats: {}", requestId,
+        brokerRequest.getQuerySource().getTableName(), queryProcessingTimeInMillis, resp.getNumDocsScanned(), resp.getTotalDocs(), scatterGatherStats);
 
     return resp;
   }
