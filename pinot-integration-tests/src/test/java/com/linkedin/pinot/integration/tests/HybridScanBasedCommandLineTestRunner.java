@@ -52,19 +52,37 @@ import org.testng.annotations.Test;
  */
 public class HybridScanBasedCommandLineTestRunner {
 
+  public static void usage() {
+    System.err.println("Usage: pinot-hybrid-cluster.sh [--record] tableName schemaFilePath segQueryDirPath timeColName timeColType invIndexCols sortedCol");
+    System.exit(1);
+  }
+
   public static void main(String[] args) {
-    if (args.length != 7) {
-      System.err.println("Usage: pinot-hybrid-cluster.sh tableName schemaFilePath segQueryDirPath timeColName timeColType invIndexCols sortedCol");
-      System.exit(1);
+    if (args.length == 0) {
+      usage();
+    }
+    int expectedArgsLen = 7;
+    int ix = 0;
+    if (args[0].startsWith("-")) {
+      if (args[0].equals("--record")) {
+        ix++;
+        expectedArgsLen++;
+        CustomHybridClusterScanComparisonIntegrationTest._recordScanResponses = true;
+      } else {
+        usage();
+      }
+    }
+    if (args.length != expectedArgsLen) {
+      usage();
     }
 
-    final String tableName = args[0];
-    final String schemaFilePath = args[1];
-    final String segQueryDirPath = args[2]; // we expect a dir called 'avro-files' and a file called 'queries.txt' in here
-    final String timeColName = args[3];
-    final String timeColType = args[4];
-    final String invIndexCols = args[5];
-    final String sortedCol = args[6];
+    final String tableName = args[ix++];
+    final String schemaFilePath = args[ix++];
+    final String segQueryDirPath = args[ix++]; // we expect a dir called 'avro-files' and files called 'queries.txt' and 'scan-responses.txt' in here
+    final String timeColName = args[ix++];
+    final String timeColType = args[ix++];
+    final String invIndexCols = args[ix++];
+    final String sortedCol = args[ix++];
 
     CustomHybridClusterScanComparisonIntegrationTest.setParams(tableName,
         schemaFilePath, segQueryDirPath, timeColName, timeColType, invIndexCols, sortedCol);
@@ -93,14 +111,22 @@ public class HybridScanBasedCommandLineTestRunner {
     private static List<String> _invIndexCols = new ArrayList<>(4);
     private static String _tableName;
     private static String _queryFilePath;
+    private static String _segsQueryDir;
     private static final String _logFileSuffix = "query-comparison.log";
     private static final String QUERY_FILE_NAME = "queries.txt";
     private static final String AVRO_DIR = "avro-files";
+    private static final String SCAN_RSP_FILE_NAME = "scan-responses.txt";  // Will have more number of lines than queries file
     private static File _schemaFile;
     private static String _sortedColumn;
-    private boolean multiThreaded = true;
     private static String _logFileName;
     private static boolean _inCmdLine = false;
+    private static boolean _recordScanResponses = false;  // Must be done in single-threaded mode if true
+    private static boolean _compareWithRspFile = true;
+    private static String _scanRspFilePath;
+
+    private boolean _multiThreaded = true;
+    private FileWriter _scanRspFileWriter;
+    private LineNumberReader _scanRspFileReader;
 
     public static void setParams(String tableName, String schemaFileName, String segsQueryDir, String timeColName,
         String timeColType, String invIndexCols, String sortedCol) {
@@ -110,7 +136,9 @@ public class HybridScanBasedCommandLineTestRunner {
       _timeColType = timeColType;
       _tableName = tableName;
       _queryFilePath = segsQueryDir + "/" + QUERY_FILE_NAME;
+      _scanRspFilePath = segsQueryDir  + "/" + SCAN_RSP_FILE_NAME;
       _sortedColumn = sortedCol;
+      _segsQueryDir = segsQueryDir;
       File avroDir = new File(segsQueryDir + "/" + AVRO_DIR);
 
       File[] avroFiles = avroDir.listFiles();
@@ -164,6 +192,24 @@ public class HybridScanBasedCommandLineTestRunner {
       }
       _nQueriesRead = 0;
       _createSegmentsInParallel = true;
+      File scanRspFile = new File(_scanRspFilePath);
+      if (_recordScanResponses) {
+        _compareWithRspFile = false;
+        if (scanRspFile.exists()) {
+          throw new RuntimeException(_scanRspFilePath + " already exists");
+        }
+        _scanRspFileWriter = new FileWriter(scanRspFile);
+        _multiThreaded = false;
+      } else {
+        // Attempt to compare with a response file if it exists
+        if (scanRspFile.exists()) {
+          _scanRspFileReader = new LineNumberReader(new FileReader(scanRspFile));
+        } else {
+          // Run live queries with the scan-based query runner.
+          _compareWithRspFile = false;
+        }
+      }
+
       for (String col : _invIndexCols) {
         invertedIndexColumns.add(col);
       }
@@ -176,6 +222,10 @@ public class HybridScanBasedCommandLineTestRunner {
       if (!_inCmdLine) {
         return;
       }
+      if (_recordScanResponses) {
+        _scanRspFileWriter.flush();
+        _scanRspFileWriter.close();
+      }
       super.tearDown();
     }
 
@@ -187,6 +237,11 @@ public class HybridScanBasedCommandLineTestRunner {
     @Override
     protected int getAvroFileCount() {
       return _avroFiles.size();
+    }
+
+    @Override
+    protected FileWriter getScanRspRecordFileWriter() {
+      return _scanRspFileWriter;
     }
 
     @Override
@@ -213,22 +268,32 @@ public class HybridScanBasedCommandLineTestRunner {
         @Override
         public Object call()
             throws Exception {
-          LineNumberReader lineNumberReader = new LineNumberReader(getQueryFile());
-          String line = lineNumberReader.readLine();
-          while (line != null) {
-            final String query = replaceTableName(line);
-            _nQueriesRead++;
-            if (multiThreaded) {
-              runQueryAsync(query);
-            } else {
-              runQuery(query, _scanBasedQueryProcessor, false);
+          LineNumberReader queryReader = new LineNumberReader(getQueryFile());
+          for (;;) {
+            String line = queryReader.readLine();
+            if (line == null) {
+              break;
             }
-            line = lineNumberReader.readLine();
+            _nQueriesRead++;
+            final String query = replaceTableName(line);
+            String compareStr = null;
+            if (_compareWithRspFile) {
+              compareStr = _scanRspFileReader.readLine();
+              if (compareStr == null) {
+                Assert.fail("Not enough lines in " + _scanRspFilePath);
+              }
+            }
+            final String scanRsp = compareStr;
+            if (_multiThreaded) {
+              runQueryAsync(query, scanRsp);
+            } else {
+              runQuery(query, _scanBasedQueryProcessor, false, scanRsp);
+            }
           }
-          lineNumberReader.close();
+          queryReader.close();
           return null;
         }
-      }, multiThreaded);
+      }, _multiThreaded);
       System.out.println(
           getNumSuccesfulQueries() + " Passed, " + getNumFailedQueries() + " Failed, " + getNumEmptyResults()
               + " empty results");

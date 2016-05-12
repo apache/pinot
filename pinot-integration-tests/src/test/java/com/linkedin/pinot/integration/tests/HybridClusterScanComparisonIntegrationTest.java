@@ -84,7 +84,8 @@ public abstract class HybridClusterScanComparisonIntegrationTest extends HybridC
   private File _schemaFile;
   private Schema _schema;
   protected ScanBasedQueryProcessor _scanBasedQueryProcessor;
-  private FileWriter _fileWriter;
+  private FileWriter _compareStatusFileWriter;
+  private FileWriter _scanRspFileWriter;
   private final AtomicInteger _successfulQueries = new AtomicInteger(0);
   private final AtomicInteger _failedQueries = new AtomicInteger(0);
   private final AtomicInteger _emptyResults = new AtomicInteger(0);
@@ -100,11 +101,11 @@ public abstract class HybridClusterScanComparisonIntegrationTest extends HybridC
   public void tearDown() throws Exception {
     super.tearDown();
 
-    _fileWriter.write("\nSuccessful queries: " + _successfulQueries.get() + "\n" +
+    _compareStatusFileWriter.write("\nSuccessful queries: " + _successfulQueries.get() + "\n" +
         "Failed queries: " + _failedQueries.get() + "\n" +
-            "Empty results: " + _emptyResults.get() + "\n");
-    _fileWriter.write("Finish time:" + System.currentTimeMillis() + "\n");
-    _fileWriter.close();
+        "Empty results: " + _emptyResults.get() + "\n");
+    _compareStatusFileWriter.write("Finish time:" + System.currentTimeMillis() + "\n");
+    _compareStatusFileWriter.close();
 
     if (_failedQueries.get() != 0) {
       Assert.fail("More than one query failed to compare properly, see the log file.");
@@ -210,9 +211,10 @@ public abstract class HybridClusterScanComparisonIntegrationTest extends HybridC
     // Wait for all offline segments to be online
     latch.await();
 
-    _fileWriter = getLogWriter();
-    _fileWriter.write("Start time:" + System.currentTimeMillis() + "\n");
-    _fileWriter.flush();
+    _compareStatusFileWriter = getLogWriter();
+    _scanRspFileWriter = getScanRspRecordFileWriter();
+    _compareStatusFileWriter.write("Start time:" + System.currentTimeMillis() + "\n");
+    _compareStatusFileWriter.flush();
     startTimeMs = System.currentTimeMillis();
     LOGGER.info("Setup completed");
   }
@@ -234,7 +236,11 @@ public abstract class HybridClusterScanComparisonIntegrationTest extends HybridC
     return new FileWriter("failed-queries-hybrid.log");
   }
 
-  protected void runQueryAsync(final String pqlQuery) throws Exception {
+  protected FileWriter getScanRspRecordFileWriter() {
+    return null;
+  }
+
+  protected void runQueryAsync(final String pqlQuery, final String scanResult) {
     _queryExecutor.execute(new Runnable() {
       @Override
       public void run() {
@@ -247,7 +253,7 @@ public abstract class HybridClusterScanComparisonIntegrationTest extends HybridC
             }).get();
 
         try {
-          runQuery(pqlQuery, scanBasedQueryProcessor, false);
+          runQuery(pqlQuery, scanBasedQueryProcessor, false, scanResult);
         } catch (Exception e) {
           Assert.fail("Caught exception", e);
         }
@@ -259,10 +265,22 @@ public abstract class HybridClusterScanComparisonIntegrationTest extends HybridC
     return 120000L;
   }
 
-  protected void runQuery(String pqlQuery, ScanBasedQueryProcessor scanBasedQueryProcessor, boolean displayStatus)
+  protected void runQuery(String pqlQuery, ScanBasedQueryProcessor scanBasedQueryProcessor, boolean displayStatus, String scanResult)
       throws Exception {
-    QueryResponse scanResponse = scanBasedQueryProcessor.processQuery(pqlQuery);
-    JSONObject scanJson = new JSONObject(new ObjectMapper().writeValueAsString(scanResponse));
+    JSONObject scanJson;
+    if (scanResult == null) {
+      QueryResponse scanResponse = scanBasedQueryProcessor.processQuery(pqlQuery);
+      String scanRspStr = new ObjectMapper().writeValueAsString(scanResponse);
+      if (_scanRspFileWriter != null) {
+        if (scanRspStr.contains("\n")) {
+          throw new RuntimeException("We don't handle new lines in json responses yet. The reader will parse newline as separator between query responses");
+        }
+        _scanRspFileWriter.write(scanRspStr + "\n");
+      }
+      scanJson = new JSONObject(scanRspStr);
+    } else {
+      scanJson = new JSONObject(scanResult);
+    }
     JSONObject pinotJson = postQuery(pqlQuery);
     QueryComparison.setCompareNumDocs(false);
 
@@ -270,7 +288,7 @@ public abstract class HybridClusterScanComparisonIntegrationTest extends HybridC
       QueryComparison.ComparisonStatus comparisonStatus = QueryComparison.compareWithEmpty(pinotJson, scanJson);
 
       if (comparisonStatus.equals(QueryComparison.ComparisonStatus.FAILED)) {
-        _fileWriter.write("\nQuery comparison failed for query:" + pqlQuery + "\n" +
+        _compareStatusFileWriter.write("\nQuery comparison failed for query " + _nQueriesRead + ":" + pqlQuery + "\n" +
             "Scan json: " + scanJson + "\n" +
             "Pinot json: " + pinotJson + "\n");
         _failedQueries.getAndIncrement();
@@ -279,16 +297,16 @@ public abstract class HybridClusterScanComparisonIntegrationTest extends HybridC
         if (comparisonStatus.equals(QueryComparison.ComparisonStatus.EMPTY) ) {
           _emptyResults.getAndIncrement();
         } else if (_logMatchingResults) {
-          _fileWriter.write("\nMatched for query:" + pqlQuery + "\n" + scanJson + "\n");
+          _compareStatusFileWriter.write("\nMatched for query:" + pqlQuery + "\n" + scanJson + "\n");
         }
       }
-      _fileWriter.flush();
+      _compareStatusFileWriter.flush();
     } catch (Exception e) {
-      _fileWriter.write("Caught exception while running query comparison, failed for query " + pqlQuery + "\n" +
+      _compareStatusFileWriter.write("Caught exception while running query comparison, failed for query " + pqlQuery + "\n" +
           "Scan json: " + scanJson + "\n" +
           "Pinot json: " + pinotJson + "\n");
       _failedQueries.getAndIncrement();
-      _fileWriter.flush();
+      _compareStatusFileWriter.flush();
     }
 
     int totalQueries = _successfulQueries.get() + _failedQueries.get();
@@ -310,7 +328,7 @@ public abstract class HybridClusterScanComparisonIntegrationTest extends HybridC
 
   @Override
   protected void runQuery(String pqlQuery, List<String> sqlQueries) throws Exception {
-    runQuery(pqlQuery, _scanBasedQueryProcessor, false);
+    runQuery(pqlQuery, _scanBasedQueryProcessor, false, null);
   }
 
   protected void runTestLoop(Callable<Object> testMethod) throws Exception {
@@ -379,8 +397,9 @@ public abstract class HybridClusterScanComparisonIntegrationTest extends HybridC
 
       // Release resources
       _scanBasedQueryProcessor.close();
-      _fileWriter.write("Status after push of " + avroFile + ":" + System.currentTimeMillis() +
-          ":Executed " + _nQueriesRead + " queries, " + _failedQueries + " failures," + _emptyResults.get() + " empty results");
+      _compareStatusFileWriter.write("Status after push of " + avroFile + ":" + System.currentTimeMillis() +
+          ":Executed " + _nQueriesRead + " queries, " + _failedQueries + " failures," + _emptyResults.get()
+          + " empty results\n");
     }
   }
 
