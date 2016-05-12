@@ -1,7 +1,7 @@
 /** AJAX and HASH RELATED METHODS **/
 
 function getData(url){
-
+    console.log("request url:" ,url)
     return $.ajax({
         url: url,
         type: 'get',

@@ -85,5 +85,20 @@
             </div>
         </div>
         {{/each}}
+
+        <div id="tooltip" class="hidden">
+        <table>
+        <tr><td>value</td><td id="dim-value"></td></tr>
+            <tr><td>baseline value</td><td id="baseline-value"></td></tr>
+            <tr><td>current value</td><td id="current-value"></td></tr>
+            <tr><td>percentage change </td><td id="delta"></td></tr>
+            <tr><td>baseline contribution</td><td id="baseline-contribution"></td></tr>
+            <tr><td>current contribution</td><td id="current-contribution"></td></tr>
+            <tr><td>contribution change   </td><td id="contribution-diff"></td></tr>
+        
+        </table>
+        </div>
+
+
     </script>
 </section>

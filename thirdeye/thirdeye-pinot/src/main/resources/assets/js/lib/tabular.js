@@ -80,7 +80,7 @@ function drawTimeSeries(ajaxData) {
 		for (var t = 0, len = ajaxData["timeBuckets"].length; t < len; t++) {
 			var baselineValue = ajaxData["data"][metrics[i]]["responseData"][t][0];
 			var currentValue = ajaxData["data"][metrics[i]]["responseData"][t][1];
-			var deltaPercentage = parseInt(ajaxData["data"][metrics[i]]["responseData"][t][2] * 100);
+			var deltaPercentage = parseInt(ajaxData["data"][metrics[i]]["responseData"][t][2]);
 			metricBaselineData.push(baselineValue);
 			metricCurrentData.push(currentValue);
 			deltaPercentageData.push(deltaPercentage);

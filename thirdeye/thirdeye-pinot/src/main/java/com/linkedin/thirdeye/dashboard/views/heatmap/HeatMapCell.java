@@ -8,9 +8,9 @@ public class HeatMapCell {
   private static DecimalFormat decimalFormat;
   private double contributionToOverallChange;
 
-  public HeatMapCell(String dimensionValue, double baselineValue, double baselineCDFValue,
-      double baselineContribution, double currentValue, double currentCDFValue,
-      double currentContribution, double percentageChange, double absoluteChange,
+  public HeatMapCell(String dimensionValue, double baselineValue, double currentValue,
+      double baselineContribution, double currentContribution, double baselineCDFValue,
+      double currentCDFValue, double percentageChange, double absoluteChange,
       double contributionDifference, double contributionToOverallChange, double deltaColor,
       double deltaSize, double contributionColor, double contributionSize,
       double contributionToOverallColor, double contributionToOverallSize) {

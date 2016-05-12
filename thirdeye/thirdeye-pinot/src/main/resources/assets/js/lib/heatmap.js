@@ -14,6 +14,9 @@ function getHeatmap() {
 
 function renderD3heatmap(data) {
 
+    console.log("heatmap data")
+    console.log(data)
+
     //Error handling when data is falsy (empty, undefined or null)
     if(!data){
         $("#"+  hash.view  +"-chart-area-error").empty()
@@ -51,6 +54,11 @@ function renderD3heatmap(data) {
             root_1.name = dimension;
             root_2.name = dimension;
 
+            root_0.metric = metric;
+            root_1.metric = metric;
+            root_2.metric = metric;
+
+
             var children_0 = [];
             var children_1 = [];
             var children_2 = [];
@@ -71,9 +79,9 @@ function renderD3heatmap(data) {
                 var delta_1 =  parseFloat(dimensionData[valId][schema["contributionDifference"]]);
                 var delta_2 =  parseFloat(dimensionData[valId][schema["contributionToOverallChange"]]);
 
-                var opacity_0 = parseFloat("0." + Math.abs(Math.round(color_0)));
-                var opacity_1 = parseFloat("0." + Math.abs(Math.round(color_1)));
-                var opacity_2 = parseFloat("0." + Math.abs(Math.round(color_2)));
+                var opacity_0 = parseFloat(Math.abs(Math.round(color_0))/25);
+                var opacity_1 = parseFloat(Math.abs(Math.round(color_1))/25);
+                var opacity_2 = parseFloat(Math.abs(Math.round(color_2))/25);
 
                 var fontColor_0 = opacity_0 < 0.3 ? '#000000' : '#ffffff';
                 var fontColor_1 = opacity_1 < 0.3 ? '#000000' : '#ffffff';
@@ -88,26 +96,13 @@ function renderD3heatmap(data) {
                 var label_2 = delta_2 <= 0 ? dimensionValue +" (" + delta_2 + "%)" : dimensionValue +" (+" + delta_2 + "%)";
 
 
+
+
                 var size = parseFloat(dimensionData[valId][schema["deltaSize"]]);
 
-                //Todo: add proper tooltip
-                var tooltip = "value: " + dimensionValue+ ",                                                                       "+
-                    "baseline value: " + dimensionData[valId][schema["baselineValue"]] + ",                                                                "+
-                    "current value: " +  dimensionData[valId][schema["currentValue"]] + ",                                                "+
-                    "delta: " + dimensionData[valId][schema["percentageChange"]] + "%" + ",                                                  "+
-                    "change in contribution (%): " +  dimensionData[valId][schema["contributionDifference"]];
-
-
-//                var tooltip = "<table><tbody><tr><td>value : </td><td>" + dimensionValue+ "</td></tr>" +
-//                    "<tr><td>baseline value : </td><td>" + dimensionData[valId][schema["baselineValue"]] + "</td></tr>" +
-//                    "<tr><td>current value : </td><td>" + dimensionData[valId][schema["currentValue"]] + "</td></tr>" +
-//                    "<tr><td>delta value : </td><td></td></tr>" +
-//                    "<tr><td>delta: </td><td>" + dimensionData[valId][schema["percentageChange"]] + "%" + "</td></tr>" +
-//                    "<tr><td>change in contribution (%) : </td><td>" + dimensionData[valId][schema["contributionDifference"]] + "</td></tr>" +
-//                    "</tbody></table>"
-                children_0.push({ "name": dimensionValue  ,"size": size, "label": label_0, "bgcolor": backgroundColor_0, "color": fontColor_0, "tooltip": tooltip});
-                children_1.push({ "name": dimensionValue ,"size": size, "label": label_1, "bgcolor": backgroundColor_1, "color": fontColor_1, "tooltip": tooltip});
-                children_2.push({ "name": dimensionValue ,"size": size, "label": label_2, "bgcolor": backgroundColor_2, "color": fontColor_2, "tooltip": tooltip});
+                children_0.push({ "name": dimensionValue  ,"size": size, "label": label_0, "bgcolor": backgroundColor_0, "color": fontColor_0, "valueId" : valId, "tooltip": tooltip});
+                children_1.push({ "name": dimensionValue ,"size": size, "label": label_1, "bgcolor": backgroundColor_1, "color": fontColor_1, "valueId" : valId, "tooltip": tooltip});
+                children_2.push({ "name": dimensionValue ,"size": size, "label": label_2, "bgcolor": backgroundColor_2, "color": fontColor_2, "valueId" : valId, "tooltip": tooltip});
 
             }
             root_0.children = children_0;
@@ -124,6 +119,37 @@ function renderD3heatmap(data) {
             var placeholder_1 = '#metric_' + metric + '_dim_' + d + '_treemap_1'
             var placeholder_2 = '#metric_' + metric + '_dim_' + d + '_treemap_2'
 
+
+            var mouseenter = function(d) {
+
+                var target = $(event.target)
+                var dimension = target.attr("data-dimension")
+                var metric = target.attr("data-metric")
+                var valueId = target.attr("data-value-id")
+                var value = target.attr("id")
+                var xPosition = d3.event.pageX/2;
+                var yPosition = d3.event.pageY/2;
+                var dimData = data["data"][metric + "." + dimension]["responseData"]
+
+
+                d3.select("#tooltip")
+                    .style("left", xPosition + "px")
+                    .style("top", yPosition + "px");
+                d3.select("#tooltip #dim-value")
+                    .text( value                                                                                                                                                                                                                      );
+                d3.select("#tooltip #baseline-value").text( dimData[valueId][schema["baselineValue"]]);
+                d3.select("#tooltip #current-value").text( dimData[valueId][schema["currentValue"]]);
+                d3.select("#tooltip #delta").text( dimData[valueId][schema["percentageChange"]] + '%');
+                d3.select("#tooltip #baseline-contribution").text( dimData[valueId][schema["baselineContribution"]]);
+                d3.select("#tooltip #current-contribution").text( dimData[valueId][schema["currentContribution"]]);
+                d3.select("#tooltip #contribution-diff").text( dimData[valueId][schema["contributionDifference"]] + '%');
+                d3.select("#tooltip").classed("hidden", false);
+            };
+
+            var mouseout = function() {
+                d3.select("#tooltip").classed("hidden", true);
+            };
+
             //DRAW TREEMAP
             function drawTreemap(root, placeholder){
                 var treemap = d3.layout.treemap()
@@ -136,7 +162,7 @@ function renderD3heatmap(data) {
                         return d.size;
                     });
 
-                var div = d3.select(placeholder).append("div")//placeholder:
+                var div = d3.select(placeholder).append("div")
                     .style("position", "relative")
                     .style("width", width + "px")
                     .style("height", (height + margin.top + margin.bottom) + "px")
@@ -147,12 +173,12 @@ function renderD3heatmap(data) {
                     .data(treemap.nodes)
                     .enter().append("div")
                     .attr("class", "node")
-                    .attr("data-dimension", function (d) {
-                        return root.name
-                    })
+                    .attr("data-dimension", function (d) {return root.name})
+                    .attr("data-metric", function (d) {return root.metric})
+                    .attr("data-value-id", function (d) {return d.valueId})
                     .attr("id", function (d) {return d.name})
-                    .attr("data-uk-tooltip", true)
-                    .attr("title", function (d) {return d.tooltip})
+                    .on("mouseenter", mouseenter)
+                    .on("mouseout", mouseout)
                     .call(position)
                     .style("background", function (d) {return d.children ? null : d.bgcolor})
                     .style("text-align", "center")
@@ -180,6 +206,8 @@ function renderD3heatmap(data) {
                         });
                 }
             }
+
+
 
             drawTreemap(root_0, placeholder_0 )
             drawTreemap(root_1, placeholder_1 )
@@ -247,23 +275,5 @@ function heatMapEventListeners(){
                 window.location.hash = encodeHashParameters(hash);
             }
         })
-
-// Tooltip  start
-//      $("#"+ hash.view +"-display-chart-section").on("mouseover", ".node",function(d) {
-//            div.transition()
-//                .duration(200)
-//                .style("opacity", .9);
-//            div .html(test + "<br/>"  + d.close)
-//                .style("left", (d3.event.pageX) + "px")
-//                .style("top", (d3.event.pageY - 28) + "px");
-//        })
-//
-//
-//        $("#"+ hash.view +"-display-chart-section").on("mouseout", function(d) {
-//                div.transition()
-//                    .duration(500)
-//                    .style("opacity", 0);
-//            });
-
 
 }
