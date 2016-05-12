@@ -32,6 +32,7 @@ import com.linkedin.pinot.core.plan.SelectionPlanNode;
 import com.linkedin.pinot.core.query.aggregation.groupby.BitHacks;
 import com.linkedin.pinot.core.query.config.QueryExecutorConfig;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import org.slf4j.Logger;
@@ -47,7 +48,7 @@ import org.slf4j.LoggerFactory;
 public class InstancePlanMakerImplV2 implements PlanMaker {
   private static final Logger LOGGER = LoggerFactory.getLogger(InstancePlanMakerImplV2.class);
   private static final String NEW_AGGREGATION_GROUPBY_STRING = "new.aggregation.groupby";
-  private boolean _enableNewAggregationGroupBy = false;
+  private boolean _enableNewAggregationGroupByCfg = false;
 
   /**
    * Default constructor.
@@ -63,17 +64,22 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
    * @param queryExecutorConfig
    */
   public InstancePlanMakerImplV2(QueryExecutorConfig queryExecutorConfig) {
-    _enableNewAggregationGroupBy = queryExecutorConfig.getConfig().getBoolean(NEW_AGGREGATION_GROUPBY_STRING, false);
-    LOGGER.info("New AggregationGroupBy operator: {}", (_enableNewAggregationGroupBy) ? "Enabled" : "Disabled");
+    _enableNewAggregationGroupByCfg = queryExecutorConfig.getConfig().getBoolean(NEW_AGGREGATION_GROUPBY_STRING, false);
+    LOGGER.info("New AggregationGroupBy operator: {}", (_enableNewAggregationGroupByCfg) ? "Enabled" : "Disabled");
   }
 
   @Override
   public PlanNode makeInnerSegmentPlan(IndexSegment indexSegment, BrokerRequest brokerRequest) {
+    return makeInnerSegmentPlan(indexSegment, brokerRequest, false);
+  }
+
+  public PlanNode makeInnerSegmentPlan(IndexSegment indexSegment, BrokerRequest brokerRequest,
+      boolean enableNewAggregationGroupBy) {
 
     if (brokerRequest.isSetAggregationsInfo()) {
       if (!brokerRequest.isSetGroupBy()) {
         // Only Aggregation
-        if (_enableNewAggregationGroupBy) {
+        if (enableNewAggregationGroupBy) {
           return new AggregationPlanNode(indexSegment, brokerRequest);
         } else {
           return new AggregationOperatorPlanNode(indexSegment, brokerRequest);
@@ -87,7 +93,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
             // AggregationGroupByPlanNode is the new implementation of group-by aggregations, and is currently turned OFF.
             // Once all feature and perf testing is performed, the code will be turned ON, and this 'if' check will
             // be removed.
-            if (_enableNewAggregationGroupBy) {
+            if (enableNewAggregationGroupBy) {
               aggregationGroupByPlanNode = new AggregationGroupByPlanNode(indexSegment, brokerRequest);
             } else {
               aggregationGroupByPlanNode = new AggregationGroupByOperatorPlanNode(indexSegment, brokerRequest,
@@ -116,13 +122,48 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   public Plan makeInterSegmentPlan(List<SegmentDataManager> segmentDataManagers, BrokerRequest brokerRequest,
       ExecutorService executorService, long timeOutMs) {
     final InstanceResponsePlanNode rootNode = new InstanceResponsePlanNode();
+
+    // Go over all the segments and check if new implementation of group-by can be enabled.
+    boolean enableNewAggregationGroupBy = _enableNewAggregationGroupByCfg;
+    List<IndexSegment> segments = new ArrayList<>();
+
+    for (SegmentDataManager segmentDataManager : segmentDataManagers) {
+      IndexSegment segment = segmentDataManager.getSegment();
+      enableNewAggregationGroupBy &= isSegmentFitForNewAggregationGroupBy(segment, brokerRequest);
+      segments.add(segment);
+    }
+
     final CombinePlanNode combinePlanNode = new CombinePlanNode(brokerRequest, executorService, timeOutMs,
-        _enableNewAggregationGroupBy);
+        enableNewAggregationGroupBy);
     rootNode.setPlanNode(combinePlanNode);
-    for (final SegmentDataManager segmentDataManager : segmentDataManagers) {
-      combinePlanNode.addPlanNode(makeInnerSegmentPlan(segmentDataManager.getSegment(), brokerRequest));
+
+    for (IndexSegment segment : segments) {
+      combinePlanNode.addPlanNode(makeInnerSegmentPlan(segment, brokerRequest, enableNewAggregationGroupBy));
     }
     return new GlobalPlanImplV0(rootNode);
+  }
+
+  /**
+   * Helper method to identify if new aggregation group-by algorithm can be enabled for this segment:
+   * - Returns true if brokerRequest is not group-by, OR
+   *   If segment is IndexSegmentImpl (not RealTimeSegmentImpl), and total number of bits in
+   *   group-by column cardinalities can fit in 64 bits.
+   * - False otherwise.
+   *
+   * @param segment
+   * @param brokerRequest
+   * @return
+   */
+  private boolean isSegmentFitForNewAggregationGroupBy(IndexSegment segment, BrokerRequest brokerRequest) {
+    if (!brokerRequest.isSetGroupBy()) {
+      return true;
+    }
+
+    if (!(segment instanceof IndexSegmentImpl)) {
+      return false;
+    }
+
+    return isGroupKeyFitForLong(segment, brokerRequest);
   }
 
   private boolean isGroupKeyFitForLong(IndexSegment indexSegment, BrokerRequest brokerRequest) {

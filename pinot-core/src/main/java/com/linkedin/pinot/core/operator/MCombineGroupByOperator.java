@@ -37,7 +37,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -195,39 +194,36 @@ public class MCombineGroupByOperator extends BaseOperator {
         public void runJob() {
           AggregationGroupByResult groupByResult;
 
-          // If block is null, or there's no group-by result, then return as there's nothing to do.
+          // If block is null (unexpected error), or there's no group-by result, then return as there's nothing to do.
           blocks[index] = (IntermediateResultsBlock) operators.get(index).nextBlock();
-          if (blocks[index] == null) {
-            return;
-          }
+          if (blocks[index] != null) {
+            groupByResult = blocks[index].getAggregationGroupByResult();
 
-          groupByResult = blocks[index].getAggregationGroupByResult();
-          if (groupByResult == null) {
-            return;
-          }
+            if (groupByResult != null) {
+              // Iterate over the group-by keys, for each key, update the group-by result in the resultsMap.
+              final Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = groupByResult.getGroupKeyIterator();
+              while (groupKeyIterator.hasNext()) {
 
-          // Iterate over the group-by keys, for each key, update the group-by result in the resultsMap.
-          final Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = groupByResult.getGroupKeyIterator();
-          while (groupKeyIterator.hasNext()) {
+                GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
+                String groupKeyString = groupKey.getStringKey();
 
-            GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
-            String groupKeyString = groupKey.getStringKey();
+                int lockIndex = (groupKeyString.hashCode() & Integer.MAX_VALUE) % NUM_LOCKS;
+                synchronized (_locks[(lockIndex)]) {
+                  Serializable[] results = resultsMap.get(groupKeyString);
 
-            int lockIndex = (groupKeyString.hashCode() & Integer.MAX_VALUE) % NUM_LOCKS;
-            synchronized (_locks[(lockIndex)]) {
-              Serializable[] results = resultsMap.get(groupKeyString);
+                  if (results == null) {
+                    results = new Serializable[numAggrFunctions];
+                    for (int j = 0; j < numAggrFunctions; j++) {
+                      results[j] = groupByResult.getResultForKey(groupKey, j);
+                    }
 
-              if (results == null) {
-                results = new Serializable[numAggrFunctions];
-                for (int j = 0; j < numAggrFunctions; j++) {
-                  results[j] = groupByResult.getResultForKey(groupKey, j);
-                }
-
-                resultsMap.put(groupKeyString, results);
-              } else {
-                for (int j = 0; j < numAggrFunctions; j++) {
-                  results[j] = aggregationFunctions.get(j)
-                      .combineTwoValues(results[j], groupByResult.getResultForKey(groupKey, j));
+                    resultsMap.put(groupKeyString, results);
+                  } else {
+                    for (int j = 0; j < numAggrFunctions; j++) {
+                      results[j] = aggregationFunctions.get(j)
+                          .combineTwoValues(results[j], groupByResult.getResultForKey(groupKey, j));
+                    }
+                  }
                 }
               }
             }
