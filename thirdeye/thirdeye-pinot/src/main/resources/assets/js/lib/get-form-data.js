@@ -2,6 +2,7 @@ function getDataSetList(){
 
     var url = "/dashboard/data/datasets";
     getData(url).done( function(data){
+
         /* Handelbars template for datasets dropdown */
         var result_datasets_template = HandleBarsTemplates.template_datasets(data);
         $(".landing-dataset").each(function(){ $(this).html(result_datasets_template)});
@@ -50,6 +51,14 @@ function getMetricNFilterList() {
 
     getData(url).done(function (data) {
 
+        if(!data){
+            var errorMessage = $("#"+ hash.view +"-time-input-form-error p");
+            var errorAlert = $("#"+ hash.view +"-time-input-form-error");
+            errorMessage.html("No metrics available in the server. Error: data = " + data);
+            errorAlert.fadeIn(100);
+            return
+        }
+
         /* Create metrics dropdown */
         var metricListHtml = "";
         for (var i = 0, len = data.length; i < len; i++) {
@@ -75,6 +84,14 @@ function getMetricNFilterList() {
     //Create dimension dropdown and filters
     var url = "/dashboard/data/filters?dataset=" + hash.dataset;
     getData(url).done(function (data) {
+
+        if(!data){
+            var errorMessage = $("#"+ hash.view +"-time-input-form-error p");
+            var errorAlert = $("#"+ hash.view +"-time-input-form-error");
+            errorMessage.html("No dimension or dimension values available. Error: dimension data = " + data);
+            errorAlert.fadeIn(100);
+            return
+        }
 
 
         /* Create dimensions and filter dimensions dropdown */

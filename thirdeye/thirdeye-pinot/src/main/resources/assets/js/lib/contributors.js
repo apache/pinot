@@ -5,6 +5,18 @@ function getContributors() {
 
   getData(url).done(function(data) {
 
+  //Error handling when data is falsy (empty, undefined or null)
+  if(!data){
+      $("#"+  hash.view  +"-chart-area-error").empty()
+      var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' })
+      warning.append($('<p></p>', { html: 'Something went wrong. Please try and reload the page. Error: data =' + data  }))
+      $("#"+  hash.view  +"-chart-area-error").append(warning)
+      $("#"+  hash.view  +"-chart-area-error").show()
+      return
+  }else{
+      $("#"+  hash.view  +"-chart-area-error").hide()
+  }
+
     // Handelbars contributors table template
     var result_contributors_template = HandleBarsTemplates.template_contributors_table(data);
     $("#"+ hash.view +"-display-chart-section").append(result_contributors_template);
@@ -61,6 +73,7 @@ function getContributors() {
 };
 
 function renderContributionTimeSeries(ajaxData) {
+
   var metrics = ajaxData['metrics'];
   var lineChartData = {};
   var lineChartMap = {};
@@ -94,11 +107,7 @@ function renderContributionTimeSeries(ajaxData) {
         } else if(dimensionValueArray.length < 20) {
             colorArray = d3.scale.category20().range();
         }else {
-
-            colorArray = [];
-            for(i=0,len=dimensionValueArray.length; i<len;i++){
-                colorArray.push( colorByName(dimensionValueArray[i]) );
-            }
+            colorArray = colorScale(dimensionValueArray.length)
         }
 
 
@@ -123,6 +132,8 @@ function renderContributionTimeSeries(ajaxData) {
         colors[dimensionValue + "-current"] = colorArray[dimensionValIndex];
         colors[dimensionValue + "-percentChange"] = colorArray[dimensionValIndex];
       }
+
+
 
       // line chart
       lineChartData[metricName][dimensionName]["time"] = xTicksCurrent;

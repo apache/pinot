@@ -8,6 +8,18 @@ function getTabular() {
 
 function renderTabular(data) {
 
+    //Error handling when data is falsy (empty, undefined or null)
+    if(!data){
+        $("#"+  hash.view  +"-chart-area-error").empty()
+        var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' })
+        warning.append($('<p></p>', { html: 'Something went wrong. Please try and reload the page. Error: data =' + data  }))
+        $("#"+  hash.view  +"-chart-area-error").append(warning)
+        $("#"+  hash.view  +"-chart-area-error").show()
+        return
+    }else{
+        $("#"+  hash.view  +"-chart-area-error").hide()
+    }
+
 	/* Handelbars template for time series legend */
 	var result_metric_time_series_section =
 	 HandleBarsTemplates.template_metric_time_series_section(data);

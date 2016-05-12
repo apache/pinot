@@ -124,12 +124,10 @@ $(document).ready( function() {
         //If hash has dataset and (dashboard or (view & metric )trigger form submit
         if( hash.hasOwnProperty("dataset")){
 
-
             if( hash.hasOwnProperty("dashboard") || hash.hasOwnProperty("metrics") ){
 
                 switch (hash.view) {
                     case "timeseries":
-
                         getTimeSeries();
                         break;
                     case "compare":

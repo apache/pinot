@@ -14,6 +14,18 @@ function getAnomalies() {
   
   getData(anomaliesUrl).done(function(anomalyData) {
     getData(timeSeriesUrl).done(function(timeSeriesData) {
+
+        //Error handling when data is falsy (empty, undefined or null)
+        if(!timeSeriesData){
+            $("#"+  hash.view  +"-chart-area-error").empty()
+            var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' })
+            warning.append($('<p></p>', { html: 'Something went wrong. Please try and reload the page. Error: metric timeseries data =' + timeSeriesData  }))
+            $("#"+  hash.view  +"-chart-area-error").append(warning)
+            $("#"+  hash.view  +"-chart-area-error").show()
+            return
+        }else{
+            $("#"+  hash.view  +"-chart-area-error").hide()
+        }
       renderAnomalyLineChart(timeSeriesData, anomalyData);
       renderAnomalyTable(anomalyData);
     });
@@ -178,6 +190,15 @@ function drawAnomalyTimeSeries(ajaxData, anomalyData) {
 }
 
 function renderAnomalyTable(data) {
+    //Error handling when data is falsy (empty, undefined or null)
+    if(!data){
+        $("#"+  hash.view  +"-chart-area-error").empty()
+        var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' })
+        warning.append($('<p></p>', { html: 'Something went wrong. Please try and reload the page. Error: anomalies data =' + data  }))
+        $("#"+  hash.view  +"-chart-area-error").append(warning)
+        $("#"+  hash.view  +"-chart-area-error").show()
+        return
+    }
 
     /* Handelbars template for table */
     var result_anomalies_template = HandleBarsTemplates.template_anomalies(data);

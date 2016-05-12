@@ -46,6 +46,8 @@ $("#main-view").on("click",".form-submit-btn",function(){
         if (numSelectedDimensions > 0) {
             hash.dimensions = dimensionAry.toString();
         }
+
+        //update hash.compareMode
         hash.compareMode = $(".compare-mode[rel='" + currentTab + "']").html().trim();
 
 

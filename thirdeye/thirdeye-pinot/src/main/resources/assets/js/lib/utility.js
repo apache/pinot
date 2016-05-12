@@ -12,6 +12,7 @@ function getData(url){
                 var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' })
                 warning.append($('<p></p>', { html: 'No data available. (Error code: 404)' }))
                 $("#"+  hash.view  +"-chart-area-error").append(warning)
+                $("#"+  hash.view  +"-chart-area-error").fadeIn(100);
                 return
             },
             500: function() {
@@ -19,6 +20,7 @@ function getData(url){
                 var error = $('<div></div>', { class: 'uk-alert uk-alert-danger' })
                 error.append($('<p></p>', { html: 'Internal server error' }))
                 $("#"+  hash.view  +"-chart-area-error").append(error)
+                $("#"+  hash.view  +"-chart-area-error").fadeIn(100);
                 return
             }
         }
@@ -616,7 +618,7 @@ function readFiltersAppliedInCurrentView(currentTab){
         var valuesAryToTrim = keyValue[1].trim().split(",")
         var valuesAry = [];
         for(var index=0, len= valuesAryToTrim.length; index < len; index++){
-            var value = valuesAryToTrim[index].replace(/\r?\n|\r/g, "");;
+            var value = valuesAryToTrim[index].trim();
             if(value == "UNKNOWN"){
                 value = "";
             }
@@ -945,6 +947,7 @@ function  applyTimeRangeSelection(target) {
 
 
 //Turn name into hexadecimal colorcode
+//If you change this method, change the colorByName handlebars helper
 function colorByName(name){
 
     if(name == "?"){
@@ -959,9 +962,11 @@ function colorByName(name){
     if(name.length < 4){
         name = name + name + name;
         name=  name.substr(-2) + name.substr(-2) + name.substr(-2);
+    }else{
+            name = name.substr(-3) + name.substr(-3) + name.substr(-3);
     }
 
-    //too long name would return infinity
+    //too long name would return infinity (16777216 = 256^3)
     var hexStr;
     if (Number.isFinite(parseInt(name, 36) + 16777216)){
         hexStr =  (parseInt(name, 36) + 16777216).toString(16).substr(0,6);
@@ -975,6 +980,81 @@ function colorByName(name){
 
     return color
 }
+
+function assignColorByID(len, index){
+
+    //16777216 = 256 ^ 3
+    var diff = parseInt(16777216 / len);
+
+    var diffAry = [];
+    for (x=0; x<len; x++){
+        diffAry.push( diff * x)
+    }
+
+    var colorAry = [];
+    var num;
+    for  (y=0; y<len; y++){
+
+        if(y%2 == 0){
+            num = diffAry[y/2]
+        }else{
+            num = diffAry[Math.floor(len - y/2)]
+        }
+
+
+        var str = (num.toString(16) + "ffffff")
+        var hex = num.toString(16).length < 6 ? str.substr(0,6) : num.toString(16)
+        colorAry.push( hex )
+    }
+    console.log('assignColorByID colorAry')
+    console.log(colorAry)
+
+    return "#" + colorAry[index]
+
+
+}
+
+/*takes the number of items and returns an array with colors on the full 256^3 colorscale */
+function colorScale(len){
+
+    //colorscale 16777216 = 256 ^ 3
+    var diff = parseInt(16777216 / len);
+
+    //array of integers from 0 to 16777216
+    var diffAry = [];
+    for (x=0; x<len; x++){
+        diffAry.push( diff * x)
+    }
+
+    //create array
+    var colorAry = [];
+    var integer;
+
+    //even elements take the color code from the blue range (0,0,255)
+    //odd elements take the color code from the red range (255,0,0)
+    for  (y=0; y<len; y++){
+
+        if(y%2 == 0){
+            integer = diffAry[y/2]
+        }else{
+            integer = diffAry[Math.floor(len - y/2)]
+        }
+
+        var str = (integer.toString(16) + "ffffff")
+        var hex = integer.toString(16).length < 6 ? str.substr(0,6) : integer.toString(16)
+        colorAry.push( hex )
+    }
+
+    console.log('colorScale colorAry')
+    console.log(colorAry)
+
+    return colorAry
+
+
+}
+
+
+
 
 
 /** DATE, TIME RELATED METHODS **/

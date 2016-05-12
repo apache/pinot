@@ -16,6 +16,8 @@ $(document).ready(function() {
         if(name.length < 4){
             name = name + name + name;
             name=  name.substr(-2) + name.substr(-2) + name.substr(-2);
+        }else{
+            name = name.substr(-3) + name.substr(-3) + name.substr(-3);
         }
 
         //too long name would return infinity
@@ -42,14 +44,16 @@ $(document).ready(function() {
         }
 
         if(parseInt(numIds) < 10){
+
             return d3.scale.category10().range()[id];
 
         } else if (parseInt(numIds) < 20) {
             return d3.scale.category20().range()[id];
 
         } else{
-            return  Handlebars.helpers.colorByName( options.hash.name )
+            return  Handlebars.helpers.assignColorByID(numIds,id)//Handlebars.helpers.colorByName( options.hash.name )
         }
+
     });
 
     Handlebars.registerHelper('colorByIdContributors', function( id, dimensionValuesMap, options ) {
@@ -63,8 +67,39 @@ $(document).ready(function() {
             return d3.scale.category20().range()[id];
 
         } else{
-            return  Handlebars.helpers.colorByName( options.hash.name )
+            return  Handlebars.helpers.assignColorByID(numIds,id)//Handlebars.helpers.colorByName( options.hash.name )
         }
+    });
+
+
+    Handlebars.registerHelper('assignColorByID', function(len, index){
+
+        //16777216 = 256 ^ 3
+        var diff = parseInt(16777216 / len);
+
+        var diffAry = [];
+        for (x=0; x<len; x++){
+            diffAry.push(diff * x)
+        }
+
+        var colorAry = [];
+        var num;
+        for  (y=0; y<len; y++){
+
+            if(y%2 == 0){
+                num = diffAry[y/2]
+            }else{
+                num = diffAry[Math.floor(len - y/2)]
+            }
+
+
+            var str = (num.toString(16) + "ffffff")
+            var hex = num.toString(16).length < 6 ? str.substr(0,6) : num.toString(16)
+            colorAry.push( hex )
+        }
+
+        return "#" + colorAry[index]
+
     });
 
 

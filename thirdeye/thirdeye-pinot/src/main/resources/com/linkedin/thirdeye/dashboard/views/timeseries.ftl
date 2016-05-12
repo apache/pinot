@@ -28,16 +28,16 @@
     <label style="display: block;"><input class="time-series-select-all-checkbox" type="checkbox">Select All
     </label>
     <div id="timeseries-time-series-legend" class="timeseries-legend-sub-box uk-display-inline-block" style="width:250px;">
-        {{#with timeSeriesData}}
-        {{#each this as |Index label|}}
+        {{#with keys}}
+        {{#each this as |label Index|}}
         <label class="legend-item  {{hide_if_eq label 'time'}}" value="{{label}}">
             <table  data-uk-tooltip title="{{label}}">
                 <tr>
                     <td>
-                        <input class="time-series-checkbox" type="checkbox" value="{{label}}" color="{{colorByName label}}">
+                        <input class="time-series-checkbox" type="checkbox" value="{{label}}" color="{{colorById Index @root/keys.length  name= label}}">
                     </td>
                     <td>
-                        <div class="legend-color uk-display-inline-block" style="width: 10px; height: 10px; background:{{colorByName label}}" color="{{colorByName label}}" ></div>
+                        <div class="legend-color uk-display-inline-block" style="width: 10px; height: 10px; background:{{colorById Index @root/keys.length  name= label}}" color="{{colorById Index @root/keys.length  name= label}}" ></div>
                     </td>
                     <td class="legend-label-value-td">
                         {{label}}

@@ -10,6 +10,17 @@ function getTimeSeries() {
 //        }
 //    })
 	getData(url).done(function(data) {
+        //Error handling when data is falsy (empty, undefined or null)
+        if(!data){
+            $("#"+  hash.view  +"-chart-area-error").empty()
+            var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' })
+            warning.append($('<p></p>', { html: 'Something went wrong. Please try and reload the page. Error: data =' + data  }))
+            $("#"+  hash.view  +"-chart-area-error").append(warning)
+            $("#"+  hash.view  +"-chart-area-error").show()
+            return
+        }else{
+            $("#"+  hash.view  +"-chart-area-error").hide()
+        }
 
 		var result_time_series = HandleBarsTemplates.template_time_series(data);
         $("#"+ hash.view +"-display-chart-section").append(result_time_series);
@@ -18,16 +29,33 @@ function getTimeSeries() {
 };
 
 function renderTimeSeriesUsingC3(d){  //time-series-area
-	//var data = JSON.parse(d);
 
     var colors = {};
-    var IdArray = Object.keys(d.timeSeriesData)
-    var numIds = IdArray.length;
-    //Only color by name works since it's a hash.map
-    // Todo: we can change the data type in be so the d3.scale.category10().range() is working
-    for(key in d.timeSeriesData){
-        colors[key] = colorByName(key);
+    var numIds = d.keys.length;
+    var colorArray;
+    if (numIds < 10) {
+        colorArray = d3.scale.category10().range();
+        for(var idIndex = 0; idIndex < numIds; idIndex++){
+            colors[ d.keys[idIndex] ] = colorArray[idIndex] //colorArray[idIndex];
+        }
+    }else if(numIds < 20) {
+        colorArray = d3.scale.category20().range();
+        for(var idIndex = 0; idIndex < numIds; idIndex++){
+            colors[ d.keys[idIndex] ] = colorArray[idIndex] //colorArray[idIndex];
+        }
+    }else {
+        colorArray = colorScale(numIds)
+        for(var idIndex = 0; idIndex < numIds; idIndex++){
+            colors[ d.keys[idIndex] ] = colorArray[idIndex]; //colorByName(d.keys[idIndex]) //colorArray[idIndex];
+        }
     }
+
+
+    console.log("colors")
+    console.log(colors)
+    console.log('d["timeSeriesData"]')
+    console.log(d["timeSeriesData"])
+
 
     var chart = c3.generate({
 	    bindto: '#time-series-area',
