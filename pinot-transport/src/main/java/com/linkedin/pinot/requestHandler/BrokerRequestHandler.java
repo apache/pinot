@@ -15,6 +15,23 @@
  */
 package com.linkedin.pinot.requestHandler;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.http.annotation.ThreadSafe;
+import org.apache.thrift.protocol.TCompactProtocol;
+import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.exception.QueryException;
@@ -52,24 +69,6 @@ import com.linkedin.pinot.transport.scattergather.ScatterGather;
 import com.linkedin.pinot.transport.scattergather.ScatterGatherRequest;
 import com.linkedin.pinot.transport.scattergather.ScatterGatherStats;
 import io.netty.buffer.ByteBuf;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
-
-import org.apache.commons.lang3.tuple.Pair;
-import org.apache.http.annotation.ThreadSafe;
-import org.apache.thrift.protocol.TCompactProtocol;
-import org.json.JSONObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -112,15 +111,15 @@ public class BrokerRequestHandler {
   public BrokerResponse handleRequest(JSONObject request) throws Exception {
     final String pql = request.getString("pql");
     final long requestId = _requestIdGenerator.incrementAndGet();
-    LOGGER.info("Query string for requestId {}: {}", requestId, pql);
+    LOGGER.debug("Query string for requestId {}: {}", requestId, pql);
     boolean isTraceEnabled = false;
 
     if (request.has("trace")) {
       try {
         isTraceEnabled = Boolean.parseBoolean(request.getString("trace"));
-        LOGGER.info("Trace is set to: {}", isTraceEnabled);
+        LOGGER.info("Trace is set to: {} for query {}", isTraceEnabled, pql);
       } catch (Exception e) {
-        LOGGER.warn("Invalid trace value: {}", request.getString("trace"), e);
+        LOGGER.warn("Invalid trace value: {} for query {}", request.getString("trace"), pql, e);
       }
     } else {
       // ignore, trace is disabled by default
@@ -138,6 +137,7 @@ public class BrokerRequestHandler {
       BrokerResponse brokerResponse = new BrokerResponseNative();
       brokerResponse.setExceptions(Arrays.asList(QueryException.getException(QueryException.PQL_PARSING_ERROR, e)));
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1);
+      LOGGER.info("Parsing error on query:{}", pql, e);
       return brokerResponse;
     }
 
@@ -163,8 +163,8 @@ public class BrokerRequestHandler {
     resp.setTimeUsedMs(queryProcessingTimeInMillis);
 
     LOGGER.debug("Broker Response : {}", resp);
-    LOGGER.info("ResponseTimes for requestId:{}, total time:{} scatterGatherStats: {}", requestId,
-        queryProcessingTimeInMillis, scatterGatherStats);
+    LOGGER.info("ResponseTimes for requestId:{}, total time:{} scatterGatherStats: {}, query:{}", requestId,
+        queryProcessingTimeInMillis, scatterGatherStats, pql);
 
     return resp;
   }
@@ -192,7 +192,7 @@ public class BrokerRequestHandler {
       final ScatterGatherStats scatterGatherStats, final long requestId) throws InterruptedException {
 
     ResponseType responseType = BrokerResponseFactory.getResponseType(request.getResponseFormat());
-    LOGGER.info("Broker Response Type: {}", responseType.name());
+    LOGGER.debug("Broker Response Type: {}", responseType.name());
 
     if (request.getQuerySource() == null || request.getQuerySource().getTableName() == null) {
       LOGGER.info("Query contains null table.");
