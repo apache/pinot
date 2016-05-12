@@ -15,14 +15,12 @@
  */
 package com.linkedin.pinot.client;
 
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Properties;
+
 import org.I0Itec.zkclient.ZkClient;
 import org.I0Itec.zkclient.serialize.BytesPushThroughSerializer;
-import org.json.JSONObject;
 
 
 /**
@@ -37,37 +35,13 @@ public class ConnectionFactory {
   /**
    * Creates a connection to a Pinot cluster, given its Zookeeper URL
    *
-   * @param zkUrl The URL to the Zookeeper cluster
+   * @param zkUrl The URL to the Zookeeper cluster, must include the cluster name e.g host:port/chroot/pinot-cluster
    * @return A connection that connects to the brokers in the given Helix cluster
    */
   public static Connection fromZookeeper(String zkUrl) {
     try {
-      ZkClient client = new ZkClient(zkUrl);
-      client.setZkSerializer(new BytesPushThroughSerializer());
-      byte[] brokerResourceNodeData = client.readData("/EXTERNALVIEW/brokerResource", true);
-      JSONObject jsonObject = new JSONObject(new String(brokerResourceNodeData));
-      JSONObject brokerResourceNode = jsonObject.getJSONObject("mapFields");
-
-      List<String> brokerUrls = new ArrayList<String>();
-
-      Iterator<String> resourceNames = brokerResourceNode.keys();
-      while (resourceNames.hasNext()) {
-        String resourceName = resourceNames.next();
-        JSONObject resource = brokerResourceNode.getJSONObject(resourceName);
-
-        Iterator<String> brokerNames = resource.keys();
-        while (brokerNames.hasNext()) {
-          String brokerName = brokerNames.next();
-          if (brokerName.startsWith("Broker_") && "ONLINE".equals(resource.getString(brokerName))) {
-            // Turn Broker_12.34.56.78_1234 into 12.34.56.78:1234
-            brokerUrls.add(brokerName.replace("Broker_", "").replace("_", ":"));
-          }
-        }
-      }
-
-      client.close();
-
-      return new Connection(brokerUrls, _transportFactory.buildTransport());
+      DynamicBrokerSelector dynamicBrokerSelector = new DynamicBrokerSelector(zkUrl);
+      return new Connection(dynamicBrokerSelector, _transportFactory.buildTransport());
     } catch (Exception e) {
       throw new PinotClientException(e);
     }
@@ -91,5 +65,5 @@ public class ConnectionFactory {
    */
   public static Connection fromHostList(String... brokers) {
     return new Connection(Arrays.asList(brokers), _transportFactory.buildTransport());
-  }
+  }  
 }

@@ -20,10 +20,8 @@ import java.util.List;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-
 /**
  * Tests for the connection factory
- *
  */
 public class ConnectionFactoryTest {
   @Test
@@ -55,4 +53,16 @@ public class ConnectionFactoryTest {
     brokers.add(broker2);
     Assert.assertEquals(connection.getBrokerList(), brokers);
   }
+  
+  // For testing DynamicBrokerSelector
+  public static void main(String[] args) {
+    String zkUrl = "<ZKURL>/<CHROOT>(otional)/<CLUSTER_NAME>"; //e.g localhost:2181/pinot-cluster
+    Connection connection =
+        ConnectionFactory.fromZookeeper(zkUrl);
+    String tableName = "<TABLE_NAME>";
+    ResultSetGroup resultSetGroup =
+        connection.execute(tableName, "select count(*) from " + tableName);
+    System.out.println(resultSetGroup);
+  }
+
 }

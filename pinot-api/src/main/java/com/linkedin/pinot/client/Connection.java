@@ -30,13 +30,19 @@ import org.slf4j.LoggerFactory;
  */
 public class Connection {
   private static final Logger LOGGER = LoggerFactory.getLogger(Connection.class);
-  private final List<String> _brokerList;
   private final PinotClientTransport _transport;
-  private final Random _random = new Random();
+  private BrokerSelector _brokerSelector;
+  private List<String> _brokerList;
 
   Connection(List<String> brokerList, PinotClientTransport transport) {
-    LOGGER.info("Creating connection to broker list {}", brokerList);
     _brokerList = brokerList;
+    LOGGER.info("Creating connection to broker list {}", brokerList);
+    _brokerSelector = new SimpleBrokerSelector(brokerList);
+    _transport = transport;
+  }
+
+  Connection(BrokerSelector brokerSelector , PinotClientTransport transport) {
+    _brokerSelector = brokerSelector;
     _transport = transport;
   }
 
@@ -52,18 +58,27 @@ public class Connection {
 
   /**
    * Executes a PQL statement.
-   *
    * @param statement The statement to execute
    * @return The result of the query
    * @throws PinotClientException If an exception occurs while processing the query
    */
   public ResultSetGroup execute(String statement) throws PinotClientException {
-    BrokerResponse response = _transport.executeQuery(pickRandomBroker(), statement);
+    return execute(null, statement);
+  }
 
+  /**
+   * Executes a PQL statement.
+   *
+   * @param statement The statement to execute
+   * @return The result of the query
+   * @throws PinotClientException If an exception occurs while processing the query
+   */
+  public ResultSetGroup execute(String tableName, String statement) throws PinotClientException {
+    String brokerHostPort = _brokerSelector.selectBroker(tableName);
+    BrokerResponse response = _transport.executeQuery(brokerHostPort, statement);
     if (response.hasExceptions()) {
       throw new PinotClientException("Query had processing exceptions: \n" + response.getExceptions());
     }
-
     return new ResultSetGroup(response);
   }
 
@@ -75,13 +90,9 @@ public class Connection {
    * @throws PinotClientException If an exception occurs while processing the query
    */
   public Future<ResultSetGroup> executeAsync(String statement) throws PinotClientException {
-    final Future<BrokerResponse> responseFuture = _transport.executeQueryAsync(pickRandomBroker(), statement);
+    final Future<BrokerResponse> responseFuture = _transport.executeQueryAsync(_brokerSelector.selectBroker(null), statement);
 
     return new ResultSetGroupFuture(responseFuture);
-  }
-
-  private String pickRandomBroker() {
-    return _brokerList.get(_random.nextInt(_brokerList.size()));
   }
 
   /**

@@ -103,7 +103,6 @@ public class ResultSetGroupTest {
       Assert.fail("Execute should have thrown an exception");
     } catch (PinotClientException e) {
       // We expect an exception here
-      e.printStackTrace();
     }
   }
 
