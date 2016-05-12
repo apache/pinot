@@ -1,39 +1,5 @@
 $(document).ready(function() {
    /** --- 1) Register Handelbars helpers --- * */
-
-   //takes a string returns a HEX color code
-    Handlebars.registerHelper('colorByName', function(name) {
-
-        if(name == "?"){
-            name = "other"
-        }else if(name == ""){
-            name = "unknown"
-        }
-        //remove non alphanumeric characters
-        name = name.replace(/\W+/g, "")
-
-        //multiple short name would
-        if(name.length < 4){
-            name = name + name + name;
-            name=  name.substr(-2) + name.substr(-2) + name.substr(-2);
-        }else{
-            name = name.substr(-3) + name.substr(-3) + name.substr(-3);
-        }
-
-        //too long name would return infinity
-        var hexStr;
-        if (Number.isFinite(parseInt(name, 36) + 16777216)){
-            hexStr =  (parseInt(name, 36) + 16777216).toString(16).substr(0,6);
-        }else{
-            name =  name.substr(-2) + name.substr(-2) + name.substr(-2);
-            hexStr =  (parseInt(name, 36) + 16777216).toString(16).substr(0,6);
-        }
-
-        var color = "#" + hexStr
-
-        return color
-
-    });
     
   //takes a string returns a HEX color code
     Handlebars.registerHelper('colorById', function( id, numIds, options ) {
@@ -51,8 +17,7 @@ $(document).ready(function() {
             return d3.scale.category20().range()[id];
 
         } else{
-            return  Handlebars.helpers.assignColorByID(numIds,id)//Handlebars.helpers.colorByName( options.hash.name )
-        }
+            return  Handlebars.helpers.assignColorByID(numIds,id)        }
 
     });
 
@@ -67,7 +32,7 @@ $(document).ready(function() {
             return d3.scale.category20().range()[id];
 
         } else{
-            return  Handlebars.helpers.assignColorByID(numIds,id)//Handlebars.helpers.colorByName( options.hash.name )
+            return  Handlebars.helpers.assignColorByID(numIds,id)
         }
     });
 
@@ -93,7 +58,7 @@ $(document).ready(function() {
             }
 
 
-            var str = (num.toString(16) + "ffffff")
+            var str = (num.toString(16) + "dddddd")
             var hex = num.toString(16).length < 6 ? str.substr(0,6) : num.toString(16)
             colorAry.push( hex )
         }

@@ -69,7 +69,7 @@ function drawTimeSeries(ajaxData) {
     }else {
       colorArray = [];
       for(i=0,len=metrics.length; i<len;i++){
-        colorArray.push( colorByName(metrics[i]) );
+         colorArray = colorScale(metrics.length)
        }
     }
 

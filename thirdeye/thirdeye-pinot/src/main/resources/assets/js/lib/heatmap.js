@@ -248,4 +248,22 @@ function heatMapEventListeners(){
             }
         })
 
+// Tooltip  start
+//      $("#"+ hash.view +"-display-chart-section").on("mouseover", ".node",function(d) {
+//            div.transition()
+//                .duration(200)
+//                .style("opacity", .9);
+//            div .html(test + "<br/>"  + d.close)
+//                .style("left", (d3.event.pageX) + "px")
+//                .style("top", (d3.event.pageY - 28) + "px");
+//        })
+//
+//
+//        $("#"+ hash.view +"-display-chart-section").on("mouseout", function(d) {
+//                div.transition()
+//                    .duration(500)
+//                    .style("opacity", 0);
+//            });
+
+
 }

@@ -78,10 +78,7 @@ function drawAnomalyTimeSeries(ajaxData, anomalyData) {
   } else if (metrics.length < 20) {
     colorArray = d3.scale.category20().range();
   } else {
-    colorArray = [];
-    for (i = 0, len = metrics.length; i < len; i++) {
-      colorArray.push(colorByName(metrics[i]));
-    }
+      colorArray = colorScale(metrics.length)
   }
 
   for (var i = 0, mlen = metrics.length; i < mlen; i++) {

@@ -46,7 +46,7 @@ function renderTimeSeriesUsingC3(d){  //time-series-area
     }else {
         colorArray = colorScale(numIds)
         for(var idIndex = 0; idIndex < numIds; idIndex++){
-            colors[ d.keys[idIndex] ] = colorArray[idIndex]; //colorByName(d.keys[idIndex]) //colorArray[idIndex];
+            colors[ d.keys[idIndex] ] = colorArray[idIndex];
         }
     }
 
