@@ -89,27 +89,8 @@ $(document).ready(function() {
     });
 
     Handlebars.registerHelper('displayRatio', function (val, index) {
-
         if ((index + 1) % 3 == 0 && parseFloat(val)) {
-            // Round the ratio to 2 decimal places, add 0.00001 to prevent
-            // Chrome rounding 0.005 to 0.00
-            var ratioVal = Math.round((parseFloat(val) + 0.00001)).toFixed(1)
-            val = ratioVal + "%"
-            return val
-        } else {
-            return val.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-        }
-    });
-
-    //Todo: remove this helper from the methods and from the template once the tabular view JSON is passing formatted data
-    Handlebars.registerHelper('displayRatioUnformattedData', function (val, index) {
-
-        if ((index + 1) % 3 == 0 && parseFloat(val)) {
-            // Round the ratio to 2 decimal places, add 0.00001 to prevent
-			// Chrome rounding 0.005 to 0.00
-            var ratioVal = Math.round(((parseFloat(val) + 0.00001) * 1000) / 10).toFixed(1)
-            val = ratioVal + "%"
-            return val
+            return  val + "%";
         } else {
             return val.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
         }

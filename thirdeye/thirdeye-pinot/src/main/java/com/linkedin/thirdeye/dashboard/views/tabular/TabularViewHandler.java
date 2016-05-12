@@ -143,9 +143,9 @@ public class TabularViewHandler implements ViewHandler<TabularViewRequest, Tabul
         "baselineValue", "currentValue", "ratio", "cumulativeBaselineValue",
         "cumulativeCurrentValue", "cumulativeRatio"
     };
-    //maintain same order in response
+    // maintain same order in response
     Map<String, GenericResponse> data = new LinkedHashMap<>();
-    for(String metric:metricNames){
+    for (String metric : metricNames) {
       ResponseSchema schema = new ResponseSchema();
       for (int i = 0; i < columns.length; i++) {
         String column = columns[i];
@@ -169,7 +169,8 @@ public class TabularViewHandler implements ViewHandler<TabularViewRequest, Tabul
         Double currentValue = metric.getCurrentValue();
         String baselineValueStr = HeatMapCell.format(baselineValue);
         String currentValueStr = HeatMapCell.format(currentValue);
-        String ratioStr = HeatMapCell.format((currentValue - baselineValue) / baselineValue);
+        String ratioStr =
+            HeatMapCell.format(((currentValue - baselineValue) * 100) / baselineValue);
 
         Double cumulativeBaselineValue;
         Double cumulativeCurrentValue;
@@ -191,16 +192,16 @@ public class TabularViewHandler implements ViewHandler<TabularViewRequest, Tabul
 
         String cumulativeBaselineValueStr = HeatMapCell.format(cumulativeBaselineValue);
         String cumulativeCurrentValueStr = HeatMapCell.format(cumulativeCurrentValue);
-        String cumulativeRatioStr = HeatMapCell
-            .format((cumulativeCurrentValue - cumulativeBaselineValue) / cumulativeBaselineValue);
+        String cumulativeRatioStr = HeatMapCell.format(
+            ((cumulativeCurrentValue - cumulativeBaselineValue) * 100) / cumulativeBaselineValue);
 
         String[] columnData = {
             baselineValueStr, currentValueStr, ratioStr, cumulativeBaselineValueStr,
             cumulativeCurrentValueStr, cumulativeRatioStr
         };
         GenericResponse rowData = data.get(metric.getMetricName());
-        if(rowData == null){
-          System.out.println("NULL for metric:"+ metric + " metricNames:"+ metricNames);
+        if (rowData == null) {
+          System.out.println("NULL for metric:" + metric + " metricNames:" + metricNames);
         }
         rowData.getResponseData().add(columnData);
 
@@ -215,7 +216,9 @@ public class TabularViewHandler implements ViewHandler<TabularViewRequest, Tabul
     // TODO Auto-generated method stub
     return null;
   }
-  public void addColumnData(Map<String, GenericResponse> data, String metric, String[] columnData, String[] columns) {
+
+  public void addColumnData(Map<String, GenericResponse> data, String metric, String[] columnData,
+      String[] columns) {
     GenericResponse rowData;
     if (data.containsKey(metric)) {
       rowData = data.get(metric);

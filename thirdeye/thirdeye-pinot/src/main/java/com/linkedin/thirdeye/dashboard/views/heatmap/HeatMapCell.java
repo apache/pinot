@@ -75,7 +75,7 @@ public class HeatMapCell {
         "contributionColor", "contributionSize", //
         "contributionToOverallColor", "contributionToOverallSize"//
     };
-    decimalFormat = new DecimalFormat("0.##");
+    decimalFormat = new DecimalFormat("0.#");
   }
 
   public String[] toArray() {
