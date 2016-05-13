@@ -115,9 +115,9 @@
                             </select>
                         </div>
                         <div class="uk-margin-small">
-                            <input id="{{tabName}}-current-start-date-input" class="current-start-date-input" rel="{{tabName}}" type="text" placeholder="YYYY-MM-DD" data-uk-datepicker="{ weekstart:0, format:'YYYY-MM-DD'}" style="width:110px;">
+                            <input id="{{tabName}}-current-start-date-input" class="current-start-date-input" rel="{{tabName}}" type="text" placeholder="YYYY-MM-DD" data-uk-datepicker="{ weekstart:0, format:'YYYY-MM-DD' }" style="width:110px;">
                             <input id="{{tabName}}-current-start-time-input" class="current-start-time-input" rel="{{tabName}}"  type="text" data-uk-timepicker="{format:'24h'}" placeholder="HH:MM" style="width:50px;"> -
-                            <input id="{{tabName}}-current-end-date-input" class="current-end-date-input" rel="{{tabName}}" type="text" placeholder="YYYY-MM-DD" data-uk-datepicker="{ weekstart:0, format:'YYYY-MM-DD'}" style="width:110px;">
+                            <input id="{{tabName}}-current-end-date-input" class="current-end-date-input" rel="{{tabName}}" type="text" placeholder="YYYY-MM-DD" data-uk-datepicker="{ weekstart:0, format:'YYYY-MM-DD' }" style="width:110px;">
                             <input id="{{tabName}}-current-end-time-input" class="current-end-time-input" rel="{{tabName}}" type="text" data-uk-timepicker="{format:'24h'}" placeholder="HH:MM" style="width:50px;">
                         </div>
                         {{#if needComparisonTimeRange}}

@@ -80,54 +80,6 @@ function updateHashParam(param, value){
     hash[param] = value;
 }
 
-
-function populateTodayDateTime(){
-
-    //Todays date
-    var currentStartDateTime = moment(parseInt(Date.now()));
-    var currentStartDateString = currentStartDateTime.format("YYYY-MM-DD");
-    var currentStartTimeString = currentStartDateTime.format("00:00");
-
-    //Todays time
-    var currentEndDateTime = moment(parseInt(Date.now()));
-    var currentEndDateString = currentEndDateTime.format("YYYY-MM-DD");
-    var currentEndTimeString = currentEndDateTime.format("HH" + ":00");
-
-    //Populate WoW date
-    var baselineStartDateTime = currentStartDateTime.add(-7,'days');
-    var baselineStartDateString = baselineStartDateTime.format("YYYY-MM-DD");
-    var baselineStartTimeString = currentStartTimeString;
-
-    //Populate WoW time
-    var baselineEndDateTime = currentEndDateTime.add(-7, 'days');
-    var baselineEndDateString = baselineEndDateTime.format("YYYY-MM-DD");
-    var baselineEndTimeString = currentEndTimeString;
-
-    $(".current-start-date").text(currentStartDateString);
-    $(".current-end-date").text(currentEndDateString);
-
-    $(".current-start-time").text(currentStartTimeString);
-    $(".current-end-time").text(currentEndTimeString);
-
-    $(".baseline-start-date").text(baselineStartDateString);
-    $(".baseline-end-date").text(baselineEndDateString);
-
-    $(".baseline-start-time").text(baselineStartTimeString);
-    $(".baseline-end-time").text(baselineEndTimeString);
-
-    $(".current-start-date-input").val(currentStartDateString);
-    $(".current-end-date-input").val(currentEndDateString);
-
-    $(".current-start-time-input").val(currentStartTimeString);
-    $(".current-end-time-input").val(currentEndTimeString);
-
-    $(".baseline-start-date-input").val(baselineStartDateString);
-    $(".baseline-end-date-input").val(baselineEndDateString);
-
-    $(".baseline-start-time-input").val(baselineStartTimeString);
-    $(".baseline-end-time-input").val(baselineEndTimeString);
-}
-
 function updateDashboardFormFromHash(){
 
     //Preselect dataset if present in hash
@@ -367,7 +319,10 @@ function selectDatasetNGetDashboardList(target){
 
     $("#"+  hash.view  +"-chart-area-error").hide();
 
-    //Trigger AJAX call
+    //Trigger AJAX calls
+    //get the latest available data timestamp of a dataset
+    getMaxDateTime()
+    
     getDashboardList()
     getMetricNFilterList();
 

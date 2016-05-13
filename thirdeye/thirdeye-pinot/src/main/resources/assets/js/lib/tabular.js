@@ -8,6 +8,7 @@ function getTabular() {
 
 function renderTabular(data) {
 
+
     //Error handling when data is falsy (empty, undefined or null)
     if(!data){
         $("#"+  hash.view  +"-chart-area-error").empty()
@@ -18,6 +19,15 @@ function renderTabular(data) {
         return
     }else{
         $("#"+  hash.view  +"-chart-area-error").hide()
+    }
+
+    if(data.metrics.length == 0){
+        $("#"+  hash.view  +"-chart-area-error").empty()
+        var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' })
+        warning.append($('<p></p>', { html: 'No metric data is present in this timerange. Error: data.metrics = 0'  }))
+        $("#"+  hash.view  +"-chart-area-error").append(warning)
+        $("#"+  hash.view  +"-chart-area-error").show()
+        return
     }
 
 	/* Handelbars template for time series legend */

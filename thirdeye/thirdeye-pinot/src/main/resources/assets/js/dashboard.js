@@ -100,12 +100,15 @@ $(document).ready( function() {
     $("#" + hash.view + "-header-tab").click();
 
     //populate default time in form
-    populateTodayDateTime()
+    //populateTodayDateTime()
+
     /** --- ) Set initial view on pageload ---**/
 
     //getDataSetList as a callback triggers ajax calls for all data on the form:
-    // dashboard list, metric, dimension and dimension value list
+    // dashboard list, metric, dimension and dimension value list, and the dataset configs
+    //ie. maxDate etc.
     getDataSetList();
+
 
 
     //Add onhashchange event listener to window object to enable back button usage on the browser

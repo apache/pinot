@@ -51,12 +51,19 @@ function getMetricNFilterList() {
 
     getData(url).done(function (data) {
 
+
+        //empty previous metriclist
+        $(".metric-list").empty()
+
+
+        var errorMessage = $("#"+ hash.view +"-time-input-form-error p");
+        var errorAlert = $("#"+ hash.view +"-time-input-form-error");
         if(!data){
-            var errorMessage = $("#"+ hash.view +"-time-input-form-error p");
-            var errorAlert = $("#"+ hash.view +"-time-input-form-error");
             errorMessage.html("No metrics available in the server. Error: data = " + data);
             errorAlert.fadeIn(100);
             return
+        }else{
+            errorAlert.hide()
         }
 
         /* Create metrics dropdown */
@@ -85,12 +92,19 @@ function getMetricNFilterList() {
     var url = "/dashboard/data/filters?dataset=" + hash.dataset;
     getData(url).done(function (data) {
 
+        //empty previous dimension list
+        $(".dimension-list").empty()
+        $(".filter-dimension-list").empty()
+
+
+        var errorMessage = $("#"+ hash.view +"-time-input-form-error p");
+        var errorAlert = $("#"+ hash.view +"-time-input-form-error");
         if(!data){
-            var errorMessage = $("#"+ hash.view +"-time-input-form-error p");
-            var errorAlert = $("#"+ hash.view +"-time-input-form-error");
             errorMessage.html("No dimension or dimension values available. Error: dimension data = " + data);
             errorAlert.fadeIn(100);
             return
+        }else{
+            errorAlert.hide()
         }
 
 
@@ -174,3 +188,77 @@ function getMetricNFilterList() {
 
     });
 };
+
+
+function getMaxDateTime() {
+
+    //Till the endpoint is ready no ajax call is triggered and works with  hardcoded data in local data variable
+    var url = "/dashboard/data/info?dataset=" + hash.dataset;
+
+    getData(url).done(function (data) {
+
+        var errorMessage = $("#"+ hash.view +"-time-input-form-error p");
+        var errorAlert = $("#"+ hash.view +"-time-input-form-error");
+        if(!data){
+            errorMessage.html("No dataset info available. Error: data/info?dataset data = " + data);
+            errorAlert.attr("data-error-source", "datasetinfo");
+            errorAlert.fadeIn(100);
+            return
+        }else{
+            $("#"+ hash.view +"-time-input-form-error[data-error-source= 'datasetinfo']").hide()
+        }
+
+        //Max date time
+        var maxMillis = data["maxTime"]
+        var currentStartDateTime = moment(parseInt(maxMillis)).add(-1, 'days');
+        var currentStartDateString = currentStartDateTime.format("YYYY-MM-DD");
+        var currentStartTimeString = currentStartDateTime.format("HH" + ":00");
+
+        //Max date time
+        var currentEndDateTime = moment(parseInt(maxMillis));
+        var currentEndDateString = currentEndDateTime.format("YYYY-MM-DD");
+        var currentEndTimeString = currentEndDateTime.format("HH" + ":00");
+
+        //Populate WoW date
+        var baselineStartDateTime = currentStartDateTime.add(-7,'days');
+        var baselineStartDateString = baselineStartDateTime.format("YYYY-MM-DD");
+        var baselineStartTimeString = currentStartTimeString;
+
+        //Populate WoW time
+        var baselineEndDateTime = currentEndDateTime.add(-7, 'days');
+        var baselineEndDateString = baselineEndDateTime.format("YYYY-MM-DD");
+        var baselineEndTimeString = currentEndTimeString;
+
+        $(".current-start-date").text(currentStartDateString);
+        $(".current-end-date").text(currentEndDateString);
+
+        $(".current-start-time").text(currentStartTimeString);
+        $(".current-end-time").text(currentEndTimeString);
+
+        $(".baseline-start-date").text(baselineStartDateString);
+        $(".baseline-end-date").text(baselineEndDateString);
+
+        $(".baseline-start-time").text(baselineStartTimeString);
+        $(".baseline-end-time").text(baselineEndTimeString);
+
+        $(".current-start-date-input").val(currentStartDateString);
+        $(".current-end-date-input").val(currentEndDateString);
+
+        $(".current-start-time-input").val(currentStartTimeString);
+        $(".current-end-time-input").val(currentEndTimeString);
+
+        $(".baseline-start-date-input").val(baselineStartDateString);
+        $(".baseline-end-date-input").val(baselineEndDateString);
+
+        $(".baseline-start-time-input").val(baselineStartTimeString);
+        $(".baseline-end-time-input").val(baselineEndTimeString);
+
+        //Set the max date on the datepicker dropdowns
+        var maxDate = moment(parseInt(maxMillis)).format("YYYY-MM-DD");
+        UIkit.datepicker(UIkit.$('.current-start-date-input'), { maxDate: maxDate, format:'YYYY-MM-DD' });
+        UIkit.datepicker(UIkit.$('.current-end-date-input'),  { maxDate: maxDate, format:'YYYY-MM-DD' });
+        UIkit.datepicker(UIkit.$('.baseline-start-date-input'),  { maxDate: maxDate, format:'YYYY-MM-DD' });
+        UIkit.datepicker(UIkit.$('.baseline-end-date-input'),  { maxDate: maxDate, format:'YYYY-MM-DD' });
+
+    })
+}
