@@ -55,8 +55,9 @@ public class TransportClientConf {
       _cfgBasedRouting.init(cfg.subset(CFG_BASED_ROUTING));
     }
 
-    if (cfg.containsKey(CONNECTION_POOL_CONFIG)) {
-      _connPool.init(cfg.subset(CONNECTION_POOL_CONFIG));
+    Configuration connPoolCfg = cfg.subset(CONNECTION_POOL_CONFIG);
+    if (connPoolCfg != null) {
+      _connPool.init(connPoolCfg);
     }
   }
 

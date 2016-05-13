@@ -87,6 +87,21 @@ public class ConnectionPoolConfig {
       _maxBacklogPerServer = cfg.getInt(MAX_BACKLOG_PER_SERVER_KEY);
     }
 
+    if (_minConnectionsPerServer > _maxConnectionsPerServer || _maxConnectionsPerServer <= 0 || _minConnectionsPerServer < 1) {
+      LOGGER.warn("Invalid values for " + MIN_CONNECTIONS_PER_SERVER_KEY +  "({}) and " + MAX_CONNECTIONS_PER_SERVER_KEY +
+          "({}). Resetting to defaults:", _minConnectionsPerServer, _maxConnectionsPerServer);
+      _minConnectionsPerServer = DEFAULT_MIN_CONNECTIONS_PER_SERVER;
+      _maxConnectionsPerServer = DEFAULT_MAX_CONNECTIONS_PER_SERVER;
+    }
+    if (_idleTimeoutMs < 0) {
+      LOGGER.warn("Invalid value for " + IDLE_TIMEOUT_MS_KEY +  "({}). Resetting to default.");
+      _idleTimeoutMs = DEFAULT_IDLE_TIMEOUT_MS;
+    }
+    if (_maxBacklogPerServer < 0) {
+      LOGGER.warn("Invalid value for " + MAX_BACKLOG_PER_SERVER_KEY + "({}). Resetting to default.");
+      _maxBacklogPerServer = DEFAULT_MAX_BACKLOG_PER_SERVER;
+    }
+
     LOGGER.info(toString());
   }
 
