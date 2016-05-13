@@ -31,15 +31,17 @@
     });
     
     $("#main-view").on("click",".remove-filter-selection", function(){
+
         var currentTabFilters = $(".filter-panel[rel='" + hash.view + "']");
         //remove the item from the hash by unchecking checkboxes on the panel and applying new selection
         var dimension = $(this).attr("rel");
         var values = $(this).attr("value").split(",");
 
         for(var i= 0, len = values.length; i<len; i++){
-            var value = values[i].replace(/(\r\n|\n|\r)/gm,"").trim();
-            $(".filter-value-checkbox[rel="+ dimension +"]", currentTabFilters).removeAttr('checked');
-            $(".filter-select-all-checkbox[rel="+ dimension +"]", currentTabFilters).removeAttr('checked');
+
+            var value = values[i].trim();
+            $(".filter-value-checkbox[rel='"+ dimension +"']", currentTabFilters).removeAttr('checked');
+            $(".filter-select-all-checkbox[rel='"+ dimension +"']", currentTabFilters).removeAttr('checked');
         }
         //Enable then trigger apply btn
         $(".apply-filter-btn[rel='" + hash.view + "']").prop("disabled", false);

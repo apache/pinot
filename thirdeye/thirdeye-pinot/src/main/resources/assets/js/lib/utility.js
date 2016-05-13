@@ -1065,6 +1065,9 @@ function  calcHeatMapCellBackground(cell, options){
     if(options.caller == "contributors"){
         value = value / 100;
     }
+    if(options.caller == "tabular"){
+      value = value / 100;
+  }
     var absValue = Math.abs(value)
 
     if (value < 0) {

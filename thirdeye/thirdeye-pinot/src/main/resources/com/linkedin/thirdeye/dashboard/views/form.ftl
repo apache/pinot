@@ -59,7 +59,7 @@
                  <label class="uk-form-label  uk-display-inline-block">Filters</label>
                 <div id="{{tabName}}-add-filter" class="add-filter add-btn uk-display-inline-block" rel="{{tabName}}" data-uk-dropdown="{mode:'click'}">
                     <button class="uk-button uk-button-primary" type="button"><i class="uk-icon-plus"></i></button>
-                    <div id="{{tabName}}-filter-panel" class="filter-panel uk-dropdown" style="width:420px; display:none;">
+                    <div id="{{tabName}}-filter-panel" class="filter-panel uk-dropdown" rel="{{tabName}}" style="width:420px; display:none;">
                         <i class="close-dropdown-btn uk-icon-close" style="position: absolute; right:5px; top: 5px;"></i>
                         <a href="#" class="uk-dropdown-close">
                             <button id="{{tabName}}-apply-filter-btn" class="apply-filter-btn uk-button uk-button-primary"  rel="{{tabName}}"  style="float:right; margin: 5px;" disabled>Apply
