@@ -123,7 +123,8 @@ public class FileBasedConfigDAOFactory implements ConfigDAOFactory {
 
     public List<AbstractConfig> findAll(String collectionName) {
 
-      File[] listFiles = getDir(collectionName).listFiles();
+      File dir = getDir(collectionName);
+      File[] listFiles = dir.listFiles();
       if (listFiles == null || listFiles.length == 0) {
         return Collections.emptyList();
       }

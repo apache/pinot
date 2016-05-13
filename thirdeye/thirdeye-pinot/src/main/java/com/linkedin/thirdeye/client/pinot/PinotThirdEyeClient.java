@@ -35,6 +35,7 @@ import com.linkedin.thirdeye.api.CollectionSchema;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.client.MetricFunction;
+import com.linkedin.thirdeye.client.PinotQuery;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.client.ThirdEyeRequest;
 import com.linkedin.thirdeye.client.ThirdEyeRequest.ThirdEyeRequestBuilder;
@@ -52,6 +53,7 @@ import com.linkedin.thirdeye.client.ThirdeyeCacheRegistry;
  * @author jteoh
  */
 public class PinotThirdEyeClient implements ThirdEyeClient {
+  private static final ThirdeyeCacheRegistry CACHE_INSTANCE = ThirdeyeCacheRegistry.getInstance();
   public static final String CONTROLLER_HOST_PROPERTY_KEY = "controllerHost";
   public static final String CONTROLLER_PORT_PROPERTY_KEY = "controllerPort";
   public static final String FIXED_COLLECTIONS_PROPERTY_KEY = "fixedCollections";
@@ -141,14 +143,14 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
 
   @Override
   public ThirdEyeResponse execute(ThirdEyeRequest request) throws Exception {
-    CollectionSchema collectionSchema = ThirdeyeCacheRegistry.getInstance()
+    CollectionSchema collectionSchema = CACHE_INSTANCE
         .getCollectionSchemaCache().get(request.getCollection());
     TimeSpec dataTimeSpec = collectionSchema.getTime();
     List<MetricFunction> metricFunctions = request.getMetricFunctions();
     List<String> dimensionNames = collectionSchema.getDimensionNames();
     String sql = PqlUtils.getPql(request, dataTimeSpec);
     LOG.debug("Executing: {}", sql);
-    ResultSetGroup result = ThirdeyeCacheRegistry.getInstance().getResultSetGroupCache().get(sql);
+    ResultSetGroup result = CACHE_INSTANCE.getResultSetGroupCache().get(new PinotQuery(sql, request.getCollection()));
     parseResultSetGroup(request, result, metricFunctions, collectionSchema, dimensionNames);
     ThirdEyeResponse resp = new ThirdEyeResponse(request, result, dataTimeSpec);
     return resp;
@@ -183,7 +185,7 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
 
   @Override
   public CollectionSchema getCollectionSchema(String collection) throws Exception {
-    return ThirdeyeCacheRegistry.getInstance().getCollectionSchemaCache().get(collection);
+    return CACHE_INSTANCE.getCollectionSchemaCache().get(collection);
   }
 
   /**
@@ -225,8 +227,9 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
         // TODO Since Pinot does not strictly require a schema to be provided for each offline data
         // set, filter out those for which a schema cannot be retrieved.
         try {
-          Schema schema = getSchema(collection);
-          if (schema == null) {
+          System.out.println();
+          CollectionSchema collectionSchema = getCollectionSchema(collection);
+          if (collectionSchema == null) {
             LOG.debug("Skipping collection {} due to null schema", collection);
             skippedCollections.add(collection);
             continue;
@@ -262,9 +265,14 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
     controllerClient.close();
   }
 
-  private Schema getSchema(String collection) throws ClientProtocolException, IOException,
-      InterruptedException, ExecutionException, TimeoutException {
-    return ThirdeyeCacheRegistry.getInstance().getSchemaCache().get(collection);
+  private Schema getSchema(String collection) {
+    Schema schema = null;
+    try {
+      schema = CACHE_INSTANCE.getSchemaCache().get(collection);
+    } catch (Exception e) {
+      LOG.info("Exception while retrieving {} from schema cache", e);
+    }
+    return schema;
   }
 
 
@@ -301,7 +309,7 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
 
   @Override
   public long getMaxDataTime(String collection) throws Exception {
-    return ThirdeyeCacheRegistry.getInstance().getCollectionMaxDataTimeCache().get(collection);
+    return CACHE_INSTANCE.getCollectionMaxDataTimeCache().get(collection);
   }
 
 }

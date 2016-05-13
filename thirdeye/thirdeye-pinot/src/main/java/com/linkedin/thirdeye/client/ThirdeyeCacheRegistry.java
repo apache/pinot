@@ -10,32 +10,27 @@ import com.linkedin.thirdeye.api.CollectionSchema;
 
 public class ThirdeyeCacheRegistry {
 
-  private LoadingCache<String,ResultSetGroup> resultSetGroupCache;
+  private LoadingCache<PinotQuery,ResultSetGroup> resultSetGroupCache;
   private LoadingCache<String,Schema> schemaCache;
   private LoadingCache<String,CollectionSchema> collectionSchemaCache;
   private LoadingCache<String,Long> collectionMaxDataTimeCache;
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ThirdeyeCacheRegistry.class);
 
-  private static ThirdeyeCacheRegistry cacheRegistryInstance = null;
 
-  private ThirdeyeCacheRegistry() {
-
+  private static class Holder {
+    static final ThirdeyeCacheRegistry INSTANCE = new ThirdeyeCacheRegistry();
   }
 
   public static ThirdeyeCacheRegistry getInstance() {
-    if(cacheRegistryInstance == null) {
-      LOGGER.info("Creating new ThirdeyeCacheRegistry instance");
-      cacheRegistryInstance = new ThirdeyeCacheRegistry();
-    }
-    return cacheRegistryInstance;
+      return Holder.INSTANCE;
   }
 
-  public LoadingCache<String, ResultSetGroup> getResultSetGroupCache() {
+  public LoadingCache<PinotQuery, ResultSetGroup> getResultSetGroupCache() {
     return resultSetGroupCache;
   }
 
-  public void registerResultSetGroupCache(LoadingCache<String, ResultSetGroup> resultSetGroupCache) {
+  public void registerResultSetGroupCache(LoadingCache<PinotQuery, ResultSetGroup> resultSetGroupCache) {
     this.resultSetGroupCache = resultSetGroupCache;
   }
 

@@ -12,9 +12,10 @@ import com.linkedin.pinot.client.Connection;
 import com.linkedin.pinot.client.ConnectionFactory;
 import com.linkedin.pinot.client.PinotClientException;
 import com.linkedin.pinot.client.ResultSetGroup;
+import com.linkedin.thirdeye.client.PinotQuery;
 import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClientConfig;
 
-public class ResultSetGroupCacheLoader extends CacheLoader<String, ResultSetGroup> {
+public class ResultSetGroupCacheLoader extends CacheLoader<PinotQuery, ResultSetGroup> {
 
   private Connection connection;
 
@@ -43,12 +44,12 @@ public class ResultSetGroupCacheLoader extends CacheLoader<String, ResultSetGrou
   }
 
   @Override
-  public ResultSetGroup load(String sql) throws Exception {
+  public ResultSetGroup load(PinotQuery pinotQuery) throws Exception {
     try {
-      ResultSetGroup resultSetGroup = connection.execute(sql);
+      ResultSetGroup resultSetGroup = connection.execute(pinotQuery.getTableName(), pinotQuery.getPql());
       return resultSetGroup;
     } catch (PinotClientException cause) {
-      throw new PinotClientException("Error when running sql:" + sql, cause);
+      throw new PinotClientException("Error when running pql:" + pinotQuery.getPql(), cause);
     }
   }
 }
