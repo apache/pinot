@@ -318,7 +318,7 @@ public class MetricsGraphicsTimeSeriesResource {
     if (bucketSize == null) {
       CollectionSchema collectionSchema =
           timeOnTimeComparisonHandler.getClient().getCollectionSchema(collection);
-      return collectionSchema.getTime().getBucket();
+      return collectionSchema.getTime().getDataGranularity();
     } else {
       String[] split = bucketSize.split("_");
       String sizeStr = split[0];

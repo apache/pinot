@@ -27,7 +27,6 @@ import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClientConfig;
 import com.linkedin.thirdeye.dashboard.configs.AbstractConfigDAO;
 import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
 
-
 public class CollectionSchemaCacheLoader extends CacheLoader<String, CollectionSchema> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(CollectionSchemaCacheLoader.class);
@@ -40,7 +39,8 @@ public class CollectionSchemaCacheLoader extends CacheLoader<String, CollectionS
   private List<String> collections;
 
   public CollectionSchemaCacheLoader(PinotThirdEyeClientConfig pinotThirdeyeClientConfig,
-      AbstractConfigDAO<CollectionConfig> collectionConfigDAO, AbstractConfigDAO<CollectionSchema> collectionSchemaDAO) {
+      AbstractConfigDAO<CollectionConfig> collectionConfigDAO,
+      AbstractConfigDAO<CollectionSchema> collectionSchemaDAO) {
 
     this.collectionConfigDAO = collectionConfigDAO;
     this.collectionSchemaDAO = collectionSchemaDAO;
@@ -54,11 +54,8 @@ public class CollectionSchemaCacheLoader extends CacheLoader<String, CollectionS
 
   public CollectionSchema getCollectionSchema(String collection) throws Exception {
     CollectionSchema collectionSchema = null;
-
-    List<CollectionSchema> collectionSchemas = collectionSchemaDAO.findAll(collection);
-    if (collectionSchemas.isEmpty()) {
-
-      LOGGER.info("Collection schema from url");
+    collectionSchema = collectionSchemaDAO.findById(collection);
+    if (collectionSchema == null) {
       // get from schema endpoint
       Schema schema = ThirdeyeCacheRegistry.getInstance().getSchemaCache().get(collection);
       List<DimensionSpec> dimSpecs = fromDimensionFieldSpecs(schema.getDimensionFieldSpecs());
@@ -67,11 +64,7 @@ public class CollectionSchemaCacheLoader extends CacheLoader<String, CollectionS
       CollectionSchema config = new CollectionSchema.Builder().setCollection(collection)
           .setDimensions(dimSpecs).setMetrics(metricSpecs).setTime(timeSpec).build();
       return config;
-    } else {
-      // use this
-      LOGGER.info("Collection schema from file");
-      collectionSchema = collectionSchemas.get(0);
-    }
+    } 
 
     return collectionSchema;
   }
@@ -135,14 +128,11 @@ public class CollectionSchemaCacheLoader extends CacheLoader<String, CollectionS
   }
 
   private TimeSpec fromTimeFieldSpec(TimeFieldSpec timeFieldSpec, String format) {
-    TimeGranularity inputGranularity = new TimeGranularity(GRANULARITY_SIZE,
-        timeFieldSpec.getIncomingGranularitySpec().getTimeType());
     TimeGranularity outputGranularity = new TimeGranularity(GRANULARITY_SIZE,
         timeFieldSpec.getOutgoingGranularitySpec().getTimeType());
-    TimeSpec spec = new TimeSpec(timeFieldSpec.getOutGoingTimeColumnName(), inputGranularity,
-        outputGranularity, DEFAULT_TIME_RETENTION, format);
+    TimeSpec spec =
+        new TimeSpec(timeFieldSpec.getOutGoingTimeColumnName(), outputGranularity, format);
     return spec;
   }
-
 
 }

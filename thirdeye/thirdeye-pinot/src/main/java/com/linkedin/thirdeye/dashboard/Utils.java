@@ -131,7 +131,7 @@ public class Utils {
 
   public static List<String> getDashboards(AbstractConfigDAO<DashboardConfig> configDAO,
       String collection) {
-    List<DashboardConfig> dashboardConfigs = configDAO.findAll(collection);
+    List<DashboardConfig> dashboardConfigs = configDAO.findAll();
 
     List<String> dashboards = new ArrayList<>();
     for (DashboardConfig dashboardConfig : dashboardConfigs) {
@@ -150,7 +150,7 @@ public class Utils {
   public static List<MetricExpression> getMetricExpressions(
       AbstractConfigDAO<DashboardConfig> configDAO, String collection, String dashboardId) {
 
-    DashboardConfig dashboardConfig = configDAO.findById(collection, dashboardId);
+    DashboardConfig dashboardConfig = configDAO.findById(collection + "_" + dashboardId);
     return dashboardConfig.getMetricExpressions();
   }
 

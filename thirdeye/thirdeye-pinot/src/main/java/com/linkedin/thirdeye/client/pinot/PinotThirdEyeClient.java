@@ -216,14 +216,6 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
       ArrayList<String> skippedCollections = new ArrayList<>();
       for (JsonNode table : tables) {
         String collection = table.asText();
-        boolean include =
-            collection.startsWith("thirdeye") || collection.equals("feed_sessions_additive");
-        if (collection.equals("feed_sessions_additive")) {
-          System.out.println("here");
-        }
-        if (!include) {
-          continue;
-        }
         // TODO Since Pinot does not strictly require a schema to be provided for each offline data
         // set, filter out those for which a schema cannot be retrieved.
         try {

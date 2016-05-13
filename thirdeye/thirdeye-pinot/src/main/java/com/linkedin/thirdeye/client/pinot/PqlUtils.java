@@ -13,6 +13,7 @@ import org.joda.time.DateTime;
 
 import com.google.common.base.Joiner;
 import com.google.common.collect.Multimap;
+import com.linkedin.pinot.common.data.TimeFieldSpec;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.client.MetricFunction;
@@ -80,12 +81,16 @@ public class PqlUtils {
 
   static String getBetweenClause(DateTime start, DateTime end, TimeSpec timeFieldSpec) {
     String timeField = timeFieldSpec.getColumnName();
-    if (timeFieldSpec.getFormat() == null) {
-      TimeGranularity bucket = timeFieldSpec.getBucket();
-      long startInConvertedUnits = bucket.convertToUnit(start.getMillis());
-      long endInConvertedUnits = bucket.convertToUnit(end.getMillis());
-      return String.format(" %s >= %s AND %s < %s", timeField, startInConvertedUnits, timeField,
-          endInConvertedUnits);
+    if (TimeSpec.SINCE_EPOCH_FORMAT.equals(timeFieldSpec.getFormat())) {
+      TimeGranularity dataGranularity = timeFieldSpec.getDataGranularity();
+      long startInConvertedUnits = dataGranularity.convertToUnit(start.getMillis());
+      long endInConvertedUnits = dataGranularity.convertToUnit(end.getMillis());
+      if (startInConvertedUnits == endInConvertedUnits) {
+        return String.format(" %s = %s", timeField, startInConvertedUnits);
+      } else {
+        return String.format(" %s >= %s AND %s < %s", timeField, startInConvertedUnits, timeField,
+            endInConvertedUnits);
+      }
     } else {
       SimpleDateFormat sdf = new SimpleDateFormat(timeFieldSpec.getFormat());
       String startDateTime = sdf.format(new Date(start.getMillis()));

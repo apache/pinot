@@ -30,8 +30,10 @@ import org.slf4j.LoggerFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.linkedin.thirdeye.api.CollectionSchema;
+import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.client.MetricExpression;
 import com.linkedin.thirdeye.client.QueryCache;
+import com.linkedin.thirdeye.client.ThirdeyeCacheRegistry;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesHandler;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesRequest;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesResponse;
@@ -59,6 +61,8 @@ import io.dropwizard.views.View;
 @Path(value = "/dashboard")
 // @Produces(MediaType.APPLICATION_JSON)
 public class DashboardResource {
+  private static final ThirdeyeCacheRegistry CACHE_REGISTRY_INSTANCE =
+      ThirdeyeCacheRegistry.getInstance();
   private static final Logger LOG = LoggerFactory.getLogger(DashboardResource.class);
   private static final String DEFAULT_TIMEZONE_ID = "UTC";
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -147,6 +151,7 @@ public class DashboardResource {
     }
     return jsonDashboards;
   }
+
   @GET
   @Path(value = "/data/info")
   @Produces(MediaType.APPLICATION_JSON)
@@ -154,8 +159,11 @@ public class DashboardResource {
     String collectionInfo = null;
     try {
       HashMap<String, String> map = new HashMap<>();
-      long maxDataTime = queryCache.getClient().getMaxDataTime(collection);
-      map.put("maxTime", "" +maxDataTime);
+      long maxDataTime = CACHE_REGISTRY_INSTANCE.getCollectionMaxDataTimeCache().get(collection);
+      TimeGranularity dataGranularity = CACHE_REGISTRY_INSTANCE.getCollectionSchemaCache()
+          .get(collection).getTime().getDataGranularity();
+      map.put("maxTime", "" + maxDataTime);
+      map.put("dataGranularity", dataGranularity.getUnit().toString());
       collectionInfo = OBJECT_MAPPER.writeValueAsString(map);
     } catch (Exception e) {
       LOG.error("Error while fetching info for collection: " + collection, e);
@@ -210,13 +218,12 @@ public class DashboardResource {
           }
         }
       } else {
-        dashboardConfig = dashboardConfigDAO.findById(collection, dashboardName);
+        dashboardConfig = dashboardConfigDAO.findById(collection + "_ " + dashboardName);
         metricExpressions = dashboardConfig.getMetricExpressions();
       }
-
       request.setMetricExpressions(metricExpressions);
       long maxDataTime = queryCache.getClient().getMaxDataTime(collection);
-      if(currentEnd > maxDataTime){
+      if (currentEnd > maxDataTime) {
         long delta = currentEnd - maxDataTime;
         currentEnd = currentEnd - delta;
         baselineEnd = baselineEnd - delta;
@@ -289,7 +296,7 @@ public class DashboardResource {
     List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metricsJson);
     request.setMetricExpressions(metricExpressions);
     long maxDataTime = queryCache.getClient().getMaxDataTime(collection);
-    if(currentEnd > maxDataTime){
+    if (currentEnd > maxDataTime) {
       long delta = currentEnd - maxDataTime;
       currentEnd = currentEnd - delta;
       baselineEnd = baselineEnd - delta;
@@ -336,12 +343,12 @@ public class DashboardResource {
     List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metricsJson);
     request.setMetricExpressions(metricExpressions);
     long maxDataTime = queryCache.getClient().getMaxDataTime(collection);
-    if(currentEnd > maxDataTime){
+    if (currentEnd > maxDataTime) {
       long delta = currentEnd - maxDataTime;
       currentEnd = currentEnd - delta;
       baselineEnd = baselineEnd - delta;
     }
-    
+
     request.setBaselineStart(new DateTime(baselineStart, DateTimeZone.forID(timeZone)));
     request.setBaselineEnd(new DateTime(baselineEnd, DateTimeZone.forID(timeZone)));
     request.setCurrentStart(new DateTime(currentStart, DateTimeZone.forID(timeZone)));
@@ -385,7 +392,7 @@ public class DashboardResource {
     List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metricsJson);
     request.setMetricExpressions(metricExpressions);
     long maxDataTime = queryCache.getClient().getMaxDataTime(collection);
-    if(currentEnd > maxDataTime){
+    if (currentEnd > maxDataTime) {
       long delta = currentEnd - maxDataTime;
       currentEnd = currentEnd - delta;
       baselineEnd = baselineEnd - delta;
@@ -450,7 +457,7 @@ public class DashboardResource {
       TimeSeriesResponse response = handler.handle(request);
       JSONObject timeseriesMap = new JSONObject();
       JSONArray timeValueArray = new JSONArray();
-      TreeSet<String> keys= new TreeSet<>();
+      TreeSet<String> keys = new TreeSet<>();
       TreeSet<Long> times = new TreeSet<>();
       for (int i = 0; i < response.getNumRows(); i++) {
         TimeSeriesRow timeSeriesRow = response.getRow(i);

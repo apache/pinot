@@ -219,13 +219,13 @@ public class EmailReportJob implements Job {
 
       ThirdEyeClient client = timeOnTimeComparisonHandler.getClient();
       // TODO provide a way for email reports to specify desired graph granularity.
-      TimeGranularity bucketGranularity =
-          client.getCollectionSchema(collection).getTime().getBucket();
+      TimeGranularity dataGranularity =
+          client.getCollectionSchema(collection).getTime().getDataGranularity();
 
       TimeOnTimeComparisonResponse chartData =
-          getData(timeOnTimeComparisonHandler, config, then, now, WEEK_MILLIS, bucketGranularity);
+          getData(timeOnTimeComparisonHandler, config, then, now, WEEK_MILLIS, dataGranularity);
       AnomalyGraphGenerator anomalyGraphGenerator = AnomalyGraphGenerator.getInstance();
-      JFreeChart chart = anomalyGraphGenerator.createChart(chartData, bucketGranularity,
+      JFreeChart chart = anomalyGraphGenerator.createChart(chartData, dataGranularity,
           windowMillis, anomaliesWithLabels);
       String chartFilePath = EMAIL_REPORT_CHART_PREFIX + config.getId() + PNG;
       LOG.info("Writing chart to {}", chartFilePath);

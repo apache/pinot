@@ -60,25 +60,24 @@ public class FileBasedConfigDAOFactory implements ConfigDAOFactory {
     return widgetConfigDAO;
   }
 
-
   private <T extends AbstractConfig> AbstractConfigDAO<T> createDAO(
       final FileBasedConfigDAO<T> fileBasedConfigDAO, String configType) {
     return new AbstractConfigDAO<T>() {
 
       @Override
-      public boolean update(String collectionName, String id, T config) throws Exception {
-        return fileBasedConfigDAO.update(collectionName, id, config);
+      public boolean update(String id, T config) throws Exception {
+        return fileBasedConfigDAO.update(id, config);
       }
 
       @Override
-      public T findById(String collectionName, String id) {
-        return fileBasedConfigDAO.findById(collectionName, id);
+      public T findById(String id) {
+        return fileBasedConfigDAO.findById(id);
       }
 
       @SuppressWarnings("unchecked")
       @Override
-      public List<T> findAll(String collectionName) {
-        List<AbstractConfig> list = fileBasedConfigDAO.findAll(collectionName);
+      public List<T> findAll() {
+        List<AbstractConfig> list = fileBasedConfigDAO.findAll();
         List<T> ret = new ArrayList<>();
         for (AbstractConfig config : list) {
           ret.add((T) config);
@@ -87,8 +86,8 @@ public class FileBasedConfigDAOFactory implements ConfigDAOFactory {
       }
 
       @Override
-      public boolean create(String collectionName, String id, T config) throws Exception {
-        return fileBasedConfigDAO.create(collectionName, id, config);
+      public boolean create(String id, T config) throws Exception {
+        return fileBasedConfigDAO.create(id, config);
       }
     };
   }
@@ -121,9 +120,9 @@ public class FileBasedConfigDAOFactory implements ConfigDAOFactory {
       }
     }
 
-    public List<AbstractConfig> findAll(String collectionName) {
+    public List<AbstractConfig> findAll() {
 
-      File dir = getDir(collectionName);
+      File dir = getConfigTypeRootDir();
       File[] listFiles = dir.listFiles();
       if (listFiles == null || listFiles.length == 0) {
         return Collections.emptyList();
@@ -137,12 +136,12 @@ public class FileBasedConfigDAOFactory implements ConfigDAOFactory {
       return list;
     }
 
-    private File getDir(String collectionName) {
-      return new File(rootDir, collectionName + "/" + configType);
+    private File getConfigTypeRootDir() {
+      return new File(rootDir, configType);
     }
 
-    private File getFile(String collectionName, String id) {
-      return new File(getDir(collectionName), id + FILE_EXT);
+    private File getFile(String id) {
+      return new File(getConfigTypeRootDir(), id + FILE_EXT);
     }
 
     private T parseFile(File file) {
@@ -163,13 +162,13 @@ public class FileBasedConfigDAOFactory implements ConfigDAOFactory {
       return null;
     }
 
-    public T findById(String collectionName, String id) {
-      File file = getFile(collectionName, id);
+    public T findById(String id) {
+      File file = getFile(id);
       return parseFile(file);
     }
 
-    public boolean create(String collectionName, String id, T config) throws Exception {
-      File file = getFile(collectionName, id);
+    public boolean create(String id, T config) throws Exception {
+      File file = getFile(id);
       file.getParentFile().mkdirs();
       System.out.println("Writing " + config.toJSON() + " at " + file.getAbsolutePath());
       FileWriter fileWriter = new FileWriter(file);
@@ -179,9 +178,8 @@ public class FileBasedConfigDAOFactory implements ConfigDAOFactory {
       return true;
     }
 
-    public boolean update(String collectionName, String id, AbstractConfig config)
-        throws Exception {
-      File file = getFile(collectionName, id);
+    public boolean update(String id, AbstractConfig config) throws Exception {
+      File file = getFile(id);
       IOUtils.write(config.toJSON(), new FileWriter(file));
       return true;
     }

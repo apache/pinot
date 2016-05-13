@@ -5,26 +5,18 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.concurrent.TimeUnit;
 
 public class TimeSpec {
-  private static final TimeGranularity DEFAULT_TIME_INPUT = new TimeGranularity(1, TimeUnit.HOURS);
-  private static final TimeGranularity DEFAULT_TIME_BUCKET = new TimeGranularity(1, TimeUnit.HOURS);
-  private static final TimeGranularity DEFAULT_TIME_RETENTION =
-      new TimeGranularity(30, TimeUnit.DAYS);
-
+  private static final TimeGranularity DEFAULT_TIME_GRANULARITY= new TimeGranularity(1, TimeUnit.DAYS);
   private String columnName;
-  private TimeGranularity input = DEFAULT_TIME_INPUT;
-  private TimeGranularity bucket = DEFAULT_TIME_BUCKET;
-  private TimeGranularity retention = DEFAULT_TIME_RETENTION;
-  private String format;
-
+  private TimeGranularity dataGranularity = DEFAULT_TIME_GRANULARITY;
+  private String format = SINCE_EPOCH_FORMAT; //sinceEpoch or yyyyMMdd
+  public static String SINCE_EPOCH_FORMAT  ="sinceEpoch";
+  
   public TimeSpec() {
   }
 
-  public TimeSpec(String columnName, TimeGranularity input, TimeGranularity bucket,
-      TimeGranularity retention, String format) {
+  public TimeSpec(String columnName, TimeGranularity dataGranularity, String format) {
     this.columnName = columnName;
-    this.input = input;
-    this.bucket = bucket;
-    this.retention = retention;
+    this.dataGranularity = dataGranularity;
     this.format = format;
   }
 
@@ -34,18 +26,8 @@ public class TimeSpec {
   }
 
   @JsonProperty
-  public TimeGranularity getInput() {
-    return input;
-  }
-
-  @JsonProperty
-  public TimeGranularity getBucket() {
-    return bucket;
-  }
-
-  @JsonProperty
-  public TimeGranularity getRetention() {
-    return retention;
+  public TimeGranularity getDataGranularity() {
+    return dataGranularity;
   }
 
   @JsonProperty
