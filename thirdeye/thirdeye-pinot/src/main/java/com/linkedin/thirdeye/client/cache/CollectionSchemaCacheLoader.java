@@ -63,12 +63,7 @@ public class CollectionSchemaCacheLoader extends CacheLoader<String, CollectionS
       Schema schema = ThirdeyeCacheRegistry.getInstance().getSchemaCache().get(collection);
       List<DimensionSpec> dimSpecs = fromDimensionFieldSpecs(schema.getDimensionFieldSpecs());
       List<MetricSpec> metricSpecs = fromMetricFieldSpecs(schema.getMetricFieldSpecs());
-      TimeSpec timeSpec;
-      if (collection.equals("feed_sessions_addtive")) {
-        timeSpec = fromTimeFieldSpec(schema.getTimeFieldSpec(), null);
-      } else {
-        timeSpec = fromTimeFieldSpec(schema.getTimeFieldSpec(), "yyyyMMdd");
-      }
+      TimeSpec timeSpec = fromTimeFieldSpec(schema.getTimeFieldSpec(), null);
       CollectionSchema config = new CollectionSchema.Builder().setCollection(collection)
           .setDimensions(dimSpecs).setMetrics(metricSpecs).setTime(timeSpec).build();
       return config;
