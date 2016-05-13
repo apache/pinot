@@ -1,7 +1,9 @@
 package com.linkedin.thirdeye.client.pinot;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Date;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -78,12 +80,24 @@ public class PqlUtils {
 
   static String getBetweenClause(DateTime start, DateTime end, TimeSpec timeFieldSpec) {
     String timeField = timeFieldSpec.getColumnName();
-    TimeGranularity bucket = timeFieldSpec.getBucket();
+    if (timeFieldSpec.getFormat() == null) {
+      TimeGranularity bucket = timeFieldSpec.getBucket();
+      long startInConvertedUnits = bucket.convertToUnit(start.getMillis());
+      long endInConvertedUnits = bucket.convertToUnit(end.getMillis());
+      return String.format(" %s >= %s AND %s < %s", timeField, startInConvertedUnits, timeField,
+          endInConvertedUnits);
+    } else {
+      SimpleDateFormat sdf = new SimpleDateFormat(timeFieldSpec.getFormat());
+      String startDateTime = sdf.format(new Date(start.getMillis()));
+      String endDateTime = sdf.format(new Date(start.getMillis()));
+      if (startDateTime.equals(endDateTime)) {
+        return String.format(" %s = %s", timeField, startDateTime);
+      } else {
+        return String.format(" %s >= %s AND %s < %s", timeField, startDateTime, timeField,
+            endDateTime);
+      }
 
-    long startInConvertedUnits = bucket.convertToUnit(start.getMillis());
-    long endInConvertedUnits = bucket.convertToUnit(end.getMillis());
-    return String.format(" %s >= %s AND %s < %s", timeField, startInConvertedUnits, timeField,
-        endInConvertedUnits);
+    }
   }
 
   static String getDimensionWhereClause(Multimap<String, String> dimensionValues) {

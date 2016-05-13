@@ -9,6 +9,7 @@ import com.fasterxml.jackson.dataformat.yaml.snakeyaml.constructor.Constructor;
 import com.google.common.base.MoreObjects;
 import com.google.common.base.MoreObjects.ToStringHelper;
 import com.google.common.base.Objects;
+import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
 
 public class PinotThirdEyeClientConfig {
 
@@ -84,5 +85,14 @@ public class PinotThirdEyeClientConfig {
         .add("controllerHost", controllerHost).add("controllerPort", controllerPort)
         .add("zookeeperUrl", zookeeperUrl);
     return stringHelper.toString();
+  }
+
+
+  public static PinotThirdEyeClientConfig createThirdEyeClientConfig(ThirdEyeConfiguration config) throws Exception {
+    File clientConfigDir = new File(config.getRootDir(), "client-config");
+    File clientConfigFile = new File(clientConfigDir, config.getClient() + ".yml");
+    PinotThirdEyeClientConfig thirdEyeClientConfig =
+        PinotThirdEyeClientConfig.fromFile(clientConfigFile);
+    return thirdEyeClientConfig;
   }
 }

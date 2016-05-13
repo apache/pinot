@@ -12,6 +12,8 @@ import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.thirdeye.api.CollectionSchema;
+
 public class FileBasedConfigDAOFactory implements ConfigDAOFactory {
   private static final Logger LOG = LoggerFactory.getLogger(FileBasedConfigDAOFactory.class);
   private static String FILE_EXT = ".json";
@@ -19,9 +21,18 @@ public class FileBasedConfigDAOFactory implements ConfigDAOFactory {
   private AbstractConfigDAO<CollectionConfig> collectionConfigDAO;
   private AbstractConfigDAO<DashboardConfig> dashboardConfigDAO;
   private AbstractConfigDAO<WidgetConfig> widgetConfigDAO;
+  private AbstractConfigDAO<CollectionSchema> collectionSchemaDAO;
 
   public FileBasedConfigDAOFactory(String rootDir) {
     this.rootDir = rootDir;
+  }
+
+  @Override
+  public AbstractConfigDAO<CollectionSchema> getCollectionSchemaDAO() {
+    final FileBasedConfigDAO<CollectionSchema> fileBasedConfigDAO =
+        new FileBasedConfigDAO<>(rootDir, CollectionSchema.class.getSimpleName());
+    collectionSchemaDAO = createDAO(fileBasedConfigDAO, CollectionSchema.class.getSimpleName());
+    return collectionSchemaDAO;
   }
 
   @Override
@@ -48,6 +59,7 @@ public class FileBasedConfigDAOFactory implements ConfigDAOFactory {
     widgetConfigDAO = createDAO(fileBasedConfigDAO, WidgetConfig.class.getSimpleName());
     return widgetConfigDAO;
   }
+
 
   private <T extends AbstractConfig> AbstractConfigDAO<T> createDAO(
       final FileBasedConfigDAO<T> fileBasedConfigDAO, String configType) {
@@ -96,6 +108,8 @@ public class FileBasedConfigDAOFactory implements ConfigDAOFactory {
         configTypeClass = DashboardConfig.class;
       } else if (configType.equalsIgnoreCase("widgetConfig")) {
         configTypeClass = WidgetConfig.class;
+      } else if (configType.equalsIgnoreCase("collectionSchema")) {
+        configTypeClass = CollectionSchema.class;
       } else {
         throw new IllegalArgumentException("Unknown configType:" + configType);
       }

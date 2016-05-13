@@ -71,7 +71,7 @@ public class Utils {
       String requestReference, String metricName, List<String> dimensions, DateTime start,
       DateTime end) throws Exception {
 
-    MetricFunction metricFunction = new MetricFunction(MetricFunction.SUM, "__COUNT");
+    MetricFunction metricFunction = new MetricFunction("COUNT", "*");
 
     List<ThirdEyeRequest> requests =
         generateRequests(collection, requestReference, metricFunction, dimensions, start, end);
@@ -152,37 +152,6 @@ public class Utils {
 
     DashboardConfig dashboardConfig = configDAO.findById(collection, dashboardId);
     return dashboardConfig.getMetricExpressions();
-  }
-
-  public static List<MetricFunction> getMetricFunctions(
-      AbstractConfigDAO<DashboardConfig> configDAO, String collection, String dashboardId,
-      String metricsJson) throws JsonParseException, JsonMappingException, IOException {
-
-    List<MetricFunction> metricFunctions = new ArrayList<>();
-    if (StringUtils.isBlank(dashboardId) && StringUtils.isBlank(metricsJson)) {
-      DashboardConfig dashboardConfig = configDAO.findById(collection, DEFAULT_DASHBOARD);
-      metricFunctions.add(new MetricFunction(MetricFunction.SUM, "__COUNT"));
-      // metricFunctions = dashboardConfig.getMetricFunctions();
-    } else if (StringUtils.isNotBlank(metricsJson)) {
-      ArrayList<String> metrics =
-          OBJECT_MAPPER.readValue(metricsJson, new TypeReference<ArrayList<String>>() {
-          });
-      for (String metric : metrics) {
-        metricFunctions.add(new MetricFunction(MetricFunction.SUM, metric));
-      }
-
-    } else {
-      DashboardConfig dashboardConfig = configDAO.findById(collection, dashboardId);
-      metricFunctions.add(new MetricFunction(MetricFunction.SUM, "__COUNT"));
-      // metricFunctions = dashboardConfig.getMetricFunctions();
-    }
-
-    return metricFunctions;
-
-  }
-
-  public static void main(String[] args) {
-
   }
 
   public static Multimap<String, String> convertToMultiMap(String filterJson) {

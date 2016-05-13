@@ -1,0 +1,153 @@
+package com.linkedin.thirdeye.client.cache;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.google.common.cache.CacheLoader;
+import com.linkedin.pinot.common.data.DimensionFieldSpec;
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import com.linkedin.pinot.common.data.MetricFieldSpec;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.data.TimeFieldSpec;
+import com.linkedin.thirdeye.api.CollectionSchema;
+import com.linkedin.thirdeye.api.DimensionSpec;
+import com.linkedin.thirdeye.api.MetricSpec;
+import com.linkedin.thirdeye.api.MetricType;
+import com.linkedin.thirdeye.api.TimeGranularity;
+import com.linkedin.thirdeye.api.TimeSpec;
+import com.linkedin.thirdeye.client.ThirdeyeCacheRegistry;
+import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClientConfig;
+import com.linkedin.thirdeye.dashboard.configs.AbstractConfigDAO;
+import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
+
+
+public class CollectionSchemaCacheLoader extends CacheLoader<String, CollectionSchema> {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(CollectionSchemaCacheLoader.class);
+
+  private static final TimeGranularity DEFAULT_TIME_RETENTION = null;
+  private static final int GRANULARITY_SIZE = 1;
+
+  private AbstractConfigDAO<CollectionConfig> collectionConfigDAO;
+  private AbstractConfigDAO<CollectionSchema> collectionSchemaDAO;
+  private List<String> collections;
+
+  public CollectionSchemaCacheLoader(PinotThirdEyeClientConfig pinotThirdeyeClientConfig,
+      AbstractConfigDAO<CollectionConfig> collectionConfigDAO, AbstractConfigDAO<CollectionSchema> collectionSchemaDAO) {
+
+    this.collectionConfigDAO = collectionConfigDAO;
+    this.collectionSchemaDAO = collectionSchemaDAO;
+
+  }
+
+  @Override
+  public CollectionSchema load(String collection) throws Exception {
+    return getCollectionSchema(collection);
+  }
+
+  public CollectionSchema getCollectionSchema(String collection) throws Exception {
+    CollectionSchema collectionSchema = null;
+
+    List<CollectionSchema> collectionSchemas = collectionSchemaDAO.findAll(collection);
+    if (collectionSchemas.isEmpty()) {
+
+      LOGGER.info("Collection schema from url");
+      // get from schema endpoint
+      Schema schema = ThirdeyeCacheRegistry.getInstance().getSchemaCache().get(collection);
+      List<DimensionSpec> dimSpecs = fromDimensionFieldSpecs(schema.getDimensionFieldSpecs());
+      List<MetricSpec> metricSpecs = fromMetricFieldSpecs(schema.getMetricFieldSpecs());
+      TimeSpec timeSpec;
+      if (collection.equals("feed_sessions_addtive")) {
+        timeSpec = fromTimeFieldSpec(schema.getTimeFieldSpec(), null);
+      } else {
+        timeSpec = fromTimeFieldSpec(schema.getTimeFieldSpec(), "yyyyMMdd");
+      }
+      CollectionSchema config = new CollectionSchema.Builder().setCollection(collection)
+          .setDimensions(dimSpecs).setMetrics(metricSpecs).setTime(timeSpec).build();
+      return config;
+    } else {
+      // use this
+      LOGGER.info("Collection schema from file");
+      collectionSchema = collectionSchemas.get(0);
+    }
+
+    return collectionSchema;
+  }
+
+  private List<DimensionSpec> fromDimensionFieldSpecs(List<DimensionFieldSpec> specs) {
+    List<DimensionSpec> results = new ArrayList<>(specs.size());
+    for (DimensionFieldSpec dimensionFieldSpec : specs) {
+      DimensionSpec dimensionSpec = new DimensionSpec(dimensionFieldSpec.getName());
+      results.add(dimensionSpec);
+    }
+    return results;
+  }
+
+  private List<MetricSpec> fromMetricFieldSpecs(List<MetricFieldSpec> specs) {
+    ArrayList<MetricSpec> results = new ArrayList<>(specs.size());
+    for (MetricFieldSpec metricFieldSpec : specs) {
+      MetricSpec metricSpec = getMetricType(metricFieldSpec);
+      results.add(metricSpec);
+    }
+    return results;
+  }
+
+  private MetricSpec getMetricType(MetricFieldSpec metricFieldSpec) {
+    DataType dataType = metricFieldSpec.getDataType();
+    MetricType metricType;
+    switch (dataType) {
+    case BOOLEAN:
+    case BYTE:
+    case BYTE_ARRAY:
+    case CHAR:
+    case CHAR_ARRAY:
+    case DOUBLE_ARRAY:
+    case FLOAT_ARRAY:
+    case INT_ARRAY:
+    case LONG_ARRAY:
+    case OBJECT:
+    case SHORT_ARRAY:
+    case STRING:
+    case STRING_ARRAY:
+    default:
+      throw new UnsupportedOperationException(dataType + " is not a supported metric type");
+    case DOUBLE:
+      metricType = MetricType.DOUBLE;
+      break;
+    case FLOAT:
+      metricType = MetricType.FLOAT;
+      break;
+    case INT:
+      metricType = MetricType.INT;
+      break;
+    case LONG:
+      metricType = MetricType.LONG;
+      break;
+    case SHORT:
+      metricType = MetricType.SHORT;
+      break;
+
+    }
+    MetricSpec metricSpec = new MetricSpec(metricFieldSpec.getName(), metricType);
+    return metricSpec;
+  }
+
+  private TimeSpec fromTimeFieldSpec(TimeFieldSpec timeFieldSpec, String format) {
+    TimeGranularity inputGranularity = new TimeGranularity(GRANULARITY_SIZE,
+        timeFieldSpec.getIncomingGranularitySpec().getTimeType());
+    TimeGranularity outputGranularity = new TimeGranularity(GRANULARITY_SIZE,
+        timeFieldSpec.getOutgoingGranularitySpec().getTimeType());
+    TimeSpec spec = new TimeSpec(timeFieldSpec.getOutGoingTimeColumnName(), inputGranularity,
+        outputGranularity, DEFAULT_TIME_RETENTION, format);
+    return spec;
+  }
+
+
+}

@@ -2,15 +2,31 @@ package com.linkedin.thirdeye.dashboard;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.LoadingCache;
+import com.linkedin.pinot.client.Connection;
+import com.linkedin.pinot.client.ConnectionFactory;
+import com.linkedin.pinot.client.ResultSetGroup;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.thirdeye.api.CollectionSchema;
 import com.linkedin.thirdeye.client.QueryCache;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
+import com.linkedin.thirdeye.client.ThirdeyeCacheRegistry;
+import com.linkedin.thirdeye.client.cache.CollectionMaxDataTimeCacheLoader;
+import com.linkedin.thirdeye.client.cache.CollectionSchemaCacheLoader;
+import com.linkedin.thirdeye.client.cache.ResultSetGroupCacheLoader;
+import com.linkedin.thirdeye.client.cache.SchemaCacheLoader;
+import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClient;
+import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClientConfig;
 import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClientFactory;
 import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
 import com.linkedin.thirdeye.dashboard.configs.AbstractConfigDAO;
+import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
 import com.linkedin.thirdeye.dashboard.configs.DashboardConfig;
 import com.linkedin.thirdeye.dashboard.configs.FileBasedConfigDAOFactory;
 import com.linkedin.thirdeye.dashboard.resources.DashboardResource;
@@ -23,6 +39,14 @@ import io.dropwizard.views.ViewBundle;
 
 public class ThirdEyeDashboardApplication extends BaseThirdEyeApplication<ThirdEyeDashboardConfiguration> {
   private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeDashboardApplication.class);
+
+  private static final String WEBAPP_CONFIG = "/webapp-config";
+
+  private LoadingCache<String, ResultSetGroup> resultSetGroupCache;
+  private LoadingCache<String, Schema> schemaCache;
+  private LoadingCache<String, CollectionSchema> collectionSchemaCache;
+  private LoadingCache<String, Long> collectionMaxDataTimeCache;
+  private ThirdeyeCacheRegistry cacheRegistry;
 
   public ThirdEyeDashboardApplication() {
 
@@ -44,17 +68,45 @@ public class ThirdEyeDashboardApplication extends BaseThirdEyeApplication<ThirdE
     bootstrap.addBundle(new AssetsBundle("/assets/lib", "/assets/lib", null, "lib"));
     bootstrap.addBundle(new AssetsBundle("/assets/img", "/assets/img", null, "img"));
     bootstrap.addBundle(new AssetsBundle("/assets/data", "/assets/data", null, "data"));
-    
+
   }
 
   @Override
   public void run(ThirdEyeDashboardConfiguration config, Environment env) throws Exception {
     super.initDetectorRelatedDAO();
-    ThirdEyeClient thirdEyeClient = PinotThirdEyeClientFactory.createThirdEyeClient(config);
+
+    // pinotThirdeyeClient configs
+    PinotThirdEyeClientConfig pinotThirdeyeClientConfig = PinotThirdEyeClientConfig.createThirdEyeClientConfig(config);
+
+    // Thirdeye client
+    ThirdEyeClient thirdEyeClient = PinotThirdEyeClient.fromClientConfig(pinotThirdeyeClientConfig);
+
+    AbstractConfigDAO<DashboardConfig> dashbaordConfigDAO = getDashboardConfigDAO(config);
+    AbstractConfigDAO<CollectionConfig> collectionConfigDAO = getCollectionConfigDAO(config);
+    AbstractConfigDAO<CollectionSchema> collectionSchemaDAO = getCollectionSchemaDAO(config);
+
+    // initialize caches
+    cacheRegistry = ThirdeyeCacheRegistry.getInstance();
+
+    resultSetGroupCache = CacheBuilder.newBuilder().expireAfterAccess(5, TimeUnit.MINUTES)
+        .build(new ResultSetGroupCacheLoader(pinotThirdeyeClientConfig));
+    cacheRegistry.registerResultSetGroupCache(resultSetGroupCache);
+
+    schemaCache = CacheBuilder.newBuilder()
+       .build(new SchemaCacheLoader(pinotThirdeyeClientConfig));
+    cacheRegistry.registerSchemaCache(schemaCache);
+
+    collectionSchemaCache = CacheBuilder.newBuilder().expireAfterWrite(1, TimeUnit.HOURS)
+       .build(new CollectionSchemaCacheLoader(pinotThirdeyeClientConfig, collectionConfigDAO, collectionSchemaDAO));
+    cacheRegistry.registerCollectionSchemaCache(collectionSchemaCache);
+
+    collectionMaxDataTimeCache = CacheBuilder.newBuilder().expireAfterAccess(5, TimeUnit.MINUTES)
+       .build(new CollectionMaxDataTimeCacheLoader(pinotThirdeyeClientConfig));
+    cacheRegistry.registerCollectionMaxDataTimeCache(collectionMaxDataTimeCache);
+
     ExecutorService queryExecutor = env.lifecycle().executorService("query_executor").build();
     QueryCache queryCache = createQueryCache(thirdEyeClient, queryExecutor);
-    AbstractConfigDAO<DashboardConfig> configDAO = getDashboardConfigDAO(config);
-    env.jersey().register(new DashboardResource(queryCache, configDAO));
+    env.jersey().register(new DashboardResource(queryCache, dashbaordConfigDAO));
     env.jersey().register(new AnomalyResultResource(anomalyResultDAO));
   }
 
@@ -65,13 +117,30 @@ public class ThirdEyeDashboardApplication extends BaseThirdEyeApplication<ThirdE
   }
 
 
+  private String getWebappConfigDir(ThirdEyeDashboardConfiguration config) {
+    String configRootDir = config.getRootDir();
+    String webappConfigDir = configRootDir + WEBAPP_CONFIG;
+    return webappConfigDir;
+  }
 
   private AbstractConfigDAO<DashboardConfig> getDashboardConfigDAO(
       ThirdEyeDashboardConfiguration config) {
-    String configRootDir = config.getRootDir();
-    String dashboardConfigDir = configRootDir + "/dashboard-config";
-    FileBasedConfigDAOFactory configDAOFactory = new FileBasedConfigDAOFactory(dashboardConfigDir);
+    FileBasedConfigDAOFactory configDAOFactory = new FileBasedConfigDAOFactory(getWebappConfigDir(config));
     AbstractConfigDAO<DashboardConfig> configDAO = configDAOFactory.getDashboardConfigDAO();
+    return configDAO;
+  }
+
+  private AbstractConfigDAO<CollectionConfig> getCollectionConfigDAO(
+      ThirdEyeDashboardConfiguration config) {
+    FileBasedConfigDAOFactory configDAOFactory = new FileBasedConfigDAOFactory(getWebappConfigDir(config));
+    AbstractConfigDAO<CollectionConfig> configDAO = configDAOFactory.getCollectionConfigDAO();
+    return configDAO;
+  }
+
+  private AbstractConfigDAO<CollectionSchema> getCollectionSchemaDAO(
+      ThirdEyeDashboardConfiguration config) {
+    FileBasedConfigDAOFactory configDAOFactory = new FileBasedConfigDAOFactory(getWebappConfigDir(config));
+    AbstractConfigDAO<CollectionSchema> configDAO = configDAOFactory.getCollectionSchemaDAO();
     return configDAO;
   }
 

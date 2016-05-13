@@ -20,11 +20,12 @@ public class TimeSpec {
   }
 
   public TimeSpec(String columnName, TimeGranularity input, TimeGranularity bucket,
-      TimeGranularity retention) {
+      TimeGranularity retention, String format) {
     this.columnName = columnName;
     this.input = input;
     this.bucket = bucket;
     this.retention = retention;
+    this.format = format;
   }
 
   @JsonProperty

@@ -4,13 +4,17 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
+
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.linkedin.thirdeye.dashboard.configs.AbstractConfig;
 
-
-public final class CollectionSchema {
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper(new YAMLFactory());
+@JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, include = JsonTypeInfo.As.PROPERTY, property = "@class")
+@JsonIgnoreProperties(value = "configType")
+public final class CollectionSchema extends AbstractConfig{
 
   private String collection;
   private List<DimensionSpec> dimensions;
@@ -127,6 +131,11 @@ public final class CollectionSchema {
 
   public static CollectionSchema decode(InputStream inputStream) throws IOException {
     return OBJECT_MAPPER.readValue(inputStream, CollectionSchema.class);
+  }
+
+  @Override
+  public String toJSON() throws Exception {
+    return OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(this);
   }
 
 }

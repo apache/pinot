@@ -78,5 +78,9 @@ public class ThirdEyeResponse {
   public List<String> getGroupKeyColumns() {
     return groupKeyColumns;
   }
+  @Override
+  public String toString() {
+    return super.toString();
+  }
 
 }
