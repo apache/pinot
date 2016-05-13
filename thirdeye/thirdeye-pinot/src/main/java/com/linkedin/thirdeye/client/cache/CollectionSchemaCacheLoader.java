@@ -10,6 +10,7 @@ import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.base.Optional;
 import com.google.common.cache.CacheLoader;
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
@@ -31,25 +32,20 @@ public class CollectionSchemaCacheLoader extends CacheLoader<String, CollectionS
 
   private static final Logger LOGGER = LoggerFactory.getLogger(CollectionSchemaCacheLoader.class);
 
-  private static final TimeGranularity DEFAULT_TIME_RETENTION = null;
   private static final int GRANULARITY_SIZE = 1;
 
-  private AbstractConfigDAO<CollectionConfig> collectionConfigDAO;
   private AbstractConfigDAO<CollectionSchema> collectionSchemaDAO;
-  private List<String> collections;
 
   public CollectionSchemaCacheLoader(PinotThirdEyeClientConfig pinotThirdeyeClientConfig,
       AbstractConfigDAO<CollectionConfig> collectionConfigDAO,
       AbstractConfigDAO<CollectionSchema> collectionSchemaDAO) {
-
-    this.collectionConfigDAO = collectionConfigDAO;
     this.collectionSchemaDAO = collectionSchemaDAO;
-
   }
 
   @Override
   public CollectionSchema load(String collection) throws Exception {
-    return getCollectionSchema(collection);
+    CollectionSchema collectionSchema = getCollectionSchema(collection);
+    return collectionSchema;
   }
 
   public CollectionSchema getCollectionSchema(String collection) throws Exception {
@@ -64,7 +60,7 @@ public class CollectionSchemaCacheLoader extends CacheLoader<String, CollectionS
       CollectionSchema config = new CollectionSchema.Builder().setCollection(collection)
           .setDimensions(dimSpecs).setMetrics(metricSpecs).setTime(timeSpec).build();
       return config;
-    } 
+    }
 
     return collectionSchema;
   }

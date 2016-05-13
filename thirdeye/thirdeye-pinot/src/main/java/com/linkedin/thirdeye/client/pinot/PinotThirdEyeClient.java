@@ -8,6 +8,7 @@ import java.util.Properties;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.helix.manager.zk.ZKHelixAdmin;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
@@ -65,11 +66,11 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
   private static final String TABLES_ENDPOINT = "tables/";
   private static final String BROKER_PREFIX = "Broker_";
 
-
   String segementZKMetadataRootPath;
   private final HttpHost controllerHost;
   private final CloseableHttpClient controllerClient;
-  private List<String> fixedCollections = null;
+  private AtomicReference<List<String>> collectionsRef =
+      new AtomicReference<List<String>>(new ArrayList<String>());
 
   protected PinotThirdEyeClient(String controllerHostName, int controllerPort) {
 
@@ -133,9 +134,8 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
   }
 
   public static ThirdEyeClient fromClientConfig(PinotThirdEyeClientConfig config) {
-    if(config.getBrokerUrl() != null || config.getBrokerUrl().trim().length() > 0 ){
-      return fromHostList(config.getControllerHost(), config.getControllerPort(),
-          config.brokerUrl);
+    if (config.getBrokerUrl() != null || config.getBrokerUrl().trim().length() > 0) {
+      return fromHostList(config.getControllerHost(), config.getControllerPort(), config.brokerUrl);
     }
     return fromZookeeper(config.getControllerHost(), config.getControllerPort(),
         config.getZookeeperUrl(), config.getClusterName(), config.getTag());
@@ -143,14 +143,15 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
 
   @Override
   public ThirdEyeResponse execute(ThirdEyeRequest request) throws Exception {
-    CollectionSchema collectionSchema = CACHE_INSTANCE
-        .getCollectionSchemaCache().get(request.getCollection());
+    CollectionSchema collectionSchema =
+        CACHE_INSTANCE.getCollectionSchemaCache().get(request.getCollection());
     TimeSpec dataTimeSpec = collectionSchema.getTime();
     List<MetricFunction> metricFunctions = request.getMetricFunctions();
     List<String> dimensionNames = collectionSchema.getDimensionNames();
     String sql = PqlUtils.getPql(request, dataTimeSpec);
     LOG.debug("Executing: {}", sql);
-    ResultSetGroup result = CACHE_INSTANCE.getResultSetGroupCache().get(new PinotQuery(sql, request.getCollection()));
+    ResultSetGroup result =
+        CACHE_INSTANCE.getResultSetGroupCache().get(new PinotQuery(sql, request.getCollection()));
     parseResultSetGroup(request, result, metricFunctions, collectionSchema, dimensionNames);
     ThirdEyeResponse resp = new ThirdEyeResponse(request, result, dataTimeSpec);
     return resp;
@@ -188,21 +189,12 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
     return CACHE_INSTANCE.getCollectionSchemaCache().get(collection);
   }
 
-  /**
-   * Hardcodes a set of collections. Note that this method assumes the schemas for
-   * these collections already exist.
-   */
-  public void setFixedCollections(List<String> collections) {
-    LOG.info("Setting fixed collections: {}", collections);
-    this.fixedCollections = collections;
-  }
-
   @Override
   public List<String> getCollections() throws Exception {
-    if (this.fixedCollections != null) {
-      // assume the fixed collections are correct.
-      return fixedCollections;
-    }
+    return collectionsRef.get();
+  }
+
+  public void loadCollections() throws Exception {
     HttpGet req = new HttpGet(TABLES_ENDPOINT);
     LOG.info("Retrieving collections: {}", req);
     CloseableHttpResponse res = controllerClient.execute(controllerHost, req);
@@ -212,14 +204,13 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
       }
       InputStream content = res.getEntity().getContent();
       JsonNode tables = new ObjectMapper().readTree(content).get("tables");
-      ArrayList<String> collections = new ArrayList<>(tables.size());
+      ArrayList<String> collections = new ArrayList<>();
       ArrayList<String> skippedCollections = new ArrayList<>();
       for (JsonNode table : tables) {
         String collection = table.asText();
         // TODO Since Pinot does not strictly require a schema to be provided for each offline data
         // set, filter out those for which a schema cannot be retrieved.
         try {
-          System.out.println();
           CollectionSchema collectionSchema = getCollectionSchema(collection);
           if (collectionSchema == null) {
             LOG.debug("Skipping collection {} due to null schema", collection);
@@ -238,8 +229,7 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
             "{} collections were not included because their schemas could not be retrieved: {}",
             skippedCollections.size(), skippedCollections);
       }
-
-      return collections;
+      collectionsRef.set(collections);
     } finally {
       if (res.getEntity() != null) {
         EntityUtils.consume(res.getEntity());
@@ -266,7 +256,6 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
     }
     return schema;
   }
-
 
   /** TESTING ONLY - WE SHOULD NOT BE USING THIS. */
   @Deprecated

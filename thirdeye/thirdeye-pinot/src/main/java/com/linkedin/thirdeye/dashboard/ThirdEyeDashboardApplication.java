@@ -7,6 +7,7 @@ import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.base.Optional;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.LoadingCache;
 import com.linkedin.pinot.client.Connection;
@@ -82,7 +83,7 @@ public class ThirdEyeDashboardApplication
         PinotThirdEyeClientConfig.createThirdEyeClientConfig(config);
 
     // Thirdeye client
-    ThirdEyeClient thirdEyeClient = PinotThirdEyeClient.fromClientConfig(pinotThirdeyeClientConfig);
+    PinotThirdEyeClient thirdEyeClient = (PinotThirdEyeClient) PinotThirdEyeClient.fromClientConfig(pinotThirdeyeClientConfig);
 
     AbstractConfigDAO<DashboardConfig> dashbaordConfigDAO = getDashboardConfigDAO(config);
     AbstractConfigDAO<CollectionConfig> collectionConfigDAO = getCollectionConfigDAO(config);
@@ -90,6 +91,11 @@ public class ThirdEyeDashboardApplication
 
     // initialize caches
     initCacheLoaders(pinotThirdeyeClientConfig, collectionConfigDAO, collectionSchemaDAO);
+    try {
+      thirdEyeClient.loadCollections();
+    } catch (Exception e) {
+      LOG.info("Exception while loading collections");
+    }
 
     ExecutorService queryExecutor = env.lifecycle().executorService("query_executor").build();
     QueryCache queryCache = createQueryCache(thirdEyeClient, queryExecutor);

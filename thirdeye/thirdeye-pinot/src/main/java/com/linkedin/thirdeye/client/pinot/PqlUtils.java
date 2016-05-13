@@ -81,7 +81,7 @@ public class PqlUtils {
 
   static String getBetweenClause(DateTime start, DateTime end, TimeSpec timeFieldSpec) {
     String timeField = timeFieldSpec.getColumnName();
-    if (TimeSpec.SINCE_EPOCH_FORMAT.equals(timeFieldSpec.getFormat())) {
+    if (timeFieldSpec.getFormat() == null || TimeSpec.SINCE_EPOCH_FORMAT.equals(timeFieldSpec.getFormat())) {
       TimeGranularity dataGranularity = timeFieldSpec.getDataGranularity();
       long startInConvertedUnits = dataGranularity.convertToUnit(start.getMillis());
       long endInConvertedUnits = dataGranularity.convertToUnit(end.getMillis());

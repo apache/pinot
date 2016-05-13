@@ -145,6 +145,9 @@ public class FileBasedConfigDAOFactory implements ConfigDAOFactory {
     }
 
     private T parseFile(File file) {
+      if (!file.exists()) {
+        return null;
+      }
       InputStream input = null;
       try {
         input = new FileInputStream(file);

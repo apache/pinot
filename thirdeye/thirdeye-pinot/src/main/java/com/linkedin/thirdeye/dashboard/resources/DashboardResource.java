@@ -29,6 +29,7 @@ import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.google.common.base.Optional;
 import com.linkedin.thirdeye.api.CollectionSchema;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.client.MetricExpression;
@@ -160,8 +161,9 @@ public class DashboardResource {
     try {
       HashMap<String, String> map = new HashMap<>();
       long maxDataTime = CACHE_REGISTRY_INSTANCE.getCollectionMaxDataTimeCache().get(collection);
-      TimeGranularity dataGranularity = CACHE_REGISTRY_INSTANCE.getCollectionSchemaCache()
-          .get(collection).getTime().getDataGranularity();
+      CollectionSchema collectionSchema =
+          CACHE_REGISTRY_INSTANCE.getCollectionSchemaCache().get(collection);
+      TimeGranularity dataGranularity = collectionSchema.getTime().getDataGranularity();
       map.put("maxTime", "" + maxDataTime);
       map.put("dataGranularity", dataGranularity.getUnit().toString());
       collectionInfo = OBJECT_MAPPER.writeValueAsString(map);
