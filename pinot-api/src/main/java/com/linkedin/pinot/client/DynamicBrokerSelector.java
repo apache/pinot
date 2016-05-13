@@ -15,10 +15,14 @@
  */
 package com.linkedin.pinot.client;
 
-import java.util.HashMap;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.I0Itec.zkclient.IZkDataListener;
 import org.I0Itec.zkclient.ZkClient;
@@ -28,20 +32,38 @@ import org.I0Itec.zkclient.serialize.BytesPushThroughSerializer;
  * Maintains a mapping between table name and list of brokers
  */
 public class DynamicBrokerSelector implements BrokerSelector, IZkDataListener {
-  Map<String, List<String>> tableToBrokerListMap = new HashMap<>();
+  AtomicReference<Map<String, List<String>>> tableToBrokerListMapRef =
+      new AtomicReference<Map<String, List<String>>>();
+  AtomicReference<List<String>> allBrokerListRef = new AtomicReference<List<String>>();
   private final Random _random = new Random();
+  private ExternalViewReader evReader;
 
   public DynamicBrokerSelector(String zkServers) {
     ZkClient zkClient = new ZkClient(zkServers);
     zkClient.setZkSerializer(new BytesPushThroughSerializer());
-    ExternalViewReader evReader = new ExternalViewReader(zkClient);
-    tableToBrokerListMap = evReader.getTableToBrokersMap();
-    System.out.println(tableToBrokerListMap);
+    zkClient.waitUntilConnected(60, TimeUnit.SECONDS);
+    zkClient.subscribeDataChanges(ExternalViewReader.BROKER_EXTERNAL_VIEW_PATH, this);
+    evReader = new ExternalViewReader(zkClient);
+    refresh();
+  }
+
+  private void refresh() {
+    Map<String, List<String>> tableToBrokerListMap = evReader.getTableToBrokersMap();
+    tableToBrokerListMapRef.set(tableToBrokerListMap);
+    Set<String> brokerSet = new HashSet<>();
+    for (List<String> brokerList : tableToBrokerListMap.values()) {
+      brokerSet.addAll(brokerList);
+    }
+    allBrokerListRef.set(new ArrayList<>(brokerSet));
   }
 
   @Override
   public String selectBroker(String table) {
-    List<String> list = tableToBrokerListMap.get(table);
+    if (table == null) {
+      List<String> list = allBrokerListRef.get();
+      return list.get(_random.nextInt(list.size()));
+    }
+    List<String> list = tableToBrokerListMapRef.get().get(table);
     if (list != null && !list.isEmpty()) {
       return list.get(_random.nextInt(list.size()));
     }
@@ -50,13 +72,11 @@ public class DynamicBrokerSelector implements BrokerSelector, IZkDataListener {
 
   @Override
   public void handleDataChange(String dataPath, Object data) throws Exception {
-    // TODO Auto-generated method stub
-    
+    refresh();
   }
 
   @Override
   public void handleDataDeleted(String dataPath) throws Exception {
-    // TODO Auto-generated method stub
-    
+    refresh();
   }
 }

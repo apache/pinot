@@ -34,6 +34,8 @@ public class ExternalViewReader {
 
   private ZkClient zkClient;
 
+  public static String BROKER_EXTERNAL_VIEW_PATH = "/EXTERNALVIEW/brokerResource";
+
   public ExternalViewReader(ZkClient zkClient) {
     this.zkClient = zkClient;
   }
@@ -41,7 +43,8 @@ public class ExternalViewReader {
   public List<String> getLiveBrokers() {
     List<String> brokerUrls = new ArrayList<String>();
     try {
-      byte[] brokerResourceNodeData = zkClient.readData("/EXTERNALVIEW/brokerResource", true);
+
+      byte[] brokerResourceNodeData = zkClient.readData(BROKER_EXTERNAL_VIEW_PATH, true);
       JSONObject jsonObject = new JSONObject(new String(brokerResourceNodeData));
       JSONObject brokerResourceNode = jsonObject.getJSONObject("mapFields");
 
