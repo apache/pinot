@@ -6,7 +6,7 @@
 
     </div>
     <div id="{{tabName}}-chart-area" class="chart-area uk-clearfix uk-width-3-4">
-        <div id="{{tabName}}-display-chart-area" style="position: relative;">
+        <div id="{{tabName}}-display-chart-area" class="display-chart-area" style="position: relative;">
             <div id="{{tabName}}-chart-area-error" class="uk-alert uk-alert-danger hidden"></div>
             <div id="{{tabName}}-chart-area-loader" class="loader hidden">
                 <i class="uk-icon-spinner uk-icon-spin uk-icon-large"></i>

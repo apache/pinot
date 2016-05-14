@@ -1,4 +1,13 @@
 /* Generic and utility classes */
+html,
+body,
+#tabs,
+#tabs>li,
+#tabs>li>section,
+#main-view,
+.display-chart-area{
+    height:100%;
+}
 
 button:focus {
     outline:0;
@@ -122,7 +131,8 @@ body a{
 #form-area{
     background-color: rgb(250, 250, 250);
     padding: 20px 10px 20px 45px;
-    min-height:700px;
+    height: 100%;
+    border-bottom: 1px solid #ddd;
 }
 
 .date-time-selector-box {
@@ -149,7 +159,6 @@ body a{
     display: inline-block
 
 }
-
 
 #dashboard-settings{
     width: 100%;
@@ -276,6 +285,11 @@ body a{
     margin: 5px 0 5px 5px;
 }
 
+/* Form time selector */
+.max-min-time-label{
+    font-size: 10px;
+}
+
 
 /** Chart area **/
 
@@ -284,23 +298,26 @@ body a{
     border-top:0px;
     margin: 0;
     padding-left: 0px;
-    min-height: 700px;
+    height: 100%;
+    border-bottom: 0
 }
 
-#display-chart-area{
-    margin: 0;
-    min-height: 700px;
+
+.display-chart-section{
+    height: 100%;
+    padding: 12px;;
 }
+
 
 .loader{
-    height: 100%;
-    width: 100%;
     position: absolute;
     top: 0;
     left: 0px;
     margin:0px;
     background-color: rgba(148, 148, 148, 0.7);
     z-index: 999;
+    height: 100%;
+    width: 100%;
 }
 
 .loader i{
@@ -309,10 +326,7 @@ body a{
     left: 50%;
 }
 
-.display-chart-section{
-    min-height: 700px;
-    padding: 12px;
-}
+
 
 #chart-control{
     font-size: 16px;
@@ -719,6 +733,19 @@ body a{
     display: none;
 }
 
+#anomalies-display-chart-section{
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    margin: auto;
+    position: relative;
+    width: 960px;
+}
+
+#anomalies-display-chart-section form {
+    position: absolute;
+    right: 10px;
+    top: 10px;
+}
+
 #anomalies-display-chart-area .timeseries-legend-sub-box{
     max-height: 250px;
 }
@@ -788,19 +815,6 @@ path {
 }
 
 /*D3 TREEMAP*/
-
-#anomalies-display-chart-section{
-    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-    margin: auto;
-    position: relative;
-    width: 960px;
-}
-
-#anomalies-display-chart-section form {
-    position: absolute;
-    right: 10px;
-    top: 10px;
-}
 
 .node {
     border: solid 1px white;

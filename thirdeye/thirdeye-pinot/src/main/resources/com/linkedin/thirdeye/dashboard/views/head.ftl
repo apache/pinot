@@ -45,12 +45,8 @@
     <script src="../../../assets/js/flot/jquery.flot.min.js" defer></script>
     <script src="../../../assets/js/flot/jquery.flot.dashes.js" defer></script>
     <script src="../../../assets/js/flot/jquery.flot.stack.js" defer></script>
-    <script type="text/javascript" src="https://www.google.com/jsapi"></script>
-    <!--<script type="text/javascript" src="https://www.gstatic.com/charts/loader.js" defer></script>-->
+    <!--<script type="text/javascript" src="https://www.google.com/jsapi"></script>-->
 
-    <script>
-        google.load("visualization", "1", {packages:["treemap"]});
-    </script>
     <script src="../../../assets/js/lib/utility.js" defer></script>
     <script src="../../../assets/js/lib/get-form-data.js" defer></script>
     <script src="../../../assets/js/lib/tabular.js" defer></script>
@@ -63,7 +59,7 @@
     <script src="../../../assets/js/lib/dashboard-form.js" defer></script>
     <script src="../../../assets/js/lib/dashboard-form-filter.js" defer></script>
     <script src="../../../assets/js/lib/dashboard-form-time.js" defer></script>
-    <script src="../../../assets/js/lib/dashboard-header-form-submit.js" defer></script>
+    <script src="../../../assets/js/lib/dashboard-form-submit.js" defer></script>
     <script src="../../../assets/js/lib/dashboard-chart-area.js" defer></script>
     <script src="../../../assets/js/dashboard.js" defer></script> 
 

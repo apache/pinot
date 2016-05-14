@@ -25,7 +25,7 @@ function getContributors() {
     renderContributionTimeSeries(data);
 
     // Calculate heatmap-cells-bg color
-    calcHeatMapBG("contributors");
+    calcHeatMapBG();
 
     // Translate UTC date into user selected or local
     // timezone

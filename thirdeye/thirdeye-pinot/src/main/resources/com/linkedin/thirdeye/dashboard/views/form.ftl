@@ -145,18 +145,12 @@
                         </div>
                         {{/if}}
 
-                        {{#if showGranularity}}
-                        <label class="uk-form-label">
-                            Granularity
-                        </label>
-                        <div class="uk-button-group radio-buttons" rel="{{tabName}}">
-                            <button class="time-input-form-gran-hours-copy baseline-aggregate-copy  radio-type-button uk-active" rel="{{tabName}}" type="button" unit="HOURS" value="3600000">HOUR</button>
-                            <button class="time-input-form-gran-days-copy baseline-aggregate-copy radio-type-button" rel="{{tabName}}" type="button" unit="DAYS" value="86400000">DAY</button>
-                            {{#if showAggregateAllGranularity}}
-                            <button class="time-input-form-gran-aggregate-all-copy baseline-aggregate-copy radio-type-button" rel="{{tabName}}" type="button" unit="aggregateAll" value="0">Aggregate all</button>
-                            {{/if}}
+                        <div class="max-min-time-label uk-margin-small" rel="{{tabName}}">
+                            Data available for timerange:
+                            <span class="min-time"></span>
+                            <span>-</span>
+                            <span class="max-time"></span>
                         </div>
-                        {{/if}}
                         <div class="time-input-logic-error uk-alert uk-alert-danger hidden" rel="{{tabName}}">
                             <p></p>
                         </div>

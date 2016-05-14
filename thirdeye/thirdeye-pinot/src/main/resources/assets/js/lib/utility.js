@@ -903,32 +903,10 @@ function  applyTimeRangeSelection(target) {
 /** CHART RELATED METHODS **/
 
 //Assigns an hexadecimal colorcode to each element of an array
-//If you change this method, change the assignColorByID handlebars helper
+//If you change this method, change the assignColorByID handlebars helper too the 2 serves all the time series type charts
 function assignColorByID(len, index){
 
-    //16777216 = 256 ^ 3
-    var diff = parseInt(16777216 / len);
-
-    var diffAry = [];
-    for (x=0; x<len; x++){
-        diffAry.push( diff * x)
-    }
-
-    var colorAry = [];
-    var num;
-    for  (y=0; y<len; y++){
-
-        if(y%2 == 0){
-            num = diffAry[y/2]
-        }else{
-            num = diffAry[Math.floor(len - y/2)]
-        }
-
-
-        var str = (num.toString(16) + "dddddd")
-        var hex = num.toString(16).length < 6 ? str.substr(0,6) : num.toString(16)
-        colorAry.push( hex )
-    }
+    var colorAry =  colorScale(len)
 
     return "#" + colorAry[index]
 
@@ -936,6 +914,7 @@ function assignColorByID(len, index){
 }
 
 /*takes the number of items and returns an array with colors on the full 256^3 colorscale */
+//If you change this method, change the assignColorByID handlebars helper too the 2 serves all the time series type charts
 function colorScale(len){
 
     //colorscale 16777216 = 256 ^ 3
@@ -965,7 +944,8 @@ function colorScale(len){
         var hex = integer.toString(16).length < 6 ? str.substr(0,6) : integer.toString(16)
         colorAry.push( hex )
     }
-
+  console.log('colorAry')
+  console.log(colorAry)
     return colorAry
 
 
@@ -1058,16 +1038,12 @@ function getTimeZone() {
  * @function
  * @public
  * @returns   Assign background color value to  heat-map-cell **/
-function  calcHeatMapCellBackground(cell, options){
+function  calcHeatMapCellBackground(cell){
 
     var cellObj = $(cell)
     var value = parseFloat(cellObj.attr('value'))
-    if(options.caller == "contributors"){
         value = value / 100;
-    }
-    if(options.caller == "tabular"){
-      value = value / 100;
-  }
+
     var absValue = Math.abs(value)
 
     if (value < 0) {
@@ -1241,7 +1217,7 @@ function sumColumn(col){
 
                 $(sumCell).html(ratioVal + "%");
                 $(sumCell).attr('value' , (ratioVal /100));
-                calcHeatMapCellBackground(sumCell, {caller: 'contributors'});
+                calcHeatMapCellBackground(sumCell);
             }
         }
 
@@ -1258,9 +1234,9 @@ function sumColumn(col){
 /** @function Assign background color value to each heat-map-cell
  * @public
  * @returns  background color **/
-function calcHeatMapBG(caller){
+function calcHeatMapBG(){
     $(".heat-map-cell").each(function (i, cell) {
-        calcHeatMapCellBackground(cell, {caller: caller});
+        calcHeatMapCellBackground(cell);
     })
 };
 

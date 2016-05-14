@@ -112,11 +112,17 @@ function getMetricNFilterList() {
         var dimensionListHtml = "";
         var filterDimensionListHtml = "";
 
+        //Global - public
+        datasetDimensions = []
+
         for (var k in  data) {
             dimensionListHtml += "<li class='dimension-option' rel='dimensions' value='" + k + "'><a href='#' class='uk-dropdown-close'>" + k + "</a></li>";
             filterDimensionListHtml += "<li class='filter-dimension-option' value='" + k + "'><a href='#' class='radio-options'>" + k + "</a></li>";
+            datasetDimensions.push(k)
         }
 
+        console.log('datasetDimensions: ')
+        console.log(datasetDimensions)
         $(".dimension-list").html(dimensionListHtml);
 
         //Preselect dimensions if present in hash
@@ -259,6 +265,15 @@ function getMaxDateTime() {
         UIkit.datepicker(UIkit.$('.current-end-date-input'),  { maxDate: maxDate, format:'YYYY-MM-DD' });
         UIkit.datepicker(UIkit.$('.baseline-start-date-input'),  { maxDate: maxDate, format:'YYYY-MM-DD' });
         UIkit.datepicker(UIkit.$('.baseline-end-date-input'),  { maxDate: maxDate, format:'YYYY-MM-DD' });
+
+        //Add max and min time as a label time selection dropdown var minMillis = data["minTime"];
+        var maxDateTime = maxMillis ? moment(parseInt(maxMillis)).format("YYYY-MM-DD h a") : "n.a.";
+        $(".max-time").text(maxDateTime);
+
+        //todo add min time to info endpoint
+        var minMillis = data["minTime"];
+        var minDateTime = minMillis ? moment(parseInt(minMillis)).format("YYYY-MM-DD h a") : "n.a.";
+        $(".min-time").text(minDateTime);
 
     })
 }

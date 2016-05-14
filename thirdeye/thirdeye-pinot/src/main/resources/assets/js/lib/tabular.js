@@ -41,7 +41,7 @@ function renderTabular(data) {
     var result_funnels_template = HandleBarsTemplates
         .template_funnels_table(data);
     $("#"+ hash.view +"-display-chart-section").append(result_funnels_template);
-    calcHeatMapBG("tabular");
+    calcHeatMapBG();
     formatMillisToTZ();
 }
 var lineChart;

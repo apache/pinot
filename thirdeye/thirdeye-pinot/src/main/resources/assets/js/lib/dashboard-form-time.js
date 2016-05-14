@@ -38,9 +38,9 @@
     });
 
 
-    $("#main-view").on("click",".baseline-aggregate-copy",function(){
+    /*$("#main-view").on("click",".baseline-aggregate-copy",function(){
         enableApplyButton( $(".time-input-apply-btn[rel='"+ hash.view +"']"))
-    });
+    });*/
 
     //Date & Time selector dropdown apply
     $("#main-view").on("click",".time-input-apply-btn",function(){
