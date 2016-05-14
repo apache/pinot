@@ -19,7 +19,7 @@
 
     /** Dataset selection **/
     $("#main-view").on("click",".dataset-option", function(){
-        selectDatasetNGetDashboardList(this)
+        selectDatasetNGetFormData(this)
     });
 
     //Advanced settings

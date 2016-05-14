@@ -51,12 +51,6 @@ function renderTimeSeriesUsingC3(d){  //time-series-area
     }
 
 
-    console.log("colors")
-    console.log(colors)
-    console.log('d["timeSeriesData"]')
-    console.log(d["timeSeriesData"])
-
-
     var chart = c3.generate({
 	    bindto: '#time-series-area',
 	    data: {

@@ -24,7 +24,7 @@ function renderTabular(data) {
     if(data.metrics.length == 0){
         $("#"+  hash.view  +"-chart-area-error").empty()
         var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' })
-        warning.append($('<p></p>', { html: 'No metric data is present in this timerange. Error: data.metrics = 0'  }))
+        warning.append($('<p></p>', { html: 'No metric data is present. Error: data.metrics.length = 0'  }))
         $("#"+  hash.view  +"-chart-area-error").append(warning)
         $("#"+  hash.view  +"-chart-area-error").show()
         return

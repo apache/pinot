@@ -14,9 +14,6 @@ function getHeatmap() {
 
 function renderD3heatmap(data) {
 
-    console.log("heatmap data")
-    console.log(data)
-
     //Error handling when data is falsy (empty, undefined or null)
     if(!data){
         $("#"+  hash.view  +"-chart-area-error").empty()

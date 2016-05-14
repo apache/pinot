@@ -1,7 +1,7 @@
 /** AJAX and HASH RELATED METHODS **/
 
 function getData(url){
-    console.log("request url:" ,url)
+    console.log("request url:", url)
     return $.ajax({
         url: url,
         type: 'get',
@@ -98,6 +98,9 @@ function updateDashboardFormFromHash(){
 
     if (hash.hasOwnProperty('dashboard')){
         $(".dashboard-option[value='"+ hash.dashboard +"']").click();
+    }else if (hash.view == "dashboard"){
+        var defaultDashboard = 'Default_All_Metrics_Dashboard';
+        $(".dashboard-option[value='"+ defaultDashboard +"']").click();
     }
 
     var currentForm =  $("#"+hash.view +"-form") ;
@@ -111,6 +114,7 @@ function updateDashboardFormFromHash(){
         var metricAry = hash.metrics.split(',');
 
         for (var i = 0, len = metricAry.length; i < len; i++) {
+
             $(".metric-option[value='" + metricAry[i] + "']", currentForm).click();
 
         }
@@ -156,7 +160,14 @@ function updateDashboardFormFromHash(){
         currentStartTimeString = currentStartDateTime
             .format("HH:mm");
 
-    } else {
+    } else if(maxMillis){
+        // populate max date -1 day
+        currentStartDateTime = moment(parseInt(maxMillis)).add(-1, 'days');
+        currentStartDateString = currentStartDateTime.format("YYYY-MM-DD");
+        currentStartTimeString = currentStartDateTime.format("HH:00");
+
+    }else{
+
         // populate todays date
         currentStartDateTime = moment(parseInt(Date.now()));
         currentStartDateString = currentStartDateTime.format("YYYY-MM-DD");
@@ -169,26 +180,26 @@ function updateDashboardFormFromHash(){
             .format("YYYY-MM-DD");
         currentEndTimeString = currentEndDateTime
             .format("HH:mm");
-    } else {
+    } else if(maxMillis) {
+        currentEndDateTime = moment(parseInt(maxMillis));
+        currentEndDateString = currentEndDateTime.format("YYYY-MM-DD");
+        currentEndTimeString = currentEndDateTime.format("HH:00");
+    }else{
         currentEndDateTime = moment(parseInt(Date.now()));
-        currentEndDateString = currentEndDateTime
-            .format("YYYY-MM-DD");
-        currentEndTimeString = currentEndDateTime.format("HH"
-            + ":00");
+        currentEndDateString = currentEndDateTime.format("YYYY-MM-DD");
+        currentEndTimeString = currentEndDateTime.format("HH:00");
     }
 
     if (hash.hasOwnProperty("baselineStart")) {
 
         baselineStartDateTime = moment(parseInt(hash.baselineStart)).tz('UTC').clone().tz('America/Los_Angeles');
-        baselineStartDateString = baselineStartDateTime
-            .format("YYYY-MM-DD");
+        baselineStartDateString = baselineStartDateTime.format("YYYY-MM-DD");
         baselineStartTimeString = currentStartTimeString;
 
     } else {
 
         baselineStartDateTime = currentStartDateTime.add(-7,'days');
-        baselineStartDateString = baselineStartDateTime
-            .format("YYYY-MM-DD");
+        baselineStartDateString = baselineStartDateTime.format("YYYY-MM-DD");
         baselineStartTimeString = currentStartTimeString;
     }
 
@@ -263,6 +274,49 @@ function updateDashboardFormFromHash(){
     $(".uk-dropdown").hide();
 }
 
+
+
+function formComponentPopulated(){
+
+    if(responseDataPopulated == 4){
+        updateDashboardFormFromHash();
+
+        //If hash has dataset && dashboard trigger form submit
+
+        if( hash.hasOwnProperty("dataset")){
+
+            //If dashboard is present in hash and present in current dataset
+            //If hash has dataset && dashboard or metric name trigger form submit
+            if(hash.view == "dashboard" && hash.hasOwnProperty("dashboard")){
+
+                //if the dashboard is present in the current dataset
+                if( $(".dashboard-option[value='"+ hash.dashboard +"']").length>0 ){
+                    //Adding random number to hash
+                    //for the usecase when on pagereload the hash would not change so ajax would not be triggered
+                    var rand= Math.random() + ""
+                    hash.rand = rand.substring(3,6);
+                    enableFormSubmit();
+                    $("#" + hash.view + "-form-submit").click();
+                }
+            } else if(hash.hasOwnProperty("metrics")){
+                //if the metric is present in the current dataset
+                var metricList = hash.metrics.split(",");
+                for(var i=0, len = metricList.length; i<len;i++){
+                    if($(".metric-option[value='"+ metricList[i] +"']").length>0){
+                        //Adding random number to hash
+                        //for the usecase when on pagereload the hash would not change so ajax would not be triggered
+                        var rand= Math.random() + ""
+                        hash.rand = rand.substring(3,6);
+                        enableFormSubmit();
+                        $("#" + hash.view + "-form-submit").click();
+                    }
+                }
+
+            }
+        }
+    }
+}
+
 /** DASHBOARD FORM RELATED METHODS **/
 /* used on href="#" anchor tags prevents the default jump to the top of the page */
 function eventPreventDefault(event){
@@ -298,33 +352,41 @@ function disableApplyButton(button){
     $(button).attr("disabled", true);
 }
 
-function selectDatasetNGetDashboardList(target){
+function selectDatasetNGetFormData(target){
 
-    //Update hash values
-    var param = "dataset";
-    var value = $(target).attr("value");
-    //Update hash
-    hash[param] = value;
-    if(value == "none"){
-        delete hash[param];
-    }
 
-    //Hide alerts
-    $("#dataset-tip").hide()
-    $(".time-input-form-error p").each(function(){
-        if($(target).html().trim() == "Please select a dataset."){
-            $(".time-input-form-error").hide()
-        }
-    })
 
+    //Cleanup form: Remove added-item and added-filter, metrics of the previous dataset
     $("#"+  hash.view  +"-chart-area-error").hide();
+    $(".view-metric-selector .added-item").remove();
+    $(".view-dimension-selector .added-item").remove();
+    $(".metric-list").empty();
+    $(".dimension-list").empty();
+    $(".filter-dimension-list").empty()
+    $(".filter-panel .value-filter").remove();
+    $(".added-filter").remove();
+    $(".filter-panel .value-filter").remove();
+
+
+    //Remove previous dataset's hash values
+    delete hash.baselineStart
+    delete hash.baselineEnd
+    delete hash.currentStart
+    delete hash.currentEnd
+    delete hash.compareMode
+    delete hash.dashboard
+    delete hash.metrics
+    delete hash.dimensions
+    delete hash.filters
+    delete hash.aggTimeGranularity
+
+
+    var value = $(target).attr("value");
+    hash.dataset = value;
 
     //Trigger AJAX calls
     //get the latest available data timestamp of a dataset
-    getMaxDateTime()
-    
-    getDashboardList()
-    getMetricNFilterList();
+    getAllFormData()
 
     //Populate the selected item on the form element
     $(".selected-dataset").text($(target).text());
@@ -334,10 +396,7 @@ function selectDatasetNGetDashboardList(target){
     $(target).closest("[data-uk-dropdown]").removeClass("uk-open");
     $(target).closest("[data-uk-dropdown]").attr("aria-expanded", false);
 
-    //Remove added-item and added-filter of the previous dataset
-    $(".view-metric-selector .added-item").remove();
-    $(".view-dimension-selector .added-item").remove();
-    $(".added-filter").remove();
+
 }
 
 function switchHeaderTab(target){
@@ -347,8 +406,8 @@ function switchHeaderTab(target){
 
 function  selectDashboard(target){
     //Update hash values
-    var param = "dashboard";
     var value = $(target).attr("value");
+    hash.dashboard = value;
 
     //Update selectors
     $("#selected-dashboard").text($(target).text());
@@ -669,16 +728,7 @@ function selectCurrentDateRange(target){
             $(".current-end-time-input[rel='"+ currentTab +"']").attr("disabled", true);
 
             break;
-        case "custom":  //selecting custom option will set the input fields to today and enable editing them
-
-            var today = moment().format("YYYY-MM-DD");
-            var hh = moment().format("HH");
-
-            //set the input field values
-            $(".current-start-date-input[rel='"+ currentTab +"']").val(today);
-            $(".current-end-date-input[rel='"+ currentTab +"']").val(today);
-            $(".current-start-time-input[rel='"+ currentTab +"']").val("00:00");
-            $(".current-end-time-input[rel='"+ currentTab +"']").val(hh +":00");
+        case "custom":
 
             //Enable inputfield edit
             $(".current-start-date-input[rel='"+ currentTab +"']").attr("disabled", false);
@@ -889,10 +939,9 @@ function  applyTimeRangeSelection(target) {
     $(".compare-mode[rel='" + currentTab + "']").html($(".compare-mode-selector[rel='" + currentTab + "']").attr("unit"))
 
     //update hash
-    var selectedGranularity = $(".baseline-aggregate-copy[rel='" + currentTab + "'].uk-active").attr("unit");
-
-    $(".baseline-aggregate[rel='" + currentTab + "']").removeClass("uk-active");
-    $(".baseline-aggregate[rel='" + currentTab + "'][unit='" + selectedGranularity + "']").addClass("uk-active");
+    //var selectedGranularity = $(".baseline-aggregate-copy[rel='" + currentTab + "'].uk-active").attr("unit");
+    // $(".baseline-aggregate[rel='" + currentTab + "']").removeClass("uk-active");
+    //$(".baseline-aggregate[rel='" + currentTab + "'][unit='" + selectedGranularity + "']").addClass("uk-active");
 
     $(target).attr("disabled", true);
     enableFormSubmit()
@@ -944,8 +993,7 @@ function colorScale(len){
         var hex = integer.toString(16).length < 6 ? str.substr(0,6) : integer.toString(16)
         colorAry.push( hex )
     }
-  console.log('colorAry')
-  console.log(colorAry)
+
     return colorAry
 
 
@@ -1137,6 +1185,11 @@ function transformUTCToTZ() {
     //Dashboard and tabular view
     $(".funnel-table-time").each(function (i, cell) {
         var dateTimeFormat = "h a";
+
+        if(hash.hasOwnProperty("aggTimeGranularity") && hash.aggTimeGranularity == "DAYS"){
+           
+            dateTimeFormat = "MM-DD h a"
+        }
         transformUTCToTZTime(cell, dateTimeFormat);
     });
 
@@ -1145,7 +1198,13 @@ function transformUTCToTZ() {
 /**Transform UTC time into user selected or browser's timezone **/
 function formatMillisToTZ() {
     $(".table-time-cell").each(function (i, cell) {
+
+
         var dateTimeFormat = "h a";
+        if(hash.hasOwnProperty("aggTimeGranularity") && hash.aggTimeGranularity == "DAYS"){
+
+            dateTimeFormat = "MM-DD h a"
+        }
         var cellObj = $(cell);
         var tz = getTimeZone()
         var currentTime = moment(parseInt(cellObj.attr('currentStartUTC')));

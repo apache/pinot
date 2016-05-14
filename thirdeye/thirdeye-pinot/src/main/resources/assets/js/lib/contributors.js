@@ -17,6 +17,16 @@ function getContributors() {
       $("#"+  hash.view  +"-chart-area-error").hide()
   }
 
+
+  if(data.metrics.length == 0){
+      $("#"+  hash.view  +"-chart-area-error").empty()
+      var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' })
+      warning.append($('<p></p>', { html: 'No metric data is present. Error: data.metrics.length = 0'  }))
+      $("#"+  hash.view  +"-chart-area-error").append(warning)
+      $("#"+  hash.view  +"-chart-area-error").show()
+      return
+  }
+
     // Handelbars contributors table template
     var result_contributors_template = HandleBarsTemplates.template_contributors_table(data);
     $("#"+ hash.view +"-display-chart-section").append(result_contributors_template);

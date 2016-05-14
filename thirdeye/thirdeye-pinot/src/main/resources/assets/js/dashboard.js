@@ -99,9 +99,6 @@ $(document).ready( function() {
     hash.view = hash.hasOwnProperty("view") ? hash.view : "dashboard";
     $("#" + hash.view + "-header-tab").click();
 
-    //populate default time in form
-    //populateTodayDateTime()
-
     /** --- ) Set initial view on pageload ---**/
 
     //getDataSetList as a callback triggers ajax calls for all data on the form:
