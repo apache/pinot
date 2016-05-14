@@ -26,10 +26,13 @@ public abstract class ThirdEyeConfiguration extends Configuration {
    */
   private String configStoreType = "FILE";
 
+  private String whitelistCollections = "";
+  private String blacklistCollections = "";
+
   @Valid
   @NotNull
   private final DataSourceFactory database = new DataSourceFactory();
-  
+
   public ThirdEyeConfiguration() {
 
   }
@@ -61,4 +64,21 @@ public abstract class ThirdEyeConfiguration extends Configuration {
   public void setConfigStoreType(String configStoreType) {
     this.configStoreType = configStoreType;
   }
+
+  public String getWhitelistCollections() {
+    return whitelistCollections;
+  }
+
+  public void setWhitelistCollections(String whitelistCollections) {
+    this.whitelistCollections = whitelistCollections;
+  }
+
+  public String getBlacklistCollections() {
+    return blacklistCollections;
+  }
+
+  public void setBlacklistCollections(String blacklistCollections) {
+    this.blacklistCollections = blacklistCollections;
+  }
+
 }

@@ -1,37 +1,24 @@
 package com.linkedin.thirdeye.client.pinot;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.helix.manager.zk.ZKHelixAdmin;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.manager.zk.ZkClient;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.http.HttpHost;
-import org.apache.http.client.ClientProtocolException;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
-import org.apache.http.util.EntityUtils;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.pinot.client.Connection;
 import com.linkedin.pinot.client.ResultSet;
 import com.linkedin.pinot.client.ResultSetGroup;
-import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.thirdeye.api.CollectionSchema;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
@@ -60,17 +47,14 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
   public static final String FIXED_COLLECTIONS_PROPERTY_KEY = "fixedCollections";
   public static final String CLUSTER_NAME_PROPERTY_KEY = "clusterName";
   public static final String TAG_PROPERTY_KEY = "tag";
+  private static final String BROKER_PREFIX = "Broker_";
 
   private static final Logger LOG = LoggerFactory.getLogger(PinotThirdEyeClient.class);
-
-  private static final String TABLES_ENDPOINT = "tables/";
-  private static final String BROKER_PREFIX = "Broker_";
 
   String segementZKMetadataRootPath;
   private final HttpHost controllerHost;
   private final CloseableHttpClient controllerClient;
-  private AtomicReference<List<String>> collectionsRef =
-      new AtomicReference<List<String>>(new ArrayList<String>());
+
 
   protected PinotThirdEyeClient(String controllerHostName, int controllerPort) {
 
@@ -191,52 +175,10 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
 
   @Override
   public List<String> getCollections() throws Exception {
-    return collectionsRef.get();
+    return CACHE_INSTANCE.getCollectionsCache().getCollections();
   }
 
-  public void loadCollections() throws Exception {
-    HttpGet req = new HttpGet(TABLES_ENDPOINT);
-    LOG.info("Retrieving collections: {}", req);
-    CloseableHttpResponse res = controllerClient.execute(controllerHost, req);
-    try {
-      if (res.getStatusLine().getStatusCode() != 200) {
-        throw new IllegalStateException(res.getStatusLine().toString());
-      }
-      InputStream content = res.getEntity().getContent();
-      JsonNode tables = new ObjectMapper().readTree(content).get("tables");
-      ArrayList<String> collections = new ArrayList<>();
-      ArrayList<String> skippedCollections = new ArrayList<>();
-      for (JsonNode table : tables) {
-        String collection = table.asText();
-        // TODO Since Pinot does not strictly require a schema to be provided for each offline data
-        // set, filter out those for which a schema cannot be retrieved.
-        try {
-          CollectionSchema collectionSchema = getCollectionSchema(collection);
-          if (collectionSchema == null) {
-            LOG.debug("Skipping collection {} due to null schema", collection);
-            skippedCollections.add(collection);
-            continue;
-          }
-        } catch (Exception e) {
-          LOG.debug("Skipping collection {} due to schema retrieval exception", collection, e);
-          skippedCollections.add(collection);
-          continue;
-        }
-        collections.add(collection);
-      }
-      if (!skippedCollections.isEmpty()) {
-        LOG.info(
-            "{} collections were not included because their schemas could not be retrieved: {}",
-            skippedCollections.size(), skippedCollections);
-      }
-      collectionsRef.set(collections);
-    } finally {
-      if (res.getEntity() != null) {
-        EntityUtils.consume(res.getEntity());
-      }
-      res.close();
-    }
-  }
+
 
   @Override
   public void clear() throws Exception {
@@ -247,15 +189,6 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
     controllerClient.close();
   }
 
-  private Schema getSchema(String collection) {
-    Schema schema = null;
-    try {
-      schema = CACHE_INSTANCE.getSchemaCache().get(collection);
-    } catch (Exception e) {
-      LOG.info("Exception while retrieving {} from schema cache", e);
-    }
-    return schema;
-  }
 
   /** TESTING ONLY - WE SHOULD NOT BE USING THIS. */
   @Deprecated

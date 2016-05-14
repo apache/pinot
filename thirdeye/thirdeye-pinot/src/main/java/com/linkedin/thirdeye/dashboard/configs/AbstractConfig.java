@@ -31,7 +31,6 @@ public abstract class AbstractConfig {
       return value;
 
     } else if (configTypeClass.getName().equals(CollectionSchema.class.getName())) {
-      System.out.println("hi");
       TypeReference<CollectionSchema> typeRef = new TypeReference<CollectionSchema>() {
       };
       T value = OBJECT_MAPPER.readValue(json, typeRef);

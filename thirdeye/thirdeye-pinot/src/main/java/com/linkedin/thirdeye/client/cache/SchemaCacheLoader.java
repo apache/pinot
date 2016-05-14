@@ -40,7 +40,7 @@ public class SchemaCacheLoader extends CacheLoader<String, Schema> {
     CloseableHttpResponse res = controllerClient.execute(controllerHost, req);
     try {
       if (res.getStatusLine().getStatusCode() != 200) {
-        throw new IllegalStateException(res.getStatusLine().toString());
+        LOGGER.error("Schema {} not found, {}", collection, res.getStatusLine().toString());
       }
       InputStream content = res.getEntity().getContent();
       Schema schema = new ObjectMapper().readValue(content, Schema.class);

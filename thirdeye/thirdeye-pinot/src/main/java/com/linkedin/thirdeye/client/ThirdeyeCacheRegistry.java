@@ -1,5 +1,8 @@
 package com.linkedin.thirdeye.client;
 
+import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -8,6 +11,7 @@ import com.google.common.cache.LoadingCache;
 import com.linkedin.pinot.client.ResultSetGroup;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.thirdeye.api.CollectionSchema;
+import com.linkedin.thirdeye.client.cache.CollectionsCache;
 
 public class ThirdeyeCacheRegistry {
 
@@ -15,6 +19,7 @@ public class ThirdeyeCacheRegistry {
   private LoadingCache<String, Schema> schemaCache;
   private LoadingCache<String, CollectionSchema> collectionSchemaCache;
   private LoadingCache<String, Long> collectionMaxDataTimeCache;
+  private CollectionsCache collectionsCache;
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ThirdeyeCacheRegistry.class);
 
@@ -59,6 +64,14 @@ public class ThirdeyeCacheRegistry {
   public void registerCollectionMaxDataTimeCache(
       LoadingCache<String, Long> collectionMaxDataTimeCache) {
     this.collectionMaxDataTimeCache = collectionMaxDataTimeCache;
+  }
+
+  public CollectionsCache getCollectionsCache() {
+    return collectionsCache;
+  }
+
+  public void registerCollectionsCache(CollectionsCache collectionsCache) {
+    this.collectionsCache = collectionsCache;
   }
 
 }

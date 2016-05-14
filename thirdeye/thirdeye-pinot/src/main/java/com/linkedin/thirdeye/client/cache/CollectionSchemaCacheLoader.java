@@ -2,15 +2,10 @@ package com.linkedin.thirdeye.client.cache;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.base.Optional;
 import com.google.common.cache.CacheLoader;
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
@@ -26,7 +21,6 @@ import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.client.ThirdeyeCacheRegistry;
 import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClientConfig;
 import com.linkedin.thirdeye.dashboard.configs.AbstractConfigDAO;
-import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
 
 public class CollectionSchemaCacheLoader extends CacheLoader<String, CollectionSchema> {
 
@@ -37,7 +31,6 @@ public class CollectionSchemaCacheLoader extends CacheLoader<String, CollectionS
   private AbstractConfigDAO<CollectionSchema> collectionSchemaDAO;
 
   public CollectionSchemaCacheLoader(PinotThirdEyeClientConfig pinotThirdeyeClientConfig,
-      AbstractConfigDAO<CollectionConfig> collectionConfigDAO,
       AbstractConfigDAO<CollectionSchema> collectionSchemaDAO) {
     this.collectionSchemaDAO = collectionSchemaDAO;
   }
