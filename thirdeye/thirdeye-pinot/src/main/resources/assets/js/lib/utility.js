@@ -82,8 +82,6 @@ function updateHashParam(param, value){
 
 function updateDashboardFormFromHash(){
 
-    console.log("updateDashboardFormFromHash started")
-
     //Preselect dataset if present in hash
     if (!hash.hasOwnProperty('dataset')){
         $(".selected-dataset").text("Select dataset");
@@ -137,6 +135,7 @@ function updateDashboardFormFromHash(){
 
     $(".filter-dimension-option:first-of-type").click();
 
+    var tz = getTimeZone();
     var currentStartDateTime;
     var currentEndDateTime;
     var baselineStartDateTime;
@@ -157,7 +156,7 @@ function updateDashboardFormFromHash(){
     if (hash.hasOwnProperty("currentStart")) {
         currentStartDateTimeUTC = moment(parseInt(hash.currentStart)).tz('UTC');
 
-        currentStartDateTime = currentStartDateTimeUTC.clone().tz('America/Los_Angeles');
+        currentStartDateTime = currentStartDateTimeUTC.clone().tz(tz);
         currentStartDateString = currentStartDateTime
             .format("YYYY-MM-DD");
         currentStartTimeString = currentStartDateTime
@@ -178,7 +177,7 @@ function updateDashboardFormFromHash(){
     }
 
     if (hash.hasOwnProperty("currentEnd")) {
-        currentEndDateTime = moment(parseInt(hash.currentEnd)).tz('UTC').clone().tz('America/Los_Angeles');
+        currentEndDateTime = moment(parseInt(hash.currentEnd)).tz('UTC').clone().tz(tz);
         currentEndDateString = currentEndDateTime
             .format("YYYY-MM-DD");
         currentEndTimeString = currentEndDateTime
@@ -195,7 +194,7 @@ function updateDashboardFormFromHash(){
 
     if (hash.hasOwnProperty("baselineStart")) {
 
-        baselineStartDateTime = moment(parseInt(hash.baselineStart)).tz('UTC').clone().tz('America/Los_Angeles');
+        baselineStartDateTime = moment(parseInt(hash.baselineStart)).tz('UTC').clone().tz(tz);
         baselineStartDateString = baselineStartDateTime.format("YYYY-MM-DD");
         baselineStartTimeString = currentStartTimeString;
 
@@ -210,7 +209,7 @@ function updateDashboardFormFromHash(){
 
         baselineEndDateTimeUTC = moment(parseInt(hash.baselineEnd)).tz('UTC');
 
-        baselineEndDateTime = baselineEndDateTimeUTC.clone().tz('America/Los_Angeles');
+        baselineEndDateTime = baselineEndDateTimeUTC.clone().tz(tz);
 
         baselineEndDateString = baselineEndDateTime
             .format("YYYY-MM-DD");
@@ -280,8 +279,9 @@ function updateDashboardFormFromHash(){
 
 
 function formComponentPopulated(){
-    if(responseDataPopulated == numFormComponents){
-
+    if(window.responseDataPopulated == window.numFormComponents){
+        delete window.responseDataPopulated;
+        delete window.numFormComponents;
 
         updateDashboardFormFromHash();
 
@@ -343,6 +343,9 @@ function radioButtons(target){
 
 //Advanced settings
 function closeClosestDropDown(target){
+
+    $(target).closest($("[data-uk-dropdown]")).removeClass("uk-open");
+    $(target).closest($("[data-uk-dropdown]")).attr("aria-expanded", false);
     $(target).closest(".uk-dropdown").hide();
 }
 
@@ -660,6 +663,7 @@ function enableFormSubmit(){
 function selectCurrentDateRange(target){
 
     var currentTab = $(target).attr('rel');
+    var tz = getTimeZone();
 
     switch ($(target).val()){
         case "today":
@@ -715,10 +719,10 @@ function selectCurrentDateRange(target){
             //subtract 7 days in milliseconds
             var currentStartMillis =  currentEndMillis - 86400000 * 7;
 
-            var currentEndDateString = moment().tz('America/Los_Angeles').format("YYYY-MM-DD")
-            var currentEndTimeString = moment().tz('America/Los_Angeles').format("hh:00")
+            var currentEndDateString = moment().tz(tz).format("YYYY-MM-DD")
+            var currentEndTimeString = moment().tz(tz).format("hh:00")
 
-            var currentStartDateString = moment(currentStartMillis).tz('America/Los_Angeles').format("YYYY-MM-DD")
+            var currentStartDateString = moment(currentStartMillis).tz(tz).format("YYYY-MM-DD")
 
             $(".current-start-date-input[rel='"+ currentTab +"']").val(currentStartDateString);
             $(".current-end-date-input[rel='"+ currentTab +"']").val(currentEndDateString);
@@ -759,13 +763,14 @@ function toggleTimeComparison(target){
 
 function selectBaselineDateRange(target){
     var currentTab = $(target).attr('rel');
+    var tz = getTimeZone();
 
     var currentStartDateString = $(".current-start-date-input[rel='"+ currentTab +"']").val();
     var currentEndDateString = $(".current-end-date-input[rel='"+ currentTab +"']").val();
-    var timezone = "America/Los_Angeles";
 
-    var currentStartDate = moment.tz(currentStartDateString, timezone);
-    var currentEndDate = moment.tz(currentEndDateString, timezone);
+
+    var currentStartDate = moment.tz(currentStartDateString, tz);
+    var currentEndDate = moment.tz(currentEndDateString, tz);
 
     var currentStartDateMillisUTC = currentStartDate.utc().valueOf();
     var currentEndDateMillisUTC = currentEndDate.utc().valueOf();
@@ -779,8 +784,8 @@ function selectBaselineDateRange(target){
             var baselineStartDateUTCMillis = moment(currentStartDateMillisUTC - parseInt(optionValue) * 86400000).tz('UTC');
             var baselineEndDateUTCMillis = moment(currentEndDateMillisUTC - parseInt(optionValue) * 86400000).tz('UTC');
 
-            var baselineStartDate = baselineStartDateUTCMillis.clone().tz('America/Los_Angeles');
-            var baselineEndDate = baselineEndDateUTCMillis.clone().tz('America/Los_Angeles');
+            var baselineStartDate = baselineStartDateUTCMillis.clone().tz(tz);
+            var baselineEndDate = baselineEndDateUTCMillis.clone().tz(tz);
 
             var baselineStartDateString = baselineStartDate.format("YYYY-MM-DD");
             var baselineEndDateString = baselineEndDate.format("YYYY-MM-DD");
@@ -823,15 +828,15 @@ function  applyTimeRangeSelection(target) {
 
     //Todo: error handling: handle when comparison is selected and no baseline is present
 
-    //turn into milliseconds
-    // DateTimes
+
     var errorMsg = $(".time-input-logic-error[rel='" + currentTab + "'] p");
     var errorAlrt = $(".time-input-logic-error[rel='" + currentTab + "']");
 
-    var timezone = "UTC";
-
     //hide error message
     errorAlrt.hide();
+
+    //turn into milliseconds
+    // DateTimes
 
     var currentStartDate = $(".current-start-date-input[rel='" + currentTab + "']").val();
     if (!currentStartDate) {
@@ -865,19 +870,26 @@ function  applyTimeRangeSelection(target) {
         return
     }
 
-
-    /* When time and timezone selection is supported use the following for date time selection
-     var current = moment.tz(date + " " + time, timezone);*/
+    var timezone = getTimeZone();
     var currentStart = moment.tz(currentStartDate + " " + currentStartTime, timezone);
+
     var currentStartMillisUTC = currentStart.utc().valueOf();
     var currentEnd = moment.tz(currentEndDate + " " + currentEndTime, timezone);
     var currentEndMillisUTC = currentEnd.utc().valueOf();
 
+
+    //Error handling
     if (currentStartMillisUTC > currentEndMillisUTC) {
 
         errorMsg.html("Please choose an end date that is later than the start date.");
         errorAlrt.fadeIn(100);
         disableApplyButton($(".time-input-apply-btn[rel='"+ currentTab +"']"))
+
+        //show the dropdown
+        $("[data-uk-dropdown]").addClass("uk-open");
+        $("[data-uk-dropdown]").attr("aria-expanded", true);
+        $(".time-input-apply-btn[rel='"+ currentTab +"']").closest(".uk-dropdown").show();
+
         return
 
     }
@@ -888,6 +900,21 @@ function  applyTimeRangeSelection(target) {
      errorAlrt.fadeIn(100);
      return
      }*/
+
+    if(maxMillis){
+        if(currentStartMillisUTC > maxMillis || currentEndMillisUTC > maxMillis) {
+
+            errorMsg.html("The data is available till: " + moment(parseInt(maxMillis)).format("YYYY-MM-DD h a") + ". Please select a time range prior to this date and time.");
+            errorAlrt.fadeIn(100);
+            disableApplyButton($(".time-input-apply-btn[rel='" + currentTab + "']"));
+            //show the dropdown
+            $("[data-uk-dropdown]").addClass("uk-open");
+            $("[data-uk-dropdown]").attr("aria-expanded", true);
+            $(".time-input-apply-btn[rel='"+ currentTab +"']").closest(".uk-dropdown").show();
+            return
+        }
+
+    }
 
 
     if ($(".time-input-compare-checkbox[rel='" + currentTab + "']").is(':checked')) {
@@ -906,6 +933,11 @@ function  applyTimeRangeSelection(target) {
             errorMsg.html("The compared time-periods overlap each-other, please adjust the request.");
             disableApplyButton($(".time-input-apply-btn[rel='"+ currentTab +"']"))
             errorAlrt.fadeIn(100);
+
+            //show the dropdown
+            $("[data-uk-dropdown]").addClass("uk-open");
+            $("[data-uk-dropdown]").attr("aria-expanded", true);
+            $(".time-input-apply-btn[rel='"+ currentTab +"']").closest(".uk-dropdown").show();
             return
 
         }
@@ -913,11 +945,17 @@ function  applyTimeRangeSelection(target) {
         if (baselineStartMillisUTC > currentEndMillisUTC && baselineStartMillisUTC < currentStartMillisUTC) {
 
             errorMsg.html("Current time-period" + currentStartDate + " " + currentStartTime + "-" + currentEndDate + " " + currentEndTime + "should be a later time then baseline time-period" + baselineStartDate + " " + baselineStartTime + "-" + baselineEndDate + " " + baselineEndTime + ". Please switch the 'date range' and the 'compare to' date range.");
+
+            //show the dropdown
+            $("[data-uk-dropdown]").addClass("uk-open");
+            $("[data-uk-dropdown]").attr("aria-expanded", true);
+            $(".time-input-apply-btn[rel='"+ currentTab +"']").closest(".uk-dropdown").show();
             return
 
         }
     }
 
+    //Change the value of the time fields on the main form
     $(".current-start-date[rel='" + currentTab + "']").html(currentStartDateString);
     $(".current-end-date[rel='" + currentTab + "']").html(currentEndDateString);
     $(".current-start-time[rel='" + currentTab + "']").html(currentStartTimeString);
@@ -948,6 +986,12 @@ function  applyTimeRangeSelection(target) {
     //$(".baseline-aggregate[rel='" + currentTab + "'][unit='" + selectedGranularity + "']").addClass("uk-active");
 
     $(target).attr("disabled", true);
+
+    //close uikit dropdown
+    $("[data-uk-dropdown]").removeClass("uk-open");
+    $("[data-uk-dropdown]").attr("aria-expanded", false);
+    $(".uk-dropdown").hide();
+
     enableFormSubmit()
 }
 
@@ -1068,7 +1112,7 @@ function getLocalTimeZone() {
  * Get Time Zone
  * @function
  * @public
- * @returns {String} Local timezone from getLocalTimeZone() or hash params
+ * @returns {String} Local timezone from getLocalTimeZone() or hash params if present
  * timezone
  */
 function getTimeZone() {

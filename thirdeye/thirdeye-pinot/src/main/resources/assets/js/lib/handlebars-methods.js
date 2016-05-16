@@ -117,14 +117,14 @@ $(document).ready(function() {
     //takes utc timestamp (milliseconds ie. 1462626000000), returns date and time in users tz
     Handlebars.registerHelper('millisToDate', function(millis) {
 
-        millis = parseInt(millis)
+        millis = parseInt(millis);
         var tz = getTimeZone();
         return moment(millis).tz(tz).format('YYYY-MM-DD h a z');
     });
 
     Handlebars.registerHelper('parse', function(str, prop) {
         str = str.replace("/;/g", ',');
-        var obj = JSON.parse(str)
+        var obj = JSON.parse(str);
         return obj[prop];
     });
 

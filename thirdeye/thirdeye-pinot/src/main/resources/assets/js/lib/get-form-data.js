@@ -3,11 +3,24 @@ function getDataSetList(){
     var url = "/dashboard/data/datasets";
     getData(url).done( function(data){
 
+        var errorMessage = $("#" + hash.view + "-time-input-form-error p");
+        var errorAlert = $("#" + hash.view + "-time-input-form-error");
+
+        if (!data) {
+            errorMessage.html("No dataset list arrived from the server. Error: data = " + data);
+            errorAlert.fadeIn(100);
+            errorAlert.attr("data-error-source", "datasetlist");
+            return
+        } else {
+            $("#"+ hash.view +"-time-input-form-error[data-error-source= 'datasetlist']").hide()
+        }
+
         /* Handelbars template for datasets dropdown */
         var result_datasets_template = HandleBarsTemplates.template_datasets(data);
         $(".landing-dataset").each(function(){ $(this).html(result_datasets_template)});
 
         $(".selected-dataset").text("Select dataset");
+
 
         if (hash.hasOwnProperty('dataset')) {
             //Populate the selected item on the form element
@@ -24,9 +37,9 @@ function getDataSetList(){
 
 function getAllFormData(){
 
-    //Todo: remove these 2 gloabal variables and work with $.when and deferreds
-    responseDataPopulated = 0;
-    numFormComponents = 4;
+    //Todo: remove these 2 global variables and work with $.when and deferreds
+    window.responseDataPopulated = 0;
+    window.numFormComponents = 4;
     getDatasetConfig();
     getDashboardList();
     getMetricList();
@@ -47,8 +60,8 @@ function getDashboardList(){
         }
         $("#dashboard-list").html(dashboardListHtml);
         $("#selected-dashboard").text("Select dashboard");
-        console.log("getDashboardList done")
-    responseDataPopulated++
+        //console.log("getDashboardList done")
+        window.responseDataPopulated++
     formComponentPopulated()
     });
 };
@@ -78,8 +91,8 @@ function getMetricList() {
         }
         $(".metric-list").html(metricListHtml);
 
-        console.log("getMetrics done")
-        responseDataPopulated++
+        //console.log("getMetrics done")
+        window.responseDataPopulated++
         formComponentPopulated()
     });
 }
@@ -132,8 +145,8 @@ function getDimensionNFilterList() {
             $(".radio-options",this).click();
         });
 
-        console.log("getDimension done")
-        responseDataPopulated++
+        //console.log("getDimension done")
+        window.responseDataPopulated++
         formComponentPopulated()
     });
 };
@@ -219,8 +232,8 @@ function getDatasetConfig() {
         var minMillis = data["minTime"];
         var minDateTime = minMillis ? moment(parseInt(minMillis)).format("YYYY-MM-DD h a") : "n.a.";
         $(".min-time").text(minDateTime);
-        console.log("getConfig done")
-        responseDataPopulated++
+        //console.log("getConfig done")
+        window.responseDataPopulated++
         formComponentPopulated()
 
     })

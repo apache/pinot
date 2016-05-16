@@ -89,8 +89,7 @@ $("#main-view").on("click",".form-submit-btn",function(){
         }
     }
 
-    //Todo support timezone selection
-    var timezone = "America/Los_Angeles";
+    var timezone = getTimeZone();
 
     //Todo: support timezone selection
 
@@ -121,8 +120,6 @@ $("#main-view").on("click",".form-submit-btn",function(){
     var currentStartTime = $(".current-start-time[rel='"+ currentTab +"']").text();
     var currentEndTime = $(".current-end-time[rel='"+ currentTab +"']").text();
 
-    /* When time and timezone selection is supported use the following for date time selection
-     var current = moment.tz(date + " " + time, timezone);*/
     var currentStart = moment.tz(currentStartDate + " " + currentStartTime, timezone);
     var currentStartMillisUTC = currentStart.utc().valueOf();
     var currentEnd = moment.tz(currentEndDate+ " " + currentEndTime, timezone);
