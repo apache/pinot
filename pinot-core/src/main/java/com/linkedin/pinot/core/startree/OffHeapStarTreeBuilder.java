@@ -207,10 +207,12 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
     List<String> validatedSplitOrder = new ArrayList<String>();
     for (String dimension : dimensionsSplitOrder) {
       if (skipMaterializationForDimensions == null || !skipMaterializationForDimensions.contains(dimension)) {
+        LOG.info("Adding dimension {} to split order", dimension);
+        validatedSplitOrder.add(dimension);
+      } else {
         LOG.info(
             "Dimension {} cannot be part of 'dimensionSplitOrder' and 'skipMaterializationForDimensions', removing it from split order",
             dimension);
-        validatedSplitOrder.add(dimension);
       }
     }
     return validatedSplitOrder;
