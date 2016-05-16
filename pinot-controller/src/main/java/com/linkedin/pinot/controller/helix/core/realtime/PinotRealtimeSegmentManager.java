@@ -22,6 +22,8 @@ import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import com.linkedin.pinot.common.metrics.ControllerMeter;
+import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.SegmentType;
@@ -72,9 +74,11 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
   private String _tableConfigPath;
   private final PinotHelixResourceManager _pinotHelixResourceManager;
   private ZkClient _zkClient;
+  private ControllerMetrics _controllerMetrics;
 
-  public PinotRealtimeSegmentManager(PinotHelixResourceManager pinotManager) {
+  public PinotRealtimeSegmentManager(PinotHelixResourceManager pinotManager, ControllerMetrics controllerMetrics) {
     _pinotHelixResourceManager = pinotManager;
+    _controllerMetrics = controllerMetrics;
     String clusterName = _pinotHelixResourceManager.getHelixClusterName();
     _propertyStorePath = PropertyPathConfig.getPath(PropertyType.PROPERTYSTORE, clusterName);
     _tableConfigPath = _propertyStorePath + TABLE_CONFIG;
@@ -121,59 +125,76 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
     List<Pair<String, String>> listOfSegmentsToAddToInstances = new ArrayList<Pair<String, String>>();
 
     for (String resource : idealStateMap.keySet()) {
-      IdealState state = idealStateMap.get(resource);
+      try {
+        IdealState state = idealStateMap.get(resource);
 
-      // Are there any partitions?
-      if (state.getPartitionSet().size() == 0) {
-        // No, this is a brand new ideal state, so we will add one new segment to every partition and replica
-        List<String> instancesInResource = new ArrayList<String>();
-        try {
-          instancesInResource
-              .addAll(_pinotHelixResourceManager.getServerInstancesForTable(resource, TableType.REALTIME));
-        } catch (Exception e) {
-          LOGGER.error("Caught exception while fetching instances for resource {}", resource, e);
-        }
-
-        // Assign a new segment to all server instances
-        for (String instanceId : instancesInResource) {
-          InstanceZKMetadata instanceZKMetadata = _pinotHelixResourceManager.getInstanceZKMetadata(instanceId);
-
-          if (instanceZKMetadata == null) {
-            LOGGER.warn("Instance {} has no associated instance metadata in ZK, ignoring for segment assignment.",
-                instanceId);
-            continue;
+        // Are there any partitions?
+        if (state.getPartitionSet().size() == 0) {
+          // No, this is a brand new ideal state, so we will add one new segment to every partition and replica
+          List<String> instancesInResource = new ArrayList<String>();
+          try {
+            instancesInResource.addAll(_pinotHelixResourceManager.getServerInstancesForTable(resource, TableType.REALTIME));
+          } catch (Exception e) {
+            LOGGER.error("Caught exception while fetching instances for resource {}", resource, e);
+            _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_REALTIME_TABLE_SEGMENT_ASSIGNMENT_ERROR, 1L);
           }
 
-          String groupId = instanceZKMetadata.getGroupId(resource);
-          String partitionId = instanceZKMetadata.getPartition(resource);
-          listOfSegmentsToAddToInstances.add(new Pair<String, String>(
-                  SegmentNameBuilder.Realtime.build(groupId, partitionId,
-                      String.valueOf(System.currentTimeMillis())), instanceId));
-        }
-      } else {
-        // Add all server instances to the list of instances for which to assign a realtime segment
-        Set<String> instancesToAssignRealtimeSegment = new HashSet<String>();
-        instancesToAssignRealtimeSegment
-            .addAll(_pinotHelixResourceManager.getServerInstancesForTable(resource, TableType.REALTIME));
+          // Assign a new segment to all server instances
+          for (String instanceId : instancesInResource) {
+            InstanceZKMetadata instanceZKMetadata = _pinotHelixResourceManager.getInstanceZKMetadata(instanceId);
 
-        // Remove server instances that are currently processing a segment
-        for (String partition : state.getPartitionSet()) {
-          RealtimeSegmentZKMetadata realtimeSegmentZKMetadata =
-              ZKMetadataProvider.getRealtimeSegmentZKMetadata(_pinotHelixResourceManager.getPropertyStore(),
-                  SegmentNameBuilder.Realtime.extractTableName(partition), partition);
-          if (realtimeSegmentZKMetadata.getStatus() == Status.IN_PROGRESS) {
-            instancesToAssignRealtimeSegment.removeAll(state.getInstanceSet(partition));
+            if (instanceZKMetadata == null) {
+              LOGGER.warn("Instance {} has no associated instance metadata in ZK, ignoring for segment assignment.",
+                  instanceId);
+              _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_REALTIME_TABLE_SEGMENT_ASSIGNMENT_ERROR, 1L);
+              continue;
+            }
+
+            String groupId = instanceZKMetadata.getGroupId(resource);
+            String partitionId = instanceZKMetadata.getPartition(resource);
+            if (groupId != null && !groupId.isEmpty() && partitionId != null && !partitionId.isEmpty()) {
+              listOfSegmentsToAddToInstances.add(new Pair<String, String>(
+                  SegmentNameBuilder.Realtime.build(groupId, partitionId, String.valueOf(System.currentTimeMillis())),
+                  instanceId));
+            } else {
+              LOGGER.warn("Instance {} has invalid groupId ({}) and/or partitionId ({}) for resource {}, ignoring for segment assignment.",
+                  instanceId, groupId, partitionId, resource);
+              _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_REALTIME_TABLE_SEGMENT_ASSIGNMENT_ERROR, 1L);
+            }
+          }
+        } else {
+          // Add all server instances to the list of instances for which to assign a realtime segment
+          Set<String> instancesToAssignRealtimeSegment = new HashSet<String>();
+          try {
+            instancesToAssignRealtimeSegment.addAll(
+                _pinotHelixResourceManager.getServerInstancesForTable(resource, TableType.REALTIME));
+          } catch (Exception e) {
+            LOGGER.error("Caught exception while fetching instances for resource {}", resource, e);
+            _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_REALTIME_TABLE_SEGMENT_ASSIGNMENT_ERROR, 1L);
+          }
+
+          // Remove server instances that are currently processing a segment
+          for (String partition : state.getPartitionSet()) {
+            RealtimeSegmentZKMetadata realtimeSegmentZKMetadata = ZKMetadataProvider.getRealtimeSegmentZKMetadata(_pinotHelixResourceManager.getPropertyStore(),
+                SegmentNameBuilder.Realtime.extractTableName(partition), partition);
+            if (realtimeSegmentZKMetadata.getStatus() == Status.IN_PROGRESS) {
+              instancesToAssignRealtimeSegment.removeAll(state.getInstanceSet(partition));
+            }
+          }
+
+          // Assign a new segment to the server instances not currently processing this segment
+          for (String instanceId : instancesToAssignRealtimeSegment) {
+            InstanceZKMetadata instanceZKMetadata = _pinotHelixResourceManager.getInstanceZKMetadata(instanceId);
+            String groupId = instanceZKMetadata.getGroupId(resource);
+            String partitionId = instanceZKMetadata.getPartition(resource);
+            listOfSegmentsToAddToInstances.add(new Pair<String, String>(
+                SegmentNameBuilder.Realtime.build(groupId, partitionId, String.valueOf(System.currentTimeMillis())),
+                instanceId));
           }
         }
-
-        // Assign a new segment to the server instances not currently processing this segment
-        for (String instanceId : instancesToAssignRealtimeSegment) {
-          InstanceZKMetadata instanceZKMetadata = _pinotHelixResourceManager.getInstanceZKMetadata(instanceId);
-          String groupId = instanceZKMetadata.getGroupId(resource);
-          String partitionId = instanceZKMetadata.getPartition(resource);
-          listOfSegmentsToAddToInstances.add(new Pair<String, String>(
-                  SegmentNameBuilder.Realtime.build(groupId, partitionId, String.valueOf(System.currentTimeMillis())), instanceId));
-        }
+      } catch (Exception e) {
+        LOGGER.warn("Caught exception while processing resource {}, skipping.", resource, e);
+        _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_REALTIME_TABLE_SEGMENT_ASSIGNMENT_ERROR, 1L);
       }
     }
 
@@ -183,32 +204,35 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
     for (final Pair<String, String> segmentIdAndInstanceId : listOfSegmentsToAddToInstances) {
       final String segmentId = segmentIdAndInstanceId.getFirst();
       final String instanceName = segmentIdAndInstanceId.getSecond();
-      String resourceName = SegmentNameBuilder.Realtime.extractTableName(segmentId);
 
-      // Does the ideal state already contain this segment?
-      if (!idealStateMap.get(resourceName).getPartitionSet().contains(segmentId)) {
-        // No, add it
-        // Create the realtime segment metadata
-        RealtimeSegmentZKMetadata realtimeSegmentMetadataToAdd = new RealtimeSegmentZKMetadata();
-        realtimeSegmentMetadataToAdd.setTableName(TableNameBuilder.extractRawTableName(resourceName));
-        realtimeSegmentMetadataToAdd.setSegmentType(SegmentType.REALTIME);
-        realtimeSegmentMetadataToAdd.setStatus(Status.IN_PROGRESS);
-        realtimeSegmentMetadataToAdd.setSegmentName(segmentId);
+      try {
+        String resourceName = SegmentNameBuilder.Realtime.extractTableName(segmentId);
 
-        // Add the new metadata to the property store
-        ZKMetadataProvider
-            .setRealtimeSegmentZKMetadata(_pinotHelixResourceManager.getPropertyStore(), realtimeSegmentMetadataToAdd);
+        // Does the ideal state already contain this segment?
+        if (!idealStateMap.get(resourceName).getPartitionSet().contains(segmentId)) {
+          // No, add it
+          // Create the realtime segment metadata
+          RealtimeSegmentZKMetadata realtimeSegmentMetadataToAdd = new RealtimeSegmentZKMetadata();
+          realtimeSegmentMetadataToAdd.setTableName(TableNameBuilder.extractRawTableName(resourceName));
+          realtimeSegmentMetadataToAdd.setSegmentType(SegmentType.REALTIME);
+          realtimeSegmentMetadataToAdd.setStatus(Status.IN_PROGRESS);
+          realtimeSegmentMetadataToAdd.setSegmentName(segmentId);
 
-        // Update the ideal state to add the new realtime segment
-        HelixHelper.updateIdealState(_pinotHelixResourceManager.getHelixZkManager(), resourceName,
-            new Function<IdealState, IdealState>() {
-              @Override
-              public IdealState apply(IdealState idealState) {
-                return PinotTableIdealStateBuilder
-                    .addNewRealtimeSegmentToIdealState(segmentId, idealState, instanceName);
-              }
-            },
-            RetryPolicies.exponentialBackoffRetryPolicy(5, 500L, 2.0f));
+          // Add the new metadata to the property store
+          ZKMetadataProvider.setRealtimeSegmentZKMetadata(_pinotHelixResourceManager.getPropertyStore(),
+              realtimeSegmentMetadataToAdd);
+
+          // Update the ideal state to add the new realtime segment
+          HelixHelper.updateIdealState(_pinotHelixResourceManager.getHelixZkManager(), resourceName, new Function<IdealState, IdealState>() {
+            @Override
+            public IdealState apply(IdealState idealState) {
+              return PinotTableIdealStateBuilder.addNewRealtimeSegmentToIdealState(segmentId, idealState, instanceName);
+            }
+          }, RetryPolicies.exponentialBackoffRetryPolicy(5, 500L, 2.0f));
+        }
+      } catch (Exception e) {
+        LOGGER.warn("Caught exception while processing segment {} for instance {}, skipping.", segmentId, instanceName, e);
+        _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_REALTIME_TABLE_SEGMENT_ASSIGNMENT_ERROR, 1L);
       }
     }
   }

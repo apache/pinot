@@ -40,7 +40,8 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   CONTROLLER_TABLE_TENANT_UPDATE_ERROR("TableTenantUpdateError", true),
   CONTROLLER_TABLE_TENANT_CREATE_ERROR("TableTenantCreateError", true),
   CONTROLLER_TABLE_TENANT_DELETE_ERROR("TableTenantDeleteError", true),
-  CONTROLLER_TABLE_TENANT_GET_ERROR("TableTenantGetError", true);
+  CONTROLLER_TABLE_TENANT_GET_ERROR("TableTenantGetError", true),
+  CONTROLLER_REALTIME_TABLE_SEGMENT_ASSIGNMENT_ERROR("errors", true);
 
 
   private final String brokerMeterName;
