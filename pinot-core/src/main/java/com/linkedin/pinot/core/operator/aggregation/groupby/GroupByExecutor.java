@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.operator.groupby;
+package com.linkedin.pinot.core.operator.aggregation.groupby;
 
 /**
  * Interface class for executing the actual group-by operation.

@@ -16,7 +16,7 @@
 package com.linkedin.pinot.core.operator.aggregation.function;
 
 import com.linkedin.pinot.core.operator.aggregation.AggregationResultHolder;
-import com.linkedin.pinot.core.operator.groupby.GroupByResultHolder;
+import com.linkedin.pinot.core.operator.aggregation.groupby.GroupByResultHolder;
 import java.util.List;
 
 

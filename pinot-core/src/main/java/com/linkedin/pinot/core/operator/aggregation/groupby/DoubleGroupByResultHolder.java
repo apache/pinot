@@ -13,29 +13,38 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.operator.groupby;
+package com.linkedin.pinot.core.operator.aggregation.groupby;
 
-import com.clearspring.analytics.util.Preconditions;
+import com.google.common.base.Preconditions;
+import java.util.Arrays;
 
 
 /**
- * Result Holder implemented using ObjectArray.
+ * Result Holder implemented using DoubleArray.
  */
-public class ObjectGroupByResultHolder implements GroupByResultHolder {
-  private Object[] _resultArray;
+public class DoubleGroupByResultHolder implements GroupByResultHolder {
+  private double[] _resultArray;
+  private final double _defaultValue;
+
   private int _resultHolderCapacity;
-  private int _maxCapacity;
+  private final int _maxCapacity;
 
   /**
    * Constructor for the class.
    *
-   * @param initialCapacity Initial capacity of result holder
-   * @param maxCapacity Max capacity of result holder
+   * @param initialCapacity
+   * @param maxCapacity
+   * @param defaultValue
    */
-  public ObjectGroupByResultHolder(int initialCapacity, int maxCapacity) {
-    _resultArray = new Object[initialCapacity];
+  public DoubleGroupByResultHolder(int initialCapacity, int maxCapacity, double defaultValue) {
     _resultHolderCapacity = initialCapacity;
+    _defaultValue = defaultValue;
     _maxCapacity = maxCapacity;
+
+    _resultArray = new double[initialCapacity];
+    if (defaultValue != 0.0) {
+      Arrays.fill(_resultArray, defaultValue);
+    }
   }
 
   /**
@@ -54,9 +63,13 @@ public class ObjectGroupByResultHolder implements GroupByResultHolder {
       // Cap the growth to maximum possible number of group keys
       _resultHolderCapacity = Math.min(_resultHolderCapacity, _maxCapacity);
 
-      Object[] current = _resultArray;
-      _resultArray = new Object[_resultHolderCapacity];
+      double[] current = _resultArray;
+      _resultArray = new double[_resultHolderCapacity];
       System.arraycopy(current, 0, _resultArray, 0, copyLength);
+
+      if (_defaultValue != 0.0) {
+        Arrays.fill(_resultArray, copyLength, _resultHolderCapacity, _defaultValue);
+      }
     }
   }
 
@@ -72,14 +85,13 @@ public class ObjectGroupByResultHolder implements GroupByResultHolder {
    */
   @Override
   public double getDoubleResult(int groupKey) {
-    throw new RuntimeException(
-        "Unsupported method getDoubleResult (returning double) for class " + getClass().getName());
+    return _resultArray[groupKey];
   }
 
   @Override
-  @SuppressWarnings("unchecked")
   public <T> T getResult(int groupKey) {
-    return (T) _resultArray[groupKey];
+    throw new RuntimeException(
+        "Unsupported method getResult (returning Object) for class " + getClass().getName());
   }
 
   /**
@@ -90,12 +102,12 @@ public class ObjectGroupByResultHolder implements GroupByResultHolder {
    */
   @Override
   public void setValueForKey(int groupKey, double newValue) {
-    throw new RuntimeException(
-        "Unsupported method 'putValueForKey' (with double param) for class " + getClass().getName());
+    _resultArray[groupKey] = newValue;
   }
 
   @Override
   public void setValueForKey(int groupKey, Object newValue) {
-    _resultArray[groupKey] = newValue;
+    throw new RuntimeException(
+        "Unsupported method 'setValueForKey' (with Object param) for class " + getClass().getName());
   }
 }

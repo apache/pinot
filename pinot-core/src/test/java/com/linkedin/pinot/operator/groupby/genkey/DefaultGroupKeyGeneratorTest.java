@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.operator.groupby.genkey;
 
-import com.linkedin.pinot.core.operator.groupby.DefaultGroupKeyGenerator;
+import com.linkedin.pinot.core.operator.aggregation.groupby.DefaultGroupKeyGenerator;
 import java.util.Random;
 import org.testng.Assert;
 import org.testng.annotations.BeforeSuite;

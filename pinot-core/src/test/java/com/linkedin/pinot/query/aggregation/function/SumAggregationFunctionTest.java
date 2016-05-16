@@ -17,8 +17,8 @@ package com.linkedin.pinot.query.aggregation.function;
 
 import com.linkedin.pinot.core.operator.aggregation.AggregationResultHolder;
 import com.linkedin.pinot.core.operator.aggregation.function.SumAggregationFunction;
-import com.linkedin.pinot.core.operator.groupby.GroupByResultHolder;
-import com.linkedin.pinot.core.operator.groupby.ResultHolderFactory;
+import com.linkedin.pinot.core.operator.aggregation.groupby.GroupByResultHolder;
+import com.linkedin.pinot.core.operator.aggregation.ResultHolderFactory;
 import it.unimi.dsi.fastutil.ints.Int2DoubleOpenHashMap;
 import java.util.Map;
 import java.util.Random;

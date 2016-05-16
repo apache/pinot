@@ -15,8 +15,8 @@
  */
 package com.linkedin.pinot.operator.groupby.result;
 
-import com.linkedin.pinot.core.operator.groupby.DoubleGroupByResultHolder;
-import com.linkedin.pinot.core.operator.groupby.GroupByResultHolder;
+import com.linkedin.pinot.core.operator.aggregation.groupby.DoubleGroupByResultHolder;
+import com.linkedin.pinot.core.operator.aggregation.groupby.GroupByResultHolder;
 import java.util.Random;
 import org.testng.Assert;
 import org.testng.annotations.BeforeSuite;

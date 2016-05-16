@@ -29,7 +29,7 @@ import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Predicate;
-import com.linkedin.pinot.core.operator.groupby.AggregationGroupByResult;
+import com.linkedin.pinot.core.operator.aggregation.groupby.AggregationGroupByResult;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionUtils;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorUtils;

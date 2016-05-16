@@ -25,8 +25,6 @@ import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunction
 import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunctionFactory;
 import com.linkedin.pinot.core.operator.aggregation.function.DistinctCountHLLAggregationFunction;
 import com.linkedin.pinot.core.operator.aggregation.function.PercentileestAggregationFunction;
-import com.linkedin.pinot.core.operator.groupby.AggregationFunctionContext;
-import com.linkedin.pinot.core.operator.groupby.ResultHolderFactory;
 import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
 import com.linkedin.pinot.core.query.aggregation.function.AvgAggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.function.MinMaxRangeAggregationFunction;
