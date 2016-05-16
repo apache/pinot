@@ -19,7 +19,6 @@ import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.lang.reflect.Array;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -249,10 +248,10 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       String dimName = dimensionNameToIndexMap.inverse().get(node.getDimensionName());
       int dimensionValue = node.getDimensionValue();
       if (dimensionValue != StarTreeIndexNode.all()) {
-        Object[] objectArray = convertToObjectArray(indexCreationInfoMap.get(dimName).getSortedUniqueElementsArray());
-        int mappedDimValue = Arrays.binarySearch(objectArray,
-                dictionaryMap.get(dimName).inverse().get(dimensionValue));
-        node.setDimensionValue(mappedDimValue);
+        Object sortedValuesForDim = indexCreationInfoMap.get(dimName).getSortedUniqueElementsArray();
+        int indexForDimValue =
+            searchValueInArray(sortedValuesForDim, dictionaryMap.get(dimName).inverse().get(dimensionValue));
+        node.setDimensionValue(indexForDimValue);
       }
     }
     //update children map
@@ -260,13 +259,12 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     Map<Integer, StarTreeIndexNode> newChildren = new HashMap<>();
     if (children != null && !children.isEmpty()) {
       String childDimName = dimensionNameToIndexMap.inverse().get(node.getChildDimensionName());
-      Object[] sortedUniqueElementsArray =
-          convertToObjectArray(indexCreationInfoMap.get(childDimName).getSortedUniqueElementsArray());
+      Object sortedValuesForDim = indexCreationInfoMap.get(childDimName).getSortedUniqueElementsArray();
       for (Entry<Integer, StarTreeIndexNode> entry : children.entrySet()) {
         int childDimValue = entry.getKey();
         int childMappedDimValue = StarTreeIndexNode.all();
         if (childDimValue != StarTreeIndexNode.all()) {
-          childMappedDimValue = Arrays.binarySearch(sortedUniqueElementsArray,
+          childMappedDimValue = searchValueInArray(sortedValuesForDim,
               dictionaryMap.get(childDimName).inverse().get(childDimValue));
         }
         newChildren.put(childMappedDimValue, entry.getValue());
@@ -457,33 +455,38 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     return segmentName;
   }
 
-  /**
-   * Given an object that is either an Object[] or a primitive array (eg int[]),
-   * convert it to an Object[]. Returns null if input is not an array.
-   *
-   * @param input
-   * @return
-   */
-  private Object[] convertToObjectArray(Object input) {
-    if (input instanceof Object[]) {
-      return (Object[]) input;
-
-    } else if (input.getClass().isArray()) {
-      int length = Array.getLength(input);
-      Object[] outputArray = new Object[length];
-
-      for (int i = 0; i < length; ++i) {
-        outputArray[i] = Array.get(input, i);
-      }
-      return outputArray;
-
-    } else {
-      return null;
-    }
-  }
-
   private GenericRow readNextRowSanitized() {
     GenericRow rowOrig = recordReader.next();
     return extractor.transform(rowOrig);
+  }
+
+  /**
+   * Helper method to binary-search a given key in an input array.
+   * Both input array and the key to search are passed in as 'Object'.
+   *
+   * - Supported data types are int, long, float, double & String.
+   * - Throws an exception for any other data type.
+   *
+   * @param inputArray Input array to search
+   * @param key Key to search for
+   * @return
+   */
+  private int searchValueInArray(Object inputArray, Object key) {
+    if (inputArray instanceof int[]) {
+      return Arrays.binarySearch((int[]) inputArray, (Integer) key);
+    } else if (inputArray instanceof long[]) {
+      return Arrays.binarySearch((long[]) inputArray, (Long) key);
+    } else if (inputArray instanceof float[]) {
+      return Arrays.binarySearch((float[]) inputArray, (Float) key);
+    } else if (inputArray instanceof double[]) {
+      return Arrays.binarySearch((double[]) inputArray, (Double) key);
+    } else if (inputArray instanceof String[]) {
+      return Arrays.binarySearch((String[]) inputArray, key);
+    } else if (inputArray instanceof Object[]) {
+      return Arrays.binarySearch((Object[]) inputArray, key);
+    } else {
+      throw new RuntimeException(
+          "Unexpected data type encountered while updating StarTree node" + inputArray.getClass().getName());
+    }
   }
 }
