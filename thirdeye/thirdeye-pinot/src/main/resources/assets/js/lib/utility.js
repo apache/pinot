@@ -82,6 +82,8 @@ function updateHashParam(param, value){
 
 function updateDashboardFormFromHash(){
 
+    console.log("updateDashboardFormFromHash started")
+
     //Preselect dataset if present in hash
     if (!hash.hasOwnProperty('dataset')){
         $(".selected-dataset").text("Select dataset");
@@ -97,6 +99,7 @@ function updateDashboardFormFromHash(){
     //Preselect dashboard if present in hash
 
     if (hash.hasOwnProperty('dashboard')){
+
         $(".dashboard-option[value='"+ hash.dashboard +"']").click();
     }else if (hash.view == "dashboard"){
         var defaultDashboard = 'Default_All_Metrics_Dashboard';
@@ -277,8 +280,9 @@ function updateDashboardFormFromHash(){
 
 
 function formComponentPopulated(){
+    if(responseDataPopulated == numFormComponents){
 
-    if(responseDataPopulated == 4){
+
         updateDashboardFormFromHash();
 
         //If hash has dataset && dashboard trigger form submit
