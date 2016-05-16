@@ -73,9 +73,6 @@
   <inceptionYear>2014-2015</inceptionYear>
   <properties>
     <build.profile.id>dev</build.profile.id>
-    <sonar.jacoco.reportPath>${project.basedir}/../target/jacoco.exec</sonar.jacoco.reportPath>
-    <jacoco.it.execution.data.file>${project.build.directory}/coverage-reports/jacoco-it.exec</jacoco.it.execution.data.file>
-    <jacoco.ut.execution.data.file>${project.build.directory}/coverage-reports/jacoco-ut.exec</jacoco.ut.execution.data.file>
     <jdk.version>1.7</jdk.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <!-- Only unit tests are run by default. -->
@@ -701,11 +698,21 @@
       <plugin>
         <groupId>org.jacoco</groupId>
         <artifactId>jacoco-maven-plugin</artifactId>
-        <version>0.7.2.201409121644</version>
-        <configuration>
-          <destFile>${sonar.jacoco.reportPath}</destFile>
-          <append>true</append>
-        </configuration>
+        <version>0.7.6.201602180812</version>
+        <executions>
+          <execution>
+            <goals>
+              <goal>prepare-agent</goal>
+            </goals>
+          </execution>
+          <execution>
+            <id>report</id>
+            <phase>test</phase>
+            <goals>
+              <goal>report</goal>
+            </goals>
+          </execution>
+        </executions>
       </plugin>
       <plugin>
         <groupId>org.codehaus.mojo</groupId>

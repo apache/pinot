@@ -24,6 +24,9 @@ script:
   - cp ../.travis_cmd.sh .
   - bash .travis_cmd.sh
 
+after_success:
+  - bash <(curl -s https://codecov.io/bash)
+
 branches:
   only:
     - master
