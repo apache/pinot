@@ -96,7 +96,7 @@ public class PqlUtils {
       String startDateTime = sdf.format(new Date(start.getMillis()));
       String endDateTime = sdf.format(new Date(start.getMillis()));
       if (startDateTime.equals(endDateTime)) {
-        return String.format(" %s = %s", timeField, startDateTime);
+        return String.format(" %s = '%s'", timeField, startDateTime);
       } else {
         return String.format(" %s >= %s AND %s < %s", timeField, startDateTime, timeField,
             endDateTime);
