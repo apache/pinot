@@ -29,17 +29,17 @@ public class MetricExpression {
     this(expression.replaceAll("[\\s]+", ""), expression);
   }
 
-  public MetricExpression(String espressionName, String expression) {
-    this.expressionName = espressionName;
+  public MetricExpression(String expressionName, String expression) {
+    this.expressionName = expressionName;
     this.expression = expression;
   }
 
-  public String getEspressionName() {
+  public String getExpressionName() {
     return expressionName;
   }
 
-  public void setEspressionName(String espressionName) {
-    this.expressionName = espressionName;
+  public void setExpressionName(String expressionName) {
+    this.expressionName = expressionName;
   }
 
   public String getExpression() {

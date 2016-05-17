@@ -22,7 +22,7 @@ public class TimeSeriesResponse {
     this.metricExpressions = metricExpressions;
     metrics = new ArrayList<>();
     for (MetricExpression expression : metricExpressions) {
-      metrics.add(expression.getEspressionName());
+      metrics.add(expression.getExpressionName());
     }
     this.dimensionNames = dimensionNames;
     numRows = rows.size();
@@ -39,7 +39,7 @@ public class TimeSeriesResponse {
   public List<MetricExpression> getMetricExpressions() {
     return metricExpressions;
   }
-  
+
   public List<String> getDimensionNames() {
     return dimensionNames;
   }

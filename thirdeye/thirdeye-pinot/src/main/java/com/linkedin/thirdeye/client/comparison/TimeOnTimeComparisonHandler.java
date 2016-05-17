@@ -120,7 +120,7 @@ public class TimeOnTimeComparisonHandler {
               MetricExpression.evaluateExpression(derivedMetricExpression, baselineValueContext);
           double currentMetricBaselineValue =
               MetricExpression.evaluateExpression(derivedMetricExpression, baselineValueContext);
-          row.getMetrics().add(new Metric(expression.getEspressionName(),
+          row.getMetrics().add(new Metric(expression.getExpressionName(),
               derivedMetricBaselineValue, currentMetricBaselineValue));
         }
       }

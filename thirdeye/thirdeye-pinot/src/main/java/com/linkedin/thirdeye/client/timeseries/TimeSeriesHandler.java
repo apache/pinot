@@ -100,7 +100,7 @@ public class TimeSeriesHandler {
           double derivedMetricValue =
               MetricExpression.evaluateExpression(derivedMetricExpression, metricValueContext);
           row.getMetrics()
-              .add(new TimeSeriesMetric(expression.getEspressionName(), derivedMetricValue));
+              .add(new TimeSeriesMetric(expression.getExpressionName(), derivedMetricValue));
         }
       }
     }
