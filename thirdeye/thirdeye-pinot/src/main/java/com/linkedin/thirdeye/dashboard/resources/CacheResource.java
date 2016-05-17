@@ -41,6 +41,7 @@ public class CacheResource {
       CACHE_INSTANCE.getCollectionSchemaCache().refresh(collection);
       CACHE_INSTANCE.getSchemaCache().refresh(collection);
       CACHE_INSTANCE.getCollectionMaxDataTimeCache().refresh(collection);
+      CACHE_INSTANCE.getCollectionConfigCache().refresh(collection);
     }
     return Response.ok().build();
   }
@@ -71,6 +72,16 @@ public class CacheResource {
     List<String> collections = CACHE_INSTANCE.getCollectionsCache().getCollections();
     for (String collection : collections) {
       CACHE_INSTANCE.getCollectionMaxDataTimeCache().refresh(collection);
+    }
+    return Response.ok().build();
+  }
+
+  @POST
+  @Path("/refresh/collectionConfig")
+  public Response refreshCollectionConfigCache() {
+    List<String> collections = CACHE_INSTANCE.getCollectionsCache().getCollections();
+    for (String collection : collections) {
+      CACHE_INSTANCE.getCollectionConfigCache().refresh(collection);
     }
     return Response.ok().build();
   }

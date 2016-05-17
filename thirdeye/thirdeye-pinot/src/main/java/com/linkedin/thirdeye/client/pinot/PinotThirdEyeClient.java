@@ -29,6 +29,7 @@ import com.linkedin.thirdeye.client.ThirdEyeRequest;
 import com.linkedin.thirdeye.client.ThirdEyeRequest.ThirdEyeRequestBuilder;
 import com.linkedin.thirdeye.client.ThirdEyeResponse;
 import com.linkedin.thirdeye.client.ThirdeyeCacheRegistry;
+import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
 
 /**
  * ThirdEyeClient that uses {@link Connection} to query data, and the Pinot Controller REST
@@ -133,7 +134,7 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
     List<MetricFunction> metricFunctions = request.getMetricFunctions();
     List<String> dimensionNames = collectionSchema.getDimensionNames();
     String sql = PqlUtils.getPql(request, dataTimeSpec);
-    LOG.debug("Executing: {}", sql);
+    LOG.info("Executing: {}", sql);
     ResultSetGroup result =
         CACHE_INSTANCE.getResultSetGroupCache().get(new PinotQuery(sql, request.getCollection()));
     parseResultSetGroup(request, result, metricFunctions, collectionSchema, dimensionNames);
@@ -178,7 +179,10 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
     return CACHE_INSTANCE.getCollectionsCache().getCollections();
   }
 
-
+  @Override
+  public CollectionConfig getCollectionConfig(String collection) throws Exception {
+    return CACHE_INSTANCE.getCollectionConfigCache().get(collection);
+  }
 
   @Override
   public void clear() throws Exception {

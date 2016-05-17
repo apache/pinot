@@ -1,17 +1,15 @@
 package com.linkedin.thirdeye.client;
 
-import java.util.List;
-import java.util.concurrent.atomic.AtomicReference;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.base.Optional;
 import com.google.common.cache.LoadingCache;
 import com.linkedin.pinot.client.ResultSetGroup;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.thirdeye.api.CollectionSchema;
 import com.linkedin.thirdeye.client.cache.CollectionsCache;
+import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
 
 public class ThirdeyeCacheRegistry {
 
@@ -19,6 +17,7 @@ public class ThirdeyeCacheRegistry {
   private LoadingCache<String, Schema> schemaCache;
   private LoadingCache<String, CollectionSchema> collectionSchemaCache;
   private LoadingCache<String, Long> collectionMaxDataTimeCache;
+  private LoadingCache<String, CollectionConfig> collectionConfigCache;
   private CollectionsCache collectionsCache;
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ThirdeyeCacheRegistry.class);
@@ -35,8 +34,7 @@ public class ThirdeyeCacheRegistry {
     return resultSetGroupCache;
   }
 
-  public void registerResultSetGroupCache(
-      LoadingCache<PinotQuery, ResultSetGroup> resultSetGroupCache) {
+  public void registerResultSetGroupCache(LoadingCache<PinotQuery, ResultSetGroup> resultSetGroupCache) {
     this.resultSetGroupCache = resultSetGroupCache;
   }
 
@@ -52,8 +50,7 @@ public class ThirdeyeCacheRegistry {
     return collectionSchemaCache;
   }
 
-  public void registerCollectionSchemaCache(
-      LoadingCache<String, CollectionSchema> collectionSchemaCache) {
+  public void registerCollectionSchemaCache(LoadingCache<String, CollectionSchema> collectionSchemaCache) {
     this.collectionSchemaCache = collectionSchemaCache;
   }
 
@@ -61,8 +58,7 @@ public class ThirdeyeCacheRegistry {
     return collectionMaxDataTimeCache;
   }
 
-  public void registerCollectionMaxDataTimeCache(
-      LoadingCache<String, Long> collectionMaxDataTimeCache) {
+  public void registerCollectionMaxDataTimeCache(LoadingCache<String, Long> collectionMaxDataTimeCache) {
     this.collectionMaxDataTimeCache = collectionMaxDataTimeCache;
   }
 
@@ -72,6 +68,14 @@ public class ThirdeyeCacheRegistry {
 
   public void registerCollectionsCache(CollectionsCache collectionsCache) {
     this.collectionsCache = collectionsCache;
+  }
+
+  public LoadingCache<String, CollectionConfig> getCollectionConfigCache() {
+    return collectionConfigCache;
+  }
+
+  public void registerCollectionConfigCache(LoadingCache<String, CollectionConfig> collectionConfigCache) {
+    this.collectionConfigCache = collectionConfigCache;
   }
 
 }

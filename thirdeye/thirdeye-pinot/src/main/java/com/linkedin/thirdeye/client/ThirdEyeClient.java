@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.client;
 import java.util.List;
 
 import com.linkedin.thirdeye.api.CollectionSchema;
+import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
 import com.linkedin.thirdeye.detector.ThirdEyeDetectorConfiguration;
 
 public interface ThirdEyeClient {
@@ -17,7 +18,9 @@ public interface ThirdEyeClient {
   void close() throws Exception;
 
   CollectionSchema getCollectionSchema(String collection) throws Exception;
-  
+
   long getMaxDataTime(String collection) throws Exception;
+
+  CollectionConfig getCollectionConfig(String collection) throws Exception;
 
 }

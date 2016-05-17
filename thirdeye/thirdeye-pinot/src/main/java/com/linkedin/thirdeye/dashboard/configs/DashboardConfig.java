@@ -5,12 +5,11 @@ import java.util.List;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.linkedin.thirdeye.client.MetricExpression;
-import com.linkedin.thirdeye.client.MetricFunction;
 
 @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, include = JsonTypeInfo.As.PROPERTY, property = "@class")
 @JsonIgnoreProperties(value = "configType")
 public class DashboardConfig extends AbstractConfig {
-  public static String DEFAULT_DASHBOARD_NAME = "Default_All_Metrics_Dashboard";
+
 
   public DashboardConfig() {
   }

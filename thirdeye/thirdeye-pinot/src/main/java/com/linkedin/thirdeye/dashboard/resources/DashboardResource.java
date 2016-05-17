@@ -30,6 +30,7 @@ import org.slf4j.LoggerFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.google.common.base.Optional;
+import com.google.common.cache.CacheLoader.InvalidCacheLoadException;
 import com.linkedin.thirdeye.api.CollectionSchema;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.client.MetricExpression;
@@ -42,6 +43,7 @@ import com.linkedin.thirdeye.client.timeseries.TimeSeriesRow;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesRow.TimeSeriesMetric;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.dashboard.configs.AbstractConfigDAO;
+import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
 import com.linkedin.thirdeye.dashboard.configs.DashboardConfig;
 import com.linkedin.thirdeye.dashboard.views.DashboardView;
 import com.linkedin.thirdeye.dashboard.views.ViewHandler;
@@ -67,6 +69,7 @@ public class DashboardResource {
   private static final Logger LOG = LoggerFactory.getLogger(DashboardResource.class);
   private static final String DEFAULT_TIMEZONE_ID = "UTC";
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+  private static String DEFAULT_DASHBOARD = "Default_Dashboard";
 
   private QueryCache queryCache;
   private AbstractConfigDAO<DashboardConfig> dashboardConfigDAO;
@@ -110,6 +113,15 @@ public class DashboardResource {
     try {
       CollectionSchema schema = queryCache.getClient().getCollectionSchema(collection);
       List<String> metrics = schema.getMetricNames();
+      CollectionConfig collectionConfig = null;
+      try {
+        collectionConfig = queryCache.getClient().getCollectionConfig(collection);
+      } catch (InvalidCacheLoadException e) {
+        LOG.debug("No collection configs for collection {}", collection);
+      }
+      if (collectionConfig != null && collectionConfig.getDerivedMetrics() != null) {
+        metrics.addAll(collectionConfig.getDerivedMetrics().keySet());
+      }
       Collections.sort(metrics);
       jsonMetrics = OBJECT_MAPPER.writeValueAsString(metrics);
     } catch (Exception e) {
@@ -210,7 +222,7 @@ public class DashboardResource {
       request.setCollection(collection);
       DashboardConfig dashboardConfig;
       List<MetricExpression> metricExpressions;
-      if (dashboardName == null || "Default_All_Metrics_Dashboard".equals(dashboardName)) {
+      if (dashboardName == null || DEFAULT_DASHBOARD.equals(dashboardName)) {
         CollectionSchema collectionSchema = queryCache.getClient().getCollectionSchema(collection);
         metricExpressions = new ArrayList<>();
         List<String> metricNames = collectionSchema.getMetricNames();
@@ -220,7 +232,7 @@ public class DashboardResource {
           }
         }
       } else {
-        dashboardConfig = dashboardConfigDAO.findById(collection + "_ " + dashboardName);
+        dashboardConfig = dashboardConfigDAO.findById(collection + "_" + dashboardName);
         metricExpressions = dashboardConfig.getMetricExpressions();
       }
       request.setMetricExpressions(metricExpressions);
@@ -295,7 +307,7 @@ public class DashboardResource {
     HeatMapViewRequest request = new HeatMapViewRequest();
 
     request.setCollection(collection);
-    List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metricsJson);
+    List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metricsJson, collection);
     request.setMetricExpressions(metricExpressions);
     long maxDataTime = queryCache.getClient().getMaxDataTime(collection);
     if (currentEnd > maxDataTime) {
@@ -342,7 +354,7 @@ public class DashboardResource {
     TabularViewRequest request = new TabularViewRequest();
     request.setCollection(collection);
 
-    List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metricsJson);
+    List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metricsJson, collection);
     request.setMetricExpressions(metricExpressions);
     long maxDataTime = queryCache.getClient().getMaxDataTime(collection);
     if (currentEnd > maxDataTime) {
@@ -391,7 +403,7 @@ public class DashboardResource {
     ContributorViewRequest request = new ContributorViewRequest();
     request.setCollection(collection);
 
-    List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metricsJson);
+    List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metricsJson, collection);
     request.setMetricExpressions(metricExpressions);
     long maxDataTime = queryCache.getClient().getMaxDataTime(collection);
     if (currentEnd > maxDataTime) {
@@ -449,7 +461,7 @@ public class DashboardResource {
       filterJson = URLDecoder.decode(filterJson, "UTF-8");
       request.setFilterSet(Utils.convertToMultiMap(filterJson));
     }
-    List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metricsJson);
+    List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metricsJson, collection);
     request.setMetricExpressions(metricExpressions);
     request.setAggregationTimeGranularity(Utils.getAggregationTimeGranularity(aggTimeGranularity));
 

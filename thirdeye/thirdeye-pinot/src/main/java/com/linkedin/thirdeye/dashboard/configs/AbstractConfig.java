@@ -23,7 +23,6 @@ public abstract class AbstractConfig {
 
   public static <T extends AbstractConfig> T fromJSON(String json,
       Class<? extends AbstractConfig> configTypeClass) throws Exception {
-    System.out.println(configTypeClass.getName()+" " +(CollectionSchema.class.getName()));
     if (configTypeClass.getName().equals(DashboardConfig.class.getName())) {
       TypeReference<DashboardConfig> typeRef = new TypeReference<DashboardConfig>() {
       };
@@ -32,6 +31,12 @@ public abstract class AbstractConfig {
 
     } else if (configTypeClass.getName().equals(CollectionSchema.class.getName())) {
       TypeReference<CollectionSchema> typeRef = new TypeReference<CollectionSchema>() {
+      };
+      T value = OBJECT_MAPPER.readValue(json, typeRef);
+      return value;
+
+    } else if (configTypeClass.getName().equals(CollectionConfig.class.getName())) {
+      TypeReference<CollectionConfig> typeRef = new TypeReference<CollectionConfig>() {
       };
       T value = OBJECT_MAPPER.readValue(json, typeRef);
       return value;

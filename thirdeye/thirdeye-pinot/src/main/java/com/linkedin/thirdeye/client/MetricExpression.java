@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.client;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -14,7 +15,10 @@ import parsii.tokenizer.ParseException;
 
 public class MetricExpression {
 
-  private String espressionName;
+  private static String COUNT_METRIC = "__COUNT";
+  private static String COUNT_METRIC_ESCAPED = "A__COUNT";
+
+  private String expressionName;
   private String expression;
 
   public MetricExpression() {
@@ -26,16 +30,16 @@ public class MetricExpression {
   }
 
   public MetricExpression(String espressionName, String expression) {
-    this.espressionName = espressionName;
+    this.expressionName = espressionName;
     this.expression = expression;
   }
 
   public String getEspressionName() {
-    return espressionName;
+    return expressionName;
   }
 
   public void setEspressionName(String espressionName) {
-    this.espressionName = espressionName;
+    this.expressionName = espressionName;
   }
 
   public String getExpression() {
@@ -56,16 +60,19 @@ public class MetricExpression {
       Scope scope = Scope.create();
       Set<String> metricNames = new TreeSet<>();
 
-      // FIXME: __COUNT parse error
-      if (expression.equals("__COUNT")) {
-        metricNames.add("__COUNT");
-      } else {
-        Parser.parse(expression, scope);
-        metricNames = scope.getLocalNames();
-      }
+      // expression parser errors out on variables starting with _
+      // we're replacing the __COUNT default metric, with an escaped string
+      // after evaluatin, we replace the escaped string back with the original
+      String modifiedExpressions = expression.replace(COUNT_METRIC, COUNT_METRIC_ESCAPED);
+
+      Parser.parse(modifiedExpressions, scope);
+      metricNames = scope.getLocalNames();
 
       ArrayList<MetricFunction> metricFunctions = new ArrayList<>();
       for (String metricName : metricNames) {
+        if(metricName.equals(COUNT_METRIC_ESCAPED)){
+          metricName = COUNT_METRIC;
+        }
         metricFunctions.add(MetricFunction.from(MetricFunction.SUM, metricName));
       }
       return metricFunctions;
@@ -74,31 +81,41 @@ public class MetricExpression {
     }
   }
 
-  public static double evaluateExpression(String expressionString,
-      Map<String, Double> metricValueContext) throws Exception {
+  public static double evaluateExpression(MetricExpression expression, Map<String, Double> context)
+      throws Exception {
+    return evaluateExpression(expression.getExpression(), context);
+  }
+
+  public static double evaluateExpression(String expressionString, Map<String, Double> context)
+      throws Exception {
+
     Scope scope = Scope.create();
+    expressionString = expressionString.replace(COUNT_METRIC, COUNT_METRIC_ESCAPED);
+    Map<String, Double> metricValueContext = context;
+    if (context.containsKey(COUNT_METRIC)) {
+      metricValueContext = new HashMap<>(context);
+      metricValueContext.put(COUNT_METRIC_ESCAPED, context.get(COUNT_METRIC));
+    }
     Expression expression = Parser.parse(expressionString, scope);
     for (String metricName : metricValueContext.keySet()) {
       Variable variable = scope.create(metricName);
       if (!metricValueContext.containsKey(metricName)) {
-        throw new Exception("No value set for metric:" + metricName + "  in the context:"
-            + metricValueContext);
+        throw new Exception(
+            "No value set for metric:" + metricName + "  in the context:" + metricValueContext);
       }
       variable.setValue(metricValueContext.get(metricName));
     }
     return expression.evaluate();
   }
 
-  public static void main(String[] args) throws ParseException {
-    Scope s = Scope.create();
-    Expression expression = Parser.parse("sqrt(a)/b", s);
-    System.out.println(s.getLocalNames());
-    Variable a = s.create("a");
-    Variable b = s.create("b");
-    a.setValue(10);
-    b.setValue(5);
-
-    System.out.println(expression.evaluate());
+  public static void main(String[] args) throws Exception {
+    String expressionString = "(successCount)/(__COUNT)";
+    MetricExpression expression = new MetricExpression("Approval_Rate", expressionString);
+    Map<String, Double> metricValueContext = new HashMap<>();
+    metricValueContext.put("__COUNT", 10d);
+    metricValueContext.put("successCount", 10d);
+    double result = MetricExpression.evaluateExpression(expressionString, metricValueContext);
+    System.out.println(result);
 
   }
 }

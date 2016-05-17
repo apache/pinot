@@ -152,7 +152,7 @@ public class FileBasedConfigDAOFactory implements ConfigDAOFactory {
       try {
         input = new FileInputStream(file);
         String json = IOUtils.toString(input, "UTF-8");
-        System.out.println("file " + file.getAbsolutePath() + " content" + json);
+        System.out.println("file  " + file.getAbsolutePath() + " content" + json);
         T instance = AbstractConfig.fromJSON(json, configTypeClass);
         return instance;
       } catch (Exception e) {
@@ -167,7 +167,8 @@ public class FileBasedConfigDAOFactory implements ConfigDAOFactory {
 
     public T findById(String id) {
       File file = getFile(id);
-      return parseFile(file);
+      T t =  parseFile(file);
+      return t;
     }
 
     public boolean create(String id, T config) throws Exception {

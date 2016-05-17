@@ -1,9 +1,13 @@
 package com.linkedin.thirdeye.dashboard.configs;
 
+import java.util.Map;
+
 public class CollectionConfig extends AbstractConfig {
   String collectionName;
 
   boolean isActive = true;
+
+  Map<String, String> derivedMetrics;
 
   public CollectionConfig() {
 
@@ -23,6 +27,15 @@ public class CollectionConfig extends AbstractConfig {
 
   public void setActive(boolean isActive) {
     this.isActive = isActive;
+  }
+
+
+  public Map<String, String> getDerivedMetrics() {
+    return derivedMetrics;
+  }
+
+  public void setDerivedMetrics(Map<String, String> derivedMetrics) {
+    this.derivedMetrics = derivedMetrics;
   }
 
   @Override
