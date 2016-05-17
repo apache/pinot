@@ -9,8 +9,9 @@ function getAnomalies() {
   + "&baselineStart=" + baselineStart + "&baselineEnd=" + baselineEnd   //
   + "&aggTimeGranularity=" + aggTimeGranularity ;
   
-  
-  var anomaliesUrl = "/anomaly-results/collection/" + hash.dataset;
+  var currentStartISO = moment(parseInt(hash.currentStart)).toISOString();
+  var currentEndISO = moment(parseInt(hash.currentEnd)).toISOString();
+  var anomaliesUrl = "/anomaly-results/collection/" + hash.dataset + "/" + currentStartISO + "/" + currentEndISO;
   
   getData(anomaliesUrl).done(function(anomalyData) {
     getData(timeSeriesUrl).done(function(timeSeriesData) {
