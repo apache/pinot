@@ -82,7 +82,7 @@ public class QueryException {
 
   public static ProcessingException getException(ProcessingException processingException, Exception exception,
       int sizeOfStackTraceToTruncate) {
-    ProcessingException retProcessingException = QueryException.FUTURE_CALL_ERROR.deepCopy();
+    ProcessingException retProcessingException = processingException.deepCopy();
     StringWriter sw = new StringWriter(sizeOfStackTraceToTruncate);
     exception.printStackTrace(new PrintWriter(sw));
     retProcessingException.setMessage(sw.toString());

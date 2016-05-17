@@ -38,7 +38,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.lang3.exception.ExceptionUtils;
 
 
 /**
@@ -100,12 +99,12 @@ public class IntermediateResultsBlock implements Block {
   }
 
   public IntermediateResultsBlock(Exception e) {
-    if (_processingExceptions == null) {
-      _processingExceptions = new ArrayList<ProcessingException>();
-    }
-    ProcessingException exception = QueryException.QUERY_EXECUTION_ERROR.deepCopy();
-    exception.setMessage(ExceptionUtils.getStackTrace(e));
-    _processingExceptions.add(exception);
+    this(QueryException.QUERY_EXECUTION_ERROR, e);
+  }
+
+  public IntermediateResultsBlock(ProcessingException processingException, Exception e) {
+    _processingExceptions = new ArrayList<>();
+    _processingExceptions.add(QueryException.getException(processingException, e));
   }
 
   public IntermediateResultsBlock() {

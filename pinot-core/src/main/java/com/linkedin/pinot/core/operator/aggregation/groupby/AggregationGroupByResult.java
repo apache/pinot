@@ -85,11 +85,11 @@ public class AggregationGroupByResult {
         return _resultHolder[index].getDoubleResult(groupId);
 
       case AVERAGE_PAIR:
-        Pair<Double, Long> doubleLongPair = (Pair<Double, Long>) _resultHolder[index].getResult(groupId);
+        Pair<Double, Long> doubleLongPair = _resultHolder[index].getResult(groupId);
         return new AvgAggregationFunction.AvgPair(doubleLongPair.getFirst(), doubleLongPair.getSecond());
 
       case MINMAXRANGE_PAIR:
-        Pair<Double, Double> doubleDoublePair = (Pair<Double, Double>) _resultHolder[index].getResult(groupId);
+        Pair<Double, Double> doubleDoublePair = _resultHolder[index].getResult(groupId);
         return new MinMaxRangeAggregationFunction.MinMaxRangePair(doubleDoublePair.getFirst(),
             doubleDoublePair.getSecond());
 
@@ -107,7 +107,7 @@ public class AggregationGroupByResult {
 
       default:
         throw new RuntimeException(
-            "Unsupported result data type " + _resultDataType + " in class " + getClass().getName());
+            "Unsupported result data type " + _resultDataType[index] + " in class " + getClass().getName());
     }
   }
 }

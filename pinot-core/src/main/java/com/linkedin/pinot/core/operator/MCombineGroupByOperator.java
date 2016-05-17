@@ -63,20 +63,22 @@ import org.slf4j.LoggerFactory;
 public class MCombineGroupByOperator extends BaseOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(MCombineGroupByOperator.class);
 
-  private static final int NUM_LOCKS = 1000;
-  private static int MAX_THREADS_PER_QUERY = 10;
-  private long _timeOutMs;
+  // Choose a proper prime number for the number of locks.
+  // Use prime number to reduce the conflict rate of different hashcodes.
+  // Too small number of locks will cause high conflict rate.
+  // Too large number of locks will consume too much memory.
+  private static final int NUM_LOCKS = 10007;
+  private static final Object[] LOCKS = new Object[NUM_LOCKS];
+  static {
+    for (int i = 0; i < NUM_LOCKS; i++) {
+      LOCKS[i] = new Object();
+    }
+  }
 
-  private final BrokerRequest _brokerRequest;
   private final List<Operator> _operators;
   private final ExecutorService _executorService;
-  final Object[] _locks;
-
-  static {
-    // No more than 10 threads per query
-    int numCores = Runtime.getRuntime().availableProcessors();
-    MAX_THREADS_PER_QUERY = Math.min(MAX_THREADS_PER_QUERY, (int) (numCores * .5));
-  }
+  private final BrokerRequest _brokerRequest;
+  private final long _timeOutMs;
 
   /**
    * Constructor for the class.
@@ -95,11 +97,6 @@ public class MCombineGroupByOperator extends BaseOperator {
     _executorService = executorService;
     _brokerRequest = brokerRequest;
     _timeOutMs = timeOutMs;
-
-    _locks = new Object[NUM_LOCKS];
-    for (int i = 0; i < NUM_LOCKS; i++) {
-      _locks[i] = new Object();
-    }
   }
 
   /**
@@ -128,27 +125,12 @@ public class MCombineGroupByOperator extends BaseOperator {
    */
   @Override
   public Block getNextBlock() {
-    final IntermediateResultsBlock blocks[] = new IntermediateResultsBlock[_operators.size()];
-    IntermediateResultsBlock mergedBlock = null;
-
     try {
-      mergedBlock = combineBlocks(_brokerRequest, _operators, _executorService, blocks);
+      return combineBlocks();
     } catch (InterruptedException e) {
       LOGGER.error("InterruptedException caught while executing CombineGroupBy", e);
-
-      if (mergedBlock == null) {
-        mergedBlock = new IntermediateResultsBlock(e);
-      }
-
-      List<ProcessingException> exceptions = mergedBlock.getExceptions();
-      if (exceptions == null) {
-        exceptions = new ArrayList<ProcessingException>();
-      }
-      exceptions.add(QueryException.getException(QueryException.COMBINE_GROUP_BY_EXCEPTION_ERROR, e));
-      mergedBlock.setExceptionsList(exceptions);
+      return new IntermediateResultsBlock(QueryException.COMBINE_GROUP_BY_EXCEPTION_ERROR, e);
     }
-
-    return mergedBlock;
   }
 
   /**
@@ -162,53 +144,50 @@ public class MCombineGroupByOperator extends BaseOperator {
    *   - Synchronization is provided by locking the group-key that is to be modified.
    *
    * 2. The result of the concurrent map is then translated into what is expected by
-   *    the broker (Map<String, Serializable).
+   *    the broker (Map<String, Serializable>).
    *
    * 3. This result is then sorted and then trimmed as per 'TOP N' in the brokerRequest.
    *
-   * @param brokerRequest BrokerRequest that is being serviced.
-   * @param operators List of underlying operators whose results is to be combined.
-   * @param executorService Executor service to use for concurrent executions.
-   * @param blocks Array of blocks where the
    * @return IntermediateResultBlock containing the final results from combine operation.
    */
-  private IntermediateResultsBlock combineBlocks(BrokerRequest brokerRequest, final List<Operator> operators,
-      ExecutorService executorService, final IntermediateResultsBlock[] blocks)
+  private IntermediateResultsBlock combineBlocks()
       throws InterruptedException {
-    List<AggregationInfo> aggregationsInfo = brokerRequest.getAggregationsInfo();
+    final int numOperators = _operators.size();
+    final IntermediateResultsBlock[] blocks = new IntermediateResultsBlock[numOperators];
+    final CountDownLatch operatorLatch = new CountDownLatch(numOperators);
+
+    final List<AggregationInfo> aggregationsInfo = _brokerRequest.getAggregationsInfo();
+    final int numAggrFunctions = aggregationsInfo.size();
 
     final List<AggregationFunction> aggregationFunctions =
-        AggregationFunctionFactory.getAggregationFunction(brokerRequest);
-
-    final int numAggrFunctions = aggregationsInfo.size();
-    final int numOperators = operators.size();
+        AggregationFunctionFactory.getAggregationFunction(_brokerRequest);
 
     final Map<String, Serializable[]> resultsMap = new ConcurrentHashMap<>();
-    final CountDownLatch operatorLatch = new CountDownLatch(numOperators);
 
     for (int i = 0; i < numOperators; i++) {
       final int index = i;
 
-      executorService.execute(new TraceRunnable() {
+      _executorService.execute(new TraceRunnable() {
         @Override
         public void runJob() {
           AggregationGroupByResult groupByResult;
 
           // If block is null (unexpected error), or there's no group-by result, then return as there's nothing to do.
-          blocks[index] = (IntermediateResultsBlock) operators.get(index).nextBlock();
+          blocks[index] = (IntermediateResultsBlock) _operators.get(index).nextBlock();
           if (blocks[index] != null) {
             groupByResult = blocks[index].getAggregationGroupByResult();
 
             if (groupByResult != null) {
               // Iterate over the group-by keys, for each key, update the group-by result in the resultsMap.
-              final Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = groupByResult.getGroupKeyIterator();
-              while (groupKeyIterator.hasNext()) {
+              Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = groupByResult.getGroupKeyIterator();
 
+              while (groupKeyIterator.hasNext()) {
                 GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
                 String groupKeyString = groupKey.getStringKey();
 
+                // HashCode method might return negative value, make it non-negative
                 int lockIndex = (groupKeyString.hashCode() & Integer.MAX_VALUE) % NUM_LOCKS;
-                synchronized (_locks[(lockIndex)]) {
+                synchronized (LOCKS[lockIndex]) {
                   Serializable[] results = resultsMap.get(groupKeyString);
 
                   if (results == null) {
@@ -255,11 +234,8 @@ public class MCombineGroupByOperator extends BaseOperator {
       mergedResults.add(new HashMap<String, Serializable>(combinedResultsMap.size()));
     }
 
-    Iterator<Map.Entry<String, Serializable[]>> iterator = combinedResultsMap.entrySet().iterator();
-    while (iterator.hasNext()) {
-      Map.Entry<String, Serializable[]> entry = iterator.next();
+    for (Map.Entry<String, Serializable[]> entry : combinedResultsMap.entrySet()) {
       String groupKey = entry.getKey();
-
       Serializable[] results = entry.getValue();
       for (int i = 0; i < numAggrFunctions; i++) {
         mergedResults.get(i).put(groupKey, results[i]);
@@ -287,11 +263,11 @@ public class MCombineGroupByOperator extends BaseOperator {
     long numDocsScanned = 0;
     long totalRawDocs = 0;
 
-    for (int i = 0; i < blocks.length; i++) {
-      numDocsScanned += blocks[i].getNumDocsScanned();
-      totalRawDocs += blocks[i].getTotalRawDocs();
+    for (IntermediateResultsBlock block : blocks) {
+      numDocsScanned += block.getNumDocsScanned();
+      totalRawDocs += block.getTotalRawDocs();
 
-      List<ProcessingException> blockExceptions = blocks[i].getExceptions();
+      List<ProcessingException> blockExceptions = block.getExceptions();
       if (blockExceptions != null) {
         if (exceptions == null) {
           exceptions = blockExceptions;
