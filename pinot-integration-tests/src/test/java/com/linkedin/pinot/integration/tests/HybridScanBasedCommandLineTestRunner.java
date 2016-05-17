@@ -32,6 +32,7 @@ import org.testng.TestNG;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+import com.linkedin.pinot.common.data.Schema;
 
 
 /**
@@ -53,15 +54,15 @@ import org.testng.annotations.Test;
 public class HybridScanBasedCommandLineTestRunner {
 
   public static void usage() {
-    System.err.println("Usage: pinot-hybrid-cluster.sh [--record] tableName schemaFilePath segQueryDirPath timeColName timeColType invIndexCols sortedCol");
+    System.err.println("Usage: pinot-hybrid-cluster.sh [--record] tableName schemaFilePath segQueryDirPath invIndexCols sortedCol");
     System.exit(1);
   }
 
-  public static void main(String[] args) {
+  public static void main(String[] args) throws Exception {
     if (args.length == 0) {
       usage();
     }
-    int expectedArgsLen = 7;
+    int expectedArgsLen = 5;
     int ix = 0;
     if (args[0].startsWith("-")) {
       if (args[0].equals("--record")) {
@@ -79,13 +80,11 @@ public class HybridScanBasedCommandLineTestRunner {
     final String tableName = args[ix++];
     final String schemaFilePath = args[ix++];
     final String segQueryDirPath = args[ix++]; // we expect a dir called 'avro-files' and files called 'queries.txt' and 'scan-responses.txt' in here
-    final String timeColName = args[ix++];
-    final String timeColType = args[ix++];
     final String invIndexCols = args[ix++];
     final String sortedCol = args[ix++];
 
     CustomHybridClusterScanComparisonIntegrationTest.setParams(tableName,
-        schemaFilePath, segQueryDirPath, timeColName, timeColType, invIndexCols, sortedCol);
+        schemaFilePath, segQueryDirPath, invIndexCols, sortedCol);
     TestListenerAdapter tla = new TestListenerAdapter();
     TestNG testng = new TestNG();
     testng.setTestClasses(new Class[]{CustomHybridClusterScanComparisonIntegrationTest.class});
@@ -128,12 +127,10 @@ public class HybridScanBasedCommandLineTestRunner {
     private FileWriter _scanRspFileWriter;
     private LineNumberReader _scanRspFileReader;
 
-    public static void setParams(String tableName, String schemaFileName, String segsQueryDir, String timeColName,
-        String timeColType, String invIndexCols, String sortedCol) {
+    public static void setParams(String tableName, String schemaFileName, String segsQueryDir,
+        String invIndexCols, String sortedCol) throws Exception {
       // TODO add some basic checks
       // TODO add params for single query
-      _timeColName = timeColName;
-      _timeColType = timeColType;
       _tableName = tableName;
       _queryFilePath = segsQueryDir + "/" + QUERY_FILE_NAME;
       _scanRspFilePath = segsQueryDir  + "/" + SCAN_RSP_FILE_NAME;
@@ -155,6 +152,10 @@ public class HybridScanBasedCommandLineTestRunner {
         _invIndexCols.add(colName);
       }
       _schemaFile = new File(schemaFileName);
+      Schema schema = Schema.fromFile(_schemaFile);
+      _timeColName = schema.getTimeColumnName();
+      _timeColType = schema.getIncomingTimeUnit().toString();
+
       _logFileName = _tableName + "-" + System.currentTimeMillis() + "-" + _logFileSuffix;
       _inCmdLine = true;
     }
