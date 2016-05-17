@@ -41,6 +41,7 @@ public abstract class ThirdEyeConfiguration extends Configuration {
   public DataSourceFactory getDatabase() {
     return database;
   }
+
   public String getRootDir() {
     return rootDir;
   }

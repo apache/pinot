@@ -43,6 +43,7 @@ import io.dropwizard.setup.Environment;
  * Mostly grabbed from ThirdEyeDetectorApplication, used to run an anomaly function or email from
  * file without
  * storing it. Not meant to be used as a fullproof test, as it's pretty hacky.
+ * TODO currently OOO. Pinot client needs to be properly set up...
  */
 public class TestAnomalyApplication extends Application<ThirdEyeDetectorConfiguration> {
   private static final Logger LOG = LoggerFactory.getLogger(TestAnomalyApplication.class);

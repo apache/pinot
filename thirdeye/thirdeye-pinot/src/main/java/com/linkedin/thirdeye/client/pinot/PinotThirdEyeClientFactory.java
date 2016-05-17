@@ -9,9 +9,6 @@ import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
 
 /**
- * See
- * {@link PinotThirdEyeClient#fromZookeeper(com.linkedin.thirdeye.client.CachedThirdEyeClientConfig, String, int, String)}
- * @author jteoh
  */
 public class PinotThirdEyeClientFactory {
 
