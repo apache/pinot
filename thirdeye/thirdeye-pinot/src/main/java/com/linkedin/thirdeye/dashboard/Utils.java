@@ -184,30 +184,33 @@ public class Utils {
     } catch (InvalidCacheLoadException | ExecutionException e) {
       LOG.debug("No collection configs for collection {}", collection);
     }
-    if (collectionConfig != null && collectionConfig.getDerivedMetrics() != null
-        && collectionConfig.getDerivedMetrics().containsKey(metricsJson)) {
-      metricsJson = collectionConfig.getDerivedMetrics().get(metricsJson);
-    }
     List<MetricExpression> metricExpressions = new ArrayList<>();
     if (metricsJson == null) {
       return metricExpressions;
     }
-    ArrayList<String> metricExpressionStrings;
+    ArrayList<String> metricExpressionNames;
     try {
       TypeReference<ArrayList<String>> valueTypeRef = new TypeReference<ArrayList<String>>() {
       };
 
-      metricExpressionStrings = OBJECT_MAPPER.readValue(metricsJson, valueTypeRef);
+      metricExpressionNames = OBJECT_MAPPER.readValue(metricsJson, valueTypeRef);
     } catch (Exception e) {
       LOG.error("Error parsing metrics json: {} errorMessage:{}", metricsJson, e.getMessage());
-      metricExpressionStrings = new ArrayList<>();
+      metricExpressionNames = new ArrayList<>();
       String[] metrics = metricsJson.split(",");
       for (String metric : metrics) {
-        metricExpressionStrings.add(metric);
+        metricExpressionNames.add(metric);
       }
     }
-    for (String metricExpressionString : metricExpressionStrings) {
-      metricExpressions.add(new MetricExpression(metricExpressionString));
+    for (String metricExpressionName: metricExpressionNames) {
+      if (collectionConfig != null && collectionConfig.getDerivedMetrics() != null
+          && collectionConfig.getDerivedMetrics().containsKey(metricsJson)) {
+        String metricExpressionString = collectionConfig.getDerivedMetrics().get(metricExpressionName);
+        metricExpressions.add(new MetricExpression(metricExpressionName, metricExpressionString));
+      } else{
+        metricExpressions.add(new MetricExpression(metricExpressionName));  
+      }
+      
     }
 
     return metricExpressions;

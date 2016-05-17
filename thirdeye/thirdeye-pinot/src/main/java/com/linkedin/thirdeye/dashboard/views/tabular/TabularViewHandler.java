@@ -123,7 +123,6 @@ public class TabularViewHandler implements ViewHandler<TabularViewRequest, Tabul
     TimeOnTimeComparisonHandler handler = new TimeOnTimeComparisonHandler(queryCache);
 
     TimeOnTimeComparisonResponse response = handler.handle(comparisonRequest);
-    List<String> metricNames = new ArrayList<>(response.getMetrics());
     List<TimeBucket> timeBuckets = getTimeBuckets(response);
     List<Row> rows = getRowsSortedByTime(response);
 
@@ -136,7 +135,11 @@ public class TabularViewHandler implements ViewHandler<TabularViewRequest, Tabul
     summary.put("currentEnd", comparisonRequest.getCurrentEnd().toString());
 
     tabularViewResponse.setSummary(summary);
-    tabularViewResponse.setMetrics(metricNames);
+    List<String> expressionNames = new ArrayList<>();
+    for (MetricExpression expression : request.getMetricExpressions()) {
+      expressionNames.add(expression.getExpressionName());
+    }
+    tabularViewResponse.setMetrics(expressionNames);
     tabularViewResponse.setTimeBuckets(timeBuckets);
 
     String[] columns = new String[] {
@@ -145,7 +148,7 @@ public class TabularViewHandler implements ViewHandler<TabularViewRequest, Tabul
     };
     // maintain same order in response
     Map<String, GenericResponse> data = new LinkedHashMap<>();
-    for (String metric : metricNames) {
+    for (String metric : expressionNames) {
       ResponseSchema schema = new ResponseSchema();
       for (int i = 0; i < columns.length; i++) {
         String column = columns[i];
@@ -164,14 +167,20 @@ public class TabularViewHandler implements ViewHandler<TabularViewRequest, Tabul
     for (Row row : rows) {
       for (Metric metric : row.getMetrics()) {
         String metricName = metric.getMetricName();
-
+        if (!expressionNames.contains(metricName)) {
+          continue;
+        }
         Double baselineValue = metric.getBaselineValue();
         Double currentValue = metric.getCurrentValue();
         String baselineValueStr = HeatMapCell.format(baselineValue);
         String currentValueStr = HeatMapCell.format(currentValue);
-        String ratioStr =
-            HeatMapCell.format(((currentValue - baselineValue) * 100) / baselineValue);
-
+        double ratio = ((currentValue - baselineValue) * 100) / baselineValue;
+        if (Double.isNaN(ratio)) {
+          ratio = 0;
+        } else if (Double.isInfinite(ratio)) {
+          ratio = 100;
+        }
+        String ratioStr = HeatMapCell.format(ratio);
         Double cumulativeBaselineValue;
         Double cumulativeCurrentValue;
 
@@ -192,17 +201,20 @@ public class TabularViewHandler implements ViewHandler<TabularViewRequest, Tabul
 
         String cumulativeBaselineValueStr = HeatMapCell.format(cumulativeBaselineValue);
         String cumulativeCurrentValueStr = HeatMapCell.format(cumulativeCurrentValue);
-        String cumulativeRatioStr = HeatMapCell.format(
-            ((cumulativeCurrentValue - cumulativeBaselineValue) * 100) / cumulativeBaselineValue);
+        double cumulativeRatio =
+            ((cumulativeCurrentValue - cumulativeBaselineValue) * 100) / cumulativeBaselineValue;
+        if (Double.isNaN(ratio)) {
+          cumulativeRatio = 0;
+        } else if (Double.isInfinite(cumulativeRatio)) {
+          cumulativeRatio = 100;
+        }
+        String cumulativeRatioStr = HeatMapCell.format(cumulativeRatio);
 
         String[] columnData = {
             baselineValueStr, currentValueStr, ratioStr, cumulativeBaselineValueStr,
             cumulativeCurrentValueStr, cumulativeRatioStr
         };
         GenericResponse rowData = data.get(metric.getMetricName());
-        if (rowData == null) {
-          System.out.println("NULL for metric:" + metric + " metricNames:" + metricNames);
-        }
         rowData.getResponseData().add(columnData);
 
       }

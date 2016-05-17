@@ -2,10 +2,12 @@ package com.linkedin.thirdeye.client.comparison;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
@@ -15,6 +17,7 @@ import org.joda.time.DateTime;
 import com.google.common.collect.Range;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.client.MetricExpression;
+import com.linkedin.thirdeye.client.MetricFunction;
 import com.linkedin.thirdeye.client.QueryCache;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.client.ThirdEyeRequest;
@@ -22,6 +25,7 @@ import com.linkedin.thirdeye.client.ThirdEyeRequest.ThirdEyeRequestBuilder;
 import com.linkedin.thirdeye.client.ThirdEyeResponse;
 import com.linkedin.thirdeye.client.TimeRangeUtils;
 import com.linkedin.thirdeye.client.comparison.Row.Metric;
+import com.linkedin.thirdeye.dashboard.Utils;
 
 public class TimeOnTimeComparisonHandler {
   private final QueryCache queryCache;
@@ -52,6 +56,7 @@ public class TimeOnTimeComparisonHandler {
         CollectionUtils.isNotEmpty(comparisonRequest.getGroupByDimensions());
     List<Map<ThirdEyeRequest, Future<ThirdEyeResponse>>> responseFutureList = new ArrayList<>();
     List<TimeOnTimeComparisonRequest> comparisonRequests = new ArrayList<>(numTimeRanges);
+
     for (int i = 0; i < numTimeRanges; i++) {
       Range<DateTime> baselineRange = baselineTimeranges.get(i);
       Range<DateTime> currentRange = currentTimeranges.get(i);
@@ -93,10 +98,18 @@ public class TimeOnTimeComparisonHandler {
         rows.add(row);
       }
     }
+
     // compute list of derived expressions
+
+    List<MetricFunction> metricFunctionsFromExpressions =
+        Utils.computeMetricFunctionsFromExpressions(comparisonRequest.getMetricExpressions());
+    Set<String> metricNameSet = new HashSet<>();
+    for (MetricFunction function : metricFunctionsFromExpressions) {
+      metricNameSet.add(function.getMetricName());
+    }
     List<MetricExpression> derivedMetricExpressions = new ArrayList<>();
     for (MetricExpression expression : comparisonRequest.getMetricExpressions()) {
-      if (expression.computeMetricFunctions().size() > 1) {
+      if (!metricNameSet.contains(expression.getExpressionName())) {
         derivedMetricExpressions.add(expression);
       }
     }
@@ -118,8 +131,15 @@ public class TimeOnTimeComparisonHandler {
           String derivedMetricExpression = expression.getExpression();
           double derivedMetricBaselineValue =
               MetricExpression.evaluateExpression(derivedMetricExpression, baselineValueContext);
+          if (Double.isInfinite(derivedMetricBaselineValue) || Double.isNaN(derivedMetricBaselineValue)) {
+            derivedMetricBaselineValue = 0;
+          }
           double currentMetricBaselineValue =
-              MetricExpression.evaluateExpression(derivedMetricExpression, baselineValueContext);
+              MetricExpression.evaluateExpression(derivedMetricExpression, currentValueContext);
+          if (Double.isInfinite(currentMetricBaselineValue) || Double.isNaN(currentMetricBaselineValue)) {
+            currentMetricBaselineValue = 0;
+          }
+
           row.getMetrics().add(new Metric(expression.getExpressionName(),
               derivedMetricBaselineValue, currentMetricBaselineValue));
         }

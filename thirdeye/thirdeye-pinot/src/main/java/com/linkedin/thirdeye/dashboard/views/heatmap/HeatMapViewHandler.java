@@ -78,7 +78,11 @@ public class HeatMapViewHandler implements ViewHandler<HeatMapViewRequest, HeatM
     TimeOnTimeComparisonResponse response = handler.handle(comparisonRequest);
 
     Set<String> dimensions = response.getDimensions();
-    Set<String> metrics = response.getMetrics();
+    List<String> expressionNames = new ArrayList<>();
+    for (MetricExpression expression : request.getMetricExpressions()) {
+      expressionNames.add(expression.getExpressionName());
+    }
+
     int numRows = response.getNumRows();
 
     Map<String, HeatMap.Builder> data = new HashMap<>();
@@ -96,6 +100,9 @@ public class HeatMapViewHandler implements ViewHandler<HeatMapViewRequest, HeatM
       String dimensionValue = row.getDimensionValue();
       for (Metric metric : row.getMetrics()) {
         String metricName = metric.getMetricName();
+        if(!expressionNames.contains(metricName)){
+          continue;
+        }
         String dataKey = metricName + "." + dimension;
         HeatMap.Builder heatMapBuilder = data.get(dataKey);
         if (heatMapBuilder == null) {
@@ -149,7 +156,7 @@ public class HeatMapViewHandler implements ViewHandler<HeatMapViewRequest, HeatM
     }
 
     HeatMapViewResponse heatMapViewResponse = new HeatMapViewResponse();
-    heatMapViewResponse.setMetrics(new ArrayList<String>(metrics));
+    heatMapViewResponse.setMetrics(expressionNames);
     heatMapViewResponse.setDimensions(new ArrayList<String>(dimensions));
 
     heatMapViewResponse.setSummary(summary);

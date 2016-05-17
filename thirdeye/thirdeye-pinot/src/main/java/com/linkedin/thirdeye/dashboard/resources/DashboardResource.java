@@ -121,6 +121,7 @@ public class DashboardResource {
       }
       if (collectionConfig != null && collectionConfig.getDerivedMetrics() != null) {
         metrics.addAll(collectionConfig.getDerivedMetrics().keySet());
+        metrics.removeAll(collectionConfig.getDerivedMetrics().values());
       }
       Collections.sort(metrics);
       jsonMetrics = OBJECT_MAPPER.writeValueAsString(metrics);

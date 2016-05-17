@@ -112,10 +112,10 @@ public class MetricExpression {
     String expressionString = "(successCount)/(__COUNT)";
     MetricExpression expression = new MetricExpression("Approval_Rate", expressionString);
     Map<String, Double> metricValueContext = new HashMap<>();
-    metricValueContext.put("__COUNT", 10d);
-    metricValueContext.put("successCount", 10d);
+    metricValueContext.put("__COUNT", 0d);
+    metricValueContext.put("successCount", 0d);
     double result = MetricExpression.evaluateExpression(expressionString, metricValueContext);
-    System.out.println(result);
+    System.out.println(Double.isInfinite(result));
 
   }
 }
