@@ -112,6 +112,7 @@
                                 <option class="current-date-range-option"  value="today">Today</option>
                                 <option class="current-date-range-option"  value="yesterday">Yesterday</option>
                                 <option class="current-date-range-option"  value="7">Last 7 days</option>
+                                <option class="current-date-range-option"  value="24">Last 24 hours</option>
                             </select>
                         </div>
                         <div class="uk-margin-small">
@@ -167,7 +168,8 @@
                 <label class="uk-form-label">
                     Granularity
                 </label>
-                <div class="uk-button-group radio-buttons">
+                <div class="granularity-btn-group uk-button-group vertical radio-buttons">
+                    <button class="time-input-form-gran-minutes baseline-aggregate radio-type-button" rel="{{tabName}}" type="button" unit="10_MINUTES" value="600000">10 MINUTES</button>
                     <button class="time-input-form-gran-hours baseline-aggregate radio-type-button uk-active" rel="{{tabName}}" type="button" unit="HOURS" value="3600000">HOUR</button>
                     <button class="time-input-form-gran-days baseline-aggregate radio-type-button" rel="{{tabName}}" unit="DAYS" type="button" value="86400000">DAY</button>
                     {{#if showAggregateAllGranularity}}

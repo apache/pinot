@@ -113,6 +113,7 @@ $(document).ready( function() {
     function locationHashChanged() {
 
         hash = parseHashParameters(window.location.hash);
+        //delete hash.rand
         updateDashboardFormFromHash();
 
 

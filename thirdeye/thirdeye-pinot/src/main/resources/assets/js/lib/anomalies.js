@@ -47,6 +47,11 @@ var lineChart;
 function drawAnomalyTimeSeries(ajaxData, anomalyData) {
 
   var currentView = $("#" + hash.view + "-display-chart-section");
+  var dateTimeFormat = "%I:%M %p";
+  if(hash.hasOwnProperty("aggTimeGranularity") && hash.aggTimeGranularity == "DAYS"){
+        dateTimeFormat = "%m-%d"
+  }
+
   var lineChartPlaceholder = $("#linechart-placeholder", currentView)[0];
   // Metric(s)
   var metrics = ajaxData["metrics"];
@@ -118,7 +123,10 @@ function drawAnomalyTimeSeries(ajaxData, anomalyData) {
     },
     axis : {
       x : {
-        type : 'timeseries'
+        type : 'timeseries',
+        tick: {
+            format: dateTimeFormat
+        }
       }
     },
     regions: regions,

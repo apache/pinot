@@ -292,6 +292,11 @@ body a{
 }
 
 
+.granularity-btn-group.vertical button{
+    width: 250px;
+}
+
+
 /** Chart area **/
 
 .chart-area{
@@ -827,6 +832,25 @@ path {
 /*c3*/
 [class*=baseline]{
   stroke-dasharray: 5,5;
+}
+
+
+/* UIKIT overwrite */
+.uk-button-group.vertical button{
+    display: block;
+    border-radius: 0;
+}
+
+.uk-button-group.vertical button:first-child{
+    border-radius: 5px 5px 0 0;
+}
+
+.uk-button-group.vertical button:last-child{
+    border-radius: 0 0 5px 5px;
+}
+
+.uk-info-circle:before {
+    color: #ffffff;
 }
 
 

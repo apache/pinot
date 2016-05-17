@@ -30,6 +30,12 @@ function getTimeSeries() {
 
 function renderTimeSeriesUsingC3(d){  //time-series-area
 
+
+    var dateTimeFormat = "%I:%M %p";
+    if(hash.hasOwnProperty("aggTimeGranularity") && hash.aggTimeGranularity == "DAYS"){
+        dateTimeFormat = "%m-%d"
+    }
+
     var colors = {};
     var numIds = d.keys.length;
     var colorArray;
@@ -61,8 +67,17 @@ function renderTimeSeriesUsingC3(d){  //time-series-area
 	    },
 	    axis : {
 	    	x: {
-	    		type: 'timeseries'
-	    	}
+	    		type: 'timeseries',
+                tick: {
+                    format: dateTimeFormat
+                }
+	    	},
+            y: {
+                tick: {
+        //format integers with comma-grouping for thousands
+                    format: d3.format(',.0f')
+                }
+            }
 	    },
         legend : {
             show : false
@@ -70,7 +85,10 @@ function renderTimeSeriesUsingC3(d){  //time-series-area
 	});
 	//chart.transform('spline','data1')
 
+
     chart.hide();
+
+    //Timeseries eventlisteners
     $("#timeseries-time-series-legend").on("click",'.time-series-checkbox', function() {
 
         var checkbox = this;

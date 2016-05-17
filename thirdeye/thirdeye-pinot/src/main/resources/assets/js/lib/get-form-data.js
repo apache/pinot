@@ -170,16 +170,17 @@ function getDatasetConfig() {
             $("#"+ hash.view +"-time-input-form-error[data-error-source= 'datasetinfo']").hide()
         }
 
-        //Max date time
-        //global
-        maxMillis = data["maxTime"];
+        /** MIN MAX DATE TIME **/
 
-        var currentStartDateTime = moment(parseInt(maxMillis)).add(-1, 'days');
+        //global
+        maxMillis = parseInt(data["maxTime"]);
+
+        var currentStartDateTime = moment(maxMillis).add(-1, 'days');
         var currentStartDateString = currentStartDateTime.format("YYYY-MM-DD");
         var currentStartTimeString = currentStartDateTime.format("HH" + ":00");
 
         //Max date time
-        var currentEndDateTime = moment(parseInt(maxMillis));
+        var currentEndDateTime = moment(maxMillis);
         var currentEndDateString = currentEndDateTime.format("YYYY-MM-DD");
         var currentEndTimeString = currentEndDateTime.format("HH" + ":00");
 
@@ -218,21 +219,81 @@ function getDatasetConfig() {
         $(".baseline-end-time-input").val(baselineEndTimeString);
 
         //Set the max date on the datepicker dropdowns
-        var maxDate = moment(parseInt(maxMillis)).format("YYYY-MM-DD");
+        var maxDate = moment(maxMillis).format("YYYY-MM-DD");
         UIkit.datepicker(UIkit.$('.current-start-date-input'), { maxDate: maxDate, format:'YYYY-MM-DD' });
         UIkit.datepicker(UIkit.$('.current-end-date-input'),  { maxDate: maxDate, format:'YYYY-MM-DD' });
         UIkit.datepicker(UIkit.$('.baseline-start-date-input'),  { maxDate: maxDate, format:'YYYY-MM-DD' });
         UIkit.datepicker(UIkit.$('.baseline-end-date-input'),  { maxDate: maxDate, format:'YYYY-MM-DD' });
 
         //Add max and min time as a label time selection dropdown var minMillis = data["minTime"];
-        var maxDateTime = maxMillis ? moment(parseInt(maxMillis)).format("YYYY-MM-DD h a") : "n.a.";
+        var maxDateTime = maxMillis ? moment(maxMillis).format("YYYY-MM-DD h a") : "n.a.";
         $(".max-time").text(maxDateTime);
 
         //todo add min time to info endpoint
-        var minMillis = data["minTime"];
-        var minDateTime = minMillis ? moment(parseInt(minMillis)).format("YYYY-MM-DD h a") : "n.a.";
+        var minMillis = parseInt(data["minTime"]);
+        var minDateTime = minMillis ? moment(minMillis).format("YYYY-MM-DD h a") : "n.a.";
         $(".min-time").text(minDateTime);
-        //console.log("getConfig done")
+
+
+        //if no data available for today 12am hide today and yesterday option from time selection
+        //if( moment(parseInt(maxMillis)) < moment(parseInt(Date.now())) ){
+        var dateToday = moment(Date.now()).format("YYYY-MM-DD")
+
+        if(  moment(dateToday).isAfter( moment(maxDate) )  ){
+
+            $(".current-date-range-option[value='today']").addClass("uk-hidden")
+            $(".current-date-range-option[value='yesterday']").addClass("uk-hidden");
+
+        }
+
+
+        /**CONFIG: DATA GRANULARITY **/
+        if(data["dataGranularity"]){
+
+            var granularity = data["dataGranularity"];
+
+            //Todo: you may remove the following if else if the set of values are known
+            if(granularity.toLowerCase().indexOf("minutes") > -1){
+                granularity = "MINUTES";
+            }else if(granularity.toLowerCase().indexOf("hours") > -1){
+                granularity = "HOURS";
+            }else if(granularity.toLowerCase().indexOf("days") > -1){
+                granularity = "DAYS";
+            }
+
+            switch(granularity){
+
+                case "MINUTES":
+                    $(".baseline-aggregate[unit='10_MINUTES']").removeClass("uk-hidden");
+                    $(".baseline-aggregate[unit='HOURS']").removeClass("uk-hidden");
+                    $(".granularity-btn-group").addClass("vertical");
+
+                break;
+                case "HOURS":
+                    $(".baseline-aggregate[unit='10_MINUTES']").addClass("uk-hidden");
+                    $(".baseline-aggregate[unit='HOURS']").removeClass("uk-hidden");
+                    $(".granularity-btn-group").removeClass("vertical");
+
+                break;
+                case "DAYS":
+                    $(".baseline-aggregate[unit='10_MINUTES']").addClass("uk-hidden");
+                    $(".baseline-aggregate[unit='HOURS']").addClass("uk-hidden");
+                    //Select DAYS as default granularity
+                    $(".baseline-aggregate[unit='HOURS']").removeClass("uk-active");
+                    $(".baseline-aggregate[unit='DAYS']").addClass("uk-active");
+                    $(".granularity-btn-group").removeClass("vertical");
+
+                break;
+                default:
+                    $(".baseline-aggregate[unit='10_MINUTES']").addClass("uk-hidden");
+                    $(".baseline-aggregate[unit='HOURS']").removeClass("uk-hidden");
+                    $(".baseline-aggregate[unit='DAYS']").removeClass("uk-hidden");
+                    $(".granularity-btn-group").removeClass("vertical");
+            }
+        }
+
+        //console.log("getconfig done")
+        //Check if all form components are populated
         window.responseDataPopulated++
         formComponentPopulated()
 

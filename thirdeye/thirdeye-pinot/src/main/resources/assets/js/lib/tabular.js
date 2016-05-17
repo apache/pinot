@@ -50,6 +50,10 @@ function drawTimeSeries(ajaxData) {
 
     var currentView = $("#" + hash.view + "-display-chart-section")
     var lineChartPlaceholder = $("#linechart-placeholder", currentView)[0];
+    var dateTimeFormat = "%I:%M %p";
+    if(hash.hasOwnProperty("aggTimeGranularity") && hash.aggTimeGranularity == "DAYS"){
+        dateTimeFormat = "%m-%d"
+    }
 
 
 	// Metric(s)
@@ -125,8 +129,17 @@ function drawTimeSeries(ajaxData) {
 		},
 		axis : {
 			x : {
-				type : 'timeseries'
-			}
+				type : 'timeseries',
+                tick: {
+                format: dateTimeFormat
+                }
+			},
+            y: {
+                tick: {
+        //format integers with comma-grouping for thousands
+                    format: d3.format(',.0f')
+                }
+            }
 		},
 		legend : {
 			show : false
@@ -160,7 +173,10 @@ function drawTimeSeries(ajaxData) {
 				label : {
 					text : "Time"
 				},
-				type : 'timeseries'
+				type : 'timeseries',
+                tick: {
+                    format: dateTimeFormat
+                }
 			},
 			y : {
 				label : {

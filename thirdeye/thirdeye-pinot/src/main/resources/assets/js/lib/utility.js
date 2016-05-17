@@ -164,7 +164,7 @@ function updateDashboardFormFromHash(){
 
     } else if(maxMillis){
         // populate max date -1 day
-        currentStartDateTime = moment(parseInt(maxMillis)).add(-1, 'days');
+        currentStartDateTime = moment(maxMillis).add(-1, 'days');
         currentStartDateString = currentStartDateTime.format("YYYY-MM-DD");
         currentStartTimeString = currentStartDateTime.format("HH:00");
 
@@ -183,7 +183,8 @@ function updateDashboardFormFromHash(){
         currentEndTimeString = currentEndDateTime
             .format("HH:mm");
     } else if(maxMillis) {
-        currentEndDateTime = moment(parseInt(maxMillis));
+        console.log("maxMillis", maxMillis)
+        currentEndDateTime = moment(maxMillis);
         currentEndDateString = currentEndDateTime.format("YYYY-MM-DD");
         currentEndTimeString = currentEndDateTime.format("HH:00");
     }else{
@@ -715,12 +716,46 @@ function selectCurrentDateRange(target){
         case "7": //last7days not full days
 
             var currentEndMillis = moment().valueOf();
+            if(maxMillis){
+                currentEndMillis = maxMillis;
+            }
 
             //subtract 7 days in milliseconds
             var currentStartMillis =  currentEndMillis - 86400000 * 7;
 
-            var currentEndDateString = moment().tz(tz).format("YYYY-MM-DD")
-            var currentEndTimeString = moment().tz(tz).format("hh:00")
+            var currentEndDateString =  moment(currentEndMillis).tz(tz).format("YYYY-MM-DD")
+            var currentEndTimeString =  moment(currentEndMillis).tz(tz).format("HH:00")
+
+            var currentStartDateString = moment(currentStartMillis).tz(tz).format("YYYY-MM-DD")
+
+            $(".current-start-date-input[rel='"+ currentTab +"']").val(currentStartDateString);
+            $(".current-end-date-input[rel='"+ currentTab +"']").val(currentEndDateString);
+            $(".current-start-time-input[rel='"+ currentTab +"']").val(currentEndTimeString);
+            $(".current-end-time-input[rel='"+ currentTab +"']").val(currentEndTimeString);
+            $(".current-start-date-input[rel='"+ currentTab +"']").attr("readonly");
+            $(".current-end-date-input[rel='"+ currentTab +"']").attr("readonly");
+            $(".current-start-date-input[rel='"+ currentTab +"']").attr("disabled", true);
+            $(".current-end-date-input[rel='"+ currentTab +"']").attr("disabled", true);
+            $(".current-start-time-input[rel='"+ currentTab +"']").attr("disabled", true);
+            $(".current-end-time-input[rel='"+ currentTab +"']").attr("disabled", true);
+
+            break;
+        case "24": //last24hours not full days
+
+            var currentEndMillis = moment().valueOf();
+            console.log("currentEndMillis before:", currentEndMillis)
+            console.log("maxMillis outside:", maxMillis)
+            if(maxMillis){
+                console.log("maxMillis inside:", maxMillis)
+                currentEndMillis = maxMillis;
+            }
+
+            console.log("currentEndMillis after:", currentEndMillis)
+            //subtract 7 days in milliseconds
+            var currentStartMillis =  currentEndMillis - 86400000;
+
+            var currentEndDateString = moment(currentEndMillis).tz(tz).format("YYYY-MM-DD")
+            var currentEndTimeString =  moment(currentEndMillis).tz(tz).format("HH:00")
 
             var currentStartDateString = moment(currentStartMillis).tz(tz).format("YYYY-MM-DD")
 
@@ -904,7 +939,7 @@ function  applyTimeRangeSelection(target) {
     if(maxMillis){
         if(currentStartMillisUTC > maxMillis || currentEndMillisUTC > maxMillis) {
 
-            errorMsg.html("The data is available till: " + moment(parseInt(maxMillis)).format("YYYY-MM-DD h a") + ". Please select a time range prior to this date and time.");
+            errorMsg.html("The data is available till: " + moment(maxMillis).format("YYYY-MM-DD h a") + ". Please select a time range prior to this date and time.");
             errorAlrt.fadeIn(100);
             disableApplyButton($(".time-input-apply-btn[rel='" + currentTab + "']"));
             //show the dropdown
