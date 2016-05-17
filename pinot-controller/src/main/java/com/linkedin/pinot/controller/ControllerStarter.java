@@ -53,7 +53,6 @@ public class ControllerStarter {
   private final PinotHelixResourceManager helixResourceManager;
   private final RetentionManager retentionManager;
   private final ValidationManager validationManager;
-  private final ControllerMetrics _controllerMetrics;
   private final MetricsRegistry _metricsRegistry;
   private final PinotRealtimeSegmentManager realtimeSegmentsManager;
 
@@ -66,13 +65,7 @@ public class ControllerStarter {
     _metricsRegistry = new MetricsRegistry();
     ValidationMetrics validationMetrics = new ValidationMetrics(_metricsRegistry);
     validationManager = new ValidationManager(validationMetrics, helixResourceManager, config);
-
-    MetricsHelper.initializeMetrics(config.subset("pinot.controller.metrics"));
-    MetricsHelper.registerMetricsRegistry(_metricsRegistry);
-    _controllerMetrics = new ControllerMetrics(_metricsRegistry);
-    _controllerMetrics.initializeGlobalMeters();
-
-    realtimeSegmentsManager = new PinotRealtimeSegmentManager(helixResourceManager, _controllerMetrics);
+    realtimeSegmentsManager = new PinotRealtimeSegmentManager(helixResourceManager);
   }
 
   public PinotHelixResourceManager getHelixResourceManager() {
@@ -97,6 +90,10 @@ public class ControllerStarter {
 
     component.getDefaultHost().attach(controllerRestApp);
 
+    MetricsHelper.initializeMetrics(config.subset("pinot.controller.metrics"));
+    MetricsHelper.registerMetricsRegistry(_metricsRegistry);
+    final ControllerMetrics controllerMetrics = new ControllerMetrics(_metricsRegistry);
+
     try {
       LOGGER.info("starting pinot helix resource manager");
       helixResourceManager.start();
@@ -107,8 +104,7 @@ public class ControllerStarter {
       LOGGER.info("starting validation manager");
       validationManager.start();
       LOGGER.info("starting realtime segments manager");
-      realtimeSegmentsManager.start();
-
+      realtimeSegmentsManager.start(controllerMetrics);
     } catch (final Exception e) {
       LOGGER.error("Caught exception while starting controller", e);
       Utils.rethrowException(e);
@@ -117,12 +113,12 @@ public class ControllerStarter {
 
     try {
       helixResourceManager.getHelixZkManager().addExternalViewChangeListener(
-          new ControllerExternalViewChangeListener(_controllerMetrics));
+          new ControllerExternalViewChangeListener(controllerMetrics));
     } catch (Exception e) {
       LOGGER.error("Caught exception while adding external view change listener", e);
     }
 
-    _controllerMetrics.addCallbackGauge(
+    controllerMetrics.addCallbackGauge(
             "helix.connected",
             new Callable<Long>() {
               @Override
@@ -131,7 +127,7 @@ public class ControllerStarter {
               }
             });
 
-    _controllerMetrics.addCallbackGauge(
+    controllerMetrics.addCallbackGauge(
         "helix.leader", new Callable<Long>() {
               @Override
               public Long call() throws Exception {
@@ -142,10 +138,11 @@ public class ControllerStarter {
     helixResourceManager.getHelixZkManager().addPreConnectCallback(new PreConnectCallback() {
       @Override
       public void onPreConnect() {
-        _controllerMetrics.addMeteredGlobalValue(ControllerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L);
+        controllerMetrics.addMeteredGlobalValue(ControllerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L);
       }
     });
-    ControllerRestApplication.setControllerMetrics(_controllerMetrics);
+    controllerMetrics.initializeGlobalMeters();
+    ControllerRestApplication.setControllerMetrics(controllerMetrics);
   }
 
   public void stop() {
