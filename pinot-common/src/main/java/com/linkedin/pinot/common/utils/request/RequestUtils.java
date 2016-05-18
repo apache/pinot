@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.common.utils.request;
 
+import com.linkedin.pinot.common.request.GroupBy;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.StarTreeMetadata;
 import java.util.ArrayList;
@@ -102,14 +103,21 @@ public class RequestUtils {
   }
 
   /**
-   * Returns true if the filter query consists only of simple predicates, conjoined by AND.
-   * <p>
-   * e.g. WHERE d1 = d1v1 AND d2 = d2v2 AND d3 = d3v3 AND d4 between t1,t2
-   * </p>
+   * Returns true for the following, false otherwise:
+   * - Query is not aggregation/group-by
+   * - Segment does not contain star tree
+   * - The only aggregation function in the query is 'sum'
+   * - All group by columns and predicate columns are materialized
+   * - Query consists only of simple predicates, conjoined by AND.
+   *   <p>
+   *   e.g. WHERE d1 = d1v1 AND d2 = d2v2 AND d3 = d3v3 AND d4 between t1,t2
+   *   </p>
+   *
    */
   public static boolean isFitForStarTreeIndex(SegmentMetadata segmentMetadata, FilterQueryTree filterTree,
-      List<AggregationInfo> aggregationsInfo) {
+      BrokerRequest brokerRequest) {
     // Apply the checks in order of their runtime.
+    List<AggregationInfo> aggregationsInfo = brokerRequest.getAggregationsInfo();
 
     // There should have some aggregation
     if (aggregationsInfo == null || aggregationsInfo.isEmpty()) {
@@ -122,10 +130,20 @@ public class RequestUtils {
       return false;
     }
 
+    // Ensure that none of the group-by columns are skipped for materialization.
     List<String> skipMaterializationList = starTreeMetadata.getSkipMaterializationForDimensions();
     Set<String> skipMaterializationSet = null;
     if (skipMaterializationList != null && !skipMaterializationList.isEmpty()) {
       skipMaterializationSet = new HashSet<String>(skipMaterializationList);
+
+      GroupBy groupBy = brokerRequest.getGroupBy();
+      if (groupBy != null) {
+        for (String groupByColumn : groupBy.getColumns()) {
+          if (skipMaterializationSet.contains(groupByColumn)) {
+            return false;
+          }
+        }
+      }
     }
 
     // We currently support only sum
