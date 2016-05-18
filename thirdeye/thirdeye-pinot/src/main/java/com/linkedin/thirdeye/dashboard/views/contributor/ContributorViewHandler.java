@@ -11,16 +11,12 @@ import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeMap;
 import java.util.TreeSet;
-import java.util.concurrent.TimeUnit;
 
 import org.joda.time.DateTime;
-import org.joda.time.DateTimeZone;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
-import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.client.MetricExpression;
-import com.linkedin.thirdeye.client.MetricFunction;
 import com.linkedin.thirdeye.client.QueryCache;
 import com.linkedin.thirdeye.client.comparison.Row;
 import com.linkedin.thirdeye.client.comparison.Row.Metric;
@@ -132,12 +128,16 @@ public class ContributorViewHandler
 
     TimeOnTimeComparisonResponse response = handler.handle(comparisonRequest);
     List<String> metricNames = new ArrayList<>(response.getMetrics());
+    List<String> expressionNames = new ArrayList<>();
+    for (MetricExpression expression : request.getMetricExpressions()) {
+      expressionNames.add(expression.getExpressionName());
+    }
     List<String> dimensions = new ArrayList<>(response.getDimensions());
     List<TimeBucket> timeBuckets = getTimeBuckets(response);
     Map<String, SortedSet<Row>> rows = getRowsSortedByTime(response);
 
     ContributorViewResponse contributorViewResponse = new ContributorViewResponse();
-    contributorViewResponse.setMetrics(metricNames);
+    contributorViewResponse.setMetrics(expressionNames);
     contributorViewResponse.setDimensions(dimensions);
     contributorViewResponse.setTimeBuckets(timeBuckets);
     GenericResponse genericResponse = new GenericResponse();
@@ -152,6 +152,9 @@ public class ContributorViewHandler
         String dimensionValue = row.getDimensionValue();
         for (Metric metric : row.getMetrics()) {
           String metricName = metric.getMetricName();
+          if (!expressionNames.contains(metricName)) {
+            continue;
+          }
           Double baselineValue = metric.getBaselineValue();
           Double currentValue = metric.getCurrentValue();
 
