@@ -31,7 +31,7 @@ import com.linkedin.pinot.core.plan.PlanNode;
 import com.linkedin.pinot.core.plan.SelectionPlanNode;
 import com.linkedin.pinot.core.query.aggregation.groupby.BitHacks;
 import com.linkedin.pinot.core.query.config.QueryExecutorConfig;
-import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
+import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -87,25 +87,20 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
       } else {
         // Aggregation GroupBy
         PlanNode aggregationGroupByPlanNode;
-        if (indexSegment instanceof IndexSegmentImpl) {
 
-          if (isGroupKeyFitForLong(indexSegment, brokerRequest)) {
-            // AggregationGroupByPlanNode is the new implementation of group-by aggregations, and is currently turned OFF.
-            // Once all feature and perf testing is performed, the code will be turned ON, and this 'if' check will
-            // be removed.
-            if (enableNewAggregationGroupBy) {
-              aggregationGroupByPlanNode = new AggregationGroupByPlanNode(indexSegment, brokerRequest);
-            } else {
-              aggregationGroupByPlanNode = new AggregationGroupByOperatorPlanNode(indexSegment, brokerRequest,
-                  AggregationGroupByImplementationType.Dictionary);
-            }
+        if (isGroupKeyFitForLong(indexSegment, brokerRequest)) {
+          // AggregationGroupByPlanNode is the new implementation of group-by aggregations, and is currently turned OFF.
+          // Once all feature and perf testing is performed, the code will be turned ON, and this 'if' check will
+          // be removed.
+          if (enableNewAggregationGroupBy) {
+            aggregationGroupByPlanNode = new AggregationGroupByPlanNode(indexSegment, brokerRequest);
           } else {
             aggregationGroupByPlanNode = new AggregationGroupByOperatorPlanNode(indexSegment, brokerRequest,
-                AggregationGroupByImplementationType.DictionaryAndTrie);
+                AggregationGroupByImplementationType.Dictionary);
           }
         } else {
-          aggregationGroupByPlanNode =
-              new AggregationGroupByOperatorPlanNode(indexSegment, brokerRequest, AggregationGroupByImplementationType.NoDictionary);
+          aggregationGroupByPlanNode = new AggregationGroupByOperatorPlanNode(indexSegment, brokerRequest,
+              AggregationGroupByImplementationType.DictionaryAndTrie);
         }
         return aggregationGroupByPlanNode;
       }
@@ -122,14 +117,17 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   public Plan makeInterSegmentPlan(List<SegmentDataManager> segmentDataManagers, BrokerRequest brokerRequest,
       ExecutorService executorService, long timeOutMs) {
     final InstanceResponsePlanNode rootNode = new InstanceResponsePlanNode();
+    List<IndexSegment> segments = new ArrayList<>();
 
     // Go over all the segments and check if new implementation of group-by can be enabled.
     boolean enableNewAggregationGroupBy = _enableNewAggregationGroupByCfg;
-    List<IndexSegment> segments = new ArrayList<>();
+    boolean isGroupByQuery = (brokerRequest.getAggregationsInfo() != null) && brokerRequest.isSetGroupBy();
 
     for (SegmentDataManager segmentDataManager : segmentDataManagers) {
       IndexSegment segment = segmentDataManager.getSegment();
-      enableNewAggregationGroupBy &= isSegmentFitForNewAggregationGroupBy(segment, brokerRequest);
+      if (isGroupByQuery && !isGroupKeyFitForLong(segment, brokerRequest)) {
+        enableNewAggregationGroupBy = false;
+      }
       segments.add(segment);
     }
 
@@ -143,34 +141,11 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     return new GlobalPlanImplV0(rootNode);
   }
 
-  /**
-   * Helper method to identify if new aggregation group-by algorithm can be enabled for this segment:
-   * - Returns true if brokerRequest is not group-by, OR
-   *   If segment is IndexSegmentImpl (not RealTimeSegmentImpl), and total number of bits in
-   *   group-by column cardinalities can fit in 64 bits.
-   * - False otherwise.
-   *
-   * @param segment
-   * @param brokerRequest
-   * @return
-   */
-  private boolean isSegmentFitForNewAggregationGroupBy(IndexSegment segment, BrokerRequest brokerRequest) {
-    if (!brokerRequest.isSetGroupBy()) {
-      return true;
-    }
-
-    if (!(segment instanceof IndexSegmentImpl)) {
-      return false;
-    }
-
-    return isGroupKeyFitForLong(segment, brokerRequest);
-  }
-
   private boolean isGroupKeyFitForLong(IndexSegment indexSegment, BrokerRequest brokerRequest) {
-    final IndexSegmentImpl columnarSegment = (IndexSegmentImpl) indexSegment;
     int totalBitSet = 0;
     for (final String column : brokerRequest.getGroupBy().getColumns()) {
-      totalBitSet += BitHacks.findLogBase2(columnarSegment.getDictionaryFor(column).length()) + 1;
+      Dictionary dictionary = indexSegment.getDataSource(column).getDictionary();
+      totalBitSet += BitHacks.findLogBase2(dictionary.length()) + 1;
     }
     if (totalBitSet > 64) {
       return false;
