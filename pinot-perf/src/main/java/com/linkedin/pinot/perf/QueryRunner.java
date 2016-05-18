@@ -19,57 +19,76 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileReader;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
-import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.io.IOUtils;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.yaml.snakeyaml.Yaml;
 
 /**
  * Simple code to run queries against a server
- * USAGE: QueryRunner confFile query numberOfTimesToRun
+ * USAGE: QueryRunner QueryFile ({BrokerHost} {BrokerPort} <single-threaded/multi-threaded>)
  */
 public class QueryRunner {
-  private static final Logger LOGGER = LoggerFactory.getLogger(QueryRunner.class);
+  private QueryRunner() {
+  }
 
+  private static final Logger LOGGER = LoggerFactory.getLogger(QueryRunner.class);
+  private static final int MILLIS_PER_SECOND = 1000;
+
+  @SuppressWarnings("InfiniteLoopStatement")
   public static void multiThreadedQueryRunner(PerfBenchmarkDriverConf conf, String queryFile)
       throws Exception {
-    final PerfBenchmarkDriver driver = new PerfBenchmarkDriver(conf);
+    final long randomSeed = 123456789L;
+    final int numClients = 10;
+    final int reportIntervalMillis = 3000;
 
-    final List<String> queries = IOUtils.readLines(new FileInputStream(new File(queryFile)));
-    final Random random = new Random();
-    final int targetQps = 10;
-    final int numClients = 3;
-    final int sleepMillis = 1000 / (numClients * targetQps);
-    ArrayList<Callable<Void>> tasks = new ArrayList<Callable<Void>>();
+    final List<String> queries;
+    try (FileInputStream input = new FileInputStream(new File(queryFile))) {
+      queries = IOUtils.readLines(input);
+    }
+
+    final int queryNum = queries.size();
+    final PerfBenchmarkDriver driver = new PerfBenchmarkDriver(conf);
+    final Random random = new Random(randomSeed);
+    final AtomicInteger counter = new AtomicInteger(0);
+    final AtomicLong totalResponseTime = new AtomicLong(0L);
+    final ExecutorService executorService = Executors.newFixedThreadPool(numClients);
 
     for (int i = 0; i < numClients; i++) {
-      Callable<Void> callable = new Callable<Void>() {
+      executorService.submit(new Runnable() {
         @Override
-        public Void call() throws Exception {
+        public void run() {
           while (true) {
-            String query = queries.get(random.nextInt(queries.size()));
-            JSONObject response = driver.postQuery(query);
-            Thread.sleep(sleepMillis);
+            String query = queries.get(random.nextInt(queryNum));
+            long start = System.currentTimeMillis();
+            try {
+              driver.postQuery(query);
+              counter.getAndIncrement();
+              totalResponseTime.getAndAdd(System.currentTimeMillis() - start);
+            } catch (Exception e) {
+              LOGGER.error("Caught exception while running query: {}", query, e);
+              return;
+            }
           }
         }
-
-      };
-      tasks.add(callable);
-    }
-    List<Future<Void>> invokeAll = Executors.newFixedThreadPool(numClients).invokeAll(tasks);
-    for (int i = 0; i < numClients; i++) {
-      Future<Void> future = invokeAll.get(i);
-      future.get();
+      });
     }
 
+    long startTime = System.currentTimeMillis();
+    while (true) {
+      Thread.sleep(reportIntervalMillis);
+      double timePassedSeconds = ((double) (System.currentTimeMillis() - startTime)) / MILLIS_PER_SECOND;
+      int count = counter.get();
+      double avgResponseTime = ((double) totalResponseTime.get()) / count;
+      LOGGER.info("Time Passed: {}s, Query Executed: {}, QPS: {}, Avg Response Time: {}ms", timePassedSeconds, count,
+          count / timePassedSeconds, avgResponseTime);
+    }
   }
 
   public static void singleThreadedQueryRunner(PerfBenchmarkDriverConf conf, String queryFile)
@@ -159,6 +178,6 @@ public class QueryRunner {
     } else {
       singleThreadedQueryRunner(conf, queryFile);
     }
-
   }
 }
+
