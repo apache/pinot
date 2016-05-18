@@ -38,7 +38,7 @@ public class ColumnIndexDirectoryTestHelper {
 
   static PinotDataBuffer newIndexBuffer(ColumnIndexDirectory columnDirectory, String column, int size, int index)
       throws IOException {
-    String columnName = column + Integer.toString(index);
+    String columnName = column + "." +  Integer.toString(index);
     // skip star tree. It's managed differently
     ColumnIndexType indexType = indexTypes[index % indexTypes.length];
     PinotDataBuffer buf = null;
@@ -58,7 +58,7 @@ public class ColumnIndexDirectoryTestHelper {
 
   static PinotDataBuffer getIndexBuffer(ColumnIndexDirectory columnDirectory, String column, int index)
       throws IOException {
-    String columnName = column + Integer.toString(index);
+    String columnName = column + "." +  Integer.toString(index);
     // skip star tree
     ColumnIndexType indexType = indexTypes[index % indexTypes.length];
     PinotDataBuffer buf = null;

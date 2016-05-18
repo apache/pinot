@@ -205,22 +205,33 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     Iterator keys = mapConfig.getKeys();
     while (keys.hasNext()) {
       String key = (String) keys.next();
-      String[] keyParts = key.split("\\" + MAP_KEY_SEPARATOR);
+      // column names can have '.' in it hence scan from backwards
+      // parsing names like "column.name.dictionary.startOffset"
+      // or, "column.name.dictionary.endOffset" where column.name is the key
+      int lastSeparatorPos = key.lastIndexOf(MAP_KEY_SEPARATOR);
+      Preconditions.checkState(lastSeparatorPos != -1, "Key separator not found: " + key +
+          ", segment: " + segmentDirectory);
+      String propertyName = key.substring(lastSeparatorPos + 1);
 
-      Preconditions.checkState(keyParts.length == 3, "Invalid key: " + key);
-      IndexKey indexKey = new IndexKey(keyParts[0], ColumnIndexType.getValue(keyParts[1]));
+      int indexSeparatorPos = key.lastIndexOf(MAP_KEY_SEPARATOR, lastSeparatorPos-1);
+      Preconditions.checkState(indexSeparatorPos != -1, "Index separator not found: " + key +
+          " , segment: " + segmentDirectory);
+      String indexName = key.substring(indexSeparatorPos + 1, lastSeparatorPos);
+      String columnName = key.substring(0, indexSeparatorPos);
+      IndexKey indexKey = new IndexKey(columnName, ColumnIndexType.getValue(indexName));
       IndexEntry entry = columnEntries.get(indexKey);
       if (entry == null) {
         entry = new IndexEntry(indexKey);
         columnEntries.put(indexKey, entry);
       }
 
-      if (keyParts[2].equals(MAP_KEY_NAME_START_OFFSET)) {
+      if (propertyName.equals(MAP_KEY_NAME_START_OFFSET)) {
         entry.startOffset = mapConfig.getLong(key);
-      } else if (keyParts[2].equals(MAP_KEY_NAME_SIZE)) {
+      } else if (propertyName.equals(MAP_KEY_NAME_SIZE)) {
         entry.size = mapConfig.getLong(key);
       } else {
-        throw new ConfigurationException("Invalid map file key: " + key + ", segmentDirectory: " + segmentDirectory.toString());
+        throw new ConfigurationException("Invalid map file key: " + key +
+            ", segmentDirectory: " + segmentDirectory.toString());
       }
     }
 
