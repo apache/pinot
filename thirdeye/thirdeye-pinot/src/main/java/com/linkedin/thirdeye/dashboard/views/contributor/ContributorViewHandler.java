@@ -237,7 +237,7 @@ public class ContributorViewHandler
     genericResponse.setSummary(summary);
     for (String dimensionName : dimensionValuesMap.keySet()) {
       List<String> dimensionValues = dimensionValuesMap.get(dimensionName);
-      sort(metricNames, dimensionName, dimensionValues, baselineTotalMapPerDimensionValue,
+      sort(expressionNames, dimensionName, dimensionValues, baselineTotalMapPerDimensionValue,
           currentTotalMapPerDimensionValue);
     }
     contributorViewResponse.setDimensionValuesMap(dimensionValuesMap);
