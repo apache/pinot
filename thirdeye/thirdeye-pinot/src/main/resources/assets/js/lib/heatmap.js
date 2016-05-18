@@ -4,7 +4,6 @@ function getHeatmap() {
     var url = "/dashboard/data/heatmap?" + window.location.hash.substring(1);
     getData(url).done(function(data) {
 
-
         renderD3heatmap(data);
 
         heatMapEventListeners()
@@ -143,7 +142,7 @@ function renderD3heatmap(data) {
                 d3.select("#tooltip").classed("hidden", false);
             };
 
-            var mouseout = function() {
+            var mouseleave = function() {
                 d3.select("#tooltip").classed("hidden", true);
             };
 
@@ -175,7 +174,7 @@ function renderD3heatmap(data) {
                     .attr("data-value-id", function (d) {return d.valueId})
                     .attr("id", function (d) {return d.name})
                     .on("mouseenter", mouseenter)
-                    .on("mouseout", mouseout)
+                    .on("mouseleave", mouseleave)
                     .call(position)
                     .style("background", function (d) {return d.children ? null : d.bgcolor})
                     .style("text-align", "center")

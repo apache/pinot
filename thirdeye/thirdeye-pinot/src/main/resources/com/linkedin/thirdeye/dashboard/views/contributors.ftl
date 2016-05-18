@@ -12,7 +12,7 @@
                 <div class="dimension-timeseries-section clear-fix uk-margin-large-bottom" dimension="{{dimensionName}}" style="width: 100%; position: relative;">
                     {{#with @root/timeBuckets}}
                     <div  class="title-box full-width">
-                        <table title="{{displayDate this.baselineUTC}}">
+                        <table>
                             <tbody>
                             <tr>
                                 <th>BASELINE</th>

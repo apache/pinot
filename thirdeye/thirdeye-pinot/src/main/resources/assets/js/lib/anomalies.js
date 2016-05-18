@@ -2,7 +2,7 @@ function getAnomalies() {
   dashboardName = "Default_All_Metrics_Dashboard";
   baselineStart = moment(parseInt(hash.currentStart)).add(-7, 'days')
   baselineEnd = moment(parseInt(hash.currentEnd)).add(-7, 'days')
-  aggTimeGranularity = "HOURS";
+  aggTimeGranularity = (window.datasetConfig.dataGranularity) ? window.datasetConfig.dataGranularity : "HOURS";
   
   
   var timeSeriesUrl = "/dashboard/data/tabular?" + window.location.hash.substring(1)  //

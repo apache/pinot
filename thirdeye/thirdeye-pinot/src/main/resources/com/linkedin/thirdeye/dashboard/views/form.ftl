@@ -78,7 +78,7 @@
                 <label  class="uk-form-label">
                     Date range selector
                 </label>
-                <div data-uk-dropdown="{mode:'click'}" style="position: relative;">
+                <div class="time-range-selector-dropdown" data-uk-dropdown="{mode:'click'}" rel="{{tabName}}" style="position: relative;">
                     <div class="date-time-selector-box">
                         <table class="date-time-selector-box-table">
                             <tr>

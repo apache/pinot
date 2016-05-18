@@ -3,7 +3,7 @@
         <div class="clear-fix" style="clear: both">
             {{#with summary}}
             <div  class="title-box full-width">
-                <table title="{{displayDate this.baselineUTC}}">
+                <table>
                     <tbody>
                     <tr>
                         <th>BASELINE</th>

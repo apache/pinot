@@ -60,9 +60,9 @@ function getDashboardList(){
         }
         $("#dashboard-list").html(dashboardListHtml);
         $("#selected-dashboard").text("Select dashboard");
-        //console.log("getDashboardList done")
+
         window.responseDataPopulated++
-    formComponentPopulated()
+        formComponentPopulated()
     });
 };
 
@@ -91,7 +91,7 @@ function getMetricList() {
         }
         $(".metric-list").html(metricListHtml);
 
-        //console.log("getMetrics done")
+
         window.responseDataPopulated++
         formComponentPopulated()
     });
@@ -99,6 +99,7 @@ function getMetricList() {
 
 
 function getDimensionNFilterList() {
+
     //Create dimension dropdown and filters
     var url = "/dashboard/data/filters?dataset=" + hash.dataset;
     getData(url).done(function (data) {
@@ -145,7 +146,7 @@ function getDimensionNFilterList() {
             $(".radio-options",this).click();
         });
 
-        //console.log("getDimension done")
+
         window.responseDataPopulated++
         formComponentPopulated()
     });
@@ -153,6 +154,8 @@ function getDimensionNFilterList() {
 
 
 function getDatasetConfig() {
+
+    window.datasetConfig = {}
 
     //Till the endpoint is ready no ajax call is triggered and works with  hardcoded data in local data variable
     var url = "/dashboard/data/info?dataset=" + hash.dataset;
@@ -173,7 +176,8 @@ function getDatasetConfig() {
         /** MIN MAX DATE TIME **/
 
         //global
-        maxMillis = parseInt(data["maxTime"]);
+        window.datasetConfig.maxMillis = parseInt(data["maxTime"]);
+        var maxMillis = window.datasetConfig.maxMillis
 
         var currentStartDateTime = moment(maxMillis).add(-1, 'days');
         var currentStartDateString = currentStartDateTime.format("YYYY-MM-DD");
@@ -182,7 +186,7 @@ function getDatasetConfig() {
         //Max date time
         var currentEndDateTime = moment(maxMillis);
         var currentEndDateString = currentEndDateTime.format("YYYY-MM-DD");
-        var currentEndTimeString = currentEndDateTime.format("HH" + ":00");
+        var currentEndTimeString = currentEndDateTime.format("HH:00");
 
         //Populate WoW date
         var baselineStartDateTime = currentStartDateTime.add(-7,'days');
@@ -250,18 +254,20 @@ function getDatasetConfig() {
         /**CONFIG: DATA GRANULARITY **/
         if(data["dataGranularity"]){
 
-            var granularity = data["dataGranularity"];
+
+            window.datasetConfig.dataGranularity = data["dataGranularity"];
+            var dataGranularity = window.datasetConfig.dataGranularity;
 
             //Todo: you may remove the following if else if the set of values are known
-            if(granularity.toLowerCase().indexOf("minutes") > -1){
-                granularity = "MINUTES";
-            }else if(granularity.toLowerCase().indexOf("hours") > -1){
-                granularity = "HOURS";
-            }else if(granularity.toLowerCase().indexOf("days") > -1){
-                granularity = "DAYS";
+            if(dataGranularity.toLowerCase().indexOf("minutes") > -1){
+                dataGranularity = "MINUTES";
+            }else if(dataGranularity.toLowerCase().indexOf("hours") > -1){
+                dataGranularity = "HOURS";
+            }else if(dataGranularity.toLowerCase().indexOf("days") > -1){
+                dataGranularity = "DAYS";
             }
 
-            switch(granularity){
+            switch(dataGranularity){
 
                 case "MINUTES":
                     $(".baseline-aggregate[unit='10_MINUTES']").removeClass("uk-hidden");
@@ -292,7 +298,7 @@ function getDatasetConfig() {
             }
         }
 
-        //console.log("getconfig done")
+
         //Check if all form components are populated
         window.responseDataPopulated++
         formComponentPopulated()

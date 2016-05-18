@@ -18,7 +18,8 @@
             <tbody class="">
             {{#each this as |anomalyData anomalyIndex|}}
             <tr>
-                <td class="checkbox-cell"><input type="checkbox" value="{{anomalyData/metric}}"></td>
+                <!--Todo:
+                <td class="checkbox-cell"><input type="checkbox" value="{{anomalyData/metric}}"></td>-->
                 <td class="border-left">{{anomalyData/id}}</td>
                 <td class="metric-label border-left">{{anomalyData/metric}}</td>
                 <td class="border-left">{{millisToDate anomalyData/startTimeUtc}}</td>

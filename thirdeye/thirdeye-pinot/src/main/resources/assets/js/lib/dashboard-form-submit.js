@@ -72,9 +72,11 @@ $("#main-view").on("click",".form-submit-btn",function(){
     }
 
     //Check if dashboard is selected in case the current view is dashboard
-    if( hash.hasOwnProperty("view") && hash.view == "dashboard") {
-        if(!hash.hasOwnProperty("dashboard")){
+    if( hash.view == "dashboard") {
+        if(!hash.dashboard){
             errorMessage.html("Please select a dashboard.");
+
+            errorAlert.attr("data-error-source", "dashboard-option");
             errorAlert.fadeIn(100);
             return
         }
@@ -84,6 +86,7 @@ $("#main-view").on("click",".form-submit-btn",function(){
     if( $("#"+ hash.view +"-view-metric-selector").length > 0 ){
         if(!hash.hasOwnProperty("metrics")){
             errorMessage.html("Please select at least 1 metric.");
+            errorAlert.attr("data-error-source", "metric-option");
             errorAlert.fadeIn(100);
             return
         }
