@@ -1,3 +1,5 @@
+//In this js file we keep chart related event listeners that are present in  multiple views
+
 //Cumulative checkbox
 $("#main-view").on("click", ".cumulative", function() {
 
@@ -68,8 +70,41 @@ $("#main-view").on("click","#sum-detail button",function() {
 $("#main-view").on("click", ".metric-label", function() {
 
 	// Change the view to contributors
+
+    //either dashboard or metrics param is present in hash
     delete hash.dashboard;
+
+    //switch to time ver time tab
     hash.view = "compare";
+
+    //set start and end date to the starte and end date of the table
+    var timeBuckets = $("#timebuckets>span")
+    var numTimeBuckets = timeBuckets.length;
+
+    var firstTimeBucketInRow = $("#timebuckets>span")[0];
+    var lastTimeBucketInRow = $("#timebuckets>span")[numTimeBuckets - 1];
+
+    var currentStartUTC = $($("span", firstTimeBucketInRow)[0]).text().trim();
+    var baselineStartUTC = $($("span", firstTimeBucketInRow)[2]).text().trim();
+
+    var currentEndUTC = $($("span", lastTimeBucketInRow)[1]).text().trim();
+    var baselineEndUTC = $($("span", lastTimeBucketInRow)[3]).text().trim();
+
+    hash.baselineStart = baselineStartUTC;
+    hash.baselineEnd = baselineEndUTC;
+    hash.currentStart = currentStartUTC;
+    hash.currentEnd = currentEndUTC;
+
+
+    //check the current granularity of the data on the table
+    var endOfFirstTimeBucket =  $($("span", firstTimeBucketInRow)[1]).text().trim();
+    var diff = parseInt(endOfFirstTimeBucket) - parseInt(currentStartUTC)
+    var diffProperties = describeMillis(diff)
+    var aggTimeGranularity = diffProperties ? diffProperties.unit : "HOURS"
+
+    hash.aggTimeGranularity = aggTimeGranularity
+
+    //set the metrics
     metrics = [];
     // Todo: if metric label it's a derived metric so title contains
     metrics.push($(this).attr("title"))
@@ -91,8 +126,8 @@ $("#main-view").on("click", "#funnels-table .heat-map-cell", function() {
 	hash.view = "compare"
 	hash.aggTimeGranularity = "aggregateAll"
 	cellObj = $(this)
-	var timeIndex = cellObj.attr("timeIndex")
-	var timeBucketForColumnIndex = $("#timebuckets>span")[timeIndex]
+	var timeIndex = cellObj.attr("timeIndex");
+	var timeBucketForColumnIndex = $("#timebuckets>span")[timeIndex];
 
     var currentStartUTC;
     var baselineStartUTC;

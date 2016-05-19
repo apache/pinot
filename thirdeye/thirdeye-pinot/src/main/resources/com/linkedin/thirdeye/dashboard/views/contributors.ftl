@@ -8,7 +8,7 @@
             <div class="dimension-section-wrapper" rel="{{dimensionName}}" metric="{{metricName}}" style="vertical-align: top; ">
                 <p class="dimension-title hidden"> {{dimensionName}}</p>
 
-                <h3 class="uk-margin-top"> Break down of metric: <b>{{metricName}}</b> by dimension:<b>{{dimensionName}}</b></h3>
+                <h3 class="uk-margin-top"> Break down of metric: <b>{{metricName}}</b> by dimension: <b>{{dimensionName}}</b></h3>
                 <div class="dimension-timeseries-section clear-fix uk-margin-large-bottom" dimension="{{dimensionName}}" style="width: 100%; position: relative;">
                     {{#with @root/timeBuckets}}
                     <div  class="title-box full-width">
@@ -70,7 +70,7 @@
                     </div>
                 </div>
 
-	            <h3 class="uk-margin-top"> Break down of metric: <b>{{metricName}}</b> by dimension:<b>{{dimensionName}}</b></h3>
+	            <h3 class="uk-margin-top"> Break down of metric: <b>{{metricName}}</b> by dimension: <b>{{dimensionName}}</b></h3>
 
                 <!-- Contributors table -->
                 <!--Summary and details buttons -->

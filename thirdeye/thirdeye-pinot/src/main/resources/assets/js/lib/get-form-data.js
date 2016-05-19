@@ -180,6 +180,12 @@ function getDatasetConfig() {
         var maxMillis = window.datasetConfig.maxMillis
 
         var currentStartDateTime = moment(maxMillis).add(-1, 'days');
+
+        //If time granularity is DAYS have default 7 days in the time selector on pageload
+        if(data["dataGranularity"] && data["dataGranularity"] == "DAYS"){
+            currentStartDateTime = moment(maxMillis).add(-7, 'days')
+        }
+
         var currentStartDateString = currentStartDateTime.format("YYYY-MM-DD");
         var currentStartTimeString = currentStartDateTime.format("HH" + ":00");
 
