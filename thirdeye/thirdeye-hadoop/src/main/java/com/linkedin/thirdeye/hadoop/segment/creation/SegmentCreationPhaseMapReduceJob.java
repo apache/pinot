@@ -200,6 +200,7 @@ public class SegmentCreationPhaseMapReduceJob {
         // backfill will generated original_segment_name.avro
         // derived_column_transformation will generate original_segment_name-m-00000.avro etc
         String segmentName = hdfsDataPath.getName().split("-(m|r)-[0-9]{5}")[0];
+        segmentName = segmentName.split(ThirdEyeConstants.AVRO_SUFFIX)[0];
         segmentGeneratorConfig.setSegmentName(segmentName);
       } else {
         segmentGeneratorConfig.setSegmentName(SegmentNameBuilder

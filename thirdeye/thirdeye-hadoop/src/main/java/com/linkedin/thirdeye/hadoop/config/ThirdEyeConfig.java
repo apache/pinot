@@ -27,6 +27,8 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.commons.lang.StringUtils;
+
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
@@ -289,7 +291,7 @@ public final class ThirdEyeConfig {
   private static List<TopKDimensionToMetricsSpec> getTopKDimensionToMetricsSpecFromProperties(Properties props) {
     List<TopKDimensionToMetricsSpec> topKDimensionToMetricsSpec = null;
     String topKDimensionNames = getAndCheck(props, ThirdEyeConfigProperties.THIRDEYE_TOPK_DIMENSION_NAMES.toString(), null);
-    if (topKDimensionNames != null && topKDimensionNames.split(FIELD_SEPARATOR).length > 0) {
+    if (StringUtils.isNotEmpty(topKDimensionNames) && topKDimensionNames.split(FIELD_SEPARATOR).length > 0) {
       topKDimensionToMetricsSpec = new ArrayList<>();
       for (String dimension : topKDimensionNames.split(FIELD_SEPARATOR)) {
         String[] topKDimensionMetrics = getAndCheck(props,

@@ -17,6 +17,7 @@ package com.linkedin.thirdeye.hadoop.backfill;
 
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -28,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.compress.archivers.ArchiveException;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -108,8 +110,21 @@ public class BackfillControllerAPIs {
 
       LOGGER.info("Extracting segment {} to {}", tempSegmentTar, tempDir);
       TarGzCompressionUtils.unTar(tempSegmentTar, tempDir);
-      if (!tempSegmentDir.exists()) {
+      File[] files = tempDir.listFiles(new FilenameFilter() {
+
+        @Override
+        public boolean accept(File dir, String name) {
+          return !name.endsWith(ThirdEyeConstants.TAR_SUFFIX) && new File(dir, name).isDirectory();
+        }
+      });
+      if (files.length == 0) {
         throw new IllegalStateException("Failed to extract " + tempSegmentTar + " to " + tempDir);
+      } else if (!files[0].getName().equals(tempSegmentDir.getName())){
+        LOGGER.info("Moving extracted segment to the segment dir {}", tempSegmentDir);
+        FileUtils.moveDirectory(files[0], tempSegmentDir);
+      }
+      if (!tempSegmentDir.exists()) {
+        throw new IllegalStateException("Failed to move " + files[0] + " to " + tempSegmentDir);
       }
 
       LOGGER.info("Copying segment from {} to hdfs {}", tempSegmentDir, hdfsSegmentPath);

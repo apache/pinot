@@ -165,6 +165,10 @@ public class ThirdeyeAvroUtils {
     List<String> metricTypesFromSchema = new ArrayList<>();
     List<String> metricNamesFromConfig = Lists.newArrayList(metricNamesProperty.split(ThirdEyeConstants.FIELD_SEPARATOR));
     for (String metricName : metricNamesFromConfig) {
+      if (ThirdEyeConstants.AUTO_METRIC_COUNT.equals(metricName)) {
+        metricTypesFromSchema.add(DataType.LONG.toString());
+        continue;
+      }
       metricTypesFromSchema.add(ThirdeyeAvroUtils.getDataTypeForField(metricName, avroSchema));
     }
     String validatedMetricTypesProperty = Joiner.on(ThirdEyeConstants.FIELD_SEPARATOR).join(metricTypesFromSchema);
