@@ -1,9 +1,13 @@
 package com.linkedin.thirdeye.common;
 
 import java.io.IOException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.http.client.ClientProtocolException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.LoadingCache;
@@ -20,6 +24,7 @@ import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClientConfig;
 import com.linkedin.thirdeye.dashboard.ThirdEyeDashboardApplication;
 import com.linkedin.thirdeye.dashboard.configs.AbstractConfigDAO;
 import com.linkedin.thirdeye.dashboard.configs.FileBasedConfigDAOFactory;
+import com.linkedin.thirdeye.dashboard.resources.CacheResource;
 import com.linkedin.thirdeye.detector.api.AnomalyFunctionRelation;
 import com.linkedin.thirdeye.detector.api.AnomalyFunctionSpec;
 import com.linkedin.thirdeye.detector.api.AnomalyResult;
@@ -37,6 +42,8 @@ import io.dropwizard.db.DataSourceFactory;
 import io.dropwizard.hibernate.HibernateBundle;
 
 public abstract class BaseThirdEyeApplication<T extends Configuration> extends Application<T> {
+
+
   protected final HibernateBundle<ThirdEyeConfiguration> hibernateBundle =
       new HibernateBundle<ThirdEyeConfiguration>(AnomalyFunctionSpec.class,
           AnomalyFunctionRelation.class, AnomalyResult.class, ContextualEvent.class,
@@ -51,6 +58,8 @@ public abstract class BaseThirdEyeApplication<T extends Configuration> extends A
   protected ContextualEventDAO contextualEventDAO;
   protected EmailConfigurationDAO emailConfigurationDAO;
   protected AnomalyFunctionRelationDAO anomalyFunctionRelationDAO;
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(BaseThirdEyeApplication.class);
 
   public void initDetectorRelatedDAO() {
     anomalyFunctionSpecDAO = new AnomalyFunctionSpecDAO(hibernateBundle.getSessionFactory());
@@ -84,6 +93,24 @@ public abstract class BaseThirdEyeApplication<T extends Configuration> extends A
     LoadingCache<String, Long> collectionMaxDataTimeCache = CacheBuilder.newBuilder()
         .build(new CollectionMaxDataTimeCacheLoader(pinotThirdeyeClientConfig));
     cacheRegistry.registerCollectionMaxDataTimeCache(collectionMaxDataTimeCache);
+  }
+
+  public void initPeriodicCacheRefresh() {
+
+    final CacheResource cacheResource = new CacheResource();
+    ScheduledExecutorService service = Executors.newSingleThreadScheduledExecutor();
+    service.scheduleAtFixedRate(new Runnable() {
+
+      @Override
+      public void run() {
+        try {
+          cacheResource.refreshCollections();
+          cacheResource.refreshMaxDataTimeCache();
+        } catch (Exception e) {
+          LOGGER.error("Exception while loading collections", e);
+        }
+      }
+    }, 0, 20, TimeUnit.SECONDS);
   }
 
   // TODO below two methods depend on webapp configs

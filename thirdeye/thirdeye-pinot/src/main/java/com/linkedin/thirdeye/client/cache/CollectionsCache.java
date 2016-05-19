@@ -59,19 +59,6 @@ public class CollectionsCache {
     if (blacklistCollections != null && !blacklistCollections.isEmpty()) {
       blacklist = Lists.newArrayList(blacklistCollections.split(","));
     }
-
-    ScheduledExecutorService service = Executors.newSingleThreadScheduledExecutor();
-    service.scheduleAtFixedRate(new Runnable() {
-
-      @Override
-      public void run() {
-        try {
-          loadCollections();
-        } catch (Exception e) {
-          LOGGER.error("Exception while loading collections", e);
-        }
-      }
-    }, 0, 1, TimeUnit.HOURS);
   }
 
 

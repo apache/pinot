@@ -104,6 +104,8 @@ public class ThirdEyeDashboardApplication
 
     CollectionsCache collectionsCache = new CollectionsCache(pinotThirdeyeClientConfig, config);
     cacheRegistry.registerCollectionsCache(collectionsCache);
+
+    super.initPeriodicCacheRefresh();
   }
 
   private QueryCache createQueryCache(ThirdEyeClient thirdEyeClient,

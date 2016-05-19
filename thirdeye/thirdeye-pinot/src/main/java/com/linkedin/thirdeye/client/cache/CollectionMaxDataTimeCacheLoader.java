@@ -44,6 +44,8 @@ public class CollectionMaxDataTimeCacheLoader extends CacheLoader<String, Long> 
 
   @Override
   public Long load(String collection) throws Exception {
+
+    LOGGER.info("Loading maxDataTime cache {}", collection);
     long maxTime = 0;
     if (propertyStore != null) {
       List<Stat> stats = new ArrayList<>();
