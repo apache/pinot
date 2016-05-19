@@ -213,9 +213,14 @@ public class ThirdEyeJob {
               throws Exception {
         Properties config = new Properties();
 
-        config.setProperty(SegmentCreationPhaseConstants.SEGMENT_CREATION_INPUT_PATH.toString(),
-            getIndexDir(root, collection, minTime, maxTime)
-            + File.separator + DERIVED_COLUMN_TRANSFORMATION.getName());
+        Path derivedOutputPath = new Path(getIndexDir(root, collection, minTime, maxTime) + File.separator +
+            DERIVED_COLUMN_TRANSFORMATION.getName());
+        FileSystem fs = FileSystem.get(new Configuration());
+        if (fs.exists(derivedOutputPath)) {
+          inputPaths = derivedOutputPath.toString();
+        }
+
+        config.setProperty(SegmentCreationPhaseConstants.SEGMENT_CREATION_INPUT_PATH.toString(), inputPaths);
         config.setProperty(SegmentCreationPhaseConstants.SEGMENT_CREATION_OUTPUT_PATH.toString(),
             getIndexDir(root, collection, minTime, maxTime) + File.separator + SEGMENT_CREATION.getName());
         config.setProperty(SegmentCreationPhaseConstants.SEGMENT_CREATION_WALLCLOCK_START_TIME.toString(),

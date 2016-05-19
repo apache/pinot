@@ -41,6 +41,7 @@ import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.mapred.AvroKey;
 import org.apache.avro.mapreduce.AvroKeyInputFormat;
+import org.apache.commons.collections.MapUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -325,22 +326,24 @@ public class TopKPhaseJob extends Configured {
       }
 
       // Check metric percentage threshold
-      boolean isPassThreshold = false;
-      for (int i = 0; i < numMetrics; i++) {
-        String metric = metricNames.get(i);
-        double metricValue = aggMetricValues[i].doubleValue();
-        double metricSum = metricSums[i].doubleValue();
-        double metricThresholdPercentage = metricThresholds.get(metric);
-        if (metricValue > (metricSum * metricThresholdPercentage / 100)) {
-          isPassThreshold = true;
-          thresholdPassCount.put(dimensionName, thresholdPassCount.get(dimensionName) + 1);
-          break;
+      if (MapUtils.isNotEmpty(metricThresholds)) {
+        boolean isPassThreshold = false;
+        for (int i = 0; i < numMetrics; i++) {
+          String metric = metricNames.get(i);
+          double metricValue = aggMetricValues[i].doubleValue();
+          double metricSum = metricSums[i].doubleValue();
+          double metricThresholdPercentage = metricThresholds.get(metric);
+          if (metricValue > (metricSum * metricThresholdPercentage / 100)) {
+            isPassThreshold = true;
+            thresholdPassCount.put(dimensionName, thresholdPassCount.get(dimensionName) + 1);
+            break;
+          }
         }
+        if (!isPassThreshold) {
+          return;
+        }
+        dimensionNameToValuesMap.get(dimensionName).put(dimensionValue, aggMetricValues);
       }
-      if (!isPassThreshold) {
-        return;
-      }
-      dimensionNameToValuesMap.get(dimensionName).put(dimensionValue, aggMetricValues);
     }
 
     @Override
