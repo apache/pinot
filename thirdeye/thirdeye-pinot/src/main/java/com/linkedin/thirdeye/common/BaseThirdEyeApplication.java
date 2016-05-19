@@ -110,7 +110,7 @@ public abstract class BaseThirdEyeApplication<T extends Configuration> extends A
           LOGGER.error("Exception while loading collections", e);
         }
       }
-    }, 0, 20, TimeUnit.SECONDS);
+    }, 0, 1, TimeUnit.HOURS);
   }
 
   // TODO below two methods depend on webapp configs
