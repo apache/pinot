@@ -731,10 +731,10 @@ function selectCurrentDateRange(target){
             $(".current-start-time-input[rel='"+ currentTab +"']").val("00:00");
 
             //disable the inputfields
-            $(".current-start-date-input[rel='"+ currentTab +"']").attr("disabled", true);
-            $(".current-end-date-input[rel='"+ currentTab +"']").attr("disabled", true);
-            $(".current-start-time-input[rel='"+ currentTab +"']").attr("disabled", true);
-            $(".current-end-time-input[rel='"+ currentTab +"']").attr("disabled", true);
+            //$(".current-start-date-input[rel='"+ currentTab +"']").attr("disabled", true);
+            //$(".current-end-date-input[rel='"+ currentTab +"']").attr("disabled", true);
+            //$(".current-start-time-input[rel='"+ currentTab +"']").attr("disabled", true);
+            //$(".current-end-time-input[rel='"+ currentTab +"']").attr("disabled", true);
 
             break;
         case "7": //last7days not full days
@@ -1086,7 +1086,7 @@ function assignColorByID(len, index){
 
     var colorAry =  colorScale(len)
 
-    return "#" + colorAry[index]
+    return colorAry[index]
 
 
 }
@@ -1119,7 +1119,7 @@ function colorScale(len){
         }
 
         var str = (integer.toString(16) + "dddddd")
-        var hex = integer.toString(16).length < 6 ? str.substr(0,6) : integer.toString(16)
+        var hex = integer.toString(16).length < 6 ? "#" + str.substr(0,6) : "#" + integer.toString(16)
         colorAry.push( hex )
     }
 

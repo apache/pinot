@@ -37,6 +37,8 @@ $(document).ready(function() {
     });
 
 
+    //If you change this method change the colorScale() and assignColorByID()functions too
+    //those 2 are defining the color of the lines on every timeseries chart when the number of items are > 20
     Handlebars.registerHelper('assignColorByID', function(len, index){
 
         //16777216 = 256 ^ 3
@@ -59,11 +61,11 @@ $(document).ready(function() {
 
 
             var str = (num.toString(16) + "dddddd")
-            var hex = num.toString(16).length < 6 ? str.substr(0,6) : num.toString(16)
+            var hex = num.toString(16).length < 6 ? "#" + str.substr(0,6) : "#" + num.toString(16)
             colorAry.push( hex )
         }
 
-        return "#" + colorAry[index]
+        return colorAry[index]
 
     });
 

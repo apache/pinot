@@ -75,6 +75,7 @@ function drawTimeSeries(ajaxData) {
 	}
 	lineChartData["time"] = xTicksCurrent;
 	barChartData["time"] = xTicksCurrent;
+
     var colorArray;
     if (metrics.length < 10) {
         colorArray = d3.scale.category10().range();
