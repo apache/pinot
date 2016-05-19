@@ -1,30 +1,15 @@
 package com.linkedin.thirdeye.common;
 
-import java.io.IOException;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 
-import org.apache.http.client.ClientProtocolException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.LoadingCache;
-import com.linkedin.pinot.client.ResultSetGroup;
-import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.thirdeye.api.CollectionSchema;
-import com.linkedin.thirdeye.client.PinotQuery;
-import com.linkedin.thirdeye.client.ThirdeyeCacheRegistry;
-import com.linkedin.thirdeye.client.cache.CollectionMaxDataTimeCacheLoader;
-import com.linkedin.thirdeye.client.cache.CollectionSchemaCacheLoader;
-import com.linkedin.thirdeye.client.cache.ResultSetGroupCacheLoader;
-import com.linkedin.thirdeye.client.cache.SchemaCacheLoader;
-import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClientConfig;
 import com.linkedin.thirdeye.dashboard.ThirdEyeDashboardApplication;
 import com.linkedin.thirdeye.dashboard.configs.AbstractConfigDAO;
+import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
+import com.linkedin.thirdeye.dashboard.configs.DashboardConfig;
 import com.linkedin.thirdeye.dashboard.configs.FileBasedConfigDAOFactory;
-import com.linkedin.thirdeye.dashboard.resources.CacheResource;
 import com.linkedin.thirdeye.detector.api.AnomalyFunctionRelation;
 import com.linkedin.thirdeye.detector.api.AnomalyFunctionSpec;
 import com.linkedin.thirdeye.detector.api.AnomalyResult;
@@ -59,8 +44,6 @@ public abstract class BaseThirdEyeApplication<T extends Configuration> extends A
   protected EmailConfigurationDAO emailConfigurationDAO;
   protected AnomalyFunctionRelationDAO anomalyFunctionRelationDAO;
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(BaseThirdEyeApplication.class);
-
   public void initDetectorRelatedDAO() {
     anomalyFunctionSpecDAO = new AnomalyFunctionSpecDAO(hibernateBundle.getSessionFactory());
     anomalyResultDAO = new AnomalyResultDAO(hibernateBundle.getSessionFactory());
@@ -70,48 +53,6 @@ public abstract class BaseThirdEyeApplication<T extends Configuration> extends A
         new AnomalyFunctionRelationDAO(hibernateBundle.getSessionFactory());
   }
 
-  public void initCacheLoaders(PinotThirdEyeClientConfig pinotThirdeyeClientConfig,
-      AbstractConfigDAO<CollectionSchema> collectionSchemaDAO)
-      throws ClientProtocolException, IOException {
-
-    ThirdeyeCacheRegistry cacheRegistry = ThirdeyeCacheRegistry.getInstance();
-
-    // TODO: have a limit on key size and maximum weight
-    LoadingCache<PinotQuery, ResultSetGroup> resultSetGroupCache =
-        CacheBuilder.newBuilder().expireAfterAccess(1, TimeUnit.HOURS)
-            .build(new ResultSetGroupCacheLoader(pinotThirdeyeClientConfig));
-    cacheRegistry.registerResultSetGroupCache(resultSetGroupCache);
-
-    LoadingCache<String, Schema> schemaCache =
-        CacheBuilder.newBuilder().build(new SchemaCacheLoader(pinotThirdeyeClientConfig));
-    cacheRegistry.registerSchemaCache(schemaCache);
-
-    LoadingCache<String, CollectionSchema> collectionSchemaCache = CacheBuilder.newBuilder()
-        .build(new CollectionSchemaCacheLoader(pinotThirdeyeClientConfig, collectionSchemaDAO));
-    cacheRegistry.registerCollectionSchemaCache(collectionSchemaCache);
-
-    LoadingCache<String, Long> collectionMaxDataTimeCache = CacheBuilder.newBuilder()
-        .build(new CollectionMaxDataTimeCacheLoader(pinotThirdeyeClientConfig));
-    cacheRegistry.registerCollectionMaxDataTimeCache(collectionMaxDataTimeCache);
-  }
-
-  public void initPeriodicCacheRefresh() {
-
-    final CacheResource cacheResource = new CacheResource();
-    ScheduledExecutorService service = Executors.newSingleThreadScheduledExecutor();
-    service.scheduleAtFixedRate(new Runnable() {
-
-      @Override
-      public void run() {
-        try {
-          cacheResource.refreshCollections();
-          cacheResource.refreshMaxDataTimeCache();
-        } catch (Exception e) {
-          LOGGER.error("Exception while loading collections", e);
-        }
-      }
-    }, 0, 1, TimeUnit.HOURS);
-  }
 
   // TODO below two methods depend on webapp configs
   protected AbstractConfigDAO<CollectionSchema> getCollectionSchemaDAO(
@@ -119,6 +60,22 @@ public abstract class BaseThirdEyeApplication<T extends Configuration> extends A
     FileBasedConfigDAOFactory configDAOFactory =
         new FileBasedConfigDAOFactory(getWebappConfigDir(config));
     AbstractConfigDAO<CollectionSchema> configDAO = configDAOFactory.getCollectionSchemaDAO();
+    return configDAO;
+  }
+
+  protected AbstractConfigDAO<CollectionConfig> getCollectionConfigDAO(
+      ThirdEyeConfiguration config) {
+    FileBasedConfigDAOFactory configDAOFactory =
+        new FileBasedConfigDAOFactory(getWebappConfigDir(config));
+    AbstractConfigDAO<CollectionConfig> configDAO = configDAOFactory.getCollectionConfigDAO();
+    return configDAO;
+  }
+
+  protected AbstractConfigDAO<DashboardConfig> getDashboardConfigDAO(
+      ThirdEyeConfiguration config) {
+    FileBasedConfigDAOFactory configDAOFactory =
+        new FileBasedConfigDAOFactory(getWebappConfigDir(config));
+    AbstractConfigDAO<DashboardConfig> configDAO = configDAOFactory.getDashboardConfigDAO();
     return configDAO;
   }
 

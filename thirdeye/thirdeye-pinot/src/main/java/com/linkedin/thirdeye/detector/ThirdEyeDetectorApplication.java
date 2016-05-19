@@ -19,6 +19,7 @@ import org.slf4j.LoggerFactory;
 import com.linkedin.thirdeye.api.CollectionSchema;
 import com.linkedin.thirdeye.client.QueryCache;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
+import com.linkedin.thirdeye.client.ThirdeyeCacheRegistry;
 import com.linkedin.thirdeye.client.comparison.TimeOnTimeComparisonHandler;
 import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClient;
 import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClientConfig;
@@ -26,6 +27,7 @@ import com.linkedin.thirdeye.client.timeseries.TimeSeriesHandler;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesResponseConverter;
 import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
 import com.linkedin.thirdeye.dashboard.configs.AbstractConfigDAO;
+import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
 import com.linkedin.thirdeye.detector.api.AnomalyFunctionSpec;
 import com.linkedin.thirdeye.detector.db.HibernateSessionWrapper;
 import com.linkedin.thirdeye.detector.driver.AnomalyDetectionJobManager;
@@ -105,9 +107,10 @@ public class ThirdEyeDetectorApplication
 
     //
     AbstractConfigDAO<CollectionSchema> collectionSchemaDAO = getCollectionSchemaDAO(config);
+    AbstractConfigDAO<CollectionConfig> collectionConfigDAO = getCollectionConfigDAO(config);
     // initialize caches
     try {
-      super.initCacheLoaders(pinotThirdeyeClientConfig, collectionSchemaDAO);
+      ThirdeyeCacheRegistry.initializeDetectorCaches(pinotThirdeyeClientConfig, collectionSchemaDAO, collectionConfigDAO);
     } catch (Exception e) {
       LOG.error("Exception while loading caches", e);
     }

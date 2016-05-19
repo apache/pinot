@@ -1,28 +1,21 @@
 package com.linkedin.thirdeye.dashboard;
 
-import java.io.IOException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import org.apache.http.client.ClientProtocolException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.LoadingCache;
 import com.linkedin.thirdeye.api.CollectionSchema;
 import com.linkedin.thirdeye.client.QueryCache;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.client.ThirdeyeCacheRegistry;
-import com.linkedin.thirdeye.client.cache.CollectionConfigCacheLoader;
-import com.linkedin.thirdeye.client.cache.CollectionsCache;
 import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClient;
 import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClientConfig;
 import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
 import com.linkedin.thirdeye.dashboard.configs.AbstractConfigDAO;
 import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
 import com.linkedin.thirdeye.dashboard.configs.DashboardConfig;
-import com.linkedin.thirdeye.dashboard.configs.FileBasedConfigDAOFactory;
 import com.linkedin.thirdeye.dashboard.resources.CacheResource;
 import com.linkedin.thirdeye.dashboard.resources.DashboardResource;
 import com.linkedin.thirdeye.detector.resources.AnomalyResultResource;
@@ -78,7 +71,7 @@ public class ThirdEyeDashboardApplication
 
     // initialize caches
     try {
-      initCacheLoaders(pinotThirdeyeClientConfig, collectionSchemaDAO, collectionConfigDAO, config);
+      ThirdeyeCacheRegistry.initializeWebappCaches(pinotThirdeyeClientConfig, collectionSchemaDAO, collectionConfigDAO, config);
     } catch (Exception e) {
       LOG.error("Exception while loading caches", e);
     }
@@ -90,53 +83,11 @@ public class ThirdEyeDashboardApplication
     env.jersey().register(new CacheResource());
   }
 
-  private void initCacheLoaders(PinotThirdEyeClientConfig pinotThirdeyeClientConfig,
-      AbstractConfigDAO<CollectionSchema> collectionSchemaDAO, AbstractConfigDAO<CollectionConfig> collectionConfigDAO,
-      ThirdEyeDashboardConfiguration config) throws ClientProtocolException, IOException {
-
-    super.initCacheLoaders(pinotThirdeyeClientConfig, collectionSchemaDAO);
-    // Add collections cache, collections config cache, in addition to defaults
-    ThirdeyeCacheRegistry cacheRegistry = ThirdeyeCacheRegistry.getInstance();
-
-    LoadingCache<String, CollectionConfig> collectionConfigCache = CacheBuilder.newBuilder()
-        .build(new CollectionConfigCacheLoader(pinotThirdeyeClientConfig, collectionConfigDAO));
-    cacheRegistry.registerCollectionConfigCache(collectionConfigCache);
-
-    CollectionsCache collectionsCache = new CollectionsCache(pinotThirdeyeClientConfig, config);
-    cacheRegistry.registerCollectionsCache(collectionsCache);
-
-    super.initPeriodicCacheRefresh();
-  }
 
   private QueryCache createQueryCache(ThirdEyeClient thirdEyeClient,
       ExecutorService queryExecutor) {
     QueryCache queryCache = new QueryCache(thirdEyeClient, Executors.newFixedThreadPool(10));
     return queryCache;
-  }
-
-  private AbstractConfigDAO<DashboardConfig> getDashboardConfigDAO(
-      ThirdEyeDashboardConfiguration config) {
-    FileBasedConfigDAOFactory configDAOFactory =
-        new FileBasedConfigDAOFactory(getWebappConfigDir(config));
-    AbstractConfigDAO<DashboardConfig> configDAO = configDAOFactory.getDashboardConfigDAO();
-    return configDAO;
-  }
-
-
-  private AbstractConfigDAO<CollectionSchema> getCollectionSchemaDAO(
-      ThirdEyeDashboardConfiguration config) {
-    FileBasedConfigDAOFactory configDAOFactory =
-        new FileBasedConfigDAOFactory(getWebappConfigDir(config));
-    AbstractConfigDAO<CollectionSchema> configDAO = configDAOFactory.getCollectionSchemaDAO();
-    return configDAO;
-  }
-
-  private AbstractConfigDAO<CollectionConfig> getCollectionConfigDAO(
-      ThirdEyeDashboardConfiguration config) {
-    FileBasedConfigDAOFactory configDAOFactory =
-        new FileBasedConfigDAOFactory(getWebappConfigDir(config));
-    AbstractConfigDAO<CollectionConfig> configDAO = configDAOFactory.getCollectionConfigDAO();
-    return configDAO;
   }
 
   public static void main(String[] args) throws Exception {
