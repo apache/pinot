@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.query.aggregation.groupby;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.MinMaxPriorityQueue;
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.request.AggregationInfo;
@@ -272,6 +273,94 @@ public class AggregationGroupByOperatorService {
   }
 
   /**
+   * Given a map from group by keys to results for multiple aggregation functions, trim the results to desired size and
+   * put them into a list of group by results. This will make it compatible to the old group by code for the upper
+   * layer.
+   *
+   * @param aggrGroupByResults Map from group by keys to result arrays.
+   * @param numAggrFunctions Number of aggregation functions.
+   * @return Trimmed list of maps containing group by results.
+   */
+  public List<Map<String, Serializable>> trimToSize(Map<String, Serializable[]> aggrGroupByResults,
+      int numAggrFunctions) {
+    Preconditions.checkNotNull(aggrGroupByResults);
+
+    List<Map<String, Serializable>> trimmedResults = new ArrayList<>(numAggrFunctions);
+    for (int i = 0; i < numAggrFunctions; i++) {
+      trimmedResults.add(new HashMap<String, Serializable>());
+    }
+
+    if (aggrGroupByResults.size() > _trimThreshold) {
+      trimToSize(_aggregationFunctionList, aggrGroupByResults, trimmedResults, numAggrFunctions, _trimSize);
+    } else {
+      convertGroupByResultsFromMapToList(aggrGroupByResults, trimmedResults, numAggrFunctions);
+    }
+
+    return trimmedResults;
+  }
+
+  /**
+   * Given a map from group by keys to results for multiple aggregation functions, convert it to a list of group by
+   * results, each of them according to one aggregation function.
+   *
+   * @param aggrGroupByResults Map from group by keys to result arrays.
+   * @param aggrGroupByResultList List of maps containing group by results returned.
+   * @param numAggrFunctions Number of aggregation functions.
+   */
+  private static void convertGroupByResultsFromMapToList(Map<String, Serializable[]> aggrGroupByResults,
+      List<Map<String, Serializable>> aggrGroupByResultList, int numAggrFunctions) {
+    for (String key : aggrGroupByResults.keySet()) {
+      Serializable[] results = aggrGroupByResults.get(key);
+      for (int i = 0; i < numAggrFunctions; i++) {
+        aggrGroupByResultList.get(i).put(key, results[i]);
+      }
+    }
+  }
+
+  /**
+   * Given a map from group by keys to results for multiple aggregation functions, trim the results to desired size and
+   * put them into a list of group by results.
+   *
+   * @param aggrFuncList List of aggregation functions.
+   * @param aggrGroupByResults Map from group by keys to result arrays.
+   * @param trimmedGroupByResultList List of maps containing group by results returned.
+   * @param numAggrFunctions Number of aggregation functions.
+   * @param trimSize Desired trim size.
+   */
+  @SuppressWarnings("unchecked")
+  private static void trimToSize(List<AggregationFunction> aggrFuncList, Map<String, Serializable[]> aggrGroupByResults,
+      List<Map<String, Serializable>> trimmedGroupByResultList, int numAggrFunctions, int trimSize) {
+    MinMaxPriorityQueue<ImmutablePair<Serializable, String>>[] heaps = new MinMaxPriorityQueue[numAggrFunctions];
+    for (int i = 0; i < numAggrFunctions; i++) {
+      boolean reverseOrder = aggrFuncList.get(i).getFunctionName().startsWith(MIN_PREFIX);
+      heaps[i] = getMinMaxPriorityQueue(aggrGroupByResults.values().iterator().next()[i], trimSize, reverseOrder);
+    }
+
+    for (String key : aggrGroupByResults.keySet()) {
+      Serializable[] results = aggrGroupByResults.get(key);
+      for (int i = 0; i < numAggrFunctions; i++) {
+        Serializable result = results[i];
+        MinMaxPriorityQueue<ImmutablePair<Serializable, String>> heap = heaps[i];
+        if (heap == null) {
+          trimmedGroupByResultList.get(i).put(key, result);
+        } else {
+          heap.add(new ImmutablePair(result, key));
+        }
+      }
+    }
+
+    for (int i = 0; i < numAggrFunctions; i++) {
+      MinMaxPriorityQueue<ImmutablePair<Serializable, String>> heap = heaps[i];
+      ImmutablePair<Serializable, String> pair;
+      if (heap != null) {
+        while ((pair = heap.pollFirst()) != null) {
+          trimmedGroupByResultList.get(i).put(pair.getRight(), pair.getLeft());
+        }
+      }
+    }
+  }
+
+  /**
    * Given a group by result, return a group by result trimmed to provided size.
    * Sorting ordering is determined based on aggregation function.
    *
@@ -313,7 +402,7 @@ public class AggregationGroupByOperatorService {
    * @param reverseOrder True if sorting order to be reversed.
    * @return
    */
-  MinMaxPriorityQueue<ImmutablePair<Serializable, String>> getMinMaxPriorityQueue(Serializable sampleObject,
+  private static MinMaxPriorityQueue<ImmutablePair<Serializable, String>> getMinMaxPriorityQueue(Serializable sampleObject,
       int maxSize, boolean reverseOrder) {
     if (!(sampleObject instanceof Comparable)) {
       return null;
@@ -332,7 +421,7 @@ public class AggregationGroupByOperatorService {
    * This class provides custom comparator to compare two groups of a groupByResult.
    * @param <T>
    */
-  class GroupByResultComparator<T extends Comparable & Serializable> {
+  static class GroupByResultComparator<T extends Comparable & Serializable> {
 
     Comparator<T> newComparator(final boolean reverseOrder) {
       return new Comparator() {

@@ -214,35 +214,14 @@ public class MCombineGroupByOperator extends BaseOperator {
     }
 
     operatorLatch.await(_timeOutMs, TimeUnit.SECONDS);
-    List<Map<String, Serializable>> untrimmedResults = buildMergedResults(resultsMap, numAggrFunctions);
-    return buildResultBlock(aggregationFunctions, untrimmedResults, blocks);
-  }
 
-  /**
-   * Helper method to build a list of maps (one element per aggregation function) containing a
-   * group-key to aggregation function value mapping.
-   *
-   * @param numAggrFunctions
-   * @param combinedResultsMap
-   * @return
-   */
-  private List<Map<String, Serializable>> buildMergedResults(Map<String, Serializable[]> combinedResultsMap,
-      int numAggrFunctions) {
-    List<Map<String, Serializable>> mergedResults = new ArrayList<>();
+    // Use aggregationGroupByOperatorService to trim the resultsMap
+    AggregationGroupByOperatorService aggregationGroupByOperatorService =
+        new AggregationGroupByOperatorService(_brokerRequest.getAggregationsInfo(), _brokerRequest.getGroupBy());
+    List<Map<String, Serializable>> trimmedResults =
+        aggregationGroupByOperatorService.trimToSize(resultsMap, numAggrFunctions);
 
-    for (int i = 0; i < numAggrFunctions; i++) {
-      mergedResults.add(new HashMap<String, Serializable>(combinedResultsMap.size()));
-    }
-
-    for (Map.Entry<String, Serializable[]> entry : combinedResultsMap.entrySet()) {
-      String groupKey = entry.getKey();
-      Serializable[] results = entry.getValue();
-      for (int i = 0; i < numAggrFunctions; i++) {
-        mergedResults.get(i).put(groupKey, results[i]);
-      }
-    }
-
-    return mergedResults;
+    return buildResultBlock(aggregationFunctions, trimmedResults, blocks);
   }
 
   /**
@@ -250,14 +229,14 @@ public class MCombineGroupByOperator extends BaseOperator {
    * merged results from all underlying operators.
    *
    * @param aggregationFunctions List of aggregation functions.
-   * @param mergedResults Map containing the merged results.
+   * @param trimmedResults List of maps containing the trimmed results.
    * @param blocks Array of blocks for which the results are being merged.
    * @return IntermediateResultsBlock containing merged results.
    */
   private IntermediateResultsBlock buildResultBlock(List<AggregationFunction> aggregationFunctions,
-      List<Map<String, Serializable>> mergedResults, IntermediateResultsBlock[] blocks) {
+      List<Map<String, Serializable>> trimmedResults, IntermediateResultsBlock[] blocks) {
 
-    IntermediateResultsBlock resultBlock = new IntermediateResultsBlock(aggregationFunctions, mergedResults, true);
+    IntermediateResultsBlock resultBlock = new IntermediateResultsBlock(aggregationFunctions, trimmedResults, true);
     List<ProcessingException> exceptions = null;
 
     long numDocsScanned = 0;
@@ -281,23 +260,7 @@ public class MCombineGroupByOperator extends BaseOperator {
     resultBlock.setTotalRawDocs(totalRawDocs);
     resultBlock.setExceptionsList(exceptions);
 
-    trimToSize(_brokerRequest, resultBlock);
     return resultBlock;
-  }
-
-  /**
-   * Sort and trim the result based on 'TOP N' specified in the brokerRequest.
-   * Sorting and trimming done in-place on the specified mergedBlock.
-   *
-   * @param brokerRequest
-   * @param mergedBlock IntermediateResultsBlock containing the merged results, that need to be trimmed.
-   */
-  private void trimToSize(BrokerRequest brokerRequest, IntermediateResultsBlock mergedBlock) {
-    AggregationGroupByOperatorService aggregationGroupByOperatorService =
-        new AggregationGroupByOperatorService(brokerRequest.getAggregationsInfo(), brokerRequest.getGroupBy());
-    List<Map<String, Serializable>> trimmedResults =
-        aggregationGroupByOperatorService.trimToSize(mergedBlock.getAggregationGroupByOperatorResult());
-    mergedBlock.setAggregationGroupByResult(trimmedResults);
   }
 
   @Override
