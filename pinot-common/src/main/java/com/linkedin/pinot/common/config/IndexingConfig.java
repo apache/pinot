@@ -21,10 +21,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class IndexingConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(IndexingConfig.class);
 
