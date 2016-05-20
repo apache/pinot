@@ -149,11 +149,6 @@ function renderContributionTimeSeries(ajaxData) {
         colors[dimensionValue + "-percentChange"] = colorArray[dimensionValIndex];
       }
 
-        console.log('contrib colorArray:')
-        console.log(colorArray)
-        console.log("contrib colors:")
-        console.log(colors)
-
 
 
       // line chart

@@ -168,3 +168,8 @@ $("#main-view").on("click", "#funnels-table .heat-map-cell", function() {
 $("#main-view").on("click", ".close-btn", function() {
     $(this).hide();
 })
+
+$("#main-view").on("click", ".close-parent", function() {
+    $(this).parent().hide();
+})
+

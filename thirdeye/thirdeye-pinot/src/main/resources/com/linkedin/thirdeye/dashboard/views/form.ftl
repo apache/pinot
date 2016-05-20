@@ -78,7 +78,8 @@
                 <label  class="uk-form-label">
                     Date range selector
                 </label>
-                <div class="time-range-selector-dropdown" data-uk-dropdown="{mode:'click'}" rel="{{tabName}}" style="position: relative;">
+                <span> ( Max date: <span class="max-time"></span> )</span>
+                <div class="time-range-selector-dropdown" data-uk-dropdown="{mode:'click'}" rel="{{tabName}}">
                     <div class="date-time-selector-box">
                         <table class="date-time-selector-box-table">
                             <tr>
@@ -182,7 +183,8 @@
             <div id="{{tabName}}-time-input-form-error" class="time-input-form-error uk-alert uk-alert-danger uk-form-row hidden">
                 <p></p>
             </div>
-            <div id="{{tabName}}-form-tip" class="uk-alert uk-form-row hidden">
+            <div id="{{tabName}}-form-tip" class="tip-to-user uk-alert uk-form-row hidden">
+                <i class="close-parent uk-icon-close"></i>
                 <p></p>
             </div>
 

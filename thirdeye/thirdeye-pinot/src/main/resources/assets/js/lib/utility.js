@@ -133,8 +133,11 @@ function updateDashboardFormFromHash(){
         }
     }
 
+    //click the first filter-dimension-option so the dimension values are visible for that dimension
     $(".filter-dimension-option:first-of-type").click();
 
+
+    //UPDATE DATE TIME
     var tz = getTimeZone();
     var maxMillis = window.datasetConfig.maxMillis;
     var currentStartDateTime;
@@ -158,38 +161,40 @@ function updateDashboardFormFromHash(){
         currentStartDateTimeUTC = moment(parseInt(hash.currentStart)).tz('UTC');
 
         currentStartDateTime = currentStartDateTimeUTC.clone().tz(tz);
-        currentStartDateString = currentStartDateTime
-            .format("YYYY-MM-DD");
-        currentStartTimeString = currentStartDateTime
-            .format("HH:mm");
+        currentStartDateString = currentStartDateTime.format("YYYY-MM-DD");
+        currentStartTimeString = currentStartDateTime.format("HH:mm");
 
     } else if(maxMillis){
         // populate max date -1 day
         currentStartDateTime = moment(maxMillis).add(-1, 'days');
+
+        //If time granularity is DAYS have default 7 days in the time selector on pageload
+        if(window.datasetConfig.dataGranularity && window.datasetConfig.dataGranularity == "DAYS"){
+            currentStartDateTime = moment(maxMillis).add(-7, 'days');
+        }
+
         currentStartDateString = currentStartDateTime.format("YYYY-MM-DD");
         currentStartTimeString = currentStartDateTime.format("HH:00");
 
     }else{
 
         // populate todays date
-        currentStartDateTime = moment(parseInt(Date.now()));
+        currentStartDateTime = moment();
         currentStartDateString = currentStartDateTime.format("YYYY-MM-DD");
         currentStartTimeString = currentStartDateTime.format("00:00");
     }
 
     if (hash.hasOwnProperty("currentEnd")) {
         currentEndDateTime = moment(parseInt(hash.currentEnd)).tz('UTC').clone().tz(tz);
-        currentEndDateString = currentEndDateTime
-            .format("YYYY-MM-DD");
-        currentEndTimeString = currentEndDateTime
-            .format("HH:mm");
+        currentEndDateString = currentEndDateTime.format("YYYY-MM-DD");
+        currentEndTimeString = currentEndDateTime.format("HH:mm");
     } else if(maxMillis) {
 
         currentEndDateTime = moment(maxMillis);
         currentEndDateString = currentEndDateTime.format("YYYY-MM-DD");
         currentEndTimeString = currentEndDateTime.format("HH:00");
     }else{
-        currentEndDateTime = moment(parseInt(Date.now()));
+        currentEndDateTime = moment();
         currentEndDateString = currentEndDateTime.format("YYYY-MM-DD");
         currentEndTimeString = currentEndDateTime.format("HH:00");
     }
@@ -537,31 +542,65 @@ function removeSelection(target){
     enableFormSubmit()
 }
 
-
-
 /** DASHBOARD FORM TIME RELATED METHODS **/
 function  selectAggregate(target) {
 
-
-    //update hash
     var currentView=  hash.view
-    var currentContainer = $(".current-date-range-selector[rel='"+ currentView +"']")
     var unit = $(target).attr("unit")
 
-    //if dayly granularity selected set the timerange to last 7 days with 12am time
+    //update hash
+    hash.aggTimeGranularity = unit;
+
+    if ($("#"+ hash.view +"-form-tip").attr("data-tip-source") == "daily-aggregate") {
+        $("#" + hash.view + "-form-tip").hide();
+    }
+
+    //Display message to user if daily granularity selected and only 1 day set the timerange to last 7 days with 12am time
     if(unit == "DAYS"){
 
-       $(".current-date-range-selector[rel='"+ currentView +"']").val("7")
-        $(".current-date-range-selector[rel='"+ currentView +"']").change()
 
+        //Set the time selectors to midnight
         $("#"+ currentView +"-current-end-time-input").val("00:00");
         $("#"+ currentView +"-current-start-time-input").val("00:00");
         $("#"+ currentView +"-baseline-start-time-input").val("00:00");
         $("#"+ currentView +"-baseline-end-time-input").val("00:00");
-        $(".time-input-apply-btn[rel='"+ currentView +"']" ).click()
+        $(".time-input-apply-btn[rel='"+ currentView +"']" ).click();
+
+        //close uikit dropdown
+        $("[data-uk-dropdown]").removeClass("uk-open");
+        $("[data-uk-dropdown]").attr("aria-expanded", false);
+        $(".uk-dropdown").hide();
+
+
+
+        //Display message to the user if he would query only one datapoint
+
+        var currentStartDate = $(".current-start-date[rel='"+ currentView +"']").text()
+        var currentEndDate =  $(".current-end-date[rel='"+ currentView +"']").text()
+
+        //Using UTC timezone in comparison since timezone doesn't matter in this case
+        var currentStartDateMillis = moment.tz(currentStartDate, "UTC").valueOf()
+        var currentEndDateMillis = moment.tz(currentEndDate, "UTC").valueOf()
+
+        var diff = currentEndDateMillis - currentStartDateMillis
+        if(diff <= 86400000){
+
+            var tipMessage = $("#"+ hash.view +"-form-tip p");
+            var tipContainer = $("#"+ hash.view +"-form-tip");
+            tipContainer.attr("data-tip-source", "daily-aggregate");
+            tipMessage.html("Select a broader date range to receive more meaningful data, more data points.");
+            tipContainer.fadeIn(100);
+
+
+          }
+        //
+// <div class="tip-to-user uk-alert close-btn">
+//    <i class="close-dropdown-btn uk-icon-close"></i>
+//    <span>Select broader timerange for daily data so the chart contains more than 1 data point</span>
+//</div>
+
 
     }
-    hash.aggTimeGranularity = unit;
 
     //Enable form submit
     enableFormSubmit()
@@ -900,13 +939,13 @@ function  applyTimeRangeSelection(target) {
     var currentStartDate = $(".current-start-date-input[rel='" + currentTab + "']").val();
     if (!currentStartDate) {
         errorMsg.html("Must provide start date");
-        disableApplyButton($(".time-input-apply-btn[rel='"+ currentTab +"']"))
+        disableApplyButton($(".time-input-apply-btn[rel='" + currentTab + "']"))
         errorAlrt.fadeIn(100);
 
         //show the dropdown
         $(".time-range-selector-dropdown[data-uk-dropdown]").addClass("uk-open");
         $(".time-range-selector-dropdown[data-uk-dropdown]").attr("aria-expanded", true);
-        $(".time-input-apply-btn[rel='"+ currentTab +"']").closest(".uk-dropdown").show();
+        $(".time-input-apply-btn[rel='" + currentTab + "']").closest(".uk-dropdown").show();
         return
     }
 
@@ -916,12 +955,12 @@ function  applyTimeRangeSelection(target) {
         errorAlrt.fadeIn(100);
 
 
-        disableApplyButton($(".time-input-apply-btn[rel='"+ currentTab +"']"))
+        disableApplyButton($(".time-input-apply-btn[rel='" + currentTab + "']"))
 
         //show the dropdown
         $(".time-range-selector-dropdown[data-uk-dropdown]").addClass("uk-open");
         $(".time-range-selector-dropdown[data-uk-dropdown]").attr("aria-expanded", true);
-        $(".time-input-apply-btn[rel='"+ currentTab +"']").closest(".uk-dropdown").show();
+        $(".time-input-apply-btn[rel='" + currentTab + "']").closest(".uk-dropdown").show();
         return
     }
 
@@ -929,12 +968,12 @@ function  applyTimeRangeSelection(target) {
     if (!currentStartTime) {
         errorMsg.html("Start time is required.");
         errorAlrt.fadeIn(100);
-        disableApplyButton($(".time-input-apply-btn[rel='"+ currentTab +"']"))
+        disableApplyButton($(".time-input-apply-btn[rel='" + currentTab + "']"))
 
         //show the dropdown
         $(".time-range-selector-dropdown[data-uk-dropdown]").addClass("uk-open");
         $(".time-range-selector-dropdown[data-uk-dropdown]").attr("aria-expanded", true);
-        $(".time-input-apply-btn[rel='"+ currentTab +"']").closest(".uk-dropdown").show();
+        $(".time-input-apply-btn[rel='" + currentTab + "']").closest(".uk-dropdown").show();
         return
     }
 
@@ -942,12 +981,12 @@ function  applyTimeRangeSelection(target) {
     if (!currentEndTime) {
         errorMsg.html("End time is required.");
         errorAlrt.fadeIn(100);
-        disableApplyButton($(".time-input-apply-btn[rel='"+ currentTab +"']"))
+        disableApplyButton($(".time-input-apply-btn[rel='" + currentTab + "']"))
 
         //show the dropdown
         $(".time-range-selector-dropdown[data-uk-dropdown]").addClass("uk-open");
         $(".time-range-selector-dropdown[data-uk-dropdown]").attr("aria-expanded", true);
-        $(".time-input-apply-btn[rel='"+ currentTab +"']").closest(".uk-dropdown").show();
+        $(".time-input-apply-btn[rel='" + currentTab + "']").closest(".uk-dropdown").show();
         return
     }
 
@@ -960,16 +999,16 @@ function  applyTimeRangeSelection(target) {
 
 
     //Error handling
-    if (currentStartMillisUTC > currentEndMillisUTC) {
+    if (currentStartMillisUTC >= currentEndMillisUTC) {
 
-        errorMsg.html("Please choose an end date that is later than the start date.");
+        errorMsg.html("Please choose a start date that is earlier than the end date.");
         errorAlrt.fadeIn(100);
-        disableApplyButton($(".time-input-apply-btn[rel='"+ currentTab +"']"))
+        disableApplyButton($(".time-input-apply-btn[rel='" + currentTab + "']"))
 
         //show the dropdown
         $(".time-range-selector-dropdown[data-uk-dropdown]").addClass("uk-open");
         $(".time-range-selector-dropdown[data-uk-dropdown]").attr("aria-expanded", true);
-        $(".time-input-apply-btn[rel='"+ currentTab +"']").closest(".uk-dropdown").show();
+        $(".time-input-apply-btn[rel='" + currentTab + "']").closest(".uk-dropdown").show();
         return
 
     }
@@ -981,8 +1020,8 @@ function  applyTimeRangeSelection(target) {
      return
      }*/
 
-    if(maxMillis){
-        if(currentStartMillisUTC > maxMillis || currentEndMillisUTC > maxMillis) {
+    if (maxMillis) {
+        if (currentStartMillisUTC > maxMillis || currentEndMillisUTC > maxMillis) {
 
             errorMsg.html("The data is available till: " + moment(maxMillis).format("YYYY-MM-DD h a") + ". Please select a time range prior to this date and time.");
             errorAlrt.fadeIn(100);
@@ -991,7 +1030,7 @@ function  applyTimeRangeSelection(target) {
             //show the dropdown
             $(".time-range-selector-dropdown[data-uk-dropdown]").addClass("uk-open");
             $(".time-range-selector-dropdown[data-uk-dropdown]").attr("aria-expanded", true);
-            $(".time-input-apply-btn[rel='"+ currentTab +"']").closest(".uk-dropdown").show();
+            $(".time-input-apply-btn[rel='" + currentTab + "']").closest(".uk-dropdown").show();
             return
         }
 
@@ -1012,13 +1051,13 @@ function  applyTimeRangeSelection(target) {
         if (baselineEndMillisUTC > currentStartMillisUTC && baselineStartMillisUTC < currentStartMillisUTC) {
 
             errorMsg.html("The compared time-periods overlap each-other, please adjust the request.");
-            disableApplyButton($(".time-input-apply-btn[rel='"+ currentTab +"']"))
+            disableApplyButton($(".time-input-apply-btn[rel='" + currentTab + "']"))
             errorAlrt.fadeIn(100);
 
             //show the dropdown
             $("[data-uk-dropdown]").addClass("uk-open");
             $("[data-uk-dropdown]").attr("aria-expanded", true);
-            $(".time-input-apply-btn[rel='"+ currentTab +"']").closest(".uk-dropdown").show();
+            $(".time-input-apply-btn[rel='" + currentTab + "']").closest(".uk-dropdown").show();
             return
 
         }
@@ -1030,11 +1069,20 @@ function  applyTimeRangeSelection(target) {
             //show the dropdown
             $("[data-uk-dropdown]").addClass("uk-open");
             $("[data-uk-dropdown]").attr("aria-expanded", true);
-            $(".time-input-apply-btn[rel='"+ currentTab +"']").closest(".uk-dropdown").show();
+            $(".time-input-apply-btn[rel='" + currentTab + "']").closest(".uk-dropdown").show();
             return
 
         }
     }
+
+    //hide user tip message about broader timerange
+    if (moment(currentEndDate).valueOf() - moment(currentStartDate).valueOf() > 86400000){
+
+        if ($("#"+ hash.view +"-form-tip").attr("data-tip-source") == "daily-aggregate") {
+            $("#" + hash.view + "-form-tip").hide();
+        }
+    }
+
 
     //Change the value of the time fields on the main form
     $(".current-start-date[rel='" + currentTab + "']").html(currentStartDateString);

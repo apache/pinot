@@ -60,9 +60,6 @@ function drawTimeSeries(ajaxData) {
 	var metrics = ajaxData["metrics"]
 	var lineChartData = {};
 	var barChartData = {};
-	var dateTimeformat = (hash.hasOwnProperty("aggTimeGranularity") && hash.aggTimeGranularity
-			.toLowerCase().indexOf("days") > -1) ? "MM-DD" : "h a";
-	var xTickFormat = dateTimeformat;
 	var xTicksBaseline = [];
 	var xTicksCurrent = [];
 	var colors = {};

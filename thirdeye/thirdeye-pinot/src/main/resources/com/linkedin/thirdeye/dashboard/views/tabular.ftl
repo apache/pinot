@@ -15,9 +15,9 @@
         </li>
     </ul>
 
-    <div id="funnel-table-msg" class="tip-to-user uk-alert close-btn">
-        <i class="close-dropdown-btn uk-icon-close"></i>
-        <span>Click on the cell to explore how various dimensions contributed to the change in the metric value for a specific time period.<br/>
+    <div id="funnel-table-msg" class="tip-to-user uk-alert">
+        <i class="close-parent uk-icon-close"></i>
+        <span>In the table below click on the cell to explore how various dimensions contributed to the change in the metric value for a specific time period.<br/>
         Click on the metric name to view the w-o-w difference trend on various dimension values.</span>
     </div>
 

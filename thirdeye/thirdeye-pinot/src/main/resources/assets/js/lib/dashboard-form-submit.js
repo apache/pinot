@@ -128,6 +128,14 @@ $("#main-view").on("click",".form-submit-btn",function(){
     var currentEnd = moment.tz(currentEndDate+ " " + currentEndTime, timezone);
     var currentEndMillisUTC = currentEnd.utc().valueOf();
 
+    if (currentStartMillisUTC >= currentEndMillisUTC) {
+
+        errorMessage.html("Please choose a start date that is earlier than the end date.");
+        errorAlert.fadeIn(100);
+        return
+
+    }
+
     hash.currentStart = currentStartMillisUTC;
     hash.currentEnd = currentEndMillisUTC;
 

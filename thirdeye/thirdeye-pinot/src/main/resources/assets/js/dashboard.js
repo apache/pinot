@@ -114,6 +114,7 @@ $(document).ready( function() {
 
         hash = parseHashParameters(window.location.hash);
         //delete hash.rand
+
         updateDashboardFormFromHash();
 
 

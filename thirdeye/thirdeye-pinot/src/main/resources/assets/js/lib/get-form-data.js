@@ -228,12 +228,8 @@ function getDatasetConfig() {
         $(".baseline-start-time-input").val(baselineStartTimeString);
         $(".baseline-end-time-input").val(baselineEndTimeString);
 
-        //Set the max date on the datepicker dropdowns
+
         var maxDate = moment(maxMillis).format("YYYY-MM-DD");
-        UIkit.datepicker(UIkit.$('.current-start-date-input'), { maxDate: maxDate, format:'YYYY-MM-DD' });
-        UIkit.datepicker(UIkit.$('.current-end-date-input'),  { maxDate: maxDate, format:'YYYY-MM-DD' });
-        UIkit.datepicker(UIkit.$('.baseline-start-date-input'),  { maxDate: maxDate, format:'YYYY-MM-DD' });
-        UIkit.datepicker(UIkit.$('.baseline-end-date-input'),  { maxDate: maxDate, format:'YYYY-MM-DD' });
 
         //Add max and min time as a label time selection dropdown var minMillis = data["minTime"];
         var maxDateTime = maxMillis ? moment(maxMillis).format("YYYY-MM-DD h a") : "n.a.";
@@ -247,7 +243,7 @@ function getDatasetConfig() {
 
         //if no data available for today 12am hide today and yesterday option from time selection
         //if( moment(parseInt(maxMillis)) < moment(parseInt(Date.now())) ){
-        var dateToday = moment(Date.now()).format("YYYY-MM-DD")
+        var dateToday = moment().format("YYYY-MM-DD")
 
         if(  moment(dateToday).isAfter( moment(maxDate) )  ){
 
