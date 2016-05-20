@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.detector.resources;
 
+import io.dropwizard.hibernate.UnitOfWork;
+
 import java.util.List;
 
 import javax.ws.rs.DELETE;
@@ -17,8 +19,6 @@ import com.codahale.metrics.annotation.Timed;
 import com.linkedin.thirdeye.detector.api.EmailConfiguration;
 import com.linkedin.thirdeye.detector.db.EmailConfigurationDAO;
 import com.linkedin.thirdeye.detector.email.EmailReportJobManager;
-
-import io.dropwizard.hibernate.UnitOfWork;
 
 @Path("/email-reports")
 @Produces(MediaType.APPLICATION_JSON)

@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.dashboard;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -19,18 +18,16 @@ import org.slf4j.LoggerFactory;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.cache.CacheLoader.InvalidCacheLoadException;
-import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.api.CollectionSchema;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.client.MetricExpression;
 import com.linkedin.thirdeye.client.MetricFunction;
 import com.linkedin.thirdeye.client.QueryCache;
+import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.ThirdEyeRequest;
 import com.linkedin.thirdeye.client.ThirdEyeRequest.ThirdEyeRequestBuilder;
 import com.linkedin.thirdeye.client.ThirdEyeResponse;
-import com.linkedin.thirdeye.client.ThirdEyeResponse;
-import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.dashboard.configs.AbstractConfigDAO;
 import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
 import com.linkedin.thirdeye.dashboard.configs.DashboardConfig;
@@ -40,7 +37,8 @@ public class Utils {
 
   private static String DEFAULT_DASHBOARD = "Default_Dashboard";
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-  private static ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
+  private static ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry
+      .getInstance();
 
   public static List<ThirdEyeRequest> generateRequests(String collection, String requestReference,
       MetricFunction metricFunction, List<String> dimensions, DateTime start, DateTime end) {
@@ -133,7 +131,8 @@ public class Utils {
 
     List<String> dashboards = new ArrayList<>();
     for (DashboardConfig dashboardConfig : dashboardConfigs) {
-      if (dashboardConfig == null || !collection.equalsIgnoreCase(dashboardConfig.getCollectionName())) {
+      if (dashboardConfig == null
+          || !collection.equalsIgnoreCase(dashboardConfig.getCollectionName())) {
         continue;
       } else {
         dashboards.add(dashboardConfig.getDashboardName());
@@ -150,34 +149,8 @@ public class Utils {
     return dashboardConfig.getMetricExpressions();
   }
 
-  public static Multimap<String, String> convertToMultiMap(String filterJson) {
-    ArrayListMultimap<String, String> multimap = ArrayListMultimap.create();
-    if (filterJson == null) {
-      return multimap;
-    }
-    try {
-      TypeReference<Map<String, ArrayList<String>>> valueTypeRef =
-          new TypeReference<Map<String, ArrayList<String>>>() {
-          };
-      Map<String, ArrayList<String>> map;
-
-      map = OBJECT_MAPPER.readValue(filterJson, valueTypeRef);
-      for (Map.Entry<String, ArrayList<String>> entry : map.entrySet()) {
-        ArrayList<String> valueList = entry.getValue();
-        ArrayList<String> trimmedList = new ArrayList<>();
-        for (String value : valueList) {
-          trimmedList.add(value.trim());
-        }
-        multimap.putAll(entry.getKey(), trimmedList);
-      }
-      return multimap;
-    } catch (IOException e) {
-      LOG.error("Error parsing filter json:{} message:{}", filterJson, e.getMessage());
-    }
-    return multimap;
-  }
-
-  public static List<MetricExpression> convertToMetricExpressions(String metricsJson, String collection) {
+  public static List<MetricExpression> convertToMetricExpressions(String metricsJson,
+      String collection) {
 
     CollectionConfig collectionConfig = null;
     try {
@@ -203,15 +176,16 @@ public class Utils {
         metricExpressionNames.add(metric);
       }
     }
-    for (String metricExpressionName: metricExpressionNames) {
+    for (String metricExpressionName : metricExpressionNames) {
       if (collectionConfig != null && collectionConfig.getDerivedMetrics() != null
           && collectionConfig.getDerivedMetrics().containsKey(metricsJson)) {
-        String metricExpressionString = collectionConfig.getDerivedMetrics().get(metricExpressionName);
+        String metricExpressionString =
+            collectionConfig.getDerivedMetrics().get(metricExpressionName);
         metricExpressions.add(new MetricExpression(metricExpressionName, metricExpressionString));
-      } else{
-        metricExpressions.add(new MetricExpression(metricExpressionName));  
+      } else {
+        metricExpressions.add(new MetricExpression(metricExpressionName));
       }
-      
+
     }
 
     return metricExpressions;

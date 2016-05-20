@@ -76,4 +76,14 @@ public class AnomalyResultDAO extends AbstractDAO<AnomalyResult> {
         .setParameter("endTimeUtc", endTime.toDateTime(DateTimeZone.UTC).getMillis())
         .setParameter("metric", metric).setParameter("filters", filters));
   }
+
+  public List<AnomalyResult> findAllByCollectionTimeAndFilters(String collection,
+      DateTime startTime, DateTime endTime, String filters) {
+    return list(namedQuery(
+        "com.linkedin.thirdeye.api.AnomalyResult#findAllByCollectionTimeAndFilters")
+        .setParameter("collection", collection)
+        .setParameter("startTimeUtc", startTime.toDateTime(DateTimeZone.UTC).getMillis())
+        .setParameter("endTimeUtc", endTime.toDateTime(DateTimeZone.UTC).getMillis())
+        .setParameter("filters", filters));
+  }
 }

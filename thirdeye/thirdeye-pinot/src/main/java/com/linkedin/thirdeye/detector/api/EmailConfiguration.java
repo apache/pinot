@@ -16,6 +16,8 @@ import javax.validation.constraints.NotNull;
 import org.hibernate.validator.constraints.Email;
 
 import com.google.common.base.MoreObjects;
+import com.google.common.collect.Multimap;
+import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 @Entity
 @Table(name = "email_configurations")
@@ -203,8 +205,13 @@ public class EmailConfiguration {
     return filters;
   }
 
+  public Multimap<String, String> getFilterSet() {
+    return ThirdEyeUtils.getFilterSet(filters);
+  }
+
   public void setFilters(String filters) {
-    this.filters = filters;
+    String sortedFilters = ThirdEyeUtils.getSortedFilters(filters);
+    this.filters = sortedFilters;
   }
 
   @Override
@@ -213,6 +220,6 @@ public class EmailConfiguration {
         .add("fromAddress", fromAddress).add("toAddresses", toAddresses).add("cron", cron)
         .add("smtpHost", smtpHost).add("smtpPort", smtpPort).add("smtpUser", smtpUser)
         .add("windowSize", windowSize).add("windowUnit", windowUnit).add("isActive", isActive)
-        .add("sendZeroAnomalyEmail", sendZeroAnomalyEmail).toString();
+        .add("sendZeroAnomalyEmail", sendZeroAnomalyEmail).add("filters", filters).toString();
   }
 }

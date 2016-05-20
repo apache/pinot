@@ -12,11 +12,9 @@ import javax.persistence.NamedQueries;
 import javax.persistence.NamedQuery;
 import javax.persistence.Table;
 
-import org.apache.commons.lang.StringUtils;
-
 import com.google.common.base.MoreObjects;
-import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
+import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 @Entity
 @Table(name = "anomaly_functions")
@@ -26,10 +24,6 @@ import com.google.common.collect.Multimap;
     @NamedQuery(name = "com.linkedin.thirdeye.api.AnomalyFunctionSpec#toggleActive", query = "UPDATE AnomalyFunctionSpec set isActive = :isActive WHERE id = :id")
 })
 public class AnomalyFunctionSpec {
-  private static final String FILTER_VALUE_ASSIGNMENT_SEPARATOR = "=";
-
-  private static final String FILTER_CLAUSE_SEPARATOR = ";";
-
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private long id;
@@ -185,22 +179,12 @@ public class AnomalyFunctionSpec {
   }
 
   public Multimap<String, String> getFilterSet() {
-    Multimap<String, String> filterSet = ArrayListMultimap.create();
-    if (StringUtils.isNotBlank(filters)) {
-      String[] filterClauses = filters.split(FILTER_CLAUSE_SEPARATOR);
-      for (String filterClause : filterClauses) {
-        String[] values = filterClause.split(FILTER_VALUE_ASSIGNMENT_SEPARATOR, 2);
-        if (values.length != 2) {
-          throw new IllegalArgumentException("Filter values assigments should in pairs: " + filters);
-        }
-        filterSet.put(values[0], values[1]);
-      }
-    }
-    return filterSet;
+    return ThirdEyeUtils.getFilterSet(filters);
   }
 
   public void setFilters(String filters) {
-    this.filters = filters;
+    String sortedFilters = ThirdEyeUtils.getSortedFilters(filters);
+    this.filters = sortedFilters;
   }
 
   @Override

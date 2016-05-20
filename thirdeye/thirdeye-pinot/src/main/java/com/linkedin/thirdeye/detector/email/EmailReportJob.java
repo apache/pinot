@@ -5,6 +5,7 @@ import java.io.File;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.net.InetAddress;
+import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
@@ -32,7 +33,6 @@ import org.slf4j.LoggerFactory;
 
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.client.MetricExpression;
-import com.linkedin.thirdeye.client.MetricFunction;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.client.comparison.TimeOnTimeComparisonHandler;
 import com.linkedin.thirdeye.client.comparison.TimeOnTimeComparisonRequest;
@@ -41,6 +41,7 @@ import com.linkedin.thirdeye.detector.api.AnomalyResult;
 import com.linkedin.thirdeye.detector.api.EmailConfiguration;
 import com.linkedin.thirdeye.detector.db.AnomalyResultDAO;
 import com.linkedin.thirdeye.detector.db.HibernateSessionWrapper;
+import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 import freemarker.template.Configuration;
 import freemarker.template.Template;
@@ -66,6 +67,7 @@ public class EmailReportJob implements Job {
   public static final String SESSION_FACTORY = "SESSION_FACTORY";
   public static final String APPLICATION_PORT = "APPLICATION_PORT";
   public static final String TIME_ON_TIME_COMPARISON_HANDLER = "TIME_ON_TIME_COMPARISON_HANDLER";
+  public static final String DASHBOARD_HOST = "DASHBOARD_HOST";
 
   public static final String CHARSET = "UTF-8";
 
@@ -76,9 +78,11 @@ public class EmailReportJob implements Job {
     SessionFactory sessionFactory =
         (SessionFactory) context.getJobDetail().getJobDataMap().get(SESSION_FACTORY);
     int applicationPort = context.getJobDetail().getJobDataMap().getInt(APPLICATION_PORT);
-    TimeOnTimeComparisonHandler timeOnTimeComparisonHandler = (TimeOnTimeComparisonHandler) context
-        .getJobDetail().getJobDataMap().get(TIME_ON_TIME_COMPARISON_HANDLER);
+    TimeOnTimeComparisonHandler timeOnTimeComparisonHandler =
+        (TimeOnTimeComparisonHandler) context.getJobDetail().getJobDataMap()
+            .get(TIME_ON_TIME_COMPARISON_HANDLER);
     ThirdEyeClient client = timeOnTimeComparisonHandler.getClient();
+    String dashboardHost = context.getJobDetail().getJobDataMap().getString(DASHBOARD_HOST);
 
     // Get time
     Date scheduledFireTime = context.getScheduledFireTime();
@@ -118,8 +122,9 @@ public class EmailReportJob implements Job {
       }
     }
 
-    String chartFilePath = writeTimeSeriesChart(config, timeOnTimeComparisonHandler, now, then,
-        collection, anomaliesWithLabels);
+    String chartFilePath =
+        writeTimeSeriesChart(config, timeOnTimeComparisonHandler, now, then, collection,
+            anomaliesWithLabels);
 
     // get dimensions for rendering
     List<String> dimensionNames;
@@ -133,10 +138,12 @@ public class EmailReportJob implements Job {
     String anomalyEndpoint;
     String functionEndpoint;
     try {
-      anomalyEndpoint = String.format("http://%s:%d/anomaly-results/",
-          InetAddress.getLocalHost().getCanonicalHostName(), applicationPort);
-      functionEndpoint = String.format("http://%s:%d/anomaly-functions/",
-          InetAddress.getLocalHost().getCanonicalHostName(), applicationPort);
+      anomalyEndpoint =
+          String.format("http://%s:%d/anomaly-results/", InetAddress.getLocalHost()
+              .getCanonicalHostName(), applicationPort);
+      functionEndpoint =
+          String.format("http://%s:%d/anomaly-functions/", InetAddress.getLocalHost()
+              .getCanonicalHostName(), applicationPort);
     } catch (Exception e) {
       throw new JobExecutionException(e);
     }
@@ -154,7 +161,11 @@ public class EmailReportJob implements Job {
       freemarkerConfig.setDefaultEncoding(CHARSET);
       freemarkerConfig.setTemplateExceptionHandler(TemplateExceptionHandler.RETHROW_HANDLER);
       Map<String, Object> templateData = new HashMap<>();
-      templateData.put("dataset", collection + ":" + config.getMetric());
+      String metric = config.getMetric();
+      String filtersJson = ThirdEyeUtils.convertMultiMapToJson(config.getFilterSet());
+      String filtersJsonEncoded = URLEncoder.encode(filtersJson, "UTF-8");
+      String windowUnit = config.getWindowUnit().toString();
+
       // templateData.put("anomalyResults", results);
       templateData.put("groupedAnomalyResults", groupedResults);
       templateData.put("anomalyCount", results.size());
@@ -171,6 +182,11 @@ public class EmailReportJob implements Job {
       templateData.put("embeddedChart", email.embed(chartFile));
       File logo = new File(getClass().getResource(THIRDEYE_LOGO_PATH).getFile());
       templateData.put("logo", email.embed(logo));
+      templateData.put("collection", collection);
+      templateData.put("metric", metric);
+      templateData.put("filters", filtersJsonEncoded);
+      templateData.put("windowUnit", windowUnit);
+      templateData.put("dashboardHost", dashboardHost);
 
       Template template = freemarkerConfig.getTemplate("simple-anomaly-report.ftl");
       template.process(templateData, out);
@@ -184,8 +200,8 @@ public class EmailReportJob implements Job {
       email.setHostName(config.getSmtpHost());
       email.setSmtpPort(config.getSmtpPort());
       if (config.getSmtpUser() != null && config.getSmtpPassword() != null) {
-        email.setAuthenticator(
-            new DefaultAuthenticator(config.getSmtpUser(), config.getSmtpPassword()));
+        email.setAuthenticator(new DefaultAuthenticator(config.getSmtpUser(), config
+            .getSmtpPassword()));
         email.setSSLOnConnect(true);
       }
       email.setFrom(config.getFromAddress());
@@ -195,6 +211,7 @@ public class EmailReportJob implements Job {
       email.setSubject(String.format("Anomaly Alert!: %d anomalies detected for %s:%s",
           results.size(), config.getCollection(), config.getMetric()));
       final String html = new String(baos.toByteArray(), CHARSET);
+
       email.setHtmlMsg(html);
       email.send();
     } catch (Exception e) {
@@ -225,8 +242,9 @@ public class EmailReportJob implements Job {
       TimeOnTimeComparisonResponse chartData =
           getData(timeOnTimeComparisonHandler, config, then, now, WEEK_MILLIS, dataGranularity);
       AnomalyGraphGenerator anomalyGraphGenerator = AnomalyGraphGenerator.getInstance();
-      JFreeChart chart = anomalyGraphGenerator.createChart(chartData, dataGranularity,
-          windowMillis, anomaliesWithLabels);
+      JFreeChart chart =
+          anomalyGraphGenerator.createChart(chartData, dataGranularity, windowMillis,
+              anomaliesWithLabels);
       String chartFilePath = EMAIL_REPORT_CHART_PREFIX + config.getId() + PNG;
       LOG.info("Writing chart to {}", chartFilePath);
       anomalyGraphGenerator.writeChartToFile(chart, chartFilePath);
@@ -241,16 +259,17 @@ public class EmailReportJob implements Job {
       final DateTime end) throws JobExecutionException {
     final List<AnomalyResult> results;
     try {
-      results = new HibernateSessionWrapper<List<AnomalyResult>>(sessionFactory)
-          .execute(new Callable<List<AnomalyResult>>() {
-            @Override
-            public List<AnomalyResult> call() throws Exception {
-              AnomalyResultDAO resultDAO =
-                  (AnomalyResultDAO) context.getJobDetail().getJobDataMap().get(RESULT_DAO);
-              return resultDAO.findAllByCollectionTimeMetricAndFilters(config.getCollection(),
-                  config.getMetric(), end, start, config.getFilters());
-            }
-          });
+      results =
+          new HibernateSessionWrapper<List<AnomalyResult>>(sessionFactory)
+              .execute(new Callable<List<AnomalyResult>>() {
+                @Override
+                public List<AnomalyResult> call() throws Exception {
+                  AnomalyResultDAO resultDAO =
+                      (AnomalyResultDAO) context.getJobDetail().getJobDataMap().get(RESULT_DAO);
+                  return resultDAO.findAllByCollectionTimeMetricAndFilters(config.getCollection(),
+                      config.getMetric(), end, start, config.getFilters());
+                }
+              });
     } catch (Exception e) {
       throw new JobExecutionException(e);
     }

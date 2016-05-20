@@ -1,5 +1,12 @@
 package com.linkedin.thirdeye.detector.driver;
 
+import io.dropwizard.Application;
+import io.dropwizard.db.DataSourceFactory;
+import io.dropwizard.hibernate.HibernateBundle;
+import io.dropwizard.lifecycle.Managed;
+import io.dropwizard.setup.Bootstrap;
+import io.dropwizard.setup.Environment;
+
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -31,13 +38,6 @@ import com.linkedin.thirdeye.detector.db.AnomalyResultDAO;
 import com.linkedin.thirdeye.detector.db.EmailConfigurationDAO;
 import com.linkedin.thirdeye.detector.email.EmailReportJobManager;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
-
-import io.dropwizard.Application;
-import io.dropwizard.db.DataSourceFactory;
-import io.dropwizard.hibernate.HibernateBundle;
-import io.dropwizard.lifecycle.Managed;
-import io.dropwizard.setup.Bootstrap;
-import io.dropwizard.setup.Environment;
 
 /**
  * Mostly grabbed from ThirdEyeDetectorApplication, used to run an anomaly function or email from
@@ -94,7 +94,7 @@ public class TestAnomalyApplication extends Application<ThirdEyeDetectorConfigur
     // TODO fix this up to be more standardized
     // ThirdEye client
     final ThirdEyeClient thirdEyeClient =
-        // CollectionMapThirdEyeClient.fromFolder(config.getClientConfigRoot());
+    // CollectionMapThirdEyeClient.fromFolder(config.getClientConfigRoot());
         PinotThirdEyeClient.getDefaultTestClient(); // TODO make this configurable
     QueryCache queryCache = new QueryCache(thirdEyeClient, Executors.newFixedThreadPool(10));
 
@@ -125,10 +125,11 @@ public class TestAnomalyApplication extends Application<ThirdEyeDetectorConfigur
       final AnomalyFunctionFactory anomalyFunctionFactory =
           new AnomalyFunctionFactory(config.getFunctionConfigPath());
 
-      final AnomalyDetectionJobManager jobManager = new AnomalyDetectionJobManager(quartzScheduler,
-          timeSeriesHandler, timeSeriesResponseConverter, anomalyFunctionSpecDAO,
-          anomalyFunctionRelationDAO, anomalyResultDAO, hibernate.getSessionFactory(),
-          environment.metrics(), anomalyFunctionFactory);
+      final AnomalyDetectionJobManager jobManager =
+          new AnomalyDetectionJobManager(quartzScheduler, timeSeriesHandler,
+              timeSeriesResponseConverter, anomalyFunctionSpecDAO, anomalyFunctionRelationDAO,
+              anomalyResultDAO, hibernate.getSessionFactory(), environment.metrics(),
+              anomalyFunctionFactory);
 
       jobManager.runAdhocFile(filePath, existingFunctionId, startISO, endISO);
     } else if (testType == TestType.EMAIL) {
@@ -141,7 +142,8 @@ public class TestAnomalyApplication extends Application<ThirdEyeDetectorConfigur
 
       final EmailReportJobManager emailReportJobManager =
           new EmailReportJobManager(quartzScheduler, emailConfigurationDAO, anomalyResultDAO,
-              hibernate.getSessionFactory(), new AtomicInteger(-1), timeOnTimeComparisonHandler);
+              hibernate.getSessionFactory(), new AtomicInteger(-1), timeOnTimeComparisonHandler,
+              config.getDashboardHost());
       emailReportJobManager.runAdhocFile(filePath);
     } else {
       throw new IllegalArgumentException("Unknown test type: " + testType);

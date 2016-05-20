@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.detector.email;
 
+import io.dropwizard.lifecycle.Managed;
+
 import java.io.File;
 import java.util.HashMap;
 import java.util.List;
@@ -28,8 +30,6 @@ import com.linkedin.thirdeye.detector.db.EmailConfigurationDAO;
 import com.linkedin.thirdeye.detector.driver.TestAnomalyApplication;
 import com.linkedin.thirdeye.detector.driver.TestAnomalyApplication.TestType;
 
-import io.dropwizard.lifecycle.Managed;
-
 public class EmailReportJobManager implements Managed {
   private static final Logger LOG = LoggerFactory.getLogger(EmailReportJobManager.class);
   private final Scheduler quartzScheduler;
@@ -40,11 +40,12 @@ public class EmailReportJobManager implements Managed {
   private final AtomicInteger applicationPort;
   private final TimeOnTimeComparisonHandler timeOnTimeComparisonHandler;
   private final Object sync;
+  private final String dashboardHost;
   private static final ObjectMapper reader = new ObjectMapper(new YAMLFactory());
 
   public EmailReportJobManager(Scheduler quartzScheduler, EmailConfigurationDAO configurationDAO,
       AnomalyResultDAO resultDAO, SessionFactory sessionFactory, AtomicInteger applicationPort,
-      TimeOnTimeComparisonHandler timeOnTimeComparisonHandler) {
+      TimeOnTimeComparisonHandler timeOnTimeComparisonHandler, String dashboardHost) {
     this.quartzScheduler = quartzScheduler;
     this.configurationDAO = configurationDAO;
     this.sessionFactory = sessionFactory;
@@ -53,6 +54,7 @@ public class EmailReportJobManager implements Managed {
     this.timeOnTimeComparisonHandler = timeOnTimeComparisonHandler;
     this.jobKeys = new HashMap<>();
     this.sync = new Object();
+    this.dashboardHost = dashboardHost;
   }
 
   public void sendAdHoc(Long id) throws Exception {
@@ -74,8 +76,9 @@ public class EmailReportJobManager implements Managed {
       for (EmailConfiguration emailConfig : emailConfigs) {
         if (emailConfig.getIsActive()) {
           String triggerKey = String.format("email_trigger_%d", emailConfig.getId());
-          CronTrigger trigger = TriggerBuilder.newTrigger().withIdentity(triggerKey)
-              .withSchedule(CronScheduleBuilder.cronSchedule(emailConfig.getCron())).build();
+          CronTrigger trigger =
+              TriggerBuilder.newTrigger().withIdentity(triggerKey)
+                  .withSchedule(CronScheduleBuilder.cronSchedule(emailConfig.getCron())).build();
 
           String jobKey = String.format("email_job_%d", emailConfig.getId());
           jobKeys.put(jobKey, emailConfig);
@@ -118,8 +121,7 @@ public class EmailReportJobManager implements Managed {
     }
   }
 
-  public void runAdhocConfig(EmailConfiguration emailConfig, String executionName)
-      throws Exception {
+  public void runAdhocConfig(EmailConfiguration emailConfig, String executionName) throws Exception {
     synchronized (sync) {
       String triggerKey = String.format("adhoc_config-based_email_trigger_%s", executionName);
       Trigger trigger = TriggerBuilder.newTrigger().withIdentity(triggerKey).startNow().build();
@@ -139,6 +141,7 @@ public class EmailReportJobManager implements Managed {
     job.getJobDataMap().put(EmailReportJob.APPLICATION_PORT, applicationPort.get());
     job.getJobDataMap().put(EmailReportJob.TIME_ON_TIME_COMPARISON_HANDLER,
         timeOnTimeComparisonHandler);
+    job.getJobDataMap().put(EmailReportJob.DASHBOARD_HOST, dashboardHost);
 
     quartzScheduler.scheduleJob(job, trigger);
     LOG.info("Started {}: {}", jobKey, emailConfig);

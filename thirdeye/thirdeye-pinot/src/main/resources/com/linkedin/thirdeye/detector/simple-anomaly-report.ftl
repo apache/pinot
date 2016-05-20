@@ -3,7 +3,7 @@
     <br>
     <br>
     <img id="Logo" src="cid:${logo}" style="float: left; margin: 0px 15px 15px 0px;" width="100">
-    You are receiving this email because you have subscribed to ThirdEye Anomaly detection service for '${dataset}'.<br/>
+    You are receiving this email because you have subscribed to ThirdEye Anomaly detection service for '${collection}:${metric}'.<br/>
     ThirdEye has analyzed your dataset for time range ${dateFormat(startTime)} to ${dateFormat(endTime)} (${timeZone}) and has detected <b>${anomalyCount} ${(anomalyCount == 1)?string("anomaly", "anomalies")}.</b> </br>
     <#if (anomalyCount > 0)>
      Below is the full list of anomalies detected during this time period.
@@ -59,6 +59,11 @@
     <hr/>
 </#if>
 <br/>
+
+Go to <a href="${dashboardHost}/dashboard#view=anomalies&dataset=${collection}&rand=896&compareMode=WoW&aggTimeGranularity=${windowUnit}&currentStart=${startTime?c}&currentEnd=${endTime?c}&metrics=${metric}&filters=${filters}" target="_top">ThirdEye Anomalies Dashboard</a>
+
+<br/>
+
 If you have any questions regarding this report, please email <a href="mailto:ask_thirdeye@linkedin.com" target="_top">ask_thirdeye@linkedin.com</a>
 <br/>
 Report generated at: ${dateFormat(reportGenerationTimeMillis)}

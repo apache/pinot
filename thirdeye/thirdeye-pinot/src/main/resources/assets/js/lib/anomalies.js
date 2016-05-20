@@ -4,18 +4,20 @@ function getAnomalies(tab) {
   baselineStart = moment(parseInt(hash.currentStart)).add(-7, 'days')
   baselineEnd = moment(parseInt(hash.currentEnd)).add(-7, 'days')
   aggTimeGranularity = (window.datasetConfig.dataGranularity) ? window.datasetConfig.dataGranularity : "HOURS";
-  
-  
+
+
   var timeSeriesUrl = "/dashboard/data/tabular?" + window.location.hash.substring(1)  //
   + "&baselineStart=" + baselineStart + "&baselineEnd=" + baselineEnd   //
-  + "&aggTimeGranularity=" + aggTimeGranularity ;
-  
+  + "&aggTimeGranularity=" + aggTimeGranularity;
+
   var currentStartISO = moment(parseInt(hash.currentStart)).toISOString();
   var currentEndISO = moment(parseInt(hash.currentEnd)).toISOString();
-  var anomaliesUrl = "/anomaly-results/collection/" + hash.dataset + "/" + currentStartISO + "/" + currentEndISO;
-  
-  getData(anomaliesUrl, tab).done(function(anomalyData) {
-    getData(timeSeriesUrl, tab).done(function(timeSeriesData) {
+  var anomaliesUrl = "/anomaly-results/collection/" + hash.dataset + "/" + currentStartISO + "/" + currentEndISO
+  + "?metrics=" + hash.metrics
+  + "&filters=" + hash.filters;
+
+  getData(anomaliesUrl).done(function(anomalyData) {
+    getData(timeSeriesUrl).done(function(timeSeriesData) {
 
         //Error handling when data is falsy (empty, undefined or null)
         if(!timeSeriesData){
@@ -141,7 +143,7 @@ function drawAnomalyTimeSeries(ajaxData, anomalyData, tab) {
       y : {
         show : false
       }
-    }, 
+    },
     point: {
       show: false
     }

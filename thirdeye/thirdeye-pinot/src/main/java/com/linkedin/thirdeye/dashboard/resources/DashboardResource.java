@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
+import io.dropwizard.views.View;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URLDecoder;
@@ -29,7 +31,6 @@ import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
-import com.google.common.base.Optional;
 import com.google.common.cache.CacheLoader.InvalidCacheLoadException;
 import com.linkedin.thirdeye.api.CollectionSchema;
 import com.linkedin.thirdeye.api.TimeGranularity;
@@ -58,14 +59,13 @@ import com.linkedin.thirdeye.dashboard.views.heatmap.HeatMapViewResponse;
 import com.linkedin.thirdeye.dashboard.views.tabular.TabularViewHandler;
 import com.linkedin.thirdeye.dashboard.views.tabular.TabularViewRequest;
 import com.linkedin.thirdeye.dashboard.views.tabular.TabularViewResponse;
-
-import io.dropwizard.views.View;
+import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 @Path(value = "/dashboard")
 // @Produces(MediaType.APPLICATION_JSON)
 public class DashboardResource {
-  private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE =
-      ThirdEyeCacheRegistry.getInstance();
+  private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry
+      .getInstance();
   private static final Logger LOG = LoggerFactory.getLogger(DashboardResource.class);
   private static final String DEFAULT_TIMEZONE_ID = "UTC";
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -197,8 +197,9 @@ public class DashboardResource {
     String jsonFilters = null;
     try {
       List<String> dimensions = Utils.getDimensions(queryCache, collection);
-      Map<String, List<String>> filters = Utils.getFilters(queryCache, collection, "filters",
-          "__COUNT", dimensions, startDateTime, endDateTime);
+      Map<String, List<String>> filters =
+          Utils.getFilters(queryCache, collection, "filters", "__COUNT", dimensions, startDateTime,
+              endDateTime);
       jsonFilters = OBJECT_MAPPER.writeValueAsString(filters);
     } catch (Exception e) {
       LOG.error("Error while fetching dimension values in filter drop down for collection: {}",
@@ -249,7 +250,7 @@ public class DashboardResource {
       request.setCurrentEnd(new DateTime(currentEnd, DateTimeZone.forID(timeZone)));
       if (filterJson != null && !filterJson.isEmpty()) {
         filterJson = URLDecoder.decode(filterJson, "UTF-8");
-        request.setFilters(Utils.convertToMultiMap(filterJson));
+        request.setFilters(ThirdEyeUtils.convertToMultiMap(filterJson));
       }
 
       request.setTimeGranularity(Utils.getAggregationTimeGranularity(aggTimeGranularity));
@@ -273,8 +274,7 @@ public class DashboardResource {
   @Path(value = "/data/viewData")
   @Produces(MediaType.APPLICATION_JSON)
   public String getDashboard(@QueryParam("dataset") String collection,
-      @QueryParam("viewType") String viewType,
-      @QueryParam("viewType") String viewRequestParamsJson) {
+      @QueryParam("viewType") String viewType, @QueryParam("viewType") String viewRequestParamsJson) {
     try {
       ViewHandler<ViewRequest, ViewResponse> viewHandler = getViewHandler(viewType);
       ViewRequestParams viewRequesParams = ViewRequestParams.fromJson(viewRequestParamsJson);
@@ -303,12 +303,13 @@ public class DashboardResource {
       @QueryParam("baselineStart") Long baselineStart, @QueryParam("baselineEnd") Long baselineEnd,
       @QueryParam("currentStart") Long currentStart, @QueryParam("currentEnd") Long currentEnd,
       @QueryParam("compareMode") String compareMode, @QueryParam("metrics") String metricsJson)
-          throws Exception {
+      throws Exception {
 
     HeatMapViewRequest request = new HeatMapViewRequest();
 
     request.setCollection(collection);
-    List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metricsJson, collection);
+    List<MetricExpression> metricExpressions =
+        Utils.convertToMetricExpressions(metricsJson, collection);
     request.setMetricExpressions(metricExpressions);
     long maxDataTime = queryCache.getClient().getMaxDataTime(collection);
     if (currentEnd > maxDataTime) {
@@ -323,7 +324,7 @@ public class DashboardResource {
     // filter
     if (filterJson != null && !filterJson.isEmpty()) {
       filterJson = URLDecoder.decode(filterJson, "UTF-8");
-      request.setFilters(Utils.convertToMultiMap(filterJson));
+      request.setFilters(ThirdEyeUtils.convertToMultiMap(filterJson));
     }
 
     HeatMapViewHandler handler = new HeatMapViewHandler(queryCache);
@@ -355,7 +356,8 @@ public class DashboardResource {
     TabularViewRequest request = new TabularViewRequest();
     request.setCollection(collection);
 
-    List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metricsJson, collection);
+    List<MetricExpression> metricExpressions =
+        Utils.convertToMetricExpressions(metricsJson, collection);
     request.setMetricExpressions(metricExpressions);
     long maxDataTime = queryCache.getClient().getMaxDataTime(collection);
     if (currentEnd > maxDataTime) {
@@ -370,7 +372,7 @@ public class DashboardResource {
     request.setCurrentEnd(new DateTime(currentEnd, DateTimeZone.forID(timeZone)));
     if (filterJson != null && !filterJson.isEmpty()) {
       filterJson = URLDecoder.decode(filterJson, "UTF-8");
-      request.setFilters(Utils.convertToMultiMap(filterJson));
+      request.setFilters(ThirdEyeUtils.convertToMultiMap(filterJson));
     }
     request.setTimeGranularity(Utils.getAggregationTimeGranularity(aggTimeGranularity));
 
@@ -399,12 +401,13 @@ public class DashboardResource {
       @QueryParam("compareMode") String compareMode,
       @QueryParam("aggTimeGranularity") String aggTimeGranularity,
       @QueryParam("metrics") String metricsJson, @QueryParam("dimensions") String groupByDimensions)
-          throws Exception {
+      throws Exception {
 
     ContributorViewRequest request = new ContributorViewRequest();
     request.setCollection(collection);
 
-    List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metricsJson, collection);
+    List<MetricExpression> metricExpressions =
+        Utils.convertToMetricExpressions(metricsJson, collection);
     request.setMetricExpressions(metricExpressions);
     long maxDataTime = queryCache.getClient().getMaxDataTime(collection);
     if (currentEnd > maxDataTime) {
@@ -419,7 +422,7 @@ public class DashboardResource {
 
     if (filterJson != null && !filterJson.isEmpty()) {
       filterJson = URLDecoder.decode(filterJson, "UTF-8");
-      request.setFilters(Utils.convertToMultiMap(filterJson));
+      request.setFilters(ThirdEyeUtils.convertToMultiMap(filterJson));
     }
     request.setTimeGranularity(Utils.getAggregationTimeGranularity(aggTimeGranularity));
     if (groupByDimensions != null && !groupByDimensions.isEmpty()) {
@@ -450,7 +453,7 @@ public class DashboardResource {
       @QueryParam("currentStart") Long start, @QueryParam("currentEnd") Long end,
       @QueryParam("aggTimeGranularity") String aggTimeGranularity,
       @QueryParam("metrics") String metricsJson, @QueryParam("dimensions") String groupByDimensions)
-          throws Exception {
+      throws Exception {
     TimeSeriesRequest request = new TimeSeriesRequest();
     request.setCollectionName(collection);
     request.setStart(new DateTime(start, DateTimeZone.forID(timeZone)));
@@ -460,9 +463,10 @@ public class DashboardResource {
     }
     if (filterJson != null && !filterJson.isEmpty()) {
       filterJson = URLDecoder.decode(filterJson, "UTF-8");
-      request.setFilterSet(Utils.convertToMultiMap(filterJson));
+      request.setFilterSet(ThirdEyeUtils.convertToMultiMap(filterJson));
     }
-    List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metricsJson, collection);
+    List<MetricExpression> metricExpressions =
+        Utils.convertToMetricExpressions(metricsJson, collection);
     request.setMetricExpressions(metricExpressions);
     request.setAggregationTimeGranularity(Utils.getAggregationTimeGranularity(aggTimeGranularity));
 
@@ -488,8 +492,9 @@ public class DashboardResource {
           String key = metricTimeSeries.getMetricName();
           if (timeSeriesRow.getDimensionName() != null
               && timeSeriesRow.getDimensionName().trim().length() > 0) {
-            key = key + "|" + timeSeriesRow.getDimensionName() + "|"
-                + timeSeriesRow.getDimensionValue();
+            key =
+                key + "|" + timeSeriesRow.getDimensionName() + "|"
+                    + timeSeriesRow.getDimensionValue();
           }
           JSONArray valueArray;
           if (!timeseriesMap.has(key)) {

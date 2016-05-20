@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.detector.resources;
 
+import io.dropwizard.hibernate.UnitOfWork;
+
 import java.util.List;
 
 import javax.ws.rs.DELETE;
@@ -16,8 +18,6 @@ import javax.ws.rs.core.Response;
 import com.linkedin.thirdeye.detector.api.AnomalyFunctionSpec;
 import com.linkedin.thirdeye.detector.db.AnomalyFunctionSpecDAO;
 import com.linkedin.thirdeye.detector.driver.AnomalyDetectionJobManager;
-
-import io.dropwizard.hibernate.UnitOfWork;
 
 @Path("/anomaly-jobs")
 @Produces(MediaType.APPLICATION_JSON)

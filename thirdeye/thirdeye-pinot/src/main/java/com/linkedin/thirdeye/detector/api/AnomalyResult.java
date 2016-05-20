@@ -20,6 +20,7 @@ import org.joda.time.DateTime;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.MoreObjects;
+import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 @Entity
 @Table(name = "anomaly_results")
@@ -38,14 +39,19 @@ import com.google.common.base.MoreObjects;
         + "AND ((r.startTimeUtc >= :startTimeUtc AND r.startTimeUtc <= :endTimeUtc) "
         + "OR (r.endTimeUtc >= :startTimeUtc AND r.endTimeUtc <= :endTimeUtc))"),
     @NamedQuery(name = "com.linkedin.thirdeye.api.AnomalyResult#findAllByCollectionTimeFunctionIdAndMetric", query = "SELECT r FROM AnomalyResult r WHERE r.collection = :collection "
-        + "AND r.functionId = :functionId " + "AND r.metric = :metric "
+        + "AND r.functionId = :functionId "
+        + "AND r.metric = :metric "
         + "AND ((r.startTimeUtc >= :startTimeUtc AND r.startTimeUtc <= :endTimeUtc) "
         + "OR (r.endTimeUtc >= :startTimeUtc AND r.endTimeUtc <= :endTimeUtc))"),
     @NamedQuery(name = "com.linkedin.thirdeye.api.AnomalyResult#findAllByCollectionTimeMetricAndFilters", query = "SELECT r FROM AnomalyResult r WHERE r.collection = :collection "
         + "AND r.metric = :metric "
-        + "AND (r.filters = :filters or (r.filters is NULL and :filters is NULL))"
+        + "AND ((r.filters = :filters) or (r.filters is NULL and :filters is NULL)) "
         + "AND ((r.startTimeUtc >= :startTimeUtc AND r.startTimeUtc <= :endTimeUtc) "
         + "OR (r.endTimeUtc >= :startTimeUtc AND r.endTimeUtc <= :endTimeUtc))"),
+    @NamedQuery(name = "com.linkedin.thirdeye.api.AnomalyResult#findAllByCollectionTimeAndFilters", query = "SELECT r FROM AnomalyResult r WHERE r.collection = :collection "
+        + "AND ((r.filters = :filters) or (r.filters is NULL and :filters is NULL)) "
+        + "AND ((r.startTimeUtc >= :startTimeUtc AND r.startTimeUtc <= :endTimeUtc) "
+        + "OR (r.endTimeUtc >= :startTimeUtc AND r.endTimeUtc <= :endTimeUtc))")
 })
 public class AnomalyResult implements Comparable<AnomalyResult> {
   private static Joiner SEMICOLON = Joiner.on(";");
@@ -218,7 +224,8 @@ public class AnomalyResult implements Comparable<AnomalyResult> {
   }
 
   public void setFilters(String filters) {
-    this.filters = filters;
+    String sortedFilters = ThirdEyeUtils.getSortedFilters(filters);
+    this.filters = sortedFilters;
   }
 
   @Override

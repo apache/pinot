@@ -42,10 +42,10 @@ $(document).ready( function() {
         showGranularity: true,
         showAggregateAllGranularity: false,
         needComparisonTimeRange: true
-    } 
+    }
     var result_form_template = HandleBarsTemplates.template_form(dasboard_section_options)
     $("#dashboard-section #form-area").append(result_form_template);
-    
+
     //COMPARE
     var compare_section_options = {
         tabName: "compare",
@@ -57,7 +57,7 @@ $(document).ready( function() {
         showGranularity: true,
         showAggregateAllGranularity: true,
         needComparisonTimeRange: true
-    } 
+    }
     var result_form_template = HandleBarsTemplates.template_form(compare_section_options)
     $("#compare-section #form-area").append(result_form_template);
 
@@ -83,7 +83,7 @@ $(document).ready( function() {
         showDashboardSelection: false,
         showMetricSelection: true,
         showDimensionSelection: false,
-        showFilterSelection: false,
+        showFilterSelection: true,
         showTimeSelection: true,
         showGranularity: false,
         showAggregateAllGranularity: false,
