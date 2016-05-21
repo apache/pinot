@@ -10,6 +10,7 @@ import java.util.concurrent.TimeUnit;
 
 import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.client.ThirdEyeRequest;
+import com.linkedin.thirdeye.client.pinot.PinotThirdEyeResponse;
 
 public class QueryCache {
   private final ExecutorService executorService;
@@ -24,29 +25,29 @@ public class QueryCache {
     return client;
   }
   
-  public ThirdEyeResponse getQueryResult(ThirdEyeRequest request) throws Exception {
-    ThirdEyeResponse response = client.execute(request);
+  public PinotThirdEyeResponse getQueryResult(ThirdEyeRequest request) throws Exception {
+    PinotThirdEyeResponse response = client.execute(request);
     return response;
   }
 
-  public Future<ThirdEyeResponse> getQueryResultAsync(final ThirdEyeRequest request)
+  public Future<PinotThirdEyeResponse> getQueryResultAsync(final ThirdEyeRequest request)
       throws Exception {
-    return executorService.submit(new Callable<ThirdEyeResponse>() {
+    return executorService.submit(new Callable<PinotThirdEyeResponse>() {
       @Override
-      public ThirdEyeResponse call() throws Exception {
+      public PinotThirdEyeResponse call() throws Exception {
         return getQueryResult(request);
       }
     });
   }
 
-  public Map<ThirdEyeRequest, Future<ThirdEyeResponse>> getQueryResultsAsync(
+  public Map<ThirdEyeRequest, Future<PinotThirdEyeResponse>> getQueryResultsAsync(
       final List<ThirdEyeRequest> requests) throws Exception {
-    Map<ThirdEyeRequest, Future<ThirdEyeResponse>> responseFuturesMap = new LinkedHashMap<>();
+    Map<ThirdEyeRequest, Future<PinotThirdEyeResponse>> responseFuturesMap = new LinkedHashMap<>();
     for (final ThirdEyeRequest request : requests) {
-      Future<ThirdEyeResponse> responseFuture =
-          executorService.submit(new Callable<ThirdEyeResponse>() {
+      Future<PinotThirdEyeResponse> responseFuture =
+          executorService.submit(new Callable<PinotThirdEyeResponse>() {
             @Override
-            public ThirdEyeResponse call() throws Exception {
+            public PinotThirdEyeResponse call() throws Exception {
               return getQueryResult(request);
             }
           });
@@ -55,19 +56,19 @@ public class QueryCache {
     return responseFuturesMap;
   }
 
-  public Map<ThirdEyeRequest, ThirdEyeResponse> getQueryResultsAsyncAndWait(
+  public Map<ThirdEyeRequest, PinotThirdEyeResponse> getQueryResultsAsyncAndWait(
       final List<ThirdEyeRequest> requests) throws Exception {
     return getQueryResultsAsyncAndWait(requests, 60);
   }
 
-  public Map<ThirdEyeRequest, ThirdEyeResponse> getQueryResultsAsyncAndWait(
+  public Map<ThirdEyeRequest, PinotThirdEyeResponse> getQueryResultsAsyncAndWait(
       final List<ThirdEyeRequest> requests, int timeoutSeconds) throws Exception {
-    Map<ThirdEyeRequest, ThirdEyeResponse> responseMap = new LinkedHashMap<>();
+    Map<ThirdEyeRequest, PinotThirdEyeResponse> responseMap = new LinkedHashMap<>();
     for (final ThirdEyeRequest request : requests) {
-      Future<ThirdEyeResponse> responseFuture =
-          executorService.submit(new Callable<ThirdEyeResponse>() {
+      Future<PinotThirdEyeResponse> responseFuture =
+          executorService.submit(new Callable<PinotThirdEyeResponse>() {
             @Override
-            public ThirdEyeResponse call() throws Exception {
+            public PinotThirdEyeResponse call() throws Exception {
               return getQueryResult(request);
             }
           });

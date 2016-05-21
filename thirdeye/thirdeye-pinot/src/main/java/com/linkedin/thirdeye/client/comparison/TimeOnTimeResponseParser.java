@@ -22,17 +22,18 @@ import com.linkedin.thirdeye.client.MetricFunction;
 import com.linkedin.thirdeye.client.ThirdEyeRequest;
 import com.linkedin.thirdeye.client.ThirdEyeResponse;
 import com.linkedin.thirdeye.client.comparison.Row.Builder;
+import com.linkedin.thirdeye.client.pinot.PinotThirdEyeResponse;
 
 public class TimeOnTimeResponseParser {
 
   private static final double MIN_CONTRIBUTION_PERCENT = 0.0001;
 
   public static Map<MetricFunction, Map<String, Map<String, Map<String, Double>>>> processGroupByDimensionResponse(
-      Map<ThirdEyeRequest, ThirdEyeResponse> queryResultMap) {
+      Map<ThirdEyeRequest, PinotThirdEyeResponse> queryResultMap) {
     Map<MetricFunction, Map<String, Map<String, Map<String, Double>>>> metricGroupByDimensionData =
         new HashMap<>();
 
-    for (Entry<ThirdEyeRequest, ThirdEyeResponse> entry : queryResultMap.entrySet()) {
+    for (Entry<ThirdEyeRequest, PinotThirdEyeResponse> entry : queryResultMap.entrySet()) {
       ThirdEyeRequest thirdEyeRequest = entry.getKey();
       ThirdEyeResponse thirdEyeResponse = entry.getValue();
       String requestReference = thirdEyeRequest.getRequestReference();
@@ -49,11 +50,11 @@ public class TimeOnTimeResponseParser {
   }
 
   public static Map<MetricFunction, Map<String, Double>> processAggregateResponse(
-      Map<ThirdEyeRequest, ThirdEyeResponse> queryResultMap) {
+      Map<ThirdEyeRequest, PinotThirdEyeResponse> queryResultMap) {
     // Map<metricFunction,Map<(baseline|current), Double>>>
     Map<MetricFunction, Map<String, Double>> metricOnlyData = new HashMap<>();
 
-    for (Entry<ThirdEyeRequest, ThirdEyeResponse> entry : queryResultMap.entrySet()) {
+    for (Entry<ThirdEyeRequest, PinotThirdEyeResponse> entry : queryResultMap.entrySet()) {
       ThirdEyeRequest thirdEyeRequest = entry.getKey();
       ThirdEyeResponse thirdEyeResponse = entry.getValue();
       String requestReference = thirdEyeRequest.getRequestReference();
@@ -118,7 +119,7 @@ public class TimeOnTimeResponseParser {
   }
 
   public static Row parseAggregationOnlyResponse(TimeOnTimeComparisonRequest comparisonRequest,
-      Map<ThirdEyeRequest, ThirdEyeResponse> queryResultMap) {
+      Map<ThirdEyeRequest, PinotThirdEyeResponse> queryResultMap) {
     Map<MetricFunction, Map<String, Double>> metricOnlyData =
         TimeOnTimeResponseParser.processAggregateResponse(queryResultMap);
 
@@ -140,7 +141,7 @@ public class TimeOnTimeResponseParser {
 
   public static List<Row> parseGroupByDimensionResponse(
       TimeOnTimeComparisonRequest comparisonRequest,
-      Map<ThirdEyeRequest, ThirdEyeResponse> queryResultMap) {
+      Map<ThirdEyeRequest, PinotThirdEyeResponse> queryResultMap) {
     Map<MetricFunction, Map<String, Double>> metricOnlyData =
         TimeOnTimeResponseParser.processAggregateResponse(queryResultMap);
     // we retrieve only top 25 group by values for each dimension, so we compute the sum of

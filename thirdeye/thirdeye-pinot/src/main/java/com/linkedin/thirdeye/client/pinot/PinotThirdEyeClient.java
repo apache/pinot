@@ -25,25 +25,13 @@ import com.linkedin.thirdeye.api.CollectionSchema;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.client.MetricFunction;
-import com.linkedin.thirdeye.client.PinotQuery;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.client.ThirdEyeRequest;
 import com.linkedin.thirdeye.client.ThirdEyeRequest.ThirdEyeRequestBuilder;
-import com.linkedin.thirdeye.client.ThirdEyeResponse;
 import com.linkedin.thirdeye.client.ThirdeyeCacheRegistry;
 import com.linkedin.thirdeye.client.cache.ResultSetGroupCacheLoader;
 import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
 
-/**
- * ThirdEyeClient that uses {@link Connection} to query data, and the Pinot Controller REST
- * endpoints for querying tables and schemas. Because of the controller dependency, schemas must be
- * provided to the cluster controller even if all cluster data is offline. <br/>
- * While this class does provide some caching on PQL queries, it is recommended to use
- * {@link CachedThirdEyeClient} or instantiate this class via {@link PinotThirdEyeClientFactory}
- * to improve performance. Instances of this class can be created from the static factory methods
- * (from*).
- * @author jteoh
- */
 public class PinotThirdEyeClient implements ThirdEyeClient {
   private static final ThirdeyeCacheRegistry CACHE_INSTANCE = ThirdeyeCacheRegistry.getInstance();
   public static final String CONTROLLER_HOST_PROPERTY_KEY = "controllerHost";
@@ -117,7 +105,7 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
   }
 
   @Override
-  public ThirdEyeResponse execute(ThirdEyeRequest request) throws Exception {
+  public PinotThirdEyeResponse execute(ThirdEyeRequest request) throws Exception {
     CollectionSchema collectionSchema =
         CACHE_INSTANCE.getCollectionSchemaCache().get(request.getCollection());
     TimeSpec dataTimeSpec = collectionSchema.getTime();
@@ -131,7 +119,7 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
       LOG.debug("Result for: {} {}", sql, format(result));
     }
     parseResultSetGroup(request, result, metricFunctions, collectionSchema, dimensionNames);
-    ThirdEyeResponse resp = new ThirdEyeResponse(request, result, dataTimeSpec);
+    PinotThirdEyeResponse resp = new PinotThirdEyeResponse(request, result, dataTimeSpec);
     return resp;
   }
 

@@ -1,9 +1,5 @@
 package com.linkedin.thirdeye.common;
 
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.linkedin.thirdeye.api.CollectionSchema;
 import com.linkedin.thirdeye.dashboard.ThirdEyeDashboardApplication;
 import com.linkedin.thirdeye.dashboard.configs.AbstractConfigDAO;
@@ -27,7 +23,6 @@ import io.dropwizard.db.DataSourceFactory;
 import io.dropwizard.hibernate.HibernateBundle;
 
 public abstract class BaseThirdEyeApplication<T extends Configuration> extends Application<T> {
-
 
   protected final HibernateBundle<ThirdEyeConfiguration> hibernateBundle =
       new HibernateBundle<ThirdEyeConfiguration>(AnomalyFunctionSpec.class,
@@ -53,7 +48,6 @@ public abstract class BaseThirdEyeApplication<T extends Configuration> extends A
         new AnomalyFunctionRelationDAO(hibernateBundle.getSessionFactory());
   }
 
-
   // TODO below two methods depend on webapp configs
   protected AbstractConfigDAO<CollectionSchema> getCollectionSchemaDAO(
       ThirdEyeConfiguration config) {
@@ -71,8 +65,7 @@ public abstract class BaseThirdEyeApplication<T extends Configuration> extends A
     return configDAO;
   }
 
-  protected AbstractConfigDAO<DashboardConfig> getDashboardConfigDAO(
-      ThirdEyeConfiguration config) {
+  protected AbstractConfigDAO<DashboardConfig> getDashboardConfigDAO(ThirdEyeConfiguration config) {
     FileBasedConfigDAOFactory configDAOFactory =
         new FileBasedConfigDAOFactory(getWebappConfigDir(config));
     AbstractConfigDAO<DashboardConfig> configDAO = configDAOFactory.getDashboardConfigDAO();

@@ -14,6 +14,7 @@ import org.joda.time.DateTime;
 import com.linkedin.thirdeye.client.MetricFunction;
 import com.linkedin.thirdeye.client.ThirdEyeRequest;
 import com.linkedin.thirdeye.client.ThirdEyeResponse;
+import com.linkedin.thirdeye.client.pinot.PinotThirdEyeResponse;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesRow.Builder;
 
 /**
@@ -36,7 +37,7 @@ public class TimeSeriesResponseParser {
    * values for the same MetricFunction - don't use this for handling multiple time series requests!
    */
   public TimeSeriesRow parseAggregationOnlyResponse(TimeSeriesRequest request,
-      Map<ThirdEyeRequest, ThirdEyeResponse> queryResultMap) {
+      Map<ThirdEyeRequest, PinotThirdEyeResponse> queryResultMap) {
     Map<MetricFunction, Double> metricData = processAggregateResponse(queryResultMap);
 
     Builder rowBuilder = new TimeSeriesRow.Builder();
@@ -47,15 +48,15 @@ public class TimeSeriesResponseParser {
   }
 
   /**
-   * Extracts the first values for each metric in the {@link ThirdEyeResponse} objects for which the
+   * Extracts the first values for each metric in the {@link PinotThirdEyeResponse} objects for which the
    * request reference matches {@value TimeSeriesThirdEyeRequestGenerator#ALL}, merging all their
    * values into a single map. Behavior is undefined when multiple responses have values for the
    * same MetricFunction.
    */
   Map<MetricFunction, Double> processAggregateResponse(
-      Map<ThirdEyeRequest, ThirdEyeResponse> queryResultMap) {
+      Map<ThirdEyeRequest, PinotThirdEyeResponse> queryResultMap) {
     Map<MetricFunction, Double> metricOnlyData = new HashMap<>();
-    for (Entry<ThirdEyeRequest, ThirdEyeResponse> entry : queryResultMap.entrySet()) {
+    for (Entry<ThirdEyeRequest, PinotThirdEyeResponse> entry : queryResultMap.entrySet()) {
       ThirdEyeRequest thirdEyeRequest = entry.getKey();
       ThirdEyeResponse thirdEyeResponse = entry.getValue();
       if (CollectionUtils.isEmpty(thirdEyeRequest.getGroupBy())) {
@@ -100,7 +101,7 @@ public class TimeSeriesResponseParser {
    * add up.
    */
   public List<TimeSeriesRow> parseGroupByDimensionResponse(TimeSeriesRequest timeSeriesRequest,
-      Map<ThirdEyeRequest, ThirdEyeResponse> queryResultMap) {
+      Map<ThirdEyeRequest, PinotThirdEyeResponse> queryResultMap) {
     // based off of TimeOnTimeResponseParser.parseGroupByDimensionResponse
     Map<MetricFunction, Double> metricOnlyData = processAggregateResponse(queryResultMap);
     // Might not retrieve all dimension values, so compute the cumulative sum
@@ -168,11 +169,11 @@ public class TimeSeriesResponseParser {
    * {@value TimeSeriesThirdEyeRequestGenerator#ALL}
    */
   Map<MetricFunction, Map<String, Map<String, Double>>> processGroupByDimensionResponse(
-      Map<ThirdEyeRequest, ThirdEyeResponse> queryResultMap) {
+      Map<ThirdEyeRequest, PinotThirdEyeResponse> queryResultMap) {
     TripleKeyMap<MetricFunction, String, String, Double> metricGroupByDimensionData =
         new TripleKeyMap<>(false, true, true);
 
-    for (Entry<ThirdEyeRequest, ThirdEyeResponse> entry : queryResultMap.entrySet()) {
+    for (Entry<ThirdEyeRequest, PinotThirdEyeResponse> entry : queryResultMap.entrySet()) {
       ThirdEyeRequest thirdEyeRequest = entry.getKey();
       ThirdEyeResponse thirdEyeResponse = entry.getValue();
       if (CollectionUtils.isNotEmpty(thirdEyeRequest.getGroupBy())) {

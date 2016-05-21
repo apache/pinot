@@ -15,7 +15,7 @@ import com.linkedin.pinot.client.ConnectionFactory;
 import com.linkedin.pinot.client.PinotClientException;
 import com.linkedin.pinot.client.ResultSet;
 import com.linkedin.pinot.client.ResultSetGroup;
-import com.linkedin.thirdeye.client.PinotQuery;
+import com.linkedin.thirdeye.client.pinot.PinotQuery;
 import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClient;
 import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClientConfig;
 

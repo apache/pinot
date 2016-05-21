@@ -22,9 +22,9 @@ import com.linkedin.thirdeye.client.QueryCache;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.client.ThirdEyeRequest;
 import com.linkedin.thirdeye.client.ThirdEyeRequest.ThirdEyeRequestBuilder;
-import com.linkedin.thirdeye.client.ThirdEyeResponse;
 import com.linkedin.thirdeye.client.TimeRangeUtils;
 import com.linkedin.thirdeye.client.comparison.Row.Metric;
+import com.linkedin.thirdeye.client.pinot.PinotThirdEyeResponse;
 import com.linkedin.thirdeye.dashboard.Utils;
 
 public class TimeOnTimeComparisonHandler {
@@ -54,7 +54,7 @@ public class TimeOnTimeComparisonHandler {
     int numTimeRanges = baselineTimeranges.size();
     boolean hasGroupByDimensions =
         CollectionUtils.isNotEmpty(comparisonRequest.getGroupByDimensions());
-    List<Map<ThirdEyeRequest, Future<ThirdEyeResponse>>> responseFutureList = new ArrayList<>();
+    List<Map<ThirdEyeRequest, Future<PinotThirdEyeResponse>>> responseFutureList = new ArrayList<>();
     List<TimeOnTimeComparisonRequest> comparisonRequests = new ArrayList<>(numTimeRanges);
 
     for (int i = 0; i < numTimeRanges; i++) {
@@ -70,22 +70,22 @@ public class TimeOnTimeComparisonHandler {
       if (hasGroupByDimensions) {
         List<ThirdEyeRequest> requests =
             ThirdEyeRequestGenerator.generateRequestsForGroupByDimensions(request);
-        Map<ThirdEyeRequest, Future<ThirdEyeResponse>> queryResultMap =
+        Map<ThirdEyeRequest, Future<PinotThirdEyeResponse>> queryResultMap =
             queryCache.getQueryResultsAsync(requests);
         responseFutureList.add(queryResultMap);
       } else {
         List<ThirdEyeRequest> requests =
             ThirdEyeRequestGenerator.generateRequestsForAggregation(request);
-        Map<ThirdEyeRequest, Future<ThirdEyeResponse>> queryResultMap =
+        Map<ThirdEyeRequest, Future<PinotThirdEyeResponse>> queryResultMap =
             queryCache.getQueryResultsAsync(requests);
         responseFutureList.add(queryResultMap);
       }
     }
     List<Row> rows = new ArrayList<>();
     for (int i = 0; i < timeRanges.size(); i++) {
-      Map<ThirdEyeRequest, Future<ThirdEyeResponse>> futureResponseMap = responseFutureList.get(i);
-      Map<ThirdEyeRequest, ThirdEyeResponse> responseMap = new LinkedHashMap<>();
-      for (Entry<ThirdEyeRequest, Future<ThirdEyeResponse>> entry : futureResponseMap.entrySet()) {
+      Map<ThirdEyeRequest, Future<PinotThirdEyeResponse>> futureResponseMap = responseFutureList.get(i);
+      Map<ThirdEyeRequest, PinotThirdEyeResponse> responseMap = new LinkedHashMap<>();
+      for (Entry<ThirdEyeRequest, Future<PinotThirdEyeResponse>> entry : futureResponseMap.entrySet()) {
         responseMap.put(entry.getKey(), entry.getValue().get(60, TimeUnit.SECONDS));
       }
       if (hasGroupByDimensions) {
@@ -162,7 +162,7 @@ public class TimeOnTimeComparisonHandler {
 
     List<ThirdEyeRequest> requests =
         ThirdEyeRequestGenerator.generateRequestsForAggregation(comparisonRequest);
-    Map<ThirdEyeRequest, ThirdEyeResponse> queryResultMap =
+    Map<ThirdEyeRequest, PinotThirdEyeResponse> queryResultMap =
         queryCache.getQueryResultsAsyncAndWait(requests);
     Row row =
         TimeOnTimeResponseParser.parseAggregationOnlyResponse(comparisonRequest, queryResultMap);
@@ -189,7 +189,7 @@ public class TimeOnTimeComparisonHandler {
     List<ThirdEyeRequest> requests =
         ThirdEyeRequestGenerator.generateRequestsForGroupByDimensions(comparisonRequest);
 
-    Map<ThirdEyeRequest, ThirdEyeResponse> queryResultMap =
+    Map<ThirdEyeRequest, PinotThirdEyeResponse> queryResultMap =
         queryCache.getQueryResultsAsyncAndWait(requests);
 
     return TimeOnTimeResponseParser.parseGroupByDimensionResponse(comparisonRequest,

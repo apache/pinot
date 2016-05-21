@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.client;
+package com.linkedin.thirdeye.client.pinot;
 
 public class PinotQuery {
 

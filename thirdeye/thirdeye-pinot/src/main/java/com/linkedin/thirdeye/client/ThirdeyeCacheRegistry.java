@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.client;
 
-
 import java.io.IOException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -21,6 +20,7 @@ import com.linkedin.thirdeye.client.cache.CollectionSchemaCacheLoader;
 import com.linkedin.thirdeye.client.cache.CollectionsCache;
 import com.linkedin.thirdeye.client.cache.ResultSetGroupCacheLoader;
 import com.linkedin.thirdeye.client.cache.SchemaCacheLoader;
+import com.linkedin.thirdeye.client.pinot.PinotQuery;
 import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClientConfig;
 import com.linkedin.thirdeye.dashboard.ThirdEyeDashboardConfiguration;
 import com.linkedin.thirdeye.dashboard.configs.AbstractConfigDAO;
@@ -55,7 +55,8 @@ public class ThirdeyeCacheRegistry {
    * @throws IOException
    */
   public static void initializeDetectorCaches(PinotThirdEyeClientConfig pinotThirdeyeClientConfig,
-      AbstractConfigDAO<CollectionSchema> collectionSchemaDAO, AbstractConfigDAO<CollectionConfig> collectionConfigDAO)
+      AbstractConfigDAO<CollectionSchema> collectionSchemaDAO,
+      AbstractConfigDAO<CollectionConfig> collectionConfigDAO)
       throws ClientProtocolException, IOException {
 
     initCacheLoaders(pinotThirdeyeClientConfig, collectionSchemaDAO, collectionConfigDAO);
@@ -71,9 +72,9 @@ public class ThirdeyeCacheRegistry {
    * @throws IOException
    */
   public static void initializeWebappCaches(PinotThirdEyeClientConfig pinotThirdeyeClientConfig,
-      AbstractConfigDAO<CollectionSchema> collectionSchemaDAO, AbstractConfigDAO<CollectionConfig> collectionConfigDAO,
-      ThirdEyeDashboardConfiguration config)
-      throws ClientProtocolException, IOException {
+      AbstractConfigDAO<CollectionSchema> collectionSchemaDAO,
+      AbstractConfigDAO<CollectionConfig> collectionConfigDAO,
+      ThirdEyeDashboardConfiguration config) throws ClientProtocolException, IOException {
 
     initCacheLoaders(pinotThirdeyeClientConfig, collectionSchemaDAO, collectionConfigDAO);
 
@@ -85,7 +86,8 @@ public class ThirdeyeCacheRegistry {
   }
 
   private static void initCacheLoaders(PinotThirdEyeClientConfig pinotThirdeyeClientConfig,
-      AbstractConfigDAO<CollectionSchema> collectionSchemaDAO, AbstractConfigDAO<CollectionConfig> collectionConfigDAO) {
+      AbstractConfigDAO<CollectionSchema> collectionSchemaDAO,
+      AbstractConfigDAO<CollectionConfig> collectionConfigDAO) {
     ThirdeyeCacheRegistry cacheRegistry = ThirdeyeCacheRegistry.getInstance();
 
     // TODO: have a limit on key size and maximum weight
@@ -134,7 +136,8 @@ public class ThirdeyeCacheRegistry {
     return resultSetGroupCache;
   }
 
-  public void registerResultSetGroupCache(LoadingCache<PinotQuery, ResultSetGroup> resultSetGroupCache) {
+  public void registerResultSetGroupCache(
+      LoadingCache<PinotQuery, ResultSetGroup> resultSetGroupCache) {
     this.resultSetGroupCache = resultSetGroupCache;
   }
 
@@ -150,7 +153,8 @@ public class ThirdeyeCacheRegistry {
     return collectionSchemaCache;
   }
 
-  public void registerCollectionSchemaCache(LoadingCache<String, CollectionSchema> collectionSchemaCache) {
+  public void registerCollectionSchemaCache(
+      LoadingCache<String, CollectionSchema> collectionSchemaCache) {
     this.collectionSchemaCache = collectionSchemaCache;
   }
 
@@ -158,7 +162,8 @@ public class ThirdeyeCacheRegistry {
     return collectionMaxDataTimeCache;
   }
 
-  public void registerCollectionMaxDataTimeCache(LoadingCache<String, Long> collectionMaxDataTimeCache) {
+  public void registerCollectionMaxDataTimeCache(
+      LoadingCache<String, Long> collectionMaxDataTimeCache) {
     this.collectionMaxDataTimeCache = collectionMaxDataTimeCache;
   }
 
@@ -174,7 +179,8 @@ public class ThirdeyeCacheRegistry {
     return collectionConfigCache;
   }
 
-  public void registerCollectionConfigCache(LoadingCache<String, CollectionConfig> collectionConfigCache) {
+  public void registerCollectionConfigCache(
+      LoadingCache<String, CollectionConfig> collectionConfigCache) {
     this.collectionConfigCache = collectionConfigCache;
   }
 
