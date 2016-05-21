@@ -318,4 +318,25 @@ public class StarTreeClusterIntegrationTest extends ClusterTest {
       IOUtils.closeQuietly(queryReader);
     }
   }
+
+  /**
+   * Test that when metrics have predicates on them, we still get
+   * correct results, ie correctly fall back on non-StarTree based execution.
+   */
+  @Test
+  public void testPredicateOnMetrics() {
+    String query;
+
+    // Query containing predicate on one metric only
+    query = "SELECT SUM(DepDelayMinutes) FROM myStarTable WHERE DepDelay > 0\n";
+    testOneQuery(query, false);
+
+    // Query containing predicate on multiple metrics
+    query = "SELECT SUM(DepDelayMinutes) FROM myStarTable WHERE DepDelay > 0 AND ArrDelay > 0\n";
+    testOneQuery(query, false);
+
+    // Query containing predicate on multiple metrics and dimensions
+    query = "SELECT SUM(DepDelayMinutes) FROM myStarTable WHERE DepDelay > 0 AND ArrDelay > 0 AND OriginStateName = 'Massachusetts'\n";
+    testOneQuery(query, false);
+  }
 }

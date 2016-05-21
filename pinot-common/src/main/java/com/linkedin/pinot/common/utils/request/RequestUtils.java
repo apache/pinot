@@ -108,6 +108,7 @@ public class RequestUtils {
    * - Segment does not contain star tree
    * - The only aggregation function in the query is 'sum'
    * - All group by columns and predicate columns are materialized
+   * - Predicates do not contain any metric columns
    * - Query consists only of simple predicates, conjoined by AND.
    *   <p>
    *   e.g. WHERE d1 = d1v1 AND d2 = d2v2 AND d3 = d3v3 AND d4 between t1,t2
@@ -153,7 +154,10 @@ public class RequestUtils {
       }
     }
 
-    //if the filter tree has children, ensure that root is AND and all its children are leaves
+    //if the filter tree has children, ensure that root is AND and all its children are leaves, and
+    //no metric columns appear in the predicates.
+    Set<String> metricColumnSet = new HashSet<String>();
+    metricColumnSet.addAll(segmentMetadata.getSchema().getMetricNames());
     if (filterTree != null && filterTree.getChildren() != null && !filterTree.getChildren().isEmpty()) {
       //ensure that its AND
       if (filterTree.getOperator() != FilterOperator.AND) {
@@ -176,12 +180,22 @@ public class RequestUtils {
         if ((skipMaterializationSet != null) && skipMaterializationSet.contains(column)) {
           return false;
         }
-        predicateColumns.add(child.getColumn());
+
+        // predicate should not contain metric columns.
+        if (metricColumnSet.contains(column)) {
+          return false;
+        }
+        predicateColumns.add(column);
       }
     } else if (filterTree != null){
       // Predicate column of root node should be materialized.
       String rootColumn = filterTree.getColumn();
       if (skipMaterializationSet != null && skipMaterializationSet.contains(rootColumn)) {
+        return false;
+      }
+
+      // predicate should not contain metric columns.
+      if (metricColumnSet.contains(rootColumn)) {
         return false;
       }
     }
