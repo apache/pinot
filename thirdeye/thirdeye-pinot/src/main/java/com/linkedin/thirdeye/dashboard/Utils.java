@@ -28,7 +28,7 @@ import com.linkedin.thirdeye.client.MetricFunction;
 import com.linkedin.thirdeye.client.QueryCache;
 import com.linkedin.thirdeye.client.ThirdEyeRequest;
 import com.linkedin.thirdeye.client.ThirdEyeRequest.ThirdEyeRequestBuilder;
-import com.linkedin.thirdeye.client.pinot.PinotThirdEyeResponse;
+import com.linkedin.thirdeye.client.ThirdEyeResponse;
 import com.linkedin.thirdeye.client.ThirdEyeResponse;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.dashboard.configs.AbstractConfigDAO;
@@ -74,11 +74,11 @@ public class Utils {
     List<ThirdEyeRequest> requests =
         generateRequests(collection, requestReference, metricFunction, dimensions, start, end);
 
-    Map<ThirdEyeRequest, Future<PinotThirdEyeResponse>> queryResultMap =
+    Map<ThirdEyeRequest, Future<ThirdEyeResponse>> queryResultMap =
         queryCache.getQueryResultsAsync(requests);
 
     Map<String, List<String>> result = new HashMap<>();
-    for (Map.Entry<ThirdEyeRequest, Future<PinotThirdEyeResponse>> entry : queryResultMap.entrySet()) {
+    for (Map.Entry<ThirdEyeRequest, Future<ThirdEyeResponse>> entry : queryResultMap.entrySet()) {
       ThirdEyeRequest request = entry.getKey();
       String dimension = request.getGroupBy().get(0);
       ThirdEyeResponse thirdEyeResponse = entry.getValue().get();

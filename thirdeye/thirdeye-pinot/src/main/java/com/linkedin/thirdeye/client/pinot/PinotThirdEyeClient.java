@@ -2,12 +2,9 @@ package com.linkedin.thirdeye.client.pinot;
 
 import java.util.List;
 import java.util.Properties;
-import java.util.concurrent.TimeUnit;
 
-import org.apache.helix.manager.zk.ZKHelixAdmin;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.manager.zk.ZkClient;
-import org.apache.helix.model.InstanceConfig;
 import org.apache.http.HttpHost;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
@@ -22,13 +19,12 @@ import com.linkedin.pinot.client.ConnectionFactory;
 import com.linkedin.pinot.client.ResultSet;
 import com.linkedin.pinot.client.ResultSetGroup;
 import com.linkedin.thirdeye.api.CollectionSchema;
-import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.client.MetricFunction;
+import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.client.ThirdEyeRequest;
 import com.linkedin.thirdeye.client.ThirdEyeRequest.ThirdEyeRequestBuilder;
-import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.cache.ResultSetGroupCacheLoader;
 import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
 
@@ -80,8 +76,10 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
     ZkClient zkClient = new ZkClient(zkUrl);
     zkClient.setZkSerializer(new ZNRecordSerializer());
     zkClient.waitUntilConnected();
-    PinotThirdEyeClient pinotThirdEyeClient = new PinotThirdEyeClient(controllerHost, controllerPort);
-    LOG.info("Created PinotThirdEyeClient to zookeeper: {} controller: {}:{}", zkUrl, controllerHost, controllerPort);
+    PinotThirdEyeClient pinotThirdEyeClient =
+        new PinotThirdEyeClient(controllerHost, controllerPort);
+    LOG.info("Created PinotThirdEyeClient to zookeeper: {} controller: {}:{}", zkUrl,
+        controllerHost, controllerPort);
     return pinotThirdEyeClient;
   }
 
@@ -113,9 +111,9 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
     List<String> dimensionNames = collectionSchema.getDimensionNames();
     String sql = PqlUtils.getPql(request, dataTimeSpec);
     LOG.info("Executing: {}", sql);
-    ResultSetGroup result =
-        CACHE_INSTANCE.getResultSetGroupCache().get(new PinotQuery(sql, request.getCollection() + "_OFFLINE"));
-    if(LOG.isDebugEnabled()){
+    ResultSetGroup result = CACHE_INSTANCE.getResultSetGroupCache()
+        .get(new PinotQuery(sql, request.getCollection() + "_OFFLINE"));
+    if (LOG.isDebugEnabled()) {
       LOG.debug("Result for: {} {}", sql, format(result));
     }
     parseResultSetGroup(request, result, metricFunctions, collectionSchema, dimensionNames);
@@ -127,7 +125,7 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
     StringBuilder sb = new StringBuilder();
     for (int i = 0; i < result.getResultSetCount(); i++) {
       ResultSet resultSet = result.getResultSet(i);
-      for(int c=0;c<resultSet.getColumnCount();c++){
+      for (int c = 0; c < resultSet.getColumnCount(); c++) {
         sb.append(resultSet.getColumnName(c)).append("=").append(resultSet.getDouble(c));
       }
     }
@@ -137,7 +135,7 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
   private void parseResultSetGroup(ThirdEyeRequest request, ResultSetGroup result,
       List<MetricFunction> metricFunctions, CollectionSchema collectionSchema,
       List<String> dimensionNames)
-          throws JsonProcessingException, RuntimeException, NumberFormatException {
+      throws JsonProcessingException, RuntimeException, NumberFormatException {
 
     for (int groupIdx = 0; groupIdx < result.getResultSetCount(); groupIdx++) {
       ResultSet resultSet = result.getResultSet(groupIdx);
@@ -204,27 +202,30 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
     int controllerPort = 11984;
     String zkUrl = "zk-lva1-pinot.corp.linkedin.com:12913/pinot-cluster";// "zk-lva1-pinot.corp:12913/pinot-cluster";
     String clusterName = "mpSprintDemoCluster";
-    
-    //RAW connection
-    Connection connection = ConnectionFactory.fromZookeeper(zkUrl +"/" + clusterName);
-    String statement = "SELECT sum(engaged_feed_session_count) FROM feed_sessions_additive WHERE  Date = 20160514";
-    ResultSetGroup resultSetGroup = connection.execute("feed_sessions_additive_OFFLINE",statement);
+
+    // RAW connection
+    Connection connection = ConnectionFactory.fromZookeeper(zkUrl + "/" + clusterName);
+    String statement =
+        "SELECT sum(engaged_feed_session_count) FROM feed_sessions_additive WHERE  Date = 20160514";
+    ResultSetGroup resultSetGroup = connection.execute("feed_sessions_additive_OFFLINE", statement);
     System.out.println(format(resultSetGroup));
 
-    //thirdeyeClient
+    // thirdeyeClient
     ResultSetGroupCacheLoader resultSetGroupCacheLoader = new ResultSetGroupCacheLoader(connection);
-//    ThirdeyeCacheRegistry.getInstance().registerResultSetGroupCache(resultSetGroupCacheLoader);
-    
-    PinotThirdEyeClient thirdEyeClient = PinotThirdEyeClient.fromZookeeper(controllerHost, controllerPort, zkUrl, clusterName);
+    // ThirdeyeCacheRegistry.getInstance().registerResultSetGroupCache(resultSetGroupCacheLoader);
+
+    PinotThirdEyeClient thirdEyeClient =
+        PinotThirdEyeClient.fromZookeeper(controllerHost, controllerPort, zkUrl, clusterName);
     ThirdEyeRequestBuilder builder = new ThirdEyeRequestBuilder();
     builder.setCollection("feed_sessions_additive");
     builder.setStartTimeInclusive(DateTime.parse("2016-05-11"));
     builder.setEndTimeExclusive(DateTime.parse("2016-05-11"));
-    builder.setMetricFunctions(Lists.newArrayList(new MetricFunction("SUM", "sum_engaged_feed_session_count")));
+    builder.setMetricFunctions(
+        Lists.newArrayList(new MetricFunction("SUM", "sum_engaged_feed_session_count")));
     ThirdEyeRequest thirdEyeRequest = builder.build("asd");
-    //ThirdEyeResponse response = thirdEyeClient.execute(thirdEyeRequest);
-    //System.out.println("Response: " + response);
-    
+    // ThirdEyeResponse response = thirdEyeClient.execute(thirdEyeRequest);
+    // System.out.println("Response: " + response);
+
   }
 
   @Override

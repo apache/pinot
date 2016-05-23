@@ -15,13 +15,10 @@ import org.joda.time.DateTime;
 
 import com.google.common.collect.Range;
 import com.linkedin.thirdeye.client.MetricExpression;
-import com.linkedin.thirdeye.client.MetricFunction;
 import com.linkedin.thirdeye.client.QueryCache;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.client.ThirdEyeRequest;
-import com.linkedin.thirdeye.client.comparison.Row;
-import com.linkedin.thirdeye.client.comparison.Row.Metric;
-import com.linkedin.thirdeye.client.pinot.PinotThirdEyeResponse;
+import com.linkedin.thirdeye.client.ThirdEyeResponse;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesRow.TimeSeriesMetric;
 
 public class TimeSeriesHandler {
@@ -45,7 +42,7 @@ public class TimeSeriesHandler {
     boolean hasGroupByDimensions = CollectionUtils.isNotEmpty(groupByDimensions);
     List<Range<DateTime>> timeRanges = timeSeriesRequest.getTimeRanges();
 
-    Map<TimeSeriesRequest, Map<ThirdEyeRequest, Future<PinotThirdEyeResponse>>> subRequestQueryResponseMap =
+    Map<TimeSeriesRequest, Map<ThirdEyeRequest, Future<ThirdEyeResponse>>> subRequestQueryResponseMap =
         new HashMap<>();
     // For each time bucket, generate a smaller TimeSeriesRequest and the ThirdEyeRequests it would
     // generate.
@@ -60,16 +57,17 @@ public class TimeSeriesHandler {
         subRequests = Collections
             .singletonList(requestGenerator.generateRequestsForAggregation(subTimeSeriesRequest));
       }
-      Map<ThirdEyeRequest, Future<PinotThirdEyeResponse>> queryResponseFutureMap =
+      Map<ThirdEyeRequest, Future<ThirdEyeResponse>> queryResponseFutureMap =
           queryCache.getQueryResultsAsync(subRequests);
       subRequestQueryResponseMap.put(subTimeSeriesRequest, queryResponseFutureMap);
     }
 
     List<TimeSeriesRow> rows = new ArrayList<>();
-    for (Entry<TimeSeriesRequest, Map<ThirdEyeRequest, Future<PinotThirdEyeResponse>>> entry : subRequestQueryResponseMap
+    for (Entry<TimeSeriesRequest, Map<ThirdEyeRequest, Future<ThirdEyeResponse>>> entry : subRequestQueryResponseMap
         .entrySet()) {
       TimeSeriesRequest subTimeSeriesRequest = entry.getKey();
-      Map<ThirdEyeRequest, PinotThirdEyeResponse> queryResponseMap = waitForFutures(entry.getValue());
+      Map<ThirdEyeRequest, ThirdEyeResponse> queryResponseMap =
+          waitForFutures(entry.getValue());
       if (hasGroupByDimensions) {
         rows.addAll(
             responseParser.parseGroupByDimensionResponse(subTimeSeriesRequest, queryResponseMap));
@@ -115,7 +113,7 @@ public class TimeSeriesHandler {
    */
   TimeSeriesRow handleAggregateOnly(TimeSeriesRequest timeSeriesRequest) throws Exception {
     ThirdEyeRequest request = requestGenerator.generateRequestsForAggregation(timeSeriesRequest);
-    Map<ThirdEyeRequest, PinotThirdEyeResponse> queryResultMap = queryCache
+    Map<ThirdEyeRequest, ThirdEyeResponse> queryResultMap = queryCache
         .getQueryResultsAsyncAndWait(Collections.singletonList(request), DEFAULT_QUERY_TIMEOUT);
     TimeSeriesRow row =
         responseParser.parseAggregationOnlyResponse(timeSeriesRequest, queryResultMap);
@@ -138,7 +136,7 @@ public class TimeSeriesHandler {
   List<TimeSeriesRow> handleGroupByDimension(TimeSeriesRequest timeSeriesRequest) throws Exception {
     List<ThirdEyeRequest> requests =
         requestGenerator.generateRequestsForGroupByDimensions(timeSeriesRequest);
-    Map<ThirdEyeRequest, PinotThirdEyeResponse> queryResultMap =
+    Map<ThirdEyeRequest, ThirdEyeResponse> queryResultMap =
         queryCache.getQueryResultsAsyncAndWait(requests, DEFAULT_QUERY_TIMEOUT);
     List<TimeSeriesRow> rows =
         responseParser.parseGroupByDimensionResponse(timeSeriesRequest, queryResultMap);

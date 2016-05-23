@@ -3,13 +3,13 @@ package com.linkedin.thirdeye.client;
 import java.util.List;
 
 import com.linkedin.thirdeye.api.CollectionSchema;
-import com.linkedin.thirdeye.client.pinot.PinotThirdEyeResponse;
+import com.linkedin.thirdeye.client.ThirdEyeResponse;
 import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
 import com.linkedin.thirdeye.detector.ThirdEyeDetectorConfiguration;
 
 public interface ThirdEyeClient {
 
-  PinotThirdEyeResponse execute(ThirdEyeRequest request) throws Exception;
+  ThirdEyeResponse execute(ThirdEyeRequest request) throws Exception;
 
   List<String> getCollections() throws Exception;
 
