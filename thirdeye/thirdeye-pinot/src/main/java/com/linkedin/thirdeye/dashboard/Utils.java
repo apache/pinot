@@ -30,7 +30,7 @@ import com.linkedin.thirdeye.client.ThirdEyeRequest;
 import com.linkedin.thirdeye.client.ThirdEyeRequest.ThirdEyeRequestBuilder;
 import com.linkedin.thirdeye.client.pinot.PinotThirdEyeResponse;
 import com.linkedin.thirdeye.client.ThirdEyeResponse;
-import com.linkedin.thirdeye.client.ThirdeyeCacheRegistry;
+import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.dashboard.configs.AbstractConfigDAO;
 import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
 import com.linkedin.thirdeye.dashboard.configs.DashboardConfig;
@@ -40,7 +40,7 @@ public class Utils {
 
   private static String DEFAULT_DASHBOARD = "Default_Dashboard";
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-  private static ThirdeyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdeyeCacheRegistry.getInstance();
+  private static ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
 
   public static List<ThirdEyeRequest> generateRequests(String collection, String requestReference,
       MetricFunction metricFunction, List<String> dimensions, DateTime start, DateTime end) {

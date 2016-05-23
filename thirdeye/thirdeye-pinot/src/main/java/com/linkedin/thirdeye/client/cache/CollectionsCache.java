@@ -24,7 +24,7 @@ import org.slf4j.LoggerFactory;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.api.CollectionSchema;
-import com.linkedin.thirdeye.client.ThirdeyeCacheRegistry;
+import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClientConfig;
 import com.linkedin.thirdeye.dashboard.ThirdEyeDashboardConfiguration;
 
@@ -33,7 +33,7 @@ public class CollectionsCache {
   private static final Logger LOGGER = LoggerFactory.getLogger(CollectionsCache.class);
 
   private static final String TABLES_ENDPOINT = "tables/";
-  private static final ThirdeyeCacheRegistry CACHE_INSTANCE = ThirdeyeCacheRegistry.getInstance();
+  private static final ThirdEyeCacheRegistry CACHE_INSTANCE = ThirdEyeCacheRegistry.getInstance();
 
   private AtomicReference<List<String>> collectionsRef;
 

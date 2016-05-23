@@ -18,7 +18,7 @@ import com.linkedin.thirdeye.api.MetricSpec;
 import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
-import com.linkedin.thirdeye.client.ThirdeyeCacheRegistry;
+import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClientConfig;
 import com.linkedin.thirdeye.dashboard.configs.AbstractConfigDAO;
 
@@ -46,7 +46,7 @@ public class CollectionSchemaCacheLoader extends CacheLoader<String, CollectionS
     collectionSchema = collectionSchemaDAO.findById(collection);
     if (collectionSchema == null) {
       // get from schema endpoint
-      Schema schema = ThirdeyeCacheRegistry.getInstance().getSchemaCache().get(collection);
+      Schema schema = ThirdEyeCacheRegistry.getInstance().getSchemaCache().get(collection);
       List<DimensionSpec> dimSpecs = fromDimensionFieldSpecs(schema.getDimensionFieldSpecs());
       List<MetricSpec> metricSpecs = fromMetricFieldSpecs(schema.getMetricFieldSpecs());
       TimeSpec timeSpec = fromTimeFieldSpec(schema.getTimeFieldSpec(), null);

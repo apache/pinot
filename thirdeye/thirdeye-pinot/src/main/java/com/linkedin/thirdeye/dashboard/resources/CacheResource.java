@@ -13,14 +13,14 @@ import javax.ws.rs.core.Response;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.thirdeye.client.ThirdeyeCacheRegistry;
+import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 
 @Path("/cache")
 @Produces(MediaType.APPLICATION_JSON)
 public class CacheResource {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(CacheResource.class);
-  private ThirdeyeCacheRegistry CACHE_INSTANCE = ThirdeyeCacheRegistry.getInstance();
+  private ThirdEyeCacheRegistry CACHE_INSTANCE = ThirdEyeCacheRegistry.getInstance();
 
   public CacheResource() {
 

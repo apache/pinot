@@ -9,7 +9,7 @@ import org.slf4j.LoggerFactory;
 import com.linkedin.thirdeye.api.CollectionSchema;
 import com.linkedin.thirdeye.client.QueryCache;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
-import com.linkedin.thirdeye.client.ThirdeyeCacheRegistry;
+import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClient;
 import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClientConfig;
 import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
@@ -71,7 +71,7 @@ public class ThirdEyeDashboardApplication
 
     // initialize caches
     try {
-      ThirdeyeCacheRegistry.initializeWebappCaches(pinotThirdeyeClientConfig, collectionSchemaDAO, collectionConfigDAO, config);
+      ThirdEyeCacheRegistry.initializeWebappCaches(pinotThirdeyeClientConfig, collectionSchemaDAO, collectionConfigDAO, config);
     } catch (Exception e) {
       LOG.error("Exception while loading caches", e);
     }

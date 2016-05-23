@@ -35,7 +35,7 @@ import com.linkedin.thirdeye.api.CollectionSchema;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.client.MetricExpression;
 import com.linkedin.thirdeye.client.QueryCache;
-import com.linkedin.thirdeye.client.ThirdeyeCacheRegistry;
+import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesHandler;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesRequest;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesResponse;
@@ -64,8 +64,8 @@ import io.dropwizard.views.View;
 @Path(value = "/dashboard")
 // @Produces(MediaType.APPLICATION_JSON)
 public class DashboardResource {
-  private static final ThirdeyeCacheRegistry CACHE_REGISTRY_INSTANCE =
-      ThirdeyeCacheRegistry.getInstance();
+  private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE =
+      ThirdEyeCacheRegistry.getInstance();
   private static final Logger LOG = LoggerFactory.getLogger(DashboardResource.class);
   private static final String DEFAULT_TIMEZONE_ID = "UTC";
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();

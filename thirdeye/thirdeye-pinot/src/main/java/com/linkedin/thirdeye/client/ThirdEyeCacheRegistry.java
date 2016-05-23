@@ -27,7 +27,7 @@ import com.linkedin.thirdeye.dashboard.configs.AbstractConfigDAO;
 import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
 import com.linkedin.thirdeye.dashboard.resources.CacheResource;
 
-public class ThirdeyeCacheRegistry {
+public class ThirdEyeCacheRegistry {
 
   private LoadingCache<PinotQuery, ResultSetGroup> resultSetGroupCache;
   private LoadingCache<String, Schema> schemaCache;
@@ -36,13 +36,13 @@ public class ThirdeyeCacheRegistry {
   private LoadingCache<String, CollectionConfig> collectionConfigCache;
   private CollectionsCache collectionsCache;
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(ThirdeyeCacheRegistry.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(ThirdEyeCacheRegistry.class);
 
   private static class Holder {
-    static final ThirdeyeCacheRegistry INSTANCE = new ThirdeyeCacheRegistry();
+    static final ThirdEyeCacheRegistry INSTANCE = new ThirdEyeCacheRegistry();
   }
 
-  public static ThirdeyeCacheRegistry getInstance() {
+  public static ThirdEyeCacheRegistry getInstance() {
     return Holder.INSTANCE;
   }
 
@@ -78,7 +78,7 @@ public class ThirdeyeCacheRegistry {
 
     initCacheLoaders(pinotThirdeyeClientConfig, collectionSchemaDAO, collectionConfigDAO);
 
-    ThirdeyeCacheRegistry cacheRegistry = ThirdeyeCacheRegistry.getInstance();
+    ThirdEyeCacheRegistry cacheRegistry = ThirdEyeCacheRegistry.getInstance();
     CollectionsCache collectionsCache = new CollectionsCache(pinotThirdeyeClientConfig, config);
     cacheRegistry.registerCollectionsCache(collectionsCache);
 
@@ -88,7 +88,7 @@ public class ThirdeyeCacheRegistry {
   private static void initCacheLoaders(PinotThirdEyeClientConfig pinotThirdeyeClientConfig,
       AbstractConfigDAO<CollectionSchema> collectionSchemaDAO,
       AbstractConfigDAO<CollectionConfig> collectionConfigDAO) {
-    ThirdeyeCacheRegistry cacheRegistry = ThirdeyeCacheRegistry.getInstance();
+    ThirdEyeCacheRegistry cacheRegistry = ThirdEyeCacheRegistry.getInstance();
 
     // TODO: have a limit on key size and maximum weight
     LoadingCache<PinotQuery, ResultSetGroup> resultSetGroupCache =

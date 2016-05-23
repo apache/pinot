@@ -28,12 +28,12 @@ import com.linkedin.thirdeye.client.MetricFunction;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.client.ThirdEyeRequest;
 import com.linkedin.thirdeye.client.ThirdEyeRequest.ThirdEyeRequestBuilder;
-import com.linkedin.thirdeye.client.ThirdeyeCacheRegistry;
+import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.cache.ResultSetGroupCacheLoader;
 import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
 
 public class PinotThirdEyeClient implements ThirdEyeClient {
-  private static final ThirdeyeCacheRegistry CACHE_INSTANCE = ThirdeyeCacheRegistry.getInstance();
+  private static final ThirdEyeCacheRegistry CACHE_INSTANCE = ThirdEyeCacheRegistry.getInstance();
   public static final String CONTROLLER_HOST_PROPERTY_KEY = "controllerHost";
   public static final String CONTROLLER_PORT_PROPERTY_KEY = "controllerPort";
   public static final String FIXED_COLLECTIONS_PROPERTY_KEY = "fixedCollections";
