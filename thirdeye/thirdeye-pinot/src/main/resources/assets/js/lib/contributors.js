@@ -1,85 +1,85 @@
 //Contributors section
-function getContributors() {
+function getContributors(tab) {
 
   var url = "/dashboard/data/contributor?" + window.location.hash.substring(1)
 
-  getData(url).done(function(data) {
+  getData(url, tab).done(function(data) {
 
-  //Error handling when data is falsy (empty, undefined or null)
-  if(!data){
-      $("#"+  hash.view  +"-chart-area-error").empty()
-      var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' })
-      warning.append($('<p></p>', { html: 'Something went wrong. Please try and reload the page. Error: data =' + data  }))
-      $("#"+  hash.view  +"-chart-area-error").append(warning)
-      $("#"+  hash.view  +"-chart-area-error").show()
-      return
-  }else{
-      $("#"+  hash.view  +"-chart-area-error").hide()
-  }
-
-
-  if(data.metrics.length == 0){
-      $("#"+  hash.view  +"-chart-area-error").empty()
-      var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' })
-      warning.append($('<p></p>', { html: 'No metric data is present. Error: data.metrics.length = 0'  }))
-      $("#"+  hash.view  +"-chart-area-error").append(warning)
-      $("#"+  hash.view  +"-chart-area-error").show()
-      return
-  }
-
-    // Handelbars contributors table template
-    var result_contributors_template = HandleBarsTemplates.template_contributors_table(data);
-    $("#"+ hash.view +"-display-chart-section").append(result_contributors_template);
-
-    // Create timeseries
-    renderContributionTimeSeries(data);
-
-    // Calculate heatmap-cells-bg color
-    calcHeatMapBG();
-
-    // Translate UTC date into user selected or local
-    // timezone
-    transformUTCToTZ();
-
-    // Select-all-checkbox will set the other checkboxes of
-    // the table to checked/ unchecked
-    $(".contributors-table").on("click", ".select_all_checkbox", function() {
-      var currentTable = $(this).closest("table");
-
-      if ($(this).is(':checked')) {
-        $("input[type='checkbox']", currentTable).attr('checked', 'checked');
-        $("input[type='checkbox']", currentTable).prop('checked', true);
-      } else {
-        $("input[type='checkbox']", currentTable).removeAttr('checked');
-      }
-      // Todo: rewrite sumColumn with new
-      // JSON
-      sumColumn(this);
-    })
-
-    /*
-     * When a checkbox is clicked loop through each columns that's not
-     * displaying ratio values, take the total of the cells' value in the column
-     * (if the row of the cell is checked and the value id not N/A) and place
-     * the total into the total row. Then calculate the sum row ratio column
-     * cell value based on the 2 previous column's value.
-     */
-    $(".contributors-table").on("click", $("input[checkbox]:not('.select_all_checkbox')"), function(event) {
-      var checkbox = event.target;
-      if ($(checkbox).is(':checked')) {
-        $(checkbox).attr('checked', 'checked');
-      } else {
-        $(checkbox).removeAttr('checked');
+      //Error handling when data is falsy (empty, undefined or null)
+      if(!data){
+          $("#"+  tab  +"-chart-area-error").empty();
+          var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' });
+          warning.append($('<p></p>', { html: 'Something went wrong. Please try and reload the page. Error: data =' + data  }));
+          $("#"+  tab  +"-chart-area-error").append(warning);
+          $("#"+  tab  +"-chart-area-error").show();
+          return
+      }else{
+          $("#"+  tab  +"-chart-area-error").hide();
       }
 
-      sumColumn(checkbox);
-    })
 
-    // Trigger sumcolumn on load
-    $(".contributors-table .select_all_checkbox[rel='discrete']").each(function() {
-      $(this).trigger("click");
-    });
-  });
+      if(data.metrics.length == 0){
+          $("#"+  tab  +"-chart-area-error").empty();
+          var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' });
+          warning.append($('<p></p>', { html: 'No metric data is present. Error: data.metrics.length = 0'  }));
+          $("#"+  tab  +"-chart-area-error").append(warning);
+          $("#"+  tab  +"-chart-area-error").show();
+          return
+      }
+
+        // Handelbars contributors table template
+        var result_contributors_template = HandleBarsTemplates.template_contributors_table(data);
+        $("#"+ tab +"-display-chart-section").append(result_contributors_template);
+
+        // Create timeseries
+        renderContributionTimeSeries(data);
+
+        // Calculate heatmap-cells-bg color
+        calcHeatMapBG();
+
+        // Translate UTC date into user selected or local
+        // timezone
+        transformUTCToTZ();
+
+        // Select-all-checkbox will set the other checkboxes of
+        // the table to checked/ unchecked
+        $(".contributors-table").on("click", ".select_all_checkbox", function() {
+          var currentTable = $(this).closest("table");
+
+          if ($(this).is(':checked')) {
+            $("input[type='checkbox']", currentTable).attr('checked', 'checked');
+            $("input[type='checkbox']", currentTable).prop('checked', true);
+          } else {
+            $("input[type='checkbox']", currentTable).removeAttr('checked');
+          }
+          // Todo: rewrite sumColumn with new
+          // JSON
+          sumColumn(this);
+        })
+
+        /*
+         * When a checkbox is clicked loop through each columns that's not
+         * displaying ratio values, take the total of the cells' value in the column
+         * (if the row of the cell is checked and the value id not N/A) and place
+         * the total into the total row. Then calculate the sum row ratio column
+         * cell value based on the 2 previous column's value.
+         */
+        $(".contributors-table").on("click", $("input[checkbox]:not('.select_all_checkbox')"), function(event) {
+          var checkbox = event.target;
+          if ($(checkbox).is(':checked')) {
+            $(checkbox).attr('checked', 'checked');
+          } else {
+            $(checkbox).removeAttr('checked');
+          }
+
+          sumColumn(checkbox);
+        })
+
+        // Trigger sumcolumn on load
+        $(".contributors-table .select_all_checkbox[rel='discrete']").each(function() {
+          $(this).trigger("click");
+        });
+   });
 };
 
 function renderContributionTimeSeries(ajaxData) {

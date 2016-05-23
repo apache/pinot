@@ -1,33 +1,33 @@
-function getHeatmap() {
+function getHeatmap(tab) {
 
     //Todo: add the real endpoint
     var url = "/dashboard/data/heatmap?" + window.location.hash.substring(1);
-    getData(url).done(function(data) {
+    getData(url, tab).done(function(data) {
 
-        renderD3heatmap(data);
+        renderD3heatmap(data, tab);
 
-        heatMapEventListeners()
+        heatMapEventListeners(tab)
 
     });
 };
 
-function renderD3heatmap(data) {
+function renderD3heatmap(data, tab) {
 
     //Error handling when data is falsy (empty, undefined or null)
     if(!data){
-        $("#"+  hash.view  +"-chart-area-error").empty()
+        $("#"+  tab  +"-chart-area-error").empty()
         var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' })
         warning.append($('<p></p>', { html: 'Something went wrong. Please try and reload the page. Error: data =' + data  }))
-        $("#"+  hash.view  +"-chart-area-error").append(warning)
-        $("#"+  hash.view  +"-chart-area-error").show()
+        $("#"+  tab  +"-chart-area-error").append(warning)
+        $("#"+  tab  +"-chart-area-error").show()
         return
     }else{
-        $("#"+  hash.view  +"-chart-area-error").hide()
+        $("#"+  tab  +"-chart-area-error").hide()
     }
 
     /* Handelbars template for treemap table */
     var result_treemap_template = HandleBarsTemplates.template_treemap(data)
-    $("#"+ hash.view +"-display-chart-section").html(result_treemap_template);
+    $("#"+ tab +"-display-chart-section").html(result_treemap_template);
 
     var numMetrics = data["metrics"].length
     for(var m =0; m< numMetrics;m++) {
@@ -59,7 +59,7 @@ function renderD3heatmap(data) {
             var children_1 = [];
             var children_2 = [];
             var numDimValues = dimensionData.length;
-            for(valId = 0;valId<numDimValues;valId++){
+            for(valId = 0; valId<numDimValues; valId++){
 
                 var dimensionValue = dimensionData[valId][schema["dimensionValue"]]
                 //Todo: remove this "" handler once backend is adding it to other
@@ -213,7 +213,7 @@ function renderD3heatmap(data) {
     }
 }
 
-function heatMapEventListeners(){
+function heatMapEventListeners(tab){
     //Treemap eventlisteners
 
     $(".dimension-treemap-mode").click(function() {
@@ -250,7 +250,7 @@ function heatMapEventListeners(){
     })
 
     //Clicking a hetamap cell should fix the value in the filter
-        $("#"+ hash.view +"-display-chart-section").on("click", "div.node", function(){
+        $("#"+ tab +"-display-chart-section").on("click", "div.node", function(){
 
             var  dimensionValue = $(this).attr("id");
             if(dimensionValue.toLowerCase() == "other" ||  dimensionValue.toLowerCase() == "unknown") {

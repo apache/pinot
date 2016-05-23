@@ -130,32 +130,37 @@ $(document).ready( function() {
 
                 switch (hash.view) {
                     case "timeseries":
-                        getTimeSeries();
+                        var tab = "timeseries";
+                        getTimeSeries(tab);
                         break;
                     case "compare":
+
+                        var tab = "compare";
                         if (hash.aggTimeGranularity.toLowerCase() == "aggregateall") {
-                            getHeatmap();
+
+                            getHeatmap(tab);
                             //else aggTimeGranularity == HOURS or DAY
                         } else if (hash.hasOwnProperty("metrics")) {
 
                             if (hash.hasOwnProperty("dimensions")) {
-                                getContributors();
+                                getContributors(tab);
                             } else {
-                                getTabular();
+                                getTabular(tab);
                             }
                         }
                     break;
                     case "anomalies":
-                      getAnomalies();
+
+                        var tab = "anomalies";
+                      getAnomalies(tab);
                       break;
                     default://dashboard tab
 
-                    getCustomDashboard();
+                        var tab = "dashboard"
+                        getCustomDashboard(tab);
                     break;
                 }
 
-            }else{
-                
             }
         }
     }

@@ -1,45 +1,47 @@
 /** AJAX and HASH RELATED METHODS **/
 
-function getData(url){
+function getData(url, tab){
     console.log("request url:", url)
+
+    tab = tab ? tab : hash.view;
     return $.ajax({
         url: url,
         type: 'get',
         dataType: 'json',
         statusCode: {
             404: function() {
-                $("#"+  hash.view  +"-chart-area-error").empty()
+                $("#"+  tab  +"-chart-area-error").empty()
                 var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' })
                 warning.append($('<p></p>', { html: 'No data available. (Error code: 404)' }))
-                $("#"+  hash.view  +"-chart-area-error").append(warning)
-                $("#"+  hash.view  +"-chart-area-error").fadeIn(100);
+                $("#"+  tab  +"-chart-area-error").append(warning)
+                $("#"+  tab +"-chart-area-error").fadeIn(100);
                 return
             },
             500: function() {
-                $("#"+  hash.view  +"-chart-area-error").empty()
+                $("#"+  tab  +"-chart-area-error").empty()
                 var error = $('<div></div>', { class: 'uk-alert uk-alert-danger' })
                 error.append($('<p></p>', { html: 'Internal server error' }))
-                $("#"+  hash.view  +"-chart-area-error").append(error)
-                $("#"+  hash.view  +"-chart-area-error").fadeIn(100);
+                $("#"+  tab  +"-chart-area-error").append(error)
+                $("#"+  tab  +"-chart-area-error").fadeIn(100);
                 return
             }
         }
         ,
-        beforeSend: showLoader()
+        beforeSend: showLoader(tab)
     }).always(function(){
-      hideLoader();
-      if(hash.view != "anomalies"){
-        $("#"+  hash.view  +"-display-chart-section").empty();
+      hideLoader(tab);
+      if(tab != "anomalies"){
+        $("#"+  tab  +"-display-chart-section").empty();
       }
     })
 }
 
-function showLoader(){
-   $("#"+  hash.view  +"-chart-area-loader").show();
+function showLoader(tab){
+   $("#"+  tab  +"-chart-area-loader").show();
 }
 
-function hideLoader(){
-    $("#"+  hash.view  +"-chart-area-loader").hide();
+function hideLoader(tab){
+    $("#"+  tab +"-chart-area-loader").hide();
 
 }
 

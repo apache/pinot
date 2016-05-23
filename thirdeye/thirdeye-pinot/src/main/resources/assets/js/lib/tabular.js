@@ -1,55 +1,56 @@
-function getTabular() {
+function getTabular(tab) {
 
 	var url = "/dashboard/data/tabular?" + window.location.hash.substring(1);
-	getData(url).done(function(data) {
-		renderTabular(data);
+	getData(url, tab).done(function(data) {
+		renderTabular(data, tab );
 	});
 };
 
-function renderTabular(data) {
-
+function renderTabular(data, tab) {
 
     //Error handling when data is falsy (empty, undefined or null)
     if(!data){
-        $("#"+  hash.view  +"-chart-area-error").empty()
+        $("#"+  tab +"-chart-area-error").empty()
         var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' })
         warning.append($('<p></p>', { html: 'Something went wrong. Please try and reload the page. Error: data =' + data  }))
-        $("#"+  hash.view  +"-chart-area-error").append(warning)
-        $("#"+  hash.view  +"-chart-area-error").show()
+        $("#"+  tab  +"-chart-area-error").append(warning)
+        $("#"+  tab  +"-chart-area-error").show()
         return
     }else{
-        $("#"+  hash.view  +"-chart-area-error").hide()
+        $("#"+  tab  +"-chart-area-error").hide()
     }
 
     if(data.metrics.length == 0){
-        $("#"+  hash.view  +"-chart-area-error").empty()
+        $("#"+  tab  +"-chart-area-error").empty()
         var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' })
         warning.append($('<p></p>', { html: 'No metric data is present. Error: data.metrics.length = 0'  }))
-        $("#"+  hash.view  +"-chart-area-error").append(warning)
-        $("#"+  hash.view  +"-chart-area-error").show()
+        $("#"+  tab  +"-chart-area-error").append(warning)
+        $("#"+  tab  +"-chart-area-error").show()
         return
     }
 
 	/* Handelbars template for time series legend */
 	var result_metric_time_series_section =
 	 HandleBarsTemplates.template_metric_time_series_section(data);
-	 $("#"+ hash.view +"-display-chart-section").append(result_metric_time_series_section);
+	 $("#"+ tab +"-display-chart-section").append(result_metric_time_series_section);
 
-    drawTimeSeries(data)
+    drawTimeSeries(data, tab)
+
 
     /* Handelbars template for funnel table */
     var result_funnels_template = HandleBarsTemplates
         .template_funnels_table(data);
-    $("#"+ hash.view +"-display-chart-section").append(result_funnels_template);
+    $("#"+ tab +"-display-chart-section").append(result_funnels_template);
     calcHeatMapBG();
     formatMillisToTZ();
 }
 var lineChart;
-function drawTimeSeries(ajaxData) {
+function drawTimeSeries(ajaxData, tab ) {
 
-
-    var currentView = $("#" + hash.view + "-display-chart-section")
+    var currentView = $("#" + tab + "-display-chart-section")
     var lineChartPlaceholder = $("#linechart-placeholder", currentView)[0];
+
+    var barChartPlaceholder = $("#barchart-placeholder", currentView)[0];
     var dateTimeFormat = "%I:%M %p";
     if(hash.hasOwnProperty("aggTimeGranularity") && hash.aggTimeGranularity == "DAYS"){
         dateTimeFormat = "%m-%d"
@@ -153,7 +154,7 @@ function drawTimeSeries(ajaxData) {
 	});
 	var barChart = c3.generate({
 
-		bindto : '#barchart-placeholder',
+		bindto : barChartPlaceholder,
 		padding : {
 			top : 0,
 			right : 100,
@@ -213,7 +214,7 @@ function drawTimeSeries(ajaxData) {
 	barChart.hide();
 
     //EventListeners
-    var currentView = $("#" + hash.view + "-display-chart-section")
+    var currentView = $("#" + tab + "-display-chart-section")
 
 	// Clicking the checkbox of the timeseries legend will redraw the timeseries
 	// with the selected elements

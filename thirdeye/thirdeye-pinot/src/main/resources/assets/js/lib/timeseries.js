@@ -1,4 +1,4 @@
-function getTimeSeries() {
+function getTimeSeries(tab) {
 
 	var url = "/dashboard/data/timeseries?" + window.location.hash.substring(1);
 
@@ -9,26 +9,26 @@ function getTimeSeries() {
 //            mimeType: 'json'
 //        }
 //    })
-	getData(url).done(function(data) {
+	getData(url, tab).done(function(data) {
         //Error handling when data is falsy (empty, undefined or null)
         if(!data){
-            $("#"+  hash.view  +"-chart-area-error").empty()
+            $("#"+  tab  +"-chart-area-error").empty()
             var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' })
             warning.append($('<p></p>', { html: 'Something went wrong. Please try and reload the page. Error: data =' + data  }))
-            $("#"+  hash.view  +"-chart-area-error").append(warning)
-            $("#"+  hash.view  +"-chart-area-error").show()
+            $("#"+  tab  +"-chart-area-error").append(warning)
+            $("#"+  tab  +"-chart-area-error").show()
             return
         }else{
-            $("#"+  hash.view  +"-chart-area-error").hide()
+            $("#"+  tab  +"-chart-area-error").hide()
         }
 
 		var result_time_series = HandleBarsTemplates.template_time_series(data);
-        $("#"+ hash.view +"-display-chart-section").append(result_time_series);
-		renderTimeSeriesUsingC3(data)
+        $("#"+ tab +"-display-chart-section").append(result_time_series);
+		renderTimeSeriesUsingC3(data, tab)
 	});
 };
 
-function renderTimeSeriesUsingC3(d){  //time-series-area
+function renderTimeSeriesUsingC3(d, tab){  //time-series-area
 
 
     var dateTimeFormat = "%I:%M %p";
@@ -125,7 +125,7 @@ function renderTimeSeriesUsingC3(d){  //time-series-area
     });
 
     //Preselect first item
-    var currentView = $("#" + hash.view + "-display-chart-section");
+    var currentView = $("#" + tab + "-display-chart-section");
     var index = $($(".time-series-checkbox",currentView)[0]).val() == "time" ? 1 : 0;
     $($(".time-series-checkbox",currentView)[index]).click();
 }

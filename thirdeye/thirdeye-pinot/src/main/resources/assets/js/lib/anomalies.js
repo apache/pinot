@@ -1,5 +1,6 @@
-function getAnomalies() {
-  dashboardName = "Default_All_Metrics_Dashboard";
+function getAnomalies(tab) {
+
+   dashboardName = "Default_All_Metrics_Dashboard";
   baselineStart = moment(parseInt(hash.currentStart)).add(-7, 'days')
   baselineEnd = moment(parseInt(hash.currentEnd)).add(-7, 'days')
   aggTimeGranularity = (window.datasetConfig.dataGranularity) ? window.datasetConfig.dataGranularity : "HOURS";
@@ -13,40 +14,40 @@ function getAnomalies() {
   var currentEndISO = moment(parseInt(hash.currentEnd)).toISOString();
   var anomaliesUrl = "/anomaly-results/collection/" + hash.dataset + "/" + currentStartISO + "/" + currentEndISO;
   
-  getData(anomaliesUrl).done(function(anomalyData) {
-    getData(timeSeriesUrl).done(function(timeSeriesData) {
+  getData(anomaliesUrl, tab).done(function(anomalyData) {
+    getData(timeSeriesUrl, tab).done(function(timeSeriesData) {
 
         //Error handling when data is falsy (empty, undefined or null)
         if(!timeSeriesData){
-            $("#"+  hash.view  +"-chart-area-error").empty()
+            $("#"+  tab  +"-chart-area-error").empty()
             var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' })
             warning.append($('<p></p>', { html: 'Something went wrong. Please try and reload the page. Error: metric timeseries data =' + timeSeriesData  }))
-            $("#"+  hash.view  +"-chart-area-error").append(warning)
-            $("#"+  hash.view  +"-chart-area-error").show()
+            $("#"+  tab  +"-chart-area-error").append(warning)
+            $("#"+  tab  +"-chart-area-error").show()
             return
         }else{
-            $("#"+  hash.view  +"-chart-area-error").hide()
+            $("#"+  tab  +"-chart-area-error").hide()
         }
-      renderAnomalyLineChart(timeSeriesData, anomalyData);
-      renderAnomalyTable(anomalyData);
+      renderAnomalyLineChart(timeSeriesData, anomalyData, tab);
+      renderAnomalyTable(anomalyData, tab);
     });
   });
 };
 
-function renderAnomalyLineChart(timeSeriesData, anomalyData) {
-  $("#"+  hash.view  +"-display-chart-section").empty();
+function renderAnomalyLineChart(timeSeriesData, anomalyData, tab) {
+  $("#"+  tab  +"-display-chart-section").empty();
 
   /* Handelbars template for time series legend */
   var result_metric_time_series_section = HandleBarsTemplates.template_metric_time_series_section(timeSeriesData);
-  $("#" + hash.view + "-display-chart-section").append(result_metric_time_series_section);
+  $("#" + tab + "-display-chart-section").append(result_metric_time_series_section);
 
-  drawAnomalyTimeSeries(timeSeriesData, anomalyData);
+  drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab);
 }
 
 var lineChart;
-function drawAnomalyTimeSeries(ajaxData, anomalyData) {
+function drawAnomalyTimeSeries(ajaxData, anomalyData, tab) {
 
-  var currentView = $("#" + hash.view + "-display-chart-section");
+  var currentView = $("#" + tab + "-display-chart-section");
   var dateTimeFormat = "%I:%M %p";
   if(hash.hasOwnProperty("aggTimeGranularity") && hash.aggTimeGranularity == "DAYS"){
         dateTimeFormat = "%m-%d"
@@ -195,19 +196,19 @@ function drawAnomalyTimeSeries(ajaxData, anomalyData) {
     $($(".time-series-metric-checkbox", currentView)[0]).click();
 }
 
-function renderAnomalyTable(data) {
+function renderAnomalyTable(data, tab) {
     //Error handling when data is falsy (empty, undefined or null)
     if(!data){
-        $("#"+  hash.view  +"-chart-area-error").empty()
+        $("#"+  tab +"-chart-area-error").empty()
         var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' })
         warning.append($('<p></p>', { html: 'Something went wrong. Please try and reload the page. Error: anomalies data =' + data  }))
-        $("#"+  hash.view  +"-chart-area-error").append(warning)
-        $("#"+  hash.view  +"-chart-area-error").show()
+        $("#"+  tab +"-chart-area-error").append(warning)
+        $("#"+  tab  +"-chart-area-error").show()
         return
     }
 
     /* Handelbars template for table */
     var result_anomalies_template = HandleBarsTemplates.template_anomalies(data);
-    $("#" + hash.view + "-display-chart-section").append(result_anomalies_template);
+    $("#" + tab + "-display-chart-section").append(result_anomalies_template);
 
 }
