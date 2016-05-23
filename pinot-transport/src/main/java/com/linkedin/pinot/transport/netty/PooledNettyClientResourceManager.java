@@ -62,13 +62,13 @@ public class PooledNettyClientResourceManager implements PooledResourceManager<S
   @Override
   public boolean destroy(ServerInstance key, boolean isBad, NettyClientConnection resource) {
 
-    LOGGER.info("Destroying client connection to server :" + key + " isBad:"+ isBad);
+    LOGGER.info("Destroying client connection {}, isBad: {}", resource, isBad);
     boolean closed = false;
     try {
       resource.close();
       closed = true;
     } catch (InterruptedException e) {
-      LOGGER.error("Got interrupted exception when closing resource", e);
+      LOGGER.error("Got interrupted exception when closing resource {}", resource, e);
     }
 
     return closed;
@@ -87,6 +87,7 @@ public class PooledNettyClientResourceManager implements PooledResourceManager<S
    */
   public class PooledClientConnection extends NettyTCPClientConnection implements Callback<NoneType> {
     private final KeyedPool<ServerInstance, NettyClientConnection> _pool;
+    private boolean _destroyed = false;
 
     public PooledClientConnection(KeyedPool<ServerInstance, NettyClientConnection> pool, ServerInstance server,
         EventLoopGroup eventGroup, Timer timer, NettyClientMetrics metric) {
@@ -110,14 +111,26 @@ public class PooledNettyClientResourceManager implements PooledResourceManager<S
     @Override
     public void onError(Throwable arg0) {
       if (isSelfClose()) {
-        LOGGER.info("Got notified on self-close to {}", _server );
-      } else {
-        LOGGER.error("Destroying connection {} due to error", _server, arg0);
+        LOGGER.info("Got notified on self-close to {} connId {}", _server, getConnId());
       }
       /**
        * We got error. Time to discard this connection.
        */
-      _pool.destroyObject(getServer(), this);
+      if (!_destroyed) {
+        LOGGER.error("Destroying connection {} due to error connId {}", _server, getConnId(), arg0);
+        _pool.destroyObject(getServer(), this);
+        _destroyed = true;
+      }
+    }
+
+    @Override
+    protected void releaseResources() {
+      // _pool is null in tests only.
+      if (_pool != null && !_destroyed) {
+        LOGGER.error("Destroying connection {} due to error connId {}", _server, getConnId());
+        _pool.destroyObject(getServer(), this);
+        _destroyed = true;
+      }
     }
   }
 }

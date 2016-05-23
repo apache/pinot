@@ -15,10 +15,6 @@
  */
 package com.linkedin.pinot.broker.broker.helix;
 
-import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.transport.netty.NettyClientConnection;
-import com.linkedin.pinot.transport.pool.KeyedPool;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,6 +23,10 @@ import org.apache.helix.NotificationContext;
 import org.apache.helix.model.LiveInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.linkedin.pinot.common.response.ServerInstance;
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.transport.netty.NettyClientConnection;
+import com.linkedin.pinot.transport.pool.KeyedPool;
 
 
 public class LiveInstancesChangeListenerImpl implements LiveInstanceChangeListener {
@@ -80,7 +80,7 @@ public class LiveInstancesChangeListenerImpl implements LiveInstanceChangeListen
 
       if (liveInstanceToSessionIdMap.containsKey(instanceId)) {
         // sessionId has changed
-        LOGGER.info("found instance Id : {} with new session Id : {} old session Id", instanceId, sessionId,
+        LOGGER.info("found instance Id : {} with new session Id : {} old session Id {}", instanceId, sessionId,
             liveInstanceToSessionIdMap.get(instanceId));
         if (!sessionId.equals(liveInstanceToSessionIdMap.get(instanceId))) {
           try {

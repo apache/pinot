@@ -157,7 +157,7 @@ public class ScatterGatherImpl implements ScatterGather {
       // Some requests were not event sent (possibly because of checkout !!)
       // and so we cancel all of them here
       for (SingleRequestHandler h : handlers) {
-        LOGGER.info("Request to {} was sent successfully:{}", h.getServer(), h.isSent());
+        LOGGER.info("Request to {} was sent successfully:{}, cancelling.", h.getServer(), h.isSent());
         h.cancel();
       }
     }
@@ -423,10 +423,11 @@ public class ScatterGatherImpl implements ScatterGather {
       }
 
       NettyClientConnection conn = null;
+      KeyedFuture<ServerInstance, NettyClientConnection> keyedFuture = null;
       boolean gotConnection = false;
       boolean error = true;
       try {
-        KeyedFuture<ServerInstance, NettyClientConnection> c = _connPool.checkoutObject(_server);
+        keyedFuture = _connPool.checkoutObject(_server);
 
         byte[] serializedRequest = _request.getRequestForService(_server, _segmentIds);
         long timeRemaining = _timeoutMS - (System.currentTimeMillis() - _startTime);
@@ -434,24 +435,21 @@ public class ScatterGatherImpl implements ScatterGather {
         // Try a maximum of pool size objects.
         while (true) {
           if (timeRemaining <= 0) {
-            c.cancel(true);
             throw new TimeoutException("Timed out trying to connect to " + _server + "(timeout=" + _timeoutMS + "ms,ntries=" + ntries + ")");
           }
-          conn = c.getOne(timeRemaining, TimeUnit.MILLISECONDS);
-          // conn may be null if we cannot get any connection from the pool. This condition can happen either
-          // due to a timeout (server host is switched off, or cable disconnected), or due to immediate connection refusal
-          // (host is up, but server JVM is not running, or not up yet). It will also get a null when the AsyncPoolImpl.create()
-          // is not able to create a connection, and this one was a waiting request.
-          // In either case, there is no point in retrying  this request
+          conn = keyedFuture.getOne(timeRemaining, TimeUnit.MILLISECONDS);
           if (conn != null && conn.validate()) {
             gotConnection = true;
             break;
           }
-          // If we get a null error map, then it is most likely a case of "Connection Refused" from remote.
-          // The connect errors are obtained from two different objects -- 'conn' and 'c'.
-          // We pick the error from 'c' here, if we find it. Unfortunately there is not a way (now) to pass the
-          // error from 'c' to 'conn' (need to do it via AsyncPoolImpl)
-          Map<ServerInstance, Throwable> errorMap = c.getError();
+          // conn may be null when the AsyncPoolImpl.create()
+          // is not able to create a connection, and this tried to wait for a connection, and it reached the max waiters limit.
+          // In that case, there is no point in retrying  this request
+          // If we get a null error map, then it is most likely a case of max waiters limit.
+          // The connect errors are obtained from two different objects -- 'conn' and 'keyedFuture'.
+          // We pick the error from 'keyedFuture' here, if we find it. Unfortunately there is not a way (now) to pass the
+          // error from 'keyedFuture' to 'conn' (need to do it via AsyncPoolImpl)
+          Map<ServerInstance, Throwable> errorMap = keyedFuture.getError();
           String errStr = "";
           if (errorMap != null && errorMap.containsKey(_server)) {
             errStr = errorMap.get(_server).getMessage();
@@ -463,7 +461,7 @@ public class ScatterGatherImpl implements ScatterGather {
           if (++ntries == MAX_CONN_RETRIES-1) {
             throw new RuntimeException("Could not connect to " + _server + " after " + ntries + "attempts(timeRemaining=" + timeRemaining + "ms)");
           }
-          c = _connPool.checkoutObject(_server);
+          keyedFuture = _connPool.checkoutObject(_server);
           timeRemaining = _timeoutMS - (System.currentTimeMillis() - _startTime);
         }
         ByteBuf req = Unpooled.wrappedBuffer(serializedRequest);
@@ -484,8 +482,13 @@ public class ScatterGatherImpl implements ScatterGather {
         BrokerRequest brokerRequest = (BrokerRequest) _request.getBrokerRequest();
         if (error) {
           if (gotConnection) {
+            // We must have failed sometime when sending the request
             _brokerMetrics.addMeteredQueryValue(brokerRequest, BrokerMeter.REQUEST_DROPPED_DUE_TO_SEND_ERROR, 1);
           } else {
+            // If we got a keyed future, but we did not get to send a request, then cancel the future.
+            if (keyedFuture!= null) {
+              keyedFuture.cancel(true);
+            }
             _brokerMetrics.addMeteredQueryValue(brokerRequest, BrokerMeter.REQUEST_DROPPED_DUE_TO_CONNECTION_ERROR, 1);
           }
         }

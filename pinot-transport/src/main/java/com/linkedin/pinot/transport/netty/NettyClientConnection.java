@@ -15,19 +15,17 @@
  */
 package com.linkedin.pinot.transport.netty;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import com.linkedin.pinot.common.response.ServerInstance;
+import com.linkedin.pinot.transport.common.AsyncResponseFuture;
+import com.linkedin.pinot.transport.common.Callback;
+import com.linkedin.pinot.transport.common.NoneType;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
 import io.netty.channel.EventLoopGroup;
 import io.netty.util.Timer;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.transport.common.AsyncResponseFuture;
-import com.linkedin.pinot.transport.common.Callback;
-import com.linkedin.pinot.transport.common.NoneType;
 
 
 /**
@@ -75,6 +73,7 @@ public abstract class NettyClientConnection {
   protected volatile Channel _channel;
   // State of the request/connection
   protected volatile State _connState;
+  protected final long _connId;
 
   // Timer for tracking read-timeouts
   protected final Timer _timer;
@@ -82,12 +81,18 @@ public abstract class NettyClientConnection {
   // Callback to notify if a response has been successfully received or error
   protected volatile Callback<NoneType> _requestCallback;
 
-  public NettyClientConnection(ServerInstance server, EventLoopGroup eventGroup, Timer timer) {
+  public NettyClientConnection(ServerInstance server, EventLoopGroup eventGroup, Timer timer, long connId) {
     _connState = State.INIT;
     _server = server;
+    _connId = connId;
     _timer = timer;
     _eventGroup = eventGroup;
   }
+
+  public long getConnId() {
+    return _connId;
+  }
+
 
   /**
    * Connect to the server. Returns false if unable to connect to the server.
