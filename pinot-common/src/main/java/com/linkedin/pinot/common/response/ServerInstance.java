@@ -17,8 +17,6 @@ package com.linkedin.pinot.common.response;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-
-import org.codehaus.jackson.map.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,7 +34,7 @@ import org.slf4j.LoggerFactory;
  * local hostname.
  */
 public class ServerInstance implements Comparable<ServerInstance> {
-  private static final ObjectMapper mapper = new ObjectMapper();
+
   protected static final Logger LOGGER = LoggerFactory.getLogger(ServerInstance.class);
 
   public static final String NAME_PORT_DELIMITER = ":";

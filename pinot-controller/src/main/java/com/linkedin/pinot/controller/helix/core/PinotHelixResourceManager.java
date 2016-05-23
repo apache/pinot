@@ -89,9 +89,6 @@ import com.linkedin.pinot.controller.helix.starter.HelixConfig;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 
 
-/**
- * Sep 30, 2014
- */
 public class PinotHelixResourceManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotHelixResourceManager.class);
   private static final long DEFAULT_EXTERNAL_VIEW_UPDATE_TIMEOUT_MILLIS = 120_000L; // 2 minutes
@@ -232,7 +229,7 @@ public class PinotHelixResourceManager {
 
     return pinotTableNames;
   }
-  
+
   public List<String> getAllPinotTableNames() {
     List<String> tableNames = getAllTableNames();
 
@@ -490,7 +487,7 @@ public class PinotHelixResourceManager {
     allServingServers.addAll(taggedRealtimeServers);
     boolean isCurrentTenantColocated =
         (allServingServers.size() < taggedOfflineServers.size() + taggedRealtimeServers.size());
-    if (isCurrentTenantColocated != serverTenant.isColoated()) {
+    if (isCurrentTenantColocated != serverTenant.isCoLocated()) {
       res.status = ResponseStatus.failure;
       res.message = "Not support different colocated type request for update request: " + serverTenant;
       LOGGER.error(res.message);
@@ -521,7 +518,7 @@ public class PinotHelixResourceManager {
       LOGGER.error(res.message);
       return res;
     }
-    if (serverTenant.isColoated()) {
+    if (serverTenant.isCoLocated()) {
       return updateColocatedServerTenant(serverTenant, res, realtimeServerTag, taggedRealtimeServers, offlineServerTag,
           taggedOfflineServers, incInstances, unTaggedInstanceList);
     } else {
@@ -696,7 +693,7 @@ public class PinotHelixResourceManager {
       LOGGER.error(res.message);
       return res;
     } else {
-      if (serverTenant.isColoated()) {
+      if (serverTenant.isCoLocated()) {
         assignColocatedServerTenant(serverTenant, numberOfInstances, unTaggedInstanceList);
       } else {
         assignIndependentServerTenant(serverTenant, numberOfInstances, unTaggedInstanceList);

@@ -26,7 +26,7 @@ import org.slf4j.LoggerFactory;
 import com.google.common.base.Objects;
 import com.linkedin.pinot.common.utils.TenantRole;
 
-
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class Tenant {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(Tenant.class);
@@ -80,7 +80,7 @@ public class Tenant {
   }
 
   @JsonIgnore
-  public boolean isColoated() {
+  public boolean isCoLocated() {
     return (realtimeInstances + offlineInstances > numberOfInstances);
   }
 
@@ -165,7 +165,7 @@ public class Tenant {
     }
 
     public Tenant build() {
-      tenant.isColoated();
+      tenant.isCoLocated();
       return tenant;
     }
   }

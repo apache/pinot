@@ -17,10 +17,11 @@ package com.linkedin.pinot.common.config;
 
 import java.lang.reflect.Field;
 
+import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class TenantConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(TenantConfig.class);
 
