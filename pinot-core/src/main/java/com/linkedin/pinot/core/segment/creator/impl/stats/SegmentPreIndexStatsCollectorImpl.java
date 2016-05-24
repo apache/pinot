@@ -91,7 +91,12 @@ public class SegmentPreIndexStatsCollectorImpl implements SegmentPreIndexStatsCo
   public void collectRow(GenericRow row, boolean isAggregated) throws Exception {
     for (final String column : row.getFieldNames()) {
       if (columnStatsCollectorMap.containsKey(column)) {
-        columnStatsCollectorMap.get(column).collect(row.getValue(column), isAggregated);
+        try {
+          columnStatsCollectorMap.get(column).collect(row.getValue(column), isAggregated);
+        } catch (Exception e) {
+          LOGGER.error("Exception while collecting stats for column:{} in row:{}", column, row);
+          throw e;
+        }
       }
     }
   }

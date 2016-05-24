@@ -15,6 +15,19 @@
  */
 package com.linkedin.pinot.core.startree;
 
+import com.google.common.base.Objects;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.BiMap;
+import com.google.common.collect.HashBiMap;
+import com.linkedin.pinot.common.data.DimensionFieldSpec;
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import com.linkedin.pinot.common.data.MetricFieldSpec;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.data.TimeFieldSpec;
+import com.linkedin.pinot.common.utils.Pairs.IntPair;
+import com.linkedin.pinot.core.data.GenericRow;
+import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import java.io.BufferedOutputStream;
 import java.io.DataOutputStream;
 import java.io.File;
@@ -26,9 +39,10 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-
+import java.util.Queue;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -37,24 +51,13 @@ import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.base.Objects;
-import com.google.common.collect.BiMap;
-import com.google.common.collect.HashBiMap;
-import com.linkedin.pinot.common.data.DimensionFieldSpec;
-import com.linkedin.pinot.common.data.MetricFieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.utils.Pairs.IntPair;
-import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
-
-
 /**
- * Uses file to build the star tree. Each row is divided into dimension and metrics. Time is added to dimension list.
- * We use the split order to build the tree. In most cases, split order will be ranked depending on the cardinality (descending order).
+ * Uses file to build the star tree. Each row is divided into dimension and metrics. Time is added
+ * to dimension list.
+ * We use the split order to build the tree. In most cases, split order will be ranked depending on
+ * the cardinality (descending order).
  * Time column will be excluded or last entry in split order irrespective of its cardinality
  * This is a recursive algorithm where we branch on one dimension at every level.
- *
  * <b>Psuedo algo</b>
  * <code>
  *
@@ -140,7 +143,7 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
     dimensionNameToStarValueMap = new HashMap<>();
     dictionaryMap = new HashMap<>();
 
-    //READ DIMENSIONS COLUMNS
+    // READ DIMENSIONS COLUMNS
     List<DimensionFieldSpec> dimensionFieldSpecs = schema.getDimensionFieldSpecs();
     for (int index = 0; index < dimensionFieldSpecs.size(); index++) {
       DimensionFieldSpec spec = dimensionFieldSpecs.get(index);
@@ -154,19 +157,24 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
       HashBiMap<Object, Integer> dictionary = HashBiMap.create();
       dictionaryMap.put(dimensionName, dictionary);
     }
-    //treat time column as just another dimension, only difference is that we will never split on this dimension unless explicitly specified in split order
+    // treat time column as just another dimension, only difference is that we will never split on
+    // this dimension unless explicitly specified in split order
     if (timeColumnName != null) {
       dimensionNames.add(timeColumnName);
-      dimensionTypes.add(schema.getTimeFieldSpec().getDataType());
+      TimeFieldSpec timeFieldSpec = schema.getTimeFieldSpec();
+      dimensionTypes.add(timeFieldSpec.getDataType());
       int index = dimensionNameToIndexMap.size();
       dimensionNameToIndexMap.put(timeColumnName, index);
+      Object starValue;
+      starValue = getAllStarValue(timeFieldSpec);
+      dimensionNameToStarValueMap.put(timeColumnName, starValue);
       HashBiMap<Object, Integer> dictionary = HashBiMap.create();
       dictionaryMap.put(schema.getTimeColumnName(), dictionary);
     }
     dimensionSizeBytes = dimensionNames.size() * Integer.SIZE / 8;
     this.numDimensions = dimensionNames.size();
 
-    //READ METRIC COLUMNS
+    // READ METRIC COLUMNS
     this.metricTypes = new ArrayList<>();
     this.metricNames = new ArrayList<>();
 
@@ -187,7 +195,7 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
     dataFile = new File(outDir, "star-tree.buf");
     dataBuffer = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(dataFile)));
 
-    //INITIALIZE THE ROOT NODE
+    // INITIALIZE THE ROOT NODE
     this.starTreeRootIndexNode = new StarTreeIndexNode();
     this.starTreeRootIndexNode.setDimensionName(StarTreeIndexNode.all());
     this.starTreeRootIndexNode.setDimensionValue(StarTreeIndexNode.all());
@@ -197,7 +205,8 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
   }
 
   /**
-   * Validate the split order by removing any dimensions that may be part of the skip materialization list.
+   * Validate the split order by removing any dimensions that may be part of the skip
+   * materialization list.
    * @param dimensionsSplitOrder
    * @param skipMaterializationForDimensions
    * @return
@@ -206,7 +215,8 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
       Set<String> skipMaterializationForDimensions) {
     List<String> validatedSplitOrder = new ArrayList<String>();
     for (String dimension : dimensionsSplitOrder) {
-      if (skipMaterializationForDimensions == null || !skipMaterializationForDimensions.contains(dimension)) {
+      if (skipMaterializationForDimensions == null
+          || !skipMaterializationForDimensions.contains(dimension)) {
         LOG.info("Adding dimension {} to split order", dimension);
         validatedSplitOrder.add(dimension);
       } else {
@@ -218,30 +228,30 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
     return validatedSplitOrder;
   }
 
-  private Object getAllStarValue(DimensionFieldSpec spec) throws Exception {
+  private Object getAllStarValue(FieldSpec spec) throws Exception {
     switch (spec.getDataType()) {
-      case STRING:
-        return "ALL";
-      case BOOLEAN:
-      case BYTE:
-      case CHAR:
-      case DOUBLE:
-      case FLOAT:
-      case INT:
-      case LONG:
-        return spec.getDefaultNullValue();
-      case OBJECT:
-      case SHORT:
-      case DOUBLE_ARRAY:
-      case CHAR_ARRAY:
-      case FLOAT_ARRAY:
-      case INT_ARRAY:
-      case LONG_ARRAY:
-      case SHORT_ARRAY:
-      case STRING_ARRAY:
-      case BYTE_ARRAY:
-      default:
-        throw new Exception("Unsupported dimension data type" + spec);
+    case STRING:
+      return "ALL";
+    case BOOLEAN:
+    case BYTE:
+    case CHAR:
+    case DOUBLE:
+    case FLOAT:
+    case INT:
+    case LONG:
+      return spec.getDefaultNullValue();
+    case OBJECT:
+    case SHORT:
+    case DOUBLE_ARRAY:
+    case CHAR_ARRAY:
+    case FLOAT_ARRAY:
+    case INT_ARRAY:
+    case LONG_ARRAY:
+    case SHORT_ARRAY:
+    case STRING_ARRAY:
+    case BYTE_ARRAY:
+    default:
+      throw new Exception("Unsupported dimension data type" + spec);
     }
   }
 
@@ -272,8 +282,10 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
       Map<Object, Integer> dictionary = dictionaryMap.get(dimName);
       Object dimValue = row.getValue(dimName);
       if (dimValue == null) {
-        //TODO: Have another default value to represent STAR. Using default value to represent STAR as of now.
-        //It does not matter during query execution, since we know that values is STAR from the star tree
+        // TODO: Have another default value to represent STAR. Using default value to represent STAR
+        // as of now.
+        // It does not matter during query execution, since we know that values is STAR from the
+        // star tree
         dimValue = dimensionNameToStarValueMap.get(dimName);
       }
       if (!dictionary.containsKey(dimValue)) {
@@ -299,13 +311,14 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
     rawRecordCount++;
   }
 
-  private void appendToAggBuffer(DimensionBuffer dimension, MetricBuffer metrics) throws IOException {
+  private void appendToAggBuffer(DimensionBuffer dimension, MetricBuffer metrics)
+      throws IOException {
     appendToBuffer(dataBuffer, dimension, metrics);
     aggRecordCount++;
   }
 
-  private void appendToBuffer(DataOutputStream dos, DimensionBuffer dimensions, MetricBuffer metricHolder)
-      throws IOException {
+  private void appendToBuffer(DataOutputStream dos, DimensionBuffer dimensions,
+      MetricBuffer metricHolder) throws IOException {
     for (int i = 0; i < numDimensions; i++) {
       dos.writeInt(dimensions.getDimension(i));
     }
@@ -327,11 +340,17 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
     LOG.debug("Split order:{}", dimensionsSplitOrder);
     long start = System.currentTimeMillis();
     dataBuffer.flush();
+    // Sort the data based on default sort order (split order + remaining dimensions)
     sort(dataFile, 0, rawRecordCount);
+    // Recursively construct the star tree, continuously sorting the data
     constructStarTree(starTreeRootIndexNode, 0, rawRecordCount, 0, dataFile);
+    // Split the leaf nodes on time column
+    splitLeafNodesOnTimeColumn();
+    // Create aggregate rows for all nodes in the tree
+    createAggDocForAllNodes(starTreeRootIndexNode);
     long end = System.currentTimeMillis();
-    LOG.debug("Took {} ms to build star tree index. Original records:{} Materialized record:{}", (end - start),
-        rawRecordCount, aggRecordCount);
+    LOG.debug("Took {} ms to build star tree index. Original records:{} Materialized record:{}",
+        (end - start), rawRecordCount, aggRecordCount);
     starTree = new StarTree(starTreeRootIndexNode, dimensionNameToIndexMap);
     File treeBinary = new File(outDir, "star-tree.bin");
     LOG.debug("Saving tree binary at: {} ", treeBinary);
@@ -341,6 +360,146 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
     dataBuffer.close();
   }
 
+  /**
+   * Create aggregated docs using BFS
+   * @param node
+   */
+  private MetricBuffer createAggDocForAllNodes(StarTreeIndexNode node) throws Exception {
+    MetricBuffer aggMetricBuffer = null;
+    if (node.isLeaf()) {
+      StarTreeDataTable leafDataTable =
+          new StarTreeDataTable(dataFile, dimensionSizeBytes, metricSizeBytes, null);
+      Iterator<Pair<byte[], byte[]>> iterator =
+          leafDataTable.iterator(node.getStartDocumentId(), node.getEndDocumentId());
+      Pair<byte[], byte[]> first = iterator.next();
+      aggMetricBuffer = MetricBuffer.fromBytes(first.getRight(), metricTypes);
+      while (iterator.hasNext()) {
+        Pair<byte[], byte[]> next = iterator.next();
+        MetricBuffer metricBuffer = MetricBuffer.fromBytes(next.getRight(), metricTypes);
+        aggMetricBuffer.aggregate(metricBuffer, metricTypes);
+      }
+    } else {
+
+      Map<Integer, StarTreeIndexNode> children = node.getChildren();
+      for (StarTreeIndexNode child : children.values()) {
+        MetricBuffer childMetricBuffer = createAggDocForAllNodes(child);
+        // don't use the star node value to compute aggregate for the parent
+        if (child.getDimensionValue() == StarTreeIndexNode.all()) {
+          continue;
+        }
+        if (aggMetricBuffer == null) {
+          aggMetricBuffer = new MetricBuffer(childMetricBuffer);
+        } else {
+          aggMetricBuffer.aggregate(childMetricBuffer, metricTypes);
+        }
+      }
+    }
+    //compute the dimension values for this node using the path, can be optimized by passing the path in the method call.
+    Map<Integer, Integer> pathValues = node.getPathValues();
+    DimensionBuffer dimensionBuffer = new DimensionBuffer(numDimensions);
+    for (int i = 0; i < numDimensions; i++) {
+      if (pathValues.containsKey(i)) {
+        dimensionBuffer.setDimension(i, pathValues.get(i));
+      } else {
+        dimensionBuffer.setDimension(i, StarTreeIndexNode.all());
+      }
+    }
+    node.setAggregatedDocumentId(rawRecordCount + aggRecordCount);
+    appendToAggBuffer(dimensionBuffer, aggMetricBuffer);
+    return aggMetricBuffer;
+
+  }
+
+  /**
+   * Helper method that visits each leaf node does the following:
+   * - Re-orders the doc-id's corresponding to leaf node wrt time column.
+   * - Create children nodes for each time value under this leaf node.
+   * - Adds a new record with aggregated data for this leaf node.
+   * @throws Exception
+   */
+  private void splitLeafNodesOnTimeColumn() throws Exception {
+    Queue<StarTreeIndexNode> nodes = new LinkedList<>();
+    nodes.add(starTreeRootIndexNode);
+
+    while (!nodes.isEmpty()) {
+      StarTreeIndexNode node = nodes.remove();
+      if (node.isLeaf()) {
+        // If we have time column, split on time column, helps in time based filtering
+        if (timeColumnName != null) {
+          int level = node.getLevel();
+          int[] newSortOrder = moveColumnInSortOrder(timeColumnName, getSortOrder(), level);
+
+          StarTreeDataTable leafDataTable =
+              new StarTreeDataTable(dataFile, dimensionSizeBytes, metricSizeBytes, newSortOrder);
+          int startDocId = node.getStartDocumentId();
+          int endDocId = node.getEndDocumentId();
+          leafDataTable.sort(startDocId, endDocId);
+          int timeColIndex = dimensionNameToIndexMap.get(timeColumnName);
+          Map<Integer, IntPair> timeColumnRangeMap =
+              leafDataTable.groupByIntColumnCount(startDocId, endDocId, timeColIndex);
+
+          node.setChildDimensionName(timeColIndex);
+          node.setChildren(new HashMap<Integer, StarTreeIndexNode>());
+
+          for (int timeValue : timeColumnRangeMap.keySet()) {
+            IntPair range = timeColumnRangeMap.get(timeValue);
+            StarTreeIndexNode child = new StarTreeIndexNode();
+            child.setDimensionName(timeColIndex);
+            child.setDimensionValue(timeValue);
+            child.setParent(node);
+            child.setLevel(node.getLevel() + 1);
+            child.setStartDocumentId(range.getLeft());
+            child.setEndDocumentId(range.getRight());
+            node.getChildren().put(timeValue, child);
+          }
+        }
+      } else {
+        nodes.addAll(node.getChildren().values());
+      }
+    }
+  }
+
+  /**
+   * Helper method that moves the given column from its current position to
+   * the specified new position.
+   * @param columnToMove
+   * @param origSortOrder
+   * @param newPositionForTimeColumn
+   * @return
+   */
+  private int[] moveColumnInSortOrder(String columnToMove, int[] origSortOrder,
+      int newPositionForTimeColumn) {
+    Preconditions.checkArgument(columnToMove != null);
+    Preconditions.checkArgument(
+        newPositionForTimeColumn >= 0 && newPositionForTimeColumn < origSortOrder.length);
+
+    int timeDimensionIndex = dimensionNameToIndexMap.get(columnToMove);
+    int[] newSortOrder = new int[origSortOrder.length];
+    int index = 0;
+
+    // Retain the sort order based on the path to this leaf node
+    for (int i = 0; i < newPositionForTimeColumn; i++) {
+      newSortOrder[index++] = origSortOrder[i];
+    }
+
+    // Move time to the front
+    newSortOrder[index++] = timeDimensionIndex;
+
+    // Append remaining columns
+    for (int i = newPositionForTimeColumn; i < numDimensions; i++) {
+      if (i != timeDimensionIndex) {
+        newSortOrder[index++] = origSortOrder[i];
+      }
+    }
+
+    return newSortOrder;
+  }
+
+  /**
+   * Debug method to print the tree.
+   * @param node
+   * @param level
+   */
   private void printTree(StarTreeIndexNode node, int level) {
     for (int i = 0; i < level; i++) {
       LOG.debug("  ");
@@ -354,12 +513,14 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
     if (node.getDimensionValue() != StarTreeIndexNode.all()) {
       dimValue = dictionaryMap.get(dimName).inverse().get(node.getDimensionValue());
     }
-    String formattedOutput =
-        Objects.toStringHelper(node).add("nodeId", node.getNodeId()).add("level", level).add("dimensionName", dimName)
-            .add("dimensionValue", dimValue).add("childDimensionName", inverse.get(node.getChildDimensionName()))
-            .add("childCount", node.getChildren() == null ? 0 : node.getChildren().size())
-            .add("startDocumentId", node.getStartDocumentId()).add("endDocumentId", node.getEndDocumentId())
-            .add("documentCount", (node.getEndDocumentId() - node.getStartDocumentId())).toString();
+
+    String formattedOutput = Objects.toStringHelper(node).add("nodeId", node.getNodeId())
+        .add("level", level).add("dimensionName", dimName).add("dimensionValue", dimValue)
+        .add("childDimensionName", inverse.get(node.getChildDimensionName()))
+        .add("childCount", node.getChildren() == null ? 0 : node.getChildren().size())
+        .add("startDocumentId", node.getStartDocumentId())
+        .add("endDocumentId", node.getEndDocumentId())
+        .add("documentCount", (node.getEndDocumentId() - node.getStartDocumentId())).toString();
     LOG.debug(formattedOutput);
 
     if (!node.isLeaf()) {
@@ -372,9 +533,11 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
 
   private List<String> computeDefaultSplitOrder() {
     ArrayList<String> defaultSplitOrder = new ArrayList<>();
-    //include only the dimensions not time column. Also, assumes that skipMaterializationForDimensions is built.
+    // include only the dimensions not time column. Also, assumes that
+    // skipMaterializationForDimensions is built.
     for (String dimensionName : dimensionNames) {
-      if (skipMaterializationForDimensions != null && !skipMaterializationForDimensions.contains(dimensionName)) {
+      if (skipMaterializationForDimensions != null
+          && !skipMaterializationForDimensions.contains(dimensionName)) {
         defaultSplitOrder.add(dimensionName);
       }
     }
@@ -384,12 +547,11 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
     Collections.sort(defaultSplitOrder, new Comparator<String>() {
       @Override
       public int compare(String o1, String o2) {
-        return dictionaryMap.get(o2).size() - dictionaryMap.get(o1).size(); //descending
+        return dictionaryMap.get(o2).size() - dictionaryMap.get(o1).size(); // descending
       }
     });
     return defaultSplitOrder;
   }
-
 
   private Set<String> computeDefaultDimensionsToSkipMaterialization() {
     Set<String> skipDimensions = new HashSet<String>();
@@ -401,7 +563,6 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
     return skipDimensions;
   }
 
-
   /*
    * Sorts the file on all dimensions
    */
@@ -411,7 +572,8 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
       printFile(file, startDocId, endDocId);
     }
 
-    StarTreeDataTable dataSorter = new StarTreeDataTable(file, dimensionSizeBytes, metricSizeBytes, getSortOrder());
+    StarTreeDataTable dataSorter =
+        new StarTreeDataTable(file, dimensionSizeBytes, metricSizeBytes, getSortOrder());
     dataSorter.sort(startDocId, endDocId, 0, dimensionSizeBytes);
     if (debugMode) {
       LOG.info("AFTER SORTING");
@@ -425,7 +587,7 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
       for (int i = 0; i < dimensionsSplitOrder.size(); i++) {
         sortOrder[i] = dimensionNameToIndexMap.get(dimensionsSplitOrder.get(i));
       }
-      //add remaining dimensions that were not part of dimensionsSplitOrder
+      // add remaining dimensions that were not part of dimensionsSplitOrder
       int counter = 0;
       for (String dimName : dimensionNames) {
         if (!dimensionsSplitOrder.contains(dimName)) {
@@ -439,7 +601,8 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
 
   private void printFile(File file, int startDocId, int endDocId) throws IOException {
     LOG.info("Contents of file:{} from:{} to:{}", file.getName(), startDocId, endDocId);
-    StarTreeDataTable dataSorter = new StarTreeDataTable(file, dimensionSizeBytes, metricSizeBytes, getSortOrder());
+    StarTreeDataTable dataSorter =
+        new StarTreeDataTable(file, dimensionSizeBytes, metricSizeBytes, getSortOrder());
     Iterator<Pair<byte[], byte[]>> iterator = dataSorter.iterator(startDocId, endDocId);
     int numRecordsToPrint = 100;
     int counter = 0;
@@ -453,17 +616,18 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
     }
   }
 
-  private int constructStarTree(StarTreeIndexNode node, int startDocId, int endDocId, int level, File file)
-      throws Exception {
-    //node.setStartDocumentId(startDocId);
+  private int constructStarTree(StarTreeIndexNode node, int startDocId, int endDocId, int level,
+      File file) throws Exception {
+    // node.setStartDocumentId(startDocId);
     int docsAdded = 0;
     if (level == dimensionsSplitOrder.size() - 1) {
       return 0;
     }
     String splitDimensionName = dimensionsSplitOrder.get(level);
     Integer splitDimensionId = dimensionNameToIndexMap.get(splitDimensionName);
-    LOG.debug("Building tree at level:{} using file:{} from startDoc:{} endDocId:{} splitting on dimension:{}", level,
-        file.getName(), startDocId, endDocId, splitDimensionName);
+    LOG.debug(
+        "Building tree at level:{} using file:{} from startDoc:{} endDocId:{} splitting on dimension:{}",
+        level, file.getName(), startDocId, endDocId, splitDimensionName);
     Map<Integer, IntPair> sortGroupBy = groupBy(startDocId, endDocId, splitDimensionId, file);
     LOG.debug("Group stats:{}", sortGroupBy);
     node.setChildDimensionName(splitDimensionId);
@@ -495,11 +659,12 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
     }
 
     // Return if star node does not need to be created.
-    if (skipStarNodeCreationForDimensions != null && skipStarNodeCreationForDimensions.contains(splitDimensionName)) {
+    if (skipStarNodeCreationForDimensions != null
+        && skipStarNodeCreationForDimensions.contains(splitDimensionName)) {
       return docsAdded;
     }
 
-    //create star node
+    // create star node
     StarTreeIndexNode starChild = new StarTreeIndexNode();
     starChild.setDimensionName(splitDimensionId);
     starChild.setDimensionValue(StarTreeIndexNode.all());
@@ -524,13 +689,14 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
     }
     docsAdded += rowsAdded;
     LOG.debug("Added {} additional records at level {}", rowsAdded, level);
-    //flush
+    // flush
     dataBuffer.flush();
 
     int childDocs = 0;
     if (rowsAdded >= maxLeafRecords) {
       sort(dataFile, startOffset, startOffset + rowsAdded);
-      childDocs = constructStarTree(starChild, startOffset, startOffset + rowsAdded, level + 1, dataFile);
+      childDocs =
+          constructStarTree(starChild, startOffset, startOffset + rowsAdded, level + 1, dataFile);
       docsAdded += childDocs;
     }
 
@@ -539,12 +705,13 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
       starChild.setStartDocumentId(startOffset);
       starChild.setEndDocumentId(startOffset + rowsAdded);
     }
-    //node.setEndDocumentId(endDocId + docsAdded);
+    // node.setEndDocumentId(endDocId + docsAdded);
     return docsAdded;
   }
 
   /**
-   * Assumes the file is already sorted, returns the unique combinations after removing a specified dimension.
+   * Assumes the file is already sorted, returns the unique combinations after removing a specified
+   * dimension.
    * Aggregates the metrics for each unique combination, currently only sum is supported by default
    * @param startDocId
    * @param endDocId
@@ -553,12 +720,15 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
    * @return
    * @throws Exception
    */
-  private Iterator<Pair<DimensionBuffer, MetricBuffer>> uniqueCombinations(int startDocId, int endDocId, File file,
-      int splitDimensionId) throws Exception {
-    StarTreeDataTable dataSorter = new StarTreeDataTable(file, dimensionSizeBytes, metricSizeBytes, getSortOrder());
+  private Iterator<Pair<DimensionBuffer, MetricBuffer>> uniqueCombinations(int startDocId,
+      int endDocId, File file, int splitDimensionId) throws Exception {
+    StarTreeDataTable dataSorter =
+        new StarTreeDataTable(file, dimensionSizeBytes, metricSizeBytes, getSortOrder());
     Iterator<Pair<byte[], byte[]>> iterator1 = dataSorter.iterator(startDocId, endDocId);
-    File tempFile = new File(outDir, file.getName() + "_" + startDocId + "_" + endDocId + ".unique.tmp");
-    DataOutputStream dos = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(tempFile)));
+    File tempFile =
+        new File(outDir, file.getName() + "_" + startDocId + "_" + endDocId + ".unique.tmp");
+    DataOutputStream dos =
+        new DataOutputStream(new BufferedOutputStream(new FileOutputStream(tempFile)));
     while (iterator1.hasNext()) {
       Pair<byte[], byte[]> next = iterator1.next();
       byte[] dimensionBuffer = next.getLeft();
@@ -566,8 +736,8 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
       DimensionBuffer dimensions = DimensionBuffer.fromBytes(dimensionBuffer);
       for (int i = 0; i < numDimensions; i++) {
         String dimensionName = dimensionNameToIndexMap.inverse().get(i);
-        if (i == splitDimensionId || (skipMaterializationForDimensions != null &&
-            skipMaterializationForDimensions.contains(dimensionName))) {
+        if (i == splitDimensionId || (skipMaterializationForDimensions != null
+            && skipMaterializationForDimensions.contains(dimensionName))) {
           dos.writeInt(StarTreeIndexNode.all());
         } else {
           dos.writeInt(dimensions.getDimension(i));
@@ -576,7 +746,8 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
       dos.write(metricBuffer);
     }
     dos.close();
-    dataSorter = new StarTreeDataTable(tempFile, dimensionSizeBytes, metricSizeBytes, getSortOrder());
+    dataSorter =
+        new StarTreeDataTable(tempFile, dimensionSizeBytes, metricSizeBytes, getSortOrder());
     dataSorter.sort(0, endDocId - startDocId);
     if (debugMode) {
       printFile(tempFile, 0, endDocId - startDocId);
@@ -604,10 +775,12 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
           byte[] dimBuffer = next.getLeft();
           byte[] metricBuffer = next.getRight();
           if (prev == null) {
-            prev = Pair.of(DimensionBuffer.fromBytes(dimBuffer), MetricBuffer.fromBytes(metricBuffer, metricTypes));
+            prev = Pair.of(DimensionBuffer.fromBytes(dimBuffer),
+                MetricBuffer.fromBytes(metricBuffer, metricTypes));
           } else {
             Pair<DimensionBuffer, MetricBuffer> current =
-                Pair.of(DimensionBuffer.fromBytes(dimBuffer), MetricBuffer.fromBytes(metricBuffer, metricTypes));
+                Pair.of(DimensionBuffer.fromBytes(dimBuffer),
+                    MetricBuffer.fromBytes(metricBuffer, metricTypes));
             if (!current.getLeft().equals(prev.getLeft())) {
               Pair<DimensionBuffer, MetricBuffer> ret = prev;
               prev = current;
@@ -626,15 +799,18 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
   }
 
   /**
-   * sorts the file from start to end on a dimension index
+   * Group by on dimension column, assumes data is already sorted on this dimension from start to
+   * end doc id
    * @param startDocId
    * @param endDocId
    * @param dimension
    * @param file
    * @return
    */
-  private Map<Integer, IntPair> groupBy(int startDocId, int endDocId, Integer dimension, File file) {
-    StarTreeDataTable dataSorter = new StarTreeDataTable(file, dimensionSizeBytes, metricSizeBytes, getSortOrder());
+  private Map<Integer, IntPair> groupBy(int startDocId, int endDocId, Integer dimension,
+      File file) {
+    StarTreeDataTable dataSorter =
+        new StarTreeDataTable(file, dimensionSizeBytes, metricSizeBytes, getSortOrder());
     return dataSorter.groupByIntColumnCount(startDocId, endDocId, dimension);
   }
 
@@ -643,7 +819,8 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
    */
   @Override
   public Iterator<GenericRow> iterator(final int startDocId, final int endDocId) throws Exception {
-    StarTreeDataTable dataSorter = new StarTreeDataTable(dataFile, dimensionSizeBytes, metricSizeBytes, getSortOrder());
+    StarTreeDataTable dataSorter =
+        new StarTreeDataTable(dataFile, dimensionSizeBytes, metricSizeBytes, getSortOrder());
     final Iterator<Pair<byte[], byte[]>> iterator = dataSorter.iterator(startDocId, endDocId);
     return new Iterator<GenericRow>() {
       @Override
@@ -672,8 +849,8 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
     return json;
   }
 
-  private void toJson(JSONObject json, StarTreeIndexNode node, Map<String, HashBiMap<Object, Integer>> dictionaryMap)
-      throws Exception {
+  private void toJson(JSONObject json, StarTreeIndexNode node,
+      Map<String, HashBiMap<Object, Integer>> dictionaryMap) throws Exception {
     String dimName = "ALL";
     Object dimValue = "ALL";
     if (node.getDimensionName() != StarTreeIndexNode.all()) {

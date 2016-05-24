@@ -40,11 +40,13 @@ public class StarTreeIndexNode implements Serializable {
   private int level;
   private int dimensionName;
   private int dimensionValue;
-  private int childDimensionName;
+  private int childDimensionName = -1;
   private Map<Integer, StarTreeIndexNode> children;
   private StarTreeIndexNode parent;
-  private int startDocumentId;
-  private int endDocumentId;
+  private int startDocumentId = -1;
+  private int endDocumentId = -1;
+  // materialized document id that contains aggregated data for this node
+  private int aggregatedDocumentId = -1;
 
   /**
    * An element in the StarTreeIndex.
@@ -128,10 +130,18 @@ public class StarTreeIndexNode implements Serializable {
     this.endDocumentId = endDocumentId;
   }
 
+  public void setAggregatedDocumentId(int aggregatedDocumentId) {
+    this.aggregatedDocumentId = aggregatedDocumentId;
+  }
+
+  public int getAggregatedDocumentId() {
+    return aggregatedDocumentId;
+  }
+
   @Override
   public int hashCode() {
-    return Objects.hashCode(nodeId, dimensionName, dimensionValue, childDimensionName, startDocumentId,
-        endDocumentId);
+    return Objects.hashCode(nodeId, dimensionName, dimensionValue, childDimensionName,
+        startDocumentId, endDocumentId, aggregatedDocumentId);
   }
 
   @Override
@@ -141,23 +151,25 @@ public class StarTreeIndexNode implements Serializable {
     }
     StarTreeIndexNode n = (StarTreeIndexNode) o;
     return Objects.equal(nodeId, n.getNodeId()) && Objects.equal(level, n.getLevel())
-        && Objects.equal(dimensionName, n.getDimensionName()) && Objects.equal(dimensionValue, n.getDimensionValue())
-        && Objects.equal(childDimensionName, n.getChildDimensionName()) && Objects.equal(children, n.getChildren())
+        && Objects.equal(dimensionName, n.getDimensionName())
+        && Objects.equal(dimensionValue, n.getDimensionValue())
+        && Objects.equal(childDimensionName, n.getChildDimensionName())
+        && Objects.equal(children, n.getChildren())
         && Objects.equal(startDocumentId, n.getStartDocumentId())
-        && Objects.equal(endDocumentId, n.getEndDocumentId());
+        && Objects.equal(endDocumentId, n.getEndDocumentId())
+        && Objects.equal(aggregatedDocumentId, n.getAggregatedDocumentId());
   }
 
   @Override
   public String toString() {
-    return Objects.toStringHelper(this).add("nodeId", nodeId).add("level", level).add("dimensionName", dimensionName)
-        .add("dimensionValue", dimensionValue).add("childDimensionName", childDimensionName)
+    return Objects.toStringHelper(this).add("nodeId", nodeId).add("level", level)
+        .add("dimensionName", dimensionName).add("dimensionValue", dimensionValue)
+        .add("childDimensionName", childDimensionName)
         .add("childCount", children == null ? 0 : children.size())
-        .add("startDocumentId", startDocumentId)
-        .add("endDocumentId", endDocumentId)
+        .add("startDocumentId", startDocumentId).add("endDocumentId", endDocumentId)
         .add("documentCount", (endDocumentId - startDocumentId))
-        .toString();
+        .add("aggregatedDocumentId", aggregatedDocumentId).toString();
   }
-
 
   /**
    * Returns the dimension IDs, in order of tree level, to this node.
