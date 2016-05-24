@@ -216,8 +216,9 @@ $(document).ready(function() {
     var source_time_series_template =  $("#time-series-template").html();
     HandleBarsTemplates.template_time_series = Handlebars.compile(source_time_series_template);
 
+    /*Hiding anomalies till it's ready for production
     var source_anomalies_template = $("#anomalies-template").html();
-    HandleBarsTemplates.template_anomalies = Handlebars.compile(source_anomalies_template);
+    HandleBarsTemplates.template_anomalies = Handlebars.compile(source_anomalies_template);*/
 
 
 
