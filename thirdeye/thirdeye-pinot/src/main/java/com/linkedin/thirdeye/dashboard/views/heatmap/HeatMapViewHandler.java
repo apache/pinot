@@ -49,15 +49,13 @@ public class HeatMapViewHandler implements ViewHandler<HeatMapViewRequest, HeatM
         Utils.getDimensionsToGroupBy(queryCache, collection, filters);
 
     List<MetricExpression> metricExpressions = request.getMetricExpressions();
-    List<MetricFunction> metricFunctions =
-        Utils.computeMetricFunctionsFromExpressions(metricExpressions);
     comparisonRequest.setCollectionName(collection);
     comparisonRequest.setBaselineStart(baselineStart);
     comparisonRequest.setBaselineEnd(baselineEnd);
     comparisonRequest.setCurrentStart(currentStart);
     comparisonRequest.setCurrentEnd(currentEnd);
     comparisonRequest.setGroupByDimensions(dimensionsToGroupBy);
-
+    comparisonRequest.setFilterSet(filters);
     comparisonRequest.setMetricExpressions(metricExpressions);
     comparisonRequest.setAggregationTimeGranularity(null);
     return comparisonRequest;
