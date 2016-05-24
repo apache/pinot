@@ -3,7 +3,8 @@
         <table id="anomalies-table" class="uk-table">
             <thead>
             <tr>
-                <th></th>
+                <!--Todo: checkbox
+                <th></th> -->
                 <th class="border-left">Anomaly ID</th>
                 <th class="border-left">Metric</th>
                 <th class="border-left">Start time</th>
