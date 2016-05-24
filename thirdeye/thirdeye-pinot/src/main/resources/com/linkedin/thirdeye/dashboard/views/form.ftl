@@ -170,7 +170,7 @@
                     Granularity
                 </label>
                 <div class="granularity-btn-group uk-button-group vertical radio-buttons">
-                    <button class="time-input-form-gran-minutes baseline-aggregate radio-type-button" rel="{{tabName}}" type="button" unit="10_MINUTES" value="600000">10 MINUTES</button>
+                    <button class="time-input-form-gran-minutes baseline-aggregate radio-type-button" rel="{{tabName}}" type="button" unit="10_MINUTES" value="600000" style="display:none">10 MINUTES</button>
                     <button class="time-input-form-gran-hours baseline-aggregate radio-type-button uk-active" rel="{{tabName}}" type="button" unit="HOURS" value="3600000">HOUR</button>
                     <button class="time-input-form-gran-days baseline-aggregate radio-type-button" rel="{{tabName}}" unit="DAYS" type="button" value="86400000">DAY</button>
                     {{#if showAggregateAllGranularity}}

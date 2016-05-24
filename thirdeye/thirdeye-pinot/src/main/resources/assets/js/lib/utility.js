@@ -641,6 +641,7 @@ function applyFilterSelection(){
 
             if(filters[key]){
                 filters[key].push(value) ;
+                //using alias for "", "?" values
                 labels[key].push(valueAlias) ;
             }else{
                 filters[key] = [value];
@@ -661,7 +662,8 @@ function applyFilterSelection(){
     //append new labels
     var html = "";
     for(k in labels){
-        html +=  "<li class='added-filter uk-button remove-filter-selection' tab="+ hash.view +" rel='" + k + "' value='" + labels[k] + "' title='" + k + ": " + decodeURIComponent(labels[k]) +  "'>" + k + ": " + decodeURIComponent(labels[k]) + "<i class='uk-icon-close'></i></li>";
+        var values = decodeURIComponent(labels[k])
+        html +=  "<li class='added-filter uk-button remove-filter-selection' tab="+ hash.view +" rel='" + k + "' value='" + labels[k] + "' title='" + k + ": " + values +  "'>" + k + ": " + values + "<i class='uk-icon-close'></i></li>";
     }
 
     $(".selected-filters-list[rel='"+ hash.view +"']").append(html);
@@ -676,6 +678,9 @@ function applyFilterSelection(){
 function updateFilterSelection(filterParams){
     var currentFilterContainer = $(".view-filter-selector[rel='"+ hash.view +"']");
     var elementsPresent = 1;
+    $(".filter-value-checkbox", currentFilterContainer).prop("checked", false);
+    $(".filter-select-all-checkbox").prop("checked", false);
+
     for(var f in filterParams){
         var dimensionValues = filterParams[f];
 
@@ -684,8 +689,8 @@ function updateFilterSelection(filterParams){
                 elementsPresent =0;
                 break;
             }
-            $(".filter-value-checkbox[rel='"+ f +"'][value='"+ dimensionValues[v] +"']", currentFilterContainer).attr('checked', 'checked');
-        }
+            $(".filter-value-checkbox[rel='"+ f +"'][value='"+ dimensionValues[v] +"']", currentFilterContainer).prop("checked", true);
+          }
     }
 
     if(elementsPresent == 1) {
