@@ -277,6 +277,10 @@ function updateDashboardFormFromHash(){
 
         updateFilterSelection(filterParams)
 
+    }else{
+        $(".remove-filter-selection[tab='" + hash.view + "']").each(function(index,label){
+            $(label).click()
+        })
     }
 
     //Close dropdown
@@ -681,6 +685,8 @@ function updateFilterSelection(filterParams){
     $(".filter-value-checkbox", currentFilterContainer).prop("checked", false);
     $(".filter-select-all-checkbox").prop("checked", false);
 
+    console.log("filterParams")
+    console.log(filterParams)
     for(var f in filterParams){
         var dimensionValues = filterParams[f];
 
