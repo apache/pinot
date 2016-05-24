@@ -685,8 +685,6 @@ function updateFilterSelection(filterParams){
     $(".filter-value-checkbox", currentFilterContainer).prop("checked", false);
     $(".filter-select-all-checkbox").prop("checked", false);
 
-    console.log("filterParams")
-    console.log(filterParams)
     for(var f in filterParams){
         var dimensionValues = filterParams[f];
 
