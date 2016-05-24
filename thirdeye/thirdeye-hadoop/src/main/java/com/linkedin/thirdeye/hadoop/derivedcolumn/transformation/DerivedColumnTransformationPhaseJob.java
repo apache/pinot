@@ -181,8 +181,9 @@ public class DerivedColumnTransformationPhaseJob extends Configured {
 
     @Override
     public void cleanup(Context context) throws IOException, InterruptedException {
-
+      avroMultipleOutputs.close();
     }
+
   }
 
   public Job run() throws Exception {
