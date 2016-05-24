@@ -17,7 +17,7 @@
 			</ul>
 
 
-            <a id="header-help" class="data-uk-tooltip uk-float-right" title="How to use ThirdEye?" href="#" target="_blank">
+            <a id="header-help" class="data-uk-tooltip uk-float-right" title="How to use ThirdEye?" href="https://docs.google.com/document/d/1w4I2fR78pV1fZUqhTm0yILGrQJvXmNZZhBkdU25IWRI/" target="_blank">
                 <i class=" uk-icon-question-circle uk-icon-medium"></i>
             </a>
 		</div>

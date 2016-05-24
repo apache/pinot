@@ -741,7 +741,7 @@ function selectCurrentDateRange(target){
 
             var today = moment().format("YYYY-MM-DD");
             
-            var hh = moment().format("HH");
+            var hh = maxMillis ? moment(maxMillis).format("HH") : moment().format("HH");
 
             // set the input field values
             $(".current-start-date-input[rel='"+ currentTab +"']").val(today);
