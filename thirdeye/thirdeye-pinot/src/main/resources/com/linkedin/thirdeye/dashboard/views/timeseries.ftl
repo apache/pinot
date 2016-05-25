@@ -11,10 +11,16 @@
     <table title="{{displayDate this.baselineUTC}}">
         <tbody>
         <tr>
+            {{#each this as |timeStamp Index|}}
+            {{#if @first}}
             <th><b>Start:</b></th>
-            <td class="baseline-date-time">{{displayDate  @first}}</td>
+            <td class="baseline-date-time">{{displayDate  timeStamp}}</td>
+            {{/if}}
+            {{#if @last}}
             <th><b>End:</b></th>
-            <td class="baseline-date-time">{{displayDate  @last}}</td>
+            <td class="baseline-date-time">{{displayDate  timeStamp}}</td>
+            {{/if}}
+            {{/each}}
         </tr>
         </tbody>
     </table>
