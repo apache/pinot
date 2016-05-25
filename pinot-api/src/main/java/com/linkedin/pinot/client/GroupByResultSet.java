@@ -19,18 +19,22 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-
 /**
- * A Pinot query result set for group by results, of which there is one of per aggregation function in the query.
+ * A Pinot query result set for group by results, of which there is one of per aggregation function
+ * in the query.
  */
 class GroupByResultSet extends AbstractResultSet {
   private final JSONObject _jsonObject;
   private final JSONArray _groupByResults;
+  private final JSONArray _groupByColumns;
+  private final String _functionName;
 
   public GroupByResultSet(JSONObject jsonObject) {
     _jsonObject = jsonObject;
     try {
       _groupByResults = jsonObject.getJSONArray("groupByResult");
+      _groupByColumns = jsonObject.getJSONArray("groupByColumns");
+      _functionName = jsonObject.getString("function");
     } catch (JSONException e) {
       throw new PinotClientException(e);
     }
@@ -38,7 +42,6 @@ class GroupByResultSet extends AbstractResultSet {
 
   /**
    * Returns the number of rows in this result group.
-   *
    * @return The number of rows in this result group
    */
   @Override
@@ -63,7 +66,8 @@ class GroupByResultSet extends AbstractResultSet {
   @Override
   public String getString(int rowIndex, int columnIndex) {
     if (columnIndex != 0) {
-      throw new IllegalArgumentException("Column index must always be 0 for aggregation result sets");
+      throw new IllegalArgumentException(
+          "Column index must always be 0 for aggregation result sets");
     }
 
     try {
@@ -89,5 +93,50 @@ class GroupByResultSet extends AbstractResultSet {
     } catch (Exception e) {
       throw new PinotClientException(e);
     }
+  }
+
+  @Override
+  public String getGroupKeyColumnName(int groupKeyColumnIndex) {
+    try {
+      return _groupByColumns.getString(groupKeyColumnIndex);
+    } catch (Exception e) {
+      throw new PinotClientException(e);
+    }
+  }
+
+  @Override
+  public String toString() {
+    int groupKeyLength = getGroupKeyLength();
+    int numColumns = groupKeyLength + getColumnCount();
+    TextTable table = new TextTable();
+    String[] columnNames = new String[numColumns];
+    for (int c = 0; c < groupKeyLength; c++) {
+      try {
+        columnNames[c] = getGroupKeyColumnName(c);
+      } catch (Exception e) {
+        columnNames[c] = "ERROR";
+      }
+    }
+    for (int c = 0; c < getColumnCount(); c++) {
+      columnNames[groupKeyLength + c] = getColumnName(c);
+    }
+    table.addHeader(columnNames);
+
+    int numRows = getRowCount();
+    for (int r = 0; r < numRows; r++) {
+      String[] columnValues = new String[numColumns];
+      for (int c = 0; c < groupKeyLength; c++) {
+        try {
+          columnValues[c] = getGroupKeyString(r, c);
+        } catch (Exception e) {
+          columnValues[c] = "ERROR";
+        }
+      }
+      for (int c = 0; c < getColumnCount(); c++) {
+        columnValues[groupKeyLength + c] = getString(r, c);
+      }
+      table.addRow(columnValues);
+    }
+    return table.toString();
   }
 }

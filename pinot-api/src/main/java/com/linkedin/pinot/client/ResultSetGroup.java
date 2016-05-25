@@ -71,4 +71,14 @@ public class ResultSetGroup {
   public ResultSet getResultSet(int index) {
     return _resultSets.get(index);
   }
+  
+  @Override
+  public String toString() {
+    StringBuilder sb = new StringBuilder();
+    for(ResultSet resultSet:_resultSets){
+      sb.append(resultSet);
+      sb.append("\n");
+    }
+    return sb.toString();
+  }
 }

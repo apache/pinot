@@ -53,15 +53,21 @@ public class ConnectionFactoryTest {
     brokers.add(broker2);
     Assert.assertEquals(connection.getBrokerList(), brokers);
   }
-  
+
   // For testing DynamicBrokerSelector
+  /**
+   * ConnectionFactoryTest <ZK_URL> <tableName> <query>
+   * @param args
+   */
   public static void main(String[] args) {
-    String zkUrl = "<ZKURL>/<CHROOT>(otional)/<CLUSTER_NAME>"; //e.g localhost:2181/pinot-cluster
-    Connection connection =
-        ConnectionFactory.fromZookeeper(zkUrl);
-    String tableName = "<TABLE_NAME>";
-    ResultSetGroup resultSetGroup =
-        connection.execute(tableName, "select count(*) from " + tableName);
+    if (args.length != 3) {
+      System.err.println("USAGE ConnectionFactoryTest <ZK_URL> <tableName> <query>");
+      System.exit(1);
+    }
+    String zkUrl = args[0];
+    Connection connection = ConnectionFactory.fromZookeeper(zkUrl);
+    String tableName = args[1];
+    ResultSetGroup resultSetGroup = connection.execute(tableName, args[2]);
     System.out.println(resultSetGroup);
   }
 

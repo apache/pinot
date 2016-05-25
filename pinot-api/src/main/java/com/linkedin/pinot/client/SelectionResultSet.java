@@ -19,7 +19,6 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-
 /**
  * Selection result set, which contains the results of a selection query.
  */
@@ -72,5 +71,40 @@ class SelectionResultSet extends AbstractResultSet {
   @Override
   public String getGroupKeyString(int rowIndex, int groupKeyColumnIndex) {
     throw new AssertionError("No group key string for selection results");
+  }
+  
+  @Override
+  public String getGroupKeyColumnName(int groupKeyColumnIndex) {
+    throw new AssertionError("No group key column name for selection results");
+  }
+
+  @Override
+  public String toString() {
+    int numColumns = getColumnCount();
+    TextTable table = new TextTable();
+    String[] columnNames = new String[numColumns];
+    for (int c = 0; c < numColumns; c++) {
+      try {
+        columnNames[c] = _columnsArray.getString(c);
+      } catch (JSONException e) {
+        columnNames[c] = "ERROR";
+      }
+    }
+    table.addHeader(columnNames);
+
+    int numRows = getRowCount();
+    for (int r = 0; r < numRows; r++) {
+      String[] columnValues = new String[numColumns];
+      for (int c = 0; c < numColumns; c++) {
+        try {
+          columnValues[c] = getString(r, c);
+        } catch (Exception e) {
+          columnNames[c] = "ERROR";
+        }
+      }
+      table.addRow(columnValues);
+    }
+    return table.toString();
+
   }
 }
