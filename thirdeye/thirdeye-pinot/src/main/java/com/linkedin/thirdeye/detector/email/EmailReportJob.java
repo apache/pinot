@@ -52,8 +52,6 @@ import freemarker.template.TemplateNumberModel;
 import freemarker.template.TemplateScalarModel;
 
 public class EmailReportJob implements Job {
-  private static final String THIRDEYE_LOGO_PATH = "/assets/img/thirdeye_logo.jpg";
-
   private static final String PNG = ".png";
 
   private static final String EMAIL_REPORT_CHART_PREFIX = "email_report_chart_";
@@ -78,9 +76,8 @@ public class EmailReportJob implements Job {
     SessionFactory sessionFactory =
         (SessionFactory) context.getJobDetail().getJobDataMap().get(SESSION_FACTORY);
     int applicationPort = context.getJobDetail().getJobDataMap().getInt(APPLICATION_PORT);
-    TimeOnTimeComparisonHandler timeOnTimeComparisonHandler =
-        (TimeOnTimeComparisonHandler) context.getJobDetail().getJobDataMap()
-            .get(TIME_ON_TIME_COMPARISON_HANDLER);
+    TimeOnTimeComparisonHandler timeOnTimeComparisonHandler = (TimeOnTimeComparisonHandler) context
+        .getJobDetail().getJobDataMap().get(TIME_ON_TIME_COMPARISON_HANDLER);
     ThirdEyeClient client = timeOnTimeComparisonHandler.getClient();
     String dashboardHost = context.getJobDetail().getJobDataMap().getString(DASHBOARD_HOST);
 
@@ -122,9 +119,8 @@ public class EmailReportJob implements Job {
       }
     }
 
-    String chartFilePath =
-        writeTimeSeriesChart(config, timeOnTimeComparisonHandler, now, then, collection,
-            anomaliesWithLabels);
+    String chartFilePath = writeTimeSeriesChart(config, timeOnTimeComparisonHandler, now, then,
+        collection, anomaliesWithLabels);
 
     // get dimensions for rendering
     List<String> dimensionNames;
@@ -138,12 +134,10 @@ public class EmailReportJob implements Job {
     String anomalyEndpoint;
     String functionEndpoint;
     try {
-      anomalyEndpoint =
-          String.format("http://%s:%d/anomaly-results/", InetAddress.getLocalHost()
-              .getCanonicalHostName(), applicationPort);
-      functionEndpoint =
-          String.format("http://%s:%d/anomaly-functions/", InetAddress.getLocalHost()
-              .getCanonicalHostName(), applicationPort);
+      anomalyEndpoint = String.format("http://%s:%d/anomaly-results/",
+          InetAddress.getLocalHost().getCanonicalHostName(), applicationPort);
+      functionEndpoint = String.format("http://%s:%d/anomaly-functions/",
+          InetAddress.getLocalHost().getCanonicalHostName(), applicationPort);
     } catch (Exception e) {
       throw new JobExecutionException(e);
     }
@@ -180,8 +174,6 @@ public class EmailReportJob implements Job {
       // http://stackoverflow.com/questions/13339445/feemarker-writing-images-to-html
       chartFile = new File(chartFilePath);
       templateData.put("embeddedChart", email.embed(chartFile));
-      File logo = new File(getClass().getResource(THIRDEYE_LOGO_PATH).getFile());
-      templateData.put("logo", email.embed(logo));
       templateData.put("collection", collection);
       templateData.put("metric", metric);
       templateData.put("filters", filtersJsonEncoded);
@@ -200,8 +192,8 @@ public class EmailReportJob implements Job {
       email.setHostName(config.getSmtpHost());
       email.setSmtpPort(config.getSmtpPort());
       if (config.getSmtpUser() != null && config.getSmtpPassword() != null) {
-        email.setAuthenticator(new DefaultAuthenticator(config.getSmtpUser(), config
-            .getSmtpPassword()));
+        email.setAuthenticator(
+            new DefaultAuthenticator(config.getSmtpUser(), config.getSmtpPassword()));
         email.setSSLOnConnect(true);
       }
       email.setFrom(config.getFromAddress());
@@ -242,9 +234,8 @@ public class EmailReportJob implements Job {
       TimeOnTimeComparisonResponse chartData =
           getData(timeOnTimeComparisonHandler, config, then, now, WEEK_MILLIS, dataGranularity);
       AnomalyGraphGenerator anomalyGraphGenerator = AnomalyGraphGenerator.getInstance();
-      JFreeChart chart =
-          anomalyGraphGenerator.createChart(chartData, dataGranularity, windowMillis,
-              anomaliesWithLabels);
+      JFreeChart chart = anomalyGraphGenerator.createChart(chartData, dataGranularity, windowMillis,
+          anomaliesWithLabels);
       String chartFilePath = EMAIL_REPORT_CHART_PREFIX + config.getId() + PNG;
       LOG.info("Writing chart to {}", chartFilePath);
       anomalyGraphGenerator.writeChartToFile(chart, chartFilePath);
@@ -259,17 +250,16 @@ public class EmailReportJob implements Job {
       final DateTime end) throws JobExecutionException {
     final List<AnomalyResult> results;
     try {
-      results =
-          new HibernateSessionWrapper<List<AnomalyResult>>(sessionFactory)
-              .execute(new Callable<List<AnomalyResult>>() {
-                @Override
-                public List<AnomalyResult> call() throws Exception {
-                  AnomalyResultDAO resultDAO =
-                      (AnomalyResultDAO) context.getJobDetail().getJobDataMap().get(RESULT_DAO);
-                  return resultDAO.findAllByCollectionTimeMetricAndFilters(config.getCollection(),
-                      config.getMetric(), end, start, config.getFilters());
-                }
-              });
+      results = new HibernateSessionWrapper<List<AnomalyResult>>(sessionFactory)
+          .execute(new Callable<List<AnomalyResult>>() {
+            @Override
+            public List<AnomalyResult> call() throws Exception {
+              AnomalyResultDAO resultDAO =
+                  (AnomalyResultDAO) context.getJobDetail().getJobDataMap().get(RESULT_DAO);
+              return resultDAO.findAllByCollectionTimeMetricAndFilters(config.getCollection(),
+                  config.getMetric(), end, start, config.getFilters());
+            }
+          });
     } catch (Exception e) {
       throw new JobExecutionException(e);
     }

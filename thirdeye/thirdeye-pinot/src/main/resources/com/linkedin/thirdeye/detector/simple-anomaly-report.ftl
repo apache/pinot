@@ -1,8 +1,6 @@
 <p>
     Hello,
     <br>
-    <br>
-    <img id="Logo" src="cid:${logo}" style="float: left; margin: 0px 15px 15px 0px;" width="100">
     You are receiving this email because you have subscribed to ThirdEye Anomaly detection service for '${collection}:${metric}'.<br/>
     ThirdEye has analyzed your dataset for time range ${dateFormat(startTime)} to ${dateFormat(endTime)} (${timeZone}) and has detected <b>${anomalyCount} ${(anomalyCount == 1)?string("anomaly", "anomalies")}.</b> </br>
     <#if (anomalyCount > 0)>
