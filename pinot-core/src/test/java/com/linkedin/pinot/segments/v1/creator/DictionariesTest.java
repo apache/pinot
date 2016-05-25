@@ -383,8 +383,11 @@ public class DictionariesTest {
     inputStrings[1] = "abc";
     Arrays.sort(inputStrings); // Sorted order: {"abc", "abc def"}
 
+    boolean[] isSorted = new boolean[1];
+    isSorted[0] = true;
     SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(false, inputStrings, fieldSpec, indexDir);
-    dictionaryCreator.build();
+    dictionaryCreator.build(isSorted);
+    Assert.assertFalse(isSorted[0]);
 
     // Get the padded string as stored in the dictionary.
     int targetPaddedLength = dictionaryCreator.getStringColumnMaxLength();
@@ -426,8 +429,10 @@ public class DictionariesTest {
       inputStrings[0] = "";
       Arrays.sort(inputStrings); // Sorted order: {""}
 
+      boolean[] isSorted = new boolean[1];
+      isSorted[0] = true;
       SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(false, inputStrings, fieldSpec, indexDir);
-      dictionaryCreator.build();
+      dictionaryCreator.build(isSorted);
 
       // Get the padded string as stored in the dictionary.
       int targetPaddedLength = dictionaryCreator.getStringColumnMaxLength();
@@ -477,7 +482,9 @@ public class DictionariesTest {
       inputStrings[1] = "%";
       Arrays.sort(inputStrings); // Sorted order: {"", "%"}
       SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(false, inputStrings, fieldSpec, indexDir);
-      dictionaryCreator.build();
+      boolean[] isSorted = new boolean[1];
+      isSorted[0] = true;
+      dictionaryCreator.build(isSorted);
     } catch (Exception e) {
       Assert.assertEquals(e.getMessage(),
           "Number of entries in dictionary != number of unique values in the data in column test");
@@ -508,7 +515,9 @@ public class DictionariesTest {
 
     try {
       SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(false, inputStrings, fieldSpec, indexDir);
-      dictionaryCreator.build();
+      boolean[] isSorted = new boolean[1];
+      isSorted[0] = true;
+      dictionaryCreator.build(isSorted);
 
       // Get the padded string as stored in the dictionary.
       int targetPaddedLength = dictionaryCreator.getStringColumnMaxLength();

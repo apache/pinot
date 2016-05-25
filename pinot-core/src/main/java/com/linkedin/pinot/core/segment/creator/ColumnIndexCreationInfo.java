@@ -28,7 +28,7 @@ public class ColumnIndexCreationInfo {
   private final Object sortedUniqueElementsArray;
   private final ForwardIndexType forwardIndexType;
   private final InvertedIndexType invertedIndexType;
-  private final boolean isSorted;
+  private boolean isSorted;
   private final boolean hasNulls;
   private final int totalNumberOfEntries;
   private final int maxNumberOfMutiValueElements;
@@ -94,6 +94,10 @@ public class ColumnIndexCreationInfo {
 
   public boolean isSorted() {
     return isSorted;
+  }
+
+  public void setSorted(boolean value) {
+    isSorted = value;
   }
 
   public boolean hasNulls() {

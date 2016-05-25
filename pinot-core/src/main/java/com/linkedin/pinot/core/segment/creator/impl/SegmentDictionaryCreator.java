@@ -99,7 +99,7 @@ public class SegmentDictionaryCreator implements Closeable {
   public void close() throws IOException {
   }
 
-  public void build() throws Exception {
+  public void build(boolean[] isSorted) throws Exception {
     switch (spec.getDataType()) {
       case INT:
         final FixedByteSingleValueMultiColWriter intDictionaryWrite =
@@ -175,6 +175,9 @@ public class SegmentDictionaryCreator implements Closeable {
           final String toWrite = sortedObjects[i].toString();
           String entry = getPaddedString(toWrite, stringColumnMaxLength);
           revised[i] = entry;
+          if (isSorted[0] && i> 0 && (revised[i-1].compareTo(entry) > 0)) {
+            isSorted[0] = false;
+          }
           assert (revised[i].getBytes(utf8CharSet).length == stringColumnMaxLength);
           revisedMap.put(revised[i], toWrite);
         }

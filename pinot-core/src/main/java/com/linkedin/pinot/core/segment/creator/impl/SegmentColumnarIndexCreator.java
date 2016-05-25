@@ -117,9 +117,12 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
     // For each column, build its dictionary and initialize a forwards and an inverted index
     for (final String column : dictionaryCreatorMap.keySet()) {
-      dictionaryCreatorMap.get(column).build();
-      dictionaryCache.put(column, new HashMap<Object, Object>());
       ColumnIndexCreationInfo indexCreationInfo = indexCreationInfoMap.get(column);
+      boolean[] isSorted = new boolean[1];
+      isSorted[0] = indexCreationInfo.isSorted();
+      dictionaryCreatorMap.get(column).build(isSorted);
+      indexCreationInfo.setSorted(isSorted[0]);
+      dictionaryCache.put(column, new HashMap<Object, Object>());
       int uniqueValueCount = indexCreationInfo.getDistinctValueCount();
       if (schema.getFieldSpecFor(column).isSingleValueField()) {
         if (indexCreationInfo.isSorted()) {
