@@ -268,9 +268,18 @@ public class AnomalyDetectionJob implements Job {
       Transaction transaction = session.beginTransaction();
       try {
         for (AnomalyResult result : results) {
-          result.setFunctionId(anomalyFunction.getSpec().getId());
-          result.setFunctionType(anomalyFunction.getSpec().getType());
-          result.setFunctionProperties(anomalyFunction.getSpec().getProperties());
+          // Properties that always come from the function spec
+          AnomalyFunctionSpec spec = anomalyFunction.getSpec();
+          result.setFunctionId(spec.getId());
+          result.setFunctionType(spec.getType());
+          result.setFunctionProperties(spec.getProperties());
+          result.setCollection(spec.getCollection());
+          result.setMetric(spec.getMetric());
+          result.setFilters(spec.getFilters());
+
+          // make sure score and weight are valid numbers
+          result.setScore(normalize(result.getScore()));
+          result.setWeight(normalize(result.getWeight()));
           resultDAO.create(result);
         }
         transaction.commit();
@@ -281,6 +290,17 @@ public class AnomalyDetectionJob implements Job {
     } finally {
       session.close();
       ManagedSessionContext.unbind(sessionFactory);
+    }
+  }
+
+  /** Handle any infinite or NaN values by replacing them with +/- max value or 0 */
+  private double normalize(double value) {
+    if (Double.isInfinite(value)) {
+      return (value > 0.0 ? 1 : -1) * Double.MAX_VALUE;
+    } else if (Double.isNaN(value)) {
+      return 0.0; // default?
+    } else {
+      return value;
     }
   }
 

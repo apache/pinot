@@ -9,9 +9,12 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.joda.time.DateTime;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.collect.Range;
 import com.linkedin.thirdeye.client.MetricExpression;
@@ -22,7 +25,8 @@ import com.linkedin.thirdeye.client.ThirdEyeResponse;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesRow.TimeSeriesMetric;
 
 public class TimeSeriesHandler {
-  private static final int DEFAULT_QUERY_TIMEOUT = 60;
+  private static final Logger LOG = LoggerFactory.getLogger(TimeSeriesHandler.class);
+  private static final int DEFAULT_QUERY_TIMEOUT = 300;
   private final QueryCache queryCache;
   private TimeSeriesThirdEyeRequestGenerator requestGenerator =
       new TimeSeriesThirdEyeRequestGenerator();
@@ -66,8 +70,7 @@ public class TimeSeriesHandler {
     for (Entry<TimeSeriesRequest, Map<ThirdEyeRequest, Future<ThirdEyeResponse>>> entry : subRequestQueryResponseMap
         .entrySet()) {
       TimeSeriesRequest subTimeSeriesRequest = entry.getKey();
-      Map<ThirdEyeRequest, ThirdEyeResponse> queryResponseMap =
-          waitForFutures(entry.getValue());
+      Map<ThirdEyeRequest, ThirdEyeResponse> queryResponseMap = waitForFutures(entry.getValue());
       if (hasGroupByDimensions) {
         rows.addAll(
             responseParser.parseGroupByDimensionResponse(subTimeSeriesRequest, queryResponseMap));
@@ -146,8 +149,13 @@ public class TimeSeriesHandler {
   private <K, V> Map<K, V> waitForFutures(Map<K, Future<V>> futuresMap) throws Exception {
     Map<K, V> responseMap = new LinkedHashMap<>();
     for (Entry<K, Future<V>> entry : futuresMap.entrySet()) {
-      responseMap.put(entry.getKey(),
-          entry.getValue().get(DEFAULT_QUERY_TIMEOUT, TimeUnit.SECONDS));
+      try {
+        responseMap.put(entry.getKey(),
+            entry.getValue().get(DEFAULT_QUERY_TIMEOUT, TimeUnit.SECONDS));
+      } catch (TimeoutException e) {
+        LOG.error("Unable to get future for key {}: {}", entry.getKey(), e);
+        throw new TimeoutException(e.getMessage());
+      }
     }
     return responseMap;
   }

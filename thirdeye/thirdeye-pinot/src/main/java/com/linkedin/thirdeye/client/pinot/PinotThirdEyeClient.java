@@ -110,7 +110,7 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
     List<MetricFunction> metricFunctions = request.getMetricFunctions();
     List<String> dimensionNames = collectionSchema.getDimensionNames();
     String sql = PqlUtils.getPql(request, dataTimeSpec);
-    LOG.info("Executing: {}", sql);
+    LOG.debug("Executing: {}", sql);
     ResultSetGroup result = CACHE_INSTANCE.getResultSetGroupCache()
         .get(new PinotQuery(sql, request.getCollection() + "_OFFLINE"));
     if (LOG.isDebugEnabled()) {
