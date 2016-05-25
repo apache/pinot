@@ -1,0 +1,13 @@
+{
+  "queryType": "timeseries",
+  "dataSource": "tpch_lineitem",
+  "intervals": ["1996-12-01/1997-01-01"],
+  "granularity": "all",
+  "aggregations": [
+    {
+      "type": "doubleSum",
+      "name": "l_extendedprice_sum",
+      "fieldName": "l_extendedprice"
+    }
+  ]
+}

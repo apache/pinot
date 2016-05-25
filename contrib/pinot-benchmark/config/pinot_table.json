@@ -1,0 +1,19 @@
+{
+  "tableName": "tpch_lineitem",
+  "segmentsConfig" : {
+    "replication" : "1",
+    "schemaName" : "tpch_lineitem",
+    "segmentAssignmentStrategy" : "BalanceNumSegmentAssignmentStrategy"
+  },
+  "tenants" : {
+    "broker":"brokerOne",
+    "server":"serverOne"
+  },
+  "tableIndexConfig" : {
+    "invertedIndexColumns" : [],
+    "loadMode"  : "HEAP",
+    "lazyLoad"  : "false"
+  },
+  "tableType":"OFFLINE",
+  "metadata": {}
+}

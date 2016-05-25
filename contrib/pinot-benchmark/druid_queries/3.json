@@ -1,0 +1,16 @@
+{
+  "queryType": "topN",
+  "dataSource": "tpch_lineitem",
+  "intervals": ["1992-01-01/1999-01-01"],
+  "granularity": "all",
+  "aggregations": [
+    {
+      "type": "doubleSum",
+      "name": "l_extendedprice_sum",
+      "fieldName": "l_extendedprice"
+    }
+  ],
+  "dimension": "l_shipdate",
+  "threshold": 10,
+  "metric": "l_extendedprice_sum"
+}
