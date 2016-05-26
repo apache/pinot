@@ -27,13 +27,14 @@
         }
     </script>
     <!--<script src="lib/jquery-1.10.2.min.js"></script>-->
-    <script src="http://builds.handlebarsjs.com.s3.amazonaws.com/handlebars-v4.0.5.js"></script>
-	<script src="https://d3js.org/d3.v3.min.js" charset="utf-8"></script>
-	<script src="../../../assets/js/d3/nvtooltip.js"></script>
-	<script src="../../../assets/js/d3/d3legend.js"></script> 
-	<script src="../../../assets/js/d3/d3line.js"></script> 
-	<script src="../../../assets/js/d3/d3linewithlegend.js"></script> 	
-   <script src="../../../assets/js/c3/c3.js"></script>
+    <!--<script src="http://builds.handlebarsjs.com.s3.amazonaws.com/handlebars-v4.0.5.js"></script>-->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/handlebars.js/4.0.5/handlebars.min.js"></script>
+	<script src="https://d3js.org/d3.v3.min.js" charset="utf-8"  defer></script>
+	<script src="../../../assets/js/d3/nvtooltip.js"  defer></script>
+	<script src="../../../assets/js/d3/d3legend.js"  defer></script>
+	<script src="../../../assets/js/d3/d3line.js"  defer></script>
+	<script src="../../../assets/js/d3/d3linewithlegend.js"  defer></script>
+   <script src="../../../assets/js/c3/c3.js"  defer></script>
 	
     <script src="../../../assets/js/vendor/vendorplugins.compiled.js" defer></script>
     <script src="../../../assets/js/uikit/uikit.min.js" defer></script>
@@ -41,13 +42,12 @@
     <!--Compiled uikit components as used-components.compiled.js consists of: sticky.min.js, datepicker.min.js, timepicker.min.js,
     autocomplete.min.js, sortable.min.js, form-select.min.js-->
     <script src="../../../assets/js/uikit/components/used-components.compiled.js" defer></script>
-
-    <script src="../../../assets/js/flot/jquery.flot.min.js" defer></script>
-    <script src="../../../assets/js/flot/jquery.flot.dashes.js" defer></script>
-    <script src="../../../assets/js/flot/jquery.flot.stack.js" defer></script>
     <!--<script type="text/javascript" src="https://www.google.com/jsapi"></script>-->
 
     <script src="../../../assets/js/lib/utility.js" defer></script>
+    <script src="../../../assets/js/lib/utility-form.js" defer></script>
+    <script src="../../../assets/js/lib/utility-form-filter.js" defer></script>
+    <script src="../../../assets/js/lib/utility-form-time.js" defer></script>
     <script src="../../../assets/js/lib/get-form-data.js" defer></script>
     <script src="../../../assets/js/lib/tabular.js" defer></script>
     <script src="../../../assets/js/lib/contributors.js" defer></script>

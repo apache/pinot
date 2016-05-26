@@ -1,6 +1,6 @@
 function getAnomalies(tab) {
 
-   dashboardName = "Default_All_Metrics_Dashboard";
+  dashboardName = "Default_Dashboard"; //Change it to be the first option:  $(".dashboard-option:first-child a").html().trim()
   baselineStart = moment(parseInt(hash.currentStart)).add(-7, 'days')
   baselineEnd = moment(parseInt(hash.currentEnd)).add(-7, 'days')
   aggTimeGranularity = (window.datasetConfig.dataGranularity) ? window.datasetConfig.dataGranularity : "HOURS";

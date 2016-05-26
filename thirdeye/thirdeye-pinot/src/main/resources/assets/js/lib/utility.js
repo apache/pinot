@@ -334,807 +334,14 @@ function formComponentPopulated(){
     }
 }
 
-/** DASHBOARD FORM RELATED METHODS **/
-/* used on href="#" anchor tags prevents the default jump to the top of the page */
-function eventPreventDefault(event){
-    event.preventDefault();
-}
 
-/* takes a clicked anchor tag and applies active class to it's prent (li, button) */
-function  radioOptions(target){
-        $(target).parent().siblings().removeClass("uk-active");
-        $(target).parent().addClass("uk-active");
-}
+/* Event listeners used in FORM area and chart area*/
+function closeAllUIKItDropdowns(){
 
-function radioButtons(target){
-
-    if(!$(target).hasClass("uk-active")) {
-        $(target).siblings().removeClass("uk-active");
-        $(target).addClass("uk-active");
-    }
-}
-
-//Advanced settings
-function closeClosestDropDown(target){
-
-    $(target).closest($("[data-uk-dropdown]")).removeClass("uk-open");
-    $(target).closest($("[data-uk-dropdown]")).attr("aria-expanded", false);
-    $(target).closest(".uk-dropdown").hide();
-}
-
-function enableApplyButton(button){
-    $(button).prop("disabled", false);
-    $(button).removeAttr("disabled");
-}
-
-function disableApplyButton(button){
-    $(button).prop("disabled", true);
-    $(button).attr("disabled", true);
-}
-
-function selectDatasetNGetFormData(target){
-
-
-
-    //Cleanup form: Remove added-item and added-filter, metrics of the previous dataset
-    $("#"+  hash.view  +"-chart-area-error").hide();
-    $(".view-metric-selector .added-item").remove();
-    $(".view-dimension-selector .added-item").remove();
-    $(".metric-list").empty();
-    $(".dimension-list").empty();
-    $(".filter-dimension-list").empty()
-    $(".filter-panel .value-filter").remove();
-    $(".added-filter").remove();
-    $(".filter-panel .value-filter").remove();
-
-
-    //Remove previous dataset's hash values
-    delete hash.baselineStart
-    delete hash.baselineEnd
-    delete hash.currentStart
-    delete hash.currentEnd
-    delete hash.compareMode
-    delete hash.dashboard
-    delete hash.metrics
-    delete hash.dimensions
-    delete hash.filters
-    delete hash.aggTimeGranularity
-
-
-    var value = $(target).attr("value");
-    hash.dataset = value;
-
-    //Trigger AJAX calls
-    //get the latest available data timestamp of a dataset
-    getAllFormData()
-
-    //Populate the selected item on the form element
-    $(".selected-dataset").text($(target).text());
-    $(".selected-dataset").attr("value",value);
-
-    //Close uikit dropdown
-    $(target).closest("[data-uk-dropdown]").removeClass("uk-open");
-    $(target).closest("[data-uk-dropdown]").attr("aria-expanded", false);
-
-
-}
-
-function switchHeaderTab(target){
-    radioButtons(target)
-    hash.view = $(target).attr("rel");
-}
-
-function  selectDashboard(target){
-
-
-    //Update hash values
-    var value = $(target).attr("value");
-    hash.dashboard = value;
-
-    //Update selectors
-    $("#selected-dashboard").text($(target).text());
-    $("#selected-dashboard").attr("value",value);
-
-    if($("#"+ hash.view +"-time-input-form-error").attr("data-error-source") == "dashboard-option"){
-        $("#"+ hash.view +"-time-input-form-error").hide();
-    }
-
-    //close uikit dropdown
-    $(target).closest("[data-uk-dropdown]").removeClass("uk-open");
-    $(target).closest("[data-uk-dropdown]").attr("aria-expanded", false);
-
-    //Remove earlier selected added-item and added-filter and update hash
-    delete hash.metrics
-    delete hash.dimensions
-    delete hash.filters
-
-    //Enable Go btn
-    enableFormSubmit()
-
-}
-
-
-function selectMetric(target){
-
-
-    //We have either dashboard or metrics param in the queries
-    delete hash.dashboard
-
-    //Update hash values
-    var param = "metrics";
-    var value = $(target).attr("value");
-
-    //if key doesn't exist
-    if(!hash["metrics"]){
-        hash["metrics"] = value;
-
-        //if key exist and value is not part of the array
-    }else if( hash["metrics"].indexOf(value) < 0){
-        hash["metrics"] =  hash["metrics"] +","+ value;
-    }
-
-    //Hide alert
-    if($("#"+ hash.view +"-time-input-form-error").attr("data-error-source") == "metric-option"){
-        $("#"+ hash.view +"-time-input-form-error").hide();
-    }
-
-
-    //Update selectors
-    $(target).hide();
-    $(".selected-metrics-list[rel='"+ hash.view +"']").append("<li class='added-item uk-button remove-selection' rel='"+ param + "' value='"+ value +"'><a href='#'>" + $(target).text() +  "<i class='uk-icon-close'></i></a></li>");
-
-    //Enable Go btn
-    enableFormSubmit()
-}
-
-function selectDimension(target){
-
-    //Update hash values
-    var param = "dimensions";
-    var value = $(target).attr("value");
-
-    //Update hash
-
-    //if key doesn't exist
-    if(!hash[param]){
-        hash[param] = value;
-
-        //if key exist and value is not part of the array
-    }else if( hash[param].indexOf(value) < 0){
-        hash[param] =  hash[param] +","+ value;
-    }
-
-    //Enable Go btn
-    $("#" + hash.view + "-form-submit").prop("disabled", false);
-
-    //Update selectors
-    $(target).attr("selected", true);
-    $(target).hide();
-    $(".selected-dimensions-list[rel='"+ hash.view +"']").append("<li class='added-item  uk-button remove-selection' rel='"+ param + "' value='"+ value +"'><a href='#'>" + $(target).text() +  "<i class='uk-icon-close'></i></a></li>");
-
-}
-
-function toggleAllDimensions(target){
-    //Todo:
-}
-
-function removeSelection(target){
-
-    //remove the item from the hash
-    var param = $(target).attr("rel");
-    var value = $(target).attr("value");
-
-    if(hash.hasOwnProperty(param)) {
-
-        hash[param] = hash[param].replace(value, "")
-
-        if (hash[param].indexOf(",") == 0) {
-            hash[param] = hash[param].substr(1, hash[param].length);
-        } else if (hash[param][hash[param].length - 1] == ",") {
-            hash[param] = hash[param].substr(0, hash[param].length - 1);
-        } else if (hash[param].indexOf(",,") > -1) {
-            hash[param] = hash[param].replace(",,", ",");
-        }
-        if (hash[param] == "") {
-            delete hash[param];
-        }
-    }
-
-    //Remove the label and make the list item available
-    $(target).remove();
-    $("li[rel="+ param +"][value="+ value  +"]").show();
-
-    //Enable Go btn
-    enableFormSubmit()
-}
-
-/** DASHBOARD FORM TIME RELATED METHODS **/
-function  selectAggregate(target) {
-
-    var currentView=  hash.view
-    var unit = $(target).attr("unit")
-
-    //update hash
-    hash.aggTimeGranularity = unit;
-
-    if ($("#"+ hash.view +"-form-tip").attr("data-tip-source") == "daily-aggregate") {
-        $("#" + hash.view + "-form-tip").hide();
-    }
-
-    //Display message to user if daily granularity selected and only 1 day set the timerange to last 7 days with 12am time
-    if(unit == "DAYS"){
-
-
-        //Set the time selectors to midnight
-        $("#"+ currentView +"-current-end-time-input").val("00:00");
-        $("#"+ currentView +"-current-start-time-input").val("00:00");
-        $("#"+ currentView +"-baseline-start-time-input").val("00:00");
-        $("#"+ currentView +"-baseline-end-time-input").val("00:00");
-        $(".time-input-apply-btn[rel='"+ currentView +"']" ).click();
-
-        //close uikit dropdown
-        $("[data-uk-dropdown]").removeClass("uk-open");
-        $("[data-uk-dropdown]").attr("aria-expanded", false);
-        $(".uk-dropdown").hide();
-
-
-
-        //Display message to the user if he would query only one datapoint
-
-        var currentStartDate = $(".current-start-date[rel='"+ currentView +"']").text()
-        var currentEndDate =  $(".current-end-date[rel='"+ currentView +"']").text()
-
-        //Using UTC timezone in comparison since timezone doesn't matter in this case
-        var currentStartDateMillis = moment.tz(currentStartDate, "UTC").valueOf()
-        var currentEndDateMillis = moment.tz(currentEndDate, "UTC").valueOf()
-
-        var diff = currentEndDateMillis - currentStartDateMillis
-        if(diff <= 86400000){
-
-            var tipMessage = $("#"+ hash.view +"-form-tip p");
-            var tipContainer = $("#"+ hash.view +"-form-tip");
-            tipContainer.attr("data-tip-source", "daily-aggregate");
-            tipMessage.html("Select a broader date range to receive more meaningful data, more data points.");
-            tipContainer.fadeIn(100);
-
-
-          }
-        //
-// <div class="tip-to-user uk-alert close-btn">
-//    <i class="close-dropdown-btn uk-icon-close"></i>
-//    <span>Select broader timerange for daily data so the chart contains more than 1 data point</span>
-//</div>
-
-
-    }
-
-    //Enable form submit
-    enableFormSubmit()
-
-}
-
-
-//function  updateBaselineTimeRange(target){
-//    var currentTab = $(target).attr("rel");
-//    $(".compare-mode-selector[rel='"+ currentTab +"']").change();
-//}
-
-
-/** DASHBOARD FORM FILTER RELATED METHODS **/
-function  selectFilterDimensionOption(target){
-    $(".value-filter").hide();
-    var dimension= $(target).attr("value")
-    $(".value-filter[rel='"+ dimension +"' ]").show();
-}
-
-function applyFilterSelection(){
-
-    var currentTabFilters = $("#"+hash.view+"-filter-panel");
-
-    //Set hash params
-    var filters = {};
-    var labels = {};
-
-    $(".filter-value-checkbox", currentTabFilters).each(function(i, checkbox) {
-        var checkboxObj = $(checkbox);
-
-        if (checkboxObj.is(':checked')) {
-            var key = $(checkbox).attr("rel");
-            var value = $(checkbox).attr("value");
-            var valueAlias = $(checkbox).parent().text();
-
-            if(filters[key]){
-                filters[key].push(value) ;
-                //using alias for "", "?" values
-                labels[key].push(valueAlias) ;
-            }else{
-                filters[key] = [value];
-                labels[key] = [valueAlias];
-            }
-        }
-    });
-
-    hash.filters = encodeURIComponent(JSON.stringify(filters));
-
-    //Disable Apply filters button and close popup
-    enableApplyButton()
-
-    //Todo: Show selected filters on dashboard
-    //empty previous filters labels
-    $(".added-filter[tab='"+ hash.view +"']").remove()
-
-    //append new labels
-    var html = "";
-    for(k in labels){
-        var values = decodeURIComponent(labels[k])
-        html +=  "<li class='added-filter uk-button remove-filter-selection' tab="+ hash.view +" rel='" + k + "' value='" + labels[k] + "' title='" + k + ": " + values +  "'>" + k + ": " + values + "<i class='uk-icon-close'></i></li>";
-    }
-
-    $(".selected-filters-list[rel='"+ hash.view +"']").append(html);
-
-    //Enable Go btn
-    enableFormSubmit()
-    $("#" + hash.view +"-filter-panel").hide();
-}
-
-/*takes an object with dimensionNames as keys and an array of dimensionValues as values,
- applies them to the current form and enables form submit */
-function updateFilterSelection(filterParams){
-    var currentFilterContainer = $(".view-filter-selector[rel='"+ hash.view +"']");
-    var elementsPresent = 1;
-    $(".filter-value-checkbox", currentFilterContainer).prop("checked", false);
-    $(".filter-select-all-checkbox").prop("checked", false);
-
-    for(var f in filterParams){
-        var dimensionValues = filterParams[f];
-
-        for(var v =0 , len = dimensionValues.length; v < len; v++){
-            if($(".filter-value-checkbox[rel='"+ f +"'][value='"+ dimensionValues[v] +"']").length == 0){
-                elementsPresent =0;
-                break;
-            }
-            $(".filter-value-checkbox[rel='"+ f +"'][value='"+ dimensionValues[v] +"']", currentFilterContainer).prop("checked", true);
-          }
-    }
-
-    if(elementsPresent == 1) {
-        //Enable then trigger apply btn
-        $('.apply-filter-btn', currentFilterContainer).prop("disabled", false);
-        $(".apply-filter-btn", currentFilterContainer).click();
-        $(".apply-filter-btn", currentFilterContainer).parent("a.uk-dropdown-close").click();
-    }
-}
-
-function readFiltersAppliedInCurrentView(currentTab){
-    var currentFilterContainer = $(".view-filter-selector[rel='"+ currentTab +"']")
-    var filters = {};
-
-    $(".added-filter",currentFilterContainer).each(function(){
-        var keyValue = $(this).attr("title").trim().split(":");
-        var dimension = keyValue[0];
-        var valuesAryToTrim = keyValue[1].trim().split(",")
-        var valuesAry = [];
-        for(var index=0, len= valuesAryToTrim.length; index < len; index++){
-            var value = valuesAryToTrim[index].trim();
-            if(value == "UNKNOWN"){
-                value = "";
-            }
-
-            valuesAry.push(value)
-        }
-        filters[dimension] = valuesAry;
-    })
-    return filters
-}
-
-function enableFormSubmit(){
-
-    $("#" + hash.view + "-form-submit").prop("disabled", false);
-    $("#" + hash.view + "-form-submit").removeAttr("disabled");
-}
-
-
-function selectCurrentDateRange(target){
-
-    var currentTab = $(target).attr('rel');
-    var tz = getTimeZone();
-    var maxMillis = window.datasetConfig.maxMillis
-
-    switch ($(target).val()){
-        case "today":
-
-            var today = moment().format("YYYY-MM-DD");
-            
-            var hh = maxMillis ? moment(maxMillis).format("HH") : moment().format("HH");
-
-            // set the input field values
-            $(".current-start-date-input[rel='"+ currentTab +"']").val(today);
-            if(hh >0){
-              $(".current-end-date-input[rel='"+ currentTab +"']").val(today);
-            } else{
-              var yesterday = moment().add(-1, 'days').format("YYYY-MM-DD");
-              $(".current-end-date-input[rel='"+ currentTab +"']").val(today);
-            }
-            
-            
-            $(".current-start-time-input[rel='"+ currentTab +"']").val("00:00");
-            $(".current-end-time-input[rel='"+ currentTab +"']").val(hh+":00");
-
-            //Disable inputfield edit
-           // $(".current-start-date-input[rel='"+ currentTab +"']").attr("disabled", true);
-           // $(".current-end-date-input[rel='"+ currentTab +"']").attr("disabled", true);
-            //$(".current-start-time-input[rel='"+ currentTab +"']").attr("disabled", true);
-            //$(".current-end-time-input[rel='"+ currentTab +"']").attr("disabled", true);
-
-            break;
-
-        case "yesterday":
-
-            // from yesterday 12am to today 12am
-            var today = moment().format("YYYY-MM-DD");
-            var yesterday = moment().add(-1, 'days').format("YYYY-MM-DD");
-
-            // set the input field values
-            $(".current-end-date-input[rel='"+ currentTab +"']").val(today);
-            $(".current-end-time-input[rel='"+ currentTab +"']").val("00:00");
-            $(".current-start-date-input[rel='"+ currentTab +"']").val(yesterday);
-            $(".current-start-time-input[rel='"+ currentTab +"']").val("00:00");
-
-            //disable the inputfields
-            //$(".current-start-date-input[rel='"+ currentTab +"']").attr("disabled", true);
-            //$(".current-end-date-input[rel='"+ currentTab +"']").attr("disabled", true);
-            //$(".current-start-time-input[rel='"+ currentTab +"']").attr("disabled", true);
-            //$(".current-end-time-input[rel='"+ currentTab +"']").attr("disabled", true);
-
-            break;
-        case "7": //last7days not full days
-
-            var currentEndMillis = moment().valueOf();
-            if(maxMillis){
-                currentEndMillis = maxMillis;
-            }
-
-            //subtract 7 days in milliseconds
-            var currentStartMillis =  currentEndMillis - 86400000 * 7;
-
-            var currentEndDateString =  moment(currentEndMillis).tz(tz).format("YYYY-MM-DD")
-            var currentEndTimeString =  moment(currentEndMillis).tz(tz).format("HH:00")
-
-            var currentStartDateString = moment(currentStartMillis).tz(tz).format("YYYY-MM-DD")
-
-            $(".current-start-date-input[rel='"+ currentTab +"']").val(currentStartDateString);
-            $(".current-end-date-input[rel='"+ currentTab +"']").val(currentEndDateString);
-            $(".current-start-time-input[rel='"+ currentTab +"']").val(currentEndTimeString);
-            $(".current-end-time-input[rel='"+ currentTab +"']").val(currentEndTimeString);
-            $(".current-start-date-input[rel='"+ currentTab +"']").attr("readonly");
-            $(".current-end-date-input[rel='"+ currentTab +"']").attr("readonly");
-            //$(".current-start-date-input[rel='"+ currentTab +"']").attr("disabled", true);
-            //$(".current-end-date-input[rel='"+ currentTab +"']").attr("disabled", true);
-            //$(".current-start-time-input[rel='"+ currentTab +"']").attr("disabled", true);
-            //$(".current-end-time-input[rel='"+ currentTab +"']").attr("disabled", true);
-
-            break;
-        case "24": //last24hours not full days
-
-            var currentEndMillis = moment().valueOf();
-
-            if(maxMillis){
-
-                currentEndMillis = maxMillis;
-            }
-
-
-            //subtract 7 days in milliseconds
-            var currentStartMillis =  currentEndMillis - 86400000;
-
-            var currentEndDateString = moment(currentEndMillis).tz(tz).format("YYYY-MM-DD")
-            var currentEndTimeString =  moment(currentEndMillis).tz(tz).format("HH:00")
-
-            var currentStartDateString = moment(currentStartMillis).tz(tz).format("YYYY-MM-DD")
-
-            $(".current-start-date-input[rel='"+ currentTab +"']").val(currentStartDateString);
-            $(".current-end-date-input[rel='"+ currentTab +"']").val(currentEndDateString);
-            $(".current-start-time-input[rel='"+ currentTab +"']").val(currentEndTimeString);
-            $(".current-end-time-input[rel='"+ currentTab +"']").val(currentEndTimeString);
-            $(".current-start-date-input[rel='"+ currentTab +"']").attr("readonly");
-            $(".current-end-date-input[rel='"+ currentTab +"']").attr("readonly");
-            //$(".current-start-date-input[rel='"+ currentTab +"']").attr("disabled", true);
-            //$(".current-end-date-input[rel='"+ currentTab +"']").attr("disabled", true);
-           //$(".current-start-time-input[rel='"+ currentTab +"']").attr("disabled", true);
-            //$(".current-end-time-input[rel='"+ currentTab +"']").attr("disabled", true);
-
-            break;
-        case "custom":
-
-            //Enable inputfield edit
-            //$(".current-start-date-input[rel='"+ currentTab +"']").attr("disabled", false);
-            //$(".current-end-date-input[rel='"+ currentTab +"']").attr("disabled", false);
-            //$(".current-start-time-input[rel='"+ currentTab +"']").attr("disabled", false);
-            //$(".current-end-time-input[rel='"+ currentTab +"']").attr("disabled", false);
-    }
-
-    //If the comparison is enabled the comparison inputfileds will be updated every time the current date input is updated
-    $(".compare-mode-selector[rel='"+ currentTab +"']").change();
-
-    //Enable apply btn
-    $(".time-input-apply-btn[rel='"+ currentTab +"']").prop("disabled", false);
-}
-
-function toggleTimeComparison(target){
-    var currentTab = $(target).attr('rel');
-    if( $(target).is(':checked') ){
-        $(".compare-mode-selector[rel='"+ currentTab +"']").change();
-    }else{
-        $(".time-input-apply-btn[rel='"+ currentTab +"']").prop("disabled", false);
-    }
-}
-
-function selectBaselineDateRange(target){
-    var currentTab = $(target).attr('rel');
-    var tz = getTimeZone();
-
-    var currentStartDateString = $(".current-start-date-input[rel='"+ currentTab +"']").val();
-    var currentEndDateString = $(".current-end-date-input[rel='"+ currentTab +"']").val();
-
-
-    var currentStartDate = moment.tz(currentStartDateString, tz);
-    var currentEndDate = moment.tz(currentEndDateString, tz);
-
-    var currentStartDateMillisUTC = currentStartDate.utc().valueOf();
-    var currentEndDateMillisUTC = currentEndDate.utc().valueOf();
-    var optionValue = $("#"+ currentTab +"-compare-mode-selector").val();
-
-    switch (optionValue){
-        case "7":
-        case "14":
-        case "21":
-        case "28":
-            var baselineStartDateUTCMillis = moment(currentStartDateMillisUTC - parseInt(optionValue) * 86400000).tz('UTC');
-            var baselineEndDateUTCMillis = moment(currentEndDateMillisUTC - parseInt(optionValue) * 86400000).tz('UTC');
-
-            var baselineStartDate = baselineStartDateUTCMillis.clone().tz(tz);
-            var baselineEndDate = baselineEndDateUTCMillis.clone().tz(tz);
-
-            var baselineStartDateString = baselineStartDate.format("YYYY-MM-DD");
-            var baselineEndDateString = baselineEndDate.format("YYYY-MM-DD");
-
-            $(".baseline-start-date-input[rel='"+ currentTab +"']").val(baselineStartDateString);
-            $(".baseline-end-date-input[rel='"+ currentTab +"']").val(baselineEndDateString);
-            $(".baseline-start-time-input[rel='"+ currentTab +"']").val($("#"+ currentTab +"-current-start-time-input").val());
-            $(".baseline-end-time-input[rel='"+ currentTab +"']").val($("#"+ currentTab +"-current-end-time-input").val());
-            $(".baseline-start-date-input[rel='"+ currentTab +"']").attr("disabled", true);
-            $(".baseline-end-date-input[rel='"+ currentTab +"']").attr("disabled", true);
-            $(".baseline-start-time-input[rel='"+ currentTab +"']").attr("disabled", true);
-            $(".baseline-end-time-input[rel='"+ currentTab +"']").attr("disabled", true);
-
-            break;
-
-        case "1":
-            //var yesterday = moment().add(-1, 'days').format("YYYY-MM-DD");
-            //$(".baseline-start-date-input[rel='"+ currentTab +"']").val(yesterday);
-            //$(".baseline-end-date-input[rel='"+ currentTab +"']").val(yesterday);
-            $(".baseline-start-time-input[rel='"+ currentTab +"']").val($("#"+ currentTab +"-current-start-time-input").val());
-            $(".baseline-end-time-input[rel='"+ currentTab +"']").val($("#"+ currentTab +"-current-end-time-input").val());
-            $(".baseline-start-date-input[rel='"+ currentTab +"']").attr("disabled", false);
-            $(".baseline-end-date-input[rel='"+ currentTab +"']").attr("disabled", false);
-            $(".baseline-start-time-input[rel='"+ currentTab +"']").attr("disabled", false);
-            $(".baseline-end-time-input[rel='"+ currentTab +"']").attr("disabled", false);
-        break;
-
-    }
-    $(".time-input-apply-btn[rel='"+ currentTab +"']").prop("disabled", false);
-}
-
-function  applyTimeRangeSelection(target) {
-
-    var currentTab = $(target).attr('rel');
-    var maxMillis = window.datasetConfig.maxMillis
-
-    var currentStartDateString = $(".current-start-date-input[rel='" + currentTab + "']").val();
-    var currentEndDateString = $(".current-end-date-input[rel='" + currentTab + "']").val();
-    var currentStartTimeString = $(".current-start-time-input[rel='" + currentTab + "']").val();
-    var currentEndTimeString = $(".current-end-time-input[rel='" + currentTab + "']").val();
-
-    //Todo: error handling: handle when comparison is selected and no baseline is present
-
-
-    var errorMsg = $(".time-input-logic-error[rel='" + currentTab + "'] p");
-    var errorAlrt = $(".time-input-logic-error[rel='" + currentTab + "']");
-
-    //hide error message
-    errorAlrt.hide();
-
-    //turn into milliseconds
-    // DateTimes
-
-    var currentStartDate = $(".current-start-date-input[rel='" + currentTab + "']").val();
-    if (!currentStartDate) {
-        errorMsg.html("Must provide start date");
-        disableApplyButton($(".time-input-apply-btn[rel='" + currentTab + "']"))
-        errorAlrt.fadeIn(100);
-
-        //show the dropdown
-        $(".time-range-selector-dropdown[data-uk-dropdown]").addClass("uk-open");
-        $(".time-range-selector-dropdown[data-uk-dropdown]").attr("aria-expanded", true);
-        $(".time-input-apply-btn[rel='" + currentTab + "']").closest(".uk-dropdown").show();
-        return
-    }
-
-    var currentEndDate = $(".current-end-date-input[rel='" + currentTab + "']").val();
-    if (!currentEndDate) {
-        errorMsg.html("Must provide end date");
-        errorAlrt.fadeIn(100);
-
-
-        disableApplyButton($(".time-input-apply-btn[rel='" + currentTab + "']"))
-
-        //show the dropdown
-        $(".time-range-selector-dropdown[data-uk-dropdown]").addClass("uk-open");
-        $(".time-range-selector-dropdown[data-uk-dropdown]").attr("aria-expanded", true);
-        $(".time-input-apply-btn[rel='" + currentTab + "']").closest(".uk-dropdown").show();
-        return
-    }
-
-    var currentStartTime = $(".current-start-time-input[rel='" + currentTab + "']").val();
-    if (!currentStartTime) {
-        errorMsg.html("Start time is required.");
-        errorAlrt.fadeIn(100);
-        disableApplyButton($(".time-input-apply-btn[rel='" + currentTab + "']"))
-
-        //show the dropdown
-        $(".time-range-selector-dropdown[data-uk-dropdown]").addClass("uk-open");
-        $(".time-range-selector-dropdown[data-uk-dropdown]").attr("aria-expanded", true);
-        $(".time-input-apply-btn[rel='" + currentTab + "']").closest(".uk-dropdown").show();
-        return
-    }
-
-    var currentEndTime = $(".current-end-time-input[rel='" + currentTab + "']").val();
-    if (!currentEndTime) {
-        errorMsg.html("End time is required.");
-        errorAlrt.fadeIn(100);
-        disableApplyButton($(".time-input-apply-btn[rel='" + currentTab + "']"))
-
-        //show the dropdown
-        $(".time-range-selector-dropdown[data-uk-dropdown]").addClass("uk-open");
-        $(".time-range-selector-dropdown[data-uk-dropdown]").attr("aria-expanded", true);
-        $(".time-input-apply-btn[rel='" + currentTab + "']").closest(".uk-dropdown").show();
-        return
-    }
-
-    var timezone = getTimeZone();
-    var currentStart = moment.tz(currentStartDate + " " + currentStartTime, timezone);
-
-    var currentStartMillisUTC = currentStart.utc().valueOf();
-    var currentEnd = moment.tz(currentEndDate + " " + currentEndTime, timezone);
-    var currentEndMillisUTC = currentEnd.utc().valueOf();
-
-
-    //Error handling
-    if (currentStartMillisUTC >= currentEndMillisUTC) {
-
-        errorMsg.html("Please choose a start date that is earlier than the end date.");
-        errorAlrt.fadeIn(100);
-        disableApplyButton($(".time-input-apply-btn[rel='" + currentTab + "']"))
-
-        //show the dropdown
-        $(".time-range-selector-dropdown[data-uk-dropdown]").addClass("uk-open");
-        $(".time-range-selector-dropdown[data-uk-dropdown]").attr("aria-expanded", true);
-        $(".time-input-apply-btn[rel='" + currentTab + "']").closest(".uk-dropdown").show();
-        return
-
-    }
-
-    //The following error can be checked when time selection is in place
-    /*else if(currentStartMillisUTC == currentEndMillisUTC){
-     errorMsg.html("Please choose an end date that is later than the start date");
-     errorAlrt.fadeIn(100);
-     return
-     }*/
-
-    if (maxMillis) {
-        if (currentStartMillisUTC > maxMillis || currentEndMillisUTC > maxMillis) {
-
-            errorMsg.html("The data is available till: " + moment(maxMillis).format("YYYY-MM-DD h a") + ". Please select a time range prior to this date and time.");
-            errorAlrt.fadeIn(100);
-            disableApplyButton($(".time-input-apply-btn[rel='" + currentTab + "']"));
-
-            //show the dropdown
-            $(".time-range-selector-dropdown[data-uk-dropdown]").addClass("uk-open");
-            $(".time-range-selector-dropdown[data-uk-dropdown]").attr("aria-expanded", true);
-            $(".time-input-apply-btn[rel='" + currentTab + "']").closest(".uk-dropdown").show();
-            return
-        }
-
-    }
-
-
-    if ($(".time-input-compare-checkbox[rel='" + currentTab + "']").is(':checked')) {
-        var baselineStartDate = $(".baseline-start-date-input").val();
-        var baselineEndDate = $(".baseline-end-date-input").val();
-        var baselineStartTime = $(".baseline-start-time-input").val();
-        var baselineEndTime = $(".baseline-end-time-input").val();
-
-        var baselineStart = moment.tz(baselineStartDate + baselineStartTime, timezone);
-        var baselineStartMillisUTC = baselineStart.utc().valueOf();
-        var baselineEnd = moment.tz(baselineEndDate + baselineEndTime, timezone);
-        var baselineEndMillisUTC = baselineEnd.utc().valueOf();
-
-        if (baselineEndMillisUTC > currentStartMillisUTC && baselineStartMillisUTC < currentStartMillisUTC) {
-
-            errorMsg.html("The compared time-periods overlap each-other, please adjust the request.");
-            disableApplyButton($(".time-input-apply-btn[rel='" + currentTab + "']"))
-            errorAlrt.fadeIn(100);
-
-            //show the dropdown
-            $("[data-uk-dropdown]").addClass("uk-open");
-            $("[data-uk-dropdown]").attr("aria-expanded", true);
-            $(".time-input-apply-btn[rel='" + currentTab + "']").closest(".uk-dropdown").show();
-            return
-
-        }
-
-        if (baselineStartMillisUTC > currentEndMillisUTC && baselineStartMillisUTC < currentStartMillisUTC) {
-
-            errorMsg.html("Current time-period" + currentStartDate + " " + currentStartTime + "-" + currentEndDate + " " + currentEndTime + "should be a later time then baseline time-period" + baselineStartDate + " " + baselineStartTime + "-" + baselineEndDate + " " + baselineEndTime + ". Please switch the 'date range' and the 'compare to' date range.");
-
-            //show the dropdown
-            $("[data-uk-dropdown]").addClass("uk-open");
-            $("[data-uk-dropdown]").attr("aria-expanded", true);
-            $(".time-input-apply-btn[rel='" + currentTab + "']").closest(".uk-dropdown").show();
-            return
-
-        }
-    }
-
-    //hide user tip message about broader timerange
-    if (moment(currentEndDate).valueOf() - moment(currentStartDate).valueOf() > 86400000){
-
-        if ($("#"+ hash.view +"-form-tip").attr("data-tip-source") == "daily-aggregate") {
-            $("#" + hash.view + "-form-tip").hide();
-        }
-    }
-
-
-    //Change the value of the time fields on the main form
-    $(".current-start-date[rel='" + currentTab + "']").html(currentStartDateString);
-    $(".current-end-date[rel='" + currentTab + "']").html(currentEndDateString);
-    $(".current-start-time[rel='" + currentTab + "']").html(currentStartTimeString);
-    $(".current-end-time[rel='" + currentTab + "']").html(currentEndTimeString);
-
-    if ($(".time-input-compare-checkbox[rel='" + currentTab + "']").is(':checked')) {
-        var baselineStartDateString = $(".baseline-start-date-input[rel='" + currentTab + "']").val();
-        var baselineEndDateString = $(".baseline-end-date-input[rel='" + currentTab + "']").val();
-        var baselineStartTimeString = $(".baseline-start-time-input[rel='" + currentTab + "']").val();
-        var baselineEndTimeString = $(".baseline-end-time-input[rel='" + currentTab + "']").val();
-
-        $(".baseline-start-date[rel='" + currentTab + "']").html(baselineStartDateString);
-        $(".baseline-end-date[rel='" + currentTab + "']").html(baselineEndDateString);
-        $(".baseline-start-time[rel='" + currentTab + "']").html(baselineStartTimeString);
-        $(".baseline-end-time[rel='" + currentTab + "']").html(baselineEndTimeString);
-        $(".comparison-display[rel='" + currentTab + "']").show();
-    } else {
-        $("#baseline-start-date[rel='" + currentTab + "']").html("");
-        $("#baseline-end-date[rel='" + currentTab + "']").html("");
-        $(".comparison-display[rel='" + currentTab + "']").hide();
-    }
-
-    $(".compare-mode[rel='" + currentTab + "']").html($(".compare-mode-selector[rel='" + currentTab + "']").attr("unit"))
-
-    //update hash
-    //var selectedGranularity = $(".baseline-aggregate-copy[rel='" + currentTab + "'].uk-active").attr("unit");
-    // $(".baseline-aggregate[rel='" + currentTab + "']").removeClass("uk-active");
-    //$(".baseline-aggregate[rel='" + currentTab + "'][unit='" + selectedGranularity + "']").addClass("uk-active");
-
-    $(target).attr("disabled", true);
-
-    //close uikit dropdown
     $("[data-uk-dropdown]").removeClass("uk-open");
     $("[data-uk-dropdown]").attr("aria-expanded", false);
     $(".uk-dropdown").hide();
-
-    enableFormSubmit()
 }
-
 
 
 /** CHART RELATED METHODS **/
@@ -1146,8 +353,6 @@ function assignColorByID(len, index){
     var colorAry =  colorScale(len)
 
     return colorAry[index]
-
-
 }
 
 /*takes the number of items and returns an array with colors on the full 256^3 colorscale */
@@ -1184,10 +389,269 @@ function colorScale(len){
 
     return colorAry
 
+}
 
+function toggleCumulative(){
+    $(".cumulative").toggleClass("uk-active");
+    $(".discrete-values").toggleClass("hidden");
+    $(".cumulative-values").toggleClass("hidden");
+
+    // Todo: feature: redraw metric timeseries using cumulative data
+    if ($("#metric-time-series-placeholder").length > 0) {
+    }
+}
+
+function calcCummulativeTotal(target){
+    $(".contributors-table .select_all_checkbox[rel='cumulative']").each(function(){
+        $(target).trigger("click");
+    });
 }
 
 
+function toggleSumDetails(target){
+    if (!$(target).hasClass("uk-active")) {
+
+        $(target).addClass("uk-active");
+        $(target).siblings().removeClass("uk-active");
+
+        var timeCells = document
+            .getElementsByClassName("table-time-cell");
+        var nextState = timeCells[0].getAttribute('colspan') == 1 ? 3
+            : 1;
+        for (var index = 0, len = timeCells.length; index < len; index++) {
+            timeCells[index].setAttribute('colspan', nextState)
+        }
+
+        var detailsCells = document
+            .getElementsByClassName("details-cell");
+        //Alert
+        if (detailsCells.length > 1000) {
+            console.log('details cells to paint:')
+            console.log(detailsCells.length)
+        }
+
+        for (var dIndex = 0, detailsLen = detailsCells.length; dIndex < detailsLen; dIndex++) {
+            detailsCells[dIndex].classList.toggle("hidden");
+        }
+
+        var subheaderCells = document
+            .getElementsByClassName("subheader");
+        for (var sIndex = 0, subheaderLen = subheaderCells.length; sIndex < subheaderLen; sIndex++) {
+            subheaderCells[sIndex].classList.toggle("hidden");
+        }
+
+    }
+}
+
+function showContributors(target){
+    // Change the view to contributors
+
+    //either dashboard or metrics param is present in hash
+    delete hash.dashboard;
+
+    //switch to time ver time tab
+    hash.view = "compare";
+
+    //set start and end date to the starte and end date of the table
+    var timeBuckets = $("#timebuckets>span")
+    var numTimeBuckets = timeBuckets.length;
+
+    var firstTimeBucketInRow = $("#timebuckets>span")[0];
+    var lastTimeBucketInRow = $("#timebuckets>span")[numTimeBuckets - 1];
+
+    var currentStartUTC = $($("span", firstTimeBucketInRow)[0]).text().trim();
+    var baselineStartUTC = $($("span", firstTimeBucketInRow)[2]).text().trim();
+
+    var currentEndUTC = $($("span", lastTimeBucketInRow)[1]).text().trim();
+    var baselineEndUTC = $($("span", lastTimeBucketInRow)[3]).text().trim();
+
+    hash.baselineStart = baselineStartUTC;
+    hash.baselineEnd = baselineEndUTC;
+    hash.currentStart = currentStartUTC;
+    hash.currentEnd = currentEndUTC;
+
+
+    //check the current granularity of the data on the table
+    var endOfFirstTimeBucket =  $($("span", firstTimeBucketInRow)[1]).text().trim();
+    var diff = parseInt(endOfFirstTimeBucket) - parseInt(currentStartUTC)
+    var diffProperties = describeMillis(diff)
+    var aggTimeGranularity = diffProperties ? diffProperties.unit : "HOURS"
+
+    hash.aggTimeGranularity = aggTimeGranularity
+
+    //set the metrics
+    metrics = [];
+    // Todo: if metric label it's a derived metric so title contains
+    metrics.push($(target).attr("title"))
+    hash.metrics = metrics.toString();
+
+    //select only the first dimension to retrieve less data
+    hash.dimensions = $($(".dimension-option")[0]).attr("value");
+
+    //update hash will trigger window.onhashchange event:
+    // update the form area and trigger the ajax call
+    window.location.hash = encodeHashParameters(hash);
+}
+
+
+/** Compare/Tabular view and dashboard view heat-map-cell click switches the view to compare/heat-map
+ * focusing on the timerange of the cell or in case of cumulative values it query the cumulative timerange **/
+function showHeatMap(target){
+    hash.view = "compare"
+    hash.aggTimeGranularity = "aggregateAll"
+    cellObj = $(target)
+    var timeIndex = cellObj.attr("timeIndex");
+    var timeBucketForColumnIndex = $("#timebuckets>span")[timeIndex];
+
+    var currentStartUTC;
+    var baselineStartUTC;
+    var currentEndUTC;
+    var baselineEndUTC;
+
+
+    var currentSection = $(target).closest(".display-chart-section")
+    if( $(".cumulative", currentSection).is(':checked') ){
+
+        var firstTimeBucketInRow = $("#timebuckets>span")[0]
+        currentStartUTC = $($("span", firstTimeBucketInRow)[0]).text().trim();
+        baselineStartUTC = $($("span", firstTimeBucketInRow)[2]).text().trim();
+
+    }else{
+        currentStartUTC = $($("span", timeBucketForColumnIndex)[0]).text().trim();
+        baselineStartUTC = $($("span", timeBucketForColumnIndex)[2]).text().trim();
+    }
+
+    currentEndUTC = $($("span", timeBucketForColumnIndex)[1]).text().trim();
+    baselineEndUTC = $($("span", timeBucketForColumnIndex)[3]).text().trim();
+
+    hash.baselineStart = baselineStartUTC;
+    hash.baselineEnd = baselineEndUTC;
+    hash.currentStart = currentStartUTC;
+    hash.currentEnd = currentEndUTC;
+    delete hash.dashboard;
+    metrics = [];
+    var metricName = cellObj.attr("metricIndex")
+    metrics.push(metricName)
+    hash.metrics = metrics.toString();
+
+    //update hash will trigger window.onhashchange event:
+    // update the form area and trigger the ajax call
+    window.location.hash = encodeHashParameters(hash);
+}
+
+/**
+ * @function
+ * @public
+ * @returns   Assign background color value to  heat-map-cell **/
+function  calcHeatMapCellBackground(cell){
+
+    var cellObj = $(cell)
+    var value = parseFloat(cellObj.attr('value'))
+    value = value / 100;
+
+    var absValue = Math.abs(value)
+
+    if (value < 0) {
+        cellObj.css('background-color', 'rgba(255,0,0,' + absValue + ')') // red
+    } else {
+        cellObj.css('background-color', 'rgba(0,0,255,' + absValue + ')') // blue
+    }
+
+    var colorIsLight = function (a) {
+        // Counting the perceptive luminance
+
+        return (a < 0.5);
+    }
+    var textColor = colorIsLight(absValue) ? 'black' : 'white';
+    cellObj.css('color', textColor);
+};
+
+
+/** CONTRIBUTORS TABLE RELATED METHODS **/
+/** Loop through each columns that's not displaying ratio values,
+ take the total of the cells' value in the column (if the row of the cell is checked  and the value id not N/A) and place the total into the total row.
+ Then calculate the sum row ratio column cell value based on the 2 previous column's value.  **/
+function sumColumn(col){
+
+    var currentTable =  $(col).closest("table");
+
+    var currentMetric =  $(col).closest(".metric-section-wrapper").attr("rel");
+    var firstDataRow = $("tr.data-row", currentTable)[0];
+    var columns = $("td",firstDataRow);
+    var isCumulative = $($("input.cumulative")[0]).hasClass("uk-active");
+
+    //Work with the cumulative or hourly total row
+
+    var sumRow = (isCumulative) ?  $("tr.cumulative-values.sum-row",  currentTable)[0] : $("tr.discrete-values.sum-row",  currentTable)[0];
+
+    //Only summarize for primitive metrics. Filter out derived metrics ie. RATIO(), for those metrics total value is N/A since that would add up the nominal % values
+    if(currentMetric.indexOf("RATIO(") == -1 ){
+
+        //Loop through each column, except for column index 0-2 since those have string values
+        for(var z= 3, len = columns.length; z < len; z++){
+
+
+            //Filter out ratio columns only calc with value columns
+            if( (z + 1 ) % 3 !== 0 ){
+
+                var rows =  (isCumulative) ? $("tr.data-row", currentTable) : $("tr.data-row", currentTable)
+
+                //Check if cumulative table is displayed
+                var sum = 0;
+
+                for(var i= 0, rlen = rows.length; i < rlen; i++){
+
+                    //Check if checkbox of the row is selected
+                    if( $("input", rows[i]).is(':checked')) {
+                        var currentRow = rows[i];
+                        var currentCell = $("td", currentRow)[z];
+                        var currentCellVal =  parseInt($(currentCell).html().trim().replace(/[\$,]/g, ''));
+                        //NaN value will be skipped
+                        if (!isNaN(currentCellVal)) {
+                            sum = sum + currentCellVal;
+                        }
+                    }
+                }
+
+                //Display the sum in the current column of the sumRow
+                var sumCell = $("th", sumRow)[z];
+                $(sumCell).html(sum);
+
+                //In case of ratio columns calculate them based on the baseline and current values of the timebucket
+            }else{
+                //take the 2 previous total row elements
+                var baselineValCell = $("th", sumRow)[z-2];
+                var currentValCell = $("th", sumRow)[z-1];
+                var baselineVal = parseInt($(baselineValCell).html().trim().replace(/[\$,]/g, ''));
+                var currentVal = parseInt($(currentValCell).html().trim().replace(/[\$,]/g, ''));
+                var sumCell = $("th", sumRow)[z];
+                //Round the ratio to 2 decimal places, add 0.00001 to prevent Chrome rounding 0.005 to 0.00
+                var ratioVal = (Math.round(((currentVal - baselineVal) / baselineVal + 0.00001) * 1000)/10).toFixed(1);
+
+                $(sumCell).html(ratioVal + "%");
+                $(sumCell).attr('value' , (ratioVal /100));
+                calcHeatMapCellBackground(sumCell);
+            }
+        }
+
+        //If the metric is a derived metric = has RATIO() form display N/A in the total row
+    }else{
+        var sumCells = $("th", sumRow);
+        for(var i = 3, tLen = sumCells.length; i< tLen; i++){
+            $(sumCells[i]).html("N/A");
+        }
+    }
+
+}
+
+/** @function Assign background color value to each heat-map-cell
+ * @public
+ * @returns  background color **/
+function calcHeatMapBG(){
+    $(".heat-map-cell").each(function (i, cell) {
+        calcHeatMapCellBackground(cell);
+    })
+};
 
 
 
@@ -1270,32 +734,7 @@ function getTimeZone() {
     return tz
 }
 
-/**
- * @function
- * @public
- * @returns   Assign background color value to  heat-map-cell **/
-function  calcHeatMapCellBackground(cell){
 
-    var cellObj = $(cell)
-    var value = parseFloat(cellObj.attr('value'))
-        value = value / 100;
-
-    var absValue = Math.abs(value)
-
-    if (value < 0) {
-        cellObj.css('background-color', 'rgba(255,0,0,' + absValue + ')') // red
-    } else {
-        cellObj.css('background-color', 'rgba(0,0,255,' + absValue + ')') // blue
-    }
-
-    var colorIsLight = function (a) {
-        // Counting the perceptive luminance
-
-        return (a < 0.5);
-    }
-    var textColor = colorIsLight(absValue) ? 'black' : 'white';
-    cellObj.css('color', textColor);
-};
 
 
 /** Transform UTC time into user selected or browser's timezone and display the date value **/
@@ -1401,91 +840,6 @@ function formatMillisToTZ() {
 
 };
 
-/** CONTRIBUTORS TABLE RELATED METHODS **/
-/** Loop through each columns that's not displaying ratio values,
- take the total of the cells' value in the column (if the row of the cell is checked  and the value id not N/A) and place the total into the total row.
- Then calculate the sum row ratio column cell value based on the 2 previous column's value.  **/
-function sumColumn(col){
-
-    var currentTable =  $(col).closest("table");
-
-    var currentMetric =  $(col).closest(".metric-section-wrapper").attr("rel");
-    var firstDataRow = $("tr.data-row", currentTable)[0];
-    var columns = $("td",firstDataRow);
-    var isCumulative = $($("input.cumulative")[0]).hasClass("uk-active");
-
-    //Work with the cumulative or hourly total row
-
-    var sumRow = (isCumulative) ?  $("tr.cumulative-values.sum-row",  currentTable)[0] : $("tr.discrete-values.sum-row",  currentTable)[0];
-
-    //Only summarize for primitive metrics. Filter out derived metrics ie. RATIO(), for those metrics total value is N/A since that would add up the nominal % values
-    if(currentMetric.indexOf("RATIO(") == -1 ){
-
-        //Loop through each column, except for column index 0-2 since those have string values
-        for(var z= 3, len = columns.length; z < len; z++){
-
-
-            //Filter out ratio columns only calc with value columns
-            if( (z + 1 ) % 3 !== 0 ){
-
-                var rows =  (isCumulative) ? $("tr.data-row", currentTable) : $("tr.data-row", currentTable)
-
-                //Check if cumulative table is displayed
-                var sum = 0;
-
-                for(var i= 0, rlen = rows.length; i < rlen; i++){
-
-                    //Check if checkbox of the row is selected
-                    if( $("input", rows[i]).is(':checked')) {
-                        var currentRow = rows[i];
-                        var currentCell = $("td", currentRow)[z];
-                        var currentCellVal =  parseInt($(currentCell).html().trim().replace(/[\$,]/g, ''));
-                        //NaN value will be skipped
-                        if (!isNaN(currentCellVal)) {
-                            sum = sum + currentCellVal;
-                        }
-                    }
-                }
-
-                //Display the sum in the current column of the sumRow
-                var sumCell = $("th", sumRow)[z];
-                $(sumCell).html(sum);
-
-                //In case of ratio columns calculate them based on the baseline and current values of the timebucket
-            }else{
-                //take the 2 previous total row elements
-                var baselineValCell = $("th", sumRow)[z-2];
-                var currentValCell = $("th", sumRow)[z-1];
-                var baselineVal = parseInt($(baselineValCell).html().trim().replace(/[\$,]/g, ''));
-                var currentVal = parseInt($(currentValCell).html().trim().replace(/[\$,]/g, ''));
-                var sumCell = $("th", sumRow)[z];
-                //Round the ratio to 2 decimal places, add 0.00001 to prevent Chrome rounding 0.005 to 0.00
-                var ratioVal = (Math.round(((currentVal - baselineVal) / baselineVal + 0.00001) * 1000)/10).toFixed(1);
-
-                $(sumCell).html(ratioVal + "%");
-                $(sumCell).attr('value' , (ratioVal /100));
-                calcHeatMapCellBackground(sumCell);
-            }
-        }
-
-        //If the metric is a derived metric = has RATIO() form display N/A in the total row
-    }else{
-        var sumCells = $("th", sumRow);
-        for(var i = 3, tLen = sumCells.length; i< tLen; i++){
-            $(sumCells[i]).html("N/A");
-        }
-    }
-
-}
-
-/** @function Assign background color value to each heat-map-cell
- * @public
- * @returns  background color **/
-function calcHeatMapBG(){
-    $(".heat-map-cell").each(function (i, cell) {
-        calcHeatMapCellBackground(cell);
-    })
-};
 
 
 

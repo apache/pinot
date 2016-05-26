@@ -27,6 +27,12 @@
         <div id='linechart-placeholder'></div>
         <div id='barchart-placeholder'></div>
         <div class="timeseries-legend-box" style="display: inline-block">
+            <svg class="line-legend" width="200" height="55">
+                <line x1="0" y1="15" x2="55" y2="15" stroke="gray" stroke-dasharray="5,5"/>
+                <text x="60" y="15" dy=".3em" style="text-anchor: start; font-family:Arial, sans-serif; font-size:0.75em">BASELINE</text>
+                <line x1="0" y1="30" x2="55" y2="30" stroke="gray"/>
+                <text x="60" y="30" dy=".3em" style="text-anchor: start; font-family:Arial, sans-serif; font-size:0.75em">CURRENT</text>
+            </svg>
             <label style="display: block;"><input class="time-series-metric-select-all-checkbox" type="checkbox">Select All
             </label>
             <div id="metric-time-series-legend" class="timeseries-legend-sub-box uk-display-inline-block" style="width:250px;">

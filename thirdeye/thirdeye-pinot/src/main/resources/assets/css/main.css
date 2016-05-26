@@ -65,7 +65,7 @@ body a{
 
 .tip-to-user{
     position: relative;
-    font-size: 12px;
+    pxfont-size: 0.75em;
     z-index: 5;
 }
 
@@ -295,7 +295,7 @@ body a{
 
 /* Form time selector */
 .max-min-time-label{
-    font-size: 10px;
+    font-size: 0.65em;
 }
 
 
@@ -384,7 +384,7 @@ body a{
 .contributors-table td,
 .contributors-table th{
     line-height: 8px;
-    font-size: 10px;
+    font-size: 0.65em;
     padding: 6px;
     font-family: Arial, sans-serif;
     color: #000;
@@ -515,7 +515,7 @@ body a{
     line-height:30px;
     padding-left:5px;
     text-overflow: ellipsis;
-    font-size: 10px;
+    font-size: 0.65em;
     font-family: Arial, sans-serif;
 }
 
@@ -567,7 +567,7 @@ body a{
 #funnels-table td,
 #funnels-table th{
     line-height: 8px;
-    font-size: 10px;
+    font-size: 0.65em;
     padding: 6px;
     font-family: Arial, sans-serif;
     color: #000;
@@ -659,13 +659,13 @@ body a{
 }
 
 .title-box th {
-    font-size: 12px;
+    font-size: 0.75em;
     font-weight: 400;
     padding: 5px;
 }
 
 .title-stat {
-    font-size: 12px;
+    font-size: 0.75em;
     font-weight: 800;
     text-align: start;
     padding: 5px;
@@ -778,7 +778,7 @@ body a{
 #anomalies-table td,
 #anomalies-table th{
     line-height: 8px;
-    font-size: 10px;
+    font-size: 0.65em;
     padding: 6px;
     font-family: Arial, sans-serif;
     color: #000;

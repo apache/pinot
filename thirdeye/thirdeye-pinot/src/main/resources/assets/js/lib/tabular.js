@@ -164,7 +164,16 @@ function drawTimeSeries(ajaxData, tab ) {
 		data : {
 			x : 'time',
 			json : barChartData,
-			type : 'spline',
+            type: 'area-spline',
+//Todo: the area should be red or blue based on the delta value being positive or negative, the border line color should be the color of the color scale element
+//            color: function (color, d) {
+//                console.log('d')
+//                console.log(d)
+//                console.log("color", color)
+//                var color = d.value > 0 ? "#00f" :  "#f00"
+//                return color;
+//            },
+			//type : 'spline',
 			colors : colors
 		},
 		axis : {
@@ -181,7 +190,11 @@ function drawTimeSeries(ajaxData, tab ) {
 				label : {
 					text : "% change",
 					position: 'outer-middle'
-				}
+				},
+                tick: {
+                    count: 5,
+                    format: function (d) { return parseInt(d)}
+                }
 			}
 		},
 		legend : {

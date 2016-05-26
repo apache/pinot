@@ -114,15 +114,15 @@ $(document).ready( function() {
     function locationHashChanged() {
 
         hash = parseHashParameters(window.location.hash);
-        //delete hash.rand
+
+        //'rand' parameter's role is to trigger hash change in case of page reload
+        delete hash.rand
 
         updateDashboardFormFromHash();
 
 
-        //close uikit dropdown
-        $("[data-uk-dropdown]").removeClass("uk-open");
-        $("[data-uk-dropdown]").attr("aria-expanded", false);
-        $(".uk-dropdown").hide();
+        //close all uikit dropdown
+        closeAllUIKItDropdowns()
 
         //If hash has dataset and (dashboard or (view & metric )trigger form submit
         if( hash.hasOwnProperty("dataset")){

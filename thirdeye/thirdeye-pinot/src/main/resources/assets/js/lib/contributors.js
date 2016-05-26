@@ -5,7 +5,7 @@ function getContributors(tab) {
 
   getData(url, tab).done(function(data) {
 
-      //Error handling when data is falsy (empty, undefined or null)
+      //Error handling when data is empty, undefined or null
       if(!data){
           $("#"+  tab  +"-chart-area-error").empty();
           var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' });
@@ -40,6 +40,10 @@ function getContributors(tab) {
         // Translate UTC date into user selected or local
         // timezone
         transformUTCToTZ();
+
+        displayFiltersInTitle()
+
+
 
         // Select-all-checkbox will set the other checkboxes of
         // the table to checked/ unchecked
@@ -293,5 +297,30 @@ function renderContributionTimeSeries(ajaxData) {
     //Initially select the first element of each dimension value list
     $($(".dimension-time-series-legend label:first-child .time-series-dimension-checkbox")).click();
 
+}
+
+function displayFiltersInTitle(){
+    var hashParams = parseHashParameters(window.location.hash);
+    if(hashParams.filters && hashParams.filters != "{}" ){
+        var filters = JSON.parse(hashParams.filters);
+        var html = "";
+
+        for(k in filters){
+            var values = decodeURIComponent(filters[k]).trim().split(",")
+
+            //Todo: remove the following value adjustment when the "" values are part of OTHER in the response data
+            for(i=0,len= values.length; i<len; i++){
+                if(values[i] == ""){
+                    values[i] = "UNKNOWN"
+                }
+            }
+
+            html +=  " in <b>" + k + "</b>: <b>" + values + "</b>";
+        }
+
+        $(".filters-title").append(html);
+    }else{
+        $(".filters-title").empty()
+    }
 }
 

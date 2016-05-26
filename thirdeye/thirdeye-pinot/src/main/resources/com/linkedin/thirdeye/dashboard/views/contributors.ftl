@@ -7,8 +7,9 @@
             {{#each ../dimensions as |dimensionName dimensionIndex|}}
             <div class="dimension-section-wrapper" rel="{{dimensionName}}" metric="{{metricName}}" style="vertical-align: top; ">
                 <p class="dimension-title hidden"> {{dimensionName}}</p>
+                <p class="dimension-title hidden"> {{dimensionName}}</p>
 
-                <h3 class="uk-margin-top"> Break down of metric: <b>{{metricName}}</b> by dimension: <b>{{dimensionName}}</b></h3>
+                <h3 class="uk-margin-top"> Break down of metric: <b>{{metricName}}</b> by dimension: <b>{{dimensionName}}</b><span class="filters-title"></span></h3>
                 <div class="dimension-timeseries-section clear-fix uk-margin-large-bottom" dimension="{{dimensionName}}" style="width: 100%; position: relative;">
                     {{#with @root/timeBuckets}}
                     <div  class="title-box full-width">
@@ -53,7 +54,12 @@
                     <div class="dimension-timeseries" id="contributor-timeseries-{{metricName}}-{{dimensionName}}" class="uk-display-inline-block" style="display: inline-block; width:83%; height: 300px;"></div>
                     <div class="dimension-timeseries" id="contributor-percentChange-{{metricName}}-{{dimensionName}}" class="uk-display-inline-block" style="display: inline-block; width:83%; height: 150px;"></div>
                     <div id="contributor-timeseries-legend-{{metricName}}-{{dimensionName}}" class="timeseries-legend-box dimension-timeseries-legend" style="display: inline-block">
-
+                        <svg class="line-legend" width="200" height="55">
+                            <line x1="0" y1="15" x2="55" y2="15" stroke="gray" stroke-dasharray="5,5"/>
+                            <text x="60" y="15" dy=".3em" style="text-anchor: start; font-family:Arial, sans-serif; font-size:0.75em">BASELINE</text>
+                            <line x1="0" y1="30" x2="55" y2="30" stroke="gray"/>
+                            <text x="60" y="30" dy=".3em" style="text-anchor: start; font-family:Arial, sans-serif; font-size:0.75em">CURRENT</text>
+                        </svg>
                         <label style="display: block;"><input class="time-series-dimension-select-all-checkbox filter-select-all-checkbox" type="checkbox">Select All</label>
                         <div class="dimension-time-series-legend timeseries-legend-sub-box uk-display-inline-block" style="width:250px;">
                             {{#lookupDimValues @root/dimensionValuesMap dimName=dimensionName}}
@@ -70,7 +76,7 @@
                     </div>
                 </div>
 
-	            <h3 class="uk-margin-top"> Break down of metric: <b>{{metricName}}</b> by dimension: <b>{{dimensionName}}</b></h3>
+	            <h3 class="uk-margin-top"> Break down of metric: <b>{{metricName}}</b> by dimension: <b>{{dimensionName}}</b><span class="filters-title"></span></h3>
 
                 <!-- Contributors table -->
                 <!--Summary and details buttons -->
@@ -116,7 +122,7 @@
                             <th class="hidden"></th>
                             <th class="row-title"> Total:</th>
                             {{#each @root/timeBuckets}}
-                            <th class="details-cell hidden">total discrete value will come from JS</th>
+                            <th class="details-cell hidden"></th>
                             <th class="details-cell hidden"></th>
                             <th class="heat-map-cell"></th>
                             {{/each}}

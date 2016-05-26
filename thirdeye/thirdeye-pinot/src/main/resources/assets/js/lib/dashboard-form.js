@@ -22,10 +22,17 @@
         selectDatasetNGetFormData(this)
     });
 
-    //Advanced settings
     $("#main-view").on("click",".close-dropdown-btn", function(){
         closeClosestDropDown(this)
     });
+
+    $("#main-view").on("click", ".close-btn", function() {
+        $(this).hide();
+    })
+
+    $("#main-view").on("click", ".close-parent", function() {
+        $(this).parent().hide();
+    })
 
     /* Form tab selection */
 

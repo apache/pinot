@@ -2,13 +2,6 @@ function getTimeSeries(tab) {
 
 	var url = "/dashboard/data/timeseries?" + window.location.hash.substring(1);
 
-//	c3.generate({
-//		bindto: '#display-chart-section',
-//        data: {
-//            url: "/dashboard/data/timeseries?" + window.location.hash.substring(1),
-//            mimeType: 'json'
-//        }
-//    })
 	getData(url, tab).done(function(data) {
         //Error handling when data is falsy (empty, undefined or null)
         if(!data){
@@ -88,7 +81,10 @@ function renderTimeSeriesUsingC3(d, tab){  //time-series-area
 
     chart.hide();
 
-    //Timeseries eventlisteners
+
+
+    /** Timeseries eventlisteners **/
+
     $("#timeseries-time-series-legend").on("click",'.time-series-checkbox', function() {
 
         var checkbox = this;

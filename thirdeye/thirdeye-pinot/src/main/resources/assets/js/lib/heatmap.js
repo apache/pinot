@@ -118,7 +118,7 @@ function renderD3heatmap(data, tab) {
 
             var mouseenter = function(d) {
 
-                var target = $(event.target)
+                var target = $(this)//$(event.target)
                 var dimension = target.attr("data-dimension")
                 var metric = target.attr("data-metric")
                 var valueId = target.attr("data-value-id")
@@ -174,7 +174,7 @@ function renderD3heatmap(data, tab) {
                     .attr("data-value-id", function (d) {return d.valueId})
                     .attr("id", function (d) {return d.name})
                     .on("mouseenter", mouseenter)
-                    .on("mouseleave", mouseleave)
+                    .on("mouseout", mouseleave)
                     .call(position)
                     .style("background", function (d) {return d.children ? null : d.bgcolor})
                     .style("text-align", "center")
@@ -271,5 +271,4 @@ function heatMapEventListeners(tab){
                 window.location.hash = encodeHashParameters(hash);
             }
         })
-
 }
