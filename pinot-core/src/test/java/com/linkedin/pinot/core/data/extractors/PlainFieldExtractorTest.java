@@ -204,6 +204,40 @@ public class PlainFieldExtractorTest {
   }
 
   @Test
+  public void timeSpecStringTest()
+      throws Exception {
+    Schema schema = new SchemaBuilder().addSingleValueDimension("svDimensionInt", DataType.INT)
+        .addSingleValueDimension("svDimensionDouble", DataType.DOUBLE)
+        .addMultiValueDimension("mvDimension", DataType.STRING, ",")
+        .addMetric("metric", DataType.INT)
+        .build();
+    TimeFieldSpec timeSpec = new TimeFieldSpec();
+    TimeGranularitySpec timeGranularitySpec = new TimeGranularitySpec(DataType.STRING, TimeUnit.DAYS, "incoming");
+    timeSpec.setIncomingGranularitySpec(timeGranularitySpec);
+    timeSpec.setOutgoingGranularitySpec(timeGranularitySpec);
+    schema.setTimeFieldSpec(timeSpec);
+    PlainFieldExtractor extractor = (PlainFieldExtractor) FieldExtractorFactory.getPlainFieldExtractor(schema);
+    GenericRow row = new GenericRow();
+    Map<String, Object> fieldMap = new HashMap<String, Object>();
+    Short shortObj = new Short((short) 5);
+    fieldMap.put("svDimensionInt", shortObj);
+    Float floatObj = new Float((float) 3.2);
+    fieldMap.put("svDimensionDouble", floatObj);
+    Double doubleObj = new Double((double) 34.5);
+    fieldMap.put("metric", doubleObj);
+    String myDate = "2016-01-17";
+    fieldMap.put("incoming", myDate);
+    row.init(fieldMap);
+    extractor.transform(row);
+    Assert.assertTrue(row.getValue("svDimensionInt") instanceof Integer);
+    Assert.assertTrue(row.getValue("svDimensionDouble") instanceof Double);
+    Assert.assertTrue(row.getValue("mvDimension") != null);
+    Assert.assertTrue(row.getValue("metric") instanceof Integer);
+    Assert.assertTrue((Integer) row.getValue("metric") == 34);
+    Assert.assertTrue(row.getValue("incoming") == "2016-01-17");
+  }
+
+  @Test
   public void inNoutTimeSpecTest()
       throws Exception {
     Schema schema = new SchemaBuilder().addSingleValueDimension("svDimensionInt", DataType.INT)

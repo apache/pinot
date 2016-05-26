@@ -132,7 +132,7 @@ public class PlainFieldExtractor implements FieldExtractor {
         // Adding outgoing time column to fieldMap;
         Object value;
         // _schema.getTimeColumnName() will give outgoing time column name.
-        if (column.equals(_schema.getTimeColumnName())) {
+        if (column.equals(_schema.getTimeColumnName()) && (_schema.getTimeFieldSpec().getDataType().isNumber())) {
           value = row.getValue(_incomingTimeColumnName);
           // For null time value, will let the rest code to handle
           if (value != null) {
