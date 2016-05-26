@@ -130,6 +130,7 @@ public class SegmentStatusChecker {
   public void runSegmentMetrics() {
     if (!_pinotHelixResourceManager.isLeader()) {
       LOGGER.info("Skipping Segment Status check, not leader!");
+      setStatusToDefault();
       stop();
       return;
     }
@@ -137,7 +138,7 @@ public class SegmentStatusChecker {
     long startTime = System.nanoTime();
 
     LOGGER.info("Starting Segment Status check for metrics");
-    //
+
     // Fetch the list of tables
     List<String> allTableNames = _pinotHelixResourceManager.getAllPinotTableNames();
     String helixClusterName = _pinotHelixResourceManager.getHelixClusterName();
@@ -207,4 +208,15 @@ public class SegmentStatusChecker {
     _metricsRegistry = metricsRegistry;
   }
 
+  void setStatusToDefault() {
+    // Fetch the list of tables
+    List<String> allTableNames = _pinotHelixResourceManager.getAllPinotTableNames();
+    String helixClusterName = _pinotHelixResourceManager.getHelixClusterName();
+    HelixAdmin helixAdmin = _pinotHelixResourceManager.getHelixAdmin();
+
+    for (String tableName : allTableNames) {
+      _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.NUMBER_OF_REPLICAS, 0);
+      _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.SEGMENTS_IN_ERROR_STATE, 0);
+    }
+  }
 }
