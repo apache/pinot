@@ -31,6 +31,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Path;
 import org.apache.commons.configuration.ConfigurationException;
+import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -71,6 +72,11 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
   @Override
   public Path getPath() {
     return segmentDirectory.toPath();
+  }
+
+  @Override
+  public long getDiskSizeBytes() {
+    return FileUtils.sizeOfDirectory(segmentDirectory.toPath().toFile());
   }
 
   public Reader createReader()

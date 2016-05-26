@@ -136,6 +136,12 @@ public class IndexSegmentImpl implements IndexSegment {
     return starTree;
   }
 
+  @Override
+  public long getDiskSizeBytes() {
+    return segmentDirectory.getDiskSizeBytes();
+  }
+
+
   public Iterator<GenericRow> iterator(final int startDocId, final int endDocId) {
     final Map<String, BlockSingleValIterator> singleValIteratorMap = new HashMap<>();
     final Map<String, BlockMultiValIterator> multiValIteratorMap = new HashMap<>();

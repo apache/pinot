@@ -667,4 +667,10 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
   public StarTree getStarTree() {
     return null;
   }
+
+  @Override
+  public long getDiskSizeBytes() {
+    // all the data is in memory..disk size is 0
+    return 0;
+  }
 }

@@ -15,16 +15,6 @@
  */
 package com.linkedin.pinot.query.planner;
 
-import static org.testng.Assert.assertEquals;
-
-import java.util.ArrayList;
-import java.util.List;
-
-import com.linkedin.pinot.core.startree.StarTree;
-import com.linkedin.pinot.core.startree.StarTreeIndexNode;
-import org.testng.annotations.BeforeMethod;
-import org.testng.annotations.Test;
-
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
@@ -36,6 +26,13 @@ import com.linkedin.pinot.core.query.planner.ParallelQueryPlannerImpl;
 import com.linkedin.pinot.core.query.planner.QueryPlan;
 import com.linkedin.pinot.core.query.planner.QueryPlanner;
 import com.linkedin.pinot.core.query.planner.SequentialQueryPlannerImpl;
+import com.linkedin.pinot.core.startree.StarTree;
+import java.util.ArrayList;
+import java.util.List;
+import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
 
 
 public class QueryPlannerTest {
@@ -93,6 +90,11 @@ public class QueryPlannerTest {
         @Override
         public StarTree getStarTree() {
           return null;
+        }
+
+        @Override
+        public long getDiskSizeBytes() {
+          return 0;
         }
       });
     }

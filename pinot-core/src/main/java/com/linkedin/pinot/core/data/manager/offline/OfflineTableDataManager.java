@@ -29,8 +29,6 @@ import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 /**
  * An implementation of offline TableDataManager.
  * Provide add and remove segment functionality.
- *
- *
  */
 public class OfflineTableDataManager extends AbstractTableDataManager {
 

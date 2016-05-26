@@ -114,6 +114,7 @@ public abstract class SegmentDirectory implements AutoCloseable {
    */
   public abstract Path getPath();
 
+  public abstract long getDiskSizeBytes();
 
   /**
    * Reader for columnar index buffers from segment directory
