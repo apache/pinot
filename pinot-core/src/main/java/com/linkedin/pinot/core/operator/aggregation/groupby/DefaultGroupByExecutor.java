@@ -18,22 +18,17 @@ package com.linkedin.pinot.core.operator.aggregation.groupby;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.GroupBy;
-import com.linkedin.pinot.core.common.BlockValSet;
+import com.linkedin.pinot.core.common.DataFetcher;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.DataSourceMetadata;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.aggregation.AggregationFunctionContext;
 import com.linkedin.pinot.core.operator.aggregation.ResultHolderFactory;
+import com.linkedin.pinot.core.operator.aggregation.SingleValueBlockCache;
 import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunction;
 import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunctionFactory;
 import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
 
 /**
@@ -44,26 +39,15 @@ import java.util.Set;
  * - Single/Multi valued columns.
  */
 public class DefaultGroupByExecutor implements GroupByExecutor {
-  private static final String COLUMN_STAR = "*";
+  private final SingleValueBlockCache _singleValueBlockCache;
 
-  private final IndexSegment _indexSegment;
-  private final List<AggregationInfo> _aggregationsInfoList;
-  private final GroupBy _groupBy;
-  private final int _maxNumGroupKeys;
+  private final GroupKeyGenerator _groupKeyGenerator;
+  private final int _numAggrFunc;
+  private final AggregationFunctionContext[] _aggrFuncContextArray;
+  private final GroupByResultHolder[] _resultHolderArray;
 
-  private ArrayList<AggregationFunctionContext> _aggrFuncContextList;
-  private GroupKeyGenerator _groupKeyGenerator;
-
-  private String[] _groupByColumns;
   private int[] _docIdToSVGroupKey;
   private int[][] _docIdToMVGroupKey;
-
-  private Set<String> _columnsLoaded;
-  private Map<String, int[]> _columnToDictArrayMap;
-  private Map<String, double[]> _columnToValueArrayMap;
-  private double[] _hashCodeArray;
-
-  private GroupByResultHolder[] _resultHolderArray;
 
   private boolean _hasMultiValuedColumns = false;
   private boolean _inited = false;
@@ -73,21 +57,38 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
    * Constructor for the class.
    *
    * @param indexSegment
-   * @param aggregationsInfoList
+   * @param aggregationInfoList
    * @param groupBy
    * @param maxNumGroupKeys
    */
-  public DefaultGroupByExecutor(IndexSegment indexSegment, List<AggregationInfo> aggregationsInfoList, GroupBy groupBy,
+  public DefaultGroupByExecutor(IndexSegment indexSegment, List<AggregationInfo> aggregationInfoList, GroupBy groupBy,
       int maxNumGroupKeys) {
     Preconditions.checkNotNull(indexSegment);
-    Preconditions.checkArgument((aggregationsInfoList != null) && (aggregationsInfoList.size() > 0));
+    Preconditions.checkNotNull(aggregationInfoList);
+    Preconditions.checkArgument(aggregationInfoList.size() > 0);
     Preconditions.checkNotNull(groupBy);
     Preconditions.checkArgument(maxNumGroupKeys > 0);
 
-    _indexSegment = indexSegment;
-    _aggregationsInfoList = aggregationsInfoList;
-    _groupBy = groupBy;
-    _maxNumGroupKeys = maxNumGroupKeys;
+    DataFetcher dataFetcher = new DataFetcher(indexSegment);
+    _singleValueBlockCache = new SingleValueBlockCache(dataFetcher);
+    List<String> groupByColumnList = groupBy.getColumns();
+    String[] groupByColumns = groupByColumnList.toArray(new String[groupByColumnList.size()]);
+    _groupKeyGenerator = new DefaultGroupKeyGenerator(dataFetcher, groupByColumns, maxNumGroupKeys);
+
+    _numAggrFunc = aggregationInfoList.size();
+    _aggrFuncContextArray = new AggregationFunctionContext[_numAggrFunc];
+    _resultHolderArray = new GroupByResultHolder[_numAggrFunc];
+    for (int i = 0; i < _numAggrFunc; i++) {
+      AggregationInfo aggregationInfo = aggregationInfoList.get(i);
+      String[] columns = aggregationInfo.getAggregationParams().get("column").trim().split(",");
+      AggregationFunctionContext aggregationFunctionContext =
+          new AggregationFunctionContext(aggregationInfo.getAggregationType(), columns);
+      _aggrFuncContextArray[i] = aggregationFunctionContext;
+      AggregationFunction aggregationFunction = aggregationFunctionContext.getAggregationFunction();
+      _resultHolderArray[i] = ResultHolderFactory.getGroupByResultHolder(aggregationFunction, maxNumGroupKeys);
+    }
+
+    _hasMultiValuedColumns = hasMultiValueGroupByColumns(indexSegment, groupByColumns);
   }
 
   /**
@@ -103,39 +104,6 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     // Returned if already initialized.
     if (_inited) {
       return;
-    }
-
-    List<String> groupByColumns = _groupBy.getColumns();
-    _groupByColumns = groupByColumns.toArray(new String[groupByColumns.size()]);
-
-    _aggrFuncContextList = new ArrayList<AggregationFunctionContext>(_aggregationsInfoList.size());
-    _columnsLoaded = new HashSet<>();
-    _columnToDictArrayMap = new HashMap<String, int[]>();
-    _columnToValueArrayMap = new HashMap<String, double[]>();
-
-    for (AggregationInfo aggregationInfo : _aggregationsInfoList) {
-      String[] columns = aggregationInfo.getAggregationParams().get("column").trim().split(",");
-
-      for (String column : columns) {
-        if (!column.equals(COLUMN_STAR) && !_columnToDictArrayMap.containsKey(column)) {
-          _columnToDictArrayMap.put(column, new int[DocIdSetPlanNode.MAX_DOC_PER_CALL]);
-          _columnToValueArrayMap.put(column, new double[DocIdSetPlanNode.MAX_DOC_PER_CALL]);
-        }
-      }
-
-      AggregationFunctionContext aggregationFunctionContext =
-          new AggregationFunctionContext(_indexSegment, aggregationInfo.getAggregationType(), columns);
-      _aggrFuncContextList.add(aggregationFunctionContext);
-    }
-
-    _hasMultiValuedColumns = hasMultiValueGroupByColumns(_indexSegment, _groupByColumns);
-    _groupKeyGenerator = new DefaultGroupKeyGenerator(_indexSegment, _groupByColumns, _maxNumGroupKeys);
-
-    _resultHolderArray = new GroupByResultHolder[_aggrFuncContextList.size()];
-    for (int i = 0; i < _aggrFuncContextList.size(); i++) {
-      AggregationFunctionContext aggregationFunctionContext = _aggrFuncContextList.get(i);
-      AggregationFunction aggregationFunction = aggregationFunctionContext.getAggregationFunction();
-      _resultHolderArray[i] = ResultHolderFactory.getGroupByResultHolder(aggregationFunction, _maxNumGroupKeys);
     }
 
     if (_hasMultiValuedColumns) {
@@ -155,17 +123,17 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
    */
   @Override
   public void process(int[] docIdSet, int startIndex, int length) {
-    Preconditions.checkState(_inited, "Method 'process' cannot be called before init.");
+    Preconditions
+        .checkState(_inited, "Method 'process' cannot be called before 'init' for class " + getClass().getName());
+
+    _singleValueBlockCache.initNewBlock(docIdSet, startIndex, length);
 
     generateGroupKeysForDocIdSet(docIdSet, startIndex, length);
     int numGroupKeys = _groupKeyGenerator.getNumGroupKeys();
 
-    fetchColumnDictIds(docIdSet, startIndex, length);
-    fetchColumnValues(startIndex, length);
-
-    for (int i = 0; i < _aggrFuncContextList.size(); i++) {
+    for (int i = 0; i < _numAggrFunc; i++) {
       _resultHolderArray[i].ensureCapacity(numGroupKeys);
-      aggregateColumn(_aggrFuncContextList.get(i), _resultHolderArray[i], length);
+      aggregateColumn(_aggrFuncContextArray[i], _resultHolderArray[i], length);
     }
   }
 
@@ -178,9 +146,9 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
    */
   private void aggregateColumn(AggregationFunctionContext aggrFuncContext, GroupByResultHolder resultHolder,
       int length) {
-    AggregationFunction function = aggrFuncContext.getAggregationFunction();
-    String aggrFuncName = aggrFuncContext.getFunctionName();
+    AggregationFunction aggregationFunction = aggrFuncContext.getAggregationFunction();
     String[] aggrColumns = aggrFuncContext.getAggregationColumns();
+    String aggrFuncName = aggregationFunction.getName();
 
     Preconditions.checkState(aggrColumns.length == 1);
     String aggrColumn = aggrColumns[0];
@@ -188,30 +156,30 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     switch (aggrFuncName) {
       case AggregationFunctionFactory.COUNT_AGGREGATION_FUNCTION:
         if (_hasMultiValuedColumns) {
-          function.aggregateGroupByMV(length, _docIdToMVGroupKey, resultHolder);
+          aggregationFunction.aggregateGroupByMV(length, _docIdToMVGroupKey, resultHolder);
         } else {
-          function.aggregateGroupBySV(length, _docIdToSVGroupKey, resultHolder);
+          aggregationFunction.aggregateGroupBySV(length, _docIdToSVGroupKey, resultHolder);
         }
-        return;
+        break;
 
       case AggregationFunctionFactory.DISTINCTCOUNT_AGGREGATION_FUNCTION:
       case AggregationFunctionFactory.DISTINCTCOUNTHLL_AGGREGATION_FUNCTION:
-        fetchColumnValueHashCodes(aggrColumn, aggrFuncContext.getDictionary(0), length);
+        double[] hashCodeArray = _singleValueBlockCache.getHashCodeArrayForColumn(aggrColumn);
         if (_hasMultiValuedColumns) {
-          function.aggregateGroupByMV(length, _docIdToMVGroupKey, resultHolder, _hashCodeArray);
+          aggregationFunction.aggregateGroupByMV(length, _docIdToMVGroupKey, resultHolder, hashCodeArray);
         } else {
-          function.aggregateGroupBySV(length, _docIdToSVGroupKey, resultHolder, _hashCodeArray);
+          aggregationFunction.aggregateGroupBySV(length, _docIdToSVGroupKey, resultHolder, hashCodeArray);
         }
-        return;
+        break;
 
       default:
-        double[] valueArray = _columnToValueArrayMap.get(aggrColumn);
-
+        double[] valueArray = _singleValueBlockCache.getDoubleValueArrayForColumn(aggrColumn);
         if (_hasMultiValuedColumns) {
-          function.aggregateGroupByMV(length, _docIdToMVGroupKey, resultHolder, valueArray);
+          aggregationFunction.aggregateGroupByMV(length, _docIdToMVGroupKey, resultHolder, valueArray);
         } else {
-          function.aggregateGroupBySV(length, _docIdToSVGroupKey, resultHolder, valueArray);
+          aggregationFunction.aggregateGroupBySV(length, _docIdToSVGroupKey, resultHolder, valueArray);
         }
+        break;
     }
   }
 
@@ -220,6 +188,9 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
    */
   @Override
   public void finish() {
+    Preconditions
+        .checkState(_inited, "Method 'finish' cannot be called before 'init' for class " + getClass().getName());
+
     _finished = true;
   }
 
@@ -231,98 +202,16 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
    */
   @Override
   public AggregationGroupByResult getResult() {
-    Preconditions.checkState(_finished, "GetResult cannot be called before finish.");
-    int numAggregationFunctions = _aggrFuncContextList.size();
+    Preconditions
+        .checkState(_finished, "Method 'getResult' cannot be called before 'finish' for class " + getClass().getName());
 
-    AggregationFunction.ResultDataType resultDataTypeArray[] =
-        new AggregationFunction.ResultDataType[numAggregationFunctions];
+    AggregationFunction.ResultDataType[] resultDataTypeArray = new AggregationFunction.ResultDataType[_numAggrFunc];
 
-    for (int i = 0; i < numAggregationFunctions; i++) {
-      AggregationFunction aggregationFunction = _aggrFuncContextList.get(i).getAggregationFunction();
+    for (int i = 0; i < _numAggrFunc; i++) {
+      AggregationFunction aggregationFunction = _aggrFuncContextArray[i].getAggregationFunction();
       resultDataTypeArray[i] = aggregationFunction.getResultDataType();
     }
     return new AggregationGroupByResult(_groupKeyGenerator, _resultHolderArray, resultDataTypeArray);
-  }
-
-  /**
-   * Fetch dictId's for the given docIdSet for all aggregation columns except count.
-   *
-   * @param docIdSet
-   * @param startIndex
-   * @param length
-   */
-  private void fetchColumnDictIds(int[] docIdSet, int startIndex, int length) {
-    _columnsLoaded.clear();
-    for (AggregationFunctionContext aggrFuncContext : _aggrFuncContextList) {
-      String aggrFuncName = aggrFuncContext.getFunctionName();
-      if (!aggrFuncName.equals(AggregationFunctionFactory.COUNT_AGGREGATION_FUNCTION)) {
-        String[] aggrColumns = aggrFuncContext.getAggregationColumns();
-        for (int i = 0; i < aggrColumns.length; i++) {
-          String aggrColumn = aggrColumns[i];
-
-          if (!_columnsLoaded.contains(aggrColumn)) {
-            int[] dictIdArray = _columnToDictArrayMap.get(aggrColumn);
-            BlockValSet blockValSet = aggrFuncContext.getBlockValSet(i);
-            blockValSet.readIntValues(docIdSet, startIndex, length, dictIdArray, startIndex);
-            _columnsLoaded.add(aggrColumn);
-          }
-        }
-      }
-    }
-  }
-
-  /**
-   * Fetch values for all aggregation columns except count and distinctcount according to the dictId's that fetched in
-   * method fetchColumnDictIds.
-   *
-   * @param startIndex
-   * @param length
-   */
-  private void fetchColumnValues(int startIndex, int length) {
-    _columnsLoaded.clear();
-    for (AggregationFunctionContext aggrFuncContext : _aggrFuncContextList) {
-      String aggrFuncName = aggrFuncContext.getFunctionName();
-      if (!aggrFuncName.equals(AggregationFunctionFactory.COUNT_AGGREGATION_FUNCTION) && !aggrFuncName.equals(
-          AggregationFunctionFactory.DISTINCTCOUNT_AGGREGATION_FUNCTION) && !aggrFuncName.equals(
-          AggregationFunctionFactory.DISTINCTCOUNTHLL_AGGREGATION_FUNCTION)) {
-        String[] aggrColumns = aggrFuncContext.getAggregationColumns();
-        for (int i = 0; i < aggrColumns.length; i++) {
-          String aggrColumn = aggrColumns[i];
-
-          if (!_columnsLoaded.contains(aggrColumn)) {
-            Dictionary dictionary = aggrFuncContext.getDictionary(i);
-            double[] valueArray = _columnToValueArrayMap.get(aggrColumn);
-            dictionary.readDoubleValues(_columnToDictArrayMap.get(aggrColumn), startIndex, length, valueArray,
-                startIndex);
-            _columnsLoaded.add(aggrColumn);
-          }
-        }
-      }
-    }
-  }
-
-  /**
-   * Fetch value hashcodes for the given aggregation column and dictionary. This method is called on distinctcount
-   * aggregation function.
-   *
-   * @param aggrColumn
-   * @param dictionary
-   * @param length
-   */
-  private void fetchColumnValueHashCodes(String aggrColumn, Dictionary dictionary, int length) {
-    int[] dictIdArray = _columnToDictArrayMap.get(aggrColumn);
-    if (_hashCodeArray == null) {
-      _hashCodeArray = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-    }
-
-    for (int i = 0; i < length; i++) {
-      int dictId = dictIdArray[i];
-      if (dictId == Dictionary.NULL_VALUE_INDEX) {
-        _hashCodeArray[i] = Integer.MIN_VALUE;
-      } else {
-        _hashCodeArray[i] = dictionary.get(dictId).hashCode();
-      }
-    }
   }
 
   /**

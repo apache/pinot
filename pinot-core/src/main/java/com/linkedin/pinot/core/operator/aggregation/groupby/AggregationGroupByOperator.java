@@ -122,8 +122,6 @@ public class AggregationGroupByOperator extends BaseOperator {
    * @return
    */
   private int processBlock(int numDocsScanned, ProjectionBlock currentBlock, Block block) {
-    int[] docIdSet;
-
     if (block instanceof DocIdSetBlock) {
       DocIdSetBlock docIdSetBlock = (DocIdSetBlock) block;
       int length = docIdSetBlock.getSearchableLength();
