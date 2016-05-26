@@ -1,24 +1,12 @@
 package com.linkedin.thirdeye.detector;
 
-import io.dropwizard.assets.AssetsBundle;
-import io.dropwizard.db.DataSourceFactory;
-import io.dropwizard.jetty.ConnectorFactory;
-import io.dropwizard.jetty.HttpConnectorFactory;
-import io.dropwizard.lifecycle.Managed;
-import io.dropwizard.lifecycle.ServerLifecycleListener;
-import io.dropwizard.migrations.MigrationsBundle;
-import io.dropwizard.server.DefaultServerFactory;
-import io.dropwizard.server.ServerFactory;
-import io.dropwizard.server.SimpleServerFactory;
-import io.dropwizard.setup.Bootstrap;
-import io.dropwizard.setup.Environment;
-
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.commons.lang.StringUtils;
 import org.eclipse.jetty.server.AbstractNetworkConnector;
 import org.eclipse.jetty.server.Connector;
 import org.eclipse.jetty.server.Server;
@@ -31,8 +19,8 @@ import org.slf4j.LoggerFactory;
 
 import com.linkedin.thirdeye.api.CollectionSchema;
 import com.linkedin.thirdeye.client.QueryCache;
-import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
+import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.client.comparison.TimeOnTimeComparisonHandler;
 import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClient;
 import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClientConfig;
@@ -46,6 +34,7 @@ import com.linkedin.thirdeye.detector.db.HibernateSessionWrapper;
 import com.linkedin.thirdeye.detector.driver.AnomalyDetectionJobManager;
 import com.linkedin.thirdeye.detector.email.EmailReportJobManager;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
+import com.linkedin.thirdeye.detector.lib.util.JobUtils;
 import com.linkedin.thirdeye.detector.resources.AnomalyDetectionJobResource;
 import com.linkedin.thirdeye.detector.resources.AnomalyFunctionRelationResource;
 import com.linkedin.thirdeye.detector.resources.AnomalyFunctionSpecResource;
@@ -55,8 +44,21 @@ import com.linkedin.thirdeye.detector.resources.EmailReportResource;
 import com.linkedin.thirdeye.detector.resources.MetricsGraphicsTimeSeriesResource;
 import com.linkedin.thirdeye.detector.task.EmailReportJobManagerTask;
 
-public class ThirdEyeDetectorApplication extends
-    BaseThirdEyeApplication<ThirdEyeDetectorConfiguration> {
+import io.dropwizard.assets.AssetsBundle;
+import io.dropwizard.db.DataSourceFactory;
+import io.dropwizard.jetty.ConnectorFactory;
+import io.dropwizard.jetty.HttpConnectorFactory;
+import io.dropwizard.lifecycle.Managed;
+import io.dropwizard.lifecycle.ServerLifecycleListener;
+import io.dropwizard.migrations.MigrationsBundle;
+import io.dropwizard.server.DefaultServerFactory;
+import io.dropwizard.server.ServerFactory;
+import io.dropwizard.server.SimpleServerFactory;
+import io.dropwizard.setup.Bootstrap;
+import io.dropwizard.setup.Environment;
+
+public class ThirdEyeDetectorApplication
+    extends BaseThirdEyeApplication<ThirdEyeDetectorConfiguration> {
   private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeDetectorApplication.class);
 
   public static void main(final String[] args) throws Exception {
@@ -110,7 +112,8 @@ public class ThirdEyeDetectorApplication extends
     AbstractConfigDAO<CollectionConfig> collectionConfigDAO = getCollectionConfigDAO(config);
     // initialize caches
     try {
-      ThirdEyeCacheRegistry.initializeDetectorCaches(pinotThirdeyeClientConfig, collectionSchemaDAO, collectionConfigDAO);
+      ThirdEyeCacheRegistry.initializeDetectorCaches(pinotThirdeyeClientConfig, collectionSchemaDAO,
+          collectionConfigDAO);
     } catch (Exception e) {
       LOG.error("Exception while loading caches", e);
     }
@@ -154,11 +157,10 @@ public class ThirdEyeDetectorApplication extends
         new AnomalyFunctionFactory(config.getFunctionConfigPath());
 
     // ThirdEye driver
-    final AnomalyDetectionJobManager jobManager =
-        new AnomalyDetectionJobManager(quartzScheduler, timeSeriesHandler,
-            timeSeriesResponseConverter, anomalyFunctionSpecDAO, anomalyFunctionRelationDAO,
-            anomalyResultDAO, hibernateBundle.getSessionFactory(), environment.metrics(),
-            anomalyFunctionFactory);
+    final AnomalyDetectionJobManager jobManager = new AnomalyDetectionJobManager(quartzScheduler,
+        timeSeriesHandler, timeSeriesResponseConverter, anomalyFunctionSpecDAO,
+        anomalyFunctionRelationDAO, anomalyResultDAO, hibernateBundle.getSessionFactory(),
+        environment.metrics(), anomalyFunctionFactory, config.getFailureEmailConfig());
 
     // Start all active jobs on startup
     environment.lifecycle().manage(new Managed() {
@@ -184,7 +186,12 @@ public class ThirdEyeDetectorApplication extends
                   }
                 }
                 if (!failedToStart.isEmpty()) {
-                  LOG.warn("{} functions failed to start!: {}", failedToStart.size(), failedToStart);
+                  LOG.warn("{} functions failed to start!: {}", failedToStart.size(),
+                      failedToStart);
+                  String subject = String.format("Startup failed to initialize %d functions",
+                      failedToStart.size());
+                  String body = StringUtils.join(failedToStart, "\n");
+                  JobUtils.sendFailureEmail(config.getFailureEmailConfig(), subject, body);
                 }
                 return null;
               }
@@ -208,7 +215,7 @@ public class ThirdEyeDetectorApplication extends
     final EmailReportJobManager emailReportJobManager =
         new EmailReportJobManager(quartzScheduler, emailConfigurationDAO, anomalyResultDAO,
             hibernateBundle.getSessionFactory(), applicationPort, timeOnTimeComparisonHandler,
-            config.getDashboardHost());
+            config.getDashboardHost(), config.getFailureEmailConfig());
 
     environment.lifecycle().addServerLifecycleListener(new ServerLifecycleListener() {
       @Override
@@ -260,10 +267,10 @@ public class ThirdEyeDetectorApplication extends
     environment.jersey().register(new ContextualEventResource(contextualEventDAO));
     environment.jersey().register(
         new MetricsGraphicsTimeSeriesResource(timeOnTimeComparisonHandler, anomalyResultDAO));
-    environment.jersey().register(
-        new AnomalyDetectionJobResource(jobManager, anomalyFunctionSpecDAO));
-    environment.jersey().register(
-        new EmailReportResource(emailConfigurationDAO, emailReportJobManager));
+    environment.jersey()
+        .register(new AnomalyDetectionJobResource(jobManager, anomalyFunctionSpecDAO));
+    environment.jersey()
+        .register(new EmailReportResource(emailConfigurationDAO, emailReportJobManager));
 
     // Tasks
     environment.admin().addTask(

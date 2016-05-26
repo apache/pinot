@@ -48,6 +48,7 @@ public class AnomalyDetectionJobManager {
   private final Map<Long, String> scheduledJobKeys;
   private final MetricRegistry metricRegistry;
   private final AnomalyFunctionFactory anomalyFunctionFactory;
+  private final FailureEmailConfiguration failureEmailConfig;
 
   private static final ObjectMapper reader = new ObjectMapper(new YAMLFactory());
 
@@ -55,7 +56,7 @@ public class AnomalyDetectionJobManager {
       TimeSeriesResponseConverter timeSeriesResponseConverter, AnomalyFunctionSpecDAO specDAO,
       AnomalyFunctionRelationDAO relationDAO, AnomalyResultDAO resultDAO,
       SessionFactory sessionFactory, MetricRegistry metricRegistry,
-      AnomalyFunctionFactory anomalyFunctionFactory) {
+      AnomalyFunctionFactory anomalyFunctionFactory, FailureEmailConfiguration failureEmailConfig) {
     this.quartzScheduler = quartzScheduler;
     // this.thirdEyeClient = thirdEyeClient;
     this.timeSeriesHandler = timeSeriesHandler;
@@ -68,6 +69,7 @@ public class AnomalyDetectionJobManager {
     this.sync = new Object();
     this.scheduledJobKeys = new HashMap<>();
     this.anomalyFunctionFactory = anomalyFunctionFactory;
+    this.failureEmailConfig = failureEmailConfig;
   }
 
   public List<Long> getActiveJobs() {
@@ -121,6 +123,8 @@ public class AnomalyDetectionJobManager {
     job.getJobDataMap().put(AnomalyDetectionJob.SESSION_FACTORY, sessionFactory);
     job.getJobDataMap().put(AnomalyDetectionJob.METRIC_REGISTRY, metricRegistry);
     job.getJobDataMap().put(AnomalyDetectionJob.RELATION_DAO, relationDAO);
+
+    job.getJobDataMap().put(FailureEmailConfiguration.FAILURE_EMAIL_CONFIG_KEY, failureEmailConfig);
 
     quartzScheduler.scheduleJob(job, trigger);
 

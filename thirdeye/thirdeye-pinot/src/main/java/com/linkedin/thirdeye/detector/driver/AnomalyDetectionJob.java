@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.detector.driver;
 
+import static com.linkedin.thirdeye.detector.driver.FailureEmailConfiguration.FAILURE_EMAIL_CONFIG_KEY;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -11,6 +13,8 @@ import java.util.Queue;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang.exception.ExceptionUtils;
+import org.apache.commons.mail.EmailException;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.Transaction;
@@ -43,6 +47,7 @@ import com.linkedin.thirdeye.detector.api.AnomalyResult;
 import com.linkedin.thirdeye.detector.db.AnomalyFunctionRelationDAO;
 import com.linkedin.thirdeye.detector.db.AnomalyResultDAO;
 import com.linkedin.thirdeye.detector.function.AnomalyFunction;
+import com.linkedin.thirdeye.detector.lib.util.JobUtils;
 
 public class AnomalyDetectionJob implements Job {
   private static final Logger LOG = LoggerFactory.getLogger(AnomalyDetectionJob.class);
@@ -73,8 +78,34 @@ public class AnomalyDetectionJob implements Job {
   private int anomalyCounter;
 
   @Override
-  public void execute(JobExecutionContext context) throws JobExecutionException {
+  public void execute(final JobExecutionContext context) throws JobExecutionException {
     anomalyFunction = (AnomalyFunction) context.getJobDetail().getJobDataMap().get(FUNCTION);
+    final FailureEmailConfiguration failureEmailConfig = (FailureEmailConfiguration) context
+        .getJobDetail().getJobDataMap().get(FAILURE_EMAIL_CONFIG_KEY);
+    try {
+      run(context, anomalyFunction);
+    } catch (Throwable t) {
+      AnomalyFunctionSpec spec = anomalyFunction.getSpec();
+      LOG.error("Job failed with exception:", t);
+      long id = spec.getId();
+      String collection = spec.getCollection();
+      String metric = spec.getMetric();
+
+      String subject =
+          String.format("FAILED ANOMALY DETECTION JOB ID=%d (%s:%s)", id, collection, metric);
+      String textBody =
+          String.format("%s%n%nException:%s", spec.toString(), ExceptionUtils.getStackTrace(t));
+      try {
+        JobUtils.sendFailureEmail(failureEmailConfig, subject, textBody);
+      } catch (EmailException e) {
+        throw new JobExecutionException(e);
+      }
+    }
+  }
+
+  private void run(JobExecutionContext context, AnomalyFunction anomalyFunction)
+      throws JobExecutionException {
+
     // thirdEyeClient = (ThirdEyeClient) context.getJobDetail().getJobDataMap().get(CLIENT);
     AnomalyFunctionSpec spec = anomalyFunction.getSpec();
     timeSeriesHandler =

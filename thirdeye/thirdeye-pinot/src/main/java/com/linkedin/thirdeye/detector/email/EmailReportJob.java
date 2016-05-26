@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.detector.email;
 
+import static com.linkedin.thirdeye.detector.driver.FailureEmailConfiguration.FAILURE_EMAIL_CONFIG_KEY;
+
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.OutputStreamWriter;
@@ -19,7 +21,9 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.commons.mail.DefaultAuthenticator;
+import org.apache.commons.mail.EmailException;
 import org.apache.commons.mail.HtmlEmail;
 import org.hibernate.SessionFactory;
 import org.jfree.chart.JFreeChart;
@@ -41,6 +45,8 @@ import com.linkedin.thirdeye.detector.api.AnomalyResult;
 import com.linkedin.thirdeye.detector.api.EmailConfiguration;
 import com.linkedin.thirdeye.detector.db.AnomalyResultDAO;
 import com.linkedin.thirdeye.detector.db.HibernateSessionWrapper;
+import com.linkedin.thirdeye.detector.driver.FailureEmailConfiguration;
+import com.linkedin.thirdeye.detector.lib.util.JobUtils;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 import freemarker.template.Configuration;
@@ -73,6 +79,29 @@ public class EmailReportJob implements Job {
   public void execute(final JobExecutionContext context) throws JobExecutionException {
     final EmailConfiguration config =
         (EmailConfiguration) context.getJobDetail().getJobDataMap().get(CONFIG);
+    final FailureEmailConfiguration failureEmailConfig = (FailureEmailConfiguration) context
+        .getJobDetail().getJobDataMap().get(FAILURE_EMAIL_CONFIG_KEY);
+    try {
+      run(context, config);
+    } catch (Throwable t) {
+      LOG.error("Job failed with exception:", t);
+      long id = config.getId();
+      String collection = config.getCollection();
+      String metric = config.getMetric();
+
+      String subject = String.format("FAILED ALERT ID=%d (%s:%s)", id, collection, metric);
+      String textBody =
+          String.format("%s%n%nException:%s", config.toString(), ExceptionUtils.getStackTrace(t));
+      try {
+        JobUtils.sendFailureEmail(failureEmailConfig, subject, textBody);
+      } catch (EmailException e) {
+        throw new JobExecutionException(e);
+      }
+    }
+  }
+
+  private void run(final JobExecutionContext context, final EmailConfiguration config)
+      throws JobExecutionException {
     SessionFactory sessionFactory =
         (SessionFactory) context.getJobDetail().getJobDataMap().get(SESSION_FACTORY);
     int applicationPort = context.getJobDetail().getJobDataMap().getInt(APPLICATION_PORT);
