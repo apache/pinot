@@ -15,6 +15,7 @@ public class MetricFunction implements Comparable<MetricFunction> {
   public MetricFunction(){
     
   }
+
   public MetricFunction(@JsonProperty("functionName") String functionName,
       @JsonProperty("metricName") String metricName) {
     this.functionName = functionName;
@@ -32,11 +33,6 @@ public class MetricFunction implements Comparable<MetricFunction> {
   public static MetricFunction from(@JsonProperty("functionName") String functionName,
       @JsonProperty("metricName") String metricName) {
     return new MetricFunction(functionName, metricName);
-  }
-
-  public static MetricFunction from(String metricFunctionName) {
-    return null;
-    // return new MetricFunction(functionName, metricName);
   }
 
   @Override

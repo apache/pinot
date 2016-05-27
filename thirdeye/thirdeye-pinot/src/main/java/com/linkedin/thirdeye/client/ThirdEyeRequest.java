@@ -161,11 +161,6 @@ public class ThirdEyeRequest {
       return this;
     }
 
-    public ThirdEyeRequestBuilder addMetricFunction(String metricFunction) {
-      metricFunctions.add(MetricFunction.from(metricFunction));
-      return this;
-    }
-
     public ThirdEyeRequestBuilder addMetricFunction(MetricFunction metricFunction) {
       metricFunctions.add(metricFunction);
       return this;

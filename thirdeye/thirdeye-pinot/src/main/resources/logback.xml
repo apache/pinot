@@ -10,7 +10,7 @@
 	</appender>
 
 	<!-- By default, the level of the root level is set to INFO -->
-	<root level="ERROR">
+	<root level="INFO">
 		<appender-ref ref="STDOUT" />
 	</root>
 </configuration>

@@ -1,7 +1,11 @@
 package com.linkedin.thirdeye.client.pinot;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Properties;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.manager.zk.ZkClient;
@@ -12,11 +16,11 @@ import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.Lists;
 import com.linkedin.pinot.client.ResultSet;
 import com.linkedin.pinot.client.ResultSetGroup;
 import com.linkedin.thirdeye.api.CollectionSchema;
+import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.client.MetricFunction;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
@@ -29,6 +33,9 @@ import com.linkedin.thirdeye.dashboard.ThirdEyeDashboardConfiguration;
 import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
 
 public class PinotThirdEyeClient implements ThirdEyeClient {
+  
+  private static final Logger LOG = LoggerFactory.getLogger(PinotThirdEyeClient.class);
+
   private static final ThirdEyeCacheRegistry CACHE_INSTANCE = ThirdEyeCacheRegistry.getInstance();
   public static final String CONTROLLER_HOST_PROPERTY_KEY = "controllerHost";
   public static final String CONTROLLER_PORT_PROPERTY_KEY = "controllerPort";
@@ -36,7 +43,6 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
   public static final String CLUSTER_NAME_PROPERTY_KEY = "clusterName";
   public static final String TAG_PROPERTY_KEY = "tag";
 
-  private static final Logger LOG = LoggerFactory.getLogger(PinotThirdEyeClient.class);
 
   String segementZKMetadataRootPath;
   private final HttpHost controllerHost;
@@ -109,53 +115,93 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
     List<MetricFunction> metricFunctions = request.getMetricFunctions();
     List<String> dimensionNames = collectionSchema.getDimensionNames();
     String sql = PqlUtils.getPql(request, dataTimeSpec);
-    LOG.info("Executing: {}", sql);
+    LOG.debug("Executing: {}", sql);
     ResultSetGroup result = CACHE_INSTANCE.getResultSetGroupCache()
         .get(new PinotQuery(sql, request.getCollection() + "_OFFLINE"));
     if (LOG.isDebugEnabled()) {
       LOG.debug("Result for: {} {}", sql, format(result));
     }
-    parseResultSetGroup(request, result, metricFunctions, collectionSchema, dimensionNames);
-    PinotThirdEyeResponse resp = new PinotThirdEyeResponse(request, result, dataTimeSpec);
+    List<String[]> resultRows =
+        parseResultSetGroup(request, result, metricFunctions, collectionSchema, dimensionNames);
+    PinotThirdEyeResponse resp = new PinotThirdEyeResponse(request, resultRows, dataTimeSpec);
     return resp;
   }
 
-  private static String format(ResultSetGroup result) {
+  private static String format(ResultSetGroup resultSetGroup) {
     StringBuilder sb = new StringBuilder();
-    for (int i = 0; i < result.getResultSetCount(); i++) {
-      ResultSet resultSet = result.getResultSet(i);
-      for (int c = 0; c < resultSet.getColumnCount(); c++) {
-        sb.append(resultSet.getColumnName(c)).append("=").append(resultSet.getDouble(c));
-      }
+    for (int i = 0; i < resultSetGroup.getResultSetCount(); i++) {
+      sb.append(resultSetGroup.getResultSet(i));
+      sb.append("\n");
     }
     return sb.toString();
   }
 
-  private void parseResultSetGroup(ThirdEyeRequest request, ResultSetGroup result,
+  private List<String[]> parseResultSetGroup(ThirdEyeRequest request, ResultSetGroup result,
       List<MetricFunction> metricFunctions, CollectionSchema collectionSchema,
-      List<String> dimensionNames)
-      throws JsonProcessingException, RuntimeException, NumberFormatException {
-
-    for (int groupIdx = 0; groupIdx < result.getResultSetCount(); groupIdx++) {
-      ResultSet resultSet = result.getResultSet(groupIdx);
-      for (int row = 0; row < resultSet.getRowCount(); row++) {
-        StringBuilder sb = new StringBuilder();
-        String delim = "";
-        if (resultSet.getGroupKeyLength() > 0) {
-          for (int groupKey = 0; groupKey < resultSet.getGroupKeyLength(); groupKey++) {
-            sb.append(delim).append(resultSet.getGroupKeyString(row, groupKey));
-            delim = ",";
-          }
-        }
-        int columnCount = resultSet.getColumnCount();
-        for (int col = 0; col < columnCount; col++) {
-          String colValStr = resultSet.getString(row, col);
-          sb.append(delim).append(colValStr);
-          delim = ",";
-        }
-        // LOG.debug("{}", sb);
+      List<String> dimensionNames) {
+    int numGroupByKeys = 0;
+    boolean hasGroupBy = false;
+    if (request.getGroupByTimeGranularity() != null) {
+      numGroupByKeys += 1;
+    }
+    if (request.getGroupBy() != null) {
+      numGroupByKeys += request.getGroupBy().size();
+    }
+    if (numGroupByKeys > 0) {
+      hasGroupBy = true;
+    }
+    int numMetrics = request.getMetricFunctions().size();
+    int numCols = numGroupByKeys + numMetrics;
+    boolean requiresTimeConversion = false;
+    TimeUnit requestTimeUnit = null;
+    TimeUnit dataTimeUnit = null;
+    if (request.getGroupByTimeGranularity() != null) {
+      requestTimeUnit = request.getGroupByTimeGranularity().getUnit();
+      dataTimeUnit = collectionSchema.getTime().getDataGranularity().getUnit();
+      if (!requestTimeUnit.equals(dataTimeUnit)) {
+        requiresTimeConversion = true;
       }
     }
+    LinkedHashMap<String, String[]> dataMap = new LinkedHashMap<>();
+    for (int i = 0; i < result.getResultSetCount(); i++) {
+      ResultSet resultSet = result.getResultSet(i);
+      int numRows = resultSet.getRowCount();
+      for (int r = 0; r < numRows; r++) {
+        String[] groupKeys;
+        if (hasGroupBy) {
+          groupKeys = new String[resultSet.getGroupKeyLength()];
+          for (int grpKeyIdx = 0; grpKeyIdx < resultSet.getGroupKeyLength(); grpKeyIdx++) {
+            String groupKeyVal = resultSet.getGroupKeyString(r, grpKeyIdx);
+            if (requiresTimeConversion && grpKeyIdx == 0) {
+              groupKeyVal = String
+                  .valueOf(requestTimeUnit.convert(Long.parseLong(groupKeyVal), dataTimeUnit));
+            }
+            groupKeys[grpKeyIdx] = groupKeyVal;
+          }
+        } else {
+          groupKeys = new String[] {};
+        }
+        StringBuilder groupKeyBuilder = new StringBuilder("");
+        for (String grpKey : groupKeys) {
+          groupKeyBuilder.append(grpKey).append("|");
+        }
+        String compositeGroupKey = groupKeyBuilder.toString();
+        String[] rowValues = dataMap.get(compositeGroupKey);
+        if (rowValues == null) {
+          rowValues = new String[numCols];
+          Arrays.fill(rowValues, "0");
+          System.arraycopy(groupKeys, 0, rowValues, 0, groupKeys.length);
+          dataMap.put(compositeGroupKey, rowValues);
+        }
+        rowValues[groupKeys.length + i] =
+            String.valueOf(Double.parseDouble(rowValues[groupKeys.length + i])
+                + Double.parseDouble(resultSet.getString(r, 0)));
+      }
+    }
+    List<String[]> rows = new ArrayList<>();
+    rows.addAll(dataMap.values());
+    return rows;
+
   }
 
   @Override
@@ -203,31 +249,32 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
 
   public static void main(String[] args) throws Exception {
 
-    ThirdEyeConfiguration config = new ThirdEyeDashboardConfiguration();
-    config.setWhitelistCollections("login_mobile");
+    ThirdEyeConfiguration thirdEyeConfig = new ThirdEyeDashboardConfiguration();
+    thirdEyeConfig.setWhitelistCollections("login_mobile");
 
     PinotThirdEyeClientConfig pinotThirdEyeClientConfig = new PinotThirdEyeClientConfig();
     pinotThirdEyeClientConfig.setControllerHost("lva1-app0086.corp.linkedin.com");
     pinotThirdEyeClientConfig.setControllerPort(11984);
-    pinotThirdEyeClientConfig.setZookeeperUrl("zk-lva1-pinot.corp.linkedin.com:12913/pinot-cluster");
+    pinotThirdEyeClientConfig
+        .setZookeeperUrl("zk-lva1-pinot.corp.linkedin.com:12913/pinot-cluster");
     pinotThirdEyeClientConfig.setClusterName("mpSprintDemoCluster");
 
-    ThirdEyeCacheRegistry.initializeWebappCaches(config, pinotThirdEyeClientConfig);
+    ThirdEyeCacheRegistry.initializeWebappCaches(thirdEyeConfig, pinotThirdEyeClientConfig);
 
     ThirdEyeClient thirdEyeClient = ThirdEyeCacheRegistry.getInstance().getQueryCache().getClient();
 
     ThirdEyeRequestBuilder builder = new ThirdEyeRequestBuilder();
     builder.setCollection("login_mobile");
     builder.setStartTimeInclusive(DateTime.parse("2016-05-11"));
-    builder.setEndTimeExclusive(DateTime.parse("2016-05-11"));
-    builder.setMetricFunctions(
-        Lists.newArrayList(new MetricFunction("SUM", "sum_loginAttempt")));
+    builder.setEndTimeExclusive(DateTime.parse("2016-05-17"));
+    builder.setMetricFunctions(Lists.newArrayList(new MetricFunction("SUM", "loginAttempt")));
+    TimeGranularity timeGranularity = new TimeGranularity(1, TimeUnit.HOURS);
+    builder.setGroupByTimeGranularity(timeGranularity);
     ThirdEyeRequest thirdEyeRequest = builder.build("asd");
     ThirdEyeResponse response = thirdEyeClient.execute(thirdEyeRequest);
-    System.out.println("Response: " + response);
-
+    System.out.println("Response: \n" + response);
     thirdEyeClient.close();
-
+    System.exit(0);
   }
 
 }

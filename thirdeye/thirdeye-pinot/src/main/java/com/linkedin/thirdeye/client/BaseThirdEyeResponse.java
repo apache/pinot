@@ -11,7 +11,7 @@ public abstract class BaseThirdEyeResponse implements ThirdEyeResponse {
   protected final ThirdEyeRequest request;
   protected final TimeSpec dataTimeSpec;
   protected final List<String> groupKeyColumns;
-
+  protected final String[] allColumnNames;
   public BaseThirdEyeResponse(ThirdEyeRequest request, TimeSpec dataTimeSpec) {
     this.request = request;
     this.dataTimeSpec = dataTimeSpec;
@@ -21,6 +21,13 @@ public abstract class BaseThirdEyeResponse implements ThirdEyeResponse {
       groupKeyColumns.add(dataTimeSpec.getColumnName());
     }
     groupKeyColumns.addAll(request.getGroupBy());
+    ArrayList<String> allColumnNameList = new ArrayList<>();
+    allColumnNameList.addAll(request.getGroupBy());
+    for(MetricFunction function:request.getMetricFunctions()){
+      allColumnNameList.add(function.toString());
+    }
+    allColumnNames = new String[allColumnNameList.size()];
+    allColumnNameList.toArray(allColumnNames);
   }
 
   @Override
@@ -49,6 +56,10 @@ public abstract class BaseThirdEyeResponse implements ThirdEyeResponse {
     return groupKeyColumns;
   }
 
+  public String[] getAllColumnNames() {
+    return allColumnNames;
+  }
+  
   @Override
   public String toString() {
     return super.toString();
