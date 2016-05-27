@@ -152,7 +152,6 @@ public class FileBasedConfigDAOFactory implements ConfigDAOFactory {
       try {
         input = new FileInputStream(file);
         String json = IOUtils.toString(input, "UTF-8");
-        System.out.println("file  " + file.getAbsolutePath() + " content" + json);
         T instance = AbstractConfig.fromJSON(json, configTypeClass);
         return instance;
       } catch (Exception e) {

@@ -12,7 +12,7 @@ import org.joda.time.DateTime;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.client.MetricExpression;
 import com.linkedin.thirdeye.client.MetricFunction;
-import com.linkedin.thirdeye.client.QueryCache;
+import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.client.comparison.Row;
 import com.linkedin.thirdeye.client.comparison.Row.Metric;
 import com.linkedin.thirdeye.client.comparison.TimeOnTimeComparisonHandler;

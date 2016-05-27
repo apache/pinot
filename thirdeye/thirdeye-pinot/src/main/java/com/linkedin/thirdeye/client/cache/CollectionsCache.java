@@ -4,9 +4,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import jersey.repackaged.com.google.common.collect.Lists;
@@ -26,7 +23,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.api.CollectionSchema;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClientConfig;
-import com.linkedin.thirdeye.dashboard.ThirdEyeDashboardConfiguration;
+import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
 
 public class CollectionsCache {
 
@@ -43,7 +40,7 @@ public class CollectionsCache {
   List<String> blacklist;
   List<String> whitelist;
 
-  public CollectionsCache(PinotThirdEyeClientConfig pinotThirdEyeClientConfig, ThirdEyeDashboardConfiguration config) {
+  public CollectionsCache(PinotThirdEyeClientConfig pinotThirdEyeClientConfig, ThirdEyeConfiguration config) {
     this.collectionsRef = new AtomicReference<>();
     this.controllerClient = HttpClients.createDefault();
     this.controllerHost = new HttpHost(pinotThirdEyeClientConfig.getControllerHost(),

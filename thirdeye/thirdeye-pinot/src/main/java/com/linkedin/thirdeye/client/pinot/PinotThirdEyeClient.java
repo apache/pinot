@@ -14,8 +14,6 @@ import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.Lists;
-import com.linkedin.pinot.client.Connection;
-import com.linkedin.pinot.client.ConnectionFactory;
 import com.linkedin.pinot.client.ResultSet;
 import com.linkedin.pinot.client.ResultSetGroup;
 import com.linkedin.thirdeye.api.CollectionSchema;
@@ -25,7 +23,9 @@ import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.client.ThirdEyeRequest;
 import com.linkedin.thirdeye.client.ThirdEyeRequest.ThirdEyeRequestBuilder;
-import com.linkedin.thirdeye.client.cache.ResultSetGroupCacheLoader;
+import com.linkedin.thirdeye.client.ThirdEyeResponse;
+import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
+import com.linkedin.thirdeye.dashboard.ThirdEyeDashboardConfiguration;
 import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
 
 public class PinotThirdEyeClient implements ThirdEyeClient {
@@ -35,7 +35,6 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
   public static final String FIXED_COLLECTIONS_PROPERTY_KEY = "fixedCollections";
   public static final String CLUSTER_NAME_PROPERTY_KEY = "clusterName";
   public static final String TAG_PROPERTY_KEY = "tag";
-  private static final String BROKER_PREFIX = "Broker_";
 
   private static final Logger LOG = LoggerFactory.getLogger(PinotThirdEyeClient.class);
 
@@ -175,6 +174,11 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
   }
 
   @Override
+  public long getMaxDataTime(String collection) throws Exception {
+    return CACHE_INSTANCE.getCollectionMaxDataTimeCache().get(collection);
+  }
+
+  @Override
   public void clear() throws Exception {
   }
 
@@ -198,39 +202,32 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
   }
 
   public static void main(String[] args) throws Exception {
-    String controllerHost = "lva1-app0086.corp.linkedin.com";
-    int controllerPort = 11984;
-    String zkUrl = "zk-lva1-pinot.corp.linkedin.com:12913/pinot-cluster";// "zk-lva1-pinot.corp:12913/pinot-cluster";
-    String clusterName = "mpSprintDemoCluster";
 
-    // RAW connection
-    Connection connection = ConnectionFactory.fromZookeeper(zkUrl + "/" + clusterName);
-    String statement =
-        "SELECT sum(engaged_feed_session_count) FROM feed_sessions_additive WHERE  Date = 20160514";
-    ResultSetGroup resultSetGroup = connection.execute("feed_sessions_additive_OFFLINE", statement);
-    System.out.println(format(resultSetGroup));
+    ThirdEyeConfiguration config = new ThirdEyeDashboardConfiguration();
+    config.setWhitelistCollections("login_mobile");
 
-    // thirdeyeClient
-    ResultSetGroupCacheLoader resultSetGroupCacheLoader = new ResultSetGroupCacheLoader(connection);
-    // ThirdeyeCacheRegistry.getInstance().registerResultSetGroupCache(resultSetGroupCacheLoader);
+    PinotThirdEyeClientConfig pinotThirdEyeClientConfig = new PinotThirdEyeClientConfig();
+    pinotThirdEyeClientConfig.setControllerHost("lva1-app0086.corp.linkedin.com");
+    pinotThirdEyeClientConfig.setControllerPort(11984);
+    pinotThirdEyeClientConfig.setZookeeperUrl("zk-lva1-pinot.corp.linkedin.com:12913/pinot-cluster");
+    pinotThirdEyeClientConfig.setClusterName("mpSprintDemoCluster");
 
-    PinotThirdEyeClient thirdEyeClient =
-        PinotThirdEyeClient.fromZookeeper(controllerHost, controllerPort, zkUrl, clusterName);
+    ThirdEyeCacheRegistry.initializeWebappCaches(config, pinotThirdEyeClientConfig);
+
+    ThirdEyeClient thirdEyeClient = ThirdEyeCacheRegistry.getInstance().getQueryCache().getClient();
+
     ThirdEyeRequestBuilder builder = new ThirdEyeRequestBuilder();
-    builder.setCollection("feed_sessions_additive");
+    builder.setCollection("login_mobile");
     builder.setStartTimeInclusive(DateTime.parse("2016-05-11"));
     builder.setEndTimeExclusive(DateTime.parse("2016-05-11"));
     builder.setMetricFunctions(
-        Lists.newArrayList(new MetricFunction("SUM", "sum_engaged_feed_session_count")));
+        Lists.newArrayList(new MetricFunction("SUM", "sum_loginAttempt")));
     ThirdEyeRequest thirdEyeRequest = builder.build("asd");
-    // ThirdEyeResponse response = thirdEyeClient.execute(thirdEyeRequest);
-    // System.out.println("Response: " + response);
+    ThirdEyeResponse response = thirdEyeClient.execute(thirdEyeRequest);
+    System.out.println("Response: " + response);
 
-  }
+    thirdEyeClient.close();
 
-  @Override
-  public long getMaxDataTime(String collection) throws Exception {
-    return CACHE_INSTANCE.getCollectionMaxDataTimeCache().get(collection);
   }
 
 }

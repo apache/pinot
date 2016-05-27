@@ -10,8 +10,8 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.TreeSet;
+import java.util.concurrent.ExecutionException;
 
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
@@ -35,8 +35,8 @@ import com.google.common.cache.CacheLoader.InvalidCacheLoadException;
 import com.linkedin.thirdeye.api.CollectionSchema;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.client.MetricExpression;
-import com.linkedin.thirdeye.client.QueryCache;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
+import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesHandler;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesRequest;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesResponse;
@@ -77,9 +77,8 @@ public class DashboardResource {
   public DashboardResource() {
   }
 
-  public DashboardResource(QueryCache queryCache,
-      AbstractConfigDAO<DashboardConfig> dashboardConfigDAO) {
-    this.queryCache = queryCache;
+  public DashboardResource(AbstractConfigDAO<DashboardConfig> dashboardConfigDAO) {
+    this.queryCache = CACHE_REGISTRY_INSTANCE.getQueryCache();
     this.dashboardConfigDAO = dashboardConfigDAO;
   }
 
@@ -157,9 +156,7 @@ public class DashboardResource {
   public String getDashboards(@QueryParam("dataset") String collection) {
     String jsonDashboards = null;
     try {
-      List<String> dashboards = Utils.getDashboards(dashboardConfigDAO, collection);
-      // dashboards.add("none");
-      jsonDashboards = OBJECT_MAPPER.writeValueAsString(dashboards);
+      jsonDashboards = CACHE_REGISTRY_INSTANCE.getDashboardsCache().get(collection);
     } catch (Exception e) {
       LOG.error("Error while fetching dashboards for collection: " + collection, e);
     }
@@ -191,21 +188,12 @@ public class DashboardResource {
   @Produces(MediaType.APPLICATION_JSON)
   public String getFilters(@QueryParam("dataset") String collection,
       @QueryParam("start") String start, @QueryParam("end") String end) {
-    DateTime startDateTime = new DateTime(System.currentTimeMillis()).minusDays(7);
-    DateTime endDateTime = new DateTime(System.currentTimeMillis());
-
     String jsonFilters = null;
     try {
-      List<String> dimensions = Utils.getDimensions(queryCache, collection);
-      Map<String, List<String>> filters =
-          Utils.getFilters(queryCache, collection, "filters", "__COUNT", dimensions, startDateTime,
-              endDateTime);
-      jsonFilters = OBJECT_MAPPER.writeValueAsString(filters);
-    } catch (Exception e) {
-      LOG.error("Error while fetching dimension values in filter drop down for collection: {}",
-          collection, e);
+      jsonFilters = CACHE_REGISTRY_INSTANCE.getDimensionFiltersCache().get(collection);
+    } catch (ExecutionException e) {
+      LOG.error("Exception while getting filters for collection {}", collection, e);
     }
-
     return jsonFilters;
   }
 

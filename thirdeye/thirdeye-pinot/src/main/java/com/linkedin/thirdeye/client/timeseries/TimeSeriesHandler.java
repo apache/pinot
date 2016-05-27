@@ -18,10 +18,10 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.collect.Range;
 import com.linkedin.thirdeye.client.MetricExpression;
-import com.linkedin.thirdeye.client.QueryCache;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.client.ThirdEyeRequest;
 import com.linkedin.thirdeye.client.ThirdEyeResponse;
+import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesRow.TimeSeriesMetric;
 
 public class TimeSeriesHandler {

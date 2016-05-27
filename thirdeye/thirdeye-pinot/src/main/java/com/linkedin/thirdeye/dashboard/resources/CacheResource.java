@@ -13,7 +13,11 @@ import javax.ws.rs.core.Response;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.cache.LoadingCache;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.thirdeye.api.CollectionSchema;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
+import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
 
 @Path("/cache")
 @Produces(MediaType.APPLICATION_JSON)
@@ -36,12 +40,20 @@ public class CacheResource {
   @POST
   @Path("/refresh")
   public Response refreshAllCaches() {
+    try {
+    CACHE_INSTANCE.getCollectionsCache().loadCollections();
+
     List<String> collections = CACHE_INSTANCE.getCollectionsCache().getCollections();
     for (String collection : collections) {
       CACHE_INSTANCE.getCollectionSchemaCache().refresh(collection);
       CACHE_INSTANCE.getSchemaCache().refresh(collection);
       CACHE_INSTANCE.getCollectionMaxDataTimeCache().refresh(collection);
       CACHE_INSTANCE.getCollectionConfigCache().refresh(collection);
+      CACHE_INSTANCE.getDimensionFiltersCache().refresh(collection);
+      CACHE_INSTANCE.getDashboardsCache().refresh(collection);
+    }
+    } catch (Exception e) {
+      LOGGER.error("Exception while refresing caches", e);
     }
     return Response.ok().build();
   }
@@ -50,8 +62,9 @@ public class CacheResource {
   @Path("/refresh/schema")
   public Response refreshSchemaCache() {
     List<String> collections = CACHE_INSTANCE.getCollectionsCache().getCollections();
+    LoadingCache<String,Schema> cache = CACHE_INSTANCE.getSchemaCache();
     for (String collection : collections) {
-      CACHE_INSTANCE.getSchemaCache().refresh(collection);
+      cache.refresh(collection);
     }
     return Response.ok().build();
   }
@@ -60,8 +73,9 @@ public class CacheResource {
   @Path("/refresh/collectionSchema")
   public Response refreshCollectionSchemaCache() {
     List<String> collections = CACHE_INSTANCE.getCollectionsCache().getCollections();
+    LoadingCache<String,CollectionSchema> cache = CACHE_INSTANCE.getCollectionSchemaCache();
     for (String collection : collections) {
-      CACHE_INSTANCE.getCollectionSchemaCache().refresh(collection);
+      cache.refresh(collection);
     }
     return Response.ok().build();
   }
@@ -70,8 +84,9 @@ public class CacheResource {
   @Path("/refresh/maxDataTime")
   public Response refreshMaxDataTimeCache() {
     List<String> collections = CACHE_INSTANCE.getCollectionsCache().getCollections();
+    LoadingCache<String,Long> cache = CACHE_INSTANCE.getCollectionMaxDataTimeCache();
     for (String collection : collections) {
-      CACHE_INSTANCE.getCollectionMaxDataTimeCache().refresh(collection);
+      cache.refresh(collection);
     }
     return Response.ok().build();
   }
@@ -80,8 +95,31 @@ public class CacheResource {
   @Path("/refresh/collectionConfig")
   public Response refreshCollectionConfigCache() {
     List<String> collections = CACHE_INSTANCE.getCollectionsCache().getCollections();
+    LoadingCache<String, CollectionConfig> cache = CACHE_INSTANCE.getCollectionConfigCache();
     for (String collection : collections) {
-      CACHE_INSTANCE.getCollectionConfigCache().refresh(collection);
+      cache.refresh(collection);
+    }
+    return Response.ok().build();
+  }
+
+  @POST
+  @Path("/refresh/filters")
+  public Response refreshDimensionFiltersCache() {
+    List<String> collections = CACHE_INSTANCE.getCollectionsCache().getCollections();
+    LoadingCache<String,String> cache = CACHE_INSTANCE.getDimensionFiltersCache();
+    for (String collection : collections) {
+      cache.refresh(collection);
+    }
+    return Response.ok().build();
+  }
+
+  @POST
+  @Path("/refresh/dashboards")
+  public Response refreshDashboardsCache() {
+    List<String> collections = CACHE_INSTANCE.getCollectionsCache().getCollections();
+    LoadingCache<String,String> cache = CACHE_INSTANCE.getDashboardsCache();
+    for (String collection : collections) {
+      cache.refresh(collection);
     }
     return Response.ok().build();
   }

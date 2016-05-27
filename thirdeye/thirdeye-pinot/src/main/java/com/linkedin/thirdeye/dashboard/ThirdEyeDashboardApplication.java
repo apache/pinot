@@ -1,21 +1,10 @@
 package com.linkedin.thirdeye.dashboard;
 
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.thirdeye.api.CollectionSchema;
-import com.linkedin.thirdeye.client.QueryCache;
-import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
-import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClient;
-import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClientConfig;
 import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
-import com.linkedin.thirdeye.dashboard.configs.AbstractConfigDAO;
-import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
-import com.linkedin.thirdeye.dashboard.configs.DashboardConfig;
 import com.linkedin.thirdeye.dashboard.resources.CacheResource;
 import com.linkedin.thirdeye.dashboard.resources.DashboardResource;
 import com.linkedin.thirdeye.detector.resources.AnomalyResultResource;
@@ -58,36 +47,15 @@ public class ThirdEyeDashboardApplication
   public void run(ThirdEyeDashboardConfiguration config, Environment env) throws Exception {
     super.initDetectorRelatedDAO();
 
-    // PinotThirdeyeClient config
-    PinotThirdEyeClientConfig pinotThirdeyeClientConfig =
-        PinotThirdEyeClientConfig.createThirdEyeClientConfig(config);
-
-    // ThirdEye client
-    ThirdEyeClient thirdEyeClient = PinotThirdEyeClient.fromClientConfig(pinotThirdeyeClientConfig);
-
-    AbstractConfigDAO<DashboardConfig> dashbaordConfigDAO = getDashboardConfigDAO(config);
-    AbstractConfigDAO<CollectionSchema> collectionSchemaDAO = getCollectionSchemaDAO(config);
-    AbstractConfigDAO<CollectionConfig> collectionConfigDAO = getCollectionConfigDAO(config);
-
-    // initialize caches
     try {
-      ThirdEyeCacheRegistry.initializeWebappCaches(pinotThirdeyeClientConfig, collectionSchemaDAO, collectionConfigDAO, config);
+      ThirdEyeCacheRegistry.initializeWebappCaches(config);
     } catch (Exception e) {
       LOG.error("Exception while loading caches", e);
     }
 
-    ExecutorService queryExecutor = env.lifecycle().executorService("query_executor").build();
-    QueryCache queryCache = createQueryCache(thirdEyeClient, queryExecutor);
-    env.jersey().register(new DashboardResource(queryCache, dashbaordConfigDAO));
+    env.jersey().register(new DashboardResource(BaseThirdEyeApplication.getDashboardConfigDAO(config)));
     env.jersey().register(new AnomalyResultResource(anomalyResultDAO));
     env.jersey().register(new CacheResource());
-  }
-
-
-  private QueryCache createQueryCache(ThirdEyeClient thirdEyeClient,
-      ExecutorService queryExecutor) {
-    QueryCache queryCache = new QueryCache(thirdEyeClient, Executors.newFixedThreadPool(10));
-    return queryCache;
   }
 
   public static void main(String[] args) throws Exception {

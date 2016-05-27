@@ -3,7 +3,6 @@ package com.linkedin.thirdeye.detector;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.Callable;
-import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.commons.lang.StringUtils;
@@ -17,18 +16,13 @@ import org.quartz.impl.StdSchedulerFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.thirdeye.api.CollectionSchema;
-import com.linkedin.thirdeye.client.QueryCache;
+
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
-import com.linkedin.thirdeye.client.ThirdEyeClient;
+import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.client.comparison.TimeOnTimeComparisonHandler;
-import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClient;
-import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClientConfig;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesHandler;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesResponseConverter;
 import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
-import com.linkedin.thirdeye.dashboard.configs.AbstractConfigDAO;
-import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
 import com.linkedin.thirdeye.detector.api.AnomalyFunctionSpec;
 import com.linkedin.thirdeye.detector.db.HibernateSessionWrapper;
 import com.linkedin.thirdeye.detector.driver.AnomalyDetectionJobManager;
@@ -92,49 +86,18 @@ public class ThirdEyeDetectorApplication
   @Override
   public void run(final ThirdEyeDetectorConfiguration config, final Environment environment)
       throws Exception {
-    // DAO
     super.initDetectorRelatedDAO();
-    LOG.info("Loading configs from: {}", config.getRootDir());
-    // TODO client factory still being used?
-    // final ThirdEyeClient thirdEyeClient =
-    // PinotThirdEyeClientFactory.createThirdEyeClient(config);
 
-    // PinotThirdeyeClient config
-    PinotThirdEyeClientConfig pinotThirdeyeClientConfig =
-        PinotThirdEyeClientConfig.createThirdEyeClientConfig(config);
-
-    // ThirdEye client
-    final ThirdEyeClient thirdEyeClient =
-        PinotThirdEyeClient.fromClientConfig(pinotThirdeyeClientConfig);
-
-    //
-    AbstractConfigDAO<CollectionSchema> collectionSchemaDAO = getCollectionSchemaDAO(config);
-    AbstractConfigDAO<CollectionConfig> collectionConfigDAO = getCollectionConfigDAO(config);
-    // initialize caches
     try {
-      ThirdEyeCacheRegistry.initializeDetectorCaches(pinotThirdeyeClientConfig, collectionSchemaDAO,
-          collectionConfigDAO);
+      ThirdEyeCacheRegistry.initializeDetectorCaches(config);
     } catch (Exception e) {
       LOG.error("Exception while loading caches", e);
     }
 
-    QueryCache queryCache = new QueryCache(thirdEyeClient, Executors.newFixedThreadPool(10));
+    QueryCache queryCache = ThirdEyeCacheRegistry.getInstance().getQueryCache();
     final TimeSeriesHandler timeSeriesHandler = new TimeSeriesHandler(queryCache);
-    TimeOnTimeComparisonHandler timeOnTimeComparisonHandler =
-        new TimeOnTimeComparisonHandler(queryCache);
-    TimeSeriesResponseConverter timeSeriesResponseConverter =
-        TimeSeriesResponseConverter.getInstance();
-    environment.lifecycle().manage(new Managed() {
-      @Override
-      public void start() throws Exception {
-        // NOP
-      }
-
-      @Override
-      public void stop() throws Exception {
-        thirdEyeClient.close();
-      }
-    });
+    TimeOnTimeComparisonHandler timeOnTimeComparisonHandler = new TimeOnTimeComparisonHandler(queryCache);
+    TimeSeriesResponseConverter timeSeriesResponseConverter = TimeSeriesResponseConverter.getInstance();
 
     // Quartz Scheduler
     SchedulerFactory schedulerFactory = new StdSchedulerFactory();

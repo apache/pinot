@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.client;
+package com.linkedin.thirdeye.client.cache;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -24,7 +24,7 @@ public class QueryCache {
   public ThirdEyeClient getClient() {
     return client;
   }
- 
+
   public ThirdEyeResponse getQueryResult(ThirdEyeRequest request) throws Exception {
     ThirdEyeResponse response = client.execute(request);
     return response;
