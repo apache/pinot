@@ -50,7 +50,7 @@ public class SegmentStatusChecker {
   private static final String CONTROLLER_LEADER_CHANGE = "CONTROLLER LEADER CHANGE";
   public static final String ONLINE = "ONLINE";
   public static final String ERROR = "ERROR";
-  private final ScheduledExecutorService _executorService;
+  private ScheduledExecutorService _executorService;
   ControllerMetrics _metricsRegistry;
   private ControllerConf _config;
   private final PinotHelixResourceManager _pinotHelixResourceManager;
@@ -62,32 +62,22 @@ public class SegmentStatusChecker {
    * @param pinotHelixResourceManager The resource checker used to interact with Helix
    * @param config The controller configuration object
    */
-  public SegmentStatusChecker(PinotHelixResourceManager pinotHelixResourceManager,
-      ControllerConf config) {
+  public SegmentStatusChecker(PinotHelixResourceManager pinotHelixResourceManager, ControllerConf config) {
     _pinotHelixResourceManager = pinotHelixResourceManager;
     _helixAdmin = pinotHelixResourceManager.getHelixAdmin();
     _segmentStatusIntervalSeconds = config.getStatusControllerFrequencyInSeconds();
-
-    _executorService = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
-      @Override
-      public Thread newThread(Runnable runnable) {
-        Thread thread = new Thread(runnable);
-        thread.setName("SegStatChecker");
-        return thread;
-      }
-    });
   }
 
   /**
    * Starts the segment status checker.
    */
   public void start(ControllerMetrics metricsRegistry) {
-    if (_segmentStatusIntervalSeconds == -1){
+    if (_segmentStatusIntervalSeconds == -1) {
       return;
     }
 
     _metricsRegistry = metricsRegistry;
-
+    setStatusToDefault();
     // Subscribe to leadership changes
     _pinotHelixResourceManager.getHelixZkManager().addControllerListener(new ControllerChangeListener() {
       @Override
@@ -95,9 +85,22 @@ public class SegmentStatusChecker {
         processLeaderChange(CONTROLLER_LEADER_CHANGE);
       }
     });
+  }
 
+  private void startThread() {
     LOGGER.info("Starting segment status checker");
 
+
+    if (_executorService == null) {
+      _executorService = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
+        @Override
+        public Thread newThread(Runnable runnable) {
+          Thread thread = new Thread(runnable);
+          thread.setName("SegStatChecker");
+          return thread;
+        }
+      });
+    }
     // Set up an executor that executes segment status tasks periodically
     _executorService.scheduleWithFixedDelay(new Runnable() {
       @Override
@@ -115,6 +118,13 @@ public class SegmentStatusChecker {
    * Stops the segment status checker.
    */
   public void stop() {
+    if (_executorService == null) {
+      return;
+    }
+    stopThread();
+  }
+
+  private void stopThread() {
     // Shut down the executor
     _executorService.shutdown();
     try {
@@ -122,6 +132,7 @@ public class SegmentStatusChecker {
     } catch (InterruptedException e) {
       e.printStackTrace();
     }
+    _executorService = null;
   }
 
   /**
@@ -174,6 +185,7 @@ public class SegmentStatusChecker {
         }
         nReplicasExternal = (nReplicasExternal > nReplicas) ? nReplicas : nReplicasExternal;
       }
+      // Synchronization provided by Controller Gauge to make sure that only one thread updates the gauge
       _metricsRegistry.setValueOfTableGauge(externalView.getId(), ControllerGauge.NUMBER_OF_REPLICAS,
           nReplicasExternal);
       _metricsRegistry.setValueOfTableGauge(externalView.getId(), ControllerGauge.SEGMENTS_IN_ERROR_STATE,
@@ -192,9 +204,9 @@ public class SegmentStatusChecker {
     try {
       LOGGER.info("Processing change notification for path: {}", path);
 
-       if (!_pinotHelixResourceManager.isLeader()) {
+      if (_pinotHelixResourceManager.isLeader()) {
         if (path.equals(CONTROLLER_LEADER_CHANGE)) {
-          start(_metricsRegistry);
+          startThread();
         }
       } else {
         LOGGER.info("Not the leader of this cluster, stopping Status Checker.");
@@ -213,7 +225,7 @@ public class SegmentStatusChecker {
     List<String> allTableNames = _pinotHelixResourceManager.getAllPinotTableNames();
     String helixClusterName = _pinotHelixResourceManager.getHelixClusterName();
     HelixAdmin helixAdmin = _pinotHelixResourceManager.getHelixAdmin();
-
+    // Synchronization provided by Controller Gauge to make sure that only one thread updates the gauge
     for (String tableName : allTableNames) {
       _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.NUMBER_OF_REPLICAS, 0);
       _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.SEGMENTS_IN_ERROR_STATE, 0);
