@@ -6,6 +6,7 @@ public class CollectionConfig extends AbstractConfig {
   String collectionName;
 
   boolean isActive = true;
+  boolean enableCount = false; // Default __COUNT metric
 
   Map<String, String> derivedMetrics;
 
@@ -29,6 +30,13 @@ public class CollectionConfig extends AbstractConfig {
     this.isActive = isActive;
   }
 
+  public boolean isEnableCount() {
+    return enableCount;
+  }
+
+  public void setEnableCount(boolean enableCount) {
+    this.enableCount = enableCount;
+  }
 
   public Map<String, String> getDerivedMetrics() {
     return derivedMetrics;

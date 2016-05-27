@@ -70,6 +70,7 @@ public class DashboardResource {
   private static final String DEFAULT_TIMEZONE_ID = "UTC";
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static String DEFAULT_DASHBOARD = "Default_Dashboard";
+  private static String COUNT_METRIC = "__COUNT";
 
   private QueryCache queryCache;
   private AbstractConfigDAO<DashboardConfig> dashboardConfigDAO;
@@ -110,7 +111,7 @@ public class DashboardResource {
   public String getMetrics(@QueryParam("dataset") String collection) {
     String jsonMetrics = null;
     try {
-      CollectionSchema schema = queryCache.getClient().getCollectionSchema(collection);
+      CollectionSchema schema = CACHE_REGISTRY_INSTANCE.getCollectionSchemaCache().get(collection);
       List<String> metrics = schema.getMetricNames();
       CollectionConfig collectionConfig = null;
       try {
@@ -213,20 +214,28 @@ public class DashboardResource {
       DashboardConfig dashboardConfig;
       List<MetricExpression> metricExpressions;
       if (dashboardName == null || DEFAULT_DASHBOARD.equals(dashboardName)) {
-        CollectionSchema collectionSchema = queryCache.getClient().getCollectionSchema(collection);
+        CollectionConfig collectionConfig = null;
+        try {
+          collectionConfig = CACHE_REGISTRY_INSTANCE.getCollectionConfigCache().get(collection);
+        } catch (InvalidCacheLoadException e) {
+          LOG.debug("No collection configs for collection {}", collection);
+        }
+        CollectionSchema collectionSchema = CACHE_REGISTRY_INSTANCE.getCollectionSchemaCache().get(collection);
+
         metricExpressions = new ArrayList<>();
         List<String> metricNames = collectionSchema.getMetricNames();
         for (String metric : metricNames) {
-          if (!metric.equals("__COUNT")) {
-            metricExpressions.add(new MetricExpression(metric));
+          if (metric.equals(COUNT_METRIC) && (collectionConfig == null || !collectionConfig.isEnableCount())) {
+            continue;
           }
+          metricExpressions.add(new MetricExpression(metric));
         }
       } else {
         dashboardConfig = dashboardConfigDAO.findById(collection + "_" + dashboardName);
         metricExpressions = dashboardConfig.getMetricExpressions();
       }
       request.setMetricExpressions(metricExpressions);
-      long maxDataTime = queryCache.getClient().getMaxDataTime(collection);
+      long maxDataTime = CACHE_REGISTRY_INSTANCE.getCollectionMaxDataTimeCache().get(collection);
       if (currentEnd > maxDataTime) {
         long delta = currentEnd - maxDataTime;
         currentEnd = currentEnd - delta;
@@ -299,7 +308,7 @@ public class DashboardResource {
     List<MetricExpression> metricExpressions =
         Utils.convertToMetricExpressions(metricsJson, collection);
     request.setMetricExpressions(metricExpressions);
-    long maxDataTime = queryCache.getClient().getMaxDataTime(collection);
+    long maxDataTime = CACHE_REGISTRY_INSTANCE.getCollectionMaxDataTimeCache().get(collection);
     if (currentEnd > maxDataTime) {
       long delta = currentEnd - maxDataTime;
       currentEnd = currentEnd - delta;
@@ -347,7 +356,7 @@ public class DashboardResource {
     List<MetricExpression> metricExpressions =
         Utils.convertToMetricExpressions(metricsJson, collection);
     request.setMetricExpressions(metricExpressions);
-    long maxDataTime = queryCache.getClient().getMaxDataTime(collection);
+    long maxDataTime = CACHE_REGISTRY_INSTANCE.getCollectionMaxDataTimeCache().get(collection);
     if (currentEnd > maxDataTime) {
       long delta = currentEnd - maxDataTime;
       currentEnd = currentEnd - delta;
@@ -397,7 +406,7 @@ public class DashboardResource {
     List<MetricExpression> metricExpressions =
         Utils.convertToMetricExpressions(metricsJson, collection);
     request.setMetricExpressions(metricExpressions);
-    long maxDataTime = queryCache.getClient().getMaxDataTime(collection);
+    long maxDataTime = CACHE_REGISTRY_INSTANCE.getCollectionMaxDataTimeCache().get(collection);
     if (currentEnd > maxDataTime) {
       long delta = currentEnd - maxDataTime;
       currentEnd = currentEnd - delta;
