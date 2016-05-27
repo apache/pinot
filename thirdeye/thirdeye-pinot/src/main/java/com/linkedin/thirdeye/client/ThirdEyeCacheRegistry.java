@@ -125,6 +125,22 @@ public class ThirdEyeCacheRegistry {
     initPeriodicCacheRefresh();
   }
 
+  /**
+   * Initializes detector caches with custom PinotThirdEyeClientConfig : ONLY FOR TESTING
+   * @param config
+   */
+  @Deprecated
+  public static void initializeDetectorCaches(ThirdEyeConfiguration config, PinotThirdEyeClientConfig pinotThirdEyeClientConfig) {
+    init(config, pinotThirdEyeClientConfig);
+    initCommonCacheLoaders();
+  }
+
+  /**
+   * Initialize web app caches with custom PinotThirdEyeClientConfig: ONLY FOR TESTING
+   * @param config
+   * @param pinotThirdeyeClientConfig
+   */
+  @Deprecated
   public static void initializeWebappCaches(ThirdEyeConfiguration config, PinotThirdEyeClientConfig pinotThirdeyeClientConfig) {
 
     init(config, pinotThirdeyeClientConfig);
