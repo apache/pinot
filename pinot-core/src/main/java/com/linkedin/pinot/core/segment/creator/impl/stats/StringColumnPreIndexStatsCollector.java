@@ -33,39 +33,74 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
   private String min = V1Constants.Str.NULL_STRING;
   private String max = V1Constants.Str.NULL_STRING;
   private final int longestStringLength = 0;
-  private final ObjectSet<String> stringSet;
+  private final ObjectSet<String> rawStringSet;
+  private final ObjectSet<String> aggregatedStringSet;
   private String[] sortedStringList;
   private boolean hasNull = false;
   private boolean sealed = false;
 
   public StringColumnPreIndexStatsCollector(FieldSpec spec) {
     super(spec);
-    stringSet = new ObjectOpenHashSet<>(1000);
+    rawStringSet = new ObjectOpenHashSet<>(INITIAL_HASH_SET_SIZE);
+    aggregatedStringSet = new ObjectOpenHashSet<>(INITIAL_HASH_SET_SIZE);
   }
 
-  @Override
-  public void collect(Object entry) {
+  /**
+   * Collect statistics for the given entry.
+   * - Add it to the passed in set (which could be raw or aggregated)
+   * - Update maximum number of values for Multi-valued entries
+   * - Update Total number of entries
+   * - Check if entry is sorted.
+   * @param entry
+   * @param set
+   */
+  private void collectEntry(Object entry, ObjectSet<String> set) {
 
     if (entry instanceof Object[]) {
       for (final Object e : (Object[]) entry) {
-        stringSet.add(e.toString());
+        set.add(e.toString());
       }
       if (maxNumberOfMultiValues < ((Object[]) entry).length) {
         maxNumberOfMultiValues = ((Object[]) entry).length;
       }
       updateTotalNumberOfEntries((Object[]) entry);
-      return;
-    }
-
-    String value;
-    if (entry != null) {
-      value = entry.toString();
     } else {
-      value = fieldSpec.getDefaultNullValue().toString();
+
+      String value;
+      if (entry != null) {
+        value = entry.toString();
+      } else {
+        value = fieldSpec.getDefaultNullValue().toString();
+      }
+      addressSorted(value);
+      set.add(value);
+      totalNumberOfEntries++;
     }
-    addressSorted(value);
-    stringSet.add(value);
   }
+
+  /**
+   * {@inheritDoc}
+   * @param entry Entry to be collected
+   * @param isAggregated True for aggregated, False for raw.
+   */
+  @Override
+  public void collect(Object entry, boolean isAggregated) {
+    if (isAggregated) {
+      collectEntry(entry, aggregatedStringSet);
+    } else {
+      collectEntry(entry, rawStringSet);
+    }
+  }
+
+  /**
+   * {@inheritDoc}
+   * @param entry Entry to be collected
+   */
+  @Override
+  public void collect(Object entry) {
+    collect(entry, false /* isAggregated */);
+  }
+
 
   @Override
   public String getMinValue() throws Exception {
@@ -102,7 +137,7 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
   @Override
   public int getCardinality() throws Exception {
     if (sealed) {
-      return stringSet.size();
+      return sortedStringList.length;
     }
     throw new IllegalAccessException("you must seal the collector first before asking for cardinality");
   }
@@ -115,8 +150,8 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
   @Override
   public void seal() {
     sealed = true;
-    sortedStringList = new String[stringSet.size()];
-    stringSet.toArray(sortedStringList);
+    sortedStringList = new String[rawStringSet.size()];
+    rawStringSet.toArray(sortedStringList);
 
     Arrays.sort(sortedStringList);
 
@@ -126,8 +161,17 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
       return;
     }
 
+    // Update min/max based on raw docs.
     min = sortedStringList[0];
     max = sortedStringList[sortedStringList.length - 1];
-  }
 
+    // Merge the raw and aggregated docs, so stats for dictionary creation are collected correctly.
+    int numAggregated = aggregatedStringSet.size();
+    if (numAggregated > 0) {
+      rawStringSet.addAll(aggregatedStringSet);
+      sortedStringList = new String[rawStringSet.size()];
+      rawStringSet.toArray(sortedStringList);
+      Arrays.sort(sortedStringList);
+    }
+  }
 }

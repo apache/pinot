@@ -31,33 +31,68 @@ public class IntColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
 
   private Integer min = null;
   private Integer max = null;
-  private final IntSet intSet;
+  private final IntSet rawIntSet;
+  private final IntSet aggregatedIntSet;
   private boolean hasNull = false;
   private int[] sortedIntList;
   private boolean sealed = false;
 
   public IntColumnPreIndexStatsCollector(FieldSpec spec) {
     super(spec);
-    intSet = new IntOpenHashSet(1000);
+    rawIntSet = new IntOpenHashSet(INITIAL_HASH_SET_SIZE);
+    aggregatedIntSet = new IntOpenHashSet(INITIAL_HASH_SET_SIZE);
   }
 
-  @Override
-  public void collect(Object entry) {
+  /**
+   * Collect statistics for the given entry.
+   * - Add it to the passed in set (which could be raw or aggregated)
+   * - Update maximum number of values for Multi-valued entries
+   * - Update Total number of entries
+   * - Check if entry is sorted.
+   * @param entry
+   * @param set
+   */
+  private void collectEntry(Object entry, IntSet set) {
     if (entry instanceof Object[]) {
       for (Object e : (Object[]) entry) {
-        intSet.add(((Number) e).intValue());
+        set.add(((Number) e).intValue());
       }
       if (maxNumberOfMultiValues < ((Object[]) entry).length) {
         maxNumberOfMultiValues = ((Object[]) entry).length;
       }
       updateTotalNumberOfEntries((Object[]) entry);
-      return;
-    }
+    } else {
 
-    int value = ((Number) entry).intValue();
-    addressSorted(value);
-    intSet.add(value);
+      int value = ((Number) entry).intValue();
+      addressSorted(value);
+      set.add(value);
+      totalNumberOfEntries++;
+    }
   }
+
+  /**
+   * {@inheritDoc}
+   * @param entry Entry to be collected
+   * @param isAggregated True for aggregated, False for raw.
+   */
+  @Override
+  public void collect(Object entry, boolean isAggregated) {
+    if (isAggregated) {
+      collectEntry(entry, aggregatedIntSet);
+    } else {
+      collectEntry(entry, rawIntSet);
+    }
+  }
+
+  /**
+   * {@inheritDoc}
+   * @param entry Entry to be collected
+   */
+  @Override
+  public void collect(Object entry) {
+    collect(entry, false /* isAggregated */);
+  }
+
 
   @Override
   public Integer getMinValue() throws Exception {
@@ -86,7 +121,7 @@ public class IntColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
   @Override
   public int getCardinality() throws Exception {
     if (sealed) {
-      return intSet.size();
+      return sortedIntList.length;
     }
     throw new IllegalAccessException("you must seal the collector first before asking for cardinality");
   }
@@ -99,8 +134,8 @@ public class IntColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
   @Override
   public void seal() {
     sealed = true;
-    sortedIntList = new int[intSet.size()];
-    intSet.toArray(sortedIntList);
+    sortedIntList = new int[rawIntSet.size()];
+    rawIntSet.toArray(sortedIntList);
 
     Arrays.sort(sortedIntList);
 
@@ -110,7 +145,17 @@ public class IntColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
       return;
     }
 
+    // Update min/max based on raw docs.
     min = sortedIntList[0];
     max = sortedIntList[sortedIntList.length - 1];
+
+    // Merge the raw and aggregated docs, so stats for dictionary creation are collected correctly.
+    int numAggregated = aggregatedIntSet.size();
+    if (numAggregated > 0) {
+      rawIntSet.addAll(aggregatedIntSet);
+      sortedIntList = new int[rawIntSet.size()];
+      rawIntSet.toArray(sortedIntList);
+      Arrays.sort(sortedIntList);
+    }
   }
 }

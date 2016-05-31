@@ -31,32 +31,65 @@ public class FloatColumnPreIndexStatsCollector extends AbstractColumnStatisticsC
 
   private Float min = Float.MAX_VALUE;
   private Float max = Float.MIN_VALUE;
-  private final FloatSet floatSet;
+  private final FloatSet rawFloatSet;
+  private final FloatSet aggregatedFloatSet;
   private float[] sortedFloatList;
   private boolean hasNull = false;
   private boolean sealed = false;
 
   public FloatColumnPreIndexStatsCollector(FieldSpec spec) {
     super(spec);
-    floatSet = new FloatOpenHashSet(1000);
+    rawFloatSet = new FloatOpenHashSet(INITIAL_HASH_SET_SIZE);
+    aggregatedFloatSet = new FloatOpenHashSet(INITIAL_HASH_SET_SIZE);
   }
 
-  @Override
-  public void collect(Object entry) {
+  /**
+   * Collect statistics for the given entry.
+   * - Add it to the passed in set (which could be raw or aggregated)
+   * - Update maximum number of values for Multi-valued entries
+   * - Update Total number of entries
+   * - Check if entry is sorted.
+   * @param entry
+   * @param set
+   */
+  private void collectEntry(Object entry, FloatSet set) {
     if (entry instanceof Object[]) {
       for (final Object e : (Object[]) entry) {
-        floatSet.add(((Number) e).floatValue());
+        set.add(((Number) e).floatValue());
       }
       if (maxNumberOfMultiValues < ((Object[]) entry).length) {
         maxNumberOfMultiValues = ((Object[]) entry).length;
       }
       updateTotalNumberOfEntries((Object[]) entry);
-      return;
+    } else {
+      float value = ((Number) entry).floatValue();
+      addressSorted(value);
+      set.add(value);
+      totalNumberOfEntries++;
     }
+  }
 
-    float value = ((Number) entry).floatValue();
-    addressSorted(value);
-    floatSet.add(value);
+  /**
+   * {@inheritDoc}
+   * @param entry Entry to be collected
+   * @param isAggregated True for aggregated, False for raw.
+   */
+  @Override
+  public void collect(Object entry, boolean isAggregated) {
+    if (isAggregated) {
+      collectEntry(entry, aggregatedFloatSet);
+    } else {
+      collectEntry(entry, rawFloatSet);
+    }
+  }
+
+  /**
+   * {@inheritDoc}
+   * @param entry Entry to be collected
+   */
+  @Override
+  public void collect(Object entry) {
+    collect(entry, false /* isAggregated */);
   }
 
   @Override
@@ -86,7 +119,7 @@ public class FloatColumnPreIndexStatsCollector extends AbstractColumnStatisticsC
   @Override
   public int getCardinality() throws Exception {
     if (sealed) {
-      return floatSet.size();
+      return sortedFloatList.length;
     }
     throw new IllegalAccessException("you must seal the collector first before asking for min value");
   }
@@ -99,8 +132,8 @@ public class FloatColumnPreIndexStatsCollector extends AbstractColumnStatisticsC
   @Override
   public void seal() {
     sealed = true;
-    sortedFloatList = new float[floatSet.size()];
-    floatSet.toArray(sortedFloatList);
+    sortedFloatList = new float[rawFloatSet.size()];
+    rawFloatSet.toArray(sortedFloatList);
 
     Arrays.sort(sortedFloatList);
 
@@ -110,8 +143,17 @@ public class FloatColumnPreIndexStatsCollector extends AbstractColumnStatisticsC
       return;
     }
 
+    // Update min/max based on raw docs.
     min = sortedFloatList[0];
     max = sortedFloatList[sortedFloatList.length - 1];
-  }
 
+    // Merge the raw and aggregated docs, so stats for dictionary creation are collected correctly.
+    int numAggregated = aggregatedFloatSet.size();
+    if (numAggregated > 0) {
+      rawFloatSet.addAll(aggregatedFloatSet);
+      sortedFloatList = new float[rawFloatSet.size()];
+      rawFloatSet.toArray(sortedFloatList);
+      Arrays.sort(sortedFloatList);
+    }
+  }
 }

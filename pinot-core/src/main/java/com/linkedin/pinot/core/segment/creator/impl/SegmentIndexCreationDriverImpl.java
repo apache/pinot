@@ -185,7 +185,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
         starTreeBuilder.getTotalRawDocumentCount() + starTreeBuilder.getTotalAggregateDocumentCount());
     while (aggregatedRowsIterator.hasNext()) {
       GenericRow genericRow = aggregatedRowsIterator.next();
-      statsCollector.collectRow(genericRow);
+      statsCollector.collectRow(genericRow, true /* isAggregated */);
       totalAggDocs++;
       totalDocs++;
     }
