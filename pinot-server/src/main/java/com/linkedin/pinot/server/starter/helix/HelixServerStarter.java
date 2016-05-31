@@ -183,6 +183,7 @@ public class HelixServerStarter {
         adminEndpointApplication.setContext(applicationContext);
         _adminApiComponent.getDefaultHost().attach(adminEndpointApplication);
         LOGGER.info("Will start admin API endpoint on port {}", adminApiPort);
+        _adminApiComponent.start();
       } else {
         LOGGER.warn("Not starting admin API endpoint due to invalid port number {}", adminApiPort);
       }
