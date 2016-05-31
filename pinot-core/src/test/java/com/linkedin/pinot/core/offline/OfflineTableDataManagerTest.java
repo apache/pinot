@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.offline;
 
+import com.google.common.collect.ImmutableList;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
@@ -158,6 +159,8 @@ public class OfflineTableDataManagerTest {
     // Now the segment should not be available for use.Also, returning a null reader is fine
     segmentDataManager = tableDataManager.acquireSegment(segmentName);
     Assert.assertNull(segmentDataManager);
+    ImmutableList<SegmentDataManager> segmentDataManagers = tableDataManager.acquireAllSegments();
+    Assert.assertEquals(segmentDataManagers.size(), 0);
     tableDataManager.releaseSegment(segmentDataManager);
 
     // Removing the segment again is fine.
@@ -168,6 +171,15 @@ public class OfflineTableDataManagerTest {
     IndexSegment ix1 = makeIndexSegment(anotherSeg, totalDocs);
     tableDataManager.addSegment(ix1);
     SegmentDataManager sdm1 = tableDataManager.acquireSegment(anotherSeg);
+    verifyCount(sdm1, 2);
+    // acquire all segments
+    ImmutableList<SegmentDataManager> segmentDataManagersList = tableDataManager.acquireAllSegments();
+    Assert.assertEquals(segmentDataManagersList.size(), 1);
+    verifyCount(sdm1, 3);
+    for (SegmentDataManager dataManager : segmentDataManagersList) {
+      tableDataManager.releaseSegment(dataManager);
+    }
+    // count is back to original
     verifyCount(sdm1, 2);
     tableDataManager.releaseSegment(sdm1);
     verifyCount(sdm1, 1);
@@ -313,6 +325,7 @@ public class OfflineTableDataManagerTest {
     private final int _maxUseTimeMs = 80;
     private final int _nSegsPercent = 70; // We use 70% of the segments for any query.
     private final TableDataManager _tableDataManager;
+    private final double acquireAllProbability = 0.20;
 
     private TestSegmentUser(TableDataManager tableDataManager) {
       _tableDataManager = tableDataManager;
@@ -322,12 +335,18 @@ public class OfflineTableDataManagerTest {
     public void run() {
       while (!_closing) {
         try {
-          Set<Integer> segmentIds = pickSegments();
-          List<String> segmentList = new ArrayList<>(segmentIds.size());
-          for (Integer segmentId : segmentIds) {
-            segmentList.add(segmentPrefix + segmentId);
+          List<SegmentDataManager> segmentDataManagers = null;
+          double probability = _random.nextDouble();
+          if (probability <= acquireAllProbability) {
+            segmentDataManagers = _tableDataManager.acquireAllSegments();
+          } else {
+            Set<Integer> segmentIds = pickSegments();
+            List<String> segmentList = new ArrayList<>(segmentIds.size());
+            for (Integer segmentId : segmentIds) {
+              segmentList.add(segmentPrefix + segmentId);
+            }
+            segmentDataManagers = _tableDataManager.acquireSegments(segmentList);
           }
-          List<SegmentDataManager> segmentDataManagers = _tableDataManager.acquireSegments(segmentList);
           // Some of them may be rejected, but that is OK.
 
           // Keep track of all segment data managers we ever accessed.
