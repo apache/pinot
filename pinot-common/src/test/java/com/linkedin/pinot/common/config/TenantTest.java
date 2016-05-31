@@ -1,15 +1,3 @@
-package com.linkedin.pinot.common.config;
-
-import com.linkedin.pinot.common.utils.TenantRole;
-import java.io.IOException;
-import org.codehaus.jackson.JsonNode;
-import org.codehaus.jackson.map.ObjectMapper;
-import org.json.JSONException;
-import org.json.JSONObject;
-import org.testng.Assert;
-import org.testng.annotations.Test;
-
-
 /**
  * Copyright (C) 2014-2015 LinkedIn Corp. (pinot-core@linkedin.com)
  *
@@ -25,6 +13,17 @@ import org.testng.annotations.Test;
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+package com.linkedin.pinot.common.config;
+
+import com.linkedin.pinot.common.utils.TenantRole;
+import java.io.IOException;
+import org.codehaus.jackson.JsonNode;
+import org.codehaus.jackson.map.ObjectMapper;
+import org.json.JSONException;
+import org.json.JSONObject;
+import org.testng.Assert;
+import org.testng.annotations.Test;
 
 public class TenantTest {
 
