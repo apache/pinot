@@ -44,7 +44,7 @@ public class UserRuleAnomalyFunction extends BaseAnomalyFunction {
   public static final String CHANGE_THRESHOLD = "changeThreshold";
   public static final String AVERAGE_VOLUME_THRESHOLD = "averageVolumeThreshold";
   public static final String MESSAGE_TEMPLATE = "messageTemplate";
-  public static final String DEFAULT_MESSAGE_TEMPLATE = "threshold=%s, %s value is %s / %s";
+  public static final String DEFAULT_MESSAGE_TEMPLATE = "threshold=%.3f, %s value is %s / %s (%.3f)";
   private static final Joiner CSV = Joiner.on(",");
 
   @Override
@@ -110,7 +110,7 @@ public class UserRuleAnomalyFunction extends BaseAnomalyFunction {
         anomalyResult.setScore(calculatePercentChange(currentValue, baselineValue));
         anomalyResult.setWeight(averageValue);
         String message = String.format(messageTemplate, changeThreshold, baselineProp, currentValue,
-            baselineValue);
+            baselineValue, calculatePercentChange(currentValue, baselineValue));
         anomalyResult.setMessage(message);
         anomalyResult.setFilters(getSpec().getFilters());
         anomalyResults.add(anomalyResult);
