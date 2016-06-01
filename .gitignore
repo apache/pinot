@@ -21,6 +21,8 @@ cscope.*
 .project
 .svn
 target/
+bin/
+*/bin/
 .idea
 *.iml
 .settings/
