@@ -15,6 +15,9 @@ import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.TimeFieldSpec;
 import com.linkedin.pinot.common.data.TimeGranularitySpec;
 
+/**
+* Avro utils for thirdeye-hadoop
+*/
 public class ThirdeyeAvroUtilsTest {
 
   public Schema avroSchema;
