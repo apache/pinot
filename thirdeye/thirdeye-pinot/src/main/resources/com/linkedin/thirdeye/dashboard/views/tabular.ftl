@@ -26,13 +26,15 @@
             <thead>
                 <tr>
                     <th class="border-left">Time</th>
+                    <th class="dropdown-column"></th>
                     {{#each timeBuckets as |timeBucket timeBucketIndex|}}
-                    <th class="table-time-cell border-left" currentStartUTC="{{timeBucket.currentStart}}" colspan="1"></th>
+                    <th class="table-time-cell border-left" currentStartUTC="{{timeBucket.currentStart}}" colspan="1" data-uk-tooltip title="{{millisToDate  timeBucket.currentStart}}">{{millisToDateTimeInAggregate  timeBucket.currentStart}}</th>
                     {{/each}}
                 </tr>
                 <!-- Subheader -->
                 <tr  class="subheader hidden">
                     <th class="border-left"></th>
+                    <th class="dropdown-column"></th>
                     {{#each timeBuckets}}
                     <th class="border-left">Baseline</th>
                     <th>Current</th>
@@ -47,6 +49,8 @@
                 {{#each data as |metricData metricIndex|}}
                 <tr class="data-row">
                     <td class="metric-label border-left" title="{{@key}}" style="width:145px;">{{@key}}</td>
+                    <td class="dropdown-column" style="position: relative"><button class="funnels-dimension-selector-btn uk-button" style="width:100%"  data-metric="{{@key}}"><i class="uk-icon-caret-down"></i></button></td>
+
                     {{#each responseData as |metricDataRows metricDataRowIndex|}}
                     <td class="{{classify 0}}" timeIndex={{metricDataRowIndex}} metricIndex={{metricIndex}} value="{{metricDataRows.[0]}}">{{displayRatio metricDataRows.[0] 0}}</td>
                     <td class="{{classify 1}}" timeIndex={{metricDataRowIndex}} metricIndex={{metricIndex}} value="{{metricDataRows.[1]}}">{{displayRatio metricDataRows.[1] 1}}</td>
@@ -88,8 +92,14 @@
     </div>
     <div id="metrics"  class="hidden">
         {{#each metrics as |metricName metricIndex|}}
-        <span>{{metricName }}</span>
+        <span>{{metricName}}</span>
         {{/each}}
+    </div>
+
+    <div class="funnels-table-dimension-box hidden">
+        <i class="close-parent uk-icon-close"></i>
+        <ul  class="funnels-table-dimension-list">
+        </ul>
     </div>
     </script>
 </section>

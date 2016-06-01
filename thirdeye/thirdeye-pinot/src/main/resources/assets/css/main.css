@@ -69,8 +69,12 @@ body a{
     z-index: 5;
 }
 
-.tip-to-user i{
-    float: right;
+.close-parent{
+    padding: 3px;
+    margin: 0;
+    position: absolute;
+    right: 5px;
+    top: 5px;
 }
 
 .checkbox-type-button,
@@ -554,7 +558,6 @@ body a{
     -webkit-transform:rotateX(180deg);
 }
 
-#funnels-table .metric-label:hover,
 #funnels-table .heat-map-cell:hover{
     cursor : pointer;
     text-decoration: underline;
@@ -574,8 +577,49 @@ body a{
     vertical-align: middle;
     text-align: center;
     border-bottom: 1px solid #666;
+}
+
+.dropdown-column{
+    width:30px;
+}
+
+.funnels-table-dimension-box{
+    background-color: #f5f5f5;
+    width:205px;
+    height:105px;
+    border: 1px solid #333;
+    padding: 15px;
+    -webkit-border-radius: 10px;
+    -moz-border-radius: 10px;
+    border-radius: 10px;
+    -webkit-box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4);
+    -moz-box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4);
+    box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4);
 
 }
+
+.funnels-table-dimension-list{
+    vertical-align: top;
+    border: 1px solid #000;
+    height: 105px;
+    overflow-y: scroll;
+    text-overflow: ellipsis;
+    margin: 0 10px;
+    background: #fff;
+}
+
+.funnels-table-dimension-list .funnels-dimension-option{
+
+    line-height: 8px;
+    font-size: 10px;
+    padding: 6px;
+    font-family: Arial, sans-serif;
+    color: #000;
+    vertical-align: middle;
+    text-align: center;
+    border-bottom: 1px solid #666;
+}
+
 
 
 .date-time-selector-box{
@@ -859,6 +903,7 @@ path {
 .uk-info-circle:before {
     color: #ffffff;
 }
+
 
 
 

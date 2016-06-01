@@ -45,9 +45,6 @@
     <!--<script type="text/javascript" src="https://www.google.com/jsapi"></script>-->
 
     <script src="../../../assets/js/lib/utility.js" defer></script>
-    <script src="../../../assets/js/lib/utility-form.js" defer></script>
-    <script src="../../../assets/js/lib/utility-form-filter.js" defer></script>
-    <script src="../../../assets/js/lib/utility-form-time.js" defer></script>
     <script src="../../../assets/js/lib/get-form-data.js" defer></script>
     <script src="../../../assets/js/lib/tabular.js" defer></script>
     <script src="../../../assets/js/lib/contributors.js" defer></script>

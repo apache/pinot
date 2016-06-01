@@ -127,6 +127,24 @@ $(document).ready(function() {
         return moment(millis).tz(tz).format('YYYY-MM-DD h a z');
     });
 
+    //takes utc timestamp (milliseconds ie. 1462626000000), returns date and time in users tz in a format in sync with the hash aggregate granularity
+    Handlebars.registerHelper('millisToDateTimeInAggregate', function(millis) {
+
+        if(!millis){
+            return "n.a"
+        }
+        millis = parseInt(millis);
+        var tz = getTimeZone();
+        var dateTimeFormat = "h a";
+        if(hash.hasOwnProperty("aggTimeGranularity") && hash.aggTimeGranularity == "DAYS"){
+
+            dateTimeFormat = "MM-DD h a"
+        }
+
+
+        return moment(millis).tz(tz).format(dateTimeFormat);
+    });
+
     Handlebars.registerHelper('parse', function(str, prop) {
         str = str.replace("/;/g", ',');
         var obj = JSON.parse(str);
