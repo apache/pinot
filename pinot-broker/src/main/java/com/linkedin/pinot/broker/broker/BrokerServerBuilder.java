@@ -67,9 +67,11 @@ public class BrokerServerBuilder {
   private static final String CLIENT_CONFIG_PREFIX = "pinot.broker.client";
   private static final String METRICS_CONFIG_PREFIX = "pinot.broker.metrics";
   private static final String BROKER_TIME_OUT_CONFIG = "pinot.broker.timeoutMs";
+  private static final String BROKER_DELAY_SHUTDOWN_TIME_CONFIG = "pinot.broker.delayShutdownTimeMs";
 
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerServerBuilder.class);
   private static final long DEFAULT_BROKER_TIME_OUT_MS = 10 * 1000L;
+  private static final long DEFAULT_BROKER_DELAY_SHUTDOWN_TIME_MS = 10 * 1000L;
 
   // Connection Pool Related
   private KeyedPool<ServerInstance, NettyClientConnection> _connPool;
@@ -92,6 +94,8 @@ public class BrokerServerBuilder {
   // Broker Request Handler
   private BrokerRequestHandler _requestHandler;
 
+  private long delayedShutdownTimeMs = DEFAULT_BROKER_DELAY_SHUTDOWN_TIME_MS;
+
   private Server _server;
   private final Configuration _config;
   private final LiveInstancesChangeListenerImpl listener;
@@ -110,6 +114,9 @@ public class BrokerServerBuilder {
   public BrokerServerBuilder(Configuration configuration, HelixExternalViewBasedRouting helixExternalViewBasedRouting,
       TimeBoundaryService timeBoundaryService, LiveInstancesChangeListenerImpl listener) throws ConfigurationException {
     _config = configuration;
+    if (_config.containsKey(BROKER_DELAY_SHUTDOWN_TIME_CONFIG)) {
+      delayedShutdownTimeMs = _config.getLong(BROKER_DELAY_SHUTDOWN_TIME_CONFIG, DEFAULT_BROKER_DELAY_SHUTDOWN_TIME_MS);
+    }
     _routingTable = helixExternalViewBasedRouting;
     _timeBoundaryService = timeBoundaryService;
     this.listener = listener;
@@ -244,7 +251,11 @@ public class BrokerServerBuilder {
 
   public void stop() throws Exception {
     LOGGER.info("Shutting down Network !!");
-
+    try {
+      Thread.sleep(delayedShutdownTimeMs);
+    } catch (Exception e) {
+      LOGGER.error("Interrupted while waiting for shutdown delay period of {} ms.", delayedShutdownTimeMs, e);
+    }
     _state.set(State.SHUTTING_DOWN);
     _connPool.shutdown();
     _eventLoopGroup.shutdownGracefully();

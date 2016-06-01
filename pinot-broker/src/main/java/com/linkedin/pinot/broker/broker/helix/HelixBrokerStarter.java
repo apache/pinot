@@ -255,7 +255,7 @@ public class HelixBrokerStarter {
     return pinotHelixBrokerStarter;
   }
 
-  protected void shutdown() {
+  public void shutdown() {
     LOGGER.info("Shutting down");
 
     if (_helixManager != null) {
