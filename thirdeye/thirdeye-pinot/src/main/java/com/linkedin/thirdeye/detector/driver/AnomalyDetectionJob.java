@@ -80,8 +80,9 @@ public class AnomalyDetectionJob implements Job {
   @Override
   public void execute(final JobExecutionContext context) throws JobExecutionException {
     anomalyFunction = (AnomalyFunction) context.getJobDetail().getJobDataMap().get(FUNCTION);
-    final FailureEmailConfiguration failureEmailConfig = (FailureEmailConfiguration) context
-        .getJobDetail().getJobDataMap().get(FAILURE_EMAIL_CONFIG_KEY);
+    final FailureEmailConfiguration failureEmailConfig =
+        (FailureEmailConfiguration) context.getJobDetail().getJobDataMap()
+            .get(FAILURE_EMAIL_CONFIG_KEY);
     try {
       run(context, anomalyFunction);
     } catch (Throwable t) {
@@ -110,8 +111,9 @@ public class AnomalyDetectionJob implements Job {
     AnomalyFunctionSpec spec = anomalyFunction.getSpec();
     timeSeriesHandler =
         (TimeSeriesHandler) context.getJobDetail().getJobDataMap().get(TIME_SERIES_HANDLER);
-    timeSeriesResponseConverter = (TimeSeriesResponseConverter) context.getJobDetail()
-        .getJobDataMap().get(TIME_SERIES_RESPONSE_CONVERTER);
+    timeSeriesResponseConverter =
+        (TimeSeriesResponseConverter) context.getJobDetail().getJobDataMap()
+            .get(TIME_SERIES_RESPONSE_CONVERTER);
     resultDAO = (AnomalyResultDAO) context.getJobDetail().getJobDataMap().get(RESULT_DAO);
     relationDAO =
         (AnomalyFunctionRelationDAO) context.getJobDetail().getJobDataMap().get(RELATION_DAO);
@@ -183,12 +185,11 @@ public class AnomalyDetectionJob implements Job {
     if (StringUtils.isNotBlank(filters)) {
       topLevelRequest.setFilterSet(spec.getFilterSet());
     }
-
-    timeSeriesRequestQueue.add(topLevelRequest);
-
-    // And all the dimensions which we should explore
     String exploreDimensionsString = spec.getExploreDimensions();
-    if (StringUtils.isNotBlank(exploreDimensionsString)) {
+    if (StringUtils.isBlank(exploreDimensionsString)) {
+      timeSeriesRequestQueue.add(topLevelRequest);
+    } else {
+      // And all the dimensions which we should explore
       List<String> exploreDimensions = Arrays.asList(exploreDimensionsString.split(","));
       // Technically we should be able to pass in all exploration dimensions in one go and let the
       // handler split the requests sent to the underlying client, but we explicitly split here to
@@ -237,8 +238,9 @@ public class AnomalyDetectionJob implements Job {
       try {
         // Run algorithm
         long startTime = System.currentTimeMillis();
-        List<AnomalyResult> results = anomalyFunction.analyze(entry.getKey(), entry.getValue(),
-            windowStart, windowEnd, knownAnomalies);
+        List<AnomalyResult> results =
+            anomalyFunction.analyze(entry.getKey(), entry.getValue(), windowStart, windowEnd,
+                knownAnomalies);
         long endTime = System.currentTimeMillis();
         histogram.update(endTime - startTime);
 
