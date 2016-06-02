@@ -63,6 +63,8 @@ public class EmailReportJob implements Job {
   private static final String EMAIL_REPORT_CHART_PREFIX = "email_report_chart_";
 
   private static final long WEEK_MILLIS = TimeUnit.DAYS.toMillis(7); // TODO make w/w configurable.
+  private static final int MINIMUM_GRAPH_WINDOW_HOURS = 24;
+  private static final int MINIMUM_GRAPH_WINDOW_DAYS = 7;
 
   private static final Logger LOG = LoggerFactory.getLogger(EmailReportJob.class);
 
@@ -303,14 +305,21 @@ public class EmailReportJob implements Job {
   }
 
   /**
-   * Generate and send request to retrieve chart data.
+   * Generate and send request to retrieve chart data. If the request window is too small, the graph
+   * data retrieved has default window sizes based on time granularity and ending at the defined
+   * endpoint: <br/>
+   * <ul>
+   * <li>DAYS: 7</li>
+   * <li>HOURS: 24</li>
+   * </ul>
    * @param bucketGranularity
    * @throws JobExecutionException
    */
   private TimeOnTimeComparisonResponse getData(
       TimeOnTimeComparisonHandler timeOnTimeComparisonHandler, EmailConfiguration config,
-      final DateTime start, final DateTime end, long baselinePeriodMillis,
+      DateTime start, final DateTime end, long baselinePeriodMillis,
       TimeGranularity bucketGranularity) throws JobExecutionException {
+    start = calculateGraphDataStart(start, end, bucketGranularity);
     try {
       TimeOnTimeComparisonRequest comparisonRequest = new TimeOnTimeComparisonRequest();
       comparisonRequest.setCollectionName(config.getCollection());
@@ -326,13 +335,35 @@ public class EmailReportJob implements Job {
       metricExpressions.add(expression);
       comparisonRequest.setMetricExpressions(metricExpressions);
       comparisonRequest.setAggregationTimeGranularity(bucketGranularity);
-      LOG.info("Starting...");
+      LOG.debug("Starting...");
       TimeOnTimeComparisonResponse response = timeOnTimeComparisonHandler.handle(comparisonRequest);
-      LOG.info("Done!");
+      LOG.debug("Done!");
       return response;
     } catch (Exception e) {
       throw new JobExecutionException(e);
     }
+  }
+
+  private DateTime calculateGraphDataStart(DateTime start, DateTime end,
+      TimeGranularity bucketGranularity) {
+    TimeUnit unit = bucketGranularity.getUnit();
+    long minUnits;
+    if (TimeUnit.DAYS.equals(unit)) {
+      minUnits = MINIMUM_GRAPH_WINDOW_DAYS;
+    } else if (TimeUnit.HOURS.equals(unit)) {
+      minUnits = MINIMUM_GRAPH_WINDOW_HOURS;
+    } else {
+      // no need to do calculation, return input start;
+      return start;
+    }
+    long currentUnits = unit.convert(end.getMillis() - start.getMillis(), TimeUnit.MILLISECONDS);
+    if (currentUnits < minUnits) {
+      LOG.info("Overriding config window size {} {} with minimum default of {}", currentUnits,
+          unit, minUnits);
+      start = end.minus(unit.toMillis(minUnits));
+    }
+    return start;
+
   }
 
   private class AssignedDimensionsMethod implements TemplateMethodModelEx {

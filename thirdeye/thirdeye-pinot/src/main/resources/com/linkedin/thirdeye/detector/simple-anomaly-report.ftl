@@ -7,10 +7,10 @@
      Below is the full list of anomalies detected during this time period.
     </#if>
 </p>    
-<#if (groupedAnomalyResults?has_content)>
 <p>
     <img id="Chart" src="cid:${embeddedChart}">
 </p>
+<#if (groupedAnomalyResults?has_content)>
     <table border="1" style="width:100%">
         <tr>
             <th>Dimensions</th>
