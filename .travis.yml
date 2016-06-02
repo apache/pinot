@@ -17,15 +17,13 @@ jdk:
   - oraclejdk8
 
 install:
-  - mvn clean install -DskipTests -Dassembly.skipAssembly=true > /dev/null
+  - ./.travis_install.sh
 
 script:
-  - cd $PINOT_MODULE
-  - cp ../.travis_cmd.sh .
-  - bash .travis_cmd.sh
+  - ./.travis_test.sh
 
 after_success:
-  - bash <(curl -s https://codecov.io/bash)
+  - bash <(cat .codecov_bash)
 
 branches:
   only:

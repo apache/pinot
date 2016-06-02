@@ -1,3 +1,4 @@
+#!/bin/bash -x
 #
 # Copyright (C) 2014-2015 LinkedIn Corp. (pinot-core@linkedin.com)
 #
@@ -14,31 +15,16 @@
 # limitations under the License.
 #
 
-#!/bin/bash
-# Abort on Error
+# Abort on error
 set -e
 
-export PING_SLEEP=30s
+# Ignore changes not related to pinot code
+echo 'Changed files:'
+git diff --name-only $TRAVIS_COMMIT_RANGE | egrep '^(pinot-|pom.xml|.travis)'
+if [ $? -ne 0 ]; then
+  echo 'No changes related to the pinot code, skip the test.'
+  exit 0
+fi
 
-kill_ping() {
-  # nicely terminate the ping output loop
-  kill $PING_LOOP_PID
-}
-error_handler() {
-  echo ERROR: An error was encountered with the build.
-  kill_ping
-  exit 1
-}
-# If an error occurs, run our error handler to output a tail of the build
-trap 'error_handler' ERR
-
-# Set up a repeating loop to send some output to Travis.
-
-bash -c "while true; do echo \$(date) - building ...; sleep $PING_SLEEP; done" &
-PING_LOOP_PID=$!
-
-# Build script
+cd $PINOT_MODULE
 mvn test
-
-# The build finished without returning an error so dump a tail of the output
-kill_ping
