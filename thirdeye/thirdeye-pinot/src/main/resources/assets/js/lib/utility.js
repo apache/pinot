@@ -564,7 +564,7 @@ function  calcHeatMapCellBackground(cell){
 
     var metric = cellObj.attr('data-metric-name')
     var invertColorMetrics = window.datasetConfig.invertColorMetrics;
-    if (undefined != invertColorMetrics && invertColorMetrics.indexOf(metric) > -1) { // invert
+    if (typeof invertColorMetrics !== "undefined" && invertColorMetrics.indexOf(metric) > -1) { // invert
       baseForLtZero = 'rgba(0,0,255,'; //lt zero becomes blue
       baseForGtZero = 'rgba(255,0,0,'; //gt zero becomes red
     }

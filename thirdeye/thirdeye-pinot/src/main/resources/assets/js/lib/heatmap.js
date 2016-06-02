@@ -33,8 +33,6 @@ function renderD3heatmap(data, tab) {
     var baseForLtZero = 'rgba(255,0,0,'; //lt zero is default red
     var baseForGtZero = 'rgba(0,0,255,'; //gt zero is default blue
     var invertColorMetrics = window.datasetConfig.invertColorMetrics;
-    console.log("invertColorMetrics in heatmap");
-    console.log(invertColorMetrics);
 
     var numMetrics = data["metrics"].length
     for(var m =0; m< numMetrics;m++) {
@@ -60,9 +58,7 @@ function renderD3heatmap(data, tab) {
             root_0.metric = metric;
             root_1.metric = metric;
             root_2.metric = metric;
-            console.log("metric " + metric);
-            if (undefined != invertColorMetrics && invertColorMetrics.indexOf(metric) > -1) { // invert
-              console.log("invertColorMetrics in heatmap for metric " + metric)
+            if (typeof invertColorMetrics !== "undefined" && invertColorMetrics.indexOf(metric) > -1) { // invert
               baseForLtZero = 'rgba(0,0,255,'; //lt zero becomes blue
               baseForGtZero = 'rgba(255,0,0,'; //gt zero becomes red
             }

@@ -186,7 +186,7 @@ $(document).ready(function() {
   //takes an object and a key as option param and returns an object as a scope
     Handlebars.registerHelper('lookupCellSizeExpression', function(obj, metricName) {
         var cellSizeExpression = obj[metricName];
-        if (undefined != cellSizeExpression) {
+        if (typeof cellSizeExpression !== "undefined") {
           cellSizeExpression = "(" + cellSizeExpression + ")";
         }
         return cellSizeExpression;
