@@ -2,15 +2,22 @@ package com.linkedin.thirdeye.dashboard.views.heatmap;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 
 import org.apache.commons.math3.distribution.NormalDistribution;
 import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.cache.CacheLoader.InvalidCacheLoadException;
+import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
+import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
+
 public class HeatMap {
 
   private static final Logger LOG = LoggerFactory.getLogger(HeatMap.class);
+  private static CollectionConfig collectionConfig = null;
+  private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
 
   List<HeatMapCell> heatMapCells;
 
@@ -22,10 +29,17 @@ public class HeatMap {
   }
 
   public static class Builder {
+
     List<String> dimensionValues = new ArrayList<>();
     DescriptiveStatistics baselineStats = new DescriptiveStatistics();
-
     DescriptiveStatistics currentStats = new DescriptiveStatistics();
+    DescriptiveStatistics numeratorBaselineStats = new DescriptiveStatistics();
+    DescriptiveStatistics numeratorCurrentStats = new DescriptiveStatistics();
+    DescriptiveStatistics denominatorBaselineStats = new DescriptiveStatistics();
+    DescriptiveStatistics denominatorCurrentStats = new DescriptiveStatistics();
+
+    DescriptiveStatistics cellSizeStats = new DescriptiveStatistics();
+    String cellSizeExpression = null;
 
     List<HeatMapCell> heatMapCells = new ArrayList<>();
 
@@ -33,13 +47,24 @@ public class HeatMap {
 
     public Builder(String dimensionName) {
       this.dimensionName = dimensionName;
-
     }
+
 
     public void addCell(String dimensionValue, double baselineValue, double currentValue) {
       dimensionValues.add(dimensionValue);
       baselineStats.addValue(baselineValue);
       currentStats.addValue(currentValue);
+    }
+
+    public void addCell(String dimensionValue, double baselineValue, double currentValue, Double cellSize, String cellSizeExpression,
+        Double numeratorBaseline, Double denominatorBaseline, Double numeratorCurrent, Double denominatorCurrent) {
+      addCell(dimensionValue, baselineValue, currentValue);
+      cellSizeStats.addValue(cellSize);
+      this.cellSizeExpression = cellSizeExpression;
+      numeratorBaselineStats.addValue(numeratorBaseline);
+      numeratorCurrentStats.addValue(numeratorCurrent);
+      denominatorBaselineStats.addValue(denominatorBaseline);
+      denominatorCurrentStats.addValue(denominatorCurrent);
     }
 
     HeatMap build() {
@@ -53,9 +78,12 @@ public class HeatMap {
         String dimensionValue = dimensionValues.get(i);
         double baselineValue = baselineStats.getElement(i);
         double currentValue = currentStats.getElement(i);
+        double numeratorBaseline = numeratorBaselineStats.getValues().length == 0 ? 0 : numeratorBaselineStats.getElement(i);
+        double numeratorCurrent = numeratorCurrentStats.getValues().length == 0 ? 0 : numeratorCurrentStats.getElement(i);
+        double denominatorBaseline = denominatorBaselineStats.getValues().length == 0 ? 0 : denominatorBaselineStats.getElement(i);
+        double denominatorCurrent = denominatorCurrentStats.getValues().length == 0 ? 0 : denominatorCurrentStats.getElement(i);
 
         // contribution
-
         double baselineContribution = baselineValue *100/ baselineTotal;
         double currentContribution = currentValue * 100 / currentTotal;
         double baselineCDFValue = 0;
@@ -79,19 +107,21 @@ public class HeatMap {
 
         double contributionDifference = currentContribution - baselineContribution;
 
+        double cellSize = cellSizeStats.getValues().length == 0 ? currentValue : cellSizeStats.getElement(i);
         double deltaColor = percentageChange;
-        double deltaSize = currentValue;
+        double deltaSize = cellSize;
         double contributionColor = (currentContribution - baselineContribution);
-        double contributionSize = currentValue;
+        double contributionSize = cellSize;
         double contributionToOverallChange = ((currentValue - baselineValue) / baselineTotal) * 100;
         double contributionToOverallColor = contributionToOverallChange;
-        double contributionToOverallSize = currentValue;
+        double contributionToOverallSize = cellSize;
 
         HeatMapCell cell = new HeatMapCell(dimensionValue, baselineValue, currentValue,
+            numeratorBaseline, denominatorBaseline, numeratorCurrent, denominatorCurrent,
             baselineContribution, currentContribution, baselineCDFValue, currentCDFValue,
             percentageChange, absoluteChange, contributionDifference, contributionToOverallChange,
             deltaColor, deltaSize, contributionColor, contributionSize, contributionToOverallColor,
-            contributionToOverallSize);
+            contributionToOverallSize, cellSizeExpression);
         heatMapCells.add(cell);
       }
       return new HeatMap(dimensionName, heatMapCells);

@@ -7,7 +7,6 @@ function getTabular(tab) {
 };
 
 function renderTabular(data, tab) {
-
     //Error handling when data is falsy (empty, undefined or null)
     if(!data){
         $("#"+  tab +"-chart-area-error").empty()
@@ -235,7 +234,7 @@ function drawTimeSeries(ajaxData, tab ) {
 		},
 		grid : {
 			x : {
-				
+
 			},
 			y : {
 				lines : [ {

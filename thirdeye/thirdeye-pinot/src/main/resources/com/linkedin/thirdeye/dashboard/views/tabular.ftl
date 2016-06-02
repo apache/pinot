@@ -52,9 +52,9 @@
                     <td class="dropdown-column" style="position: relative"><button class="funnels-dimension-selector-btn uk-button" style="width:100%"  data-metric="{{@key}}"><i class="uk-icon-caret-down"></i></button></td>
 
                     {{#each responseData as |metricDataRows metricDataRowIndex|}}
-                    <td class="{{classify 0}}" timeIndex={{metricDataRowIndex}} metricIndex={{metricIndex}} value="{{metricDataRows.[0]}}">{{displayRatio metricDataRows.[0] 0}}</td>
-                    <td class="{{classify 1}}" timeIndex={{metricDataRowIndex}} metricIndex={{metricIndex}} value="{{metricDataRows.[1]}}">{{displayRatio metricDataRows.[1] 1}}</td>
-                    <td class="{{classify 2}}" timeIndex={{metricDataRowIndex}} metricIndex={{metricIndex}} value="{{metricDataRows.[2]}}" title="Baseline Value: {{displayRatio metricDataRows.[0] 0}} Current Value: {{displayRatio metricDataRows.[1] 1}}">
+                    <td class="{{classify 0}}" timeIndex={{metricDataRowIndex}} data-metric-name={{metricIndex}} metricIndex={{metricIndex}} value="{{metricDataRows.[0]}}">{{displayRatio metricDataRows.[0] 0}}</td>
+                    <td class="{{classify 1}}" timeIndex={{metricDataRowIndex}} data-metric-name={{metricIndex}} metricIndex={{metricIndex}} value="{{metricDataRows.[1]}}">{{displayRatio metricDataRows.[1] 1}}</td>
+                    <td class="{{classify 2}}" timeIndex={{metricDataRowIndex}} data-metric-name={{metricIndex}} metricIndex={{metricIndex}} value="{{metricDataRows.[2]}}" title="Baseline Value: {{displayRatio metricDataRows.[0] 0}} Current Value: {{displayRatio metricDataRows.[1] 1}}">
                         {{displayRatio metricDataRows.[2] 2}}
                     </td>
                     {{/each}}
@@ -69,9 +69,9 @@
                 <tr class="data-row">
                     <td class="metric-label border-left" title="{{@key}}" style="width:145px;">{{@key}}</td>
                     {{#each responseData as |metricDataRows metricDataRowIndex|}}
-                    <td class="{{classify 0}}" timeIndex={{metricDataRowIndex}} metricIndex={{metricIndex}} value="{{metricDataRows.[0]}}">{{displayRatio metricDataRows.[3] 0}}</td>
-                    <td class="{{classify 1}}" timeIndex={{metricDataRowIndex}} metricIndex={{metricIndex}} value="{{metricDataRows.[1]}}">{{displayRatio metricDataRows.[4] 1}}</td>
-                    <td class="{{classify 2}}" timeIndex={{metricDataRowIndex}} metricIndex={{metricIndex}} value="{{metricDataRows.[2]}}" title="Baseline Value: {{displayRatio metricDataRows.[0] 0}} Current Value: {{displayRatio metricDataRows.[1] 1}}">
+                    <td class="{{classify 0}}" timeIndex={{metricDataRowIndex}} data-metric-name={{metricIndex}} metricIndex={{metricIndex}} value="{{metricDataRows.[0]}}">{{displayRatio metricDataRows.[3] 0}}</td>
+                    <td class="{{classify 1}}" timeIndex={{metricDataRowIndex}} data-metric-name={{metricIndex}} metricIndex={{metricIndex}} value="{{metricDataRows.[1]}}">{{displayRatio metricDataRows.[4] 1}}</td>
+                    <td class="{{classify 2}}" timeIndex={{metricDataRowIndex}} data-metric-name={{metricIndex}} metricIndex={{metricIndex}} value="{{metricDataRows.[2]}}" title="Baseline Value: {{displayRatio metricDataRows.[0] 0}} Current Value: {{displayRatio metricDataRows.[1] 1}}">
                         {{displayRatio metricDataRows.[5] 2}}
                     </td>
                     {{/each}}

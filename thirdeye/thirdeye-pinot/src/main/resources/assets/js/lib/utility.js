@@ -558,15 +558,26 @@ function showHeatMap(target){
 function  calcHeatMapCellBackground(cell){
 
     var cellObj = $(cell)
+
+    var baseForLtZero = 'rgba(255,0,0,'; //lt zero is default red
+    var baseForGtZero = 'rgba(0,0,255,'; //gt zero is default blue
+
+    var metric = cellObj.attr('data-metric-name')
+    var invertColorMetrics = window.datasetConfig.invertColorMetrics;
+    if (typeof invertColorMetrics !== "undefined" && invertColorMetrics.indexOf(metric) > -1) { // invert
+      baseForLtZero = 'rgba(0,0,255,'; //lt zero becomes blue
+      baseForGtZero = 'rgba(255,0,0,'; //gt zero becomes red
+    }
+
     var value = parseFloat(cellObj.attr('value'))
     value = value / 100;
 
     var absValue = Math.abs(value)
 
     if (value < 0) {
-        cellObj.css('background-color', 'rgba(255,0,0,' + absValue + ')') // red
+        cellObj.css('background-color', baseForLtZero + absValue + ')') // red
     } else {
-        cellObj.css('background-color', 'rgba(0,0,255,' + absValue + ')') // blue
+        cellObj.css('background-color', baseForGtZero + absValue + ')') // blue
     }
 
     var colorIsLight = function (a) {
@@ -826,7 +837,7 @@ function transformUTCToTZ() {
         var dateTimeFormat = "h a";
 
         if(hash.hasOwnProperty("aggTimeGranularity") && hash.aggTimeGranularity == "DAYS"){
-           
+
             dateTimeFormat = "MM-DD h a"
         }
         transformUTCToTZTime(cell, dateTimeFormat);

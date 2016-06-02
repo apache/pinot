@@ -4,9 +4,9 @@ function getHeatmap(tab) {
     var url = "/dashboard/data/heatmap?" + window.location.hash.substring(1);
     getData(url, tab).done(function(data) {
 
-        renderD3heatmap(data, tab);
+      renderD3heatmap(data, tab);
 
-        heatMapEventListeners(tab)
+      heatMapEventListeners(tab)
 
     });
 };
@@ -28,6 +28,11 @@ function renderD3heatmap(data, tab) {
     /* Handelbars template for treemap table */
     var result_treemap_template = HandleBarsTemplates.template_treemap(data)
     $("#"+ tab +"-display-chart-section").html(result_treemap_template);
+
+    //var invertColorMetrics
+    var baseForLtZero = 'rgba(255,0,0,'; //lt zero is default red
+    var baseForGtZero = 'rgba(0,0,255,'; //gt zero is default blue
+    var invertColorMetrics = window.datasetConfig.invertColorMetrics;
 
     var numMetrics = data["metrics"].length
     for(var m =0; m< numMetrics;m++) {
@@ -53,6 +58,10 @@ function renderD3heatmap(data, tab) {
             root_0.metric = metric;
             root_1.metric = metric;
             root_2.metric = metric;
+            if (typeof invertColorMetrics !== "undefined" && invertColorMetrics.indexOf(metric) > -1) { // invert
+              baseForLtZero = 'rgba(0,0,255,'; //lt zero becomes blue
+              baseForGtZero = 'rgba(255,0,0,'; //gt zero becomes red
+            }
 
 
             var children_0 = [];
@@ -83,9 +92,9 @@ function renderD3heatmap(data, tab) {
                 var fontColor_1 = opacity_1 < 0.3 ? '#000000' : '#ffffff';
                 var fontColor_2 = opacity_2 < 0.3 ? '#000000' : '#ffffff';
 
-                var backgroundColor_0 =  Math.round(color_0) < 0 ? "rgba(255,0,0, " + opacity_0 + ")" :  ( Math.round(color_0) > 0 ? "rgba(0,0,255," + opacity_0 + ")" : "rgba(221,221,221,1)");
-                var backgroundColor_1 =  Math.round(color_1) < 0 ? "rgba(255,0,0, " + opacity_1 + ")" :  ( Math.round(color_1) > 0 ? "rgba(0,0,255," + opacity_1 + ")" : "rgba(221,221,221,1)");
-                var backgroundColor_2 =  Math.round(color_2) < 0 ? "rgba(255,0,0, " + opacity_2 + ")" :  ( Math.round(color_2) > 0 ? "rgba(0,0,255," + opacity_2 + ")" : "rgba(221,221,221,1)");
+                var backgroundColor_0 =  Math.round(color_0) < 0 ? baseForLtZero + opacity_0 + ")" :  ( Math.round(color_0) > 0 ? baseForGtZero + opacity_0 + ")" : "rgba(221,221,221,1)");
+                var backgroundColor_1 =  Math.round(color_1) < 0 ? baseForLtZero + opacity_1 + ")" :  ( Math.round(color_1) > 0 ? baseForGtZero + opacity_1 + ")" : "rgba(221,221,221,1)");
+                var backgroundColor_2 =  Math.round(color_2) < 0 ? baseForLtZero + opacity_2 + ")" :  ( Math.round(color_2) > 0 ? baseForGtZero + opacity_2 + ")" : "rgba(221,221,221,1)");
 
                 var label_0 = delta_0 <= 0 ? dimensionValue +" (" + delta_0 + "%)" : dimensionValue +" (+" + delta_0 + "%)";
                 var label_1 = delta_1 <= 0 ? dimensionValue +" (" + delta_1 + "%)" : dimensionValue +" (+" + delta_1 + "%)";
@@ -116,6 +125,7 @@ function renderD3heatmap(data, tab) {
             var placeholder_2 = '#metric_' + metric + '_dim_' + d + '_treemap_2'
 
 
+
             var mouseenter = function(d) {
 
                 var target = $(this)//$(event.target)
@@ -127,20 +137,42 @@ function renderD3heatmap(data, tab) {
                 var yPosition = d3.event.pageY/2;
                 var dimData = data["data"][metric + "." + dimension]["responseData"]
 
+                var cellSizeExpression = dimData[valueId][schema["cellSizeExpression"]];
 
                 d3.select("#tooltip")
-                    .style("left", xPosition + "px")
-                    .style("top", yPosition + "px");
-                d3.select("#tooltip #dim-value")
-                    .text( value                                                                                                                                                                                                                      );
-                d3.select("#tooltip #baseline-value").text( dimData[valueId][schema["baselineValue"]]);
-                d3.select("#tooltip #current-value").text( dimData[valueId][schema["currentValue"]]);
-                d3.select("#tooltip #delta").text( dimData[valueId][schema["percentageChange"]] + '%');
-                d3.select("#tooltip #baseline-contribution").text( dimData[valueId][schema["baselineContribution"]]);
-                d3.select("#tooltip #current-contribution").text( dimData[valueId][schema["currentContribution"]]);
-                d3.select("#tooltip #contribution-diff").text( dimData[valueId][schema["contributionDifference"]] + '%');
-                d3.select("#tooltip").classed("hidden", false);
+                        .style("left", xPosition + "px")
+                        .style("top", yPosition + "px");
+
+                    d3.select("#tooltip #dim-value")
+                        .text( value );
+
+                    d3.select("#tooltip #delta").text( dimData[valueId][schema["percentageChange"]] + '%');
+                    d3.select("#tooltip #baseline-contribution").text( dimData[valueId][schema["baselineContribution"]]);
+                    d3.select("#tooltip #current-contribution").text( dimData[valueId][schema["currentContribution"]]);
+                    d3.select("#tooltip #contribution-diff").text( dimData[valueId][schema["contributionDifference"]] + '%');
+                    d3.select("#tooltip").classed("hidden", false);
+
+
+                if (cellSizeExpression != null && undefined != cellSizeExpression) {
+                    var cellSizeExpressionDisplay = dimData[valueId][schema["deltaSize"]] + " (" + cellSizeExpression + ")";
+                    //dynamic width  cellSizeExpressionDisplay + tooltip width - last column width
+                    var width = (cellSizeExpressionDisplay.length * 12) + 50 ;
+                    d3.select("#tooltip").style("width", width + "px")
+                    d3.select("#tooltip #baseline-value").text( dimData[valueId][schema["baselineValue"]] + " (" + dimData[valueId][schema["numeratorBaseline"]] + "/" + dimData[valueId][schema["denominatorBaseline"]] +")");
+                    d3.select("#tooltip #current-value").text( dimData[valueId][schema["currentValue"]] + " (" + dimData[valueId][schema["numeratorCurrent"]] + "/" + dimData[valueId][schema["denominatorCurrent"]] + ")");
+                    d3.select("#tooltip #cell-size").text( cellSizeExpressionDisplay );
+                    d3.select("#tooltip #cell-size-row").classed("hidden", false);
+
+
+                } else {
+
+                    d3.select("#tooltip #baseline-value").text( dimData[valueId][schema["baselineValue"]]);
+                    d3.select("#tooltip #current-value").text( dimData[valueId][schema["currentValue"]]);
+
+                }
+
             };
+
 
             var mouseleave = function() {
                 d3.select("#tooltip").classed("hidden", true);

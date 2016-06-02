@@ -1,14 +1,22 @@
 package com.linkedin.thirdeye.dashboard.configs;
 
+import java.util.List;
 import java.util.Map;
+
+import com.linkedin.thirdeye.client.MetricExpression;
 
 public class CollectionConfig extends AbstractConfig {
   String collectionName;
+  String collectionAlias;
 
   boolean isActive = true;
   boolean enableCount = false; // Default __COUNT metric
 
   Map<String, String> derivedMetrics;
+
+  List<String> invertColorMetrics; // Invert colors of heatmap and table cells
+
+  Map<String, MetricExpression> cellSizeExpression; // Expression defining how to compute cell size
 
   public CollectionConfig() {
 
@@ -20,6 +28,14 @@ public class CollectionConfig extends AbstractConfig {
 
   public void setCollectionName(String collectionName) {
     this.collectionName = collectionName;
+  }
+
+  public String getCollectionAlias() {
+    return collectionAlias;
+  }
+
+  public void setCollectionAlias(String collectionAlias) {
+    this.collectionAlias = collectionAlias;
   }
 
   public boolean isActive() {
@@ -44,6 +60,23 @@ public class CollectionConfig extends AbstractConfig {
 
   public void setDerivedMetrics(Map<String, String> derivedMetrics) {
     this.derivedMetrics = derivedMetrics;
+  }
+
+  public List<String> getInvertColorMetrics() {
+    return invertColorMetrics;
+  }
+
+  public void setInvertColorMetrics(List<String> invertColorMetrics) {
+    this.invertColorMetrics = invertColorMetrics;
+  }
+
+
+  public Map<String, MetricExpression> getCellSizeExpression() {
+    return cellSizeExpression;
+  }
+
+  public void setCellSizeExpression(Map<String, MetricExpression> cellSizeExpression) {
+    this.cellSizeExpression = cellSizeExpression;
   }
 
   @Override

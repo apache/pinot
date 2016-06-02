@@ -1,6 +1,6 @@
 $(document).ready(function() {
    /** --- 1) Register Handelbars helpers --- * */
-    
+
   //takes a string returns a HEX color code
     Handlebars.registerHelper('colorById', function( id, numIds, options ) {
 
@@ -182,7 +182,16 @@ $(document).ready(function() {
         //Without the options.fn()  the raw object would be returned to be the html content
         return options.fn(obj[options.hash.dimName])
     });
-    
+
+  //takes an object and a key as option param and returns an object as a scope
+    Handlebars.registerHelper('lookupCellSizeExpression', function(obj, metricName) {
+        var cellSizeExpression = obj[metricName];
+        if (typeof cellSizeExpression !== "undefined") {
+          cellSizeExpression = "(" + cellSizeExpression + ")";
+        }
+        return cellSizeExpression;
+    });
+
     //takes an object and a key as option param and returns an object as a scope
     Handlebars.registerHelper('lookupRowIdList', function(obj, options) {
         //Without the options.fn()  the raw object would be returned to be the html content
@@ -230,7 +239,7 @@ $(document).ready(function() {
 
     /* var source_metric_time_series_section_anomaly = $("#metric-time-series-section-anomaly-template").html();
     HandleBarsTemplates.template_metric_time_series_section_anomaly = Handlebars.compile(source_metric_time_series_section_anomaly);*/
-    
+
     var source_time_series_template =  $("#time-series-template").html();
     HandleBarsTemplates.template_time_series = Handlebars.compile(source_time_series_template);
 

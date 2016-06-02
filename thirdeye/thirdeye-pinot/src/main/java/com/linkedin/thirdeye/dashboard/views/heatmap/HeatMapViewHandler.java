@@ -8,10 +8,14 @@ import java.util.Map.Entry;
 import java.util.Set;
 
 import org.joda.time.DateTime;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import com.google.common.cache.CacheLoader.InvalidCacheLoadException;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.client.MetricExpression;
 import com.linkedin.thirdeye.client.MetricFunction;
+import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.client.comparison.Row;
 import com.linkedin.thirdeye.client.comparison.Row.Metric;
@@ -19,6 +23,7 @@ import com.linkedin.thirdeye.client.comparison.TimeOnTimeComparisonHandler;
 import com.linkedin.thirdeye.client.comparison.TimeOnTimeComparisonRequest;
 import com.linkedin.thirdeye.client.comparison.TimeOnTimeComparisonResponse;
 import com.linkedin.thirdeye.dashboard.Utils;
+import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
 import com.linkedin.thirdeye.dashboard.resources.ViewRequestParams;
 import com.linkedin.thirdeye.dashboard.views.GenericResponse;
 import com.linkedin.thirdeye.dashboard.views.GenericResponse.Info;
@@ -29,6 +34,11 @@ import com.linkedin.thirdeye.dashboard.views.ViewRequest;
 public class HeatMapViewHandler implements ViewHandler<HeatMapViewRequest, HeatMapViewResponse> {
 
   private final QueryCache queryCache;
+  private CollectionConfig collectionConfig = null;
+  private static final Logger LOGGER = LoggerFactory.getLogger(HeatMapViewHandler.class);
+  private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
+
+  private static final String RATIO_SEPARATOR = "/";
 
   public HeatMapViewHandler(QueryCache queryCache) {
     this.queryCache = queryCache;
@@ -73,13 +83,22 @@ public class HeatMapViewHandler implements ViewHandler<HeatMapViewRequest, HeatM
     TimeOnTimeComparisonRequest comparisonRequest = generateTimeOnTimeComparisonRequest(request);
     TimeOnTimeComparisonHandler handler = new TimeOnTimeComparisonHandler(queryCache);
 
+    try {
+      collectionConfig = CACHE_REGISTRY_INSTANCE.getCollectionConfigCache().get(comparisonRequest.getCollectionName());
+    } catch (InvalidCacheLoadException e) {
+      LOGGER.debug("No collection configs for collection {}", comparisonRequest.getCollectionName());
+    }
+
     TimeOnTimeComparisonResponse response = handler.handle(comparisonRequest);
 
     Set<String> dimensions = response.getDimensions();
     List<String> expressionNames = new ArrayList<>();
+    Map<String, String> metricExpressions = new HashMap<>();
     for (MetricExpression expression : request.getMetricExpressions()) {
       expressionNames.add(expression.getExpressionName());
+      metricExpressions.put(expression.getExpressionName(), expression.getExpression());
     }
+    Map<String, String> cellSizeExpressions = new HashMap<>();
 
     int numRows = response.getNumRows();
 
@@ -96,6 +115,10 @@ public class HeatMapViewHandler implements ViewHandler<HeatMapViewRequest, HeatM
       Row row = response.getRow(i);
       String dimension = row.getDimensionName();
       String dimensionValue = row.getDimensionValue();
+      Map<String, Metric> metricMap = new HashMap<>();
+      for (Metric metric : row.getMetrics()) {
+        metricMap.put(metric.getMetricName(), metric);
+      }
       for (Metric metric : row.getMetrics()) {
         String metricName = metric.getMetricName();
         if(!expressionNames.contains(metricName)){
@@ -107,7 +130,32 @@ public class HeatMapViewHandler implements ViewHandler<HeatMapViewRequest, HeatM
           heatMapBuilder = new HeatMap.Builder(dimension);
           data.put(dataKey, heatMapBuilder);
         }
-        heatMapBuilder.addCell(dimensionValue, metric.getBaselineValue(), metric.getCurrentValue());
+        if (collectionConfig != null && collectionConfig.getCellSizeExpression() != null
+            && collectionConfig.getCellSizeExpression().get(metricName) != null) {
+          String metricExpression = metricExpressions.get(metricName);
+
+          String[] tokens = metricExpression.split(RATIO_SEPARATOR);
+          String numerator = tokens[0];
+          String denominator = tokens[1];
+          Metric numeratorMetric = metricMap.get(numerator);
+          Metric denominatorMetric = metricMap.get(denominator);
+          Double numeratorBaseline = numeratorMetric == null ? 0 : numeratorMetric.getBaselineValue();
+          Double numeratorCurrent = numeratorMetric == null ? 0 : numeratorMetric.getCurrentValue();
+          Double denominatorBaseline = denominatorMetric == null ? 0 : denominatorMetric.getBaselineValue();
+          Double denominatorCurrent = denominatorMetric == null ? 0 : denominatorMetric.getCurrentValue();
+
+          Map<String, Double> context = new HashMap<>();
+          context.put(numerator, numeratorCurrent);
+          context.put(denominator, denominatorCurrent);
+          String cellSizeExpression = collectionConfig.getCellSizeExpression().get(metricName).getExpression();
+          cellSizeExpressions.put(metricName, cellSizeExpression);
+          Double cellSize = MetricExpression.evaluateExpression(cellSizeExpression, context);
+
+          heatMapBuilder.addCell(dimensionValue, metric.getBaselineValue(), metric.getCurrentValue(), cellSize, cellSizeExpression,
+              numeratorBaseline, denominatorBaseline, numeratorCurrent, denominatorCurrent);
+        } else {
+          heatMapBuilder.addCell(dimensionValue, metric.getBaselineValue(), metric.getCurrentValue());
+        }
         baselineTotalPerDimension.put(dimension,
             baselineTotalPerDimension.get(dimension) + metric.getBaselineValue());
         currentTotalPerDimension.put(dimension,
@@ -135,7 +183,7 @@ public class HeatMapViewHandler implements ViewHandler<HeatMapViewRequest, HeatM
     summary.addSimpleField("currentTotal", HeatMapCell.format(currentTotal));
     summary.addSimpleField("deltaChange", HeatMapCell.format(currentTotal-baselineTotal));
     summary.addSimpleField("deltaPercentage", HeatMapCell.format((currentTotal-baselineTotal)*100.0/baselineTotal));
-    
+
     for (Entry<String, HeatMap.Builder> entry : data.entrySet()) {
       String dataKey = entry.getKey();
       GenericResponse heatMapResponse = new GenericResponse();
@@ -159,6 +207,7 @@ public class HeatMapViewHandler implements ViewHandler<HeatMapViewRequest, HeatM
 
     heatMapViewResponse.setSummary(summary);
     heatMapViewResponse.setData(heatMapViewResponseData);
+    heatMapViewResponse.setCellSizeExpression(cellSizeExpressions);
     return heatMapViewResponse;
   }
 
