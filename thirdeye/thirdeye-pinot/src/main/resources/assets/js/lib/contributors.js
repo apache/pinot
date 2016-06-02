@@ -212,7 +212,7 @@ function renderContributionTimeSeries(ajaxData) {
         data : {
           x : 'time',
           json : barChartData[metricName][dimensionName],
-          type : 'spline',
+          type: 'area-spline',
           colors : colors
         },
         axis : {

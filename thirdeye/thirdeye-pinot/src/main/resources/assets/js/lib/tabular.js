@@ -2,7 +2,7 @@ function getTabular(tab) {
 
 	var url = "/dashboard/data/tabular?" + window.location.hash.substring(1);
 	getData(url, tab).done(function(data) {
-		renderTabular(data, tab );
+		renderTabular(data, tab);
 	});
 };
 
@@ -42,7 +42,40 @@ function renderTabular(data, tab) {
         .template_funnels_table(data);
     $("#"+ tab +"-display-chart-section").append(result_funnels_template);
     calcHeatMapBG();
-    formatMillisToTZ();
+    //formatMillisToTZ();
+
+    /* Build the dimension dropdown*/
+    var dimensionListHtml = "";
+    var dimensionList = window.datasetConfig.datasetDimensions;
+
+    for (var index = 0, numDimensions = dimensionList.length; index  < numDimensions; index++ ) {
+        dimensionListHtml += "<li class='funnels-dimension-option' rel='dimensions' value='" + dimensionList[index] + "'><a href='#' class='uk-dropdown-close'>" + dimensionList[index] + "</a></li>";
+
+    }
+
+    $(".funnels-table-dimension-list").append(dimensionListHtml);
+
+    $(".funnels-dimension-selector-btn").click(function(event){
+
+        var metric = $(this).attr("data-metric")
+
+        var topPosition = event.pageY - 65;
+        var leftPosition = 15;
+
+        var dimensionDropdown = $(".funnels-table-dimension-box:last-of-type");
+        dimensionDropdown.attr("data-metric", metric);
+        dimensionDropdown.css( "position", "absolute");
+        dimensionDropdown.css( "top", topPosition + "px");
+        dimensionDropdown.css( "left", leftPosition + "%");
+        dimensionDropdown.css( "z-index", "3");
+        dimensionDropdown.show()
+
+    })
+
+    // Click metric name in the table
+    $("#main-view").on("click", ".funnels-dimension-option", function() {
+        switchToContributors(this)
+    });
 }
 var lineChart;
 function drawTimeSeries(ajaxData, tab ) {
@@ -270,5 +303,63 @@ function drawTimeSeries(ajaxData, tab ) {
 
     //Preselect first metric
 	$($(".time-series-metric-checkbox", currentView)[0]).click();
+}
 
+
+function switchToContributors(target){
+    // Change the view to contributors
+    console.log("dimension:")
+    console.log($(target).attr("value"))
+
+    var dimensionContainer = $(target).closest(".funnels-table-dimension-box");
+    var metric = $(dimensionContainer).attr("data-metric");
+    var dimension = $(target).attr("value");
+
+    console.log("funnels-table-dimension-box data-metric:")
+    console.log(metric)
+
+    //either dashboard or metrics param is present in hash
+    delete hash.dashboard;
+
+    //switch to time ver time tab
+    hash.view = "compare";
+
+    //set start and end date to the starte and end date of the table
+    var timeBuckets = $("#timebuckets>span")
+    var numTimeBuckets = timeBuckets.length;
+
+    var firstTimeBucketInRow = $("#timebuckets>span")[0];
+    var lastTimeBucketInRow = $("#timebuckets>span")[numTimeBuckets - 1];
+
+    var currentStartUTC = $($("span", firstTimeBucketInRow)[0]).text().trim();
+    var baselineStartUTC = $($("span", firstTimeBucketInRow)[2]).text().trim();
+
+    var currentEndUTC = $($("span", lastTimeBucketInRow)[1]).text().trim();
+    var baselineEndUTC = $($("span", lastTimeBucketInRow)[3]).text().trim();
+
+    hash.baselineStart = baselineStartUTC;
+    hash.baselineEnd = baselineEndUTC;
+    hash.currentStart = currentStartUTC;
+    hash.currentEnd = currentEndUTC;
+
+    //check the current granularity of the data on the table
+    var endOfFirstTimeBucket =  $($("span", firstTimeBucketInRow)[1]).text().trim();
+    var diff = parseInt(endOfFirstTimeBucket) - parseInt(currentStartUTC)
+    var diffProperties = describeMillis(diff)
+    var aggTimeGranularity = diffProperties ? diffProperties.unit : "HOURS"
+
+    hash.aggTimeGranularity = aggTimeGranularity
+
+    //set the metrics
+    metrics = [];
+    // Todo: if metric label it's a derived metric so title contains
+    metrics.push(metric)
+    hash.metrics = metrics.toString();
+
+    //select only the first dimension to retrieve less data
+    hash.dimensions = dimension;
+
+    //update hash will trigger window.onhashchange event:
+    // update the form area and trigger the ajax call
+    window.location.hash = encodeHashParameters(hash);
 }

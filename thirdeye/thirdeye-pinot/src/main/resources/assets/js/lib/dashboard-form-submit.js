@@ -1,7 +1,12 @@
 //Form submit (Go button)
 $("#main-view").on("click",".form-submit-btn",function(){
+    formSubmit(this)
+});
 
-    var currentTab = $(this).attr("rel")
+function formSubmit(target){
+
+    var currentTab = $(target).attr("rel")
+
 
     //Close uikit dropdowns
     $("[data-uk-dropdown]").removeClass("uk-open");
@@ -9,7 +14,9 @@ $("#main-view").on("click",".form-submit-btn",function(){
     $(".uk-dropdown").hide();
 
 
-    //Update hash
+    /*Update hash*/
+
+
     //update hash.dateset
     var selectedDateset = $("#selected-dateset").attr("value");
     if(selectedDateset != "none" && selectedDateset != undefined && selectedDateset != ""){
@@ -57,12 +64,19 @@ $("#main-view").on("click",".form-submit-btn",function(){
     hash.filters = encodeURIComponent(JSON.stringify(filters));
 
 
+    //update hash.aggTimeGranularity
+    //If the form has aggregate selector
+    if( $(".baseline-aggregate[rel='"+ currentTab +"']").length > 0 ) {
+        // Aggregate
+        //var aggregateSize = 1;
+        var aggregateUnit = $(".baseline-aggregate.uk-active[rel='" + currentTab + "']").attr("unit");
+        hash.aggTimeGranularity = aggregateUnit;
+    }
 
-    //Validate form
+    /* Validate form */
+
     var errorMessage = $("#"+ hash.view +"-time-input-form-error p");
     var errorAlert = $("#"+ hash.view +"-time-input-form-error");
-
-    //Validation
 
     //Check if dataset is selected
     if( !hash.hasOwnProperty("dataset")) {
@@ -92,18 +106,11 @@ $("#main-view").on("click",".form-submit-btn",function(){
         }
     }
 
+
+    //Validate date time selection and update hash params: currentStart, currentEnd, baselineStart, baselineEnd
     var timezone = getTimeZone();
 
     //Todo: support timezone selection
-
-
-    //If the form has aggregate selector
-    if( $(".baseline-aggregate[rel='"+ currentTab +"']").length > 0 ) {
-        // Aggregate
-        //var aggregateSize = 1;
-        var aggregateUnit = $(".baseline-aggregate.uk-active[rel='" + currentTab + "']").attr("unit");
-        hash.aggTimeGranularity = aggregateUnit;
-    }
 
     // DateTimes
     var currentStartDate = $(".current-start-date[rel='"+ currentTab +"']").text();
@@ -139,8 +146,7 @@ $("#main-view").on("click",".form-submit-btn",function(){
     hash.currentStart = currentStartMillisUTC;
     hash.currentEnd = currentEndMillisUTC;
 
-
-    //Check if baseline date range is present unless the viewtype is timeseries
+    //Check if baseline date range is present unless the viewtype is timeseries anomalies
     switch(hash.view) {
         case "anomalies":
         case "timeseries":
@@ -154,7 +160,6 @@ $("#main-view").on("click",".form-submit-btn",function(){
             }
             break
     }
-
 
     if($(".baseline-start-date[rel='"+ currentTab +"']").text().length > 0){
 
@@ -181,10 +186,10 @@ $("#main-view").on("click",".form-submit-btn",function(){
     if(hash.view == "anomalies"){
         hash.rand = (Math.random() + "").substring(3,6);
     }
-    //window.location.hash change triggers window.onhashchange event
-    // that contains the ajax requests
+    /* window.location.hash change triggers window.onhashchange event
+    that contains the ajax requests */
     window.location.hash = encodeHashParameters(hash);
 
     //Disable form submit
     //$("#" + hash.view + "-form-submit").prop("disabled", true);
-});
+}

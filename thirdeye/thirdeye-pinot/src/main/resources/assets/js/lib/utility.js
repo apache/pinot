@@ -298,8 +298,9 @@ function formComponentPopulated(){
 
         updateDashboardFormFromHash();
 
-        //If hash has dataset && dashboard trigger form submit
+        //Trigger form submit if enough elements present for a query
 
+        //If hash has dataset && dashboard trigger form submit
         if( hash.hasOwnProperty("dataset")){
 
             //If dashboard is present in hash and present in current dataset
@@ -309,7 +310,7 @@ function formComponentPopulated(){
                 //if the dashboard is present in the current dataset
                 if( $(".dashboard-option[value='"+ hash.dashboard +"']").length>0 ){
                     //Adding random number to hash
-                    //for the usecase when on pagereload the hash would not change so ajax would not be triggered
+                    //for the usecase of pagereload: the hash would not change so ajax would not be triggered
                     var rand= Math.random() + ""
                     hash.rand = rand.substring(3,6);
                     enableFormSubmit();
@@ -333,6 +334,14 @@ function formComponentPopulated(){
         }
     }
 }
+
+/* Event listeners used in multiple instances in FORM area*/
+function enableApplyButton(button){
+    $(button).prop("disabled", false);
+    $(button).removeAttr("disabled");
+}
+
+
 
 
 /* Event listeners used in FORM area and chart area*/
@@ -446,51 +455,54 @@ function toggleSumDetails(target){
 function showContributors(target){
     // Change the view to contributors
 
-    //either dashboard or metrics param is present in hash
-    delete hash.dashboard;
+//    //either dashboard or metrics param is present in hash
+//    delete hash.dashboard;
+//
+//    //switch to time ver time tab
+//    hash.view = "compare";
+//
+//    //set start and end date to the starte and end date of the table
+//    var timeBuckets = $("#timebuckets>span")
+//    var numTimeBuckets = timeBuckets.length;
+//
+//    var firstTimeBucketInRow = $("#timebuckets>span")[0];
+//    var lastTimeBucketInRow = $("#timebuckets>span")[numTimeBuckets - 1];
+//
+//    var currentStartUTC = $($("span", firstTimeBucketInRow)[0]).text().trim();
+//    var baselineStartUTC = $($("span", firstTimeBucketInRow)[2]).text().trim();
+//
+//    var currentEndUTC = $($("span", lastTimeBucketInRow)[1]).text().trim();
+//    var baselineEndUTC = $($("span", lastTimeBucketInRow)[3]).text().trim();
+//
+//    hash.baselineStart = baselineStartUTC;
+//    hash.baselineEnd = baselineEndUTC;
+//    hash.currentStart = currentStartUTC;
+//    hash.currentEnd = currentEndUTC;
+//
+//
+//    //check the current granularity of the data on the table
+//    var endOfFirstTimeBucket =  $($("span", firstTimeBucketInRow)[1]).text().trim();
+//    var diff = parseInt(endOfFirstTimeBucket) - parseInt(currentStartUTC)
+//    var diffProperties = describeMillis(diff)
+//    var aggTimeGranularity = diffProperties ? diffProperties.unit : "HOURS"
+//
+//    hash.aggTimeGranularity = aggTimeGranularity
+//
+//    //set the metrics
+//    metrics = [];
+//    // Todo: if metric label it's a derived metric so title contains
+//    metrics.push($(target).attr("title"))
+//    hash.metrics = metrics.toString();
+//
+//    //select only the first dimension to retrieve less data
+//    hash.dimensions = $($(".dimension-option")[0]).attr("value");
+//
+//    //update hash will trigger window.onhashchange event:
+//    // update the form area and trigger the ajax call
+//    window.location.hash = encodeHashParameters(hash);
 
-    //switch to time ver time tab
-    hash.view = "compare";
-
-    //set start and end date to the starte and end date of the table
-    var timeBuckets = $("#timebuckets>span")
-    var numTimeBuckets = timeBuckets.length;
-
-    var firstTimeBucketInRow = $("#timebuckets>span")[0];
-    var lastTimeBucketInRow = $("#timebuckets>span")[numTimeBuckets - 1];
-
-    var currentStartUTC = $($("span", firstTimeBucketInRow)[0]).text().trim();
-    var baselineStartUTC = $($("span", firstTimeBucketInRow)[2]).text().trim();
-
-    var currentEndUTC = $($("span", lastTimeBucketInRow)[1]).text().trim();
-    var baselineEndUTC = $($("span", lastTimeBucketInRow)[3]).text().trim();
-
-    hash.baselineStart = baselineStartUTC;
-    hash.baselineEnd = baselineEndUTC;
-    hash.currentStart = currentStartUTC;
-    hash.currentEnd = currentEndUTC;
 
 
-    //check the current granularity of the data on the table
-    var endOfFirstTimeBucket =  $($("span", firstTimeBucketInRow)[1]).text().trim();
-    var diff = parseInt(endOfFirstTimeBucket) - parseInt(currentStartUTC)
-    var diffProperties = describeMillis(diff)
-    var aggTimeGranularity = diffProperties ? diffProperties.unit : "HOURS"
-
-    hash.aggTimeGranularity = aggTimeGranularity
-
-    //set the metrics
-    metrics = [];
-    // Todo: if metric label it's a derived metric so title contains
-    metrics.push($(target).attr("title"))
-    hash.metrics = metrics.toString();
-
-    //select only the first dimension to retrieve less data
-    hash.dimensions = $($(".dimension-option")[0]).attr("value");
-
-    //update hash will trigger window.onhashchange event:
-    // update the form area and trigger the ajax call
-    window.location.hash = encodeHashParameters(hash);
 }
 
 

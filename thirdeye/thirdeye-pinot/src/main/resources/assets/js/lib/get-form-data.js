@@ -2,18 +2,7 @@ function getDataSetList(){
 
     var url = "/dashboard/data/datasets";
     getData(url).done( function(data){
-
-        var errorMessage = $("#" + hash.view + "-time-input-form-error p");
-        var errorAlert = $("#" + hash.view + "-time-input-form-error");
-
-        if (!data) {
-            errorMessage.html("No dataset list arrived from the server. Error: data = " + data);
-            errorAlert.fadeIn(100);
-            errorAlert.attr("data-error-source", "datasetlist");
-            return
-        } else {
-            $("#"+ hash.view +"-time-input-form-error[data-error-source= 'datasetlist']").hide()
-        }
+        validateFormData(data,"No dataset list arrived from the server.", "datasets" )
 
         /* Handelbars template for datasets dropdown */
         var result_datasets_template = HandleBarsTemplates.template_datasets(data);
@@ -34,6 +23,23 @@ function getDataSetList(){
 
     });
 };
+
+/** GET DATASET LIST RELATED METHODS **/
+
+//takes the data the message
+function validateFormData(data, message, errorSource ){
+    var errorMessage = $(".time-input-form-error p");
+    var errorAlert = $(".time-input-form-error");
+
+    if (!data) {
+        errorMessage.html(  message + " Error: data = " + data);
+        errorAlert.fadeIn(100);
+        errorAlert.attr("data-error-source", errorSource);
+        return
+    } else {
+        $(".time-input-form-error[data-error-source= '" + errorSource + "']").hide()
+    }
+}
 
 function getAllFormData(){
 
@@ -73,15 +79,7 @@ function getMetricList() {
 
     getData(url).done(function (data) {
 
-        var errorMessage = $("#" + hash.view + "-time-input-form-error p");
-        var errorAlert = $("#" + hash.view + "-time-input-form-error");
-        if (!data) {
-            errorMessage.html("No metrics available in the server. Error: data = " + data);
-            errorAlert.fadeIn(100);
-            return
-        } else {
-            errorAlert.hide()
-        }
+        validateFormData(data, "No metrics available in the server." , "metrics" )
 
 
         /* Create metrics dropdown */
@@ -104,16 +102,8 @@ function getDimensionNFilterList() {
     var url = "/dashboard/data/filters?dataset=" + hash.dataset;
     getData(url).done(function (data) {
 
+        validateFormData(data, "No dimension or dimension values available." , "filters" )
 
-        var errorMessage = $("#"+ hash.view +"-time-input-form-error p");
-        var errorAlert = $("#"+ hash.view +"-time-input-form-error");
-        if(!data){
-            errorMessage.html("No dimension or dimension values available. Error: dimension data = " + data);
-            errorAlert.fadeIn(100);
-            return
-        }else{
-            errorAlert.hide()
-        }
 
 
         /* Create dimensions and filter dimensions dropdown */
@@ -121,12 +111,13 @@ function getDimensionNFilterList() {
         var filterDimensionListHtml = "";
 
         //Global - public
-        datasetDimensions = []
+        datasetDimensions = [];
+        window.datasetConfig.datasetDimensions = [];
 
         for (var k in  data) {
             dimensionListHtml += "<li class='dimension-option' rel='dimensions' value='" + k + "'><a href='#' class='uk-dropdown-close'>" + k + "</a></li>";
             filterDimensionListHtml += "<li class='filter-dimension-option' value='" + k + "'><a href='#' class='radio-options'>" + k + "</a></li>";
-            datasetDimensions.push(k)
+            window.datasetConfig.datasetDimensions.push(k)
         }
 
         $(".dimension-list").html(dimensionListHtml);
@@ -162,16 +153,7 @@ function getDatasetConfig() {
 
     getData(url).done(function (data) {
 
-        var errorMessage = $("#"+ hash.view +"-time-input-form-error p");
-        var errorAlert = $("#"+ hash.view +"-time-input-form-error");
-        if(!data){
-            errorMessage.html("No dataset info available. Error: data/info?dataset data = " + data);
-            errorAlert.attr("data-error-source", "datasetinfo");
-            errorAlert.fadeIn(100);
-            return
-        }else{
-            $("#"+ hash.view +"-time-input-form-error[data-error-source= 'datasetinfo']").hide()
-        }
+        validateFormData(data, "No dataset config info available." , "info" )
 
         /** MIN MAX DATE TIME **/
 
