@@ -133,7 +133,8 @@ public class AnomalyDetectionJob implements Job {
     if (windowEndProp == null) {
       long delayMillis = 0;
       if (spec.getWindowDelay() != null) {
-        delayMillis = TimeUnit.MILLISECONDS.convert(spec.getWindowDelay(), spec.getWindowUnit());
+        delayMillis =
+            TimeUnit.MILLISECONDS.convert(spec.getWindowDelay(), spec.getWindowDelayUnit());
       }
       Date scheduledFireTime = context.getScheduledFireTime();
 

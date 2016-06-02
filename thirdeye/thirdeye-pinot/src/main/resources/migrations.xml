@@ -4,7 +4,7 @@
     xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
-         http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.1.xsd">
+                        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.1.xsd">
 
   <changeSet id="1" author="gbrandt">
     <!-- AnomalyFunctionSpec -->
@@ -230,4 +230,21 @@
       </column>
     </addColumn>
   </changeSet>
+
+  <changeSet id="7" author="nprabhak">
+    <addColumn tableName="anomaly_functions">
+      <column name="window_delay_unit" type="varchar(63)">
+        <constraints nullable="false"/>
+      </column>
+    </addColumn>
+    <addColumn tableName="email_configurations">
+      <column name="window_delay_unit" type="varchar(63)">
+        <constraints nullable="false"/>
+      </column>
+      <column name="window_delay" type="int">
+        <constraints nullable="false"/>
+      </column>
+    </addColumn>
+  </changeSet>
+
 </databaseChangeLog>

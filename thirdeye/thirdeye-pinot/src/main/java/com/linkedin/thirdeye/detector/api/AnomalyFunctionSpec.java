@@ -61,6 +61,9 @@ public class AnomalyFunctionSpec {
   @Column(name = "window_delay", nullable = false)
   private Integer windowDelay;
 
+  @Column(name = "window_delay_unit", nullable = false)
+  private TimeUnit windowDelayUnit;
+
   @Column(name = "explore_dimensions", nullable = true)
   private String exploreDimensions;
 
@@ -166,6 +169,14 @@ public class AnomalyFunctionSpec {
     this.windowDelay = windowDelay;
   }
 
+  public TimeUnit getWindowDelayUnit() {
+    return windowDelayUnit;
+  }
+
+  public void setWindowDelayUnit(TimeUnit windowDelayUnit) {
+    this.windowDelayUnit = windowDelayUnit;
+  }
+
   public String getExploreDimensions() {
     return exploreDimensions;
   }
@@ -202,6 +213,7 @@ public class AnomalyFunctionSpec {
         && Objects.equals(windowSize, af.getWindowSize())
         && Objects.equals(windowUnit, af.getWindowUnit())
         && Objects.equals(windowDelay, af.getWindowDelay())
+        && Objects.equals(windowDelayUnit, af.getWindowDelayUnit())
         && Objects.equals(exploreDimensions, af.getExploreDimensions())
         && Objects.equals(filters, af.getFilters());
   }
@@ -209,7 +221,8 @@ public class AnomalyFunctionSpec {
   @Override
   public int hashCode() {
     return Objects.hash(id, collection, metric, type, isActive, cron, properties, bucketSize,
-        bucketUnit, windowSize, windowUnit, windowDelay, exploreDimensions, filters);
+        bucketUnit, windowSize, windowUnit, windowDelay, windowDelayUnit, exploreDimensions,
+        filters);
   }
 
   @Override
@@ -218,7 +231,7 @@ public class AnomalyFunctionSpec {
         .add("metric", metric).add("type", type).add("isActive", isActive).add("cron", cron)
         .add("properties", properties).add("bucketSize", bucketSize).add("bucketUnit", bucketUnit)
         .add("windowSize", windowSize).add("windowUnit", windowUnit)
-        .add("windowDelay", windowDelay).add("exploreDimensions", exploreDimensions)
-        .add("filters", filters).toString();
+        .add("windowDelay", windowDelay).add("windowDelayUnit", windowDelayUnit)
+        .add("exploreDimensions", exploreDimensions).add("filters", filters).toString();
   }
 }
