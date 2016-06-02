@@ -118,7 +118,10 @@ public class EmailReportJob implements Job {
     Date scheduledFireTime = context.getScheduledFireTime();
     long deltaMillis =
         TimeUnit.MILLISECONDS.convert(config.getWindowSize(), config.getWindowUnit());
-    final DateTime now = new DateTime(scheduledFireTime, DateTimeZone.UTC);
+    long delayMillis =
+        TimeUnit.MILLISECONDS.convert(config.getWindowDelay(), config.getWindowDelayUnit());
+    final DateTime nowWithoutDelay = new DateTime(scheduledFireTime, DateTimeZone.UTC);
+    final DateTime now = nowWithoutDelay.minus(delayMillis);
     final DateTime then = now.minus(deltaMillis);
 
     final String collection = config.getCollection();

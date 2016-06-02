@@ -4,7 +4,7 @@
     xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
-         http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.1.xsd">
+                        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.1.xsd">
 
   <changeSet id="1" author="gbrandt">
     <!-- AnomalyFunctionSpec -->
@@ -230,4 +230,36 @@
       </column>
     </addColumn>
   </changeSet>
+
+  <changeSet id="7" author="nprabhak">
+    <!-- After running this changeset you might have to update rows with proper values  -->
+    <addColumn tableName="anomaly_functions">
+      <!-- Default value is DAYS -->
+      <column name="window_delay_unit" type="varchar(63)" defaultValue="6">
+        <constraints nullable="false"/>
+      </column>
+    </addColumn>
+    <addColumn tableName="email_configurations">
+      <!-- Default value is DAYS -->
+      <column name="window_delay_unit" type="varchar(63)" defaultValue="6">
+        <constraints nullable="false"/>
+      </column>
+      <column name="window_delay" type="int" defaultValueNumeric="1">
+        <constraints nullable="false"/>
+      </column>
+    </addColumn>
+  </changeSet>
+
+  <changeSet id="8" author="nprabhak">
+    <addNotNullConstraint columnDataType="varchar(63)"
+                          columnName="window_delay_unit"
+                          tableName="anomaly_functions"/>
+    <addNotNullConstraint columnDataType="varchar(63)"
+                          columnName="window_delay_unit"
+                          tableName="email_configurations"/>
+    <addNotNullConstraint columnDataType="int"
+                          columnName="window_delay"
+                          tableName="email_configurations"/>
+  </changeSet>
+
 </databaseChangeLog>

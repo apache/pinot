@@ -89,6 +89,12 @@ public class EmailConfiguration {
   @Column(name = "filters", nullable = true)
   private String filters;
 
+  @Column(name = "window_delay", nullable = false)
+  private Integer windowDelay;
+
+  @Column(name = "window_delay_unit", nullable = false)
+  private TimeUnit windowDelayUnit;
+
   public long getId() {
     return id;
   }
@@ -214,12 +220,29 @@ public class EmailConfiguration {
     this.filters = sortedFilters;
   }
 
+  public Integer getWindowDelay() {
+    return windowDelay;
+  }
+
+  public void setWindowDelay(Integer windowDelay) {
+    this.windowDelay = windowDelay;
+  }
+
+  public TimeUnit getWindowDelayUnit() {
+    return windowDelayUnit;
+  }
+
+  public void setWindowDelayUnit(TimeUnit windowDelayUnit) {
+    this.windowDelayUnit = windowDelayUnit;
+  }
+
   @Override
   public String toString() {
     return MoreObjects.toStringHelper(this).add("collection", collection).add("metric", metric)
         .add("fromAddress", fromAddress).add("toAddresses", toAddresses).add("cron", cron)
         .add("smtpHost", smtpHost).add("smtpPort", smtpPort).add("smtpUser", smtpUser)
         .add("windowSize", windowSize).add("windowUnit", windowUnit).add("isActive", isActive)
-        .add("sendZeroAnomalyEmail", sendZeroAnomalyEmail).add("filters", filters).toString();
+        .add("sendZeroAnomalyEmail", sendZeroAnomalyEmail).add("filters", filters)
+        .add("windowDelay", windowDelay).add("windowDelayUnit", windowDelayUnit).toString();
   }
 }
