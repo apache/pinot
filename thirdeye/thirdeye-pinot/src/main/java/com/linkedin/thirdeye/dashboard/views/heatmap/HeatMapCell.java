@@ -9,17 +9,22 @@ public class HeatMapCell {
   private double contributionToOverallChange;
 
   public HeatMapCell(String dimensionValue, double baselineValue, double currentValue,
+      double numeratorBaseline, double denominatorBaseline, double numeratorCurrent, double denominatorCurrent,
       double baselineContribution, double currentContribution, double baselineCDFValue,
       double currentCDFValue, double percentageChange, double absoluteChange,
       double contributionDifference, double contributionToOverallChange, double deltaColor,
       double deltaSize, double contributionColor, double contributionSize,
-      double contributionToOverallColor, double contributionToOverallSize) {
+      double contributionToOverallColor, double contributionToOverallSize, String cellSizeExpression) {
     super();
     this.dimensionValue = dimensionValue;
     this.baselineValue = baselineValue;
+    this.numeratorBaseline = numeratorBaseline;
+    this.denominatorBaseline = denominatorBaseline;
     this.baselineCDFValue = baselineCDFValue;
     this.baselineContribution = baselineContribution;
     this.currentValue = currentValue;
+    this.numeratorCurrent = numeratorCurrent;
+    this.denominatorCurrent = denominatorCurrent;
     this.currentCDFValue = currentCDFValue;
     this.currentContribution = currentContribution;
     this.percentageChange = percentageChange;
@@ -32,6 +37,7 @@ public class HeatMapCell {
     this.contributionSize = contributionSize;
     this.contributionToOverallColor = contributionToOverallColor;
     this.contributionToOverallSize = contributionToOverallSize;
+    this.cellSizeExpression = cellSizeExpression;
   }
 
   String dimensionValue;
@@ -43,12 +49,20 @@ public class HeatMapCell {
 
   double baselineContribution;
 
+  double numeratorBaseline;
+
+  double denominatorBaseline;
+
   // current
   double currentValue;
 
   double currentCDFValue;
 
   double currentContribution;
+
+  double numeratorCurrent;
+
+  double denominatorCurrent;
 
   // comparison fields
   double percentageChange;
@@ -64,16 +78,20 @@ public class HeatMapCell {
   double contributionToOverallColor;
   double contributionToOverallSize;
 
+  String cellSizeExpression;
+
   static {
     columns = new String[] {
         "dimensionValue", "baselineValue", "currentValue", //
+        "numeratorBaseline", "denominatorBaseline", "numeratorCurrent", "denominatorCurrent",
         "baselineContribution", "currentContribution", //
         "baselineCDFValue", "currentCDFValue", //
         "percentageChange", "absoluteChange", //
         "contributionDifference", "contributionToOverallChange", //
         "deltaColor", "deltaSize", //
         "contributionColor", "contributionSize", //
-        "contributionToOverallColor", "contributionToOverallSize"//
+        "contributionToOverallColor", "contributionToOverallSize",//
+        "cellSizeExpression"
     };
     decimalFormat = new DecimalFormat("0.#");
   }
@@ -81,13 +99,15 @@ public class HeatMapCell {
   public String[] toArray() {
     return new String[] {
         dimensionValue, format(baselineValue), format(currentValue), //
+        format(numeratorBaseline), format(denominatorBaseline), format(numeratorCurrent), format(denominatorCurrent),
         format(baselineContribution), format(currentContribution), //
         format(baselineCDFValue), format(currentCDFValue), //
         format(percentageChange), format(absoluteChange), //
         format(contributionDifference), format(contributionToOverallChange), //
         format(deltaColor), format(deltaSize), //
         format(contributionColor), format(contributionSize), //
-        format(contributionToOverallColor), format(contributionToOverallSize)
+        format(contributionToOverallColor), format(contributionToOverallSize),
+        cellSizeExpression
     };
   }
 

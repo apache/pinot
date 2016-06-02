@@ -282,6 +282,10 @@ function getDatasetConfig() {
             }
         }
 
+        /**CONFIG: INVERT COLOR METRICS **/
+        if(data["invertColorMetrics"]){
+            window.datasetConfig.invertColorMetrics = data["invertColorMetrics"];
+        }
 
         //Check if all form components are populated
         window.responseDataPopulated++

@@ -146,7 +146,7 @@
                                     {{#each this as |rowId rowIdIndex|}}
                                     <td class="{{classify 0}}" value="{{returnValue @root/responseData  key=rowId schemaItem='baselineValue'}}">{{returnValue @root/responseData  key=rowId schemaItem='baselineValue'}}</td>
                                     <td class="{{classify 1}}" value="{{returnValue @root/responseData  key=rowId schemaItem='currentValue'}}">{{returnValue @root/responseData  key=rowId schemaItem='currentValue'}}</td>
-                                    <td class="{{classify 2}}" value="{{returnValue @root/responseData  key=rowId schemaItem='percentageChange'}}">{{returnValue @root/responseData  key=rowId schemaItem='percentageChange'}}</td>
+                                    <td class="{{classify 2}}" value="{{returnValue @root/responseData  key=rowId schemaItem='percentageChange'}}" data-metric-name="{{metricName}}" data-metric-index="{{metricIndex}}">{{returnValue @root/responseData  key=rowId schemaItem='percentageChange'}}</td>
                                     {{/each}}
                                 {{/lookupRowIdList}}
                             </tr>
@@ -208,11 +208,10 @@
                                     {{#each this as |rowId rowIdIndex|}}
                                     <td class="{{classify 0}}" value="{{returnValue @root/responseData  key=rowId schemaItem='cumulativeBaselineValue'}}">{{returnValue @root/responseData  key=rowId schemaItem = 'cumulativeBaselineValue'}}</td>
                                     <td class="{{classify 1}}" value="{{returnValue @root/responseData  key=rowId schemaItem='cumulativeCurrentValue'}}">{{returnValue @root/responseData  key= rowId schemaItem = "cumulativeCurrentValue"}}</td>
-                                    <td class="{{classify 2}}" value="{{returnValue @root/responseData  key=rowId schemaItem='cumulativePercentageChange'}}">{{returnValue @root/responseData  key= rowId schemaItem = "cumulativePercentageChange"}}</td>
+                                    <td class="{{classify 2}}" value="{{returnValue @root/responseData  key=rowId schemaItem='cumulativePercentageChange'}}" data-metric-name="{{metricName}}" data-metric-index="{{metricIndex}}">{{returnValue @root/responseData  key= rowId schemaItem = "cumulativePercentageChange"}}</td>
                                     {{/each}}
                                 {{/lookupRowIdList}}
-                            </tr>
-                            {{/each}}
+                            </trdata                            {{/each}}
                         {{/lookupDimValues}}
                         </tbody>
                     </table>

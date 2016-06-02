@@ -31,7 +31,7 @@
                             <th> Delta (%):</th>
                         </tr>
                         <tr>
-                            <td class="title-stat">{{metricName}}</td>
+                            <td class="title-stat">{{metricName}}  {{lookupCellSizeExpression @root/cellSizeExpression  metricName}} </td>
                             <td class="title-stat baseline-total">{{@root/summary/simpleFields/baselineTotal}}</td>
                             <td class="title-stat current-total">{{@root/summary/simpleFields/currentTotal}}</td>
                             <td class="title-stat delta-value">{{@root/summary/simpleFields/deltaChange}} </td>
@@ -91,6 +91,7 @@
         <tr><td>value</td><td id="dim-value"></td></tr>
             <tr><td>baseline value</td><td id="baseline-value"></td></tr>
             <tr><td>current value</td><td id="current-value"></td></tr>
+            <tr id="cell-size-row" class="hidden"><td>cell size</td><td id="cell-size"></td></tr>
             <tr><td>percentage change </td><td id="delta"></td></tr>
             <tr><td>baseline contribution</td><td id="baseline-contribution"></td></tr>
             <tr><td>current contribution</td><td id="current-contribution"></td></tr>

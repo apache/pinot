@@ -10,6 +10,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map.Entry;
 import java.util.TreeSet;
 import java.util.concurrent.ExecutionException;
 
@@ -20,6 +21,10 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 
+import jersey.repackaged.com.google.common.base.Joiner;
+
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections.MapUtils;
 import org.apache.commons.io.IOUtils;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -96,7 +101,7 @@ public class DashboardResource {
   public String getCollections() {
     String jsonCollections = null;
     try {
-      List<String> collections = queryCache.getClient().getCollections();
+      List<String> collections = CACHE_REGISTRY_INSTANCE.getCollectionsCache().getCollections();
       jsonCollections = OBJECT_MAPPER.writeValueAsString(collections);
     } catch (Exception e) {
       LOG.error("Error while fetching datasets", e);
@@ -115,7 +120,7 @@ public class DashboardResource {
       List<String> metrics = schema.getMetricNames();
       CollectionConfig collectionConfig = null;
       try {
-        collectionConfig = queryCache.getClient().getCollectionConfig(collection);
+        collectionConfig = CACHE_REGISTRY_INSTANCE.getCollectionConfigCache().get(collection);
       } catch (InvalidCacheLoadException e) {
         LOG.debug("No collection configs for collection {}", collection);
       }
@@ -177,7 +182,18 @@ public class DashboardResource {
       TimeGranularity dataGranularity = collectionSchema.getTime().getDataGranularity();
       map.put("maxTime", "" + maxDataTime);
       map.put("dataGranularity", dataGranularity.getUnit().toString());
+
+      CollectionConfig collectionConfig = null;
+      try {
+        collectionConfig = CACHE_REGISTRY_INSTANCE.getCollectionConfigCache().get(collection);
+      } catch (InvalidCacheLoadException e) {
+        LOG.debug("No collection configs for collection {}", collection);
+      }
+      if (collectionConfig != null && CollectionUtils.isNotEmpty(collectionConfig.getInvertColorMetrics())) {
+        map.put("invertColorMetrics", Joiner.on(",").join(collectionConfig.getInvertColorMetrics()));
+      }
       collectionInfo = OBJECT_MAPPER.writeValueAsString(map);
+
     } catch (Exception e) {
       LOG.error("Error while fetching info for collection: " + collection, e);
     }
