@@ -38,6 +38,8 @@ public class HeatMapViewHandler implements ViewHandler<HeatMapViewRequest, HeatM
   private static final Logger LOGGER = LoggerFactory.getLogger(HeatMapViewHandler.class);
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
 
+  private static final String RATIO_SEPARATOR = "/";
+
   public HeatMapViewHandler(QueryCache queryCache) {
     this.queryCache = queryCache;
   }
@@ -131,8 +133,10 @@ public class HeatMapViewHandler implements ViewHandler<HeatMapViewRequest, HeatM
         if (collectionConfig != null && collectionConfig.getCellSizeExpression() != null
             && collectionConfig.getCellSizeExpression().get(metricName) != null) {
           String metricExpression = metricExpressions.get(metricName);
-          String numerator = metricExpression.split("/")[0];
-          String denominator = metricExpression.split("/")[1];
+
+          String[] tokens = metricExpression.split(RATIO_SEPARATOR);
+          String numerator = tokens[0];
+          String denominator = tokens[1];
           Metric numeratorMetric = metricMap.get(numerator);
           Metric denominatorMetric = metricMap.get(denominator);
           Double numeratorBaseline = numeratorMetric == null ? 0 : numeratorMetric.getBaselineValue();
