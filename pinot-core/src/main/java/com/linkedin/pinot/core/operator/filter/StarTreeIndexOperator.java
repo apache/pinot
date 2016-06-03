@@ -33,7 +33,6 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.collect.HashBiMap;
 import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.request.GroupBy;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.common.utils.request.RequestUtils;
@@ -43,7 +42,6 @@ import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.DataSourceMetadata;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.common.Predicate;
-import com.linkedin.pinot.core.common.predicate.EqPredicate;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.blocks.BaseFilterBlock;
 import com.linkedin.pinot.core.operator.dociditerators.BitmapDocIdIterator;
@@ -54,13 +52,14 @@ public class StarTreeIndexOperator extends BaseFilterOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(StarTreeIndexOperator.class);
   private IndexSegment segment;
 
-  // predicates map
+  // Predicates map
   Map<String, PredicateEntry> predicatesMap;
 
-  // group by columns
+  // Group by columns
   Set<String> groupByColumns;
 
-  Set<String> equalityPredicateColumns;
+  // Columns with predicate on them
+  Set<String> predicateColumns;
 
   boolean emptyResult = false;
   private BrokerRequest brokerRequest;
@@ -68,7 +67,7 @@ public class StarTreeIndexOperator extends BaseFilterOperator {
   public StarTreeIndexOperator(IndexSegment segment, BrokerRequest brokerRequest) {
     this.segment = segment;
     this.brokerRequest = brokerRequest;
-    equalityPredicateColumns = new HashSet<>();
+    predicateColumns = new HashSet<>();
     groupByColumns = new HashSet<>();
     predicatesMap = new HashMap<>();
     initPredicatesToEvaluate();
@@ -101,28 +100,19 @@ public class StarTreeIndexOperator extends BaseFilterOperator {
     Predicate predicate = Predicate.newPredicate(childFilter);
     Dictionary dictionary = segment.getDataSource(column).getDictionary();
     PredicateEntry predicateEntry = null;
-    if (childFilter.getOperator() == FilterOperator.EQUALITY) {
-      EqPredicate eqPredicate = (EqPredicate) predicate;
-      // Computing dictionaryId allows us early termination and avoids multiple looks up during tree
-      // traversal
-      int dictId = dictionary.indexOf(eqPredicate.getEqualsValue());
-      if (dictId < 0) {
-        // Empty result
-        emptyResult = true;
-      }
-      predicateEntry = new PredicateEntry(predicate, dictId);
-      equalityPredicateColumns.add(column);
-    } else {
-      // If dictionary does not have any values that satisfy the predicate, set emptyResults to
-      // true.
-      PredicateEvaluator predicateEvaluator =
-          PredicateEvaluatorProvider.getPredicateFunctionFor(predicate, dictionary);
-      if (predicateEvaluator.alwaysFalse()) {
-        emptyResult = true;
-      }
-      // Store this predicate, we will have to apply it later
-      predicateEntry = new PredicateEntry(predicate, -1);
+
+    PredicateEvaluator predicateEvaluator =
+        PredicateEvaluatorProvider.getPredicateFunctionFor(predicate, dictionary);
+
+    // If dictionary does not have any values that satisfy the predicate, set emptyResults to
+    // true.
+    if (predicateEvaluator.alwaysFalse()) {
+      emptyResult = true;
     }
+
+    // Store this predicate, we will have to apply it later
+    predicateEntry = new PredicateEntry(predicate, predicateEvaluator);
+    predicateColumns.add(column);
     predicatesMap.put(column, predicateEntry);
   }
 
@@ -408,16 +398,19 @@ public class StarTreeIndexOperator extends BaseFilterOperator {
       HashSet<String> remainingGroupByColumns) {
     Map<Integer, StarTreeIndexNode> children = node.getChildren();
 
-    if (equalityPredicateColumns.contains(column)) {
+    if (predicateColumns.contains(column)) {
       // Check if there is exact match filter on this column
-      int nextValueId;
       PredicateEntry predicateEntry = predicatesMap.get(column);
-      nextValueId = predicateEntry.dictionaryId;
+
       remainingPredicateColumns.remove(column);
       remainingGroupByColumns.remove(column);
-      if (children.containsKey(nextValueId)) {
-        addNodeToSearchQueue(searchQueue, children.get(nextValueId), remainingPredicateColumns,
-            remainingGroupByColumns);
+
+      int[] matchingDictionaryIds = predicateEntry.predicateEvaluator.getMatchingDictionaryIds();
+      for (int matchingDictionaryId : matchingDictionaryIds) {
+        if (children.containsKey(matchingDictionaryId)) {
+          addNodeToSearchQueue(searchQueue, children.get(matchingDictionaryId), remainingPredicateColumns,
+              remainingGroupByColumns);
+        }
       }
     } else {
       int nextValueId;
@@ -473,11 +466,11 @@ public class StarTreeIndexOperator extends BaseFilterOperator {
 
   class PredicateEntry {
     Predicate predicate;
-    int dictionaryId;
+    private PredicateEvaluator predicateEvaluator;
 
-    public PredicateEntry(Predicate predicate, int dictionaryId) {
+    public PredicateEntry(Predicate predicate, PredicateEvaluator predicateEvaluator) {
       this.predicate = predicate;
-      this.dictionaryId = dictionaryId;
+      this.predicateEvaluator = predicateEvaluator;
     }
   }
 }

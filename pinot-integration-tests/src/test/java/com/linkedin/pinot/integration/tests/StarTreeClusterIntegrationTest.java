@@ -339,4 +339,28 @@ public class StarTreeClusterIntegrationTest extends ClusterTest {
     query = "SELECT SUM(DepDelayMinutes) FROM myStarTable WHERE DepDelay > 0 AND ArrDelay > 0 AND OriginStateName = 'Massachusetts'\n";
     testOneQuery(query, false);
   }
+
+  /**
+   * Tests queries with non-equality predicates
+   */
+  @Test
+  public void testNonEqualityPredicates() {
+    String query;
+
+    // 'Range' query
+    query = "SELECT SUM(DepDelayMinutes) FROM myStarTable WHERE DepDelay between 0 and 10000\n";
+    testOneQuery(query, false);
+
+    // 'IN' query
+    query = "SELECT SUM(DepDelayMinutes) FROM myStarTable WHERE Origin IN ('JFK', 'LAX', 'DCW')\n";
+    testOneQuery(query, false);
+
+    // 'NOT IN' Query
+    query = "SELECT SUM(DepDelayMinutes) FROM myStarTable WHERE Origin NOT IN ('JFK', 'LAX', 'DCW')\n";
+    testOneQuery(query, false);
+
+    // 'NOT EQ' Query
+    query = "SELECT SUM(DepDelayMinutes) FROM myStarTable WHERE Origin <> 'JFK'\n";
+    testOneQuery(query, false);
+  }
 }
