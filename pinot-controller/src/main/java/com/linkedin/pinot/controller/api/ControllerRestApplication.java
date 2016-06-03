@@ -52,11 +52,6 @@ import com.linkedin.pinot.controller.api.restlet.resources.PqlQueryResource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
-/**
- * Sep 24, 2014
- */
-
 public class ControllerRestApplication extends PinotRestletApplication {
   private static final Logger LOGGER = LoggerFactory.getLogger(ControllerRestApplication.class);
   private static final String ONE_HOUR_IN_MILLIS = Long.toString(3600L * 1000L);
