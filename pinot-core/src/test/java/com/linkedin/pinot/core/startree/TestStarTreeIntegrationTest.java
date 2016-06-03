@@ -88,7 +88,7 @@ public class TestStarTreeIntegrationTest {
         map.put(dimName, dimName + "-v" + row % (numDimensions - i));
       }
       //time
-      map.put("daysSinceEpoch", 1);
+      map.put("daysSinceEpoch", row % 7);
       for (int i = 0; i < numMetrics; i++) {
         String metName = schema.getMetricFieldSpecs().get(i).getName();
         map.put(metName, 1);
@@ -100,11 +100,13 @@ public class TestStarTreeIntegrationTest {
     RecordReader reader = createReader(schema, data);
     driver.init(config, reader);
     driver.build();
-
+    System.out.println("Generated segment at " + tempOutputDir);
     ReadMode mode = ReadMode.heap;
     //query to test
     String[] metricNames = new String[] { "m1" };
-    String query = "select sum(m1) from T";
+    String query = "select sum(m1) from T where d1 = 'd1-v2' group by d2";
+//    String query = "select sum(m1) from T";
+
     Pql2Compiler compiler = new Pql2Compiler();
     BrokerRequest brokerRequest = compiler.compileToBrokerRequest(query);
 
@@ -142,6 +144,7 @@ public class TestStarTreeIntegrationTest {
 
     double[] actualSums = computeSum(segment, starTreeDocIdIterator, metricNames);
     System.out.println("actualSums=" + Arrays.toString(actualSums));
+    
   }
 
   private double[] computeSum(IndexSegment segment, BlockDocIdIterator docIdIterator, String... metricNames) {
@@ -157,7 +160,7 @@ public class TestStarTreeIntegrationTest {
     }
     double[] sums = new double[metricNames.length];
     while ((docId = docIdIterator.next()) != Constants.EOF) {
-      System.out.println("docId:" + docId);
+      System.out.println("Matching DocId: " + docId);
       for (int i = 0; i < numMetrics; i++) {
         valIterators[i].skipTo(docId);
         int dictId = valIterators[i].nextIntVal();

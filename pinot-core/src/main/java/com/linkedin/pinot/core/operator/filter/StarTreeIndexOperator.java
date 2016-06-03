@@ -25,6 +25,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
+import java.util.Set;
 
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
@@ -49,17 +50,17 @@ import com.linkedin.pinot.core.operator.dociditerators.BitmapDocIdIterator;
 import com.linkedin.pinot.core.operator.docidsets.FilterBlockDocIdSet;
 import com.linkedin.pinot.core.startree.StarTreeIndexNode;
 
-
 public class StarTreeIndexOperator extends BaseFilterOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(StarTreeIndexOperator.class);
-
   private IndexSegment segment;
-  //predicates that can be applied on the star tree
-  Map<String, PredicateEntry> eligibleEqualityPredicatesMap;
-  //predicates that cannot be applied on star tree index because it appears in group by clause
-  Map<String, PredicateEntry> inEligiblePredicatesMap;
-  //predicates that cannot be applied because they are not of type Equality
-  Map<String, PredicateEntry> nonEqualityPredicatesMap;
+
+  // predicates map
+  Map<String, PredicateEntry> predicatesMap;
+
+  // group by columns
+  Set<String> groupByColumns;
+
+  Set<String> equalityPredicateColumns;
 
   boolean emptyResult = false;
   private BrokerRequest brokerRequest;
@@ -67,19 +68,19 @@ public class StarTreeIndexOperator extends BaseFilterOperator {
   public StarTreeIndexOperator(IndexSegment segment, BrokerRequest brokerRequest) {
     this.segment = segment;
     this.brokerRequest = brokerRequest;
-    eligibleEqualityPredicatesMap = new HashMap<>();
-    inEligiblePredicatesMap = new HashMap<>();
-    nonEqualityPredicatesMap = new HashMap<>();
+    equalityPredicateColumns = new HashSet<>();
+    groupByColumns = new HashSet<>();
+    predicatesMap = new HashMap<>();
     initPredicatesToEvaluate();
   }
 
   private void initPredicatesToEvaluate() {
     FilterQueryTree filterTree = RequestUtils.generateFilterQueryTree(brokerRequest);
-    //find all filter columns
+    // Find all filter columns
     if (filterTree != null) {
       if (filterTree.getChildren() != null && !filterTree.getChildren().isEmpty()) {
         for (FilterQueryTree childFilter : filterTree.getChildren()) {
-          //nested filters are not supported
+          // Nested filters are not supported
           assert childFilter.getChildren() == null || childFilter.getChildren().isEmpty();
           processFilterTree(childFilter);
         }
@@ -87,46 +88,42 @@ public class StarTreeIndexOperator extends BaseFilterOperator {
         processFilterTree(filterTree);
       }
     }
-    //group by columns, we cannot lose group by columns during traversal
+    // Group by columns, we cannot lose group by columns during traversal
     GroupBy groupBy = brokerRequest.getGroupBy();
     if (groupBy != null) {
-      for (String groupByCol : groupBy.getColumns()) {
-        //remove if there was a filter predicate set on this column in the query
-        if (eligibleEqualityPredicatesMap.containsKey(groupByCol)) {
-          inEligiblePredicatesMap.put(groupByCol, eligibleEqualityPredicatesMap.get(groupByCol));
-          eligibleEqualityPredicatesMap.remove(groupByCol);
-        } else {
-          //there is no predicate but we cannot lose this dimension while traversing
-          inEligiblePredicatesMap.put(groupByCol, null);
-        }
-      }
+      groupByColumns.addAll(groupBy.getColumns());
     }
   }
 
   private void processFilterTree(FilterQueryTree childFilter) {
     String column = childFilter.getColumn();
-    //only equality predicates are supported
+    // Only equality predicates are supported
     Predicate predicate = Predicate.newPredicate(childFilter);
     Dictionary dictionary = segment.getDataSource(column).getDictionary();
+    PredicateEntry predicateEntry = null;
     if (childFilter.getOperator() == FilterOperator.EQUALITY) {
       EqPredicate eqPredicate = (EqPredicate) predicate;
-      //computing dictionaryId allows us early termination and avoids multiple looks up during tree traversal
+      // Computing dictionaryId allows us early termination and avoids multiple looks up during tree
+      // traversal
       int dictId = dictionary.indexOf(eqPredicate.getEqualsValue());
       if (dictId < 0) {
-        //empty result
+        // Empty result
         emptyResult = true;
       }
-      eligibleEqualityPredicatesMap.put(column, new PredicateEntry(predicate, dictId));
+      predicateEntry = new PredicateEntry(predicate, dictId);
+      equalityPredicateColumns.add(column);
     } else {
-      // If dictionary does not have any values that satisfy the predicate, set emptyResults to true.
+      // If dictionary does not have any values that satisfy the predicate, set emptyResults to
+      // true.
       PredicateEvaluator predicateEvaluator =
           PredicateEvaluatorProvider.getPredicateFunctionFor(predicate, dictionary);
       if (predicateEvaluator.alwaysFalse()) {
         emptyResult = true;
       }
-      //store this predicate, we will have to apply it later
-      nonEqualityPredicatesMap.put(column, new PredicateEntry(predicate, -1));
+      // Store this predicate, we will have to apply it later
+      predicateEntry = new PredicateEntry(predicate, -1);
     }
+    predicatesMap.put(column, predicateEntry);
   }
 
   @Override
@@ -141,40 +138,15 @@ public class StarTreeIndexOperator extends BaseFilterOperator {
 
   @Override
   public BaseFilterBlock nextFilterBlock(BlockId blockId) {
-    long start, end;
     MutableRoaringBitmap finalResult = null;
     if (emptyResult) {
       finalResult = new MutableRoaringBitmap();
-      final BitmapDocIdIterator bitmapDocIdIterator = new BitmapDocIdIterator(finalResult.getIntIterator());
+      final BitmapDocIdIterator bitmapDocIdIterator =
+          new BitmapDocIdIterator(finalResult.getIntIterator());
       return createBaseFilterBlock(bitmapDocIdIterator);
     }
-    start = System.currentTimeMillis();
-    Queue<SearchEntry> matchedEntries = findMatchingLeafNodes();
-    //iterate over the matching nodes. For each column, generate the list of ranges.
-    List<Operator> matchingLeafOperators = new ArrayList<>();
-    int totalDocsToScan = 0;
-    for (SearchEntry matchedEntry : matchedEntries) {
-      Operator matchingLeafOperator;
-      int startDocId = matchedEntry.starTreeIndexnode.getStartDocumentId();
-      int endDocId = matchedEntry.starTreeIndexnode.getEndDocumentId();
 
-      List<Operator> filterOperators = createFilterOperatorsForRemainingPredicates(matchedEntry);
-
-      if (filterOperators.size() == 0) {
-        matchingLeafOperator = createFilterOperator(startDocId, endDocId);
-      } else if (filterOperators.size() == 1) {
-        matchingLeafOperator = filterOperators.get(0);
-      } else {
-        matchingLeafOperator = new AndOperator(filterOperators);
-      }
-      matchingLeafOperators.add(matchingLeafOperator);
-      totalDocsToScan += (endDocId - startDocId);
-      LOGGER.debug("{}", matchedEntry.starTreeIndexnode);
-    }
-    end = System.currentTimeMillis();
-    LOGGER.debug("Found {} matching leaves, took {} ms to create remaining filter operators. Total docs to scan:{}",
-        matchedEntries.size(), (end - start), totalDocsToScan);
-
+    List<Operator> matchingLeafOperators = buildMatchingLeafOperators();
     if (matchingLeafOperators.size() == 1) {
       BaseFilterOperator baseFilterOperator = (BaseFilterOperator) matchingLeafOperators.get(0);
       return baseFilterOperator.nextFilterBlock(blockId);
@@ -184,9 +156,77 @@ public class StarTreeIndexOperator extends BaseFilterOperator {
     }
   }
 
-  private BaseFilterOperator createFilterOperator(int startDocId, int endDocId) {
-    final MutableRoaringBitmap answer = new MutableRoaringBitmap();
-    answer.add(startDocId, endDocId);
+  /**
+   * Helper method to build a list of operators for matching leaf nodes.
+   * - Finds all leaf nodes that match the predicates
+   * - Iterates over all the matching leaf nodes, and generate a list of matching ranges
+   * @return
+   */
+  private List<Operator> buildMatchingLeafOperators() {
+    int totalDocsToScan = 0;
+    int numExactlyMatched = 0;
+    long start = System.currentTimeMillis();
+
+    final MutableRoaringBitmap exactlyMatchedDocsBitmap = new MutableRoaringBitmap();
+    Queue<SearchEntry> matchedEntries = findMatchingLeafNodes();
+
+    // Iterate over the matching nodes. For each column, generate the list of ranges.
+    List<Operator> matchingLeafOperators = new ArrayList<>();
+    for (SearchEntry matchedEntry : matchedEntries) {
+      Operator matchingLeafOperator = null;
+      StarTreeIndexNode matchedLeafNode = matchedEntry.starTreeIndexnode;
+
+      int startDocId = matchedLeafNode.getStartDocumentId();
+      int endDocId = matchedLeafNode.getEndDocumentId();
+
+      if (matchedEntry.remainingPredicateColumns.isEmpty()) {
+        // No more filters to apply
+        // Use aggregated doc for this leaf node if possible
+        if (matchedLeafNode.getAggregatedDocumentId() != -1 && matchedEntry.remainingGroupByColumns.isEmpty()) {
+          exactlyMatchedDocsBitmap.add(matchedLeafNode.getAggregatedDocumentId());
+          numExactlyMatched = numExactlyMatched + 1;
+        } else {
+          // Have to scan all the documents under this leaf node
+          exactlyMatchedDocsBitmap.add(startDocId, endDocId);
+          numExactlyMatched += (endDocId - startDocId);
+        }
+      } else {
+        Map<String, PredicateEntry> remainingPredicatesMap = computeRemainingPredicates(matchedEntry);
+        List<Operator> filterOperators =
+            createFilterOperatorsForRemainingPredicates(matchedEntry, remainingPredicatesMap);
+
+        if (filterOperators.size() == 0) {
+          // The predicates are applied, but we cannot use aggregated doc, as we might have lost
+          // the group by dimensions, in the aggregated doc.
+          exactlyMatchedDocsBitmap.add(startDocId, endDocId);
+          numExactlyMatched += (endDocId - startDocId);
+        } else if (filterOperators.size() == 1) {
+          matchingLeafOperator = filterOperators.get(0);
+        } else {
+          matchingLeafOperator = new AndOperator(filterOperators);
+        }
+        if (matchingLeafOperator != null) {
+          matchingLeafOperators.add(matchingLeafOperator);
+        }
+      }
+
+      totalDocsToScan += (endDocId - startDocId);
+      LOGGER.debug("{}", matchedLeafNode);
+    }
+
+    // Add an operator for exactlyMatchedDocs
+    if (numExactlyMatched > 0) {
+      matchingLeafOperators.add(createFilterOperator(exactlyMatchedDocsBitmap));
+      totalDocsToScan += numExactlyMatched;
+    }
+
+    long end = System.currentTimeMillis();
+    LOGGER.debug("Found {} matching leaves, took {} ms to create remaining filter operators. Total docs to scan:{}",
+        matchedEntries.size(), (end - start), totalDocsToScan);
+    return matchingLeafOperators;
+  }
+
+  private BaseFilterOperator createFilterOperator(final MutableRoaringBitmap answer) {
     return new BaseFilterOperator() {
 
       @Override
@@ -206,28 +246,46 @@ public class StarTreeIndexOperator extends BaseFilterOperator {
     };
   }
 
-  private List<Operator> createFilterOperatorsForRemainingPredicates(SearchEntry matchedEntry) {
+  /**
+   * Builds a list of filter operators for a given matched leaf node for the given
+   * set of predicates.
+   * @param matchedEntry
+   * @param remainingPredicatesMap
+   * @return
+   */
+  private List<Operator> createFilterOperatorsForRemainingPredicates(SearchEntry matchedEntry,
+      Map<String, PredicateEntry> remainingPredicatesMap) {
     int startDocId = matchedEntry.starTreeIndexnode.getStartDocumentId();
     int endDocId = matchedEntry.starTreeIndexnode.getEndDocumentId();
+
     List<Operator> childOperators = new ArrayList<>();
-    Map<String, PredicateEntry> remainingPredicatesMap = new HashMap<>();
-    for (String column : matchedEntry.remainingPredicates) {
-      PredicateEntry predicateEntry = eligibleEqualityPredicatesMap.get(column);
-      remainingPredicatesMap.put(column, predicateEntry);
-    }
-    //apply predicate that were not applied because of group by
-    //this should mostly empty unless query has a column in both filter and group by
-    remainingPredicatesMap.putAll(inEligiblePredicatesMap);
-    remainingPredicatesMap.putAll(nonEqualityPredicatesMap);
     for (String column : remainingPredicatesMap.keySet()) {
       PredicateEntry predicateEntry = remainingPredicatesMap.get(column);
-      //predicateEntry could be null if column appeared  only in groupBy
+
+      // predicateEntry could be null if column appeared only in groupBy
       if (predicateEntry != null) {
-        BaseFilterOperator childOperator = createChildOperator(startDocId, endDocId - 1, column, predicateEntry);
+        BaseFilterOperator childOperator =
+            createChildOperator(startDocId, endDocId - 1, column, predicateEntry);
         childOperators.add(childOperator);
       }
     }
     return childOperators;
+  }
+
+  /**
+   * Helper method to compute remaining predicates from remainingPredicateColumns of
+   * the given search entry.
+   *
+   * @param entry Search entry for which to compute the remaining predicates.
+   * @return
+   */
+  private Map<String, PredicateEntry> computeRemainingPredicates(SearchEntry entry) {
+    Map<String, PredicateEntry> remainingPredicatesMap = new HashMap<>();
+    for (String column : entry.remainingPredicateColumns) {
+      PredicateEntry predicateEntry = predicatesMap.get(column);
+      remainingPredicatesMap.put(column, predicateEntry);
+    }
+    return remainingPredicatesMap;
   }
 
   private BaseFilterOperator createChildOperator(int startDocId, int endDocId, String column,
@@ -267,12 +325,12 @@ public class StarTreeIndexOperator extends BaseFilterOperator {
 
           @Override
           public void setStartDocId(int startDocId) {
-            //no-op
+            // no-op
           }
 
           @Override
           public void setEndDocId(int endDocId) {
-            //no-op
+            // no-op
           }
 
           @Override
@@ -297,65 +355,118 @@ public class StarTreeIndexOperator extends BaseFilterOperator {
   private Queue<SearchEntry> findMatchingLeafNodes() {
     Queue<SearchEntry> matchedEntries = new LinkedList<>();
     Queue<SearchEntry> searchQueue = new LinkedList<>();
-    HashBiMap<String, Integer> dimensionIndexToNameMapping = segment.getStarTree().getDimensionNameToIndexMap();
+    HashBiMap<String, Integer> dimensionIndexToNameMapping =
+        segment.getStarTree().getDimensionNameToIndexMap();
+
     SearchEntry startEntry = new SearchEntry();
     startEntry.starTreeIndexnode = segment.getStarTree().getRoot();
-    startEntry.remainingPredicates = new HashSet<>(eligibleEqualityPredicatesMap.keySet());
+    startEntry.remainingPredicateColumns = new HashSet<>(predicatesMap.keySet());
+    startEntry.remainingGroupByColumns = new HashSet<>(groupByColumns);
     searchQueue.add(startEntry);
+
     while (!searchQueue.isEmpty()) {
       SearchEntry searchEntry = searchQueue.remove();
       StarTreeIndexNode current = searchEntry.starTreeIndexnode;
-      HashSet<String> remainingColumnsToFilter = searchEntry.remainingPredicates;
-      //check if its leaf
-      if (current.isLeaf()) {
-        //reached leaf
+      HashSet<String> remainingPredicateColumns = searchEntry.remainingPredicateColumns;
+      HashSet<String> remainingGroupByColumns = searchEntry.remainingGroupByColumns;
+      // Check if its leaf
+      if (current.isLeaf() || (remainingPredicateColumns.isEmpty() && remainingGroupByColumns.isEmpty())) {
+        // reached leaf
         matchedEntries.add(searchEntry);
         continue;
       }
-      //find next set of nodes to search
-      String nextDimension = dimensionIndexToNameMapping.inverse().get(current.getChildDimensionName());
-      HashSet<String> newRemainingPredicates = new HashSet<>();
-      newRemainingPredicates.addAll(remainingColumnsToFilter);
-      newRemainingPredicates.remove(nextDimension);
-      if (!(inEligiblePredicatesMap.containsKey(nextDimension)
-          || nonEqualityPredicatesMap.containsKey(nextDimension))) {
-        //check if there is exact match filter on this column
-        int nextValueId;
-        if (eligibleEqualityPredicatesMap.containsKey(nextDimension)) {
-          nextValueId = eligibleEqualityPredicatesMap.get(nextDimension).dictionaryId;
-        } else {
-          nextValueId = StarTreeIndexNode.all();
-        }
-        SearchEntry newEntry = new SearchEntry();
-        newEntry.starTreeIndexnode = current.getChildren().get(nextValueId);
-        if (newEntry.starTreeIndexnode != null) {
-          newEntry.remainingPredicates = newRemainingPredicates;
-          searchQueue.add(newEntry);
-        }
-      } else {
-        //if there is a group by
-        for (Map.Entry<Integer, StarTreeIndexNode> entry : current.getChildren().entrySet()) {
-          if (entry.getKey() != StarTreeIndexNode.all()) {
-            SearchEntry newEntry = new SearchEntry();
-            newEntry.starTreeIndexnode = entry.getValue();
-            newEntry.remainingPredicates = newRemainingPredicates;
-            searchQueue.add(newEntry);
-          }
-        }
-      }
+      // Find next set of nodes to search
+      String nextDimension =
+          dimensionIndexToNameMapping.inverse().get(current.getChildDimensionName());
+
+      HashSet<String> newRemainingPredicateColumns = new HashSet<>();
+      newRemainingPredicateColumns.addAll(remainingPredicateColumns);
+      HashSet<String> newRemainingGroupByColumns = new HashSet<>();
+      newRemainingGroupByColumns.addAll(remainingGroupByColumns);
+
+      addMatchingChildrenToQueue(searchQueue, current, nextDimension, newRemainingPredicateColumns,
+          newRemainingGroupByColumns);
     }
     return matchedEntries;
   }
 
+  /**
+   * Helper method to add matching children into the search queue.
+   * - If predicate can be applied (i.e. equality predicate that is eligible), add the child
+   * satisfying the predicate into the queue.
+   * - If predicate cannot be applied (either inEligible or nonEquality), add all children to the
+   * queue.
+   * - If no predicate on the column, add the star-child to the queue
+   * @param searchQueue
+   * @param node
+   * @param column
+   * @param remainingPredicateColumns
+   * @param remainingGroupByColumns
+   */
+  private void addMatchingChildrenToQueue(Queue<SearchEntry> searchQueue, StarTreeIndexNode node,
+      String column, HashSet<String> remainingPredicateColumns,
+      HashSet<String> remainingGroupByColumns) {
+    Map<Integer, StarTreeIndexNode> children = node.getChildren();
+
+    if (equalityPredicateColumns.contains(column)) {
+      // Check if there is exact match filter on this column
+      int nextValueId;
+      PredicateEntry predicateEntry = predicatesMap.get(column);
+      nextValueId = predicateEntry.dictionaryId;
+      remainingPredicateColumns.remove(column);
+      remainingGroupByColumns.remove(column);
+      if (children.containsKey(nextValueId)) {
+        addNodeToSearchQueue(searchQueue, children.get(nextValueId), remainingPredicateColumns,
+            remainingGroupByColumns);
+      }
+    } else {
+      int nextValueId;
+      if (groupByColumns.contains(column) || predicatesMap.containsKey(column)
+          || !children.containsKey(StarTreeIndexNode.all())) {
+        for (StarTreeIndexNode indexNode : children.values()) {
+          if (indexNode.getDimensionValue() != StarTreeIndexNode.all()) {
+            remainingPredicateColumns.remove(column);
+            remainingGroupByColumns.remove(column);
+            addNodeToSearchQueue(searchQueue, indexNode, remainingPredicateColumns,
+                remainingGroupByColumns);
+          }
+        }
+      } else {
+        // Since we have a star node and no group by on this column we can take lose this dimension
+        // by taking star node path
+        nextValueId = StarTreeIndexNode.all();
+        addNodeToSearchQueue(searchQueue, children.get(nextValueId), remainingPredicateColumns,
+            remainingGroupByColumns);
+      }
+    }
+  }
+
+  /**
+   * Helper method to add the given node the the provided queue.
+   * @param searchQueue
+   * @param node
+   * @param predicateColumns
+   * @param groupByColumns
+   */
+  private void addNodeToSearchQueue(Queue<SearchEntry> searchQueue, StarTreeIndexNode node,
+      HashSet<String> predicateColumns, HashSet<String> groupByColumns) {
+    SearchEntry newEntry = new SearchEntry();
+    newEntry.starTreeIndexnode = node;
+    newEntry.remainingPredicateColumns = predicateColumns;
+    newEntry.remainingGroupByColumns = groupByColumns;
+    searchQueue.add(newEntry);
+  }
+
   class SearchEntry {
     StarTreeIndexNode starTreeIndexnode;
-    HashSet<String> remainingPredicates;
+    HashSet<String> remainingPredicateColumns;
+    HashSet<String> remainingGroupByColumns;
 
     @Override
     public String toString() {
       StringBuilder sb = new StringBuilder();
       sb.append(starTreeIndexnode);
-      sb.append("\t").append(remainingPredicates);
+      sb.append("\t").append(remainingPredicateColumns);
       return sb.toString();
     }
   }

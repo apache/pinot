@@ -172,10 +172,8 @@ public class StarTreeDataTable {
           prevStart = i;
         }
         prevValue = value;
-        if (i == length - 1) {
-          rangeMap.put(prevValue, new IntPair(startDocId + prevStart, startDocId + i));
-        }
       }
+      rangeMap.put(prevValue, new IntPair(startDocId + prevStart, endDocId));
       return rangeMap;
     } catch (IOException e) {
       e.printStackTrace();

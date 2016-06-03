@@ -29,6 +29,10 @@ public class MetricBuffer {
     this.numbers = numbers;
   }
 
+  public MetricBuffer(MetricBuffer copy) {
+    this.numbers = Arrays.copyOf(copy.numbers, copy.numbers.length);
+  }
+
   public static MetricBuffer fromBytes(byte[] bytes, List<DataType> metricTypes) {
     ByteBuffer buffer = ByteBuffer.wrap(bytes);
     Number[] numbers = new Number[metricTypes.size()];
