@@ -29,6 +29,8 @@ public class PinotAdminEndpointApplication extends PinotRestletApplication {
   @Override
   protected void configureRouter(Router router) {
     attachRoutesForClass(router, MmapDebugResource.class);
+    attachRoutesForClass(router, TableSizeResource.class);
+
 
     // Attach Swagger stuff
     router.attach("/api", SwaggerResource.class);

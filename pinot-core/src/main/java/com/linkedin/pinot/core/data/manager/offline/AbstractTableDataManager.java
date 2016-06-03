@@ -16,9 +16,16 @@
 
 package com.linkedin.pinot.core.data.manager.offline;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableList;
+import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
 import com.linkedin.pinot.common.metrics.ServerGauge;
 import com.linkedin.pinot.common.metrics.ServerMeter;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
+import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.common.utils.NamedThreadFactory;
+import com.linkedin.pinot.core.data.manager.config.TableDataManagerConfig;
+import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -28,14 +35,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import javax.annotation.Nonnull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.google.common.annotations.VisibleForTesting;
-import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
-import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.common.utils.NamedThreadFactory;
-import com.linkedin.pinot.core.data.manager.config.TableDataManagerConfig;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
 
 
 public abstract  class AbstractTableDataManager implements TableDataManager {
@@ -214,6 +216,23 @@ public abstract  class AbstractTableDataManager implements TableDataManager {
     return _queryExecutorService;
   }
 
+  @Nonnull
+  @Override
+  public ImmutableList<SegmentDataManager> acquireAllSegments() {
+    ImmutableList.Builder<SegmentDataManager> segmentListBuilder = ImmutableList.builder();
+    try {
+      _rwLock.readLock().lock();
+      for (Map.Entry<String, SegmentDataManager> segmentEntry : _segmentsMap.entrySet()) {
+        SegmentDataManager segmentDataManager = segmentEntry.getValue();
+        segmentDataManager.incrementRefCnt();
+        segmentListBuilder.add(segmentDataManager);
+      }
+    } finally {
+      _rwLock.readLock().unlock();
+    }
+    return segmentListBuilder.build();
+  }
+
   @Override
   public List<SegmentDataManager> acquireSegments(List<String> segmentList) {
     List<SegmentDataManager> ret = new ArrayList<SegmentDataManager>();
@@ -260,4 +279,8 @@ public abstract  class AbstractTableDataManager implements TableDataManager {
     }
   }
 
+  @Override
+  public String getTableName() {
+    return _tableName;
+  }
 }

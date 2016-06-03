@@ -15,19 +15,19 @@
  */
 package com.linkedin.pinot.core.data.manager.offline;
 
-import com.linkedin.pinot.common.metrics.ServerMetrics;
-import java.util.List;
-import java.util.concurrent.ExecutorService;
-
-import org.apache.helix.ZNRecord;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
-
+import com.google.common.collect.ImmutableList;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
+import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.data.manager.config.TableDataManagerConfig;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import java.util.List;
+import java.util.concurrent.ExecutorService;
+import javax.annotation.Nonnull;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 
 
 /**
@@ -90,6 +90,15 @@ public interface TableDataManager {
    * using the {@link #releaseSegment(SegmentDataManager) releaseSegment} method
    * @return segments by giving a list of segment names in this TableDataManager.
    */
+  @Nonnull
+  ImmutableList<SegmentDataManager> acquireAllSegments();
+
+  /**
+   *
+   * @note This method gets a lock on the segments. It is the caller's responsibility to return the segments
+   * using the {@link #releaseSegment(SegmentDataManager) releaseSegment} method
+   * @return segments by giving a list of segment names in this TableDataManager.
+   */
   List<SegmentDataManager> acquireSegments(List<String> segmentList);
 
   /**
@@ -105,6 +114,11 @@ public interface TableDataManager {
   * give back segmentReader, so the segment could be safely deleted.
   */
   void releaseSegment(SegmentDataManager segmentDataManager);
+
+  /**
+   * Get the table name managed by this instance
+   */
+  String getTableName();
 
   /**
    * @return ExecutorService for query.
