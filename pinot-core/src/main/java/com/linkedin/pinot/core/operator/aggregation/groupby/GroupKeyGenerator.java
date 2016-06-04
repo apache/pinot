@@ -23,15 +23,6 @@ import java.util.Iterator;
  * Interface for generating group-by keys.
  */
 public interface GroupKeyGenerator {
-
-  /**
-   * Generate group-by key for a given docId.
-   *
-   * @param docId
-   * @return
-   */
-  int generateKeyForDocId(int docId);
-
   /**
    * Generate group-by keys for a given docId set and return the mapping
    * in the passed in docIdToGroupKey array.
