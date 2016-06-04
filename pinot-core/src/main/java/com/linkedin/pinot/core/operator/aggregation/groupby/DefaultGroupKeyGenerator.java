@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.core.operator.aggregation.groupby;
 
-import com.google.common.base.Preconditions;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockMultiValIterator;
 import com.linkedin.pinot.core.common.BlockSingleValIterator;
@@ -337,9 +336,8 @@ public class DefaultGroupKeyGenerator implements GroupKeyGenerator {
   private int updateRawKeyToGroupKeyMapping(long rawKey) {
     int groupKey;
     if (_storageType == STORAGE_TYPE.ARRAY_BASED) {
-      Preconditions.checkState(rawKey < _uniqueGroupKeysFlag.length);
-
       int intRawKey = (int) rawKey;
+
       if (_uniqueGroupKeysFlag[intRawKey] == false) {
         _uniqueGroupKeysFlag[intRawKey] = true;
         _numUniqueGroupKeys++;
