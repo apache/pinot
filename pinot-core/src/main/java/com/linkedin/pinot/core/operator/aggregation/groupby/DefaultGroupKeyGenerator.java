@@ -170,16 +170,14 @@ public class DefaultGroupKeyGenerator implements GroupKeyGenerator {
    */
   @Override
   public int generateKeyForDocId(int docId) {
+    long rawKey = 0;
+
     for (int i = 0; i < _groupByColumns.length; i++) {
-      if (_isSingleValueGroupByColumn[i]) {
-        _singleValIterators[i].skipTo(docId);
-        _reusableGroupByValuesArray[i] = _singleValIterators[i].nextIntVal();
-      } else {
-        throw new RuntimeException("GroupBy on multi-valued columns not supported.");
-      }
+      BlockSingleValIterator singleValIterator = _singleValIterators[i];
+      singleValIterator.skipTo(docId);
+      rawKey = rawKey * _cardinalities[i] + singleValIterator.nextIntVal();
     }
 
-    long rawKey = generateRawKey(_reusableGroupByValuesArray, _cardinalities);
     return updateRawKeyToGroupKeyMapping(rawKey);
   }
 
