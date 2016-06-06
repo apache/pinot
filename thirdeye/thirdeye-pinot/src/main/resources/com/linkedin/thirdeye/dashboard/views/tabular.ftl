@@ -1,6 +1,6 @@
 <section id="custom-funnel-section" class="hidden" style="margin: 0;">
 	<script id="funnels-table-template" type="text/x-handlebars-template">
-        <ul class="uk-display-inline-block uk-float-left">
+    <ul class="uk-display-inline-block uk-float-left">
         <li id="sum-detail" class="uk-display-inline-block uk-button-group uk-margin" data-uk-button-radio="">
             <button class="radio-type-button uk-active">
                 Summary
@@ -68,6 +68,8 @@
                 {{#each data as |metricData metricIndex|}}
                 <tr class="data-row">
                     <td class="metric-label border-left" title="{{@key}}" style="width:145px;">{{@key}}</td>
+                    <td class="dropdown-column" style="position: relative"><button class="funnels-dimension-selector-btn uk-button" style="width:100%"  data-metric="{{@key}}"><i class="uk-icon-caret-down"></i></button></td>
+
                     {{#each responseData as |metricDataRows metricDataRowIndex|}}
                     <td class="{{classify 0}}" timeIndex={{metricDataRowIndex}} data-metric-name={{metricIndex}} metricIndex={{metricIndex}} value="{{metricDataRows.[0]}}">{{displayRatio metricDataRows.[3] 0}}</td>
                     <td class="{{classify 1}}" timeIndex={{metricDataRowIndex}} data-metric-name={{metricIndex}} metricIndex={{metricIndex}} value="{{metricDataRows.[1]}}">{{displayRatio metricDataRows.[4] 1}}</td>

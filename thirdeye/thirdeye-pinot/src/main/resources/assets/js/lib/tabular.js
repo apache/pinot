@@ -37,8 +37,7 @@ function renderTabular(data, tab) {
 
 
     /* Handelbars template for funnel table */
-    var result_funnels_template = HandleBarsTemplates
-        .template_funnels_table(data);
+    var result_funnels_template = HandleBarsTemplates.template_funnels_table(data);
     $("#"+ tab +"-display-chart-section").append(result_funnels_template);
     calcHeatMapBG();
     //formatMillisToTZ();
@@ -307,15 +306,10 @@ function drawTimeSeries(ajaxData, tab ) {
 
 function switchToContributors(target){
     // Change the view to contributors
-    console.log("dimension:")
-    console.log($(target).attr("value"))
 
     var dimensionContainer = $(target).closest(".funnels-table-dimension-box");
     var metric = $(dimensionContainer).attr("data-metric");
     var dimension = $(target).attr("value");
-
-    console.log("funnels-table-dimension-box data-metric:")
-    console.log(metric)
 
     //either dashboard or metrics param is present in hash
     delete hash.dashboard;
