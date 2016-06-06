@@ -40,11 +40,6 @@ import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.pql.parsers.Pql2Compiler;
 
-
-/**
- * Dec 8, 2014
- */
-
 public class PqlQueryResource extends BasePinotControllerRestletResource {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(PqlQueryResource.class);

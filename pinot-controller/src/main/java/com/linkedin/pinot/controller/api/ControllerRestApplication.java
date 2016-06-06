@@ -21,6 +21,7 @@ import com.linkedin.pinot.controller.api.restlet.resources.BasePinotControllerRe
 import com.linkedin.pinot.controller.api.restlet.resources.PinotVersionRestletResource;
 import com.linkedin.pinot.common.restlet.swagger.SwaggerResource;
 
+import com.linkedin.pinot.controller.api.restlet.resources.TableSize;
 import org.restlet.Context;
 import org.restlet.Request;
 import org.restlet.Response;
@@ -92,6 +93,7 @@ public class ControllerRestApplication extends PinotRestletApplication {
     attachRoutesForClass(router, PinotTableInstances.class);
     attachRoutesForClass(router, PinotTableSchema.class);
     attachRoutesForClass(router, PinotSegmentRestletResource.class);
+    attachRoutesForClass(router, TableSize.class);
 
     // PUT
     attachRoutesForClass(router, PinotTableSegmentConfigs.class);

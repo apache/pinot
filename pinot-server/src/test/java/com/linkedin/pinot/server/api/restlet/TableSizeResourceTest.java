@@ -16,6 +16,7 @@
 
 package com.linkedin.pinot.server.api.restlet;
 
+import com.linkedin.pinot.common.restlet.resources.TableSizeInfo;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
@@ -134,8 +135,8 @@ public class TableSizeResourceTest {
       Response response = client.handle(request);
       Assert.assertEquals(response.getStatus(),Status.SUCCESS_OK);
       String body = response.getEntity().getText();
-      TableSizeResource.TableSizeInfo tableSizeInfo =
-          new ObjectMapper().readValue(body, TableSizeResource.TableSizeInfo.class);
+      TableSizeInfo tableSizeInfo =
+          new ObjectMapper().readValue(body, TableSizeInfo.class);
       Assert.assertEquals("testTable", tableSizeInfo.tableName);
       Assert.assertEquals(1, tableSizeInfo.segments.size());
       Assert.assertEquals(indexSegment.getSegmentName(), tableSizeInfo.segments.get(0).segmentName);

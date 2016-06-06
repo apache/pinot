@@ -124,8 +124,9 @@ public class MultiGetRequestTest {
     int errors = 0;
     int timeouts = 0;
     for (int i = 0; i < urls.size(); i++) {
+      GetMethod getMethod = null;
       try {
-        GetMethod getMethod = completionService.take().get();
+         getMethod = completionService.take().get();
         if (getMethod.getStatusCode() >= 300) {
           ++errors;
           Assert.assertEquals(getMethod.getResponseBodyAsString(), ERROR_MSG);

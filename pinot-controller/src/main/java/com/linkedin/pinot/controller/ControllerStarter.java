@@ -15,9 +15,26 @@
  */
 package com.linkedin.pinot.controller;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.linkedin.pinot.common.Utils;
+import com.linkedin.pinot.common.metrics.ControllerMeter;
+import com.linkedin.pinot.common.metrics.ControllerMetrics;
+import com.linkedin.pinot.common.metrics.MetricsHelper;
+import com.linkedin.pinot.common.metrics.ValidationMetrics;
+import com.linkedin.pinot.controller.api.ControllerRestApplication;
+import com.linkedin.pinot.controller.helix.SegmentStatusChecker;
+import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.linkedin.pinot.controller.helix.core.realtime.PinotRealtimeSegmentManager;
+import com.linkedin.pinot.controller.helix.core.retention.RetentionManager;
+import com.linkedin.pinot.controller.validation.ValidationManager;
+import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
 import java.util.concurrent.Callable;
-
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import org.apache.commons.httpclient.HttpConnectionManager;
+import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.apache.helix.PreConnectCallback;
 import org.restlet.Application;
 import org.restlet.Component;
@@ -25,24 +42,6 @@ import org.restlet.Context;
 import org.restlet.data.Protocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.linkedin.pinot.common.Utils;
-import com.linkedin.pinot.common.metrics.ControllerMeter;
-import com.linkedin.pinot.common.metrics.ControllerMetrics;
-import com.linkedin.pinot.common.metrics.MetricsHelper;
-import com.linkedin.pinot.common.metrics.ValidationMetrics;
-import com.linkedin.pinot.controller.api.ControllerRestApplication;
-import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import com.linkedin.pinot.controller.helix.core.realtime.PinotRealtimeSegmentManager;
-import com.linkedin.pinot.controller.helix.core.retention.RetentionManager;
-import com.linkedin.pinot.controller.helix.SegmentStatusChecker;
-import com.linkedin.pinot.controller.validation.ValidationManager;
-import com.yammer.metrics.core.MetricsRegistry;
-
-
-/**
- * Sep 24, 2014
- */
 
 public class ControllerStarter {
   private static final Logger LOGGER = LoggerFactory.getLogger(ControllerStarter.class);
@@ -57,6 +56,7 @@ public class ControllerStarter {
   private final MetricsRegistry _metricsRegistry;
   private final PinotRealtimeSegmentManager realtimeSegmentsManager;
   private final SegmentStatusChecker segmentStatusChecker;
+  private final ExecutorService executorService;
 
   public ControllerStarter(ControllerConf conf) {
     config = conf;
@@ -69,6 +69,8 @@ public class ControllerStarter {
     validationManager = new ValidationManager(validationMetrics, helixResourceManager, config);
     realtimeSegmentsManager = new PinotRealtimeSegmentManager(helixResourceManager);
     segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config);
+    executorService = Executors.newCachedThreadPool(
+        new ThreadFactoryBuilder().setNameFormat("restlet-multiget-thread-%d").build());
   }
 
   public PinotHelixResourceManager getHelixResourceManager() {
@@ -88,6 +90,8 @@ public class ControllerStarter {
     LOGGER.info("injecting conf and resource manager to the api context");
     applicationContext.getAttributes().put(ControllerConf.class.toString(), config);
     applicationContext.getAttributes().put(PinotHelixResourceManager.class.toString(), helixResourceManager);
+    applicationContext.getAttributes().put(HttpConnectionManager.class.toString(), new MultiThreadedHttpConnectionManager());
+    applicationContext.getAttributes().put(Executor.class.toString(), executorService);
 
     controllerRestApp.setContext(applicationContext);
 
@@ -163,6 +167,7 @@ public class ControllerStarter {
       LOGGER.info("stopping segments status manager");
       segmentStatusChecker.stop();
 
+      executorService.shutdownNow();
     } catch (final Exception e) {
       LOGGER.error("Caught exception", e);
     }

@@ -15,35 +15,35 @@
  */
 package com.linkedin.pinot.controller.helix;
 
-import static com.linkedin.pinot.common.utils.CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE;
-import static com.linkedin.pinot.common.utils.CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE;
-
+import com.google.common.collect.Lists;
+import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.config.Tenant;
+import com.linkedin.pinot.common.config.Tenant.TenantBuilder;
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
+import com.linkedin.pinot.common.utils.TenantRole;
+import java.util.HashMap;
 import java.util.List;
-
+import java.util.Map;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
+import org.apache.helix.model.HelixConfigScope;
+import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.participant.StateMachineEngine;
 import org.apache.helix.participant.statemachine.StateModelFactory;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import com.google.common.collect.Lists;
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.config.Tenant;
-import com.linkedin.pinot.common.config.Tenant.TenantBuilder;
-import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
-import com.linkedin.pinot.common.utils.TenantRole;
+import static com.linkedin.pinot.common.utils.CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE;
+import static com.linkedin.pinot.common.utils.CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE;
 
-
-/**
- * Sep 29, 2014
- */
 
 public class ControllerRequestBuilderUtil {
 
-  public static JSONObject buildInstanceCreateRequestJSON(String host, String port, String tag) throws JSONException {
+  public static JSONObject buildInstanceCreateRequestJSON(String host, String port, String tag)
+      throws JSONException {
     final JSONObject ret = new JSONObject();
     ret.put("host", host);
     ret.put("port", port);
@@ -51,7 +51,8 @@ public class ControllerRequestBuilderUtil {
     return ret;
   }
 
-  public static JSONArray buildBulkInstanceCreateRequestJSON(int start, int end) throws JSONException {
+  public static JSONArray buildBulkInstanceCreateRequestJSON(int start, int end)
+      throws JSONException {
     final JSONArray ret = new JSONArray();
     for (int i = start; i <= end; i++) {
       final JSONObject ins = new JSONObject();
@@ -65,20 +66,22 @@ public class ControllerRequestBuilderUtil {
   }
 
   public static void addFakeBrokerInstancesToAutoJoinHelixCluster(String helixClusterName, String zkServer,
-      int numInstances) throws Exception {
+      int numInstances)
+      throws Exception {
     addFakeBrokerInstancesToAutoJoinHelixCluster(helixClusterName, zkServer, numInstances, false);
   }
 
   public static void addFakeBrokerInstancesToAutoJoinHelixCluster(String helixClusterName, String zkServer,
-      int numInstances, boolean isSingleTenant) throws Exception {
+      int numInstances, boolean isSingleTenant)
+      throws Exception {
     for (int i = 0; i < numInstances; ++i) {
       final String brokerId = "Broker_localhost_" + i;
       final HelixManager helixZkManager =
           HelixManagerFactory.getZKHelixManager(helixClusterName, brokerId, InstanceType.PARTICIPANT, zkServer);
       final StateMachineEngine stateMachineEngine = helixZkManager.getStateMachineEngine();
       final StateModelFactory<?> stateModelFactory = new EmptyBrokerOnlineOfflineStateModelFactory();
-      stateMachineEngine.registerStateModelFactory(EmptyBrokerOnlineOfflineStateModelFactory.getStateModelDef(),
-          stateModelFactory);
+      stateMachineEngine
+          .registerStateModelFactory(EmptyBrokerOnlineOfflineStateModelFactory.getStateModelDef(), stateModelFactory);
       helixZkManager.connect();
       if (isSingleTenant) {
         helixZkManager.getClusterManagmentTool().addInstanceTag(helixClusterName, brokerId,
@@ -91,12 +94,21 @@ public class ControllerRequestBuilderUtil {
   }
 
   public static void addFakeDataInstancesToAutoJoinHelixCluster(String helixClusterName, String zkServer,
-      int numInstances) throws Exception {
-    addFakeDataInstancesToAutoJoinHelixCluster(helixClusterName, zkServer, numInstances, false);
+      int numInstances)
+      throws Exception {
+    addFakeDataInstancesToAutoJoinHelixCluster(helixClusterName, zkServer, numInstances, false, 8097);
   }
 
   public static void addFakeDataInstancesToAutoJoinHelixCluster(String helixClusterName, String zkServer,
-      int numInstances, boolean isSingleTenant) throws Exception {
+      int numInstances, boolean isSingleTenant)
+      throws Exception {
+    addFakeDataInstancesToAutoJoinHelixCluster(helixClusterName, zkServer, numInstances, isSingleTenant, 8097);
+  }
+
+  public static void addFakeDataInstancesToAutoJoinHelixCluster(String helixClusterName, String zkServer,
+      int numInstances, boolean isSingleTenant, int adminPort)
+      throws Exception {
+
     for (int i = 0; i < numInstances; ++i) {
       final String instanceId = "Server_localhost_" + i;
 
@@ -104,8 +116,8 @@ public class ControllerRequestBuilderUtil {
           HelixManagerFactory.getZKHelixManager(helixClusterName, instanceId, InstanceType.PARTICIPANT, zkServer);
       final StateMachineEngine stateMachineEngine = helixZkManager.getStateMachineEngine();
       final StateModelFactory<?> stateModelFactory = new EmptySegmentOnlineOfflineStateModelFactory();
-      stateMachineEngine.registerStateModelFactory(EmptySegmentOnlineOfflineStateModelFactory.getStateModelDef(),
-          stateModelFactory);
+      stateMachineEngine
+          .registerStateModelFactory(EmptySegmentOnlineOfflineStateModelFactory.getStateModelDef(), stateModelFactory);
       helixZkManager.connect();
       if (isSingleTenant) {
         helixZkManager.getClusterManagmentTool().addInstanceTag(helixClusterName, instanceId,
@@ -115,6 +127,12 @@ public class ControllerRequestBuilderUtil {
       } else {
         helixZkManager.getClusterManagmentTool().addInstanceTag(helixClusterName, instanceId, UNTAGGED_SERVER_INSTANCE);
       }
+      HelixConfigScope scope =
+          new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.PARTICIPANT, helixClusterName)
+              .forParticipant(instanceId).build();
+      Map<String, String> props = new HashMap<>();
+      props.put(CommonConstants.Helix.Instance.ADMIN_PORT_KEY, String.valueOf(adminPort + i));
+      helixZkManager.getClusterManagmentTool().setConfig(scope, props);
     }
   }
 
@@ -126,30 +144,33 @@ public class ControllerRequestBuilderUtil {
   }
 
   public static JSONObject buildServerTenantCreateRequestJSON(String tenantName, int numberOfInstances,
-      int offlineInstances, int realtimeInstances) throws JSONException {
+      int offlineInstances, int realtimeInstances)
+      throws JSONException {
     Tenant tenant = new TenantBuilder(tenantName).setRole(TenantRole.SERVER).setTotalInstances(numberOfInstances)
         .setOfflineInstances(offlineInstances).setRealtimeInstances(realtimeInstances).build();
     return tenant.toJSON();
   }
 
   public static JSONObject buildCreateOfflineTableJSON(String tableName, String serverTenant, String brokerTenant,
-      int numReplicas) throws JSONException {
+      int numReplicas)
+      throws JSONException {
     return buildCreateOfflineTableJSON(tableName, serverTenant, brokerTenant, "timeColumnName", "timeType", "DAYS",
         "700", numReplicas, "BalanceNumSegmentAssignmentStrategy");
   }
 
   public static JSONObject buildCreateOfflineTableJSON(String tableName, String serverTenant, String brokerTenant,
       String timeColumnName, String timeType, String retentionTimeUnit, String retentionTimeValue, int numReplicas,
-      String segmentAssignmentStrategy) throws JSONException {
+      String segmentAssignmentStrategy)
+      throws JSONException {
     return buildCreateOfflineTableJSON(tableName, serverTenant, brokerTenant, timeColumnName, timeType,
         retentionTimeUnit, retentionTimeValue, numReplicas, segmentAssignmentStrategy,
         Lists.newArrayList("coulmn1", "column2"));
-
   }
 
   public static JSONObject buildCreateOfflineTableJSON(String tableName, String serverTenant, String brokerTenant,
       String timeColumnName, String timeType, String retentionTimeUnit, String retentionTimeValue, int numReplicas,
-      String segmentAssignmentStrategy, List<String> invertedIndexColumnList) throws JSONException {
+      String segmentAssignmentStrategy, List<String> invertedIndexColumnList)
+      throws JSONException {
     JSONObject creationRequest = new JSONObject();
     creationRequest.put("tableName", tableName);
 
@@ -166,7 +187,7 @@ public class ControllerRequestBuilderUtil {
     creationRequest.put("segmentsConfig", segmentsConfig);
     JSONObject tableIndexConfig = new JSONObject();
     JSONArray invertedIndexColumns = new JSONArray();
-    for(String columnToIndex:invertedIndexColumnList){
+    for (String columnToIndex : invertedIndexColumnList) {
       invertedIndexColumns.put(columnToIndex);
     }
     tableIndexConfig.put("invertedIndexColumns", invertedIndexColumns);
@@ -183,15 +204,13 @@ public class ControllerRequestBuilderUtil {
     creationRequest.put("tenants", tenants);
     creationRequest.put("tableType", "OFFLINE");
     JSONObject metadata = new JSONObject();
-    JSONObject customConfigs = new JSONObject();
-    customConfigs.put("d2Name", "xlntBetaPinot");
-    metadata.put("customConfigs", customConfigs);
     creationRequest.put("metadata", metadata);
     return creationRequest;
   }
 
   public static JSONObject buildCreateOfflineTableJSON(String tableName, String serverTenant, String brokerTenant,
-      int numReplicas, String segmentAssignmentStrategy) throws JSONException {
+      int numReplicas, String segmentAssignmentStrategy)
+      throws JSONException {
     return buildCreateOfflineTableJSON(tableName, serverTenant, brokerTenant, "timeColumnName", "daysSinceEpoch",
         "DAYS", "700", numReplicas, segmentAssignmentStrategy);
   }
