@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.detector.function;
 
+import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -33,19 +34,19 @@ import com.linkedin.thirdeye.detector.api.AnomalyResult;
  * @param averageVolumeThreshold minimum average threshold across the entire input window. If the
  *          average value does not meet or exceed the threshold, no anomaly results will be
  *          generated. This value should be a double.
- * @param messageTemplate (optional) String intended to be used with String.format, with 4 arguments
- *          being
- *          changeThreshold, baseline (eg w/w), current value, baseline value. If not provided,
- *          defaults to {@link UserRuleAnomalyFunction#DEFAULT_MESSAGE_TEMPLATE}
  */
 public class UserRuleAnomalyFunction extends BaseAnomalyFunction {
   private static final Logger LOGGER = LoggerFactory.getLogger(UserRuleAnomalyFunction.class);
   public static final String BASELINE = "baseline";
   public static final String CHANGE_THRESHOLD = "changeThreshold";
   public static final String AVERAGE_VOLUME_THRESHOLD = "averageVolumeThreshold";
-  public static final String MESSAGE_TEMPLATE = "messageTemplate";
-  public static final String DEFAULT_MESSAGE_TEMPLATE = "threshold=%.3f, %s value is %s / %s (%.3f)";
+  public static final String DEFAULT_MESSAGE_TEMPLATE = "threshold=%s, %s value is %s / %s (%s)";
   private static final Joiner CSV = Joiner.on(",");
+  private static final NumberFormat PERCENT_FORMATTER = NumberFormat.getPercentInstance();
+  static {
+    // limit number of decimal points shown, for readability
+    PERCENT_FORMATTER.setMaximumFractionDigits(2);
+  }
 
   @Override
   public List<AnomalyResult> analyze(DimensionKey dimensionKey, MetricTimeSeries timeSeries,
@@ -68,8 +69,6 @@ public class UserRuleAnomalyFunction extends BaseAnomalyFunction {
     // Compute baseline for comparison
     String baselineProp = props.getProperty(BASELINE);
     long baselineMillis = getBaselineMillis(baselineProp);
-
-    String messageTemplate = props.getProperty(MESSAGE_TEMPLATE, DEFAULT_MESSAGE_TEMPLATE);
 
     // Compute the bucket size, so we can iterate in those steps
     long bucketMillis =
@@ -109,8 +108,8 @@ public class UserRuleAnomalyFunction extends BaseAnomalyFunction {
         anomalyResult.setEndTimeUtc(null); // point-in-time
         anomalyResult.setScore(calculatePercentChange(currentValue, baselineValue));
         anomalyResult.setWeight(averageValue);
-        String message = String.format(messageTemplate, changeThreshold, baselineProp, currentValue,
-            baselineValue, calculatePercentChange(currentValue, baselineValue));
+        String message =
+            getAnomalyResultMessage(changeThreshold, baselineProp, currentValue, baselineValue);
         anomalyResult.setMessage(message);
         anomalyResult.setFilters(getSpec().getFilters());
         anomalyResults.add(anomalyResult);
@@ -119,6 +118,18 @@ public class UserRuleAnomalyFunction extends BaseAnomalyFunction {
     }
     return anomalyResults;
 
+  }
+
+  private String getAnomalyResultMessage(double threshold, String baselineProp, double currentValue,
+      double baselineValue) {
+    double change = calculatePercentChange(currentValue, baselineValue);
+    NumberFormat percentInstance = NumberFormat.getPercentInstance();
+    percentInstance.setMaximumFractionDigits(2);
+    String thresholdPercent = percentInstance.format(threshold);
+    String changePercent = percentInstance.format(change);
+    String message = String.format(DEFAULT_MESSAGE_TEMPLATE, thresholdPercent, baselineProp,
+        currentValue, baselineValue, changePercent);
+    return message;
   }
 
   /**
