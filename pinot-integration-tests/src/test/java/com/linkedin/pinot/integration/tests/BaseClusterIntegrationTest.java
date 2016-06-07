@@ -937,7 +937,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     }
   }
 
-  @Test
+  @Test(enabled = false)  // jfim: This is disabled because testGeneratedQueriesWithMultivalues covers the same thing
   public void testGeneratedQueries() throws Exception {
     int generatedQueryCount = getGeneratedQueryCount();
 

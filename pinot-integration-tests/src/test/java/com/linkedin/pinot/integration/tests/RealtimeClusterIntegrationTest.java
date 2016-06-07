@@ -117,7 +117,7 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @Override
-  @Test
+  @Test(enabled = false)  // jfim: This is disabled because the multivalue one covers the same thing
   public void testGeneratedQueries() throws Exception {
     super.testGeneratedQueries();
   }

@@ -384,7 +384,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @Override
-  @Test
+  @Test(enabled = false)  // jfim: This is disabled because testGeneratedQueriesWithMultivalues covers the same thing
   public void testGeneratedQueries() throws Exception {
     super.testGeneratedQueries();
   }

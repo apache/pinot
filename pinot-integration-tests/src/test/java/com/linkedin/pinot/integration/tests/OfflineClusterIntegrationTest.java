@@ -37,8 +37,7 @@ import com.linkedin.pinot.common.utils.FileUploadUtils;
 import com.linkedin.pinot.util.TestUtils;
 
 /**
- * Integration test that converts avro data for 12 segments and runs queries against it.
- *
+ * Integration test that converts Avro data for 12 segments and runs queries against it.
  */
 public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(OfflineClusterIntegrationTest.class);
@@ -140,7 +139,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @Override
-  @Test
+  @Test(enabled = false)  // jfim: This is disabled because the multivalue one covers the same thing
   public void testGeneratedQueries() throws Exception {
     super.testGeneratedQueries();
   }

@@ -23,4 +23,4 @@ if [ $? -ne 0 ]; then
 fi
 
 cd $PINOT_MODULE
-mvn test
+mvn test -P travis
