@@ -39,14 +39,15 @@ import com.linkedin.pinot.controller.api.pojos.Instance;
 import com.linkedin.pinot.common.restlet.swagger.HttpVerb;
 import com.linkedin.pinot.common.restlet.swagger.Parameter;
 import com.linkedin.pinot.common.restlet.swagger.Paths;
+import com.linkedin.pinot.common.restlet.swagger.Response;
+import com.linkedin.pinot.common.restlet.swagger.Responses;
 import com.linkedin.pinot.common.restlet.swagger.Summary;
 import com.linkedin.pinot.common.restlet.swagger.Tags;
 import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
 
 
 /**
- * Sep 30, 2014
- *
+ * Restlet to manage Pinot instances.
  */
 
 public class PinotInstanceRestletResource extends BasePinotControllerRestletResource {
@@ -64,16 +65,47 @@ public class PinotInstanceRestletResource extends BasePinotControllerRestletReso
   @Override
   @Post("json")
   public Representation post(Representation entity) {
-    StringRepresentation presentation = null;
+    StringRepresentation presentation;
+
     try {
-      final Instance instance = mapper.readValue(ByteStreams.toByteArray(entity.getStream()), Instance.class);
-      presentation = addInstance(instance);
+      final String instanceName = (String) getRequest().getAttributes().get(INSTANCE_NAME);
+
+      if (instanceName == null) {
+        // This is a request to create an instance
+        try {
+          final Instance instance = mapper.readValue(ByteStreams.toByteArray(entity.getStream()), Instance.class);
+          presentation = addInstance(instance);
+        } catch (final Exception e) {
+          presentation = new StringRepresentation(e.getMessage() + "\n" + ExceptionUtils.getStackTrace(e));
+          LOGGER.error("Caught exception while processing post request", e);
+          ControllerRestApplication.getControllerMetrics()
+              .addMeteredGlobalValue(ControllerMeter.CONTROLLER_INTERNAL_ERROR, 1L);
+          setStatus(Status.SERVER_ERROR_INTERNAL);
+        }
+      } else {
+        // This is a request to toggle the state of an instance
+        if (_pinotHelixResourceManager.instanceExists(instanceName)) {
+          final String state = getRequest().getEntityAsText().trim();
+
+          if (isValidState(state)) {
+            presentation = toggleInstanceState(instanceName, state);
+          } else {
+            LOGGER.error(INVALID_STATE_ERROR);
+            setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
+            return new StringRepresentation(INVALID_STATE_ERROR);
+          }
+        } else {
+          setStatus(Status.CLIENT_ERROR_NOT_FOUND);
+          presentation = new StringRepresentation("Error: Instance " + instanceName + " not found.");
+        }
+      }
     } catch (final Exception e) {
       presentation = new StringRepresentation(e.getMessage() + "\n" + ExceptionUtils.getStackTrace(e));
       LOGGER.error("Caught exception while processing post request", e);
-      ControllerRestApplication.getControllerMetrics().addMeteredGlobalValue(ControllerMeter.CONTROLLER_INTERNAL_ERROR, 1L);
+      ControllerRestApplication.getControllerMetrics().addMeteredGlobalValue(ControllerMeter.CONTROLLER_INSTANCE_POST_ERROR, 1L);
       setStatus(Status.SERVER_ERROR_INTERNAL);
     }
+
     return presentation;
   }
 
@@ -81,7 +113,14 @@ public class PinotInstanceRestletResource extends BasePinotControllerRestletReso
   @Summary("Adds an instance")
   @Tags({ "instance" })
   @Paths({ "/instances", "/instances/" })
-  private StringRepresentation addInstance(Instance instance) throws JSONException {
+  @Responses({
+      @Response(statusCode = "200", description = "The instance was created successfully"),
+      @Response(statusCode = "409", description = "The instance already exists and no action was taken"),
+      @Response(statusCode = "500", description = "Failed to create the instance")
+  })
+  private StringRepresentation addInstance(
+      @Parameter(name = "instance", in = "body", description = "The instance to add", required = true)
+      Instance instance) throws JSONException {
     StringRepresentation presentation;
     final PinotResourceManagerResponse resp = _pinotHelixResourceManager.addInstance(instance);
     LOGGER.info("instace create request recieved for instance : " + instance.toInstanceId());
@@ -106,19 +145,11 @@ public class PinotInstanceRestletResource extends BasePinotControllerRestletReso
     Representation presentation;
     try {
       final String instanceName = (String) getRequest().getAttributes().get(INSTANCE_NAME);
-      final String state = getReference().getQueryAsForm().getValues(STATE);
-
-      if (!isValidState(state)) {
-        LOGGER.error(INVALID_STATE_ERROR);
-        setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
-        return new StringRepresentation(INVALID_STATE_ERROR);
-      }
 
       if (instanceName == null) {
         presentation = getAllInstances();
-      } else if (_pinotHelixResourceManager.instanceExists(instanceName)) {
-        presentation = toggleInstanceState(instanceName, state);
       } else {
+        setStatus(Status.CLIENT_ERROR_NOT_FOUND);
         presentation = new StringRepresentation("Error: Instance " + instanceName + " not found.");
       }
 
@@ -140,6 +171,9 @@ public class PinotInstanceRestletResource extends BasePinotControllerRestletReso
   @Summary("Views all instances")
   @Tags({ "instance" })
   @Paths({ "/instances", "/instances/" })
+  @Responses({
+      @Response(statusCode = "200", description = "A list of instances")
+  })
   private Representation getAllInstances() throws JSONException {
     JSONObject object = new JSONObject();
     JSONArray instanceArray = new JSONArray();
@@ -149,7 +183,7 @@ public class PinotInstanceRestletResource extends BasePinotControllerRestletReso
       instanceArray.put(instanceName);
     }
 
-    object.put("Instances", instanceArray);
+    object.put("instances", instanceArray);
     return new StringRepresentation(object.toString());
   }
 
@@ -160,15 +194,22 @@ public class PinotInstanceRestletResource extends BasePinotControllerRestletReso
    * @return StringRepresentation of state after trying to enable/disable/drop instance.
    * @throws JSONException
    */
-  @HttpVerb("get")
+  @HttpVerb("post")
   @Summary("Enable, disable or drop an instance")
   @Tags({ "instance" })
-  @Paths({ "/instances/{instanceName}", "/instances/{instanceName}/" })
-  private StringRepresentation toggleInstanceState(@Parameter(name = "instanceName", in = "path",
-      description = "The name of the instance for which to toggle its state", required = true) String instanceName,
-      @Parameter(name = "state", in = "query", description = "The desired instance state, either enable or disable",
-          required = true) String state) throws JSONException {
-
+  @Paths({ "/instances/{instanceName}/state", "/instances/{instanceName}/state" })
+  @Responses({
+      @Response(statusCode = "200", description = "The instance state was changed successfully"),
+      @Response(statusCode = "400", description = "The state given was not enable, disable or drop"),
+      @Response(statusCode = "404", description = "The instance was not found")
+  })
+  private StringRepresentation toggleInstanceState(
+      @Parameter(name = "instanceName", in = "path",
+          description = "The name of the instance for which to toggle its state", required = true)
+      String instanceName,
+      @Parameter(name = "state", in = "body",
+          description = "The desired instance state, either enable, disable or drop", required = true)
+      String state) throws JSONException {
     if (StateType.ENABLE.name().equalsIgnoreCase(state)) {
       return new StringRepresentation(_pinotHelixResourceManager.enableInstance(instanceName).toJSON().toString());
 

@@ -100,7 +100,7 @@ public class ControllerInstanceToggleTest extends ControllerTest {
           _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, tableName + "_OFFLINE");
       Set<String> instanceSet = HelixHelper.getOnlineInstanceFromExternalView(resourceExternalView);
       Assert.assertEquals(instanceSet.size(), i--);
-      sendGetRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forInstanceDisable(instanceName));
+      sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forInstanceState(instanceName), "disable");
       Thread.sleep(2000);
       resourceExternalView = _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, tableName + "_OFFLINE");
       instanceSet = HelixHelper.getOnlineInstanceFromExternalView(resourceExternalView);
@@ -115,7 +115,7 @@ public class ControllerInstanceToggleTest extends ControllerTest {
           _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, tableName + "_OFFLINE");
       Set<String> instanceSet = HelixHelper.getOnlineInstanceFromExternalView(resourceExternalView);
       Assert.assertEquals(instanceSet.size(), i++);
-      sendGetRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forInstanceEnable(instanceName));
+      sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forInstanceState(instanceName), "ENABLE");
       Thread.sleep(2000);
       resourceExternalView = _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, tableName + "_OFFLINE");
       instanceSet = HelixHelper.getOnlineInstanceFromExternalView(resourceExternalView);
@@ -130,7 +130,7 @@ public class ControllerInstanceToggleTest extends ControllerTest {
           _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
       Set<String> instanceSet = HelixHelper.getOnlineInstanceFromExternalView(resourceExternalView);
       Assert.assertEquals(instanceSet.size(), i--);
-      sendGetRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forInstanceDisable(instanceName));
+      sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forInstanceState(instanceName), "Disable");
       Thread.sleep(2000);
       resourceExternalView =
           _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
@@ -146,7 +146,7 @@ public class ControllerInstanceToggleTest extends ControllerTest {
           _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
       Set<String> instanceSet = HelixHelper.getOnlineInstanceFromExternalView(resourceExternalView);
       Assert.assertEquals(instanceSet.size(), i++);
-      sendGetRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forInstanceEnable(instanceName));
+      sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forInstanceState(instanceName), "Enable");
       Thread.sleep(2000);
       resourceExternalView =
           _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
