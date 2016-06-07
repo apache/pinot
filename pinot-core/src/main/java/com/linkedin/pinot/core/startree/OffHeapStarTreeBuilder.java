@@ -382,11 +382,11 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
 
       Map<Integer, StarTreeIndexNode> children = node.getChildren();
       for (StarTreeIndexNode child : children.values()) {
-        MetricBuffer childMetricBuffer = createAggDocForAllNodes(child);
         // don't use the star node value to compute aggregate for the parent
         if (child.getDimensionValue() == StarTreeIndexNode.all()) {
           continue;
         }
+        MetricBuffer childMetricBuffer = createAggDocForAllNodes(child);
         if (aggMetricBuffer == null) {
           aggMetricBuffer = new MetricBuffer(childMetricBuffer);
         } else {
