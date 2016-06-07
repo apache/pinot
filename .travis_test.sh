@@ -16,15 +16,11 @@
 #
 
 # Ignore changes not related to pinot code
-echo 'Changed files:'
 git diff --name-only $TRAVIS_COMMIT_RANGE | egrep '^(pinot-|pom.xml|.travis)'
 if [ $? -ne 0 ]; then
   echo 'No changes related to the pinot code, skip the test.'
   exit 0
 fi
-
-# Abort on error
-set -e
 
 cd $PINOT_MODULE
 mvn test
