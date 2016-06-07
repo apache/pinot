@@ -22,6 +22,8 @@ import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metrics.ControllerMeter;
+import com.linkedin.pinot.common.restlet.swagger.Response;
+import com.linkedin.pinot.common.restlet.swagger.Responses;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.controller.api.ControllerRestApplication;
 import com.linkedin.pinot.common.restlet.swagger.HttpVerb;
@@ -124,12 +126,18 @@ public class PinotSegmentRestletResource extends BasePinotControllerRestletResou
   @Summary("Lists segment metadata for a given table")
   @Tags({ "segment", "table" })
   @Paths({ "/tables/{tableName}/segments/metadata", "/tables/{tableName}/segments/metadata/" })
+  @Responses({
+      @Response(statusCode = "200", description = "A list of segment metadata"),
+      @Response(statusCode = "404", description = "The table does not exist")
+  })
   private Representation getAllSegmentsMetadataForTable(
       @Parameter(name = "tableName", in = "path", description = "The name of the table for which to list segment metadata",
           required = true) String tableName,
       @Parameter(name = "type", in = "query", description = "Type of table {offline|realtime}",
           required = false) String tableType)
       throws JSONException, JsonProcessingException {
+    boolean foundRealtimeTable = false;
+    boolean foundOfflineTable = false;
 
     JSONArray ret = new JSONArray();
     if ((tableType == null || TableType.REALTIME.name().equalsIgnoreCase(tableType))
@@ -140,6 +148,7 @@ public class PinotSegmentRestletResource extends BasePinotControllerRestletResou
       realtime.put("segments", new ObjectMapper().writeValueAsString(_pinotHelixResourceManager
           .getInstanceToSegmentsInATableMap(realtimeTableName)));
       ret.put(realtime);
+      foundRealtimeTable = true;
     }
 
     if ((tableType == null || TableType.OFFLINE.name().equalsIgnoreCase(tableType))
@@ -150,9 +159,15 @@ public class PinotSegmentRestletResource extends BasePinotControllerRestletResou
       offline.put("segments", new ObjectMapper().writeValueAsString(_pinotHelixResourceManager
           .getInstanceToSegmentsInATableMap(offlineTableName)));
       ret.put(offline);
+      foundOfflineTable = true;
     }
 
-    return new StringRepresentation(ret.toString());
+    if (foundOfflineTable || foundRealtimeTable) {
+      return new StringRepresentation(ret.toString());
+    } else {
+      setStatus(Status.CLIENT_ERROR_NOT_FOUND);
+      return new StringRepresentation("Table " + tableName + " not found.");
+    }
   }
 
   /**

@@ -20,6 +20,8 @@ import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metrics.ControllerMeter;
+import com.linkedin.pinot.common.restlet.swagger.Response;
+import com.linkedin.pinot.common.restlet.swagger.Responses;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
@@ -122,6 +124,10 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
   @Paths({
       "/segments/{tableName}/{segmentName}"
   })
+  @Responses({
+      @Response(statusCode = "200", description = "A segment file in Pinot format"),
+      @Response(statusCode = "404", description = "The segment file or table does not exist")
+  })
   private Representation getSegmentFile(
       @Parameter(name = "tableName", in = "path", description = "The name of the table in which the segment resides", required = true)
       String tableName,
@@ -132,7 +138,7 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
     if (dataFile.exists()) {
       presentation = new FileRepresentation(dataFile, MediaType.ALL, 0);
     } else {
-      setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
+      setStatus(Status.CLIENT_ERROR_NOT_FOUND);
       presentation = new StringRepresentation("Table or segment is not found!");
     }
     return presentation;
@@ -144,6 +150,10 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
   @Paths({
       "/segments/{tableName}",
       "/segments/{tableName}/"
+  })
+  @Responses({
+      @Response(statusCode = "200", description = "A list of all segments for the specified table"),
+      @Response(statusCode = "404", description = "The segment file or table does not exist")
   })
   private Representation getSegmentsForTable(
       @Parameter(name = "tableName", in = "path", description = "The name of the table for which to list segments", required = true)
@@ -175,7 +185,7 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
         }
       } else {
         LOGGER.error("Error: Table {} not found.", tableName);
-        setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
+        setStatus(Status.CLIENT_ERROR_NOT_FOUND);
       }
     }
 
@@ -189,6 +199,9 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
   @Paths({
       "/segments",
       "/segments/"
+  })
+  @Responses({
+      @Response(statusCode = "200", description = "A list of all segments for the all tables")
   })
   private Representation getAllSegments() {
     Representation presentation;
@@ -298,6 +311,10 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
   @Paths({
       "/segments",
       "/segments/"
+  })
+  @Responses({
+      @Response(statusCode = "200", description = "The segment was successfully uploaded"),
+      @Response(statusCode = "500", description = "There was an error when uploading the segment")
   })
   private Representation uploadSegment(File indexDir, File dataFile)
       throws ConfigurationException, IOException, JSONException {

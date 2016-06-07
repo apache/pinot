@@ -4,6 +4,8 @@ import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metrics.ControllerMeter;
+import com.linkedin.pinot.common.restlet.swagger.Response;
+import com.linkedin.pinot.common.restlet.swagger.Responses;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.controller.api.ControllerRestApplication;
 import com.linkedin.pinot.common.restlet.swagger.HttpVerb;
@@ -76,6 +78,9 @@ public class PinotSchemaRestletResource extends BasePinotControllerRestletResour
       "/schemas",
       "/schemas/"
   })
+  @Responses({
+      @Response(statusCode = "200", description = "A list of all schemas")
+  })
   private Representation getAllSchemas() {
     List<String> schemaNames = _pinotHelixResourceManager.getSchemaNames();
     JSONArray ret = new JSONArray();
@@ -97,6 +102,10 @@ public class PinotSchemaRestletResource extends BasePinotControllerRestletResour
       "/schemas/{schemaName}",
       "/schemas/{schemaName}/"
   })
+  @Responses({
+      @Response(statusCode = "200", description = "The contents of the specified schema"),
+      @Response(statusCode = "404", description = "The specified schema does not exist")
+  })
   private Representation getSchema(
       @Parameter(name = "schemaName", in = "path", description = "The name of the schema to get")
       String schemaName)
@@ -104,7 +113,7 @@ public class PinotSchemaRestletResource extends BasePinotControllerRestletResour
     LOGGER.info("looking for schema {}", schemaName);
     Schema schema = _pinotHelixResourceManager.getSchema(schemaName);
     if (schema == null) {
-      setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
+      setStatus(Status.CLIENT_ERROR_NOT_FOUND);
       return new StringRepresentation("{}");
     }
     LOGGER.info("schema string is : " + schema.getJSONSchema());
@@ -129,6 +138,10 @@ public class PinotSchemaRestletResource extends BasePinotControllerRestletResour
   @Paths({
       "/schemas",
       "/schemas/"
+  })
+  @Responses({
+      @Response(statusCode = "200", description = "The schema was added"),
+      @Response(statusCode = "500", description = "There was an error while adding the schema")
   })
   private Representation uploadNewSchema()
       throws Exception {
@@ -182,6 +195,10 @@ public class PinotSchemaRestletResource extends BasePinotControllerRestletResour
   @Paths({
       "/schemas/{schemaName}",
       "/schemas/{schemaName}/"
+  })
+  @Responses({
+      @Response(statusCode = "200", description = "The schema was updated"),
+      @Response(statusCode = "500", description = "There was an error while updating the schema")
   })
   private Representation uploadSchema(
       @Parameter(name = "schemaName", in = "path", description = "The name of the schema to get")
@@ -275,13 +292,19 @@ public class PinotSchemaRestletResource extends BasePinotControllerRestletResour
       "/schemas/{schemaName}",
       "/schemas/{schemaName}/"
   })
+  @Responses({
+      @Response(statusCode = "200", description = "The schema was deleted"),
+      @Response(statusCode = "404", description = "The schema does not exist"),
+      @Response(statusCode = "409", description = "The schema could not be deleted due to being in use"),
+      @Response(statusCode = "500", description = "There was an error while deleting the schema")
+  })
   StringRepresentation deleteSchema(@Parameter(name = "schemaName", in = "path",
       description = "The name of the schema to get", required = true) String schemaName) throws JSONException, IOException {
 
     Schema schema = _pinotHelixResourceManager.getSchema(schemaName);
     if (schema == null) {
       LOGGER.error("Error: could not find schema {}", schemaName);
-      setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
+      setStatus(Status.CLIENT_ERROR_NOT_FOUND);
       return new StringRepresentation("Error: Could not find schema " + schemaName);
     }
 
@@ -293,7 +316,7 @@ public class PinotSchemaRestletResource extends BasePinotControllerRestletResour
 
       if (schemaName.equals(tableSchema)) {
         LOGGER.error("Cannot delete schema {}, as it is associated with table {}", schemaName, tableName);
-        setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
+        setStatus(Status.CLIENT_ERROR_CONFLICT);
         return new StringRepresentation("Error: Cannot delete schema " + schemaName + " as it is associated with table: " +
           TableNameBuilder.extractRawTableName(tableName));
       }
