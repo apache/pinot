@@ -1,27 +1,34 @@
 function getTimeSeries(tab) {
-
+    var hashString = window.location.hash.substring(1);
 	var url = "/dashboard/data/timeseries?" + window.location.hash.substring(1);
 
 	getData(url, tab).done(function(data) {
-        //Error handling when data is falsy (empty, undefined or null)
-        if(!data){
-            $("#"+  tab  +"-chart-area-error").empty()
-            var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' })
-            warning.append($('<p></p>', { html: 'Something went wrong. Please try and reload the page. Error: data =' + data  }))
-            $("#"+  tab  +"-chart-area-error").append(warning)
-            $("#"+  tab  +"-chart-area-error").show()
-            return
-        }else{
-            $("#"+  tab  +"-chart-area-error").hide()
-        }
 
-		var result_time_series = HandleBarsTemplates.template_time_series(data);
-        $("#"+ tab +"-display-chart-section").append(result_time_series);
-		renderTimeSeriesUsingC3(data, tab)
+
+        //cache the query data
+        window.sessionStorage.setItem(hashString, JSON.stringify(data));
+        renderTimeSeries(data, tab)
 	});
 };
 
-function renderTimeSeriesUsingC3(d, tab){  //time-series-area
+
+function renderTimeSeries(d, tab){  //time-series-area
+    var data = d;
+    //Error handling when data is falsy (empty, undefined or null),
+    //400 and 500 errors are handled in getData()
+    if(!data){
+        $("#"+  tab  +"-chart-area-error").empty()
+        var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' })
+        warning.append($('<p></p>', { html: 'Something went wrong. Please try and reload the page. Error: data =' + data  }))
+        $("#"+  tab  +"-chart-area-error").append(warning)
+        $("#"+  tab  +"-chart-area-error").show()
+        return
+    }else{
+        $("#"+  tab  +"-chart-area-error").hide()
+    }
+
+    var result_time_series = HandleBarsTemplates.template_time_series(data);
+    $("#"+ tab +"-display-chart-section").append(result_time_series);
 
 
     var dateTimeFormat = "%I:%M %p";

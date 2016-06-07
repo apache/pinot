@@ -1,7 +1,13 @@
 function getTabular(tab) {
 
-	var url = "/dashboard/data/tabular?" + window.location.hash.substring(1);
-	getData(url, tab).done(function(data) {
+    var hashString = window.location.hash.substring(1);
+    var url = "/dashboard/data/tabular?" + hashString;
+
+    getData(url, tab).done(function(data) {
+
+        //cache the query data
+        window.sessionStorage.setItem(hashString, JSON.stringify(data));
+
 		renderTabular(data, tab);
 	});
 };
@@ -29,8 +35,7 @@ function renderTabular(data, tab) {
     }
 
 	/* Handelbars template for time series legend */
-	var result_metric_time_series_section =
-	 HandleBarsTemplates.template_metric_time_series_section(data);
+	var result_metric_time_series_section = HandleBarsTemplates.template_metric_time_series_section(data);
 	 $("#"+ tab +"-display-chart-section").append(result_metric_time_series_section);
 
     drawTimeSeries(data, tab)
@@ -45,7 +50,8 @@ function renderTabular(data, tab) {
 
     /* Build the dimension dropdown*/
     var dimensionListHtml = "";
-    var dimensionList = window.datasetConfig.datasetDimensions;
+    var datasetConfig = JSON.parse( sessionStorage.getItem("datasetConfig") )
+    var dimensionList = datasetConfig.datasetDimensions;
 
     for (var index = 0, numDimensions = dimensionList.length; index  < numDimensions; index++ ) {
         dimensionListHtml += "<li class='funnels-dimension-option' rel='dimensions' value='" + dimensionList[index] + "'><a href='#' class='uk-dropdown-close'>" + dimensionList[index] + "</a></li>";

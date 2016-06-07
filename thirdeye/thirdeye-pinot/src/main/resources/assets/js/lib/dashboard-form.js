@@ -113,16 +113,20 @@
 
 
         //Remove previous dataset's hash values
-        delete hash.baselineStart
-        delete hash.baselineEnd
-        delete hash.currentStart
-        delete hash.currentEnd
-        delete hash.compareMode
-        delete hash.dashboard
-        delete hash.metrics
-        delete hash.dimensions
-        delete hash.filters
-        delete hash.aggTimeGranularity
+        delete hash.baselineStart;
+        delete hash.baselineEnd;
+        delete hash.currentStart;
+        delete hash.currentEnd;
+        delete hash.compareMode;
+        delete hash.dashboard;
+        delete hash.metrics;
+        delete hash.dimensions;
+        delete hash.filters;
+        delete hash.aggTimeGranularity;
+
+        //Clear sessionstorage
+        //to remove the previous datasets datasetConfig and the related data
+        sessionStorage.clear();
 
 
         var value = $(target).attr("value");

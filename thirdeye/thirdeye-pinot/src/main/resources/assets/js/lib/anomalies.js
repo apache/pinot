@@ -3,12 +3,12 @@ function getAnomalies(tab) {
   dashboardName = "Default_Dashboard"; //Change it to be the first option:  $(".dashboard-option:first-child a").html().trim()
   baselineStart = moment(parseInt(hash.currentStart)).add(-7, 'days')
   baselineEnd = moment(parseInt(hash.currentEnd)).add(-7, 'days')
-  aggTimeGranularity = (window.datasetConfig.dataGranularity) ? window.datasetConfig.dataGranularity : "HOURS";
 
+  var datasetConfig = JSON.parse( sessionStorage.getItem("datasetConfig") )
+  aggTimeGranularity = (datasetConfig.dataGranularity) ? datasetConfig.dataGranularity : "HOURS";
 
-  var timeSeriesUrl = "/dashboard/data/tabular?" + window.location.hash.substring(1)  //
-  + "&baselineStart=" + baselineStart + "&baselineEnd=" + baselineEnd   //
-  + "&aggTimeGranularity=" + aggTimeGranularity;
+  var hashString = window.location.hash.substring(1);
+  var timeSeriesUrl = "/dashboard/data/tabular?" + hashString  + "&baselineStart=" + baselineStart + "&baselineEnd=" + baselineEnd + "&aggTimeGranularity=" + aggTimeGranularity;
 
   var currentStartISO = moment(parseInt(hash.currentStart)).toISOString();
   var currentEndISO = moment(parseInt(hash.currentEnd)).toISOString();
@@ -19,17 +19,9 @@ function getAnomalies(tab) {
   getData(anomaliesUrl).done(function(anomalyData) {
     getData(timeSeriesUrl).done(function(timeSeriesData) {
 
-        //Error handling when data is falsy (empty, undefined or null)
-        if(!timeSeriesData){
-            $("#"+  tab  +"-chart-area-error").empty()
-            var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' })
-            warning.append($('<p></p>', { html: 'Something went wrong. Please try and reload the page. Error: metric timeseries data =' + timeSeriesData  }))
-            $("#"+  tab  +"-chart-area-error").append(warning)
-            $("#"+  tab  +"-chart-area-error").show()
-            return
-        }else{
-            $("#"+  tab  +"-chart-area-error").hide()
-        }
+        //cache the query data
+        window.sessionStorage.setItem(hashString, JSON.stringify( {"anomalyData": anomalyData, "timeSeriesData": timeSeriesData}) );
+
       renderAnomalyLineChart(timeSeriesData, anomalyData, tab);
       renderAnomalyTable(anomalyData, tab);
     });
@@ -37,6 +29,22 @@ function getAnomalies(tab) {
 };
 
 function renderAnomalyLineChart(timeSeriesData, anomalyData, tab) {
+
+    //Error handling when data is falsy (empty, undefined or null)
+    if(!timeSeriesData){
+        $("#"+  tab  +"-chart-area-error").empty()
+        var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' })
+        warning.append($('<p></p>', { html: 'Something went wrong. Please try and reload the page. Error: metric timeseries data =' + timeSeriesData  }))
+        $("#"+  tab  +"-chart-area-error").append(warning)
+        $("#"+  tab  +"-chart-area-error").show()
+        return
+    }else{
+        $("#"+  tab  +"-chart-area-error").hide()
+    }
+
+
+
+
   $("#"+  tab  +"-display-chart-section").empty();
 
   /* Handelbars template for time series legend */

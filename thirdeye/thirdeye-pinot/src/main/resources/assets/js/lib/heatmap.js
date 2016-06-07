@@ -1,17 +1,18 @@
 function getHeatmap(tab) {
 
-    //Todo: add the real endpoint
+    var hashString = window.location.hash.substring(1);
     var url = "/dashboard/data/heatmap?" + window.location.hash.substring(1);
     getData(url, tab).done(function(data) {
 
-      renderD3heatmap(data, tab);
+        //cache the query data
+        window.sessionStorage.setItem(hashString, JSON.stringify(data));
 
-      heatMapEventListeners(tab)
+        renderHeatmap(data, tab);
 
     });
 };
 
-function renderD3heatmap(data, tab) {
+function renderHeatmap(data, tab) {
 
     //Error handling when data is falsy (empty, undefined or null)
     if(!data){
@@ -32,7 +33,9 @@ function renderD3heatmap(data, tab) {
     //var invertColorMetrics
     var baseForLtZero = 'rgba(255,0,0,'; //lt zero is default red
     var baseForGtZero = 'rgba(0,0,255,'; //gt zero is default blue
-    var invertColorMetrics = window.datasetConfig.invertColorMetrics;
+
+    var datasetConfig = JSON.parse( sessionStorage.getItem("datasetConfig") )
+    var invertColorMetrics = datasetConfig.invertColorMetrics;
 
     var numMetrics = data["metrics"].length
     for(var m =0; m< numMetrics;m++) {
@@ -243,6 +246,9 @@ function renderD3heatmap(data, tab) {
 
         }
     }
+
+    //Add eventlisteners
+    heatMapEventListeners(tab);
 }
 
 function heatMapEventListeners(tab){

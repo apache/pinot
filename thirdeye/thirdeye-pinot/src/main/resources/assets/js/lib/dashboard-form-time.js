@@ -107,7 +107,9 @@
 
         var currentTab = $(target).attr('rel');
         var tz = getTimeZone();
-        var maxMillis = window.datasetConfig.maxMillis
+
+        var datasetConfig = JSON.parse( sessionStorage.getItem("datasetConfig") )
+        var maxMillis = datasetConfig.maxMillis;
 
         switch ($(target).val()){
             case "today":
@@ -297,7 +299,9 @@
     function  applyTimeRangeSelection(target) {
 
         var currentTab = $(target).attr('rel');
-        var maxMillis = window.datasetConfig.maxMillis
+
+        var datasetConfig = JSON.parse( sessionStorage.getItem("datasetConfig") )
+        var maxMillis = datasetConfig.maxMillis;
 
         var currentStartDateString = $(".current-start-date-input[rel='" + currentTab + "']").val();
         var currentEndDateString = $(".current-end-date-input[rel='" + currentTab + "']").val();

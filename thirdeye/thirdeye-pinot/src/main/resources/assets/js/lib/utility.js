@@ -141,7 +141,9 @@ function updateDashboardFormFromHash(){
 
     //UPDATE DATE TIME
     var tz = getTimeZone();
-    var maxMillis = window.datasetConfig.maxMillis;
+
+    var datasetConfig = JSON.parse( sessionStorage.getItem("datasetConfig") )
+    var maxMillis = datasetConfig.maxMillis;
     var currentStartDateTime;
     var currentEndDateTime;
     var baselineStartDateTime;
@@ -171,7 +173,7 @@ function updateDashboardFormFromHash(){
         currentStartDateTime = moment(maxMillis).add(-1, 'days');
 
         //If time granularity is DAYS have default 7 days in the time selector on pageload
-        if(window.datasetConfig.dataGranularity && window.datasetConfig.dataGranularity == "DAYS"){
+        if(datasetConfig.dataGranularity && datasetConfig.dataGranularity == "DAYS"){
             currentStartDateTime = moment(maxMillis).add(-7, 'days');
         }
 
@@ -558,12 +560,12 @@ function showHeatMap(target){
 function  calcHeatMapCellBackground(cell){
 
     var cellObj = $(cell)
-
+    var datasetConfig = JSON.parse( sessionStorage.getItem("datasetConfig") )
     var baseForLtZero = 'rgba(255,0,0,'; //lt zero is default red
     var baseForGtZero = 'rgba(0,0,255,'; //gt zero is default blue
 
     var metric = cellObj.attr('data-metric-name')
-    var invertColorMetrics = window.datasetConfig.invertColorMetrics;
+    var invertColorMetrics = (datasetConfig) ? datasetConfig.invertColorMetrics : null;
     if (typeof invertColorMetrics !== "undefined" && invertColorMetrics.indexOf(metric) > -1) { // invert
       baseForLtZero = 'rgba(0,0,255,'; //lt zero becomes blue
       baseForGtZero = 'rgba(255,0,0,'; //gt zero becomes red
