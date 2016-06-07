@@ -344,8 +344,14 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
     sort(dataFile, 0, rawRecordCount);
     // Recursively construct the star tree, continuously sorting the data
     constructStarTree(starTreeRootIndexNode, 0, rawRecordCount, 0, dataFile);
-    // Split the leaf nodes on time column
-    splitLeafNodesOnTimeColumn();
+
+    // Split the leaf nodes on time column. This is only possible if we have not split on time-column name
+    // yet, and time column is still preserved (ie not replaced by StarTreeNode.all()).
+    if (timeColumnName != null && !skipMaterializationForDimensions.contains(timeColumnName) &&
+        !dimensionsSplitOrder.contains(timeColumnName)) {
+      splitLeafNodesOnTimeColumn();
+    }
+
     // Create aggregate rows for all nodes in the tree
     createAggDocForAllNodes(starTreeRootIndexNode);
     long end = System.currentTimeMillis();
