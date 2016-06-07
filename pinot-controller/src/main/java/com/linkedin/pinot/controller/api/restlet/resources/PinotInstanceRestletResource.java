@@ -122,8 +122,11 @@ public class PinotInstanceRestletResource extends BasePinotControllerRestletReso
       @Parameter(name = "instance", in = "body", description = "The instance to add", required = true)
       Instance instance) throws JSONException {
     StringRepresentation presentation;
+    LOGGER.info("Instance creation request received for instance " + instance.toInstanceId());
     final PinotResourceManagerResponse resp = _pinotHelixResourceManager.addInstance(instance);
-    LOGGER.info("instace create request recieved for instance : " + instance.toInstanceId());
+    if (resp.status == PinotResourceManagerResponse.ResponseStatus.failure) {
+      setStatus(Status.CLIENT_ERROR_CONFLICT);
+    }
     presentation = new StringRepresentation(resp.toJSON().toString());
     return presentation;
   }

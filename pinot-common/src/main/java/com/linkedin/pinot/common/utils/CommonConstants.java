@@ -31,6 +31,9 @@ public class CommonConstants {
     public static final String PREFIX_OF_SERVER_INSTANCE = "Server_";
     public static final String PREFIX_OF_BROKER_INSTANCE = "Broker_";
 
+    public static final String SERVER_INSTANCE_TYPE = "server";
+    public static final String BROKER_INSTANCE_TYPE = "broker";
+
     public static final String BROKER_RESOURCE_INSTANCE = "brokerResource";
     public static final String UNTAGGED_SERVER_INSTANCE = "server_untagged";
     public static final String UNTAGGED_BROKER_INSTANCE = "broker_untagged";

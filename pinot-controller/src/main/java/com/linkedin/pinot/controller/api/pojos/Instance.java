@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.controller.api.pojos;
 
+import java.util.Objects;
 import org.apache.helix.model.InstanceConfig;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -26,71 +27,99 @@ import com.linkedin.pinot.common.utils.StringUtil;
 
 
 /**
- * Sep 30, 2014
+ * Instance POJO, used as part of the API to create instances.
  */
 
 public class Instance {
-
-  private final String instanceHost;
-  private final String instancePort;
-  private final String tag;
+  private final String _host;
+  private final String _port;
+  private final String _type;
+  private final String _tag;
+  private final String _instancePrefix;
 
   @JsonCreator
-  public Instance(@JsonProperty("host") String host, @JsonProperty("port") String port, @JsonProperty("tag") String tag) {
-    instanceHost = host;
-    instancePort = port;
-    this.tag = tag;
+  public Instance(
+      @JsonProperty("host") String host,
+      @JsonProperty("port") String port,
+      @JsonProperty("type") String type,
+      @JsonProperty("tag") String tag) {
+    _host = host;
+    _port = port;
+    _tag = tag;
+
+    if (CommonConstants.Helix.SERVER_INSTANCE_TYPE.equalsIgnoreCase(type)) {
+      _instancePrefix = CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE;
+      _type = CommonConstants.Helix.SERVER_INSTANCE_TYPE;
+    } else if (CommonConstants.Helix.BROKER_INSTANCE_TYPE.equalsIgnoreCase(type)) {
+      _instancePrefix = CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE;
+      _type = CommonConstants.Helix.BROKER_INSTANCE_TYPE;
+    } else {
+      throw new IllegalArgumentException("Invalid instance type " + type + ", expected either server or broker");
+    }
   }
 
-  public String getInstanceHost() {
-    return instanceHost;
+  public String getHost() {
+    return _host;
   }
 
-  public String getInstancePort() {
-    return instancePort;
+  public String getPort() {
+    return _port;
   }
 
   public String getTag() {
-    return tag;
+    return _tag;
+  }
+
+  public String getType() {
+    return _type;
   }
 
   public String toInstanceId() {
-    return StringUtil.join("_", instanceHost, instancePort);
+    return _instancePrefix + _host + "_" + _port;
   }
 
   @Override
   public String toString() {
     final StringBuilder bld = new StringBuilder();
-    bld.append("host : " + instanceHost + "\n");
-    bld.append("port : " + instancePort + "\n");
-    if (tag != null) {
-      bld.append("tag : " + tag + "\n");
+    bld.append("host : " + _host + "\n");
+    bld.append("port : " + _port + "\n");
+    bld.append("type : " + _type + "\n");
+    if (_tag != null) {
+      bld.append("tag : " + _tag + "\n");
     }
     return bld.toString();
   }
 
   public JSONObject toJSON() throws JSONException {
     final JSONObject ret = new JSONObject();
-    ret.put("host", instanceHost);
-    ret.put("port", instancePort);
-    if (tag != null) {
-      ret.put("tag", tag);
-    } else {
-      ret.put("tag", CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE);
-    }
+    ret.put("host", _host);
+    ret.put("port", _port);
+    ret.put("type", _type);
+    ret.put("tag", getTagOrDefaultTag());
     return ret;
   }
 
   public InstanceConfig toInstanceConfig() {
     final InstanceConfig iConfig = new InstanceConfig(toInstanceId());
-    iConfig.setHostName(instanceHost);
-    iConfig.setPort(instancePort);
+    iConfig.setHostName(_host);
+    iConfig.setPort(_port);
     iConfig.setInstanceEnabled(true);
-    if (tag != null) {
-      iConfig.addTag(tag);
-    } else {
-      iConfig.addTag(CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE);
-    }
+    iConfig.addTag(getTagOrDefaultTag());
     return iConfig;
+  }
+
+  private String getTagOrDefaultTag() {
+    if (_tag != null) {
+      return _tag;
+    } else {
+      switch (_type) {
+        case CommonConstants.Helix.SERVER_INSTANCE_TYPE:
+          return CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE;
+        case CommonConstants.Helix.BROKER_INSTANCE_TYPE:
+          return CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE;
+        default:
+          throw new RuntimeException("Unknown instance type " + _type + ", was expecting either server or broker");
+      }
+    }
   }
 }

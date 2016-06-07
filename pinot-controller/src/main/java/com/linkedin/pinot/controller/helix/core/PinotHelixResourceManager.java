@@ -323,7 +323,7 @@ public class PinotHelixResourceManager {
     final List<String> instances = HelixHelper.getAllInstances(_helixAdmin, _helixClusterName);
     if (instances.contains(instance.toInstanceId())) {
       resp.status = ResponseStatus.failure;
-      resp.message = "Instance " + instance + " already exists.";
+      resp.message = "Instance " + instance.toInstanceId() + " already exists.";
       return resp;
     } else {
       _helixAdmin.addInstance(_helixClusterName, instance.toInstanceConfig());

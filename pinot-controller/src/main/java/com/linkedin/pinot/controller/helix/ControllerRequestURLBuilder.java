@@ -59,6 +59,10 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "instances", instanceName, "state");
   }
 
+  public String forInstanceList() {
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "instances");
+  }
+
   public String forInstanceBulkCreate() {
     return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "instances", "bulkAdd");
   }
