@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.detector;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -15,7 +17,6 @@ import org.quartz.SchedulerFactory;
 import org.quartz.impl.StdSchedulerFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.cache.QueryCache;
@@ -56,12 +57,17 @@ public class ThirdEyeDetectorApplication
   private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeDetectorApplication.class);
 
   public static void main(final String[] args) throws Exception {
-    String thirdEyeConfigDir = args[0];
+    List<String> argList = new ArrayList<String>(Arrays.asList(args));
+    if (argList.size() == 1) {
+      argList.add(0, "server");
+    }
+    int lastIndex = argList.size() - 1;
+    String thirdEyeConfigDir = argList.get(lastIndex);
     System.setProperty("dw.rootDir", thirdEyeConfigDir);
     String detectorApplicationConfigFile = thirdEyeConfigDir + "/" + "detector.yml";
-    new ThirdEyeDetectorApplication().run(new String[] {
-        "server", detectorApplicationConfigFile
-    });
+    argList.set(lastIndex, detectorApplicationConfigFile); // replace config dir with the
+                                                           // actual config file
+    new ThirdEyeDetectorApplication().run(argList.toArray(new String[argList.size()]));
   }
 
   @Override
@@ -96,8 +102,10 @@ public class ThirdEyeDetectorApplication
 
     QueryCache queryCache = ThirdEyeCacheRegistry.getInstance().getQueryCache();
     final TimeSeriesHandler timeSeriesHandler = new TimeSeriesHandler(queryCache);
-    TimeOnTimeComparisonHandler timeOnTimeComparisonHandler = new TimeOnTimeComparisonHandler(queryCache);
-    TimeSeriesResponseConverter timeSeriesResponseConverter = TimeSeriesResponseConverter.getInstance();
+    TimeOnTimeComparisonHandler timeOnTimeComparisonHandler =
+        new TimeOnTimeComparisonHandler(queryCache);
+    TimeSeriesResponseConverter timeSeriesResponseConverter =
+        TimeSeriesResponseConverter.getInstance();
 
     // Quartz Scheduler
     SchedulerFactory schedulerFactory = new StdSchedulerFactory();
