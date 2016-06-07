@@ -20,6 +20,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,7 +51,11 @@ public class DataSize {
    * @param val string to parse
    * @return returns -1 in case of invalid value
    */
-  public static long toBytes(String val) {
+  public static long toBytes(@Nullable String val) {
+    if (val == null) {
+      return -1;
+    }
+
     Matcher matcher = STORAGE_VAL_PATTERN.matcher(val);
     if (! matcher.matches()) {
       return -1;

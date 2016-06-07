@@ -30,8 +30,8 @@ public class OfflineTableConfig extends AbstractTableConfig {
 
   protected OfflineTableConfig(String tableName, String tableType,
       SegmentsValidationAndRetentionConfig validationConfig, TenantConfig tenantConfig,
-      TableCustomConfig customConfigs, IndexingConfig indexConfig) {
-    super(tableName, tableType, validationConfig, tenantConfig, customConfigs);
+      TableCustomConfig customConfigs, IndexingConfig indexConfig, QuotaConfig quotaConfig) {
+    super(tableName, tableType, validationConfig, tenantConfig, customConfigs, quotaConfig);
     this.indexConfig = indexConfig;
   }
 
