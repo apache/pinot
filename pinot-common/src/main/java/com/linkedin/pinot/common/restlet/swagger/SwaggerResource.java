@@ -152,6 +152,20 @@ public class SwaggerResource extends ServerResource {
           operation.put(Tags.class.getSimpleName().toLowerCase(), ((Tags) annotationInstance).value());
         }
 
+        annotationInstance = method.getAnnotation(Responses.class);
+        if (annotationInstance != null) {
+          Responses responsesAnnotation = (Responses) annotationInstance;
+          JSONObject responses = new JSONObject();
+
+          for (Response responseAnnotation : responsesAnnotation.value()) {
+            JSONObject response = new JSONObject();
+            response.put("description", responseAnnotation.description());
+            responses.put(responseAnnotation.statusCode(), response);
+          }
+
+          operation.put(Responses.class.getSimpleName().toLowerCase(), responses);
+        }
+
         operation.put("operationId", method.getName());
 
         ArrayList<JSONObject> parameters = new ArrayList<JSONObject>();
