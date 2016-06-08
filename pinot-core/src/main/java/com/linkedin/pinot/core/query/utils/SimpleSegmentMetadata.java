@@ -190,4 +190,9 @@ public class SimpleSegmentMetadata implements SegmentMetadata {
     // TODO Auto-generated method stub
     return null;
   }
+
+  @Override
+  public String getPinotHadoopJarVersion()  {
+    return null;
+  }
 }

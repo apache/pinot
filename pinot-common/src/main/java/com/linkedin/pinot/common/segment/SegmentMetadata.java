@@ -143,6 +143,13 @@ public interface SegmentMetadata {
   String getBitmapInvertedIndexFileName(String column, String segmentVersion);
 
   /**
+   * returns the version of the Pinot Hadoop jar that was used to create this segment
+   * @param column
+   * @return
+   */
+  String getPinotHadoopJarVersion();
+
+  /**
    * @return
    */
   public Map<String, String> toMap();

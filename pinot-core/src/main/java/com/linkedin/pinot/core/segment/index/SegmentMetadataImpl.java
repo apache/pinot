@@ -69,6 +69,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private SegmentVersion _segmentVersion;
   private boolean _hasStarTree;
   private StarTreeMetadata _starTreeMetadata = null;
+  private String _pinotHadoopJarVersion;
 
   public SegmentMetadataImpl(File indexDir) throws ConfigurationException, IOException {
     LOGGER.debug("SegmentMetadata location: {}", indexDir);
@@ -86,6 +87,11 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     loadCreationMeta(new File(indexDir, V1Constants.SEGMENT_CREATION_META));
     setTimeIntervalAndGranularity();
     LOGGER.debug("loaded metadata for {}", indexDir.getName());
+  }
+
+  public SegmentMetadataImpl(File indexDir, String pinotHadoopJarVersion) throws ConfigurationException, IOException {
+    this(indexDir);
+    _pinotHadoopJarVersion = pinotHadoopJarVersion;
   }
 
   public SegmentMetadataImpl(OfflineSegmentZKMetadata offlineSegmentZKMetadata) {
@@ -267,7 +273,8 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
     // Set the maxLeafRecords
     String maxLeafRecordsString =
-        _segmentMetadataPropertiesConfiguration.getString(MetadataKeys.StarTree.STAR_TREE_MAX_LEAF_RECORDS);
+        _segmentMetadataPropertiesConfiguration.getString(
+            MetadataKeys.StarTree.STAR_TREE_MAX_LEAF_RECORDS);
     if (maxLeafRecordsString != null) {
       _starTreeMetadata.setMaxLeafRecords(Long.valueOf(maxLeafRecordsString));
     }
@@ -503,5 +510,11 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   public String getBitmapInvertedIndexFileName(String column, String segmentVersion) {
     return column + V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION;
   }
+
+  @Override
+  public String getPinotHadoopJarVersion() {
+    return _pinotHadoopJarVersion;
+  }
+
 
 }

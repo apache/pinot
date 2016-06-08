@@ -451,6 +451,12 @@ public class RetentionManagerTest {
       public String getBitmapInvertedIndexFileName(String column, String segmentVersion) {
         throw new UnsupportedOperationException("getBitmapInvertedIndexFileName not supported in " + this.getClass());
       }
+
+      @Override
+      public String getPinotHadoopJarVersion() {
+        return null;
+      }
+
     };
     return segmentMetadata;
   }
