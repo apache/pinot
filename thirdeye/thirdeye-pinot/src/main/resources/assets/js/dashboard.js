@@ -77,7 +77,6 @@ $(document).ready( function() {
     var result_form_template = HandleBarsTemplates.template_form(timseries_section_options)
     $("#timeseries-section #form-area").append(result_form_template);
 
-    /* Hiding anomalies till it's ready for production
     //ANOMALIES
     var anomalies_section_options = {
         tabName: "anomalies",
@@ -92,7 +91,7 @@ $(document).ready( function() {
     }
 
     var result_form_template = HandleBarsTemplates.template_form(anomalies_section_options)
-    $("#anomalies-section #form-area").append(result_form_template);*/
+    $("#anomalies-section #form-area").append(result_form_template);
 
 
     //Global object with the query params
@@ -120,11 +119,98 @@ $(document).ready( function() {
 
         updateDashboardFormFromHash();
 
-
-        //close all uikit dropdown
+        //close all uikit dropdowns
         closeAllUIKItDropdowns()
 
-        //If hash has dataset and (dashboard or (view & metric )trigger form submit
+        //Render the charts:
+        //if the data is cached already (ie. user hit back button) renderChartFromCachedData
+        //else trigger ajax call.
+
+        //Check if query is the same as an earlier query
+        //in the ajax calls where chart data is received we updated the sessionStorage with the hashstring as key and the data as value
+        //here we check if the sessionStorage already contains this query data
+        var hashString = window.location.hash.substring(1);
+        if (sessionStorage.getItem(hashString)) {
+            renderChartFromCachedData(hashString);
+        }else{
+            //trigger ajax call if hash has dataset and (dashboard or (view & metric )
+            requestChartData()
+        }
+    }
+
+    function renderChartFromCachedData(hashString){
+        var data = JSON.parse( sessionStorage.getItem(hashString) );
+
+        //if data was falsy trigger the ajax call
+        if(!data){
+            requestChartData()
+        }
+
+        var hashParams = parseHashParameters(hashString);
+        if( hashParams.hasOwnProperty("dataset")){
+
+            if( hashParams.hasOwnProperty("dashboard") || hashParams.hasOwnProperty("metrics") ){
+
+                switch (hashParams.view) {
+                    case "timeseries":
+                        //passing the tab name (ie: dachboard, compare, timesries etc.)
+                        // to the render function so the charts will be displayed on the correct tab
+                        // even if user switches the tab while waiting for the ajax response
+                        var tab = "timeseries";
+                        showLoader(tab);
+
+                        $("#"+  tab  +"-display-chart-section").empty();
+
+                        renderTimeSeries(data, tab)
+
+                        hideLoader(tab)
+
+                        break;
+                    case "compare":
+                        var tab = "compare";
+                        showLoader(tab);
+                        $("#"+  tab  +"-display-chart-section").empty();
+
+                        if (hash.aggTimeGranularity.toLowerCase() == "aggregateall") {
+                            renderHeatmap(data, tab);
+                            //else aggTimeGranularity == HOURS or DAY
+                        } else if (hash.hasOwnProperty("metrics")) {
+
+                            if (hash.hasOwnProperty("dimensions")) {
+                                renderContributors(data, tab);
+                            } else {
+                                renderTabular(data, tab);
+                            }
+                        }
+                        hideLoader(tab)
+                        break;
+                    case "anomalies":
+                        var tab = "anomalies";
+                        var anomalyData = data.anomalyData;
+                        var timeSeriesData = data.timeSeriesData;
+                        showLoader(tab);
+                        $("#"+  tab  +"-display-chart-section").empty();
+
+                            renderAnomalyLineChart(timeSeriesData, anomalyData, tab);
+                            renderAnomalyTable(anomalyData, tab);
+                        hideLoader(tab)
+                        break;
+                    default://dashboard tab
+                        showLoader(tab);
+                        var tab = "dashboard";
+                        $("#"+  tab  +"-display-chart-section").empty();
+                        renderTabular(data, tab);
+                        hideLoader(tab);
+                        break;
+                }
+            }
+        }
+
+
+    }
+
+    function requestChartData(){
+        //If hash has dataset and (dashboard or (view & metric )trigger ajax call
         if( hash.hasOwnProperty("dataset")){
 
             if( hash.hasOwnProperty("dashboard") || hash.hasOwnProperty("metrics") ){
@@ -135,7 +221,6 @@ $(document).ready( function() {
                         getTimeSeries(tab);
                         break;
                     case "compare":
-
                         var tab = "compare";
                         if (hash.aggTimeGranularity.toLowerCase() == "aggregateall") {
 
@@ -149,17 +234,17 @@ $(document).ready( function() {
                                 getTabular(tab);
                             }
                         }
-                    break;
+                        break;
                     case "anomalies":
 
                         var tab = "anomalies";
-                      getAnomalies(tab);
-                      break;
+                        getAnomalies(tab);
+                        break;
                     default://dashboard tab
 
                         var tab = "dashboard"
                         getCustomDashboard(tab);
-                    break;
+                        break;
                 }
 
             }

@@ -110,15 +110,22 @@ function getDimensionNFilterList() {
         var dimensionListHtml = "";
         var filterDimensionListHtml = "";
 
-        //Global - public
-        datasetDimensions = [];
-        window.datasetConfig.datasetDimensions = [];
+         if( sessionStorage.getItem("datasetConfig") ) {
+             var datasetConfig = JSON.parse(sessionStorage.getItem("datasetConfig"))
+         }else{
+             var datasetConfig = {};
+
+         }
+
+        datasetConfig.datasetDimensions = [];
 
         for (var k in  data) {
             dimensionListHtml += "<li class='dimension-option' rel='dimensions' value='" + k + "'><a href='#' class='uk-dropdown-close'>" + k + "</a></li>";
             filterDimensionListHtml += "<li class='filter-dimension-option' value='" + k + "'><a href='#' class='radio-options'>" + k + "</a></li>";
-            window.datasetConfig.datasetDimensions.push(k)
+            datasetConfig.datasetDimensions.push(k)
         }
+
+        window.sessionStorage.setItem("datasetConfig", JSON.stringify(datasetConfig))
 
         $(".dimension-list").html(dimensionListHtml);
 
@@ -146,7 +153,6 @@ function getDimensionNFilterList() {
 
 function getDatasetConfig() {
 
-    window.datasetConfig = {}
 
     //Till the endpoint is ready no ajax call is triggered and works with  hardcoded data in local data variable
     var url = "/dashboard/data/info?dataset=" + hash.dataset;
@@ -157,9 +163,18 @@ function getDatasetConfig() {
 
         /** MIN MAX DATE TIME **/
 
-        //global
-        window.datasetConfig.maxMillis = parseInt(data["maxTime"]);
-        var maxMillis = window.datasetConfig.maxMillis
+        //if datasetConfig is not present in the
+        if( sessionStorage.getItem("datasetConfig") ) {
+            var datasetConfig = JSON.parse(sessionStorage.getItem("datasetConfig"))
+        }else{
+            var datasetConfig = {};
+        }
+
+        datasetConfig.maxMillis = parseInt(data["maxTime"]);
+
+        var maxMillis = datasetConfig.maxMillis;
+
+        window.sessionStorage.setItem("datasetConfig", JSON.stringify(datasetConfig));
 
         var currentStartDateTime = moment(maxMillis).add(-1, 'days');
 
@@ -238,9 +253,14 @@ function getDatasetConfig() {
         /**CONFIG: DATA GRANULARITY **/
         if(data["dataGranularity"]){
 
+            //modify sessionStorage.datasetConfig
+            var datasetConfig = JSON.parse( sessionStorage.getItem("datasetConfig") )
 
-            window.datasetConfig.dataGranularity = data["dataGranularity"];
-            var dataGranularity = window.datasetConfig.dataGranularity;
+            datasetConfig.dataGranularity = data["dataGranularity"];
+
+            var dataGranularity = datasetConfig.dataGranularity;
+
+            window.sessionStorage.setItem("datasetConfig", JSON.stringify(datasetConfig))
 
             //Todo: you may remove the following if else if the set of values are known
             if(dataGranularity.toLowerCase().indexOf("minutes") > -1){
@@ -284,7 +304,13 @@ function getDatasetConfig() {
 
         /**CONFIG: INVERT COLOR METRICS **/
         if(data["invertColorMetrics"]){
-            window.datasetConfig.invertColorMetrics = data["invertColorMetrics"];
+
+            //modify sessionStorage.datasetConfig
+            var datasetConfig = JSON.parse( sessionStorage.getItem("datasetConfig") )
+
+            datasetConfig.invertColorMetrics = data["invertColorMetrics"];
+
+            window.sessionStorage.setItem("datasetConfig", JSON.stringify(datasetConfig))
         }
 
         //Check if all form components are populated

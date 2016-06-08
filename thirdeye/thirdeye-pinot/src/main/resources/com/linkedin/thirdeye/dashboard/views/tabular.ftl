@@ -18,7 +18,7 @@
     <div id="funnel-table-msg" class="tip-to-user uk-alert">
         <i class="close-parent uk-icon-close"></i>
         <span>In the table below click on the cell to explore how various dimensions contributed to the change in the metric value for a specific time period.<br/>
-        Click on the metric name to view the w-o-w difference trend on various dimension values.</span>
+        Click on the arrow next to the metric name and chose a dimension to view the w-o-w difference trend on various dimension values.</span>
     </div>
 
     <div class="flipped-scroll-container">
