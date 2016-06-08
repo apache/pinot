@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.dashboard.views.heatmap;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -31,12 +32,15 @@ import com.linkedin.thirdeye.dashboard.views.GenericResponse.ResponseSchema;
 import com.linkedin.thirdeye.dashboard.views.ViewHandler;
 import com.linkedin.thirdeye.dashboard.views.ViewRequest;
 
+import jersey.repackaged.com.google.common.collect.Lists;
+
 public class HeatMapViewHandler implements ViewHandler<HeatMapViewRequest, HeatMapViewResponse> {
 
   private final QueryCache queryCache;
   private CollectionConfig collectionConfig = null;
   private static final Logger LOGGER = LoggerFactory.getLogger(HeatMapViewHandler.class);
-  private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
+  private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE =
+      ThirdEyeCacheRegistry.getInstance();
 
   private static final String RATIO_SEPARATOR = "/";
 
@@ -80,86 +84,116 @@ public class HeatMapViewHandler implements ViewHandler<HeatMapViewRequest, HeatM
     // query 1 for everything from baseline start to baseline end
     // query for everything from current start to current end
 
-    TimeOnTimeComparisonRequest comparisonRequest = generateTimeOnTimeComparisonRequest(request);
-    TimeOnTimeComparisonHandler handler = new TimeOnTimeComparisonHandler(queryCache);
-
     try {
-      collectionConfig = CACHE_REGISTRY_INSTANCE.getCollectionConfigCache().get(comparisonRequest.getCollectionName());
+      collectionConfig =
+          CACHE_REGISTRY_INSTANCE.getCollectionConfigCache().get(request.getCollection());
     } catch (InvalidCacheLoadException e) {
-      LOGGER.debug("No collection configs for collection {}", comparisonRequest.getCollectionName());
+      LOGGER.debug("No collection configs for collection {}", request.getCollection());
     }
 
-    TimeOnTimeComparisonResponse response = handler.handle(comparisonRequest);
-
-    Set<String> dimensions = response.getDimensions();
     List<String> expressionNames = new ArrayList<>();
+    Map<String, String> cellSizeExpressions = new HashMap<>();
     Map<String, String> metricExpressions = new HashMap<>();
+    Set<String> metricOrExpressionNames = new HashSet<>();
     for (MetricExpression expression : request.getMetricExpressions()) {
       expressionNames.add(expression.getExpressionName());
       metricExpressions.put(expression.getExpressionName(), expression.getExpression());
+      metricOrExpressionNames.add(expression.getExpressionName());
+      List<MetricFunction> metricFunctions = expression.computeMetricFunctions();
+      for (MetricFunction function : metricFunctions) {
+        metricOrExpressionNames.add(function.getMetricName());
+      }
     }
-    Map<String, String> cellSizeExpressions = new HashMap<>();
-
-    int numRows = response.getNumRows();
 
     Map<String, HeatMap.Builder> data = new HashMap<>();
+
+    TimeOnTimeComparisonRequest comparisonRequest = generateTimeOnTimeComparisonRequest(request);
+    List<String> groupByDimensions = comparisonRequest.getGroupByDimensions();
+    TimeOnTimeComparisonHandler handler = new TimeOnTimeComparisonHandler(queryCache);
+
     // we are tracking per dimension, to validate that its the same for each dimension
-    Map<String, Double> baselineTotalPerDimension = new HashMap<>();
-    Map<String, Double> currentTotalPerDimension = new HashMap<>();
-    for (String dimension : dimensions) {
-      baselineTotalPerDimension.put(dimension, 0d);
-      currentTotalPerDimension.put(dimension, 0d);
+    Map<String, Map<String, Double>> baselineTotalPerMetricAndDimension = new HashMap<>();
+    Map<String, Map<String, Double>> currentTotalPerMetricAndDimension = new HashMap<>();
+
+    for (String metricOrExpressionName : metricOrExpressionNames) {
+      Map<String, Double> baselineTotalMap = new HashMap<>();
+      Map<String, Double> currentTotalMap = new HashMap<>();
+      baselineTotalPerMetricAndDimension.put(metricOrExpressionName, baselineTotalMap);
+      currentTotalPerMetricAndDimension.put(metricOrExpressionName, currentTotalMap);
+      for (String dimension : groupByDimensions) {
+        baselineTotalMap.put(dimension, 0d);
+        currentTotalMap.put(dimension, 0d);
+      }
     }
 
-    for (int i = 0; i < numRows; i++) {
-      Row row = response.getRow(i);
-      String dimension = row.getDimensionName();
-      String dimensionValue = row.getDimensionValue();
-      Map<String, Metric> metricMap = new HashMap<>();
-      for (Metric metric : row.getMetrics()) {
-        metricMap.put(metric.getMetricName(), metric);
-      }
-      for (Metric metric : row.getMetrics()) {
-        String metricName = metric.getMetricName();
-        if(!expressionNames.contains(metricName)){
-          continue;
-        }
-        String dataKey = metricName + "." + dimension;
-        HeatMap.Builder heatMapBuilder = data.get(dataKey);
-        if (heatMapBuilder == null) {
-          heatMapBuilder = new HeatMap.Builder(dimension);
-          data.put(dataKey, heatMapBuilder);
-        }
-        if (collectionConfig != null && collectionConfig.getCellSizeExpression() != null
-            && collectionConfig.getCellSizeExpression().get(metricName) != null) {
-          String metricExpression = metricExpressions.get(metricName);
+    for (String groupByDimension : groupByDimensions) {
 
-          String[] tokens = metricExpression.split(RATIO_SEPARATOR);
-          String numerator = tokens[0];
-          String denominator = tokens[1];
-          Metric numeratorMetric = metricMap.get(numerator);
-          Metric denominatorMetric = metricMap.get(denominator);
-          Double numeratorBaseline = numeratorMetric == null ? 0 : numeratorMetric.getBaselineValue();
-          Double numeratorCurrent = numeratorMetric == null ? 0 : numeratorMetric.getCurrentValue();
-          Double denominatorBaseline = denominatorMetric == null ? 0 : denominatorMetric.getBaselineValue();
-          Double denominatorCurrent = denominatorMetric == null ? 0 : denominatorMetric.getCurrentValue();
+      comparisonRequest.setGroupByDimensions(Lists.newArrayList(groupByDimension));
+      TimeOnTimeComparisonResponse response = handler.handle(comparisonRequest);
 
-          Map<String, Double> context = new HashMap<>();
-          context.put(numerator, numeratorCurrent);
-          context.put(denominator, denominatorCurrent);
-          String cellSizeExpression = collectionConfig.getCellSizeExpression().get(metricName).getExpression();
-          cellSizeExpressions.put(metricName, cellSizeExpression);
-          Double cellSize = MetricExpression.evaluateExpression(cellSizeExpression, context);
+      int numRows = response.getNumRows();
+      for (int i = 0; i < numRows; i++) {
 
-          heatMapBuilder.addCell(dimensionValue, metric.getBaselineValue(), metric.getCurrentValue(), cellSize, cellSizeExpression,
-              numeratorBaseline, denominatorBaseline, numeratorCurrent, denominatorCurrent);
-        } else {
-          heatMapBuilder.addCell(dimensionValue, metric.getBaselineValue(), metric.getCurrentValue());
+        Row row = response.getRow(i);
+        String dimensionValue = row.getDimensionValue();
+        Map<String, Metric> metricMap = new HashMap<>();
+        for (Metric metric : row.getMetrics()) {
+          metricMap.put(metric.getMetricName(), metric);
         }
-        baselineTotalPerDimension.put(dimension,
-            baselineTotalPerDimension.get(dimension) + metric.getBaselineValue());
-        currentTotalPerDimension.put(dimension,
-            currentTotalPerDimension.get(dimension) + metric.getCurrentValue());
+        for (Metric metric : row.getMetrics()) {
+          String metricName = metric.getMetricName();
+          // update the baselineTotal and current total
+          Map<String, Double> baselineTotalMap = baselineTotalPerMetricAndDimension.get(metricName);
+          Map<String, Double> currentTotalMap = currentTotalPerMetricAndDimension.get(metricName);
+
+          baselineTotalMap.put(groupByDimension,
+              baselineTotalMap.get(groupByDimension) + metric.getBaselineValue());
+          currentTotalMap.put(groupByDimension,
+              currentTotalMap.get(groupByDimension) + metric.getCurrentValue());
+
+          if (!expressionNames.contains(metricName)) {
+            continue;
+          }
+          String dataKey = metricName + "." + groupByDimension;
+          HeatMap.Builder heatMapBuilder = data.get(dataKey);
+          if (heatMapBuilder == null) {
+            heatMapBuilder = new HeatMap.Builder(groupByDimension);
+            data.put(dataKey, heatMapBuilder);
+          }
+          if (collectionConfig != null && collectionConfig.getCellSizeExpression() != null
+              && collectionConfig.getCellSizeExpression().get(metricName) != null) {
+            String metricExpression = metricExpressions.get(metricName);
+
+            String[] tokens = metricExpression.split(RATIO_SEPARATOR);
+            String numerator = tokens[0];
+            String denominator = tokens[1];
+            Metric numeratorMetric = metricMap.get(numerator);
+            Metric denominatorMetric = metricMap.get(denominator);
+            Double numeratorBaseline =
+                numeratorMetric == null ? 0 : numeratorMetric.getBaselineValue();
+            Double numeratorCurrent =
+                numeratorMetric == null ? 0 : numeratorMetric.getCurrentValue();
+            Double denominatorBaseline =
+                denominatorMetric == null ? 0 : denominatorMetric.getBaselineValue();
+            Double denominatorCurrent =
+                denominatorMetric == null ? 0 : denominatorMetric.getCurrentValue();
+
+            Map<String, Double> context = new HashMap<>();
+            context.put(numerator, numeratorCurrent);
+            context.put(denominator, denominatorCurrent);
+            String cellSizeExpression =
+                collectionConfig.getCellSizeExpression().get(metricName).getExpression();
+            cellSizeExpressions.put(metricName, cellSizeExpression);
+            Double cellSize = MetricExpression.evaluateExpression(cellSizeExpression, context);
+
+            heatMapBuilder.addCell(dimensionValue, metric.getBaselineValue(),
+                metric.getCurrentValue(), cellSize, cellSizeExpression, numeratorBaseline,
+                denominatorBaseline, numeratorCurrent, denominatorCurrent);
+          } else {
+            heatMapBuilder.addCell(dimensionValue, metric.getBaselineValue(),
+                metric.getCurrentValue());
+          }
+        }
       }
     }
 
@@ -170,19 +204,45 @@ public class HeatMapViewHandler implements ViewHandler<HeatMapViewRequest, HeatM
       String column = columns[i];
       schema.add(column, i);
     }
+    Info summary = new Info();
 
     Map<String, GenericResponse> heatMapViewResponseData = new HashMap<>();
-    Info summary = new Info();
-    summary.addSimpleField("baselineStart", comparisonRequest.getBaselineStart().toString());
-    summary.addSimpleField("baselineEnd", comparisonRequest.getBaselineEnd().toString());
-    summary.addSimpleField("currentStart", comparisonRequest.getCurrentStart().toString());
-    summary.addSimpleField("currentEnd", comparisonRequest.getCurrentEnd().toString());
-    Double baselineTotal = baselineTotalPerDimension.values().iterator().next();
-    Double currentTotal = currentTotalPerDimension.values().iterator().next();
-    summary.addSimpleField("baselineTotal", HeatMapCell.format(baselineTotal));
-    summary.addSimpleField("currentTotal", HeatMapCell.format(currentTotal));
-    summary.addSimpleField("deltaChange", HeatMapCell.format(currentTotal-baselineTotal));
-    summary.addSimpleField("deltaPercentage", HeatMapCell.format((currentTotal-baselineTotal)*100.0/baselineTotal));
+    for (MetricExpression expression : request.getMetricExpressions()) {
+      List<MetricFunction> metricFunctions = expression.computeMetricFunctions();
+      Double baselineTotal = baselineTotalPerMetricAndDimension.get(expression.getExpressionName())
+          .values().iterator().next();
+      Double currentTotal = currentTotalPerMetricAndDimension.get(expression.getExpressionName())
+          .values().iterator().next();
+
+      // check if its derived
+      if (metricFunctions.size() > 1) {
+        Map<String, Double> baselineContext = new HashMap<>();
+        Map<String, Double> currentContext = new HashMap<>();
+        for (String metricOrExpression : metricOrExpressionNames) {
+          baselineContext.put(metricOrExpression, baselineTotalPerMetricAndDimension
+              .get(metricOrExpression).values().iterator().next());
+          currentContext.put(metricOrExpression,
+              currentTotalPerMetricAndDimension.get(metricOrExpression).values().iterator().next());
+        }
+        baselineTotal = MetricExpression.evaluateExpression(expression, baselineContext);
+        currentTotal = MetricExpression.evaluateExpression(expression, currentContext);
+      } else {
+        baselineTotal = baselineTotalPerMetricAndDimension.get(expression.getExpressionName())
+            .values().iterator().next();
+        currentTotal = currentTotalPerMetricAndDimension.get(expression.getExpressionName())
+            .values().iterator().next();
+      }
+      summary.addSimpleField("baselineStart", comparisonRequest.getBaselineStart().toString());
+      summary.addSimpleField("baselineEnd", comparisonRequest.getBaselineEnd().toString());
+      summary.addSimpleField("currentStart", comparisonRequest.getCurrentStart().toString());
+      summary.addSimpleField("currentEnd", comparisonRequest.getCurrentEnd().toString());
+
+      summary.addSimpleField("baselineTotal", HeatMapCell.format(baselineTotal));
+      summary.addSimpleField("currentTotal", HeatMapCell.format(currentTotal));
+      summary.addSimpleField("deltaChange", HeatMapCell.format(currentTotal - baselineTotal));
+      summary.addSimpleField("deltaPercentage",
+          HeatMapCell.format((currentTotal - baselineTotal) * 100.0 / baselineTotal));
+    }
 
     for (Entry<String, HeatMap.Builder> entry : data.entrySet()) {
       String dataKey = entry.getKey();
@@ -203,11 +263,11 @@ public class HeatMapViewHandler implements ViewHandler<HeatMapViewRequest, HeatM
 
     HeatMapViewResponse heatMapViewResponse = new HeatMapViewResponse();
     heatMapViewResponse.setMetrics(expressionNames);
-    heatMapViewResponse.setDimensions(new ArrayList<String>(dimensions));
-
-    heatMapViewResponse.setSummary(summary);
+    heatMapViewResponse.setDimensions(groupByDimensions);
     heatMapViewResponse.setData(heatMapViewResponseData);
     heatMapViewResponse.setCellSizeExpression(cellSizeExpressions);
+    heatMapViewResponse.setSummary(summary);
+
     return heatMapViewResponse;
   }
 

@@ -12,6 +12,10 @@ public interface ThirdEyeResponse {
 
   List<MetricFunction> getMetricFunctions();
 
+  int getNumRows();
+  
+  ThirdEyeResponseRow getRow(int rowId);
+  
   int getNumRowsFor(MetricFunction metricFunction);
 
   // TODO make new API methods to make it clearer how to retrieve metric values vs dimension values,

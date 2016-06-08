@@ -13,16 +13,24 @@ import java.util.concurrent.TimeoutException;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.collect.Range;
+import com.linkedin.thirdeye.api.TimeGranularity;
+import com.linkedin.thirdeye.api.TimeRange;
 import com.linkedin.thirdeye.client.MetricExpression;
+import com.linkedin.thirdeye.client.MetricFunction;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.client.ThirdEyeRequest;
+import com.linkedin.thirdeye.client.ThirdEyeRequest.ThirdEyeRequestBuilder;
 import com.linkedin.thirdeye.client.ThirdEyeResponse;
+import com.linkedin.thirdeye.client.ThirdEyeResponseRow;
 import com.linkedin.thirdeye.client.cache.QueryCache;
+import com.linkedin.thirdeye.client.timeseries.TimeSeriesRow.Builder;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesRow.TimeSeriesMetric;
+import com.linkedin.thirdeye.dashboard.Utils;
 
 public class TimeSeriesHandler {
   private static final Logger LOG = LoggerFactory.getLogger(TimeSeriesHandler.class);
@@ -44,41 +52,32 @@ public class TimeSeriesHandler {
   public TimeSeriesResponse handle(TimeSeriesRequest timeSeriesRequest) throws Exception {
     List<String> groupByDimensions = timeSeriesRequest.getGroupByDimensions();
     boolean hasGroupByDimensions = CollectionUtils.isNotEmpty(groupByDimensions);
-    List<Range<DateTime>> timeRanges = timeSeriesRequest.getTimeRanges();
 
-    Map<TimeSeriesRequest, Map<ThirdEyeRequest, Future<ThirdEyeResponse>>> subRequestQueryResponseMap =
-        new HashMap<>();
-    // For each time bucket, generate a smaller TimeSeriesRequest and the ThirdEyeRequests it would
-    // generate.
-    for (Range<DateTime> range : timeRanges) {
-      TimeSeriesRequest subTimeSeriesRequest = new TimeSeriesRequest(timeSeriesRequest);
-      subTimeSeriesRequest.setStart(range.lowerEndpoint());
-      subTimeSeriesRequest.setEnd(range.upperEndpoint());
-      List<ThirdEyeRequest> subRequests;
-      if (hasGroupByDimensions) {
-        subRequests = requestGenerator.generateRequestsForGroupByDimensions(subTimeSeriesRequest);
-      } else {
-        subRequests = Collections
-            .singletonList(requestGenerator.generateRequestsForAggregation(subTimeSeriesRequest));
-      }
-      Map<ThirdEyeRequest, Future<ThirdEyeResponse>> queryResponseFutureMap =
-          queryCache.getQueryResultsAsync(subRequests);
-      subRequestQueryResponseMap.put(subTimeSeriesRequest, queryResponseFutureMap);
+    ThirdEyeRequestBuilder requestBuilder = new ThirdEyeRequestBuilder();
+    requestBuilder.setCollection(timeSeriesRequest.getCollectionName());
+    requestBuilder.setStartTimeInclusive(timeSeriesRequest.getStart());
+    requestBuilder.setEndTimeExclusive(timeSeriesRequest.getEnd());
+    List<MetricFunction> metricFunctionsFromExpressions =
+        Utils.computeMetricFunctionsFromExpressions(timeSeriesRequest.getMetricExpressions());
+    requestBuilder.setMetricFunctions(metricFunctionsFromExpressions);
+    if (hasGroupByDimensions) {
+      requestBuilder.setGroupBy(groupByDimensions);
     }
+    requestBuilder.setGroupByTimeGranularity(timeSeriesRequest.getAggregationTimeGranularity());
+
+    ThirdEyeRequest thirdeyeRequest = requestBuilder.build("timeseries");
+    ThirdEyeResponse thirdEyeResponse = queryCache.getClient().execute(thirdeyeRequest);
 
     List<TimeSeriesRow> rows = new ArrayList<>();
-    for (Entry<TimeSeriesRequest, Map<ThirdEyeRequest, Future<ThirdEyeResponse>>> entry : subRequestQueryResponseMap
-        .entrySet()) {
-      TimeSeriesRequest subTimeSeriesRequest = entry.getKey();
-      Map<ThirdEyeRequest, ThirdEyeResponse> queryResponseMap = waitForFutures(entry.getValue());
-      if (hasGroupByDimensions) {
-        rows.addAll(
-            responseParser.parseGroupByDimensionResponse(subTimeSeriesRequest, queryResponseMap));
-      } else {
-        rows.add(
-            responseParser.parseAggregationOnlyResponse(subTimeSeriesRequest, queryResponseMap));
-      }
+    int numRows = thirdEyeResponse.getNumRows();
+    List<Range<DateTime>> timeRanges = timeSeriesRequest.getTimeRanges();
+
+    for (int i = 0; i < numRows; i++) {
+      ThirdEyeResponseRow thirdeyeResponseRow = thirdEyeResponse.getRow(i);
+      TimeSeriesRow timeSeriesRow = convertToTimeSeriesRow(thirdeyeRequest, thirdeyeResponseRow, timeRanges);
+      rows.add(timeSeriesRow);
     }
+
     List<MetricExpression> metricExpressions = timeSeriesRequest.getMetricExpressions();
     // compute list of derived expressions
     List<MetricExpression> derivedMetricExpressions = new ArrayList<>();
@@ -106,6 +105,28 @@ public class TimeSeriesHandler {
       }
     }
     return new TimeSeriesResponse(metricExpressions, groupByDimensions, rows);
+  }
+
+  private TimeSeriesRow convertToTimeSeriesRow(ThirdEyeRequest thirdeyeRequest, ThirdEyeResponseRow thirdeyeResponseRow, List<Range<DateTime>> timeRanges) {
+    Builder builder = new TimeSeriesRow.Builder();
+    Range<DateTime> range = timeRanges.get(thirdeyeResponseRow.getTimeBucketId());
+    builder.setStart(range.lowerEndpoint());
+    builder.setEnd(range.upperEndpoint());
+
+    List<String> dimensionNames = thirdeyeRequest.getGroupBy();
+    for (int i = 0; i < dimensionNames.size(); i ++) {
+      builder.setDimensionName(dimensionNames.get(i));
+      builder.setDimensionValue(thirdeyeResponseRow.getDimensions().get(i));
+    }
+
+    List<Double> metrics = thirdeyeResponseRow.getMetrics();
+    for (int i = 0; i < metrics.size(); i ++) {
+      String metricName = thirdeyeRequest.getMetricFunctions().get(i).getMetricName();
+      builder.addMetric(metricName, metrics.get(i));
+    }
+
+    TimeSeriesRow timeSeriesRow = builder.build();
+    return timeSeriesRow;
   }
 
   /**

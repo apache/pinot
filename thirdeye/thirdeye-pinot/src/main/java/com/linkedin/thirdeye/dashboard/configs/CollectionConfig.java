@@ -6,8 +6,13 @@ import java.util.Map;
 import com.linkedin.thirdeye.client.MetricExpression;
 
 public class CollectionConfig extends AbstractConfig {
+
+  public static double DEFAULT_THRESHOLD = 0.01;
+
   String collectionName;
   String collectionAlias;
+
+  double metricThreshold = DEFAULT_THRESHOLD;
 
   boolean isActive = true;
   boolean enableCount = false; // Default __COUNT metric
@@ -36,6 +41,14 @@ public class CollectionConfig extends AbstractConfig {
 
   public void setCollectionAlias(String collectionAlias) {
     this.collectionAlias = collectionAlias;
+  }
+
+  public double getMetricThreshold() {
+    return metricThreshold;
+  }
+
+  public void setMetricThreshold(double metricThreshold) {
+    this.metricThreshold = metricThreshold;
   }
 
   public boolean isActive() {

@@ -13,6 +13,8 @@ import org.apache.http.HttpHost;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.joda.time.DateTime;
+import org.joda.time.format.DateTimeFormat;
+import org.joda.time.format.DateTimeFormatter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,7 +35,7 @@ import com.linkedin.thirdeye.dashboard.ThirdEyeDashboardConfiguration;
 import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
 
 public class PinotThirdEyeClient implements ThirdEyeClient {
-  
+
   private static final Logger LOG = LoggerFactory.getLogger(PinotThirdEyeClient.class);
 
   private static final ThirdEyeCacheRegistry CACHE_INSTANCE = ThirdEyeCacheRegistry.getInstance();
@@ -42,7 +44,6 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
   public static final String FIXED_COLLECTIONS_PROPERTY_KEY = "fixedCollections";
   public static final String CLUSTER_NAME_PROPERTY_KEY = "clusterName";
   public static final String TAG_PROPERTY_KEY = "tag";
-
 
   String segementZKMetadataRootPath;
   private final HttpHost controllerHost;
@@ -152,15 +153,21 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
     }
     int numMetrics = request.getMetricFunctions().size();
     int numCols = numGroupByKeys + numMetrics;
-    boolean requiresTimeConversion = false;
-    TimeUnit requestTimeUnit = null;
+    boolean hasGroupByTime = false;
     TimeUnit dataTimeUnit = null;
+    long startTime = request.getStartTimeInclusive().getMillis();
+    long interval = -1;
+    dataTimeUnit = collectionSchema.getTime().getDataGranularity().getUnit();
+    boolean isISOFormat = false;
+    DateTimeFormatter dateTimeFormatter = null;
+    String timeFormat = collectionSchema.getTime().getFormat();
+    if (timeFormat != null && !timeFormat.equals(TimeSpec.SINCE_EPOCH_FORMAT)) {
+      isISOFormat = true;
+      dateTimeFormatter = DateTimeFormat.forPattern(timeFormat).withZoneUTC();
+    }
     if (request.getGroupByTimeGranularity() != null) {
-      requestTimeUnit = request.getGroupByTimeGranularity().getUnit();
-      dataTimeUnit = collectionSchema.getTime().getDataGranularity().getUnit();
-      if (!requestTimeUnit.equals(dataTimeUnit)) {
-        requiresTimeConversion = true;
-      }
+      hasGroupByTime = true;
+      interval = request.getGroupByTimeGranularity().toMillis();
     }
     LinkedHashMap<String, String[]> dataMap = new LinkedHashMap<>();
     for (int i = 0; i < result.getResultSetCount(); i++) {
@@ -172,9 +179,16 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
           groupKeys = new String[resultSet.getGroupKeyLength()];
           for (int grpKeyIdx = 0; grpKeyIdx < resultSet.getGroupKeyLength(); grpKeyIdx++) {
             String groupKeyVal = resultSet.getGroupKeyString(r, grpKeyIdx);
-            if (requiresTimeConversion && grpKeyIdx == 0) {
-              groupKeyVal = String
-                  .valueOf(requestTimeUnit.convert(Long.parseLong(groupKeyVal), dataTimeUnit));
+            if (hasGroupByTime && grpKeyIdx == 0) {
+              int timeBucket;
+              long millis;
+              if (!isISOFormat) {
+                millis = dataTimeUnit.toMillis(Long.parseLong(groupKeyVal));
+              } else {
+                millis = DateTime.parse(groupKeyVal, dateTimeFormatter).getMillis();
+              }
+              timeBucket = (int) ((millis - startTime) / interval);
+              groupKeyVal = String.valueOf(timeBucket);
             }
             groupKeys[grpKeyIdx] = groupKeyVal;
           }
