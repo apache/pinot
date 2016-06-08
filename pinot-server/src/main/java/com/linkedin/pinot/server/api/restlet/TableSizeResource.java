@@ -17,6 +17,8 @@
 package com.linkedin.pinot.server.api.restlet;
 
 import com.google.common.collect.ImmutableList;
+import com.linkedin.pinot.common.restlet.resources.SegmentSizeInfo;
+import com.linkedin.pinot.common.restlet.resources.TableSizeInfo;
 import com.linkedin.pinot.common.restlet.swagger.Description;
 import com.linkedin.pinot.common.restlet.swagger.HttpVerb;
 import com.linkedin.pinot.common.restlet.swagger.Parameter;
@@ -28,8 +30,6 @@ import com.linkedin.pinot.core.data.manager.offline.TableDataManager;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.server.starter.ServerInstance;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 import javax.ws.rs.Produces;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.restlet.data.Status;
@@ -93,9 +93,7 @@ public class TableSizeResource extends ServerResource {
       IndexSegment segment = segmentDataManager.getSegment();
       long segmentSizeBytes = segment.getDiskSizeBytes();
       if (detailed) {
-        SegmentSizeInfo segmentSizeInfo = new SegmentSizeInfo();
-        segmentSizeInfo.segmentName = segment.getSegmentName();
-        segmentSizeInfo.diskSizeInBytes = segmentSizeBytes;
+        SegmentSizeInfo segmentSizeInfo = new SegmentSizeInfo(segment.getSegmentName(), segmentSizeBytes);
         tableSizeInfo.segments.add(segmentSizeInfo);
       }
       tableSizeInfo.diskSizeInBytes += segmentSizeBytes;
@@ -114,17 +112,5 @@ public class TableSizeResource extends ServerResource {
       setStatus(Status.SERVER_ERROR_INTERNAL);
       return new StringRepresentation("{\"message\": \"Failed to convert data to json\"}");
     }
-  }
-
-  // we may want to pull this outside for an API of its own
-  public static class SegmentSizeInfo {
-    public String segmentName;
-    public long diskSizeInBytes;
-  }
-
-  public static class TableSizeInfo {
-    public String tableName;
-    public long diskSizeInBytes;
-    public List<SegmentSizeInfo> segments = new ArrayList<>();
   }
 }

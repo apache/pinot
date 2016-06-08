@@ -24,11 +24,6 @@ import org.apache.commons.configuration.PropertiesConfiguration;
 
 import com.linkedin.pinot.common.utils.StringUtil;
 
-
-/**
- * Sep 26, 2014
- */
-
 public class ControllerConf extends PropertiesConfiguration {
   private static final String CONTROLLER_VIP_HOST = "controller.vip.host";
   private static final String CONTROLLER_VIP_PROTOCOL = "controller.vip.protocol";
@@ -43,10 +38,13 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final String RETENTION_MANAGER_FREQUENCY_IN_SECONDS = "controller.retention.frequencyInSeconds";
   private static final String VALIDATION_MANAGER_FREQUENCY_IN_SECONDS = "controller.validation.frequencyInSeconds";
   private static final String STATUS_CHECKER_FREQUENCY_IN_SECONDS = "controller.statuschecker.frequencyInSeconds";
+  private static final String SERVER_ADMIN_REQUEST_TIMEOUT_SECONDS = "server.request.timeoutSeconds";
+
   private static final int DEFAULT_RETENTION_CONTROLLER_FREQUENCY_IN_SECONDS = 6 * 60 * 60; // 6 Hours.
   private static final int DEFAULT_VALIDATION_CONTROLLER_FREQUENCY_IN_SECONDS = 60 * 60; // 1 Hour.
   private static final int DEFAULT_STATUS_CONTROLLER_FREQUENCY_IN_SECONDS = 5 * 60; // 5 minutes
   private static final long DEFAULT_EXTERNAL_VIEW_ONLINE_TO_OFFLINE_TIMEOUT_MILLIS = 120_000L; // 2 minutes
+  private static final int DEFAULT_SERVER_ADMIN_REQUEST_TIMEOUT_SECONDS = 30;
 
   public ControllerConf(File file) throws ConfigurationException {
     super(file);
@@ -199,5 +197,16 @@ public class ControllerConf extends PropertiesConfiguration {
 
   public void setTenantIsolationEnabled(boolean isSingleTenant) {
     setProperty(CLUSTER_TENANT_ISOLATION_ENABLE, isSingleTenant);
+  }
+
+  public void setServerAdminRequestTimeoutSeconds(int timeoutSeconds) {
+    setProperty(SERVER_ADMIN_REQUEST_TIMEOUT_SECONDS, timeoutSeconds);
+  }
+
+  public int getServerAdminRequestTimeoutSeconds() {
+    if (containsKey(SERVER_ADMIN_REQUEST_TIMEOUT_SECONDS)) {
+      getInt(SERVER_ADMIN_REQUEST_TIMEOUT_SECONDS);
+    }
+    return DEFAULT_SERVER_ADMIN_REQUEST_TIMEOUT_SECONDS;
   }
 }

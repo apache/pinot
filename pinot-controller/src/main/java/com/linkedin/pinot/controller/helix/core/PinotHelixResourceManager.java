@@ -15,6 +15,9 @@
  */
 package com.linkedin.pinot.controller.helix.core;
 
+import com.google.common.base.Preconditions;
+import com.google.common.collect.BiMap;
+import com.google.common.collect.HashBiMap;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -24,6 +27,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nonnull;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.Predicate;
 import org.apache.helix.AccessOption;
@@ -1015,7 +1019,7 @@ public class PinotHelixResourceManager {
       String brokerTenant =
           ControllerTenantNameBuilder.getBrokerTenantNameForTenant(tableConfig.getTenantConfig().getBroker());
       if (_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, brokerTenant).isEmpty()) {
-        throw new RuntimeException("broker tenant : " + tableConfig.getTenantConfig().getBroker() + " is not existed!");
+        throw new RuntimeException("broker tenant : " + tableConfig.getTenantConfig().getBroker() + " does not exist");
       }
       LOGGER.info("Trying to update BrokerDataResource IdealState!");
       final IdealState idealState =
@@ -1732,5 +1736,28 @@ public class PinotHelixResourceManager {
 
   public List<String> getOnlineInstanceList() {
     return _helixDataAccessor.getChildNames(_keyBuilder.liveInstances());
+  }
+
+  /**
+   * Provides admin endpoints for the provided data instances
+   * @param instances instances for which to read endpoints
+   * @return returns map of instances to their admin endpoints.
+   * The return value is a bimap because admin instances are typically used for
+   * http requests. So, on response, we need mapping from the endpoint to the
+   * server instances. With BiMap, both mappings are easily available
+   */
+  public @Nonnull
+  BiMap<String, String> getDataInstanceAdminEndpoints(@Nonnull Set<String> instances) {
+    Preconditions.checkNotNull(instances);
+    BiMap<String, String> endpointToInstance = HashBiMap.create(instances.size());
+    for (String instance : instances) {
+      InstanceConfig helixInstanceConfig = getHelixInstanceConfig(instance);
+      ZNRecord record = helixInstanceConfig.getRecord();
+      String[] hostnameSplit = helixInstanceConfig.getHostName().split("_");
+      Preconditions.checkState(hostnameSplit.length >= 2);
+      String port = record.getSimpleField(CommonConstants.Helix.Instance.ADMIN_PORT_KEY);
+      endpointToInstance.put(instance, hostnameSplit[1] + ":" + port);
+    }
+    return endpointToInstance;
   }
 }

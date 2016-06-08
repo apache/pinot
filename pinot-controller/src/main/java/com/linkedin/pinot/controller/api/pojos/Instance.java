@@ -15,21 +15,16 @@
  */
 package com.linkedin.pinot.controller.api.pojos;
 
-import java.util.Objects;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.linkedin.pinot.common.utils.CommonConstants;
 import org.apache.helix.model.InstanceConfig;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.StringUtil;
-
-
 /**
  * Instance POJO, used as part of the API to create instances.
  */
-
 public class Instance {
   private final String _host;
   private final String _port;

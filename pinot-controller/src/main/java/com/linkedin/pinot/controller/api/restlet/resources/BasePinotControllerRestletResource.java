@@ -6,6 +6,9 @@ import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import java.util.Map;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.Executor;
+import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.restlet.Response;
 import org.restlet.engine.header.Header;
@@ -50,6 +53,9 @@ public class BasePinotControllerRestletResource extends ServerResource {
   protected final ControllerConf _controllerConf;
   protected final PinotHelixResourceManager _pinotHelixResourceManager;
 
+  protected final Executor executor;
+  protected final HttpConnectionManager connectionManager;
+
   private static String getHostName() {
     if (controllerHostName != null) {
       return controllerHostName;
@@ -76,12 +82,13 @@ public class BasePinotControllerRestletResource extends ServerResource {
   }
 
   public BasePinotControllerRestletResource() {
-    _controllerConf =
-        (ControllerConf) getApplication().getContext().getAttributes().get(ControllerConf.class.toString());
+    ConcurrentMap<String, Object> appAttributes = getApplication().getContext().getAttributes();
 
+    _controllerConf = (ControllerConf) appAttributes.get(ControllerConf.class.toString());
     _pinotHelixResourceManager =
-        (PinotHelixResourceManager) getApplication().getContext().getAttributes()
-            .get(PinotHelixResourceManager.class.toString());
+        (PinotHelixResourceManager) appAttributes.get(PinotHelixResourceManager.class.toString());
+    connectionManager = (HttpConnectionManager) appAttributes.get(HttpConnectionManager.class.toString());
+    executor = (Executor) appAttributes.get(Executor.class.toString());
   }
 
   /**
@@ -90,8 +97,9 @@ public class BasePinotControllerRestletResource extends ServerResource {
    * @return True if state is one of {enable|disable|drop}, false otherwise.
    */
   protected static boolean isValidState(String state) {
-    return (StateType.ENABLE.name().equalsIgnoreCase(state) || StateType.DISABLE.name().equalsIgnoreCase(state) || StateType.DROP
-        .name().equalsIgnoreCase(state));
+    return (StateType.ENABLE.name().equalsIgnoreCase(state) ||
+        StateType.DISABLE.name().equalsIgnoreCase(state) ||
+        StateType.DROP.name().equalsIgnoreCase(state));
   }
 
   /**

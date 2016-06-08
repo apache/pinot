@@ -78,13 +78,13 @@ public class HelixServerStarter {
       throws Exception {
     _helixClusterName = helixClusterName;
     _pinotHelixProperties = pinotHelixProperties;
-
+    String hostname = pinotHelixProperties.getString(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST,
+        NetUtil.getHostAddress());
     _instanceId =
         pinotHelixProperties.getString(
             "instanceId",
             CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE
-                + pinotHelixProperties.getString(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST,
-                    NetUtil.getHostAddress())
+                + hostname
                 + "_"
                 + pinotHelixProperties.getInt(CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT,
                     CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT));
@@ -111,7 +111,12 @@ public class HelixServerStarter {
         stateModelFactory);
     _helixAdmin = _helixManager.getClusterManagmentTool();
     addInstanceTagIfNeeded(helixClusterName, _instanceId);
-    setShuttingDownStatus(false);
+    // Start restlet server for admin API endpoint
+    int adminApiPort = pinotHelixProperties.getInt(CommonConstants.Server.CONFIG_OF_ADMIN_API_PORT,
+        Integer.parseInt(CommonConstants.Server.DEFAULT_ADMIN_API_PORT));
+    adminApiService = new AdminApiService(_serverInstance);
+    adminApiService.start(adminApiPort);
+    updateInstanceConfigInHelix(adminApiPort, false/*shutDownStatus*/);
 
     // Register message handler factory
     SegmentMessageHandlerFactory messageHandlerFactory = new SegmentMessageHandlerFactory(fetcherAndLoader);
@@ -160,20 +165,28 @@ public class HelixServerStarter {
               }
             });
 
-    // Start restlet server for admin API endpoint
-    int adminApiPort = pinotHelixProperties.getInt(CommonConstants.Server.CONFIG_OF_ADMIN_API_PORT,
-        Integer.parseInt(CommonConstants.Server.DEFAULT_ADMIN_API_PORT));
-    adminApiService = new AdminApiService(_serverInstance);
-    adminApiService.start(adminApiPort);
+
   }
 
-  private void setShuttingDownStatus(boolean shuttingDown) {
-    HelixConfigScope scope =
-        new HelixConfigScopeBuilder(ConfigScopeProperty.PARTICIPANT, _helixClusterName).forParticipant(_instanceId)
-            .build();
+  private void updateInstanceConfigInHelix(int adminApiPort, boolean shuttingDown) {
     Map<String, String> propToUpdate = new HashMap<String, String>();
     propToUpdate.put(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, String.valueOf(shuttingDown));
-    _helixAdmin.setConfig(scope, propToUpdate);
+    propToUpdate.put(CommonConstants.Helix.Instance.ADMIN_PORT_KEY, String.valueOf(adminApiPort));
+    updateInstanceConfigInHelix(propToUpdate);
+  }
+
+  private void setShuttingDownStatus(boolean shuttingDownStatus) {
+    Map<String, String> propToUpdate = new HashMap<String, String>();
+    propToUpdate.put(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, String.valueOf(shuttingDownStatus));
+    updateInstanceConfigInHelix(propToUpdate);
+  }
+
+  private void updateInstanceConfigInHelix(Map<String, String> props) {
+    HelixConfigScope scope =
+        new HelixConfigScopeBuilder(ConfigScopeProperty.PARTICIPANT, _helixClusterName)
+            .forParticipant(_instanceId)
+            .build();
+    _helixAdmin.setConfig(scope, props);
   }
 
   private void addInstanceTagIfNeeded(String clusterName, String instanceName) {
