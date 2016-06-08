@@ -30,8 +30,8 @@ import com.linkedin.pinot.core.data.manager.offline.TableDataManager;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.server.starter.ServerInstance;
 import java.io.IOException;
-import javax.ws.rs.Produces;
 import org.codehaus.jackson.map.ObjectMapper;
+import org.restlet.data.MediaType;
 import org.restlet.data.Status;
 import org.restlet.representation.Representation;
 import org.restlet.representation.StringRepresentation;
@@ -64,7 +64,6 @@ public class TableSizeResource extends ServerResource {
   @Description("Lists size of all the segments of the table")
   @Summary("Show table storage size")
   @Paths({"/table/{tableName}/size"})
-  @Produces("application/json")
   public StringRepresentation getTableSize(
       @Parameter(name="tableName", in = "path", description = "Table name (Ex: myTable_OFFLINE)")
       String tableName,
@@ -80,8 +79,7 @@ public class TableSizeResource extends ServerResource {
 
     TableDataManager tableDataManager = dataManager.getTableDataManager(tableName);
     if (tableDataManager == null) {
-      setStatus(Status.CLIENT_ERROR_NOT_FOUND);
-      return new StringRepresentation("{\"message\" : \"Table " + tableName +
+      return responseRepresentation(Status.CLIENT_ERROR_NOT_FOUND,"{\"message\" : \"Table " + tableName +
           " is not found\"}");
     }
     TableSizeInfo tableSizeInfo = new TableSizeInfo();
@@ -109,8 +107,13 @@ public class TableSizeResource extends ServerResource {
     try {
       return new StringRepresentation(new ObjectMapper().writeValueAsString(tableSizeInfo));
     } catch (IOException e) {
-      setStatus(Status.SERVER_ERROR_INTERNAL);
-      return new StringRepresentation("{\"message\": \"Failed to convert data to json\"}");
+      return responseRepresentation(Status.SERVER_ERROR_INTERNAL,"{\"message\": \"Failed to convert data to json\"}");
     }
+  }
+  private StringRepresentation responseRepresentation(Status status, String msg) {
+    setStatus(status);
+    StringRepresentation repr = new StringRepresentation(msg);
+    repr.setMediaType(MediaType.APPLICATION_JSON);
+    return repr;
   }
 }
