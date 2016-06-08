@@ -143,7 +143,7 @@ public class ControllerRestApplication extends PinotRestletApplication {
     webdir.setIndexName("index.html");
     router.attach("/query", webdir);
 
-    final Directory swaggerUiDir = new Directory(getContext(), getClass().getClassLoader().getResource("META-INF/resources/webjars/swagger-ui/2.1.8-M1").toString());
+    final Directory swaggerUiDir = new Directory(getContext(), getClass().getClassLoader().getResource("META-INF/resources/webjars/swagger-ui/2.1.4").toString());
     swaggerUiDir.setDeeplyAccessible(true);
     router.attach("/swagger-ui", swaggerUiDir);
 
