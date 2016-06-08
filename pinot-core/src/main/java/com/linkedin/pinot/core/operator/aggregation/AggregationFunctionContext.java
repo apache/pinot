@@ -15,49 +15,26 @@
  */
 package com.linkedin.pinot.core.operator.aggregation;
 
-import com.linkedin.pinot.core.common.BlockValSet;
-import com.linkedin.pinot.core.common.DataSource;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunction;
 import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunctionFactory;
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
 
 /**
  * This class caches miscellaneous data to perform efficient aggregation.
  */
 public class AggregationFunctionContext {
-  private final String _aggFuncName;
   private final AggregationFunction _aggregationFunction;
   private final String[] _aggrColumns;
-
-  private BlockValSet[] _blockSingleValSet;
-  private Dictionary[] _dictionaries;
 
   /**
    * Constructor for the class.
    *
-   * @param indexSegment
    * @param aggFuncName
-   * @param columns
+   * @param aggrColumns
    */
-  public AggregationFunctionContext(IndexSegment indexSegment, String aggFuncName, String[] columns) {
-    _aggFuncName = aggFuncName.toLowerCase();
-    _aggregationFunction = AggregationFunctionFactory.getAggregationFunction(_aggFuncName);
-    _aggrColumns = columns;
-
-    if (_aggFuncName.equals(AggregationFunctionFactory.COUNT_AGGREGATION_FUNCTION)) {
-      return;
-    }
-
-    _blockSingleValSet = new BlockValSet[columns.length];
-    _dictionaries = new Dictionary[columns.length];
-
-    for (int i = 0; i < columns.length; i++) {
-      DataSource dataSource = indexSegment.getDataSource(columns[i]);
-      _dictionaries[i] = dataSource.getDictionary();
-      _blockSingleValSet[i] = dataSource.getNextBlock().getBlockValueSet();
-    }
+  public AggregationFunctionContext(String aggFuncName, String[] aggrColumns) {
+    _aggregationFunction = AggregationFunctionFactory.getAggregationFunction(aggFuncName);
+    _aggrColumns = aggrColumns;
   }
 
   /**
@@ -69,42 +46,10 @@ public class AggregationFunctionContext {
   }
 
   /**
-   * Returns the aggregation function name.
-   * @return
-   */
-  public String getFunctionName() {
-    return _aggFuncName;
-  }
-
-  /**
    * Returns an array of aggregation column names.
    * @return
    */
   public String[] getAggregationColumns() {
     return _aggrColumns;
-  }
-
-  /**
-   * Returns the value-set of aggregation column for the given index.
-   * Assumes caller passes a valid value that can be indexed into the
-   * _aggrColumns array.
-   *
-   * @param index
-   * @return
-   */
-  public BlockValSet getBlockValSet(int index) {
-    return _blockSingleValSet[index];
-  }
-
-  /**
-   * Returns the dictionary for the column corresponding to the specified index.
-   * Assumes caller passes a valid value that can be indexed into that _aggrColumns
-   * array.
-   *
-   * @param index
-   * @return
-   */
-  public Dictionary getDictionary(int index) {
-    return _dictionaries[index];
   }
 }

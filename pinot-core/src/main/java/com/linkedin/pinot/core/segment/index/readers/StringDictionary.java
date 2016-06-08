@@ -106,12 +106,22 @@ public class StringDictionary extends ImmutableDictionaryReader {
   public void readDoubleValues(int[] dictionaryIds, int startPos, int limit, double[] outValues, int outStartPos) {
     throw new RuntimeException("Can not convert string to double");
   }
+
   @Override
   public void readStringValues(int[] dictionaryIds, int startPos, int limit, String[] outValues, int outStartPos) {
     dataFileReader.readStringValues(dictionaryIds, 0/*column*/, startPos, limit, outValues, outStartPos);
+    int outEndPos = outStartPos + limit;
+    for (int i = outStartPos; i < outEndPos; i++) {
+      String val = outValues[i];
+      byte[] bytes = val.getBytes(UTF_8);
+      for (int j = 0; j < lengthofMaxEntry; j++) {
+        if (bytes[j] == STRING_PAD_CHAR) {
+          outValues[i] = new String(bytes, 0, j, UTF_8);
+          break;
+        }
+      }
+    }
   }
-
-
 
   private String getString(int dictionaryId) {
     return dataFileReader.getString(dictionaryId, 0);
