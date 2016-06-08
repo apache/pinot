@@ -19,8 +19,6 @@ import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.GroupBy;
 import com.linkedin.pinot.core.common.DataFetcher;
-import com.linkedin.pinot.core.common.DataSource;
-import com.linkedin.pinot.core.common.DataSourceMetadata;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.aggregation.AggregationFunctionContext;
 import com.linkedin.pinot.core.operator.aggregation.ResultHolderFactory;
@@ -59,21 +57,20 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
    * @param indexSegment
    * @param aggregationInfoList
    * @param groupBy
-   * @param maxNumGroupKeys
    */
-  public DefaultGroupByExecutor(IndexSegment indexSegment, List<AggregationInfo> aggregationInfoList, GroupBy groupBy,
-      int maxNumGroupKeys) {
+  public DefaultGroupByExecutor(IndexSegment indexSegment, List<AggregationInfo> aggregationInfoList, GroupBy groupBy) {
     Preconditions.checkNotNull(indexSegment);
     Preconditions.checkNotNull(aggregationInfoList);
     Preconditions.checkArgument(aggregationInfoList.size() > 0);
     Preconditions.checkNotNull(groupBy);
-    Preconditions.checkArgument(maxNumGroupKeys > 0);
 
     DataFetcher dataFetcher = new DataFetcher(indexSegment);
     _singleValueBlockCache = new SingleValueBlockCache(dataFetcher);
     List<String> groupByColumnList = groupBy.getColumns();
     String[] groupByColumns = groupByColumnList.toArray(new String[groupByColumnList.size()]);
-    _groupKeyGenerator = new DefaultGroupKeyGenerator(dataFetcher, groupByColumns, maxNumGroupKeys);
+    _groupKeyGenerator = new DefaultGroupKeyGenerator(dataFetcher, groupByColumns);
+    int maxNumResults = _groupKeyGenerator.getGlobalGroupKeyUpperBound();
+    _hasMultiValuedColumns = _groupKeyGenerator.hasMultiValueGroupByColumn();
 
     _numAggrFunc = aggregationInfoList.size();
     _aggrFuncContextArray = new AggregationFunctionContext[_numAggrFunc];
@@ -85,10 +82,8 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
           new AggregationFunctionContext(aggregationInfo.getAggregationType(), columns);
       _aggrFuncContextArray[i] = aggregationFunctionContext;
       AggregationFunction aggregationFunction = aggregationFunctionContext.getAggregationFunction();
-      _resultHolderArray[i] = ResultHolderFactory.getGroupByResultHolder(aggregationFunction, maxNumGroupKeys);
+      _resultHolderArray[i] = ResultHolderFactory.getGroupByResultHolder(aggregationFunction, maxNumResults);
     }
-
-    _hasMultiValuedColumns = hasMultiValueGroupByColumns(indexSegment, groupByColumns);
   }
 
   /**
@@ -129,10 +124,10 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     _singleValueBlockCache.initNewBlock(docIdSet, startIndex, length);
 
     generateGroupKeysForDocIdSet(docIdSet, startIndex, length);
-    int numGroupKeys = _groupKeyGenerator.getNumGroupKeys();
+    int capacityNeeded = _groupKeyGenerator.getCurrentGroupKeyUpperBound();
 
     for (int i = 0; i < _numAggrFunc; i++) {
-      _resultHolderArray[i].ensureCapacity(numGroupKeys);
+      _resultHolderArray[i].ensureCapacity(capacityNeeded);
       aggregateColumn(_aggrFuncContextArray[i], _resultHolderArray[i], length);
     }
   }
@@ -212,25 +207,6 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
       resultDataTypeArray[i] = aggregationFunction.getResultDataType();
     }
     return new AggregationGroupByResult(_groupKeyGenerator, _resultHolderArray, resultDataTypeArray);
-  }
-
-  /**
-   * Returns true if any of the group-by columns are multi-valued, false otherwise.
-   *
-   * @param indexSegment
-   * @param groupByColumns
-   * @return
-   */
-  private static boolean hasMultiValueGroupByColumns(IndexSegment indexSegment, String[] groupByColumns) {
-    for (String groupByColumn : groupByColumns) {
-      DataSource dataSource = indexSegment.getDataSource(groupByColumn);
-      DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
-
-      if (!dataSourceMetadata.isSingleValue()) {
-        return true;
-      }
-    }
-    return false;
   }
 
   /**
