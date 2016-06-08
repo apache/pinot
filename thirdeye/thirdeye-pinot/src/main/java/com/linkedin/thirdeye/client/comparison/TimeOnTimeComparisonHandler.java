@@ -148,9 +148,4 @@ public class TimeOnTimeComparisonHandler {
     return queryCache.getClient();
   }
 
-  public static void main(String[] args) {
-    long x = (long) (1 << 48 - 1);
-    System.out.println(x);
-    System.out.println(Double.parseDouble("" + x));
-  }
 }
