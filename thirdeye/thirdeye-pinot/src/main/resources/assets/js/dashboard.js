@@ -77,7 +77,7 @@ $(document).ready( function() {
     var result_form_template = HandleBarsTemplates.template_form(timseries_section_options)
     $("#timeseries-section #form-area").append(result_form_template);
 
-    /* Hiding anomalies till it's ready for production
+    /* Hiding anomalies till it's ready for production*/
     //ANOMALIES
     var anomalies_section_options = {
         tabName: "anomalies",
@@ -92,7 +92,7 @@ $(document).ready( function() {
     }
 
     var result_form_template = HandleBarsTemplates.template_form(anomalies_section_options)
-    $("#anomalies-section #form-area").append(result_form_template);*/
+    $("#anomalies-section #form-area").append(result_form_template);
 
 
     //Global object with the query params

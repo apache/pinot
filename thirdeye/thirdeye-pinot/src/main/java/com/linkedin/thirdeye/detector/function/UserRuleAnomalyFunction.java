@@ -105,7 +105,7 @@ public class UserRuleAnomalyFunction extends BaseAnomalyFunction {
         anomalyResult.setFunctionId(getSpec().getId());
         anomalyResult.setProperties(getSpec().getProperties());
         anomalyResult.setStartTimeUtc(currentKey);
-        anomalyResult.setEndTimeUtc(null); // point-in-time
+        anomalyResult.setEndTimeUtc(currentKey + bucketMillis); // point-in-time
         anomalyResult.setScore(calculatePercentChange(currentValue, baselineValue));
         anomalyResult.setWeight(averageValue);
         String message =
