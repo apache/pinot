@@ -20,6 +20,7 @@ import java.util.List;
 import com.linkedin.pinot.common.metrics.ControllerMeter;
 import com.linkedin.pinot.controller.api.ControllerRestApplication;
 import org.apache.commons.lang3.exception.ExceptionUtils;
+import org.apache.helix.model.InstanceConfig;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -134,10 +135,7 @@ public class PinotInstanceRestletResource extends BasePinotControllerRestletReso
   /**
    * URI mapping:
    * "/instances", "/instances/" : Lists all the instances
-   * "/instances/{instanceName}/state?={state}":
-   * - state = 'enable'  : Enable the instanceName
-   * - state = 'disable' : Disable the instanceName
-   * - state = 'drop'    : Drop the instanceName
+   * "/instances/{instanceName}" : Gets information about an instance
    *
    * {@inheritDoc}
    * @see org.restlet.resource.ServerResource#get()
@@ -152,8 +150,7 @@ public class PinotInstanceRestletResource extends BasePinotControllerRestletReso
       if (instanceName == null) {
         presentation = getAllInstances();
       } else {
-        setStatus(Status.CLIENT_ERROR_NOT_FOUND);
-        presentation = new StringRepresentation("Error: Instance " + instanceName + " not found.");
+        presentation = getInstanceInformation(instanceName);
       }
 
     } catch (final Exception e) {
@@ -163,6 +160,50 @@ public class PinotInstanceRestletResource extends BasePinotControllerRestletReso
       setStatus(Status.SERVER_ERROR_INTERNAL);
     }
     return presentation;
+  }
+
+  /**
+   * Gets the information for an instance.
+   *
+   * @param instanceName The instance name
+   */
+  @HttpVerb("get")
+  @Summary("Gets information for an instance")
+  @Tags({ "instance" })
+  @Paths({ "/instances/{instanceName}", "/instances/{instanceName}/" })
+  @Responses({
+      @Response(statusCode = "200", description = "Information about the specified instance"),
+      @Response(statusCode = "404", description = "The specified instance does not exist"),
+      @Response(statusCode = "500", description = "There was an error while fetching information for the given instance")
+  })
+  private Representation getInstanceInformation(
+      @Parameter(
+          name = "instanceName",
+          description = "The name of the instance (eg. Server_1.2.3.4_1234 or Broker_someHost.example.com_2345)",
+          in = "path",
+          required = true)
+      String instanceName) {
+    try {
+      if (!_pinotHelixResourceManager.instanceExists(instanceName)) {
+        setStatus(Status.CLIENT_ERROR_NOT_FOUND);
+        return new StringRepresentation("Error: Instance " + instanceName + " not found.");
+      }
+
+      InstanceConfig instanceConfig = _pinotHelixResourceManager.getHelixInstanceConfig(instanceName);
+
+      JSONObject response = new JSONObject();
+      response.put("instanceName", instanceConfig.getInstanceName());
+      response.put("hostName", instanceConfig.getHostName());
+      response.put("enabled", instanceConfig.getInstanceEnabled());
+      response.put("port", instanceConfig.getPort());
+      response.put("tags", new JSONArray(instanceConfig.getTags()));
+
+      return new StringRepresentation(response.toString());
+    } catch (Exception e) {
+      LOGGER.warn("Caught exception while fetching information for instance {}", instanceName, e);
+      setStatus(Status.SERVER_ERROR_INTERNAL);
+      return new StringRepresentation("{}");
+    }
   }
 
   /**

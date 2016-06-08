@@ -1,8 +1,10 @@
 package com.linkedin.pinot.controller.restlet.resources;
 
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
 import com.linkedin.pinot.controller.helix.ControllerTest;
 import java.io.IOException;
+import java.util.Collections;
 import org.json.JSONObject;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -74,5 +76,46 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
     instanceList = new JSONObject(sendGetRequest(urlBuilder.forInstanceList()));
     assertEquals(instanceList.getJSONArray("instances").length(), 4,
         "Expected two instances after creation of duplicate instances");
+
+    // Check that the instances are properly created
+    JSONObject instance = new JSONObject(sendGetRequest(urlBuilder.forInstanceInformation("Broker_1.2.3.4_1234")));
+    assertEquals(instance.get("instanceName"), "Broker_1.2.3.4_1234");
+    assertEquals(instance.get("hostName"), "1.2.3.4");
+    assertEquals(instance.get("port"), "1234");
+    assertEquals(instance.get("enabled"), true);
+    assertEquals(instance.getJSONArray("tags").length(), 1);
+    assertEquals(instance.getJSONArray("tags").get(0), CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE);
+
+    instance = new JSONObject(sendGetRequest(urlBuilder.forInstanceInformation("Server_1.2.3.4_2345")));
+    assertEquals(instance.get("instanceName"), "Server_1.2.3.4_2345");
+    assertEquals(instance.get("hostName"), "1.2.3.4");
+    assertEquals(instance.get("port"), "2345");
+    assertEquals(instance.get("enabled"), true);
+    assertEquals(instance.getJSONArray("tags").length(), 1);
+    assertEquals(instance.getJSONArray("tags").get(0), CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE);
+
+    instance = new JSONObject(sendGetRequest(urlBuilder.forInstanceInformation("Broker_2.3.4.5_1234")));
+    assertEquals(instance.get("instanceName"), "Broker_2.3.4.5_1234");
+    assertEquals(instance.get("hostName"), "2.3.4.5");
+    assertEquals(instance.get("port"), "1234");
+    assertEquals(instance.get("enabled"), true);
+    assertEquals(instance.getJSONArray("tags").length(), 1);
+    assertEquals(instance.getJSONArray("tags").get(0), "someTag");
+
+    instance = new JSONObject(sendGetRequest(urlBuilder.forInstanceInformation("Server_2.3.4.5_2345")));
+    assertEquals(instance.get("instanceName"), "Server_2.3.4.5_2345");
+    assertEquals(instance.get("hostName"), "2.3.4.5");
+    assertEquals(instance.get("port"), "2345");
+    assertEquals(instance.get("enabled"), true);
+    assertEquals(instance.getJSONArray("tags").length(), 1);
+    assertEquals(instance.getJSONArray("tags").get(0), "someTag");
+
+    // Check that an error is given for an instance that does not exist
+    try {
+      sendGetRequest(urlBuilder.forInstanceInformation("Server_potato_8126"));
+      fail("Request to get instance information for an instance that does not exist did not fail");
+    } catch (IOException e) {
+      // Expected
+    }
   }
 }
