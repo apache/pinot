@@ -15,13 +15,17 @@
  */
 package com.linkedin.pinot.common.restlet.swagger;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.linkedin.pinot.common.restlet.PinotRestletApplication;
 import java.lang.annotation.Annotation;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 
+import java.util.Set;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -170,7 +174,12 @@ public class SwaggerResource extends ServerResource {
 
         ArrayList<JSONObject> parameters = new ArrayList<JSONObject>();
 
-        for (Annotation[] annotations : method.getParameterAnnotations()) {
+        Annotation[][] parameterAnnotations = method.getParameterAnnotations();
+        Class<?>[] parameterTypes = method.getParameterTypes();
+        for (int i = 0; i < parameterTypes.length; i++) {
+          Class<?> parameterType = parameterTypes[i];
+          Annotation[] annotations = parameterAnnotations[i];
+
           if (annotations.length != 0) {
             JSONObject parameter = new JSONObject();
             for (Annotation annotation : annotations) {
@@ -181,8 +190,29 @@ public class SwaggerResource extends ServerResource {
                 if (parameterAnnotation.description() != null) {
                   parameter.put("description", parameterAnnotation.description());
                 }
-                parameter.put("type", "string");
                 parameter.put("required", parameterAnnotation.required());
+
+                if (parameterType.equals(String.class)) {
+                  parameter.put("type", "string");
+                } else if (parameterType.equals(Boolean.class) || parameterType.equals(Boolean.TYPE)) {
+                  parameter.put("type", "boolean");
+                } else if (parameterType.equals(Integer.class) || parameterType.equals(Integer.TYPE)) {
+                  parameter.put("type", "integer");
+                } else if (parameterType.equals(Long.class) || parameterType.equals(Long.TYPE)) {
+                  // Long maps to integer type in http://swagger.io/specification/#dataTypeFormat
+                  parameter.put("type", "integer");
+                } else if (parameterType.equals(Float.class) || parameterType.equals(Float.TYPE)) {
+                  parameter.put("type", "boolean");
+                } else if (parameterType.equals(Double.class) || parameterType.equals(Double.TYPE)) {
+                  parameter.put("type", "double");
+                } else if (parameterType.equals(Byte.class) || parameterType.equals(Byte.TYPE)) {
+                  // Byte maps to string type in http://swagger.io/specification/#dataTypeFormat
+                  parameter.put("type", "string");
+                } else if (isDocumentableType(parameterType)) {
+                  parameter.put("schema", schemaForType(parameterType));
+                } else {
+                  parameter.put("type", "string");
+                }
               }
             }
 
@@ -195,6 +225,93 @@ public class SwaggerResource extends ServerResource {
         operation.put("parameters", parameters.toArray(new JSONObject[parameters.size()]));
       }
     }
+  }
+
+  private JSONObject schemaForType(Class<?> type) {
+    try {
+      JSONObject schema = new JSONObject();
+
+      schema.put("type", "object");
+      schema.put("title", type.getSimpleName());
+
+      Example example = type.getAnnotation(Example.class);
+      if (example != null) {
+        schema.put("example", new JSONObject(example.value()));
+      }
+
+      for (Constructor<?> constructor : type.getConstructors()) {
+        if (constructor.isAnnotationPresent(JsonCreator.class)) {
+          JSONObject properties = new JSONObject();
+          JSONArray required = new JSONArray();
+
+          Annotation[][] parameterAnnotations = constructor.getParameterAnnotations();
+          Class<?>[] parameterTypes = constructor.getParameterTypes();
+          for (int i = 0; i < parameterTypes.length; i++) {
+            Class<?> parameterType = parameterTypes[i];
+            Annotation[] annotations = parameterAnnotations[i];
+
+            if (annotations.length != 0) {
+              for (Annotation annotation : annotations) {
+                if (annotation instanceof JsonProperty) {
+                  JsonProperty jsonPropertyAnnotation = (JsonProperty) annotation;
+                  JSONObject parameter = new JSONObject();
+                  properties.put(jsonPropertyAnnotation.value(), parameter);
+
+                  if (parameterType.equals(String.class)) {
+                    parameter.put("type", "string");
+                  } else if (parameterType.equals(Boolean.class) || parameterType.equals(Boolean.TYPE)) {
+                    parameter.put("type", "boolean");
+                  } else if (parameterType.equals(Integer.class) || parameterType.equals(Integer.TYPE)) {
+                    parameter.put("type", "integer");
+                  } else if (parameterType.equals(Long.class) || parameterType.equals(Long.TYPE)) {
+                    // Long maps to integer type in http://swagger.io/specification/#dataTypeFormat
+                    parameter.put("type", "integer");
+                  } else if (parameterType.equals(Float.class) || parameterType.equals(Float.TYPE)) {
+                    parameter.put("type", "boolean");
+                  } else if (parameterType.equals(Double.class) || parameterType.equals(Double.TYPE)) {
+                    parameter.put("type", "double");
+                  } else if (parameterType.equals(Byte.class) || parameterType.equals(Byte.TYPE)) {
+                    // Byte maps to string type in http://swagger.io/specification/#dataTypeFormat
+                    parameter.put("type", "string");
+                  } else {
+                    parameter.put("type", "string");
+                  }
+
+                  if (jsonPropertyAnnotation.required()) {
+                    required.put(jsonPropertyAnnotation.value());
+                  }
+                }
+              }
+            }
+          }
+
+          if (required.length() != 0) {
+            schema.put("required", required);
+          }
+
+          schema.put("properties", properties);
+          break;
+        }
+      }
+
+      return schema;
+    } catch (Exception e) {
+      return new JSONObject();
+    }
+  }
+
+  private boolean isDocumentableType(Class<?> clazz) {
+    Constructor<?>[] constructors = clazz.getDeclaredConstructors();
+    for (Constructor<?> constructor : constructors) {
+      Annotation[] constructorAnnotations = constructor.getDeclaredAnnotations();
+      for (Annotation constructorAnnotation : constructorAnnotations) {
+        if (constructorAnnotation instanceof JsonCreator) {
+          return true;
+        }
+      }
+    }
+
+    return false;
   }
 
   private void addTag(JSONArray tags, String tagName, String description) throws JSONException {
