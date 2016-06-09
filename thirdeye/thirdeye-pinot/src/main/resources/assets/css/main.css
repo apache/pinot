@@ -408,7 +408,7 @@ body a{
 
 .contributors-table .contributors-table-date{
     font-weight: 600;
-    width: 150px;
+    white-space: nowrap;
 }
 
 .contributors-table table tr td:first-child {

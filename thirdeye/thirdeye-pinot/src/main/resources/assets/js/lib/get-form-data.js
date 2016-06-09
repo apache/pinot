@@ -171,10 +171,19 @@ function getDatasetConfig() {
         var currentStartDateString = currentStartDateTime.format("YYYY-MM-DD");
         var currentStartTimeString = currentStartDateTime.format("HH" + ":00");
 
+        //If time granularity is DAYS have default 12am on pageload
+        if(data["dataGranularity"] && data["dataGranularity"] == "DAYS"){
+            currentStartTimeString = "00:00";
+        }
+
         //Max date time
         var currentEndDateTime = moment(maxMillis);
         var currentEndDateString = currentEndDateTime.format("YYYY-MM-DD");
         var currentEndTimeString = currentEndDateTime.format("HH:00");
+        //If time granularity is DAYS have default 12am on pageload
+        if(data["dataGranularity"] && data["dataGranularity"] == "DAYS"){
+            currentEndTimeString = "00:00";
+        }
 
         //Populate WoW date
         var baselineStartDateTime = currentStartDateTime.add(-7,'days');
@@ -272,6 +281,8 @@ function getDatasetConfig() {
                     $(".baseline-aggregate[unit='HOURS']").removeClass("uk-active");
                     $(".baseline-aggregate[unit='DAYS']").addClass("uk-active");
                     $(".granularity-btn-group").removeClass("vertical");
+
+
 
                 break;
                 default:
