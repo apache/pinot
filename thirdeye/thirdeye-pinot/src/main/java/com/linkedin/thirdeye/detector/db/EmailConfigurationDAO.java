@@ -1,12 +1,13 @@
 package com.linkedin.thirdeye.detector.db;
 
-import io.dropwizard.hibernate.AbstractDAO;
-
 import java.util.List;
 
 import org.hibernate.SessionFactory;
 
+import com.linkedin.thirdeye.detector.api.AnomalyFunctionSpec;
 import com.linkedin.thirdeye.detector.api.EmailConfiguration;
+
+import io.dropwizard.hibernate.AbstractDAO;
 
 public class EmailConfigurationDAO extends AbstractDAO<EmailConfiguration> {
   public EmailConfigurationDAO(SessionFactory sessionFactory) {
@@ -30,4 +31,24 @@ public class EmailConfigurationDAO extends AbstractDAO<EmailConfiguration> {
   public List<EmailConfiguration> findAll() {
     return list(namedQuery("com.linkedin.thirdeye.api.EmailConfiguration#findAll"));
   }
+
+  /*
+   * These methods are provided as an alternative to EmailFunctionDependencyDAO
+   */
+  public EmailConfiguration addFunctionDependency(EmailConfiguration emailConfiguration,
+      AnomalyFunctionSpec functionSpec) {
+    List<AnomalyFunctionSpec> dependencies = emailConfiguration.getFunctions();
+    if (!dependencies.contains(functionSpec)) {
+      dependencies.add(functionSpec);
+    }
+    return persist(emailConfiguration);
+  }
+
+  public EmailConfiguration deleteFunctionDependency(EmailConfiguration emailConfiguration,
+      AnomalyFunctionSpec functionSpec) {
+    List<AnomalyFunctionSpec> dependencies = emailConfiguration.getFunctions();
+    dependencies.remove(functionSpec);
+    return persist(emailConfiguration);
+  }
+
 }

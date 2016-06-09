@@ -262,4 +262,55 @@
                           tableName="email_configurations"/>
   </changeSet>
 
+  <changeSet id="9" author="jteoh">
+    <!-- Function dependencies for each email report -->
+    <createTable tableName="email_function_dependencies">
+      <column name="email_id" type="bigint">
+      </column>
+      <column name="function_id" type="bigint">
+      </column>
+    </createTable>
+    <sql dbms="mysql">
+      ALTER TABLE email_configurations ENGINE = InnoDb;
+      ALTER TABLE anomaly_functions ENGINE = InnoDb;
+      ALTER TABLE email_function_dependencies ENGINE = InnoDb;
+      <comment>Required for multiple foreign keys</comment>
+    </sql>
+    <addPrimaryKey
+      tableName="email_function_dependencies"
+      columnNames="email_id, function_id"
+    />
+    <addForeignKeyConstraint
+      constraintName="fk_email_id"
+      baseTableName="email_function_dependencies"
+      baseColumnNames="email_id"
+      referencedTableName="email_configurations"
+      referencedColumnNames="id"
+      onDelete="CASCADE"
+    />
+    <addForeignKeyConstraint
+      constraintName="fk_function_id"
+      baseTableName="email_function_dependencies"
+      baseColumnNames="function_id"
+      referencedTableName="anomaly_functions"
+      referencedColumnNames="id"
+      onDelete="CASCADE"
+    />
+    <sql>
+      INSERT INTO email_function_dependencies
+        (SELECT ec.id email_id, af.id function_id
+         FROM email_configurations ec
+         JOIN anomaly_functions af ON (ec.collection = af.collection
+                                       AND ec.metric = af.metric
+                                       AND ((ec.filters = af.filters)
+                                            OR (ec.filters IS NULL
+                                                AND af.filters IS NULL))));
+    </sql>
+    <rollback>
+      <!-- Required because we used a sql changetag to run custom sql -->
+      <dropTable tableName="email_function_dependencies"/>
+    </rollback>
+
+  </changeSet>
+
 </databaseChangeLog>

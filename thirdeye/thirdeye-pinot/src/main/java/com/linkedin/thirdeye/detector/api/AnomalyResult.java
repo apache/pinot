@@ -39,8 +39,7 @@ import com.linkedin.thirdeye.util.ThirdEyeUtils;
         + "AND ((r.startTimeUtc >= :startTimeUtc AND r.startTimeUtc <= :endTimeUtc) "
         + "OR (r.endTimeUtc >= :startTimeUtc AND r.endTimeUtc <= :endTimeUtc))"),
     @NamedQuery(name = "com.linkedin.thirdeye.api.AnomalyResult#findAllByCollectionTimeFunctionIdAndMetric", query = "SELECT r FROM AnomalyResult r WHERE r.collection = :collection "
-        + "AND r.functionId = :functionId "
-        + "AND r.metric = :metric "
+        + "AND r.functionId = :functionId " + "AND r.metric = :metric "
         + "AND ((r.startTimeUtc >= :startTimeUtc AND r.startTimeUtc <= :endTimeUtc) "
         + "OR (r.endTimeUtc >= :startTimeUtc AND r.endTimeUtc <= :endTimeUtc))"),
     @NamedQuery(name = "com.linkedin.thirdeye.api.AnomalyResult#findAllByCollectionTimeMetricAndFilters", query = "SELECT r FROM AnomalyResult r WHERE r.collection = :collection "
@@ -50,6 +49,13 @@ import com.linkedin.thirdeye.util.ThirdEyeUtils;
         + "OR (r.endTimeUtc >= :startTimeUtc AND r.endTimeUtc <= :endTimeUtc))"),
     @NamedQuery(name = "com.linkedin.thirdeye.api.AnomalyResult#findAllByCollectionTimeAndFilters", query = "SELECT r FROM AnomalyResult r WHERE r.collection = :collection "
         + "AND ((r.filters = :filters) or (r.filters is NULL and :filters is NULL)) "
+        + "AND ((r.startTimeUtc >= :startTimeUtc AND r.startTimeUtc <= :endTimeUtc) "
+        + "OR (r.endTimeUtc >= :startTimeUtc AND r.endTimeUtc <= :endTimeUtc))"),
+    @NamedQuery(name = "com.linkedin.thirdeye.api.AnomalyResult#findAllByTimeAndFunctionId", query = "SELECT r FROM AnomalyResult r WHERE r.functionId = :functionId "
+        + "AND ((r.startTimeUtc >= :startTimeUtc AND r.startTimeUtc <= :endTimeUtc) "
+        + "OR (r.endTimeUtc >= :startTimeUtc AND r.endTimeUtc <= :endTimeUtc))"),
+    @NamedQuery(name = "com.linkedin.thirdeye.api.AnomalyResult#findAllByTimeAndEmailId", query = "SELECT r FROM EmailConfiguration d JOIN d.functions f JOIN f.anomalies r "
+        + "WHERE d.id = :emailId "
         + "AND ((r.startTimeUtc >= :startTimeUtc AND r.startTimeUtc <= :endTimeUtc) "
         + "OR (r.endTimeUtc >= :startTimeUtc AND r.endTimeUtc <= :endTimeUtc))")
 })

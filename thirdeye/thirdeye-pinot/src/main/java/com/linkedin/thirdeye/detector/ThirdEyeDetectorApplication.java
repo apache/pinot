@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.detector;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -15,7 +17,6 @@ import org.quartz.SchedulerFactory;
 import org.quartz.impl.StdSchedulerFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.cache.QueryCache;
@@ -34,6 +35,7 @@ import com.linkedin.thirdeye.detector.resources.AnomalyFunctionRelationResource;
 import com.linkedin.thirdeye.detector.resources.AnomalyFunctionSpecResource;
 import com.linkedin.thirdeye.detector.resources.AnomalyResultResource;
 import com.linkedin.thirdeye.detector.resources.ContextualEventResource;
+import com.linkedin.thirdeye.detector.resources.EmailFunctionDependencyResource;
 import com.linkedin.thirdeye.detector.resources.EmailReportResource;
 import com.linkedin.thirdeye.detector.resources.MetricsGraphicsTimeSeriesResource;
 import com.linkedin.thirdeye.detector.task.EmailReportJobManagerTask;
@@ -55,13 +57,35 @@ public class ThirdEyeDetectorApplication
     extends BaseThirdEyeApplication<ThirdEyeDetectorConfiguration> {
   private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeDetectorApplication.class);
 
+  /**
+   * Entry point for the detector application, used to start up the app server and handle database
+   * migrations. There must be at least one argument, with the root directory for all application
+   * configs (including <code>detector.yml</code>) provided as the last argument. If no preceding
+   * arguments are provided, the application server will startup using <code>detector.yml</code>.
+   * <br>
+   * If additional arguments do precede the root configuration directory, they are passed as
+   * arguments to the Dropwizard application along with the <code>detector.yml</code> file. As an
+   * example, one could pass in the arguments:
+   * <br>
+   * <br>
+   * <code>db migrate <i>config_folder</i></code>
+   * <br>
+   * <br>
+   * to run database migrations using configurations in <code>detector.yml</code>.
+   * @throws Exception
+   */
   public static void main(final String[] args) throws Exception {
-    String thirdEyeConfigDir = args[0];
+    List<String> argList = new ArrayList<String>(Arrays.asList(args));
+    if (argList.size() == 1) {
+      argList.add(0, "server");
+    }
+    int lastIndex = argList.size() - 1;
+    String thirdEyeConfigDir = argList.get(lastIndex);
     System.setProperty("dw.rootDir", thirdEyeConfigDir);
     String detectorApplicationConfigFile = thirdEyeConfigDir + "/" + "detector.yml";
-    new ThirdEyeDetectorApplication().run(new String[] {
-        "server", detectorApplicationConfigFile
-    });
+    argList.set(lastIndex, detectorApplicationConfigFile); // replace config dir with the
+                                                           // actual config file
+    new ThirdEyeDetectorApplication().run(argList.toArray(new String[argList.size()]));
   }
 
   @Override
@@ -96,8 +120,10 @@ public class ThirdEyeDetectorApplication
 
     QueryCache queryCache = ThirdEyeCacheRegistry.getInstance().getQueryCache();
     final TimeSeriesHandler timeSeriesHandler = new TimeSeriesHandler(queryCache);
-    TimeOnTimeComparisonHandler timeOnTimeComparisonHandler = new TimeOnTimeComparisonHandler(queryCache);
-    TimeSeriesResponseConverter timeSeriesResponseConverter = TimeSeriesResponseConverter.getInstance();
+    TimeOnTimeComparisonHandler timeOnTimeComparisonHandler =
+        new TimeOnTimeComparisonHandler(queryCache);
+    TimeSeriesResponseConverter timeSeriesResponseConverter =
+        TimeSeriesResponseConverter.getInstance();
 
     // Quartz Scheduler
     SchedulerFactory schedulerFactory = new StdSchedulerFactory();
@@ -234,6 +260,7 @@ public class ThirdEyeDetectorApplication
         .register(new AnomalyDetectionJobResource(jobManager, anomalyFunctionSpecDAO));
     environment.jersey()
         .register(new EmailReportResource(emailConfigurationDAO, emailReportJobManager));
+    environment.jersey().register(new EmailFunctionDependencyResource(emailFunctionDependencyDAO));
 
     // Tasks
     environment.admin().addTask(

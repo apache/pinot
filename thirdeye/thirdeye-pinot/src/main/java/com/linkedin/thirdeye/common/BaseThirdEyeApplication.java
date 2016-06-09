@@ -12,11 +12,13 @@ import com.linkedin.thirdeye.detector.api.AnomalyFunctionSpec;
 import com.linkedin.thirdeye.detector.api.AnomalyResult;
 import com.linkedin.thirdeye.detector.api.ContextualEvent;
 import com.linkedin.thirdeye.detector.api.EmailConfiguration;
+import com.linkedin.thirdeye.detector.api.EmailFunctionDependency;
 import com.linkedin.thirdeye.detector.db.AnomalyFunctionRelationDAO;
 import com.linkedin.thirdeye.detector.db.AnomalyFunctionSpecDAO;
 import com.linkedin.thirdeye.detector.db.AnomalyResultDAO;
 import com.linkedin.thirdeye.detector.db.ContextualEventDAO;
 import com.linkedin.thirdeye.detector.db.EmailConfigurationDAO;
+import com.linkedin.thirdeye.detector.db.EmailFunctionDependencyDAO;
 
 import io.dropwizard.Application;
 import io.dropwizard.Configuration;
@@ -28,7 +30,7 @@ public abstract class BaseThirdEyeApplication<T extends Configuration> extends A
   protected final HibernateBundle<ThirdEyeConfiguration> hibernateBundle =
       new HibernateBundle<ThirdEyeConfiguration>(AnomalyFunctionSpec.class,
           AnomalyFunctionRelation.class, AnomalyResult.class, ContextualEvent.class,
-          EmailConfiguration.class) {
+          EmailConfiguration.class, EmailFunctionDependency.class) {
         @Override
         public DataSourceFactory getDataSourceFactory(ThirdEyeConfiguration config) {
           return config.getDatabase();
@@ -39,6 +41,7 @@ public abstract class BaseThirdEyeApplication<T extends Configuration> extends A
   protected ContextualEventDAO contextualEventDAO;
   protected EmailConfigurationDAO emailConfigurationDAO;
   protected AnomalyFunctionRelationDAO anomalyFunctionRelationDAO;
+  protected EmailFunctionDependencyDAO emailFunctionDependencyDAO;
 
   public void initDetectorRelatedDAO() {
     anomalyFunctionSpecDAO = new AnomalyFunctionSpecDAO(hibernateBundle.getSessionFactory());
@@ -47,24 +50,29 @@ public abstract class BaseThirdEyeApplication<T extends Configuration> extends A
     emailConfigurationDAO = new EmailConfigurationDAO(hibernateBundle.getSessionFactory());
     anomalyFunctionRelationDAO =
         new AnomalyFunctionRelationDAO(hibernateBundle.getSessionFactory());
+    emailFunctionDependencyDAO =
+        new EmailFunctionDependencyDAO(hibernateBundle.getSessionFactory());
   }
 
   // TODO below two methods depend on webapp configs
-  public static AbstractConfigDAO<CollectionSchema> getCollectionSchemaDAO(ThirdEyeConfiguration config) {
+  public static AbstractConfigDAO<CollectionSchema> getCollectionSchemaDAO(
+      ThirdEyeConfiguration config) {
     FileBasedConfigDAOFactory configDAOFactory =
         new FileBasedConfigDAOFactory(getWebappConfigDir(config));
     AbstractConfigDAO<CollectionSchema> configDAO = configDAOFactory.getCollectionSchemaDAO();
     return configDAO;
   }
 
-  public static AbstractConfigDAO<CollectionConfig> getCollectionConfigDAO(ThirdEyeConfiguration config) {
+  public static AbstractConfigDAO<CollectionConfig> getCollectionConfigDAO(
+      ThirdEyeConfiguration config) {
     FileBasedConfigDAOFactory configDAOFactory =
         new FileBasedConfigDAOFactory(getWebappConfigDir(config));
     AbstractConfigDAO<CollectionConfig> configDAO = configDAOFactory.getCollectionConfigDAO();
     return configDAO;
   }
 
-  public static AbstractConfigDAO<DashboardConfig> getDashboardConfigDAO(ThirdEyeConfiguration config) {
+  public static AbstractConfigDAO<DashboardConfig> getDashboardConfigDAO(
+      ThirdEyeConfiguration config) {
     FileBasedConfigDAOFactory configDAOFactory =
         new FileBasedConfigDAOFactory(getWebappConfigDir(config));
     AbstractConfigDAO<DashboardConfig> configDAO = configDAOFactory.getDashboardConfigDAO();
