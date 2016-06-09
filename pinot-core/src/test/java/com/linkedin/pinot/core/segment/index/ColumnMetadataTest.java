@@ -25,13 +25,16 @@ import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
+import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
+import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
 
@@ -42,42 +45,40 @@ public class ColumnMetadataTest {
   private static final File INDEX_DIR = new File(ColumnMetadataTest.class.toString());
   private static final String CREATOR_VERSION = "TestHadoopJar.1.1.1";
 
-  @BeforeClass
-  public void setUP() throws Exception {
+  @BeforeTest public void setUP() throws Exception {
 
     if (INDEX_DIR.exists()) {
       FileUtils.deleteQuietly(INDEX_DIR);
     }
-
-    final String filePath =
-        TestUtils
-            .getFileFromResourceUrl(ColumnMetadataTest.class.getClassLoader().getResource(AVRO_DATA));
-
-    // intentionally changed this to TimeUnit.Hours to make it non-default for testing
-    final SegmentGeneratorConfig config =
-        SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "daysSinceEpoch",
-            TimeUnit.HOURS, "testTable");
-    config.setSegmentNamePostfix("1");
-    config.setTimeColumnName("daysSinceEpoch");
-    config.setCreatorVersion(CREATOR_VERSION);
-    final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
-    driver.init(config);
-    driver.build();
   }
 
-  @AfterClass
-  public void tearDown() {
+  @AfterTest public void tearDown() {
     FileUtils.deleteQuietly(INDEX_DIR);
   }
 
-  @Test
-  public void testAllFieldsInitialized()
-      throws Exception {
-    final IndexSegmentImpl segment =
-        (IndexSegmentImpl) Loaders.IndexSegment.load(INDEX_DIR.listFiles()[0], ReadMode.mmap);
-    SegmentMetadataImpl metadata = (SegmentMetadataImpl) segment.getSegmentMetadata();
-    Assert.assertEquals(metadata.getCreatorName(), CREATOR_VERSION);
-    ColumnMetadata col7Meta =  metadata.getColumnMetadataFor("column7");
+  public SegmentGeneratorConfig CreateSegmentConfigWithoutCreator() throws Exception {
+
+    final String filePath = TestUtils
+        .getFileFromResourceUrl(ColumnMetadataTest.class.getClassLoader().getResource(AVRO_DATA));
+    // intentionally changed this to TimeUnit.Hours to make it non-default for testing
+    final SegmentGeneratorConfig config;
+    config = SegmentTestUtils
+        .getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR,
+            "daysSinceEpoch", TimeUnit.HOURS, "testTable");
+    config.setSegmentNamePostfix("1");
+    config.setTimeColumnName("daysSinceEpoch");
+    return config;
+  }
+
+  public SegmentGeneratorConfig CreateSegmentConfigWithCreator() throws Exception {
+    SegmentGeneratorConfig config = CreateSegmentConfigWithoutCreator();
+    config.setCreatorVersion(CREATOR_VERSION);
+    return config;
+  }
+
+  public void VerifySegmentAfterLoading(SegmentMetadataImpl metadata) {
+
+    ColumnMetadata col7Meta = metadata.getColumnMetadataFor("column7");
     Assert.assertEquals("column7", col7Meta.getColumnName());
     Assert.assertEquals(359, col7Meta.getCardinality());
     Assert.assertEquals(false, col7Meta.isSingleValue());
@@ -96,7 +97,6 @@ public class ColumnMetadataTest {
     // since this is MV field
     Assert.assertTrue(col7Meta.getTotalDocs() < col7Meta.getTotalNumberOfEntries());
 
-
     // single valued string field
     ColumnMetadata col3 = metadata.getColumnMetadataFor("column3");
     Assert.assertEquals(FieldSpec.DataType.STRING, col3.getDataType());
@@ -108,4 +108,41 @@ public class ColumnMetadataTest {
     ColumnMetadata timeColumn = metadata.getColumnMetadataFor("daysSinceEpoch");
     Assert.assertEquals(TimeUnit.HOURS, timeColumn.getTimeunit());
   }
+
+  @Test public void testAllFieldsInitialized() throws Exception {
+    // Build the Segment metadata
+    SegmentGeneratorConfig config = CreateSegmentConfigWithCreator();
+    final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
+    driver.init(config);
+    driver.build();
+
+    // Load segment metadata
+    final IndexSegmentImpl segment = (IndexSegmentImpl) Loaders.IndexSegment.load(INDEX_DIR.listFiles()[0], ReadMode.mmap);
+    SegmentMetadataImpl metadata = (SegmentMetadataImpl) segment.getSegmentMetadata();
+
+    // Make sure we got the creator name as well
+    String creatorName = metadata.getCreatorName();
+    Assert.assertEquals(creatorName, CREATOR_VERSION);
+
+  }
+
+  @Test public void TestAllFieldsExceptCreatorName() throws Exception {
+
+    // Build the Segment metadata
+    SegmentGeneratorConfig config = CreateSegmentConfigWithoutCreator();
+    final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
+    driver.init(config);
+    driver.build();
+
+    // Load segment metadata
+    final IndexSegmentImpl segment = (IndexSegmentImpl) Loaders.IndexSegment.load(INDEX_DIR.listFiles()[0], ReadMode.mmap);
+    SegmentMetadataImpl metadata = (SegmentMetadataImpl) segment.getSegmentMetadata();
+
+    VerifySegmentAfterLoading(metadata);
+
+    // Make sure we get null for creator name
+    String creatorName = metadata.getCreatorName();
+    Assert.assertEquals(creatorName, null);
+  }
 }
+

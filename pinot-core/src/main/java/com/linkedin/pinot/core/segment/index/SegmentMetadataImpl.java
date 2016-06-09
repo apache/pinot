@@ -209,7 +209,10 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   }
 
   private void init() {
-    _creatorName = _segmentMetadataPropertiesConfiguration.getString(Segment.SEGMENT_CREATOR_VERSION);
+    if (_segmentMetadataPropertiesConfiguration.containsKey(Segment.SEGMENT_CREATOR_VERSION)) {
+      _creatorName = _segmentMetadataPropertiesConfiguration.getString(Segment.SEGMENT_CREATOR_VERSION);
+    }
+
 
     String versionString = _segmentMetadataPropertiesConfiguration
         .getString(V1Constants.MetadataKeys.Segment.SEGMENT_VERSION, SegmentVersion.v1.toString());
