@@ -108,7 +108,9 @@ public class AnomalyDetectionJob implements Job {
       throws JobExecutionException {
 
     // thirdEyeClient = (ThirdEyeClient) context.getJobDetail().getJobDataMap().get(CLIENT);
+    LOG.info("AnomalyFunction: {}", anomalyFunction);
     AnomalyFunctionSpec spec = anomalyFunction.getSpec();
+    LOG.info("AnomalyFunctionSpec: {}", spec);
     timeSeriesHandler =
         (TimeSeriesHandler) context.getJobDetail().getJobDataMap().get(TIME_SERIES_HANDLER);
     timeSeriesResponseConverter =
@@ -139,14 +141,22 @@ public class AnomalyDetectionJob implements Job {
       Date scheduledFireTime = context.getScheduledFireTime();
 
       windowEnd = new DateTime(scheduledFireTime).minus(delayMillis);
+      LOG.info(
+          "Running anomaly detection job with scheduledFireTime: {}, delayMillis: {}, windowEnd: {}",
+          scheduledFireTime, delayMillis, windowEnd);
     } else {
       windowEnd = ISODateTimeFormat.dateTimeParser().parseDateTime(windowEndProp);
     }
 
     // Compute window start
     if (windowStartProp == null) {
-      long windowMillis = TimeUnit.MILLISECONDS.convert(spec.getWindowSize(), spec.getWindowUnit());
+      int windowSize = spec.getWindowSize();
+      TimeUnit windowUnit = spec.getWindowUnit();
+      long windowMillis = TimeUnit.MILLISECONDS.convert(windowSize, windowUnit);
       windowStart = windowEnd.minus(windowMillis);
+      LOG.info(
+          "Running anomaly detection job with windowUnit: {}, windowMillis: {}, windowStart: {}",
+          windowUnit, windowMillis, windowStart);
     } else {
       windowStart = ISODateTimeFormat.dateTimeParser().parseDateTime(windowStartProp);
     }
@@ -159,6 +169,9 @@ public class AnomalyDetectionJob implements Job {
 
     // Collection
     collection = spec.getCollection();
+
+    LOG.info("Running anomaly detection job with metricFunction: {}, collection: {}",
+        metricFunction, collection);
 
     try {
       CollectionSchema collectionSchema =
@@ -180,6 +193,10 @@ public class AnomalyDetectionJob implements Job {
     topLevelRequest.setAggregationTimeGranularity(timeGranularity);
     topLevelRequest.setStart(windowStart);
     topLevelRequest.setEnd(windowEnd);
+
+    LOG.info(
+        "Running anomaly detection job with windowStartProp: {}, windowEndProp: {}, metricExpressions: {}, timeGranularity: {}, windowStart: {}, windowEnd: {}",
+        windowStartProp, windowEndProp, metricExpressions, timeGranularity, windowStart, windowEnd);
 
     // Filters are supported now. Now filter clauses can be specified in AnomalyFunctionSpec.
     String filters = spec.getFilters();
@@ -239,10 +256,17 @@ public class AnomalyDetectionJob implements Job {
       try {
         // Run algorithm
         long startTime = System.currentTimeMillis();
+        DimensionKey dimensionKey = entry.getKey();
+        MetricTimeSeries metricTimeSeries = entry.getValue();
+        LOG.info(
+            "Analyzing anomaly function with dimensionKey: {}, windowStart: {}, windowEnd: {}",
+            dimensionKey, windowStart, windowEnd);
         List<AnomalyResult> results =
-            anomalyFunction.analyze(entry.getKey(), entry.getValue(), windowStart, windowEnd,
+            anomalyFunction.analyze(dimensionKey, metricTimeSeries, windowStart, windowEnd,
                 knownAnomalies);
+
         long endTime = System.currentTimeMillis();
+        LOG.info("Updating histogram with startTime: {}, endTime: {}", startTime, endTime);
         histogram.update(endTime - startTime);
 
         // Handle results
