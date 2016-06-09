@@ -1,12 +1,19 @@
 package com.linkedin.thirdeye.detector.api;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+import javax.persistence.CascadeType;
 import javax.persistence.Column;
 import javax.persistence.Entity;
+import javax.persistence.FetchType;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
+import javax.persistence.JoinColumn;
+import javax.persistence.JoinTable;
+import javax.persistence.ManyToMany;
 import javax.persistence.NamedQueries;
 import javax.persistence.NamedQuery;
 import javax.persistence.Table;
@@ -22,7 +29,7 @@ import com.linkedin.thirdeye.util.ThirdEyeUtils;
 @Entity
 @Table(name = "email_configurations")
 @NamedQueries({
-  @NamedQuery(name = "com.linkedin.thirdeye.api.EmailConfiguration#findAll", query = "SELECT c FROM EmailConfiguration c")
+    @NamedQuery(name = "com.linkedin.thirdeye.api.EmailConfiguration#findAll", query = "SELECT c FROM EmailConfiguration c")
 })
 public class EmailConfiguration {
   @Id
@@ -94,6 +101,16 @@ public class EmailConfiguration {
 
   @Column(name = "window_delay_unit", nullable = false)
   private TimeUnit windowDelayUnit;
+
+  @ManyToMany(cascade = {
+      CascadeType.ALL
+  }, fetch = FetchType.LAZY)
+  @JoinTable(name = "email_function_dependencies", joinColumns = {
+      @JoinColumn(name = "email_id", referencedColumnName = "id")
+  }, inverseJoinColumns = {
+      @JoinColumn(name = "function_id", referencedColumnName = "id")
+  })
+  private List<AnomalyFunctionSpec> functions = new ArrayList<>();
 
   public long getId() {
     return id;
@@ -243,6 +260,15 @@ public class EmailConfiguration {
         .add("smtpHost", smtpHost).add("smtpPort", smtpPort).add("smtpUser", smtpUser)
         .add("windowSize", windowSize).add("windowUnit", windowUnit).add("isActive", isActive)
         .add("sendZeroAnomalyEmail", sendZeroAnomalyEmail).add("filters", filters)
-        .add("windowDelay", windowDelay).add("windowDelayUnit", windowDelayUnit).toString();
+        .add("windowDelay", windowDelay).add("windowDelayUnit", windowDelayUnit)
+        .add("functions", functions).toString();
+  }
+
+  public List<AnomalyFunctionSpec> getFunctions() {
+    return functions;
+  }
+
+  public void setFunctions(List<AnomalyFunctionSpec> functions) {
+    this.functions = functions;
   }
 }

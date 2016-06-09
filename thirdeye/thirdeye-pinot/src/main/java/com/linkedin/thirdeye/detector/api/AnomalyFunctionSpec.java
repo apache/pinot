@@ -1,17 +1,23 @@
 package com.linkedin.thirdeye.detector.api;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
 import javax.persistence.Column;
 import javax.persistence.Entity;
+import javax.persistence.FetchType;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
+import javax.persistence.JoinColumn;
+import javax.persistence.ManyToMany;
 import javax.persistence.NamedQueries;
 import javax.persistence.NamedQuery;
+import javax.persistence.OneToMany;
 import javax.persistence.Table;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.base.MoreObjects;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
@@ -69,6 +75,13 @@ public class AnomalyFunctionSpec {
 
   @Column(name = "filters", nullable = true)
   private String filters;
+
+  @ManyToMany(mappedBy = "functions", fetch = FetchType.LAZY)
+  private List<EmailConfiguration> emails;
+
+  @OneToMany(fetch = FetchType.LAZY)
+  @JoinColumn(name = "function_id", referencedColumnName = "id")
+  private List<AnomalyResult> anomalies;
 
   public AnomalyFunctionSpec() {
   }
@@ -198,6 +211,24 @@ public class AnomalyFunctionSpec {
     this.filters = sortedFilters;
   }
 
+  @JsonIgnore
+  public List<EmailConfiguration> getEmails() {
+    return emails;
+  }
+
+  public void setEmails(List<EmailConfiguration> emails) {
+    this.emails = emails;
+  }
+
+  @JsonIgnore
+  public List<AnomalyResult> getAnomalies() {
+    return anomalies;
+  }
+
+  public void setAnomalies(List<AnomalyResult> anomalies) {
+    this.anomalies = anomalies;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (!(o instanceof AnomalyFunctionSpec)) {
@@ -230,8 +261,8 @@ public class AnomalyFunctionSpec {
     return MoreObjects.toStringHelper(this).add("id", id).add("collection", collection)
         .add("metric", metric).add("type", type).add("isActive", isActive).add("cron", cron)
         .add("properties", properties).add("bucketSize", bucketSize).add("bucketUnit", bucketUnit)
-        .add("windowSize", windowSize).add("windowUnit", windowUnit)
-        .add("windowDelay", windowDelay).add("windowDelayUnit", windowDelayUnit)
-        .add("exploreDimensions", exploreDimensions).add("filters", filters).toString();
+        .add("windowSize", windowSize).add("windowUnit", windowUnit).add("windowDelay", windowDelay)
+        .add("windowDelayUnit", windowDelayUnit).add("exploreDimensions", exploreDimensions)
+        .add("filters", filters).toString();
   }
 }

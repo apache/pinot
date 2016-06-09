@@ -35,6 +35,7 @@ import com.linkedin.thirdeye.detector.resources.AnomalyFunctionRelationResource;
 import com.linkedin.thirdeye.detector.resources.AnomalyFunctionSpecResource;
 import com.linkedin.thirdeye.detector.resources.AnomalyResultResource;
 import com.linkedin.thirdeye.detector.resources.ContextualEventResource;
+import com.linkedin.thirdeye.detector.resources.EmailFunctionDependencyResource;
 import com.linkedin.thirdeye.detector.resources.EmailReportResource;
 import com.linkedin.thirdeye.detector.resources.MetricsGraphicsTimeSeriesResource;
 import com.linkedin.thirdeye.detector.task.EmailReportJobManagerTask;
@@ -56,6 +57,23 @@ public class ThirdEyeDetectorApplication
     extends BaseThirdEyeApplication<ThirdEyeDetectorConfiguration> {
   private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeDetectorApplication.class);
 
+  /**
+   * Entry point for the detector application, used to start up the app server and handle database
+   * migrations. There must be at least one argument, with the root directory for all application
+   * configs (including <code>detector.yml</code>) provided as the last argument. If no preceding
+   * arguments are provided, the application server will startup using <code>detector.yml</code>.
+   * <br>
+   * If additional arguments do precede the root configuration directory, they are passed as
+   * arguments to the Dropwizard application along with the <code>detector.yml</code> file. As an
+   * example, one could pass in the arguments:
+   * <br>
+   * <br>
+   * <code>db migrate <i>config_folder</i></code>
+   * <br>
+   * <br>
+   * to run database migrations using configurations in <code>detector.yml</code>.
+   * @throws Exception
+   */
   public static void main(final String[] args) throws Exception {
     List<String> argList = new ArrayList<String>(Arrays.asList(args));
     if (argList.size() == 1) {
@@ -242,6 +260,7 @@ public class ThirdEyeDetectorApplication
         .register(new AnomalyDetectionJobResource(jobManager, anomalyFunctionSpecDAO));
     environment.jersey()
         .register(new EmailReportResource(emailConfigurationDAO, emailReportJobManager));
+    environment.jersey().register(new EmailFunctionDependencyResource(emailFunctionDependencyDAO));
 
     // Tasks
     environment.admin().addTask(
