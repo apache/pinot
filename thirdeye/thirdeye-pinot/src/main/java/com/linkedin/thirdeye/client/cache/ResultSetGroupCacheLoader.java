@@ -16,19 +16,14 @@ import com.linkedin.pinot.client.PinotClientException;
 import com.linkedin.pinot.client.ResultSet;
 import com.linkedin.pinot.client.ResultSetGroup;
 import com.linkedin.thirdeye.client.pinot.PinotQuery;
-import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClient;
 import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClientConfig;
 
 public class ResultSetGroupCacheLoader extends CacheLoader<PinotQuery, ResultSetGroup> {
   private static final Logger LOG = LoggerFactory.getLogger(ResultSetGroupCacheLoader.class);
-
-  private Connection connection;
+  private static int MAX_CONNECTIONS = 25;
+  private Connection[] connections;
 
   private static final String BROKER_PREFIX = "Broker_";
-
-  public ResultSetGroupCacheLoader(Connection connection) {
-    this.connection = connection;
-  }
 
   public ResultSetGroupCacheLoader(PinotThirdEyeClientConfig pinotThirdEyeClientConfig) {
 
@@ -49,28 +44,44 @@ public class ResultSetGroupCacheLoader extends CacheLoader<PinotQuery, ResultSet
         thirdeyeBrokers[i] = instanceConfig.getHostName().replaceAll(BROKER_PREFIX, "") + ":"
             + instanceConfig.getPort();
       }
-      this.connection = ConnectionFactory.fromHostList(thirdeyeBrokers);
+      this.connections = new Connection[MAX_CONNECTIONS];
+      for (int i = 0; i < MAX_CONNECTIONS; i++) {
+        connections[i] = ConnectionFactory.fromHostList(thirdeyeBrokers);
+      }
     } else {
-      this.connection = ConnectionFactory.fromZookeeper(pinotThirdEyeClientConfig.getZookeeperUrl()
-          + "/" + pinotThirdEyeClientConfig.getClusterName());
+      this.connections = new Connection[MAX_CONNECTIONS];
+      for (int i = 0; i < MAX_CONNECTIONS; i++) {
+        connections[i] = ConnectionFactory.fromZookeeper(pinotThirdEyeClientConfig.getZookeeperUrl()
+            + "/" + pinotThirdEyeClientConfig.getClusterName());
+      }
     }
   }
 
   @Override
   public ResultSetGroup load(PinotQuery pinotQuery) throws Exception {
     try {
-      synchronized (this) {
+      Connection connection = getConnection();
+      synchronized (connection) {
+        long start = System.currentTimeMillis();
+
         ResultSetGroup resultSetGroup =
             connection.execute(pinotQuery.getTableName(), pinotQuery.getPql());
         if (LOG.isDebugEnabled()) {
           LOG.debug("Query:{}  response:{}", pinotQuery.getPql(), format(resultSetGroup));
         }
+        long end = System.currentTimeMillis();
+        LOG.info("Query:{}  took:{} ms", pinotQuery.getPql(), (end - start));
+
         return resultSetGroup;
       }
     } catch (PinotClientException cause) {
       LOG.error("Error when running pql:" + pinotQuery.getPql(), cause);
       throw new PinotClientException("Error when running pql:" + pinotQuery.getPql(), cause);
     }
+  }
+
+  private Connection getConnection() {
+    return connections[(int) (Thread.currentThread().getId() % MAX_CONNECTIONS)];
   }
 
   private static String format(ResultSetGroup result) {

@@ -9,6 +9,8 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.LoadingCache;
+import com.google.common.cache.RemovalListener;
+import com.google.common.cache.RemovalNotification;
 import com.linkedin.pinot.client.ResultSetGroup;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.thirdeye.api.CollectionSchema;
@@ -167,10 +169,17 @@ public class ThirdEyeCacheRegistry {
 
     ThirdEyeCacheRegistry cacheRegistry = ThirdEyeCacheRegistry.getInstance();
 
+    RemovalListener<PinotQuery, ResultSetGroup> listener = new RemovalListener<PinotQuery, ResultSetGroup>() {
+      
+      @Override
+      public void onRemoval(RemovalNotification<PinotQuery, ResultSetGroup> notification) {
+        LOGGER.info("Expired {}", notification.getKey().getPql());
+      }
+    };
     // ResultSetGroup Cache
     // TODO: have a limit on key size and maximum weight
     LoadingCache<PinotQuery, ResultSetGroup> resultSetGroupCache =
-        CacheBuilder.newBuilder().expireAfterAccess(1, TimeUnit.HOURS)
+        CacheBuilder.newBuilder().removalListener(listener).expireAfterAccess(1, TimeUnit.HOURS)
             .build(new ResultSetGroupCacheLoader(pinotThirdeyeClientConfig));
     cacheRegistry.registerResultSetGroupCache(resultSetGroupCache);
 
