@@ -155,7 +155,7 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
             String partitionId = instanceZKMetadata.getPartition(resource);
             if (groupId != null && !groupId.isEmpty() && partitionId != null && !partitionId.isEmpty()) {
               listOfSegmentsToAddToInstances.add(new Pair<String, String>(
-                  SegmentNameBuilder.Realtime.build(groupId, partitionId, String.valueOf(System.currentTimeMillis())),
+                  SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName(groupId, partitionId, String.valueOf(System.currentTimeMillis())),
                   instanceId));
             } else {
               LOGGER.warn("Instance {} has invalid groupId ({}) and/or partitionId ({}) for resource {}, ignoring for segment assignment.",
@@ -189,7 +189,7 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
             String groupId = instanceZKMetadata.getGroupId(resource);
             String partitionId = instanceZKMetadata.getPartition(resource);
             listOfSegmentsToAddToInstances.add(new Pair<String, String>(
-                SegmentNameBuilder.Realtime.build(groupId, partitionId, String.valueOf(System.currentTimeMillis())),
+                SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName(groupId, partitionId, String.valueOf(System.currentTimeMillis())),
                 instanceId));
           }
         }

@@ -144,10 +144,10 @@ public class ValidationManagerTest {
 
     // Create a bunch of dummy segments
     String testTableName = "TestTableTotalDocCountTest";
-    String segmentName1 = SegmentNameBuilder.Realtime.build("groupid_1", "0", "1");
-    String segmentName2 = SegmentNameBuilder.Realtime.build("groupid_1", "0", "2");
-    String segmentName3 = SegmentNameBuilder.Realtime.build("groupid_1", "0", "3");
-    String segmentName4 = SegmentNameBuilder.Realtime.build("groupid_2", "0", "3");
+    String segmentName1 = SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("groupid_1", "0", "1");
+    String segmentName2 = SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("groupid_1", "0", "2");
+    String segmentName3 = SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("groupid_1", "0", "3");
+    String segmentName4 = SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("groupid_2", "0", "3");
 
     DummyMetadata metadata1 = new DummyMetadata(testTableName, segmentName1, 10);
     DummyMetadata metadata2 = new DummyMetadata(testTableName, segmentName2, 20);
