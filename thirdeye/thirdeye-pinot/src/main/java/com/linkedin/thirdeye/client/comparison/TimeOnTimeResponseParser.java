@@ -9,6 +9,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import jersey.repackaged.com.google.common.collect.Lists;
+
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,6 +45,13 @@ public class TimeOnTimeResponseParser {
   private static String TIME_DIMENSION_JOINER = "|";
   private double metricThreshold = CollectionConfig.DEFAULT_THRESHOLD;
   private static String OTHER = "OTHER";
+
+  private Map<String, ThirdEyeResponseRow> baselineResponseMap;
+  private Map<String, ThirdEyeResponseRow> currentResponseMap;
+  private List<MetricFunction> metricFunctions;
+  private int numMetrics;
+  int numTimeBuckets;
+  private List<Row> rows;
 
   public TimeOnTimeResponseParser(ThirdEyeResponse baselineResponse,
       ThirdEyeResponse currentResponse, List<Range<DateTime>> baselineRanges,
@@ -80,201 +89,41 @@ public class TimeOnTimeResponseParser {
       hasGroupByTime = true;
     }
 
-    Map<String, ThirdEyeResponseRow> baselineResponseMap;
-    Map<String, ThirdEyeResponseRow> currentResponseMap;
-    List<MetricFunction> metricFunctions = baselineResponse.getMetricFunctions();
-    int numMetrics = metricFunctions.size();
+    metricFunctions = baselineResponse.getMetricFunctions();
+    numMetrics = metricFunctions.size();
+    numTimeBuckets = baselineRanges.size();
+    rows = new ArrayList<>();
 
-    List<Row> rows = new ArrayList<>();
     if (hasGroupByTime) {
-
-      int numTimeBuckets = baselineRanges.size();
-
-      if (hasGroupByDimensions) {
-        // group by time and dimension  //contributor
-        baselineResponseMap = createResponseMapByTimeAndDimension(baselineResponse);
-        currentResponseMap = createResponseMapByTimeAndDimension(currentResponse);
-
-        Map<Integer, List<Double>> baselineMetricSums = getMetricSumsByTime(baselineResponse);
-        Map<Integer, List<Double>> currentMetricSums = getMetricSumsByTime(currentResponse);
-
-        Set<String> timeDimensionValues = new HashSet<>();
-        timeDimensionValues.addAll(baselineResponseMap.keySet());
-        timeDimensionValues.addAll(currentResponseMap.keySet());
-        Set<String> dimensionValues = new HashSet<>();
-        for (String timeDimensionValue : timeDimensionValues) {
-          String[] tokens = timeDimensionValue.split(TIME_DIMENSION_JOINER_ESCAPED);
-          String dimensionValue = tokens.length < 2 ? "" : tokens[1];
-          dimensionValues.add(dimensionValue);
-        }
-
-        String dimensionName = baselineResponse.getGroupKeyColumns().get(1);
-
-        // other row
-        List<Row.Builder> otherBuilders = new ArrayList<>();
-        List<double[]> otherBaselineMetrics = new ArrayList<>();
-        List<double[]> otherCurrentMetrics = new ArrayList<>();
-        List<Row> otherRows = new ArrayList<>();
-        boolean includeOther = false;
-        for (int timeBucketId = 0; timeBucketId < numTimeBuckets; timeBucketId++) {
-          Range<DateTime> baselineTimeRange = baselineRanges.get(timeBucketId);
-          Range<DateTime> currentTimeRange = currentRanges.get(timeBucketId);
-
-          Row.Builder builder = new Row.Builder();
-          builder.setBaselineStart(baselineTimeRange.lowerEndpoint());
-          builder.setBaselineEnd(baselineTimeRange.upperEndpoint());
-          builder.setCurrentStart(currentTimeRange.lowerEndpoint());
-          builder.setCurrentEnd(currentTimeRange.upperEndpoint());
-          builder.setDimensionName(dimensionName);
-          builder.setDimensionValue(OTHER);
-          otherBuilders.add(builder);
-          double[] otherBaseline = new double[numMetrics];
-          Arrays.fill(otherBaseline, 0);
-          double[] otherCurrent = new double[numMetrics];
-          Arrays.fill(otherCurrent, 0);
-          otherBaselineMetrics.add(otherBaseline);
-          otherCurrentMetrics.add(otherCurrent);
-        }
-
-        for (String dimensionValue : dimensionValues) {
-          List<Row> thresholdRows = new ArrayList<>();
-          for (int timeBucketId = 0; timeBucketId < numTimeBuckets; timeBucketId++) {
-            Range<DateTime> baselineTimeRange = baselineRanges.get(timeBucketId);
-            Range<DateTime> currentTimeRange = currentRanges.get(timeBucketId);
-
-            //compute the time|dimension key
-            String baselineTimeDimensionValue = timeBucketId + TIME_DIMENSION_JOINER + dimensionValue;
-            String currentTimeDimensionValue = timeBucketId + TIME_DIMENSION_JOINER + dimensionValue;
-
-            ThirdEyeResponseRow baselineRow = baselineResponseMap.get(baselineTimeDimensionValue);
-            ThirdEyeResponseRow currentRow = currentResponseMap.get(currentTimeDimensionValue);
-
-            Row.Builder builder = new Row.Builder();
-            builder.setBaselineStart(baselineTimeRange.lowerEndpoint());
-            builder.setBaselineEnd(baselineTimeRange.upperEndpoint());
-            builder.setCurrentStart(currentTimeRange.lowerEndpoint());
-            builder.setCurrentEnd(currentTimeRange.upperEndpoint());
-            builder.setDimensionName(dimensionName);
-            builder.setDimensionValue(dimensionValue);
-            addMetric(baselineRow, currentRow, builder);
-
-            Row row = builder.build();
-            thresholdRows.add(row);
-          }
-          boolean passedThreshold = false;
-
-          for (int timeBucketId = 0; timeBucketId < numTimeBuckets; timeBucketId++) {
-            if (checkMetricSums(thresholdRows.get(timeBucketId), baselineMetricSums.get(timeBucketId), currentMetricSums.get(timeBucketId))) {
-              passedThreshold = true;
-              break;
-            }
-          }
-
-          if (passedThreshold) { // if any of the cells of a contributor row passes threshold, add all those cells
-            rows.addAll(thresholdRows);
-          } else { // else that row of cells goes into OTHER
-            otherRows.addAll(thresholdRows);
-            includeOther = true;
-            for (int timeBucketId = 0; timeBucketId < numTimeBuckets; timeBucketId++) {
-              Row row = thresholdRows.get(timeBucketId);
-              List<Metric> metrics = row.getMetrics();
-              for (int i = 0; i < metrics.size(); i++) {
-                Metric metricToAdd = metrics.get(i);
-                otherBaselineMetrics.get(timeBucketId)[i] += metricToAdd.getBaselineValue();
-                otherCurrentMetrics.get(timeBucketId)[i] += metricToAdd.getCurrentValue();
-              }
-            }
-          }
-        }
-
-        // include OTHER row
-        if (includeOther) {
-          for (int timeBucketId = 0; timeBucketId < numTimeBuckets; timeBucketId++) {
-            Builder otherBuilder = otherBuilders.get(timeBucketId);
-            double[] otherBaseline = otherBaselineMetrics.get(timeBucketId);
-            double[] otherCurrent = otherCurrentMetrics.get(timeBucketId);
-            for (int i = 0; i < numMetrics; i++) {
-              otherBuilder.addMetric(metricFunctions.get(i).getMetricName(), otherBaseline[i], otherCurrent[i]);
-            }
-            rows.add(otherBuilder.build());
-          }
-        }
-      } else {
-        // group by time only //tabular
-        baselineResponseMap = createResponseMapByTime(baselineResponse);
-        currentResponseMap = createResponseMapByTime(currentResponse);
-
-        for (int timeBucketId = 0; timeBucketId < numTimeBuckets; timeBucketId++) {
-          Range<DateTime> baselineTimeRange = baselineRanges.get(timeBucketId);
-          ThirdEyeResponseRow baselineRow =
-              baselineResponseMap.get(String.valueOf(timeBucketId));
-
-          Range<DateTime> currentTimeRange = currentRanges.get(timeBucketId);
-          ThirdEyeResponseRow currentRow = currentResponseMap.get(String.valueOf(timeBucketId));
-
-          Row.Builder builder = new Row.Builder();
-          builder.setBaselineStart(baselineTimeRange.lowerEndpoint());
-          builder.setBaselineEnd(baselineTimeRange.upperEndpoint());
-          builder.setCurrentStart(currentTimeRange.lowerEndpoint());
-          builder.setCurrentEnd(currentTimeRange.upperEndpoint());
-
-          addMetric(baselineRow, currentRow, builder);
-          Row row = builder.build();
-          rows.add(row);
-        }
+      if (hasGroupByDimensions) { // contributor view
+        parseGroupByTimeDimensionResponse();
+      } else { //tabular view
+        parseGroupByTimeResponse();
       }
     } else {
-      // no break down by time
-      if (hasGroupByDimensions) {
-        // group by dimensions only //heatmap
-        baselineResponseMap = createResponseMapByDimension(baselineResponse);
-        currentResponseMap = createResponseMapByDimension(currentResponse);
-
-        String dimensionName = baselineResponse.getGroupKeyColumns().get(0);
-
-        Set<String> dimensionValues = new HashSet<>();
-        dimensionValues.addAll(baselineResponseMap.keySet());
-        dimensionValues.addAll(currentResponseMap.keySet());
-
-
-        for (String dimensionValue : dimensionValues) {
-          Row.Builder builder = new Row.Builder();
-          builder.setBaselineStart(baselineRanges.get(0).lowerEndpoint());
-          builder.setBaselineEnd(baselineRanges.get(0).upperEndpoint());
-          builder.setCurrentStart(currentRanges.get(0).lowerEndpoint());
-          builder.setCurrentEnd(currentRanges.get(0).upperEndpoint());
-
-          builder.setDimensionName(dimensionName);
-          builder.setDimensionValue(dimensionValue);
-
-          ThirdEyeResponseRow baselineRow = baselineResponseMap.get(dimensionValue);
-          ThirdEyeResponseRow currentRow = currentResponseMap.get(dimensionValue);
-
-          addMetric(baselineRow, currentRow, builder);
-
-          Row row = builder.build();
-          rows.add(row);
-        }
-
-        double[] baselineMetricSums = getMetricSums(baselineResponse);
-        double[] currentMetricSums = getMetricSums(currentResponse);
-        rows = getRowsWithThresholdFiltering(rows, dimensionName, metricFunctions, baselineMetricSums, currentMetricSums);
-
+      if (hasGroupByDimensions) { //heatmap
+        parseGroupByDimensionResponse();
       } else {
-        // no group by
+        throw new UnsupportedOperationException("Response cannot have neither group by time nor group by dimension");
       }
     }
-
     return rows;
   }
 
-  private List<Row> getRowsWithThresholdFiltering(List<Row> rows, String dimensionName,
-      List<MetricFunction> metricFunctions, double[] baselineMetricSums, double[] currentMetricSums) {
+  private void parseGroupByDimensionResponse() {
+    baselineResponseMap = createResponseMapByDimension(baselineResponse);
+    currentResponseMap = createResponseMapByDimension(currentResponse);
 
-    int numMetrics = currentResponse.getMetricFunctions().size();
+    List<Double> baselineMetricSums = getMetricSums(baselineResponse);
+    List<Double> currentMetricSums = getMetricSums(currentResponse);
 
-    // Collect rows which pass threshold
-    List<Row> thresholdPassedRows = new ArrayList<>();
+    // group by dimension name
+    String dimensionName = baselineResponse.getGroupKeyColumns().get(0);
+
+    // group by dimension values
+    Set<String> dimensionValues = new HashSet<>();
+    dimensionValues.addAll(baselineResponseMap.keySet());
+    dimensionValues.addAll(currentResponseMap.keySet());
 
     // Construct OTHER row
     Row.Builder otherBuilder = new Row.Builder();
@@ -290,23 +139,32 @@ public class TimeOnTimeResponseParser {
     Arrays.fill(otherCurrent, 0);
     boolean includeOther = false;
 
-    for (Row row : rows) {
-      boolean passedThreshold = false;
-      List<Metric> metrics = row.getMetrics();
-      for (int i = 0; i < numMetrics; i ++) {
-        double baselineValue = metrics.get(i).getBaselineValue();
-        double currentValue = metrics.get(i).getCurrentValue();
-        if ((baselineValue >= baselineMetricSums[i] * metricThreshold) ||
-            (currentValue >= currentMetricSums[i] * metricThreshold)) {
-          passedThreshold = true;
-          break;
-        }
-      }
+    // for every dimension value, we check if the row we constructed passes metric threshold
+    // if it does, we add it to the rows
+    // else, include it in the OTHER row
+    for (String dimensionValue : dimensionValues) {
+      Row.Builder builder = new Row.Builder();
+      builder.setBaselineStart(baselineRanges.get(0).lowerEndpoint());
+      builder.setBaselineEnd(baselineRanges.get(0).upperEndpoint());
+      builder.setCurrentStart(currentRanges.get(0).lowerEndpoint());
+      builder.setCurrentEnd(currentRanges.get(0).upperEndpoint());
 
+      builder.setDimensionName(dimensionName);
+      builder.setDimensionValue(dimensionValue);
+
+      ThirdEyeResponseRow baselineRow = baselineResponseMap.get(dimensionValue);
+      ThirdEyeResponseRow currentRow = currentResponseMap.get(dimensionValue);
+
+      addMetric(baselineRow, currentRow, builder);
+
+      Row row = builder.build();
+
+      boolean passedThreshold = checkMetricSums(row, baselineMetricSums, currentMetricSums);
       if (passedThreshold) {  // if any metric passes threshold, include it
-        thresholdPassedRows.add(row);
+        rows.add(row);
       } else { // else add it to OTHER
         includeOther = true;
+        List<Metric> metrics = row.getMetrics();
         for (int i = 0; i < numMetrics; i ++) {
           Metric metric = metrics.get(i);
           otherBaseline[i] += metric.getBaselineValue();
@@ -318,10 +176,148 @@ public class TimeOnTimeResponseParser {
       for (int i = 0; i < numMetrics; i ++) {
         otherBuilder.addMetric(metricFunctions.get(i).getMetricName(), otherBaseline[i], otherCurrent[i]);
       }
-      thresholdPassedRows.add(otherBuilder.build());
+      rows.add(otherBuilder.build());
+    }
+  }
+
+  private void parseGroupByTimeResponse() {
+    baselineResponseMap = createResponseMapByTime(baselineResponse);
+    currentResponseMap = createResponseMapByTime(currentResponse);
+
+    for (int timeBucketId = 0; timeBucketId < numTimeBuckets; timeBucketId++) {
+      Range<DateTime> baselineTimeRange = baselineRanges.get(timeBucketId);
+      ThirdEyeResponseRow baselineRow =
+          baselineResponseMap.get(String.valueOf(timeBucketId));
+
+      Range<DateTime> currentTimeRange = currentRanges.get(timeBucketId);
+      ThirdEyeResponseRow currentRow = currentResponseMap.get(String.valueOf(timeBucketId));
+
+      Row.Builder builder = new Row.Builder();
+      builder.setBaselineStart(baselineTimeRange.lowerEndpoint());
+      builder.setBaselineEnd(baselineTimeRange.upperEndpoint());
+      builder.setCurrentStart(currentTimeRange.lowerEndpoint());
+      builder.setCurrentEnd(currentTimeRange.upperEndpoint());
+
+      addMetric(baselineRow, currentRow, builder);
+      Row row = builder.build();
+      rows.add(row);
+    }
+  }
+
+  private void parseGroupByTimeDimensionResponse() {
+
+    baselineResponseMap = createResponseMapByTimeAndDimension(baselineResponse);
+    currentResponseMap = createResponseMapByTimeAndDimension(currentResponse);
+
+    Map<Integer, List<Double>> baselineMetricSums = getMetricSumsByTime(baselineResponse);
+    Map<Integer, List<Double>> currentMetricSums = getMetricSumsByTime(currentResponse);
+
+    // group by time and dimension values
+    Set<String> timeDimensionValues = new HashSet<>();
+    timeDimensionValues.addAll(baselineResponseMap.keySet());
+    timeDimensionValues.addAll(currentResponseMap.keySet());
+    Set<String> dimensionValues = new HashSet<>();
+    for (String timeDimensionValue : timeDimensionValues) {
+      String[] tokens = timeDimensionValue.split(TIME_DIMENSION_JOINER_ESCAPED);
+      String dimensionValue = tokens.length < 2 ? "" : tokens[1];
+      dimensionValues.add(dimensionValue);
     }
 
-    return thresholdPassedRows;
+    // group by dimension name
+    String dimensionName = baselineResponse.getGroupKeyColumns().get(1);
+
+    // other row
+    List<Row.Builder> otherBuilders = new ArrayList<>();
+    List<double[]> otherBaselineMetrics = new ArrayList<>();
+    List<double[]> otherCurrentMetrics = new ArrayList<>();
+    boolean includeOther = false;
+    // constructing an OTHER rows, 1 for each time bucket
+    for (int timeBucketId = 0; timeBucketId < numTimeBuckets; timeBucketId++) {
+      Range<DateTime> baselineTimeRange = baselineRanges.get(timeBucketId);
+      Range<DateTime> currentTimeRange = currentRanges.get(timeBucketId);
+
+      Row.Builder builder = new Row.Builder();
+      builder.setBaselineStart(baselineTimeRange.lowerEndpoint());
+      builder.setBaselineEnd(baselineTimeRange.upperEndpoint());
+      builder.setCurrentStart(currentTimeRange.lowerEndpoint());
+      builder.setCurrentEnd(currentTimeRange.upperEndpoint());
+      builder.setDimensionName(dimensionName);
+      builder.setDimensionValue(OTHER);
+      otherBuilders.add(builder);
+      double[] otherBaseline = new double[numMetrics];
+      Arrays.fill(otherBaseline, 0);
+      double[] otherCurrent = new double[numMetrics];
+      Arrays.fill(otherCurrent, 0);
+      otherBaselineMetrics.add(otherBaseline);
+      otherCurrentMetrics.add(otherCurrent);
+    }
+
+    // for every comparison row we construct, we check if any of its time buckets passes metric threshold
+    // if it does, we add it to the rows as is
+    // else, we add the metric values to the OTHER row
+    for (String dimensionValue : dimensionValues) {
+      List<Row> thresholdRows = new ArrayList<>();
+      for (int timeBucketId = 0; timeBucketId < numTimeBuckets; timeBucketId++) {
+        Range<DateTime> baselineTimeRange = baselineRanges.get(timeBucketId);
+        Range<DateTime> currentTimeRange = currentRanges.get(timeBucketId);
+
+        //compute the time|dimension key
+        String baselineTimeDimensionValue = timeBucketId + TIME_DIMENSION_JOINER + dimensionValue;
+        String currentTimeDimensionValue = timeBucketId + TIME_DIMENSION_JOINER + dimensionValue;
+
+        ThirdEyeResponseRow baselineRow = baselineResponseMap.get(baselineTimeDimensionValue);
+        ThirdEyeResponseRow currentRow = currentResponseMap.get(currentTimeDimensionValue);
+
+        Row.Builder builder = new Row.Builder();
+        builder.setBaselineStart(baselineTimeRange.lowerEndpoint());
+        builder.setBaselineEnd(baselineTimeRange.upperEndpoint());
+        builder.setCurrentStart(currentTimeRange.lowerEndpoint());
+        builder.setCurrentEnd(currentTimeRange.upperEndpoint());
+        builder.setDimensionName(dimensionName);
+        builder.setDimensionValue(dimensionValue);
+        addMetric(baselineRow, currentRow, builder);
+
+        Row row = builder.build();
+        thresholdRows.add(row);
+      }
+
+      // check if rows pass threshold
+      boolean passedThreshold = false;
+      for (int timeBucketId = 0; timeBucketId < numTimeBuckets; timeBucketId++) {
+        if (checkMetricSums(thresholdRows.get(timeBucketId), baselineMetricSums.get(timeBucketId), currentMetricSums.get(timeBucketId))) {
+          passedThreshold = true;
+          break;
+        }
+      }
+
+      if (passedThreshold) { // if any of the cells of a contributor row passes threshold, add all those cells
+        rows.addAll(thresholdRows);
+      } else { // else that row of cells goes into OTHER
+        includeOther = true;
+        for (int timeBucketId = 0; timeBucketId < numTimeBuckets; timeBucketId++) {
+          Row row = thresholdRows.get(timeBucketId);
+          List<Metric> metrics = row.getMetrics();
+          for (int i = 0; i < metrics.size(); i++) {
+            Metric metricToAdd = metrics.get(i);
+            otherBaselineMetrics.get(timeBucketId)[i] += metricToAdd.getBaselineValue();
+            otherCurrentMetrics.get(timeBucketId)[i] += metricToAdd.getCurrentValue();
+          }
+        }
+      }
+    }
+
+    // create other row using the other baseline and current sums
+    if (includeOther) {
+      for (int timeBucketId = 0; timeBucketId < numTimeBuckets; timeBucketId++) {
+        Builder otherBuilder = otherBuilders.get(timeBucketId);
+        double[] otherBaseline = otherBaselineMetrics.get(timeBucketId);
+        double[] otherCurrent = otherCurrentMetrics.get(timeBucketId);
+        for (int i = 0; i < numMetrics; i++) {
+          otherBuilder.addMetric(metricFunctions.get(i).getMetricName(), otherBaseline[i], otherCurrent[i]);
+        }
+        rows.add(otherBuilder.build());
+      }
+    }
   }
 
   private static Map<String, ThirdEyeResponseRow> createResponseMapByTimeAndDimension(
@@ -380,10 +376,9 @@ public class TimeOnTimeResponseParser {
     }
   }
 
-  private double[] getMetricSums(ThirdEyeResponse response) {
+  private List<Double> getMetricSums(ThirdEyeResponse response) {
 
     ThirdEyeRequest request = response.getRequest();
-    double[] metricSums = new double[request.getMetricNames().size()];
     ThirdEyeRequestBuilder requestBuilder = ThirdEyeRequest.newBuilder();
     requestBuilder.setCollection(request.getCollection());
     requestBuilder.setStartTimeInclusive(request.getStartTimeInclusive());
@@ -397,10 +392,7 @@ public class TimeOnTimeResponseParser {
     } catch (Exception e) {
       LOGGER.error("Caught exception when executing metric sums request", e);
     }
-    List<Double> metrics = metricSumsResponse.getRow(0).getMetrics();
-    for (int i = 0; i < metrics.size(); i++) {
-      metricSums[i] = metrics.get(i);
-    }
+    List<Double> metricSums = metricSumsResponse.getRow(0).getMetrics();
     return metricSums;
   }
 
@@ -432,10 +424,20 @@ public class TimeOnTimeResponseParser {
 
   private boolean checkMetricSums(Row row, List<Double> baselineMetricSums, List<Double> currentMetricSums) {
     List<Metric> metrics = row.getMetrics();
+
     for (int i = 0; i < metrics.size(); i ++) {
       Metric metric = metrics.get(i);
-      if (metric.getBaselineValue() >= metricThreshold * baselineMetricSums.get(i) ||
-          metric.getCurrentValue() >= metricThreshold * currentMetricSums.get(i)) {
+      System.out.println(i + " " + metric.getBaselineValue() + " " + metric.getCurrentValue());
+      double baselineSum = 0;
+      if (baselineMetricSums != null) {
+        baselineSum = baselineMetricSums.get(i);
+      }
+      double currentSum = 0;
+      if (currentMetricSums != null) {
+        currentSum = currentMetricSums.get(i);
+      }
+      if (metric.getBaselineValue() > metricThreshold * baselineSum ||
+          metric.getCurrentValue() > metricThreshold * currentSum) {
         return true;
       }
     }

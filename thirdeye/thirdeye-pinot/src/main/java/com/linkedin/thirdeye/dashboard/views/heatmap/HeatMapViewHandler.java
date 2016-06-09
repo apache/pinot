@@ -7,6 +7,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
@@ -39,9 +43,7 @@ public class HeatMapViewHandler implements ViewHandler<HeatMapViewRequest, HeatM
   private final QueryCache queryCache;
   private CollectionConfig collectionConfig = null;
   private static final Logger LOGGER = LoggerFactory.getLogger(HeatMapViewHandler.class);
-  private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE =
-      ThirdEyeCacheRegistry.getInstance();
-
+  private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
   private static final String RATIO_SEPARATOR = "/";
 
   public HeatMapViewHandler(QueryCache queryCache) {
@@ -109,7 +111,7 @@ public class HeatMapViewHandler implements ViewHandler<HeatMapViewRequest, HeatM
 
     TimeOnTimeComparisonRequest comparisonRequest = generateTimeOnTimeComparisonRequest(request);
     List<String> groupByDimensions = comparisonRequest.getGroupByDimensions();
-    TimeOnTimeComparisonHandler handler = new TimeOnTimeComparisonHandler(queryCache);
+    final TimeOnTimeComparisonHandler handler = new TimeOnTimeComparisonHandler(queryCache);
 
     // we are tracking per dimension, to validate that its the same for each dimension
     Map<String, Map<String, Double>> baselineTotalPerMetricAndDimension = new HashMap<>();
@@ -126,10 +128,13 @@ public class HeatMapViewHandler implements ViewHandler<HeatMapViewRequest, HeatM
       }
     }
 
-    for (String groupByDimension : groupByDimensions) {
+    List<Future<TimeOnTimeComparisonResponse>> timeOnTimeComparisonResponsesFutures =
+        getTimeOnTimeComparisonResponses(groupByDimensions, comparisonRequest, handler);
 
-      comparisonRequest.setGroupByDimensions(Lists.newArrayList(groupByDimension));
-      TimeOnTimeComparisonResponse response = handler.handle(comparisonRequest);
+    for (int groupByDimensionId = 0; groupByDimensionId < groupByDimensions.size(); groupByDimensionId ++) {
+      String groupByDimension = groupByDimensions.get(groupByDimensionId);
+
+      TimeOnTimeComparisonResponse response = timeOnTimeComparisonResponsesFutures.get(groupByDimensionId).get();
 
       int numRows = response.getNumRows();
       for (int i = 0; i < numRows; i++) {
@@ -269,6 +274,34 @@ public class HeatMapViewHandler implements ViewHandler<HeatMapViewRequest, HeatM
     heatMapViewResponse.setSummary(summary);
 
     return heatMapViewResponse;
+  }
+
+  private TimeOnTimeComparisonRequest getComparisonRequestByDimension(TimeOnTimeComparisonRequest comparisonRequest,
+      String groupByDimension) {
+    TimeOnTimeComparisonRequest request = new TimeOnTimeComparisonRequest(comparisonRequest);
+    request.setGroupByDimensions(Lists.newArrayList(groupByDimension));
+    return request;
+  }
+
+  private List<Future<TimeOnTimeComparisonResponse>> getTimeOnTimeComparisonResponses(List<String> groupByDimensions,
+      TimeOnTimeComparisonRequest comparisonRequest, final TimeOnTimeComparisonHandler handler) {
+
+    ExecutorService service = Executors.newFixedThreadPool(10);
+
+    List<Future<TimeOnTimeComparisonResponse>> timeOnTimeComparisonResponseFutures = new ArrayList<>();
+
+    for (final String groupByDimension : groupByDimensions) {
+      final TimeOnTimeComparisonRequest comparisonRequestByDimension =
+          getComparisonRequestByDimension(comparisonRequest, groupByDimension);
+      Callable<TimeOnTimeComparisonResponse> callable = new Callable<TimeOnTimeComparisonResponse>() {
+        public TimeOnTimeComparisonResponse call() throws Exception {
+          return handler.handle(comparisonRequestByDimension);
+        }
+      };
+      timeOnTimeComparisonResponseFutures.add(service.submit(callable));
+    }
+    service.shutdown();
+    return timeOnTimeComparisonResponseFutures;
   }
 
   public static void main() {

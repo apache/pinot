@@ -107,7 +107,8 @@ public class TimeSeriesHandler {
     return new TimeSeriesResponse(metricExpressions, groupByDimensions, rows);
   }
 
-  private TimeSeriesRow convertToTimeSeriesRow(ThirdEyeRequest thirdeyeRequest, ThirdEyeResponseRow thirdeyeResponseRow, List<Range<DateTime>> timeRanges) {
+  private TimeSeriesRow convertToTimeSeriesRow(ThirdEyeRequest thirdeyeRequest, ThirdEyeResponseRow thirdeyeResponseRow,
+      List<Range<DateTime>> timeRanges) {
     Builder builder = new TimeSeriesRow.Builder();
     Range<DateTime> range = timeRanges.get(thirdeyeResponseRow.getTimeBucketId());
     builder.setStart(range.lowerEndpoint());
