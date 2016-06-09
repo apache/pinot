@@ -69,6 +69,7 @@ public class SegmentGeneratorConfig {
   private boolean _enableStarTreeIndex = false;
   private String _starTreeIndexSpecFile = null;
   private StarTreeIndexSpec _starTreeIndexSpec = null;
+  private String _creatorVersion = null;
 
   public SegmentGeneratorConfig() {
   }
@@ -98,6 +99,7 @@ public class SegmentGeneratorConfig {
     _enableStarTreeIndex = config._enableStarTreeIndex;
     _starTreeIndexSpecFile = config._starTreeIndexSpecFile;
     _starTreeIndexSpec = config._starTreeIndexSpec;
+    _creatorVersion = config._creatorVersion;
   }
 
   public SegmentGeneratorConfig(Schema schema) {
@@ -214,6 +216,14 @@ public class SegmentGeneratorConfig {
 
   public void setSegmentName(String segmentName) {
     _segmentName = segmentName;
+  }
+
+  public String getCreatorVersion() {
+    return _creatorVersion;
+  }
+
+  public void setCreatorVersion(String creatorVersion) {
+    _creatorVersion = creatorVersion;
   }
 
   public String getSegmentNamePostfix() {

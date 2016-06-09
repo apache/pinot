@@ -170,6 +170,14 @@ public class HadoopSegmentCreationMapReduceJob {
 
       segmentGeneratorConfig.setOutDir(_localDiskSegmentDirectory);
 
+      // Add the current java package name and version to the segment metadata
+      // properties file.
+      Package objPackage = this.getClass().getPackage();
+      String packageName = objPackage.getSpecificationTitle();
+      String packageVersion = objPackage.getSpecificationVersion();
+      LOGGER.info("Pinot Hadoop Package Name {} and version {}", packageName, packageVersion);
+      segmentGeneratorConfig.setCreatorVersion(packageName + packageVersion);
+
       SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
       driver.init(segmentGeneratorConfig);
       driver.build();

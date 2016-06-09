@@ -18,6 +18,7 @@ package com.linkedin.pinot.common.segment;
 import java.io.File;
 import java.util.Map;
 
+import javax.annotation.Nullable;
 import org.joda.time.Duration;
 import org.joda.time.Interval;
 
@@ -143,11 +144,11 @@ public interface SegmentMetadata {
   String getBitmapInvertedIndexFileName(String column, String segmentVersion);
 
   /**
-   * returns the version of the Pinot Hadoop jar that was used to create this segment
-   * @param column
+   * returns the name of the component that created the segment
    * @return
    */
-  String getPinotHadoopJarVersion();
+  @Nullable
+  String getCreatorName();
 
   /**
    * @return

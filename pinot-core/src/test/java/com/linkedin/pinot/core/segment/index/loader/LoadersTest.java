@@ -147,12 +147,5 @@ public class LoadersTest {
     }
   }
 
-  @Test
-  public void testPinotHadoopJarVersionInSegmentMetadata() throws Exception {
-    File indexDir = new File("path");
-    String pinotHadoopJarVersion = "PinotHadoopJar.2.2.6";
-    SegmentMetadata segmentMetadata = new SegmentMetadataImpl(indexDir, pinotHadoopJarVersion);
-    Assert.assertEquals(segmentMetadata.getPinotHadoopJarVersion(), pinotHadoopJarVersion);
-  }
 
 }

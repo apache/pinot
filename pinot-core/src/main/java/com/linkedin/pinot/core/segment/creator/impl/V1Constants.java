@@ -100,6 +100,7 @@ public class V1Constants {
     }
 
     public static class Segment {
+      public static final String SEGMENT_CREATOR_VERSION = "creator.version";
       public static final String SEGMENT_NAME = "segment.name";
       public static final String SEGMENT_VERSION = "segment.index.version";
       public static final String TABLE_NAME = "segment.table.name";

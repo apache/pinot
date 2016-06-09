@@ -40,6 +40,7 @@ public class ColumnMetadataTest {
 
   private static final String AVRO_DATA = "data/test_data-mv.avro";
   private static final File INDEX_DIR = new File(ColumnMetadataTest.class.toString());
+  private static final String CREATOR_VERSION = "TestHadoopJar.1.1.1";
 
   @BeforeClass
   public void setUP() throws Exception {
@@ -58,6 +59,7 @@ public class ColumnMetadataTest {
             TimeUnit.HOURS, "testTable");
     config.setSegmentNamePostfix("1");
     config.setTimeColumnName("daysSinceEpoch");
+    config.setCreatorVersion(CREATOR_VERSION);
     final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
     driver.init(config);
     driver.build();
@@ -74,6 +76,7 @@ public class ColumnMetadataTest {
     final IndexSegmentImpl segment =
         (IndexSegmentImpl) Loaders.IndexSegment.load(INDEX_DIR.listFiles()[0], ReadMode.mmap);
     SegmentMetadataImpl metadata = (SegmentMetadataImpl) segment.getSegmentMetadata();
+    Assert.assertEquals(metadata.getCreatorName(), CREATOR_VERSION);
     ColumnMetadata col7Meta =  metadata.getColumnMetadataFor("column7");
     Assert.assertEquals("column7", col7Meta.getColumnName());
     Assert.assertEquals(359, col7Meta.getCardinality());

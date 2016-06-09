@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixAdmin;
@@ -452,8 +453,7 @@ public class RetentionManagerTest {
         throw new UnsupportedOperationException("getBitmapInvertedIndexFileName not supported in " + this.getClass());
       }
 
-      @Override
-      public String getPinotHadoopJarVersion() {
+      @Nullable @Override public String getCreatorName() {
         return null;
       }
 
