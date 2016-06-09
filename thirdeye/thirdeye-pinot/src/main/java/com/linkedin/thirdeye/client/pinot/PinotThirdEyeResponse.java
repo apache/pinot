@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.client.pinot;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -9,19 +10,40 @@ import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.client.BaseThirdEyeResponse;
 import com.linkedin.thirdeye.client.MetricFunction;
 import com.linkedin.thirdeye.client.ThirdEyeRequest;
+import com.linkedin.thirdeye.client.ThirdEyeResponseRow;
 
 public class PinotThirdEyeResponse extends BaseThirdEyeResponse {
   private final Map<MetricFunction, Integer> metricFuncToIdMapping;
+  private List<ThirdEyeResponseRow> responseRows;
   private List<String[]> rows;
-  List<String> dimensions;
 
   public PinotThirdEyeResponse(ThirdEyeRequest request, List<String[]> rows,
       TimeSpec dataTimeSpec) {
     super(request, dataTimeSpec);
     this.rows = rows;
+    this.responseRows = new ArrayList<>(rows.size());
     this.metricFuncToIdMapping = new HashMap<>();
     for (int i = 0; i < metricFunctions.size(); i++) {
       metricFuncToIdMapping.put(metricFunctions.get(i), i + groupKeyColumns.size());
+    }
+    for (String[] row : rows) {
+      int timeBucketId = -1;
+      List<String> dimensions = new ArrayList<>();
+      if (!groupKeyColumns.isEmpty()) {
+        for (int i = 0; i < groupKeyColumns.size(); i++) {
+          if (request.getGroupByTimeGranularity() != null && i == 0) {
+            timeBucketId = Integer.parseInt(row[i]);
+          } else {
+            dimensions.add(row[i]);
+          }
+        }
+      }
+      List<Double> metrics = new ArrayList<>();
+      for (int i = 0; i < metricFunctions.size(); i++) {
+        metrics.add(Double.parseDouble(row[groupKeyColumns.size() + i]));
+      }
+      ThirdEyeResponseRow responseRow = new ThirdEyeResponseRow(timeBucketId, dimensions, metrics);
+      responseRows.add(responseRow);
     }
   }
 
@@ -50,5 +72,15 @@ public class PinotThirdEyeResponse extends BaseThirdEyeResponse {
       textTable.addRow(row);
     }
     return textTable.toString();
+  }
+
+  @Override
+  public int getNumRows() {
+    return rows.size();
+  }
+
+  @Override
+  public ThirdEyeResponseRow getRow(int rowId) {
+    return responseRows.get(rowId);
   }
 }

@@ -36,6 +36,12 @@ public abstract class BaseThirdEyeResponse implements ThirdEyeResponse {
   }
 
   @Override
+  public abstract int getNumRows();
+
+  @Override
+  public abstract ThirdEyeResponseRow getRow(int rowId);
+
+  @Override
   public abstract int getNumRowsFor(MetricFunction metricFunction);
 
   @Override

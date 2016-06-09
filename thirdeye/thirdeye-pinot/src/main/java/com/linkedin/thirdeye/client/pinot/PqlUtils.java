@@ -56,7 +56,7 @@ public class PqlUtils {
     String groupByClause = getDimensionGroupByClause(groupBy, timeGranularity, dataTimeSpec);
     if (StringUtils.isNotBlank(groupByClause)) {
       sb.append(" ").append(groupByClause);
-      int bucketCount = DEFAULT_TOP;
+      int bucketCount = Integer.MAX_VALUE;
       sb.append(" TOP ").append(bucketCount);
 
     }
@@ -94,7 +94,7 @@ public class PqlUtils {
     } else {
       SimpleDateFormat sdf = new SimpleDateFormat(timeFieldSpec.getFormat());
       String startDateTime = sdf.format(new Date(start.getMillis()));
-      String endDateTime = sdf.format(new Date(start.getMillis()));
+      String endDateTime = sdf.format(new Date(end.getMillis()));
       if (startDateTime.equals(endDateTime)) {
         return String.format(" %s = '%s'", timeField, startDateTime);
       } else {

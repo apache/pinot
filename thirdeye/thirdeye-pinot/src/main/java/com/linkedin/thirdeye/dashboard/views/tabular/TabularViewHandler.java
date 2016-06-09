@@ -9,39 +9,26 @@ import java.util.List;
 import java.util.Map;
 import java.util.SortedSet;
 import java.util.TreeSet;
-import java.util.concurrent.TimeUnit;
 
 import org.joda.time.DateTime;
 
 import com.google.common.collect.Multimap;
-import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.client.MetricExpression;
-import com.linkedin.thirdeye.client.MetricFunction;
 import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.client.comparison.Row;
 import com.linkedin.thirdeye.client.comparison.Row.Metric;
 import com.linkedin.thirdeye.client.comparison.TimeOnTimeComparisonHandler;
 import com.linkedin.thirdeye.client.comparison.TimeOnTimeComparisonRequest;
 import com.linkedin.thirdeye.client.comparison.TimeOnTimeComparisonResponse;
-import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.dashboard.resources.ViewRequestParams;
 import com.linkedin.thirdeye.dashboard.views.GenericResponse;
+import com.linkedin.thirdeye.dashboard.views.GenericResponse.ResponseSchema;
 import com.linkedin.thirdeye.dashboard.views.TimeBucket;
 import com.linkedin.thirdeye.dashboard.views.ViewHandler;
 import com.linkedin.thirdeye.dashboard.views.ViewRequest;
-import com.linkedin.thirdeye.dashboard.views.GenericResponse.ResponseSchema;
 import com.linkedin.thirdeye.dashboard.views.heatmap.HeatMapCell;
 
 public class TabularViewHandler implements ViewHandler<TabularViewRequest, TabularViewResponse> {
-
-  private final Comparator<DateTime> dateTimeComparator = new Comparator<DateTime>() {
-    public int compare(DateTime dateTime1, DateTime dateTime2) {
-      long millisSinceEpoch1 = dateTime1.getMillis();
-      long millisSinceEpoch2 = dateTime2.getMillis();
-      return (millisSinceEpoch1 < millisSinceEpoch2) ? -1
-          : (millisSinceEpoch1 == millisSinceEpoch2) ? 0 : 1;
-    }
-  };
 
   private final Comparator<Row> rowComparator = new Comparator<Row>() {
     public int compare(Row row1, Row row2) {
@@ -71,8 +58,6 @@ public class TabularViewHandler implements ViewHandler<TabularViewRequest, Tabul
     Multimap<String, String> filters = request.getFilters();
 
     List<MetricExpression> metricExpressions = request.getMetricExpressions();
-    List<MetricFunction> metricFunctions =
-        Utils.computeMetricFunctionsFromExpressions(metricExpressions);
     comparisonRequest.setCollectionName(collection);
     comparisonRequest.setBaselineStart(baselineStart);
     comparisonRequest.setBaselineEnd(baselineEnd);

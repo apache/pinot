@@ -90,7 +90,7 @@ public class ContributionCell {
         "cumulativePercentageChange", "cumulativeContributionDifference"//
     };
 
-    decimalFormat = new DecimalFormat("0.#");
+    decimalFormat = new DecimalFormat("0.##");
   }
 
   public String[] toArray() {
