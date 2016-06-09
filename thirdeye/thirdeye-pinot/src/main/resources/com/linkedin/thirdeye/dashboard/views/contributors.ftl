@@ -99,16 +99,17 @@
                         <thead>
                         <!-- Time row-->
                         <tr>
-                            <th class="contributors-table-date border-left" colspan="2" currentUTC="{{@root/timeBuckets.[0]/currentStart}}" baselineUTC="{{@root/timeBuckets.[0]/currentStart}}">Current Start: {{@root/timeBuckets.[0]/currentStart}}
+                            <!-- Hiding total feature till ratio metrics are handled: table-date cell should be colspan="2" when readding -->
+                            <th class="contributors-table-date border-left" currentUTC="{{@root/timeBuckets.[0]/currentStart}}" baselineUTC="{{@root/timeBuckets.[0]/currentStart}}"  title="Baseline Start: {{millisToDate  @root/timeBuckets.[0]/baselineStart}}">Current Start: {{millisToDate @root/timeBuckets.[0]/currentStart}}
                             </th>
                             {{#each @root/timeBuckets as |timeBucket timeBucketIndex|}}
-                            <th class="table-time-cell border-left" currentUTC="{{timeBucket/currentStart}}" title="{{timeBucket/baselineStart}}" colspan="1">{{timeBucket/currentStart}}
+                            <th class="table-time-cell border-left" currentUTC="{{timeBucket/currentStart}}" title="baseline: {{timeBucket/baselineStart}}" colspan="1">{{timeBucket/currentStart}}
                             </th>
                             {{/each}}
                         </tr>
                         <!--Subheader-->
                         <tr class="subheader hidden">
-                            <th colspan="2" class="divider-cell">{{dimensionName}} total</th>
+                            <th class="divider-cell">{{dimensionName}} values</th>
                             {{#each @root/timeBuckets}}
                             <th class="details-cell border-left hidden">Baseline</th>
                             <th class="details-cell hidden">Current</th>
@@ -117,7 +118,8 @@
                         </tr>
 
                         <!-- Dimension total row discrete values-->
-                        <tr class="discrete-values sum-row">
+                        <!-- Hiding total feature till ratio metrics are handled -->
+                        <!--<tr class="discrete-values sum-row">
                             <th class="select_all_cell"><input class="select_all_checkbox" value="1" type="checkbox" rel="discrete"></th>
                             <th class="hidden"></th>
                             <th class="row-title"> Total:</th>
@@ -126,10 +128,10 @@
                             <th class="details-cell hidden"></th>
                             <th class="heat-map-cell"></th>
                             {{/each}}
-                        </tr>
+                        </tr>-->
 
                         <!-- Divider row -->
-                        <tr class="divider-row">
+                        <tr class="divider-row hidden">
                             <td colspan="5"><h3>{{dimensionName}} values:</h3>
                             </td>
                         </tr>
@@ -139,7 +141,8 @@
                         {{#lookupDimValues @root/dimensionValuesMap dimName=dimensionName}}
                             {{#each this as |dimensionValue dimensionValueIndex|}}
                             <tr class="data-row discrete-values">
-                                <td class="checkbox-cell"><input value="1" type="checkbox"></td>
+                                <!-- Hiding total feature till ratio metrics are handled -->
+                                <!--<td class="checkbox-cell"><input value="1" type="checkbox"></td>-->
                                 <td class="dimension dimension-cell hidden">{{dimensionName}}</td>
                                 <td class="dimension-value-cell">{{dimensionValue}}</td>
                                 {{#lookupRowIdList @root/responseData/keyToRowIdMapping metricName=metricName dimName=dimensionName dimValue=dimensionValue}}
@@ -160,7 +163,8 @@
                         <thead>
                         <!-- Time row-->
                         <tr>
-                            <th class="contributors-table-date border-left" colspan="2" currentUTC="{{@root/timeBuckets.[0]/currentStart}}" baselineUTC="{{@root/timeBuckets.[0]/currentStart}}">Current Start: {{@root/timeBuckets.[0]/currentStart}}
+                            <!-- Hiding total feature till ratio metrics are handled: table-date cell should be colspan="2" when readding -->
+                            <th class="contributors-table-date border-left" currentUTC="{{@root/timeBuckets.[0]/currentStart}}" baselineUTC="{{@root/timeBuckets.[0]/currentStart}}" title="Baseline Start: {{millisToDate  @root/timeBuckets.[0]/baselineStart}}">Current Start: {{millisToDate @root/timeBuckets.[0]/currentStart}}
                             </th>
                             {{#each @root/timeBuckets as |timeBucket timeBucketIndex|}}
                             <th class="table-time-cell border-left" currentUTC="{{timeBucket/currentStart}}" title="{{timeBucket/baselineStart}}" colspan="1">{{timeBucket/currentStart}}
@@ -169,7 +173,7 @@
                         </tr>
                         <!--Subheader-->
                         <tr class="subheader hidden">
-                            <th colspan="2" class="divider-cell">{{dimensionName}} total</th>
+                            <th class="divider-cell">{{dimensionName}} values</th>
                             {{#each @root/timeBuckets}}
                             <th class="details-cell border-left hidden">Baseline</th>
                             <th class="details-cell hidden">Current</th>
@@ -178,7 +182,8 @@
                         </tr>
 
                         <!-- Dimension total row cumulative values-->
-                        <tr class="cumulative-values sum-row hidden">
+                        <!-- Hiding total feature till ratio metrics are handled -->
+                        <!--<tr class="cumulative-values sum-row hidden">
                             <th class="select_all_cell"><input class="select_all_checkbox" value="1" type="checkbox" rel="cumulative"></th>
                             <th class="hidden"></th>
                             <th class="row-title"> Total:</th>
@@ -187,10 +192,10 @@
                             <th class="details-cell hidden"></th>
                             <th class="heat-map-cell"></th>
                             {{/each}}
-                        </tr>
+                        </tr>-->
 
                         <!-- Divider row -->
-                        <tr class="divider-row">
+                        <tr class="divider-row hidden">
                             <td colspan="5"><h3>{{dimensionName}} values:</h3>
                             </td>
                         </tr>
@@ -201,7 +206,8 @@
                         {{#lookupDimValues @root/dimensionValuesMap dimName=dimensionName}}
                             {{#each this as |dimensionValue dimensionValueIndex|}}
                             <tr class="data-row">
-                                <td class="checkbox-cell"><input value="1" type="checkbox"></td>
+                                <!-- Hiding total feature till ratio metrics are handled -->
+                                <!--<td class="checkbox-cell"><input value="1" type="checkbox"></td>-->
                                 <td class="dimension dimension-cell hidden">{{dimensionName}}</td>
                                 <td class="dimension-value-cell">{{dimensionValue}}</td>
                                 {{#lookupRowIdList @root/responseData/keyToRowIdMapping metricName=metricName dimName=dimensionName dimValue=dimensionValue}}
@@ -211,7 +217,8 @@
                                     <td class="{{classify 2}}" value="{{returnValue @root/responseData  key=rowId schemaItem='cumulativePercentageChange'}}" data-metric-name="{{metricName}}" data-metric-index="{{metricIndex}}">{{returnValue @root/responseData  key= rowId schemaItem = "cumulativePercentageChange"}}</td>
                                     {{/each}}
                                 {{/lookupRowIdList}}
-                            </trdata                            {{/each}}
+                            </tr>
+                            {{/each}}
                         {{/lookupDimValues}}
                         </tbody>
                     </table>

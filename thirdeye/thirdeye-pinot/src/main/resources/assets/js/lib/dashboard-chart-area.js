@@ -6,11 +6,10 @@ $("#main-view").on("click", ".cumulative", function() {
 });
 
 //On the FIRST click on cumulative btn trigger the cumulative column total calculation on contributors table
-$("#main-view").one("click", ".cumulative", function() {
+<!-- Hiding total feature till ratio metrics are handled -->
+/*$("#main-view").one("click", ".cumulative", function() {
     calcCummulativeTotal(this)
-
-
-});
+});*/
 
 // Summary and details tab toggle
 $("#main-view").on("click","#sum-detail button",function() {
@@ -21,16 +20,12 @@ $("#main-view").on("click","#sum-detail button",function() {
 
 // Click metric name in the table
 $("#main-view").on("click", ".metric-label", function() {
-
     showContributors(this)
-
 });
 
 // Clicking heat-map-cell should choose the related metrics and the derived
 // metric the current time to the related hour then loading heatmap view
 $("#main-view").on("click", "#funnels-table .heat-map-cell", function() {
-
 	showHeatMap(this)
-
 })
 

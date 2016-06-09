@@ -66,18 +66,13 @@ $(document).ready(function() {
         }
 
         return colorAry[index]
-
     });
-
-
 
     Handlebars.registerHelper('hide_if_eq', function(param1, param2){
        if(param1 == param2){
            return "uk-hidden"
        }
     });
-
-
 
         //takes a value and if alias is available displays the alias
     //in dashboards the derived metrics can have an alias int he configuration

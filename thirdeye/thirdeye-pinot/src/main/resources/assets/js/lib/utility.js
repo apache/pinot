@@ -178,6 +178,9 @@ function updateDashboardFormFromHash(){
         currentStartDateString = currentStartDateTime.format("YYYY-MM-DD");
         currentStartTimeString = currentStartDateTime.format("HH:00");
 
+        if(datasetConfig.dataGranularity && datasetConfig.dataGranularity == "DAYS"){
+            currentStartTimeString = "00:00"
+        }
     }else{
 
         // populate todays date
@@ -195,6 +198,10 @@ function updateDashboardFormFromHash(){
         currentEndDateTime = moment(maxMillis);
         currentEndDateString = currentEndDateTime.format("YYYY-MM-DD");
         currentEndTimeString = currentEndDateTime.format("HH:00");
+
+        if(datasetConfig.dataGranularity && datasetConfig.dataGranularity == "DAYS"){
+            currentEndTimeString = "00:00"
+        }
     }else{
         currentEndDateTime = moment();
         currentEndDateString = currentEndDateTime.format("YYYY-MM-DD");
@@ -818,11 +825,6 @@ function transformUTCToTZTime(cell, format){
 /** Transform UTC time into user selected or browser's timezone **/
 function transformUTCToTZ() {
 
-    //Contributors view
-    $(".contributors-table-date").each(function (dindex, cell) {
-        var dateFormat = "YYYY-MM-DD";
-        transformUTCMillisToTZDate(cell, dateFormat)
-    });
     $(".table-time-cell").each(function (i, cell) {
         var dateTimeFormat = "h a";
         if(hash.hasOwnProperty("aggTimeGranularity") && hash.aggTimeGranularity == "DAYS"){
