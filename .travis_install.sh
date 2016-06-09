@@ -28,4 +28,4 @@ if [ $? -ne 0 ]; then
   exit 0
 fi
 
-mvn clean install -DskipTests=true -Dmaven.javadoc.skip=true -Dassembly.skipAssembly=true > /dev/null
+mvn clean install -DskipTests=true -Dmaven.javadoc.skip=true -Dassembly.skipAssembly=true | egrep '(ERROR|SUCCESS|FAILURE|SKIPPED)'
