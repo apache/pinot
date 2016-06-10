@@ -222,7 +222,7 @@ public class TableSizeReaderTest {
   @Test
   public void testNoSuchTable() {
     TableSizeReader reader = new TableSizeReader(executor, connectionManager, helix);
-    Assert.assertNull(reader.getTableSizeDetails("mytable", 1000));
+    Assert.assertNull(reader.getTableSizeDetails("mytable", 5000));
   }
 
   private TableSizeReader.TableSizeDetails testRunner(final String[] servers, String table) {
@@ -245,7 +245,7 @@ public class TableSizeReaderTest {
         });
 
     TableSizeReader reader = new TableSizeReader(executor, connectionManager, helix);
-    return reader.getTableSizeDetails(table, 1000);
+    return reader.getTableSizeDetails(table, timeoutMsec);
   }
 
   private Map<String, List<String>> segmentToServers(final String...servers) {
