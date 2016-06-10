@@ -7,9 +7,14 @@ import java.util.Date;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
+import org.joda.time.format.DateTimeFormat;
+import org.joda.time.format.DateTimeFormatter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Joiner;
 import com.google.common.collect.Multimap;
@@ -17,6 +22,7 @@ import com.linkedin.pinot.common.data.TimeFieldSpec;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.client.MetricFunction;
+import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.ThirdEyeRequest;
 
 /**
@@ -28,6 +34,8 @@ public class PqlUtils {
   private static final Joiner COMMA = Joiner.on(",");
   private static final Joiner EQUALS = Joiner.on(" = ");
   private static final int DEFAULT_TOP = 300;
+  private static final Logger LOGGER = LoggerFactory.getLogger(PqlUtils.class);
+  private static ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
 
   /**
    * Returns sql to calculate the sum of all raw metrics required for <tt>request</tt>, grouped by
@@ -47,7 +55,7 @@ public class PqlUtils {
     StringBuilder sb = new StringBuilder();
     String selectionClause = getSelectionClause(metricFunctions);
     sb.append("SELECT ").append(selectionClause).append(" FROM ").append(collection);
-    String betweenClause = getBetweenClause(startTime, endTime, dataTimeSpec);
+    String betweenClause = getBetweenClause(collection, startTime, endTime, dataTimeSpec);
     sb.append(" WHERE ").append(betweenClause);
     String dimensionWhereClause = getDimensionWhereClause(filterSet);
     if (StringUtils.isNotBlank(dimensionWhereClause)) {
@@ -79,7 +87,7 @@ public class PqlUtils {
     return builder.toString();
   }
 
-  static String getBetweenClause(DateTime start, DateTime end, TimeSpec timeFieldSpec) {
+  static String getBetweenClause(String collection, DateTime start, DateTime end, TimeSpec timeFieldSpec) {
     String timeField = timeFieldSpec.getColumnName();
     if (timeFieldSpec.getFormat() == null || TimeSpec.SINCE_EPOCH_FORMAT.equals(timeFieldSpec.getFormat())) {
       TimeGranularity dataGranularity = timeFieldSpec.getDataGranularity();
@@ -88,17 +96,25 @@ public class PqlUtils {
       if (startInConvertedUnits == endInConvertedUnits) {
         return String.format(" %s = %s", timeField, startInConvertedUnits);
       } else {
-        return String.format(" %s >= %s AND %s < %s", timeField, startInConvertedUnits, timeField,
+        return String.format(" %s >= %s AND %s <= %s", timeField, startInConvertedUnits, timeField,
             endInConvertedUnits);
       }
     } else {
-      SimpleDateFormat sdf = new SimpleDateFormat(timeFieldSpec.getFormat());
-      String startDateTime = sdf.format(new Date(start.getMillis()));
-      String endDateTime = sdf.format(new Date(end.getMillis()));
+
+      String timeFormat = null;
+      try {
+         timeFormat = CACHE_REGISTRY_INSTANCE.getCollectionSchemaCache().get(collection).getTime().getFormat();
+      } catch (ExecutionException e) {
+        LOGGER.error("Caught exception when reading from cache", e);
+      }
+      DateTimeFormatter dateTimeFormatter = DateTimeFormat.forPattern(timeFormat).withZoneUTC();
+
+      String startDateTime = dateTimeFormatter.print(start);
+      String endDateTime = dateTimeFormatter.print(end);
       if (startDateTime.equals(endDateTime)) {
         return String.format(" %s = '%s'", timeField, startDateTime);
       } else {
-        return String.format(" %s >= %s AND %s < %s", timeField, startDateTime, timeField,
+        return String.format(" %s >= %s AND %s <= %s", timeField, startDateTime, timeField,
             endDateTime);
       }
 

@@ -73,9 +73,12 @@ public class TimeSeriesHandler {
     List<Range<DateTime>> timeRanges = timeSeriesRequest.getTimeRanges();
 
     for (int i = 0; i < numRows; i++) {
+
       ThirdEyeResponseRow thirdeyeResponseRow = thirdEyeResponse.getRow(i);
-      TimeSeriesRow timeSeriesRow = convertToTimeSeriesRow(thirdeyeRequest, thirdeyeResponseRow, timeRanges);
-      rows.add(timeSeriesRow);
+      if (thirdeyeResponseRow.getTimeBucketId() >=0 && thirdeyeResponseRow.getTimeBucketId() < timeRanges.size()) {
+        TimeSeriesRow timeSeriesRow = convertToTimeSeriesRow(thirdeyeRequest, thirdeyeResponseRow, timeRanges);
+        rows.add(timeSeriesRow);
+      }
     }
 
     List<MetricExpression> metricExpressions = timeSeriesRequest.getMetricExpressions();
