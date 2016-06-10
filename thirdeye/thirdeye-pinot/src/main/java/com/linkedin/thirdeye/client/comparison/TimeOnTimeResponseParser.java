@@ -427,6 +427,7 @@ public class TimeOnTimeResponseParser {
 
     for (int i = 0; i < metrics.size(); i ++) {
       Metric metric = metrics.get(i);
+
       double baselineSum = 0;
       if (baselineMetricSums != null) {
         baselineSum = baselineMetricSums.get(i);
