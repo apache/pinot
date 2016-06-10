@@ -47,7 +47,7 @@ public class SegmentNameBuilder {
       // old style name
       //  return StringUtils.join(
       //      Lists.newArrayList(tableName, instanceName, groupId, partitionName, sequenceNumber), "__");
-      
+
       // shorter name: {groupId}__{partitionRange}__{sequenceNumber}
       // groupId contains the realtime table name, amongst other things
       // see com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder#getGroupIdFromRealtimeDataTable for details on the groupId
@@ -63,9 +63,9 @@ public class SegmentNameBuilder {
 
     public static String buildLowLevelConsumerSegmentName(String tableName, String partitionId, String sequenceNumber,
         long millisSinceEpoch) {
-      // ISO8601 date: 2016-01-20T123456.789Z
+      // ISO8601 date: 20160120T1234Z
       DateTime dateTime = new DateTime(millisSinceEpoch, DateTimeZone.UTC);
-      String date = dateTime.toString("yyyy-MM-DD'T'HHmmss.SSS'Z'");
+      String date = dateTime.toString("yyyyMMdd'T'HHmm'Z'");
 
       // New realtime consumer v2 name: {tableName}__{partitionId}__{sequenceNumber}__{date}
       if (isValidSegmentComponent(tableName) && isValidSegmentComponent(partitionId) &&

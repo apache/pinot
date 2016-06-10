@@ -33,7 +33,7 @@ public class SegmentNameBuilderTest {
     String v2Name = SegmentNameBuilder.Realtime.buildLowLevelConsumerSegmentName("myTable_REALTIME", "0", "1", 1465508537069L);
 
     assertEquals(shortV1Name, "myTable_REALTIME_1234567_0__ALL__1234567");
-    assertEquals(v2Name, "myTable_REALTIME__0__1__2016-06-161T214217.069Z");
+    assertEquals(v2Name, "myTable_REALTIME__0__1__20160609T2142Z");
 
     // Check v1/v2 format detection
     assertEquals(isRealtimeV1Name(oldV1Name), true);
