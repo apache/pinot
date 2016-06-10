@@ -130,7 +130,6 @@ public class SegmentStatusChecker {
     try {
       _executorService.awaitTermination(SegmentCheckerDefaultIntervalSeconds, TimeUnit.SECONDS);
     } catch (InterruptedException e) {
-      e.printStackTrace();
     }
     _executorService = null;
   }
@@ -172,6 +171,12 @@ public class SegmentStatusChecker {
           }
         }
         if (nIdeal == 0) {
+          // No online segments in ideal state
+          continue;
+        }
+        if (externalView.getStateMap(partitionName) == null) {
+          // No replicas for this segment
+          nReplicasExternal = 0;
           continue;
         }
         for (Map.Entry<String, String> serverAndState : externalView.getStateMap(partitionName).entrySet()) {
