@@ -5,9 +5,9 @@ import org.slf4j.LoggerFactory;
 
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
+import com.linkedin.thirdeye.dashboard.resources.AnomalyResource;
 import com.linkedin.thirdeye.dashboard.resources.CacheResource;
 import com.linkedin.thirdeye.dashboard.resources.DashboardResource;
-import com.linkedin.thirdeye.detector.resources.AnomalyResultResource;
 
 import io.dropwizard.assets.AssetsBundle;
 import io.dropwizard.setup.Bootstrap;
@@ -54,7 +54,8 @@ public class ThirdEyeDashboardApplication
     }
 
     env.jersey().register(new DashboardResource(BaseThirdEyeApplication.getDashboardConfigDAO(config)));
-    env.jersey().register(new AnomalyResultResource(anomalyResultDAO));
+    env.jersey().register(new AnomalyResource(anomalyFunctionSpecDAO, anomalyFunctionRelationDAO, anomalyResultDAO,
+        emailConfigurationDAO));
     env.jersey().register(new CacheResource());
   }
 
