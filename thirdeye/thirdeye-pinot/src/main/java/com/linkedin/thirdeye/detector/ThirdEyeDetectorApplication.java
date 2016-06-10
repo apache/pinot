@@ -55,6 +55,7 @@ import io.dropwizard.setup.Environment;
 
 public class ThirdEyeDetectorApplication
     extends BaseThirdEyeApplication<ThirdEyeDetectorConfiguration> {
+  private static final String QUARTZ_MISFIRE_THRESHOLD = "3600000"; // 1 hour
   private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeDetectorApplication.class);
 
   /**
@@ -126,6 +127,7 @@ public class ThirdEyeDetectorApplication
         TimeSeriesResponseConverter.getInstance();
 
     // Quartz Scheduler
+    System.setProperty("org.quartz.jobStore.misfireThreshold", QUARTZ_MISFIRE_THRESHOLD);
     SchedulerFactory schedulerFactory = new StdSchedulerFactory();
     final Scheduler quartzScheduler = schedulerFactory.getScheduler();
     environment.lifecycle().manage(new Managed() {
