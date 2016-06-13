@@ -87,7 +87,7 @@ public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTe
     ensureDirectoryExistsAndIsEmpty(_tarsDir);
   }
 
-  private void generateAndUploadRandomSegment(String segmentName, int rowCount) throws Exception {
+  protected void generateAndUploadRandomSegment(String segmentName, int rowCount) throws Exception {
     ThreadLocalRandom random = ThreadLocalRandom.current();
     Schema schema = new Schema.Parser().parse(
         new File(TestUtils.getFileFromResourceUrl(getClass().getClassLoader().getResource("dummy.avsc"))));
