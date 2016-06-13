@@ -97,6 +97,18 @@
     <argLine> -Xms4g -Xmx4g -XX:MaxPermSize=512m -XX:MaxDirectMemorySize=10g </argLine>
   </properties>
 
+  <profiles>
+    <profile>
+      <id>travis</id>
+      <activation>
+        <activeByDefault>false</activeByDefault>
+      </activation>
+      <properties>
+        <argLine> -Xms4g -Xmx4g -XX:MaxPermSize=512m -XX:MaxDirectMemorySize=10g -Dlog4j.configuration=log4j-nooutput.properties</argLine>
+      </properties>
+    </profile>
+  </profiles>
+
   <repositories>
     <repository>
       <id>restlet.org</id>
@@ -820,27 +832,4 @@
       </plugin>
     </plugins>
   </reporting>
-  <profiles>
-    <!--
-      Configuration for unit/integration tests section 3 of 3 (profiles) STARTS HERE.
-      Use the following profile to run Integration tests. From the command line:
-      mvn clean install -P integration-test
-      or:
-      mvn integration-test -P integration-test
-     * Note that if you do: 'mvn test -P integration-test'
-       integration tests will not run, because the test phase is before the
-       integration phase in the default maven lifecycle.
-     * Also note that unit tests will also be run when integration tests are
-       run, because the integration-test phase is always after the test phase
-       in the default Maven lifecycle.
-       See also: surefire plugin section and properties section.
-      -->
-    <profile>
-      <id>integration-test</id>
-      <properties>
-        <SKIP_INTEGRATION_TESTS>false</SKIP_INTEGRATION_TESTS>
-      </properties>
-    </profile>
-    <!-- Configuration for unit/integration tests section 3 of 3 (profiles) ENDS HERE.-->
-  </profiles>
 </project>
