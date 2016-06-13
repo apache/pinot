@@ -45,7 +45,7 @@ public class ColumnMetadataTest {
   private static final File INDEX_DIR = new File(ColumnMetadataTest.class.toString());
   private static final String CREATOR_VERSION = "TestHadoopJar.1.1.1";
 
-  @BeforeTest public void setUP() throws Exception {
+  @BeforeTest public void setUp() throws Exception {
 
     if (INDEX_DIR.exists()) {
       FileUtils.deleteQuietly(INDEX_DIR);
@@ -70,13 +70,13 @@ public class ColumnMetadataTest {
     return config;
   }
 
-  public SegmentGeneratorConfig CreateSegmentConfigWithCreator() throws Exception {
+  public SegmentGeneratorConfig createSegmentConfigWithCreator() throws Exception {
     SegmentGeneratorConfig config = CreateSegmentConfigWithoutCreator();
     config.setCreatorVersion(CREATOR_VERSION);
     return config;
   }
 
-  public void VerifySegmentAfterLoading(SegmentMetadataImpl metadata) {
+  public void verifySegmentAfterLoading(SegmentMetadataImpl metadata) {
 
     ColumnMetadata col7Meta = metadata.getColumnMetadataFor("column7");
     Assert.assertEquals("column7", col7Meta.getColumnName());
@@ -111,7 +111,7 @@ public class ColumnMetadataTest {
 
   @Test public void testAllFieldsInitialized() throws Exception {
     // Build the Segment metadata
-    SegmentGeneratorConfig config = CreateSegmentConfigWithCreator();
+    SegmentGeneratorConfig config = createSegmentConfigWithCreator();
     final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
     driver.init(config);
     driver.build();
@@ -126,7 +126,7 @@ public class ColumnMetadataTest {
 
   }
 
-  @Test public void TestAllFieldsExceptCreatorName() throws Exception {
+  @Test public void testAllFieldsExceptCreatorName() throws Exception {
 
     // Build the Segment metadata
     SegmentGeneratorConfig config = CreateSegmentConfigWithoutCreator();
@@ -138,7 +138,7 @@ public class ColumnMetadataTest {
     final IndexSegmentImpl segment = (IndexSegmentImpl) Loaders.IndexSegment.load(INDEX_DIR.listFiles()[0], ReadMode.mmap);
     SegmentMetadataImpl metadata = (SegmentMetadataImpl) segment.getSegmentMetadata();
 
-    VerifySegmentAfterLoading(metadata);
+    verifySegmentAfterLoading(metadata);
 
     // Make sure we get null for creator name
     String creatorName = metadata.getCreatorName();
