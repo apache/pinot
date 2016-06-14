@@ -299,8 +299,7 @@ public class SelectionOperatorService {
           "type of results Expected: (PriorityQueue| ArrayList)) actual:" + reducedResults.getClass());
     }
 
-    List<String> columns = getSelectionColumnsFromDataSchema(dataSchema);
-    return new SelectionResults(columns, rows);
+    return new SelectionResults(_selectionColumns, rows);
   }
 
   private JSONArray getSelectionColumnsJsonArrayFromDataSchema(DataSchema dataSchema) {
