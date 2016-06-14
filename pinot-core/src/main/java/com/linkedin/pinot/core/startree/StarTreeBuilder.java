@@ -15,36 +15,34 @@
  */
 package com.linkedin.pinot.core.startree;
 
+import com.google.common.collect.HashBiMap;
+import com.linkedin.pinot.core.data.GenericRow;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import com.google.common.collect.HashBiMap;
-import com.linkedin.pinot.core.data.GenericRow;
 import java.util.Set;
 
 
 public interface StarTreeBuilder {
   /**
-   * Initializes the builder, called before append.
+   * Initialize the builder, called before append.
    *
-   * @param splitOrder
-   *  The dimensions that should be used in successive splits down the tree.
-   * @param maxLeafRecords
-   *  The maximum number of records that can exist at a leaf, if there are still split dimensions available.
-   * @param table
-   *  The temporary table to store dimensional data.
+   * @param config star tree builder config.
    * @throws Exception
    */
   void init(StarTreeBuilderConfig config) throws Exception;
 
   /**
-   * Adds a possibly non-unique dimension combination to the StarTree table.
+   * Append a new record row to the star tree builder.
+   *
+   * @param row record row to be appended.
    * @throws Exception
    */
   void append(GenericRow row) throws Exception;
 
   /**
-   * Builds the StarTree, called after all calls to append (after build);
+   * Build the star tree, called after all record rows appended to the builder.
+   *
    * @throws Exception
    */
   void build() throws Exception;
@@ -55,40 +53,61 @@ public interface StarTreeBuilder {
   void cleanup();
 
   /**
-   * Returns the root node of the tree (after build).
+   * Get the generated star tree.
+   *
+   * @return generated star tree.
    */
   StarTree getTree();
 
   /**
+   * Get an iterator for all non-aggregate records and aggregate records.
    *
-   * @return
+   * @param startDocId start document id.
+   * @param endDocId end document id.
+   * @return records iterator.
    * @throws Exception
    */
   Iterator<GenericRow> iterator(int startDocId, int endDocId) throws Exception;
 
   /**
-   * Returns the total number of non-aggregate dimension combinations.
+   * Get the total number of non-aggregate records.
+   *
+   * @return number of non-aggregate records.
    */
   int getTotalRawDocumentCount();
 
   /**
-   * Returns the total number of aggregate dimension combinations.
+   * Get the total number of aggregate records.
+   *
+   * @return number of aggregate records.
    */
   int getTotalAggregateDocumentCount();
 
   /**
-   * Returns the maximum number of leaf records from init.
+   * Get the maximum number of records in leaf node.
+   *
+   * @return maximum number of records in leaf node.
    */
   int getMaxLeafRecords();
 
   /**
-   * Returns the split order
+   * Get the dimensions split order.
+   *
+   * @return dimensions split order.
    */
   List<String> getDimensionsSplitOrder();
 
-  Map<String, HashBiMap<Object, Integer>> getDictionaryMap();
-
-  HashBiMap<String, Integer> getDimensionNameToIndexMap();
-
+  /**
+   * Get the skip materialization dimensions set associated with the star tree.
+   *
+   * @return skip materialization dimensions set.
+   */
   Set<String> getSkipMaterializationForDimensions();
+
+  /**
+   * Get the column to dictionary map associated with the star tree.
+   *
+   * @return column to dictionary map.
+   */
+  Map<String, HashBiMap<Object, Integer>> getDictionaryMap();
 }

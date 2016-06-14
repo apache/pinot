@@ -15,48 +15,31 @@
  */
 package com.linkedin.pinot.core.startree;
 
-import java.io.ByteArrayOutputStream;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.OutputStream;
 import java.io.Serializable;
+import java.util.List;
 
-import com.google.common.collect.HashBiMap;
 
+public class StarTree implements Serializable {
 
-public class StarTree implements Serializable{
+  private StarTreeIndexNode _root;
+  private List<String> _dimensionList;
 
-  /**
-   * 
-   */
-  private static final long serialVersionUID = 1L;
-  StarTreeIndexNode root;
-  private HashBiMap<String, Integer> dimensionNameToIndexMap;
-
-  public StarTree(StarTreeIndexNode root, HashBiMap<String, Integer> dimensionNameToIndexMap) {
-    this.root = root;
-    this.dimensionNameToIndexMap = dimensionNameToIndexMap;
+  public StarTree(StarTreeIndexNode root, List<String> dimensionList) {
+    _root = root;
+    _dimensionList = dimensionList;
   }
 
   public StarTreeIndexNode getRoot() {
-    return root;
+    return _root;
   }
 
-  public HashBiMap<String, Integer> getDimensionNameToIndexMap() {
-    return dimensionNameToIndexMap;
-  }
-
-  /**
-   * Returns a Java-serialized StarTree structure of this node and all its sub-trees.
-   */
-  public byte[] toBytes() throws IOException {
-    ByteArrayOutputStream baos = new ByteArrayOutputStream();
-    writeTree(baos);
-    baos.close();
-    return baos.toByteArray();
+  public List<String> getDimensionList() {
+    return _dimensionList;
   }
 
   public void writeTree(OutputStream outputStream) throws IOException {
@@ -65,12 +48,10 @@ public class StarTree implements Serializable{
   }
 
   /**
-   * De-serializes a StarTree structure generated with {@link #toBytes}.
+   * De-serializes a StarTree structure generated with {@link #writeTree(OutputStream)}.
    */
-  public static StarTree fromBytes(InputStream inputStream) throws IOException, ClassNotFoundException {
+  public static StarTree readTree(InputStream inputStream) throws IOException, ClassNotFoundException {
     ObjectInputStream ois = new ObjectInputStream(inputStream);
-    StarTree node = (StarTree) ois.readObject();
-    return node;
+    return (StarTree) ois.readObject();
   }
-
 }
