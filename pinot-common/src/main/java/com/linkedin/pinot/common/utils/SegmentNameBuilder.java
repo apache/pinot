@@ -78,9 +78,9 @@ public class SegmentNameBuilder {
     }
 
     public static String extractTableName(String segmentId) {
-      if (isOldV1StyleName(segmentId) || isRealtimeV2Name(segmentId)) {
+      if (isLongHighLevelSegmentName(segmentId) || isLowLevelRealtimeSegmentName(segmentId)) {
         return segmentId.split("__")[0];
-      } else if (isShortV1StyleName(segmentId)) {
+      } else if (isShortHighLevelSegmentName(segmentId)) {
         // Table name is the first part of the Kafka consumer group id
         String groupId = extractGroupIdName(segmentId);
         return groupId.substring(0, groupId.indexOf(REALTIME_SUFFIX) + REALTIME_SUFFIX_LENGTH);
@@ -90,11 +90,11 @@ public class SegmentNameBuilder {
     }
 
     public static String extractGroupIdName(String segmentId) {
-      if (isOldV1StyleName(segmentId)) {
+      if (isLongHighLevelSegmentName(segmentId)) {
         return segmentId.split("__")[2];
-      } else if (isShortV1StyleName(segmentId)) {
+      } else if (isShortHighLevelSegmentName(segmentId)) {
         return segmentId.split("__")[0];
-      } else if (isRealtimeV2Name(segmentId)){
+      } else if (isLowLevelRealtimeSegmentName(segmentId)){
         throw new RuntimeException("Realtime v2 segments don't have a consumer group id");
       } else {
         throw new RuntimeException("Unable to parse segment name " + segmentId);
@@ -102,11 +102,11 @@ public class SegmentNameBuilder {
     }
 
     public static String extractPartitionRange(String segmentId) {
-      if (isOldV1StyleName(segmentId)) {
+      if (isLongHighLevelSegmentName(segmentId)) {
         return segmentId.split("__")[3];
-      } else if (isShortV1StyleName(segmentId)) {
+      } else if (isShortHighLevelSegmentName(segmentId)) {
         return segmentId.split("__")[1];
-      } else if (isRealtimeV2Name(segmentId)){
+      } else if (isLowLevelRealtimeSegmentName(segmentId)){
         return segmentId.split("__")[2];
       } else {
         throw new RuntimeException("Unable to parse segment name " + segmentId);
@@ -114,11 +114,11 @@ public class SegmentNameBuilder {
     }
 
     public static String extractSequenceNumber(String segmentId) {
-      if (isOldV1StyleName(segmentId)) {
+      if (isLongHighLevelSegmentName(segmentId)) {
         return segmentId.split("__")[4];
-      } else if (isShortV1StyleName(segmentId)) {
+      } else if (isShortHighLevelSegmentName(segmentId)) {
         return segmentId.split("__")[2];
-      } else if (isRealtimeV2Name(segmentId)){
+      } else if (isLowLevelRealtimeSegmentName(segmentId)){
         return segmentId.split("__")[2];
       } else {
         throw new RuntimeException("Unable to parse segment name " + segmentId);
@@ -126,7 +126,7 @@ public class SegmentNameBuilder {
 
     }
 
-    public static boolean isRealtimeV1Name(String segmentId) {
+    public static boolean isHighLevelRealtimeSegmentName(String segmentId) {
       int namePartCount = segmentId.split("__").length;
       // Realtime v1 segment names have either:
       // - Five parts (old style name: tableName, instanceName, groupId, partitionName, sequenceNumber)
@@ -134,17 +134,17 @@ public class SegmentNameBuilder {
       return namePartCount == 5 || namePartCount == 3;
     }
 
-    public static boolean isRealtimeV2Name(String segmentId) {
+    public static boolean isLowLevelRealtimeSegmentName(String segmentId) {
       int namePartCount = segmentId.split("__").length;
       // Realtime v2 segment names have four parts (tableName, partitionId, sequenceNumber, date)
       return namePartCount == 4;
     }
 
-    private static boolean isOldV1StyleName(String segmentId) {
+    private static boolean isLongHighLevelSegmentName(String segmentId) {
       return segmentId.split("__").length == 5;
     }
 
-    private static boolean isShortV1StyleName(String segmentId) {
+    private static boolean isShortHighLevelSegmentName(String segmentId) {
       return segmentId.split("__").length == 3;
     }
 
