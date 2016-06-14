@@ -127,7 +127,7 @@ public class AggregationPhaseJob extends Configured {
       // metrics
       Number[] metrics = new Number[numMetrics];
       for (int i = 0; i < numMetrics; i++) {
-        Number metricValue = ThirdeyeAvroUtils.getMetricFromRecord(inputRecord, metricNames.get(i));
+        Number metricValue = ThirdeyeAvroUtils.getMetricFromRecord(inputRecord, metricNames.get(i), metricTypes.get(i));
         metrics[i] = metricValue;
       }
 
