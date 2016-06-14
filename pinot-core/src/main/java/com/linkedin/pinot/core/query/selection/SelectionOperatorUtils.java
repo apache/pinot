@@ -516,31 +516,33 @@ public class SelectionOperatorUtils {
   public static Serializable[] getFormattedRow(Serializable[] inputValues, List<String> selectionColumns,
       DataSchema dataSchema)
       throws JSONException {
-    Serializable[] formattedRow = new Serializable[inputValues.length];
-
-    for (int i = 0; i < dataSchema.size(); ++i) {
-      // If column not part of schema, we don't know how to format it, so just skip.
-      if (!selectionColumns.contains(dataSchema.getColumnName(i))) {
+    Serializable[] formattedRow = new Serializable[selectionColumns.size()];
+    Map<String, Integer> columnToIdxMapping = buildColumnToIdxMappingForDataSchema(dataSchema);
+    for (int i = 0; i < selectionColumns.size(); ++i) {
+      // If column not part of schema, we put null value. This shouldn't be hit as segment level response
+      // will be null if selecting columns not existed in the segment.
+      if (!columnToIdxMapping.containsKey(selectionColumns.get(i))) {
+        formattedRow[i] = null;
         continue;
       }
-
-      if (dataSchema.getColumnType(i).isSingleValue()) {
-        if (dataSchema.getColumnType(i) == DataType.STRING) {
-          formattedRow[i] = inputValues[i];
+      int idxInDataSchema = columnToIdxMapping.get(selectionColumns.get(i));
+      if (dataSchema.getColumnType(idxInDataSchema).isSingleValue()) {
+        if (dataSchema.getColumnType(idxInDataSchema) == DataType.STRING) {
+          formattedRow[i] = inputValues[idxInDataSchema];
         } else {
-          formattedRow[i] = DEFAULT_FORMAT_STRING_MAP.get(dataSchema.getColumnType(i)).format(inputValues[i]);
+          formattedRow[i] = DEFAULT_FORMAT_STRING_MAP.get(dataSchema.getColumnType(idxInDataSchema)).format(inputValues[idxInDataSchema]);
         }
       } else {
         String[] multiValued;
-        DecimalFormat decimalFormat = DEFAULT_FORMAT_STRING_MAP.get(dataSchema.getColumnType(i));
+        DecimalFormat decimalFormat = DEFAULT_FORMAT_STRING_MAP.get(dataSchema.getColumnType(idxInDataSchema));
 
-        switch (dataSchema.getColumnType(i)) {
+        switch (dataSchema.getColumnType(idxInDataSchema)) {
           case STRING_ARRAY:
-            multiValued = (String[]) inputValues[i];
+            multiValued = (String[]) inputValues[idxInDataSchema];
             break;
 
           case INT_ARRAY:
-            int[] intValues = (int[]) inputValues[i];
+            int[] intValues = (int[]) inputValues[idxInDataSchema];
             multiValued = new String[intValues.length];
             for (int j = 0; j < intValues.length; j++) {
               multiValued[j] = decimalFormat.format(intValues[j]);
@@ -548,7 +550,7 @@ public class SelectionOperatorUtils {
             break;
 
           case FLOAT_ARRAY:
-            float[] floatValues = (float[]) inputValues[i];
+            float[] floatValues = (float[]) inputValues[idxInDataSchema];
             multiValued = new String[floatValues.length];
             for (int j = 0; j < floatValues.length; j++) {
               multiValued[j] = decimalFormat.format(floatValues[j]);
@@ -556,7 +558,7 @@ public class SelectionOperatorUtils {
             break;
 
           case LONG_ARRAY:
-            long[] longValues = (long[]) inputValues[i];
+            long[] longValues = (long[]) inputValues[idxInDataSchema];
             multiValued = new String[longValues.length];
             for (int j = 0; j < longValues.length; j++) {
               multiValued[j] = decimalFormat.format(longValues[j]);
@@ -564,7 +566,7 @@ public class SelectionOperatorUtils {
             break;
 
           case DOUBLE_ARRAY:
-            double[] doubleValues = (double[]) inputValues[i];
+            double[] doubleValues = (double[]) inputValues[idxInDataSchema];
             multiValued = new String[doubleValues.length];
             for (int j = 0; j < doubleValues.length; j++) {
               multiValued[j] = decimalFormat.format(doubleValues[j]);
@@ -578,6 +580,14 @@ public class SelectionOperatorUtils {
       }
     }
     return formattedRow;
+  }
+
+  private static Map<String, Integer> buildColumnToIdxMappingForDataSchema(DataSchema dataSchema) {
+    Map<String, Integer> columnToIdxMapping = new HashMap<String, Integer>();
+    for (int i = 0; i < dataSchema.size(); ++i) {
+      columnToIdxMapping.put(dataSchema.getColumnName(i), i);
+    }
+    return columnToIdxMapping;
   }
 
   public static Serializable[] extractRowFromDataTable(DataTable dt, int rowId) {
