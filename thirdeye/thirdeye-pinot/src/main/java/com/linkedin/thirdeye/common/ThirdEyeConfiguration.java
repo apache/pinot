@@ -7,6 +7,7 @@ import javax.validation.Valid;
 import javax.validation.constraints.NotNull;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.linkedin.thirdeye.detector.driver.FailureEmailConfiguration;
 
 public abstract class ThirdEyeConfiguration extends Configuration {
   /**
@@ -28,6 +29,9 @@ public abstract class ThirdEyeConfiguration extends Configuration {
 
   private String whitelistCollections = "";
   private String blacklistCollections = "";
+
+  private FailureEmailConfiguration failureEmailConfig;
+
 
   @Valid
   @NotNull
@@ -80,6 +84,18 @@ public abstract class ThirdEyeConfiguration extends Configuration {
 
   public void setBlacklistCollections(String blacklistCollections) {
     this.blacklistCollections = blacklistCollections;
+  }
+
+  public String getFunctionConfigPath() {
+    return getRootDir() + "/detector-config/anomaly-functions/functions.properties";
+  }
+
+  public FailureEmailConfiguration getFailureEmailConfig() {
+    return failureEmailConfig;
+  }
+
+  public void setFailureEmailConfig(FailureEmailConfiguration failureEmailConfig) {
+    this.failureEmailConfig = failureEmailConfig;
   }
 
 }
