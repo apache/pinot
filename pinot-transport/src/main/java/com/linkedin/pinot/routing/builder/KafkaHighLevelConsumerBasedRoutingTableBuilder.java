@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.routing.builder;
 
+import com.linkedin.pinot.common.utils.SegmentName;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -53,6 +54,10 @@ public class KafkaHighLevelConsumerBasedRoutingTableBuilder implements RoutingTa
             || pruner.isInactive(instance)) {
           continue;
         }
+
+        // Skip segments that are not high level consumer segments
+        if (!SegmentName.isHighLevelConsumerSegmentName(segment))
+          continue;
 
         String groupId = SegmentNameBuilder.Realtime.extractGroupIdName(segment);
         if (!groupIdToRouting.containsKey(groupId)) {
