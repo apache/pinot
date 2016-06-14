@@ -100,6 +100,7 @@ public class DerivedColumnTransformationPhaseJob extends Configured {
     private DerivedColumnTransformationPhaseConfig config;
     private List<String> dimensionsNames;
     private List<String> metricNames;
+    private List<MetricType> metricTypes;
     private TopKDimensionValues topKDimensionValues;
     private Map<String, Set<String>> topKDimensionsMap;
     private String timeColumnName;
@@ -122,6 +123,7 @@ public class DerivedColumnTransformationPhaseJob extends Configured {
       config = DerivedColumnTransformationPhaseConfig.fromThirdEyeConfig(thirdeyeConfig);
       dimensionsNames = config.getDimensionNames();
       metricNames = config.getMetricNames();
+      metricTypes = config.getMetricTypes();
       timeColumnName = config.getTimeColumnName();
 
       outputSchema = new Schema.Parser().parse(configuration.get(DERIVED_COLUMN_TRANSFORMATION_PHASE_OUTPUT_SCHEMA.toString()));
@@ -168,8 +170,10 @@ public class DerivedColumnTransformationPhaseJob extends Configured {
       }
 
       // metrics
-      for (String metric : metricNames) {
-        outputRecord.put(metric, ThirdeyeAvroUtils.getMetricFromRecord(inputRecord, metric));
+      for (int i = 0; i < metricNames.size(); i ++) {
+        String metricName = metricNames.get(i);
+        MetricType metricType = metricTypes.get(i);
+        outputRecord.put(metricName, ThirdeyeAvroUtils.getMetricFromRecord(inputRecord, metricName, metricType));
       }
 
       // time
