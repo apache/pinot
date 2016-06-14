@@ -17,6 +17,7 @@ package com.linkedin.pinot.core.segment.index.loader;
 
 import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
 import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
@@ -139,15 +140,12 @@ public class LoadersTest {
     }
     {
       IndexSegment indexSegment = Loaders.IndexSegment.load(segmentDirectory, ReadMode.mmap, v3LoadingConfig);
-      Assert.assertEquals(SegmentVersion.valueOf(indexSegment.getSegmentMetadata().getVersion()), SegmentVersion.v3);
+      Assert.assertEquals(SegmentVersion.valueOf(indexSegment.getSegmentMetadata().getVersion()),
+          SegmentVersion.v3);
       Assert.assertTrue(SegmentDirectoryPaths.segmentDirectoryFor(segmentDirectory, SegmentVersion.v3).exists());
       Assert.assertFalse(v3TempDir.exists());
     }
-
-
   }
-
-
 
 
 }

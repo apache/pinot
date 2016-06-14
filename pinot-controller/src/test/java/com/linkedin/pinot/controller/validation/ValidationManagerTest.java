@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import com.linkedin.pinot.common.utils.SegmentNameBuilder;
+import javax.annotation.Nullable;
 import org.apache.helix.manager.zk.ZkClient;
 import org.joda.time.DateTime;
 import org.joda.time.Duration;
@@ -458,5 +459,10 @@ public class ValidationManagerTest {
       // TODO Auto-generated method stub
       return null;
     }
+
+    @Nullable @Override public String getCreatorName() {
+      return null;
+    }
+
   }
 }
