@@ -7,8 +7,6 @@ import java.util.List;
 import org.apache.commons.lang.ObjectUtils;
 import org.joda.time.DateTime;
 
-import com.linkedin.thirdeye.client.MetricFunction;
-
 public class TimeSeriesRow implements Comparable<TimeSeriesRow> {
   private final long start;
   private final long end;
@@ -93,8 +91,8 @@ public class TimeSeriesRow implements Comparable<TimeSeriesRow> {
   static class Builder {
     private DateTime start;
     private DateTime end;
-    private String dimensionName;
-    private String dimensionValue;
+    private String dimensionName = "all";
+    private String dimensionValue = "all";
     private final List<TimeSeriesMetric> metrics = new ArrayList<>();
 
     public void setStart(DateTime start) {
@@ -135,7 +133,7 @@ public class TimeSeriesRow implements Comparable<TimeSeriesRow> {
   }
 
   public static class TimeSeriesMetric implements Comparable<TimeSeriesMetric> {
-    private final String metricName; 
+    private final String metricName;
     private final Double value;
 
     public TimeSeriesMetric(String metricName, Double value) {
@@ -152,7 +150,7 @@ public class TimeSeriesRow implements Comparable<TimeSeriesRow> {
     public String getMetricName() {
       return metricName;
     }
-    
+
     public Double getValue() {
       return value;
     }

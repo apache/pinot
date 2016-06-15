@@ -1,30 +1,26 @@
 package com.linkedin.thirdeye.client.timeseries;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
 
-import com.linkedin.thirdeye.client.MetricExpression;
-import com.linkedin.thirdeye.client.MetricFunction;
+import com.linkedin.thirdeye.client.timeseries.TimeSeriesRow.TimeSeriesMetric;
 
 public class TimeSeriesResponse {
-  private final int numRows;
-  private final List<MetricExpression> metricExpressions;
-  private final List<String> metrics;
-  private final List<String> dimensionNames;
+  int numRows;
+  private final Set<String> metrics = new TreeSet<>();
+  private final Set<String> dimensions = new TreeSet<>();
   private final List<TimeSeriesRow> rows;
 
-  public TimeSeriesResponse(List<MetricExpression> metricExpressions, List<String> dimensionNames,
-      List<TimeSeriesRow> rows) {
-    rows = new ArrayList<>(rows);
-    Collections.sort(rows);
-    this.rows = Collections.unmodifiableList(rows);
-    this.metricExpressions = metricExpressions;
-    metrics = new ArrayList<>();
-    for (MetricExpression expression : metricExpressions) {
-      metrics.add(expression.getExpressionName());
+  public TimeSeriesResponse(List<TimeSeriesRow> rows) {
+    this.rows = rows;
+    for (TimeSeriesRow row : rows) {
+      for (TimeSeriesMetric metric : row.getMetrics()) {
+        metrics.add(metric.getMetricName());
+      }
+      dimensions.add(row.getDimensionName());
     }
-    this.dimensionNames = dimensionNames;
     numRows = rows.size();
   }
 
@@ -32,23 +28,27 @@ public class TimeSeriesResponse {
     return numRows;
   }
 
-  public List<String> getMetrics() {
+  public Set<String> getMetrics() {
     return metrics;
   }
 
-  public List<MetricExpression> getMetricExpressions() {
-    return metricExpressions;
-  }
-
-  public List<String> getDimensionNames() {
-    return dimensionNames;
-  }
-
-  public List<TimeSeriesRow> getRows() {
-    return rows;
+  public Set<String> getDimensions() {
+    return dimensions;
   }
 
   public TimeSeriesRow getRow(int index) {
     return rows.get(index);
+  }
+
+  public static class Builder {
+    List<TimeSeriesRow> rows = new ArrayList<>();
+
+    public void add(TimeSeriesRow row) {
+      rows.add(row);
+    }
+
+    TimeSeriesResponse build() {
+      return new TimeSeriesResponse(rows);
+    }
   }
 }
