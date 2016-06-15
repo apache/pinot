@@ -59,6 +59,10 @@ body a{
     color: blue;
 }
 
+.thin-input{
+   width:60px;
+}
+
 .plus-symbol:before {
     content: "+";
 }
@@ -145,6 +149,7 @@ body a{
 .time-range-selector-dropdown{
     position: relative;
     margin-top: 5px;
+    max-width: 270px;
 }
 
 .date-time-selector-box {
@@ -230,7 +235,7 @@ body a{
     padding: 4px;
 }
 
-/* Dashboard header: Filter related */
+/* Form: Filter related */
 
 .uk-dropdown.filter-panel{
     width:450px;
@@ -297,7 +302,7 @@ body a{
     margin: 5px 0 5px 5px;
 }
 
-/* Form time selector */
+/* Form: Time selector */
 .max-min-time-label{
     font-size: 0.65em;
 }
@@ -305,6 +310,15 @@ body a{
 
 .granularity-btn-group.vertical button{
     width: 250px;
+}
+
+/* Form: Anomaly config related */
+#configure-alert-form .uk-form-row{
+   margin-bottom: 15px;
+}
+
+#configure-alert-form .time-range-selector-dropdown{
+    width: 262px;
 }
 
 
@@ -475,7 +489,7 @@ body a{
 #linechart-placeholder {
     display: inline-block;
     width: 83%;
-    height: 300px;
+    height: 250px;
 }
 
 

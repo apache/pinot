@@ -3,8 +3,7 @@
         <table id="anomalies-table" class="uk-table">
             <thead>
             <tr>
-                <!--Todo: checkbox
-                <th></th> -->
+                <th></th>
                 <th class="border-left">Anomaly ID</th>
                 <th class="border-left">Metric</th>
                 <th class="border-left">Start time</th>
@@ -20,8 +19,7 @@
             <tbody class="">
             {{#each this as |anomalyData anomalyIndex|}}
             <tr>
-                <!--Todo:
-                <td class="checkbox-cell"><input type="checkbox" value="{{anomalyData/metric}}"></td>-->
+                <td class="checkbox-cell"><input type="checkbox" value="{{anomalyData/metric}}"></td>
                 <td class="border-left">{{anomalyData/id}}</td>
                 <td class="metric-label border-left">{{anomalyData/metric}}</td>
                 <td class="border-left">{{millisToDate anomalyData/startTimeUtc}}</td>
@@ -30,8 +28,6 @@
 				<td class="border-left">{{anomalyData/functionId}}</td>
                 <td class="border-left">{{anomalyData/functionType}}</td>
                 <td class="border-left">{{anomalyData/dimensions}}</td>
-                
-
             </tr>
 
             {{/each}}
