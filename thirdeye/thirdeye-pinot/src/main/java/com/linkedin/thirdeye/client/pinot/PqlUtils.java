@@ -1,9 +1,7 @@
 package com.linkedin.thirdeye.client.pinot;
 
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Date;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -18,7 +16,6 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Joiner;
 import com.google.common.collect.Multimap;
-import com.linkedin.pinot.common.data.TimeFieldSpec;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.client.MetricFunction;
@@ -35,7 +32,8 @@ public class PqlUtils {
   private static final Joiner EQUALS = Joiner.on(" = ");
   private static final int DEFAULT_TOP = 300;
   private static final Logger LOGGER = LoggerFactory.getLogger(PqlUtils.class);
-  private static ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
+  private static ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry
+      .getInstance();
 
   /**
    * Returns sql to calculate the sum of all raw metrics required for <tt>request</tt>, grouped by
@@ -87,37 +85,57 @@ public class PqlUtils {
     return builder.toString();
   }
 
-  static String getBetweenClause(String collection, DateTime start, DateTime end, TimeSpec timeFieldSpec) {
+  static String getBetweenClause(String collection, DateTime start, DateTime end,
+      TimeSpec timeFieldSpec) {
+    TimeGranularity dataGranularity = timeFieldSpec.getDataGranularity();
+    long startMillis = start.getMillis();
+    long endMillis = end.getMillis();
+    long dataGranularityMillis = dataGranularity.toMillis();
+
+    // Shrink start and end as per data granularity
+    long startAlignmentDelta = startMillis % dataGranularityMillis;
+    if (startAlignmentDelta != 0) {
+      long startMillisAligned = startMillis + dataGranularityMillis - startAlignmentDelta;
+      start = new DateTime(startMillisAligned);
+    }
+
+    long endAligmentDelta = endMillis % dataGranularityMillis;
+    if (endAligmentDelta != 0) {
+      long endMillisAligned = endMillis - endAligmentDelta;
+      end = new DateTime(endMillisAligned);
+    }
+
+    String startQueryTime;
+    String endQueryTime;
+
     String timeField = timeFieldSpec.getColumnName();
-    if (timeFieldSpec.getFormat() == null || TimeSpec.SINCE_EPOCH_FORMAT.equals(timeFieldSpec.getFormat())) {
-      TimeGranularity dataGranularity = timeFieldSpec.getDataGranularity();
+    if (timeFieldSpec.getFormat() == null
+        || TimeSpec.SINCE_EPOCH_FORMAT.equals(timeFieldSpec.getFormat())) {
       long startInConvertedUnits = dataGranularity.convertToUnit(start.getMillis());
       long endInConvertedUnits = dataGranularity.convertToUnit(end.getMillis());
-      if (startInConvertedUnits == endInConvertedUnits) {
-        return String.format(" %s = %s", timeField, startInConvertedUnits);
-      } else {
-        return String.format(" %s >= %s AND %s <= %s", timeField, startInConvertedUnits, timeField,
-            endInConvertedUnits);
-      }
+      startQueryTime = String.valueOf(startInConvertedUnits);
+      endQueryTime = String.valueOf(endInConvertedUnits);
     } else {
 
       String timeFormat = null;
       try {
-         timeFormat = CACHE_REGISTRY_INSTANCE.getCollectionSchemaCache().get(collection).getTime().getFormat();
+        timeFormat =
+            CACHE_REGISTRY_INSTANCE.getCollectionSchemaCache().get(collection).getTime()
+                .getFormat();
       } catch (ExecutionException e) {
         LOGGER.error("Caught exception when reading from cache", e);
       }
       DateTimeFormatter dateTimeFormatter = DateTimeFormat.forPattern(timeFormat).withZoneUTC();
 
-      String startDateTime = dateTimeFormatter.print(start);
-      String endDateTime = dateTimeFormatter.print(end);
-      if (startDateTime.equals(endDateTime)) {
-        return String.format(" %s = '%s'", timeField, startDateTime);
-      } else {
-        return String.format(" %s >= %s AND %s <= %s", timeField, startDateTime, timeField,
-            endDateTime);
-      }
+      startQueryTime = dateTimeFormatter.print(start);
+      endQueryTime = dateTimeFormatter.print(end);
+    }
 
+    if (startQueryTime.equals(endQueryTime)) {
+      return String.format(" %s = %s", timeField, startQueryTime);
+    } else {
+      return String.format(" %s >= %s AND %s <= %s", timeField, startQueryTime, timeField,
+          endQueryTime);
     }
   }
 
