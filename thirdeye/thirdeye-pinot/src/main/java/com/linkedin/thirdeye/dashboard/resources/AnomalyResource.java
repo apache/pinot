@@ -2,8 +2,10 @@ package com.linkedin.thirdeye.dashboard.resources;
 
 import io.dropwizard.hibernate.UnitOfWork;
 
+import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
@@ -23,6 +25,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.api.CollectionSchema;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
@@ -34,6 +37,7 @@ import com.linkedin.thirdeye.detector.db.AnomalyFunctionRelationDAO;
 import com.linkedin.thirdeye.detector.db.AnomalyFunctionSpecDAO;
 import com.linkedin.thirdeye.detector.db.AnomalyResultDAO;
 import com.linkedin.thirdeye.detector.db.EmailConfigurationDAO;
+import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 @Path(value = "/dashboard")
 @Produces(MediaType.APPLICATION_JSON)
@@ -45,21 +49,18 @@ public class AnomalyResource {
 
   private QueryCache queryCache;
   private AnomalyFunctionSpecDAO anomalyFunctionSpecDAO;
-  private AnomalyFunctionRelationDAO anomalyFunctionRelationDAO;
   private AnomalyResultDAO anomalyResultDAO;
   private EmailConfigurationDAO emailConfigurationDAO;
   private AnomalyDetectionJobManager anomalyDetectionJobManager;
 
   public AnomalyResource(AnomalyDetectionJobManager anomalyDetectionJobManager,
       AnomalyFunctionSpecDAO anomalyFunctionSpecDAO,
-      AnomalyFunctionRelationDAO anomalyFunctionRelationDAO,
       AnomalyResultDAO anomalyResultDAO,
       EmailConfigurationDAO emailConfigurationDAO) {
 
     this.queryCache = CACHE_REGISTRY_INSTANCE.getQueryCache();
     this.anomalyDetectionJobManager = anomalyDetectionJobManager;
     this.anomalyFunctionSpecDAO = anomalyFunctionSpecDAO;
-    this.anomalyFunctionRelationDAO = anomalyFunctionRelationDAO;
     this.anomalyResultDAO = anomalyResultDAO;
     this.emailConfigurationDAO = emailConfigurationDAO;
 
@@ -77,10 +78,11 @@ public class AnomalyResource {
   public List<AnomalyResult> viewAnomaliesInRange(@QueryParam("dataset") String dataset,
       @QueryParam("startTimeIso") String startTimeIso,
       @QueryParam("endTimeIso") String endTimeIso,
-      @QueryParam("filters") String filters,
-      @QueryParam("metric") String metric) {
+      @QueryParam("metric") String metric,
+      @QueryParam("dimensions") String dimensions) {
 
     List<AnomalyResult> anomalyResults = new ArrayList<>();
+    List<AnomalyResult> anomalies = null;
     try {
       DateTime endTime = DateTime.now();
       if (StringUtils.isNotEmpty(endTimeIso)) {
@@ -90,22 +92,40 @@ public class AnomalyResource {
       if (StringUtils.isNotEmpty(startTimeIso)) {
         startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso);
       }
-      System.out.println(dataset + " " + startTimeIso + " " + startTime + " " + endTimeIso + " " + endTime + " " + metric + " " + filters);
-      if (StringUtils.isEmpty(metric) && StringUtils.isEmpty(filters)) {
+      System.out.println(dataset + " " + startTimeIso + " " + startTime + " " + endTimeIso + " " + endTime + " " + metric);
+      if (StringUtils.isEmpty(metric)) {
         anomalyResults = anomalyResultDAO.findAllByCollectionAndTime(dataset, startTime, endTime);
-      } else if (StringUtils.isEmpty(metric)) {
-        anomalyResults = anomalyResultDAO.findAllByCollectionTimeAndFilters(dataset, startTime, endTime, filters);
-      } else if (StringUtils.isEmpty(filters)) {
-        anomalyResults = anomalyResultDAO.findAllByCollectionTimeAndMetric(dataset, metric, startTime, endTime);
       } else {
-        anomalyResults =  anomalyResultDAO.findAllByCollectionTimeMetricAndFilters(dataset, metric, startTime, endTime, filters);
+        anomalyResults = anomalyResultDAO.findAllByCollectionTimeAndMetric(dataset, metric, startTime, endTime);
       }
-      System.out.println(anomalyResults.size());
+      anomalies = anomalyResults;
+
+      System.out.println(dimensions);
+      if (StringUtils.isNotEmpty(dimensions)) {
+
+        dimensions = URLDecoder.decode(dimensions, "UTF-8");
+        Multimap<String, String> dimensionsMap = ThirdEyeUtils.convertToMultiMap(dimensions);
+
+        System.out.println(dimensions);
+        anomalies = new ArrayList<>();
+        for (AnomalyResult anomalyResult : anomalyResults) {
+          String filters = anomalyResult.getFilters();
+          String dimensionString = anomalyResult.getDimensions();
+          if (StringUtils.isNotEmpty(filters) && StringUtils.isNotEmpty(dimensionString)
+              && StringUtils.isNotEmpty(dimensionString = dimensionString.replaceAll("\\*|,", ""))) {
+            String dimensionName = filters.split("=")[0];
+            if (dimensionsMap.containsKey(dimensionName) && dimensionsMap.get(dimensionName).contains(dimensionString)) {
+              anomalies.add(anomalyResult);
+            }
+          }
+        }
+      }
+      System.out.println(anomalies.size());
 
     } catch (Exception e) {
       LOG.error("Exception in fetching anomalies", e);
     }
-    return anomalyResults;
+    return anomalies;
   }
 
   /************* CRUD for anomaly functions of collection **********************************************/
@@ -114,11 +134,21 @@ public class AnomalyResource {
   @GET
   @UnitOfWork
   @Path("/anomaly-function/view")
-  public List<AnomalyFunctionSpec> viewAnomalyFunctions(@QueryParam("dataset") String dataset) {
+  public List<AnomalyFunctionSpec> viewAnomalyFunctions(@QueryParam("dataset") String dataset, @QueryParam("metric") String metric) {
 
-    List<AnomalyFunctionSpec> anomalyFunctionSpec = new ArrayList<>();
-    anomalyFunctionSpec = anomalyFunctionSpecDAO.findAllByCollection(dataset);
-    return anomalyFunctionSpec;
+    List<AnomalyFunctionSpec> anomalyFunctionSpecs = anomalyFunctionSpecDAO.findAllByCollection(dataset);
+
+    List<AnomalyFunctionSpec> anomalyFunctions = anomalyFunctionSpecs;
+
+    if (StringUtils.isNotEmpty(metric)) {
+      anomalyFunctions = new ArrayList<>();
+      for (AnomalyFunctionSpec anomalyFunctionSpec : anomalyFunctionSpecs) {
+        if (metric.equals(anomalyFunctionSpec.getMetric())) {
+          anomalyFunctions.add(anomalyFunctionSpec);
+        }
+      }
+    }
+    return anomalyFunctions;
   }
 
   // Add anomaly function
@@ -126,6 +156,7 @@ public class AnomalyResource {
   @UnitOfWork
   @Path("/anomaly-function/create")
   public Response createAnomalyFunction(@QueryParam("dataset") String dataset,
+      @QueryParam("functionName") String functionName,
       @QueryParam("metric") String metric,
       @QueryParam("type") String type,
       @QueryParam("windowSize") String windowSize,
