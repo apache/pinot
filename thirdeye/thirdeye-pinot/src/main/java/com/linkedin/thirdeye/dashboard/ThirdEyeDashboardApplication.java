@@ -76,11 +76,12 @@ public class ThirdEyeDashboardApplication
     env.jersey().register(new DashboardResource(BaseThirdEyeApplication.getDashboardConfigDAO(config)));
     env.jersey().register(new CacheResource());
     AnomalyDetectionJobManager anomalyDetectionJobManager = new AnomalyDetectionJobManager(quartzScheduler,
-        anomalyFunctionSpecDAO, anomalyFunctionRelationDAO, anomalyResultDAO,
+        anomalyFunctionSpecDAO,  anomalyResultDAO,
         hibernateBundle.getSessionFactory(), env.metrics(),
-        new AnomalyFunctionFactory(config.getFunctionConfigPath()), config.getFailureEmailConfig());
+        new AnomalyFunctionFactory(config.getFunctionConfigPath()),
+        config.getFailureEmailConfig());
     env.jersey().register(new AnomalyResource(anomalyDetectionJobManager, anomalyFunctionSpecDAO,
-        anomalyFunctionRelationDAO, anomalyResultDAO, emailConfigurationDAO));
+        anomalyResultDAO, emailConfigurationDAO));
   }
 
   public static void main(String[] args) throws Exception {
