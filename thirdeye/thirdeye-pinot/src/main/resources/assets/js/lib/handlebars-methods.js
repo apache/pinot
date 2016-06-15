@@ -216,6 +216,9 @@ $(document).ready(function() {
     var source_datasets_template = $("#datasets-template").html();
     HandleBarsTemplates.template_datasets = Handlebars.compile(source_datasets_template);
 
+    var source_metric_list_template = $("#metric-list-template").html();
+    HandleBarsTemplates.template_metric_list = Handlebars.compile(source_metric_list_template);
+
     var source_filter_dimension_value_template =  $("#filter-dimension-value-template").html();
     HandleBarsTemplates.template_filter_dimension_value = Handlebars.compile(source_filter_dimension_value_template);
 

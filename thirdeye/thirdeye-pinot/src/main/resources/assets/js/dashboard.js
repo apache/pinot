@@ -41,7 +41,8 @@ $(document).ready( function() {
         showTimeSelection: true,
         showGranularity: true,
         showAggregateAllGranularity: false,
-        needComparisonTimeRange: true
+        needComparisonTimeRange: true,
+        showConfigAnomaly: false
     }
     var result_form_template = HandleBarsTemplates.template_form(dasboard_section_options)
     $("#dashboard-section #form-area").append(result_form_template);
@@ -56,7 +57,8 @@ $(document).ready( function() {
         showTimeSelection: true,
         showGranularity: true,
         showAggregateAllGranularity: true,
-        needComparisonTimeRange: true
+        needComparisonTimeRange: true,
+        showConfigAnomaly: false
     }
     var result_form_template = HandleBarsTemplates.template_form(compare_section_options)
     $("#compare-section #form-area").append(result_form_template);
@@ -71,7 +73,8 @@ $(document).ready( function() {
         showTimeSelection: true,
         showGranularity: true,
         showAggregateAllGranularity: false,
-        needComparisonTimeRange: false
+        needComparisonTimeRange: false,
+        showConfigAnomaly: false
     }
 
     var result_form_template = HandleBarsTemplates.template_form(timseries_section_options)
@@ -88,7 +91,8 @@ $(document).ready( function() {
         showTimeSelection: true,
         showGranularity: false,
         showAggregateAllGranularity: false,
-        needComparisonTimeRange: false
+        needComparisonTimeRange: false,
+        showConfigAnomaly: true
     }
 
     var result_form_template = HandleBarsTemplates.template_form(anomalies_section_options)
