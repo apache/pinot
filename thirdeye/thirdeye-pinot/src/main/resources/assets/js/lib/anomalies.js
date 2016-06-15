@@ -12,8 +12,8 @@ function getAnomalies(tab) {
 
   var currentStartISO = moment(parseInt(hash.currentStart)).toISOString();
   var currentEndISO = moment(parseInt(hash.currentEnd)).toISOString();
-  var anomaliesUrl = "/anomaly-results/collection/" + hash.dataset + "/" + currentStartISO + "/" + currentEndISO
-  + "?metrics=" + hash.metrics
+  var anomaliesUrl = "/dashboard/anomalies/view?collection" + hash.dataset + "&startTimeIso" + currentStartISO + "&endTimeIso" + currentEndISO
+  + "&metrics=" + hash.metrics
   + "&filters=" + hash.filters;
 
   getData(anomaliesUrl).done(function(anomalyData) {
@@ -47,7 +47,7 @@ function renderAnomalyLineChart(timeSeriesData, anomalyData, tab) {
 }
 
 var lineChart;
-function drawAnomalyTimeSeries(ajaxData, anomalyData, tab) {
+function drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab) {
 
   var currentView = $("#" + tab + "-display-chart-section");
   var dateTimeFormat = "%I:%M %p";
@@ -57,7 +57,7 @@ function drawAnomalyTimeSeries(ajaxData, anomalyData, tab) {
 
   var lineChartPlaceholder = $("#linechart-placeholder", currentView)[0];
   // Metric(s)
-  var metrics = ajaxData["metrics"];
+  var metrics = timeSeriesData["metrics"];
   var lineChartData = {};
   var dateTimeformat = (hash.hasOwnProperty("aggTimeGranularity") && hash.aggTimeGranularity.toLowerCase().indexOf("days") > -1) ? "MM-DD" : "h a";
   var xTickFormat = dateTimeformat;
@@ -67,17 +67,20 @@ function drawAnomalyTimeSeries(ajaxData, anomalyData, tab) {
   var chartTypes = {};
   var axes = {};
   var regions = [];
-  for (var t = 0, len = ajaxData["timeBuckets"].length; t < len; t++) {
-    var timeBucket = ajaxData["timeBuckets"][t]["currentStart"]
-    var currentEnd = ajaxData["timeBuckets"][t]["currentEnd"]
+
+  for (var t = 0, len = timeSeriesData["timeBuckets"].length; t < len; t++) {
+    var timeBucket = timeSeriesData["timeBuckets"][t]["currentStart"]
+    var currentEnd = timeSeriesData["timeBuckets"][t]["currentEnd"]
     xTicksBaseline.push(timeBucket)
     xTicksCurrent.push(timeBucket)
   }
   for(var i=0;i<anomalyData.length;i++){
-    anomaly = anomalyData[i];
-    anomalyStart = anomaly.startTimeUtc
-    anomalyEnd = anomaly.endTimeUtc
-    regions.push({axis: 'x', start: anomalyStart, end: anomalyEnd, class: 'regionX'})
+    var anomaly = anomalyData[i];
+
+    var anomalyStart = anomaly.startTimeUtc
+    var anomalyEnd = anomaly.endTimeUtc
+    var anomayID = "anomaly-id-" + anomaly.id;
+    regions.push({'axis': 'x', 'start': anomalyStart, 'end': anomalyEnd, 'class': 'regionX ' + anomayID })
   }
   lineChartData["time"] = xTicksCurrent;
 
@@ -94,10 +97,10 @@ function drawAnomalyTimeSeries(ajaxData, anomalyData, tab) {
     var metricBaselineData = [];
     var metricCurrentData = [];
     var deltaPercentageData = [];
-    for (var t = 0, len = ajaxData["timeBuckets"].length; t < len; t++) {
-      var baselineValue = ajaxData["data"][metrics[i]]["responseData"][t][0];
-      var currentValue = ajaxData["data"][metrics[i]]["responseData"][t][1];
-      var deltaPercentage = parseInt(ajaxData["data"][metrics[i]]["responseData"][t][2] * 100);
+    for (var t = 0, len = timeSeriesData["timeBuckets"].length; t < len; t++) {
+      var baselineValue = timeSeriesData["data"][metrics[i]]["responseData"][t][0];
+      var currentValue = timeSeriesData["data"][metrics[i]]["responseData"][t][1];
+      var deltaPercentage = parseInt(timeSeriesData["data"][metrics[i]]["responseData"][t][2] * 100);
       metricBaselineData.push(baselineValue);
       metricCurrentData.push(currentValue);
       deltaPercentageData.push(deltaPercentage);

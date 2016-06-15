@@ -35,6 +35,7 @@
     <#include "tabs/tab.ftl">
     <#include "form.ftl">
     <#include "dataset-list.ftl">
+    <#include "metric-list.ftl">
     <#include "filter-value.ftl">
     <#include "metric-timeseries.ftl">
     <#include "tabular.ftl">

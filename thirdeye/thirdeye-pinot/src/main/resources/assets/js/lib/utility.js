@@ -36,6 +36,48 @@ function getData(url, tab){
     })
 }
 
+
+function submitData(url){
+    return $.ajax({
+        url: url,
+        type: 'post',
+        dataType: 'json',
+        //contentType: 'application/json',
+        //data: data,
+        //processData: false,
+        success: function( data, textStatus, jQxhr ){
+            //$('#response pre').html( JSON.stringify( data ) );
+        },
+        error: function( jqXhr, textStatus, errorThrown ){
+            console.log( errorThrown );
+        }
+//        ,
+//        statusCode: {
+//            404: function() {
+//                $("#"+  tab  +"-chart-area-error").empty()
+//                var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' })
+//                warning.append($('<p></p>', { html: 'No data available. (Error code: 404)' }))
+//                $("#"+  tab  +"-chart-area-error").append(warning)
+//                $("#"+  tab +"-chart-area-error").fadeIn(100);
+//                return
+//            },
+//            500: function() {
+//                $("#"+  tab  +"-chart-area-error").empty()
+//                var error = $('<div></div>', { class: 'uk-alert uk-alert-danger' })
+//                error.append($('<p></p>', { html: 'Internal server error' }))
+//                $("#"+  tab  +"-chart-area-error").append(error)
+//                $("#"+  tab  +"-chart-area-error").fadeIn(100);
+//                return
+//            }
+//        }
+//        ,
+        //beforeSend: showLoader(tab)
+    }).always(function(){
+
+    })
+
+}
+
 function showLoader(tab){
    $("#"+  tab  +"-chart-area-loader").show();
 }
@@ -118,6 +160,8 @@ function updateDashboardFormFromHash(){
 
         for (var i = 0, len = metricAry.length; i < len; i++) {
 
+            console.log("metric option present: ")
+            console.log($(".metric-option[value='" + metricAry[i] + "']", currentForm))
             $(".metric-option[value='" + metricAry[i] + "']", currentForm).click();
 
         }
