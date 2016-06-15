@@ -48,9 +48,9 @@ import com.linkedin.pinot.util.TestUtils;
  */
 public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(UploadRefreshDeleteIntegrationTest.class);
-  private final File _tmpDir = new File("/tmp/" + getClass().getSimpleName());
-  private final File _segmentsDir = new File(_tmpDir, "segments");
-  private final File _tarsDir = new File(_tmpDir, "tars");
+  protected final File _tmpDir = new File("/tmp/" + getClass().getSimpleName());
+  protected final File _segmentsDir = new File(_tmpDir, "segments");
+  protected final File _tarsDir = new File(_tmpDir, "tars");
 
   @Override
   public void testMultipleQueries() throws Exception {
