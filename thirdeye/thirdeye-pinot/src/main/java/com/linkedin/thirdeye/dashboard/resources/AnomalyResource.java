@@ -162,13 +162,23 @@ public class AnomalyResource {
       @QueryParam("windowSize") String windowSize,
       @QueryParam("windowUnit") String windowUnit,
       @QueryParam("windowDelay") String windowDelay,
-      @QueryParam("scheduleStartIso") String scheduleStartIso,
-      @QueryParam("repeatEverySize") String repeatEverySize,
-      @QueryParam("repeatEveryUnit") String repeatEveryUnit,
+      @QueryParam("windowDelayUnit") String windowDelayUnit,
+      @QueryParam("scheduleMinute") String scheduleMinute,
+      @QueryParam("scheduleHour") String scheduleHour,
+      @QueryParam("repeatEvery") String repeatEvery,
       @QueryParam("exploreDimension") String exploreDimensions,
       @QueryParam("properties") String properties,
       @QueryParam("isActive") boolean isActive)
           throws Exception {
+
+    if (StringUtils.isEmpty(dataset) || StringUtils.isEmpty(functionName) || StringUtils.isEmpty(metric)
+        || StringUtils.isEmpty(windowSize) || StringUtils.isEmpty(windowUnit) || StringUtils.isEmpty(windowDelay)
+        || StringUtils.isEmpty(properties)) {
+      throw new UnsupportedOperationException("Received null for one of the mandatory params: "
+          + "dataset " + dataset + ", functionName " + functionName + ", metric " + metric
+          + ", windowSize " + windowSize + ", windowUnit " + windowUnit + ", windowDelay " + windowDelay
+          + ", properties" + properties);
+    }
 
     CollectionSchema schema = CACHE_REGISTRY_INSTANCE.getCollectionSchemaCache().get(dataset);
     TimeGranularity dataGranularity = schema.getTime().getDataGranularity();
@@ -177,18 +187,26 @@ public class AnomalyResource {
     anomalyFunctionSpec.setIsActive(isActive);
     anomalyFunctionSpec.setCollection(dataset);
     anomalyFunctionSpec.setMetric(metric);
+    if (StringUtils.isEmpty(type)) {
+      type = "USER_RULE";
+    }
     anomalyFunctionSpec.setType(type);
     anomalyFunctionSpec.setWindowSize(Integer.valueOf(windowSize));
     anomalyFunctionSpec.setWindowUnit(TimeUnit.valueOf(windowUnit));
     anomalyFunctionSpec.setWindowDelay(Integer.valueOf(windowDelay));
+    if (StringUtils.isEmpty(windowDelayUnit)) {
+      anomalyFunctionSpec.setWindowDelayUnit(TimeUnit.valueOf(windowUnit));
+    } else {
+      anomalyFunctionSpec.setWindowDelayUnit(TimeUnit.valueOf(windowDelayUnit));
+    }
     anomalyFunctionSpec.setBucketSize(dataGranularity.getSize());
     anomalyFunctionSpec.setBucketUnit(dataGranularity.getUnit());
     anomalyFunctionSpec.setExploreDimensions(exploreDimensions);
     anomalyFunctionSpec.setProperties(properties);
 
     String cron = "";
-    if (StringUtils.isNotEmpty(scheduleStartIso)) {
-      cron = constructCron(scheduleStartIso, repeatEverySize, repeatEveryUnit);
+    if (StringUtils.isNotEmpty(repeatEvery)) {
+      cron = constructCron(scheduleMinute, scheduleHour, repeatEvery);
     }
     anomalyFunctionSpec.setCron(cron);
 
@@ -201,22 +219,21 @@ public class AnomalyResource {
     return Response.ok(id).build();
   }
 
-  private String constructCron(String scheduleStartIso, String repeatEverySize, String repeatEveryUnit) {
+  private String constructCron(String scheduleMinute, String scheduleHour, String repeatEvery) {
 
-    DateTime scheduleTime = DateTime.now();
-    if (StringUtils.isNotEmpty(scheduleStartIso)) {
-      scheduleTime = ISODateTimeFormat.dateTimeParser().parseDateTime(scheduleStartIso);
-    }
     String minute = "0";
-    minute = String.valueOf(scheduleTime.getMinuteOfHour());
-
-    String hour = "*";
-    if (repeatEveryUnit.equals(TimeUnit.DAYS)) {
-      hour = String.valueOf(scheduleTime.getHourOfDay());
+    String hour = "0";
+    String cron = "0 0 0 * * ?";
+    if (repeatEvery.equals(TimeUnit.DAYS.toString())) {
+      minute = StringUtils.isEmpty(scheduleMinute) ? minute : scheduleMinute;
+      hour = StringUtils.isEmpty(scheduleHour) ? hour : scheduleHour;
+    } else if (repeatEvery.equals(TimeUnit.HOURS.toString())) {
+      minute = StringUtils.isEmpty(scheduleMinute) ? minute : scheduleMinute;
+      hour = "*";
     }
-
-    String cron = String.format("0 %s %s * * ?", minute, hour);
+    cron = String.format("0 %s %s * * ?", minute, hour);
     return cron;
+
   }
 
   // Edit anomaly function
@@ -260,5 +277,9 @@ public class AnomalyResource {
   // Delete email function
 
   // Run email function ad hoc
+
+  public static void main(String[] args) {
+
+  }
 
 }
