@@ -22,6 +22,7 @@ import com.linkedin.pinot.integration.tests.UploadRefreshDeleteIntegrationTest;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.commons.io.FileUtils;
 import org.apache.helix.manager.zk.ZKHelixAdmin;
 import org.apache.helix.model.IdealState;
 import org.json.JSONObject;
@@ -67,6 +68,11 @@ public class BalanceNumSegmentAssignmentStrategyIntegrationTest extends UploadRe
 
     // Create Helix connection
     _helixAdmin = new ZKHelixAdmin(ZkStarter.DEFAULT_ZK_STR);
+
+    // Set up temporary directories
+    ensureDirectoryExistsAndIsEmpty(_tmpDir);
+    ensureDirectoryExistsAndIsEmpty(_segmentsDir);
+    ensureDirectoryExistsAndIsEmpty(_tarsDir);
   }
 
   @AfterClass
@@ -79,6 +85,9 @@ public class BalanceNumSegmentAssignmentStrategyIntegrationTest extends UploadRe
     stopBroker();
     stopController();
     stopZk();
+
+    // Delete temporary directory
+    FileUtils.deleteQuietly(_tmpDir);
   }
 
   @Test
