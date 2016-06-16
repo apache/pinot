@@ -313,4 +313,12 @@
 
   </changeSet>
 
+  <changeSet id="10" author="npawar">
+    <addColumn tableName="anomaly_functions">
+      <column name="function_name" type="varchar(1023)" defaultValue="default_function_name">
+        <constraints nullable="false"/>
+      </column>
+    </addColumn>
+  </changeSet>
+
 </databaseChangeLog>
