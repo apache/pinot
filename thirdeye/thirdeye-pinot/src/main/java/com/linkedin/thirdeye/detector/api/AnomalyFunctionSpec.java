@@ -31,6 +31,9 @@ public class AnomalyFunctionSpec {
   @Column(name = "collection", nullable = false)
   private String collection;
 
+  @Column(name = "function_name", nullable = false)
+  private String function_name;
+
   @Column(name = "metric", nullable = false)
   private String metric;
 
@@ -87,6 +90,14 @@ public class AnomalyFunctionSpec {
 
   public void setCollection(String collection) {
     this.collection = collection;
+  }
+
+  public String getFunctionName() {
+    return function_name;
+  }
+
+  public void setFunctionName(String functionName) {
+    this.function_name = functionName;
   }
 
   public String getMetric() {
