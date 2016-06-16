@@ -1,0 +1,21 @@
+coverage:
+  precision: 2
+  round: down
+  range: "70...100"
+  notify:
+    require_ci_to_pass: yes
+
+  status:
+    project: yes
+
+    patch: yes
+
+    changes: yes
+
+  ignore:
+    - pinot-common/src/main/java/com/linkedin/pinot/common/request/*
+    - pinot-common/src/main/java/com/linkedin/pinot/common/response/*
+
+comment:
+  layout: "header, diff, changes"
+  behavior: default
