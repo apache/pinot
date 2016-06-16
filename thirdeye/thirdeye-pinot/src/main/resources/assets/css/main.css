@@ -149,7 +149,7 @@ body a{
 .time-range-selector-dropdown{
     position: relative;
     margin-top: 5px;
-    max-width: 270px;
+    max-width: 280px;
 }
 
 .date-time-selector-box {
@@ -844,6 +844,14 @@ body a{
     text-align: center;
     border-bottom: 1px solid #666;
 
+}
+
+#anomalies-table .checkbox-cell{
+    padding: 0px;
+}
+
+#anomalies-table .checkbox-cell label{
+    padding: 6px;
 }
 
 
