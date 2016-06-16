@@ -186,6 +186,7 @@ public class AnomalyResource {
     AnomalyFunctionSpec anomalyFunctionSpec = new AnomalyFunctionSpec();
     anomalyFunctionSpec.setIsActive(isActive);
     anomalyFunctionSpec.setCollection(dataset);
+    anomalyFunctionSpec.setFunctionName(functionName);
     anomalyFunctionSpec.setMetric(metric);
     if (StringUtils.isEmpty(type)) {
       type = "USER_RULE";

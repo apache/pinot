@@ -40,6 +40,7 @@ public class AnomalyFunctionSpec {
   @Column(name = "function_name", nullable = false)
   private String functionName;
 
+
   @Column(name = "metric", nullable = false)
   private String metric;
 
