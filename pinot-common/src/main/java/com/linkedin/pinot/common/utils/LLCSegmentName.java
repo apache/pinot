@@ -70,6 +70,11 @@ public class LLCSegmentName extends SegmentName implements Comparable {
   }
 
   @Override
+  public String getPartitionRange() {
+    return Integer.toString(getPartitionId());
+  }
+
+  @Override
   public int getSequenceNumber() {
     return _sequenceNumber;
   }
