@@ -61,7 +61,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
     INSTANCE_DATA_MANAGER = instanceDataManager;
   }
 
-  public static String getStateModelDef() {
+  public static String getStateModelName() {
     return "SegmentOnlineOfflineStateModel";
   }
 
@@ -82,6 +82,30 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
     public SegmentOnlineOfflineStateModel(String helixClusterName, String instanceId) {
       _helixClusterName = helixClusterName;
       _instanceId = instanceId;
+    }
+
+    @Transition(from = "OFFLINE", to = "CONSUMING")
+    public void onBecomeConsumingFromOnline(Message message, NotificationContext context) {
+      LOGGER.error("Unexpected transition from OFFLINE to CONSUMING for {}", message.getResourceName());
+      throw new RuntimeException("Unexpected state transition");
+    }
+
+    @Transition(from = "CONSUMING", to = "ONLINE")
+    public void onBecomeOnlineFromConsuming(Message message, NotificationContext context) {
+      LOGGER.error("Unexpected transition from CONSUMING to ONLINE for {}", message.getResourceName());
+      throw new RuntimeException("Unexpected state transition");
+    }
+
+    @Transition(from = "CONSUMING", to = "OFFLINE")
+    public void onBecomeOfflineFromConsuming(Message message, NotificationContext context) {
+      LOGGER.error("Unexpected transition from CONSUMING to OFFLINE for {}", message.getResourceName());
+      throw new RuntimeException("Unexpected state transition");
+    }
+
+    @Transition(from = "CONSUMING", to = "DROPPED")
+    public void onBecomeDroppedFromConsuming(Message message, NotificationContext context) {
+      LOGGER.error("Unexpected transition from CONSUMING to DROPPED for {}", message.getResourceName());
+      throw new RuntimeException("Unexpected state transition");
     }
 
     @Transition(from = "OFFLINE", to = "ONLINE")
