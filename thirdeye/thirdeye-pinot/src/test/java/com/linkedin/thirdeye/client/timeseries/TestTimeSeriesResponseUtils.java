@@ -17,11 +17,9 @@ import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.MetricSchema;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.MetricType;
-import com.linkedin.thirdeye.client.MetricExpression;
 import com.linkedin.thirdeye.client.MetricFunction;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesRow.Builder;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesRow.TimeSeriesMetric;
-import com.linkedin.thirdeye.dashboard.Utils;
 
 public class TestTimeSeriesResponseUtils {
   private static final TimeSeriesResponseConverter converter =
@@ -84,7 +82,7 @@ public class TestTimeSeriesResponseUtils {
    */
   public Object[] createMapProviderArgs(String testName, boolean groupByDimension,
       boolean groupTimeSeriesMetricsIntoRow) {
-    List<String> dimensions = Arrays.asList("dim1", "dim2", "dim3");
+    List<String> dimensions = Arrays.asList("dim1", "dim2", "dim3", "all");
     List<String> dimensionValueSuffixes = Arrays.asList("_a", "_b", "_c"); // appended to each
                                                                            // dimension
     List<MetricFunction> metricFunctions = createSumFunctions("m1", "m2", "m3");
@@ -94,14 +92,14 @@ public class TestTimeSeriesResponseUtils {
       DateTime start = new DateTime(hoursSinceEpoch);
       DateTime end = start.plusHours(1);
       for (String dimension : (groupByDimension ? dimensions
-          : Collections.<String> singleton(null))) {
+          : Collections.<String> singleton("all"))) {
         for (String dimensionValueSuffix : (groupByDimension ? dimensionValueSuffixes
-            : Collections.<String> singleton(null))) {
+            : Collections.<String> singleton("all"))) {
           String dimensionValue;
           if (groupByDimension) {
             dimensionValue = dimension + dimensionValueSuffix;
           } else {
-            dimensionValue = null;
+            dimensionValue = "all";
           }
           List<TimeSeriesMetric> timeSeriesMetrics = new ArrayList<>();
           for (MetricFunction metricFunction : metricFunctions) {
@@ -212,8 +210,7 @@ public class TestTimeSeriesResponseUtils {
     }
 
     private TimeSeriesResponse getResponse() {
-      List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metricFunctions);
-      return new TimeSeriesResponse(metricExpressions, dimensions, timeSeriesRows);
+      return new TimeSeriesResponse(timeSeriesRows);
     }
 
     private Map<DimensionKey, MetricTimeSeries> getMap() {
