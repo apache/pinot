@@ -16,28 +16,34 @@
 package com.linkedin.pinot.controller.helix.core.util;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
-
+import java.util.concurrent.TimeUnit;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixAdmin;
+import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
+import org.apache.helix.PropertyKey;
 import org.apache.helix.PropertyPathConfig;
 import org.apache.helix.PropertyType;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.controller.HelixControllerMain;
 import org.apache.helix.manager.zk.ZKHelixAdmin;
+import org.apache.helix.manager.zk.ZKHelixDataAccessor;
 import org.apache.helix.manager.zk.ZKHelixManager;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
+import org.apache.helix.manager.zk.ZkBaseDataAccessor;
+import org.apache.helix.manager.zk.ZkClient;
 import org.apache.helix.messaging.handling.HelixTaskExecutor;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.HelixConfigScope.ConfigScopeProperty;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.Message.MessageType;
+import org.apache.helix.model.StateModelDefinition;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.controller.helix.core.PinotHelixBrokerResourceOnlineOfflineStateModelGenerator;
@@ -54,11 +60,12 @@ public class HelixSetupUtils {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixSetupUtils.class);
 
-  public static synchronized HelixManager setup(String helixClusterName, String zkPath, String pinotControllerInstanceId) {
+  public static synchronized HelixManager setup(String helixClusterName, String zkPath, String pinotControllerInstanceId,
+      boolean isUpdateStateModel) {
 
     setupConfigForHelix();
     try {
-      createHelixClusterIfNeeded(helixClusterName, zkPath);
+      createHelixClusterIfNeeded(helixClusterName, zkPath, isUpdateStateModel);
     } catch (final Exception e) {
       LOGGER.error("Caught exception", e);
       return null;
@@ -85,10 +92,34 @@ public class HelixSetupUtils {
   }
 
   public static void createHelixClusterIfNeeded(String helixClusterName, String zkPath) {
+    createHelixClusterIfNeeded(helixClusterName, zkPath);
+  }
+
+  public static void createHelixClusterIfNeeded(String helixClusterName, String zkPath, boolean isUpdateStateModel) {
     final HelixAdmin admin = new ZKHelixAdmin(zkPath);
+    final String segmentStateModelName = PinotHelixSegmentOnlineOfflineStateModelGenerator.PINOT_SEGMENT_ONLINE_OFFLINE_STATE_MODEL;
 
     if (admin.getClusters().contains(helixClusterName)) {
-      LOGGER.info("cluster already exist, skipping it.. ********************************************* ");
+      LOGGER.info("cluster already exists ********************************************* ");
+      if (isUpdateStateModel) {
+        final StateModelDefinition curStateModelDef = admin.getStateModelDef(helixClusterName, segmentStateModelName);
+        List<String> states = curStateModelDef.getStatesPriorityList();
+        if (states.contains(PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE)) {
+          LOGGER.info("State model {} already updated to contain CONSUMING state", segmentStateModelName);
+          return;
+        } else {
+          LOGGER.info("Updating {} to add states for low level kafka consumers", segmentStateModelName);
+          StateModelDefinition newStateModelDef = PinotHelixSegmentOnlineOfflineStateModelGenerator.generatePinotStateModelDefinition();
+          ZkClient zkClient = new ZkClient(zkPath);
+          zkClient.waitUntilConnected(20, TimeUnit.SECONDS);
+          zkClient.setZkSerializer(new ZNRecordSerializer());
+          HelixDataAccessor accessor = new ZKHelixDataAccessor(helixClusterName, new ZkBaseDataAccessor<ZNRecord>(zkClient));
+          PropertyKey.Builder keyBuilder = accessor.keyBuilder();
+          accessor.setProperty(keyBuilder.stateModelDef(segmentStateModelName), newStateModelDef);
+          LOGGER.info("Completed updating statemodel {}", segmentStateModelName);
+          zkClient.close();
+        }
+      }
       return;
     }
 
@@ -107,13 +138,13 @@ public class HelixSetupUtils {
 
     admin.setConfig(scope, props);
 
-    LOGGER.info("Adding state model definition named : "
-        + PinotHelixSegmentOnlineOfflineStateModelGenerator.PINOT_SEGMENT_ONLINE_OFFLINE_STATE_MODEL
-        + " generated using : " + PinotHelixSegmentOnlineOfflineStateModelGenerator.class.toString()
-        + " ********************************************** ");
+    LOGGER.info("Adding state model {} (with CONSUMED state) generated using {} **********************************************",
+        segmentStateModelName , PinotHelixSegmentOnlineOfflineStateModelGenerator.class.toString());
 
-    admin.addStateModelDef(helixClusterName,
-        PinotHelixSegmentOnlineOfflineStateModelGenerator.PINOT_SEGMENT_ONLINE_OFFLINE_STATE_MODEL,
+    // If this is a fresh cluster we are creating, then the cluster will see the CONSUMING state in the
+    // state model. But then the servers will never be asked to go to that STATE (whether they have the code
+    // to handle it or not) unil we complete the feature using low-level kafka consumers and turn the feature on.
+    admin.addStateModelDef(helixClusterName, segmentStateModelName,
         PinotHelixSegmentOnlineOfflineStateModelGenerator.generatePinotStateModelDefinition());
 
     LOGGER.info("Adding state model definition named : "
