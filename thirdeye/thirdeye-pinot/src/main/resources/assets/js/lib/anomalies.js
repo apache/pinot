@@ -191,7 +191,12 @@ function drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab) {
             $(".anomaly-table-checkbox input").each(function(){
 
                 if($(this).attr("data-value") ==  metricName){
-                    $(this).closest("tr").show();
+                    var tableRow = $(this).closest("tr");
+                    tableRow.show()
+                    //check the related input boxes
+                    $("input", tableRow).attr('checked', 'checked');
+                    $("input", tableRow).prop('checked', true);
+                    //show the related timeranges
                     var anomalyId = "anomaly-id-" + $(this).attr("id");
                     $("." + anomalyId).show();
                 }
