@@ -1,33 +1,37 @@
 package com.linkedin.thirdeye.client.pinot;
 
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Date;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
+import org.joda.time.format.DateTimeFormat;
+import org.joda.time.format.DateTimeFormatter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Joiner;
 import com.google.common.collect.Multimap;
-import com.linkedin.pinot.common.data.TimeFieldSpec;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.client.MetricFunction;
+import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.ThirdEyeRequest;
 
 /**
  * Util class for generated PQL queries (pinot).
- * @author jteoh
  */
 public class PqlUtils {
   private static final Joiner AND = Joiner.on(" AND ");
   private static final Joiner COMMA = Joiner.on(",");
   private static final Joiner EQUALS = Joiner.on(" = ");
   private static final int DEFAULT_TOP = 300;
+  private static final Logger LOGGER = LoggerFactory.getLogger(PqlUtils.class);
+  private static ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE =
+      ThirdEyeCacheRegistry.getInstance();
 
   /**
    * Returns sql to calculate the sum of all raw metrics required for <tt>request</tt>, grouped by
@@ -80,28 +84,45 @@ public class PqlUtils {
   }
 
   static String getBetweenClause(DateTime start, DateTime end, TimeSpec timeFieldSpec) {
+    TimeGranularity dataGranularity = timeFieldSpec.getDataGranularity();
+    long startMillis = start.getMillis();
+    long endMillis = end.getMillis();
+    long dataGranularityMillis = dataGranularity.toMillis();
+
+    // Shrink start and end as per data granularity
+    long startAlignmentDelta = startMillis % dataGranularityMillis;
+    if (startAlignmentDelta != 0) {
+      long startMillisAligned = startMillis + dataGranularityMillis - startAlignmentDelta;
+      start = new DateTime(startMillisAligned);
+    }
+
+    long endAligmentDelta = endMillis % dataGranularityMillis;
+    if (endAligmentDelta != 0) {
+      long endMillisAligned = endMillis - endAligmentDelta;
+      end = new DateTime(endMillisAligned);
+    }
+
+    String startQueryTime;
+    String endQueryTime;
+
     String timeField = timeFieldSpec.getColumnName();
-    if (timeFieldSpec.getFormat() == null || TimeSpec.SINCE_EPOCH_FORMAT.equals(timeFieldSpec.getFormat())) {
-      TimeGranularity dataGranularity = timeFieldSpec.getDataGranularity();
+    String timeFormat = timeFieldSpec.getFormat();
+    if (timeFormat == null || TimeSpec.SINCE_EPOCH_FORMAT.equals(timeFormat)) {
       long startInConvertedUnits = dataGranularity.convertToUnit(start.getMillis());
       long endInConvertedUnits = dataGranularity.convertToUnit(end.getMillis());
-      if (startInConvertedUnits == endInConvertedUnits) {
-        return String.format(" %s = %s", timeField, startInConvertedUnits);
-      } else {
-        return String.format(" %s >= %s AND %s < %s", timeField, startInConvertedUnits, timeField,
-            endInConvertedUnits);
-      }
+      startQueryTime = String.valueOf(startInConvertedUnits);
+      endQueryTime = String.valueOf(endInConvertedUnits);
     } else {
-      SimpleDateFormat sdf = new SimpleDateFormat(timeFieldSpec.getFormat());
-      String startDateTime = sdf.format(new Date(start.getMillis()));
-      String endDateTime = sdf.format(new Date(end.getMillis()));
-      if (startDateTime.equals(endDateTime)) {
-        return String.format(" %s = '%s'", timeField, startDateTime);
-      } else {
-        return String.format(" %s >= %s AND %s < %s", timeField, startDateTime, timeField,
-            endDateTime);
-      }
+      DateTimeFormatter dateTimeFormatter = DateTimeFormat.forPattern(timeFormat).withZoneUTC();
+      startQueryTime = dateTimeFormatter.print(start);
+      endQueryTime = dateTimeFormatter.print(end);
+    }
 
+    if (startQueryTime.equals(endQueryTime)) {
+      return String.format(" %s = %s", timeField, startQueryTime);
+    } else {
+      return String.format(" %s >= %s AND %s <= %s", timeField, startQueryTime, timeField,
+          endQueryTime);
     }
   }
 

@@ -42,6 +42,7 @@ import com.google.common.collect.Lists;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.core.data.readers.AvroRecordReader;
+import com.linkedin.thirdeye.hadoop.config.MetricType;
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConstants;
 
 /**
@@ -202,6 +203,28 @@ public class ThirdeyeAvroUtils {
     Number metricValue = (Number) record.get(metricName);
     if (metricValue == null) {
       metricValue = ThirdEyeConstants.EMPTY_NUMBER;
+    }
+    return metricValue;
+  }
+
+  public static Number getMetricFromRecord(GenericRecord record, String metricName, MetricType metricType) {
+    Number metricValue = (Number) record.get(metricName);
+    if (metricValue == null) {
+      switch (metricType) {
+      case DOUBLE:
+        metricValue = 0d;
+        break;
+      case FLOAT:
+        metricValue = 0f;
+        break;
+      case LONG:
+        metricValue = 0L;
+        break;
+      case INT:
+      case SHORT:
+      default:
+        metricValue = 0;
+      }
     }
     return metricValue;
   }

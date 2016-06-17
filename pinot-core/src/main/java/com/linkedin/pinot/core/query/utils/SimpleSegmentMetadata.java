@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2015 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ import com.linkedin.pinot.common.segment.StarTreeMetadata;
 import java.util.HashMap;
 import java.util.Map;
 
+import javax.annotation.Nullable;
 import org.apache.commons.configuration.Configuration;
 import org.joda.time.Duration;
 import org.joda.time.Interval;
@@ -190,4 +191,9 @@ public class SimpleSegmentMetadata implements SegmentMetadata {
     // TODO Auto-generated method stub
     return null;
   }
+
+  @Nullable @Override public String getCreatorName() {
+    return null;
+  }
+
 }

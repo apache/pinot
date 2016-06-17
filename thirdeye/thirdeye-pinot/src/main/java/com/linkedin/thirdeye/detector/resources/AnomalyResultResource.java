@@ -1,7 +1,5 @@
 package com.linkedin.thirdeye.detector.resources;
 
-import io.dropwizard.hibernate.UnitOfWork;
-
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.util.ArrayList;
@@ -26,6 +24,8 @@ import com.codahale.metrics.annotation.Timed;
 import com.linkedin.thirdeye.detector.api.AnomalyResult;
 import com.linkedin.thirdeye.detector.db.AnomalyResultDAO;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
+
+import io.dropwizard.hibernate.UnitOfWork;
 
 @Path("/anomaly-results")
 @Produces(MediaType.APPLICATION_JSON)
@@ -121,14 +121,45 @@ public class AnomalyResultResource {
           metricResults =
               dao.findAllByCollectionTimeAndMetric(collection, metric, startTime, endTime);
         } else {
-          metricResults =
-              dao.findAllByCollectionTimeMetricAndFilters(collection, metric, startTime, endTime,
-                  filters);
+          metricResults = dao.findAllByCollectionTimeMetricAndFilters(collection, metric, startTime,
+              endTime, filters);
         }
         results.addAll(metricResults);
       }
     }
 
     return results;
+  }
+
+  @GET
+  @Timed
+  @UnitOfWork
+  @Path("/function/{functionId}")
+  public List<AnomalyResult> findByFunction(@PathParam("functionId") Long functionId) {
+    DateTime endTime = DateTime.now();
+    DateTime startTime = endTime.minusDays(7);
+    return dao.findAllByTimeAndFunctionId(startTime, endTime, functionId);
+  }
+
+  @GET
+  @Timed
+  @UnitOfWork
+  @Path("/function/{functionId}/{startIsoTime}")
+  public List<AnomalyResult> findByFunction(@PathParam("functionId") Long functionId,
+      @PathParam("startIsoTime") String startIsoTime) {
+    DateTime startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startIsoTime);
+    DateTime endTime = DateTime.now();
+    return dao.findAllByTimeAndFunctionId(startTime, endTime, functionId);
+  }
+
+  @GET
+  @Timed
+  @UnitOfWork
+  @Path("/function/{functionId}/{startIsoTime}/{endIsoTime}")
+  public List<AnomalyResult> findByFunction(@PathParam("functionId") Long functionId,
+      @PathParam("startIsoTime") String startIsoTime, @PathParam("endIsoTime") String endIsoTime) {
+    DateTime startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startIsoTime);
+    DateTime endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endIsoTime);
+    return dao.findAllByTimeAndFunctionId(startTime, endTime, functionId);
   }
 }

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2015 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,6 +39,8 @@ import com.linkedin.pinot.common.request.Selection;
 import com.linkedin.pinot.common.request.SelectionSort;
 import com.linkedin.pinot.common.response.BrokerResponseJSON;
 import com.linkedin.pinot.common.response.ServerInstance;
+import com.linkedin.pinot.common.response.broker.BrokerResponseNative;
+import com.linkedin.pinot.common.response.broker.SelectionResults;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema;
@@ -61,6 +63,7 @@ import com.linkedin.pinot.core.plan.Plan;
 import com.linkedin.pinot.core.plan.PlanNode;
 import com.linkedin.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import com.linkedin.pinot.core.plan.maker.PlanMaker;
+import com.linkedin.pinot.core.query.reduce.BrokerReduceService;
 import com.linkedin.pinot.core.query.reduce.DefaultReduceService;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorService;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorUtils;
@@ -71,7 +74,6 @@ import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 import com.linkedin.pinot.util.TestUtils;
-
 
 public class SelectionQueriesTest {
 
@@ -149,7 +151,8 @@ public class SelectionQueriesTest {
       driver.build();
 
       System.out.println("built at : " + segmentDir.getAbsolutePath());
-      _indexSegmentList.add(new OfflineSegmentDataManager(ColumnarSegmentLoader.load(new File(segmentDir, driver.getSegmentName()), ReadMode.heap)));
+      _indexSegmentList
+          .add(new OfflineSegmentDataManager(ColumnarSegmentLoader.load(new File(segmentDir, driver.getSegmentName()), ReadMode.heap)));
     }
   }
 
@@ -259,9 +262,9 @@ public class SelectionQueriesTest {
     final DataTable instanceResponse = globalPlan.getInstanceResponse();
     System.out.println("instanceResponse : " + instanceResponse);
 
-    final DefaultReduceService defaultReduceService = new DefaultReduceService();
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
+    final DefaultReduceService defaultReduceService = new DefaultReduceService();
     final BrokerResponseJSON brokerResponse = defaultReduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
     System.out.println("Selection Result : " + brokerResponse.getSelectionResults());
     System.out.println("Time used : " + brokerResponse.getTimeUsedMs());
@@ -275,7 +278,92 @@ public class SelectionQueriesTest {
     JSONArray resultsJsonArray = jsonResult.getJSONArray("results");
     for (int i = 0; i < resultsJsonArray.length(); ++i) {
       JSONArray rowJsonArray = resultsJsonArray.getJSONArray(i);
+      Assert.assertEquals(rowJsonArray.length(), 3);
       Assert.assertEquals(rowJsonArray.getString(0), "i");
+    }
+
+    final BrokerReduceService brokerReduceService = new BrokerReduceService();
+    final BrokerResponseNative brokerResponseNative = brokerReduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
+    System.out.println("Selection Result : " + brokerResponseNative.getSelectionResults().toString());
+    System.out.println("Time used : " + brokerResponseNative.getTimeUsedMs());
+
+    SelectionResults selectionResults = brokerResponseNative.getSelectionResults();
+    List<String> columnArray = selectionResults.getColumns();
+    Assert.assertEquals(columnArray.size(), 3);
+    Assert.assertEquals(columnArray.get(0), "column11");
+    Assert.assertEquals(columnArray.get(1), "column12");
+    Assert.assertEquals(columnArray.get(2), "met_impressionCount");
+
+    List<Serializable[]> resultRows = selectionResults.getRows();
+    Assert.assertEquals(resultRows.size(), 10);
+    for (int i = 0; i < resultRows.size(); ++i) {
+      Serializable[] resultRow = resultRows.get(i);
+      Assert.assertEquals(resultRow.length, 3);
+      JSONArray rowJsonArray = resultsJsonArray.getJSONArray(i);
+      Assert.assertEquals(resultRow[0], rowJsonArray.getString(0));
+      Assert.assertEquals(resultRow[1], rowJsonArray.getString(1));
+      Assert.assertEquals(resultRow[2], rowJsonArray.getString(2));
+    }
+  }
+
+  @Test
+  public void testInterSegmentSelectionWithOrderByColumnNotInSelectionColumnsPlanMakerAndRun() throws Exception {
+    final int numSegments = 20;
+    setupSegmentList(numSegments);
+    final PlanMaker instancePlanMaker = new InstancePlanMakerImplV2();
+    final BrokerRequest brokerRequest = getSelectionNoFilterBrokerRequest2();
+    final ExecutorService executorService = Executors.newCachedThreadPool(new NamedThreadFactory("test-plan-maker"));
+    final Plan globalPlan =
+        instancePlanMaker.makeInterSegmentPlan(_indexSegmentList, brokerRequest, executorService, 150000);
+    globalPlan.print();
+    globalPlan.execute();
+    final DataTable instanceResponse = globalPlan.getInstanceResponse();
+    System.out.println("instanceResponse : " + instanceResponse);
+
+    final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
+    instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
+
+    final DefaultReduceService defaultReduceService = new DefaultReduceService();
+    final BrokerResponseJSON brokerResponse = defaultReduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
+    System.out.println("Selection Result : " + brokerResponse.getSelectionResults());
+    System.out.println("Time used : " + brokerResponse.getTimeUsedMs());
+
+    JSONObject jsonResult = brokerResponse.getSelectionResults();
+    JSONArray columnJsonArray = jsonResult.getJSONArray("columns");
+    Assert.assertEquals(columnJsonArray.getString(0), "column11");
+    Assert.assertEquals(columnJsonArray.getString(1), "column12");
+    Assert.assertEquals(columnJsonArray.getString(2), "met_impressionCount");
+
+    JSONArray resultsJsonArray = jsonResult.getJSONArray("results");
+    for (int i = 0; i < resultsJsonArray.length(); ++i) {
+      JSONArray rowJsonArray = resultsJsonArray.getJSONArray(i);
+      Assert.assertEquals(rowJsonArray.length(), 3);
+      Assert.assertEquals(rowJsonArray.getString(0), "U");
+      Assert.assertEquals(rowJsonArray.getString(1), "db");
+      Assert.assertEquals(rowJsonArray.getString(2), "6240989492723764727");
+    }
+
+    final BrokerReduceService brokerReduceService = new BrokerReduceService();
+    final BrokerResponseNative brokerResponseNative = brokerReduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
+    System.out.println("Selection Result : " + brokerResponseNative.getSelectionResults());
+    System.out.println("Time used : " + brokerResponseNative.getTimeUsedMs());
+
+    SelectionResults selectionResults = brokerResponseNative.getSelectionResults();
+    List<String> columnArray = selectionResults.getColumns();
+    Assert.assertEquals(columnArray.size(), 3);
+    Assert.assertEquals(columnArray.get(0), "column11");
+    Assert.assertEquals(columnArray.get(1), "column12");
+    Assert.assertEquals(columnArray.get(2), "met_impressionCount");
+
+    List<Serializable[]> resultRows = selectionResults.getRows();
+    Assert.assertEquals(resultRows.size(), 10);
+    for (int i = 0; i < resultRows.size(); ++i) {
+      Serializable[] resultRow = resultRows.get(i);
+      Assert.assertEquals(resultRow.length, 3);
+      JSONArray rowJsonArray = resultsJsonArray.getJSONArray(i);
+      Assert.assertEquals(resultRow[0], rowJsonArray.getString(0));
+      Assert.assertEquals(resultRow[1], rowJsonArray.getString(1));
+      Assert.assertEquals(resultRow[2], rowJsonArray.getString(2));
     }
   }
 
@@ -290,6 +378,12 @@ public class SelectionQueriesTest {
   private BrokerRequest getSelectionNoFilterBrokerRequest() {
     final BrokerRequest brokerRequest = new BrokerRequest();
     brokerRequest.setSelections(getSelectionQuery());
+    return brokerRequest;
+  }
+
+  private BrokerRequest getSelectionNoFilterBrokerRequest2() {
+    final BrokerRequest brokerRequest = new BrokerRequest();
+    brokerRequest.setSelections(getSelectionOrderbyQuery2());
     return brokerRequest;
   }
 
@@ -337,6 +431,24 @@ public class SelectionQueriesTest {
     final List<SelectionSort> selectionSortSequence = new ArrayList<SelectionSort>();
     final SelectionSort selectionSort = new SelectionSort();
     selectionSort.setColumn("column11");
+    selectionSort.setIsAsc(false);
+    selectionSortSequence.add(selectionSort);
+    selection.setSelectionSortSequence(selectionSortSequence);
+    return selection;
+  }
+
+  private Selection getSelectionOrderbyQuery2() {
+    final Selection selection = new Selection();
+    final List<String> selectionColumns = new ArrayList<String>();
+    selectionColumns.add("column11");
+    selectionColumns.add("column12");
+    selectionColumns.add("met_impressionCount");
+    selection.setSelectionColumns(selectionColumns);
+    selection.setOffset(0);
+    selection.setSize(10);
+    final List<SelectionSort> selectionSortSequence = new ArrayList<SelectionSort>();
+    final SelectionSort selectionSort = new SelectionSort();
+    selectionSort.setColumn("column13");
     selectionSort.setIsAsc(false);
     selectionSortSequence.add(selectionSort);
     selection.setSelectionSortSequence(selectionSortSequence);

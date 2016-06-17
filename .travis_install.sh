@@ -1,6 +1,6 @@
 #!/bin/bash -x
 #
-# Copyright (C) 2014-2015 LinkedIn Corp. (pinot-core@linkedin.com)
+# Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -28,4 +28,11 @@ if [ $? -ne 0 ]; then
   exit 0
 fi
 
-mvn clean install -DskipTests=true -Dmaven.javadoc.skip=true -Dassembly.skipAssembly=true > /dev/null
+# If install fails, log the error message and package status
+mvn clean install -DskipTests=true -Dmaven.javadoc.skip=true -Dassembly.skipAssembly=true > install.out
+if [ $? -ne 0 ]; then
+  egrep '(ERROR|SUCCESS|FAILURE|SKIPPED)' install.out
+  rm install.out
+  exit 1
+fi
+rm install.out

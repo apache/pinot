@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2015 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import java.util.PriorityQueue;
 
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.IdealState;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,8 +37,6 @@ import com.linkedin.pinot.common.utils.Pairs.Number2ObjectPair;
 
 /**
  * Assigns a segment to the instance that has least number of segments.
- *
- *
  */
 public class BalanceNumSegmentAssignmentStrategy implements SegmentAssignmentStrategy {
   private static final Logger LOGGER = LoggerFactory.getLogger(BalanceNumSegmentAssignmentStrategy.class);
@@ -58,23 +57,29 @@ public class BalanceNumSegmentAssignmentStrategy implements SegmentAssignmentStr
     List<String> selectedInstances = new ArrayList<String>();
     Map<String, Integer> currentNumSegmentsPerInstanceMap = new HashMap<String, Integer>();
     List<String> allTaggedInstances = helixAdmin.getInstancesInClusterWithTag(helixClusterName, serverTenantName);
+
     for (String instance : allTaggedInstances) {
       currentNumSegmentsPerInstanceMap.put(instance, 0);
     }
-    ExternalView externalView = helixAdmin.getResourceExternalView(helixClusterName, tableName);
-    if (externalView != null) {
-      for (String partitionName : externalView.getPartitionSet()) {
-        Map<String, String> instanceToStateMap = externalView.getStateMap(partitionName);
-        for (String instanceName : instanceToStateMap.keySet()) {
-          if (currentNumSegmentsPerInstanceMap.containsKey(instanceName)) {
-            currentNumSegmentsPerInstanceMap.put(instanceName, currentNumSegmentsPerInstanceMap.get(instanceName) + 1);
-          } else {
-            currentNumSegmentsPerInstanceMap.put(instanceName, 1);
+
+    // Count number of segments assigned to each instance
+    IdealState idealState = helixAdmin.getResourceIdealState(helixClusterName, tableName);
+    if (idealState != null) {
+      for (String partitionName : idealState.getPartitionSet()) {
+        Map<String, String> instanceToStateMap =  idealState.getInstanceStateMap(partitionName);
+        if (instanceToStateMap != null) {
+          for (String instanceName : instanceToStateMap.keySet()) {
+            if (currentNumSegmentsPerInstanceMap.containsKey(instanceName)) {
+              currentNumSegmentsPerInstanceMap.put(instanceName, currentNumSegmentsPerInstanceMap.get(instanceName) + 1);
+            } else {
+              currentNumSegmentsPerInstanceMap.put(instanceName, 1);
+            }
           }
         }
       }
-
     }
+
+    // Select up to numReplicas instances with the fewest segments assigned
     PriorityQueue<Number2ObjectPair<String>> priorityQueue =
         new PriorityQueue<Number2ObjectPair<String>>(numReplicas, Pairs.getDescendingnumber2ObjectPairComparator());
     for (String key : currentNumSegmentsPerInstanceMap.keySet()) {
@@ -87,6 +92,7 @@ public class BalanceNumSegmentAssignmentStrategy implements SegmentAssignmentStr
     while (!priorityQueue.isEmpty()) {
       selectedInstances.add(priorityQueue.poll().getB());
     }
+
     LOGGER.info("Segment assignment result for : " + segmentMetadata.getName() + ", in resource : "
         + segmentMetadata.getTableName() + ", selected instances: " + Arrays.toString(selectedInstances.toArray()));
     return selectedInstances;

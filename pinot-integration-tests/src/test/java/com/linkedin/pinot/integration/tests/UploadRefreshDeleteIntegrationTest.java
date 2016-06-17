@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2015 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -48,9 +48,9 @@ import com.linkedin.pinot.util.TestUtils;
  */
 public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(UploadRefreshDeleteIntegrationTest.class);
-  private final File _tmpDir = new File("/tmp/" + getClass().getSimpleName());
-  private final File _segmentsDir = new File(_tmpDir, "segments");
-  private final File _tarsDir = new File(_tmpDir, "tars");
+  protected final File _tmpDir = new File("/tmp/" + getClass().getSimpleName());
+  protected final File _segmentsDir = new File(_tmpDir, "segments");
+  protected final File _tarsDir = new File(_tmpDir, "tars");
 
   @Override
   public void testMultipleQueries() throws Exception {
@@ -87,7 +87,7 @@ public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTe
     ensureDirectoryExistsAndIsEmpty(_tarsDir);
   }
 
-  private void generateAndUploadRandomSegment(String segmentName, int rowCount) throws Exception {
+  protected void generateAndUploadRandomSegment(String segmentName, int rowCount) throws Exception {
     ThreadLocalRandom random = ThreadLocalRandom.current();
     Schema schema = new Schema.Parser().parse(
         new File(TestUtils.getFileFromResourceUrl(getClass().getClassLoader().getResource("dummy.avsc"))));

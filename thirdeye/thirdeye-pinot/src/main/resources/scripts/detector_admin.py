@@ -64,6 +64,7 @@ ADMIN = '/admin/' #'/'
 FUNCTIONS_ENDPOINT = API + 'anomaly-functions/'
 JOBS_ENDPOINT = API + 'anomaly-jobs/'
 EMAIL_REPORTS_ENDPOINT = API + 'email-reports/'
+EMAIL_FUNCTION_DEPENDENCIES_ENDPOINT = API + "email-function-dependencies/"
 ANOMALY_RESULTS_ENDPOINT = API + 'anomaly-results/'
 EMAIL_RESET_ENDPOINT = ADMIN + 'tasks/email?action=reset'
 
@@ -226,12 +227,17 @@ def add_anomaly_results_subparser(subparsers):
     find_parser.add_argument('inps', type=int, nargs='+', help='result ids', metavar='ids')
     find_parser.set_defaults(func=find_anomaly_result)
 
-    show_parser = results_subparser.add_parser('show', help='show anomaly results for a collection + time frame')
-    show_parser.add_argument('collection', help='thirdeye collection')
-    show_parser.add_argument('--start', help='start time in IS08601 or as daysago(#), default=daysago(7)', required=False, default=convert_to_iso('daysago(7)'))
-    show_parser.add_argument('--end', help='end time in IS08601 or as daysago(#)', required=False)
-    show_parser.set_defaults(func=show_anomaly_results_for_collection)
+    show_by_collection_parser = results_subparser.add_parser('show_by_collection', help='show anomaly results for a collection + time frame')
+    show_by_collection_parser.add_argument('collection', help='thirdeye collection')
+    show_by_collection_parser.add_argument('--start', help='start time in IS08601 or as daysago(#), default=daysago(7)', required=False, default=convert_to_iso('daysago(7)'))
+    show_by_collection_parser.add_argument('--end', help='end time in IS08601 or as daysago(#)', required=False)
+    show_by_collection_parser.set_defaults(func=show_anomaly_results_for_collection)
 
+    show_by_function_parser = results_subparser.add_parser('show_by_function', help='show anomaly results for a set of function ids + time frame')
+    show_by_function_parser.add_argument('inps', type=int, nargs='+', help='thirdeye function ids', metavar='ids')
+    show_by_function_parser.add_argument('--start', help='start time in IS08601 or as daysago(#), default=daysago(7)', required=False, default=convert_to_iso('daysago(7)'))
+    show_by_function_parser.add_argument('--end', help='end time in IS08601 or as daysago(#)', required=False)
+    show_by_function_parser.set_defaults(func=show_anomaly_results_for_function)    
     # create_parser = results_subparser.add_parser('create', help='create a new anomaly result')
     # create_parser.add_argument('inps', nargs='+', help='JSON files specifying result to be created', metavar='file_paths')
     # create_parser.set_defaults(func=create_anomaly_result)
@@ -240,12 +246,50 @@ def add_anomaly_results_subparser(subparsers):
     # delete_parser.add_argument('inps', type=int, nargs='+', help='result ids', metavar='ids')
     # delete_parser.set_defaults(func=delete_anomaly_result)
 
+def add_email_function_dependencies_subparser(subparsers):
+    deps = subparsers.add_parser('dependencies', help='email function dependencies') # find out how to alias?
+    deps_subparser = deps.add_subparsers()
+
+    show_parser = deps_subparser.add_parser('show', help='show all email function dependencies')
+    show_parser.set_defaults(func=show_email_function_dependencies)
+
+    find_by_email_parser = deps_subparser.add_parser('findByEmail', help='find email function dependencies by email id')
+    find_by_email_parser.add_argument('inps', type=int, nargs='+', help='result ids', metavar='ids')
+    find_by_email_parser.set_defaults(func=find_email_function_dependencies_by_email)
+
+    find_by_function_parser = deps_subparser.add_parser('findByFunction', help='find email function dependencies by function id')
+    find_by_function_parser.add_argument('inps', type=int, nargs='+', help='result ids', metavar='ids')
+    find_by_function_parser.set_defaults(func=find_email_function_dependencies_by_function)
+
+    create_parser = deps_subparser.add_parser('create', help='create a new email function dependency')
+    create_parser.add_argument('email_id', type=int, help='id of the existing email configuration')
+    create_parser.add_argument('function_ids', type=int, nargs='+', help='associated function ids')
+    create_parser.set_defaults(func=create_email_function_dependencies)
+
+    create_from_json_parser = deps_subparser.add_parser('create_from_json', help='create a new email function dependency from json files')
+    create_from_json_parser.add_argument('inps', nargs='+', help='JSON files specifying dependencies to be created', metavar='file_paths')
+    create_from_json_parser.set_defaults(func=create_email_function_dependencies_from_file)
+
+    delete_parser = deps_subparser.add_parser('delete', help='delete an email function dependency')
+    delete_parser.add_argument('email_id', type=int, help='email report id of dependency to be deleted')
+    delete_parser.add_argument('function_ids', type=int, nargs='+', help='associated function dependencies')
+    delete_parser.set_defaults(func=delete_email_function_dependencies)
+
+    delete_by_email_parser = deps_subparser.add_parser('deleteByEmail', help='delete an email function dependency by email id')
+    delete_by_email_parser.add_argument('inps', type=int, nargs='+', help='email ids', metavar='ids')
+    delete_by_email_parser.set_defaults(func=delete_email_function_dependencies_by_email)
+
+    delete_by_function_parser = deps_subparser.add_parser('deleteByFunction', help='delete an email function dependency by function id')
+    delete_by_function_parser.add_argument('inps', type=int, nargs='+', help='function ids', metavar='ids')
+    delete_by_function_parser.set_defaults(func=delete_email_function_dependencies_by_function)
+
 
 def add_fs_subparser(subparsers):
     """ ls """
-    ls_parser = subparsers.add_parser('ls', help='list files')
-    ls_parser.add_argument('file', nargs='*', help='files to list (optional, defaults to current directory)')
-    ls_parser.add_argument('-r', help='recursive flag')
+    # Under construction...
+    # ls_parser = subparsers.add_parser('ls', help='list files')
+    # ls_parser.add_argument('file', nargs='*', help='files to list (optional, defaults to current directory)')
+    # ls_parser.add_argument('-r', help='recursive flag')
 
 
 """ Utility methods """
@@ -484,15 +528,102 @@ def find_anomaly_result(id):
 @Request
 def show_anomaly_results_for_collection(collection, start, end=None):
     start = convert_to_iso(start)
-    url = ANOMALY_RESULTS_ENDPOINT + str(collection) + '/' + start
+    url = ANOMALY_RESULTS_ENDPOINT + 'collection/' + str(collection) + '/' + start
+    if end:
+        end = convert_to_iso(end)
+        url += '/' + end
+    return 'GET', url, {'print_result': True}
+
+
+@MultipleInps
+@Request
+def show_anomaly_results_for_function(id, start=None, end=None):
+    url = ANOMALY_RESULTS_ENDPOINT + 'function/' + str(id)
+    if start:
+        start = convert_to_iso(start)
+        url += '/' + start
+        if end:
+            end = convert_to_iso(end)
+            url += '/' + end
+    elif end:
+        raise ValueError("End date cannot be specified without a start date")
+    return 'GET', url, {'print_result': True}
+
     if end:
         end = convert_to_iso(end)
         url += '/' + end
     print url
     return 'GET', url, {'print_result': True}
 
+
+@Request
+def show_email_function_dependencies():
+    print "Retrieving dependencies"
+    return 'GET', EMAIL_FUNCTION_DEPENDENCIES_ENDPOINT, {'print_result': True}
+
+
+@MultipleInps
+@Request
+def find_email_function_dependencies_by_email(id):
+    print "Finding email function dependencies for email %d" % id
+    return 'GET', EMAIL_FUNCTION_DEPENDENCIES_ENDPOINT + 'email/' + str(id), {'print_result': True}
+
+
+@MultipleInps
+@Request
+def find_email_function_dependencies_by_function(id):
+    print "Finding email function dependencies for function %d" % id
+    return 'GET', EMAIL_FUNCTION_DEPENDENCIES_ENDPOINT + 'function/' + str(id), {'print_result': True}
+
+
+def create_email_function_dependencies(email_id, function_ids):
+    print "Creating dependencies for email %d to functions %s" % (email_id, function_ids)
+
+    @MultipleInps
+    @Request
+    def create_email_function_dependency(function_id):
+        url = EMAIL_FUNCTION_DEPENDENCIES_ENDPOINT + str(email_id) + '/' + str(function_id)
+        return 'POST', url
+    return create_email_function_dependency(function_ids)
+
+
+@MultipleInps
+@Request
+def create_email_function_dependencies_from_file(file_path):
+    print "Creating dependency from file path %s" % file_path
+    #callable
+    with open(file_path, 'r') as f:
+        data = f.read()
+    return 'POST', EMAIL_FUNCTION_DEPENDENCIES_ENDPOINT, {'data': data, 'print_result': create_msg_success('function')}
+
+
+def delete_email_function_dependencies(email_id, function_ids):
+    print "Deleting dependencies for email %d to functions %s" % (email_id, function_ids)
+
+    @MultipleInps
+    @Request
+    def delete_email_function_dependency(function_id):
+        url = EMAIL_FUNCTION_DEPENDENCIES_ENDPOINT + str(email_id) + '/' + str(function_id)
+        return 'DELETE', url
+    return delete_email_function_dependency(function_ids)
+
+
+@MultipleInps
+@Request
+def delete_email_function_dependencies_by_email(id):
+    print "Deleting dependencies by email id %d" % id
+    return 'DELETE', EMAIL_FUNCTION_DEPENDENCIES_ENDPOINT + 'email/' + str(id)
+
+
+@MultipleInps
+@Request
+def delete_email_function_dependencies_by_function():
+    print "Deleting dependencies by function id %d" % id
+    return 'DELETE', EMAIL_FUNCTION_DEPENDENCIES_ENDPOINT + 'function/' + str(id)
+
+
 """ Initialization code """
-hosts = ["localhost" ]
+hosts = ["localhost"]
 
 
 def extract_host():
@@ -516,6 +647,7 @@ def main():
     add_jobs_subparser(subparsers)
     add_email_reports_subparser(subparsers)
     add_anomaly_results_subparser(subparsers)
+    add_email_function_dependencies_subparser(subparsers)
     add_fs_subparser(subparsers)
 
     shell = DetectorAdminShell(parser)

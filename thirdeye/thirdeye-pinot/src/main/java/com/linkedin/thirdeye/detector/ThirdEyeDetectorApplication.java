@@ -13,6 +13,8 @@ import io.dropwizard.server.SimpleServerFactory;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -42,21 +44,45 @@ import com.linkedin.thirdeye.detector.resources.AnomalyFunctionRelationResource;
 import com.linkedin.thirdeye.detector.resources.AnomalyFunctionSpecResource;
 import com.linkedin.thirdeye.detector.resources.AnomalyResultResource;
 import com.linkedin.thirdeye.detector.resources.ContextualEventResource;
+import com.linkedin.thirdeye.detector.resources.EmailFunctionDependencyResource;
 import com.linkedin.thirdeye.detector.resources.EmailReportResource;
 import com.linkedin.thirdeye.detector.resources.MetricsGraphicsTimeSeriesResource;
 import com.linkedin.thirdeye.detector.task.EmailReportJobManagerTask;
 
 public class ThirdEyeDetectorApplication
     extends BaseThirdEyeApplication<ThirdEyeDetectorConfiguration> {
+  private static final String QUARTZ_MISFIRE_THRESHOLD = "3600000"; // 1 hour
   private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeDetectorApplication.class);
 
+  /**
+   * Entry point for the detector application, used to start up the app server and handle database
+   * migrations. There must be at least one argument, with the root directory for all application
+   * configs (including <code>detector.yml</code>) provided as the last argument. If no preceding
+   * arguments are provided, the application server will startup using <code>detector.yml</code>.
+   * <br>
+   * If additional arguments do precede the root configuration directory, they are passed as
+   * arguments to the Dropwizard application along with the <code>detector.yml</code> file. As an
+   * example, one could pass in the arguments:
+   * <br>
+   * <br>
+   * <code>db migrate <i>config_folder</i></code>
+   * <br>
+   * <br>
+   * to run database migrations using configurations in <code>detector.yml</code>.
+   * @throws Exception
+   */
   public static void main(final String[] args) throws Exception {
-    String thirdEyeConfigDir = args[0];
+    List<String> argList = new ArrayList<String>(Arrays.asList(args));
+    if (argList.size() == 1) {
+      argList.add(0, "server");
+    }
+    int lastIndex = argList.size() - 1;
+    String thirdEyeConfigDir = argList.get(lastIndex);
     System.setProperty("dw.rootDir", thirdEyeConfigDir);
     String detectorApplicationConfigFile = thirdEyeConfigDir + "/" + "detector.yml";
-    new ThirdEyeDetectorApplication().run(new String[] {
-        "server", detectorApplicationConfigFile
-    });
+    argList.set(lastIndex, detectorApplicationConfigFile); // replace config dir with the
+                                                           // actual config file
+    new ThirdEyeDetectorApplication().run(argList.toArray(new String[argList.size()]));
   }
 
   @Override
@@ -90,6 +116,7 @@ public class ThirdEyeDetectorApplication
     }
 
     // Quartz Scheduler
+    System.setProperty("org.quartz.jobStore.misfireThreshold", QUARTZ_MISFIRE_THRESHOLD);
     SchedulerFactory schedulerFactory = new StdSchedulerFactory();
     final Scheduler quartzScheduler = schedulerFactory.getScheduler();
     environment.lifecycle().manage(new Managed() {
@@ -223,6 +250,7 @@ public class ThirdEyeDetectorApplication
         .register(new AnomalyDetectionJobResource(jobManager, anomalyFunctionSpecDAO));
     environment.jersey()
         .register(new EmailReportResource(emailConfigurationDAO, emailReportJobManager));
+    environment.jersey().register(new EmailFunctionDependencyResource(emailFunctionDependencyDAO));
 
     // Tasks
     environment.admin().addTask(

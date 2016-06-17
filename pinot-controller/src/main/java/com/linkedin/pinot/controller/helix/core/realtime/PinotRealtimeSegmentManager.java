@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2015 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -155,7 +155,7 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
             String partitionId = instanceZKMetadata.getPartition(resource);
             if (groupId != null && !groupId.isEmpty() && partitionId != null && !partitionId.isEmpty()) {
               listOfSegmentsToAddToInstances.add(new Pair<String, String>(
-                  SegmentNameBuilder.Realtime.build(groupId, partitionId, String.valueOf(System.currentTimeMillis())),
+                  SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName(groupId, partitionId, String.valueOf(System.currentTimeMillis())),
                   instanceId));
             } else {
               LOGGER.warn("Instance {} has invalid groupId ({}) and/or partitionId ({}) for resource {}, ignoring for segment assignment.",
@@ -189,7 +189,7 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
             String groupId = instanceZKMetadata.getGroupId(resource);
             String partitionId = instanceZKMetadata.getPartition(resource);
             listOfSegmentsToAddToInstances.add(new Pair<String, String>(
-                SegmentNameBuilder.Realtime.build(groupId, partitionId, String.valueOf(System.currentTimeMillis())),
+                SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName(groupId, partitionId, String.valueOf(System.currentTimeMillis())),
                 instanceId));
           }
         }

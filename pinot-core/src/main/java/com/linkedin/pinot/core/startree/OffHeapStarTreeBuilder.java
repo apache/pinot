@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2015 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -204,30 +204,6 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
     LOG.debug("metricNames:{}", metricNames);
   }
 
-  /**
-   * Validate the split order by removing any dimensions that may be part of the skip
-   * materialization list.
-   * @param dimensionsSplitOrder
-   * @param skipMaterializationForDimensions
-   * @return
-   */
-  private List<String> sanitizeSplitOrder(List<String> dimensionsSplitOrder,
-      Set<String> skipMaterializationForDimensions) {
-    List<String> validatedSplitOrder = new ArrayList<String>();
-    for (String dimension : dimensionsSplitOrder) {
-      if (skipMaterializationForDimensions == null
-          || !skipMaterializationForDimensions.contains(dimension)) {
-        LOG.info("Adding dimension {} to split order", dimension);
-        validatedSplitOrder.add(dimension);
-      } else {
-        LOG.info(
-            "Dimension {} cannot be part of 'dimensionSplitOrder' and 'skipMaterializationForDimensions', removing it from split order",
-            dimension);
-      }
-    }
-    return validatedSplitOrder;
-  }
-
   private Object getAllStarValue(FieldSpec spec) throws Exception {
     switch (spec.getDataType()) {
     case STRING:
@@ -330,14 +306,19 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
     if (skipMaterializationForDimensions == null || skipMaterializationForDimensions.isEmpty()) {
       skipMaterializationForDimensions = computeDefaultDimensionsToSkipMaterialization();
     }
+
+    // For default split order, give preference to skipMaterializationForDimensions.
+    // For user-defined split order, give preference to split-order.
     if (dimensionsSplitOrder == null || dimensionsSplitOrder.isEmpty()) {
       dimensionsSplitOrder = computeDefaultSplitOrder();
+      dimensionsSplitOrder.removeAll(skipMaterializationForDimensions);
+    } else {
+      skipMaterializationForDimensions.removeAll(dimensionsSplitOrder);
     }
 
-    // Remove any dimensions from split order that would be not be materialized.
-    dimensionsSplitOrder = sanitizeSplitOrder(dimensionsSplitOrder, skipMaterializationForDimensions);
+    LOG.debug("Split order: {}", dimensionsSplitOrder);
+    LOG.debug("Skip Materilazitaion For Dimensions: {}", skipMaterializationForDimensions);
 
-    LOG.debug("Split order:{}", dimensionsSplitOrder);
     long start = System.currentTimeMillis();
     dataBuffer.flush();
     // Sort the data based on default sort order (split order + remaining dimensions)

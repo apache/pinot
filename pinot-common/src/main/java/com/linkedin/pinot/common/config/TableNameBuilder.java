@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2015 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.common.config;
 
+import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.common.utils.StringUtil;
 
@@ -31,6 +32,10 @@ public class TableNameBuilder {
   }
 
   public String forTable(String tableName) {
+    Preconditions.checkNotNull(tableName);
+    Preconditions.checkArgument(!tableName.contains("__"),
+        "Table name cannot contain two consecutive underscore characters");
+
     if (needsPostfix(tableName)) {
       return StringUtil.join("_", tableName, type.toString().toUpperCase());
     }

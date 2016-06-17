@@ -117,8 +117,9 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
     List<String> dimensionNames = collectionSchema.getDimensionNames();
     String sql = PqlUtils.getPql(request, dataTimeSpec);
     LOG.debug("Executing: {}", sql);
-    ResultSetGroup result = CACHE_INSTANCE.getResultSetGroupCache()
-        .get(new PinotQuery(sql, request.getCollection() + "_OFFLINE"));
+    ResultSetGroup result =
+        CACHE_INSTANCE.getResultSetGroupCache().get(
+            new PinotQuery(sql, request.getCollection() + "_OFFLINE"));
     if (LOG.isDebugEnabled()) {
       LOG.debug("Result for: {} {}", sql, format(result));
     }
@@ -174,6 +175,7 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
       ResultSet resultSet = result.getResultSet(i);
       int numRows = resultSet.getRowCount();
       for (int r = 0; r < numRows; r++) {
+        boolean skipRowDueToError = false;
         String[] groupKeys;
         if (hasGroupBy) {
           groupKeys = new String[resultSet.getGroupKeyLength()];
@@ -187,10 +189,18 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
               } else {
                 millis = DateTime.parse(groupKeyVal, dateTimeFormatter).getMillis();
               }
+              if (millis < startTime) {
+                LOG.error("Data point earlier than requested start time {}: {}", startTime, millis);
+                skipRowDueToError = true;
+                break;
+              }
               timeBucket = (int) ((millis - startTime) / interval);
               groupKeyVal = String.valueOf(timeBucket);
             }
             groupKeys[grpKeyIdx] = groupKeyVal;
+          }
+          if (skipRowDueToError) {
+            continue;
           }
         } else {
           groupKeys = new String[] {};

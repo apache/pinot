@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2015 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package com.linkedin.pinot.common.segment;
 import java.io.File;
 import java.util.Map;
 
+import javax.annotation.Nullable;
 import org.joda.time.Duration;
 import org.joda.time.Interval;
 
@@ -141,6 +142,13 @@ public interface SegmentMetadata {
    * @return
    */
   String getBitmapInvertedIndexFileName(String column, String segmentVersion);
+
+  /**
+   * returns the name of the component that created the segment
+   * @return
+   */
+  @Nullable
+  String getCreatorName();
 
   /**
    * @return

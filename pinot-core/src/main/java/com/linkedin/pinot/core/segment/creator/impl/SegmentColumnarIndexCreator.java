@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2015 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -208,6 +208,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     final PropertiesConfiguration properties =
         new PropertiesConfiguration(new File(file, V1Constants.MetadataKeys.METADATA_FILE_NAME));
 
+    properties.setProperty(SEGMENT_CREATOR_VERSION, config.getCreatorVersion());
     properties.setProperty(SEGMENT_NAME, segmentName);
     properties.setProperty(TABLE_NAME, config.getTableName());
     properties.setProperty(DIMENSIONS, config.getDimensions());

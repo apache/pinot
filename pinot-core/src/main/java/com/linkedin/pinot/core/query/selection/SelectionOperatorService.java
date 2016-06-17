@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2015 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -299,8 +299,7 @@ public class SelectionOperatorService {
           "type of results Expected: (PriorityQueue| ArrayList)) actual:" + reducedResults.getClass());
     }
 
-    List<String> columns = getSelectionColumnsFromDataSchema(dataSchema);
-    return new SelectionResults(columns, rows);
+    return new SelectionResults(_selectionColumns, rows);
   }
 
   private JSONArray getSelectionColumnsJsonArrayFromDataSchema(DataSchema dataSchema) {

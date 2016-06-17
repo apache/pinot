@@ -48,6 +48,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.linkedin.thirdeye.hadoop.config.MetricType;
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfig;
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfigProperties;
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConstants;
@@ -216,6 +217,7 @@ public class DerivedColumnNoTransformationTest {
     private TopKDimensionValues topKDimensionValues;
     private Map<String, Set<String>> topKDimensionsMap;
     private String timeColumnName;
+    private List<MetricType> metricTypes;
 
     @Override
     public void setup(Context context) throws IOException, InterruptedException {
@@ -226,6 +228,7 @@ public class DerivedColumnNoTransformationTest {
       config = DerivedColumnTransformationPhaseConfig.fromThirdEyeConfig(thirdeyeConfig);
       dimensionsNames = config.getDimensionNames();
       metricNames = config.getMetricNames();
+      metricTypes = config.getMetricTypes();
       timeColumnName = config.getTimeColumnName();
 
       outputSchema = new Schema.Parser().parse(configuration.get(DerivedColumnTransformationPhaseConstants.DERIVED_COLUMN_TRANSFORMATION_PHASE_OUTPUT_SCHEMA.toString()));
@@ -270,8 +273,10 @@ public class DerivedColumnNoTransformationTest {
       }
 
       // metrics
-      for (String metric : metricNames) {
-        outputRecord.put(metric, ThirdeyeAvroUtils.getMetricFromRecord(inputRecord, metric));
+      for (int i = 0; i < metricNames.size(); i ++) {
+        String metricName = metricNames.get(i);
+        MetricType metricType = metricTypes.get(i);
+        outputRecord.put(metricName, ThirdeyeAvroUtils.getMetricFromRecord(inputRecord, metricName, metricType));
       }
 
       // time

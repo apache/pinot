@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2015 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -169,6 +169,17 @@ public class HadoopSegmentCreationMapReduceJob {
       segmentGeneratorConfig.setReaderConfig(getReaderConfig(fileFormat));
 
       segmentGeneratorConfig.setOutDir(_localDiskSegmentDirectory);
+
+      // Add the current java package version to the segment metadata
+      // properties file.
+      Package objPackage = this.getClass().getPackage();
+      if (null != objPackage) {
+        String packageVersion = objPackage.getSpecificationVersion();
+        if (null != packageVersion) {
+          LOGGER.info("Pinot Hadoop Package version {}", packageVersion);
+          segmentGeneratorConfig.setCreatorVersion(packageVersion);
+        }
+      }
 
       SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
       driver.init(segmentGeneratorConfig);

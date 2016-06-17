@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2015 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import com.linkedin.pinot.common.utils.SegmentNameBuilder;
+import javax.annotation.Nullable;
 import org.apache.helix.manager.zk.ZkClient;
 import org.joda.time.DateTime;
 import org.joda.time.Duration;
@@ -144,10 +145,10 @@ public class ValidationManagerTest {
 
     // Create a bunch of dummy segments
     String testTableName = "TestTableTotalDocCountTest";
-    String segmentName1 = SegmentNameBuilder.Realtime.build("groupid_1", "0", "1");
-    String segmentName2 = SegmentNameBuilder.Realtime.build("groupid_1", "0", "2");
-    String segmentName3 = SegmentNameBuilder.Realtime.build("groupid_1", "0", "3");
-    String segmentName4 = SegmentNameBuilder.Realtime.build("groupid_2", "0", "3");
+    String segmentName1 = SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("groupid_1", "0", "1");
+    String segmentName2 = SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("groupid_1", "0", "2");
+    String segmentName3 = SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("groupid_1", "0", "3");
+    String segmentName4 = SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("groupid_2", "0", "3");
 
     DummyMetadata metadata1 = new DummyMetadata(testTableName, segmentName1, 10);
     DummyMetadata metadata2 = new DummyMetadata(testTableName, segmentName2, 20);
@@ -458,5 +459,10 @@ public class ValidationManagerTest {
       // TODO Auto-generated method stub
       return null;
     }
+
+    @Nullable @Override public String getCreatorName() {
+      return null;
+    }
+
   }
 }

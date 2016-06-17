@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.controller.api.restlet.resources;
 
+import com.alibaba.fastjson.JSONObject;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
@@ -23,6 +24,11 @@ import com.linkedin.pinot.common.metrics.ControllerMeter;
 import com.linkedin.pinot.common.restlet.swagger.Response;
 import com.linkedin.pinot.common.restlet.swagger.Responses;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.common.segment.fetcher.SegmentFetcher;
+import com.linkedin.pinot.common.segment.fetcher.SegmentFetcherFactory;
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.FileUploadUtils;
+import com.linkedin.pinot.common.utils.FileUploadUtils.FileUploadType;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.common.utils.time.TimeUtils;
@@ -34,6 +40,7 @@ import com.linkedin.pinot.common.restlet.swagger.Summary;
 import com.linkedin.pinot.common.restlet.swagger.Tags;
 import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+
 import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
@@ -57,6 +64,7 @@ import org.restlet.representation.Representation;
 import org.restlet.representation.StringRepresentation;
 import org.restlet.resource.Delete;
 import org.restlet.resource.Post;
+import org.restlet.util.Series;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -69,13 +77,14 @@ import org.slf4j.LoggerFactory;
  */
 public class PinotSegmentUploadRestletResource extends BasePinotControllerRestletResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotSegmentUploadRestletResource.class);
+  private static final String RESTLET_HTTP_HEADERS = "org.restlet.http.headers";
+
   private final File baseDataDir;
   private final File tempDir;
   private final File tempUntarredPath;
   private final String vip;
 
   public PinotSegmentUploadRestletResource() throws IOException {
-
     baseDataDir = new File(_controllerConf.getDataDir());
     if (!baseDataDir.exists()) {
       FileUtils.forceMkdir(baseDataDir);
@@ -164,7 +173,7 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
     Representation presentation;
     final JSONArray ret = new JSONArray();
 
-    if(activeOnly) {
+    if (activeOnly) {
       String offlineTableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
       List<String> segmentList = _pinotHelixResourceManager.getAllSegmentsForResource(offlineTableName);
       ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
@@ -228,30 +237,95 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
     File tmpSegmentDir = null;
     File dataFile = null;
     try {
-
-      // 1/ Create a factory for disk-based file items
-      final DiskFileItemFactory factory = new DiskFileItemFactory();
-
-      // 2/ Create a new file upload handler based on the Restlet
-      // FileUpload extension that will parse Restlet requests and
-      // generates FileItems.
-      final RestletFileUpload upload = new RestletFileUpload(factory);
-      final List<FileItem> items;
-
-      // 3/ Request is parsed by the handler which generates a
-      // list of FileItems
-      items = upload.parseRequest(getRequest());
-
-      boolean found = false;
-      for (final Iterator<FileItem> it = items.iterator(); it.hasNext() && !found;) {
-        final FileItem fi = it.next();
-        if (fi.getFieldName() != null) {
-          found = true;
-          dataFile = new File(tempDir, fi.getFieldName());
-          fi.write(dataFile);
-        }
+      // 0/ Get upload type, if it's uri, then download it, otherwise, get the tar from the request.
+      Series headers = (Series) getRequestAttributes().get(RESTLET_HTTP_HEADERS);
+      String uploadTypeStr = headers.getFirstValue(FileUploadUtils.UPLOAD_TYPE);
+      FileUploadType uploadType = null;
+      try {
+        uploadType = (uploadTypeStr == null) ? FileUploadType.getDefaultUploadType() : FileUploadType.valueOf(uploadTypeStr);
+      } catch (Exception e) {
+        uploadType = FileUploadType.getDefaultUploadType();
       }
+      String downloadURI = null;
+      boolean found = false;
+      switch (uploadType) {
+        case URI:
+        case JSON:
+          // Download segment from the given Uri
+          try {
+            downloadURI = getDownloadUri(uploadType, headers, entity);
+          } catch (Exception e) {
+            String errorMsg =
+                String.format("Failed to get download Uri for upload file type: %s, with error %s",
+                    uploadType, e.getMessage());
+            LOGGER.warn(errorMsg);
+            JSONObject errorMsgInJson = getErrorMsgInJson(errorMsg);
+            ControllerRestApplication.getControllerMetrics()
+                .addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
+            setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
+            return new StringRepresentation(errorMsgInJson.toJSONString(),
+                MediaType.APPLICATION_JSON);
+          }
 
+          SegmentFetcher segmentFetcher = null;
+          // Get segmentFetcher based on uri parsed from download uri
+          try {
+            segmentFetcher = SegmentFetcherFactory.getSegmentFetcherBasedOnURI(downloadURI);
+          } catch (Exception e) {
+            String errorMsg =
+                String.format("Failed to get SegmentFetcher from download Uri: %s", downloadURI);
+            LOGGER.warn(errorMsg);
+            JSONObject errorMsgInJson = getErrorMsgInJson(errorMsg);
+            ControllerRestApplication.getControllerMetrics()
+                .addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
+            setStatus(Status.SERVER_ERROR_INTERNAL);
+            return new StringRepresentation(errorMsgInJson.toJSONString(),
+                MediaType.APPLICATION_JSON);
+          }
+          // Download segment tar to local.
+          dataFile = new File(tempDir, "tmp-" + System.nanoTime());
+          try {
+            segmentFetcher.fetchSegmentToLocal(downloadURI, dataFile);
+          } catch (Exception e) {
+            String errorMsg =
+                String.format("Failed to fetch segment tar from download Uri: %s to %s",
+                    downloadURI, dataFile.toString());
+            LOGGER.warn(errorMsg);
+            JSONObject errorMsgInJson = getErrorMsgInJson(errorMsg);
+            ControllerRestApplication.getControllerMetrics()
+                .addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
+            setStatus(Status.SERVER_ERROR_INTERNAL);
+            return new StringRepresentation(errorMsgInJson.toJSONString(),
+                MediaType.APPLICATION_JSON);
+          }
+          if (dataFile.exists() && dataFile.length() > 0) {
+            found = true;
+          }
+          break;
+        case TAR:
+        default:
+          // 1/ Create a factory for disk-based file items
+          final DiskFileItemFactory factory = new DiskFileItemFactory();
+
+          // 2/ Create a new file upload handler based on the Restlet
+          // FileUpload extension that will parse Restlet requests and
+          // generates FileItems.
+          final RestletFileUpload upload = new RestletFileUpload(factory);
+          final List<FileItem> items;
+
+          // 3/ Request is parsed by the handler which generates a
+          // list of FileItems
+          items = upload.parseRequest(getRequest());
+
+          for (final Iterator<FileItem> it = items.iterator(); it.hasNext() && !found;) {
+            final FileItem fi = it.next();
+            if (fi.getFieldName() != null) {
+              found = true;
+              dataFile = new File(tempDir, fi.getFieldName());
+              fi.write(dataFile);
+            }
+          }
+      }
       // Once handled, the content of the uploaded file is sent
       // back to the client.
       if (found) {
@@ -268,18 +342,20 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
         if (!tmpSegmentDir.exists()) {
           tmpSegmentDir.mkdirs();
         }
-        // While there is TarGzCompressionUtils.unTarOneFile, we use unTar here to unpack all files in the segment in
-        // order to ensure the segment is not corrupted
+        // While there is TarGzCompressionUtils.unTarOneFile, we use unTar here to unpack all files
+        // in the segment in order to ensure the segment is not corrupted
         TarGzCompressionUtils.unTar(dataFile, tmpSegmentDir);
         File segmentFile = tmpSegmentDir.listFiles()[0];
         String clientIpAddress = getClientInfo().getAddress();
         String clientAddress = InetAddress.getByName(clientIpAddress).getHostName();
         LOGGER.info("Processing upload request for segment '{}' from client '{}'", segmentFile.getName(), clientAddress);
-        return uploadSegment(segmentFile, dataFile);
+        return uploadSegment(segmentFile, dataFile, downloadURI);
       } else {
         // Some problem occurs, sent back a simple line of text.
-        rep = new StringRepresentation("no file uploaded", MediaType.TEXT_PLAIN);
-        LOGGER.warn("No file was uploaded");
+        String errorMsg = "No file was uploaded";
+        LOGGER.warn(errorMsg);
+        JSONObject errorMsgInJson = getErrorMsgInJson(errorMsg );
+        rep = new StringRepresentation(errorMsgInJson.toJSONString(), MediaType.APPLICATION_JSON);
         ControllerRestApplication.getControllerMetrics().addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
         setStatus(Status.SERVER_ERROR_INTERNAL);
       }
@@ -305,6 +381,22 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
     return rep;
   }
 
+  private String getDownloadUri(FileUploadType uploadType, Series headers, Representation entity) throws Exception {
+    switch (uploadType) {
+    case URI:
+      return headers.getFirstValue(FileUploadUtils.DOWNLOAD_URI);
+    case JSON:
+      // Get segmentJsonStr
+      String segmentJsonStr = entity.getText();
+      JSONObject segmentJson = JSONObject.parseObject(segmentJsonStr);
+      // Download segment from the given Uri
+      return segmentJson.getString(CommonConstants.Segment.Offline.DOWNLOAD_URL);
+    default:
+      break;
+    }
+    throw new UnsupportedOperationException("Not support getDownloadUri method for upload type - " + uploadType);
+  }
+
   @HttpVerb("post")
   @Summary("Uploads a segment")
   @Tags({"segment"})
@@ -316,7 +408,7 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
       @Response(statusCode = "200", description = "The segment was successfully uploaded"),
       @Response(statusCode = "500", description = "There was an error when uploading the segment")
   })
-  private Representation uploadSegment(File indexDir, File dataFile)
+  private Representation uploadSegment(File indexDir, File dataFile, String downloadUrl)
       throws ConfigurationException, IOException, JSONException {
     final SegmentMetadata metadata = new SegmentMetadataImpl(indexDir);
     final File tableDir = new File(baseDataDir, metadata.getTableName());
@@ -330,16 +422,18 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
     if (!isSegmentTimeValid(metadata)) {
       response = new PinotResourceManagerResponse("Invalid segment start/end time", false);
     } else {
-      response = _pinotHelixResourceManager
-          .addSegment(metadata, constructDownloadUrl(metadata.getTableName(), dataFile.getName()));
+      if (downloadUrl == null) {
+        downloadUrl = constructDownloadUrl(metadata.getTableName(), dataFile.getName());
+      }
+      response = _pinotHelixResourceManager.addSegment(metadata, downloadUrl);
     }
 
     if (response.isSuccessfull()) {
       setStatus(Status.SUCCESS_OK);
     } else {
-        ControllerRestApplication.getControllerMetrics().addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
-        setStatus(Status.SERVER_ERROR_INTERNAL);
-      }
+      ControllerRestApplication.getControllerMetrics().addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
+      setStatus(Status.SERVER_ERROR_INTERNAL);
+    }
 
     return new StringRepresentation(response.toJSON().toString());
   }
@@ -386,7 +480,7 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
     Interval timeInterval = metadata.getTimeInterval();
     return (timeInterval == null || (TimeUtils.timeValueInValidRange(timeInterval.getStartMillis())) && TimeUtils
         .timeValueInValidRange(timeInterval.getEndMillis()));
-    }
+  }
 
   /**
    * URI Mappings:

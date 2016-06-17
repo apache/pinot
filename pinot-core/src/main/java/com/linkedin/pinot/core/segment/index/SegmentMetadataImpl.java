@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2015 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,6 +37,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.joda.time.Duration;
@@ -46,6 +47,7 @@ import org.slf4j.LoggerFactory;
 
 import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys;
 import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment;
+import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.SEGMENT_CREATOR_VERSION;
 import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.TIME_UNIT;
 
 
@@ -69,6 +71,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private SegmentVersion _segmentVersion;
   private boolean _hasStarTree;
   private StarTreeMetadata _starTreeMetadata = null;
+  private String _creatorName;
 
   public SegmentMetadataImpl(File indexDir) throws ConfigurationException, IOException {
     LOGGER.debug("SegmentMetadata location: {}", indexDir);
@@ -90,6 +93,8 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
   public SegmentMetadataImpl(OfflineSegmentZKMetadata offlineSegmentZKMetadata) {
     _segmentMetadataPropertiesConfiguration = new PropertiesConfiguration();
+
+    _segmentMetadataPropertiesConfiguration.addProperty(Segment.SEGMENT_CREATOR_VERSION, null);
 
     _segmentMetadataPropertiesConfiguration.addProperty(V1Constants.MetadataKeys.Segment.SEGMENT_START_TIME,
         Long.toString(offlineSegmentZKMetadata.getStartTime()));
@@ -125,6 +130,8 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   public SegmentMetadataImpl(RealtimeSegmentZKMetadata segmentMetadata) {
 
     _segmentMetadataPropertiesConfiguration = new PropertiesConfiguration();
+
+    _segmentMetadataPropertiesConfiguration.addProperty(Segment.SEGMENT_CREATOR_VERSION, null);
 
     _segmentMetadataPropertiesConfiguration.addProperty(V1Constants.MetadataKeys.Segment.SEGMENT_START_TIME,
         Long.toString(segmentMetadata.getStartTime()));
@@ -202,6 +209,11 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   }
 
   private void init() {
+    if (_segmentMetadataPropertiesConfiguration.containsKey(Segment.SEGMENT_CREATOR_VERSION)) {
+      _creatorName = _segmentMetadataPropertiesConfiguration.getString(Segment.SEGMENT_CREATOR_VERSION);
+    }
+
+
     String versionString = _segmentMetadataPropertiesConfiguration
         .getString(V1Constants.MetadataKeys.Segment.SEGMENT_VERSION, SegmentVersion.v1.toString());
     _segmentVersion = SegmentVersion.valueOf(versionString);
@@ -243,7 +255,8 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     }
 
     // StarTree config here
-    _hasStarTree = _segmentMetadataPropertiesConfiguration.getBoolean(MetadataKeys.StarTree.STAR_TREE_ENABLED, false);
+    _hasStarTree = _segmentMetadataPropertiesConfiguration.getBoolean(
+        MetadataKeys.StarTree.STAR_TREE_ENABLED, false);
     if (_hasStarTree) {
       initStarTreeMetadata();
     }
@@ -267,7 +280,8 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
     // Set the maxLeafRecords
     String maxLeafRecordsString =
-        _segmentMetadataPropertiesConfiguration.getString(MetadataKeys.StarTree.STAR_TREE_MAX_LEAF_RECORDS);
+        _segmentMetadataPropertiesConfiguration.getString(
+            MetadataKeys.StarTree.STAR_TREE_MAX_LEAF_RECORDS);
     if (maxLeafRecordsString != null) {
       _starTreeMetadata.setMaxLeafRecords(Long.valueOf(maxLeafRecordsString));
     }
@@ -502,6 +516,10 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   @Override
   public String getBitmapInvertedIndexFileName(String column, String segmentVersion) {
     return column + V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION;
+  }
+
+  @Nullable @Override public String getCreatorName() {
+    return _creatorName;
   }
 
 }

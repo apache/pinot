@@ -134,6 +134,10 @@ public class AnomalyDetectionJobManager {
 
     quartzScheduler.scheduleJob(job, trigger);
 
+    LOG.info(
+        "buildAndScheduleJob anomalyFunction: {}, windowStartIsoString: {}, windowEndIsoString: {}",
+        anomalyFunction, windowStartIsoString, windowEndIsoString);
+
     LOG.info("Started {}: {}", jobKey, spec);
   }
 
@@ -146,8 +150,9 @@ public class AnomalyDetectionJobManager {
       AnomalyFunction anomalyFunction = anomalyFunctionFactory.fromSpec(spec);
 
       String triggerKey = String.format("scheduled_anomaly_function_trigger_%d", spec.getId());
-      CronTrigger trigger = TriggerBuilder.newTrigger().withIdentity(triggerKey)
-          .withSchedule(CronScheduleBuilder.cronSchedule(spec.getCron())).build();
+      CronTrigger trigger =
+          TriggerBuilder.newTrigger().withIdentity(triggerKey)
+              .withSchedule(CronScheduleBuilder.cronSchedule(spec.getCron())).build();
 
       String jobKey = String.format("scheduled_anomaly_function_job_%d", spec.getId());
       scheduledJobKeys.put(id, jobKey);
@@ -202,8 +207,8 @@ public class AnomalyDetectionJobManager {
 
   public static void main(String[] args) throws Exception {
     if (args.length != 2 && args.length != 4) {
-      System.err.println(
-          "Arguments must be configYml functionSpecPath [startISO endISO, both hour aligned]");
+      System.err
+          .println("Arguments must be configYml functionSpecPath [startISO endISO, both hour aligned]");
       System.exit(1);
     }
     String thirdEyeConfigDir = args[0];
@@ -226,7 +231,7 @@ public class AnomalyDetectionJobManager {
     new TestAnomalyApplication(filePath, startISO, endISO, TestType.FUNCTION, existingFunctionId)
         .run(new String[] {
             "server", detectorApplicationConfigFile
-    });
+        });
   }
 
 }

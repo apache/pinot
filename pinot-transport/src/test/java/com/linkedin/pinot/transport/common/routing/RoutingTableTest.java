@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2015 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -101,47 +101,47 @@ public class RoutingTableTest {
 
     HelixExternalViewBasedRouting routingTable = new HelixExternalViewBasedRouting(null, routingStrategy, null, null);
     ExternalView externalView = new ExternalView("testResource0_REALTIME");
-    externalView.setState(SegmentNameBuilder.Realtime.build("0", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "0"),
+    externalView.setState(SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("0", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "0"),
         "dataServer_instance_0", "ONLINE");
-    externalView.setState(SegmentNameBuilder.Realtime.build("0", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "1"),
+    externalView.setState(SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("0", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "1"),
         "dataServer_instance_1", "ONLINE");
-    externalView.setState(SegmentNameBuilder.Realtime.build("1", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "2"),
+    externalView.setState(SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("1", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "2"),
         "dataServer_instance_2", "ONLINE");
-    externalView.setState(SegmentNameBuilder.Realtime.build("1", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "3"),
+    externalView.setState(SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("1", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "3"),
         "dataServer_instance_3", "ONLINE");
-    externalView.setState(SegmentNameBuilder.Realtime.build("2", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "4"),
+    externalView.setState(SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("2", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "4"),
         "dataServer_instance_4", "ONLINE");
-    externalView.setState(SegmentNameBuilder.Realtime.build("2", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "5"),
+    externalView.setState(SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("2", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "5"),
         "dataServer_instance_5", "ONLINE");
     routingTable.markDataResourceOnline("testResource0_REALTIME", externalView,
         generateInstanceConfigs("dataServer_instance", 0, 5));
     ExternalView externalView1 = new ExternalView("testResource1_REALTIME");
-    externalView1.setState(SegmentNameBuilder.Realtime.build("0", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "10"),
+    externalView1.setState(SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("0", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "10"),
         "dataServer_instance_10", "ONLINE");
-    externalView1.setState(SegmentNameBuilder.Realtime.build("0", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "11"),
+    externalView1.setState(SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("0", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "11"),
         "dataServer_instance_11", "ONLINE");
-    externalView1.setState(SegmentNameBuilder.Realtime.build("0", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "12"),
+    externalView1.setState(SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("0", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "12"),
         "dataServer_instance_12", "ONLINE");
     routingTable.markDataResourceOnline("testResource1_REALTIME", externalView1,
         generateInstanceConfigs("dataServer_instance", 10, 12));
     ExternalView externalView2 = new ExternalView("testResource2_REALTIME");
-    externalView2.setState(SegmentNameBuilder.Realtime.build("0", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "20"),
+    externalView2.setState(SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("0", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "20"),
         "dataServer_instance_20", "ONLINE");
-    externalView2.setState(SegmentNameBuilder.Realtime.build("0", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "21"),
+    externalView2.setState(SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("0", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "21"),
         "dataServer_instance_21", "ONLINE");
-    externalView2.setState(SegmentNameBuilder.Realtime.build("0", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "22"),
+    externalView2.setState(SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("0", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "22"),
         "dataServer_instance_22", "ONLINE");
-    externalView2.setState(SegmentNameBuilder.Realtime.build("1", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "23"),
+    externalView2.setState(SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("1", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "23"),
         "dataServer_instance_23", "ONLINE");
-    externalView2.setState(SegmentNameBuilder.Realtime.build("1", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "24"),
+    externalView2.setState(SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("1", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "24"),
         "dataServer_instance_24", "ONLINE");
-    externalView2.setState(SegmentNameBuilder.Realtime.build("1", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "25"),
+    externalView2.setState(SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("1", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "25"),
         "dataServer_instance_25", "ONLINE");
-    externalView2.setState(SegmentNameBuilder.Realtime.build("2", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "26"),
+    externalView2.setState(SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("2", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "26"),
         "dataServer_instance_26", "ONLINE");
-    externalView2.setState(SegmentNameBuilder.Realtime.build("2", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "27"),
+    externalView2.setState(SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("2", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "27"),
         "dataServer_instance_27", "ONLINE");
-    externalView2.setState(SegmentNameBuilder.Realtime.build("2", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "28"),
+    externalView2.setState(SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("2", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "28"),
         "dataServer_instance_28", "ONLINE");
     routingTable.markDataResourceOnline("testResource2_REALTIME", externalView2,
         generateInstanceConfigs("dataServer_instance", 20, 28));
@@ -150,31 +150,31 @@ public class RoutingTableTest {
       assertResourceRequest(
           routingTable,
           "testResource0_REALTIME",
-          new String[] { "[" + SegmentNameBuilder.Realtime.build("0", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "0")
-              + ", " + SegmentNameBuilder.Realtime.build("0", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "1") + "]", "["
-              + SegmentNameBuilder.Realtime.build("1", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "2")
+          new String[] { "[" + SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("0", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "0")
+              + ", " + SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("0", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "1") + "]", "["
+              + SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("1", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "2")
               + ", "
-              + SegmentNameBuilder.Realtime.build("1", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "3") + "]", "["
-              + SegmentNameBuilder.Realtime.build("2", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "4") + ", "
-              + SegmentNameBuilder.Realtime.build("2", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "5") + "]" }, 2);
+              + SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("1", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "3") + "]", "["
+              + SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("2", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "4") + ", "
+              + SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("2", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "5") + "]" }, 2);
     }
     for (int numRun = 0; numRun < 100; ++numRun) {
       assertResourceRequest(routingTable, "testResource1_REALTIME",
-          new String[] { "[" + SegmentNameBuilder.Realtime.build("0", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "10")
-              + ", " + SegmentNameBuilder.Realtime.build("0", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "11") + ", "
-              + SegmentNameBuilder.Realtime.build("0", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "12") + "]" }, 3);
+          new String[] { "[" + SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("0", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "10")
+              + ", " + SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("0", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "11") + ", "
+              + SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("0", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "12") + "]" }, 3);
     }
     for (int numRun = 0; numRun < 100; ++numRun) {
       assertResourceRequest(routingTable, "testResource2_REALTIME",
-          new String[] { "[" + SegmentNameBuilder.Realtime.build("0", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "20")
-              + ", " + SegmentNameBuilder.Realtime.build("0", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "21") + ", "
-              + SegmentNameBuilder.Realtime.build("0", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "22") + "]", "["
-              + SegmentNameBuilder.Realtime.build("1", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "23") + ", "
-              + SegmentNameBuilder.Realtime.build("1", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "24") + ", "
-              + SegmentNameBuilder.Realtime.build("1", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "25") + "]", "["
-              + SegmentNameBuilder.Realtime.build("2", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "26") + ", "
-              + SegmentNameBuilder.Realtime.build("2", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "27") + ", "
-              + SegmentNameBuilder.Realtime.build("2", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "28") + "]" }, 3);
+          new String[] { "[" + SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("0", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "20")
+              + ", " + SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("0", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "21") + ", "
+              + SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("0", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "22") + "]", "["
+              + SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("1", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "23") + ", "
+              + SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("1", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "24") + ", "
+              + SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("1", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "25") + "]", "["
+              + SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("2", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "26") + ", "
+              + SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("2", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "27") + ", "
+              + SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("2", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "28") + "]" }, 3);
     }
   }
 

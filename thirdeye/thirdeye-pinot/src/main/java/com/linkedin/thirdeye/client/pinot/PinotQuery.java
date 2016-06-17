@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.client.pinot;
 
+import com.google.common.base.Objects;
+
 public class PinotQuery {
 
   private String pql;
@@ -26,4 +28,14 @@ public class PinotQuery {
     this.tableName = tableName;
   }
 
+  @Override
+  public int hashCode() {
+    return pql.hashCode();
+  }
+
+  @Override
+  public boolean equals(Object obj) {
+    PinotQuery that = (PinotQuery) obj;
+    return this.pql.equals(that.pql);
+  }
 }
