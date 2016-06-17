@@ -21,6 +21,8 @@ import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
+import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.client.comparison.TimeOnTimeComparisonHandler;
 import com.linkedin.thirdeye.detector.api.EmailConfiguration;
 import com.linkedin.thirdeye.detector.db.AnomalyResultDAO;
@@ -33,6 +35,8 @@ import io.dropwizard.lifecycle.Managed;
 
 public class EmailReportJobManager implements Managed {
   private static final Logger LOG = LoggerFactory.getLogger(EmailReportJobManager.class);
+  private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
+
   private final Scheduler quartzScheduler;
   private final EmailConfigurationDAO configurationDAO;
   private final Map<String, EmailConfiguration> jobKeys;
@@ -44,17 +48,19 @@ public class EmailReportJobManager implements Managed {
   private final String dashboardHost;
   private final FailureEmailConfiguration failureEmailConfig;
   private static final ObjectMapper reader = new ObjectMapper(new YAMLFactory());
+  private final QueryCache queryCache;
 
   public EmailReportJobManager(Scheduler quartzScheduler, EmailConfigurationDAO configurationDAO,
       AnomalyResultDAO resultDAO, SessionFactory sessionFactory, AtomicInteger applicationPort,
-      TimeOnTimeComparisonHandler timeOnTimeComparisonHandler, String dashboardHost,
-      FailureEmailConfiguration failureEmailConfig) {
+      String dashboardHost, FailureEmailConfiguration failureEmailConfig) {
+
+    this.queryCache = CACHE_REGISTRY_INSTANCE.getQueryCache();
     this.quartzScheduler = quartzScheduler;
     this.configurationDAO = configurationDAO;
     this.sessionFactory = sessionFactory;
     this.resultDAO = resultDAO;
     this.applicationPort = applicationPort;
-    this.timeOnTimeComparisonHandler = timeOnTimeComparisonHandler;
+    this.timeOnTimeComparisonHandler = new TimeOnTimeComparisonHandler(queryCache);
     this.failureEmailConfig = failureEmailConfig;
     this.jobKeys = new HashMap<>();
     this.sync = new Object();

@@ -1,5 +1,18 @@
 package com.linkedin.thirdeye.detector;
 
+import io.dropwizard.assets.AssetsBundle;
+import io.dropwizard.db.DataSourceFactory;
+import io.dropwizard.jetty.ConnectorFactory;
+import io.dropwizard.jetty.HttpConnectorFactory;
+import io.dropwizard.lifecycle.Managed;
+import io.dropwizard.lifecycle.ServerLifecycleListener;
+import io.dropwizard.migrations.MigrationsBundle;
+import io.dropwizard.server.DefaultServerFactory;
+import io.dropwizard.server.ServerFactory;
+import io.dropwizard.server.SimpleServerFactory;
+import io.dropwizard.setup.Bootstrap;
+import io.dropwizard.setup.Environment;
+
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -16,12 +29,7 @@ import org.quartz.impl.StdSchedulerFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
-import com.linkedin.thirdeye.client.cache.QueryCache;
-import com.linkedin.thirdeye.client.comparison.TimeOnTimeComparisonHandler;
-import com.linkedin.thirdeye.client.timeseries.TimeSeriesHandler;
-import com.linkedin.thirdeye.client.timeseries.TimeSeriesResponseConverter;
 import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
 import com.linkedin.thirdeye.detector.api.AnomalyFunctionSpec;
 import com.linkedin.thirdeye.detector.db.HibernateSessionWrapper;
@@ -37,19 +45,6 @@ import com.linkedin.thirdeye.detector.resources.ContextualEventResource;
 import com.linkedin.thirdeye.detector.resources.EmailReportResource;
 import com.linkedin.thirdeye.detector.resources.MetricsGraphicsTimeSeriesResource;
 import com.linkedin.thirdeye.detector.task.EmailReportJobManagerTask;
-
-import io.dropwizard.assets.AssetsBundle;
-import io.dropwizard.db.DataSourceFactory;
-import io.dropwizard.jetty.ConnectorFactory;
-import io.dropwizard.jetty.HttpConnectorFactory;
-import io.dropwizard.lifecycle.Managed;
-import io.dropwizard.lifecycle.ServerLifecycleListener;
-import io.dropwizard.migrations.MigrationsBundle;
-import io.dropwizard.server.DefaultServerFactory;
-import io.dropwizard.server.ServerFactory;
-import io.dropwizard.server.SimpleServerFactory;
-import io.dropwizard.setup.Bootstrap;
-import io.dropwizard.setup.Environment;
 
 public class ThirdEyeDetectorApplication
     extends BaseThirdEyeApplication<ThirdEyeDetectorConfiguration> {
@@ -94,11 +89,6 @@ public class ThirdEyeDetectorApplication
       LOG.error("Exception while loading caches", e);
     }
 
-    QueryCache queryCache = ThirdEyeCacheRegistry.getInstance().getQueryCache();
-    final TimeSeriesHandler timeSeriesHandler = new TimeSeriesHandler(queryCache);
-    TimeOnTimeComparisonHandler timeOnTimeComparisonHandler = new TimeOnTimeComparisonHandler(queryCache);
-    TimeSeriesResponseConverter timeSeriesResponseConverter = TimeSeriesResponseConverter.getInstance();
-
     // Quartz Scheduler
     SchedulerFactory schedulerFactory = new StdSchedulerFactory();
     final Scheduler quartzScheduler = schedulerFactory.getScheduler();
@@ -121,8 +111,7 @@ public class ThirdEyeDetectorApplication
 
     // ThirdEye driver
     final AnomalyDetectionJobManager jobManager = new AnomalyDetectionJobManager(quartzScheduler,
-        timeSeriesHandler, timeSeriesResponseConverter, anomalyFunctionSpecDAO,
-        anomalyFunctionRelationDAO, anomalyResultDAO, hibernateBundle.getSessionFactory(),
+        anomalyFunctionSpecDAO, anomalyFunctionRelationDAO, anomalyResultDAO, hibernateBundle.getSessionFactory(),
         environment.metrics(), anomalyFunctionFactory, config.getFailureEmailConfig());
 
     // Start all active jobs on startup
@@ -177,7 +166,7 @@ public class ThirdEyeDetectorApplication
 
     final EmailReportJobManager emailReportJobManager =
         new EmailReportJobManager(quartzScheduler, emailConfigurationDAO, anomalyResultDAO,
-            hibernateBundle.getSessionFactory(), applicationPort, timeOnTimeComparisonHandler,
+            hibernateBundle.getSessionFactory(), applicationPort,
             config.getDashboardHost(), config.getFailureEmailConfig());
 
     environment.lifecycle().addServerLifecycleListener(new ServerLifecycleListener() {
@@ -229,7 +218,7 @@ public class ThirdEyeDetectorApplication
     environment.jersey().register(new AnomalyResultResource(anomalyResultDAO));
     environment.jersey().register(new ContextualEventResource(contextualEventDAO));
     environment.jersey().register(
-        new MetricsGraphicsTimeSeriesResource(timeOnTimeComparisonHandler, anomalyResultDAO));
+        new MetricsGraphicsTimeSeriesResource(anomalyResultDAO));
     environment.jersey()
         .register(new AnomalyDetectionJobResource(jobManager, anomalyFunctionSpecDAO));
     environment.jersey()

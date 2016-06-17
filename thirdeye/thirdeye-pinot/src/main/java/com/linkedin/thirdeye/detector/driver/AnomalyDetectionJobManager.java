@@ -24,6 +24,8 @@ import org.slf4j.LoggerFactory;
 import com.codahale.metrics.MetricRegistry;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
+import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesHandler;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesResponseConverter;
 import com.linkedin.thirdeye.detector.api.AnomalyFunctionSpec;
@@ -36,8 +38,9 @@ import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 
 public class AnomalyDetectionJobManager {
   private static final Logger LOG = LoggerFactory.getLogger(AnomalyDetectionJobManager.class);
+  private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
+
   private final Scheduler quartzScheduler;
-  // private final ThirdEyeClient thirdEyeClient;
   private final TimeSeriesHandler timeSeriesHandler;
   private final TimeSeriesResponseConverter timeSeriesResponseConverter;
   private final AnomalyFunctionSpecDAO specDAO;
@@ -49,18 +52,21 @@ public class AnomalyDetectionJobManager {
   private final MetricRegistry metricRegistry;
   private final AnomalyFunctionFactory anomalyFunctionFactory;
   private final FailureEmailConfiguration failureEmailConfig;
+  private QueryCache queryCache;
 
   private static final ObjectMapper reader = new ObjectMapper(new YAMLFactory());
 
-  public AnomalyDetectionJobManager(Scheduler quartzScheduler, TimeSeriesHandler timeSeriesHandler,
-      TimeSeriesResponseConverter timeSeriesResponseConverter, AnomalyFunctionSpecDAO specDAO,
+  public AnomalyDetectionJobManager(Scheduler quartzScheduler, AnomalyFunctionSpecDAO specDAO,
       AnomalyFunctionRelationDAO relationDAO, AnomalyResultDAO resultDAO,
       SessionFactory sessionFactory, MetricRegistry metricRegistry,
       AnomalyFunctionFactory anomalyFunctionFactory, FailureEmailConfiguration failureEmailConfig) {
+
+    this.queryCache = CACHE_REGISTRY_INSTANCE.getQueryCache();
+
+    timeSeriesHandler = new TimeSeriesHandler(queryCache);
+    timeSeriesResponseConverter = TimeSeriesResponseConverter.getInstance();
+
     this.quartzScheduler = quartzScheduler;
-    // this.thirdEyeClient = thirdEyeClient;
-    this.timeSeriesHandler = timeSeriesHandler;
-    this.timeSeriesResponseConverter = timeSeriesResponseConverter;
     this.specDAO = specDAO;
     this.relationDAO = relationDAO;
     this.resultDAO = resultDAO;

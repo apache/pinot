@@ -20,6 +20,9 @@ import javax.ws.rs.core.Response;
 
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
+import org.joda.time.format.DateTimeFormat;
+import org.joda.time.format.DateTimeFormatter;
 import org.joda.time.format.ISODateTimeFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,13 +33,14 @@ import com.linkedin.thirdeye.api.CollectionSchema;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.cache.QueryCache;
-import com.linkedin.thirdeye.dashboard.AnomalyDetectionJobManager;
 import com.linkedin.thirdeye.detector.api.AnomalyFunctionSpec;
 import com.linkedin.thirdeye.detector.api.AnomalyResult;
+import com.linkedin.thirdeye.detector.api.EmailConfiguration;
 import com.linkedin.thirdeye.detector.db.AnomalyFunctionRelationDAO;
 import com.linkedin.thirdeye.detector.db.AnomalyFunctionSpecDAO;
 import com.linkedin.thirdeye.detector.db.AnomalyResultDAO;
 import com.linkedin.thirdeye.detector.db.EmailConfigurationDAO;
+import com.linkedin.thirdeye.detector.driver.AnomalyDetectionJobManager;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 @Path(value = "/dashboard")
@@ -46,12 +50,15 @@ public class AnomalyResource {
       .getInstance();
   private static final Logger LOG = LoggerFactory.getLogger(AnomalyResource.class);
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+  private static final String DEFAULT_SMTP_HOST = "email.corp.linkedin.com";
+  private static final String DEFAULT_SMTP_PORT = "25";
 
   private QueryCache queryCache;
   private AnomalyFunctionSpecDAO anomalyFunctionSpecDAO;
   private AnomalyResultDAO anomalyResultDAO;
   private EmailConfigurationDAO emailConfigurationDAO;
   private AnomalyDetectionJobManager anomalyDetectionJobManager;
+
 
   public AnomalyResource(AnomalyDetectionJobManager anomalyDetectionJobManager,
       AnomalyFunctionSpecDAO anomalyFunctionSpecDAO,
@@ -172,12 +179,10 @@ public class AnomalyResource {
           throws Exception {
 
     if (StringUtils.isEmpty(dataset) || StringUtils.isEmpty(functionName) || StringUtils.isEmpty(metric)
-        || StringUtils.isEmpty(windowSize) || StringUtils.isEmpty(windowUnit) || StringUtils.isEmpty(windowDelay)
-        || StringUtils.isEmpty(properties)) {
+        || StringUtils.isEmpty(windowSize) || StringUtils.isEmpty(windowUnit) || StringUtils.isEmpty(properties)) {
       throw new UnsupportedOperationException("Received null for one of the mandatory params: "
           + "dataset " + dataset + ", functionName " + functionName + ", metric " + metric
-          + ", windowSize " + windowSize + ", windowUnit " + windowUnit + ", windowDelay " + windowDelay
-          + ", properties" + properties);
+          + ", windowSize " + windowSize + ", windowUnit " + windowUnit + ", properties" + properties);
     }
 
     CollectionSchema schema = CACHE_REGISTRY_INSTANCE.getCollectionSchemaCache().get(dataset);
@@ -194,14 +199,24 @@ public class AnomalyResource {
     anomalyFunctionSpec.setType(type);
     anomalyFunctionSpec.setWindowSize(Integer.valueOf(windowSize));
     anomalyFunctionSpec.setWindowUnit(TimeUnit.valueOf(windowUnit));
-    anomalyFunctionSpec.setWindowDelay(Integer.valueOf(windowDelay));
-    if (StringUtils.isEmpty(windowDelayUnit)) {
-      anomalyFunctionSpec.setWindowDelayUnit(TimeUnit.valueOf(windowUnit));
-    } else {
-      anomalyFunctionSpec.setWindowDelayUnit(TimeUnit.valueOf(windowDelayUnit));
+
+    TimeUnit windowDelayTimeUnit = TimeUnit.valueOf(windowUnit);
+    if (StringUtils.isNotEmpty(windowDelayUnit)) {
+      windowDelayTimeUnit = TimeUnit.valueOf(windowDelayUnit);
     }
+    int windowDelayTime;
+    if (StringUtils.isNotEmpty(windowDelay)) {
+      windowDelayTime = Integer.valueOf(windowDelay);
+    } else {
+      Long maxDateTime = CACHE_REGISTRY_INSTANCE.getCollectionMaxDataTimeCache().get(dataset);
+      windowDelayTime = (int) windowDelayTimeUnit.convert(System.currentTimeMillis() - maxDateTime, TimeUnit.MILLISECONDS);
+    }
+    anomalyFunctionSpec.setWindowDelayUnit(windowDelayTimeUnit);
+    anomalyFunctionSpec.setWindowDelay(windowDelayTime);
+
     anomalyFunctionSpec.setBucketSize(dataGranularity.getSize());
     anomalyFunctionSpec.setBucketUnit(dataGranularity.getUnit());
+
     anomalyFunctionSpec.setExploreDimensions(exploreDimensions);
     anomalyFunctionSpec.setProperties(properties);
 
@@ -211,7 +226,7 @@ public class AnomalyResource {
     }
     anomalyFunctionSpec.setCron(cron);
 
-    Long id = anomalyFunctionSpecDAO.create(anomalyFunctionSpec);
+    Long id = anomalyFunctionSpecDAO.createOrUpdate(anomalyFunctionSpec);
 
     if (isActive) {
       anomalyDetectionJobManager.start(id);
@@ -241,20 +256,75 @@ public class AnomalyResource {
   @POST
   @UnitOfWork
   @Path("/anomaly-function/update")
-  public Response updateAnomalyFunction(@QueryParam("id") Long id, @QueryParam("dataset") String dataset,
-      @QueryParam("metric") String metric, @QueryParam("type") String type, @QueryParam("windowSize") String windowSize,
-      @QueryParam("windowUnit") String windowUnit, @QueryParam("windowDelay") String windowDelay,
-      @QueryParam("exploreDimension") String exploreDimension, @QueryParam("properties") String properties) {
+  public Response updateAnomalyFunction(@QueryParam("id") Long id,
+      @QueryParam("dataset") String dataset,
+      @QueryParam("functionName") String functionName,
+      @QueryParam("metric") String metric,
+      @QueryParam("type") String type,
+      @QueryParam("windowSize") String windowSize,
+      @QueryParam("windowUnit") String windowUnit,
+      @QueryParam("windowDelay") String windowDelay,
+      @QueryParam("windowDelayUnit") String windowDelayUnit,
+      @QueryParam("scheduleMinute") String scheduleMinute,
+      @QueryParam("scheduleHour") String scheduleHour,
+      @QueryParam("repeatEvery") String repeatEvery,
+      @QueryParam("exploreDimension") String exploreDimensions,
+      @QueryParam("properties") String properties,
+      @QueryParam("isActive") boolean isActive) throws ExecutionException {
 
-    return Response.ok(id).build();
+    if (StringUtils.isEmpty(dataset) || StringUtils.isEmpty(functionName) || StringUtils.isEmpty(metric)
+        || StringUtils.isEmpty(windowSize) || StringUtils.isEmpty(windowUnit) || StringUtils.isEmpty(windowDelay)
+        || StringUtils.isEmpty(properties)) {
+      throw new UnsupportedOperationException("Received null for one of the mandatory params: "
+          + "dataset " + dataset + ", functionName " + functionName + ", metric " + metric
+          + ", windowSize " + windowSize + ", windowUnit " + windowUnit + ", windowDelay " + windowDelay
+          + ", properties" + properties);
+    }
+
+    CollectionSchema schema = CACHE_REGISTRY_INSTANCE.getCollectionSchemaCache().get(dataset);
+    TimeGranularity dataGranularity = schema.getTime().getDataGranularity();
+
+    AnomalyFunctionSpec anomalyFunctionSpec = new AnomalyFunctionSpec();
+    anomalyFunctionSpec.setId(id);
+    anomalyFunctionSpec.setIsActive(isActive);
+    anomalyFunctionSpec.setCollection(dataset);
+    anomalyFunctionSpec.setFunctionName(functionName);
+    anomalyFunctionSpec.setMetric(metric);
+    if (StringUtils.isEmpty(type)) {
+      type = "USER_RULE";
+    }
+    anomalyFunctionSpec.setType(type);
+    anomalyFunctionSpec.setWindowSize(Integer.valueOf(windowSize));
+    anomalyFunctionSpec.setWindowUnit(TimeUnit.valueOf(windowUnit));
+    anomalyFunctionSpec.setWindowDelay(Integer.valueOf(windowDelay));
+    if (StringUtils.isEmpty(windowDelayUnit)) {
+      anomalyFunctionSpec.setWindowDelayUnit(TimeUnit.valueOf(windowUnit));
+    } else {
+      anomalyFunctionSpec.setWindowDelayUnit(TimeUnit.valueOf(windowDelayUnit));
+    }
+    anomalyFunctionSpec.setBucketSize(dataGranularity.getSize());
+    anomalyFunctionSpec.setBucketUnit(dataGranularity.getUnit());
+    anomalyFunctionSpec.setExploreDimensions(exploreDimensions);
+    anomalyFunctionSpec.setProperties(properties);
+
+    String cron = "";
+    if (StringUtils.isNotEmpty(repeatEvery)) {
+      cron = constructCron(scheduleMinute, scheduleHour, repeatEvery);
+    }
+    anomalyFunctionSpec.setCron(cron);
+
+    Long responseId = anomalyFunctionSpecDAO.createOrUpdate(anomalyFunctionSpec);
+
+    return Response.ok(responseId).build();
   }
 
   // Delete anomaly function
   @DELETE
   @UnitOfWork
   @Path("/anomaly-function/delete")
-  public Response deleteAnomalyFunctions(@QueryParam("id") Long id, @QueryParam("dataset") String dataset) {
+  public Response deleteAnomalyFunctions(@QueryParam("id") Long id, @QueryParam("functionName") String functionName) {
 
+    anomalyFunctionSpecDAO.delete(id);
     return Response.noContent().build();
   }
 
@@ -262,16 +332,112 @@ public class AnomalyResource {
   @POST
   @UnitOfWork
   @Path("/anomaly-function/adhoc")
-  public Response runAdhocAnomalyFunctions(@QueryParam("id") Long id, @QueryParam("dataset") String dataset) {
+  public Response runAdhocAnomalyFunctions(@QueryParam("id") Long id, @QueryParam("functionName") String functionName,
+      @QueryParam("windowStartIso") String windowStartIso, @QueryParam("windowEndIso") String windowEndIso)
+          throws Exception {
 
+    AnomalyFunctionSpec anomalyFunctionSpec = anomalyFunctionSpecDAO.findById(id);
+    if (StringUtils.isEmpty(windowStartIso) || StringUtils.isEmpty(windowEndIso)) {
+      int windowSize = anomalyFunctionSpec.getWindowSize();
+      TimeUnit windowUnit = anomalyFunctionSpec.getWindowUnit();
+      int delaySize = anomalyFunctionSpec.getWindowDelay();
+      TimeUnit delayUnit = anomalyFunctionSpec.getWindowDelayUnit();
+
+      DateTime now = new DateTime();
+      DateTime windowEnd = now.minus(TimeUnit.MILLISECONDS.convert(delaySize, delayUnit));
+      windowEndIso = windowEnd.toString();
+      DateTime windowStart = windowEnd.minus(TimeUnit.MILLISECONDS.convert(windowSize, windowUnit));
+      windowStartIso = windowStart.toString();
+    }
+    anomalyDetectionJobManager.runAdHoc(id, windowStartIso, windowEndIso);
     return Response.noContent().build();
   }
 
   /*************** CRUD for email functions of collection *********************************************/
 
   // View all email functions
+  @GET
+  @UnitOfWork
+  @Path("/email-config/view")
+  public List<EmailConfiguration> viewEmailConfigs(@QueryParam("dataset") String dataset,
+      @QueryParam("metric") String metric) {
+
+    if (StringUtils.isEmpty(dataset)) {
+      throw new UnsupportedOperationException("dataset is a required query param");
+    }
+
+    List<EmailConfiguration> emailConfigSpecs = emailConfigurationDAO.findAll();
+
+    List<EmailConfiguration> emailConfigs = new ArrayList<>();
+    for (EmailConfiguration emailConfigSpec : emailConfigSpecs) {
+      if (dataset.equals(emailConfigSpec.getCollection()) &&
+          (StringUtils.isEmpty(metric) || (StringUtils.isNotEmpty(metric) && metric.equals(emailConfigSpec.getMetric())))) {
+        emailConfigs.add(emailConfigSpec);
+      }
+    }
+    return emailConfigs;
+  }
 
   // Add email function
+  @GET
+  @UnitOfWork
+  @Path("/email-config/create")
+  public Response createEmailConfigs(@QueryParam("dataset") String dataset,
+      @QueryParam("metric") String metric,
+      @QueryParam("fromAddress") String fromAddress,
+      @QueryParam("toAddresses") String toAddresses,
+      @QueryParam("repeatEvery") String repeatEvery,
+      @QueryParam("scheduleMinute") String scheduleMinute,
+      @QueryParam("scheduleHour") String scheduleHour,
+      @QueryParam("smtpHost") String smtpHost,
+      @QueryParam("smtpPort") String smtpPort,
+      @QueryParam("windowSize") String windowSize,
+      @QueryParam("windowUnit") String windowUnit,
+      @QueryParam("windowDelay") String windowDelay,
+      @QueryParam("windowDelayUnit") String windowDelayUnit,
+      @QueryParam("filters") String filters,
+      @QueryParam("isActive") boolean isActive,
+      @QueryParam("sendZeroAnomalyEmail") boolean sendZeroAnomalyEmail) {
+
+    EmailConfiguration emailConfiguration = new EmailConfiguration();
+    emailConfiguration.setCollection(dataset);
+    emailConfiguration.setMetric(metric);
+    emailConfiguration.setFromAddress(fromAddress);
+    emailConfiguration.setToAddresses(toAddresses);
+    String cron = "";
+    if (StringUtils.isNotEmpty(repeatEvery)) {
+      cron = constructCron(scheduleMinute, scheduleHour, repeatEvery);
+    }
+    if (StringUtils.isEmpty(smtpHost)) {
+      smtpHost = DEFAULT_SMTP_HOST;
+    }
+    if (StringUtils.isEmpty(smtpPort)) {
+      smtpPort = DEFAULT_SMTP_PORT;
+    }
+    emailConfiguration.setSmtpHost(smtpHost);
+    emailConfiguration.setSmtpPort(Integer.valueOf(smtpPort));
+
+    emailConfiguration.setWindowSize(Integer.valueOf(windowSize));
+    emailConfiguration.setWindowUnit(TimeUnit.valueOf(windowUnit));
+
+    TimeUnit windowDelayTimeUnit = TimeUnit.valueOf(windowUnit);
+    if (StringUtils.isNotEmpty(windowDelayUnit)) {
+      windowDelayTimeUnit = TimeUnit.valueOf(windowDelayUnit);
+    }
+    int windowDelayTime = 0;
+    if (StringUtils.isNotEmpty(windowDelay)) {
+      windowDelayTime = Integer.valueOf(windowDelay);
+    }
+    emailConfiguration.setWindowDelayUnit(windowDelayTimeUnit);
+    emailConfiguration.setWindowDelay(windowDelayTime);
+
+    emailConfiguration.setIsActive(isActive);
+    emailConfiguration.setSendZeroAnomalyEmail(sendZeroAnomalyEmail);
+    emailConfiguration.setFilters(filters);
+
+    Long id = 0L;//emailConfigurationDAO.create(emailConfiguration);
+    return Response.ok(id).build();
+  }
 
   // Edit email function
 
