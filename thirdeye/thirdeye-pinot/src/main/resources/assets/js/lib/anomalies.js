@@ -12,7 +12,7 @@ function getAnomalies(tab) {
 
   var currentStartISO = moment(parseInt(hash.currentStart)).toISOString();
   var currentEndISO = moment(parseInt(hash.currentEnd)).toISOString();
-  var anomaliesUrl = "/dashboard/anomalies/view?collection" + hash.dataset + "&startTimeIso" + currentStartISO + "&endTimeIso" + currentEndISO
+  var anomaliesUrl = "/dashboard/anomalies/view?dataset=" + hash.dataset + "&startTimeIso=" + currentStartISO + "&endTimeIso=" + currentEndISO
   + "&metrics=" + hash.metrics
   + "&filters=" + hash.filters;
 
@@ -80,7 +80,7 @@ function drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab) {
     var anomalyStart = anomaly.startTimeUtc
     var anomalyEnd = anomaly.endTimeUtc
     var anomayID = "anomaly-id-" + anomaly.id;
-    regions.push({'axis': 'x', 'start': anomalyStart, 'end': anomalyEnd, 'class': 'regionX ' + anomayID })
+    regions.push({'axis': 'x', 'start': anomalyStart, 'end': anomalyEnd, 'class': 'regionX ' + anomayID, 'id': 'testing-id' })
   }
   lineChartData["time"] = xTicksCurrent;
 
@@ -152,8 +152,25 @@ function drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab) {
     }
   });
 
-
   lineChart.hide();
+    var numAnomalies = anomalyData.length
+    var regionColors;
+    if(parseInt(numAnomalies) < 10){
+        regionColors = d3.scale.category10().range();
+
+    } else if (numAnomalies < 20) {
+        regionColors = d3.scale.category20().range();
+    }else{
+        regionColors = colorScale(numAnomalies);
+    }
+
+
+    //paint the anomaly regions based on anomaly id
+    for(var i= 0;i< numAnomalies;i++) {
+        var anomalyId = "anomaly-id-" + anomalyData[i]["id"];
+        d3.select("." + anomalyId +" rect")
+        .style("fill", regionColors[i])
+    }
 
 
     //EventListeners
@@ -166,13 +183,41 @@ function drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab) {
         var checkboxObj = $(checkbox);
         metricName = checkboxObj.val();
         if (checkboxObj.is(':checked')) {
-
+            //Show metric's lines on timeseries
             lineChart.show(metricName + "-current");
             lineChart.show(metricName + "-baseline");
-        } else {
 
+            //show related ranges on timeserie and related rows in the tabular display
+            $(".anomaly-table-checkbox input").each(function(){
+
+                if($(this).attr("data-value") ==  metricName){
+                    var tableRow = $(this).closest("tr");
+                    tableRow.show()
+                    //check the related input boxes
+                    $("input", tableRow).attr('checked', 'checked');
+                    $("input", tableRow).prop('checked', true);
+                    //show the related timeranges
+                    var anomalyId = "anomaly-id-" + $(this).attr("id");
+                    $("." + anomalyId).show();
+                }
+            })
+
+        } else {
+            //Hide metric's lines on timeseries
             lineChart.hide(metricName + "-current");
             lineChart.hide(metricName + "-baseline");
+
+            //hide related ranges on timeserie and related rows in the tabular display
+            $(".anomaly-table-checkbox input").each(function(){
+
+                if($(this).attr("data-value") ==  metricName){
+                    $(this).closest("tr").hide();
+                    var anomalyId = "anomaly-id-" + $(this).attr("id");
+                    $("." + anomalyId).hide();
+                }
+            })
+
+
         }
     });
 
@@ -197,6 +242,20 @@ function drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab) {
         }
     });
 
+
+    //licking a checkbox in the table toggles the region of that timerange on the timeseries chart
+    currentView.on("change",".anomaly-table-checkbox input", function(){
+
+        var anomalyId = ".anomaly-id-" + $(this).attr("id");
+        if ($(this).is(':checked')){
+            $(anomalyId).show();
+        }else{
+            $(anomalyId).hide();
+        }
+
+
+    });
+
     //Preselect first metric
     $($(".time-series-metric-checkbox", currentView)[0]).click();
 }
@@ -215,5 +274,23 @@ function renderAnomalyTable(data, tab) {
     /* Handelbars template for table */
     var result_anomalies_template = HandleBarsTemplates.template_anomalies(data);
     $("#" + tab + "-display-chart-section").append(result_anomalies_template);
+
+    $("#anomalies-table").on("click", ".select-all-checkbox", function() {
+
+
+        var currentTable = $(this).closest("table");
+
+        if ($(this).is(':checked')) {
+            $("input[type='checkbox']", currentTable).attr('checked', 'checked');
+            $("input[type='checkbox']", currentTable).prop('checked', true);
+            $("input[type='checkbox']", currentTable).change();
+
+        } else {
+            $("input[type='checkbox']", currentTable).removeAttr('checked');
+            $("input[type='checkbox']", currentTable).prop('checked', false);
+            $("input[type='checkbox']", currentTable).change();
+
+        }
+    })
 
 }

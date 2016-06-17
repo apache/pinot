@@ -87,7 +87,7 @@ $(document).ready( function() {
         showDashboardSelection: false,
         showMetricSelection: true,
         showDimensionSelection: false,
-        showFilterSelection: true,
+        showFilterSelection: false,
         showTimeSelection: true,
         showGranularity: false,
         showAggregateAllGranularity: false,

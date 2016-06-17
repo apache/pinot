@@ -195,7 +195,8 @@
 
         {{#if showConfigAnomaly}}
         <!-- This is a button toggling the modal -->
-        <button class="uk-button uk-margin-large" data-uk-modal="{target:'#manage-alert-modal', center:true}">Configure anomaly alerts</button>
+        <!-- Hiding anomaly alert configutarion till it's ready for production -->
+        <button class="uk-button uk-margin-large uk-hidden" data-uk-modal="{target:'#manage-alert-modal', center:true}">Configure anomaly alerts</button>
 
         <div id="manage-alert-modal" class="uk-modal">
             <div class="uk-modal-dialog uk-modal-dialog-large">
@@ -349,11 +350,11 @@
                                 <tbody>
                                 <tr>
                                     <td class="date-time-selector-box-start-td" style="height:30px;">
-                                        <span id="anomaly-start-date" class="anomaly-start-date" rel="anomalies">2016-06-07</span>
-                                        <span id="anomaly-start-time" class="anomaly-start-time" rel="anomalies">23:00</span>
+                                        <span id="anomaly-start-date" class="anomaly-start-date">2016-06-12</span>
+                                        <span id="anomaly-start-time" class="anomaly-start-time">23:00</span>
                                         <span class="date-devider">-</span>
-                                        <span id="anomaly-end-date" class="anomaly-end-date" rel="anomalies">2016-06-08</span>
-                                        <span id="anomaly-end-time" class="anomaly-end-time" rel="anomalies">23:00</span>
+                                        <span id="anomaly-end-date" class="anomaly-end-date">2016-06-13</span>
+                                        <span id="anomaly-end-time" class="anomaly-end-time">23:00</span>
                                     </td>
                                     <td class="arrow-down uk-button-primary"><i class="uk-icon-caret-down"></i></td>
                                 </tr>
