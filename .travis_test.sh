@@ -22,5 +22,11 @@ if [ $? -ne 0 ]; then
   exit 0
 fi
 
+# Only run tests for JDK 8
+if [ $TRAVIS_JDK_VERSION != 'oraclejdk7' ]; then
+  echo 'Skip tests for version other than oraclejdk7.'
+  exit 0
+fi
+
 cd $PINOT_MODULE
 mvn test -P travis
