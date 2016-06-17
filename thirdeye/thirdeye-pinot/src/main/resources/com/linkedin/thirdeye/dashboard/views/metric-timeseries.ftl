@@ -41,22 +41,32 @@
                     <table  data-uk-tooltip title="{{metricName}}">
                         <tr>
                             <td>
-                                <input class="time-series-metric-checkbox" type="checkbox" value="{{metricName}}" color="{{colorById metricIndex ../metrics.length  name= metricName}}">
+                                <input class="time-series-metric-checkbox" type="checkbox" value="{{metricName}}">
                             </td>
                             <td>
-                                <div class="legend-color uk-display-inline-block" style="width: 10px; height: 10px; background:{{colorById metricIndex ../metrics.length  name= metricName}}" color="{{colorById metricIndex ../metrics.length  name= metricName}}" ></div>
-                            </td>
-                            <td class="legend-label-value-td">
-                                {{metricName}}
-                            </td>
-                        </tr>
-                    </table>
-                </label>
-                {{/each}}
-            </div>
-        </div>
 
-        </div>
+                               <!--{{!--{{#if line_legend}}--}}-->
+                                <div class="legend-color" color="#1f77b4" style="width: 35px;height: 20px;position:  relative;">
+                                    <svg height="20" width="35" style="position: absolute;top: -5px;">
+                                        <line x1="0" y1="12" x2="35" y2="12" stroke="{{colorById metricIndex ../metrics.length  name= metricName}}" stroke-dasharray="5,5"></line>
+                                        <line x1="0" y1="19" x2="35" y2="19" stroke="{{colorById metricIndex ../metrics.length  name= metricName}}"></line>
+                                    </svg>
+                                </div>
+                                <!--{{!--{{else}}
+                               <div class="legend-color uk-display-inline-block" style="width: 10px; height: 10px; background:{{colorById metricIndex ../metrics.length  name= metricName}}" color="{{colorById metricIndex ../metrics.length  name= metricName}}" ></div>
+                               {{/if}}--}}-->
+                                </td>
+                           <td class="legend-label-value-td">
+                               {{metricName}}
+                           </td>
+                       </tr>
+                   </table>
+               </label>
+               {{/each}}
+           </div>
+       </div>
 
-        </script>
+       </div>
+
+       </script>
 </section>

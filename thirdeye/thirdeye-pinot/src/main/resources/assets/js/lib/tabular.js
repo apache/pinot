@@ -224,7 +224,7 @@ function drawTimeSeries(ajaxData, tab ) {
 				},
                 tick: {
                     count: 5,
-                    format: function (d) { return parseInt(d)}
+                    format: function (d) { return d.toFixed(2)}
                 }
 			}
 		},

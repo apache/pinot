@@ -49,11 +49,6 @@ function renderAnomalyLineChart(timeSeriesData, anomalyData, tab) {
 var lineChart;
 function drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab) {
 
-    console.log('timeSeriesData')
-    console.log(timeSeriesData)
-    console.log('anomalyData')
-    console.log(anomalyData)
-
   var currentView = $("#" + tab + "-display-chart-section");
   var dateTimeFormat = "%I:%M %p";
   if(hash.hasOwnProperty("aggTimeGranularity") && hash.aggTimeGranularity == "DAYS"){
@@ -188,13 +183,36 @@ function drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab) {
         var checkboxObj = $(checkbox);
         metricName = checkboxObj.val();
         if (checkboxObj.is(':checked')) {
-
+            //Show metric's lines on timeseries
             lineChart.show(metricName + "-current");
             lineChart.show(metricName + "-baseline");
-        } else {
 
+            //show related ranges on timeserie and related rows in the tabular display
+            $(".anomaly-table-checkbox input").each(function(){
+
+                if($(this).attr("data-value") ==  metricName){
+                    $(this).closest("tr").show();
+                    var anomalyId = "anomaly-id-" + $(this).attr("id");
+                    $("." + anomalyId).show();
+                }
+            })
+
+        } else {
+            //Hide metric's lines on timeseries
             lineChart.hide(metricName + "-current");
             lineChart.hide(metricName + "-baseline");
+
+            //hide related ranges on timeserie and related rows in the tabular display
+            $(".anomaly-table-checkbox input").each(function(){
+
+                if($(this).attr("data-value") ==  metricName){
+                    $(this).closest("tr").hide();
+                    var anomalyId = "anomaly-id-" + $(this).attr("id");
+                    $("." + anomalyId).hide();
+                }
+            })
+
+
         }
     });
 
