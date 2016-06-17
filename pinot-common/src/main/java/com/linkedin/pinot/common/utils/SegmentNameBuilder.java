@@ -107,7 +107,7 @@ public class SegmentNameBuilder {
       } else if (isShortV1StyleName(segmentId)) {
         return segmentId.split("__")[1];
       } else if (isRealtimeV2Name(segmentId)){
-        return segmentId.split("__")[2];
+        return segmentId.split("__")[1];
       } else {
         throw new RuntimeException("Unable to parse segment name " + segmentId);
       }
