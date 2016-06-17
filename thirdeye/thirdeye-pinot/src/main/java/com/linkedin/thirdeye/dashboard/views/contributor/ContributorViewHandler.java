@@ -25,13 +25,11 @@ import com.linkedin.thirdeye.client.comparison.TimeOnTimeComparisonHandler;
 import com.linkedin.thirdeye.client.comparison.TimeOnTimeComparisonRequest;
 import com.linkedin.thirdeye.client.comparison.TimeOnTimeComparisonResponse;
 import com.linkedin.thirdeye.dashboard.Utils;
-import com.linkedin.thirdeye.dashboard.resources.ViewRequestParams;
 import com.linkedin.thirdeye.dashboard.views.GenericResponse;
 import com.linkedin.thirdeye.dashboard.views.GenericResponse.Info;
 import com.linkedin.thirdeye.dashboard.views.GenericResponse.ResponseSchema;
 import com.linkedin.thirdeye.dashboard.views.TimeBucket;
 import com.linkedin.thirdeye.dashboard.views.ViewHandler;
-import com.linkedin.thirdeye.dashboard.views.ViewRequest;
 
 public class ContributorViewHandler
     implements ViewHandler<ContributorViewRequest, ContributorViewResponse> {
@@ -301,11 +299,6 @@ public class ContributorViewHandler
     }
     double currentSum = map.get(metricName).get(dimName).get(dimValue);
     map.get(metricName).get(dimName).put(dimValue, currentSum + value);
-  }
-
-  @Override
-  public ViewRequest createRequest(ViewRequestParams ViewRequesParams) {
-    return null;
   }
 
 }

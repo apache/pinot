@@ -29,12 +29,10 @@ import com.linkedin.thirdeye.client.comparison.TimeOnTimeComparisonRequest;
 import com.linkedin.thirdeye.client.comparison.TimeOnTimeComparisonResponse;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
-import com.linkedin.thirdeye.dashboard.resources.ViewRequestParams;
 import com.linkedin.thirdeye.dashboard.views.GenericResponse;
 import com.linkedin.thirdeye.dashboard.views.GenericResponse.Info;
 import com.linkedin.thirdeye.dashboard.views.GenericResponse.ResponseSchema;
 import com.linkedin.thirdeye.dashboard.views.ViewHandler;
-import com.linkedin.thirdeye.dashboard.views.ViewRequest;
 
 import jersey.repackaged.com.google.common.collect.Lists;
 
@@ -306,12 +304,6 @@ public class HeatMapViewHandler implements ViewHandler<HeatMapViewRequest, HeatM
 
   public static void main() {
 
-  }
-
-  @Override
-  public ViewRequest createRequest(ViewRequestParams ViewRequesParams) {
-    // TODO Auto-generated method stub
-    return null;
   }
 
 }
