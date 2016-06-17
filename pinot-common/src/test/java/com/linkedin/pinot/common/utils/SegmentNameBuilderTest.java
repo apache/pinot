@@ -52,7 +52,7 @@ public class SegmentNameBuilderTest {
     // Check partition range
     assertEquals(extractPartitionRange(oldV1Name), "0");
     assertEquals(extractPartitionRange(shortV1Name), "ALL");
-    assertEquals(extractPartitionRange(v2Name), "1");
+    assertEquals(extractPartitionRange(v2Name), "0");
 
     // Check groupId
     assertEquals(extractGroupIdName(oldV1Name), "myTable_REALTIME_1234567_0");
