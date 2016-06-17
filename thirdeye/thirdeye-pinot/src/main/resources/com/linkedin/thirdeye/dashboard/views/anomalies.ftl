@@ -3,7 +3,7 @@
         <table id="anomalies-table" class="uk-table">
             <thead>
             <tr>
-                <th class="select_all_cell"><input class="select-all-checkbox" value="1" type="checkbox" rel="anomalies" checked></th>
+                <th class="select_all_cell"><input class="select-all-checkbox" value="1" type="checkbox" rel="anomalies" checked>Select All</th>
                 <th class="border-left">Anomaly ID</th>
                 <th class="border-left">Metric</th>
                 <th class="border-left">Start time</th>
