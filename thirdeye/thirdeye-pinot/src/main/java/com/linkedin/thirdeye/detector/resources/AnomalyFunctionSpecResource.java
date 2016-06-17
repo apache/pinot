@@ -32,7 +32,7 @@ public class AnomalyFunctionSpecResource {
   @Timed
   @UnitOfWork
   public Response create(AnomalyFunctionSpec anomalyFunctionSpec) {
-    Long id = dao.create(anomalyFunctionSpec);
+    Long id = dao.createOrUpdate(anomalyFunctionSpec);
     return Response.ok(id).build();
   }
 

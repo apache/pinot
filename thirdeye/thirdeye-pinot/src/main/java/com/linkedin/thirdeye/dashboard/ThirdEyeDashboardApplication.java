@@ -11,6 +11,7 @@ import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
 import com.linkedin.thirdeye.dashboard.resources.AnomalyResource;
 import com.linkedin.thirdeye.dashboard.resources.CacheResource;
 import com.linkedin.thirdeye.dashboard.resources.DashboardResource;
+import com.linkedin.thirdeye.detector.driver.AnomalyDetectionJobManager;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 
 import io.dropwizard.assets.AssetsBundle;
@@ -76,7 +77,7 @@ public class ThirdEyeDashboardApplication
     env.jersey().register(new DashboardResource(BaseThirdEyeApplication.getDashboardConfigDAO(config)));
     env.jersey().register(new CacheResource());
     AnomalyDetectionJobManager anomalyDetectionJobManager = new AnomalyDetectionJobManager(quartzScheduler,
-        anomalyFunctionSpecDAO,  anomalyResultDAO,
+        anomalyFunctionSpecDAO,  anomalyFunctionRelationDAO, anomalyResultDAO,
         hibernateBundle.getSessionFactory(), env.metrics(),
         new AnomalyFunctionFactory(config.getFunctionConfigPath()),
         config.getFailureEmailConfig());

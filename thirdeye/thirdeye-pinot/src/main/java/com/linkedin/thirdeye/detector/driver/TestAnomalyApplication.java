@@ -96,7 +96,6 @@ public class TestAnomalyApplication extends Application<ThirdEyeDetectorConfigur
     final ThirdEyeClient thirdEyeClient =
         // CollectionMapThirdEyeClient.fromFolder(config.getClientConfigRoot());
         PinotThirdEyeClient.getDefaultTestClient(); // TODO make this configurable
-    QueryCache queryCache = new QueryCache(thirdEyeClient, Executors.newFixedThreadPool(10));
 
     environment.lifecycle().manage(new Managed() {
       @Override
@@ -119,30 +118,23 @@ public class TestAnomalyApplication extends Application<ThirdEyeDetectorConfigur
       final AnomalyFunctionRelationDAO anomalyFunctionRelationDAO =
           new AnomalyFunctionRelationDAO(hibernate.getSessionFactory());
 
-      final TimeSeriesHandler timeSeriesHandler = new TimeSeriesHandler(queryCache);
-      TimeSeriesResponseConverter timeSeriesResponseConverter =
-          TimeSeriesResponseConverter.getInstance();
-
       final AnomalyFunctionFactory anomalyFunctionFactory =
           new AnomalyFunctionFactory(config.getFunctionConfigPath());
 
       final AnomalyDetectionJobManager jobManager = new AnomalyDetectionJobManager(quartzScheduler,
-          timeSeriesHandler, timeSeriesResponseConverter, anomalyFunctionSpecDAO,
-          anomalyFunctionRelationDAO, anomalyResultDAO, hibernate.getSessionFactory(),
+           anomalyFunctionSpecDAO, anomalyFunctionRelationDAO, anomalyResultDAO, hibernate.getSessionFactory(),
           environment.metrics(), anomalyFunctionFactory, failureEmailConfig);
 
       jobManager.runAdhocFile(filePath, existingFunctionId, startISO, endISO);
     } else if (testType == TestType.EMAIL) {
 
-      final TimeOnTimeComparisonHandler timeOnTimeComparisonHandler =
-          new TimeOnTimeComparisonHandler(queryCache);
       // email
       final EmailConfigurationDAO emailConfigurationDAO =
           new EmailConfigurationDAO(hibernate.getSessionFactory());
 
       final EmailReportJobManager emailReportJobManager =
           new EmailReportJobManager(quartzScheduler, emailConfigurationDAO, anomalyResultDAO,
-              hibernate.getSessionFactory(), new AtomicInteger(-1), timeOnTimeComparisonHandler,
+              hibernate.getSessionFactory(), new AtomicInteger(-1),
               config.getDashboardHost(), failureEmailConfig);
       emailReportJobManager.runAdhocFile(filePath);
     } else {
