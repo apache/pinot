@@ -221,6 +221,10 @@ function renderContributionTimeSeries(ajaxData) {
             label : {
               text : "% change",
               position: 'outer-middle'
+            },
+            tick: {
+              count: 5,
+              format: function (d) { return d.toFixed(2)}
             }
           }
           

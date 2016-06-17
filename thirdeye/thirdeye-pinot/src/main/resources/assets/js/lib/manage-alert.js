@@ -60,6 +60,6 @@ function saveAlert(){
     /* Submit form */
     var url = "/dashboard/anomaly-function/create?dataset=" + dataset + "&metric=" + metric + "&type=" + type + "&name=" + name + "&windowSize=" + windowSize + "&windowUnit=" + windowUnit + "&windowDelay=" + windowDelay + "&scheduleStartIso=" + scheduleStartIso  + "&repeatEverySize=" + repeatEverySize + "&repeatEveryUnit=" + repeatEveryUnit + "&exploreDimension=" + exploreDimension + "&properties=" + properties;
     submitData(url).done(function(){
-        console.log("success")
+        console.log("/dashboard/anomaly-function/create response")
     })
 }
