@@ -9,7 +9,6 @@ import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.client.MetricExpression;
-import com.linkedin.thirdeye.client.MetricFunction;
 
 public class TimeOnTimeComparisonRequest {
 
@@ -44,6 +43,10 @@ public class TimeOnTimeComparisonRequest {
   private DateTime currentEnd;
 
   private TimeGranularity aggregationTimeGranularity;
+  private boolean isEndDateInclusive = false;
+
+  public TimeOnTimeComparisonRequest() {
+  }
 
   public TimeOnTimeComparisonRequest(TimeOnTimeComparisonRequest that) {
     this.collectionName = that.collectionName;
@@ -59,13 +62,11 @@ public class TimeOnTimeComparisonRequest {
       this.filterSet = ArrayListMultimap.create(that.filterSet);
     }
     if (that.aggregationTimeGranularity != null) {
-      this.aggregationTimeGranularity = new TimeGranularity(
-          that.aggregationTimeGranularity.getSize(), that.aggregationTimeGranularity.getUnit());
+      this.aggregationTimeGranularity =
+          new TimeGranularity(that.aggregationTimeGranularity.getSize(),
+              that.aggregationTimeGranularity.getUnit());
     }
     this.metricExpressions = new ArrayList<>(that.metricExpressions);
-  }
-
-  public TimeOnTimeComparisonRequest() {
   }
 
   public String getCollectionName() {
@@ -79,11 +80,11 @@ public class TimeOnTimeComparisonRequest {
   public List<MetricExpression> getMetricExpressions() {
     return metricExpressions;
   }
-  
+
   public void setMetricExpressions(List<MetricExpression> metricExpressions) {
     this.metricExpressions = metricExpressions;
   }
-  
+
   public List<String> getGroupByDimensions() {
     return groupByDimensions;
   }
@@ -140,11 +141,19 @@ public class TimeOnTimeComparisonRequest {
     this.currentEnd = currentEnd;
   }
 
+  public TimeGranularity getAggregationTimeGranularity() {
+    return aggregationTimeGranularity;
+  }
+
   public void setAggregationTimeGranularity(TimeGranularity aggregationTimeGranularity) {
     this.aggregationTimeGranularity = aggregationTimeGranularity;
   }
 
-  public TimeGranularity getAggregationTimeGranularity() {
-    return aggregationTimeGranularity;
+  public boolean isEndDateInclusive() {
+    return isEndDateInclusive;
+  }
+
+  public void setEndDateInclusive(boolean isEndDateInclusive) {
+    this.isEndDateInclusive = isEndDateInclusive;
   }
 }

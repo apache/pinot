@@ -8,11 +8,8 @@ import org.joda.time.DateTime;
 import com.google.common.base.MoreObjects;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
-import com.google.common.collect.Range;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.client.MetricExpression;
-import com.linkedin.thirdeye.client.MetricFunction;
-import com.linkedin.thirdeye.client.TimeRangeUtils;
 
 public class TimeSeriesRequest {
   private String collectionName;
@@ -39,6 +36,7 @@ public class TimeSeriesRequest {
   private DateTime start;
   private DateTime end;
   private TimeGranularity aggregationTimeGranularity;
+  private boolean isEndDateInclusive = false;
 
   public TimeSeriesRequest() {
   }
@@ -63,6 +61,7 @@ public class TimeSeriesRequest {
           new TimeGranularity(timeSeriesRequest.aggregationTimeGranularity.getSize(),
               timeSeriesRequest.aggregationTimeGranularity.getUnit());
     }
+    this.setEndDateInclusive(timeSeriesRequest.isEndDateInclusive());
   }
 
   public String getCollectionName() {
@@ -115,12 +114,10 @@ public class TimeSeriesRequest {
     this.start = start;
   }
 
-  /** Get end time, exclusive. */
   public DateTime getEnd() {
     return end;
   }
 
-  /** Set end time, exclusive. */
   public void setEnd(DateTime end) {
     this.end = end;
   }
@@ -133,8 +130,12 @@ public class TimeSeriesRequest {
     this.aggregationTimeGranularity = aggregationTimeGranularity;
   }
 
-  public List<Range<DateTime>> getTimeRanges() {
-    return TimeRangeUtils.computeTimeRanges(aggregationTimeGranularity, start, end);
+  public boolean isEndDateInclusive() {
+    return isEndDateInclusive;
+  }
+
+  public void setEndDateInclusive(boolean includeEndDate) {
+    this.isEndDateInclusive = includeEndDate;
   }
 
   @Override
