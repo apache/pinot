@@ -15,23 +15,23 @@
 #
 
 coverage:
-  precision: 2
-  round: down
-  range: "70...100"
-  notify:
-    require_ci_to_pass: yes
-
-  status:
-    project: yes
-
-    patch: yes
-
-    changes: yes
-
+  # Ignore all the auto generated files.
   ignore:
-    - pinot-common/src/main/java/com/linkedin/pinot/common/request/*
-    - pinot-common/src/main/java/com/linkedin/pinot/common/response/*
-
-comment:
-  layout: "header, diff, changes"
-  behavior: default
+    - pinot-common/src/main/java/com/linkedin/pinot/common/request/AggregationInfo.java
+    - pinot-common/src/main/java/com/linkedin/pinot/common/request/BrokerRequest.java
+    - pinot-common/src/main/java/com/linkedin/pinot/common/request/FilterOperator.java
+    - pinot-common/src/main/java/com/linkedin/pinot/common/request/FilterQuery.java
+    - pinot-common/src/main/java/com/linkedin/pinot/common/request/FilterQueryMap.java
+    - pinot-common/src/main/java/com/linkedin/pinot/common/request/GroupBy.java
+    - pinot-common/src/main/java/com/linkedin/pinot/common/request/InstanceRequest.java
+    - pinot-common/src/main/java/com/linkedin/pinot/common/request/QuerySource.java
+    - pinot-common/src/main/java/com/linkedin/pinot/common/request/QueryType.java
+    - pinot-common/src/main/java/com/linkedin/pinot/common/request/Selection.java
+    - pinot-common/src/main/java/com/linkedin/pinot/common/request/SelectionSort.java
+    - pinot-common/src/main/java/com/linkedin/pinot/common/response/AggregationResult.java
+    - pinot-common/src/main/java/com/linkedin/pinot/common/response/InstanceResponse.java
+    - pinot-common/src/main/java/com/linkedin/pinot/common/response/InstanceResponseDataTable.java
+    - pinot-common/src/main/java/com/linkedin/pinot/common/response/ProcessingException.java
+    - pinot-common/src/main/java/com/linkedin/pinot/common/response/ResponseStatistics.java
+    - pinot-common/src/main/java/com/linkedin/pinot/common/response/RowEvent.java
+    - pinot-common/src/main/java/com/linkedin/pinot/common/response/RowEventVal.java
