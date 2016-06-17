@@ -30,24 +30,24 @@ public class SegmentNameBuilderTest {
   public void testSegmentNameBuilder() {
     String oldV1Name = "myTable_REALTIME__Server_1.2.3.4_1234__myTable_REALTIME_1234567_0__0__23456789";
     String shortV1Name = SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("myTable_REALTIME_1234567_0", "ALL", "1234567");
-    String v2Name = SegmentNameBuilder.Realtime.buildLowLevelConsumerSegmentName("myTable_REALTIME", "0", "1", 1465508537069L);
+    String v2Name = SegmentNameBuilder.Realtime.buildLowLevelConsumerSegmentName("myTable", "0", "1", 1465508537069L);
 
     assertEquals(shortV1Name, "myTable_REALTIME_1234567_0__ALL__1234567");
-    assertEquals(v2Name, "myTable_REALTIME__0__1__20160609T2142Z");
+    assertEquals(v2Name, "myTable__0__1__20160609T2142Z");
 
-    // Check v1/v2 format detection
-    assertEquals(isRealtimeV1Name(oldV1Name), true);
-    assertEquals(isRealtimeV1Name(shortV1Name), true);
-    assertEquals(isRealtimeV1Name(v2Name), false);
+    // Check high level consumer/low level consumer format detection
+    assertEquals(isHighLevelRealtimeSegmentName(oldV1Name), true);
+    assertEquals(isHighLevelRealtimeSegmentName(shortV1Name), true);
+    assertEquals(isHighLevelRealtimeSegmentName(v2Name), false);
 
-    assertEquals(isRealtimeV2Name(oldV1Name), false);
-    assertEquals(isRealtimeV2Name(shortV1Name), false);
-    assertEquals(isRealtimeV2Name(v2Name), true);
+    assertEquals(isLowLevelRealtimeSegmentName(oldV1Name), false);
+    assertEquals(isLowLevelRealtimeSegmentName(shortV1Name), false);
+    assertEquals(isLowLevelRealtimeSegmentName(v2Name), true);
 
     // Check table name
     assertEquals(extractTableName(oldV1Name), "myTable_REALTIME");
     assertEquals(extractTableName(shortV1Name), "myTable_REALTIME");
-    assertEquals(extractTableName(v2Name), "myTable_REALTIME");
+    assertEquals(extractTableName(v2Name), "myTable");
 
     // Check partition range
     assertEquals(extractPartitionRange(oldV1Name), "0");
