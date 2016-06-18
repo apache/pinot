@@ -15,10 +15,11 @@
  */
 package com.linkedin.pinot.common.utils;
 
+import java.util.Arrays;
+import org.testng.Assert;
 import org.testng.annotations.Test;
-
-import static org.testng.Assert.assertEquals;
 import static com.linkedin.pinot.common.utils.SegmentNameBuilder.Realtime.*;
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.fail;
 
 
@@ -30,10 +31,11 @@ public class SegmentNameBuilderTest {
   public void testSegmentNameBuilder() {
     String oldV1Name = "myTable_REALTIME__Server_1.2.3.4_1234__myTable_REALTIME_1234567_0__0__23456789";
     String shortV1Name = SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("myTable_REALTIME_1234567_0", "ALL", "1234567");
-    String v2Name = SegmentNameBuilder.Realtime.buildLowLevelConsumerSegmentName("myTable_REALTIME", "0", "1", 1465508537069L);
+    LLCSegmentNameHolder holder = new LLCSegmentNameHolder("myTable", 0, 1, 1465508537069L);
+    final String v2Name = holder.getSegmentName();
 
     assertEquals(shortV1Name, "myTable_REALTIME_1234567_0__ALL__1234567");
-    assertEquals(v2Name, "myTable_REALTIME__0__1__20160609T2142Z");
+    assertEquals(v2Name, "myTable__0__1__20160609T2142Z");
 
     // Check v1/v2 format detection
     assertEquals(isRealtimeV1Name(oldV1Name), true);
@@ -47,12 +49,12 @@ public class SegmentNameBuilderTest {
     // Check table name
     assertEquals(extractTableName(oldV1Name), "myTable_REALTIME");
     assertEquals(extractTableName(shortV1Name), "myTable_REALTIME");
-    assertEquals(extractTableName(v2Name), "myTable_REALTIME");
+    assertEquals(holder.getTableName(), "myTable");
 
     // Check partition range
     assertEquals(extractPartitionRange(oldV1Name), "0");
     assertEquals(extractPartitionRange(shortV1Name), "ALL");
-    assertEquals(extractPartitionRange(v2Name), "1");
+    assertEquals(holder.getPartitionId(), 0);
 
     // Check groupId
     assertEquals(extractGroupIdName(oldV1Name), "myTable_REALTIME_1234567_0");
@@ -67,7 +69,7 @@ public class SegmentNameBuilderTest {
     // Check sequence number
     assertEquals(extractSequenceNumber(oldV1Name), "23456789");
     assertEquals(extractSequenceNumber(shortV1Name), "1234567");
-    assertEquals(extractSequenceNumber(v2Name), "1");
+    assertEquals(holder.getSequenceNumber(), 1);
   }
 
   @Test
@@ -80,13 +82,6 @@ public class SegmentNameBuilderTest {
       // Expected
     }
 
-    try {
-      SegmentNameBuilder.Realtime.buildLowLevelConsumerSegmentName(null, null, null, 1234L);
-      fail("Exception not thrown");
-    } catch (Exception e) {
-      // Expected
-    }
-
     // Double underscores should not work
     try {
       SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("__", "a", "b");
@@ -94,12 +89,55 @@ public class SegmentNameBuilderTest {
     } catch (Exception e) {
       // Expected
     }
+  }
 
+  @Test
+  public void LLCHolderTest() {
+    final String tableName = "myTable";
+    final int partitionId = 4;
+    final int sequenceNumber = 27;
+    final long msSinceEpoch = 1466200248000L;
+    final String creationTime = "20160617T2150Z";
+    final String segmentName = "myTable__4__27__" + creationTime;
+
+    LLCSegmentNameHolder holder1 = new LLCSegmentNameHolder(tableName, partitionId, sequenceNumber, msSinceEpoch);
+    Assert.assertEquals(holder1.getSegmentName(), segmentName);
+    Assert.assertEquals(holder1.getPartitionId(), partitionId);
+    Assert.assertEquals(holder1.getCreationTime(), creationTime);
+    Assert.assertEquals(holder1.getSequenceNumber(), sequenceNumber);
+    Assert.assertEquals(holder1.getTableName(), tableName);
+
+    LLCSegmentNameHolder holder2 = new LLCSegmentNameHolder(segmentName);
+    Assert.assertEquals(holder2.getSegmentName(), segmentName);
+    Assert.assertEquals(holder2.getPartitionId(), partitionId);
+    Assert.assertEquals(holder2.getCreationTime(), creationTime);
+    Assert.assertEquals(holder2.getSequenceNumber(), sequenceNumber);
+    Assert.assertEquals(holder2.getTableName(), tableName);
+
+    Assert.assertEquals(holder1, holder2);
+
+    LLCSegmentNameHolder holder3 = new LLCSegmentNameHolder(tableName, partitionId+1, sequenceNumber-1, msSinceEpoch);
+    Assert.assertTrue(holder1.compareTo(holder3) < 0);
+    LLCSegmentNameHolder holder4 = new LLCSegmentNameHolder(tableName, partitionId+1, sequenceNumber+1, msSinceEpoch);
+    Assert.assertTrue(holder1.compareTo(holder4) < 0);
+    LLCSegmentNameHolder holder5 = new LLCSegmentNameHolder(tableName, partitionId-1, sequenceNumber+1, msSinceEpoch);
+    Assert.assertTrue(holder1.compareTo(holder5) > 0);
+    LLCSegmentNameHolder holder6 = new LLCSegmentNameHolder(tableName, partitionId, sequenceNumber+1, msSinceEpoch);
+    Assert.assertTrue(holder1.compareTo(holder6) < 0);
+
+    LLCSegmentNameHolder holder7 = new LLCSegmentNameHolder(tableName+"NotGood", partitionId, sequenceNumber+1, msSinceEpoch);
     try {
-      SegmentNameBuilder.Realtime.buildLowLevelConsumerSegmentName("a", "b", "__", 1234L);
-      fail("Exception not thrown");
+      holder1.compareTo(holder7);
+      Assert.fail("Not failing when comparing " + holder1.getSegmentName() + " and " + holder7.getSegmentName());
     } catch (Exception e) {
-      // Expected
+      // expected
     }
+    LLCSegmentNameHolder[] testSorted = new LLCSegmentNameHolder[] {holder3, holder1, holder4, holder5, holder6};
+    Arrays.sort(testSorted);
+    Assert.assertTrue(testSorted[0] == holder5);
+    Assert.assertTrue(testSorted[1] == holder1);
+    Assert.assertTrue(testSorted[2] == holder6);
+    Assert.assertTrue(testSorted[3] == holder3);
+    Assert.assertTrue(testSorted[4] == holder4);
   }
 }
