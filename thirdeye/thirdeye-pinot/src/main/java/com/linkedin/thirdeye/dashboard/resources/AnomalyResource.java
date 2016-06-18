@@ -4,7 +4,10 @@ import io.dropwizard.hibernate.UnitOfWork;
 
 import java.net.URLDecoder;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -36,10 +39,12 @@ import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.detector.api.AnomalyFunctionSpec;
 import com.linkedin.thirdeye.detector.api.AnomalyResult;
 import com.linkedin.thirdeye.detector.api.EmailConfiguration;
+import com.linkedin.thirdeye.detector.api.EmailFunctionDependency;
 import com.linkedin.thirdeye.detector.db.AnomalyFunctionRelationDAO;
 import com.linkedin.thirdeye.detector.db.AnomalyFunctionSpecDAO;
 import com.linkedin.thirdeye.detector.db.AnomalyResultDAO;
 import com.linkedin.thirdeye.detector.db.EmailConfigurationDAO;
+import com.linkedin.thirdeye.detector.db.EmailFunctionDependencyDAO;
 import com.linkedin.thirdeye.detector.driver.AnomalyDetectionJobManager;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
@@ -50,27 +55,28 @@ public class AnomalyResource {
       .getInstance();
   private static final Logger LOG = LoggerFactory.getLogger(AnomalyResource.class);
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-  private static final String DEFAULT_SMTP_HOST = "email.corp.linkedin.com";
   private static final String DEFAULT_SMTP_PORT = "25";
 
   private QueryCache queryCache;
   private AnomalyFunctionSpecDAO anomalyFunctionSpecDAO;
   private AnomalyResultDAO anomalyResultDAO;
   private EmailConfigurationDAO emailConfigurationDAO;
+  private EmailFunctionDependencyDAO emailFunctionDependencyDAO;
   private AnomalyDetectionJobManager anomalyDetectionJobManager;
 
 
   public AnomalyResource(AnomalyDetectionJobManager anomalyDetectionJobManager,
       AnomalyFunctionSpecDAO anomalyFunctionSpecDAO,
       AnomalyResultDAO anomalyResultDAO,
-      EmailConfigurationDAO emailConfigurationDAO) {
+      EmailConfigurationDAO emailConfigurationDAO,
+      EmailFunctionDependencyDAO emailFunctionDependencyDAO) {
 
     this.queryCache = CACHE_REGISTRY_INSTANCE.getQueryCache();
     this.anomalyDetectionJobManager = anomalyDetectionJobManager;
     this.anomalyFunctionSpecDAO = anomalyFunctionSpecDAO;
     this.anomalyResultDAO = anomalyResultDAO;
     this.emailConfigurationDAO = emailConfigurationDAO;
-
+    this.emailFunctionDependencyDAO = emailFunctionDependencyDAO;
   }
 
   public AnomalyResource() {
@@ -272,11 +278,11 @@ public class AnomalyResource {
       @QueryParam("properties") String properties,
       @QueryParam("isActive") boolean isActive) throws ExecutionException {
 
-    if (StringUtils.isEmpty(dataset) || StringUtils.isEmpty(functionName) || StringUtils.isEmpty(metric)
-        || StringUtils.isEmpty(windowSize) || StringUtils.isEmpty(windowUnit) || StringUtils.isEmpty(windowDelay)
-        || StringUtils.isEmpty(properties)) {
+    if (id == null || StringUtils.isEmpty(dataset) || StringUtils.isEmpty(functionName)
+        || StringUtils.isEmpty(metric) || StringUtils.isEmpty(windowSize) || StringUtils.isEmpty(windowUnit)
+        || StringUtils.isEmpty(windowDelay) || StringUtils.isEmpty(properties)) {
       throw new UnsupportedOperationException("Received null for one of the mandatory params: "
-          + "dataset " + dataset + ", functionName " + functionName + ", metric " + metric
+          + "id " + id + ",dataset " + dataset + ", functionName " + functionName + ", metric " + metric
           + ", windowSize " + windowSize + ", windowUnit " + windowUnit + ", windowDelay " + windowDelay
           + ", properties" + properties);
     }
@@ -368,18 +374,19 @@ public class AnomalyResource {
 
     List<EmailConfiguration> emailConfigSpecs = emailConfigurationDAO.findAll();
 
-    List<EmailConfiguration> emailConfigs = new ArrayList<>();
+    List<EmailConfiguration> emailConfigurations = new ArrayList<>();
     for (EmailConfiguration emailConfigSpec : emailConfigSpecs) {
       if (dataset.equals(emailConfigSpec.getCollection()) &&
           (StringUtils.isEmpty(metric) || (StringUtils.isNotEmpty(metric) && metric.equals(emailConfigSpec.getMetric())))) {
-        emailConfigs.add(emailConfigSpec);
+
+        emailConfigurations.add(emailConfigSpec);
       }
     }
-    return emailConfigs;
+    return emailConfigurations;
   }
 
   // Add email function
-  @GET
+  @POST
   @UnitOfWork
   @Path("/email-config/create")
   public Response createEmailConfigs(@QueryParam("dataset") String dataset,
@@ -397,7 +404,17 @@ public class AnomalyResource {
       @QueryParam("windowDelayUnit") String windowDelayUnit,
       @QueryParam("filters") String filters,
       @QueryParam("isActive") boolean isActive,
-      @QueryParam("sendZeroAnomalyEmail") boolean sendZeroAnomalyEmail) {
+      @QueryParam("sendZeroAnomalyEmail") boolean sendZeroAnomalyEmail,
+      @QueryParam("functionIds") String functionIds) {
+
+    if (StringUtils.isEmpty(dataset) || StringUtils.isEmpty(functionIds) || StringUtils.isEmpty(metric)
+        || StringUtils.isEmpty(windowSize) || StringUtils.isEmpty(windowUnit) || StringUtils.isEmpty(fromAddress)
+        || StringUtils.isEmpty(toAddresses) || StringUtils.isEmpty(smtpHost)) {
+      throw new UnsupportedOperationException("Received null for one of the mandatory params: "
+          + "dataset " + dataset + ", functionIds " + functionIds + ", metric " + metric
+          + ", windowSize " + windowSize + ", windowUnit " + windowUnit + ", fromAddress" + fromAddress
+          + ", toAddresses " + toAddresses + ", smtpHost" + smtpHost);
+    }
 
     EmailConfiguration emailConfiguration = new EmailConfiguration();
     emailConfiguration.setCollection(dataset);
@@ -408,9 +425,7 @@ public class AnomalyResource {
     if (StringUtils.isNotEmpty(repeatEvery)) {
       cron = constructCron(scheduleMinute, scheduleHour, repeatEvery);
     }
-    if (StringUtils.isEmpty(smtpHost)) {
-      smtpHost = DEFAULT_SMTP_HOST;
-    }
+    emailConfiguration.setCron(cron);
     if (StringUtils.isEmpty(smtpPort)) {
       smtpPort = DEFAULT_SMTP_PORT;
     }
@@ -435,15 +450,115 @@ public class AnomalyResource {
     emailConfiguration.setSendZeroAnomalyEmail(sendZeroAnomalyEmail);
     emailConfiguration.setFilters(filters);
 
-    Long id = 0L;//emailConfigurationDAO.create(emailConfiguration);
+    List<AnomalyFunctionSpec> anomalyFunctionSpecs = new ArrayList<>();
+    for (String functionIdString : functionIds.split(",")) {
+      AnomalyFunctionSpec anomalyFunctionSpec = anomalyFunctionSpecDAO.findById(Long.valueOf(functionIdString));
+      anomalyFunctionSpecs.add(anomalyFunctionSpec);
+    }
+    emailConfiguration.setFunctions(anomalyFunctionSpecs);
+
+    Long id = emailConfigurationDAO.createOrUpdate(emailConfiguration);
+
     return Response.ok(id).build();
   }
 
-  // Edit email function
+  // Update email function
+  @POST
+  @UnitOfWork
+  @Path("/email-config/update")
+  public Response updateEmailConfigs(@QueryParam("id") Long id,
+      @QueryParam("dataset") String dataset,
+      @QueryParam("metric") String metric,
+      @QueryParam("fromAddress") String fromAddress,
+      @QueryParam("toAddresses") String toAddresses,
+      @QueryParam("repeatEvery") String repeatEvery,
+      @QueryParam("scheduleMinute") String scheduleMinute,
+      @QueryParam("scheduleHour") String scheduleHour,
+      @QueryParam("smtpHost") String smtpHost,
+      @QueryParam("smtpPort") String smtpPort,
+      @QueryParam("windowSize") String windowSize,
+      @QueryParam("windowUnit") String windowUnit,
+      @QueryParam("windowDelay") String windowDelay,
+      @QueryParam("windowDelayUnit") String windowDelayUnit,
+      @QueryParam("filters") String filters,
+      @QueryParam("isActive") boolean isActive,
+      @QueryParam("sendZeroAnomalyEmail") boolean sendZeroAnomalyEmail,
+      @QueryParam("functionIds") String functionIds) {
+
+    if (id == null || StringUtils.isEmpty(dataset) || StringUtils.isEmpty(functionIds) || StringUtils.isEmpty(metric)
+        || StringUtils.isEmpty(windowSize) || StringUtils.isEmpty(windowUnit) || StringUtils.isEmpty(fromAddress)
+        || StringUtils.isEmpty(toAddresses) || StringUtils.isEmpty(smtpHost)) {
+      throw new UnsupportedOperationException("Received null for one of the mandatory params: "
+          + "dataset " + dataset + ", functionIds " + functionIds + ", metric " + metric
+          + ", windowSize " + windowSize + ", windowUnit " + windowUnit + ", fromAddress" + fromAddress
+          + ", toAddresses " + toAddresses + ", smtpHost" + smtpHost);
+    }
+
+    EmailConfiguration emailConfiguration = new EmailConfiguration();
+    emailConfiguration.setId(id);
+    emailConfiguration.setCollection(dataset);
+    emailConfiguration.setMetric(metric);
+    emailConfiguration.setFromAddress(fromAddress);
+    emailConfiguration.setToAddresses(toAddresses);
+    String cron = "";
+    if (StringUtils.isNotEmpty(repeatEvery)) {
+      cron = constructCron(scheduleMinute, scheduleHour, repeatEvery);
+    }
+    emailConfiguration.setCron(cron);
+    if (StringUtils.isEmpty(smtpPort)) {
+      smtpPort = DEFAULT_SMTP_PORT;
+    }
+    emailConfiguration.setSmtpHost(smtpHost);
+    emailConfiguration.setSmtpPort(Integer.valueOf(smtpPort));
+
+    emailConfiguration.setWindowSize(Integer.valueOf(windowSize));
+    emailConfiguration.setWindowUnit(TimeUnit.valueOf(windowUnit));
+
+    TimeUnit windowDelayTimeUnit = TimeUnit.valueOf(windowUnit);
+    if (StringUtils.isNotEmpty(windowDelayUnit)) {
+      windowDelayTimeUnit = TimeUnit.valueOf(windowDelayUnit);
+    }
+    int windowDelayTime = 0;
+    if (StringUtils.isNotEmpty(windowDelay)) {
+      windowDelayTime = Integer.valueOf(windowDelay);
+    }
+    emailConfiguration.setWindowDelayUnit(windowDelayTimeUnit);
+    emailConfiguration.setWindowDelay(windowDelayTime);
+
+    emailConfiguration.setIsActive(isActive);
+    emailConfiguration.setSendZeroAnomalyEmail(sendZeroAnomalyEmail);
+    emailConfiguration.setFilters(filters);
+
+    List<AnomalyFunctionSpec> anomalyFunctionSpecs = new ArrayList<>();
+    for (String functionIdString : functionIds.split(",")) {
+      AnomalyFunctionSpec anomalyFunctionSpec = anomalyFunctionSpecDAO.findById(Long.valueOf(functionIdString));
+      anomalyFunctionSpecs.add(anomalyFunctionSpec);
+    }
+    emailConfiguration.setFunctions(anomalyFunctionSpecs);
+
+    Long responseId = emailConfigurationDAO.createOrUpdate(emailConfiguration);
+
+    return Response.ok(responseId).build();
+  }
+
 
   // Delete email function
+  @DELETE
+  @UnitOfWork
+  @Path("/email-config/delete")
+  public Response deleteEmailConfigs(@QueryParam("id") Long id) {
+
+    emailConfigurationDAO.delete(id);
+    return Response.noContent().build();
+  }
 
   // Run email function ad hoc
+  @POST
+  @UnitOfWork
+  @Path("/email-config/adhoc")
+  public Response runAdhocEmailConfig(@QueryParam("id") Long id) {
+    return Response.ok(id).build();
+  }
 
   public static void main(String[] args) {
 
