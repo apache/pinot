@@ -35,7 +35,7 @@ public class EmailReportResource {
   @Timed
   @UnitOfWork
   public Response create(EmailConfiguration configuration) {
-    Long id = dao.create(configuration);
+    Long id = dao.createOrUpdate(configuration);
     return Response.ok(id).build();
   }
 

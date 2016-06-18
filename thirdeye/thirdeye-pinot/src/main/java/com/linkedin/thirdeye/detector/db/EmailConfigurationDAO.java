@@ -18,7 +18,7 @@ public class EmailConfigurationDAO extends AbstractDAO<EmailConfiguration> {
     return get(id);
   }
 
-  public Long create(EmailConfiguration emailConfiguration) {
+  public Long createOrUpdate(EmailConfiguration emailConfiguration) {
     return persist(emailConfiguration).getId();
   }
 

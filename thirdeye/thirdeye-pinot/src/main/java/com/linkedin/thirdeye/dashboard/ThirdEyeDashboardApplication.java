@@ -82,7 +82,7 @@ public class ThirdEyeDashboardApplication
         new AnomalyFunctionFactory(config.getFunctionConfigPath()),
         config.getFailureEmailConfig());
     env.jersey().register(new AnomalyResource(anomalyDetectionJobManager, anomalyFunctionSpecDAO,
-        anomalyResultDAO, emailConfigurationDAO));
+        anomalyResultDAO, emailConfigurationDAO, emailFunctionDependencyDAO));
   }
 
   public static void main(String[] args) throws Exception {
