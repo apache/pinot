@@ -20,12 +20,10 @@ import com.linkedin.thirdeye.client.comparison.Row.Metric;
 import com.linkedin.thirdeye.client.comparison.TimeOnTimeComparisonHandler;
 import com.linkedin.thirdeye.client.comparison.TimeOnTimeComparisonRequest;
 import com.linkedin.thirdeye.client.comparison.TimeOnTimeComparisonResponse;
-import com.linkedin.thirdeye.dashboard.resources.ViewRequestParams;
 import com.linkedin.thirdeye.dashboard.views.GenericResponse;
 import com.linkedin.thirdeye.dashboard.views.GenericResponse.ResponseSchema;
 import com.linkedin.thirdeye.dashboard.views.TimeBucket;
 import com.linkedin.thirdeye.dashboard.views.ViewHandler;
-import com.linkedin.thirdeye.dashboard.views.ViewRequest;
 import com.linkedin.thirdeye.dashboard.views.heatmap.HeatMapCell;
 
 public class TabularViewHandler implements ViewHandler<TabularViewRequest, TabularViewResponse> {
@@ -206,12 +204,6 @@ public class TabularViewHandler implements ViewHandler<TabularViewRequest, Tabul
     }
 
     return tabularViewResponse;
-  }
-
-  @Override
-  public ViewRequest createRequest(ViewRequestParams ViewRequesParams) {
-    // TODO Auto-generated method stub
-    return null;
   }
 
   public void addColumnData(Map<String, GenericResponse> data, String metric, String[] columnData,

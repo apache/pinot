@@ -49,9 +49,6 @@ import com.linkedin.thirdeye.dashboard.configs.AbstractConfigDAO;
 import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
 import com.linkedin.thirdeye.dashboard.configs.DashboardConfig;
 import com.linkedin.thirdeye.dashboard.views.DashboardView;
-import com.linkedin.thirdeye.dashboard.views.ViewHandler;
-import com.linkedin.thirdeye.dashboard.views.ViewRequest;
-import com.linkedin.thirdeye.dashboard.views.ViewResponse;
 import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewHandler;
 import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewRequest;
 import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewResponse;
@@ -278,30 +275,6 @@ public class DashboardResource {
       return "{\"ERROR\": + " + e.getMessage() + "}";
     }
 
-  }
-
-  @GET
-  @Path(value = "/data/viewData")
-  @Produces(MediaType.APPLICATION_JSON)
-  public String getDashboard(@QueryParam("dataset") String collection,
-      @QueryParam("viewType") String viewType, @QueryParam("viewType") String viewRequestParamsJson) {
-    try {
-      ViewHandler<ViewRequest, ViewResponse> viewHandler = getViewHandler(viewType);
-      ViewRequestParams viewRequesParams = ViewRequestParams.fromJson(viewRequestParamsJson);
-      ViewRequest viewRequest = viewHandler.createRequest(viewRequesParams);
-
-      ViewResponse response = viewHandler.process(viewRequest);
-      String jsonResponse = OBJECT_MAPPER.writer().writeValueAsString(response);
-      return jsonResponse;
-    } catch (Exception e) {
-      e.printStackTrace();
-    }
-    return null;
-  }
-
-  private ViewHandler<ViewRequest, ViewResponse> getViewHandler(String viewType) {
-    // TODO Auto-generated method stub
-    return null;
   }
 
   @GET
