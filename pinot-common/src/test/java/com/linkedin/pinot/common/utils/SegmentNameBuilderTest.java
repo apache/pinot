@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.common.utils;
 
+import java.util.Arrays;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 import static com.linkedin.pinot.common.utils.SegmentNameBuilder.Realtime.*;
@@ -131,5 +132,12 @@ public class SegmentNameBuilderTest {
     } catch (Exception e) {
       // expected
     }
+    LLCSegmentNameHolder[] testSorted = new LLCSegmentNameHolder[] {holder3, holder1, holder4, holder5, holder6};
+    Arrays.sort(testSorted);
+    Assert.assertTrue(testSorted[0] == holder5);
+    Assert.assertTrue(testSorted[1] == holder1);
+    Assert.assertTrue(testSorted[2] == holder6);
+    Assert.assertTrue(testSorted[3] == holder3);
+    Assert.assertTrue(testSorted[4] == holder4);
   }
 }
