@@ -19,6 +19,32 @@ package com.linkedin.pinot.common.utils;
 public abstract class SegmentNameHolder {
   protected static final String SEPARATOR = "__";
 
+  public static enum RealtimeSegmentType {
+    UNSUPPORTED,
+    HLC_LONG,
+    HLC_SHORT,
+    LLC,
+  }
+
+  public RealtimeSegmentType getSegmentType(String segmentName) {
+    try {
+      if (SegmentNameBuilder.Realtime.isRealtimeV1Name(segmentName)) {
+        HLCSegmentNameHolder holder = new HLCSegmentNameHolder(segmentName);
+        if (holder.isOldStyleNaming()) {
+          return RealtimeSegmentType.HLC_LONG;
+        } else {
+          return RealtimeSegmentType.HLC_SHORT;
+        }
+      } else if (SegmentNameBuilder.Realtime.isRealtimeV2Name(segmentName)) {
+        return RealtimeSegmentType.LLC;
+      } else {
+        return RealtimeSegmentType.UNSUPPORTED;
+      }
+    } catch (Exception e) {
+      return RealtimeSegmentType.UNSUPPORTED;
+    }
+  }
+
   protected boolean isValidComponentName(String string) {
     if (string.contains("__")) {
       return false;
