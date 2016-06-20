@@ -29,6 +29,7 @@ import com.linkedin.thirdeye.dashboard.views.heatmap.HeatMapCell;
 public class TabularViewHandler implements ViewHandler<TabularViewRequest, TabularViewResponse> {
 
   private final Comparator<Row> rowComparator = new Comparator<Row>() {
+    @Override
     public int compare(Row row1, Row row2) {
       long millisSinceEpoch1 = row1.getCurrentStart().getMillis();
       long millisSinceEpoch2 = row2.getCurrentStart().getMillis();
@@ -43,8 +44,8 @@ public class TabularViewHandler implements ViewHandler<TabularViewRequest, Tabul
     this.queryCache = queryCache;
   }
 
-  private TimeOnTimeComparisonRequest generateTimeOnTimeComparisonRequest(
-      TabularViewRequest request) throws Exception {
+  private TimeOnTimeComparisonRequest generateTimeOnTimeComparisonRequest(TabularViewRequest request)
+      throws Exception {
 
     TimeOnTimeComparisonRequest comparisonRequest = new TimeOnTimeComparisonRequest();
     String collection = request.getCollection();
@@ -52,6 +53,7 @@ public class TabularViewHandler implements ViewHandler<TabularViewRequest, Tabul
     DateTime baselineEnd = request.getBaselineEnd();
     DateTime currentStart = request.getCurrentStart();
     DateTime currentEnd = request.getCurrentEnd();
+    comparisonRequest.setEndDateInclusive(true);
 
     Multimap<String, String> filters = request.getFilters();
 
@@ -125,10 +127,11 @@ public class TabularViewHandler implements ViewHandler<TabularViewRequest, Tabul
     tabularViewResponse.setMetrics(expressionNames);
     tabularViewResponse.setTimeBuckets(timeBuckets);
 
-    String[] columns = new String[] {
-        "baselineValue", "currentValue", "ratio", "cumulativeBaselineValue",
-        "cumulativeCurrentValue", "cumulativeRatio"
-    };
+    String[] columns =
+        new String[] {
+            "baselineValue", "currentValue", "ratio", "cumulativeBaselineValue",
+            "cumulativeCurrentValue", "cumulativeRatio"
+        };
     // maintain same order in response
     Map<String, GenericResponse> data = new LinkedHashMap<>();
     for (String metric : expressionNames) {
@@ -193,10 +196,11 @@ public class TabularViewHandler implements ViewHandler<TabularViewRequest, Tabul
         }
         String cumulativeRatioStr = HeatMapCell.format(cumulativeRatio);
 
-        String[] columnData = {
-            baselineValueStr, currentValueStr, ratioStr, cumulativeBaselineValueStr,
-            cumulativeCurrentValueStr, cumulativeRatioStr
-        };
+        String[] columnData =
+            {
+                baselineValueStr, currentValueStr, ratioStr, cumulativeBaselineValueStr,
+                cumulativeCurrentValueStr, cumulativeRatioStr
+            };
         GenericResponse rowData = data.get(metric.getMetricName());
         rowData.getResponseData().add(columnData);
 

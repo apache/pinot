@@ -193,6 +193,7 @@ public class AnomalyDetectionJob implements Job {
     topLevelRequest.setAggregationTimeGranularity(timeGranularity);
     topLevelRequest.setStart(windowStart);
     topLevelRequest.setEnd(windowEnd);
+    topLevelRequest.setEndDateInclusive(false);
 
     LOG.info(
         "Running anomaly detection job with windowStartProp: {}, windowEndProp: {}, metricExpressions: {}, timeGranularity: {}, windowStart: {}, windowEnd: {}",

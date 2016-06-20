@@ -12,6 +12,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
+import jersey.repackaged.com.google.common.collect.Lists;
+
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,22 +36,21 @@ import com.linkedin.thirdeye.dashboard.views.GenericResponse.Info;
 import com.linkedin.thirdeye.dashboard.views.GenericResponse.ResponseSchema;
 import com.linkedin.thirdeye.dashboard.views.ViewHandler;
 
-import jersey.repackaged.com.google.common.collect.Lists;
-
 public class HeatMapViewHandler implements ViewHandler<HeatMapViewRequest, HeatMapViewResponse> {
 
   private final QueryCache queryCache;
   private CollectionConfig collectionConfig = null;
   private static final Logger LOGGER = LoggerFactory.getLogger(HeatMapViewHandler.class);
-  private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
+  private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry
+      .getInstance();
   private static final String RATIO_SEPARATOR = "/";
 
   public HeatMapViewHandler(QueryCache queryCache) {
     this.queryCache = queryCache;
   }
 
-  private TimeOnTimeComparisonRequest generateTimeOnTimeComparisonRequest(
-      HeatMapViewRequest request) throws Exception {
+  private TimeOnTimeComparisonRequest generateTimeOnTimeComparisonRequest(HeatMapViewRequest request)
+      throws Exception {
 
     TimeOnTimeComparisonRequest comparisonRequest = new TimeOnTimeComparisonRequest();
     String collection = request.getCollection();
@@ -57,6 +58,7 @@ public class HeatMapViewHandler implements ViewHandler<HeatMapViewRequest, HeatM
     DateTime baselineEnd = request.getBaselineEnd();
     DateTime currentStart = request.getCurrentStart();
     DateTime currentEnd = request.getCurrentEnd();
+    comparisonRequest.setEndDateInclusive(true);
 
     Multimap<String, String> filters = request.getFilters();
     List<String> dimensionsToGroupBy =
@@ -129,10 +131,11 @@ public class HeatMapViewHandler implements ViewHandler<HeatMapViewRequest, HeatM
     List<Future<TimeOnTimeComparisonResponse>> timeOnTimeComparisonResponsesFutures =
         getTimeOnTimeComparisonResponses(groupByDimensions, comparisonRequest, handler);
 
-    for (int groupByDimensionId = 0; groupByDimensionId < groupByDimensions.size(); groupByDimensionId ++) {
+    for (int groupByDimensionId = 0; groupByDimensionId < groupByDimensions.size(); groupByDimensionId++) {
       String groupByDimension = groupByDimensions.get(groupByDimensionId);
 
-      TimeOnTimeComparisonResponse response = timeOnTimeComparisonResponsesFutures.get(groupByDimensionId).get();
+      TimeOnTimeComparisonResponse response =
+          timeOnTimeComparisonResponsesFutures.get(groupByDimensionId).get();
 
       int numRows = response.getNumRows();
       for (int i = 0; i < numRows; i++) {
@@ -212,28 +215,33 @@ public class HeatMapViewHandler implements ViewHandler<HeatMapViewRequest, HeatM
     Map<String, GenericResponse> heatMapViewResponseData = new HashMap<>();
     for (MetricExpression expression : request.getMetricExpressions()) {
       List<MetricFunction> metricFunctions = expression.computeMetricFunctions();
-      Double baselineTotal = baselineTotalPerMetricAndDimension.get(expression.getExpressionName())
-          .values().iterator().next();
-      Double currentTotal = currentTotalPerMetricAndDimension.get(expression.getExpressionName())
-          .values().iterator().next();
+      Double baselineTotal =
+          baselineTotalPerMetricAndDimension.get(expression.getExpressionName()).values()
+              .iterator().next();
+      Double currentTotal =
+          currentTotalPerMetricAndDimension.get(expression.getExpressionName()).values().iterator()
+              .next();
 
       // check if its derived
       if (metricFunctions.size() > 1) {
         Map<String, Double> baselineContext = new HashMap<>();
         Map<String, Double> currentContext = new HashMap<>();
         for (String metricOrExpression : metricOrExpressionNames) {
-          baselineContext.put(metricOrExpression, baselineTotalPerMetricAndDimension
-              .get(metricOrExpression).values().iterator().next());
+          baselineContext
+              .put(metricOrExpression, baselineTotalPerMetricAndDimension.get(metricOrExpression)
+                  .values().iterator().next());
           currentContext.put(metricOrExpression,
               currentTotalPerMetricAndDimension.get(metricOrExpression).values().iterator().next());
         }
         baselineTotal = MetricExpression.evaluateExpression(expression, baselineContext);
         currentTotal = MetricExpression.evaluateExpression(expression, currentContext);
       } else {
-        baselineTotal = baselineTotalPerMetricAndDimension.get(expression.getExpressionName())
-            .values().iterator().next();
-        currentTotal = currentTotalPerMetricAndDimension.get(expression.getExpressionName())
-            .values().iterator().next();
+        baselineTotal =
+            baselineTotalPerMetricAndDimension.get(expression.getExpressionName()).values()
+                .iterator().next();
+        currentTotal =
+            currentTotalPerMetricAndDimension.get(expression.getExpressionName()).values()
+                .iterator().next();
       }
       summary.addSimpleField("baselineStart", comparisonRequest.getBaselineStart().toString());
       summary.addSimpleField("baselineEnd", comparisonRequest.getBaselineEnd().toString());
@@ -274,28 +282,32 @@ public class HeatMapViewHandler implements ViewHandler<HeatMapViewRequest, HeatM
     return heatMapViewResponse;
   }
 
-  private TimeOnTimeComparisonRequest getComparisonRequestByDimension(TimeOnTimeComparisonRequest comparisonRequest,
-      String groupByDimension) {
+  private TimeOnTimeComparisonRequest getComparisonRequestByDimension(
+      TimeOnTimeComparisonRequest comparisonRequest, String groupByDimension) {
     TimeOnTimeComparisonRequest request = new TimeOnTimeComparisonRequest(comparisonRequest);
     request.setGroupByDimensions(Lists.newArrayList(groupByDimension));
     return request;
   }
 
-  private List<Future<TimeOnTimeComparisonResponse>> getTimeOnTimeComparisonResponses(List<String> groupByDimensions,
-      TimeOnTimeComparisonRequest comparisonRequest, final TimeOnTimeComparisonHandler handler) {
+  private List<Future<TimeOnTimeComparisonResponse>> getTimeOnTimeComparisonResponses(
+      List<String> groupByDimensions, TimeOnTimeComparisonRequest comparisonRequest,
+      final TimeOnTimeComparisonHandler handler) {
 
     ExecutorService service = Executors.newFixedThreadPool(10);
 
-    List<Future<TimeOnTimeComparisonResponse>> timeOnTimeComparisonResponseFutures = new ArrayList<>();
+    List<Future<TimeOnTimeComparisonResponse>> timeOnTimeComparisonResponseFutures =
+        new ArrayList<>();
 
     for (final String groupByDimension : groupByDimensions) {
       final TimeOnTimeComparisonRequest comparisonRequestByDimension =
           getComparisonRequestByDimension(comparisonRequest, groupByDimension);
-      Callable<TimeOnTimeComparisonResponse> callable = new Callable<TimeOnTimeComparisonResponse>() {
-        public TimeOnTimeComparisonResponse call() throws Exception {
-          return handler.handle(comparisonRequestByDimension);
-        }
-      };
+      Callable<TimeOnTimeComparisonResponse> callable =
+          new Callable<TimeOnTimeComparisonResponse>() {
+            @Override
+            public TimeOnTimeComparisonResponse call() throws Exception {
+              return handler.handle(comparisonRequestByDimension);
+            }
+          };
       timeOnTimeComparisonResponseFutures.add(service.submit(callable));
     }
     service.shutdown();

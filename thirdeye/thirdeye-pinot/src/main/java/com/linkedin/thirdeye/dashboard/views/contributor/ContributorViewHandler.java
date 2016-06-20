@@ -21,7 +21,6 @@ import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.client.comparison.Row;
 import com.linkedin.thirdeye.client.comparison.Row.Metric;
 import com.linkedin.thirdeye.client.comparison.TimeOnTimeComparisonHandler;
-import com.linkedin.thirdeye.client.comparison.TimeOnTimeComparisonHandler;
 import com.linkedin.thirdeye.client.comparison.TimeOnTimeComparisonRequest;
 import com.linkedin.thirdeye.client.comparison.TimeOnTimeComparisonResponse;
 import com.linkedin.thirdeye.dashboard.Utils;
@@ -31,9 +30,10 @@ import com.linkedin.thirdeye.dashboard.views.GenericResponse.ResponseSchema;
 import com.linkedin.thirdeye.dashboard.views.TimeBucket;
 import com.linkedin.thirdeye.dashboard.views.ViewHandler;
 
-public class ContributorViewHandler
-    implements ViewHandler<ContributorViewRequest, ContributorViewResponse> {
+public class ContributorViewHandler implements
+    ViewHandler<ContributorViewRequest, ContributorViewResponse> {
   private final Comparator<DateTime> dateTimeComparator = new Comparator<DateTime>() {
+    @Override
     public int compare(DateTime dateTime1, DateTime dateTime2) {
       long millisSinceEpoch1 = dateTime1.getMillis();
       long millisSinceEpoch2 = dateTime2.getMillis();
@@ -43,6 +43,7 @@ public class ContributorViewHandler
   };
 
   private final Comparator<Row> rowComparator = new Comparator<Row>() {
+    @Override
     public int compare(Row row1, Row row2) {
       long millisSinceEpoch1 = row1.getCurrentStart().getMillis();
       long millisSinceEpoch2 = row2.getCurrentStart().getMillis();
@@ -66,6 +67,7 @@ public class ContributorViewHandler
     DateTime baselineEnd = request.getBaselineEnd();
     DateTime currentStart = request.getCurrentStart();
     DateTime currentEnd = request.getCurrentEnd();
+    comparisonRequest.setEndDateInclusive(true);
 
     Multimap<String, String> filters = request.getFilters();
     List<String> dimensionsToGroupBy = request.getGroupByDimensions();

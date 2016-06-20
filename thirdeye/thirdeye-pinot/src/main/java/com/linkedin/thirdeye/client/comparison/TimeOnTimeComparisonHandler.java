@@ -26,6 +26,8 @@ import com.linkedin.thirdeye.client.comparison.Row.Metric;
 import com.linkedin.thirdeye.dashboard.Utils;
 
 public class TimeOnTimeComparisonHandler {
+  private static final String CURRENT = "current";
+  private static final String BASELINE = "baseline";
   private final QueryCache queryCache;
 
   public TimeOnTimeComparisonHandler(QueryCache queryCache) {
@@ -40,17 +42,27 @@ public class TimeOnTimeComparisonHandler {
     List<Range<DateTime>> currentTimeranges = new ArrayList<>();
     TimeGranularity aggregationTimeGranularity = comparisonRequest.getAggregationTimeGranularity();
     // baseline time ranges
-    baselineTimeranges = TimeRangeUtils.computeTimeRanges(aggregationTimeGranularity,
-        comparisonRequest.getBaselineStart(), comparisonRequest.getBaselineEnd());
+    DateTime baselineStart = comparisonRequest.getBaselineStart();
+    DateTime baselineEnd = comparisonRequest.getBaselineEnd();
+    baselineTimeranges =
+        TimeRangeUtils.computeTimeRanges(aggregationTimeGranularity, baselineStart, baselineEnd);
     // current time ranges
-    currentTimeranges = TimeRangeUtils.computeTimeRanges(aggregationTimeGranularity,
-        comparisonRequest.getCurrentStart(), comparisonRequest.getCurrentEnd());
+    DateTime currentStart = comparisonRequest.getCurrentStart();
+    DateTime currentEnd = comparisonRequest.getCurrentEnd();
+    if (comparisonRequest.isEndDateInclusive()) {
+      // ThirdEyeRequest is exclusive endpoint, so increment by one bucket
+      long aggTimeBucketMillis = aggregationTimeGranularity.toMillis();
+      currentEnd = currentEnd.plus(aggTimeBucketMillis);
+      baselineEnd = baselineEnd.plus(aggTimeBucketMillis);
+    }
+    currentTimeranges =
+        TimeRangeUtils.computeTimeRanges(aggregationTimeGranularity, currentStart, currentEnd);
     // create baseline request
-    ThirdEyeRequest baselineRequest = createThirdEyeRequest("baseline", comparisonRequest,
-        comparisonRequest.getBaselineStart(), comparisonRequest.getBaselineEnd());
+    ThirdEyeRequest baselineRequest =
+        createThirdEyeRequest(BASELINE, comparisonRequest, baselineStart, baselineEnd);
     // create current request
-    ThirdEyeRequest currentRequest = createThirdEyeRequest("current", comparisonRequest,
-        comparisonRequest.getCurrentStart(), comparisonRequest.getCurrentEnd());
+    ThirdEyeRequest currentRequest =
+        createThirdEyeRequest(CURRENT, comparisonRequest, currentStart, currentEnd);
 
     List<ThirdEyeRequest> requests = new ArrayList<>();
     requests.add(baselineRequest);
@@ -63,9 +75,9 @@ public class TimeOnTimeComparisonHandler {
       ThirdEyeRequest request = entry.getKey();
       Future<ThirdEyeResponse> responseFuture = entry.getValue();
       ThirdEyeResponse response = responseFuture.get(60, TimeUnit.SECONDS);
-      if ("baseline".equals(request.getRequestReference())) {
+      if (BASELINE.equals(request.getRequestReference())) {
         baselineResponse = response;
-      } else if ("current".equals(request.getRequestReference())) {
+      } else if (CURRENT.equals(request.getRequestReference())) {
         currentResponse = response;
       }
     }
@@ -74,7 +86,7 @@ public class TimeOnTimeComparisonHandler {
             currentTimeranges, comparisonRequest.getAggregationTimeGranularity(),
             comparisonRequest.getGroupByDimensions());
     List<Row> rows = timeOnTimeResponseParser.parseResponse();
-    //compute the derived metrics
+    // compute the derived metrics
     computeDerivedMetrics(comparisonRequest, rows);
     return new TimeOnTimeComparisonResponse(rows);
   }
@@ -112,17 +124,20 @@ public class TimeOnTimeComparisonHandler {
           String derivedMetricExpression = expression.getExpression();
           double derivedMetricBaselineValue =
               MetricExpression.evaluateExpression(derivedMetricExpression, baselineValueContext);
-          if (Double.isInfinite(derivedMetricBaselineValue) || Double.isNaN(derivedMetricBaselineValue)) {
+          if (Double.isInfinite(derivedMetricBaselineValue)
+              || Double.isNaN(derivedMetricBaselineValue)) {
             derivedMetricBaselineValue = 0;
           }
           double currentMetricBaselineValue =
               MetricExpression.evaluateExpression(derivedMetricExpression, currentValueContext);
-          if (Double.isInfinite(currentMetricBaselineValue) || Double.isNaN(currentMetricBaselineValue)) {
+          if (Double.isInfinite(currentMetricBaselineValue)
+              || Double.isNaN(currentMetricBaselineValue)) {
             currentMetricBaselineValue = 0;
           }
 
-          row.getMetrics().add(new Metric(expression.getExpressionName(),
-              derivedMetricBaselineValue, currentMetricBaselineValue));
+          row.getMetrics().add(
+              new Metric(expression.getExpressionName(), derivedMetricBaselineValue,
+                  currentMetricBaselineValue));
         }
       }
     }

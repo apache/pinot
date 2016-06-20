@@ -183,7 +183,8 @@ public class DashboardResource {
       } catch (InvalidCacheLoadException e) {
         LOG.debug("No collection configs for collection {}", collection);
       }
-      if (collectionConfig != null && CollectionUtils.isNotEmpty(collectionConfig.getInvertColorMetrics())) {
+      if (collectionConfig != null
+          && CollectionUtils.isNotEmpty(collectionConfig.getInvertColorMetrics())) {
         map.put("invertColorMetrics", Joiner.on(",").join(collectionConfig.getInvertColorMetrics()));
       }
       collectionInfo = OBJECT_MAPPER.writeValueAsString(map);
@@ -230,12 +231,14 @@ public class DashboardResource {
         } catch (InvalidCacheLoadException e) {
           LOG.debug("No collection configs for collection {}", collection);
         }
-        CollectionSchema collectionSchema = CACHE_REGISTRY_INSTANCE.getCollectionSchemaCache().get(collection);
+        CollectionSchema collectionSchema =
+            CACHE_REGISTRY_INSTANCE.getCollectionSchemaCache().get(collection);
 
         metricExpressions = new ArrayList<>();
         List<String> metricNames = collectionSchema.getMetricNames();
         for (String metric : metricNames) {
-          if (metric.equals(COUNT_METRIC) && (collectionConfig == null || !collectionConfig.isEnableCount())) {
+          if (metric.equals(COUNT_METRIC)
+              && (collectionConfig == null || !collectionConfig.isEnableCount())) {
             continue;
           }
           metricExpressions.add(new MetricExpression(metric));
@@ -441,6 +444,7 @@ public class DashboardResource {
     request.setCollectionName(collection);
     request.setStart(new DateTime(start, DateTimeZone.forID(timeZone)));
     request.setEnd(new DateTime(end, DateTimeZone.forID(timeZone)));
+    request.setEndDateInclusive(true);
     if (groupByDimensions != null && !groupByDimensions.isEmpty()) {
       request.setGroupByDimensions(Arrays.asList(groupByDimensions.trim().split(",")));
     }
