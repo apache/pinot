@@ -61,7 +61,7 @@ public class TimeSeriesRequest {
           new TimeGranularity(timeSeriesRequest.aggregationTimeGranularity.getSize(),
               timeSeriesRequest.aggregationTimeGranularity.getUnit());
     }
-    this.setEndDateInclusive(timeSeriesRequest.isEndDateInclusive());
+    this.isEndDateInclusive = timeSeriesRequest.isEndDateInclusive;
   }
 
   public String getCollectionName() {
