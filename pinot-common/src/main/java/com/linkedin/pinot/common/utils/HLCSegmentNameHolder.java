@@ -45,11 +45,24 @@ public class HLCSegmentNameHolder extends SegmentNameHolder {
   private final String _sequenceNumber;
   private final String _partitionRange;
   private final String _segmentName;
+  private final RealtimeSegmentType _segmentType;
+  private final String _tableName;
+
+  public static boolean isRealtimeV1Name(String segmentId) {
+    int namePartCount = segmentId.split(SEPARATOR).length;
+    // Realtime v1 segment names have either:
+    // - Five parts (old style name: tableName, instanceName, groupId, partitionName, sequenceNumber)
+    // - Three parts (shorter name : groupId, partitionName, sequenceNumber)
+    return namePartCount == 5 || namePartCount == 3;
+  }
 
   // Can be called with old or new style naming.
   public HLCSegmentNameHolder(String segmentName) {
     // Decide if it is old style or new style v1 naming here.
-    String parts[] = segmentName.split("__");
+    if (segmentName.endsWith(SEPARATOR) || segmentName.startsWith(SEPARATOR)) {
+      throw new RuntimeException(segmentName + " is not a HighLevelConsumer segment name");
+    }
+    String parts[] = segmentName.split(SEPARATOR);
     if (parts.length == 5) {
       _isOldStyleNaming = true;
     } else if (parts.length == 3) {
@@ -59,13 +72,17 @@ public class HLCSegmentNameHolder extends SegmentNameHolder {
     }
 
     if (isOldStyleNaming()) {
+      _tableName = parts[0];
       _groupId = parts[2];
       _partitionRange = parts[3];
       _sequenceNumber = parts[4];
+      _segmentType = RealtimeSegmentType.HLC_LONG;
     } else {
       _groupId = parts[0];
       _partitionRange = parts[1];
       _sequenceNumber = parts[2];
+      _tableName = _groupId.substring(0, _groupId.indexOf(REALTIME_SUFFIX) + REALTIME_SUFFIX_LENGTH);
+      _segmentType = RealtimeSegmentType.HLC_SHORT;
     }
     _segmentName = segmentName;
   }
@@ -85,6 +102,8 @@ public class HLCSegmentNameHolder extends SegmentNameHolder {
       _partitionRange = partitionRange;
       _sequenceNumber = sequenceNumber;
       _segmentName = StringUtils.join(Lists.newArrayList(groupId, partitionRange, sequenceNumber), SEPARATOR);
+      _tableName = _groupId.substring(0, _groupId.indexOf(REALTIME_SUFFIX) + REALTIME_SUFFIX_LENGTH);
+      _segmentType = RealtimeSegmentType.HLC_SHORT;
     } else {
       throw new IllegalArgumentException("Invalid group id (" + groupId + "), partition range (" + partitionRange +
           ") or sequence number (" + sequenceNumber + ")");
@@ -95,19 +114,38 @@ public class HLCSegmentNameHolder extends SegmentNameHolder {
     return _isOldStyleNaming;
   }
 
+  @Override
   public String getGroupId() {
     return _groupId;
   }
 
-  public String getSequenceNumber() {
+  @Override
+  public String getSequenceNumberStr() {
     return _sequenceNumber;
   }
 
+  @Override
+  public int getSequenceNumber() {
+    return Integer.valueOf(_sequenceNumber);
+  }
+
+  @Override
   public String getPartitionRange() {
     return _partitionRange;
   }
 
+  @Override
   public String getSegmentName() {
     return _segmentName;
+  }
+
+  @Override
+  public String getTableName() {
+    return _tableName;
+  }
+
+  @Override
+  public RealtimeSegmentType getSegmentType() {
+    return _segmentType;
   }
 }

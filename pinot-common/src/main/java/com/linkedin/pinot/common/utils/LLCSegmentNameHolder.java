@@ -29,7 +29,10 @@ public class LLCSegmentNameHolder extends  SegmentNameHolder implements Comparab
   private final String _segmentName;
 
   public LLCSegmentNameHolder(String segmentName) {
-    String[] parts =  segmentName.split("__");
+    if (segmentName.endsWith(SEPARATOR) || segmentName.startsWith(SEPARATOR)) {
+      throw new RuntimeException(segmentName + " is not a Low level consumer segment name");
+    }
+    String[] parts =  segmentName.split(SEPARATOR);
     if (parts.length != 4) {
       throw new RuntimeException(segmentName + " is not a Low level consumer segment name");
     }
@@ -53,14 +56,22 @@ public class LLCSegmentNameHolder extends  SegmentNameHolder implements Comparab
     _segmentName = tableName + SEPARATOR + partitionId + SEPARATOR + sequenceNumber + SEPARATOR + _creationTime;
   }
 
+  @Override
+  public RealtimeSegmentType getSegmentType() {
+    return RealtimeSegmentType.LLC;
+  }
+
+  @Override
   public String getTableName() {
     return _tableName;
   }
 
+  @Override
   public int getPartitionId() {
     return _partitionId;
   }
 
+  @Override
   public int getSequenceNumber() {
     return _sequenceNumber;
   }
@@ -69,8 +80,14 @@ public class LLCSegmentNameHolder extends  SegmentNameHolder implements Comparab
     return _creationTime;
   }
 
+  @Override
   public String getSegmentName() {
     return _segmentName;
+  }
+
+  @Override
+  public String getSequenceNumberStr() {
+    return Integer.toString(_sequenceNumber);
   }
 
   @Override

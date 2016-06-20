@@ -18,7 +18,6 @@ package com.linkedin.pinot.common.utils;
 import java.util.Arrays;
 import org.testng.Assert;
 import org.testng.annotations.Test;
-import static com.linkedin.pinot.common.utils.SegmentNameBuilder.Realtime.*;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.fail;
 
@@ -29,62 +28,86 @@ import static org.testng.Assert.fail;
 public class SegmentNameBuilderTest {
   @Test
   public void testSegmentNameBuilder() {
-    String oldV1Name = "myTable_REALTIME__Server_1.2.3.4_1234__myTable_REALTIME_1234567_0__0__23456789";
-    String shortV1Name = SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("myTable_REALTIME_1234567_0", "ALL", "1234567");
-    LLCSegmentNameHolder holder = new LLCSegmentNameHolder("myTable", 0, 1, 1465508537069L);
-    final String v2Name = holder.getSegmentName();
+    final String oldV1Name = "myTable_REALTIME__Server_1.2.3.4_1234__myTable_REALTIME_1234567_0__0__23456789";
+    final String groupId = "myTable_REALTIME_1234567_0";
+    final String partitionRange = "ALL";
+    final String sequenceNumber = "1234567";
+    HLCSegmentNameHolder shortNameSegment = new HLCSegmentNameHolder(groupId, partitionRange, sequenceNumber);
+    HLCSegmentNameHolder longNameSegment = new HLCSegmentNameHolder(oldV1Name);
+    final String shortV1Name = shortNameSegment.getSegmentName();
+    LLCSegmentNameHolder llcSegment = new LLCSegmentNameHolder("myTable", 0, 1, 1465508537069L);
+    final String v2Name = llcSegment.getSegmentName();
 
     assertEquals(shortV1Name, "myTable_REALTIME_1234567_0__ALL__1234567");
     assertEquals(v2Name, "myTable__0__1__20160609T2142Z");
 
     // Check v1/v2 format detection
-    assertEquals(isRealtimeV1Name(oldV1Name), true);
-    assertEquals(isRealtimeV1Name(shortV1Name), true);
-    assertEquals(isRealtimeV1Name(v2Name), false);
+    assertEquals(SegmentNameHolder.getSegmentType(oldV1Name), SegmentNameHolder.RealtimeSegmentType.HLC_LONG);
+    assertEquals(SegmentNameHolder.getSegmentType(shortV1Name), SegmentNameHolder.RealtimeSegmentType.HLC_SHORT);
+    assertEquals(SegmentNameHolder.getSegmentType(v2Name), SegmentNameHolder.RealtimeSegmentType.LLC);
 
-    assertEquals(isRealtimeV2Name(oldV1Name), false);
-    assertEquals(isRealtimeV2Name(shortV1Name), false);
-    assertEquals(isRealtimeV2Name(v2Name), true);
+//    assertEquals(isRealtimeV2Name(oldV1Name), false);
+//    assertEquals(isRealtimeV2Name(shortV1Name), false);
+//    assertEquals(isRealtimeV2Name(v2Name), true);
 
     // Check table name
-    assertEquals(extractTableName(oldV1Name), "myTable_REALTIME");
-    assertEquals(extractTableName(shortV1Name), "myTable_REALTIME");
-    assertEquals(holder.getTableName(), "myTable");
+    assertEquals(longNameSegment.getTableName(), "myTable_REALTIME");
+    assertEquals(shortNameSegment.getTableName(), "myTable_REALTIME");
+    assertEquals(llcSegment.getTableName(), "myTable");
 
     // Check partition range
-    assertEquals(extractPartitionRange(oldV1Name), "0");
-    assertEquals(extractPartitionRange(shortV1Name), "ALL");
-    assertEquals(holder.getPartitionId(), 0);
+    assertEquals(longNameSegment.getPartitionRange(), "0");
+    assertEquals(shortNameSegment.getPartitionRange(), "ALL");
+    assertEquals(llcSegment.getPartitionId(), 0);
 
     // Check groupId
-    assertEquals(extractGroupIdName(oldV1Name), "myTable_REALTIME_1234567_0");
-    assertEquals(extractGroupIdName(shortV1Name), "myTable_REALTIME_1234567_0");
+    assertEquals(longNameSegment.getGroupId(), "myTable_REALTIME_1234567_0");
+    assertEquals(shortNameSegment.getGroupId(), "myTable_REALTIME_1234567_0");
     try {
-      extractGroupIdName(v2Name);
+      llcSegment.getGroupId();
       fail("extractGroupIdName with a v2 name did not throw an exception");
     } catch (Exception e) {
       // Expected
     }
 
     // Check sequence number
-    assertEquals(extractSequenceNumber(oldV1Name), "23456789");
-    assertEquals(extractSequenceNumber(shortV1Name), "1234567");
-    assertEquals(holder.getSequenceNumber(), 1);
+    assertEquals(longNameSegment.getSequenceNumber(), 23456789);
+    assertEquals(longNameSegment.getSequenceNumberStr(), "23456789");
+    assertEquals(shortNameSegment.getSequenceNumberStr(), "1234567");
+    assertEquals(shortNameSegment.getSequenceNumber(), 1234567);
+    assertEquals(llcSegment.getSequenceNumber(), 1);
+
+    assertEquals(llcSegment.getSegmentType(), SegmentNameHolder.RealtimeSegmentType.LLC);
+    assertEquals(longNameSegment.getSegmentType(), SegmentNameHolder.RealtimeSegmentType.HLC_LONG);
+    assertEquals(shortNameSegment.getSegmentType(), SegmentNameHolder.RealtimeSegmentType.HLC_SHORT);
+
+    assertEquals(SegmentNameHolder.getSegmentType(llcSegment.getSegmentName()), SegmentNameHolder.RealtimeSegmentType.LLC);
+    assertEquals(SegmentNameHolder.getSegmentType(longNameSegment.getSegmentName()), SegmentNameHolder.RealtimeSegmentType.HLC_LONG);
+    assertEquals(SegmentNameHolder.getSegmentType(shortNameSegment.getSegmentName()), SegmentNameHolder.RealtimeSegmentType.HLC_SHORT);
+
+    // Invalid segment names
+    assertEquals(SegmentNameHolder.getSegmentType(shortNameSegment.getSegmentName() + "__"), SegmentNameHolder.RealtimeSegmentType.UNSUPPORTED);
+    assertEquals(SegmentNameHolder.getSegmentType("__" + shortNameSegment.getSegmentName()), SegmentNameHolder.RealtimeSegmentType.UNSUPPORTED);
+    assertEquals(SegmentNameHolder.getSegmentType("__abc__"), SegmentNameHolder.RealtimeSegmentType.UNSUPPORTED);
+    assertEquals(SegmentNameHolder.getSegmentType("a__abc__1__3__4__54__g__gg___h"), SegmentNameHolder.RealtimeSegmentType.UNSUPPORTED);
   }
 
   @Test
   public void testExceptions() {
     // Nulls should not work
+    /*
     try {
       SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName(null, null, null);
       fail("Exception not thrown");
     } catch (Exception e) {
       // Expected
     }
+    */
 
     // Double underscores should not work
     try {
-      SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("__", "a", "b");
+      HLCSegmentNameHolder holder = new HLCSegmentNameHolder("__", "a", "b");
+//      SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("__", "a", "b");
       fail("Exception not thrown");
     } catch (Exception e) {
       // Expected

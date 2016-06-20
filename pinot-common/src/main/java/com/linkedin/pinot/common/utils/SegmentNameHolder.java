@@ -17,28 +17,29 @@
 package com.linkedin.pinot.common.utils;
 
 public abstract class SegmentNameHolder {
-  protected static final String SEPARATOR = "__";
+  public static final String SEPARATOR = "__";
+  public static final String REALTIME_SUFFIX = "_REALTIME";
+  public static final int REALTIME_SUFFIX_LENGTH = REALTIME_SUFFIX.length();
 
-  public static enum RealtimeSegmentType {
+  public enum RealtimeSegmentType {
     UNSUPPORTED,
     HLC_LONG,
     HLC_SHORT,
     LLC,
   }
 
-  public RealtimeSegmentType getSegmentType(String segmentName) {
+  public static RealtimeSegmentType getSegmentType(String segmentName) {
     try {
-      if (SegmentNameBuilder.Realtime.isRealtimeV1Name(segmentName)) {
+      if (HLCSegmentNameHolder.isRealtimeV1Name(segmentName)) {
         HLCSegmentNameHolder holder = new HLCSegmentNameHolder(segmentName);
         if (holder.isOldStyleNaming()) {
           return RealtimeSegmentType.HLC_LONG;
         } else {
           return RealtimeSegmentType.HLC_SHORT;
         }
-      } else if (SegmentNameBuilder.Realtime.isRealtimeV2Name(segmentName)) {
-        return RealtimeSegmentType.LLC;
       } else {
-        return RealtimeSegmentType.UNSUPPORTED;
+        LLCSegmentNameHolder holder = new LLCSegmentNameHolder(segmentName);
+        return RealtimeSegmentType.LLC;
       }
     } catch (Exception e) {
       return RealtimeSegmentType.UNSUPPORTED;
@@ -50,5 +51,27 @@ public abstract class SegmentNameHolder {
       return false;
     }
     return true;
+  }
+
+  public abstract String getTableName();
+
+  public abstract String getSequenceNumberStr();
+
+  public abstract int getSequenceNumber();
+
+  public abstract String getSegmentName();
+
+  public abstract RealtimeSegmentType getSegmentType();
+
+  public String getGroupId() {
+    throw new RuntimeException("No groupId in " + getSegmentName());
+  }
+
+  public int getPartitionId() {
+    throw new RuntimeException("No partitionId in " + getSegmentName());
+  }
+
+  public String getPartitionRange() {
+    throw new RuntimeException("No partitionRange in " + getSegmentName());
   }
 }

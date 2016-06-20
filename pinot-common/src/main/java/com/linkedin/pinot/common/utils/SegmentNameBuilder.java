@@ -37,6 +37,13 @@ public class SegmentNameBuilder {
 
   public static class Realtime {
 
+    /**
+     * @deprecated Use HLCSegmentNameHolder
+     * @param groupId groupid
+     * @param partitionRange partitionRange
+     * @param sequenceNumber sequenceNumber
+     * @return segmentName
+     */
     public static String buildHighLevelConsumerSegmentName(String groupId, String partitionRange,
         String sequenceNumber) {
       // old style name
@@ -56,6 +63,11 @@ public class SegmentNameBuilder {
       }
     }
 
+    /**
+     * @deprecated Use HLCSegmentNameHolder
+     * @param segmentId segmentName
+     * @return tablename
+     */
     public static String extractTableName(String segmentId) {
       if (isOldV1StyleName(segmentId)) {
         return segmentId.split("__")[0];
@@ -68,6 +80,11 @@ public class SegmentNameBuilder {
       }
     }
 
+    /**
+     * @deprecated Use HLCSegmentNameHolder
+     * @param segmentId segmentname
+     * @return groupname
+     */
     public static String extractGroupIdName(String segmentId) {
       if (isOldV1StyleName(segmentId)) {
         return segmentId.split("__")[2];
@@ -78,6 +95,11 @@ public class SegmentNameBuilder {
       }
     }
 
+    /**
+     * @deprecated Use HLCSegmentNameHolder
+     * @param segmentId segment name
+     * @return partitionrange
+     */
     public static String extractPartitionRange(String segmentId) {
       if (isOldV1StyleName(segmentId)) {
         return segmentId.split("__")[3];
@@ -88,6 +110,11 @@ public class SegmentNameBuilder {
       }
     }
 
+    /**
+     * @deprecated  Use HLCSegmentNameHolder
+     * @param segmentId segment name
+     * @return sequence number
+     */
     public static String extractSequenceNumber(String segmentId) {
       if (isOldV1StyleName(segmentId)) {
         return segmentId.split("__")[4];
@@ -99,6 +126,11 @@ public class SegmentNameBuilder {
 
     }
 
+    /**
+     * @deprecated  Use HLCSegmentNameHolder
+     * @param segmentId segment name
+     * @return true if realtime long segment name
+     */
     public static boolean isRealtimeV1Name(String segmentId) {
       int namePartCount = segmentId.split("__").length;
       // Realtime v1 segment names have either:
@@ -107,6 +139,11 @@ public class SegmentNameBuilder {
       return namePartCount == 5 || namePartCount == 3;
     }
 
+    /**
+     * @deprecated  Use HLCSegmentNameHolder
+     * @param segmentId segment name
+     * @return true if realtime short segment name
+     */
     public static boolean isRealtimeV2Name(String segmentId) {
       try {
         LLCSegmentNameHolder holder = new LLCSegmentNameHolder(segmentId);
