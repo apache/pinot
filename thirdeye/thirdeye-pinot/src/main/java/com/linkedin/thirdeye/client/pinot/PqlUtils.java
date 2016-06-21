@@ -18,7 +18,6 @@ import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.client.MetricFunction;
-import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.ThirdEyeRequest;
 
 /**
@@ -28,10 +27,7 @@ public class PqlUtils {
   private static final Joiner AND = Joiner.on(" AND ");
   private static final Joiner COMMA = Joiner.on(",");
   private static final Joiner EQUALS = Joiner.on(" = ");
-  private static final int DEFAULT_TOP = 300;
   private static final Logger LOGGER = LoggerFactory.getLogger(PqlUtils.class);
-  private static ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE =
-      ThirdEyeCacheRegistry.getInstance();
 
   /**
    * Returns sql to calculate the sum of all raw metrics required for <tt>request</tt>, grouped by
@@ -46,12 +42,12 @@ public class PqlUtils {
   }
 
   static String getPql(String collection, List<MetricFunction> metricFunctions, DateTime startTime,
-      DateTime endTime, Multimap<String, String> filterSet, List<String> groupBy,
+      DateTime endTimeExclusive, Multimap<String, String> filterSet, List<String> groupBy,
       TimeGranularity timeGranularity, TimeSpec dataTimeSpec) {
     StringBuilder sb = new StringBuilder();
     String selectionClause = getSelectionClause(metricFunctions);
     sb.append("SELECT ").append(selectionClause).append(" FROM ").append(collection);
-    String betweenClause = getBetweenClause(startTime, endTime, dataTimeSpec);
+    String betweenClause = getBetweenClause(startTime, endTimeExclusive, dataTimeSpec);
     sb.append(" WHERE ").append(betweenClause);
     String dimensionWhereClause = getDimensionWhereClause(filterSet);
     if (StringUtils.isNotBlank(dimensionWhereClause)) {
@@ -83,10 +79,10 @@ public class PqlUtils {
     return builder.toString();
   }
 
-  static String getBetweenClause(DateTime start, DateTime end, TimeSpec timeFieldSpec) {
+  static String getBetweenClause(DateTime start, DateTime endExclusive, TimeSpec timeFieldSpec) {
     TimeGranularity dataGranularity = timeFieldSpec.getDataGranularity();
     long startMillis = start.getMillis();
-    long endMillis = end.getMillis();
+    long endMillis = endExclusive.getMillis();
     long dataGranularityMillis = dataGranularity.toMillis();
 
     // Shrink start and end as per data granularity
@@ -99,30 +95,30 @@ public class PqlUtils {
     long endAligmentDelta = endMillis % dataGranularityMillis;
     if (endAligmentDelta != 0) {
       long endMillisAligned = endMillis - endAligmentDelta;
-      end = new DateTime(endMillisAligned);
+      endExclusive = new DateTime(endMillisAligned);
     }
 
     String startQueryTime;
-    String endQueryTime;
+    String endQueryTimeExclusive;
 
     String timeField = timeFieldSpec.getColumnName();
     String timeFormat = timeFieldSpec.getFormat();
     if (timeFormat == null || TimeSpec.SINCE_EPOCH_FORMAT.equals(timeFormat)) {
       long startInConvertedUnits = dataGranularity.convertToUnit(start.getMillis());
-      long endInConvertedUnits = dataGranularity.convertToUnit(end.getMillis());
+      long endInConvertedUnits = dataGranularity.convertToUnit(endExclusive.getMillis());
       startQueryTime = String.valueOf(startInConvertedUnits);
-      endQueryTime = String.valueOf(endInConvertedUnits);
+      endQueryTimeExclusive = String.valueOf(endInConvertedUnits);
     } else {
       DateTimeFormatter dateTimeFormatter = DateTimeFormat.forPattern(timeFormat).withZoneUTC();
       startQueryTime = dateTimeFormatter.print(start);
-      endQueryTime = dateTimeFormatter.print(end);
+      endQueryTimeExclusive = dateTimeFormatter.print(endExclusive);
     }
 
-    if (startQueryTime.equals(endQueryTime)) {
+    if (startQueryTime.equals(endQueryTimeExclusive)) {
       return String.format(" %s = %s", timeField, startQueryTime);
     } else {
-      return String.format(" %s >= %s AND %s <= %s", timeField, startQueryTime, timeField,
-          endQueryTime);
+      return String.format(" %s >= %s AND %s < %s", timeField, startQueryTime, timeField,
+          endQueryTimeExclusive);
     }
   }
 

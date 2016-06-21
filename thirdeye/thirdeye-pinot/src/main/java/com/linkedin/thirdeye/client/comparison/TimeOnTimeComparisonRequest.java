@@ -67,6 +67,7 @@ public class TimeOnTimeComparisonRequest {
               that.aggregationTimeGranularity.getUnit());
     }
     this.metricExpressions = new ArrayList<>(that.metricExpressions);
+    this.isEndDateInclusive = that.isEndDateInclusive;
   }
 
   public String getCollectionName() {
