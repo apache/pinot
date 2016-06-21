@@ -221,4 +221,14 @@ public class Utils {
     }
     return metricExpressions;
   }
+
+  public static String getCollectionFromAlias(String alias) throws ExecutionException {
+    String collectionName = alias;
+    try {
+      collectionName = CACHE_REGISTRY_INSTANCE.getCollectionAliasCache().get(alias);
+    } catch (InvalidCacheLoadException e) {
+      LOG.debug("No collection name for alias {}", alias);
+    }
+    return collectionName;
+  }
 }

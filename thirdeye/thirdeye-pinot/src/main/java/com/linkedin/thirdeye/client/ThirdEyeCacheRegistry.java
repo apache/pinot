@@ -14,6 +14,7 @@ import com.google.common.cache.RemovalNotification;
 import com.linkedin.pinot.client.ResultSetGroup;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.thirdeye.api.CollectionSchema;
+import com.linkedin.thirdeye.client.cache.CollectionAliasCacheLoader;
 import com.linkedin.thirdeye.client.cache.CollectionConfigCacheLoader;
 import com.linkedin.thirdeye.client.cache.CollectionMaxDataTimeCacheLoader;
 import com.linkedin.thirdeye.client.cache.CollectionSchemaCacheLoader;
@@ -42,6 +43,7 @@ public class ThirdEyeCacheRegistry {
   private LoadingCache<String, CollectionConfig> collectionConfigCache;
   private LoadingCache<String, String> dashboardsCache;
   private LoadingCache<String, String> dimensionFiltersCache;
+  private LoadingCache<String, String> collectionAliasCache;
   private CollectionsCache collectionsCache;
   private QueryCache queryCache;
 
@@ -170,7 +172,7 @@ public class ThirdEyeCacheRegistry {
     ThirdEyeCacheRegistry cacheRegistry = ThirdEyeCacheRegistry.getInstance();
 
     RemovalListener<PinotQuery, ResultSetGroup> listener = new RemovalListener<PinotQuery, ResultSetGroup>() {
-      
+
       @Override
       public void onRemoval(RemovalNotification<PinotQuery, ResultSetGroup> notification) {
         LOGGER.info("Expired {}", notification.getKey().getPql());
@@ -200,8 +202,13 @@ public class ThirdEyeCacheRegistry {
 
     // CollectionConfig Cache
     LoadingCache<String, CollectionConfig> collectionConfigCache = CacheBuilder.newBuilder()
-        .build(new CollectionConfigCacheLoader(pinotThirdeyeClientConfig, collectionConfigDAO));
+        .build(new CollectionConfigCacheLoader(collectionConfigDAO));
     cacheRegistry.registerCollectionConfigCache(collectionConfigCache);
+
+    // Collection Alias cache
+    LoadingCache<String, String> collectionAliasCache = CacheBuilder.newBuilder()
+        .build(new CollectionAliasCacheLoader(collectionConfigDAO));
+    cacheRegistry.registerCollectionAliasCache(collectionAliasCache);
 
     // Query Cache
     QueryCache queryCache = new QueryCache(thirdEyeClient, Executors.newFixedThreadPool(10));
@@ -294,6 +301,14 @@ public class ThirdEyeCacheRegistry {
 
   public void registerCollectionConfigCache(LoadingCache<String, CollectionConfig> collectionConfigCache) {
     this.collectionConfigCache = collectionConfigCache;
+  }
+
+  public LoadingCache<String, String> getCollectionAliasCache() {
+    return collectionAliasCache;
+  }
+
+  public void registerCollectionAliasCache(LoadingCache<String, String> collectionAliasCache) {
+    this.collectionAliasCache = collectionAliasCache;
   }
 
   public LoadingCache<String, String> getDimensionFiltersCache() {

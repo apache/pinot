@@ -22,6 +22,7 @@ import javax.ws.rs.core.MediaType;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.json.JSONArray;
@@ -34,10 +35,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.google.common.base.Joiner;
 import com.google.common.cache.CacheLoader.InvalidCacheLoadException;
+import com.google.common.cache.LoadingCache;
 import com.linkedin.thirdeye.api.CollectionSchema;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.client.MetricExpression;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
+import com.linkedin.thirdeye.client.cache.CollectionsCache;
 import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesHandler;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesRequest;
@@ -72,6 +75,12 @@ public class DashboardResource {
   private static String COUNT_METRIC = "__COUNT";
 
   private QueryCache queryCache;
+  private CollectionsCache collectionsCache;
+  private LoadingCache<String,CollectionSchema> collectionSchemaCache;
+  private LoadingCache<String, CollectionConfig> collectionConfigCache;
+  private LoadingCache<String, Long> collectionMaxDataTimeCache;
+  private LoadingCache<String,String> dashboardsCache;
+  private LoadingCache<String, String> dimensionFiltersCache;
   private AbstractConfigDAO<DashboardConfig> dashboardConfigDAO;
 
   public DashboardResource() {
@@ -79,6 +88,12 @@ public class DashboardResource {
 
   public DashboardResource(AbstractConfigDAO<DashboardConfig> dashboardConfigDAO) {
     this.queryCache = CACHE_REGISTRY_INSTANCE.getQueryCache();
+    this.collectionsCache = CACHE_REGISTRY_INSTANCE.getCollectionsCache();
+    this.collectionSchemaCache = CACHE_REGISTRY_INSTANCE.getCollectionSchemaCache();
+    this.collectionConfigCache = CACHE_REGISTRY_INSTANCE.getCollectionConfigCache();
+    this.collectionMaxDataTimeCache = CACHE_REGISTRY_INSTANCE.getCollectionMaxDataTimeCache();
+    this.dashboardsCache = CACHE_REGISTRY_INSTANCE.getDashboardsCache();
+    this.dimensionFiltersCache = CACHE_REGISTRY_INSTANCE.getDimensionFiltersCache();
     this.dashboardConfigDAO = dashboardConfigDAO;
   }
 
@@ -95,7 +110,21 @@ public class DashboardResource {
   public String getCollections() {
     String jsonCollections = null;
     try {
-      List<String> collections = CACHE_REGISTRY_INSTANCE.getCollectionsCache().getCollections();
+      List<String> collections = new ArrayList<>();
+      for (String collection : collectionsCache.getCollections()) {
+        CollectionConfig collectionConfig = null;
+        try {
+          collectionConfig = collectionConfigCache.get(collection);
+          String collectionAlias = collectionConfig.getCollectionAlias();
+          if (StringUtils.isNotEmpty(collectionAlias)) {
+            collection = collectionAlias;
+          }
+        } catch (InvalidCacheLoadException e){
+          LOG.debug("No CollectionConfig for collection {}", collection);
+        }
+        collections.add(collection);
+      }
+
       jsonCollections = OBJECT_MAPPER.writeValueAsString(collections);
     } catch (Exception e) {
       LOG.error("Error while fetching datasets", e);
@@ -110,11 +139,13 @@ public class DashboardResource {
   public String getMetrics(@QueryParam("dataset") String collection) {
     String jsonMetrics = null;
     try {
-      CollectionSchema schema = CACHE_REGISTRY_INSTANCE.getCollectionSchemaCache().get(collection);
+      collection = Utils.getCollectionFromAlias(collection);
+
+      CollectionSchema schema = collectionSchemaCache.get(collection);
       List<String> metrics = schema.getMetricNames();
       CollectionConfig collectionConfig = null;
       try {
-        collectionConfig = CACHE_REGISTRY_INSTANCE.getCollectionConfigCache().get(collection);
+        collectionConfig = collectionConfigCache.get(collection);
       } catch (InvalidCacheLoadException e) {
         LOG.debug("No collection configs for collection {}", collection);
       }
@@ -137,10 +168,9 @@ public class DashboardResource {
   public String getDimensions(@QueryParam("dataset") String collection) {
     String jsonDimensions = null;
     try {
-      // CollectionSchema schema = queryCache.getClient().getCollectionSchema(collection);
-      // List<String> dimensions = schema.getDimensionNames();
 
-      // Collections.sort(dimensions);
+      collection = Utils.getCollectionFromAlias(collection);
+
       List<String> dimensions = Utils.getDimensions(queryCache, collection);
       jsonDimensions = OBJECT_MAPPER.writeValueAsString(dimensions);
     } catch (Exception e) {
@@ -156,7 +186,10 @@ public class DashboardResource {
   public String getDashboards(@QueryParam("dataset") String collection) {
     String jsonDashboards = null;
     try {
-      jsonDashboards = CACHE_REGISTRY_INSTANCE.getDashboardsCache().get(collection);
+
+      collection = Utils.getCollectionFromAlias(collection);
+
+      jsonDashboards = dashboardsCache.get(collection);
     } catch (Exception e) {
       LOG.error("Error while fetching dashboards for collection: " + collection, e);
     }
@@ -169,17 +202,19 @@ public class DashboardResource {
   public String getMaxTime(@QueryParam("dataset") String collection) {
     String collectionInfo = null;
     try {
+
+      collection = Utils.getCollectionFromAlias(collection);
+
       HashMap<String, String> map = new HashMap<>();
-      long maxDataTime = CACHE_REGISTRY_INSTANCE.getCollectionMaxDataTimeCache().get(collection);
-      CollectionSchema collectionSchema =
-          CACHE_REGISTRY_INSTANCE.getCollectionSchemaCache().get(collection);
+      long maxDataTime = collectionMaxDataTimeCache.get(collection);
+      CollectionSchema collectionSchema = collectionSchemaCache.get(collection);
       TimeGranularity dataGranularity = collectionSchema.getTime().getDataGranularity();
       map.put("maxTime", "" + maxDataTime);
       map.put("dataGranularity", dataGranularity.getUnit().toString());
 
       CollectionConfig collectionConfig = null;
       try {
-        collectionConfig = CACHE_REGISTRY_INSTANCE.getCollectionConfigCache().get(collection);
+        collectionConfig = collectionConfigCache.get(collection);
       } catch (InvalidCacheLoadException e) {
         LOG.debug("No collection configs for collection {}", collection);
       }
@@ -202,12 +237,16 @@ public class DashboardResource {
       @QueryParam("start") String start, @QueryParam("end") String end) {
     String jsonFilters = null;
     try {
-      jsonFilters = CACHE_REGISTRY_INSTANCE.getDimensionFiltersCache().get(collection);
+
+      collection = Utils.getCollectionFromAlias(collection);
+
+      jsonFilters = dimensionFiltersCache.get(collection);
     } catch (ExecutionException e) {
       LOG.error("Exception while getting filters for collection {}", collection, e);
     }
     return jsonFilters;
   }
+
 
   @GET
   @Path(value = "/data/customDashboard")
@@ -220,6 +259,9 @@ public class DashboardResource {
       @QueryParam("compareMode") String compareMode,
       @QueryParam("aggTimeGranularity") String aggTimeGranularity) {
     try {
+
+      collection = Utils.getCollectionFromAlias(collection);
+
       TabularViewRequest request = new TabularViewRequest();
       request.setCollection(collection);
       DashboardConfig dashboardConfig;
@@ -227,12 +269,11 @@ public class DashboardResource {
       if (dashboardName == null || DEFAULT_DASHBOARD.equals(dashboardName)) {
         CollectionConfig collectionConfig = null;
         try {
-          collectionConfig = CACHE_REGISTRY_INSTANCE.getCollectionConfigCache().get(collection);
+          collectionConfig = collectionConfigCache.get(collection);
         } catch (InvalidCacheLoadException e) {
           LOG.debug("No collection configs for collection {}", collection);
         }
-        CollectionSchema collectionSchema =
-            CACHE_REGISTRY_INSTANCE.getCollectionSchemaCache().get(collection);
+        CollectionSchema collectionSchema = collectionSchemaCache.get(collection);
 
         metricExpressions = new ArrayList<>();
         List<String> metricNames = collectionSchema.getMetricNames();
@@ -248,7 +289,7 @@ public class DashboardResource {
         metricExpressions = dashboardConfig.getMetricExpressions();
       }
       request.setMetricExpressions(metricExpressions);
-      long maxDataTime = CACHE_REGISTRY_INSTANCE.getCollectionMaxDataTimeCache().get(collection);
+      long maxDataTime = collectionMaxDataTimeCache.get(collection);
       if (currentEnd > maxDataTime) {
         long delta = currentEnd - maxDataTime;
         currentEnd = currentEnd - delta;
@@ -291,13 +332,15 @@ public class DashboardResource {
       @QueryParam("compareMode") String compareMode, @QueryParam("metrics") String metricsJson)
       throws Exception {
 
+    collection = Utils.getCollectionFromAlias(collection);
+
     HeatMapViewRequest request = new HeatMapViewRequest();
 
     request.setCollection(collection);
     List<MetricExpression> metricExpressions =
         Utils.convertToMetricExpressions(metricsJson, collection);
     request.setMetricExpressions(metricExpressions);
-    long maxDataTime = CACHE_REGISTRY_INSTANCE.getCollectionMaxDataTimeCache().get(collection);
+    long maxDataTime = collectionMaxDataTimeCache.get(collection);
     if (currentEnd > maxDataTime) {
       long delta = currentEnd - maxDataTime;
       currentEnd = currentEnd - delta;
@@ -339,13 +382,16 @@ public class DashboardResource {
       @QueryParam("compareMode") String compareMode,
       @QueryParam("aggTimeGranularity") String aggTimeGranularity,
       @QueryParam("metrics") String metricsJson) throws Exception {
+
+    collection = Utils.getCollectionFromAlias(collection);
+
     TabularViewRequest request = new TabularViewRequest();
     request.setCollection(collection);
 
     List<MetricExpression> metricExpressions =
         Utils.convertToMetricExpressions(metricsJson, collection);
     request.setMetricExpressions(metricExpressions);
-    long maxDataTime = CACHE_REGISTRY_INSTANCE.getCollectionMaxDataTimeCache().get(collection);
+    long maxDataTime = collectionMaxDataTimeCache.get(collection);
     if (currentEnd > maxDataTime) {
       long delta = currentEnd - maxDataTime;
       currentEnd = currentEnd - delta;
@@ -389,13 +435,15 @@ public class DashboardResource {
       @QueryParam("metrics") String metricsJson, @QueryParam("dimensions") String groupByDimensions)
       throws Exception {
 
+    collection = Utils.getCollectionFromAlias(collection);
+
     ContributorViewRequest request = new ContributorViewRequest();
     request.setCollection(collection);
 
     List<MetricExpression> metricExpressions =
         Utils.convertToMetricExpressions(metricsJson, collection);
     request.setMetricExpressions(metricExpressions);
-    long maxDataTime = CACHE_REGISTRY_INSTANCE.getCollectionMaxDataTimeCache().get(collection);
+    long maxDataTime = collectionMaxDataTimeCache.get(collection);
     if (currentEnd > maxDataTime) {
       long delta = currentEnd - maxDataTime;
       currentEnd = currentEnd - delta;
@@ -440,6 +488,9 @@ public class DashboardResource {
       @QueryParam("aggTimeGranularity") String aggTimeGranularity,
       @QueryParam("metrics") String metricsJson, @QueryParam("dimensions") String groupByDimensions)
       throws Exception {
+
+    collection = Utils.getCollectionFromAlias(collection);
+
     TimeSeriesRequest request = new TimeSeriesRequest();
     request.setCollectionName(collection);
     request.setStart(new DateTime(start, DateTimeZone.forID(timeZone)));
