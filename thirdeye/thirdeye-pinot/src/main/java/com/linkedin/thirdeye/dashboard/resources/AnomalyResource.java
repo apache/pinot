@@ -46,6 +46,7 @@ import com.linkedin.thirdeye.detector.db.AnomalyResultDAO;
 import com.linkedin.thirdeye.detector.db.EmailConfigurationDAO;
 import com.linkedin.thirdeye.detector.db.EmailFunctionDependencyDAO;
 import com.linkedin.thirdeye.detector.driver.AnomalyDetectionJobManager;
+import com.linkedin.thirdeye.detector.email.EmailReportJobManager;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 @Path(value = "/dashboard")
@@ -63,9 +64,11 @@ public class AnomalyResource {
   private EmailConfigurationDAO emailConfigurationDAO;
   private EmailFunctionDependencyDAO emailFunctionDependencyDAO;
   private AnomalyDetectionJobManager anomalyDetectionJobManager;
+  private EmailReportJobManager emailReportJobManager;
 
 
   public AnomalyResource(AnomalyDetectionJobManager anomalyDetectionJobManager,
+      EmailReportJobManager emailReportJobManager,
       AnomalyFunctionSpecDAO anomalyFunctionSpecDAO,
       AnomalyResultDAO anomalyResultDAO,
       EmailConfigurationDAO emailConfigurationDAO,
@@ -73,6 +76,7 @@ public class AnomalyResource {
 
     this.queryCache = CACHE_REGISTRY_INSTANCE.getQueryCache();
     this.anomalyDetectionJobManager = anomalyDetectionJobManager;
+    this.emailReportJobManager = emailReportJobManager;
     this.anomalyFunctionSpecDAO = anomalyFunctionSpecDAO;
     this.anomalyResultDAO = anomalyResultDAO;
     this.emailConfigurationDAO = emailConfigurationDAO;
@@ -556,7 +560,8 @@ public class AnomalyResource {
   @POST
   @UnitOfWork
   @Path("/email-config/adhoc")
-  public Response runAdhocEmailConfig(@QueryParam("id") Long id) {
+  public Response runAdhocEmailConfig(@QueryParam("id") Long id) throws Exception {
+    emailReportJobManager.sendAdHoc(id);
     return Response.ok(id).build();
   }
 
