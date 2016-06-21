@@ -15,24 +15,23 @@
  */
 package com.linkedin.pinot.common.metadata.stream;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
-
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource.Realtime.Kafka.ConsumerType;
 import com.linkedin.pinot.common.utils.StringUtil;
-import static com.linkedin.pinot.common.utils.EqualityUtils.isEqual;
-import static com.linkedin.pinot.common.utils.EqualityUtils.hashCodeOf;
-import static com.linkedin.pinot.common.utils.EqualityUtils.isSameReference;
-import static com.linkedin.pinot.common.utils.EqualityUtils.isNullOrNotSameClass;
+import static com.linkedin.pinot.common.utils.EqualityUtils.*;
 
 
 public class KafkaStreamMetadata implements StreamMetadata {
 
   private final String _kafkaTopicName;
-  private final ConsumerType _consumerType;
+  private final List<ConsumerType> _consumerTypes = new ArrayList<>(2);
   private final String _zkBrokerUrl;
   private final String _decoderClass;
   private final Map<String, String> _decoderProperties = new HashMap<String, String>();
@@ -43,9 +42,14 @@ public class KafkaStreamMetadata implements StreamMetadata {
     _zkBrokerUrl =
         streamConfigMap.get(StringUtil.join(".", Helix.DataSource.STREAM_PREFIX,
             Helix.DataSource.Realtime.Kafka.HighLevelConsumer.ZK_CONNECTION_STRING));
-    _consumerType =
-        ConsumerType.valueOf(streamConfigMap.get(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM_PREFIX,
-            CommonConstants.Helix.DataSource.Realtime.Kafka.CONSUMER_TYPE)));
+
+    String consumerTypesCsv =streamConfigMap.get(StringUtil.join(".", Helix.DataSource.STREAM_PREFIX, Helix.DataSource.Realtime.Kafka.CONSUMER_TYPE));
+    String[] parts = consumerTypesCsv.split(",");
+    for (String part : parts) {
+      _consumerTypes.add(ConsumerType.valueOf(part));
+    }
+    Collections.sort(_consumerTypes);
+
     _kafkaTopicName =
         streamConfigMap.get(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM_PREFIX,
             CommonConstants.Helix.DataSource.Realtime.Kafka.TOPIC_NAME));
@@ -74,8 +78,8 @@ public class KafkaStreamMetadata implements StreamMetadata {
     return _kafkaTopicName;
   }
 
-  public ConsumerType getConsumerType() {
-    return _consumerType;
+  public List<ConsumerType> getConsumerTypes() {
+    return _consumerTypes;
   }
 
   public Map<String, String> getKafkaConfigs() {
@@ -135,7 +139,7 @@ public class KafkaStreamMetadata implements StreamMetadata {
     KafkaStreamMetadata that = (KafkaStreamMetadata) o;
 
     return isEqual(_kafkaTopicName, that._kafkaTopicName) &&
-        isEqual(_consumerType, that._consumerType) &&
+        isEqual(_consumerTypes, that._consumerTypes) &&
         isEqual(_zkBrokerUrl, that._zkBrokerUrl) &&
         isEqual(_decoderClass, that._decoderClass) &&
         isEqual(_decoderProperties, that._decoderProperties) &&
@@ -145,7 +149,7 @@ public class KafkaStreamMetadata implements StreamMetadata {
   @Override
   public int hashCode() {
     int result = hashCodeOf(_kafkaTopicName);
-    result = hashCodeOf(result, _consumerType);
+    result = hashCodeOf(result, _consumerTypes);
     result = hashCodeOf(result, _zkBrokerUrl);
     result = hashCodeOf(result, _decoderClass);
     result = hashCodeOf(result, _decoderProperties);

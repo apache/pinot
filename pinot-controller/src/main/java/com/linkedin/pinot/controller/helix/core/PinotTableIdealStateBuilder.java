@@ -18,13 +18,13 @@ package com.linkedin.pinot.controller.helix.core;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.builder.CustomModeISBuilder;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
-
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
@@ -33,6 +33,7 @@ import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix;
 import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
 import com.linkedin.pinot.common.utils.StringUtil;
+import com.linkedin.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 
 
 /**
@@ -41,6 +42,7 @@ import com.linkedin.pinot.common.utils.StringUtil;
  *
  */
 public class PinotTableIdealStateBuilder {
+  private static final Logger LOGGER = LoggerFactory.getLogger(PinotTableIdealStateBuilder.class);
   public static final String ONLINE = "ONLINE";
   public static final String OFFLINE = "OFFLINE";
   public static final String DROPPED = "DROPPED";
@@ -167,28 +169,48 @@ public class PinotTableIdealStateBuilder {
         new KafkaStreamMetadata(realtimeTableConfig.getIndexingConfig().getStreamConfigs());
     String realtimeServerTenant =
         ControllerTenantNameBuilder.getRealtimeTenantNameForTenant(realtimeTableConfig.getTenantConfig().getServer());
-    switch (kafkaStreamMetadata.getConsumerType()) {
-      case highLevel:
-        IdealState idealState =
-            buildInitialKafkaHighLevelConsumerRealtimeIdealStateFor(realtimeTableName, helixAdmin, helixClusterName,
-                zkHelixPropertyStore);
-        List<String> realtimeInstances = helixAdmin.getInstancesInClusterWithTag(helixClusterName, realtimeServerTenant);
+    List<Helix.DataSource.Realtime.Kafka.ConsumerType> consumerTypes = kafkaStreamMetadata.getConsumerTypes();
+    IdealState idealState =
+        buildInitialKafkaHighLevelConsumerRealtimeIdealStateFor(realtimeTableName);
+    final List<String> realtimeInstances = helixAdmin.getInstancesInClusterWithTag(helixClusterName,
+        realtimeServerTenant);
+
+    int nConsumers = 0;
+    for (Helix.DataSource.Realtime.Kafka.ConsumerType consumerType : consumerTypes) {
+      LOGGER.info("Setting up instances for highlevel consumer for table {}", realtimeTableName);
+      if (consumerType.equals(Helix.DataSource.Realtime.Kafka.ConsumerType.highLevel)) {
         if (realtimeInstances.size() % Integer.parseInt(realtimeTableConfig.getValidationConfig().getReplication()) != 0) {
-          throw new RuntimeException("Number of instance in current tenant should be an integer multiples of the number of replications");
+          throw new RuntimeException(
+              "Number of instance in current tenant should be an integer multiples of the number of replications");
         }
-        setupInstanceConfigForKafkaHighLevelConsumer(realtimeTableName, realtimeInstances.size(),
-            Integer.parseInt(realtimeTableConfig.getValidationConfig().getReplication()), realtimeTableConfig
-                .getIndexingConfig().getStreamConfigs(), zkHelixPropertyStore, realtimeInstances);
-        return idealState;
-      case simple:
-      default:
-        throw new UnsupportedOperationException("Not support kafka consumer type: "
-            + kafkaStreamMetadata.getConsumerType());
+        setupInstanceConfigForKafkaHighLevelConsumer(realtimeTableName, realtimeInstances.size(), Integer.parseInt(realtimeTableConfig.getValidationConfig().getReplication()),
+            realtimeTableConfig.getIndexingConfig().getStreamConfigs(), zkHelixPropertyStore, realtimeInstances);
+        nConsumers++;
+      } else if (consumerType.equals(Helix.DataSource.Realtime.Kafka.ConsumerType.simple)) {
+        LOGGER.info("Assigning partitions to instances for simple consumer for table {}", realtimeTableName);
+        final int nReplicas = Integer.valueOf(realtimeTableConfig.getValidationConfig().getReplicasPerPartition());
+        final KafkaStreamMetadata kafkaMetadata = new KafkaStreamMetadata(realtimeTableConfig.getIndexingConfig().getStreamConfigs());
+        final String topicName = kafkaMetadata.getKafkaTopicName();
+        final PinotLLCRealtimeSegmentManager segmentManager = PinotLLCRealtimeSegmentManager.getInstance();
+        final int nPartitions = getNPartitions(kafkaMetadata);
+        // TODO Get/Infer the initial offset from table Config?
+        final long startOffset = 0L;
+        segmentManager.setupHelixEntries(topicName, realtimeTableName, nPartitions, realtimeInstances, nReplicas, 0L);
+        nConsumers++;
+      }
     }
+    if (nConsumers == 0) {
+      throw new UnsupportedOperationException("Unknown kafka consumer types: " + consumerTypes);
+    }
+    return idealState;
   }
 
-  public static IdealState buildInitialKafkaHighLevelConsumerRealtimeIdealStateFor(String realtimeTableName,
-      HelixAdmin helixAdmin, String helixClusterName, ZkHelixPropertyStore<ZNRecord> zkHelixPropertyStore) {
+  private static int getNPartitions(KafkaStreamMetadata kafkaMetadata) {
+    // TODO Get the number of partitions from Kafka
+    return 8;
+  }
+
+  public static IdealState buildInitialKafkaHighLevelConsumerRealtimeIdealStateFor(String realtimeTableName) {
     final CustomModeISBuilder customModeIdealStateBuilder = new CustomModeISBuilder(realtimeTableName);
     customModeIdealStateBuilder
         .setStateModel(PinotHelixSegmentOnlineOfflineStateModelGenerator.PINOT_SEGMENT_ONLINE_OFFLINE_STATE_MODEL)

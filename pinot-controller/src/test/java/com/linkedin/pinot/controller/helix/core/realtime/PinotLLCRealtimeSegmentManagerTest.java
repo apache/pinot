@@ -17,69 +17,60 @@
 package com.linkedin.pinot.controller.helix.core.realtime;
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.helix.AccessOption;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.mockito.ArgumentMatcher;
 import org.testng.Assert;
+import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
+import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
+import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import static org.mockito.Matchers.argThat;
-import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 
 public class PinotLLCRealtimeSegmentManagerTest {
-  private final String clusterName = "testCluster";
-  private final String server1 = "Server_1";
-  private final String server2 = "Server_2";
-  private final String server3 = "Server_3";
+  private static final String clusterName = "testCluster";
+  private String[] serverNames;
 
-  private HelixManager createMockHelixManager() {
-    HelixManager helixManager = mock(HelixManager.class);
-    when(helixManager.getClusterName()).thenReturn(clusterName);
-    return  helixManager;
+  private List<String> getInstanceList(final int nServers) {
+    Assert.assertTrue(nServers <= serverNames.length);
+    String[] instanceArray = Arrays.copyOf(serverNames, nServers);
+    return Arrays.asList(instanceArray);
   }
 
-  private HelixAdmin createMockHelixAdmin() {
-    HelixAdmin helixAdmin = mock(HelixAdmin.class);
-    return helixAdmin;
+  @BeforeTest
+  public void setUp() {
+    final int maxInstances = 20;
+    serverNames = new String[maxInstances];
+    for (int i = 0; i < maxInstances; i++) {
+      serverNames[i] = "Server_" + i;
+    }
   }
-
-  private ZkHelixPropertyStore createMockPropertyStore() {
-    ZkHelixPropertyStore propertyStore = mock(ZkHelixPropertyStore.class);
-    return propertyStore;
-  }
-
-  private PinotHelixResourceManager createMockHelixResourceManager() {
-    PinotHelixResourceManager helixResourceManager = mock(PinotHelixResourceManager.class);
-    return helixResourceManager;
-  }
-
 
   @Test
   public void testKafkaAssignment() throws Exception {
-    final HelixAdmin helixAdmin = createMockHelixAdmin();
-    final HelixManager helixManager = createMockHelixManager();
-    final PinotHelixResourceManager helixResourceManager = createMockHelixResourceManager();
-    final ZkHelixPropertyStore propertyStore = createMockPropertyStore();
+    testKafkaAssignment(8, 3, 2);
+    testKafkaAssignment(16, 4, 3);
+    testKafkaAssignment(16, 13, 3);
+    testKafkaAssignment(16, 6, 5);
+  }
 
-    PinotLLCRealtimeSegmentManager.create(helixAdmin, helixManager, propertyStore, helixResourceManager);
-    PinotLLCRealtimeSegmentManager segmentManager = PinotLLCRealtimeSegmentManager.getInstance();
+  public void testKafkaAssignment(final int nPartitions, final int nInstances, final int nReplicas) {
+    MockPinotLLCRealtimeSegmentManager segmentManager = new MockPinotLLCRealtimeSegmentManager(false);
 
     final String topic = "someTopic";
     final String rtTableName = "table_REALTIME";
-    final int nPartitions = 8;
-    final int nReplicas = 2;
-    String[] instances = {server1, server2, server3};
+    List<String> instances = getInstanceList(nInstances);
+//    String[] instances = {server1, server2, server3, server4};
+    final long startOffset = 7L;
 
     // Populate 'partitionSet' with all kafka partitions,
     // As we find partitions in the assigment, we will remove the partition from this set.
@@ -88,9 +79,9 @@ public class PinotLLCRealtimeSegmentManagerTest {
       partitionSet.add(i);
     }
 
-    ZNRecord znRecord = segmentManager.assignKafkaPartitions(topic, nPartitions, Arrays.asList(instances), nReplicas);
+    segmentManager.setupHelixEntries(topic, rtTableName, nPartitions, instances, nReplicas, startOffset);
 
-    Map<String, List<String>> assignmentMap = znRecord.getListFields();
+    Map<String, List<String>> assignmentMap = segmentManager._partitionAssignment.getListFields();
     Assert.assertEquals(assignmentMap.size(), nPartitions);
     // The map looks something like this:
     // {
@@ -104,9 +95,10 @@ public class PinotLLCRealtimeSegmentManagerTest {
       int p = Integer.valueOf(entry.getKey());
       Assert.assertTrue(partitionSet.contains(p));
       partitionSet.remove(p);
-      Assert.assertEquals(entry.getValue().size(), nReplicas);
+
+      Assert.assertEquals(entry.getValue().size(), nReplicas, "Mismatch for partition " + p);
       // Make sure that we have unique server entries in the list for that partition
-      Set allServers = allServers();
+      Set allServers = new HashSet(instances);
       for (String server : entry.getValue()) {
         Assert.assertTrue(allServers.contains(server));
         allServers.remove(server);
@@ -114,29 +106,123 @@ public class PinotLLCRealtimeSegmentManagerTest {
       // allServers may not be empty here.
     }
     Assert.assertTrue(partitionSet.isEmpty());    // We should have no more partitions left.
-    segmentManager.writeKafkaPartitionAssignemnt(rtTableName, znRecord);
-    verify(propertyStore).set(eq("KAFKA_PARTITIONS/" + rtTableName), argThat(new ZNRecordMatcher(znRecord)),  eq(AccessOption.PERSISTENT));
   }
 
-  private Set allServers() {
-    Set<String> result = new HashSet<>(3);
-    result.add(server1);
-    result.add(server2);
-    result.add(server3);
-    return result;
+  @Test
+  public void testInitialSegmentAssignments() throws Exception {
+    testInitialSegmentAssignments(8, 3, 2);
+    testInitialSegmentAssignments(16, 4, 3);
+    testInitialSegmentAssignments(16, 13, 3);
+    testInitialSegmentAssignments(16, 6, 5);
   }
 
-  class ZNRecordMatcher extends ArgumentMatcher {
-    private final ZNRecord _znRecord;
-    public ZNRecordMatcher(final ZNRecord znRecord) {
-      _znRecord = znRecord;
+  private void testInitialSegmentAssignments(final int nPartitions, final int nInstances, final int nReplicas) {
+    MockPinotLLCRealtimeSegmentManager segmentManager = new MockPinotLLCRealtimeSegmentManager(true);
+
+    final String topic = "someTopic";
+    final String rtTableName = "table_REALTIME";
+    List<String> instances = getInstanceList(nInstances);
+    final long startOffset = 81L;
+
+    segmentManager.setupHelixEntries(topic, rtTableName, nPartitions, instances, nReplicas, startOffset);
+
+    final String actualRtTableName = segmentManager._realtimeTableName;
+    final Map<String, List<String>> idealStateEntries = segmentManager._idealStateEntries;
+    final List<String> propStorePaths = segmentManager._paths;
+    final List<ZNRecord> propStoreEntries = segmentManager._records;
+
+    Assert.assertEquals(propStorePaths.size(), nPartitions);
+    Assert.assertEquals(propStoreEntries.size(), nPartitions);
+    Assert.assertEquals(idealStateEntries.size(), nPartitions);
+    Assert.assertEquals(actualRtTableName, rtTableName);
+
+    Map<Integer, ZNRecord> segmentPropStoreMap = new HashMap<>(propStorePaths.size());
+    Map<Integer, String> segmentPathsMap = new HashMap<>(propStorePaths.size());
+    for (String path : propStorePaths) {
+      String segNameStr = path.split("/")[3];
+      int partition = new LLCSegmentName(segNameStr).getPartitionId();
+      segmentPathsMap.put(partition, path);
     }
+
+    for (ZNRecord znRecord : propStoreEntries) {
+      LLCRealtimeSegmentZKMetadata metadata = new LLCRealtimeSegmentZKMetadata(znRecord);
+      segmentPropStoreMap.put(new LLCSegmentName(metadata.getSegmentName()).getPartitionId(), znRecord);
+    }
+
+    Assert.assertEquals(segmentPathsMap.size(), nPartitions);
+    Assert.assertEquals(segmentPropStoreMap.size(), nPartitions);
+
+    for (int partition = 0; partition < nPartitions; partition++) {
+      final LLCRealtimeSegmentZKMetadata metadata = new LLCRealtimeSegmentZKMetadata(segmentPropStoreMap.get(partition));
+      metadata.toString();  // Just for coverage
+      ZNRecord znRecord = metadata.toZNRecord();
+      LLCRealtimeSegmentZKMetadata metadataCopy = new LLCRealtimeSegmentZKMetadata(znRecord);
+      Assert.assertEquals(metadata, metadataCopy);
+      final String path = segmentPathsMap.get(partition);
+      final String segmentName = metadata.getSegmentName();
+      Assert.assertEquals(metadata.getStartOffset(), startOffset);
+      Assert.assertEquals(path, "/SEGMENTS/" + rtTableName + "/" + segmentName);
+      LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
+      Assert.assertEquals(llcSegmentName.getPartitionId(), partition);
+      Assert.assertEquals(llcSegmentName.getTableName(), TableNameBuilder.extractRawTableName(rtTableName));
+      Assert.assertEquals(metadata.getNumReplicas(), nReplicas);
+    }
+  }
+
+  static class MockPinotLLCRealtimeSegmentManager extends PinotLLCRealtimeSegmentManager {
+
+    private final boolean _setupInitialSegments;
+
+    private static HelixManager createMockHelixManager() {
+      HelixManager helixManager = mock(HelixManager.class);
+      return  helixManager;
+    }
+
+    private static HelixAdmin createMockHelixAdmin() {
+      HelixAdmin helixAdmin = mock(HelixAdmin.class);
+      return helixAdmin;
+    }
+
+    private static ZkHelixPropertyStore createMockPropertyStore() {
+      ZkHelixPropertyStore propertyStore = mock(ZkHelixPropertyStore.class);
+      return propertyStore;
+    }
+
+    private static PinotHelixResourceManager createMockHelixResourceManager() {
+      PinotHelixResourceManager helixResourceManager = mock(PinotHelixResourceManager.class);
+      return helixResourceManager;
+    }
+
+    public String _realtimeTableName;
+    public Map<String, List<String>> _idealStateEntries;
+    public List<String> _paths;
+    public List<ZNRecord> _records;
+    public ZNRecord _partitionAssignment;
+    public long _startOffset;
+
+    protected MockPinotLLCRealtimeSegmentManager(boolean setupInitialSegments) {
+      super(createMockHelixAdmin(), clusterName, createMockHelixManager(), createMockPropertyStore(),
+          createMockHelixResourceManager());
+      _setupInitialSegments = setupInitialSegments;
+    }
+
     @Override
-    public boolean matches(Object o) {
-      if (o == _znRecord) {
-        return true;
+    protected void updateHelix(String realtimeTableName,  final Map<String, List<String>> idealStateEntries, List<String> paths, List<ZNRecord> records) {
+      _realtimeTableName = realtimeTableName;
+      _idealStateEntries = idealStateEntries;
+      _paths = paths;
+      _records = records;
+    }
+
+    @Override
+    protected void setupInitialSegments(String realtimeTableName, ZNRecord partitionAssignment, long startOffset) {
+      if (_setupInitialSegments) {
+        super.setupInitialSegments(realtimeTableName, partitionAssignment, startOffset);
+      } else {
+        _realtimeTableName = realtimeTableName;
+        _partitionAssignment = partitionAssignment;
+        _startOffset = startOffset;
       }
-      return false;
     }
   }
 }

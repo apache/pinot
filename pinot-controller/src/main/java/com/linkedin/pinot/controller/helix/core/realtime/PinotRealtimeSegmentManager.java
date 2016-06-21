@@ -76,6 +76,10 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
   private ZkClient _zkClient;
   private ControllerMetrics _controllerMetrics;
 
+  public static String getSegmentsPath() {
+    return SEGMENTS_PATH;
+  }
+
   public PinotRealtimeSegmentManager(PinotHelixResourceManager pinotManager) {
     _pinotHelixResourceManager = pinotManager;
     String clusterName = _pinotHelixResourceManager.getHelixClusterName();
