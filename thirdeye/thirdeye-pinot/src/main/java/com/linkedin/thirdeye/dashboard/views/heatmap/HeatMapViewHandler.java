@@ -58,7 +58,7 @@ public class HeatMapViewHandler implements ViewHandler<HeatMapViewRequest, HeatM
     DateTime baselineEnd = request.getBaselineEnd();
     DateTime currentStart = request.getCurrentStart();
     DateTime currentEnd = request.getCurrentEnd();
-    comparisonRequest.setEndDateInclusive(true);
+    comparisonRequest.setEndDateInclusive(false);
 
     Multimap<String, String> filters = request.getFilters();
     List<String> dimensionsToGroupBy =
