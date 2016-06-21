@@ -223,7 +223,7 @@ public class Utils {
   }
 
   public static String getCollectionFromAlias(String alias) throws ExecutionException {
-    String collectionName = null;
+    String collectionName = alias;
     try {
       collectionName = CACHE_REGISTRY_INSTANCE.getCollectionAliasCache().get(alias);
     } catch (InvalidCacheLoadException e) {
