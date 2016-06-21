@@ -188,5 +188,85 @@ public class SegmentStatusCheckerTest {
     segmentStatusChecker.stop();
   }
 
+  @Test
+  public void missingEVTest() throws Exception {
+    final String tableName = "myTable";
+    List<String> allTableNames = new ArrayList<String>();
+    allTableNames.add(tableName);
+    IdealState idealState = new IdealState(tableName);
+    idealState.setPartitionState("myTable_0", "pinot1", "ONLINE");
+    idealState.setPartitionState("myTable_0", "pinot2", "ONLINE");
+    idealState.setPartitionState("myTable_0", "pinot3", "ONLINE");
+    idealState.setPartitionState("myTable_1", "pinot1", "ONLINE");
+    idealState.setPartitionState("myTable_1", "pinot2", "ONLINE");
+    idealState.setPartitionState("myTable_1", "pinot3", "ONLINE");
+    idealState.setPartitionState("myTable_2", "pinot3", "OFFLINE");
+    idealState.setReplicas("2");
+    idealState.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
+
+    HelixAdmin helixAdmin;
+    {
+      helixAdmin = mock(HelixAdmin.class);
+      when(helixAdmin.getResourceIdealState("StatusChecker","myTable")).thenReturn(idealState);
+      when(helixAdmin.getResourceExternalView("StatusChecker","myTable")).thenReturn(null);
+    }
+    {
+      helixResourceManager = mock(PinotHelixResourceManager.class);
+      when(helixResourceManager.isLeader()).thenReturn(true);
+      when(helixResourceManager.getAllPinotTableNames()).thenReturn(allTableNames);
+      when(helixResourceManager.getHelixClusterName()).thenReturn("StatusChecker");
+      when(helixResourceManager.getHelixAdmin()).thenReturn(helixAdmin);
+    }
+    {
+      config = mock(ControllerConf.class);
+      when(config.getStatusControllerFrequencyInSeconds()).thenReturn(300);
+    }
+    metricsRegistry = new MetricsRegistry();
+    controllerMetrics = new ControllerMetrics(metricsRegistry);
+    segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config);
+    segmentStatusChecker.setMetricsRegistry(controllerMetrics);
+    segmentStatusChecker.runSegmentMetrics();
+    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName,
+        ControllerGauge.SEGMENTS_IN_ERROR_STATE), 0);
+    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName,
+        ControllerGauge.NUMBER_OF_REPLICAS), 0);
+    segmentStatusChecker.stop();
+  }
+
+  @Test
+  public void missingIdealTest() throws Exception {
+    final String tableName = "myTable";
+    List<String> allTableNames = new ArrayList<String>();
+    allTableNames.add(tableName);
+    IdealState idealState = null;
+
+    HelixAdmin helixAdmin;
+    {
+      helixAdmin = mock(HelixAdmin.class);
+      when(helixAdmin.getResourceIdealState("StatusChecker","myTable")).thenReturn(null);
+      when(helixAdmin.getResourceExternalView("StatusChecker","myTable")).thenReturn(null);
+    }
+    {
+      helixResourceManager = mock(PinotHelixResourceManager.class);
+      when(helixResourceManager.isLeader()).thenReturn(true);
+      when(helixResourceManager.getAllPinotTableNames()).thenReturn(allTableNames);
+      when(helixResourceManager.getHelixClusterName()).thenReturn("StatusChecker");
+      when(helixResourceManager.getHelixAdmin()).thenReturn(helixAdmin);
+    }
+    {
+      config = mock(ControllerConf.class);
+      when(config.getStatusControllerFrequencyInSeconds()).thenReturn(300);
+    }
+    metricsRegistry = new MetricsRegistry();
+    controllerMetrics = new ControllerMetrics(metricsRegistry);
+    segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config);
+    segmentStatusChecker.setMetricsRegistry(controllerMetrics);
+    segmentStatusChecker.runSegmentMetrics();
+    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName,
+        ControllerGauge.SEGMENTS_IN_ERROR_STATE), 0);
+    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName,
+        ControllerGauge.NUMBER_OF_REPLICAS), 0);
+    segmentStatusChecker.stop();
+  }
 
 }

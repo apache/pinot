@@ -156,6 +156,9 @@ public class SegmentStatusChecker {
 
     for (String tableName : allTableNames) {
       IdealState idealState = helixAdmin.getResourceIdealState(helixClusterName, tableName);
+      if (idealState == null) {
+        continue;
+      }
       ExternalView externalView = helixAdmin.getResourceExternalView(helixClusterName, tableName);
       final int nReplicasIdeal = Integer.parseInt(idealState.getReplicas());
       int nReplicasExternal = nReplicasIdeal;
@@ -165,6 +168,9 @@ public class SegmentStatusChecker {
         int nIdeal = 0;
         // Skip segments not online in ideal state
         for (Map.Entry<String, String> serverAndState : idealState.getInstanceStateMap(partitionName).entrySet()) {
+          if (serverAndState == null) {
+            break;
+          }
           if (serverAndState.getValue().equals(ONLINE)){
             nIdeal++;
             break;
@@ -174,7 +180,7 @@ public class SegmentStatusChecker {
           // No online segments in ideal state
           continue;
         }
-        if (externalView.getStateMap(partitionName) == null) {
+        if ((externalView == null) || (externalView.getStateMap(partitionName) == null)) {
           // No replicas for this segment
           nReplicasExternal = 0;
           continue;
@@ -191,12 +197,12 @@ public class SegmentStatusChecker {
         nReplicasExternal = (nReplicasExternal > nReplicas) ? nReplicas : nReplicasExternal;
       }
       // Synchronization provided by Controller Gauge to make sure that only one thread updates the gauge
-      _metricsRegistry.setValueOfTableGauge(externalView.getId(), ControllerGauge.NUMBER_OF_REPLICAS,
+      _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.NUMBER_OF_REPLICAS,
           nReplicasExternal);
-      _metricsRegistry.setValueOfTableGauge(externalView.getId(), ControllerGauge.SEGMENTS_IN_ERROR_STATE,
+      _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.SEGMENTS_IN_ERROR_STATE,
           nErrors);
       if (nReplicasExternal < nReplicasIdeal) {
-        LOGGER.warn("Table {} has {} replicas, below replication threshold :{}", externalView.getResourceName(),
+        LOGGER.warn("Table {} has {} replicas, below replication threshold :{}", tableName,
             nReplicasExternal, nReplicasIdeal);
       }
     }
