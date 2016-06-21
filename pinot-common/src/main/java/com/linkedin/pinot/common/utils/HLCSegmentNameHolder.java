@@ -48,14 +48,6 @@ public class HLCSegmentNameHolder extends SegmentNameHolder {
   private final RealtimeSegmentType _segmentType;
   private final String _tableName;
 
-  public static boolean isRealtimeV1Name(String segmentId) {
-    int namePartCount = segmentId.split(SEPARATOR).length;
-    // Realtime v1 segment names have either:
-    // - Five parts (old style name: tableName, instanceName, groupId, partitionName, sequenceNumber)
-    // - Three parts (shorter name : groupId, partitionName, sequenceNumber)
-    return namePartCount == 5 || namePartCount == 3;
-  }
-
   // Can be called with old or new style naming.
   public HLCSegmentNameHolder(String segmentName) {
     // Decide if it is old style or new style v1 naming here.

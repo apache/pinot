@@ -30,19 +30,18 @@ public abstract class SegmentNameHolder {
 
   public static RealtimeSegmentType getSegmentType(String segmentName) {
     try {
-      if (HLCSegmentNameHolder.isRealtimeV1Name(segmentName)) {
-        HLCSegmentNameHolder holder = new HLCSegmentNameHolder(segmentName);
-        if (holder.isOldStyleNaming()) {
-          return RealtimeSegmentType.HLC_LONG;
-        } else {
-          return RealtimeSegmentType.HLC_SHORT;
-        }
-      } else {
+      HLCSegmentNameHolder holder = new HLCSegmentNameHolder(segmentName);
+      if (holder.isOldStyleNaming()) {
+        return RealtimeSegmentType.HLC_LONG;
+      } else
+        return RealtimeSegmentType.HLC_SHORT;
+    } catch (Exception e1) {
+      try {
         LLCSegmentNameHolder holder = new LLCSegmentNameHolder(segmentName);
         return RealtimeSegmentType.LLC;
+      } catch (Exception e2) {
+        return RealtimeSegmentType.UNSUPPORTED;
       }
-    } catch (Exception e) {
-      return RealtimeSegmentType.UNSUPPORTED;
     }
   }
 
