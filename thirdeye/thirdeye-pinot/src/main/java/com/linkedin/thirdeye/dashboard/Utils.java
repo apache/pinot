@@ -26,8 +26,8 @@ import com.linkedin.thirdeye.client.MetricFunction;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.ThirdEyeRequest;
 import com.linkedin.thirdeye.client.ThirdEyeRequest.ThirdEyeRequestBuilder;
-import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.client.ThirdEyeResponse;
+import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.dashboard.configs.AbstractConfigDAO;
 import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
 import com.linkedin.thirdeye.dashboard.configs.DashboardConfig;
@@ -220,15 +220,5 @@ public class Utils {
       metricExpressions.add(new MetricExpression(function.getMetricName()));
     }
     return metricExpressions;
-  }
-
-  public static String getCollectionFromAlias(String alias) throws ExecutionException {
-    String collectionName = alias;
-    try {
-      collectionName = CACHE_REGISTRY_INSTANCE.getCollectionAliasCache().get(alias);
-    } catch (InvalidCacheLoadException e) {
-      LOG.debug("No collection name for alias {}", alias);
-    }
-    return collectionName;
   }
 }
