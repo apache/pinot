@@ -39,6 +39,9 @@ import static org.mockito.Mockito.when;
 
 public class PinotLLCRealtimeSegmentManagerTest {
   private final String clusterName = "testCluster";
+  private final String server1 = "Server_1";
+  private final String server2 = "Server_2";
+  private final String server3 = "Server_3";
 
   private HelixManager createMockHelixManager() {
     HelixManager helixManager = mock(HelixManager.class);
@@ -73,14 +76,13 @@ public class PinotLLCRealtimeSegmentManagerTest {
     PinotLLCRealtimeSegmentManager segmentManager = PinotLLCRealtimeSegmentManager.getInstance();
 
     final String topic = "someTopic";
-    final String server1 = "Server_1";
-    final String server2 = "Server_2";
-    final String server3 = "Server_3";
     final String rtTableName = "table_REALTIME";
     final int nPartitions = 4;
     final int nReplicas = 2;
     String[] instances = {server1, server2, server3};
 
+    // Populate 'partitionSet' with all kafka partitions,
+    // As we find partitions in the assigment, we will remove the partition from this set.
     Set<Integer> partitionSet = new HashSet<>(nPartitions);
     for (int i = 0; i < nPartitions; i++) {
       partitionSet.add(i);
@@ -90,15 +92,40 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     Map<String, List<String>> assignmentMap = znRecord.getListFields();
     Assert.assertEquals(assignmentMap.size(), nPartitions);
+    // The map looks something like this:
+    // {
+    //  "0" : [S1, S2],
+    //  "1" : [S2, S3],
+    //  "2" : [S3, S4],
+    // }
+    // Walk through the map, making sure that every partition (and no more) appears in the key, and
+    // every one of them has exactly as many elements as the number of replicas.
     for (Map.Entry<String, List<String>> entry : assignmentMap.entrySet()) {
       int p = Integer.valueOf(entry.getKey());
       Assert.assertTrue(partitionSet.contains(p));
       partitionSet.remove(p);
       Assert.assertEquals(entry.getValue().size(), nReplicas);
+      // Make sure that we have unique server entries in the list for that partition
+      Set allServers = allServers();
+      for (String server : entry.getValue()) {
+        Assert.assertTrue(allServers.contains(server));
+        allServers.remove(server);
+      }
+      // allServers may not be empty here.
     }
+    Assert.assertTrue(partitionSet.isEmpty());    // We should have no more partitions left.
     segmentManager.writeKafkaPartitionAssignemnt(rtTableName, znRecord);
     verify(propertyStore).set(eq("KAFKA_PARTITIONS/" + rtTableName), argThat(new ZNRecordMatcher(znRecord)),  eq(AccessOption.PERSISTENT));
   }
+
+  private Set allServers() {
+    Set<String> result = new HashSet<>(3);
+    result.add(server1);
+    result.add(server2);
+    result.add(server3);
+    return result;
+  }
+
   class ZNRecordMatcher extends ArgumentMatcher {
     private final ZNRecord _znRecord;
     public ZNRecordMatcher(final ZNRecord znRecord) {
