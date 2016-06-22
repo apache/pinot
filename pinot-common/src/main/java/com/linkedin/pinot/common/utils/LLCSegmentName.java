@@ -20,7 +20,7 @@ import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 
 
-public class LLCSegmentNameHolder extends  SegmentNameHolder implements Comparable {
+public class LLCSegmentName extends SegmentName implements Comparable {
   private final static String DATE_FORMAT = "yyyyMMdd'T'HHmm'Z'";
   private final String _tableName;
   private final int _partitionId;
@@ -28,8 +28,11 @@ public class LLCSegmentNameHolder extends  SegmentNameHolder implements Comparab
   private final String _creationTime;
   private final String _segmentName;
 
-  public LLCSegmentNameHolder(String segmentName) {
-    String[] parts =  segmentName.split("__");
+  public LLCSegmentName(String segmentName) {
+    if (segmentName.endsWith(SEPARATOR) || segmentName.startsWith(SEPARATOR)) {
+      throw new RuntimeException(segmentName + " is not a Low level consumer segment name");
+    }
+    String[] parts =  segmentName.split(SEPARATOR);
     if (parts.length != 4) {
       throw new RuntimeException(segmentName + " is not a Low level consumer segment name");
     }
@@ -40,7 +43,7 @@ public class LLCSegmentNameHolder extends  SegmentNameHolder implements Comparab
     _creationTime = parts[3];
   }
 
-  public LLCSegmentNameHolder(String tableName, int partitionId, int sequenceNumber, long msSinceEpoch) {
+  public LLCSegmentName(String tableName, int partitionId, int sequenceNumber, long msSinceEpoch) {
     if (!isValidComponentName(tableName)) {
       throw new RuntimeException("Invalid table name " + tableName);
     }
@@ -53,14 +56,22 @@ public class LLCSegmentNameHolder extends  SegmentNameHolder implements Comparab
     _segmentName = tableName + SEPARATOR + partitionId + SEPARATOR + sequenceNumber + SEPARATOR + _creationTime;
   }
 
+  @Override
+  public RealtimeSegmentType getSegmentType() {
+    return RealtimeSegmentType.LLC;
+  }
+
+  @Override
   public String getTableName() {
     return _tableName;
   }
 
+  @Override
   public int getPartitionId() {
     return _partitionId;
   }
 
+  @Override
   public int getSequenceNumber() {
     return _sequenceNumber;
   }
@@ -69,13 +80,19 @@ public class LLCSegmentNameHolder extends  SegmentNameHolder implements Comparab
     return _creationTime;
   }
 
+  @Override
   public String getSegmentName() {
     return _segmentName;
   }
 
   @Override
+  public String getSequenceNumberStr() {
+    return Integer.toString(_sequenceNumber);
+  }
+
+  @Override
   public int compareTo(Object o) {
-    LLCSegmentNameHolder other = (LLCSegmentNameHolder)o;
+    LLCSegmentName other = (LLCSegmentName)o;
     if (!this.getTableName().equals(other.getTableName())) {
       throw new RuntimeException("Cannot compare segment names " + this.getSegmentName() + " and " + other.getSegmentName());
     }
@@ -107,21 +124,21 @@ public class LLCSegmentNameHolder extends  SegmentNameHolder implements Comparab
       return false;
     }
 
-    LLCSegmentNameHolder holder = (LLCSegmentNameHolder) o;
+    LLCSegmentName segName = (LLCSegmentName) o;
 
-    if (_partitionId != holder._partitionId) {
+    if (_partitionId != segName._partitionId) {
       return false;
     }
-    if (_sequenceNumber != holder._sequenceNumber) {
+    if (_sequenceNumber != segName._sequenceNumber) {
       return false;
     }
-    if (_tableName != null ? !_tableName.equals(holder._tableName) : holder._tableName != null) {
+    if (_tableName != null ? !_tableName.equals(segName._tableName) : segName._tableName != null) {
       return false;
     }
-    if (_creationTime != null ? !_creationTime.equals(holder._creationTime) : holder._creationTime != null) {
+    if (_creationTime != null ? !_creationTime.equals(segName._creationTime) : segName._creationTime != null) {
       return false;
     }
-    return !(_segmentName != null ? !_segmentName.equals(holder._segmentName) : holder._segmentName != null);
+    return !(_segmentName != null ? !_segmentName.equals(segName._segmentName) : segName._segmentName != null);
   }
 
   @Override

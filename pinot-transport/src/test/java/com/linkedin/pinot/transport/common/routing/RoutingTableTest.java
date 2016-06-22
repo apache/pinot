@@ -25,7 +25,7 @@ import org.slf4j.Logger;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.common.utils.SegmentNameBuilder;
+import com.linkedin.pinot.common.utils.HLCSegmentName;
 import com.linkedin.pinot.routing.HelixExternalViewBasedRouting;
 import com.linkedin.pinot.routing.RoutingTableLookupRequest;
 import com.linkedin.pinot.routing.builder.KafkaHighLevelConsumerBasedRoutingTableBuilder;
@@ -99,50 +99,53 @@ public class RoutingTableTest {
   @Test
   public void testKafkaHighLevelConsumerBasedRoutingTable() {
     RoutingTableBuilder routingStrategy = new KafkaHighLevelConsumerBasedRoutingTableBuilder();
+    final String group0 = "testResource0_REALTIME_1433316466991_0";
+    final String group1 = "testResource1_REALTIME_1433316490099_1";
+    final String group2 = "testResource2_REALTIME_1436589344583_1";
 
     HelixExternalViewBasedRouting routingTable = new HelixExternalViewBasedRouting(null, routingStrategy, null, null);
     ExternalView externalView = new ExternalView("testResource0_REALTIME");
-    externalView.setState(SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("0", ALL_PARTITIONS, "0"),
+    externalView.setState(new HLCSegmentName(group0, ALL_PARTITIONS, "0").getSegmentName(),
         "dataServer_instance_0", "ONLINE");
-    externalView.setState(SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("0", ALL_PARTITIONS, "1"),
+    externalView.setState(new HLCSegmentName(group0, ALL_PARTITIONS, "1").getSegmentName(),
         "dataServer_instance_1", "ONLINE");
-    externalView.setState(SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("1", ALL_PARTITIONS, "2"),
+    externalView.setState(new HLCSegmentName(group1, ALL_PARTITIONS, "2").getSegmentName(),
         "dataServer_instance_2", "ONLINE");
-    externalView.setState(SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("1", ALL_PARTITIONS, "3"),
+    externalView.setState(new HLCSegmentName(group1, ALL_PARTITIONS, "3").getSegmentName(),
         "dataServer_instance_3", "ONLINE");
-    externalView.setState(SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("2", ALL_PARTITIONS, "4"),
+    externalView.setState(new HLCSegmentName(group2, ALL_PARTITIONS, "4").getSegmentName(),
         "dataServer_instance_4", "ONLINE");
-    externalView.setState(SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("2", ALL_PARTITIONS, "5"),
+    externalView.setState(new HLCSegmentName(group2, ALL_PARTITIONS, "5").getSegmentName(),
         "dataServer_instance_5", "ONLINE");
     routingTable.markDataResourceOnline("testResource0_REALTIME", externalView,
         generateInstanceConfigs("dataServer_instance", 0, 5));
     ExternalView externalView1 = new ExternalView("testResource1_REALTIME");
-    externalView1.setState(SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("0", ALL_PARTITIONS, "10"),
+    externalView1.setState(new HLCSegmentName(group0, ALL_PARTITIONS, "10").getSegmentName(),
         "dataServer_instance_10", "ONLINE");
-    externalView1.setState(SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("0", ALL_PARTITIONS, "11"),
+    externalView1.setState(new HLCSegmentName(group0, ALL_PARTITIONS, "11").getSegmentName(),
         "dataServer_instance_11", "ONLINE");
-    externalView1.setState(SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("0", ALL_PARTITIONS, "12"),
+    externalView1.setState(new HLCSegmentName(group0, ALL_PARTITIONS, "12").getSegmentName(),
         "dataServer_instance_12", "ONLINE");
     routingTable.markDataResourceOnline("testResource1_REALTIME", externalView1,
         generateInstanceConfigs("dataServer_instance", 10, 12));
     ExternalView externalView2 = new ExternalView("testResource2_REALTIME");
-    externalView2.setState(SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("0", ALL_PARTITIONS, "20"),
+    externalView2.setState(new HLCSegmentName(group0, ALL_PARTITIONS, "20").getSegmentName(),
         "dataServer_instance_20", "ONLINE");
-    externalView2.setState(SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("0", ALL_PARTITIONS, "21"),
+    externalView2.setState(new HLCSegmentName(group0, ALL_PARTITIONS, "21").getSegmentName(),
         "dataServer_instance_21", "ONLINE");
-    externalView2.setState(SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("0", ALL_PARTITIONS, "22"),
+    externalView2.setState(new HLCSegmentName(group0, ALL_PARTITIONS, "22").getSegmentName(),
         "dataServer_instance_22", "ONLINE");
-    externalView2.setState(SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("1", ALL_PARTITIONS, "23"),
+    externalView2.setState(new HLCSegmentName(group1, ALL_PARTITIONS, "23").getSegmentName(),
         "dataServer_instance_23", "ONLINE");
-    externalView2.setState(SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("1", ALL_PARTITIONS, "24"),
+    externalView2.setState(new HLCSegmentName(group1, ALL_PARTITIONS, "24").getSegmentName(),
         "dataServer_instance_24", "ONLINE");
-    externalView2.setState(SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("1", ALL_PARTITIONS, "25"),
+    externalView2.setState(new HLCSegmentName(group1, ALL_PARTITIONS, "25").getSegmentName(),
         "dataServer_instance_25", "ONLINE");
-    externalView2.setState(SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("2", ALL_PARTITIONS, "26"),
+    externalView2.setState(new HLCSegmentName(group2, ALL_PARTITIONS, "26").getSegmentName(),
         "dataServer_instance_26", "ONLINE");
-    externalView2.setState(SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("2", ALL_PARTITIONS, "27"),
+    externalView2.setState(new HLCSegmentName(group2, ALL_PARTITIONS, "27").getSegmentName(),
         "dataServer_instance_27", "ONLINE");
-    externalView2.setState(SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("2", ALL_PARTITIONS, "28"),
+    externalView2.setState(new HLCSegmentName(group2, ALL_PARTITIONS, "28").getSegmentName(),
         "dataServer_instance_28", "ONLINE");
     routingTable.markDataResourceOnline("testResource2_REALTIME", externalView2,
         generateInstanceConfigs("dataServer_instance", 20, 28));
@@ -151,31 +154,31 @@ public class RoutingTableTest {
       assertResourceRequest(
           routingTable,
           "testResource0_REALTIME",
-          new String[] { "[" + SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("0", ALL_PARTITIONS, "0")
-              + ", " + SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("0", ALL_PARTITIONS, "1") + "]", "["
-              + SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("1", ALL_PARTITIONS, "2")
+          new String[] { "[" + new HLCSegmentName(group0, ALL_PARTITIONS, "0").getSegmentName()
+              + ", " + new HLCSegmentName(group0, ALL_PARTITIONS, "1").getSegmentName() + "]", "["
+              + new HLCSegmentName(group1, ALL_PARTITIONS, "2").getSegmentName()
               + ", "
-              + SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("1", ALL_PARTITIONS, "3") + "]", "["
-              + SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("2", ALL_PARTITIONS, "4") + ", "
-              + SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("2", ALL_PARTITIONS, "5") + "]" }, 2);
+              + new HLCSegmentName(group1, ALL_PARTITIONS, "3").getSegmentName() + "]", "["
+              + new HLCSegmentName(group2, ALL_PARTITIONS, "4").getSegmentName() + ", "
+              + new HLCSegmentName(group2, ALL_PARTITIONS, "5").getSegmentName() + "]" }, 2);
     }
     for (int numRun = 0; numRun < 100; ++numRun) {
       assertResourceRequest(routingTable, "testResource1_REALTIME",
-          new String[] { "[" + SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("0", ALL_PARTITIONS, "10")
-              + ", " + SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("0", ALL_PARTITIONS, "11") + ", "
-              + SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("0", ALL_PARTITIONS, "12") + "]" }, 3);
+          new String[] { "[" + new HLCSegmentName(group0, ALL_PARTITIONS, "10").getSegmentName()
+              + ", " + new HLCSegmentName(group0, ALL_PARTITIONS, "11").getSegmentName() + ", "
+              + new HLCSegmentName(group0, ALL_PARTITIONS, "12").getSegmentName() + "]" }, 3);
     }
     for (int numRun = 0; numRun < 100; ++numRun) {
       assertResourceRequest(routingTable, "testResource2_REALTIME",
-          new String[] { "[" + SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("0", ALL_PARTITIONS, "20")
-              + ", " + SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("0", ALL_PARTITIONS, "21") + ", "
-              + SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("0", ALL_PARTITIONS, "22") + "]", "["
-              + SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("1", ALL_PARTITIONS, "23") + ", "
-              + SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("1", ALL_PARTITIONS, "24") + ", "
-              + SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("1", ALL_PARTITIONS, "25") + "]", "["
-              + SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("2", ALL_PARTITIONS, "26") + ", "
-              + SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("2", ALL_PARTITIONS, "27") + ", "
-              + SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("2", ALL_PARTITIONS, "28") + "]" }, 3);
+          new String[] { "[" + new HLCSegmentName(group0, ALL_PARTITIONS, "20").getSegmentName()
+              + ", " + new HLCSegmentName(group0, ALL_PARTITIONS, "21").getSegmentName() + ", "
+              + new HLCSegmentName(group0, ALL_PARTITIONS, "22").getSegmentName() + "]", "["
+              + new HLCSegmentName(group1, ALL_PARTITIONS, "23").getSegmentName() + ", "
+              + new HLCSegmentName(group1, ALL_PARTITIONS, "24").getSegmentName() + ", "
+              + new HLCSegmentName(group1, ALL_PARTITIONS, "25").getSegmentName() + "]", "["
+              + new HLCSegmentName(group2, ALL_PARTITIONS, "26").getSegmentName() + ", "
+              + new HLCSegmentName(group2, ALL_PARTITIONS, "27").getSegmentName() + ", "
+              + new HLCSegmentName(group2, ALL_PARTITIONS, "28").getSegmentName() + "]" }, 3);
     }
   }
 
