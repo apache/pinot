@@ -17,7 +17,7 @@ package com.linkedin.pinot.common.config;
 
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
-import com.linkedin.pinot.common.utils.SegmentNameHolder;
+import com.linkedin.pinot.common.utils.SegmentName;
 import com.linkedin.pinot.common.utils.StringUtil;
 
 
@@ -34,7 +34,7 @@ public class TableNameBuilder {
 
   public String forTable(String tableName) {
     Preconditions.checkNotNull(tableName);
-    Preconditions.checkArgument(!tableName.contains(SegmentNameHolder.SEPARATOR),
+    Preconditions.checkArgument(!tableName.contains(SegmentName.SEPARATOR),
         "Table name cannot contain two consecutive underscore characters");
 
     if (needsPostfix(tableName)) {

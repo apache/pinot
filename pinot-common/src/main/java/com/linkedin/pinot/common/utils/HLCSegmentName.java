@@ -39,7 +39,7 @@ import org.apache.commons.lang.StringUtils;
 import com.google.common.collect.Lists;
 
 
-public class HLCSegmentNameHolder extends SegmentNameHolder {
+public class HLCSegmentName extends SegmentName {
   private final boolean _isOldStyleNaming;
   private final String _groupId;
   private final String _sequenceNumber;
@@ -49,7 +49,7 @@ public class HLCSegmentNameHolder extends SegmentNameHolder {
   private final String _tableName;
 
   // Can be called with old or new style naming.
-  public HLCSegmentNameHolder(String segmentName) {
+  public HLCSegmentName(String segmentName) {
     // Decide if it is old style or new style v1 naming here.
     if (segmentName.endsWith(SEPARATOR) || segmentName.startsWith(SEPARATOR)) {
       throw new RuntimeException(segmentName + " is not a HighLevelConsumer segment name");
@@ -86,7 +86,7 @@ public class HLCSegmentNameHolder extends SegmentNameHolder {
    * @param partitionRange
    * @param sequenceNumber
    */
-  public HLCSegmentNameHolder (String groupId, String partitionRange, String sequenceNumber) {
+  public HLCSegmentName(String groupId, String partitionRange, String sequenceNumber) {
     if (isValidComponentName(groupId) && isValidComponentName(partitionRange) &&
         isValidComponentName(sequenceNumber)) {
       _isOldStyleNaming = false;

@@ -146,7 +146,7 @@ public class SegmentNameBuilder {
      */
     public static boolean isRealtimeV2Name(String segmentId) {
       try {
-        LLCSegmentNameHolder holder = new LLCSegmentNameHolder(segmentId);
+        LLCSegmentName holder = new LLCSegmentName(segmentId);
       } catch (Exception e) {
         return false;
       }

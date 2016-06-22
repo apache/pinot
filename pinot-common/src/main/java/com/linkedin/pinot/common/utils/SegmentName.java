@@ -16,7 +16,7 @@
 
 package com.linkedin.pinot.common.utils;
 
-public abstract class SegmentNameHolder {
+public abstract class SegmentName {
   public static final String SEPARATOR = "__";
   public static final String REALTIME_SUFFIX = "_REALTIME";
   public static final int REALTIME_SUFFIX_LENGTH = REALTIME_SUFFIX.length();
@@ -30,14 +30,14 @@ public abstract class SegmentNameHolder {
 
   public static RealtimeSegmentType getSegmentType(String segmentName) {
     try {
-      HLCSegmentNameHolder holder = new HLCSegmentNameHolder(segmentName);
-      if (holder.isOldStyleNaming()) {
+      HLCSegmentName segName = new HLCSegmentName(segmentName);
+      if (segName.isOldStyleNaming()) {
         return RealtimeSegmentType.HLC_LONG;
       } else
         return RealtimeSegmentType.HLC_SHORT;
     } catch (Exception e1) {
       try {
-        LLCSegmentNameHolder holder = new LLCSegmentNameHolder(segmentName);
+        LLCSegmentName segName = new LLCSegmentName(segmentName);
         return RealtimeSegmentType.LLC;
       } catch (Exception e2) {
         return RealtimeSegmentType.UNSUPPORTED;

@@ -34,7 +34,7 @@ import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.StarTreeMetadata;
-import com.linkedin.pinot.common.utils.HLCSegmentNameHolder;
+import com.linkedin.pinot.common.utils.HLCSegmentName;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -145,10 +145,10 @@ public class ValidationManagerTest {
     String testTableName = "TestTableTotalDocCountTest";
     final String group1 = testTableName + "_REALTIME_1466446700000_34";
     final String group2 = testTableName + "_REALTIME_1466446700000_17";
-    String segmentName1 = new HLCSegmentNameHolder(group1, "0", "1").getSegmentName();
-    String segmentName2 = new HLCSegmentNameHolder(group1, "0", "2").getSegmentName();
-    String segmentName3 = new HLCSegmentNameHolder(group1, "0", "3").getSegmentName();
-    String segmentName4 = new HLCSegmentNameHolder(group2, "0", "3").getSegmentName();
+    String segmentName1 = new HLCSegmentName(group1, "0", "1").getSegmentName();
+    String segmentName2 = new HLCSegmentName(group1, "0", "2").getSegmentName();
+    String segmentName3 = new HLCSegmentName(group1, "0", "3").getSegmentName();
+    String segmentName4 = new HLCSegmentName(group2, "0", "3").getSegmentName();
 
     DummyMetadata metadata1 = new DummyMetadata(testTableName, segmentName1, 10);
     DummyMetadata metadata2 = new DummyMetadata(testTableName, segmentName2, 20);
