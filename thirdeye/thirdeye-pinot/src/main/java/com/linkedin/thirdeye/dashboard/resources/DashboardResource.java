@@ -139,7 +139,7 @@ public class DashboardResource {
   public String getMetrics(@QueryParam("dataset") String collection) {
     String jsonMetrics = null;
     try {
-      collection = Utils.getCollectionFromAlias(collection);
+      collection = ThirdEyeUtils.getCollectionFromAlias(collection);
 
       CollectionSchema schema = collectionSchemaCache.get(collection);
       List<String> metrics = schema.getMetricNames();
@@ -169,7 +169,7 @@ public class DashboardResource {
     String jsonDimensions = null;
     try {
 
-      collection = Utils.getCollectionFromAlias(collection);
+      collection = ThirdEyeUtils.getCollectionFromAlias(collection);
 
       List<String> dimensions = Utils.getDimensions(queryCache, collection);
       jsonDimensions = OBJECT_MAPPER.writeValueAsString(dimensions);
@@ -187,7 +187,7 @@ public class DashboardResource {
     String jsonDashboards = null;
     try {
 
-      collection = Utils.getCollectionFromAlias(collection);
+      collection = ThirdEyeUtils.getCollectionFromAlias(collection);
 
       jsonDashboards = dashboardsCache.get(collection);
     } catch (Exception e) {
@@ -203,7 +203,7 @@ public class DashboardResource {
     String collectionInfo = null;
     try {
 
-      collection = Utils.getCollectionFromAlias(collection);
+      collection = ThirdEyeUtils.getCollectionFromAlias(collection);
 
       HashMap<String, String> map = new HashMap<>();
       long maxDataTime = collectionMaxDataTimeCache.get(collection);
@@ -238,7 +238,7 @@ public class DashboardResource {
     String jsonFilters = null;
     try {
 
-      collection = Utils.getCollectionFromAlias(collection);
+      collection = ThirdEyeUtils.getCollectionFromAlias(collection);
 
       jsonFilters = dimensionFiltersCache.get(collection);
     } catch (ExecutionException e) {
@@ -260,7 +260,7 @@ public class DashboardResource {
       @QueryParam("aggTimeGranularity") String aggTimeGranularity) {
     try {
 
-      collection = Utils.getCollectionFromAlias(collection);
+      collection = ThirdEyeUtils.getCollectionFromAlias(collection);
 
       TabularViewRequest request = new TabularViewRequest();
       request.setCollection(collection);
@@ -332,7 +332,7 @@ public class DashboardResource {
       @QueryParam("compareMode") String compareMode, @QueryParam("metrics") String metricsJson)
       throws Exception {
 
-    collection = Utils.getCollectionFromAlias(collection);
+    collection = ThirdEyeUtils.getCollectionFromAlias(collection);
 
     HeatMapViewRequest request = new HeatMapViewRequest();
 
@@ -383,7 +383,7 @@ public class DashboardResource {
       @QueryParam("aggTimeGranularity") String aggTimeGranularity,
       @QueryParam("metrics") String metricsJson) throws Exception {
 
-    collection = Utils.getCollectionFromAlias(collection);
+    collection = ThirdEyeUtils.getCollectionFromAlias(collection);
 
     TabularViewRequest request = new TabularViewRequest();
     request.setCollection(collection);
@@ -435,7 +435,7 @@ public class DashboardResource {
       @QueryParam("metrics") String metricsJson, @QueryParam("dimensions") String groupByDimensions)
       throws Exception {
 
-    collection = Utils.getCollectionFromAlias(collection);
+    collection = ThirdEyeUtils.getCollectionFromAlias(collection);
 
     ContributorViewRequest request = new ContributorViewRequest();
     request.setCollection(collection);
@@ -489,7 +489,7 @@ public class DashboardResource {
       @QueryParam("metrics") String metricsJson, @QueryParam("dimensions") String groupByDimensions)
       throws Exception {
 
-    collection = Utils.getCollectionFromAlias(collection);
+    collection = ThirdEyeUtils.getCollectionFromAlias(collection);
 
     TimeSeriesRequest request = new TimeSeriesRequest();
     request.setCollectionName(collection);

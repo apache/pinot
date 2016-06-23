@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.io.FileUtils;
@@ -105,7 +106,7 @@ public class EmailReportJob implements Job {
   }
 
   private void run(final JobExecutionContext context, final EmailConfiguration config)
-      throws JobExecutionException {
+      throws JobExecutionException, ExecutionException {
     LOG.info("Starting email report {}", config.getId());
     SessionFactory sessionFactory =
         (SessionFactory) context.getJobDetail().getJobDataMap().get(SESSION_FACTORY);
@@ -127,6 +128,7 @@ public class EmailReportJob implements Job {
     final DateTime then = now.minus(deltaMillis);
 
     final String collection = config.getCollection();
+    final String collectionAlias = ThirdEyeUtils.getAliasFromCollection(collection);
 
     // Get the anomalies in that range
     final List<AnomalyResult> results =
@@ -215,7 +217,7 @@ public class EmailReportJob implements Job {
       // http://stackoverflow.com/questions/13339445/feemarker-writing-images-to-html
       chartFile = new File(chartFilePath);
       templateData.put("embeddedChart", email.embed(chartFile));
-      templateData.put("collection", collection);
+      templateData.put("collection", collectionAlias);
       templateData.put("metric", metric);
       templateData.put("filters", filtersJsonEncoded);
       templateData.put("windowUnit", windowUnit);
@@ -242,7 +244,7 @@ public class EmailReportJob implements Job {
         email.addTo(toAddress);
       }
       email.setSubject(String.format("Anomaly Alert!: %d anomalies detected for %s:%s",
-          results.size(), config.getCollection(), config.getMetric()));
+          results.size(), collectionAlias, config.getMetric()));
       final String html = new String(baos.toByteArray(), CHARSET);
 
       email.setHtmlMsg(html);

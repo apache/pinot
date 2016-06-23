@@ -6,6 +6,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
 
 import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
@@ -14,8 +15,11 @@ import org.slf4j.LoggerFactory;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.cache.CacheLoader.InvalidCacheLoadException;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
+import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
+import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
 
 public class ThirdEyeUtils {
   private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeUtils.class);
@@ -23,6 +27,9 @@ public class ThirdEyeUtils {
   private static final String FILTER_VALUE_ASSIGNMENT_SEPARATOR = "=";
   private static final String FILTER_CLAUSE_SEPARATOR = ";";
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
+  private static ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry
+      .getInstance();
 
   public static Multimap<String, String> getFilterSet(String filters) {
     Multimap<String, String> filterSet = ArrayListMultimap.create();
@@ -114,9 +121,31 @@ public class ThirdEyeUtils {
     return sortedFilters;
   }
 
-  public static void main(String[] args) {
-    String filters = "a=z;z=d;a=f;a=e;k=m;k=f;z=c;f=g;";
-    System.out.println(getSortedFilters(filters));
+  /** Returns the collection name for the provided alias, or the input string if it is not an alias. */
+  public static String getCollectionFromAlias(String alias) throws ExecutionException {
+    String collectionName = alias;
+    try {
+      collectionName = CACHE_REGISTRY_INSTANCE.getCollectionAliasCache().get(alias);
+    } catch (InvalidCacheLoadException e) {
+      LOG.debug("No collection name for alias {}", alias);
+    }
+    return collectionName;
+  }
+
+  /** Returns the alias for the provided collection, or the input string if no alias exists. */
+  public static String getAliasFromCollection(String collection) throws ExecutionException {
+    String result = collection;
+    try {
+      CollectionConfig collectionConfig =
+          CACHE_REGISTRY_INSTANCE.getCollectionConfigCache().get(collection);
+      String configAlias = collectionConfig.getCollectionAlias();
+      if (StringUtils.isNotBlank(configAlias)) {
+        result = configAlias;
+      }
+    } catch (InvalidCacheLoadException e) {
+      LOG.debug("No alias for collection {}", collection);
+    }
+    return result;
   }
 
 }
