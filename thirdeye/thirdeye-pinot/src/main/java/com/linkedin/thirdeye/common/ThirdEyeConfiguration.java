@@ -31,7 +31,8 @@ public abstract class ThirdEyeConfiguration extends Configuration {
   private String blacklistCollections = "";
 
   private FailureEmailConfiguration failureEmailConfig;
-  private String dashboardHost;
+  private String detectorHost;
+  private int detectorPort;
 
 
   @Valid
@@ -99,13 +100,20 @@ public abstract class ThirdEyeConfiguration extends Configuration {
     this.failureEmailConfig = failureEmailConfig;
   }
 
-
-  public String getDashboardHost() {
-    return dashboardHost;
+  public String getDetectorHost() {
+    return detectorHost;
   }
 
-  public void setDashboardHost(String dashboardHost) {
-    this.dashboardHost = dashboardHost;
+  public void setDetectorHost(String detectorHost) {
+    this.detectorHost = detectorHost;
+  }
+
+  public int getDetectorPort() {
+    return detectorPort;
+  }
+
+  public void setDetectorPort(int detectorPort) {
+    this.detectorPort = detectorPort;
   }
 
 }

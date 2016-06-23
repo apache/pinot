@@ -34,6 +34,7 @@ import org.slf4j.LoggerFactory;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
 import com.linkedin.thirdeye.detector.api.AnomalyFunctionSpec;
+import com.linkedin.thirdeye.detector.api.EmailConfiguration;
 import com.linkedin.thirdeye.detector.db.HibernateSessionWrapper;
 import com.linkedin.thirdeye.detector.driver.AnomalyDetectionJobManager;
 import com.linkedin.thirdeye.detector.email.EmailReportJobManager;
@@ -45,9 +46,9 @@ import com.linkedin.thirdeye.detector.resources.AnomalyFunctionSpecResource;
 import com.linkedin.thirdeye.detector.resources.AnomalyResultResource;
 import com.linkedin.thirdeye.detector.resources.ContextualEventResource;
 import com.linkedin.thirdeye.detector.resources.EmailFunctionDependencyResource;
+import com.linkedin.thirdeye.detector.resources.EmailReportJobResource;
 import com.linkedin.thirdeye.detector.resources.EmailReportResource;
 import com.linkedin.thirdeye.detector.resources.MetricsGraphicsTimeSeriesResource;
-import com.linkedin.thirdeye.detector.task.EmailReportJobManagerTask;
 
 public class ThirdEyeDetectorApplication
     extends BaseThirdEyeApplication<ThirdEyeDetectorConfiguration> {
@@ -137,7 +138,7 @@ public class ThirdEyeDetectorApplication
         new AnomalyFunctionFactory(config.getFunctionConfigPath());
 
     // ThirdEye driver
-    final AnomalyDetectionJobManager jobManager = new AnomalyDetectionJobManager(quartzScheduler,
+    final AnomalyDetectionJobManager anomalyDetectionJobManager = new AnomalyDetectionJobManager(quartzScheduler,
         anomalyFunctionSpecDAO, anomalyFunctionRelationDAO, anomalyResultDAO, hibernateBundle.getSessionFactory(),
         environment.metrics(), anomalyFunctionFactory, config.getFailureEmailConfig());
 
@@ -149,15 +150,13 @@ public class ThirdEyeDetectorApplication
             .execute(new Callable<Void>() {
               @Override
               public Void call() throws Exception {
-                List<AnomalyFunctionSpec> functions;
-                functions = anomalyFunctionSpecDAO.findAll();
-                LinkedList<AnomalyFunctionSpec> failedToStart =
-                    new LinkedList<AnomalyFunctionSpec>();
+                List<AnomalyFunctionSpec> functions = anomalyFunctionSpecDAO.findAll();
+                LinkedList<AnomalyFunctionSpec> failedToStart = new LinkedList<AnomalyFunctionSpec>();
                 for (AnomalyFunctionSpec function : functions) {
                   if (function.getIsActive()) {
                     try {
                       LOG.info("Starting {}", function);
-                      jobManager.start(function.getId());
+                      anomalyDetectionJobManager.start(function.getId());
                     } catch (Exception e) {
                       LOG.error("Failed to schedule function " + function.getId(), e);
                       failedToStart.add(function);
@@ -228,8 +227,26 @@ public class ThirdEyeDetectorApplication
               .execute(new Callable<Void>() {
                 @Override
                 public Void call() throws Exception {
-                  LOG.info("Starting email report job manager");
-                  emailReportJobManager.start();
+                  List<EmailConfiguration> configs = emailConfigurationDAO.findAll();
+                  LinkedList<EmailConfiguration> failedToStart = new LinkedList<EmailConfiguration>();
+                  for (EmailConfiguration config : configs) {
+                    if (config.getIsActive()) {
+                      try {
+                        LOG.info("Starting {}", config);
+                        emailReportJobManager.start(config.getId());
+                      } catch (Exception e) {
+                        LOG.error("Failed to schedule report " + config.getId(), e);
+                        failedToStart.add(config);
+                      }
+                    }
+                  }
+                  if (!failedToStart.isEmpty()) {
+                    LOG.warn("{} functions failed to start!: {}", failedToStart.size(), failedToStart);
+                    String subject = String.format("Startup failed to initialize %d reports",
+                        failedToStart.size());
+                    String body = StringUtils.join(failedToStart, "\n");
+                    JobUtils.sendFailureEmail(config.getFailureEmailConfig(), subject, body);
+                  }
                   return null;
                 }
               });
@@ -244,17 +261,13 @@ public class ThirdEyeDetectorApplication
     environment.jersey().register(new AnomalyFunctionRelationResource(anomalyFunctionRelationDAO));
     environment.jersey().register(new AnomalyResultResource(anomalyResultDAO));
     environment.jersey().register(new ContextualEventResource(contextualEventDAO));
-    environment.jersey().register(
-        new MetricsGraphicsTimeSeriesResource(anomalyResultDAO));
+    environment.jersey().register(new MetricsGraphicsTimeSeriesResource(anomalyResultDAO));
     environment.jersey()
-        .register(new AnomalyDetectionJobResource(jobManager, anomalyFunctionSpecDAO));
-    environment.jersey()
-        .register(new EmailReportResource(emailConfigurationDAO, emailReportJobManager));
+        .register(new AnomalyDetectionJobResource(anomalyDetectionJobManager, anomalyFunctionSpecDAO));
+    environment.jersey().register(new EmailReportJobResource(emailReportJobManager, emailConfigurationDAO));
+    environment.jersey().register(new EmailReportResource(emailConfigurationDAO, emailReportJobManager));
     environment.jersey().register(new EmailFunctionDependencyResource(emailFunctionDependencyDAO));
 
-    // Tasks
-    environment.admin().addTask(
-        new EmailReportJobManagerTask(emailReportJobManager, hibernateBundle.getSessionFactory()));
   }
 
   public static int getApplicationPortNumber(ThirdEyeDetectorConfiguration config) {

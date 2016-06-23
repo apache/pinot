@@ -6,6 +6,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
@@ -16,6 +17,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
+import com.linkedin.thirdeye.dashboard.resources.AnomalyResource;
 
 public class ThirdEyeUtils {
   private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeUtils.class);
@@ -112,6 +114,23 @@ public class ThirdEyeUtils {
     }
 
     return sortedFilters;
+  }
+
+
+  public static String constructCron(String scheduleMinute, String scheduleHour, String repeatEvery) {
+
+    String minute = "0";
+    String hour = "0";
+    String cron = AnomalyResource.DEFAULT_CRON;
+    if (repeatEvery.equals(TimeUnit.DAYS.toString())) {
+      minute = StringUtils.isEmpty(scheduleMinute) ? minute : scheduleMinute;
+      hour = StringUtils.isEmpty(scheduleHour) ? hour : scheduleHour;
+    } else if (repeatEvery.equals(TimeUnit.HOURS.toString())) {
+      minute = StringUtils.isEmpty(scheduleMinute) ? minute : scheduleMinute;
+      hour = "*";
+    }
+    cron = String.format("0 %s %s * * ?", minute, hour);
+    return cron;
   }
 
   public static void main(String[] args) {
