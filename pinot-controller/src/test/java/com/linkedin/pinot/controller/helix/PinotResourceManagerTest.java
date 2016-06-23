@@ -63,11 +63,11 @@ public class PinotResourceManagerTest {
 
     final String instanceId = "localhost_helixController";
     _pinotHelixResourceManager =
-        new PinotHelixResourceManager(ZK_SERVER, HELIX_CLUSTER_NAME, instanceId, null, 10000L, true);
+        new PinotHelixResourceManager(ZK_SERVER, HELIX_CLUSTER_NAME, instanceId, null, 10000L, true, /*isUpdateStateModel=*/false);
     _pinotHelixResourceManager.start();
 
     final String helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(ZK_SERVER);
-    _helixZkManager = HelixSetupUtils.setup(HELIX_CLUSTER_NAME, helixZkURL, instanceId);
+    _helixZkManager = HelixSetupUtils.setup(HELIX_CLUSTER_NAME, helixZkURL, instanceId, /*isUpdateStateModel=*/false);
     _helixAdmin = _helixZkManager.getClusterManagmentTool();
 
     /////////////////////////

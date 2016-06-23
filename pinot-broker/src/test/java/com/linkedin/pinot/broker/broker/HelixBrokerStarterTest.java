@@ -69,11 +69,11 @@ public class HelixBrokerStarterTest {
     _zkClient = new ZkClient(ZkStarter.DEFAULT_ZK_STR);
     final String instanceId = "localhost_helixController";
     _pinotResourceManager =
-        new PinotHelixResourceManager(ZkStarter.DEFAULT_ZK_STR, HELIX_CLUSTER_NAME, instanceId, null, 10000L, true);
+        new PinotHelixResourceManager(ZkStarter.DEFAULT_ZK_STR, HELIX_CLUSTER_NAME, instanceId, null, 10000L, true, /*isUpdateStateModel=*/false);
     _pinotResourceManager.start();
 
     final String helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(ZkStarter.DEFAULT_ZK_STR);
-    _helixZkManager = HelixSetupUtils.setup(HELIX_CLUSTER_NAME, helixZkURL, instanceId);
+    _helixZkManager = HelixSetupUtils.setup(HELIX_CLUSTER_NAME, helixZkURL, instanceId, /*isUpdateStateModel=*/false);
     _helixAdmin = _helixZkManager.getClusterManagmentTool();
     Thread.sleep(3000);
     final Configuration pinotHelixBrokerProperties = DefaultHelixBrokerConfig.getDefaultBrokerConf();

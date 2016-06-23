@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.io.FileUtils;
@@ -81,8 +82,9 @@ public class EmailReportJob implements Job {
   public void execute(final JobExecutionContext context) throws JobExecutionException {
     final EmailConfiguration config =
         (EmailConfiguration) context.getJobDetail().getJobDataMap().get(CONFIG);
-    final FailureEmailConfiguration failureEmailConfig = (FailureEmailConfiguration) context
-        .getJobDetail().getJobDataMap().get(FAILURE_EMAIL_CONFIG_KEY);
+    final FailureEmailConfiguration failureEmailConfig =
+        (FailureEmailConfiguration) context.getJobDetail().getJobDataMap()
+            .get(FAILURE_EMAIL_CONFIG_KEY);
     try {
       run(context, config);
     } catch (Throwable t) {
@@ -104,13 +106,14 @@ public class EmailReportJob implements Job {
   }
 
   private void run(final JobExecutionContext context, final EmailConfiguration config)
-      throws JobExecutionException {
+      throws JobExecutionException, ExecutionException {
     LOG.info("Starting email report {}", config.getId());
     SessionFactory sessionFactory =
         (SessionFactory) context.getJobDetail().getJobDataMap().get(SESSION_FACTORY);
     int applicationPort = context.getJobDetail().getJobDataMap().getInt(APPLICATION_PORT);
-    TimeOnTimeComparisonHandler timeOnTimeComparisonHandler = (TimeOnTimeComparisonHandler) context
-        .getJobDetail().getJobDataMap().get(TIME_ON_TIME_COMPARISON_HANDLER);
+    TimeOnTimeComparisonHandler timeOnTimeComparisonHandler =
+        (TimeOnTimeComparisonHandler) context.getJobDetail().getJobDataMap()
+            .get(TIME_ON_TIME_COMPARISON_HANDLER);
     ThirdEyeClient client = timeOnTimeComparisonHandler.getClient();
     String dashboardHost = context.getJobDetail().getJobDataMap().getString(DASHBOARD_HOST);
 
@@ -125,6 +128,7 @@ public class EmailReportJob implements Job {
     final DateTime then = now.minus(deltaMillis);
 
     final String collection = config.getCollection();
+    final String collectionAlias = ThirdEyeUtils.getAliasFromCollection(collection);
 
     // Get the anomalies in that range
     final List<AnomalyResult> results =
@@ -155,8 +159,9 @@ public class EmailReportJob implements Job {
       }
     }
 
-    String chartFilePath = writeTimeSeriesChart(config, timeOnTimeComparisonHandler, now, then,
-        collection, anomaliesWithLabels);
+    String chartFilePath =
+        writeTimeSeriesChart(config, timeOnTimeComparisonHandler, now, then, collection,
+            anomaliesWithLabels);
 
     // get dimensions for rendering
     List<String> dimensionNames;
@@ -170,10 +175,12 @@ public class EmailReportJob implements Job {
     String anomalyEndpoint;
     String functionEndpoint;
     try {
-      anomalyEndpoint = String.format("http://%s:%d/anomaly-results/",
-          InetAddress.getLocalHost().getCanonicalHostName(), applicationPort);
-      functionEndpoint = String.format("http://%s:%d/anomaly-functions/",
-          InetAddress.getLocalHost().getCanonicalHostName(), applicationPort);
+      anomalyEndpoint =
+          String.format("http://%s:%d/anomaly-results/", InetAddress.getLocalHost()
+              .getCanonicalHostName(), applicationPort);
+      functionEndpoint =
+          String.format("http://%s:%d/anomaly-functions/", InetAddress.getLocalHost()
+              .getCanonicalHostName(), applicationPort);
     } catch (Exception e) {
       throw new JobExecutionException(e);
     }
@@ -210,7 +217,7 @@ public class EmailReportJob implements Job {
       // http://stackoverflow.com/questions/13339445/feemarker-writing-images-to-html
       chartFile = new File(chartFilePath);
       templateData.put("embeddedChart", email.embed(chartFile));
-      templateData.put("collection", collection);
+      templateData.put("collection", collectionAlias);
       templateData.put("metric", metric);
       templateData.put("filters", filtersJsonEncoded);
       templateData.put("windowUnit", windowUnit);
@@ -228,8 +235,8 @@ public class EmailReportJob implements Job {
       email.setHostName(config.getSmtpHost());
       email.setSmtpPort(config.getSmtpPort());
       if (config.getSmtpUser() != null && config.getSmtpPassword() != null) {
-        email.setAuthenticator(
-            new DefaultAuthenticator(config.getSmtpUser(), config.getSmtpPassword()));
+        email.setAuthenticator(new DefaultAuthenticator(config.getSmtpUser(), config
+            .getSmtpPassword()));
         email.setSSLOnConnect(true);
       }
       email.setFrom(config.getFromAddress());
@@ -237,7 +244,7 @@ public class EmailReportJob implements Job {
         email.addTo(toAddress);
       }
       email.setSubject(String.format("Anomaly Alert!: %d anomalies detected for %s:%s",
-          results.size(), config.getCollection(), config.getMetric()));
+          results.size(), collectionAlias, config.getMetric()));
       final String html = new String(baos.toByteArray(), CHARSET);
 
       email.setHtmlMsg(html);
@@ -270,8 +277,9 @@ public class EmailReportJob implements Job {
       TimeOnTimeComparisonResponse chartData =
           getData(timeOnTimeComparisonHandler, config, then, now, WEEK_MILLIS, dataGranularity);
       AnomalyGraphGenerator anomalyGraphGenerator = AnomalyGraphGenerator.getInstance();
-      JFreeChart chart = anomalyGraphGenerator.createChart(chartData, dataGranularity, windowMillis,
-          anomaliesWithLabels);
+      JFreeChart chart =
+          anomalyGraphGenerator.createChart(chartData, dataGranularity, windowMillis,
+              anomaliesWithLabels);
       String chartFilePath = EMAIL_REPORT_CHART_PREFIX + config.getId() + PNG;
       LOG.info("Writing chart to {}", chartFilePath);
       anomalyGraphGenerator.writeChartToFile(chart, chartFilePath);
@@ -286,15 +294,16 @@ public class EmailReportJob implements Job {
       final DateTime end) throws JobExecutionException {
     final List<AnomalyResult> results;
     try {
-      results = new HibernateSessionWrapper<List<AnomalyResult>>(sessionFactory)
-          .execute(new Callable<List<AnomalyResult>>() {
-            @Override
-            public List<AnomalyResult> call() throws Exception {
-              AnomalyResultDAO resultDAO =
-                  (AnomalyResultDAO) context.getJobDetail().getJobDataMap().get(RESULT_DAO);
-              return resultDAO.findAllByTimeAndEmailId(start, end, config.getId());
-            }
-          });
+      results =
+          new HibernateSessionWrapper<List<AnomalyResult>>(sessionFactory)
+              .execute(new Callable<List<AnomalyResult>>() {
+                @Override
+                public List<AnomalyResult> call() throws Exception {
+                  AnomalyResultDAO resultDAO =
+                      (AnomalyResultDAO) context.getJobDetail().getJobDataMap().get(RESULT_DAO);
+                  return resultDAO.findAllByTimeAndEmailId(start, end, config.getId());
+                }
+              });
     } catch (Exception e) {
       throw new JobExecutionException(e);
     }
@@ -320,12 +329,11 @@ public class EmailReportJob implements Job {
     try {
       TimeOnTimeComparisonRequest comparisonRequest = new TimeOnTimeComparisonRequest();
       comparisonRequest.setCollectionName(config.getCollection());
-
       comparisonRequest.setBaselineStart(start.minus(baselinePeriodMillis));
       comparisonRequest.setBaselineEnd(end.minus(baselinePeriodMillis));
-
       comparisonRequest.setCurrentStart(start);
       comparisonRequest.setCurrentEnd(end);
+      comparisonRequest.setEndDateInclusive(true);
 
       List<MetricExpression> metricExpressions = new ArrayList<>();
       MetricExpression expression = new MetricExpression(config.getMetric());
@@ -355,8 +363,8 @@ public class EmailReportJob implements Job {
     }
     long currentUnits = unit.convert(end.getMillis() - start.getMillis(), TimeUnit.MILLISECONDS);
     if (currentUnits < minUnits) {
-      LOG.info("Overriding config window size {} {} with minimum default of {}", currentUnits, unit,
-          minUnits);
+      LOG.info("Overriding config window size {} {} with minimum default of {}", currentUnits,
+          unit, minUnits);
       start = end.minus(unit.toMillis(minUnits));
     }
     return start;

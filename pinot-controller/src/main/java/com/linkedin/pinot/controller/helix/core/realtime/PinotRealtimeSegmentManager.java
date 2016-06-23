@@ -15,24 +15,6 @@
  */
 package com.linkedin.pinot.controller.helix.core.realtime;
 
-import com.google.common.base.Function;
-import com.linkedin.pinot.common.Utils;
-import com.linkedin.pinot.common.config.AbstractTableConfig;
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
-import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
-import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
-import com.linkedin.pinot.common.metrics.ControllerMeter;
-import com.linkedin.pinot.common.metrics.ControllerMetrics;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
-import com.linkedin.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
-import com.linkedin.pinot.common.utils.CommonConstants.Segment.SegmentType;
-import com.linkedin.pinot.common.utils.SegmentNameBuilder;
-import com.linkedin.pinot.common.utils.helix.HelixHelper;
-import com.linkedin.pinot.common.utils.retry.RetryPolicies;
-import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
-import com.linkedin.pinot.core.query.utils.Pair;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -56,6 +38,24 @@ import org.apache.zookeeper.data.Stat;
 import org.json.JSONException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.google.common.base.Function;
+import com.linkedin.pinot.common.Utils;
+import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
+import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
+import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import com.linkedin.pinot.common.metrics.ControllerMeter;
+import com.linkedin.pinot.common.metrics.ControllerMetrics;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
+import com.linkedin.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
+import com.linkedin.pinot.common.utils.CommonConstants.Segment.SegmentType;
+import com.linkedin.pinot.common.utils.HLCSegmentName;
+import com.linkedin.pinot.common.utils.helix.HelixHelper;
+import com.linkedin.pinot.common.utils.retry.RetryPolicies;
+import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
+import com.linkedin.pinot.core.query.utils.Pair;
 
 
 /**
@@ -155,7 +155,7 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
             String partitionId = instanceZKMetadata.getPartition(resource);
             if (groupId != null && !groupId.isEmpty() && partitionId != null && !partitionId.isEmpty()) {
               listOfSegmentsToAddToInstances.add(new Pair<String, String>(
-                  SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName(groupId, partitionId, String.valueOf(System.currentTimeMillis())),
+                  new HLCSegmentName(groupId, partitionId, String.valueOf(System.currentTimeMillis())).getSegmentName(),
                   instanceId));
             } else {
               LOGGER.warn("Instance {} has invalid groupId ({}) and/or partitionId ({}) for resource {}, ignoring for segment assignment.",
@@ -176,8 +176,10 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
 
           // Remove server instances that are currently processing a segment
           for (String partition : state.getPartitionSet()) {
+            // Helix partition is the segment name
+            HLCSegmentName segName = new HLCSegmentName(partition);
             RealtimeSegmentZKMetadata realtimeSegmentZKMetadata = ZKMetadataProvider.getRealtimeSegmentZKMetadata(_pinotHelixResourceManager.getPropertyStore(),
-                SegmentNameBuilder.Realtime.extractTableName(partition), partition);
+                segName.getTableName(), partition);
             if (realtimeSegmentZKMetadata.getStatus() == Status.IN_PROGRESS) {
               instancesToAssignRealtimeSegment.removeAll(state.getInstanceSet(partition));
             }
@@ -189,7 +191,7 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
             String groupId = instanceZKMetadata.getGroupId(resource);
             String partitionId = instanceZKMetadata.getPartition(resource);
             listOfSegmentsToAddToInstances.add(new Pair<String, String>(
-                SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName(groupId, partitionId, String.valueOf(System.currentTimeMillis())),
+                new HLCSegmentName(groupId, partitionId, String.valueOf(System.currentTimeMillis())).getSegmentName(),
                 instanceId));
           }
         }
@@ -207,7 +209,8 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
       final String instanceName = segmentIdAndInstanceId.getSecond();
 
       try {
-        String resourceName = SegmentNameBuilder.Realtime.extractTableName(segmentId);
+        final HLCSegmentName segName = new HLCSegmentName(segmentId);
+        String resourceName = segName.getTableName();
 
         // Does the ideal state already contain this segment?
         if (!idealStateMap.get(resourceName).getPartitionSet().contains(segmentId)) {

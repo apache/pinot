@@ -15,16 +15,12 @@
  */
 package com.linkedin.pinot.controller.helix.retention;
 
-import com.linkedin.pinot.common.segment.StarTreeMetadata;
-import com.linkedin.pinot.common.utils.time.TimeUtils;
 import java.io.File;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-
-import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixAdmin;
@@ -40,20 +36,22 @@ import org.testng.Assert;
 import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
-
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.common.segment.StarTreeMetadata;
 import com.linkedin.pinot.common.utils.ZkStarter;
+import com.linkedin.pinot.common.utils.time.TimeUtils;
 import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.retention.RetentionManager;
 import com.linkedin.pinot.controller.helix.core.util.ZKMetadataUtils;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import javax.annotation.Nullable;
 
 
 public class RetentionManagerTest {
@@ -86,7 +84,7 @@ public class RetentionManagerTest {
     _zkClient = new ZkClient(ZK_STR);
 
     _pinotHelixResourceManager =
-        new PinotHelixResourceManager(ZK_STR, HELIX_CLUSTER_NAME, CONTROLLER_INSTANCE_NAME, null, 10000L, true);
+        new PinotHelixResourceManager(ZK_STR, HELIX_CLUSTER_NAME, CONTROLLER_INSTANCE_NAME, null, 10000L, true, /*isUpdateStateModel=*/false);
     _pinotHelixResourceManager.start();
     ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_STR, 2, true);
     ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_STR, 2, true);

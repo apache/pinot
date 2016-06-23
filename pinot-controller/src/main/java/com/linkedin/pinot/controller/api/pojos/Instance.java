@@ -15,16 +15,20 @@
  */
 package com.linkedin.pinot.controller.api.pojos;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.restlet.swagger.Example;
 import org.apache.helix.model.InstanceConfig;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.linkedin.pinot.common.utils.CommonConstants;
+
+
 /**
  * Instance POJO, used as part of the API to create instances.
  */
+@Example("{\n" + "\t\"host\": \"hostname.example.com\",\n" + "\t\"port\": \"1234\",\n" + "\t\"type\": \"server\"\n" + "}")
 public class Instance {
   private final String _host;
   private final String _port;
@@ -34,10 +38,10 @@ public class Instance {
 
   @JsonCreator
   public Instance(
-      @JsonProperty("host") String host,
-      @JsonProperty("port") String port,
-      @JsonProperty("type") String type,
-      @JsonProperty("tag") String tag) {
+      @JsonProperty(value = "host", required = true) String host,
+      @JsonProperty(value = "port", required = true) String port,
+      @JsonProperty(value = "type", required = true) String type,
+      @JsonProperty(value = "tag", required = false) String tag) {
     _host = host;
     _port = port;
     _tag = tag;

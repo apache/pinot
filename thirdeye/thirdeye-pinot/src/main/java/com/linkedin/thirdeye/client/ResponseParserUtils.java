@@ -67,7 +67,7 @@ public class ResponseParserUtils {
     ThirdEyeResponse metricSumsResponse = null;
     try {
       metricSumsResponse =
-          CACHE_REGISTRY_INSTANCE.getQueryCache().getClient().execute(metricSumsRequest);
+          CACHE_REGISTRY_INSTANCE.getQueryCache().getQueryResult(metricSumsRequest);
     } catch (Exception e) {
       LOGGER.error("Caught exception when executing metric sums request", e);
     }
@@ -90,7 +90,7 @@ public class ResponseParserUtils {
     ThirdEyeResponse metricSumsResponse = null;
     try {
       metricSumsResponse =
-          CACHE_REGISTRY_INSTANCE.getQueryCache().getClient().execute(metricSumsRequest);
+          CACHE_REGISTRY_INSTANCE.getQueryCache().getQueryResult(metricSumsRequest);
     } catch (Exception e) {
       LOGGER.error("Caught exception when executing metric sums request", e);
     }

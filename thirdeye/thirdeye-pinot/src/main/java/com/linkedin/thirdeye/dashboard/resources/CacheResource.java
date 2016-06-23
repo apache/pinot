@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.dashboard.resources;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -10,9 +11,11 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.cache.CacheLoader.InvalidCacheLoadException;
 import com.google.common.cache.LoadingCache;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.thirdeye.api.CollectionSchema;
@@ -95,9 +98,23 @@ public class CacheResource {
   @Path("/refresh/collectionConfig")
   public Response refreshCollectionConfigCache() {
     List<String> collections = CACHE_INSTANCE.getCollectionsCache().getCollections();
-    LoadingCache<String, CollectionConfig> cache = CACHE_INSTANCE.getCollectionConfigCache();
+    LoadingCache<String, CollectionConfig> collectionConfigCache = CACHE_INSTANCE.getCollectionConfigCache();
+    LoadingCache<String, String> collectionAliasCache = CACHE_INSTANCE.getCollectionAliasCache();
+    collectionAliasCache.invalidateAll();
     for (String collection : collections) {
-      cache.refresh(collection);
+
+      try {
+        collectionConfigCache.refresh(collection);
+
+        // refresh aliases
+        CollectionConfig collectionConfig = collectionConfigCache.get(collection);
+        String collectionAlias = collectionConfig.getCollectionAlias();
+        if (StringUtils.isNotEmpty(collectionAlias)) {
+          collectionAliasCache.refresh(collectionAlias);
+        }
+      } catch (InvalidCacheLoadException | ExecutionException e) {
+        LOGGER.debug("No CollectionConfig for collection", collection);
+      }
     }
     return Response.ok().build();
   }

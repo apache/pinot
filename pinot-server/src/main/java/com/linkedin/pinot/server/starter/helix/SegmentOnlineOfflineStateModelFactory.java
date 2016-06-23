@@ -72,7 +72,10 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
     return SegmentOnlineOfflineStateModel;
   }
 
-  @StateModelInfo(states = "{'OFFLINE','ONLINE', 'DROPPED'}", initialState = "OFFLINE")
+  // Helix seems to need StateModelInfo annotation for 'initialState'. It does not use the 'states' field.
+  // The transitions in the helix messages indicate the from/to states, and helix uses the
+  // Transition annotations (but only if StateModelInfo is defined).
+  @StateModelInfo(states = "{'OFFLINE','ONLINE', 'CONSUMING', 'DROPPED'}", initialState = "OFFLINE")
   public class SegmentOnlineOfflineStateModel extends StateModel {
     private final Logger LOGGER =
         LoggerFactory.getLogger(INSTANCE_ID + " - " + SegmentOnlineOfflineStateModel.class);

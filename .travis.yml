@@ -12,8 +12,8 @@ env:
   - PINOT_MODULE="pinot-perf"
 
 jdk:
-  - openjdk7
   - oraclejdk7
+  - openjdk7
   - oraclejdk8
 
 install:

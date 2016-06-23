@@ -19,7 +19,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.StateModelDefinition;
 import org.apache.helix.model.StateModelDefinition.StateModelDefinitionProperty;
@@ -40,8 +39,42 @@ public class PinotHelixSegmentOnlineOfflineStateModelGenerator {
   public static final String ONLINE_STATE = "ONLINE";
   public static final String OFFLINE_STATE = "OFFLINE";
   public static final String DROPPED_STATE = "DROPPED";
+  public static final String CONSUMING_STATE = "CONSUMING";
 
   public static StateModelDefinition generatePinotStateModelDefinition() {
+    StateModelDefinition.Builder builder = new StateModelDefinition.Builder(PINOT_SEGMENT_ONLINE_OFFLINE_STATE_MODEL);
+    builder.initialState(OFFLINE_STATE);
+
+    builder.addState(ONLINE_STATE);
+    builder.addState(CONSUMING_STATE);
+    builder.addState(OFFLINE_STATE);
+    builder.addState(DROPPED_STATE);
+    // Set the initial state when the node starts
+
+    // Add transitions between the states.
+    builder.addTransition(CONSUMING_STATE, ONLINE_STATE);
+    builder.addTransition(OFFLINE_STATE, CONSUMING_STATE);
+    builder.addTransition(OFFLINE_STATE, ONLINE_STATE);
+    builder.addTransition(CONSUMING_STATE, OFFLINE_STATE);
+    builder.addTransition(ONLINE_STATE, OFFLINE_STATE);
+    builder.addTransition(OFFLINE_STATE, DROPPED_STATE);
+
+    // set constraints on states.
+    // static constraint
+    builder.dynamicUpperBound(ONLINE_STATE, "R");
+    // dynamic constraint, R means it should be derived based on the replication
+    // factor.
+    builder.dynamicUpperBound(CONSUMING_STATE, "R");
+
+    StateModelDefinition statemodelDefinition = builder.build();
+    return statemodelDefinition;
+  }
+
+  /**
+   * This method is not used, Code is to be removed when we have the new state model running in production
+   * @return
+   */
+  public static StateModelDefinition generatePinotStateModelDefinitionOld() {
 
     ZNRecord record = new ZNRecord(PINOT_SEGMENT_ONLINE_OFFLINE_STATE_MODEL);
 
@@ -122,6 +155,7 @@ public class PinotHelixSegmentOnlineOfflineStateModelGenerator {
     record.setListField(StateModelDefinitionProperty.STATE_TRANSITION_PRIORITYLIST.toString(),
         stateTransitionPriorityList);
 
-    return new StateModelDefinition(record);
+    throw new RuntimeException("This state model should not be used");
+//    return new StateModelDefinition(record);
   }
 }

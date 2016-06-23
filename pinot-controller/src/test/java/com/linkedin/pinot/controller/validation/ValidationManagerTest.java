@@ -15,15 +15,11 @@
  */
 package com.linkedin.pinot.controller.validation;
 
-import com.linkedin.pinot.common.segment.StarTreeMetadata;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-
-import com.linkedin.pinot.common.utils.SegmentNameBuilder;
-import javax.annotation.Nullable;
 import org.apache.helix.manager.zk.ZkClient;
 import org.joda.time.DateTime;
 import org.joda.time.Duration;
@@ -32,16 +28,18 @@ import org.testng.Assert;
 import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
-
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.common.segment.StarTreeMetadata;
+import com.linkedin.pinot.common.utils.HLCSegmentName;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import javax.annotation.Nullable;
 
 
 /**
@@ -66,7 +64,7 @@ public class ValidationManagerTest {
     _zkClient = new ZkClient(ZK_STR);
 
     _pinotHelixResourceManager =
-        new PinotHelixResourceManager(ZK_STR, HELIX_CLUSTER_NAME, CONTROLLER_INSTANCE_NAME, null, 1000L, true);
+        new PinotHelixResourceManager(ZK_STR, HELIX_CLUSTER_NAME, CONTROLLER_INSTANCE_NAME, null, 1000L, true, /*isUpdateStateModel=*/false);
     _pinotHelixResourceManager.start();
   }
 
@@ -145,10 +143,12 @@ public class ValidationManagerTest {
 
     // Create a bunch of dummy segments
     String testTableName = "TestTableTotalDocCountTest";
-    String segmentName1 = SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("groupid_1", "0", "1");
-    String segmentName2 = SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("groupid_1", "0", "2");
-    String segmentName3 = SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("groupid_1", "0", "3");
-    String segmentName4 = SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("groupid_2", "0", "3");
+    final String group1 = testTableName + "_REALTIME_1466446700000_34";
+    final String group2 = testTableName + "_REALTIME_1466446700000_17";
+    String segmentName1 = new HLCSegmentName(group1, "0", "1").getSegmentName();
+    String segmentName2 = new HLCSegmentName(group1, "0", "2").getSegmentName();
+    String segmentName3 = new HLCSegmentName(group1, "0", "3").getSegmentName();
+    String segmentName4 = new HLCSegmentName(group2, "0", "3").getSegmentName();
 
     DummyMetadata metadata1 = new DummyMetadata(testTableName, segmentName1, 10);
     DummyMetadata metadata2 = new DummyMetadata(testTableName, segmentName2, 20);

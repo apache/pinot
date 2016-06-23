@@ -31,6 +31,7 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final String CONTROLLER_PORT = "controller.port";
   private static final String DATA_DIR = "controller.data.dir";
   private static final String ZK_STR = "controller.zk.str";
+  private static final String UPDATE_SEGMENT_STATE_MODEL = "controller.update_segment_state_model"; // boolean: Update the statemodel on boot?
   private static final String HELIX_CLUSTER_NAME = "controller.helix.cluster.name";
   private static final String CLUSTER_TENANT_ISOLATION_ENABLE = "cluster.tenant.isolation.enable";
   private static final String CONSOLE_WEBAPP_ROOT_PATH = "controller.query.console";
@@ -89,6 +90,10 @@ public class ControllerConf extends PropertiesConfiguration {
     setProperty(DATA_DIR, dataDir);
   }
 
+  public void setUpdateSegmentStateModel(String updateStateModel) {
+    setProperty(UPDATE_SEGMENT_STATE_MODEL, updateStateModel);
+  }
+
   public void setZkStr(String zkStr) {
     setProperty(ZK_STR, zkStr);
   }
@@ -107,6 +112,13 @@ public class ControllerConf extends PropertiesConfiguration {
 
   public String getDataDir() {
     return (String) getProperty(DATA_DIR);
+  }
+
+  public boolean isUpdateSegmentStateModel() {
+    if (containsKey(UPDATE_SEGMENT_STATE_MODEL)) {
+      return Boolean.parseBoolean(getProperty(UPDATE_SEGMENT_STATE_MODEL).toString());
+    }
+    return false;   // Default is to leave the statemodel untouched.
   }
 
   public String getZkStr() {

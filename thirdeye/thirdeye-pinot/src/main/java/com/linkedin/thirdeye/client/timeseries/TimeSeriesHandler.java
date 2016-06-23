@@ -40,18 +40,23 @@ public class TimeSeriesHandler {
     List<Range<DateTime>> timeranges = new ArrayList<>();
     TimeGranularity aggregationTimeGranularity = timeSeriesRequest.getAggregationTimeGranularity();
     // time ranges
-    timeranges = TimeRangeUtils.computeTimeRanges(aggregationTimeGranularity,
-        timeSeriesRequest.getStart(), timeSeriesRequest.getEnd());
+    DateTime start = timeSeriesRequest.getStart();
+    DateTime end = timeSeriesRequest.getEnd();
+    if (timeSeriesRequest.isEndDateInclusive()) {
+      // ThirdEyeRequest is exclusive endpoint, so increment by one bucket
+      end = end.plus(aggregationTimeGranularity.toMillis());
+    }
+    timeranges = TimeRangeUtils.computeTimeRanges(aggregationTimeGranularity, start, end);
     // create request
-    ThirdEyeRequest request = createThirdEyeRequest("timeseries", timeSeriesRequest,
-        timeSeriesRequest.getStart(), timeSeriesRequest.getEnd());
+    ThirdEyeRequest request = createThirdEyeRequest("timeseries", timeSeriesRequest, start, end);
 
     Future<ThirdEyeResponse> responseFuture = queryCache.getQueryResultAsync(request);
     ThirdEyeResponse response = responseFuture.get(60, TimeUnit.SECONDS);
 
-    TimeSeriesResponseParser timeSeriesResponseParser = new TimeSeriesResponseParser(response,
-        timeranges, timeSeriesRequest.getAggregationTimeGranularity(),
-        timeSeriesRequest.getGroupByDimensions());
+    TimeSeriesResponseParser timeSeriesResponseParser =
+        new TimeSeriesResponseParser(response, timeranges,
+            timeSeriesRequest.getAggregationTimeGranularity(),
+            timeSeriesRequest.getGroupByDimensions());
     List<TimeSeriesRow> rows = timeSeriesResponseParser.parseResponse();
     // compute the derived metrics
     computeDerivedMetrics(timeSeriesRequest, rows);
@@ -92,8 +97,8 @@ public class TimeSeriesHandler {
             derivedMetricValue = 0;
           }
 
-          row.getMetrics()
-              .add(new TimeSeriesMetric(expression.getExpressionName(), derivedMetricValue));
+          row.getMetrics().add(
+              new TimeSeriesMetric(expression.getExpressionName(), derivedMetricValue));
         }
       }
     }

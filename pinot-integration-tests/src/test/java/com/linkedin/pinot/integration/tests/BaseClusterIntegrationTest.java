@@ -501,6 +501,10 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   public static void pushAvroIntoKafka(List<File> avroFiles, String kafkaBroker, String kafkaTopic) {
+    pushAvroIntoKafka(avroFiles, kafkaBroker, kafkaTopic, null);
+  }
+
+  public static void pushAvroIntoKafka(List<File> avroFiles, String kafkaBroker, String kafkaTopic, final byte[] header) {
     Properties properties = new Properties();
     properties.put("metadata.broker.list", kafkaBroker);
     properties.put("serializer.class", "kafka.serializer.DefaultEncoder");
@@ -519,6 +523,9 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         int messagesInThisBatch = 0;
         for (GenericRecord genericRecord : reader) {
           outputStream.reset();
+          if (header != null && 0 < header.length) {
+            outputStream.write(header);
+          }
           datumWriter.write(genericRecord, binaryEncoder);
           binaryEncoder.flush();
 
@@ -910,13 +917,17 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     });
   }
 
-  public void pushAvroIntoKafka(final List<File> avroFiles, ExecutorService executor, final String kafkaTopic) {
+  public void pushAvroIntoKafka(final List<File> avroFiles, ExecutorService executor, final String kafkaTopic, final byte[] header) {
     executor.execute(new Runnable() {
       @Override
       public void run() {
-        pushAvroIntoKafka(avroFiles, KafkaStarterUtils.DEFAULT_KAFKA_BROKER, kafkaTopic);
+        pushAvroIntoKafka(avroFiles, KafkaStarterUtils.DEFAULT_KAFKA_BROKER, kafkaTopic, header);
       }
     });
+  }
+
+  public void pushAvroIntoKafka(final List<File> avroFiles, ExecutorService executor, final String kafkaTopic) {
+    pushAvroIntoKafka(avroFiles, executor, kafkaTopic, null);
   }
 
   public File getSchemaFile() {
