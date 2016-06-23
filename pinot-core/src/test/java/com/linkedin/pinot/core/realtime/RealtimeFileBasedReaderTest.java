@@ -63,7 +63,7 @@ public class RealtimeFileBasedReaderTest {
   @BeforeClass
   public static void before() throws Exception {
     filePath = RealtimeFileBasedReaderTest.class.getClassLoader().getResource(AVRO_DATA).getFile();
-    fieldTypeMap = new HashMap<String, FieldSpec.FieldType>();
+    fieldTypeMap = new HashMap<>();
     fieldTypeMap.put("column1", FieldType.DIMENSION);
     fieldTypeMap.put("column2", FieldType.DIMENSION);
     fieldTypeMap.put("column3", FieldType.DIMENSION);
@@ -74,8 +74,8 @@ public class RealtimeFileBasedReaderTest {
     fieldTypeMap.put("column8", FieldType.DIMENSION);
     fieldTypeMap.put("column9", FieldType.DIMENSION);
     fieldTypeMap.put("column10", FieldType.DIMENSION);
-    fieldTypeMap.put("column11", FieldType.DIMENSION);
-    fieldTypeMap.put("column12", FieldType.DIMENSION);
+    fieldTypeMap.put("weeksSinceEpochSunday", FieldType.DIMENSION);
+    fieldTypeMap.put("daysSinceEpoch", FieldType.DIMENSION);
     fieldTypeMap.put("column13", FieldType.TIME);
     fieldTypeMap.put("count", FieldType.METRIC);
     schema = SegmentTestUtils.extractSchemaFromAvro(new File(filePath), fieldTypeMap, TimeUnit.MINUTES);

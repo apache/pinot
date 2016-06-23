@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.segments.v1.creator;
 
+import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -81,34 +82,33 @@ public class SegmentTestUtils {
   }
 
   public static Schema extractSchemaFromAvro(File avroFile, Map<String, FieldType> fieldTypeMap, TimeUnit granularity)
-      throws FileNotFoundException, IOException {
+      throws IOException {
     DataFileStream<GenericRecord> dataStream =
-        new DataFileStream<GenericRecord>(new FileInputStream(avroFile), new GenericDatumReader<GenericRecord>());
+        new DataFileStream<>(new FileInputStream(avroFile), new GenericDatumReader<GenericRecord>());
     Schema schema = new Schema();
 
     for (final Field field : dataStream.getSchema().getFields()) {
       final String columnName = field.name();
-      if (fieldTypeMap.get(field.name()) == FieldType.TIME) {
-        final TimeGranularitySpec gSpec =
-            new TimeGranularitySpec(getColumnType(dataStream.getSchema().getField(columnName)), granularity, field.name());
-        final TimeFieldSpec fSpec = new TimeFieldSpec(gSpec);
-        schema.addField(columnName, fSpec);
-      } else if (fieldTypeMap.get(field.name()) == FieldType.DIMENSION) {
-        final FieldSpec fieldSpec = new DimensionFieldSpec();
-        fieldSpec.setName(columnName);
-        fieldSpec.setFieldType(fieldTypeMap.get(field.name()));
-        fieldSpec.setDataType(getColumnType(dataStream.getSchema().getField(columnName)));
-        fieldSpec.setSingleValueField(isSingleValueField(dataStream.getSchema().getField(columnName)));
-        fieldSpec.setDelimiter(",");
-        schema.addField(columnName, fieldSpec);
-      } else {
-        final FieldSpec fieldSpec = new MetricFieldSpec();
-        fieldSpec.setName(columnName);
-        fieldSpec.setFieldType(fieldTypeMap.get(field.name()));
-        fieldSpec.setDataType(getColumnType(dataStream.getSchema().getField(columnName)));
-        fieldSpec.setSingleValueField(isSingleValueField(dataStream.getSchema().getField(columnName)));
-        fieldSpec.setDelimiter(",");
-        schema.addField(columnName, fieldSpec);
+      FieldType fieldType = fieldTypeMap.get(columnName);
+      Preconditions.checkNotNull(fieldType);
+
+      switch (fieldType) {
+        case TIME:
+          final TimeGranularitySpec gSpec = new TimeGranularitySpec(getColumnType(field), granularity, columnName);
+          final TimeFieldSpec fSpec = new TimeFieldSpec(gSpec);
+          schema.addField(columnName, fSpec);
+          continue;
+        case DIMENSION:
+          final FieldSpec dimensionFieldSpec =
+              new DimensionFieldSpec(columnName, getColumnType(field), isSingleValueField(field));
+          schema.addField(columnName, dimensionFieldSpec);
+          continue;
+        case METRIC:
+          final FieldSpec metricFieldSpec = new MetricFieldSpec(columnName, getColumnType(field));
+          schema.addField(columnName, metricFieldSpec);
+          continue;
+        default:
+          throw new UnsupportedOperationException("Unsupported field type: " + fieldType);
       }
     }
 
