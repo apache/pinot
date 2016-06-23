@@ -2,14 +2,10 @@ package com.linkedin.thirdeye.dashboard.resources;
 
 import io.dropwizard.hibernate.UnitOfWork;
 
+import java.io.IOException;
 import java.net.URLDecoder;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 import javax.ws.rs.DELETE;
@@ -22,31 +18,24 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.http.client.ClientProtocolException;
 import org.joda.time.DateTime;
-import org.joda.time.DateTimeZone;
-import org.joda.time.format.DateTimeFormat;
-import org.joda.time.format.DateTimeFormatter;
 import org.joda.time.format.ISODateTimeFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.api.CollectionSchema;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
-import com.linkedin.thirdeye.client.cache.QueryCache;
+import com.linkedin.thirdeye.dashboard.DetectorHttpUtils;
 import com.linkedin.thirdeye.detector.api.AnomalyFunctionSpec;
 import com.linkedin.thirdeye.detector.api.AnomalyResult;
 import com.linkedin.thirdeye.detector.api.EmailConfiguration;
-import com.linkedin.thirdeye.detector.api.EmailFunctionDependency;
-import com.linkedin.thirdeye.detector.db.AnomalyFunctionRelationDAO;
 import com.linkedin.thirdeye.detector.db.AnomalyFunctionSpecDAO;
 import com.linkedin.thirdeye.detector.db.AnomalyResultDAO;
 import com.linkedin.thirdeye.detector.db.EmailConfigurationDAO;
-import com.linkedin.thirdeye.detector.db.EmailFunctionDependencyDAO;
-import com.linkedin.thirdeye.detector.driver.AnomalyDetectionJobManager;
-import com.linkedin.thirdeye.detector.email.EmailReportJobManager;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 @Path(value = "/dashboard")
@@ -54,33 +43,28 @@ import com.linkedin.thirdeye.util.ThirdEyeUtils;
 public class AnomalyResource {
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry
       .getInstance();
-  private static final Logger LOG = LoggerFactory.getLogger(AnomalyResource.class);
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-  private static final String DEFAULT_SMTP_PORT = "25";
 
-  private QueryCache queryCache;
+  private static final Logger LOG = LoggerFactory.getLogger(AnomalyResource.class);
+  private static final String DEFAULT_SMTP_PORT = "25";
+  public static final String DEFAULT_CRON = "0 0 0 * * ?";
+  private static final String UTF8 = "UTF-8";
+
   private AnomalyFunctionSpecDAO anomalyFunctionSpecDAO;
   private AnomalyResultDAO anomalyResultDAO;
   private EmailConfigurationDAO emailConfigurationDAO;
-  private EmailFunctionDependencyDAO emailFunctionDependencyDAO;
-  private AnomalyDetectionJobManager anomalyDetectionJobManager;
-  private EmailReportJobManager emailReportJobManager;
+  private DetectorHttpUtils detectorHttpUtils;
 
 
-  public AnomalyResource(AnomalyDetectionJobManager anomalyDetectionJobManager,
-      EmailReportJobManager emailReportJobManager,
-      AnomalyFunctionSpecDAO anomalyFunctionSpecDAO,
+
+  public AnomalyResource(AnomalyFunctionSpecDAO anomalyFunctionSpecDAO,
       AnomalyResultDAO anomalyResultDAO,
       EmailConfigurationDAO emailConfigurationDAO,
-      EmailFunctionDependencyDAO emailFunctionDependencyDAO) {
+      String detectorHttpHost, int detectorHttpPort) {
 
-    this.queryCache = CACHE_REGISTRY_INSTANCE.getQueryCache();
-    this.anomalyDetectionJobManager = anomalyDetectionJobManager;
-    this.emailReportJobManager = emailReportJobManager;
+    this.detectorHttpUtils = new DetectorHttpUtils(detectorHttpHost, detectorHttpPort);
     this.anomalyFunctionSpecDAO = anomalyFunctionSpecDAO;
     this.anomalyResultDAO = anomalyResultDAO;
     this.emailConfigurationDAO = emailConfigurationDAO;
-    this.emailFunctionDependencyDAO = emailFunctionDependencyDAO;
   }
 
   public AnomalyResource() {
@@ -109,36 +93,38 @@ public class AnomalyResource {
       if (StringUtils.isNotEmpty(startTimeIso)) {
         startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso);
       }
-      System.out.println(dataset + " " + startTimeIso + " " + startTime + " " + endTimeIso + " " + endTime + " " + metric);
-      if (StringUtils.isEmpty(metric)) {
-        anomalyResults = anomalyResultDAO.findAllByCollectionAndTime(dataset, startTime, endTime);
-      } else {
-        anomalyResults = anomalyResultDAO.findAllByCollectionTimeAndMetric(dataset, metric, startTime, endTime);
-      }
+      anomalyResults = anomalyResultDAO.findAllByCollectionAndTime(dataset, startTime, endTime);
       anomalies = anomalyResults;
 
-      System.out.println(dimensions);
-      if (StringUtils.isNotEmpty(dimensions)) {
+      if (StringUtils.isNotBlank(metric)) {
+        Multimap<String, String> dimensionsMap = ArrayListMultimap.create();
+        if (StringUtils.isNotEmpty(dimensions)) {
+          dimensions = URLDecoder.decode(dimensions, UTF8 );
+          dimensionsMap = ThirdEyeUtils.convertToMultiMap(dimensions);
+        }
 
-        dimensions = URLDecoder.decode(dimensions, "UTF-8");
-        Multimap<String, String> dimensionsMap = ThirdEyeUtils.convertToMultiMap(dimensions);
-
-        System.out.println(dimensions);
         anomalies = new ArrayList<>();
         for (AnomalyResult anomalyResult : anomalyResults) {
-          String filters = anomalyResult.getFilters();
-          String dimensionString = anomalyResult.getDimensions();
-          if (StringUtils.isNotEmpty(filters) && StringUtils.isNotEmpty(dimensionString)
-              && StringUtils.isNotEmpty(dimensionString = dimensionString.replaceAll("\\*|,", ""))) {
-            String dimensionName = filters.split("=")[0];
-            if (dimensionsMap.containsKey(dimensionName) && dimensionsMap.get(dimensionName).contains(dimensionString)) {
-              anomalies.add(anomalyResult);
+          String metricName = anomalyResult.getMetric();
+          // if metric doesn't match, continue
+          if (!metricName.contains(metric)) {
+            continue;
+          }
+          if (StringUtils.isNotBlank(dimensions)) {
+            String filters = anomalyResult.getFilters();
+            String dimensionValue = anomalyResult.getDimensions();
+            // if dimension value doesn't match, continue
+            if (StringUtils.isNotBlank(filters) && StringUtils.isNotBlank(dimensionValue)
+                && StringUtils.isNotBlank(dimensionValue = dimensionValue.replaceAll("\\*|,", ""))) { //
+              String dimensionName = filters.split("=")[0];
+              if (!dimensionsMap.containsKey(dimensionName) || !dimensionsMap.get(dimensionName).contains(dimensionValue)) {
+                continue;
+              }
             }
           }
+          anomalies.add(anomalyResult);
         }
       }
-      System.out.println(anomalies.size());
-
     } catch (Exception e) {
       LOG.error("Exception in fetching anomalies", e);
     }
@@ -199,7 +185,7 @@ public class AnomalyResource {
     TimeGranularity dataGranularity = schema.getTime().getDataGranularity();
 
     AnomalyFunctionSpec anomalyFunctionSpec = new AnomalyFunctionSpec();
-    anomalyFunctionSpec.setIsActive(isActive);
+    anomalyFunctionSpec.setIsActive(false);
     anomalyFunctionSpec.setCollection(dataset);
     anomalyFunctionSpec.setFunctionName(functionName);
     anomalyFunctionSpec.setMetric(metric);
@@ -230,36 +216,19 @@ public class AnomalyResource {
     anomalyFunctionSpec.setExploreDimensions(exploreDimensions);
     anomalyFunctionSpec.setProperties(properties);
 
-    String cron = "";
+    String cron = DEFAULT_CRON;
     if (StringUtils.isNotEmpty(repeatEvery)) {
-      cron = constructCron(scheduleMinute, scheduleHour, repeatEvery);
+      cron = ThirdEyeUtils.constructCron(scheduleMinute, scheduleHour, repeatEvery);
     }
     anomalyFunctionSpec.setCron(cron);
 
     Long id = anomalyFunctionSpecDAO.createOrUpdate(anomalyFunctionSpec);
 
-    if (isActive) {
-      anomalyDetectionJobManager.start(id);
+    if (isActive) { // this call will set isActive and schedule it
+      detectorHttpUtils.enableAnomalyFunction(String.valueOf(id));
     }
 
     return Response.ok(id).build();
-  }
-
-  private String constructCron(String scheduleMinute, String scheduleHour, String repeatEvery) {
-
-    String minute = "0";
-    String hour = "0";
-    String cron = "0 0 0 * * ?";
-    if (repeatEvery.equals(TimeUnit.DAYS.toString())) {
-      minute = StringUtils.isEmpty(scheduleMinute) ? minute : scheduleMinute;
-      hour = StringUtils.isEmpty(scheduleHour) ? hour : scheduleHour;
-    } else if (repeatEvery.equals(TimeUnit.HOURS.toString())) {
-      minute = StringUtils.isEmpty(scheduleMinute) ? minute : scheduleMinute;
-      hour = "*";
-    }
-    cron = String.format("0 %s %s * * ?", minute, hour);
-    return cron;
-
   }
 
   // Edit anomaly function
@@ -280,7 +249,7 @@ public class AnomalyResource {
       @QueryParam("repeatEvery") String repeatEvery,
       @QueryParam("exploreDimension") String exploreDimensions,
       @QueryParam("properties") String properties,
-      @QueryParam("isActive") boolean isActive) throws ExecutionException {
+      @QueryParam("isActive") boolean isActive) throws Exception {
 
     if (id == null || StringUtils.isEmpty(dataset) || StringUtils.isEmpty(functionName)
         || StringUtils.isEmpty(metric) || StringUtils.isEmpty(windowSize) || StringUtils.isEmpty(windowUnit)
@@ -291,12 +260,19 @@ public class AnomalyResource {
           + ", properties" + properties);
     }
 
+    AnomalyFunctionSpec anomalyFunctionSpec = anomalyFunctionSpecDAO.findById(id);
+    if (anomalyFunctionSpec == null) {
+      throw new IllegalStateException("AnomalyFunctionSpec with id " + id + " does not exist");
+    }
+    // call endpoint to stop if active
+    if (anomalyFunctionSpec.getIsActive()) {
+      detectorHttpUtils.disableAnomalyFunction(String.valueOf(id));
+    }
+
     CollectionSchema schema = CACHE_REGISTRY_INSTANCE.getCollectionSchemaCache().get(dataset);
     TimeGranularity dataGranularity = schema.getTime().getDataGranularity();
 
-    AnomalyFunctionSpec anomalyFunctionSpec = new AnomalyFunctionSpec();
-    anomalyFunctionSpec.setId(id);
-    anomalyFunctionSpec.setIsActive(isActive);
+    anomalyFunctionSpec.setIsActive(false);
     anomalyFunctionSpec.setCollection(dataset);
     anomalyFunctionSpec.setFunctionName(functionName);
     anomalyFunctionSpec.setMetric(metric);
@@ -317,13 +293,17 @@ public class AnomalyResource {
     anomalyFunctionSpec.setExploreDimensions(exploreDimensions);
     anomalyFunctionSpec.setProperties(properties);
 
-    String cron = "";
+    String cron = DEFAULT_CRON;
     if (StringUtils.isNotEmpty(repeatEvery)) {
-      cron = constructCron(scheduleMinute, scheduleHour, repeatEvery);
+      cron = ThirdEyeUtils.constructCron(scheduleMinute, scheduleHour, repeatEvery);
     }
     anomalyFunctionSpec.setCron(cron);
 
     Long responseId = anomalyFunctionSpecDAO.createOrUpdate(anomalyFunctionSpec);
+
+    if (isActive) {
+      detectorHttpUtils.enableAnomalyFunction(String.valueOf(responseId));
+    }
 
     return Response.ok(responseId).build();
   }
@@ -332,9 +312,18 @@ public class AnomalyResource {
   @DELETE
   @UnitOfWork
   @Path("/anomaly-function/delete")
-  public Response deleteAnomalyFunctions(@QueryParam("id") Long id, @QueryParam("functionName") String functionName) {
+  public Response deleteAnomalyFunctions(@QueryParam("id") Long id, @QueryParam("functionName") String functionName)
+      throws IOException {
 
-    anomalyFunctionSpecDAO.delete(id);
+    // call endpoint to stop if active
+    AnomalyFunctionSpec anomalyFunctionSpec = anomalyFunctionSpecDAO.findById(id);
+    if (anomalyFunctionSpec.getIsActive()) {
+      detectorHttpUtils.disableAnomalyFunction(String.valueOf(id));
+    }
+
+    // delete from db
+    anomalyFunctionSpecDAO.delete(anomalyFunctionSpec);
+
     return Response.noContent().build();
   }
 
@@ -359,7 +348,8 @@ public class AnomalyResource {
       DateTime windowStart = windowEnd.minus(TimeUnit.MILLISECONDS.convert(windowSize, windowUnit));
       windowStartIso = windowStart.toString();
     }
-    anomalyDetectionJobManager.runAdHoc(id, windowStartIso, windowEndIso);
+    // call endpoint to run adhoc
+    detectorHttpUtils.runAdhocAnomalyFunction(String.valueOf(id), windowStartIso, windowEndIso);
     return Response.noContent().build();
   }
 
@@ -409,7 +399,7 @@ public class AnomalyResource {
       @QueryParam("filters") String filters,
       @QueryParam("isActive") boolean isActive,
       @QueryParam("sendZeroAnomalyEmail") boolean sendZeroAnomalyEmail,
-      @QueryParam("functionIds") String functionIds) {
+      @QueryParam("functionIds") String functionIds) throws ClientProtocolException, IOException {
 
     if (StringUtils.isEmpty(dataset) || StringUtils.isEmpty(functionIds) || StringUtils.isEmpty(metric)
         || StringUtils.isEmpty(windowSize) || StringUtils.isEmpty(windowUnit) || StringUtils.isEmpty(fromAddress)
@@ -421,13 +411,14 @@ public class AnomalyResource {
     }
 
     EmailConfiguration emailConfiguration = new EmailConfiguration();
+    emailConfiguration.setIsActive(false);
     emailConfiguration.setCollection(dataset);
     emailConfiguration.setMetric(metric);
     emailConfiguration.setFromAddress(fromAddress);
     emailConfiguration.setToAddresses(toAddresses);
-    String cron = "";
+    String cron = DEFAULT_CRON;
     if (StringUtils.isNotEmpty(repeatEvery)) {
-      cron = constructCron(scheduleMinute, scheduleHour, repeatEvery);
+      cron = ThirdEyeUtils.constructCron(scheduleMinute, scheduleHour, repeatEvery);
     }
     emailConfiguration.setCron(cron);
     if (StringUtils.isEmpty(smtpPort)) {
@@ -450,7 +441,6 @@ public class AnomalyResource {
     emailConfiguration.setWindowDelayUnit(windowDelayTimeUnit);
     emailConfiguration.setWindowDelay(windowDelayTime);
 
-    emailConfiguration.setIsActive(isActive);
     emailConfiguration.setSendZeroAnomalyEmail(sendZeroAnomalyEmail);
     emailConfiguration.setFilters(filters);
 
@@ -462,6 +452,10 @@ public class AnomalyResource {
     emailConfiguration.setFunctions(anomalyFunctionSpecs);
 
     Long id = emailConfigurationDAO.createOrUpdate(emailConfiguration);
+    // enable id isActive
+    if (isActive) {
+      detectorHttpUtils.enableEmailConfiguration(String.valueOf(id));
+    }
 
     return Response.ok(id).build();
   }
@@ -487,7 +481,7 @@ public class AnomalyResource {
       @QueryParam("filters") String filters,
       @QueryParam("isActive") boolean isActive,
       @QueryParam("sendZeroAnomalyEmail") boolean sendZeroAnomalyEmail,
-      @QueryParam("functionIds") String functionIds) {
+      @QueryParam("functionIds") String functionIds) throws ClientProtocolException, IOException {
 
     if (id == null || StringUtils.isEmpty(dataset) || StringUtils.isEmpty(functionIds) || StringUtils.isEmpty(metric)
         || StringUtils.isEmpty(windowSize) || StringUtils.isEmpty(windowUnit) || StringUtils.isEmpty(fromAddress)
@@ -498,15 +492,23 @@ public class AnomalyResource {
           + ", toAddresses " + toAddresses + ", smtpHost" + smtpHost);
     }
 
-    EmailConfiguration emailConfiguration = new EmailConfiguration();
+    // stop email report if active
+    EmailConfiguration emailConfiguration = emailConfigurationDAO.findById(id);
+    if (emailConfiguration == null) {
+      throw new IllegalStateException("No email configuration for id " + id);
+    }
+    if (emailConfiguration.getIsActive()) {
+      detectorHttpUtils.disableEmailConfiguration(String.valueOf(id));
+    }
+    emailConfiguration.setIsActive(false);
     emailConfiguration.setId(id);
     emailConfiguration.setCollection(dataset);
     emailConfiguration.setMetric(metric);
     emailConfiguration.setFromAddress(fromAddress);
     emailConfiguration.setToAddresses(toAddresses);
-    String cron = "";
+    String cron = DEFAULT_CRON;
     if (StringUtils.isNotEmpty(repeatEvery)) {
-      cron = constructCron(scheduleMinute, scheduleHour, repeatEvery);
+      cron = ThirdEyeUtils.constructCron(scheduleMinute, scheduleHour, repeatEvery);
     }
     emailConfiguration.setCron(cron);
     if (StringUtils.isEmpty(smtpPort)) {
@@ -529,7 +531,6 @@ public class AnomalyResource {
     emailConfiguration.setWindowDelayUnit(windowDelayTimeUnit);
     emailConfiguration.setWindowDelay(windowDelayTime);
 
-    emailConfiguration.setIsActive(isActive);
     emailConfiguration.setSendZeroAnomalyEmail(sendZeroAnomalyEmail);
     emailConfiguration.setFilters(filters);
 
@@ -542,6 +543,10 @@ public class AnomalyResource {
 
     Long responseId = emailConfigurationDAO.createOrUpdate(emailConfiguration);
 
+    // call endpoint to start, if active
+    if (isActive) {
+      detectorHttpUtils.enableEmailConfiguration(String.valueOf(id));
+    }
     return Response.ok(responseId).build();
   }
 
@@ -550,9 +555,15 @@ public class AnomalyResource {
   @DELETE
   @UnitOfWork
   @Path("/email-config/delete")
-  public Response deleteEmailConfigs(@QueryParam("id") Long id) {
+  public Response deleteEmailConfigs(@QueryParam("id") Long id) throws ClientProtocolException, IOException {
 
-    emailConfigurationDAO.delete(id);
+    // stop schedule if active
+    EmailConfiguration emailConfiguration = emailConfigurationDAO.findById(id);
+    if (emailConfiguration.getIsActive()) {
+      detectorHttpUtils.disableEmailConfiguration(String.valueOf(id));
+    }
+    // delete from db
+    emailConfigurationDAO.delete(emailConfiguration);
     return Response.noContent().build();
   }
 
@@ -561,12 +572,14 @@ public class AnomalyResource {
   @UnitOfWork
   @Path("/email-config/adhoc")
   public Response runAdhocEmailConfig(@QueryParam("id") Long id) throws Exception {
-    emailReportJobManager.sendAdHoc(id);
+    detectorHttpUtils.runAdhocEmailConfiguration(String.valueOf(id));
     return Response.ok(id).build();
   }
+
 
   public static void main(String[] args) {
 
   }
+
 
 }

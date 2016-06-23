@@ -29,7 +29,8 @@ import com.linkedin.thirdeye.util.ThirdEyeUtils;
 @Entity
 @Table(name = "email_configurations")
 @NamedQueries({
-    @NamedQuery(name = "com.linkedin.thirdeye.api.EmailConfiguration#findAll", query = "SELECT c FROM EmailConfiguration c")
+    @NamedQuery(name = "com.linkedin.thirdeye.api.EmailConfiguration#findAll", query = "SELECT c FROM EmailConfiguration c"),
+    @NamedQuery(name = "com.linkedin.thirdeye.api.EmailConfiguration#toggleActive", query = "UPDATE EmailConfiguration set isActive = :isActive WHERE id = :id")
 })
 public class EmailConfiguration {
   @Id
