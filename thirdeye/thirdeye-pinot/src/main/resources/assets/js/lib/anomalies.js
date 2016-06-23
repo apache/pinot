@@ -17,6 +17,7 @@ function getAnomalies(tab) {
   + "&filters=" + hash.filters;
 
   getData(anomaliesUrl).done(function(anomalyData) {
+
     getData(timeSeriesUrl).done(function(timeSeriesData) {
 
         //Error handling when data is falsy (empty, undefined or null)
