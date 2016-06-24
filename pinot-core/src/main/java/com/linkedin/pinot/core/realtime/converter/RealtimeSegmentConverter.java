@@ -73,7 +73,7 @@ public class RealtimeSegmentConverter {
     this(realtimeSegment, outputPath, schema, tableName, segmentName, sortedColumn, new ArrayList<String>());
   }
 
-  public void build() throws Exception {
+  public void build(SegmentVersion segmentVersion) throws Exception {
     // lets create a record reader
     RecordReader reader;
 
@@ -90,7 +90,7 @@ public class RealtimeSegmentConverter {
     }
     genConfig.setTimeColumnName(dataSchema.getTimeFieldSpec().getOutGoingTimeColumnName());
     genConfig.setSegmentTimeUnit(dataSchema.getTimeFieldSpec().getOutgoingGranularitySpec().getTimeType());
-    genConfig.setSegmentVersion(SegmentVersion.v1);
+    genConfig.setSegmentVersion(segmentVersion);
     genConfig.setTableName(tableName);
     genConfig.setOutDir(outputPath);
     genConfig.setSegmentName(segmentName);

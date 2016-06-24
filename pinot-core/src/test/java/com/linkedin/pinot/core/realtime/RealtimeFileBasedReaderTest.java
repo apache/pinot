@@ -15,23 +15,19 @@
  */
 package com.linkedin.pinot.core.realtime;
 
-import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
-import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockMetadata;
@@ -41,12 +37,14 @@ import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.realtime.converter.RealtimeSegmentConverter;
 import com.linkedin.pinot.core.realtime.impl.FileBasedStreamProviderConfig;
 import com.linkedin.pinot.core.realtime.impl.FileBasedStreamProviderImpl;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
+import com.yammer.metrics.core.MetricsRegistry;
 
 
 public class RealtimeFileBasedReaderTest {
@@ -60,8 +58,7 @@ public class RealtimeFileBasedReaderTest {
   private static IndexSegment offlineSegment;
   private static final String segmentName = "someSegment";
 
-  @BeforeClass
-  public static void before() throws Exception {
+  private void setUp(SegmentVersion segmentVersion) throws Exception {
     filePath = RealtimeFileBasedReaderTest.class.getClassLoader().getResource(AVRO_DATA).getFile();
     fieldTypeMap = new HashMap<>();
     fieldTypeMap.put("column1", FieldType.DIMENSION);
@@ -101,13 +98,30 @@ public class RealtimeFileBasedReaderTest {
 
     RealtimeSegmentConverter conveter =
         new RealtimeSegmentConverter(realtimeSegment, "/tmp/realtime", schema, tableName, segmentName, null);
-    conveter.build();
+    conveter.build(segmentVersion);
 
     offlineSegment = Loaders.IndexSegment.load(new File("/tmp/realtime").listFiles()[0], ReadMode.mmap);
   }
 
   @Test
-  public void testDataSourceWithoutPredicateForSingleValueDimensionColumns() {
+  public void allTestsV1() throws Exception {
+    setUp(SegmentVersion.v1);
+    testDataSourceWithoutPredicateForSingleValueDimensionColumns();
+    testDataSourceWithoutPredicateForSingleValueMetricColumns();
+    testDataSourceWithoutPredicateForSingleValueTimeColumns();
+    testDataSourceWithoutPredicateForMultiValueDimensionColumns();
+  }
+
+  @Test
+  public void allTestsV3() throws Exception {
+    setUp(SegmentVersion.v3);
+    testDataSourceWithoutPredicateForSingleValueDimensionColumns();
+    testDataSourceWithoutPredicateForSingleValueMetricColumns();
+    testDataSourceWithoutPredicateForSingleValueTimeColumns();
+    testDataSourceWithoutPredicateForMultiValueDimensionColumns();
+  }
+
+  private void testDataSourceWithoutPredicateForSingleValueDimensionColumns() {
 
     for (FieldSpec spec : schema.getAllFieldSpecs()) {
       if (spec.isSingleValueField() && spec.getFieldType() == FieldType.DIMENSION) {
@@ -148,8 +162,7 @@ public class RealtimeFileBasedReaderTest {
     }
   }
 
-  @Test
-  public void testDataSourceWithoutPredicateForSingleValueMetricColumns() {
+  private void testDataSourceWithoutPredicateForSingleValueMetricColumns() {
 
     for (FieldSpec spec : schema.getAllFieldSpecs()) {
       if (spec.isSingleValueField() && spec.getFieldType() == FieldType.METRIC) {
@@ -184,8 +197,7 @@ public class RealtimeFileBasedReaderTest {
     }
   }
 
-  @Test
-  public void testDataSourceWithoutPredicateForSingleValueTimeColumns() {
+  private void testDataSourceWithoutPredicateForSingleValueTimeColumns() {
 
     for (FieldSpec spec : schema.getAllFieldSpecs()) {
       if (spec.isSingleValueField() && spec.getFieldType() == FieldType.TIME) {
@@ -215,8 +227,7 @@ public class RealtimeFileBasedReaderTest {
     }
   }
 
-  @Test
-  public void testDataSourceWithoutPredicateForMultiValueDimensionColumns() {
+  private void testDataSourceWithoutPredicateForMultiValueDimensionColumns() {
 
     for (FieldSpec spec : schema.getAllFieldSpecs()) {
       if (!spec.isSingleValueField()) {
