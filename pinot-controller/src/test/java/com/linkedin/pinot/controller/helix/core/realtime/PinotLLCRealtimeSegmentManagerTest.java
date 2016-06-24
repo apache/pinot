@@ -77,7 +77,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     final String topic = "someTopic";
     final String rtTableName = "table_REALTIME";
-    final int nPartitions = 4;
+    final int nPartitions = 8;
     final int nReplicas = 2;
     String[] instances = {server1, server2, server3};
 
