@@ -5,7 +5,10 @@ import io.dropwizard.hibernate.UnitOfWork;
 import java.io.IOException;
 import java.net.URLDecoder;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import javax.ws.rs.DELETE;
@@ -17,6 +20,9 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import jersey.repackaged.com.google.common.base.Joiner;
+import jersey.repackaged.com.google.common.collect.Lists;
+
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.client.ClientProtocolException;
 import org.joda.time.DateTime;
@@ -24,7 +30,6 @@ import org.joda.time.format.ISODateTimeFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.api.CollectionSchema;
 import com.linkedin.thirdeye.api.TimeGranularity;
@@ -41,13 +46,15 @@ import com.linkedin.thirdeye.util.ThirdEyeUtils;
 @Path(value = "/dashboard")
 @Produces(MediaType.APPLICATION_JSON)
 public class AnomalyResource {
-  private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry
-      .getInstance();
-
+  private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
   private static final Logger LOG = LoggerFactory.getLogger(AnomalyResource.class);
+
   private static final String DEFAULT_SMTP_PORT = "25";
   public static final String DEFAULT_CRON = "0 0 0 * * ?";
   private static final String UTF8 = "UTF-8";
+  private static final String STAR_DIMENSION = "*";
+  private static final String DIMENSION_JOINER = ",";
+  private static final String DEFAULT_FUNCTION_TYPE = "USER_RULE";
 
   private AnomalyFunctionSpecDAO anomalyFunctionSpecDAO;
   private AnomalyResultDAO anomalyResultDAO;
@@ -72,6 +79,14 @@ public class AnomalyResource {
 
   /************** CRUD for anomalies of a collection ********************************************************/
 
+  @GET
+  @UnitOfWork
+  @Path("/anomalies/metrics")
+  public List<String> viewMetricsForDataset(@QueryParam("dataset") String dataset) {
+    List<String> metrics = anomalyFunctionSpecDAO.findDistinctMetricsByCollection(dataset);
+    return metrics;
+  }
+
   // View anomalies for collection
   @GET
   @UnitOfWork
@@ -83,7 +98,6 @@ public class AnomalyResource {
       @QueryParam("dimensions") String dimensions) {
 
     List<AnomalyResult> anomalyResults = new ArrayList<>();
-    List<AnomalyResult> anomalies = null;
     try {
       DateTime endTime = DateTime.now();
       if (StringUtils.isNotEmpty(endTimeIso)) {
@@ -93,42 +107,58 @@ public class AnomalyResource {
       if (StringUtils.isNotEmpty(startTimeIso)) {
         startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso);
       }
-      anomalyResults = anomalyResultDAO.findAllByCollectionAndTime(dataset, startTime, endTime);
-      anomalies = anomalyResults;
+
+      String[] dimensionPatterns = null;
+      if (StringUtils.isNotBlank(dimensions)) {
+
+        // get dimension names and index position
+        List<String> dimensionNames = CACHE_REGISTRY_INSTANCE.getCollectionSchemaCache()
+            .get(dataset).getDimensionNames();
+        Map<String, Integer> dimensionNameToIndexMap = new HashMap<>();
+        for (int i = 0; i < dimensionNames.size(); i ++) {
+          dimensionNameToIndexMap.put(dimensionNames.get(i), i);
+        }
+
+        // get dimensions map from request
+        dimensions = URLDecoder.decode(dimensions, UTF8 );
+        Multimap<String, String> dimensionsMap = ThirdEyeUtils.convertToMultiMap(dimensions);
+
+        // create dimension patterns
+        String[] dimensionsArray = new String[dimensionNames.size()];
+        Arrays.fill(dimensionsArray, STAR_DIMENSION);
+        List<String> dimensionPatternsList = new ArrayList<>();
+
+        for (String dimensionName : dimensionsMap.keySet()) {
+          List<String> dimensionValues = Lists.newArrayList(dimensionsMap.get(dimensionName));
+          int dimensionIndex = dimensionNameToIndexMap.get(dimensionName);
+          for (String dimensionValue : dimensionValues) {
+            StringBuffer sb = new StringBuffer();
+            dimensionsArray[dimensionIndex] = dimensionValue;
+            sb.append(Joiner.on(DIMENSION_JOINER).join(Lists.newArrayList(dimensionsArray)));
+            dimensionPatternsList.add(sb.toString());
+            dimensionsArray[dimensionIndex] = STAR_DIMENSION;
+          }
+        }
+        dimensionPatterns = new String[dimensionPatternsList.size()];
+        dimensionPatterns = dimensionPatternsList.toArray(dimensionPatterns);
+      }
 
       if (StringUtils.isNotBlank(metric)) {
-        Multimap<String, String> dimensionsMap = ArrayListMultimap.create();
-        if (StringUtils.isNotEmpty(dimensions)) {
-          dimensions = URLDecoder.decode(dimensions, UTF8 );
-          dimensionsMap = ThirdEyeUtils.convertToMultiMap(dimensions);
+        if (StringUtils.isNotBlank(dimensions)) {
+          anomalyResults = anomalyResultDAO.findAllByCollectionTimeMetricAndDimensions(dataset, metric,
+              startTime, endTime, dimensionPatterns);
+        } else {
+          anomalyResults = anomalyResultDAO.findAllByCollectionTimeAndMetric(dataset, metric,
+              startTime, endTime);
         }
-
-        anomalies = new ArrayList<>();
-        for (AnomalyResult anomalyResult : anomalyResults) {
-          String metricName = anomalyResult.getMetric();
-          // if metric doesn't match, continue
-          if (!metricName.contains(metric)) {
-            continue;
-          }
-          if (StringUtils.isNotBlank(dimensions)) {
-            String filters = anomalyResult.getFilters();
-            String dimensionValue = anomalyResult.getDimensions();
-            // if dimension value doesn't match, continue
-            if (StringUtils.isNotBlank(filters) && StringUtils.isNotBlank(dimensionValue)
-                && StringUtils.isNotBlank(dimensionValue = dimensionValue.replaceAll("\\*|,", ""))) { //
-              String dimensionName = filters.split("=")[0];
-              if (!dimensionsMap.containsKey(dimensionName) || !dimensionsMap.get(dimensionName).contains(dimensionValue)) {
-                continue;
-              }
-            }
-          }
-          anomalies.add(anomalyResult);
-        }
+      } else {
+        anomalyResults = anomalyResultDAO.findAllByCollectionAndTime(dataset, startTime, endTime);
       }
+
     } catch (Exception e) {
       LOG.error("Exception in fetching anomalies", e);
     }
-    return anomalies;
+    return anomalyResults;
   }
 
   /************* CRUD for anomaly functions of collection **********************************************/
@@ -140,7 +170,6 @@ public class AnomalyResource {
   public List<AnomalyFunctionSpec> viewAnomalyFunctions(@QueryParam("dataset") String dataset, @QueryParam("metric") String metric) {
 
     List<AnomalyFunctionSpec> anomalyFunctionSpecs = anomalyFunctionSpecDAO.findAllByCollection(dataset);
-
     List<AnomalyFunctionSpec> anomalyFunctions = anomalyFunctionSpecs;
 
     if (StringUtils.isNotEmpty(metric)) {
@@ -190,7 +219,7 @@ public class AnomalyResource {
     anomalyFunctionSpec.setFunctionName(functionName);
     anomalyFunctionSpec.setMetric(metric);
     if (StringUtils.isEmpty(type)) {
-      type = "USER_RULE";
+      type = DEFAULT_FUNCTION_TYPE;
     }
     anomalyFunctionSpec.setType(type);
     anomalyFunctionSpec.setWindowSize(Integer.valueOf(windowSize));
@@ -277,7 +306,7 @@ public class AnomalyResource {
     anomalyFunctionSpec.setFunctionName(functionName);
     anomalyFunctionSpec.setMetric(metric);
     if (StringUtils.isEmpty(type)) {
-      type = "USER_RULE";
+      type = DEFAULT_FUNCTION_TYPE;
     }
     anomalyFunctionSpec.setType(type);
     anomalyFunctionSpec.setWindowSize(Integer.valueOf(windowSize));
@@ -575,11 +604,5 @@ public class AnomalyResource {
     detectorHttpUtils.runAdhocEmailConfiguration(String.valueOf(id));
     return Response.ok(id).build();
   }
-
-
-  public static void main(String[] args) {
-
-  }
-
 
 }

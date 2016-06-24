@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.detector.db;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.hibernate.SessionFactory;
@@ -48,6 +49,16 @@ public class AnomalyFunctionSpecDAO extends AbstractDAO<AnomalyFunctionSpec> {
   public List<AnomalyFunctionSpec> findAllByCollection(String collection) {
     return list(namedQuery("com.linkedin.thirdeye.api.AnomalyFunctionSpec#findAllByCollection")
         .setParameter("collection", collection));
+  }
+
+  public List<String> findDistinctMetricsByCollection(String collection) {
+    List<String> metrics = new ArrayList<>();
+    List<AnomalyFunctionSpec> anomalyFunctionSpecs = list(namedQuery("com.linkedin.thirdeye.api.AnomalyFunctionSpec#findDistinctMetricsByCollection")
+        .setParameter("collection", collection));
+    for (Object anomalyFunctionSpec : anomalyFunctionSpecs) {
+      metrics.add(anomalyFunctionSpec.toString());
+    }
+    return metrics;
   }
 
 }
