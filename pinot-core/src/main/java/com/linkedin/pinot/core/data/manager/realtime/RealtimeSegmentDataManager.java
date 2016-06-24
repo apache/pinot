@@ -15,21 +15,17 @@
  */
 package com.linkedin.pinot.core.data.manager.realtime;
 
-import com.linkedin.pinot.core.data.extractors.FieldExtractorFactory;
-import com.linkedin.pinot.core.data.extractors.PlainFieldExtractor;
 import java.io.File;
 import java.util.List;
 import java.util.Map;
 import java.util.TimerTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
-
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.plist.PropertyListConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.IndexingConfig;
@@ -44,8 +40,11 @@ import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.SegmentType;
 import com.linkedin.pinot.core.data.GenericRow;
+import com.linkedin.pinot.core.data.extractors.FieldExtractorFactory;
+import com.linkedin.pinot.core.data.extractors.PlainFieldExtractor;
 import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.realtime.StreamProvider;
 import com.linkedin.pinot.core.realtime.StreamProviderConfig;
 import com.linkedin.pinot.core.realtime.StreamProviderFactory;
@@ -88,6 +87,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private final String sortedColumn;
   private final List<String> invertedIndexColumns;
   private Logger segmentLogger = LOGGER;
+  private final SegmentVersion _segmentVersion;
 
   // An instance of this class exists only for the duration of the realtime segment that is currently being consumed.
   // Once the segment is committed, the segment is handled by OfflineSegmentDataManager
@@ -96,6 +96,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       RealtimeTableDataManager realtimeResourceManager, final String resourceDataDir, final ReadMode mode,
       final Schema schema, final ServerMetrics serverMetrics) throws Exception {
     super();
+    final String segmentVersionStr = tableConfig.getIndexingConfig().getSegmentFormatVersion();
+    _segmentVersion = SegmentVersion.fromStringOrDefault(segmentVersionStr);
     this.schema = schema;
     this.extractor = (PlainFieldExtractor) FieldExtractorFactory.getPlainFieldExtractor(schema);
     this.serverMetrics =serverMetrics;
@@ -241,7 +243,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
           segmentLogger.info("Trying to build segment");
           final long buildStartTime = System.nanoTime();
-          converter.build();
+          converter.build(_segmentVersion);
           final long buildEndTime = System.nanoTime();
           segmentLogger.info("Built segment in {} ms",
               TimeUnit.MILLISECONDS.convert((buildEndTime - buildStartTime), TimeUnit.NANOSECONDS));
