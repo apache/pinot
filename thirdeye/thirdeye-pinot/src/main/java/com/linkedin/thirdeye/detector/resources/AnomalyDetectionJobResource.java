@@ -1,7 +1,5 @@
 package com.linkedin.thirdeye.detector.resources;
 
-import io.dropwizard.hibernate.UnitOfWork;
-
 import java.util.List;
 
 import javax.ws.rs.DELETE;
@@ -18,6 +16,8 @@ import javax.ws.rs.core.Response;
 import com.linkedin.thirdeye.detector.api.AnomalyFunctionSpec;
 import com.linkedin.thirdeye.detector.db.AnomalyFunctionSpecDAO;
 import com.linkedin.thirdeye.detector.driver.AnomalyDetectionJobManager;
+
+import io.dropwizard.hibernate.UnitOfWork;
 
 @Path("/anomaly-jobs")
 @Produces(MediaType.APPLICATION_JSON)
@@ -66,6 +66,15 @@ public class AnomalyDetectionJobResource {
   public Response adHoc(@PathParam("id") Long id, @QueryParam("start") String start,
       @QueryParam("end") String end) throws Exception {
     manager.runAdHoc(id, start, end);
+    return Response.ok().build();
+  }
+
+  @POST
+  @Path("/{id}/simulate-period")
+  @UnitOfWork
+  public Response simulatePeriod(@PathParam("id") Long id, @QueryParam("start") String start,
+      @QueryParam("end") String end) throws Exception {
+    manager.simulatePeriod(id, start, end);
     return Response.ok().build();
   }
 
