@@ -6,7 +6,7 @@
     <#if (anomalyCount > 0)>
      Below is the full list of anomalies detected during this time period.
     </#if>
-</p>    
+</p>
 <p>
     <img id="Chart" src="cid:${embeddedChart}">
 </p>
@@ -20,7 +20,7 @@
             <th>Reason</th>
             <th>Function</th>
         </tr>
-        <#assign anomalySequenceIndex = 1> 
+        <#assign anomalySequenceIndex = 1>
         <#list groupedAnomalyResults?keys as dimensionKey>
             <#assign results = groupedAnomalyResults[dimensionKey]>
             <#assign dimensionStr = assignedDimensions(dimensionKey)>
@@ -58,7 +58,7 @@
 </#if>
 <br/>
 
-<!--Go to <a href="${dashboardHost}/dashboard#view=anomalies&dataset=${collection}&rand=896&compareMode=WoW&aggTimeGranularity=${windowUnit}&currentStart=${startTime?c}&currentEnd=${endTime?c}&metrics=${metric}&filters=${filters}" target="_top">ThirdEye Anomalies Dashboard</a>-->
+Go to <a href="${dashboardHost}/dashboard#view=anomalies&dataset=${collection}&rand=896&compareMode=WoW&aggTimeGranularity=${windowUnit}&currentStart=${startTime?c}&currentEnd=${endTime?c}&metrics=${metric}&filters=${filters}" target="_top">ThirdEye Anomalies Dashboard</a>
 
 <br/>
 
