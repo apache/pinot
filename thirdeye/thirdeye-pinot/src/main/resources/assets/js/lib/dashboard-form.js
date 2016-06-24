@@ -47,7 +47,12 @@
 
     /** Metric selection **/
     $("#main-view").on("click",".metric-option", function(){
-       selectMetric(this)
+        selectMetrics(this)
+    })
+
+    /** Metric selection **/
+    $("#main-view").on("click",".single-metric-option", function(){
+        selectSingleMetric(this)
     })
 
     /** Dimension selection **/
@@ -151,7 +156,6 @@
 
     function  selectDashboard(target){
 
-
         //Update hash values
         var value = $(target).attr("value");
         hash.dashboard = value;
@@ -160,6 +164,7 @@
         $("#selected-dashboard").text($(target).text());
         $("#selected-dashboard").attr("value",value);
 
+        //If previously error was shown hide it
         if($("#"+ hash.view +"-time-input-form-error").attr("data-error-source") == "dashboard-option"){
             $("#"+ hash.view +"-time-input-form-error").hide();
         }
@@ -179,8 +184,7 @@
     }
 
 
-    function selectMetric(target){
-
+    function selectMetrics(target){
 
         //We have either dashboard or metrics param in the queries
         delete hash.dashboard
@@ -203,7 +207,6 @@
             $("#"+ hash.view +"-time-input-form-error").hide();
         }
 
-
         //Update selectors
         $(target).hide();
         $(".selected-metrics-list[rel='"+ hash.view +"']").append("<li class='added-item uk-button remove-selection' rel='"+ param + "' value='"+ value +"'><a href='#'>" + $(target).text() +  "<i class='uk-icon-close'></i></a></li>");
@@ -211,6 +214,22 @@
         //Enable Go btn
         enableFormSubmit()
     }
+
+    function  selectSingleMetric(target) {
+
+        //Update hash values
+        var value = $(target).attr("value");
+        hash.metrics = value;
+
+        //Update selectors
+        $("#selected-metric").text($(target).text());
+        $("#selected-metric").attr("value", value);
+
+        //Enable Go btn
+        enableFormSubmit()
+
+    }
+
 
     function selectDimension(target){
 

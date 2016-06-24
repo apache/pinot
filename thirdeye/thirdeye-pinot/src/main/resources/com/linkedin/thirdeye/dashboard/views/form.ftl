@@ -25,7 +25,7 @@
                 </div>
             </div>
 			{{/if}}
-			{{#if showMetricSelection}}
+			{{#if showMultiMetricSelection}}
             <div id="{{tabName}}-view-metric-selector" class="view-metric-selector" rel="{{tabName}}">
 				<label class="uk-form-label uk-display-inline-block">Metrics</label>
                 <div class="add-metrics add-btn uk-display-inline-block" rel="{{tabName}}" data-uk-dropdown="{mode:'click'}">
@@ -39,6 +39,21 @@
                 </ul>
             </div>
 			{{/if}}
+            {{#if showSingleMetricSelection}}
+            <div id="{{tabName}}-view-single-metric-selector" class="view-single-metric-selector" rel="{{tabName}}">
+                <label class="uk-form-label uk-display-inline-block">Metric</label>
+                <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group uk-display-inline-block"
+                <!--<div class="add-metric add-btn uk-display-inline-block" rel="{{tabName}}" data-uk-dropdown="{mode:'click'}">-->
+                    <div id="selected-metric" class="uk-button">Select metric</div>
+                    <button class="add-single-metric-btn uk-button uk-button-primary" type="button"><i class="uk-icon-caret-down"></i></button>
+                    <div class="uk-dropdown uk-dropdown-small">
+                        <ul class="single-metric-list uk-nav uk-nav-dropdown single-select">
+                        </ul>
+                    </div>
+                </div>
+
+            </div>
+            {{/if}}
 			{{#if showDimensionSelection}}
             <div class="view-dimension-selector" rel="{{tabName}}">
                 <label class="uk-form-label  uk-display-inline-block">Dimensions</label>

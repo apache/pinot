@@ -88,13 +88,18 @@ function getMetricList() {
 
         validateFormData(data, "No metrics available in the server." , "metrics" )
 
-        /* Handelbars template for query form metric list */
-        var queryFormMetricListData = {data: data};
+        /* Handelbars template for query form multi select metric list */
+        var queryFormMetricListData = {data: data, singleMetricSelector: false};
         var result_query_form_metric_list_template = HandleBarsTemplates.template_metric_list(queryFormMetricListData);
         $(".metric-list").each(function(){ $(this).html(result_query_form_metric_list_template )});
 
+        /* Handelbars template for query form single select metric list */
+        var queryFormMetricListData = {data: data, singleMetricSelector: true};
+        var result_query_form_metric_list_template = HandleBarsTemplates.template_metric_list(queryFormMetricListData);
+        $(".single-metric-list").each(function(){ $(this).html(result_query_form_metric_list_template )});
+
         /* Handelbars template for manage anomalies form metric list */
-        var anomalyFormMetricListData = {data: data, scope: "anomaly-"};
+        var anomalyFormMetricListData = {data: data, scope: "anomaly-", singleMetricSelector: false};
         var result_anomaly_form_metric_list_template = HandleBarsTemplates.template_metric_list(anomalyFormMetricListData);
         $(".anomaly-metric-list").each(function(){ $(this).html(result_anomaly_form_metric_list_template)});
 

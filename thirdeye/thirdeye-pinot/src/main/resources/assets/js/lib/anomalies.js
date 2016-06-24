@@ -13,7 +13,7 @@ function getAnomalies(tab) {
   var currentStartISO = moment(parseInt(hash.currentStart)).toISOString();
   var currentEndISO = moment(parseInt(hash.currentEnd)).toISOString();
   var anomaliesUrl = "/dashboard/anomalies/view?dataset=" + hash.dataset + "&startTimeIso=" + currentStartISO + "&endTimeIso=" + currentEndISO
-  + "&metrics=" + hash.metrics
+  + "&metric=" + hash.metrics
   + "&filters=" + hash.filters;
 
   getData(anomaliesUrl).done(function(anomalyData) {

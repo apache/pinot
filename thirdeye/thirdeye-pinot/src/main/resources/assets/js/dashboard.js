@@ -35,7 +35,8 @@ $(document).ready( function() {
     var dasboard_section_options = {
         tabName: "dashboard",
         showDashboardSelection: true,
-        showMetricSelection: false,
+        showMultiMetricSelection: false,
+        showSingleMetricSelection: false,
         showDimensionSelection: false,
         showFilterSelection: false,
         showTimeSelection: true,
@@ -51,7 +52,8 @@ $(document).ready( function() {
     var compare_section_options = {
         tabName: "compare",
         showDashboardSelection: false,
-        showMetricSelection: true,
+        showMultiMetricSelection: true,
+        showSingleMetricSelection: false,
         showDimensionSelection: true,
         showFilterSelection: true,
         showTimeSelection: true,
@@ -67,7 +69,8 @@ $(document).ready( function() {
     var timseries_section_options = {
         tabName: "timeseries",
         showDashboardSelection: false,
-        showMetricSelection: true,
+        showMultiMetricSelection: true,
+        showSingleMetricSelection: false,
         showDimensionSelection: true,
         showFilterSelection: true,
         showTimeSelection: true,
@@ -85,7 +88,8 @@ $(document).ready( function() {
     var anomalies_section_options = {
         tabName: "anomalies",
         showDashboardSelection: false,
-        showMetricSelection: true,
+        showMultiMetricSelection: false,
+        showSingleMetricSelection: true,
         showDimensionSelection: false,
         showFilterSelection: false,
         showTimeSelection: true,

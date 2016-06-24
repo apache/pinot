@@ -141,8 +141,11 @@ function updateDashboardFormFromHash(){
 
         for (var i = 0, len = metricAry.length; i < len; i++) {
 
-            $(".metric-option[value='" + metricAry[i] + "']", currentForm).click();
-
+            if(hash.view == "anomalies"){
+                $(".single-metric-option[value='" + metricAry[i] + "']", currentForm).click();
+            }else{
+                $(".metric-option[value='" + metricAry[i] + "']", currentForm).click();
+            }
         }
     }
 
