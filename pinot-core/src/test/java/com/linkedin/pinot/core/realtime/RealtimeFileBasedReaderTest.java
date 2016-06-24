@@ -106,15 +106,16 @@ public class RealtimeFileBasedReaderTest {
   @Test
   public void allTestsV1() throws Exception {
     setUp(SegmentVersion.v1);
-    testDataSourceWithoutPredicateForSingleValueDimensionColumns();
-    testDataSourceWithoutPredicateForSingleValueMetricColumns();
-    testDataSourceWithoutPredicateForSingleValueTimeColumns();
-    testDataSourceWithoutPredicateForMultiValueDimensionColumns();
+    allTests();
   }
 
   @Test
   public void allTestsV3() throws Exception {
     setUp(SegmentVersion.v3);
+    allTests();
+  }
+
+  private void allTests() throws Exception {
     testDataSourceWithoutPredicateForSingleValueDimensionColumns();
     testDataSourceWithoutPredicateForSingleValueMetricColumns();
     testDataSourceWithoutPredicateForSingleValueTimeColumns();
