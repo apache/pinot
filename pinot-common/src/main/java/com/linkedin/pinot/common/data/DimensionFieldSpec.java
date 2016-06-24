@@ -22,12 +22,11 @@ public class DimensionFieldSpec extends FieldSpec {
     setFieldType(FieldType.DIMENSION);
   }
 
-  public DimensionFieldSpec(String name, DataType dType, boolean singleValue, String delimeter) {
-    super(name, FieldType.DIMENSION, dType, singleValue, delimeter);
+  public DimensionFieldSpec(String name, DataType dataType, boolean isSingleValueField, String delimiter) {
+    super(name, FieldType.DIMENSION, dataType, isSingleValueField, delimiter);
   }
 
-  public DimensionFieldSpec(String name, DataType dType, boolean singleValue) {
-    super(name, FieldType.DIMENSION, dType, singleValue);
+  public DimensionFieldSpec(String name, DataType dataType, boolean isSingleValueField) {
+    super(name, FieldType.DIMENSION, dataType, isSingleValueField);
   }
-
 }

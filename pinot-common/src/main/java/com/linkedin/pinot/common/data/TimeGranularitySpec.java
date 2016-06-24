@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.common.data;
 
+import com.google.common.base.Preconditions;
 import java.util.concurrent.TimeUnit;
 
 import org.joda.time.DateTime;
@@ -26,7 +27,7 @@ import com.linkedin.pinot.common.data.FieldSpec.DataType;
  * name is the name of the time column in the schema
  * dataType is the data type of the time column (eg. LONG, INT)
  * timeType is the TimeUnit of the time column (eg. HOURS, MINUTES)
- * timeunitSize is the size of the time buckets (eg. 10 MINUTES, 2 HOURS). By defult this will be
+ * timeunitSize is the size of the time buckets (eg. 10 MINUTES, 2 HOURS). By default this will be
  * set to 1.
  * eg. If the time column is in milliseconds, constructor can be invoked as
  * TimeGranularitySpec(LONG, MILLISECONDS, timeColumnName)
@@ -35,60 +36,69 @@ import com.linkedin.pinot.common.data.FieldSpec.DataType;
  */
 public class TimeGranularitySpec {
 
-  private static int DEFAULT_TIME_SIZE = 1;
+  private static final int DEFAULT_TIME_SIZE = 1;
 
-  DataType dataType;
-  TimeUnit timeType;
-  int timeunitSize = DEFAULT_TIME_SIZE;
-  String name;
+  private DataType _dataType;
+  private TimeUnit _timeType;
+  private int _timeunitSize = DEFAULT_TIME_SIZE;
+  private String _name;
 
   // Default constructor required by JSON de-serielizer.
   public TimeGranularitySpec() {
   }
 
   public TimeGranularitySpec(DataType dataType, TimeUnit timeType, String name) {
-    this.dataType = dataType;
-    this.timeType = timeType;
-    this.name = name;
+    _dataType = dataType;
+    _timeType = timeType;
+    _name = name;
   }
 
   public TimeGranularitySpec(DataType dataType, int timeunitSize, TimeUnit timeType, String name) {
-    this.dataType = dataType;
-    this.timeType = timeType;
-    this.timeunitSize = timeunitSize;
-    this.name = name;
+    _dataType = dataType;
+    _timeType = timeType;
+    _timeunitSize = timeunitSize;
+    _name = name;
+  }
+
+  public void setDataType(DataType dataType) {
+    // Data type should not be null.
+    Preconditions.checkNotNull(dataType);
+
+    _dataType = dataType;
   }
 
   public DataType getDataType() {
-    return dataType;
-  }
-
-  public void setDataType(DataType dType) {
-    this.dataType = dType;
-  }
-
-  public TimeUnit getTimeType() {
-    return timeType;
+    return _dataType;
   }
 
   public void setTimeType(TimeUnit timeType) {
-    this.timeType = timeType;
+    // Time type should not be null.
+    Preconditions.checkNotNull(timeType);
+
+    _timeType = timeType;
   }
 
-  public int getTimeunitSize() {
-    return timeunitSize;
+  public TimeUnit getTimeType() {
+    return _timeType;
   }
 
   public void setTimeunitSize(int timeunitSize) {
-    this.timeunitSize = timeunitSize;
+    _timeunitSize = timeunitSize;
+  }
+
+  public int getTimeunitSize() {
+    return _timeunitSize;
+  }
+
+  public void setName(String name) {
+    // Name should not be null.
+    Preconditions.checkNotNull(name);
+
+    _name = name;
   }
 
   public String getName() {
-    return name;
-  }
-
-  public void setName(String columnName) {
-    this.name = columnName;
+    return _name;
   }
 
   @Override
@@ -112,15 +122,21 @@ public class TimeGranularitySpec {
    * @return
    */
   public DateTime toDateTime(long timeSinceEpoch) {
-    return new DateTime(timeType.toMillis(timeSinceEpoch * timeunitSize));
+    return new DateTime(_timeType.toMillis(timeSinceEpoch * _timeunitSize));
   }
 
   @Override
   public int hashCode() {
-    int result = dataType != null ? dataType.hashCode() : 0;
-    result = 31 * result + (timeType != null ? timeType.hashCode() : 0);
-    result = 31 * result + Integer.valueOf(timeunitSize).hashCode();
-    result = 31 * result + (name != null ? name.hashCode() : 0);
+    int result = _dataType != null ? _dataType.hashCode() : 0;
+    result = 31 * result + (_timeType != null ? _timeType.hashCode() : 0);
+    result = 31 * result + Integer.valueOf(_timeunitSize).hashCode();
+    result = 31 * result + (_name != null ? _name.hashCode() : 0);
     return result;
+  }
+
+  @Override
+  public String toString() {
+    return "< data type: " + getDataType() + ", time type: " + getTimeType() + ", time unit size: " + getTimeunitSize()
+        + ", name: " + getName() + " >";
   }
 }

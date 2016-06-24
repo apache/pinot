@@ -15,152 +15,221 @@
  */
 package com.linkedin.pinot.common.data;
 
+import com.google.common.base.Preconditions;
 import org.apache.avro.Schema.Type;
+import org.codehaus.jackson.annotate.JsonIgnore;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
 
-// Json annotation required for abstract classes.
-//@JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, include = JsonTypeInfo.As.PROPERTY, property = "type")
 public abstract class FieldSpec {
   private static final String DEFAULT_DIM_NULL_VALUE_OF_STRING = "null";
-  private static final Integer DEFAULT_DIM_NULL_VALUE_OF_INT = Integer.valueOf(Integer.MIN_VALUE);
-  private static final Long DEFAULT_DIM_NULL_VALUE_OF_LONG = Long.valueOf(Long.MIN_VALUE);
-  private static final Float DEFAULT_DIM_NULL_VALUE_OF_FLOAT = Float.valueOf(Float.NEGATIVE_INFINITY);
-  private static final Double DEFAULT_DIM_NULL_VALUE_OF_DOUBLE = Double.valueOf(Double.NEGATIVE_INFINITY);
+  private static final Integer DEFAULT_DIM_NULL_VALUE_OF_INT = Integer.MIN_VALUE;
+  private static final Long DEFAULT_DIM_NULL_VALUE_OF_LONG = Long.MIN_VALUE;
+  private static final Float DEFAULT_DIM_NULL_VALUE_OF_FLOAT = Float.NEGATIVE_INFINITY;
+  private static final Double DEFAULT_DIM_NULL_VALUE_OF_DOUBLE = Double.NEGATIVE_INFINITY;
 
-  private static final Integer DEFAULT_METRIC_NULL_VALUE_OF_INT = Integer.valueOf(0);
-  private static final Long DEFAULT_METRIC_NULL_VALUE_OF_LONG = Long.valueOf(0);
-  private static final Float DEFAULT_METRIC_NULL_VALUE_OF_FLOAT = Float.valueOf(0);
-  private static final Double DEFAULT_METRIC_NULL_VALUE_OF_DOUBLE = Double.valueOf(0);
+  private static final Integer DEFAULT_METRIC_NULL_VALUE_OF_INT = 0;
+  private static final Long DEFAULT_METRIC_NULL_VALUE_OF_LONG = 0L;
+  private static final Float DEFAULT_METRIC_NULL_VALUE_OF_FLOAT = 0.0F;
+  private static final Double DEFAULT_METRIC_NULL_VALUE_OF_DOUBLE = 0.0D;
 
-  String name;
-  FieldType fieldType;
-  DataType dataType;
-  boolean isSingleValueField = true;
-  String delimiter = ",";
-  Object defaultNullValue;
+  private String _name;
+  private FieldType _fieldType;
+  private DataType _dataType;
+  private boolean _isSingleValueField = true;
+  private String _delimiter = ",";
+  private Object _defaultNullValue;
+
+  // Fields to help make sure we first set data type then default null value.
+  @JsonIgnore
+  protected boolean _isDataTypeSet = false;
+  @JsonIgnore
+  protected boolean _isDefaultNullValueSet = false;
 
   public FieldSpec() {
-
   }
 
-  public FieldSpec(String name, FieldType fType, DataType dType, boolean singleValue, String delimeter) {
-    this.name = name;
-    this.fieldType = fType;
-    this.dataType = dType;
-    this.isSingleValueField = singleValue;
-    this.delimiter = delimeter;
-  }
-
-  public FieldSpec(String name, FieldType fType, DataType dType, boolean singleValue, String delimeter,
+  public FieldSpec(String name, FieldType fieldType, DataType dataType, boolean isSingleValueField, String delimiter,
       Object defaultNullValue) {
-    this.name = name;
-    fieldType = fType;
-    dataType = dType;
-    isSingleValueField = singleValue;
-    delimiter = delimeter;
+    Preconditions.checkNotNull(name);
+    Preconditions.checkNotNull(fieldType);
+    Preconditions.checkNotNull(dataType);
+
+    _name = name;
+    _fieldType = fieldType;
+    _dataType = dataType;
+    _isDataTypeSet = true;
+    _isSingleValueField = isSingleValueField;
+    _delimiter = delimiter;
     if (defaultNullValue != null) {
-      defaultNullValueFromString(defaultNullValue.toString());
-    } else {
-      this.defaultNullValue = null;
+      setDefaultNullValue(defaultNullValue);
     }
   }
 
-  public FieldSpec(String name, FieldType fType, DataType dType, boolean singleValue) {
-    this(name, fType, dType, singleValue, null);
+  public FieldSpec(String name, FieldType fieldType, DataType dataType, boolean isSingleValueField, String delimiter) {
+    this(name, fieldType, dataType, isSingleValueField, delimiter, null);
   }
 
-  public FieldSpec(String name, FieldType fType, DataType dType, String delimeter) {
-    this(name, fType, dType, false, delimeter);
+  public FieldSpec(String name, FieldType fieldType, DataType dataType, boolean isSingleValueField) {
+    this(name, fieldType, dataType, isSingleValueField, null, null);
   }
 
   public void setName(String name) {
-    this.name = name;
+    Preconditions.checkNotNull(name);
+
+    _name = name;
   }
 
   public String getName() {
-    return name;
+    return _name;
+  }
+
+  public void setDelimiter(String delimiter) {
+    _delimiter = delimiter;
   }
 
   public String getDelimiter() {
-    return delimiter;
-  }
-
-  public void setDelimiter(String delimeter) {
-    delimiter = delimeter;
-  }
-
-  public FieldType getFieldType() {
-    return fieldType;
+    return _delimiter;
   }
 
   public void setFieldType(FieldType fieldType) {
-    this.fieldType = fieldType;
+    Preconditions.checkNotNull(fieldType);
+
+    _fieldType = fieldType;
   }
 
-  public DataType getDataType() {
-    return dataType;
+  public FieldType getFieldType() {
+    return _fieldType;
   }
 
   public void setDataType(DataType dataType) {
-    this.dataType = dataType;
+    Preconditions.checkNotNull(dataType);
+
+    _isDataTypeSet = true;
+    _dataType = dataType;
+
+    // Reset default null value if already set.
+    if (_isDefaultNullValueSet) {
+      updateDefaultNullValue();
+    }
   }
 
-  public boolean isSingleValueField() {
-    return isSingleValueField;
+  public DataType getDataType() {
+    return _dataType;
   }
 
   public void setSingleValueField(boolean isSingleValueField) {
-    this.isSingleValueField = isSingleValueField;
+    _isSingleValueField = isSingleValueField;
   }
 
-  // This method is invoked via ObjectMapper, in Schema.java.
-  // Do NOT change the signature or remove it.
-  public void setDefaultNullValue(Object value) {
-    if (value != null) {
-      defaultNullValueFromString(value.toString());
+  public boolean isSingleValueField() {
+    return _isSingleValueField;
+  }
+
+  public void setDefaultNullValue(Object defaultNullValue) {
+    Preconditions.checkNotNull(defaultNullValue);
+
+    _isDefaultNullValueSet = true;
+
+    if (_isDataTypeSet) {
+      defaultNullValueFromString(defaultNullValue.toString());
     } else {
-      this.defaultNullValue = null;
+      // Set default null value as the value passed in, and might reset when setDataType() get called.
+      _defaultNullValue = defaultNullValue;
     }
   }
 
-  // Called when trying to set a default null value from hadoop.
-  public void defaultNullValueFromString(String value) {
-    if (value == null) {
-      this.defaultNullValue = null;
-      return;
+  /**
+   * Helper function to convert the string format default null value to the correct data type.
+   *
+   * @param value string format of the default null value.
+   */
+  protected void defaultNullValueFromString(String value) {
+    DataType dataType = getDataType();
+    switch (dataType) {
+      case INT:
+        _defaultNullValue = Integer.valueOf(value);
+        return;
+      case LONG:
+        _defaultNullValue = Long.valueOf(value);
+        return;
+      case FLOAT:
+        _defaultNullValue = Float.valueOf(value);
+        return;
+      case DOUBLE:
+        _defaultNullValue = Double.valueOf(value);
+        return;
+      case STRING:
+        _defaultNullValue = value;
+        return;
+      default:
+        throw new UnsupportedOperationException("Unknown data type " + dataType);
     }
-    PinotDataType source, dest;
-    source = PinotDataType.STRING;
-    dest = PinotDataType.getPinotDataType(this);
-    if (source == dest) {
-      this.defaultNullValue = value;
-      return;
+  }
+
+  /**
+   * Helper function to update default null value according to the data type.
+   */
+  protected void updateDefaultNullValue() {
+    defaultNullValueFromString(_defaultNullValue.toString());
+  }
+
+  public Object getDefaultNullValue() {
+    if (_defaultNullValue != null) {
+      return _defaultNullValue;
     }
-    Object defaultNullObj;
-    try {
-      defaultNullObj = dest.convert(((Object) value), source);
-    } catch (Exception e) {
-      defaultNullObj = null;
+    DataType dataType = getDataType();
+    switch (_fieldType) {
+      case METRIC:
+        switch (dataType) {
+          case INT:
+            return DEFAULT_METRIC_NULL_VALUE_OF_INT;
+          case LONG:
+            return DEFAULT_METRIC_NULL_VALUE_OF_LONG;
+          case FLOAT:
+            return DEFAULT_METRIC_NULL_VALUE_OF_FLOAT;
+          case DOUBLE:
+            return DEFAULT_METRIC_NULL_VALUE_OF_DOUBLE;
+          default:
+            throw new UnsupportedOperationException("Unknown default null value for metric of data type " + _dataType);
+        }
+      case DIMENSION:
+      case TIME:
+        switch (dataType) {
+          case INT:
+            return DEFAULT_DIM_NULL_VALUE_OF_INT;
+          case LONG:
+            return DEFAULT_DIM_NULL_VALUE_OF_LONG;
+          case FLOAT:
+            return DEFAULT_DIM_NULL_VALUE_OF_FLOAT;
+          case DOUBLE:
+            return DEFAULT_DIM_NULL_VALUE_OF_DOUBLE;
+          case STRING:
+            return DEFAULT_DIM_NULL_VALUE_OF_STRING;
+          default:
+            throw new UnsupportedOperationException(
+                "Unknown default null value for dimension/time column of data type " + _dataType);
+        }
+      default:
+        throw new UnsupportedOperationException("Unknown field type" + _fieldType);
     }
-    this.defaultNullValue = defaultNullObj;
   }
 
   @Override
   public String toString() {
-    return "< data type : " + dataType + " , field type : " + fieldType
-        + ((isSingleValueField) ? ", single value column" : ", multi value column") + ", delimeter : " + delimiter
-        + " >";
+    return "< data type: " + getDataType() + " , field type: " + getFieldType()
+        + (isSingleValueField() ? ", single value column" : ", multi value column, delimiter: '" + getDelimiter() + "'")
+        + ", default null value: " + getDefaultNullValue() + " >";
   }
 
   @Override
-  public boolean equals(Object other) {
-    if (other == null) {
-      return false;
+  public boolean equals(Object obj) {
+    if (obj instanceof FieldSpec) {
+      return toString().equals(obj.toString());
     }
-    return this.toString().equals(other.toString());
+    return false;
   }
 
   @Override
@@ -307,55 +376,6 @@ public abstract class FieldSpec {
         default:
           return null;
       }
-    }
-  }
-
-  public Object getDefaultNullValue() {
-    if (defaultNullValue != null) {
-      return defaultNullValue;
-    }
-    switch (getFieldType()) {
-      case METRIC:
-        switch (dataType) {
-          case INT:
-          case INT_ARRAY:
-            return DEFAULT_METRIC_NULL_VALUE_OF_INT;
-          case LONG:
-          case LONG_ARRAY:
-            return DEFAULT_METRIC_NULL_VALUE_OF_LONG;
-          case FLOAT:
-          case FLOAT_ARRAY:
-            return DEFAULT_METRIC_NULL_VALUE_OF_FLOAT;
-          case DOUBLE:
-          case DOUBLE_ARRAY:
-            return DEFAULT_METRIC_NULL_VALUE_OF_DOUBLE;
-          default:
-            throw new UnsupportedOperationException("Unknown default null value for metric of data type " + dataType);
-        }
-      case DIMENSION:
-      case TIME:
-        switch (getDataType()) {
-          case INT:
-          case INT_ARRAY:
-            return DEFAULT_DIM_NULL_VALUE_OF_INT;
-          case LONG:
-          case LONG_ARRAY:
-            return DEFAULT_DIM_NULL_VALUE_OF_LONG;
-          case FLOAT:
-          case FLOAT_ARRAY:
-            return DEFAULT_DIM_NULL_VALUE_OF_FLOAT;
-          case DOUBLE:
-          case DOUBLE_ARRAY:
-            return DEFAULT_DIM_NULL_VALUE_OF_DOUBLE;
-          case STRING:
-          case STRING_ARRAY:
-            return DEFAULT_DIM_NULL_VALUE_OF_STRING;
-          default:
-            throw new UnsupportedOperationException(
-                "Unknown default null value for dimension/time column of data type " + dataType);
-        }
-      default:
-        throw new UnsupportedOperationException("Not supported data type for null value - " + dataType);
     }
   }
 }

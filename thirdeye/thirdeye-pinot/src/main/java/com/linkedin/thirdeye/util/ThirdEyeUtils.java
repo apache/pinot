@@ -6,8 +6,8 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
@@ -19,11 +19,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.cache.CacheLoader.InvalidCacheLoadException;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
-
-import com.linkedin.thirdeye.dashboard.resources.AnomalyResource;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
-
+import com.linkedin.thirdeye.dashboard.resources.AnomalyResource;
 
 public class ThirdEyeUtils {
   private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeUtils.class);
@@ -167,5 +165,6 @@ public class ThirdEyeUtils {
     cron = String.format("0 %s %s * * ?", minute, hour);
     return cron;
   }
+
 
 }

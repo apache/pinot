@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.common.data;
 
+import com.google.common.base.Preconditions;
 import java.util.concurrent.TimeUnit;
 
 import org.codehaus.jackson.annotate.JsonIgnore;
@@ -22,47 +23,41 @@ import org.codehaus.jackson.annotate.JsonIgnore;
 
 public class TimeFieldSpec extends FieldSpec {
 
-  private TimeGranularitySpec incomingGranularitySpec;
-  private TimeGranularitySpec outgoingGranularitySpec;
+  private TimeGranularitySpec _incomingGranularitySpec;
+  private TimeGranularitySpec _outgoingGranularitySpec;
 
   public TimeFieldSpec() {
     super();
     setFieldType(FieldType.TIME);
-    this.incomingGranularitySpec = null;
-    this.outgoingGranularitySpec = null;
   }
 
-  public TimeFieldSpec(String name, DataType dType, TimeUnit timeType) {
-    super(name, FieldType.TIME, dType, true);
-    this.incomingGranularitySpec = new TimeGranularitySpec(dType, timeType, name);
-    this.outgoingGranularitySpec = incomingGranularitySpec;
+  public TimeFieldSpec(String name, DataType dataType, TimeUnit timeUnit) {
+    super(name, FieldType.TIME, dataType, true);
+    _incomingGranularitySpec = new TimeGranularitySpec(dataType, timeUnit, name);
+    _outgoingGranularitySpec = _incomingGranularitySpec;
+    _isDataTypeSet = true;
   }
 
 
-  public TimeFieldSpec(String name, DataType dType, int size, TimeUnit timeType) {
-    super(name, FieldType.TIME, dType, true);
-    this.incomingGranularitySpec = new TimeGranularitySpec(dType, size, timeType, name);
-    this.outgoingGranularitySpec = incomingGranularitySpec;
+  public TimeFieldSpec(String name, DataType dataType, int size, TimeUnit timeUnit) {
+    super(name, FieldType.TIME, dataType, true);
+    _incomingGranularitySpec = new TimeGranularitySpec(dataType, size, timeUnit, name);
+    _outgoingGranularitySpec = _incomingGranularitySpec;
+    _isDataTypeSet = true;
   }
 
-  public TimeFieldSpec(TimeGranularitySpec incominGranularitySpec) {
-    super(incominGranularitySpec.getName(), FieldType.TIME, incominGranularitySpec.getDataType(), true);
-    this.incomingGranularitySpec = incominGranularitySpec;
-    this.outgoingGranularitySpec = incomingGranularitySpec;
+  public TimeFieldSpec(TimeGranularitySpec incomingGranularitySpec) {
+    super(incomingGranularitySpec.getName(), FieldType.TIME, incomingGranularitySpec.getDataType(), true);
+    _incomingGranularitySpec = incomingGranularitySpec;
+    _outgoingGranularitySpec = _incomingGranularitySpec;
+    _isDataTypeSet = true;
   }
 
-  public TimeFieldSpec(TimeGranularitySpec incominGranularitySpec, TimeGranularitySpec outgoingGranularitySpec) {
-    super(incominGranularitySpec.getName(), FieldType.TIME, incominGranularitySpec.getDataType(), true);
-    this.incomingGranularitySpec = incominGranularitySpec;
-    this.outgoingGranularitySpec = outgoingGranularitySpec;
-  }
-
-  @JsonIgnore
-  public boolean isSame() {
-    if (this.outgoingGranularitySpec == null && this.incomingGranularitySpec != null) {
-      return true;
-    }
-    return incomingGranularitySpec.equals(outgoingGranularitySpec);
+  public TimeFieldSpec(TimeGranularitySpec incomingGranularitySpec, TimeGranularitySpec outgoingGranularitySpec) {
+    super(incomingGranularitySpec.getName(), FieldType.TIME, incomingGranularitySpec.getDataType(), true);
+    _incomingGranularitySpec = incomingGranularitySpec;
+    _outgoingGranularitySpec = outgoingGranularitySpec;
+    _isDataTypeSet = true;
   }
 
   @Override
@@ -71,51 +66,59 @@ public class TimeFieldSpec extends FieldSpec {
   }
 
   @Override
-  public String getDelimiter() {
-    return null;
-  }
-
-  @Override
-  public FieldType getFieldType() {
-    return FieldType.TIME;
-  }
-
-  @Override
   public DataType getDataType() {
     return getOutgoingGranularitySpec().getDataType();
   }
 
-  @Override
-  public boolean isSingleValueField() {
-    return true;
-  }
-
-  @JsonIgnore(true)
+  @JsonIgnore
   public String getIncomingTimeColumnName() {
-    return incomingGranularitySpec.getName();
+    return _incomingGranularitySpec.getName();
   }
 
-  @JsonIgnore(true)
+  @JsonIgnore
   public String getOutGoingTimeColumnName() {
     return getOutgoingGranularitySpec().getName();
   }
 
   public void setIncomingGranularitySpec(TimeGranularitySpec incomingGranularitySpec) {
-    this.incomingGranularitySpec = incomingGranularitySpec;
-  }
+    Preconditions.checkNotNull(incomingGranularitySpec);
 
-  public void setOutgoingGranularitySpec(TimeGranularitySpec outgoingGranularitySpec) {
-    this.outgoingGranularitySpec = outgoingGranularitySpec;
+    _isDataTypeSet = true;
+    _incomingGranularitySpec = incomingGranularitySpec;
+
+    // If already set default null value but not outgoing granularity spec, update the default null value.
+    if (_isDefaultNullValueSet) {
+      updateDefaultNullValue();
+    }
   }
 
   public TimeGranularitySpec getIncomingGranularitySpec() {
-    return incomingGranularitySpec;
+    return _incomingGranularitySpec;
+  }
+
+  public void setOutgoingGranularitySpec(TimeGranularitySpec outgoingGranularitySpec) {
+    Preconditions.checkNotNull(outgoingGranularitySpec);
+
+    _isDataTypeSet = true;
+    _outgoingGranularitySpec = outgoingGranularitySpec;
+
+    // If already set default null value, update the default null value.
+    if (_isDefaultNullValueSet) {
+      updateDefaultNullValue();
+    }
   }
 
   public TimeGranularitySpec getOutgoingGranularitySpec() {
-    if (outgoingGranularitySpec == null) {
-      outgoingGranularitySpec = incomingGranularitySpec;
+    if (_outgoingGranularitySpec == null) {
+      _outgoingGranularitySpec = _incomingGranularitySpec;
     }
-    return outgoingGranularitySpec;
+    return _outgoingGranularitySpec;
+  }
+
+  @Override
+  public String toString() {
+    return "< data type: " + getDataType() + ", field type : " + getFieldType() + ", incoming granularity spec: "
+        + getIncomingGranularitySpec() + ", outgoing granularity spec: " + getOutgoingGranularitySpec()
+        + ", default null value: " + getDefaultNullValue() + " >";
   }
 }

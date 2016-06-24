@@ -1,5 +1,9 @@
 package com.linkedin.thirdeye.detector;
 
+
+import java.util.ArrayList;
+import java.util.Arrays;
+
 import io.dropwizard.assets.AssetsBundle;
 import io.dropwizard.db.DataSourceFactory;
 import io.dropwizard.jetty.ConnectorFactory;
@@ -13,8 +17,6 @@ import io.dropwizard.server.SimpleServerFactory;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
 
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.Callable;
