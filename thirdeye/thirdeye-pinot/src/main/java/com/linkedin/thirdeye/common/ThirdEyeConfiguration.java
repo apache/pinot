@@ -29,6 +29,13 @@ public abstract class ThirdEyeConfiguration extends Configuration {
   private String whitelistCollections = "";
   private String blacklistCollections = "";
 
+  private String detectorHost = "";
+  private int detectorPort = 0;
+
+  private String smtpHost = "";
+  private int smtpPort = 0;
+
+
   @Valid
   @NotNull
   private final DataSourceFactory database = new DataSourceFactory();
@@ -80,6 +87,42 @@ public abstract class ThirdEyeConfiguration extends Configuration {
 
   public void setBlacklistCollections(String blacklistCollections) {
     this.blacklistCollections = blacklistCollections;
+  }
+
+  public String getFunctionConfigPath() {
+    return getRootDir() + "/detector-config/anomaly-functions/functions.properties";
+  }
+
+  public String getDetectorHost() {
+    return detectorHost;
+  }
+
+  public void setDetectorHost(String detectorHost) {
+    this.detectorHost = detectorHost;
+  }
+
+  public int getDetectorPort() {
+    return detectorPort;
+  }
+
+  public void setDetectorPort(int detectorPort) {
+    this.detectorPort = detectorPort;
+  }
+
+  public String getSmtpHost() {
+    return smtpHost;
+  }
+
+  public void setSmtpHost(String smtpHost) {
+    this.smtpHost = smtpHost;
+  }
+
+  public int getSmtpPort() {
+    return smtpPort;
+  }
+
+  public void setSmtpPort(int smtpPort) {
+    this.smtpPort = smtpPort;
   }
 
 }

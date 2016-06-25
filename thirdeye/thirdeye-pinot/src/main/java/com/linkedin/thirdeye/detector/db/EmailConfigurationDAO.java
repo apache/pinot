@@ -14,18 +14,30 @@ public class EmailConfigurationDAO extends AbstractDAO<EmailConfiguration> {
     super(sessionFactory);
   }
 
+
+  public void toggleActive(Long id, boolean isActive) {
+    namedQuery("com.linkedin.thirdeye.api.EmailConfiguration#toggleActive").setParameter("id", id)
+        .setParameter("isActive", isActive).executeUpdate();
+  }
+
   public EmailConfiguration findById(Long id) {
     return get(id);
   }
 
-  public Long create(EmailConfiguration emailConfiguration) {
-    return persist(emailConfiguration).getId();
+  public Long createOrUpdate(EmailConfiguration emailConfiguration) {
+    long id = persist(emailConfiguration).getId();
+    currentSession().getTransaction().commit();
+    return id;
   }
 
   public void delete(Long id) {
     EmailConfiguration anomalyResult = new EmailConfiguration();
     anomalyResult.setId(id);
     currentSession().delete(anomalyResult);
+  }
+
+  public void delete(EmailConfiguration emailConfiguration) {
+    currentSession().delete(emailConfiguration);
   }
 
   public List<EmailConfiguration> findAll() {

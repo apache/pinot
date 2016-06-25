@@ -31,15 +31,26 @@ function formSubmit(target){
 
     //update hash.metrics
     delete hash.metrics
-    var selectedMetrics = $(".view-metric-selector[rel='" + currentTab + "'] .added-item");
 
-    var numSelectedMetrics = selectedMetrics.length;
-    var metricAry = [];
-    for (var i = 0; i < numSelectedMetrics; i++) {
-        metricAry.push(selectedMetrics[i].getAttribute("value"));
-    }
-    if (numSelectedMetrics > 0) {
-        hash.metrics = metricAry.toString();
+    var selectedMetrics;
+    if(currentTab == "anomalies"){
+        selectedMetrics = $("#selected-metric").attr("value") ? $("#selected-metric").attr("value") : "";
+
+        if(selectedMetrics != ""){
+            hash.metrics = selectedMetrics;
+        }
+    }else{
+        selectedMetrics = $(".view-metric-selector[rel='" + currentTab + "'] .added-item");
+
+        var numSelectedMetrics = selectedMetrics.length;
+        var metricAry = [];
+        for (var i = 0; i < numSelectedMetrics; i++) {
+            metricAry.push(selectedMetrics[i].getAttribute("value"));
+        }
+        if (numSelectedMetrics > 0) {
+            hash.metrics = metricAry.toString();
+        }
+
     }
 
     //update hash.dimensions

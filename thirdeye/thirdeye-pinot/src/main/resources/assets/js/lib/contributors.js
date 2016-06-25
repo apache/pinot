@@ -53,7 +53,6 @@ function getContributors(tab) {
          $("input[type='checkbox']", currentTable).prop('checked', true);
          } else {
          $("input[type='checkbox']", currentTable).removeAttr('checked');
-
          }
          // Todo: rewrite sumColumn with ratio metric values
 
@@ -222,6 +221,10 @@ function renderContributionTimeSeries(ajaxData) {
             label : {
               text : "% change",
               position: 'outer-middle'
+            },
+            tick: {
+              count: 5,
+              format: function (d) { return d.toFixed(2)}
             }
           }
           

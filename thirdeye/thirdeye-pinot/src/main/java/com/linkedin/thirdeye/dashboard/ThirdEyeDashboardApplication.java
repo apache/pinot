@@ -5,9 +5,9 @@ import org.slf4j.LoggerFactory;
 
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
+import com.linkedin.thirdeye.dashboard.resources.AnomalyResource;
 import com.linkedin.thirdeye.dashboard.resources.CacheResource;
 import com.linkedin.thirdeye.dashboard.resources.DashboardResource;
-import com.linkedin.thirdeye.detector.resources.AnomalyResultResource;
 
 import io.dropwizard.assets.AssetsBundle;
 import io.dropwizard.setup.Bootstrap;
@@ -21,7 +21,6 @@ public class ThirdEyeDashboardApplication
   public static final String WEBAPP_CONFIG = "/webapp-config";
 
   public ThirdEyeDashboardApplication() {
-
   }
 
   @Override
@@ -40,7 +39,6 @@ public class ThirdEyeDashboardApplication
     bootstrap.addBundle(new AssetsBundle("/assets/lib", "/assets/lib", null, "lib"));
     bootstrap.addBundle(new AssetsBundle("/assets/img", "/assets/img", null, "img"));
     bootstrap.addBundle(new AssetsBundle("/assets/data", "/assets/data", null, "data"));
-
   }
 
   @Override
@@ -54,8 +52,8 @@ public class ThirdEyeDashboardApplication
     }
 
     env.jersey().register(new DashboardResource(BaseThirdEyeApplication.getDashboardConfigDAO(config)));
-    env.jersey().register(new AnomalyResultResource(anomalyResultDAO));
     env.jersey().register(new CacheResource());
+    env.jersey().register(new AnomalyResource(anomalyFunctionSpecDAO, anomalyResultDAO, emailConfigurationDAO, config));
   }
 
   public static void main(String[] args) throws Exception {

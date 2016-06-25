@@ -57,7 +57,12 @@ import com.linkedin.thirdeye.util.ThirdEyeUtils;
     @NamedQuery(name = "com.linkedin.thirdeye.api.AnomalyResult#findAllByTimeAndEmailId", query = "SELECT r FROM EmailConfiguration d JOIN d.functions f JOIN f.anomalies r "
         + "WHERE d.id = :emailId "
         + "AND ((r.startTimeUtc >= :startTimeUtc AND r.startTimeUtc <= :endTimeUtc) "
-        + "OR (r.endTimeUtc >= :startTimeUtc AND r.endTimeUtc <= :endTimeUtc))")
+        + "OR (r.endTimeUtc >= :startTimeUtc AND r.endTimeUtc <= :endTimeUtc))"),
+        @NamedQuery(name = "com.linkedin.thirdeye.api.AnomalyResult#findAllByCollectionTimeMetricAndDimensions", query = "SELECT r FROM AnomalyResult r WHERE r.collection = :collection "
+            + "AND r.metric = :metric "
+            + "AND r.dimensions IN :dimensions "
+            + "AND ((r.startTimeUtc >= :startTimeUtc AND r.startTimeUtc <= :endTimeUtc) "
+            + "OR (r.endTimeUtc >= :startTimeUtc AND r.endTimeUtc <= :endTimeUtc))")
 })
 public class AnomalyResult implements Comparable<AnomalyResult> {
   private static Joiner SEMICOLON = Joiner.on(";");

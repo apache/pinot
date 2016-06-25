@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.detector.db;
 
+import io.dropwizard.hibernate.AbstractDAO;
+
 import java.util.List;
 
 import org.hibernate.SessionFactory;
@@ -7,8 +9,6 @@ import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 
 import com.linkedin.thirdeye.detector.api.AnomalyResult;
-
-import io.dropwizard.hibernate.AbstractDAO;
 
 public class AnomalyResultDAO extends AbstractDAO<AnomalyResult> {
   public AnomalyResultDAO(SessionFactory sessionFactory) {
@@ -75,6 +75,17 @@ public class AnomalyResultDAO extends AbstractDAO<AnomalyResult> {
             .setParameter("startTimeUtc", startTime.toDateTime(DateTimeZone.UTC).getMillis())
             .setParameter("endTimeUtc", endTime.toDateTime(DateTimeZone.UTC).getMillis())
             .setParameter("metric", metric).setParameter("filters", filters));
+  }
+
+  public List<AnomalyResult> findAllByCollectionTimeMetricAndDimensions(String collection,
+      String metric, DateTime startTime, DateTime endTime, String[] dimensions) {
+
+    return list(namedQuery(
+        "com.linkedin.thirdeye.api.AnomalyResult#findAllByCollectionTimeMetricAndDimensions")
+            .setParameter("collection", collection)
+            .setParameter("startTimeUtc", startTime.toDateTime(DateTimeZone.UTC).getMillis())
+            .setParameter("endTimeUtc", endTime.toDateTime(DateTimeZone.UTC).getMillis())
+            .setParameter("metric", metric).setParameterList("dimensions", dimensions));
   }
 
   public List<AnomalyResult> findAllByCollectionTimeAndFilters(String collection,

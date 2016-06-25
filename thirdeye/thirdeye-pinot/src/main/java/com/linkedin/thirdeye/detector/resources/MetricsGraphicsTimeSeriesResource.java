@@ -21,7 +21,6 @@ import org.joda.time.format.ISODateTimeFormat;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.LinkedListMultimap;
@@ -30,6 +29,8 @@ import com.linkedin.thirdeye.api.CollectionSchema;
 import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.TimeGranularity;
+import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
+import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.client.comparison.TimeOnTimeComparisonHandler;
 import com.linkedin.thirdeye.detector.api.AnomalyResult;
 import com.linkedin.thirdeye.detector.api.MetricsGraphicsTimeSeries;
@@ -39,13 +40,15 @@ import io.dropwizard.hibernate.UnitOfWork;
 
 @Path("/time-series/metrics-graphics")
 public class MetricsGraphicsTimeSeriesResource {
-  private static final Joiner CSV = Joiner.on(", ");
+  private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
+
   private final TimeOnTimeComparisonHandler timeOnTimeComparisonHandler;
   private final AnomalyResultDAO resultDAO;
+  private final QueryCache queryCache;
 
-  public MetricsGraphicsTimeSeriesResource(TimeOnTimeComparisonHandler timeOnTimeComparisonHandler,
-      AnomalyResultDAO resultDAO) {
-    this.timeOnTimeComparisonHandler = timeOnTimeComparisonHandler;
+  public MetricsGraphicsTimeSeriesResource(AnomalyResultDAO resultDAO) {
+    this.queryCache = CACHE_REGISTRY_INSTANCE.getQueryCache();
+    this.timeOnTimeComparisonHandler = new TimeOnTimeComparisonHandler(queryCache);
     this.resultDAO = resultDAO;
   }
 

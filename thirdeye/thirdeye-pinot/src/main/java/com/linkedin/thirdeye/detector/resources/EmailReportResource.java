@@ -11,7 +11,6 @@ import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
-import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
@@ -35,28 +34,8 @@ public class EmailReportResource {
   @Timed
   @UnitOfWork
   public Response create(EmailConfiguration configuration) {
-    Long id = dao.create(configuration);
+    Long id = dao.createOrUpdate(configuration);
     return Response.ok(id).build();
-  }
-
-  @POST
-  @Timed
-  @UnitOfWork
-  @Path("/from-file")
-  public Response testFile(EmailConfiguration configuration, @QueryParam("name") String name)
-      throws Exception {
-    configuration.setId(-1);
-    manager.runAdhocConfig(configuration, name);
-    return Response.ok(name).build();
-  }
-
-  @POST
-  @Timed
-  @UnitOfWork
-  @Path("/{id}/ad-hoc")
-  public Response sendAdHoc(@PathParam("id") Long id) throws Exception {
-    manager.sendAdHoc(id);
-    return Response.ok().build();
   }
 
   @DELETE

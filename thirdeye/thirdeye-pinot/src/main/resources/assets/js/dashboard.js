@@ -35,13 +35,15 @@ $(document).ready( function() {
     var dasboard_section_options = {
         tabName: "dashboard",
         showDashboardSelection: true,
-        showMetricSelection: false,
+        showMultiMetricSelection: false,
+        showSingleMetricSelection: false,
         showDimensionSelection: false,
         showFilterSelection: false,
         showTimeSelection: true,
         showGranularity: true,
         showAggregateAllGranularity: false,
-        needComparisonTimeRange: true
+        needComparisonTimeRange: true,
+        showConfigAnomaly: false
     }
     var result_form_template = HandleBarsTemplates.template_form(dasboard_section_options)
     $("#dashboard-section #form-area").append(result_form_template);
@@ -50,13 +52,15 @@ $(document).ready( function() {
     var compare_section_options = {
         tabName: "compare",
         showDashboardSelection: false,
-        showMetricSelection: true,
+        showMultiMetricSelection: true,
+        showSingleMetricSelection: false,
         showDimensionSelection: true,
         showFilterSelection: true,
         showTimeSelection: true,
         showGranularity: true,
         showAggregateAllGranularity: true,
-        needComparisonTimeRange: true
+        needComparisonTimeRange: true,
+        showConfigAnomaly: false
     }
     var result_form_template = HandleBarsTemplates.template_form(compare_section_options)
     $("#compare-section #form-area").append(result_form_template);
@@ -65,13 +69,15 @@ $(document).ready( function() {
     var timseries_section_options = {
         tabName: "timeseries",
         showDashboardSelection: false,
-        showMetricSelection: true,
+        showMultiMetricSelection: true,
+        showSingleMetricSelection: false,
         showDimensionSelection: true,
         showFilterSelection: true,
         showTimeSelection: true,
         showGranularity: true,
         showAggregateAllGranularity: false,
-        needComparisonTimeRange: false
+        needComparisonTimeRange: false,
+        showConfigAnomaly: false
     }
 
     var result_form_template = HandleBarsTemplates.template_form(timseries_section_options)
@@ -82,13 +88,15 @@ $(document).ready( function() {
     var anomalies_section_options = {
         tabName: "anomalies",
         showDashboardSelection: false,
-        showMetricSelection: true,
+        showMultiMetricSelection: false,
+        showSingleMetricSelection: true,
         showDimensionSelection: false,
-        showFilterSelection: true,
+        showFilterSelection: false,
         showTimeSelection: true,
         showGranularity: false,
         showAggregateAllGranularity: false,
-        needComparisonTimeRange: false
+        needComparisonTimeRange: false,
+        showConfigAnomaly: true
     }
 
     var result_form_template = HandleBarsTemplates.template_form(anomalies_section_options)

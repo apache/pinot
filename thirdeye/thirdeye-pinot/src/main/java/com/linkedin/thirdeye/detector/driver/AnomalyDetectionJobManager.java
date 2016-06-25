@@ -24,20 +24,22 @@ import org.slf4j.LoggerFactory;
 import com.codahale.metrics.MetricRegistry;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
+import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesHandler;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesResponseConverter;
 import com.linkedin.thirdeye.detector.api.AnomalyFunctionSpec;
 import com.linkedin.thirdeye.detector.db.AnomalyFunctionRelationDAO;
 import com.linkedin.thirdeye.detector.db.AnomalyFunctionSpecDAO;
 import com.linkedin.thirdeye.detector.db.AnomalyResultDAO;
-import com.linkedin.thirdeye.detector.driver.TestAnomalyApplication.TestType;
 import com.linkedin.thirdeye.detector.function.AnomalyFunction;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 
 public class AnomalyDetectionJobManager {
   private static final Logger LOG = LoggerFactory.getLogger(AnomalyDetectionJobManager.class);
+  private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
+
   private final Scheduler quartzScheduler;
-  // private final ThirdEyeClient thirdEyeClient;
   private final TimeSeriesHandler timeSeriesHandler;
   private final TimeSeriesResponseConverter timeSeriesResponseConverter;
   private final AnomalyFunctionSpecDAO specDAO;
@@ -49,18 +51,21 @@ public class AnomalyDetectionJobManager {
   private final MetricRegistry metricRegistry;
   private final AnomalyFunctionFactory anomalyFunctionFactory;
   private final FailureEmailConfiguration failureEmailConfig;
+  private QueryCache queryCache;
 
   private static final ObjectMapper reader = new ObjectMapper(new YAMLFactory());
 
-  public AnomalyDetectionJobManager(Scheduler quartzScheduler, TimeSeriesHandler timeSeriesHandler,
-      TimeSeriesResponseConverter timeSeriesResponseConverter, AnomalyFunctionSpecDAO specDAO,
+  public AnomalyDetectionJobManager(Scheduler quartzScheduler, AnomalyFunctionSpecDAO specDAO,
       AnomalyFunctionRelationDAO relationDAO, AnomalyResultDAO resultDAO,
       SessionFactory sessionFactory, MetricRegistry metricRegistry,
       AnomalyFunctionFactory anomalyFunctionFactory, FailureEmailConfiguration failureEmailConfig) {
+
+    this.queryCache = CACHE_REGISTRY_INSTANCE.getQueryCache();
+
+    timeSeriesHandler = new TimeSeriesHandler(queryCache);
+    timeSeriesResponseConverter = TimeSeriesResponseConverter.getInstance();
+
     this.quartzScheduler = quartzScheduler;
-    // this.thirdEyeClient = thirdEyeClient;
-    this.timeSeriesHandler = timeSeriesHandler;
-    this.timeSeriesResponseConverter = timeSeriesResponseConverter;
     this.specDAO = specDAO;
     this.relationDAO = relationDAO;
     this.resultDAO = resultDAO;
@@ -197,35 +202,6 @@ public class AnomalyDetectionJobManager {
     String jobKey = String.format("file-based_anomaly_function_job_%s", executionName);
     buildAndScheduleJob(jobKey, trigger, anomalyFunction, spec, windowStartIsoString,
         windowEndIsoString);
-  }
-
-  public static void main(String[] args) throws Exception {
-    if (args.length != 2 && args.length != 4) {
-      System.err
-          .println("Arguments must be configYml functionSpecPath [startISO endISO, both hour aligned]");
-      System.exit(1);
-    }
-    String thirdEyeConfigDir = args[0];
-    System.setProperty("dw.rootDir", thirdEyeConfigDir);
-    String detectorApplicationConfigFile = thirdEyeConfigDir + "/" + "detector.yml";
-    String filePath = args[1];
-    String startISO = null;
-    String endISO = null;
-    if (args.length == 4) {
-      startISO = args[2];
-      endISO = args[3];
-    } else {
-      DateTime now = DateTime.now().minusHours(3); // data delay.
-      startISO = now.minusDays(7) // subtract 7 days to set up w/w comparison
-          .minusHours(4) // subtract hours to specify what the length of the comparison window is
-          .toString();
-      endISO = now.toString();
-    }
-    int existingFunctionId = 1;
-    new TestAnomalyApplication(filePath, startISO, endISO, TestType.FUNCTION, existingFunctionId)
-        .run(new String[] {
-            "server", detectorApplicationConfigFile
-        });
   }
 
 }

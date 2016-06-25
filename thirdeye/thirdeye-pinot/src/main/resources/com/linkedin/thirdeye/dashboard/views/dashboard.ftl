@@ -13,8 +13,7 @@
 				<li id="dashboard-header-tab" class="header-tab" rel="dashboard"><a href="#">Dashboard</a></li>
 				<li id="compare-header-tab" class="header-tab" rel="compare"><a href="#">Time over time comparison</a></li>
 				<li id="timeseries-header-tab" class="header-tab" rel="timeseries"><a href="#">Timeseries</a></li>
-				<!--  Hiding anomalies till it's ready for production-->
-				<li id="anomalies-header-tab" class="header-tab hidden" rel="anomalies"><a href="#">Anomalies</a></li>
+				<li id="anomalies-header-tab" class="header-tab" rel="anomalies"><a href="#">Anomalies</a></li>
 			</ul>
 
 
@@ -35,16 +34,14 @@
     <#include "tabs/tab.ftl">
     <#include "form.ftl">
     <#include "dataset-list.ftl">
+    <#include "metric-list.ftl">
     <#include "filter-value.ftl">
     <#include "metric-timeseries.ftl">
     <#include "tabular.ftl">
     <#include "heat-map.ftl">
     <#include "contributors.ftl">
     <#include "timeseries.ftl">
-    <!--
-    Hiding anomalies till it's ready for production -->
     <#include "anomalies.ftl">
-
 
 </body>
 

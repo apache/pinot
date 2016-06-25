@@ -27,7 +27,8 @@ import com.linkedin.thirdeye.util.ThirdEyeUtils;
 @NamedQueries({
     @NamedQuery(name = "com.linkedin.thirdeye.api.AnomalyFunctionSpec#findAll", query = "SELECT af FROM AnomalyFunctionSpec af"),
     @NamedQuery(name = "com.linkedin.thirdeye.api.AnomalyFunctionSpec#findAllByCollection", query = "SELECT af FROM AnomalyFunctionSpec af WHERE af.collection = :collection"),
-    @NamedQuery(name = "com.linkedin.thirdeye.api.AnomalyFunctionSpec#toggleActive", query = "UPDATE AnomalyFunctionSpec set isActive = :isActive WHERE id = :id")
+    @NamedQuery(name = "com.linkedin.thirdeye.api.AnomalyFunctionSpec#toggleActive", query = "UPDATE AnomalyFunctionSpec set isActive = :isActive WHERE id = :id"),
+    @NamedQuery(name = "com.linkedin.thirdeye.api.AnomalyFunctionSpec#findDistinctMetricsByCollection", query = "SELECT DISTINCT(af.metric) FROM AnomalyFunctionSpec af WHERE af.collection = :collection"),
 })
 public class AnomalyFunctionSpec {
   @Id
@@ -39,6 +40,7 @@ public class AnomalyFunctionSpec {
 
   @Column(name = "function_name", nullable = false)
   private String functionName;
+
 
   @Column(name = "metric", nullable = false)
   private String metric;

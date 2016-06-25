@@ -5,8 +5,14 @@ function getDataSetList(){
         validateFormData(data,"No dataset list arrived from the server.", "datasets" )
 
         /* Handelbars template for datasets dropdown */
-        var result_datasets_template = HandleBarsTemplates.template_datasets(data);
+        var queryFormDatasetData = {data: data}
+        var result_datasets_template = HandleBarsTemplates.template_datasets(queryFormDatasetData);
         $(".landing-dataset").each(function(){ $(this).html(result_datasets_template)});
+
+        /* Handelbars template for anomaly form datasets dropdown */
+        var anomalyFormDatasetData = {data: data, scope: "anomaly-"}
+        var result_anomly_datasets_template = HandleBarsTemplates.template_datasets(anomalyFormDatasetData);
+        $(".anomaly-dataset").each(function(){ $(this).html(result_anomly_datasets_template)});
 
         $(".selected-dataset").text("Select dataset");
 
@@ -66,6 +72,7 @@ function getDashboardList(){
         }
         $("#dashboard-list").html(dashboardListHtml);
         $("#selected-dashboard").text("Select dashboard");
+        $("#dashboard-list").html(dashboardListHtml);
 
         window.responseDataPopulated++
         formComponentPopulated()
@@ -81,14 +88,20 @@ function getMetricList() {
 
         validateFormData(data, "No metrics available in the server." , "metrics" )
 
+        /* Handelbars template for query form multi select metric list */
+        var queryFormMetricListData = {data: data, singleMetricSelector: false};
+        var result_query_form_metric_list_template = HandleBarsTemplates.template_metric_list(queryFormMetricListData);
+        $(".metric-list").each(function(){ $(this).html(result_query_form_metric_list_template )});
 
-        /* Create metrics dropdown */
-        var metricListHtml = "";
-        for (var i = 0, len = data.length; i < len; i++) {
-            metricListHtml += "<li class='metric-option' rel='metrics' value='" + data[i] + "'><a href='#' class='uk-dropdown-close'>" + data[i] + "</a></li>";
-        }
-        $(".metric-list").html(metricListHtml);
+        /* Handelbars template for query form single select metric list */
+        var queryFormMetricListData = {data: data, singleMetricSelector: true};
+        var result_query_form_metric_list_template = HandleBarsTemplates.template_metric_list(queryFormMetricListData);
+        $(".single-metric-list").each(function(){ $(this).html(result_query_form_metric_list_template )});
 
+        /* Handelbars template for manage anomalies form metric list */
+        var anomalyFormMetricListData = {data: data, scope: "anomaly-", singleMetricSelector: false};
+        var result_anomaly_form_metric_list_template = HandleBarsTemplates.template_metric_list(anomalyFormMetricListData);
+        $(".anomaly-metric-list").each(function(){ $(this).html(result_anomaly_form_metric_list_template)});
 
         window.responseDataPopulated++
         formComponentPopulated()

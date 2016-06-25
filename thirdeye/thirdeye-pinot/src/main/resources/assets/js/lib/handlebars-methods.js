@@ -17,7 +17,8 @@ $(document).ready(function() {
             return d3.scale.category20().range()[id];
 
         } else{
-            return  Handlebars.helpers.assignColorByID(numIds,id)        }
+            return  Handlebars.helpers.assignColorByID(numIds,id)
+        }
 
     });
 
@@ -68,10 +69,27 @@ $(document).ready(function() {
         return colorAry[index]
     });
 
+    //Assign hidden class to element if the 2 params are equal
     Handlebars.registerHelper('hide_if_eq', function(param1, param2){
        if(param1 == param2){
            return "uk-hidden"
        }
+    });
+
+    //parse anomaly data properties value and returns the requested param
+    Handlebars.registerHelper('lookupAnomalyProperty', function(propertiestSring, param){
+
+        var propertiesAry = propertiestSring.split(";");
+        for ( var i= 0, numProp = propertiesAry.length; i<numProp; i++){
+           var keyValue = propertiesAry[i];
+           keyValue = keyValue.split("=")
+
+           var key = keyValue[0];
+           if( key == param){
+               var value = keyValue[1]
+               return key + " = " + value
+           }
+        }
     });
 
         //takes a value and if alias is available displays the alias
@@ -85,6 +103,7 @@ $(document).ready(function() {
         }
     });
 
+    //helper for tabular and contributor view only to display the ratio values in every 3rd cell
     Handlebars.registerHelper('displayRatio', function (val, index) {
         if ((index + 1) % 3 == 0 && parseFloat(val)) {
             return  val + "%";
@@ -216,6 +235,9 @@ $(document).ready(function() {
     var source_datasets_template = $("#datasets-template").html();
     HandleBarsTemplates.template_datasets = Handlebars.compile(source_datasets_template);
 
+    var source_metric_list_template = $("#metric-list-template").html();
+    HandleBarsTemplates.template_metric_list = Handlebars.compile(source_metric_list_template);
+
     var source_filter_dimension_value_template =  $("#filter-dimension-value-template").html();
     HandleBarsTemplates.template_filter_dimension_value = Handlebars.compile(source_filter_dimension_value_template);
 
@@ -241,8 +263,5 @@ $(document).ready(function() {
     /*Hiding anomalies till it's ready for production*/
     var source_anomalies_template = $("#anomalies-template").html();
     HandleBarsTemplates.template_anomalies = Handlebars.compile(source_anomalies_template);
-
-
-
 
 })

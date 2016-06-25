@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.detector.db;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.hibernate.SessionFactory;
@@ -14,12 +15,16 @@ public class AnomalyFunctionSpecDAO extends AbstractDAO<AnomalyFunctionSpec> {
   }
 
   public AnomalyFunctionSpec findById(Long id) {
-    return get(id);
+    AnomalyFunctionSpec anomalyFunctionSpec = get(id);
+    return anomalyFunctionSpec;
   }
 
-  public Long create(AnomalyFunctionSpec anomalyFunctionSpec) {
-    return persist(anomalyFunctionSpec).getId();
+  public Long createOrUpdate(AnomalyFunctionSpec anomalyFunctionSpec) {
+    long id = persist(anomalyFunctionSpec).getId();
+    currentSession().getTransaction().commit();
+    return id;
   }
+
 
   public void toggleActive(Long id, boolean isActive) {
     namedQuery("com.linkedin.thirdeye.api.AnomalyFunctionSpec#toggleActive").setParameter("id", id)
@@ -32,6 +37,10 @@ public class AnomalyFunctionSpecDAO extends AbstractDAO<AnomalyFunctionSpec> {
     currentSession().delete(anomalyFunctionSpec);
   }
 
+  public void delete(AnomalyFunctionSpec anomalyFunctionSpec) {
+    currentSession().delete(anomalyFunctionSpec);
+  }
+
   public List<AnomalyFunctionSpec> findAll() {
     return list(namedQuery("com.linkedin.thirdeye.api.AnomalyFunctionSpec#findAll"));
   }
@@ -40,4 +49,16 @@ public class AnomalyFunctionSpecDAO extends AbstractDAO<AnomalyFunctionSpec> {
     return list(namedQuery("com.linkedin.thirdeye.api.AnomalyFunctionSpec#findAllByCollection")
         .setParameter("collection", collection));
   }
+
+  public List<String> findDistinctMetricsByCollection(String collection) {
+    List<String> metrics = new ArrayList<>();
+    // although query returns list of strings, JPA returns List<AnomalyFunctionSpec> for list(Query) call
+    List<AnomalyFunctionSpec> distinctMetricsList = list(namedQuery("com.linkedin.thirdeye.api.AnomalyFunctionSpec#findDistinctMetricsByCollection")
+        .setParameter("collection", collection));
+    for (Object metric : distinctMetricsList) {
+      metrics.add(metric.toString());
+    }
+    return metrics;
+  }
+
 }
