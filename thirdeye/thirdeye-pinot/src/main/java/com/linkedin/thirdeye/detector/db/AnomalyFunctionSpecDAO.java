@@ -8,7 +8,6 @@ import org.hibernate.SessionFactory;
 import com.linkedin.thirdeye.detector.api.AnomalyFunctionSpec;
 
 import io.dropwizard.hibernate.AbstractDAO;
-import io.dropwizard.hibernate.UnitOfWork;
 
 public class AnomalyFunctionSpecDAO extends AbstractDAO<AnomalyFunctionSpec> {
   public AnomalyFunctionSpecDAO(SessionFactory sessionFactory) {
@@ -53,10 +52,11 @@ public class AnomalyFunctionSpecDAO extends AbstractDAO<AnomalyFunctionSpec> {
 
   public List<String> findDistinctMetricsByCollection(String collection) {
     List<String> metrics = new ArrayList<>();
-    List<AnomalyFunctionSpec> anomalyFunctionSpecs = list(namedQuery("com.linkedin.thirdeye.api.AnomalyFunctionSpec#findDistinctMetricsByCollection")
+    // although query returns list of strings, JPA returns List<AnomalyFunctionSpec> for list(Query) call
+    List<AnomalyFunctionSpec> distinctMetricsList = list(namedQuery("com.linkedin.thirdeye.api.AnomalyFunctionSpec#findDistinctMetricsByCollection")
         .setParameter("collection", collection));
-    for (Object anomalyFunctionSpec : anomalyFunctionSpecs) {
-      metrics.add(anomalyFunctionSpec.toString());
+    for (Object metric : distinctMetricsList) {
+      metrics.add(metric.toString());
     }
     return metrics;
   }

@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+import javax.validation.constraints.NotNull;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -35,6 +36,7 @@ import com.linkedin.thirdeye.api.CollectionSchema;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.dashboard.DetectorHttpUtils;
+import com.linkedin.thirdeye.dashboard.ThirdEyeDashboardConfiguration;
 import com.linkedin.thirdeye.detector.api.AnomalyFunctionSpec;
 import com.linkedin.thirdeye.detector.api.AnomalyResult;
 import com.linkedin.thirdeye.detector.api.EmailConfiguration;
@@ -49,7 +51,6 @@ public class AnomalyResource {
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
   private static final Logger LOG = LoggerFactory.getLogger(AnomalyResource.class);
 
-  private static final String DEFAULT_SMTP_PORT = "25";
   public static final String DEFAULT_CRON = "0 0 0 * * ?";
   private static final String UTF8 = "UTF-8";
   private static final String STAR_DIMENSION = "*";
@@ -60,21 +61,19 @@ public class AnomalyResource {
   private AnomalyResultDAO anomalyResultDAO;
   private EmailConfigurationDAO emailConfigurationDAO;
   private DetectorHttpUtils detectorHttpUtils;
-
-
+  private ThirdEyeDashboardConfiguration dashboardConfiguration;
 
   public AnomalyResource(AnomalyFunctionSpecDAO anomalyFunctionSpecDAO,
       AnomalyResultDAO anomalyResultDAO,
       EmailConfigurationDAO emailConfigurationDAO,
-      String detectorHttpHost, int detectorHttpPort) {
+      ThirdEyeDashboardConfiguration dashboardConfiguration) {
 
-    this.detectorHttpUtils = new DetectorHttpUtils(detectorHttpHost, detectorHttpPort);
+    this.dashboardConfiguration = dashboardConfiguration;
+    this.detectorHttpUtils = new DetectorHttpUtils(dashboardConfiguration.getDetectorHost(),
+        dashboardConfiguration.getDetectorPort());
     this.anomalyFunctionSpecDAO = anomalyFunctionSpecDAO;
     this.anomalyResultDAO = anomalyResultDAO;
     this.emailConfigurationDAO = emailConfigurationDAO;
-  }
-
-  public AnomalyResource() {
   }
 
   /************** CRUD for anomalies of a collection ********************************************************/
@@ -83,6 +82,9 @@ public class AnomalyResource {
   @UnitOfWork
   @Path("/anomalies/metrics")
   public List<String> viewMetricsForDataset(@QueryParam("dataset") String dataset) {
+    if (StringUtils.isBlank(dataset)) {
+      throw new IllegalArgumentException("dataset is a required query param");
+    }
     List<String> metrics = anomalyFunctionSpecDAO.findDistinctMetricsByCollection(dataset);
     return metrics;
   }
@@ -91,11 +93,15 @@ public class AnomalyResource {
   @GET
   @UnitOfWork
   @Path("/anomalies/view")
-  public List<AnomalyResult> viewAnomaliesInRange(@QueryParam("dataset") String dataset,
+  public List<AnomalyResult> viewAnomaliesInRange(@NotNull @QueryParam("dataset") String dataset,
       @QueryParam("startTimeIso") String startTimeIso,
       @QueryParam("endTimeIso") String endTimeIso,
       @QueryParam("metric") String metric,
       @QueryParam("dimensions") String dimensions) {
+
+    if (StringUtils.isBlank(dataset)) {
+      throw new IllegalArgumentException("dataset is a required query param");
+    }
 
     List<AnomalyResult> anomalyResults = new ArrayList<>();
     try {
@@ -167,7 +173,12 @@ public class AnomalyResource {
   @GET
   @UnitOfWork
   @Path("/anomaly-function/view")
-  public List<AnomalyFunctionSpec> viewAnomalyFunctions(@QueryParam("dataset") String dataset, @QueryParam("metric") String metric) {
+  public List<AnomalyFunctionSpec> viewAnomalyFunctions(@NotNull @QueryParam("dataset") String dataset,
+      @QueryParam("metric") String metric) {
+
+    if (StringUtils.isBlank(dataset)) {
+      throw new IllegalArgumentException("dataset is a required query param");
+    }
 
     List<AnomalyFunctionSpec> anomalyFunctionSpecs = anomalyFunctionSpecDAO.findAllByCollection(dataset);
     List<AnomalyFunctionSpec> anomalyFunctions = anomalyFunctionSpecs;
@@ -187,19 +198,20 @@ public class AnomalyResource {
   @POST
   @UnitOfWork
   @Path("/anomaly-function/create")
-  public Response createAnomalyFunction(@QueryParam("dataset") String dataset,
-      @QueryParam("functionName") String functionName,
-      @QueryParam("metric") String metric,
+  public Response createAnomalyFunction(@NotNull @QueryParam("dataset") String dataset,
+      @NotNull @QueryParam("functionName") String functionName,
+      @NotNull @QueryParam("metric") String metric,
       @QueryParam("type") String type,
-      @QueryParam("windowSize") String windowSize,
-      @QueryParam("windowUnit") String windowUnit,
+      @NotNull @QueryParam("windowSize") String windowSize,
+      @NotNull @QueryParam("windowUnit") String windowUnit,
       @QueryParam("windowDelay") String windowDelay,
       @QueryParam("windowDelayUnit") String windowDelayUnit,
       @QueryParam("scheduleMinute") String scheduleMinute,
       @QueryParam("scheduleHour") String scheduleHour,
       @QueryParam("repeatEvery") String repeatEvery,
       @QueryParam("exploreDimension") String exploreDimensions,
-      @QueryParam("properties") String properties,
+      @QueryParam("filters") String filters,
+      @NotNull @QueryParam("properties") String properties,
       @QueryParam("isActive") boolean isActive)
           throws Exception {
 
@@ -239,15 +251,17 @@ public class AnomalyResource {
     anomalyFunctionSpec.setWindowDelayUnit(windowDelayTimeUnit);
     anomalyFunctionSpec.setWindowDelay(windowDelayTime);
 
+    // bucket size and unit are defaulted to the collection granularity
     anomalyFunctionSpec.setBucketSize(dataGranularity.getSize());
     anomalyFunctionSpec.setBucketUnit(dataGranularity.getUnit());
 
     anomalyFunctionSpec.setExploreDimensions(exploreDimensions);
+    anomalyFunctionSpec.setFilters(filters);
     anomalyFunctionSpec.setProperties(properties);
 
     String cron = DEFAULT_CRON;
     if (StringUtils.isNotEmpty(repeatEvery)) {
-      cron = ThirdEyeUtils.constructCron(scheduleMinute, scheduleHour, repeatEvery);
+      cron = ThirdEyeUtils.constructCron(scheduleMinute, scheduleHour, TimeUnit.valueOf(repeatEvery));
     }
     anomalyFunctionSpec.setCron(cron);
 
@@ -264,20 +278,21 @@ public class AnomalyResource {
   @POST
   @UnitOfWork
   @Path("/anomaly-function/update")
-  public Response updateAnomalyFunction(@QueryParam("id") Long id,
-      @QueryParam("dataset") String dataset,
-      @QueryParam("functionName") String functionName,
-      @QueryParam("metric") String metric,
+  public Response updateAnomalyFunction(@NotNull @QueryParam("id") Long id,
+      @NotNull @QueryParam("dataset") String dataset,
+      @NotNull @QueryParam("functionName") String functionName,
+      @NotNull @QueryParam("metric") String metric,
       @QueryParam("type") String type,
-      @QueryParam("windowSize") String windowSize,
-      @QueryParam("windowUnit") String windowUnit,
-      @QueryParam("windowDelay") String windowDelay,
+      @NotNull @QueryParam("windowSize") String windowSize,
+      @NotNull @QueryParam("windowUnit") String windowUnit,
+      @NotNull @QueryParam("windowDelay") String windowDelay,
       @QueryParam("windowDelayUnit") String windowDelayUnit,
       @QueryParam("scheduleMinute") String scheduleMinute,
       @QueryParam("scheduleHour") String scheduleHour,
       @QueryParam("repeatEvery") String repeatEvery,
       @QueryParam("exploreDimension") String exploreDimensions,
-      @QueryParam("properties") String properties,
+      @QueryParam("filters") String filters,
+      @NotNull @QueryParam("properties") String properties,
       @QueryParam("isActive") boolean isActive) throws Exception {
 
     if (id == null || StringUtils.isEmpty(dataset) || StringUtils.isEmpty(functionName)
@@ -317,14 +332,18 @@ public class AnomalyResource {
     } else {
       anomalyFunctionSpec.setWindowDelayUnit(TimeUnit.valueOf(windowDelayUnit));
     }
+
+    // bucket size and unit are defaulted to the collection granularity
     anomalyFunctionSpec.setBucketSize(dataGranularity.getSize());
     anomalyFunctionSpec.setBucketUnit(dataGranularity.getUnit());
+
+    anomalyFunctionSpec.setFilters(filters);
     anomalyFunctionSpec.setExploreDimensions(exploreDimensions);
     anomalyFunctionSpec.setProperties(properties);
 
     String cron = DEFAULT_CRON;
     if (StringUtils.isNotEmpty(repeatEvery)) {
-      cron = ThirdEyeUtils.constructCron(scheduleMinute, scheduleHour, repeatEvery);
+      cron = ThirdEyeUtils.constructCron(scheduleMinute, scheduleHour, TimeUnit.valueOf(repeatEvery));
     }
     anomalyFunctionSpec.setCron(cron);
 
@@ -341,11 +360,19 @@ public class AnomalyResource {
   @DELETE
   @UnitOfWork
   @Path("/anomaly-function/delete")
-  public Response deleteAnomalyFunctions(@QueryParam("id") Long id, @QueryParam("functionName") String functionName)
+  public Response deleteAnomalyFunctions(@NotNull @QueryParam("id") Long id,
+      @QueryParam("functionName") String functionName)
       throws IOException {
+
+    if (id == null) {
+      throw new IllegalArgumentException("id is a required query param");
+    }
 
     // call endpoint to stop if active
     AnomalyFunctionSpec anomalyFunctionSpec = anomalyFunctionSpecDAO.findById(id);
+    if (anomalyFunctionSpec == null) {
+      throw new IllegalStateException("No anomalyFunctionSpec with id " + id);
+    }
     if (anomalyFunctionSpec.getIsActive()) {
       detectorHttpUtils.disableAnomalyFunction(String.valueOf(id));
     }
@@ -360,11 +387,20 @@ public class AnomalyResource {
   @POST
   @UnitOfWork
   @Path("/anomaly-function/adhoc")
-  public Response runAdhocAnomalyFunctions(@QueryParam("id") Long id, @QueryParam("functionName") String functionName,
-      @QueryParam("windowStartIso") String windowStartIso, @QueryParam("windowEndIso") String windowEndIso)
+  public Response runAdhocAnomalyFunctions(@NotNull @QueryParam("id") Long id,
+      @QueryParam("functionName") String functionName,
+      @QueryParam("windowStartIso") String windowStartIso,
+      @QueryParam("windowEndIso") String windowEndIso)
           throws Exception {
 
+    if (id == null) {
+      throw new IllegalArgumentException("id is a required query param");
+    }
+
     AnomalyFunctionSpec anomalyFunctionSpec = anomalyFunctionSpecDAO.findById(id);
+    if (anomalyFunctionSpec == null) {
+      throw new IllegalStateException("No anomalyFunctionSpec with id " + id);
+    }
     if (StringUtils.isEmpty(windowStartIso) || StringUtils.isEmpty(windowEndIso)) {
       int windowSize = anomalyFunctionSpec.getWindowSize();
       TimeUnit windowUnit = anomalyFunctionSpec.getWindowUnit();
@@ -388,7 +424,7 @@ public class AnomalyResource {
   @GET
   @UnitOfWork
   @Path("/email-config/view")
-  public List<EmailConfiguration> viewEmailConfigs(@QueryParam("dataset") String dataset,
+  public List<EmailConfiguration> viewEmailConfigs(@NotNull @QueryParam("dataset") String dataset,
       @QueryParam("metric") String metric) {
 
     if (StringUtils.isEmpty(dataset)) {
@@ -412,17 +448,15 @@ public class AnomalyResource {
   @POST
   @UnitOfWork
   @Path("/email-config/create")
-  public Response createEmailConfigs(@QueryParam("dataset") String dataset,
-      @QueryParam("metric") String metric,
-      @QueryParam("fromAddress") String fromAddress,
-      @QueryParam("toAddresses") String toAddresses,
+  public Response createEmailConfigs(@NotNull @QueryParam("dataset") String dataset,
+      @NotNull @QueryParam("metric") String metric,
+      @NotNull @QueryParam("fromAddress") String fromAddress,
+      @NotNull @QueryParam("toAddresses") String toAddresses,
       @QueryParam("repeatEvery") String repeatEvery,
       @QueryParam("scheduleMinute") String scheduleMinute,
       @QueryParam("scheduleHour") String scheduleHour,
-      @QueryParam("smtpHost") String smtpHost,
-      @QueryParam("smtpPort") String smtpPort,
-      @QueryParam("windowSize") String windowSize,
-      @QueryParam("windowUnit") String windowUnit,
+      @NotNull @QueryParam("windowSize") String windowSize,
+      @NotNull @QueryParam("windowUnit") String windowUnit,
       @QueryParam("windowDelay") String windowDelay,
       @QueryParam("windowDelayUnit") String windowDelayUnit,
       @QueryParam("filters") String filters,
@@ -432,11 +466,11 @@ public class AnomalyResource {
 
     if (StringUtils.isEmpty(dataset) || StringUtils.isEmpty(functionIds) || StringUtils.isEmpty(metric)
         || StringUtils.isEmpty(windowSize) || StringUtils.isEmpty(windowUnit) || StringUtils.isEmpty(fromAddress)
-        || StringUtils.isEmpty(toAddresses) || StringUtils.isEmpty(smtpHost)) {
+        || StringUtils.isEmpty(toAddresses)) {
       throw new UnsupportedOperationException("Received null for one of the mandatory params: "
           + "dataset " + dataset + ", functionIds " + functionIds + ", metric " + metric
           + ", windowSize " + windowSize + ", windowUnit " + windowUnit + ", fromAddress" + fromAddress
-          + ", toAddresses " + toAddresses + ", smtpHost" + smtpHost);
+          + ", toAddresses " + toAddresses);
     }
 
     EmailConfiguration emailConfiguration = new EmailConfiguration();
@@ -447,14 +481,12 @@ public class AnomalyResource {
     emailConfiguration.setToAddresses(toAddresses);
     String cron = DEFAULT_CRON;
     if (StringUtils.isNotEmpty(repeatEvery)) {
-      cron = ThirdEyeUtils.constructCron(scheduleMinute, scheduleHour, repeatEvery);
+      cron = ThirdEyeUtils.constructCron(scheduleMinute, scheduleHour, TimeUnit.valueOf(repeatEvery));
     }
     emailConfiguration.setCron(cron);
-    if (StringUtils.isEmpty(smtpPort)) {
-      smtpPort = DEFAULT_SMTP_PORT;
-    }
-    emailConfiguration.setSmtpHost(smtpHost);
-    emailConfiguration.setSmtpPort(Integer.valueOf(smtpPort));
+
+    emailConfiguration.setSmtpHost(dashboardConfiguration.getSmtpHost());
+    emailConfiguration.setSmtpPort(dashboardConfiguration.getSmtpPort());
 
     emailConfiguration.setWindowSize(Integer.valueOf(windowSize));
     emailConfiguration.setWindowUnit(TimeUnit.valueOf(windowUnit));
@@ -493,18 +525,16 @@ public class AnomalyResource {
   @POST
   @UnitOfWork
   @Path("/email-config/update")
-  public Response updateEmailConfigs(@QueryParam("id") Long id,
-      @QueryParam("dataset") String dataset,
-      @QueryParam("metric") String metric,
-      @QueryParam("fromAddress") String fromAddress,
-      @QueryParam("toAddresses") String toAddresses,
+  public Response updateEmailConfigs(@NotNull @QueryParam("id") Long id,
+      @NotNull @QueryParam("dataset") String dataset,
+      @NotNull @QueryParam("metric") String metric,
+      @NotNull @QueryParam("fromAddress") String fromAddress,
+      @NotNull @QueryParam("toAddresses") String toAddresses,
       @QueryParam("repeatEvery") String repeatEvery,
       @QueryParam("scheduleMinute") String scheduleMinute,
       @QueryParam("scheduleHour") String scheduleHour,
-      @QueryParam("smtpHost") String smtpHost,
-      @QueryParam("smtpPort") String smtpPort,
-      @QueryParam("windowSize") String windowSize,
-      @QueryParam("windowUnit") String windowUnit,
+      @NotNull @QueryParam("windowSize") String windowSize,
+      @NotNull @QueryParam("windowUnit") String windowUnit,
       @QueryParam("windowDelay") String windowDelay,
       @QueryParam("windowDelayUnit") String windowDelayUnit,
       @QueryParam("filters") String filters,
@@ -514,11 +544,11 @@ public class AnomalyResource {
 
     if (id == null || StringUtils.isEmpty(dataset) || StringUtils.isEmpty(functionIds) || StringUtils.isEmpty(metric)
         || StringUtils.isEmpty(windowSize) || StringUtils.isEmpty(windowUnit) || StringUtils.isEmpty(fromAddress)
-        || StringUtils.isEmpty(toAddresses) || StringUtils.isEmpty(smtpHost)) {
+        || StringUtils.isEmpty(toAddresses)) {
       throw new UnsupportedOperationException("Received null for one of the mandatory params: "
           + "dataset " + dataset + ", functionIds " + functionIds + ", metric " + metric
           + ", windowSize " + windowSize + ", windowUnit " + windowUnit + ", fromAddress" + fromAddress
-          + ", toAddresses " + toAddresses + ", smtpHost" + smtpHost);
+          + ", toAddresses " + toAddresses);
     }
 
     // stop email report if active
@@ -537,14 +567,12 @@ public class AnomalyResource {
     emailConfiguration.setToAddresses(toAddresses);
     String cron = DEFAULT_CRON;
     if (StringUtils.isNotEmpty(repeatEvery)) {
-      cron = ThirdEyeUtils.constructCron(scheduleMinute, scheduleHour, repeatEvery);
+      cron = ThirdEyeUtils.constructCron(scheduleMinute, scheduleHour, TimeUnit.valueOf(repeatEvery));
     }
     emailConfiguration.setCron(cron);
-    if (StringUtils.isEmpty(smtpPort)) {
-      smtpPort = DEFAULT_SMTP_PORT;
-    }
-    emailConfiguration.setSmtpHost(smtpHost);
-    emailConfiguration.setSmtpPort(Integer.valueOf(smtpPort));
+
+    emailConfiguration.setSmtpHost(dashboardConfiguration.getSmtpHost());
+    emailConfiguration.setSmtpPort(dashboardConfiguration.getSmtpPort());
 
     emailConfiguration.setWindowSize(Integer.valueOf(windowSize));
     emailConfiguration.setWindowUnit(TimeUnit.valueOf(windowUnit));
@@ -584,10 +612,16 @@ public class AnomalyResource {
   @DELETE
   @UnitOfWork
   @Path("/email-config/delete")
-  public Response deleteEmailConfigs(@QueryParam("id") Long id) throws ClientProtocolException, IOException {
+  public Response deleteEmailConfigs(@NotNull @QueryParam("id") Long id) throws ClientProtocolException, IOException {
 
+    if (id == null) {
+      throw new IllegalArgumentException("id is a required query param");
+    }
     // stop schedule if active
     EmailConfiguration emailConfiguration = emailConfigurationDAO.findById(id);
+    if (emailConfiguration == null) {
+      throw new IllegalStateException("No emailConfiguraiton for id " + id);
+    }
     if (emailConfiguration.getIsActive()) {
       detectorHttpUtils.disableEmailConfiguration(String.valueOf(id));
     }
@@ -600,7 +634,15 @@ public class AnomalyResource {
   @POST
   @UnitOfWork
   @Path("/email-config/adhoc")
-  public Response runAdhocEmailConfig(@QueryParam("id") Long id) throws Exception {
+  public Response runAdhocEmailConfig(@NotNull @QueryParam("id") Long id) throws Exception {
+
+    if (id == null) {
+      throw new IllegalArgumentException("id is a required query param");
+    }
+    EmailConfiguration emailConfiguration = emailConfigurationDAO.findById(id);
+    if (emailConfiguration == null) {
+      throw new IllegalStateException("No emailConfiguraiton for id " + id);
+    }
     detectorHttpUtils.runAdhocEmailConfiguration(String.valueOf(id));
     return Response.ok(id).build();
   }

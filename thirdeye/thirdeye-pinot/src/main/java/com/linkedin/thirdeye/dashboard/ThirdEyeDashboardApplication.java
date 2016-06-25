@@ -53,8 +53,7 @@ public class ThirdEyeDashboardApplication
 
     env.jersey().register(new DashboardResource(BaseThirdEyeApplication.getDashboardConfigDAO(config)));
     env.jersey().register(new CacheResource());
-    env.jersey().register(new AnomalyResource(anomalyFunctionSpecDAO, anomalyResultDAO, emailConfigurationDAO,
-        config.getDetectorHost(), config.getDetectorPort()));
+    env.jersey().register(new AnomalyResource(anomalyFunctionSpecDAO, anomalyResultDAO, emailConfigurationDAO, config));
   }
 
   public static void main(String[] args) throws Exception {

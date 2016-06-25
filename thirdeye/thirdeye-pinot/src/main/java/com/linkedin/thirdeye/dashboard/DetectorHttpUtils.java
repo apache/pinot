@@ -80,14 +80,4 @@ public class DetectorHttpUtils {
     return response;
   }
 
-  public static void main(String[] args) throws ClientProtocolException, IOException {
-    DetectorHttpUtils d = new DetectorHttpUtils("localhost", 1346);
-    d.disableAnomalyFunction("5");
-    //d.enableAnomalyFunction("5");
-    //d.runAdhocAnomalyFunction("6", "2016-06-01", "2016-06-10");
-    //d.enableEmailConfiguration("3");
-    //d.disableEmailConfiguration("3");
-    //d.runAdhocEmailConfiguration("3");
-  }
-
 }

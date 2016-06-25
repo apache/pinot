@@ -7,7 +7,6 @@ import javax.validation.Valid;
 import javax.validation.constraints.NotNull;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.linkedin.thirdeye.detector.driver.FailureEmailConfiguration;
 
 public abstract class ThirdEyeConfiguration extends Configuration {
   /**
@@ -30,9 +29,11 @@ public abstract class ThirdEyeConfiguration extends Configuration {
   private String whitelistCollections = "";
   private String blacklistCollections = "";
 
-  private FailureEmailConfiguration failureEmailConfig;
-  private String detectorHost;
-  private int detectorPort;
+  private String detectorHost = "";
+  private int detectorPort = 0;
+
+  private String smtpHost = "";
+  private int smtpPort = 0;
 
 
   @Valid
@@ -92,14 +93,6 @@ public abstract class ThirdEyeConfiguration extends Configuration {
     return getRootDir() + "/detector-config/anomaly-functions/functions.properties";
   }
 
-  public FailureEmailConfiguration getFailureEmailConfig() {
-    return failureEmailConfig;
-  }
-
-  public void setFailureEmailConfig(FailureEmailConfiguration failureEmailConfig) {
-    this.failureEmailConfig = failureEmailConfig;
-  }
-
   public String getDetectorHost() {
     return detectorHost;
   }
@@ -114,6 +107,22 @@ public abstract class ThirdEyeConfiguration extends Configuration {
 
   public void setDetectorPort(int detectorPort) {
     this.detectorPort = detectorPort;
+  }
+
+  public String getSmtpHost() {
+    return smtpHost;
+  }
+
+  public void setSmtpHost(String smtpHost) {
+    this.smtpHost = smtpHost;
+  }
+
+  public int getSmtpPort() {
+    return smtpPort;
+  }
+
+  public void setSmtpPort(int smtpPort) {
+    this.smtpPort = smtpPort;
   }
 
 }

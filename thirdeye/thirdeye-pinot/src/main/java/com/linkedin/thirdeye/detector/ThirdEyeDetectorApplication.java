@@ -243,7 +243,7 @@ public class ThirdEyeDetectorApplication
                     }
                   }
                   if (!failedToStart.isEmpty()) {
-                    LOG.warn("{} functions failed to start!: {}", failedToStart.size(), failedToStart);
+                    LOG.warn("{} reports failed to start!: {}", failedToStart.size(), failedToStart);
                     String subject = String.format("Startup failed to initialize %d reports",
                         failedToStart.size());
                     String body = StringUtils.join(failedToStart, "\n");

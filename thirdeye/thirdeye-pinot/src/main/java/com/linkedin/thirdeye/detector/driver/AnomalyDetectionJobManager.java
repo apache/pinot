@@ -32,7 +32,6 @@ import com.linkedin.thirdeye.detector.api.AnomalyFunctionSpec;
 import com.linkedin.thirdeye.detector.db.AnomalyFunctionRelationDAO;
 import com.linkedin.thirdeye.detector.db.AnomalyFunctionSpecDAO;
 import com.linkedin.thirdeye.detector.db.AnomalyResultDAO;
-import com.linkedin.thirdeye.detector.driver.TestAnomalyApplication.TestType;
 import com.linkedin.thirdeye.detector.function.AnomalyFunction;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 
@@ -203,35 +202,6 @@ public class AnomalyDetectionJobManager {
     String jobKey = String.format("file-based_anomaly_function_job_%s", executionName);
     buildAndScheduleJob(jobKey, trigger, anomalyFunction, spec, windowStartIsoString,
         windowEndIsoString);
-  }
-
-  public static void main(String[] args) throws Exception {
-    if (args.length != 2 && args.length != 4) {
-      System.err
-          .println("Arguments must be configYml functionSpecPath [startISO endISO, both hour aligned]");
-      System.exit(1);
-    }
-    String thirdEyeConfigDir = args[0];
-    System.setProperty("dw.rootDir", thirdEyeConfigDir);
-    String detectorApplicationConfigFile = thirdEyeConfigDir + "/" + "detector.yml";
-    String filePath = args[1];
-    String startISO = null;
-    String endISO = null;
-    if (args.length == 4) {
-      startISO = args[2];
-      endISO = args[3];
-    } else {
-      DateTime now = DateTime.now().minusHours(3); // data delay.
-      startISO = now.minusDays(7) // subtract 7 days to set up w/w comparison
-          .minusHours(4) // subtract hours to specify what the length of the comparison window is
-          .toString();
-      endISO = now.toString();
-    }
-    int existingFunctionId = 1;
-    new TestAnomalyApplication(filePath, startISO, endISO, TestType.FUNCTION, existingFunctionId)
-        .run(new String[] {
-            "server", detectorApplicationConfigFile
-        });
   }
 
 }

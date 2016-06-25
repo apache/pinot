@@ -30,8 +30,6 @@ import com.linkedin.thirdeye.detector.api.EmailConfiguration;
 import com.linkedin.thirdeye.detector.db.AnomalyResultDAO;
 import com.linkedin.thirdeye.detector.db.EmailConfigurationDAO;
 import com.linkedin.thirdeye.detector.driver.FailureEmailConfiguration;
-import com.linkedin.thirdeye.detector.driver.TestAnomalyApplication;
-import com.linkedin.thirdeye.detector.driver.TestAnomalyApplication.TestType;
 
 public class EmailReportJobManager{
   private static final Logger LOG = LoggerFactory.getLogger(EmailReportJobManager.class);
@@ -170,19 +168,4 @@ public class EmailReportJobManager{
     }
   }
 
-
-  public static void main(String[] args) throws Exception {
-    if (args.length != 2) {
-      System.err.println("Arguments must be configYml emailConfigPath");
-      System.exit(1);
-    }
-    String thirdEyeConfigDir = args[0];
-    System.setProperty("dw.rootDir", thirdEyeConfigDir);
-    String detectorApplicationConfigFile = thirdEyeConfigDir + "/" + "detector.yml";
-    String filePath = args[1];
-
-    new TestAnomalyApplication(filePath, null, null, TestType.EMAIL, -1).run(new String[] {
-        "server", detectorApplicationConfigFile
-    });
-  }
 }

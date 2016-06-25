@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.util;
 
+import java.util.concurrent.TimeUnit;
+
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -10,6 +12,18 @@ import com.google.common.collect.Multimap;
 
 @Test
 public class ThirdEyeUtilsTest {
+
+  @Test(dataProvider = "testConstructCronDataProvider")
+  public void testConstructCron(String scheduleMinute, String scheduleHour, String repeatEvery, String expectedCron)
+  throws Exception {
+    String actualCron = null;
+    try {
+      actualCron = ThirdEyeUtils.constructCron(scheduleMinute, scheduleHour, TimeUnit.valueOf(repeatEvery));
+    } catch (Exception e) {
+
+    }
+    Assert.assertEquals(actualCron, expectedCron);
+  }
 
   @Test(dataProvider = "testSortedFiltersDataProvider")
   public void testSortedFilters(String filters, String expectedFilters) {
@@ -28,6 +42,25 @@ public class ThirdEyeUtilsTest {
       String expectedFilters) {
     String sortedFilters = ThirdEyeUtils.getSortedFiltersFromMultiMap(filterMultimap);
     Assert.assertEquals(sortedFilters, expectedFilters);
+  }
+
+  @DataProvider(name = "testConstructCronDataProvider")
+  public Object[][] testConstructCronDataProvider() {
+    return new Object[][] {
+        {
+          "10", "12", "DAYS", "0 10 12 * * ?"
+        }, {
+          null, null, "DAYS", "0 0 0 * * ?"
+        }, {
+          null, null, "HOURS", "0 0 * * * ?"
+        }, {
+          "70", "12", "DAYS", null
+        }, {
+          "20", "25", "DAYS", null
+        }, {
+          "70", "12", "WEEKS", null
+        }
+    };
   }
 
   @DataProvider(name = "testSortedFiltersDataProvider")

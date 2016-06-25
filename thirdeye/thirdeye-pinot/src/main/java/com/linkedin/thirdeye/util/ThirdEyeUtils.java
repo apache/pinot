@@ -150,15 +150,23 @@ public class ThirdEyeUtils {
     return result;
   }
 
-  public static String constructCron(String scheduleMinute, String scheduleHour, String repeatEvery) {
+  public static String constructCron(String scheduleMinute, String scheduleHour, TimeUnit repeatEvery) {
 
+    if (StringUtils.isNotBlank(scheduleMinute)
+        && (Integer.valueOf(scheduleMinute) < 0 || Integer.valueOf(scheduleMinute) > 59)) {
+      throw new IllegalArgumentException("scheduleMinute " + scheduleMinute + " must be between [0,60)");
+    }
+    if (StringUtils.isNotBlank(scheduleHour)
+        && (Integer.valueOf(scheduleHour) < 0 || Integer.valueOf(scheduleHour) > 23)) {
+      throw new IllegalArgumentException("scheduleHour " + scheduleHour + " must be between [0,23]");
+    }
     String minute = "0";
     String hour = "0";
     String cron = AnomalyResource.DEFAULT_CRON;
-    if (repeatEvery.equals(TimeUnit.DAYS.toString())) {
+    if (repeatEvery.equals(TimeUnit.DAYS)) {
       minute = StringUtils.isEmpty(scheduleMinute) ? minute : scheduleMinute;
       hour = StringUtils.isEmpty(scheduleHour) ? hour : scheduleHour;
-    } else if (repeatEvery.equals(TimeUnit.HOURS.toString())) {
+    } else if (repeatEvery.equals(TimeUnit.HOURS)) {
       minute = StringUtils.isEmpty(scheduleMinute) ? minute : scheduleMinute;
       hour = "*";
     }
