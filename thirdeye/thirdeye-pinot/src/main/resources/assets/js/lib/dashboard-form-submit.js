@@ -15,12 +15,10 @@ function formSubmit(target){
 
 
     /*Update hash*/
-
-
-    //update hash.dateset
-    var selectedDateset = $("#selected-dateset").attr("value");
-    if(selectedDateset != "none" && selectedDateset != undefined && selectedDateset != ""){
-        hash.dateset= selectedDateset;
+    //update hash.dataset
+    var selectedDataset = $("#selected-dataset").attr("value");
+    if(selectedDataset != "none" && selectedDataset != undefined && selectedDataset != ""){
+        hash.dataset= selectedDataset;
     }
 
     //update hash.dashboard

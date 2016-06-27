@@ -60,7 +60,7 @@ body a{
 }
 
 .thin-input{
-   width:60px;
+   width:65px;
 }
 
 .plus-symbol:before {
@@ -318,10 +318,9 @@ body a{
    margin-bottom: 15px;
 }
 
-#configure-alert-form .time-range-selector-dropdown{
-    width: 262px;
+#selected-anomaly-dataset{
+    margin-left: 21px;
 }
-
 
 /** Chart area **/
 
