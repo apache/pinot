@@ -40,9 +40,23 @@ function selectAnomalyDataset(target){
     $("#selected-anomaly-dataset").text($(target).text());
     $("#selected-anomaly-dataset").attr("value",value);
 
+
+    var url = "/dashboard/data/metrics?dataset=" + value;
+    getData(url).done(function (data) {
+        /* Handelbars template for manage anomalies form metric list */
+        var anomalyFormMetricListData = {data: data, scope: "anomaly-", singleMetricSelector: false};
+        var result_anomaly_form_metric_list_template = HandleBarsTemplates.template_metric_list(anomalyFormMetricListData);
+        $(".anomaly-metric-list").each(function(){ $(this).html(result_anomaly_form_metric_list_template)});
+    });
+
     //close uikit dropdown
     $(target).closest("[data-uk-dropdown]").removeClass("uk-open");
     $(target).closest("[data-uk-dropdown]").attr("aria-expanded", false);
+
+    //If previously error was shown hide it
+    if($("#manage-alert-error").attr("data-error-source") == "anomaly-dataset-option"){
+        $("#manage-alert-error").hide();
+    }
 }
 
 function selectAnomalyMetric(target){
@@ -100,7 +114,6 @@ function selectAnomalyMonitoringRepeatUnit(target){
 
 function saveAlert(){
 
-
 //    //Close uikit dropdowns
     $("[data-uk-dropdown]").removeClass("uk-open");
     $("[data-uk-dropdown]").attr("aria-expanded", false);
@@ -130,31 +143,25 @@ function saveAlert(){
        var isActive = false;
     }
 
-
-
     var tendency =  ( $("#selected-anomaly-condition ").val() == "DROP" ) ? "-" : "";
-    var changeThreshold = parseFloat( $("#anomaly-threshold-input").val() / 100)  ;
-    console.log('$("#anomaly-threshold-input").val() ' )
-    console.log($("#anomaly-threshold-input").val()  )
-
+    var changeThreshold = parseFloat( $("#anomaly-threshold-input").val() / 100);
 
     /* Validate form */
+    var errorMessage = $("#manage-alert-error p");
+    var errorAlert = $("#manage-alert-error");
+
+    //Check if dataset is selected
+    if(dataset == "") {
+        errorMessage.html("Please select a dataset.");
+        errorAlert.attr("data-error-source", "anomaly-dataset-option");
+        errorAlert.fadeIn(100);
+        return
+    }
+
+
 
     /* Grab the values */
-//    var dataset = "feed_sessions_additive";
-//    var functionName = "TEST06104";
-//    var metric = "feed_sessions_additive";
-//    var type = "USER_RULE";
-//    var windowSize = "1";
-//    var windowUnit = "DAYS";
-//    var repeatEverySize = "1";
-//    var repeatEveryUnit =  "HOURS";
-//    var isActive = true;
-
-
-
-    var windowDelay =  "1";//consider max time  //Milliseconds?
-//  var scheduleStartIso = "2016-06-23T08:15:30-05:00";
+    var windowDelay =  "1";  //consider max time
     var scheduleMinute = "00";
     var scheduleHour = "12";
 
@@ -165,6 +172,6 @@ function saveAlert(){
     var url = "/dashboard/anomaly-function/create?dataset=" + dataset + "&metric=" + metric + "&type=" + type + "&functionName=" + functionName + "&windowSize=" + windowSize + "&windowUnit=" + windowUnit + "&windowDelay=" + windowDelay + "&scheduleMinute=" + scheduleMinute  + "&scheduleHour=" + scheduleHour + "&repeatEverySize=" + repeatEverySize + "&repeatEveryUnit=" + repeatEveryUnit + "&exploreDimension=" + exploreDimension + "&isActive=" +  isActive + "&properties=baseline=" + "w/w" + ";changeThreshold=" + tendency + changeThreshold + ";";
 
     submitData(url).done(function(){
-        console.log("/dashboard/anomaly-function/create response")
+        console.log("/dashboard/anomaly-function/create success")
     })
 }

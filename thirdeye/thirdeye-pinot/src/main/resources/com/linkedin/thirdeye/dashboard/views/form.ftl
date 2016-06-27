@@ -357,7 +357,11 @@
                 </div>
 
                 <div class="uk-form-row">
-                    <input class="active-alert" rel="{{tabName}}" type="checkbox" checked><span> Keep this alert active.</span>
+                    <input id="active-alert" rel="{{tabName}}" type="checkbox" checked><span> Keep this alert active.</span>
+                </div>
+
+                <div id="manage-alert-error" class="uk-alert uk-alert-danger hidden" rel="{{tabName}}">
+                    <p></p>
                 </div>
 
                 <div class="uk-modal-footer">
