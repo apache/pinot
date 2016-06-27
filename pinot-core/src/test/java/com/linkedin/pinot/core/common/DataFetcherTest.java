@@ -21,28 +21,24 @@ import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.data.readers.RecordReader;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
+import com.linkedin.pinot.util.TestDataRecordReader;
 import java.io.File;
 import java.util.HashMap;
-import java.util.Map;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang.mutable.MutableLong;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
 public class DataFetcherTest {
-  private static final Logger LOGGER = LoggerFactory.getLogger(DataFetcherTest.class);
-
-  private static final String INDEX_DIR_PATH = FileUtils.getTempDirectoryPath() + File.separator + "DataFetchertest";
+  private static final String SEGMENT_NAME = "dataFetcherTestSegment";
+  private static final String INDEX_DIR_PATH = FileUtils.getTempDirectoryPath() + File.separator + SEGMENT_NAME;
   private static final int NUM_ROWS = 1000;
   private static final String DIMENSION_NAME = "dimension";
   private static final String INT_METRIC_NAME = "int_metric";
@@ -53,16 +49,18 @@ public class DataFetcherTest {
 
   private final long _randomSeed = System.currentTimeMillis();
   private final Random _random = new Random(_randomSeed);
+  private final String _errorMessage = "Random seed is: " + _randomSeed;
   private final String[] _dimensionValues = new String[NUM_ROWS];
   private final int[] _intMetricValues = new int[NUM_ROWS];
   private final long[] _longMetricValues = new long[NUM_ROWS];
   private final float[] _floatMetricValues = new float[NUM_ROWS];
   private final double[] _doubleMetricValues = new double[NUM_ROWS];
-  private final GenericRow[] _segmentData = new GenericRow[NUM_ROWS];
   private DataFetcher _dataFetcher;
 
   @BeforeClass
   private void setup() throws Exception {
+    GenericRow[] segmentData = new GenericRow[NUM_ROWS];
+
     // Generate random dimension and metric values.
     for (int i = 0; i < NUM_ROWS; i++) {
       double randomDouble = _random.nextDouble();
@@ -80,74 +78,27 @@ public class DataFetcherTest {
       map.put(DOUBLE_METRIC_NAME, _doubleMetricValues[i]);
       GenericRow genericRow = new GenericRow();
       genericRow.init(map);
-      _segmentData[i] = genericRow;
+      segmentData[i] = genericRow;
     }
 
     // Create an index segment with the random dimension and metric values.
     final Schema schema = new Schema();
-
-    DimensionFieldSpec dimensionFieldSpec = new DimensionFieldSpec(DIMENSION_NAME, FieldSpec.DataType.STRING, true);
-    schema.addField(DIMENSION_NAME, dimensionFieldSpec);
-
-    MetricFieldSpec intMetricFieldSpec = new MetricFieldSpec(INT_METRIC_NAME, FieldSpec.DataType.INT);
-    schema.addField(INT_METRIC_NAME, intMetricFieldSpec);
-
-    MetricFieldSpec longMetricFieldSpec = new MetricFieldSpec(LONG_METRIC_NAME, FieldSpec.DataType.LONG);
-    schema.addField(LONG_METRIC_NAME, longMetricFieldSpec);
-
-    MetricFieldSpec floatMetricFieldSpec = new MetricFieldSpec(FLOAT_METRIC_NAME, FieldSpec.DataType.FLOAT);
-    schema.addField(FLOAT_METRIC_NAME, floatMetricFieldSpec);
-
-    MetricFieldSpec doubleMetricFieldSpec = new MetricFieldSpec(DOUBLE_METRIC_NAME, FieldSpec.DataType.DOUBLE);
-    schema.addField(DOUBLE_METRIC_NAME, doubleMetricFieldSpec);
+    schema.addField(DIMENSION_NAME, new DimensionFieldSpec(DIMENSION_NAME, FieldSpec.DataType.STRING, true));
+    schema.addField(INT_METRIC_NAME, new MetricFieldSpec(INT_METRIC_NAME, FieldSpec.DataType.INT));
+    schema.addField(LONG_METRIC_NAME, new MetricFieldSpec(LONG_METRIC_NAME, FieldSpec.DataType.LONG));
+    schema.addField(FLOAT_METRIC_NAME, new MetricFieldSpec(FLOAT_METRIC_NAME, FieldSpec.DataType.FLOAT));
+    schema.addField(DOUBLE_METRIC_NAME, new MetricFieldSpec(DOUBLE_METRIC_NAME, FieldSpec.DataType.DOUBLE));
 
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
+    FileUtils.deleteQuietly(new File(INDEX_DIR_PATH));
     config.setOutDir(INDEX_DIR_PATH);
-    config.setSegmentName("dataFetcherTestSegment");
-
-    RecordReader reader = new RecordReader() {
-      int index = 0;
-
-      @Override
-      public void init() throws Exception {
-      }
-
-      @Override
-      public void rewind() throws Exception {
-        index = 0;
-      }
-
-      @Override
-      public boolean hasNext() {
-        return index < NUM_ROWS;
-      }
-
-      @Override
-      public Schema getSchema() {
-        return schema;
-      }
-
-      @Override
-      public GenericRow next() {
-        return _segmentData[index++];
-      }
-
-      @Override
-      public Map<String, MutableLong> getNullCountMap() {
-        return null;
-      }
-
-      @Override
-      public void close() throws Exception {
-      }
-    };
+    config.setSegmentName(SEGMENT_NAME);
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    driver.init(config, reader);
+    driver.init(config, new TestDataRecordReader(schema, segmentData));
     driver.build();
 
-    ReadMode mode = ReadMode.heap;
-    IndexSegment indexSegment = Loaders.IndexSegment.load(new File(INDEX_DIR_PATH, driver.getSegmentName()), mode);
+    IndexSegment indexSegment = Loaders.IndexSegment.load(new File(INDEX_DIR_PATH, SEGMENT_NAME), ReadMode.heap);
 
     // Get a data fetcher for the index segment.
     _dataFetcher = new DataFetcher(indexSegment);
@@ -168,12 +119,7 @@ public class DataFetcherTest {
     _dataFetcher.fetchSingleIntValues(INT_METRIC_NAME, dictIds, 0, length, intValues, 0);
 
     for (int i = 0; i < length; i++) {
-      if (intValues[i] != _intMetricValues[docIds[i]]) {
-        LOGGER.error("For index {}, value does not match: fetched value: {}, expected value: {}", i, intValues[i],
-            _intMetricValues[docIds[i]]);
-        LOGGER.error("Random Seed: {}", _randomSeed);
-        Assert.fail();
-      }
+      Assert.assertEquals(intValues[i], _intMetricValues[docIds[i]], _errorMessage);
     }
   }
 
@@ -192,12 +138,7 @@ public class DataFetcherTest {
     _dataFetcher.fetchSingleLongValues(LONG_METRIC_NAME, dictIds, 0, length, longValues, 0);
 
     for (int i = 0; i < length; i++) {
-      if (longValues[i] != _longMetricValues[docIds[i]]) {
-        LOGGER.error("For index {}, value does not match: fetched value: {}, expected value: {}", i, longValues[i],
-            _longMetricValues[docIds[i]]);
-        LOGGER.error("Random Seed: {}", _randomSeed);
-        Assert.fail();
-      }
+      Assert.assertEquals(longValues[i], _longMetricValues[docIds[i]], _errorMessage);
     }
   }
 
@@ -216,12 +157,7 @@ public class DataFetcherTest {
     _dataFetcher.fetchSingleFloatValues(FLOAT_METRIC_NAME, dictIds, 0, length, floatValues, 0);
 
     for (int i = 0; i < length; i++) {
-      if (floatValues[i] != _floatMetricValues[docIds[i]]) {
-        LOGGER.error("For index {}, value does not match: fetched value: {}, expected value: {}", i, floatValues[i],
-            _floatMetricValues[docIds[i]]);
-        LOGGER.error("Random Seed: {}", _randomSeed);
-        Assert.fail();
-      }
+      Assert.assertEquals(floatValues[i], _floatMetricValues[docIds[i]], _errorMessage);
     }
   }
 
@@ -240,12 +176,7 @@ public class DataFetcherTest {
     _dataFetcher.fetchSingleDoubleValues(DOUBLE_METRIC_NAME, dictIds, 0, length, doubleValues, 0);
 
     for (int i = 0; i < length; i++) {
-      if (doubleValues[i] != _doubleMetricValues[docIds[i]]) {
-        LOGGER.error("For index {}, value does not match: fetched value: {}, expected value: {}", i, doubleValues[i],
-            _doubleMetricValues[docIds[i]]);
-        LOGGER.error("Random Seed: {}", _randomSeed);
-        Assert.fail();
-      }
+      Assert.assertEquals(doubleValues[i], _doubleMetricValues[docIds[i]], _errorMessage);
     }
   }
 
@@ -264,12 +195,7 @@ public class DataFetcherTest {
     _dataFetcher.fetchSingleStringValues(DIMENSION_NAME, dictIds, 0, length, stringValues, 0);
 
     for (int i = 0; i < length; i++) {
-      if (!stringValues[i].equals(_dimensionValues[docIds[i]])) {
-        LOGGER.error("For index {}, value does not match: fetched value: {}, expected value: {}", i, stringValues[i],
-            _dimensionValues[docIds[i]]);
-        LOGGER.error("Random Seed: {}", _randomSeed);
-        Assert.fail();
-      }
+      Assert.assertEquals(stringValues[i], _dimensionValues[docIds[i]], _errorMessage);
     }
   }
 
@@ -288,12 +214,12 @@ public class DataFetcherTest {
     _dataFetcher.fetchSingleHashCodes(DIMENSION_NAME, dictIds, 0, length, hashCodes, 0);
 
     for (int i = 0; i < length; i++) {
-      if (hashCodes[i] != _dimensionValues[docIds[i]].hashCode()) {
-        LOGGER.error("For index {}, hash code does not match: fetched value: {}, expected value: {}", i,
-            hashCodes[i], _dimensionValues[docIds[i]].hashCode());
-        LOGGER.error("Random Seed: {}", _randomSeed);
-        Assert.fail();
-      }
+      Assert.assertEquals((int) hashCodes[i], _dimensionValues[docIds[i]].hashCode(), _errorMessage);
     }
+  }
+
+  @AfterClass
+  public void cleanUp() {
+    FileUtils.deleteQuietly(new File(INDEX_DIR_PATH));
   }
 }

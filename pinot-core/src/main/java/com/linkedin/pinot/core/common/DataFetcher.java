@@ -28,6 +28,8 @@ import java.util.Map;
  * duplicate codes and garbage collection.
  */
 public class DataFetcher {
+  private static final BlockId BLOCK_ZERO = new BlockId(0);
+
   private final IndexSegment _indexSegment;
 
   private final Map<String, DataSource> _columnToDataSourceMap = new HashMap<>();
@@ -82,7 +84,7 @@ public class DataFetcher {
   public BlockValSet getBlockValSetForColumn(String column) {
     BlockValSet blockValSet = _columnToBlockValSetMap.get(column);
     if (blockValSet == null) {
-      blockValSet = getDataSourceForColumn(column).getNextBlock().getBlockValueSet();
+      blockValSet = getDataSourceForColumn(column).nextBlock(BLOCK_ZERO).getBlockValueSet();
       _columnToBlockValSetMap.put(column, blockValSet);
     }
     return blockValSet;

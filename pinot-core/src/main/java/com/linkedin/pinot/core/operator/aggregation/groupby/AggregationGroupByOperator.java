@@ -68,7 +68,7 @@ public class AggregationGroupByOperator extends BaseOperator {
     _indexSegment = indexSegment;
     _aggregationInfoList = aggregationsInfoList;
     _projectionOperator = projectionOperator;
-    _groupByExecutor = GroupByExecutorFactory.getGroupByExecutor(indexSegment, aggregationsInfoList, groupBy);
+    _groupByExecutor = new DefaultGroupByExecutor(indexSegment, aggregationsInfoList, groupBy);
   }
 
   /**
