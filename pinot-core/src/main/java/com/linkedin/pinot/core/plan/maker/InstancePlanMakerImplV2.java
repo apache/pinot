@@ -47,7 +47,7 @@ import org.slf4j.LoggerFactory;
  */
 public class InstancePlanMakerImplV2 implements PlanMaker {
   private static final Logger LOGGER = LoggerFactory.getLogger(InstancePlanMakerImplV2.class);
-  private static final String NEW_AGGREGATION_GROUPBY_STRING = "new.aggregation.groupby";
+  private static final String ENABLE_NEW_AGGREGATION_GROUP_BY_CFG = "new.aggregation.groupby";
   private boolean _enableNewAggregationGroupByCfg = false;
 
   /**
@@ -64,7 +64,8 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
    * @param queryExecutorConfig
    */
   public InstancePlanMakerImplV2(QueryExecutorConfig queryExecutorConfig) {
-    _enableNewAggregationGroupByCfg = queryExecutorConfig.getConfig().getBoolean(NEW_AGGREGATION_GROUPBY_STRING, false);
+    _enableNewAggregationGroupByCfg =
+        queryExecutorConfig.getConfig().getBoolean(ENABLE_NEW_AGGREGATION_GROUP_BY_CFG, true);
     LOGGER.info("New AggregationGroupBy operator: {}", (_enableNewAggregationGroupByCfg) ? "Enabled" : "Disabled");
   }
 
