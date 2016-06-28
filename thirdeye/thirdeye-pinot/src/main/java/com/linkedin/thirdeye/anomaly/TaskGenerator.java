@@ -6,7 +6,8 @@ import com.linkedin.thirdeye.detector.api.AnomalyFunctionSpec;
 
 public class TaskGenerator {
 
-  public List<ThirdEyeTask> createTasks(AnomalyFunctionSpec spec){
+
+  public List<TaskInfo> createTasks(AnomalyFunctionSpec spec){
     return null;
   }
   

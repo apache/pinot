@@ -1,6 +1,6 @@
 package com.linkedin.thirdeye.anomaly;
 
-public class ThirdEyeJob {
+public class ThirdEyeJobInfo {
   String jobName;
   
   int executionId;

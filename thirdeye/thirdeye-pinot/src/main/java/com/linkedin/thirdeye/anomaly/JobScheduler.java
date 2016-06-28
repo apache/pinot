@@ -15,8 +15,7 @@ public class JobScheduler {
   }
   
   private void scheduleJob(AnomalyFunctionSpec anomalyFunctionSpec) {
-    
-    //write the entry in TASK DB
+
   }
 
   private List<AnomalyFunctionSpec> readAnomalyFunctionSpecs() {
