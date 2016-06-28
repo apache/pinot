@@ -50,6 +50,7 @@ import com.linkedin.pinot.core.startree.StarTreeIndexNode;
 
 public class StarTreeIndexOperator extends BaseFilterOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(StarTreeIndexOperator.class);
+  private final int numRawDocs;
   private IndexSegment segment;
 
   // Predicates map
@@ -66,6 +67,7 @@ public class StarTreeIndexOperator extends BaseFilterOperator {
 
   public StarTreeIndexOperator(IndexSegment segment, BrokerRequest brokerRequest) {
     this.segment = segment;
+    numRawDocs = segment.getSegmentMetadata().getTotalRawDocs();
     this.brokerRequest = brokerRequest;
     predicateColumns = new HashSet<>();
     groupByColumns = new HashSet<>();
@@ -171,9 +173,10 @@ public class StarTreeIndexOperator extends BaseFilterOperator {
 
       if (matchedEntry.remainingPredicateColumns.isEmpty()) {
         // No more filters to apply
-        // Use aggregated doc for this leaf node if possible
-        if (matchedLeafNode.getAggregatedDocumentId() != -1 && matchedEntry.remainingGroupByColumns.isEmpty()) {
-          exactlyMatchedDocsBitmap.add(matchedLeafNode.getAggregatedDocumentId());
+        // Use aggregated doc for this leaf node if possible.
+        int aggregatedDocumentId = matchedLeafNode.getAggregatedDocumentId();
+        if (isValidAggregatedDocId(aggregatedDocumentId) && matchedEntry.remainingGroupByColumns.isEmpty()) {
+          exactlyMatchedDocsBitmap.add(aggregatedDocumentId);
           numExactlyMatched = numExactlyMatched + 1;
         } else {
           // Have to scan all the documents under this leaf node
@@ -214,6 +217,20 @@ public class StarTreeIndexOperator extends BaseFilterOperator {
     LOGGER.debug("Found {} matching leaves, took {} ms to create remaining filter operators. Total docs to scan:{}",
         matchedEntries.size(), (end - start), totalDocsToScan);
     return matchingLeafOperators;
+  }
+
+  /**
+   * Returns true if aggregated doc id is valid, ie >= numRawDocs, false otherwise.
+   *
+   * This is a temporary fix to handle aggredated doc id's being de-serialized as 0 instead of -1
+   * for older segments that do not have this field. This will be resolved once we implement the
+   * on-disk format for star-tree along with its own serializer/deserializer, and versioning.
+   *
+   * @param aggregatedDocumentId
+   * @return
+   */
+  private boolean isValidAggregatedDocId(int aggregatedDocumentId) {
+    return (aggregatedDocumentId >= numRawDocs);
   }
 
   private BaseFilterOperator createFilterOperator(final MutableRoaringBitmap answer) {
@@ -359,8 +376,9 @@ public class StarTreeIndexOperator extends BaseFilterOperator {
       StarTreeIndexNode current = searchEntry.starTreeIndexnode;
       HashSet<String> remainingPredicateColumns = searchEntry.remainingPredicateColumns;
       HashSet<String> remainingGroupByColumns = searchEntry.remainingGroupByColumns;
-      // Check if its leaf
-      if (current.isLeaf() || (remainingPredicateColumns.isEmpty() && remainingGroupByColumns.isEmpty())) {
+      // Check if its leaf, or if there are no remaining predicates/groupbycolumns, and node has valid aggregated docId
+      if (current.isLeaf() || (remainingPredicateColumns.isEmpty() && remainingGroupByColumns.isEmpty()) &&
+          isValidAggregatedDocId(current.getAggregatedDocumentId())) {
         // reached leaf
         matchedEntries.add(searchEntry);
         continue;
