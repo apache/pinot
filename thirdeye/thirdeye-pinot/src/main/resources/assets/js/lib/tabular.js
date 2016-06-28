@@ -314,7 +314,7 @@ function switchToContributors(target){
     //either dashboard or metrics param is present in hash
     delete hash.dashboard;
 
-    //switch to time ver time tab
+    //switch to time tab
     hash.view = "compare";
 
     //set start and end date to the starte and end date of the table

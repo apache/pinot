@@ -126,15 +126,19 @@ function renderD3heatmap(data, tab) {
 
 
 
-            var mouseenter = function(d) {
+            var mousemove = function(d) {
 
                 var target = $(this)//$(event.target)
-                var dimension = target.attr("data-dimension")
-                var metric = target.attr("data-metric")
-                var valueId = target.attr("data-value-id")
-                var value = target.attr("id")
-                var xPosition = d3.event.pageX/2;
-                var yPosition = d3.event.pageY/2;
+                var dimension = target.attr("data-dimension");
+                var metric = target.attr("data-metric");
+                var valueId = target.attr("data-value-id");
+                var value = target.attr("id");
+                var treemapOffset = $($(".dimension-treemap")[0]).offset();
+                var tooltipWidth = $("#tooltip").css("width") ;
+                var tooltipWidthOffset = parseInt(tooltipWidth.substring(0, tooltipWidth.length -2) ) / 2;
+
+                var xPosition = d3.event.pageX - treemapOffset.left + tooltipWidthOffset + 5;
+                var yPosition = d3.event.pageY - treemapOffset.top + 5;
                 var dimData = data["data"][metric + "." + dimension]["responseData"]
 
                 var cellSizeExpression = dimData[valueId][schema["cellSizeExpression"]];
@@ -205,7 +209,7 @@ function renderD3heatmap(data, tab) {
                     .attr("data-metric", function (d) {return root.metric})
                     .attr("data-value-id", function (d) {return d.valueId})
                     .attr("id", function (d) {return d.name})
-                    .on("mouseenter", mouseenter)
+                    .on("mousemove", mousemove)
                     .on("mouseout", mouseleave)
                     .call(position)
                     .style("background", function (d) {return d.children ? null : d.bgcolor})

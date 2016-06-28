@@ -60,7 +60,7 @@ body a{
 }
 
 .thin-input{
-   width:60px;
+   width:65px;
 }
 
 .plus-symbol:before {
@@ -318,10 +318,9 @@ body a{
    margin-bottom: 15px;
 }
 
-#configure-alert-form .time-range-selector-dropdown{
-    width: 262px;
+#selected-anomaly-dataset{
+    margin-left: 21px;
 }
-
 
 /** Chart area **/
 
@@ -822,6 +821,7 @@ body a{
 #anomalies-table{
     width:100%;
     border: 1px solid #444;
+    margin-top: 0px;
 }
 
 #anomalies-table .metric-label:hover,
@@ -832,6 +832,11 @@ body a{
 
 #anomalies-table thead{
     border-top: 1px solid #666;
+}
+
+#anomalies-table .color-box{
+    width: 10px;
+    height: 10px;
 }
 
 #anomalies-table td,

@@ -177,8 +177,27 @@ function drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab) {
     // Clicking the checkbox of the timeseries legend will redraw the timeseries
     // with the selected elements
     currentView.on("click",'.time-series-metric-checkbox', function() {
+        anomalyTimeSeriesCheckbox(this);
+    });
 
-        var checkbox = this;
+    //Select all / deselect all metrics option
+    currentView.on("click",".time-series-metric-select-all-checkbox", function(){
+        anomalyTimeSelectAllCheckbox(this);
+    });
+
+
+    //licking a checkbox in the table toggles the region of that timerange on the timeseries chart
+    currentView.on("change",".anomaly-table-checkbox input", function(){
+        toggleAnomalyTimeRange(this);
+    });
+
+    //Preselect first metric on load
+    $($(".time-series-metric-checkbox", currentView)[0]).click();
+
+
+
+    function anomalyTimeSeriesCheckbox(target){
+        var checkbox = target;
         var checkboxObj = $(checkbox);
         metricName = checkboxObj.val();
         if (checkboxObj.is(':checked')) {
@@ -218,13 +237,12 @@ function drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab) {
 
 
         }
-    });
+    }
 
-    //Select all / deselect all metrics option
-    currentView.on("click",".time-series-metric-select-all-checkbox", function(){
 
+    function anomalyTimeSelectAllCheckbox(target){
         //if select all is checked
-        if($(this).is(':checked')){
+        if($(target).is(':checked')){
             //trigger click on each unchecked checkbox
             $(".time-series-metric-checkbox", currentView).each(function(index, checkbox) {
                 if (!$(checkbox).is(':checked')) {
@@ -239,25 +257,22 @@ function drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab) {
                 }
             })
         }
-    });
+    }
 
 
-    //licking a checkbox in the table toggles the region of that timerange on the timeseries chart
-    currentView.on("change",".anomaly-table-checkbox input", function(){
-
-        var anomalyId = ".anomaly-id-" + $(this).attr("id");
-        if ($(this).is(':checked')){
+    function toggleAnomalyTimeRange(target){
+        var anomalyId = ".anomaly-id-" + $(target).attr("id");
+        console.log("toggle anomalyId: ")
+        if ($(target).is(':checked')){
             $(anomalyId).show();
+            console.log("show anomalyId")
         }else{
             $(anomalyId).hide();
+            console.log("hide anomalyId")
         }
+    }
 
-
-    });
-
-    //Preselect first metric
-    $($(".time-series-metric-checkbox", currentView)[0]).click();
-}
+} //end of drawAnomalyTimeSeries
 
 function renderAnomalyTable(data, tab) {
     //Error handling when data is falsy (empty, undefined or null)
@@ -274,8 +289,11 @@ function renderAnomalyTable(data, tab) {
     var result_anomalies_template = HandleBarsTemplates.template_anomalies(data);
     $("#" + tab + "-display-chart-section").append(result_anomalies_template);
 
-    $("#anomalies-table").on("click", ".select-all-checkbox", function() {
 
+    //Eventlisteners of anomalies table
+
+    //Select all checkbox selects the checkboxes in all rows
+    $("#anomalies-table").on("click", ".select-all-checkbox", function() {
 
         var currentTable = $(this).closest("table");
 
@@ -292,4 +310,45 @@ function renderAnomalyTable(data, tab) {
         }
     })
 
+
+
+    //Clicking a checkbox in the table takes user to related heatmap chart
+    $("#anomalies-table").on("click",".heatmap-link", function(){
+        showHeatMapOfAnomaly(this);
+    });
+
+    /** Compare/Tabular view and dashboard view heat-map-cell click switches the view to compare/heat-map
+     * focusing on the timerange of the cell or in case of cumulative values it query the cumulative timerange **/
+    function showHeatMapOfAnomaly(target){
+
+        var $target = $(target);
+        hash.view = "compare";
+        hash.aggTimeGranularity = "aggregateAll";
+
+        var currentStartUTC = $target.attr("data-start-utc-millis");
+        var currentEndUTC = $target.attr("data-end-utc-millis");
+
+        //Using WoW for anomaly baseline
+        var baselineStartUTC =  moment(parseInt(currentStartUTC)).add(-7, 'days').valueOf();
+        var baselineEndUTC = moment(parseInt(currentEndUTC)).add(-7, 'days').valueOf();
+
+        hash.baselineStart = baselineStartUTC;
+        hash.baselineEnd = baselineEndUTC;
+        hash.currentStart = currentStartUTC;
+        hash.currentEnd = currentEndUTC;
+        delete hash.dashboard;
+        metrics = [];
+        var metricName = $target.attr("data-metric");
+        metrics.push(metricName);
+        hash.metrics = metrics.toString();
+
+        //update hash will trigger window.onhashchange event:
+        // update the form area and trigger the ajax call
+        window.location.hash = encodeHashParameters(hash);
+    }
+
+
 }
+
+
+

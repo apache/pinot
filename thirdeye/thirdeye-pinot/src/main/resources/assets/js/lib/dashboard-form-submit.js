@@ -15,12 +15,10 @@ function formSubmit(target){
 
 
     /*Update hash*/
-
-
-    //update hash.dateset
-    var selectedDateset = $("#selected-dateset").attr("value");
-    if(selectedDateset != "none" && selectedDateset != undefined && selectedDateset != ""){
-        hash.dateset= selectedDateset;
+    //update hash.dataset
+    var selectedDataset = $("#selected-dataset").attr("value");
+    if(selectedDataset != "none" && selectedDataset != undefined && selectedDataset != ""){
+        hash.dataset= selectedDataset;
     }
 
     //update hash.dashboard
@@ -115,6 +113,16 @@ function formSubmit(target){
             errorAlert.fadeIn(100);
             return
         }
+    }
+
+    //If the form has single-metric selector metric has to be selected
+    if( $("#"+ hash.view +"-view-single-metric-selector").length > 0 ) {
+       if( $("#selected-metric").attr("value") == ""){
+           errorMessage.html("Please select at least 1 metric.");
+           errorAlert.attr("data-error-source", "metric-option");
+           errorAlert.fadeIn(100);
+           return
+       }
     }
 
 
