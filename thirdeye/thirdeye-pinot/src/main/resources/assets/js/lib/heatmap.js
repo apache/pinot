@@ -133,12 +133,21 @@ function renderD3heatmap(data, tab) {
                 var metric = target.attr("data-metric");
                 var valueId = target.attr("data-value-id");
                 var value = target.attr("id");
+
                 var treemapOffset = $($(".dimension-treemap")[0]).offset();
                 var tooltipWidth = $("#tooltip").css("width") ;
-                var tooltipWidthOffset = parseInt(tooltipWidth.substring(0, tooltipWidth.length -2) ) / 2;
+                var tooltipHeight = $("#tooltip").css("height");
 
-                var xPosition = d3.event.pageX - treemapOffset.left + tooltipWidthOffset + 5;
-                var yPosition = d3.event.pageY - treemapOffset.top + 5;
+                var tooltipWidthOffset = parseInt(tooltipWidth.substring(0, tooltipWidth.length -2) ) / 2;
+                var tooltipHeightOffset = parseInt(tooltipHeight.substring(0, tooltipHeight.length -2) ) / 2;
+
+                var directionX = d3.event.pageX - treemapOffset.left < window.innerWidth /2 ? "-1" : "1";
+                var directionY = d3.event.pageY - treemapOffset.top < window.innerHeight /2 ? "-1" : "1";
+                var distanceFromMousePointer = 50;
+
+                var xPosition = d3.event.pageX - treemapOffset.left - directionX * (tooltipWidthOffset + distanceFromMousePointer);
+                var yPosition = d3.event.pageY - treemapOffset.top - directionY * (tooltipHeightOffset  + distanceFromMousePointer) ;
+
                 var dimData = data["data"][metric + "." + dimension]["responseData"]
 
                 var cellSizeExpression = dimData[valueId][schema["cellSizeExpression"]];

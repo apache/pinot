@@ -1,21 +1,25 @@
 function getAnomalies(tab) {
 
-  dashboardName = "Default_Dashboard"; //Change it to be the first option:  $(".dashboard-option:first-child a").html().trim()
-  baselineStart = moment(parseInt(hash.currentStart)).add(-7, 'days')
-  baselineEnd = moment(parseInt(hash.currentEnd)).add(-7, 'days')
-  aggTimeGranularity = (window.datasetConfig.dataGranularity) ? window.datasetConfig.dataGranularity : "HOURS";
+  //var dashboardName = "Default_Dashboard"; //Change it to be the first option:  $(".dashboard-option:first-child a").html().trim()
+  var baselineStart = moment(parseInt(hash.currentStart)).add(-7, 'days')
+  var baselineEnd = moment(parseInt(hash.currentEnd)).add(-7, 'days')
+  var aggTimeGranularity = (window.datasetConfig.dataGranularity) ? window.datasetConfig.dataGranularity : "HOURS";
+  var dataset = hash.dataset;
+  var compareMode = "WoW";
+  var currentStart = hash.currentStart;
+  var currentEnd = hash.currentEnd;
+  var metrics = hash.metrics;
 
-
-  var timeSeriesUrl = "/dashboard/data/tabular?" + window.location.hash.substring(1)  //
+  var timeSeriesUrl = "/dashboard/data/tabular?dataset=" + dataset + "&compareMode=" + compareMode //
+  + "&currentStart=" + currentStart + "&currentEnd=" + currentEnd  //
   + "&baselineStart=" + baselineStart + "&baselineEnd=" + baselineEnd   //
-  + "&aggTimeGranularity=" + aggTimeGranularity;
+  + "&aggTimeGranularity=" + aggTimeGranularity + "&metrics=" + metrics;
 
   var currentStartISO = moment(parseInt(hash.currentStart)).toISOString();
   var currentEndISO = moment(parseInt(hash.currentEnd)).toISOString();
   var anomaliesUrl = "/dashboard/anomalies/view?dataset=" + hash.dataset + "&startTimeIso=" + currentStartISO + "&endTimeIso=" + currentEndISO + "&metric=" + hash.metrics + "&filters=" + hash.filters;
 
   getData(anomaliesUrl).done(function(anomalyData) {
-
     getData(timeSeriesUrl).done(function(timeSeriesData) {
 
         //Error handling when data is falsy (empty, undefined or null)
@@ -262,13 +266,10 @@ function drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab) {
 
     function toggleAnomalyTimeRange(target){
         var anomalyId = ".anomaly-id-" + $(target).attr("id");
-        console.log("toggle anomalyId: ")
         if ($(target).is(':checked')){
             $(anomalyId).show();
-            console.log("show anomalyId")
         }else{
             $(anomalyId).hide();
-            console.log("hide anomalyId")
         }
     }
 
