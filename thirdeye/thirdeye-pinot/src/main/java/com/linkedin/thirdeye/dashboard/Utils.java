@@ -4,12 +4,15 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+
+import jersey.repackaged.com.google.common.collect.Lists;
 
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
@@ -193,12 +196,12 @@ public class Utils {
 
   public static List<MetricFunction> computeMetricFunctionsFromExpressions(
       List<MetricExpression> metricExpressions) {
-    List<MetricFunction> metricFunctions = new ArrayList<>();
+    Set<MetricFunction> metricFunctions = new HashSet<>();
 
     for (MetricExpression expression : metricExpressions) {
       metricFunctions.addAll(expression.computeMetricFunctions());
     }
-    return metricFunctions;
+    return Lists.newArrayList(metricFunctions);
   }
 
   public static TimeGranularity getAggregationTimeGranularity(String aggTimeGranularity) {
