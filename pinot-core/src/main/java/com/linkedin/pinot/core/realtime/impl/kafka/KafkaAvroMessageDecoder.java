@@ -58,9 +58,6 @@ public class KafkaAvroMessageDecoder implements KafkaMessageDecoder {
 
   @Override
   public void init(Map<String, String> props, Schema indexingSchema, String topicName) throws Exception {
-    for (String key : props.keySet()) {
-      System.out.println(key + ":" + props.get(key));
-    }
     schemaRegistryBaseUrl = props.get(SCHEMA_REGISTRY_REST_URL);
     StringUtils.chomp(schemaRegistryBaseUrl, "/");
     kafkaTopicName = topicName;
