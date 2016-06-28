@@ -821,6 +821,7 @@ body a{
 #anomalies-table{
     width:100%;
     border: 1px solid #444;
+    margin-top: 0px;
 }
 
 #anomalies-table .metric-label:hover,
@@ -831,6 +832,11 @@ body a{
 
 #anomalies-table thead{
     border-top: 1px solid #666;
+}
+
+#anomalies-table .color-box{
+    width: 10px;
+    height: 10px;
 }
 
 #anomalies-table td,

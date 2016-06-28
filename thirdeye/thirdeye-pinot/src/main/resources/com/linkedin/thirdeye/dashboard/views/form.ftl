@@ -41,7 +41,7 @@
 			{{/if}}
             {{#if showSingleMetricSelection}}
             <div id="{{tabName}}-view-single-metric-selector" class="view-single-metric-selector" rel="{{tabName}}">
-                <label class="uk-form-label">Metric</label>
+                <label class="uk-form-label">Anomaly Metric</label>
                 <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group"
                 <!--<div class="add-metric add-btn uk-display-inline-block" rel="{{tabName}}" data-uk-dropdown="{mode:'click'}">-->
                     <div id="selected-metric" class="uk-button">Select metric</div>
@@ -211,7 +211,7 @@
         {{#if showConfigAnomaly}}
         <!-- This is a button toggling the modal -->
 
-        <button class="uk-button uk-margin-large" data-uk-modal="{target:'#manage-alert-modal', center:true}">Configure anomaly alerts</button>
+        <button class="uk-button uk-margin-large hidden" data-uk-modal="{target:'#manage-alert-modal', center:true}">Configure anomaly alerts</button>
 
         <div id="manage-alert-modal" class="uk-modal">
             <div class="uk-modal-dialog uk-modal-dialog-large">
@@ -240,7 +240,7 @@
                             <div class="uk-button uk-button-primary" type="button"><i class="uk-icon-caret-down"></i>
                         </div>
                         <div class="uk-dropdown uk-dropdown-small uk-dropdown-bottom" style="top: 30px; left: 0px;">
-                            <ul class="anomaly-metric-list uk-nav uk-nav-dropdown">
+                            <ul class="create-anomaly-metric-list uk-nav uk-nav-dropdown">
                             </ul>
                         </div>
                     </div>

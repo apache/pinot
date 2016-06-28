@@ -110,6 +110,9 @@
         $(".view-metric-selector .added-item").remove();
         $(".view-dimension-selector .added-item").remove();
         $(".metric-list").empty();
+        $(".single-metric-list").empty();
+        $("#selected-metric").html("Select metric");
+        $("#selected-metric").attr("value", "");
         $(".dimension-list").empty();
         $(".filter-dimension-list").empty()
         $(".filter-panel .value-filter").remove();
@@ -223,7 +226,12 @@
 
         //Update selectors
         $("#selected-metric").text($(target).text());
-        $("#selected-metric").attr("value", value);
+        $("#selected-metric").attr("value", value)
+
+        //Hide alert
+        if($("#"+ hash.view +"-time-input-form-error").attr("data-error-source") == "metric-option"){
+            $("#"+ hash.view +"-time-input-form-error").hide();
+        }
 
         //Enable Go btn
         enableFormSubmit()

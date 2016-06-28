@@ -115,6 +115,16 @@ function formSubmit(target){
         }
     }
 
+    //If the form has single-metric selector metric has to be selected
+    if( $("#"+ hash.view +"-view-single-metric-selector").length > 0 ) {
+       if( $("#selected-metric").attr("value") == ""){
+           errorMessage.html("Please select at least 1 metric.");
+           errorAlert.attr("data-error-source", "metric-option");
+           errorAlert.fadeIn(100);
+           return
+       }
+    }
+
 
     //Validate date time selection and update hash params: currentStart, currentEnd, baselineStart, baselineEnd
     var timezone = getTimeZone();

@@ -51,10 +51,11 @@ function getAllFormData(){
 
     //Todo: remove these 2 global variables and work with $.when and deferreds
     window.responseDataPopulated = 0;
-    window.numFormComponents = 4;
+    window.numFormComponents = 5;
     getDatasetConfig();
     getDashboardList();
     getMetricList();
+    getAnomalyMetricList();
     getDimensionNFilterList();
 }
 
@@ -93,20 +94,35 @@ function getMetricList() {
         var result_query_form_metric_list_template = HandleBarsTemplates.template_metric_list(queryFormMetricListData);
         $(".metric-list").each(function(){ $(this).html(result_query_form_metric_list_template )});
 
-        /* Handelbars template for query form single select metric list */
-        var queryFormMetricListData = {data: data, singleMetricSelector: true};
-        var result_query_form_metric_list_template = HandleBarsTemplates.template_metric_list(queryFormMetricListData);
-        $(".single-metric-list").each(function(){ $(this).html(result_query_form_metric_list_template )});
-
         /* Handelbars template for manage anomalies form metric list */
         var anomalyFormMetricListData = {data: data, scope: "anomaly-", singleMetricSelector: false};
         var result_anomaly_form_metric_list_template = HandleBarsTemplates.template_metric_list(anomalyFormMetricListData);
-        $(".anomaly-metric-list").each(function(){ $(this).html(result_anomaly_form_metric_list_template)});
+        $(".create-anomaly-metric-list").each(function(){ $(this).html(result_anomaly_form_metric_list_template)});
 
         window.responseDataPopulated++
         formComponentPopulated()
     });
 }
+
+function getAnomalyMetricList() {
+
+    //Create metric dropdown
+        var url = "/dashboard/anomalies/metrics?dataset=" + hash.dataset;
+
+    getData(url).done(function (data) {
+
+       validateFormData(data, "No metrics available in the server." , "anomaly metrics" )
+
+       /* Handelbars template for query form single select metric list on anomaly view */
+       var queryFormMetricListData = {data: data, singleMetricSelector: true};
+       var result_query_form_metric_list_template = HandleBarsTemplates.template_metric_list(queryFormMetricListData);
+       $(".single-metric-list").each(function(){ $(this).html(result_query_form_metric_list_template )});
+
+       window.responseDataPopulated++
+       formComponentPopulated()
+    });
+}
+
 
 
 function getDimensionNFilterList() {
