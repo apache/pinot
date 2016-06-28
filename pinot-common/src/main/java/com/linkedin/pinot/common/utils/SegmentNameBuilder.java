@@ -38,7 +38,7 @@ public class SegmentNameBuilder {
   public static class Realtime {
 
     /**
-     * @deprecated Use HLCSegmentNameHolder
+     * @deprecated  Use {@link HLCSegmentName}
      * @param groupId groupid
      * @param partitionRange partitionRange
      * @param sequenceNumber sequenceNumber
@@ -64,7 +64,7 @@ public class SegmentNameBuilder {
     }
 
     /**
-     * @deprecated Use HLCSegmentNameHolder
+     * @deprecated  Use {@link HLCSegmentName}
      * @param segmentId segmentName
      * @return tablename
      */
@@ -81,7 +81,7 @@ public class SegmentNameBuilder {
     }
 
     /**
-     * @deprecated Use HLCSegmentNameHolder
+     * @deprecated  Use {@link HLCSegmentName}
      * @param segmentId segmentname
      * @return groupname
      */
@@ -96,7 +96,7 @@ public class SegmentNameBuilder {
     }
 
     /**
-     * @deprecated Use HLCSegmentNameHolder
+     * @deprecated  Use {@link HLCSegmentName}
      * @param segmentId segment name
      * @return partitionrange
      */
@@ -111,7 +111,7 @@ public class SegmentNameBuilder {
     }
 
     /**
-     * @deprecated  Use HLCSegmentNameHolder
+     * @deprecated  Use {@link HLCSegmentName}
      * @param segmentId segment name
      * @return sequence number
      */
@@ -127,7 +127,7 @@ public class SegmentNameBuilder {
     }
 
     /**
-     * @deprecated  Use HLCSegmentNameHolder
+     * @deprecated  Use {@link HLCSegmentName}
      * @param segmentId segment name
      * @return true if realtime long segment name
      */
@@ -140,7 +140,7 @@ public class SegmentNameBuilder {
     }
 
     /**
-     * @deprecated  Use HLCSegmentNameHolder
+     * @deprecated  Use {@link HLCSegmentName}
      * @param segmentId segment name
      * @return true if realtime short segment name
      */
