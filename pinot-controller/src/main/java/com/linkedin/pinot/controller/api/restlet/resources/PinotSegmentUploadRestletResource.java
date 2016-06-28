@@ -43,7 +43,10 @@ import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
+import java.net.URLDecoder;
+import java.net.URLEncoder;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
@@ -143,6 +146,11 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
       @Parameter(name = "segmentName", in = "path", description = "The name of the segment to download", required = true)
       String segmentName) {
     Representation presentation;
+    try {
+      segmentName = URLDecoder.decode(segmentName, "UTF-8");
+    } catch (UnsupportedEncodingException e) {
+      throw new AssertionError("UTF-8 encoding should always be supported", e);
+    }
     final File dataFile = new File(baseDataDir, StringUtil.join("/", tableName, segmentName));
     if (dataFile.exists()) {
       presentation = new FileRepresentation(dataFile, MediaType.ALL, 0);
@@ -539,7 +547,11 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
   }
 
   public String constructDownloadUrl(String tableName, String segmentName) {
-    final String ret = StringUtil.join("/", vip, "segments", tableName, segmentName);
-    return ret;
+    try {
+      return StringUtil.join("/", vip, "segments", tableName, URLEncoder.encode(segmentName, "UTF-8"));
+    } catch (UnsupportedEncodingException e) {
+      // Shouldn't happen
+      throw new AssertionError("UTF-8 encoding should always be supported", e);
+    }
   }
 }

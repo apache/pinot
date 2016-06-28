@@ -732,7 +732,9 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
               genConfig.setSchema(inputPinotSchema);
             }
 
-            genConfig.setSegmentNamePostfix(Integer.toString(segmentNumber));
+            // jfim: We add a space and a special character to do a regression test for PINOT-3296 Segments with spaces
+            // in their filename don't work properly
+            genConfig.setSegmentNamePostfix(Integer.toString(segmentNumber) + " %");
             genConfig.setEnableStarTreeIndex(createStarTreeIndex);
             genConfig.setStarTreeIndexSpec(null);
 
