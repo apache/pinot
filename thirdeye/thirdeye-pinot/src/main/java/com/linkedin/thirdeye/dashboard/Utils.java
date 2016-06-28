@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -18,6 +19,7 @@ import org.slf4j.LoggerFactory;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.cache.CacheLoader.InvalidCacheLoadException;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.api.CollectionSchema;
 import com.linkedin.thirdeye.api.TimeGranularity;
@@ -193,12 +195,12 @@ public class Utils {
 
   public static List<MetricFunction> computeMetricFunctionsFromExpressions(
       List<MetricExpression> metricExpressions) {
-    List<MetricFunction> metricFunctions = new ArrayList<>();
+    Set<MetricFunction> metricFunctions = new HashSet<>();
 
     for (MetricExpression expression : metricExpressions) {
       metricFunctions.addAll(expression.computeMetricFunctions());
     }
-    return metricFunctions;
+    return Lists.newArrayList(metricFunctions);
   }
 
   public static TimeGranularity getAggregationTimeGranularity(String aggTimeGranularity) {
