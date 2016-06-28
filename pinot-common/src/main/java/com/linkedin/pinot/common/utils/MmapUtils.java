@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.common.utils;
 
+import com.google.common.base.Joiner;
 import com.linkedin.pinot.common.Utils;
 import java.io.File;
 import java.io.IOException;
@@ -58,16 +59,71 @@ public class MmapUtils {
   }
 
   public static class AllocationContext {
+    private final String fileName;
+    private final String parentFileName;
+    private final String parentPathName;
+
     private final String context;
     private final AllocationType allocationType;
 
-    public AllocationContext(String context, AllocationType allocationType) {
+    public static final Joiner PATH_JOINER = Joiner.on(File.separatorChar).skipNulls();
+
+    AllocationContext(String context, AllocationType allocationType) {
       this.context = context;
       this.allocationType = allocationType;
+      this.fileName = null;
+      this.parentFileName = null;
+      this.parentPathName = null;
+    }
+
+    AllocationContext(File file, String details, AllocationType allocationType) {
+      context = details;
+      this.allocationType = allocationType;
+
+      // We separate the path into three components to lower the overall on-heap memory usage when there are lots of
+      // redundant paths. Paths that are memory mapped are usually <storage directory>/<segment name>/<column name>.ext
+      // and this allows sharing the same String instance if the storage directory and segment name is duplicated many
+      // times.
+
+      if (file != null) {
+        fileName = file.getName().intern();
+        File parent = file.getParentFile();
+        if (parent != null) {
+          File parentParent = parent.getParentFile();
+          if (parentParent != null) {
+            String absolutePath = parentParent.getAbsolutePath();
+
+            if (absolutePath.equals("/"))
+              absolutePath = "";
+
+            parentFileName = parent.getName().intern();
+            parentPathName = absolutePath.intern();
+          } else {
+            String absolutePath = parent.getAbsolutePath();
+
+            if (absolutePath.equals("/"))
+              absolutePath = "";
+
+            parentFileName = absolutePath.intern();
+            parentPathName = null;
+          }
+        } else {
+          parentFileName = null;
+          parentPathName = null;
+        }
+      } else {
+        fileName = null;
+        parentFileName = null;
+        parentPathName = null;
+      }
     }
 
     public String getContext() {
-      return context;
+      if (fileName != null) {
+        return PATH_JOINER.join(parentPathName, parentFileName, fileName) + " (" + context + ")";
+      } else {
+        return context;
+      }
     }
 
     public AllocationType getAllocationType() {
@@ -76,7 +132,7 @@ public class MmapUtils {
 
     @Override
     public String toString() {
-      return context;
+      return getContext();
     }
   }
 
@@ -162,16 +218,19 @@ public class MmapUtils {
    * Allocates a direct byte buffer, tracking usage information.
    *
    * @param capacity The capacity to allocate.
-   * @param allocationContext The file that this byte buffer refers to
+   * @param file The file that this byte buffer refers to
    * @param details Further details about the allocation
    * @return A new allocated byte buffer with the requested capacity
    */
-  public static ByteBuffer allocateDirectByteBuffer(int capacity, File allocationContext, String details) {
-    String context;
-    if (allocationContext != null) {
-      context = allocationContext.getAbsolutePath() + " (" + details + ")";
+  public static ByteBuffer allocateDirectByteBuffer(final int capacity, final File file, final String details) {
+    final String context;
+    final AllocationContext allocationContext;
+    if (file != null) {
+      context = file.getAbsolutePath() + " (" + details + ")";
+      allocationContext = new AllocationContext(file, details, AllocationType.DIRECT_BYTE_BUFFER);
     } else {
       context = "no file (" + details + ")";
+      allocationContext = new AllocationContext(details, AllocationType.DIRECT_BYTE_BUFFER);
     }
 
     DIRECT_BYTE_BUFFER_USAGE.addAndGet(capacity);
@@ -191,7 +250,7 @@ public class MmapUtils {
       Utils.rethrowException(e);
     }
 
-    BUFFER_TO_CONTEXT_MAP.put(byteBuffer, new AllocationContext(context, AllocationType.DIRECT_BYTE_BUFFER));
+    BUFFER_TO_CONTEXT_MAP.put(byteBuffer, allocationContext);
 
     return byteBuffer;
   }
@@ -203,16 +262,20 @@ public class MmapUtils {
    * @param mode The mmap mode
    * @param position The byte position to mmap
    * @param size The number of bytes to mmap
-   * @param allocationContext The file that is mmap'ed
+   * @param file The file that is mmap'ed
    * @param details Additional details about the allocation
    */
   public static MappedByteBuffer mmapFile(RandomAccessFile randomAccessFile, FileChannel.MapMode mode, long position,
-      long size, File allocationContext, String details) throws IOException {
-    String context;
-    if (allocationContext != null) {
-      context = allocationContext.getAbsolutePath() + " (" + details + ")";
+      long size, File file, String details) throws IOException {
+    final String context;
+    final AllocationContext allocationContext;
+
+    if (file != null) {
+      context = file.getAbsolutePath() + " (" + details + ")";
+      allocationContext = new AllocationContext(file, details, AllocationType.MMAP);
     } else {
       context = "no file (" + details + ")";
+      allocationContext = new AllocationContext(details, AllocationType.MMAP);
     }
 
     MMAP_BUFFER_USAGE.addAndGet(size);
@@ -233,7 +296,7 @@ public class MmapUtils {
       Utils.rethrowException(e);
     }
 
-    BUFFER_TO_CONTEXT_MAP.put(byteBuffer, new AllocationContext(context, AllocationType.MMAP));
+    BUFFER_TO_CONTEXT_MAP.put(byteBuffer, allocationContext);
 
     return byteBuffer;
   }
