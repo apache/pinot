@@ -375,7 +375,7 @@ public class DashboardResource {
   @Path(value = "/data/tabular")
   @Produces(MediaType.APPLICATION_JSON)
   public String getTabularData(@QueryParam("dataset") String collection,
-      @QueryParam("filterClause") String filterJson,
+      @QueryParam("filters") String filterJson,
       @QueryParam("timeZone") @DefaultValue(DEFAULT_TIMEZONE_ID) String timeZone,
       @QueryParam("baselineStart") Long baselineStart, @QueryParam("baselineEnd") Long baselineEnd,
       @QueryParam("currentStart") Long currentStart, @QueryParam("currentEnd") Long currentEnd,
