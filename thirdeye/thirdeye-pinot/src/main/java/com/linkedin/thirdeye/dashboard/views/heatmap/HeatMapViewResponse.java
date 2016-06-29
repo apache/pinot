@@ -23,7 +23,7 @@ public class HeatMapViewResponse implements ViewResponse {
   List<String> dimensions;
   Info summary;
   Map<String, GenericResponse> data;
-  Map<String, String> cellSizeExpression;
+  Map<String, String> metricExpression;
 
   public HeatMapViewResponse() {
     super();
@@ -62,12 +62,12 @@ public class HeatMapViewResponse implements ViewResponse {
   }
 
 
-  public Map<String, String> getCellSizeExpression() {
-    return cellSizeExpression;
+  public Map<String, String> getMetricExpression() {
+    return metricExpression;
   }
 
-  public void setCellSizeExpression(Map<String, String> cellSizeExpression) {
-    this.cellSizeExpression = cellSizeExpression;
+  public void setMetricExpression(Map<String, String> metricExpression) {
+    this.metricExpression = metricExpression;
   }
 
   private static Map<String, String> generateSummary(GenericResponse genericResponse) {

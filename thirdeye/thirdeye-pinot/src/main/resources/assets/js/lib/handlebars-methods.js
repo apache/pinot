@@ -198,12 +198,12 @@ $(document).ready(function() {
     });
 
   //takes an object and a key as option param and returns an object as a scope
-    Handlebars.registerHelper('lookupCellSizeExpression', function(obj, metricName) {
-        var cellSizeExpression = obj[metricName];
-        if (typeof cellSizeExpression !== "undefined") {
-          cellSizeExpression = "(" + cellSizeExpression + ")";
+    Handlebars.registerHelper('lookupInMapByKey', function(mapObj, key) {
+        var val = mapObj[key];
+        if (typeof val !== "undefined") {
+          val = "(" + val + ")";
         }
-        return cellSizeExpression;
+        return val;
     });
 
     //takes an object and a key as option param and returns an object as a scope
