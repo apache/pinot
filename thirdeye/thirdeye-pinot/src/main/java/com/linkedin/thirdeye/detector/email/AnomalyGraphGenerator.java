@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.TimeZone;
 import java.util.TreeMap;
 
 import org.jfree.chart.ChartFactory;
@@ -51,6 +52,8 @@ public class AnomalyGraphGenerator {
   private static final int DEFAULT_CHART_HEIGHT = 480;
   private static final int DEFAULT_CHART_WIDTH = 720;
   private static final Logger LOG = LoggerFactory.getLogger(AnomalyGraphGenerator.class);
+
+  private static final TimeZone TIME_ZONE = EmailReportJob.DEFAULT_TIME_ZONE;
 
   // Credit for initial skeleton code:
   // http://www.java2s.com/Code/Java/Chart/JFreeChartLineChartDemo6.htm
@@ -92,7 +95,7 @@ public class AnomalyGraphGenerator {
     // create the chart...
     final JFreeChart chart = ChartFactory.createTimeSeriesChart(null, // no chart title for email
                                                                       // image
-        "Date", // x axis label
+        "Date (" + TIME_ZONE.getID() + ")", // x axis label
         metric, // y axis label
         dataset, // data
         true, // include legend
@@ -274,7 +277,9 @@ public class AnomalyGraphGenerator {
       throw new IllegalArgumentException(
           "Unsupported time unit granularity: " + timeGranularity.getUnit());
     }
-    return new SimpleDateFormat(format);
+    SimpleDateFormat dateFormat = new SimpleDateFormat(format);
+    dateFormat.setTimeZone(TIME_ZONE);
+    return dateFormat;
   }
 
   private DateTickUnit getDateTickUnit(final TimeGranularity timeGranularity,

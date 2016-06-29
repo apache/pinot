@@ -15,6 +15,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TimeZone;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -76,6 +77,7 @@ public class EmailReportJob implements Job {
   public static final String TIME_ON_TIME_COMPARISON_HANDLER = "TIME_ON_TIME_COMPARISON_HANDLER";
   public static final String DASHBOARD_HOST = "DASHBOARD_HOST";
 
+  public static final TimeZone DEFAULT_TIME_ZONE = TimeZone.getTimeZone("America/Los_Angeles");
   public static final String CHARSET = "UTF-8";
 
   @Override
@@ -185,7 +187,7 @@ public class EmailReportJob implements Job {
       throw new JobExecutionException(e);
     }
 
-    DateTimeZone timeZone = DateTimeZone.forID("America/Los_Angeles");
+    DateTimeZone timeZone = DateTimeZone.forTimeZone(DEFAULT_TIME_ZONE);
     DateFormatMethod dateFormatMethod = new DateFormatMethod(timeZone);
 
     // Render template - create email first so we can get embedded image string
