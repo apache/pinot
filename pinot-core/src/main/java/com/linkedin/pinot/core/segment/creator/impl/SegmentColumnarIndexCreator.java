@@ -31,13 +31,13 @@ import com.linkedin.pinot.core.segment.creator.impl.fwd.MultiValueUnsortedForwar
 import com.linkedin.pinot.core.segment.creator.impl.fwd.SingleValueSortedForwardIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.fwd.SingleValueUnsortedForwardIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.inv.OffHeapBitmapInvertedIndexCreator;
-import com.linkedin.pinot.core.segment.creator.impl.stats.StringColumnPreIndexStatsCollector;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.commons.lang.StringEscapeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -73,6 +73,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   private int totalConversions;
   private int totalNullCols;
   private int docIdCounter;
+  private char paddingCharacter;
   private Map<String, Map<Object, Object>> dictionaryCache = new HashMap<String, Map<Object, Object>>();
 
   @Override
@@ -103,13 +104,15 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     this.totalNulls = segmentIndexCreationInfo.getTotalNulls();
     this.totalConversions = segmentIndexCreationInfo.getTotalConversions();
     this.totalNullCols = segmentIndexCreationInfo.getTotalNullCols();
+    this.paddingCharacter = segmentCreationSpec.getPaddingCharacter();
 
     // Initialize and build dictionaries
     for (final FieldSpec spec : schema.getAllFieldSpecs()) {
       final ColumnIndexCreationInfo info = indexCreationInfoMap.get(spec.getName());
       if (info.isCreateDictionary()) {
         dictionaryCreatorMap.put(spec.getName(),
-            new SegmentDictionaryCreator(info.hasNulls(), info.getSortedUniqueElementsArray(), spec, file));
+            new SegmentDictionaryCreator(info.hasNulls(), info.getSortedUniqueElementsArray(), spec, file,
+                paddingCharacter));
       } else {
         throw new RuntimeException("Creation of indices without dictionaries is not implemented!");
       }
@@ -209,6 +212,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         new PropertiesConfiguration(new File(file, V1Constants.MetadataKeys.METADATA_FILE_NAME));
 
     properties.setProperty(SEGMENT_CREATOR_VERSION, config.getCreatorVersion());
+    properties.setProperty(SEGMENT_PADDING_CHARACTER, StringEscapeUtils.escapeJava(Character.toString(
+        config.getPaddingCharacter())));
     properties.setProperty(SEGMENT_NAME, segmentName);
     properties.setProperty(TABLE_NAME, config.getTableName());
     properties.setProperty(DIMENSIONS, config.getDimensions());

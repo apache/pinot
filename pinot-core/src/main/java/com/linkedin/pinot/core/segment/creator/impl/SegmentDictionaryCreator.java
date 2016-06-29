@@ -41,6 +41,7 @@ public class SegmentDictionaryCreator implements Closeable {
   private final FieldSpec spec;
   private final File dictionaryFile;
   private final int rowCount;
+  private final char  paddingChar;
   private static final Charset utf8CharSet = Charset.forName("UTF-8");
 
   private Int2IntOpenHashMap intValueToIndexMap;
@@ -51,7 +52,7 @@ public class SegmentDictionaryCreator implements Closeable {
 
   private int stringColumnMaxLength = 0;
 
-  public SegmentDictionaryCreator(boolean hasNulls, Object sortedList, FieldSpec spec, File indexDir)
+  public SegmentDictionaryCreator(boolean hasNulls, Object sortedList, FieldSpec spec, File indexDir, char paddingChar)
       throws IOException {
     rowCount = ArrayUtils.getLength(sortedList);
 
@@ -91,6 +92,7 @@ public class SegmentDictionaryCreator implements Closeable {
         spec.getName(), hasNulls, rowCount, spec.getDataType(), spec.isSingleValueField(), first, last);
     this.sortedList = sortedList;
     this.spec = spec;
+    this.paddingChar = paddingChar;
     dictionaryFile = new File(indexDir, spec.getName() + ".dict");
     FileUtils.touch(dictionaryFile);
   }
@@ -173,7 +175,7 @@ public class SegmentDictionaryCreator implements Closeable {
         Map<String, String> revisedMap = new HashMap<String, String>();
         for (int i = 0; i < rowCount; i++) {
           final String toWrite = sortedObjects[i].toString();
-          String entry = getPaddedString(toWrite, stringColumnMaxLength);
+          String entry = getPaddedString(toWrite, stringColumnMaxLength, paddingChar);
           revised[i] = entry;
           if (isSorted[0] && i> 0 && (revised[i-1].compareTo(entry) > 0)) {
             isSorted[0] = false;
@@ -276,9 +278,10 @@ public class SegmentDictionaryCreator implements Closeable {
    *
    * @param inputString
    * @param targetLength
+   * @param paddingChar
    * @return
    */
-  public static String getPaddedString(String inputString, int targetLength) {
+  public static String getPaddedString(String inputString, int targetLength, char paddingChar) {
     if (inputString.length() >= targetLength) {
       return inputString;
     }
@@ -286,7 +289,7 @@ public class SegmentDictionaryCreator implements Closeable {
     StringBuilder stringBuilder = new StringBuilder(inputString);
     final int padding = targetLength - inputString.getBytes(utf8CharSet).length;
     for (int i = 0; i < padding; i++) {
-      stringBuilder.append(V1Constants.Str.STRING_PAD_CHAR);
+      stringBuilder.append(paddingChar);
     }
     return stringBuilder.toString();
   }

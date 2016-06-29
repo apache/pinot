@@ -455,6 +455,11 @@ public class RetentionManagerTest {
         return null;
       }
 
+      @Override
+      public Character getPaddingCharacter() {
+        return V1Constants.Str.DEFAULT_STRING_PAD_CHAR;
+      }
+
     };
     return segmentMetadata;
   }

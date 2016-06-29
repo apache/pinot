@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.controller.validation;
 
+import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -462,6 +463,11 @@ public class ValidationManagerTest {
 
     @Nullable @Override public String getCreatorName() {
       return null;
+    }
+
+    @Override
+    public Character getPaddingCharacter() {
+      return V1Constants.Str.DEFAULT_STRING_PAD_CHAR;
     }
 
   }

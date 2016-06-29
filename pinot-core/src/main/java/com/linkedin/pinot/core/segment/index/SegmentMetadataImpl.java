@@ -40,6 +40,7 @@ import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.commons.lang.StringEscapeUtils;
 import org.joda.time.Duration;
 import org.joda.time.Interval;
 import org.slf4j.Logger;
@@ -47,7 +48,6 @@ import org.slf4j.LoggerFactory;
 
 import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys;
 import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment;
-import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.SEGMENT_CREATOR_VERSION;
 import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.TIME_UNIT;
 
 
@@ -72,6 +72,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private boolean _hasStarTree;
   private StarTreeMetadata _starTreeMetadata = null;
   private String _creatorName;
+  private char _paddingCharacter = V1Constants.Str.LEGACY_STRING_PAD_CHAR;
 
   public SegmentMetadataImpl(File indexDir) throws ConfigurationException, IOException {
     LOGGER.debug("SegmentMetadata location: {}", indexDir);
@@ -95,6 +96,8 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     _segmentMetadataPropertiesConfiguration = new PropertiesConfiguration();
 
     _segmentMetadataPropertiesConfiguration.addProperty(Segment.SEGMENT_CREATOR_VERSION, null);
+
+    _segmentMetadataPropertiesConfiguration.addProperty(Segment.SEGMENT_PADDING_CHARACTER, V1Constants.Str.DEFAULT_STRING_PAD_CHAR);
 
     _segmentMetadataPropertiesConfiguration.addProperty(V1Constants.MetadataKeys.Segment.SEGMENT_START_TIME,
         Long.toString(offlineSegmentZKMetadata.getStartTime()));
@@ -132,6 +135,8 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     _segmentMetadataPropertiesConfiguration = new PropertiesConfiguration();
 
     _segmentMetadataPropertiesConfiguration.addProperty(Segment.SEGMENT_CREATOR_VERSION, null);
+
+    _segmentMetadataPropertiesConfiguration.addProperty(Segment.SEGMENT_PADDING_CHARACTER, V1Constants.Str.DEFAULT_STRING_PAD_CHAR);
 
     _segmentMetadataPropertiesConfiguration.addProperty(V1Constants.MetadataKeys.Segment.SEGMENT_START_TIME,
         Long.toString(segmentMetadata.getStartTime()));
@@ -213,6 +218,10 @@ public class SegmentMetadataImpl implements SegmentMetadata {
       _creatorName = _segmentMetadataPropertiesConfiguration.getString(Segment.SEGMENT_CREATOR_VERSION);
     }
 
+    if (_segmentMetadataPropertiesConfiguration.containsKey(Segment.SEGMENT_PADDING_CHARACTER)) {
+      String padding = _segmentMetadataPropertiesConfiguration.getString(Segment.SEGMENT_PADDING_CHARACTER);
+      _paddingCharacter = StringEscapeUtils.unescapeJava(padding).charAt(0);
+    }
 
     String versionString = _segmentMetadataPropertiesConfiguration
         .getString(V1Constants.MetadataKeys.Segment.SEGMENT_VERSION, SegmentVersion.v1.toString());
@@ -522,4 +531,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     return _creatorName;
   }
 
+  @Override public Character getPaddingCharacter() {
+    return _paddingCharacter;
+  }
 }

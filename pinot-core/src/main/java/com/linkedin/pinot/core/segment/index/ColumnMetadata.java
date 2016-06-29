@@ -21,6 +21,7 @@ import java.lang.reflect.Field;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.commons.lang.StringEscapeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,6 +54,7 @@ public class ColumnMetadata {
   private final TimeUnit timeunit;
   private final boolean hasDictionary;
   private final int totalNumberOfEntries;
+  private final char paddingCharacter;
 
   public static ColumnMetadata fromPropertiesConfiguration(String column, PropertiesConfiguration config) {
     Builder builder = new Builder();
@@ -138,6 +140,17 @@ public class ColumnMetadata {
             .getKeyFor(column, V1Constants.MetadataKeys.Column.TOTAL_NUMBER_OF_ENTRIES));
     builder.setTotalNumberOfEntries(totalNumberOfEntries);
 
+    char paddingCharacter = V1Constants.Str.LEGACY_STRING_PAD_CHAR;
+    if (config
+        .containsKey(V1Constants.MetadataKeys.Segment.SEGMENT_PADDING_CHARACTER)) {
+      String padding = config.getString(V1Constants.MetadataKeys.Segment.SEGMENT_PADDING_CHARACTER);
+      paddingCharacter = StringEscapeUtils.unescapeJava(padding).charAt(0);
+    } else {
+      paddingCharacter = V1Constants.Str.LEGACY_STRING_PAD_CHAR;
+    }
+
+    builder.setPaddingCharacter(paddingCharacter);
+
     return builder.build();
   }
 
@@ -159,6 +172,7 @@ public class ColumnMetadata {
     private int totalNumberOfEntries;
     private int totalRawDocs;
     private int totalAggDocs;
+    private char paddingCharacter;
 
     public Builder setColumnName(String columnName) {
       this.columnName = columnName;
@@ -235,6 +249,11 @@ public class ColumnMetadata {
       return this;
     }
 
+    public Builder setPaddingCharacter(char paddingCharacter) {
+      this.paddingCharacter = paddingCharacter;
+      return this;
+    }
+
     public Builder setTotalRawDocs(int totalRawDocs) {
       this.totalRawDocs = totalRawDocs;
       return this;
@@ -249,7 +268,7 @@ public class ColumnMetadata {
       return new ColumnMetadata(columnName, cardinality, totalRawDocs, totalAggDocs,totalDocs, dataType, bitsPerElement,
       stringColumnMaxLength, fieldType, isSorted, hasInvertedIndex,
       inSingleValue, maxNumberOfMultiValues, containsNulls, hasDictionary, timeunit,
-      totalNumberOfEntries);
+      totalNumberOfEntries, paddingCharacter);
     }
 
 
@@ -262,7 +281,7 @@ public class ColumnMetadata {
   private ColumnMetadata(String columnName, int cardinality, int totalRawDocs, int totalAggDocs, int totalDocs, DataType dataType, int bitsPerElement,
       int stringColumnMaxLength, FieldType fieldType, boolean isSorted, boolean hasInvertedIndex,
       boolean insSingleValue, int maxNumberOfMultiValues, boolean hasNulls, boolean hasDictionary, TimeUnit timeunit,
-      int totalNumberOfEntries) {
+      int totalNumberOfEntries, char paddingCharacter) {
 
     this.columnName = columnName;
     this.cardinality = cardinality;
@@ -281,6 +300,7 @@ public class ColumnMetadata {
     this.timeunit = timeunit;
     this.hasDictionary = hasDictionary;
     this.totalNumberOfEntries = totalNumberOfEntries;
+    this.paddingCharacter = paddingCharacter;
   }
 
   public String getColumnName() {
@@ -289,6 +309,10 @@ public class ColumnMetadata {
 
   public int getTotalNumberOfEntries() {
     return totalNumberOfEntries;
+  }
+
+  public char getPaddingCharacter() {
+    return paddingCharacter;
   }
 
   public int getMaxNumberOfMultiValues() {

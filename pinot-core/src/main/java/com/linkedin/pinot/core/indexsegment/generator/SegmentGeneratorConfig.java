@@ -25,6 +25,7 @@ import com.linkedin.pinot.core.data.readers.CSVRecordReaderConfig;
 import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.data.readers.RecordReaderConfig;
 import com.linkedin.pinot.core.indexsegment.utils.AvroUtils;
+import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -70,6 +71,7 @@ public class SegmentGeneratorConfig {
   private String _starTreeIndexSpecFile = null;
   private StarTreeIndexSpec _starTreeIndexSpec = null;
   private String _creatorVersion = null;
+  private char _paddingCharacter = V1Constants.Str.LEGACY_STRING_PAD_CHAR;
 
   public SegmentGeneratorConfig() {
   }
@@ -100,6 +102,7 @@ public class SegmentGeneratorConfig {
     _starTreeIndexSpecFile = config._starTreeIndexSpecFile;
     _starTreeIndexSpec = config._starTreeIndexSpec;
     _creatorVersion = config._creatorVersion;
+    _paddingCharacter = config._paddingCharacter;
   }
 
   public SegmentGeneratorConfig(Schema schema) {
@@ -224,6 +227,14 @@ public class SegmentGeneratorConfig {
 
   public void setCreatorVersion(String creatorVersion) {
     _creatorVersion = creatorVersion;
+  }
+
+  public char getPaddingCharacter() {
+    return _paddingCharacter;
+  }
+
+  public void setPaddingCharacter(char paddingCharacter) {
+    _paddingCharacter = paddingCharacter;
   }
 
   public String getSegmentNamePostfix() {

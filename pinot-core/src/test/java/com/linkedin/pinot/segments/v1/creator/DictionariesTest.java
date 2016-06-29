@@ -374,10 +374,12 @@ public class DictionariesTest {
   public void testStringsValuesWithPadding()
       throws Exception {
     File indexDir = new File("/tmp/dict.test");
+    indexDir.deleteOnExit();
     FieldSpec fieldSpec = new DimensionFieldSpec("test", DataType.STRING, true, "\t");
 
     String[] inputStrings = new String[2];
     String[] paddedStrings = new String[2];
+    char paddingChar = '%';
 
     inputStrings[0] = "abc def";
     inputStrings[1] = "abc";
@@ -385,14 +387,16 @@ public class DictionariesTest {
 
     boolean[] isSorted = new boolean[1];
     isSorted[0] = true;
-    SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(false, inputStrings, fieldSpec, indexDir);
+    SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(false, inputStrings, fieldSpec, indexDir,
+        paddingChar);
     dictionaryCreator.build(isSorted);
     Assert.assertFalse(isSorted[0]);
 
     // Get the padded string as stored in the dictionary.
     int targetPaddedLength = dictionaryCreator.getStringColumnMaxLength();
     for (int i = 0; i < inputStrings.length; i++) {
-      paddedStrings[i] = SegmentDictionaryCreator.getPaddedString(inputStrings[i], targetPaddedLength);
+      paddedStrings[i] = SegmentDictionaryCreator.getPaddedString(inputStrings[i], targetPaddedLength,
+          paddingChar);
     }
     Arrays.sort(paddedStrings); // Sorted Order: {"abc def%%%%", "abc%%%%%%%"}
 
@@ -400,7 +404,8 @@ public class DictionariesTest {
     for (int i = 0; i < inputStrings.length; i++) {
       int paddedIndex = dictionaryCreator.indexOfSV(inputStrings[i]);
       Assert.assertTrue(paddedStrings[paddedIndex]
-          .equals(SegmentDictionaryCreator.getPaddedString(inputStrings[i], targetPaddedLength)));
+          .equals(SegmentDictionaryCreator.getPaddedString(inputStrings[i], targetPaddedLength,
+              paddingChar)));
     }
 
     dictionaryCreator.close();
@@ -420,6 +425,7 @@ public class DictionariesTest {
   public void testSingleEmptyString()
       throws Exception {
     File indexDir = new File("/tmp/dict.test");
+    indexDir.deleteOnExit();
     FieldSpec fieldSpec = new DimensionFieldSpec("test", DataType.STRING, true, "\t");
 
     String[] inputStrings = new String[1];
@@ -431,14 +437,16 @@ public class DictionariesTest {
 
       boolean[] isSorted = new boolean[1];
       isSorted[0] = true;
-      SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(false, inputStrings, fieldSpec, indexDir);
+      SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(false, inputStrings, fieldSpec, indexDir,
+          V1Constants.Str.DEFAULT_STRING_PAD_CHAR);
       dictionaryCreator.build(isSorted);
 
       // Get the padded string as stored in the dictionary.
       int targetPaddedLength = dictionaryCreator.getStringColumnMaxLength();
       Assert.assertTrue(targetPaddedLength == 1);
       for (int i = 0; i < inputStrings.length; i++) {
-        paddedStrings[i] = SegmentDictionaryCreator.getPaddedString(inputStrings[i], targetPaddedLength);
+        paddedStrings[i] = SegmentDictionaryCreator.getPaddedString(inputStrings[i], targetPaddedLength,
+            V1Constants.Str.DEFAULT_STRING_PAD_CHAR);
       }
       Arrays.sort(paddedStrings); // Sorted Order: {"%"}
 
@@ -446,11 +454,14 @@ public class DictionariesTest {
       for (int i = 0; i < inputStrings.length; i++) {
         int paddedIndex = dictionaryCreator.indexOfSV(inputStrings[i]);
         Assert.assertTrue(paddedStrings[paddedIndex].equals(
-            SegmentDictionaryCreator.getPaddedString(inputStrings[i], targetPaddedLength)));
+            SegmentDictionaryCreator.getPaddedString(inputStrings[i], targetPaddedLength,
+                V1Constants.Str.DEFAULT_STRING_PAD_CHAR)));
       }
 
       // Verify that empty string got padded
-      Assert.assertTrue(paddedStrings[0].equals("%"));
+      Assert.assertTrue(paddedStrings[0].equals(
+          SegmentDictionaryCreator.getPaddedString(inputStrings[0], targetPaddedLength,
+          V1Constants.Str.DEFAULT_STRING_PAD_CHAR)));
       dictionaryCreator.close();
     } catch (Exception e) {
         throw e;
@@ -472,16 +483,19 @@ public class DictionariesTest {
   public void testPaddedConflict()
       throws Exception {
     File indexDir = new File("/tmp/dict.test");
+    indexDir.deleteOnExit();
     FieldSpec fieldSpec = new DimensionFieldSpec("test", DataType.STRING, true, "\t");
 
     String[] inputStrings = new String[2];
     String[] paddedStrings = new String[2];
+    char paddingChar = '%';
 
     try {
       inputStrings[0] = "";
       inputStrings[1] = "%";
       Arrays.sort(inputStrings); // Sorted order: {"", "%"}
-      SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(false, inputStrings, fieldSpec, indexDir);
+      SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(false, inputStrings, fieldSpec, indexDir,
+          paddingChar);
       boolean[] isSorted = new boolean[1];
       isSorted[0] = true;
       dictionaryCreator.build(isSorted);
@@ -492,6 +506,54 @@ public class DictionariesTest {
       FileUtils.deleteQuietly(indexDir);
     }
   }
+
+  /**
+   * Tests SegmentDictionaryCreator for case when there is one empty string
+   * and a string with a single '%' character
+   *
+   * This test asserts that the padded length of the empty string is 1
+   * in actual padded dictionary), and not 0.
+   *
+   * @throws Exception
+   */
+  @Test
+  public void testPaddedNoConflict()
+      throws Exception {
+    File indexDir = new File("/tmp/dict.test");
+    FieldSpec fieldSpec = new DimensionFieldSpec("test", DataType.STRING, true, "\t");
+
+    String[] inputStrings = new String[2];
+    String[] paddedStrings = new String[2];
+    char paddingChar = '\0';
+
+    inputStrings[0] = "";
+    inputStrings[1] = "%";
+    Arrays.sort(inputStrings); // Sorted order: {"", "%"}
+    SegmentDictionaryCreator dictionaryCreator =
+        new SegmentDictionaryCreator(false, inputStrings, fieldSpec, indexDir, paddingChar);
+    boolean[] isSorted = new boolean[1];
+    isSorted[0] = true;
+    dictionaryCreator.build(isSorted);
+    // Get the padded string as stored in the dictionary.
+    int targetPaddedLength = dictionaryCreator.getStringColumnMaxLength();
+    for (int i = 0; i < inputStrings.length; i++) {
+      paddedStrings[i] = SegmentDictionaryCreator.getPaddedString(inputStrings[i], targetPaddedLength, paddingChar);
+    }
+    Arrays.sort(paddedStrings); // Sorted Order: {"abc def%%%%", "abc%%%%%%%"}
+
+    // Assert that indexOfSV for un-padded string returns the index of the corresponding padded string.
+    for (int i = 0; i < inputStrings.length; i++) {
+      int paddedIndex = dictionaryCreator.indexOfSV(inputStrings[i]);
+      Assert.assertTrue(paddedStrings[paddedIndex].equals(
+          SegmentDictionaryCreator.getPaddedString(inputStrings[i], targetPaddedLength, paddingChar)));
+    }
+
+    dictionaryCreator.close();
+    FileUtils.deleteQuietly(indexDir);
+
+    FileUtils.deleteQuietly(indexDir);
+
+   }
 
   /**
    * Tests SegmentDictionaryCreator for case when there is only one string
@@ -514,7 +576,8 @@ public class DictionariesTest {
     Arrays.sort(inputStrings); // Sorted order: {"null"}
 
     try {
-      SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(false, inputStrings, fieldSpec, indexDir);
+      SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(false, inputStrings, fieldSpec, indexDir,
+          V1Constants.Str.DEFAULT_STRING_PAD_CHAR);
       boolean[] isSorted = new boolean[1];
       isSorted[0] = true;
       dictionaryCreator.build(isSorted);
@@ -523,7 +586,8 @@ public class DictionariesTest {
       int targetPaddedLength = dictionaryCreator.getStringColumnMaxLength();
       Assert.assertTrue(targetPaddedLength == 4);
       for (int i = 0; i < inputStrings.length; i++) {
-        paddedStrings[i] = SegmentDictionaryCreator.getPaddedString(inputStrings[i], targetPaddedLength);
+        paddedStrings[i] = SegmentDictionaryCreator.getPaddedString(inputStrings[i], targetPaddedLength,
+            V1Constants.Str.DEFAULT_STRING_PAD_CHAR);
       }
       Arrays.sort(paddedStrings); // Sorted Order: {"null"}
 
@@ -531,7 +595,8 @@ public class DictionariesTest {
       for (int i = 0; i < inputStrings.length; i++) {
         int paddedIndex = dictionaryCreator.indexOfSV(inputStrings[i]);
         Assert.assertTrue(paddedStrings[paddedIndex].equals(
-            SegmentDictionaryCreator.getPaddedString(inputStrings[i], targetPaddedLength)));
+            SegmentDictionaryCreator.getPaddedString(inputStrings[i], targetPaddedLength,
+                V1Constants.Str.DEFAULT_STRING_PAD_CHAR)));
       }
 
       // Verify that the string "null" did not get changed

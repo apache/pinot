@@ -41,7 +41,8 @@ public class V1Constants {
   }
 
   public static class Str {
-    public static final char STRING_PAD_CHAR = '%';
+    public static final char DEFAULT_STRING_PAD_CHAR = '\0';
+    public static final char LEGACY_STRING_PAD_CHAR = '%';
     public static final java.lang.String CHAR_SET = "UTF-8";
     public static final String NULL_STRING = "nil";
     public static final String NULL_BOOLEAN = Boolean.toString(false);
@@ -116,6 +117,7 @@ public class V1Constants {
       public static final String SEGMENT_TOTAL_AGGREGATE_DOCS = "segment.total.aggregate.docs";
       public static final String SEGMENT_CRC = "segment.crc";
       public static final String SEGMENT_CREATION_TIME = "segment.creation.time";
+      public static final String SEGMENT_PADDING_CHARACTER = "segment.padding.character";
       public static final String SEGMENT_TOTAL_ERRORS = "segment.total.errors";
       public static final String SEGMENT_TOTAL_NULLS = "segment.total.nulls";
       public static final String SEGMENT_TOTAL_CONVERSIONS = "segment.total.conversions";
