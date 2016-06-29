@@ -93,6 +93,4 @@ public class JobScheduler {
     quartzScheduler.shutdown();
 
   }
-
-
 }

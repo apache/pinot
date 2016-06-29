@@ -2,20 +2,25 @@ package com.linkedin.thirdeye.anomaly;
 
 import org.joda.time.DateTime;
 
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.linkedin.thirdeye.detector.api.AnomalyFunctionSpec;
+import com.linkedin.thirdeye.util.CustomDateSerializer;
 
 public class TaskInfo {
 
   private String jobName;
   private long jobExecutionId;
 
+  @JsonSerialize(using = CustomDateSerializer.class)
   private DateTime windowStartTime;
+  
+  @JsonSerialize(using = CustomDateSerializer.class)
   private DateTime windowEndTime;
   private AnomalyFunctionSpec anomalyFunctionSpec;
   private String groupByDimension;
 
-  public TaskInfo(String jobName, long jobExecutionId, DateTime windowStartTime, DateTime windowEndTime,
-      AnomalyFunctionSpec anomalyFunctionSpec, String groupByDimension) {
+  public TaskInfo(String jobName, long jobExecutionId, DateTime windowStartTime,
+      DateTime windowEndTime, AnomalyFunctionSpec anomalyFunctionSpec, String groupByDimension) {
     this.jobName = jobName;
     this.jobExecutionId = jobExecutionId;
     this.windowStartTime = windowStartTime;

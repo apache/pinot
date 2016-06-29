@@ -17,7 +17,7 @@ import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
 import com.linkedin.thirdeye.detector.ThirdEyeDetectorConfiguration;
 import com.linkedin.thirdeye.detector.db.HibernateSessionWrapper;
 
-public class ThirdEyeApplication
+public class TestThirdEyeAnomalyApplication
     extends BaseThirdEyeApplication<ThirdEyeDetectorConfiguration> {
 
   public static void main(final String[] args) throws Exception {
@@ -31,7 +31,7 @@ public class ThirdEyeApplication
     String detectorApplicationConfigFile = thirdEyeConfigDir + "/" + "detector.yml";
     argList.set(lastIndex, detectorApplicationConfigFile); // replace config dir with the
                                                            // actual config file
-    new ThirdEyeApplication().run(argList.toArray(new String[argList.size()]));
+    new TestThirdEyeAnomalyApplication().run(argList.toArray(new String[argList.size()]));
   }
 
   @Override

@@ -5,6 +5,8 @@ import java.util.Objects;
 
 import javax.persistence.Column;
 import javax.persistence.Entity;
+import javax.persistence.EnumType;
+import javax.persistence.Enumerated;
 import javax.persistence.FetchType;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
@@ -32,6 +34,7 @@ public class AnomalyJobSpec {
   @Column(name = "job_name", nullable = false)
   private String jobName;
 
+  @Enumerated(EnumType.STRING)
   @Column(name = "status", nullable = false)
   private JobStatus status;
 
@@ -67,7 +70,6 @@ public class AnomalyJobSpec {
   public void setJobName(String jobName) {
     this.jobName = jobName;
   }
-
 
   public JobStatus getStatus() {
     return status;
