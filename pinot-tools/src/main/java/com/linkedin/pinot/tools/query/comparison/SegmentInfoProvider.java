@@ -34,61 +34,58 @@ import org.apache.commons.io.FileUtils;
 
 
 /**
- * Given a segments directory, pick a random segment and read the dictionaries for all dimension columns.
+ * Given a segments directory, pick all segments and read the dictionaries for all single-value dimension columns.
  */
 public class SegmentInfoProvider {
   private static final String TMP_DIR = System.getProperty("java.io.tmpdir");
   private static final String SEGMENT_INFO_PROVIDER = "segmentInfoProvider";
-  private final String _segmentDirName;
 
-  List<String> _dimensionColumns;
-  List<String> _metricColumns;
-  private Map<String, List<String>> _columnValuesMap;
+  private final List<String> _singleValueDimensionColumns;
+  private final List<String> _metricColumns;
+  private final Map<String, List<Object>> _singleValueDimensionValuesMap;
 
   /**
-   * Assumes that segments directory has at least one segment, and picks the first one.
-   * - Gets all dimension/metric columns from the directory.
-   * - Reads dictionaries for all dimension columns.
+   * Assume that segments directory has at least one segment.
+   * - Gets all single-value dimension/metric columns from the directory.
+   * - Reads dictionaries for all single-value dimension columns.
    *
-   * @throws Exception
    * @param segmentDirName Name of directory containing tarred/untarred segments.
+   * @throws Exception
    */
   public SegmentInfoProvider(String segmentDirName)
       throws Exception {
-
-    _segmentDirName = segmentDirName;
-    File segmentsDir = new File(_segmentDirName);
-
-    Set<String> uniqueDimensions = new HashSet<>();
     Set<String> uniqueMetrics = new HashSet<>();
-    Map<String, Set<String>> uniqueColumnValues = new HashMap<>();
+    Set<String> uniqueSingleValueDimensions = new HashSet<>();
+    Map<String, Set<Object>> uniqueSingleValueDimensionValues = new HashMap<>();
 
+    File segmentsDir = new File(segmentDirName);
     for (File segment : segmentsDir.listFiles()) {
-      readOneSegment(segment, uniqueDimensions, uniqueMetrics, uniqueColumnValues);
+      readOneSegment(segment, uniqueMetrics, uniqueSingleValueDimensions, uniqueSingleValueDimensionValues);
     }
 
-    _dimensionColumns = new ArrayList<>(uniqueDimensions);
+    _singleValueDimensionColumns = new ArrayList<>(uniqueSingleValueDimensions);
     _metricColumns = new ArrayList<>(uniqueMetrics);
-    _columnValuesMap = new HashMap<>(uniqueColumnValues.size());
+    _singleValueDimensionValuesMap = new HashMap<>(uniqueSingleValueDimensionValues.size());
 
-    for (Map.Entry<String, Set<String>> entry : uniqueColumnValues.entrySet()) {
-      _columnValuesMap.put(entry.getKey(), new ArrayList<>(entry.getValue()));
+    for (Map.Entry<String, Set<Object>> entry : uniqueSingleValueDimensionValues.entrySet()) {
+      _singleValueDimensionValuesMap.put(entry.getKey(), new ArrayList<>(entry.getValue()));
     }
   }
 
   /**
    * Read the metadata of the given segmentFile and collect:
-   * - Unique dimension columns
    * - Unique metric columns
-   * - Unique values for each column
+   * - Unique single-value dimension columns
+   * - Unique values for each single-value dimension columns
    *
-   * @param segmentFile
-   * @param uniqueDimensions
-   * @param uniqueMetrics
+   * @param segmentFile segment file.
+   * @param uniqueMetrics unique metric columns buffer.
+   * @param uniqueSingleValueDimensions unique single-value dimension columns buffer.
+   * @param singleValueDimensionValuesMap single-value dimension columns to unique values map buffer.
    * @throws Exception
    */
-  private void readOneSegment(File segmentFile, Set<String> uniqueDimensions, Set<String> uniqueMetrics,
-      Map<String, Set<String>> columnValuesMap)
+  private void readOneSegment(File segmentFile, Set<String> uniqueMetrics, Set<String> uniqueSingleValueDimensions,
+      Map<String, Set<Object>> singleValueDimensionValuesMap)
       throws Exception {
     File segmentDir;
     File tmpDir = null;
@@ -104,10 +101,8 @@ public class SegmentInfoProvider {
     }
 
     IndexSegmentImpl indexSegment = (IndexSegmentImpl) Loaders.IndexSegment.load(segmentDir, ReadMode.heap);
-    SegmentMetadata segmentMetadata = indexSegment.getSegmentMetadata();
-    Schema schema = segmentMetadata.getSchema();
+    Schema schema = indexSegment.getSegmentMetadata().getSchema();
 
-    uniqueDimensions.addAll(schema.getDimensionNames());
     uniqueMetrics.addAll(schema.getMetricNames());
 
     for (DimensionFieldSpec fieldSpec : schema.getDimensionFieldSpecs()) {
@@ -116,17 +111,18 @@ public class SegmentInfoProvider {
       }
 
       String column = fieldSpec.getName();
+      uniqueSingleValueDimensions.add(column);
       Dictionary dictionary = indexSegment.getDictionaryFor(column);
 
-      Set<String> values = columnValuesMap.get(column);
+      Set<Object> values = singleValueDimensionValuesMap.get(column);
       if (values == null) {
         values = new HashSet<>();
-        columnValuesMap.put(column, values);
+        singleValueDimensionValuesMap.put(column, values);
       }
 
       int length = dictionary.length();
       for (int i = 0; i < length; i++) {
-        values.add(dictionary.getStringValue(i));
+        values.add(dictionary.get(i));
       }
     }
 
@@ -136,25 +132,29 @@ public class SegmentInfoProvider {
   }
 
   /**
-   * Returns the list of dimension columns
-   * @return
+   * Return the list of single-value dimension columns.
+   *
+   * @return single-value dimension columns.
    */
-  public List<String> getDimensionColumns() {
-    return _dimensionColumns;
+  public List<String> getSingleValueDimensionColumns() {
+    return _singleValueDimensionColumns;
   }
 
   /**
-   * Returns the list of metric columns
-   * @return
+   * Return the list of metric columns
+   *
+   * @return metric columns.
    */
   public List<String> getMetricColumns() {
     return _metricColumns;
   }
 
   /**
-   * @return Map with key as column name, and value as list of (string) values for the column
+   * Return the map from single-value dimension names to values list for the column.
+   *
+   * @return map from single-value dimension names to values list for the column.
    */
-  public Map<String, List<String>> getColumnValuesMap() {
-    return _columnValuesMap;
+  public Map<String, List<Object>> getSingleValueDimensionValuesMap() {
+    return _singleValueDimensionValuesMap;
   }
 }

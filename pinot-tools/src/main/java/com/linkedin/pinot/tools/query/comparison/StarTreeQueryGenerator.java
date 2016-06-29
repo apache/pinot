@@ -15,13 +15,14 @@
  */
 package com.linkedin.pinot.tools.query.comparison;
 
-import java.util.ArrayList;
+import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
-import org.apache.commons.lang.StringUtils;
+import java.util.Set;
 
 
 /**
@@ -29,150 +30,262 @@ import org.apache.commons.lang.StringUtils;
  * Generate queries of the form: SELECT SUM(m1), SUM(m2)... WHERE d1='v1' AND d2='v2'... GROUP BY d3,d4...
  */
 public class StarTreeQueryGenerator {
+  private static final String SELECT = "SELECT ";
+  private static final String FROM = " FROM ";
+  private static final String WHERE = " WHERE ";
+  private static final String GROUP_BY = " GROUP BY ";
+  private static final String BETWEEN = " BETWEEN ";
+  private static final String IN = " IN ";
+  private static final String AND = " AND ";
 
+  private static final int MAX_NUM_AGGREGATIONS = 3;
   private static final int MAX_NUM_PREDICATES = 3;
-  private static final int MAX_NUM_GROUP_BYS = 3;
-
-  private static final String SELECT = "SELECT";
-  private static final String FROM = "FROM";
-  private static final String WHERE = "WHERE";
-  private static final String GROUP_BY = "GROUP BY";
-  private static final String EMPTY_STRING = "";
-
-  private Random _random;
+  private static final int MAX_NUM_GROUP_BYS = 2;
+  private static final int MAX_NUM_IN_VALUES = 5;
+  private static final int SHUFFLE_THRESHOLD = 5 * MAX_NUM_IN_VALUES;
+  private static final Random RANDOM = new Random();
+  // Add more functions here to generate them in the queries.
+  private static final List<String> AGGREGATION_FUNCTIONS = Collections.singletonList("SUM");
+  // Add more comparators here to generate them in the 'WHERE' clause.
+  private static final List<String> COMPARATORS = Arrays.asList("=", "<>", "<", ">", "<=", ">=");
 
   private final String _tableName;
-  private final List<String> _dimensionColumns;
+  private final List<String> _singleValueDimensionColumns;
   private final List<String> _metricColumns;
-  private final Map<String, List<String>> _columnValues;
+  private final Map<String, List<Object>> _singleValueDimensionValuesMap;
 
-  // Add more functions here to generate them in the queries.
-  private final List<String> _aggregationFunctions = Arrays.asList(new String[]{"SUM"});
 
-  // Add more comparators here to generate them in the 'WHERE' clause.
-  private final List<String> _comparators = Arrays.asList(new String[]{"="});
-
-  public StarTreeQueryGenerator(String tableName, List<String> dimensionColumns, List<String> metricColumns,
-      Map<String, List<String>> columnValues) {
+  public StarTreeQueryGenerator(String tableName, List<String> singleValueDimensionColumns, List<String> metricColumns,
+      Map<String, List<Object>> singleValueDimensionValuesMap) {
     _tableName = tableName;
-    _dimensionColumns = dimensionColumns;
+    _singleValueDimensionColumns = singleValueDimensionColumns;
     _metricColumns = metricColumns;
-    _columnValues = columnValues;
-    _random = new Random();
+    _singleValueDimensionValuesMap = singleValueDimensionValuesMap;
   }
 
   /**
-   * Generate one aggregation string for the given column.
-   * @param column
-   * @return
+   * Generate one aggregation function for the given metric column.
+   *
+   * @param metricColumn metric column.
+   * @return aggregation function.
    */
-  private String generateAggregation(String column) {
-    int max = _aggregationFunctions.size();
-    return _aggregationFunctions.get(_random.nextInt(max)) + "(" + column + ")";
+  private StringBuilder generateAggregation(String metricColumn) {
+    StringBuilder stringBuilder =
+        new StringBuilder(AGGREGATION_FUNCTIONS.get(RANDOM.nextInt(AGGREGATION_FUNCTIONS.size())));
+    return stringBuilder.append('(').append(metricColumn).append(')');
   }
 
   /**
    * Generate the aggregation section of the query, returns at least one aggregation.
-   * @return
+   *
+   * @return aggregation section.
    */
-  private String generateAggregations() {
-    int numAggregations = _random.nextInt(_metricColumns.size() + 1);
-    numAggregations = Math.max(numAggregations, 1);
-    List<String> aggregations = new ArrayList<>(numAggregations);
+  private StringBuilder generateAggregations() {
+    StringBuilder stringBuilder = new StringBuilder();
 
+    int numAggregations = Math.min(RANDOM.nextInt(MAX_NUM_AGGREGATIONS) + 1, _metricColumns.size());
     Collections.shuffle(_metricColumns);
     for (int i = 0; i < numAggregations; i++) {
-      aggregations.add(generateAggregation(_metricColumns.get(i)));
+      if (i != 0) {
+        stringBuilder.append(',').append(' ');
+      }
+      stringBuilder.append(generateAggregation(_metricColumns.get(i)));
     }
 
-    return StringUtils.join(aggregations, ", ");
+    return stringBuilder;
   }
 
   /**
-   * Generate individual predicates that form the overall WHERE clause.
-   * @param column
-   * @return
+   * Generate a comparison predicate for the given dimension column.
+   *
+   * @param dimensionColumn dimension column.
+   * @return comparison predicate.
    */
-  private String generatePredicate(String column) {
-    List<String> predicate = new ArrayList<>();
+  private StringBuilder generateComparisonPredicate(String dimensionColumn) {
+    StringBuilder stringBuilder = new StringBuilder(dimensionColumn);
 
-    predicate.add(column);
-    predicate.add(_comparators.get(_random.nextInt(_comparators.size())));
-    List<String> valueArray = _columnValues.get(column);
+    stringBuilder.append(' ').append(COMPARATORS.get(RANDOM.nextInt(COMPARATORS.size()))).append(' ');
 
-    String value = "'" + valueArray.get(_random.nextInt(valueArray.size())) + "'";
-    predicate.add(value);
+    List<Object> valueArray = _singleValueDimensionValuesMap.get(dimensionColumn);
+    Object value = valueArray.get(RANDOM.nextInt(valueArray.size()));
+    if (value instanceof String) {
+      stringBuilder.append('\'').append(((String) value).replaceAll("'", "''")).append('\'');
+    } else {
+      stringBuilder.append(value);
+    }
 
-    return StringUtils.join(predicate, " ");
+    return stringBuilder;
   }
 
   /**
-   * Randomly generate the WHERE clause of the query, may return empty string
-   * @return
+   * Generate a between predicate for the given dimension column.
+   *
+   * @param dimensionColumn dimension column.
+   * @return between predicate.
    */
-  private String generatePredicates() {
-    int numDimensions = _dimensionColumns.size();
-    int numPredicates = _random.nextInt(numDimensions + 1);
-    numPredicates = Math.min(numPredicates, MAX_NUM_PREDICATES);
+  private StringBuilder generateBetweenPredicate(String dimensionColumn) {
+    StringBuilder stringBuilder = new StringBuilder(dimensionColumn).append(BETWEEN);
+
+    List<Object> valueArray = _singleValueDimensionValuesMap.get(dimensionColumn);
+    Object value1 = valueArray.get(RANDOM.nextInt(valueArray.size()));
+    Object value2 = valueArray.get(RANDOM.nextInt(valueArray.size()));
+
+    Preconditions.checkState((value1 instanceof String && value2 instanceof String)
+        || (value1 instanceof Number && value2 instanceof Number));
+
+    if (value1 instanceof String) {
+      if (((String) value1).compareTo((String) value2) < 0) {
+        stringBuilder.append('\'').append(((String) value1).replaceAll("'", "''")).append('\'');
+        stringBuilder.append(AND);
+        stringBuilder.append('\'').append(((String) value2).replaceAll("'", "''")).append('\'');
+      } else {
+        stringBuilder.append('\'').append(((String) value2).replaceAll("'", "''")).append('\'');
+        stringBuilder.append(AND);
+        stringBuilder.append('\'').append(((String) value1).replaceAll("'", "''")).append('\'');
+      }
+    } else {
+      if (((Number) value1).doubleValue() < ((Number) value2).doubleValue()) {
+        stringBuilder.append(value1).append(AND).append(value2);
+      } else {
+        stringBuilder.append(value2).append(AND).append(value1);
+      }
+    }
+
+    return stringBuilder;
+  }
+
+  /**
+   * Generate a in predicate for the given dimension column.
+   *
+   * @param dimensionColumn dimension column.
+   * @return in predicate.
+   */
+  private StringBuilder generateInPredicate(String dimensionColumn) {
+    StringBuilder stringBuilder = new StringBuilder(dimensionColumn).append(IN).append('(');
+
+    List<Object> valueArray = _singleValueDimensionValuesMap.get(dimensionColumn);
+    int size = valueArray.size();
+    int numValues = Math.min(RANDOM.nextInt(MAX_NUM_IN_VALUES) + 1, size);
+    if (size < SHUFFLE_THRESHOLD) {
+      // For smaller size values, use shuffle strategy.
+      Collections.shuffle(valueArray);
+      for (int i = 0; i < numValues; i++) {
+        if (i != 0) {
+          stringBuilder.append(',').append(' ');
+        }
+        Object value = valueArray.get(i);
+        if (value instanceof String) {
+          stringBuilder.append('\'').append(((String) value).replaceAll("'", "''")).append('\'');
+        } else {
+          stringBuilder.append(value);
+        }
+      }
+    } else {
+      // For larger size values, use random indices strategy.
+      Set<Integer> indices = new HashSet<>();
+      while (indices.size() < numValues) {
+        indices.add(RANDOM.nextInt(size));
+      }
+      boolean isFirst = true;
+      for (int index : indices) {
+        if (isFirst) {
+          isFirst = false;
+        } else {
+          stringBuilder.append(',').append(' ');
+        }
+        Object value = valueArray.get(index);
+        if (value instanceof String) {
+          stringBuilder.append('\'').append(((String) value).replaceAll("'", "''")).append('\'');
+        } else {
+          stringBuilder.append(value);
+        }
+      }
+    }
+
+    return stringBuilder.append(')');
+  }
+
+  /**
+   * Randomly generate the WHERE clause of the query, may return empty string.
+   *
+   * @return all predicates.
+   */
+  private StringBuilder generatePredicates() {
+    int numPredicates = Math.min(RANDOM.nextInt(MAX_NUM_PREDICATES + 1), _singleValueDimensionColumns.size());
     if (numPredicates == 0) {
-      return EMPTY_STRING;
+      return null;
     }
 
-    List<String> predicates = new ArrayList<>(numPredicates);
-    Collections.shuffle(_dimensionColumns);
+    StringBuilder stringBuilder = new StringBuilder(WHERE);
+    Collections.shuffle(_singleValueDimensionColumns);
     for (int i = 0; i < numPredicates; i++) {
-      predicates.add(generatePredicate(_dimensionColumns.get(i)));
+      if (i != 0) {
+        stringBuilder.append(AND);
+      }
+      String dimensionName = _singleValueDimensionColumns.get(i);
+      switch (RANDOM.nextInt(3)) {
+        case 0:
+          stringBuilder.append(generateComparisonPredicate(dimensionName));
+          break;
+        case 1:
+          stringBuilder.append(generateBetweenPredicate(dimensionName));
+          break;
+        default:
+          stringBuilder.append(generateInPredicate(dimensionName));
+          break;
+      }
     }
 
-    return WHERE + " " + StringUtils.join(predicates, " AND ");
+    return stringBuilder;
   }
 
   /**
    * Randomly generate the GROUP BY section, may return empty string.
-   * @return
-   */
-  private String generateGroupBys() {
-    List<String> groupBys = new ArrayList<>();
-    int numDimensions = _dimensionColumns.size();
-
-    int numGroupBys = _random.nextInt(numDimensions + 1);
-    numGroupBys = Math.min(numGroupBys, MAX_NUM_GROUP_BYS);
-    if (numGroupBys == 0) {
-      return EMPTY_STRING;
-    }
-
-    Collections.shuffle(_dimensionColumns);
-    for (int i = 0; i < numGroupBys; i++) {
-      groupBys.add(_dimensionColumns.get(i));
-    }
-
-    return GROUP_BY + " " + StringUtils.join(groupBys, ", ");
-  }
-
-  /**
-   * Combine the various sections to form the overall query
    *
-   * @param aggregations
-   * @param predicates
-   * @param groupBys
-   * @return
+   * @return group by section.
    */
-  private String buildQuery(String aggregations, String predicates, String groupBys) {
-    List<String> components = new ArrayList<>();
+  private StringBuilder generateGroupBys() {
+    int numPredicates = Math.min(RANDOM.nextInt(MAX_NUM_GROUP_BYS + 1), _singleValueDimensionColumns.size());
+    if (numPredicates == 0) {
+      return null;
+    }
 
-    components.add(SELECT);
-    components.add(aggregations);
-    components.add(FROM);
-    components.add(_tableName);
-    components.add(predicates);
-    components.add(groupBys);
+    StringBuilder stringBuilder = new StringBuilder(GROUP_BY);
+    Collections.shuffle(_singleValueDimensionColumns);
+    for (int i = 0; i < numPredicates; i++) {
+      if (i != 0) {
+        stringBuilder.append(',').append(' ');
+      }
+      stringBuilder.append(_singleValueDimensionColumns.get(i));
+    }
 
-    return StringUtils.join(components, " ");
+    return stringBuilder;
   }
 
   /**
-   * Randomly generate a query
-   * @return Return the generated query
+   * Combine the various sections to form the overall query.
+   *
+   * @param aggregations aggregation section.
+   * @param predicates predicate section.
+   * @param groupBys group by section.
+   * @return overall query.
+   */
+  private String buildQuery(StringBuilder aggregations, StringBuilder predicates, StringBuilder groupBys) {
+    StringBuilder stringBuilder = new StringBuilder(SELECT).append(aggregations);
+    stringBuilder.append(FROM).append(_tableName);
+    if (predicates != null) {
+      stringBuilder.append(predicates);
+    }
+    if (groupBys != null) {
+      stringBuilder.append(groupBys);
+    }
+    return stringBuilder.toString();
+  }
+
+  /**
+   * Randomly generate a query.
+   *
+   * @return Return the generated query.
    */
   public String nextQuery() {
     return buildQuery(generateAggregations(), generatePredicates(), generateGroupBys());
