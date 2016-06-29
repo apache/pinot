@@ -63,6 +63,10 @@ body a{
    width:65px;
 }
 
+.required:after {
+    content:" *";
+}
+
 .plus-symbol:before {
     content: "+";
 }
@@ -318,8 +322,13 @@ body a{
    margin-bottom: 15px;
 }
 
-#selected-anomaly-dataset{
-    margin-left: 21px;
+
+#rule{
+    margin-left: 20px;
+}
+
+#anomaly-threshold{
+    width: 120px;
 }
 
 /** Chart area **/

@@ -3,9 +3,9 @@
     {{#each this}}
     <li class=
     {{#if @root/singleMetricSelector}}
-        'single-metric-option'
+        'single-metric-option{{@root/scope}}'
     {{else}}
-        '{{@root/scope}}metric-option'
+        'metric-option'
     {{/if}}
     rel='metrics' value='{{this}}'><a href='#' class='uk-dropdown-close'>{{this}}</a></li>
     {{/each}}

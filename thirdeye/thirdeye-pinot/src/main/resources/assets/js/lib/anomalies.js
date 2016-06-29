@@ -83,7 +83,7 @@ function drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab) {
     var anomalyStart = anomaly.startTimeUtc
     var anomalyEnd = anomaly.endTimeUtc
     var anomayID = "anomaly-id-" + anomaly.id;
-    regions.push({'axis': 'x', 'start': anomalyStart, 'end': anomalyEnd, 'class': 'regionX ' + anomayID, 'id': 'testing-id' })
+    regions.push({'axis': 'x', 'start': anomalyStart, 'end': anomalyEnd, 'class': 'regionX ' + anomayID })
   }
   lineChartData["time"] = xTicksCurrent;
 

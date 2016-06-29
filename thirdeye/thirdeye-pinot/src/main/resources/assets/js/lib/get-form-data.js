@@ -10,12 +10,11 @@ function getDataSetList(){
         $(".landing-dataset").each(function(){ $(this).html(result_datasets_template)});
 
         /* Handelbars template for anomaly form datasets dropdown */
-        var anomalyFormDatasetData = {data: data, scope: "anomaly-"}
+        var anomalyFormDatasetData = {data: data, scope: "-manage-alert"}
         var result_anomly_datasets_template = HandleBarsTemplates.template_datasets(anomalyFormDatasetData);
         $(".anomaly-dataset").each(function(){ $(this).html(result_anomly_datasets_template)});
 
         $(".selected-dataset").text("Select dataset");
-
 
         if (hash.hasOwnProperty('dataset')) {
             //Populate the selected item on the form element
@@ -93,11 +92,6 @@ function getMetricList() {
         var queryFormMetricListData = {data: data, singleMetricSelector: false};
         var result_query_form_metric_list_template = HandleBarsTemplates.template_metric_list(queryFormMetricListData);
         $(".metric-list").each(function(){ $(this).html(result_query_form_metric_list_template )});
-
-        /* Handelbars template for manage anomalies form metric list */
-        var anomalyFormMetricListData = {data: data, scope: "anomaly-", singleMetricSelector: false};
-        var result_anomaly_form_metric_list_template = HandleBarsTemplates.template_metric_list(anomalyFormMetricListData);
-        $(".create-anomaly-metric-list").each(function(){ $(this).html(result_anomaly_form_metric_list_template)});
 
         window.responseDataPopulated++
         formComponentPopulated()

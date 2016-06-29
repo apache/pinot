@@ -41,7 +41,7 @@
 			{{/if}}
             {{#if showSingleMetricSelection}}
             <div id="{{tabName}}-view-single-metric-selector" class="view-single-metric-selector" rel="{{tabName}}">
-                <label class="uk-form-label">Anomaly Metric</label>
+                <label class="uk-form-label">Anomaly metric</label>
                 <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group"
                 <!--<div class="add-metric add-btn uk-display-inline-block" rel="{{tabName}}" data-uk-dropdown="{mode:'click'}">-->
                     <div id="selected-metric" class="uk-button">Select metric</div>
@@ -211,7 +211,7 @@
         {{#if showConfigAnomaly}}
         <!-- This is a button toggling the modal -->
 
-        <button class="uk-button uk-margin-large hidden" data-uk-modal="{target:'#manage-alert-modal', center:true}">Configure anomaly alerts</button>
+        <button class="uk-button uk-margin-large" data-uk-modal="{target:'#manage-alert-modal', center:true}">Configure anomaly alerts</button>
 
         <div id="manage-alert-modal" class="uk-modal">
             <div class="uk-modal-dialog uk-modal-dialog-large">
@@ -219,11 +219,11 @@
                 <div class="uk-modal-header">Configure anomaly alerts</div>
             <form id="configure-alert-form" class="uk-form">
                 <div class="uk-form-row">
-                    <label class="uk-form-label bold-label">Alert name </label>
-                    <input id="anomaly-name" type="text" maxlength="80">
+                    <label class="uk-form-label bold-label required">Rule</label>
+                    <input id="rule" type="text" maxlength="80">
                 </div>
                 <div class="uk-form-row">
-                    <label class="uk-form-label bold-label">Dataset</label>
+                    <label class="uk-form-label bold-label required">Dataset</label>
                     <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group uk-display-inline-block">
                         <div id="selected-anomaly-dataset" class="uk-button" value="">Select dataset
                         </div>
@@ -234,26 +234,26 @@
                     </div>
                 </div>
                 <div class="uk-display-inline-block">Alert me when </div>
-                <div id="{{tabName}}-view-anomaly-metric-selector" class="anomaly-metric-selector uk-form-row uk-display-inline-block" rel="{{tabName}}">
+                <div id="metric-selector-manage-alert" class="uk-form-row uk-display-inline-block">
                 <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group uk-display-inline-block">
-                        <div id="selected-anomaly-metric" class="uk-button" value="">Metric</div>
+                        <div id="selected-metric-manage-alert" class="uk-button" value="">Metric</div>
                             <div class="uk-button uk-button-primary" type="button"><i class="uk-icon-caret-down"></i>
                         </div>
                         <div class="uk-dropdown uk-dropdown-small uk-dropdown-bottom" style="top: 30px; left: 0px;">
-                            <ul class="create-anomaly-metric-list uk-nav uk-nav-dropdown">
+                            <ul class="manage-alert-metric-list uk-nav uk-nav-dropdown">
                             </ul>
                         </div>
                     </div>
                 </div>
-                <div id="anomaly-function-selector" class="uk-form-row uk-form-row uk-display-inline-block" rel="{{tabName}}">
+                <div id="anomaly-condition-selector" class="uk-form-row uk-form-row uk-display-inline-block" rel="{{tabName}}">
                     <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group uk-display-inline-block">
                         <div id="selected-anomaly-condition" class="uk-button" value="">Condition
                         </div>
 
                         <div class="uk-button uk-button-primary" type="button"><i class="uk-icon-caret-down"></i>
                         </div>
-                        <div class="uk-dropdown uk-dropdown-small uk-dropdown-bottom uk-nav uk-nav-dropdown" style="top: 30px; left: 0px;">
-                            <ul>
+                        <div class="uk-dropdown uk-dropdown-small uk-dropdown-bottom" style="top: 30px; left: 0px;">
+                            <ul class="uk-nav uk-nav-dropdown">
                                 <li class="anomaly-condition-option" value="DROPS"><a href="#" class="uk-dropdown-close">DROPS</a></li>
                                 <li class="anomaly-condition-option" value="INCREASES"><a href="#" class="uk-dropdown-close">INCREASES</a></li>
                             </ul>
@@ -261,10 +261,10 @@
                     </div>
                 </div>
                 <span> by </span>
-                <div id="anomaly-threshold uk-display-inline-block" class="uk-form-row uk-form-row uk-display-inline-block" rel="{{tabName}}">
-                    <input id="anomaly-threshold-input" type="text" placeholder="Threshold"><span>%</span>
+                <div class="uk-form-row uk-form-row uk-display-inline-block" rel="{{tabName}}">
+                    <input id="anomaly-threshold" type="text" placeholder="threshold (1-100)" ><span>%</span>
                 </div>
-                <div id="anomaly-compare-period-selector uk-display-inline-block" class="uk-form-row uk-form-row uk-display-inline-block" rel="{{tabName}}">
+                <div id="anomaly-compare-mode-selector uk-display-inline-block" class="uk-form-row uk-form-row uk-display-inline-block" rel="{{tabName}}">
                     <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group uk-display-inline-block">
                         <div id="selected-anomaly-compare-mode" class="uk-button" value="WoW">WoW</div>
                         <div class="uk-button uk-button-primary" type="button"><i class="uk-icon-caret-down"></i>
@@ -279,18 +279,18 @@
                     </div>
                 </div>
                 <span>for</span>
-                <input id="anomaly-monitoring-window-size" class="thin-input" type="number" value="1">
+                <input id="monitoring-window-size" class="thin-input" type="number">
                 <span>consecutive</span>
-                <div id="anomaly-monitoring-unit-selector uk-display-inline-block" class="uk-form-row uk-form-row uk-display-inline-block" rel="{{tabName}}">
+                <div id="monitoring-unit-selector uk-display-inline-block" class="uk-form-row uk-form-row uk-display-inline-block" rel="{{tabName}}">
                     <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group uk-display-inline-block">
-                        <div id="selected-anomaly-monitoring-window-unit" class="uk-button" unit="HOURS">HOUR(S)</div>
+                        <div id="selected-monitoring-window-unit" class="uk-button" unit="HOURS">HOUR(S)</div>
                         <div class="uk-button uk-button-primary" type="button"><i class="uk-icon-caret-down"></i></div>
                         <div class="uk-dropdown uk-dropdown-small uk-dropdown-bottom" style="top: 30px; left: 0px;">
                             <ul class="uk-nav uk-nav-dropdown">
-                                <li class="anomaly-monitoring-window-unit-option" unit="HOURS"><a href="#" class="uk-dropdown-close">HOUR(S)</a></li>
-                                <li class="anomaly-monitoring-window-unit-option" unit="DAYS"><a href="#" class="uk-dropdown-close" >DAY(S)</a></li>
-                                <li class="anomaly-monitoring-window-unit-option" unit="WEEKS"><a href="#" class="uk-dropdown-close">WEEK(S)</a></li>
-                                <li class="anomaly-monitoring-window-unit-option" unit="MONTHS"><a href="#" class="uk-dropdown-close">MONTH(S)</a></li>
+                                <li class="monitoring-window-unit-option" unit="HOURS"><a href="#" class="uk-dropdown-close">HOUR(S)</a></li>
+                                <li class="monitoring-window-unit-option" unit="DAYS"><a href="#" class="uk-dropdown-close" >DAY(S)</a></li>
+                                <li class="monitoring-window-unit-option" unit="WEEKS"><a href="#" class="uk-dropdown-close">WEEK(S)</a></li>
+                                <li class="monitoring-window-unit-option" unit="MONTHS"><a href="#" class="uk-dropdown-close">MONTH(S)</a></li>
                             </ul>
                         </div>
                     </div>
@@ -337,9 +337,9 @@
 
                 <div class="uk-form-row">
                     <span class="uk-form-label uk-display-inline-block">Monitor the data every </span>
-                    <input id="monitoring-repeat-size" type="number" class="thin-input"  value="1">
+                    <input id="monitoring-repeat-size" type="number" class="thin-input">
                     <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group uk-display-inline-block">
-                        <div id="selected-anomaly-monitoring-repeat-unit" class="uk-button" unit="HOURS">HOUR(S)</div>
+                        <div id="selected-monitoring-repeat-unit" class="uk-button" unit="HOURS">HOUR(S)</div>
                         <div class="uk-button uk-button-primary" type="button"><i class="uk-icon-caret-down"></i>
                         </div>
                         <div class="uk-dropdown uk-dropdown-small uk-dropdown-bottom" style="top: 30px; left: 0px;">
@@ -352,7 +352,7 @@
                     <span id="monitoring-schedule" class="hidden">
                         <span> at
                         </span>
-                        <input id="monitoring-schedule-hour" class="thin-input" type="text" data-uk-timepicker="{format:'24h'}" placeholder="HH:MM">
+                        <input id="monitoring-schedule-time" class="thin-input" type="text" data-uk-timepicker="{format:'24h'}" placeholder="HH:MM">
                     </span>
                 </div>
 
@@ -363,45 +363,11 @@
                 <div id="manage-alert-error" class="uk-alert uk-alert-danger hidden" rel="{{tabName}}">
                     <p></p>
                 </div>
+                <div id="manage-alert-success" class="uk-alert uk-alert-success hidden" rel="{{tabName}}">
+                    <p></p>
+                </div>
 
                 <div class="uk-modal-footer">
-
-                    <button type="button" id="save-run-alert" class="uk-button uk-button-primary" rel="{{tabName}}">Save and run in the timerange</button>
-                    <div class="uk-display-inline-block" data-uk-dropdown="{mode:'click'}" rel="{{tabName}}" style="position: relative; top: 20px; height: 40px">
-                        <div class="date-time-selector-box">
-
-                            <#--<table class="date-time-selector-box-table">-->
-                                <#--<tbody>-->
-                                <#--<tr>-->
-                                    <#--<td class="date-time-selector-box-start-td" style="height:30px;">-->
-                                        <#--<input id="anomaly-start-date" rel="{{tabName}}" type="text" placeholder="YYYY-MM-DD" data-uk-datepicker="{ weekstart:0, format:'YYYY-MM-DD' }" style="width:110px;">-->
-                                        <#--<input id="anomaly-start-time" class="thin-input" rel="{{tabName}}"  type="text" data-uk-timepicker="{format:'24h'}" placeholder="HH:MM">-->
-                                        <#--<span id="anomaly-start-date" class="anomaly-start-date">2016-06-12</span>-->
-                                        <#--<!--<span id="anomaly-start-time" class="anomaly-start-time">23:00</span>-->
-                                        <#--<span class="date-devider">-</span>-->
-                                        <#--<span id="anomaly-end-date" class="anomaly-end-date">2016-06-13</span>-->
-                                        <#--<span id="anomaly-end-time" class="anomaly-end-time">23:00</span>-->
-                                    <#--</td>-->
-                                    <#--<td class="arrow-down uk-button-primary"><i class="uk-icon-caret-down"></i></td>-->
-                                <#--</tr>-->
-                                <#--</tbody>-->
-                            <#--</table>-->
-                            <table class="date-time-selector-box-table">
-                                <tbody>
-                                <tr>
-                                    <td class="" style="height:30px;">
-                                        <input id="anomaly-start-date" rel="{{tabName}}" type="text" placeholder="YYYY-MM-DD" data-uk-datepicker="{ weekstart:0, format:'YYYY-MM-DD' }" style="width:110px;">
-                                        <input id="anomaly-start-time" class="thin-input" rel="{{tabName}}"  type="text" data-uk-timepicker="{format:'24h'}" placeholder="HH:MM">
-                                        <span class="date-devider">-</span>
-                                        <input id="anomaly-end-date" rel="{{tabName}}" type="text" placeholder="YYYY-MM-DD" data-uk-datepicker="{ weekstart:0, format:'YYYY-MM-DD' }" style="width:110px;">
-                                        <input id="anomaly-end-time" class="thin-input" rel="{{tabName}}"  type="text" data-uk-timepicker="{format:'24h'}" placeholder="HH:MM">
-                                    </td>
-                                </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
                     <button type="button" id="save-alert" class="uk-button uk-button-primary" rel="{{tabName}}">Save Alert</button>
                     <button class="uk-button uk-modal-close">Cancel</button>
                 </div>
