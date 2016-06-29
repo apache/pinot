@@ -1,5 +1,9 @@
 package com.linkedin.thirdeye.common;
 
+import com.linkedin.thirdeye.anomaly.AnomalyJobSpec;
+import com.linkedin.thirdeye.anomaly.AnomalyJobSpecDAO;
+import com.linkedin.thirdeye.anomaly.AnomalyTaskSpec;
+import com.linkedin.thirdeye.anomaly.AnomalyTaskSpecDAO;
 import com.linkedin.thirdeye.api.CollectionSchema;
 import com.linkedin.thirdeye.dashboard.ThirdEyeDashboardApplication;
 import com.linkedin.thirdeye.dashboard.configs.AbstractConfigDAO;
@@ -30,7 +34,8 @@ public abstract class BaseThirdEyeApplication<T extends Configuration> extends A
   protected final HibernateBundle<ThirdEyeConfiguration> hibernateBundle =
       new HibernateBundle<ThirdEyeConfiguration>(AnomalyFunctionSpec.class,
           AnomalyFunctionRelation.class, AnomalyResult.class, ContextualEvent.class,
-          EmailConfiguration.class, EmailFunctionDependency.class) {
+          EmailConfiguration.class, EmailFunctionDependency.class, AnomalyJobSpec.class,
+          AnomalyTaskSpec.class) {
         @Override
         public DataSourceFactory getDataSourceFactory(ThirdEyeConfiguration config) {
           return config.getDatabase();
@@ -42,6 +47,8 @@ public abstract class BaseThirdEyeApplication<T extends Configuration> extends A
   protected EmailConfigurationDAO emailConfigurationDAO;
   protected AnomalyFunctionRelationDAO anomalyFunctionRelationDAO;
   protected EmailFunctionDependencyDAO emailFunctionDependencyDAO;
+  protected AnomalyJobSpecDAO anomalyJobSpecDAO;
+  protected AnomalyTaskSpecDAO anomalyTaskSpecDAO;
 
   public void initDetectorRelatedDAO() {
     anomalyFunctionSpecDAO = new AnomalyFunctionSpecDAO(hibernateBundle.getSessionFactory());
@@ -52,6 +59,8 @@ public abstract class BaseThirdEyeApplication<T extends Configuration> extends A
         new AnomalyFunctionRelationDAO(hibernateBundle.getSessionFactory());
     emailFunctionDependencyDAO =
         new EmailFunctionDependencyDAO(hibernateBundle.getSessionFactory());
+    anomalyJobSpecDAO = new AnomalyJobSpecDAO(hibernateBundle.getSessionFactory());
+    anomalyTaskSpecDAO = new AnomalyTaskSpecDAO(hibernateBundle.getSessionFactory());
   }
 
   // TODO below two methods depend on webapp configs
