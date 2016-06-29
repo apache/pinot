@@ -24,6 +24,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * Routing table instance pruner, which is used to remove inactive and disabled instances during routing table creation.
+ */
 public class RoutingTableInstancePruner {
   private static final Logger LOGGER = LoggerFactory.getLogger(RoutingTableInstancePruner.class);
 

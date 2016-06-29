@@ -24,8 +24,6 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Create a RoutingTableBuilder instance from a given key.
- *
- *
  */
 public class RoutingTableBuilderFactory {
   private static final Logger LOGGER = LoggerFactory.getLogger(RoutingTableBuilderFactory.class);
@@ -42,6 +40,12 @@ public class RoutingTableBuilderFactory {
     keyToFunction.put("kafkahighlevelconsumerbasedroutingtablebuilder", KafkaHighLevelConsumerBasedRoutingTableBuilder.class);
   }
 
+  /**
+   * Obtains an instance of a routing table builder given a routing table building strategy name.
+   *
+   * @param routingTableBuilderKey The type of routing table builder to obtain
+   * @return A routing table builder
+   */
   @SuppressWarnings("unchecked")
   public static RoutingTableBuilder get(String routingTableBuilderKey) {
     try {
@@ -58,5 +62,4 @@ public class RoutingTableBuilderFactory {
       throw new AssertionError("Should not reach this");
     }
   }
-
 }

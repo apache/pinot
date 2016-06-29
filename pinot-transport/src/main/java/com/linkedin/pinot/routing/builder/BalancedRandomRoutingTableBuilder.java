@@ -34,8 +34,6 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Create a given number of routing tables based on random selections from ExternalView.
- *
- *
  */
 public class BalancedRandomRoutingTableBuilder implements RoutingTableBuilder {
   private static final Logger LOGGER = LoggerFactory.getLogger(BalancedRandomRoutingTableBuilder.class);

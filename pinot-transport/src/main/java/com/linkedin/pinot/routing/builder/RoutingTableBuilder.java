@@ -25,21 +25,26 @@ import com.linkedin.pinot.routing.ServerToSegmentSetMap;
 
 
 /**
- * Interface for creating a list of ServerToSegmentSetMap based on ExternalView from helix.
- *
- *
+ * Interface for creating a list of ServerToSegmentSetMap based on ExternalView from Helix.
  */
 public interface RoutingTableBuilder {
 
   /**
-   * @param configuration
+   * Inits the routing table builder.
+   *
+   * @param configuration The configuration to use
    */
   void init(Configuration configuration);
 
   /**
-   * @param tableName
-   * @param externalView
-   * @return List of routing table used to
+   * Builds one or more routing tables (maps of servers to segment lists) that are used for query routing. The union of
+   * the segment lists that are in each routing table should contain all data in Pinot.
+   *
+   * @param tableName The table name for which to build the routing table
+   * @param externalView The external view for the table
+   * @param instanceConfigList The instance configurations for the instances serving this particular table (used for
+   *                           pruning)
+   * @return List of routing tables used to route queries
    */
   List<ServerToSegmentSetMap> computeRoutingTableFromExternalView(String tableName, ExternalView externalView,
       List<InstanceConfig> instanceConfigList);
