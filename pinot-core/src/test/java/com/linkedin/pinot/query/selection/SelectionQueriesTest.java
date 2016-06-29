@@ -253,7 +253,7 @@ public class SelectionQueriesTest {
     final int numSegments = 20;
     setupSegmentList(numSegments);
     final PlanMaker instancePlanMaker = new InstancePlanMakerImplV2();
-    final BrokerRequest brokerRequest = getSelectionNoFilterBrokerRequest();
+    final BrokerRequest brokerRequest = getSelectionNoFilterBrokerRequest1();
     final ExecutorService executorService = Executors.newCachedThreadPool(new NamedThreadFactory("test-plan-maker"));
     final Plan globalPlan =
         instancePlanMaker.makeInterSegmentPlan(_indexSegmentList, brokerRequest, executorService, 150000);
@@ -271,15 +271,15 @@ public class SelectionQueriesTest {
 
     JSONObject jsonResult = brokerResponse.getSelectionResults();
     JSONArray columnJsonArray = jsonResult.getJSONArray("columns");
-    Assert.assertEquals(columnJsonArray.getString(0), "column11");
-    Assert.assertEquals(columnJsonArray.getString(1), "column12");
-    Assert.assertEquals(columnJsonArray.getString(2), "met_impressionCount");
+    Assert.assertEquals(columnJsonArray.getString(0), "column12");
+    Assert.assertEquals(columnJsonArray.getString(1), "met_impressionCount");
+    Assert.assertEquals(columnJsonArray.getString(2), "column11");
 
     JSONArray resultsJsonArray = jsonResult.getJSONArray("results");
     for (int i = 0; i < resultsJsonArray.length(); ++i) {
       JSONArray rowJsonArray = resultsJsonArray.getJSONArray(i);
       Assert.assertEquals(rowJsonArray.length(), 3);
-      Assert.assertEquals(rowJsonArray.getString(0), "i");
+      Assert.assertEquals(rowJsonArray.getString(2), "i");
     }
 
     final BrokerReduceService brokerReduceService = new BrokerReduceService();
@@ -290,9 +290,9 @@ public class SelectionQueriesTest {
     SelectionResults selectionResults = brokerResponseNative.getSelectionResults();
     List<String> columnArray = selectionResults.getColumns();
     Assert.assertEquals(columnArray.size(), 3);
-    Assert.assertEquals(columnArray.get(0), "column11");
-    Assert.assertEquals(columnArray.get(1), "column12");
-    Assert.assertEquals(columnArray.get(2), "met_impressionCount");
+    Assert.assertEquals(columnArray.get(0), "column12");
+    Assert.assertEquals(columnArray.get(1), "met_impressionCount");
+    Assert.assertEquals(columnArray.get(2), "column11");
 
     List<Serializable[]> resultRows = selectionResults.getRows();
     Assert.assertEquals(resultRows.size(), 10);
@@ -387,6 +387,12 @@ public class SelectionQueriesTest {
     return brokerRequest;
   }
 
+  private BrokerRequest getSelectionNoFilterBrokerRequest1() {
+    final BrokerRequest brokerRequest = new BrokerRequest();
+    brokerRequest.setSelections(getSelectionQuery1());
+    return brokerRequest;
+  }
+
   private BrokerRequest getSelectionWithFilterBrokerRequest() {
     final BrokerRequest brokerRequest = new BrokerRequest();
     brokerRequest.setSelections(getSelectionQuery());
@@ -425,6 +431,24 @@ public class SelectionQueriesTest {
     selectionColumns.add("column11");
     selectionColumns.add("column12");
     selectionColumns.add("met_impressionCount");
+    selection.setSelectionColumns(selectionColumns);
+    selection.setOffset(0);
+    selection.setSize(10);
+    final List<SelectionSort> selectionSortSequence = new ArrayList<SelectionSort>();
+    final SelectionSort selectionSort = new SelectionSort();
+    selectionSort.setColumn("column11");
+    selectionSort.setIsAsc(false);
+    selectionSortSequence.add(selectionSort);
+    selection.setSelectionSortSequence(selectionSortSequence);
+    return selection;
+  }
+
+  private Selection getSelectionQuery1() {
+    final Selection selection = new Selection();
+    final List<String> selectionColumns = new ArrayList<String>();
+    selectionColumns.add("column12");
+    selectionColumns.add("met_impressionCount");
+    selectionColumns.add("column11");
     selection.setSelectionColumns(selectionColumns);
     selection.setOffset(0);
     selection.setSize(10);

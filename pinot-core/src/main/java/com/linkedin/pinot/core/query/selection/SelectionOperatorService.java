@@ -304,10 +304,8 @@ public class SelectionOperatorService {
 
   private JSONArray getSelectionColumnsJsonArrayFromDataSchema(DataSchema dataSchema) {
     final JSONArray jsonArray = new JSONArray();
-    for (int idx = 0; idx < dataSchema.size(); ++idx) {
-      if (_selectionColumns.contains(dataSchema.getColumnName(idx))) {
-        jsonArray.put(dataSchema.getColumnName(idx));
-      }
+    for (String column: _selectionColumns) {
+      jsonArray.put(column);
     }
     return jsonArray;
   }
@@ -710,48 +708,52 @@ public class SelectionOperatorService {
       throws JSONException {
 
     final JSONArray jsonArray = new JSONArray();
-    for (int i = 0; i < dataSchema.size(); ++i) {
-      if (_selectionColumns.contains(dataSchema.getColumnName(i))) {
-        if (dataSchema.getColumnType(i).isSingleValue()) {
-          if (dataSchema.getColumnType(i) == DataType.STRING) {
-            jsonArray.put(poll[i]);
+    Map<String, Integer> columnToIdxMapping = buildColumnToIdxMappingForDataSchema(dataSchema);
+    for (int i = 0; i < _selectionColumns.size(); ++i) {
+      if (!columnToIdxMapping.containsKey(_selectionColumns.get(i))) {
+        jsonArray.put((String)null);
+      } else {
+        int colIdx = columnToIdxMapping.get(_selectionColumns.get(i));
+        if (dataSchema.getColumnType(colIdx).isSingleValue()) {
+          if (dataSchema.getColumnType(colIdx) == DataType.STRING) {
+            jsonArray.put(poll[colIdx]);
           } else {
-            jsonArray.put(DEFAULT_FORMAT_STRING_MAP.get(dataSchema.getColumnType(i)).format(poll[i]));
+            jsonArray.put(DEFAULT_FORMAT_STRING_MAP.get(dataSchema.getColumnType(colIdx)).format(poll[colIdx]));
           }
         } else {
           // Multi-value;
 
           JSONArray stringJsonArray = new JSONArray();
           //          stringJsonArray.put(poll[i]);
-          switch (dataSchema.getColumnType(i)) {
+          switch (dataSchema.getColumnType(colIdx)) {
             case STRING_ARRAY:
-              String[] stringValues = (String[]) poll[i];
+              String[] stringValues = (String[]) poll[colIdx];
               for (String s : stringValues) {
                 stringJsonArray.put(s);
               }
               break;
             case INT_ARRAY:
-              int[] intValues = (int[]) poll[i];
+              int[] intValues = (int[]) poll[colIdx];
               for (int s : intValues) {
-                stringJsonArray.put(DEFAULT_FORMAT_STRING_MAP.get(dataSchema.getColumnType(i)).format(s));
+                stringJsonArray.put(DEFAULT_FORMAT_STRING_MAP.get(dataSchema.getColumnType(colIdx)).format(s));
               }
               break;
             case FLOAT_ARRAY:
-              float[] floatValues = (float[]) poll[i];
+              float[] floatValues = (float[]) poll[colIdx];
               for (float s : floatValues) {
-                stringJsonArray.put(DEFAULT_FORMAT_STRING_MAP.get(dataSchema.getColumnType(i)).format(s));
+                stringJsonArray.put(DEFAULT_FORMAT_STRING_MAP.get(dataSchema.getColumnType(colIdx)).format(s));
               }
               break;
             case LONG_ARRAY:
-              long[] longValues = (long[]) poll[i];
+              long[] longValues = (long[]) poll[colIdx];
               for (long s : longValues) {
-                stringJsonArray.put(DEFAULT_FORMAT_STRING_MAP.get(dataSchema.getColumnType(i)).format(s));
+                stringJsonArray.put(DEFAULT_FORMAT_STRING_MAP.get(dataSchema.getColumnType(colIdx)).format(s));
               }
               break;
             case DOUBLE_ARRAY:
-              double[] doubleValues = (double[]) poll[i];
+              double[] doubleValues = (double[]) poll[colIdx];
               for (double s : doubleValues) {
-                stringJsonArray.put(DEFAULT_FORMAT_STRING_MAP.get(dataSchema.getColumnType(i)).format(s));
+                stringJsonArray.put(DEFAULT_FORMAT_STRING_MAP.get(dataSchema.getColumnType(colIdx)).format(s));
               }
               break;
             default:
@@ -764,6 +766,13 @@ public class SelectionOperatorService {
     return jsonArray;
   }
 
+  private static Map<String, Integer> buildColumnToIdxMappingForDataSchema(DataSchema dataSchema) {
+    Map<String, Integer> columnToIdxMapping = new HashMap<String, Integer>();
+    for (int i = 0; i < dataSchema.size(); ++i) {
+      columnToIdxMapping.put(dataSchema.getColumnName(i), i);
+    }
+    return columnToIdxMapping;
+  }
 
   private static Serializable[] getRowFromDataTable(DataTable dt, int rowId) {
     final Serializable[] row = new Serializable[dt.getDataSchema().size()];
