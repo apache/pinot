@@ -16,7 +16,7 @@
 package com.linkedin.pinot.core.startree;
 
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.TimeFieldSpec;
@@ -42,7 +42,6 @@ import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import com.linkedin.pinot.pql.parsers.Pql2Compiler;
 import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -50,87 +49,57 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.mutable.MutableLong;
 import org.apache.commons.math.util.MathUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
-import org.testng.annotations.AfterSuite;
-import org.testng.annotations.BeforeSuite;
-import org.testng.annotations.Test;
+
 
 /**
- * This test generates a Star-Tree segment with random data, and ensures that
- * aggregation results computed using star-tree index operator are the same as
- * aggregation results computed by scanning raw docs.
+ * Base class containing common functionality for all star-tree integration tests.
  */
-public class TestStarTreeIntegrationTest {
-  private static final Logger LOGGER = LoggerFactory.getLogger(TestStarTreeIntegrationTest.class);
+public class BaseStarTreeIndexTest {
+  private static final Logger LOGGER = LoggerFactory.getLogger(BaseStarTreeIndexTest.class);
 
-  private static final String SEGMENT_NAME = "starTreeSegment";
-  private static final String SEGMENT_DIR_NAME = "/tmp/star-tree-index";
   private static final String TIME_COLUMN_NAME = "daysSinceEpoch";
   private static final int NUM_DIMENSIONS = 4;
   private static final int NUM_METRICS = 2;
   private static final int METRIC_MAX_VALUE = 10000;
-  private final long _randomSeed = System.nanoTime();
+  protected final long _randomSeed = System.nanoTime();
 
-  private IndexSegment _segment;
-  private Schema _schema;
 
-  @BeforeSuite
-  void setup()
-      throws Exception {
-    buildSegment(SEGMENT_DIR_NAME, SEGMENT_NAME);
-    loadSegment(SEGMENT_DIR_NAME, SEGMENT_NAME);
-  }
+  protected String[] _hardCodedQueries =
+      new String[]{
+          "select sum(m1) from T",
+          "select sum(m1) from T where d1 = 'd1-v1'",
+          "select sum(m1) from T where d1 <> 'd1-v1'",
+          "select sum(m1) from T where d1 between 'd1-v1' and 'd1-v3'",
+          "select sum(m1) from T where d1 in ('d1-v1', 'd1-v2')",
+          "select sum(m1) from T where d1 in ('d1-v1', 'd1-v2') and d2 not in ('d2-v1')",
+          "select sum(m1) from T group by d1", "select sum(m1) from T group by d1, d2",
+          "select sum(m1) from T where d1 = 'd1-v2' group by d1",
+          "select sum(m1) from T where d1 between 'd1-v1' and 'd1-v3' group by d2",
+          "select sum(m1) from T where d1 = 'd1-v2' group by d2, d3",
+          "select sum(m1) from T where d1 <> 'd1-v1' group by d2",
+          "select sum(m1) from T where d1 in ('d1-v1', 'd1-v2') group by d2",
+          "select sum(m1) from T where d1 in ('d1-v1', 'd1-v2') and d2 not in ('d2-v1') group by d3",
+          "select sum(m1) from T where d1 in ('d1-v1', 'd1-v2') and d2 not in ('d2-v1') group by d3, d4"};
 
-  @AfterSuite
-  void tearDown()
-      throws IOException {
-    FileUtils.deleteDirectory(new File(SEGMENT_DIR_NAME));
-  }
-
-  /**
-   * This test ensures that the aggregation result computed using the star-tree index operator
-   * is the same as computed by scanning raw-docs, for a hard-coded set of queries.
-   *
-   * @throws Exception
-   */
-  @Test
-  public void testHardCodedQueries() throws Exception {
-    String[] queries = new String[]{
-        "select sum(m1) from T",
-        "select sum(m1) from T where d1 = 'd1-v1'",
-        "select sum(m1) from T where d1 <> 'd1-v1'",
-        "select sum(m1) from T where d1 between 'd1-v1' and 'd1-v3'",
-        "select sum(m1) from T where d1 in ('d1-v1', 'd1-v2')",
-        "select sum(m1) from T where d1 in ('d1-v1', 'd1-v2') and d2 not in ('d2-v1')",
-        "select sum(m1) from T group by d1",
-        "select sum(m1) from T group by d1, d2",
-        "select sum(m1) from T where d1 = 'd1-v2' group by d1",
-        "select sum(m1) from T where d1 between 'd1-v1' and 'd1-v3' group by d2",
-        "select sum(m1) from T where d1 = 'd1-v2' group by d2, d3",
-        "select sum(m1) from T where d1 <> 'd1-v1' group by d2",
-        "select sum(m1) from T where d1 in ('d1-v1', 'd1-v2') group by d2",
-        "select sum(m1) from T where d1 in ('d1-v1', 'd1-v2') and d2 not in ('d2-v1') group by d3",
-        "select sum(m1) from T where d1 in ('d1-v1', 'd1-v2') and d2 not in ('d2-v1') group by d3, d4"
-    };
-
+  protected void testHardCodedQueries(IndexSegment segment, Schema schema) {
     // Test against all metric columns, instead of just the aggregation column in the query.
-    List<String> metricNames = _schema.getMetricNames();
-    SegmentMetadata segmentMetadata = _segment.getSegmentMetadata();
+    List<String> metricNames = schema.getMetricNames();
+    SegmentMetadata segmentMetadata = segment.getSegmentMetadata();
 
-    for (int i = 0; i < queries.length; i++) {
+    for (int i = 0; i < _hardCodedQueries.length; i++) {
       Pql2Compiler compiler = new Pql2Compiler();
-      BrokerRequest brokerRequest = compiler.compileToBrokerRequest(queries[i]);
+      BrokerRequest brokerRequest = compiler.compileToBrokerRequest(_hardCodedQueries[i]);
 
       FilterQueryTree filterQueryTree = RequestUtils.generateFilterQueryTree(brokerRequest);
       Assert.assertTrue(RequestUtils.isFitForStarTreeIndex(segmentMetadata, filterQueryTree, brokerRequest));
 
-      Map<String, double[]> expectedResult = computeSumUsingRawDocs(metricNames, brokerRequest);
-      Map<String, double[]> actualResult = computeSumUsingAggregatedDocs(metricNames, brokerRequest);
+      Map<String, double[]> expectedResult = computeSumUsingRawDocs(segment, metricNames, brokerRequest);
+      Map<String, double[]> actualResult = computeSumUsingAggregatedDocs(segment, metricNames, brokerRequest);
 
       Assert.assertEquals(expectedResult.size(), actualResult.size(), "Mis-match in number of groups");
       for (Map.Entry<String, double[]> entry : expectedResult.entrySet()) {
@@ -154,8 +123,9 @@ public class TestStarTreeIntegrationTest {
    *  @param metricNames
    * @param brokerRequest
    */
-  private Map<String, double[]> computeSumUsingRawDocs(List<String> metricNames, BrokerRequest brokerRequest) {
-    FilterPlanNode planNode = new FilterPlanNode(_segment, brokerRequest);
+  protected Map<String, double[]> computeSumUsingRawDocs(IndexSegment segment, List<String> metricNames,
+      BrokerRequest brokerRequest) {
+    FilterPlanNode planNode = new FilterPlanNode(segment, brokerRequest);
     Operator rawOperator = planNode.run();
     BlockDocIdIterator rawDocIdIterator = rawOperator.nextBlock().getBlockDocIdSet().iterator();
 
@@ -163,7 +133,7 @@ public class TestStarTreeIntegrationTest {
     if (brokerRequest.isSetAggregationsInfo() && brokerRequest.isSetGroupBy()) {
       groupByColumns = brokerRequest.getGroupBy().getColumns();
     }
-    return computeSum(_segment, rawDocIdIterator, metricNames, groupByColumns);
+    return computeSum(segment, rawDocIdIterator, metricNames, groupByColumns);
   }
 
   /**
@@ -172,8 +142,9 @@ public class TestStarTreeIntegrationTest {
    * @param brokerRequest
    * @return
    */
-  private Map<String, double[]> computeSumUsingAggregatedDocs(List<String> metricNames, BrokerRequest brokerRequest) {
-    StarTreeIndexOperator starTreeOperator = new StarTreeIndexOperator(_segment, brokerRequest);
+  Map<String, double[]> computeSumUsingAggregatedDocs(IndexSegment segment, List<String> metricNames,
+      BrokerRequest brokerRequest) {
+    StarTreeIndexOperator starTreeOperator = new StarTreeIndexOperator(segment, brokerRequest);
     starTreeOperator.open();
     BlockDocIdIterator starTreeDocIdIterator = starTreeOperator.nextBlock().getBlockDocIdSet().iterator();
 
@@ -182,7 +153,7 @@ public class TestStarTreeIntegrationTest {
       groupByColumns = brokerRequest.getGroupBy().getColumns();
     }
 
-    return computeSum(_segment, starTreeDocIdIterator, metricNames, groupByColumns);
+    return computeSum(segment, starTreeDocIdIterator, metricNames, groupByColumns);
   }
 
   /**
@@ -192,25 +163,25 @@ public class TestStarTreeIntegrationTest {
    * @param segmentName
    * @throws Exception
    */
-  private void buildSegment(String segmentDirName, String segmentName)
+  Schema buildSegment(String segmentDirName, String segmentName)
       throws Exception {
     int ROWS = (int) MathUtils.factorial(NUM_DIMENSIONS);
-    _schema = new Schema();
+    Schema schema = new Schema();
 
     for (int i = 0; i < NUM_DIMENSIONS; i++) {
       String dimName = "d" + (i + 1);
-      DimensionFieldSpec dimensionFieldSpec = new DimensionFieldSpec(dimName, DataType.STRING, true);
-      _schema.addField(dimName, dimensionFieldSpec);
+      DimensionFieldSpec dimensionFieldSpec = new DimensionFieldSpec(dimName, FieldSpec.DataType.STRING, true);
+      schema.addField(dimName, dimensionFieldSpec);
     }
 
-    _schema.setTimeFieldSpec(new TimeFieldSpec(TIME_COLUMN_NAME, DataType.INT, TimeUnit.DAYS));
+    schema.setTimeFieldSpec(new TimeFieldSpec(TIME_COLUMN_NAME, FieldSpec.DataType.INT, TimeUnit.DAYS));
     for (int i = 0; i < NUM_METRICS; i++) {
       String metricName = "m" + (i + 1);
-      MetricFieldSpec metricFieldSpec = new MetricFieldSpec(metricName, DataType.INT);
-      _schema.addField(metricName, metricFieldSpec);
+      MetricFieldSpec metricFieldSpec = new MetricFieldSpec(metricName, FieldSpec.DataType.INT);
+      schema.addField(metricName, metricFieldSpec);
     }
 
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig(_schema);
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
     config.setEnableStarTreeIndex(true);
     config.setOutDir(segmentDirName);
     config.setFormat(FileFormat.AVRO);
@@ -220,13 +191,13 @@ public class TestStarTreeIntegrationTest {
     for (int row = 0; row < ROWS; row++) {
       HashMap<String, Object> map = new HashMap<>();
       for (int i = 0; i < NUM_DIMENSIONS; i++) {
-        String dimName = _schema.getDimensionFieldSpecs().get(i).getName();
+        String dimName = schema.getDimensionFieldSpecs().get(i).getName();
         map.put(dimName, dimName + "-v" + row % (NUM_DIMENSIONS - i));
       }
 
       Random random = new Random(_randomSeed);
       for (int i = 0; i < NUM_METRICS; i++) {
-        String metName = _schema.getMetricFieldSpecs().get(i).getName();
+        String metName = schema.getMetricFieldSpecs().get(i).getName();
         map.put(metName, random.nextInt(METRIC_MAX_VALUE));
       }
 
@@ -239,10 +210,12 @@ public class TestStarTreeIntegrationTest {
     }
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    RecordReader reader = createReader(_schema, data);
+    RecordReader reader = createReader(schema, data);
     driver.init(config, reader);
     driver.build();
+
     LOGGER.info("Built segment {} at {}", segmentName, segmentDirName);
+    return schema;
   }
 
   /**
@@ -252,10 +225,10 @@ public class TestStarTreeIntegrationTest {
    * @param segmentName
    * @throws Exception
    */
-  private void loadSegment(String segmentDirName, String segmentName)
+  IndexSegment loadSegment(String segmentDirName, String segmentName)
       throws Exception {
-    _segment = Loaders.IndexSegment.load(new File(segmentDirName, segmentName), ReadMode.heap);
-    LOGGER.info("Loaded segment {}", segmentName);
+    LOGGER.info("Loading segment {}", segmentName);
+    return Loaders.IndexSegment.load(new File(segmentDirName, segmentName), ReadMode.heap);
   }
 
   /**
@@ -324,7 +297,8 @@ public class TestStarTreeIntegrationTest {
       int counter = 0;
 
       @Override
-      public void rewind() throws Exception {
+      public void rewind()
+          throws Exception {
         counter = 0;
       }
 
@@ -334,7 +308,8 @@ public class TestStarTreeIntegrationTest {
       }
 
       @Override
-      public void init() throws Exception {
+      public void init()
+          throws Exception {
 
       }
 
@@ -354,7 +329,8 @@ public class TestStarTreeIntegrationTest {
       }
 
       @Override
-      public void close() throws Exception {
+      public void close()
+          throws Exception {
 
       }
     };
