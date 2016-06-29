@@ -75,8 +75,8 @@ public class StarQueryComparison {
 
     SegmentInfoProvider segmentInfoProvider = new SegmentInfoProvider(_segmentDirName);
     StarTreeQueryGenerator
-        queryGenerator = new StarTreeQueryGenerator(_tableName, segmentInfoProvider.getDimensionColumns(),
-        segmentInfoProvider.getMetricColumns(), segmentInfoProvider.getColumnValuesMap());
+        queryGenerator = new StarTreeQueryGenerator(_tableName, segmentInfoProvider.getSingleValueDimensionColumns(),
+        segmentInfoProvider.getMetricColumns(), segmentInfoProvider.getSingleValueDimensionValuesMap());
 
     boolean ret = true;
     for (int i = 0; i < _numQueries; i++) {

@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import com.linkedin.pinot.common.utils.StringUtil;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -27,15 +28,12 @@ import java.util.Random;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
-
 import org.apache.avro.Schema;
 import org.apache.avro.file.DataFileReader;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.commons.io.IOUtils;
-
-import com.linkedin.pinot.common.utils.StringUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,27 +50,22 @@ public class QueryGenerator {
   private List<String> _nonMultivalueColumnNames = new ArrayList<String>();
   private List<String> _nonMultivalueNumericalColumnNames = new ArrayList<String>();
   private Map<String, Integer> _multivalueColumnCardinality = new HashMap<String, Integer>();
+
+  // The reason for only generating aggregation queries is that currently we don't verify the results or selection
+  // queries, and the schema merging is not working properly (if realtime and offline schemas do not match).
+  // Old value is: Arrays.asList(new SelectionQueryGenerationStrategy(), new AggregationQueryGenerationStrategy());
+  // TODO: Add back SelectionQueryGenerationStrategy after adding selection query results verification
   private List<QueryGenerationStrategy> _queryGenerationStrategies =
       Collections.<QueryGenerationStrategy>singletonList(new AggregationQueryGenerationStrategy());
-     /* Arrays.asList(
-      new SelectionQueryGenerationStrategy(), new AggregationQueryGenerationStrategy()); */
+
   private List<String> _booleanOperators = Arrays.asList("OR", "AND");
   private List<PredicateGenerator> _predicateGenerators = Arrays.asList(new ComparisonOperatorPredicateGenerator(),
       new InPredicateGenerator(), new BetweenPredicateGenerator());
   private static final int MAX_MULTIVALUE_CARDINALITY = 5;
-  private static final long RANDOM_SEED = -1L;
-  private static final Random RANDOM;
+  private static final Random RANDOM = new Random();
   private final String _pqlTableName;
   private final String _h2TableName;
   private boolean skipMultivaluePredicates;
-
-  static {
-    if (RANDOM_SEED == -1L) {
-      RANDOM = new Random();
-    } else {
-      RANDOM = new Random(RANDOM_SEED);
-    }
-  }
 
   public QueryGenerator(final List<File> avroFiles, final String pqlTableName, String h2TableName) {
     _pqlTableName = pqlTableName;
@@ -388,7 +381,7 @@ public class QueryGenerator {
       // Generate a predicate
       QueryFragment predicate = generatePredicate();
 
-      // Generate a result limit between 0 and 5000 as negative numbers mean no limit
+      // Generate a result limit between 1 and 30 as negative numbers mean no limit
       int resultLimit = RANDOM.nextInt(30) + 1;
       LimitQueryFragment limit = new LimitQueryFragment(resultLimit);
 

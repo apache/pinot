@@ -60,23 +60,27 @@ import org.testng.annotations.Test;
 public class StarTreeClusterIntegrationTest extends ClusterTest {
   private static final Logger LOGGER =
       LoggerFactory.getLogger(StarTreeClusterIntegrationTest.class);
+
+  private static final int NUM_GENERATED_QUERIES = 100;
+
   private static final int TOTAL_EXPECTED_DOCS = 115545;
-  private final String DEFAULT_TABLE_NAME = "myTable";
 
-  private final String STAR_TREE_TABLE_NAME = "myStarTable";
-  private final String TIME_COLUMN_NAME = "DaysSinceEpoch";
+  private static final String DEFAULT_TABLE_NAME = "myTable";
+  private static final String STAR_TREE_TABLE_NAME = "myStarTable";
 
-  private final String TIME_UNIT = "daysSinceEpoch";
-  private final String RETENTION_TIME_UNIT = "DAYS";
+  private static final String TIME_COLUMN_NAME = "DaysSinceEpoch";
+  private static final String TIME_UNIT = "daysSinceEpoch";
+  private static final String RETENTION_TIME_UNIT = "DAYS";
 
-  private final int RETENTION_TIME = 3000;
+  private static final int RETENTION_TIME = 3000;
   private static final int SEGMENT_COUNT = 12;
   private static final long TIMEOUT_IN_MILLISECONDS = 30 * 1000;
   private static final long TIMEOUT_IN_SECONDS = 3600;
 
-  private final File _tmpDir = new File("/tmp/StarTreeClusterIntegrationTest");
-  private final File _segmentsDir = new File("/tmp/StarTreeClusterIntegrationTest/segmentDir");
-  private final File _tarredSegmentsDir = new File("/tmp/StarTreeClusterIntegrationTest/tarDir");
+  private static final File _tmpDir = new File("/tmp/StarTreeClusterIntegrationTest");
+  private static final File _segmentsDir = new File("/tmp/StarTreeClusterIntegrationTest/segmentDir");
+  private static final File _tarredSegmentsDir = new File("/tmp/StarTreeClusterIntegrationTest/tarDir");
+
   private StarTreeQueryGenerator _queryGenerator;
   private File _queryFile;
 
@@ -247,12 +251,12 @@ public class StarTreeClusterIntegrationTest extends ClusterTest {
     SegmentInfoProvider dictionaryReader =
         new SegmentInfoProvider(_tarredSegmentsDir.getAbsolutePath());
 
-    List<String> dimensionColumns = dictionaryReader.getDimensionColumns();
     List<String> metricColumns = dictionaryReader.getMetricColumns();
-    Map<String, List<String>> columnValuesMap = dictionaryReader.getColumnValuesMap();
+    List<String> singleValueDimensionColumns = dictionaryReader.getSingleValueDimensionColumns();
+    Map<String, List<Object>> singleValueDimensionValuesMap = dictionaryReader.getSingleValueDimensionValuesMap();
 
-    _queryGenerator = new StarTreeQueryGenerator(STAR_TREE_TABLE_NAME, dimensionColumns,
-        metricColumns, columnValuesMap);
+    _queryGenerator = new StarTreeQueryGenerator(STAR_TREE_TABLE_NAME, singleValueDimensionColumns, metricColumns,
+        singleValueDimensionValuesMap);
   }
 
   /**
@@ -276,6 +280,15 @@ public class StarTreeClusterIntegrationTest extends ClusterTest {
       String refQuery = convertToRefQuery(starQuery);
       JSONObject refResponse = postQuery(refQuery);
 
+      // Skip comparison if not all results returned for reference response.
+      if (refResponse.getInt("numDocsScanned") > 0) {
+        JSONObject aggregationResults = refResponse.getJSONArray("aggregationResults").getJSONObject(0);
+        if (aggregationResults.has("groupByResult")
+            && aggregationResults.getJSONArray("groupByResult").length() == 10000) {
+          return;
+        }
+      }
+
       boolean result = QueryComparison.compare(starResponse, refResponse, false);
       String message = "Result mis-match for Query: " + starQuery + "\nStar: "
           + starResponse.toString() + "\nRef: " + refResponse.toString();
@@ -295,9 +308,9 @@ public class StarTreeClusterIntegrationTest extends ClusterTest {
     FileUtils.deleteDirectory(_tmpDir);
   }
 
-  @Test(enabled = false)
+  @Test
   public void testGeneratedQueries() {
-    for (int i = 0; i < 1000; ++i) {
+    for (int i = 0; i < NUM_GENERATED_QUERIES; i++) {
       String starQuery = _queryGenerator.nextQuery();
       testOneQuery(starQuery, false);
     }
