@@ -80,10 +80,6 @@ public class UserRuleAnomalyFunction extends BaseAnomalyFunction {
 
     mergedAnomalyResult.setMessage(ANOMALY_RESULT_MESSAGE_JOINER.join(messages));
 
-    System.out.println("XXX");
-    System.out.println(mergedAnomalyResult);
-    System.out.println("YYY");
-
     return mergedAnomalyResult;
   }
 
