@@ -21,6 +21,10 @@ public class AnomalyTaskSpecDAO extends AbstractDAO<AnomalyTaskSpec> {
     return anomalyTasksSpec;
   }
 
+  public List<AnomalyTaskSpec> findAll() {
+    return list(namedQuery("com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#findAll"));
+  }
+
   public List<AnomalyTaskSpec> findByJobExecutionId(Long jobExecutionId) {
     return list(namedQuery("com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#findByJobExecutionId")
         .setParameter("jobExecutionId", jobExecutionId));
@@ -31,7 +35,7 @@ public class AnomalyTaskSpecDAO extends AbstractDAO<AnomalyTaskSpec> {
         "com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#findByStatusOrderByCreateTimeAscending")
             .setParameter("status", status));
   }
-  
+
   //also update the worker id that is picking up the task
   public boolean updateStatus(Long taskId) {
     try {

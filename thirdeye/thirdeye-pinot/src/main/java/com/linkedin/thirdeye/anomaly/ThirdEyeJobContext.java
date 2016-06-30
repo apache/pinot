@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory;
 import com.linkedin.thirdeye.detector.db.AnomalyFunctionSpecDAO;
 import com.linkedin.thirdeye.detector.db.AnomalyJobSpecDAO;
 import com.linkedin.thirdeye.detector.db.AnomalyTaskSpecDAO;
+import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 
 
 public class ThirdEyeJobContext {
@@ -20,6 +21,7 @@ public class ThirdEyeJobContext {
   private AnomalyJobSpecDAO anomalyJobSpecDAO;
   private AnomalyTaskSpecDAO anomalyTaskSpecDAO;
   private AnomalyFunctionSpecDAO anomalyFunctionSpecDAO;
+  private AnomalyFunctionFactory anomalyFunctionFactory;
   private SessionFactory sessionFactory;
 
   private Long anomalyFunctionId;
@@ -125,13 +127,13 @@ public class ThirdEyeJobContext {
     this.windowEnd = windowEnd;
   }
 
-
-  public void setScheduledFireTime(Date scheduledFireTime) {
-    // TODO Auto-generated method stub
-    
+  public AnomalyFunctionFactory getAnomalyFunctionFactory() {
+    return anomalyFunctionFactory;
   }
 
-
+  public void setAnomalyFunctionFactory(AnomalyFunctionFactory anomalyFunctionFactory) {
+    this.anomalyFunctionFactory = anomalyFunctionFactory;
+  }
 
 
 }

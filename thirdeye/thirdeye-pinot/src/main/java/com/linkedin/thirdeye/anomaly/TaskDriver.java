@@ -10,29 +10,44 @@ import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.Transaction;
 import org.hibernate.context.internal.ManagedSessionContext;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.anomaly.JobRunner.JobStatus;
 import com.linkedin.thirdeye.detector.api.AnomalyTaskSpec;
+import com.linkedin.thirdeye.detector.db.AnomalyFunctionRelationDAO;
+import com.linkedin.thirdeye.detector.db.AnomalyResultDAO;
 import com.linkedin.thirdeye.detector.db.AnomalyTaskSpecDAO;
 
 public class TaskDriver {
 
   private static final Logger LOG = LoggerFactory.getLogger(TaskDriver.class);
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private ExecutorService taskExecutorService;
 
   private AnomalyTaskSpecDAO anomalyTaskSpecDAO;
+  private AnomalyResultDAO anomalyResultDAO;
+  private AnomalyFunctionRelationDAO anomalyFunctionRelationDAO;
   private SessionFactory sessionFactory;
+  private TaskContext taskContext;
+
   volatile boolean shutdown = false;
   private static int MAX_PARALLEL_TASK = 3;
 
-  public TaskDriver(AnomalyTaskSpecDAO anomalyTaskSpecDAO, SessionFactory sessionFactory) {
+  public TaskDriver(AnomalyTaskSpecDAO anomalyTaskSpecDAO, AnomalyResultDAO anomalyResultDAO,
+      AnomalyFunctionRelationDAO anomalyFunctionRelationDAO, SessionFactory sessionFactory) {
     this.anomalyTaskSpecDAO = anomalyTaskSpecDAO;
+    this.anomalyResultDAO = anomalyResultDAO;
+    this.anomalyFunctionRelationDAO = anomalyFunctionRelationDAO;
     this.sessionFactory = sessionFactory;
     taskExecutorService = Executors.newFixedThreadPool(MAX_PARALLEL_TASK);
+
+    taskContext = new TaskContext();
+    taskContext.setRelationDAO(anomalyFunctionRelationDAO);
+    taskContext.setResultDAO(anomalyResultDAO);
+    taskContext.setSessionFactory(sessionFactory);
 
   }
 
@@ -43,12 +58,21 @@ public class TaskDriver {
         @Override
         public Void call() throws Exception {
           while (!shutdown) {
+
             LOG.info("Finding next task to execute for threadId:{}",
                 Thread.currentThread().getId());
+
             AnomalyTaskSpec anomalyTaskSpec = selectAndUpdate();
-            LOG.info("Executing task: {}", anomalyTaskSpec.getTaskId());
+            LOG.info("Executing task: {} {}", anomalyTaskSpec.getTaskId(), anomalyTaskSpec.getTaskInfo());
             TaskRunner taskRunner = new TaskRunner();
-            // return taskRunner.execute(taskInfo, taskContext);
+            TaskInfo taskInfo = null;
+            try {
+              taskInfo = OBJECT_MAPPER.readValue(anomalyTaskSpec.getTaskInfo(), TaskInfo.class);
+            } catch (Exception e) {
+              LOG.error("Exception in converting taskInfo string to TaskInfo {}", anomalyTaskSpec.getTaskInfo(), e);
+            }
+            LOG.info("Task Info {}", taskInfo);
+            taskRunner.execute(taskInfo, taskContext);
             LOG.info("DONE Executing task: {}", anomalyTaskSpec.getTaskId());
           }
           return null;

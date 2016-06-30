@@ -19,6 +19,7 @@ import com.linkedin.thirdeye.detector.api.AnomalyFunctionSpec;
 import com.linkedin.thirdeye.detector.db.AnomalyFunctionSpecDAO;
 import com.linkedin.thirdeye.detector.db.AnomalyJobSpecDAO;
 import com.linkedin.thirdeye.detector.db.AnomalyTaskSpecDAO;
+import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 
 public class JobScheduler {
 
@@ -28,15 +29,18 @@ public class JobScheduler {
   private AnomalyJobSpecDAO anomalyJobSpecDAO;
   private AnomalyTaskSpecDAO anomalyTaskSpecDAO;
   private AnomalyFunctionSpecDAO anomalyFunctionSpecDAO;
+  private AnomalyFunctionFactory anomalyFunctionFactory;
   private SessionFactory sessionFactory;
 
   private ThirdEyeJobContext thirdEyeJobContext;
 
   public JobScheduler(AnomalyJobSpecDAO anomalyJobSpecDAO, AnomalyTaskSpecDAO anomalyTaskSpecDAO,
-      AnomalyFunctionSpecDAO anomalyFunctionSpecDAO, SessionFactory sessionFactory) {
+      AnomalyFunctionSpecDAO anomalyFunctionSpecDAO, AnomalyFunctionFactory anomalyFunctionFactory,
+      SessionFactory sessionFactory) {
     this.anomalyJobSpecDAO = anomalyJobSpecDAO;
     this.anomalyTaskSpecDAO = anomalyTaskSpecDAO;
     this.anomalyFunctionSpecDAO = anomalyFunctionSpecDAO;
+    this.anomalyFunctionFactory = anomalyFunctionFactory;
     this.sessionFactory = sessionFactory;
 
     schedulerFactory = new StdSchedulerFactory();
@@ -57,6 +61,7 @@ public class JobScheduler {
       thirdEyeJobContext.setAnomalyFunctionSpecDAO(anomalyFunctionSpecDAO);
       thirdEyeJobContext.setAnomalyJobSpecDAO(anomalyJobSpecDAO);
       thirdEyeJobContext.setAnomalyTaskSpecDAO(anomalyTaskSpecDAO);
+      thirdEyeJobContext.setAnomalyFunctionFactory(anomalyFunctionFactory);
       thirdEyeJobContext.setSessionFactory(sessionFactory);
       thirdEyeJobContext.setAnomalyFunctionId(anomalyFunctionSpec.getId());
       String jobName = String.format("%s_%d", anomalyFunctionSpec.getFunctionName(), anomalyFunctionSpec.getId());

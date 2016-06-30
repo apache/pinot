@@ -12,9 +12,11 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.Callable;
 
+import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
 import com.linkedin.thirdeye.detector.ThirdEyeDetectorConfiguration;
 import com.linkedin.thirdeye.detector.db.HibernateSessionWrapper;
+import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 
 public class TestThirdEyeAnomalyApplication
     extends BaseThirdEyeApplication<ThirdEyeDetectorConfiguration> {
@@ -57,11 +59,17 @@ public class TestThirdEyeAnomalyApplication
       throws Exception {
 
     super.initDetectorRelatedDAO();
+    ThirdEyeCacheRegistry.initializeDetectorCaches(config);
+
+    final AnomalyFunctionFactory anomalyFunctionFactory =
+        new AnomalyFunctionFactory(config.getFunctionConfigPath());
 
     final JobScheduler jobScheduler = new JobScheduler(anomalyJobSpecDAO, anomalyTaskSpecDAO,
-        anomalyFunctionSpecDAO, hibernateBundle.getSessionFactory());
+        anomalyFunctionSpecDAO, anomalyFunctionFactory, hibernateBundle.getSessionFactory());
     final TaskDriver taskDriver =
-        new TaskDriver(anomalyTaskSpecDAO, hibernateBundle.getSessionFactory());
+        new TaskDriver(anomalyTaskSpecDAO, anomalyResultDAO, anomalyFunctionRelationDAO, hibernateBundle.getSessionFactory());
+
+    final TesterClass testerClass = new TesterClass(anomalyTaskSpecDAO);
 
     environment.lifecycle().manage(new Managed() {
       @Override
@@ -72,6 +80,7 @@ public class TestThirdEyeAnomalyApplication
           public Void call() throws Exception {
             taskDriver.start();
             jobScheduler.start();
+            //testerClass.start();
             return null;
           }
         });

@@ -14,6 +14,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.thirdeye.detector.api.AnomalyFunctionSpec;
+import com.linkedin.thirdeye.detector.function.AnomalyFunction;
+import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 
 public class TaskGenerator {
 
@@ -21,13 +23,16 @@ public class TaskGenerator {
 
 
 
-  public List<TaskInfo> createTasks(ThirdEyeJobContext thirdeyeJobContext, AnomalyFunctionSpec anomalyFunctionSpec){
+  public List<TaskInfo> createTasks(ThirdEyeJobContext thirdeyeJobContext, AnomalyFunctionSpec anomalyFunctionSpec)
+      throws Exception{
 
     List<TaskInfo> tasks = new ArrayList<>();
 
     DateTime windowStart = thirdeyeJobContext.getWindowStart();
     DateTime windowEnd = thirdeyeJobContext.getWindowEnd();
     long jobExecutionId = thirdeyeJobContext.getJobExecutionId();
+    AnomalyFunctionFactory anomalyFunctionFactory = thirdeyeJobContext.getAnomalyFunctionFactory();
+    AnomalyFunction anomalyFunction = anomalyFunctionFactory.fromSpec(anomalyFunctionSpec);
 
     // generate tasks
     String exploreDimensionsString = anomalyFunctionSpec.getExploreDimensions();

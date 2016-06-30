@@ -215,6 +215,7 @@ public class AnomalyFunctionSpec {
     return filters;
   }
 
+  @JsonIgnore
   public Multimap<String, String> getFilterSet() {
     return ThirdEyeUtils.getFilterSet(filters);
   }
