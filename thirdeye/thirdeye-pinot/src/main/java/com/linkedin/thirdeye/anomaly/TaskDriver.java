@@ -1,90 +1,96 @@
 package com.linkedin.thirdeye.anomaly;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.Transaction;
 import org.hibernate.context.internal.ManagedSessionContext;
-import org.quartz.Scheduler;
-import org.quartz.SchedulerException;
-import org.quartz.SchedulerFactory;
-import org.quartz.impl.StdSchedulerFactory;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.thirdeye.anomaly.JobRunner.JobStatus;
+import com.linkedin.thirdeye.detector.api.AnomalyResult;
 import com.linkedin.thirdeye.detector.api.AnomalyTaskSpec;
 import com.linkedin.thirdeye.detector.db.AnomalyTaskSpecDAO;
+
+import sun.nio.ch.sctp.Shutdown;
 
 public class TaskDriver {
 
   private static final Logger LOG = LoggerFactory.getLogger(TaskDriver.class);
 
-  private ScheduledExecutorService pollService;
-  private SchedulerFactory schedulerFactory;
-  private Scheduler quartzScheduler;
+  private ExecutorService taskExecutorService;
 
   private AnomalyTaskSpecDAO anomalyTaskSpecDAO;
   private SessionFactory sessionFactory;
+  volatile boolean shutdown = false;
+  private static int MAX_PARALLEL_TASK = 3;
 
   public TaskDriver(AnomalyTaskSpecDAO anomalyTaskSpecDAO, SessionFactory sessionFactory) {
     this.anomalyTaskSpecDAO = anomalyTaskSpecDAO;
     this.sessionFactory = sessionFactory;
+    taskExecutorService = Executors.newFixedThreadPool(MAX_PARALLEL_TASK);
 
-    pollService = Executors.newSingleThreadScheduledExecutor();
-    schedulerFactory = new StdSchedulerFactory();
-    try {
-      quartzScheduler = schedulerFactory.getScheduler();
-    } catch (SchedulerException e) {
-      LOG.error("Exception while starting quartz scheduler", e);
-    }
   }
 
-  public void start() throws SchedulerException{
-    quartzScheduler.start();
-
-    pollService.scheduleAtFixedRate(new Runnable() {
-      @Override
-      public void run() {
-        // read the tasks from DB
-        System.out.println("Running selectAndUpdate");
-        List<AnomalyTaskSpec> statusUpdatedTasks = selectAndUpdate();
-        for (AnomalyTaskSpec anomalyTaskSpec : statusUpdatedTasks) {
-          // create taskRunner
-
-          // call execute method
-          // get the results and write them to database
+  public void start() throws Exception {
+    List<Callable<Void>> callables = new ArrayList<>();
+    for (int i = 0; i < MAX_PARALLEL_TASK; i++) {
+      Callable<Void> callable = new Callable<Void>() {
+        @Override
+        public Void call() throws Exception {
+          while (!shutdown) {
+            LOG.info("Finding next task to execute");
+            AnomalyTaskSpec anomalyTaskSpec = selectAndUpdate();
+            LOG.info("Executing task: {}", anomalyTaskSpec.getTaskId());
+            TaskRunner taskRunner = new TaskRunner();
+            // return taskRunner.execute(taskInfo, taskContext);
+            LOG.info("DONE Executing task: {}", anomalyTaskSpec.getTaskId());
+          }
+          return null;
         }
-      }
-    }, 0, 1, TimeUnit.MINUTES);
-
+      };
+      callables.add(callable);
+    }
+    taskExecutorService.invokeAll(callables);
+    System.out.println("Started task driver");
   }
 
-  public void stop() throws SchedulerException{
-    pollService.shutdown();
-    quartzScheduler.shutdown();
+  public void stop() {
+    taskExecutorService.shutdown();
   }
 
-
-  private List<AnomalyTaskSpec> selectAndUpdate() {
-    System.out.println("Starting selectAndUpdate");
+  private AnomalyTaskSpec selectAndUpdate() {
+    LOG.info("Starting selectAndUpdate");
     Session session = sessionFactory.openSession();
-    List<AnomalyTaskSpec> updatedTasks = null;
+    AnomalyTaskSpec acquiredTask = null;
     try {
       ManagedSessionContext.bind(session);
       Transaction transaction = session.beginTransaction();
       try {
-        System.out.println("executing");
-        List<AnomalyTaskSpec> anomalyTasks = anomalyTaskSpecDAO.findByStatusForUpdate(JobStatus.WAITING);
-        System.out.println("Results======" + anomalyTasks);
-        updatedTasks = anomalyTaskSpecDAO.updateStatus();
-        if (!transaction.wasCommitted()) {
-          transaction.commit();
-        }
+        LOG.info("Trying to find a task to execute");
+        do {
+          List<AnomalyTaskSpec> anomalyTasks =
+              anomalyTaskSpecDAO.findByStatusOrderByCreateTimeAscending(JobStatus.WAITING);
+          for (AnomalyTaskSpec anomalyTaskSpec : anomalyTasks) {
+            boolean success = anomalyTaskSpecDAO.updateStatus(anomalyTaskSpec.getTaskId());
+            if (success) {
+              acquiredTask = anomalyTaskSpec;
+              if (!transaction.wasCommitted()) {
+                transaction.commit();
+              }
+              break;
+            }
+          }
+          Thread.sleep(1000);
+        } while (acquiredTask == null);
+        LOG.info("Acquired task ======" + acquiredTask);
       } catch (Exception e) {
         transaction.rollback();
         throw new RuntimeException(e);
@@ -93,8 +99,7 @@ public class TaskDriver {
       session.close();
       ManagedSessionContext.unbind(sessionFactory);
     }
-    System.out.println("returning");
-    return updatedTasks;
+    return acquiredTask;
   }
 
 }

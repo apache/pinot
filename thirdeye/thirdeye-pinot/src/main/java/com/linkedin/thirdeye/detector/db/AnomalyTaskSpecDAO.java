@@ -4,6 +4,8 @@ import java.util.List;
 
 import io.dropwizard.hibernate.AbstractDAO;
 
+import org.hibernate.HibernateException;
+import org.hibernate.Query;
 import org.hibernate.SessionFactory;
 
 import com.linkedin.thirdeye.anomaly.JobRunner.JobStatus;
@@ -24,13 +26,21 @@ public class AnomalyTaskSpecDAO extends AbstractDAO<AnomalyTaskSpec> {
         .setParameter("jobExecutionId", jobExecutionId));
   }
 
-  public List<AnomalyTaskSpec> findByStatusForUpdate(JobStatus status) {
-    return list(namedQuery("com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#findByStatusForUpdate")
-        .setParameter("status", status));
+  public List<AnomalyTaskSpec> findByStatusOrderByCreateTimeAscending(JobStatus status) {
+    return list(namedQuery(
+        "com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#findByStatusOrderByCreateTimeAscending")
+            .setParameter("status", status));
   }
-
-  public List<AnomalyTaskSpec> updateStatus() {
-    return list(namedQuery("com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#updateStatus"));
+  
+  //also update the worker id that is picking up the task
+  public boolean updateStatus(Long taskId) {
+    try {
+      int executeUpdate = namedQuery("com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#updateStatus").setParameter("taskId", taskId).executeUpdate();
+      return executeUpdate == 1;
+    } catch (HibernateException exception) {
+      exception.printStackTrace();
+      return false;
+    }
   }
 
   public Long createOrUpdate(AnomalyTaskSpec anomalyTasksSpec) {

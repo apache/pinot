@@ -1,6 +1,8 @@
 package com.linkedin.thirdeye.anomaly;
 
 
+import java.util.Date;
+
 import org.hibernate.SessionFactory;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
@@ -121,6 +123,12 @@ public class ThirdEyeJobContext {
 
   public void setWindowEnd(DateTime windowEnd) {
     this.windowEnd = windowEnd;
+  }
+
+
+  public void setScheduledFireTime(Date scheduledFireTime) {
+    // TODO Auto-generated method stub
+    
   }
 
 

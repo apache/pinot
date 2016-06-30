@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.anomaly;
 
-
 import io.dropwizard.assets.AssetsBundle;
 import io.dropwizard.db.DataSourceFactory;
 import io.dropwizard.lifecycle.Managed;
@@ -59,21 +58,20 @@ public class TestThirdEyeAnomalyApplication
 
     super.initDetectorRelatedDAO();
 
-    final JobScheduler jobScheduler = new JobScheduler(anomalyJobSpecDAO, anomalyTaskSpecDAO, anomalyFunctionSpecDAO,
-        hibernateBundle.getSessionFactory());
-    final TaskDriver taskDriver = new TaskDriver(anomalyTaskSpecDAO, hibernateBundle.getSessionFactory());
-    final TesterClass myclass = new TesterClass(anomalyTaskSpecDAO);
+    final JobScheduler jobScheduler = new JobScheduler(anomalyJobSpecDAO, anomalyTaskSpecDAO,
+        anomalyFunctionSpecDAO, hibernateBundle.getSessionFactory());
+    final TaskDriver taskDriver =
+        new TaskDriver(anomalyTaskSpecDAO, hibernateBundle.getSessionFactory());
 
     environment.lifecycle().manage(new Managed() {
       @Override
       public void start() throws Exception {
         new HibernateSessionWrapper<Void>(hibernateBundle.getSessionFactory())
-        .execute(new Callable<Void>() {
+            .execute(new Callable<Void>() {
           @Override
           public Void call() throws Exception {
-            //taskDriver.start();
-            //jobScheduler.start();
-            myclass.start();
+            taskDriver.start();
+            jobScheduler.start();
             return null;
           }
         });
@@ -81,11 +79,10 @@ public class TestThirdEyeAnomalyApplication
 
       @Override
       public void stop() throws Exception {
-        //taskDriver.stop();
-        //jobScheduler.stop();
+        taskDriver.stop();
+        jobScheduler.stop();
       }
     });
   }
-
 
 }

@@ -23,8 +23,8 @@ public class TesterClass {
   @UnitOfWork
   public void start() {
     System.out.println("starting");
-    List<AnomalyTaskSpec> list = dao.findByStatusForUpdate(JobStatus.WAITING);
-    System.out.println("Result : " + list);
+//    List<AnomalyTaskSpec> list = dao.findByStatusForUpdate(JobStatus.WAITING);
+//    System.out.println("Result : " + list);
   }
 
   public void stop() {
