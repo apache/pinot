@@ -17,6 +17,8 @@ import org.slf4j.LoggerFactory;
 
 import com.linkedin.thirdeye.detector.api.AnomalyFunctionSpec;
 import com.linkedin.thirdeye.detector.db.AnomalyFunctionSpecDAO;
+import com.linkedin.thirdeye.detector.db.AnomalyJobSpecDAO;
+import com.linkedin.thirdeye.detector.db.AnomalyTaskSpecDAO;
 
 public class JobScheduler {
 

@@ -1,9 +1,11 @@
-package com.linkedin.thirdeye.anomaly;
+package com.linkedin.thirdeye.detector.api;
 
 import java.util.Objects;
 
 import javax.persistence.Column;
 import javax.persistence.Entity;
+import javax.persistence.EnumType;
+import javax.persistence.Enumerated;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
@@ -12,13 +14,16 @@ import javax.persistence.NamedQuery;
 import javax.persistence.Table;
 
 import com.google.common.base.MoreObjects;
+import com.linkedin.thirdeye.anomaly.JobRunner;
 import com.linkedin.thirdeye.anomaly.JobRunner.JobStatus;
 
 @Entity
 @Table(name = "anomaly_tasks")
 @NamedQueries({
-    @NamedQuery(name = "com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#findAll", query = "SELECT af FROM AnomalyTaskSpec af"),
-    @NamedQuery(name = "com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#findByJobExecutionId", query = "SELECT af FROM AnomalyTaskSpec af WHERE af.jobExecutionId = :jobExecutionId")
+    @NamedQuery(name = "com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#findAll", query = "SELECT at FROM AnomalyTaskSpec at"),
+    @NamedQuery(name = "com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#findByJobExecutionId", query = "SELECT at FROM AnomalyTaskSpec at WHERE at.jobExecutionId = :jobExecutionId"),
+    @NamedQuery(name = "com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#findByStatusForUpdate", query = "SELECT at FROM AnomalyTaskSpec at WHERE at.status = :status FOR UPDATE")//,
+   // @NamedQuery(name = "com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#updateStatus", query = "UPDATE AnomalyTaskSpec SET at.status = :status WHERE at.status = 'WAITING'")
 })
 public class AnomalyTaskSpec {
   @Id
@@ -29,6 +34,10 @@ public class AnomalyTaskSpec {
   @Column(name = "job_execution_id", nullable = false)
   private long jobExecutionId;
 
+  @Column(name = "job_name", nullable = false)
+  private String jobName;
+
+  @Enumerated(EnumType.STRING)
   @Column(name = "status", nullable = false)
   private JobStatus status;
 
@@ -60,6 +69,17 @@ public class AnomalyTaskSpec {
 
   public long getJobExecutionId() {
     return jobExecutionId;
+  }
+
+
+
+  public void setJobName(String jobName) {
+    this.jobName = jobName;
+  }
+
+
+  public String getJobName() {
+    return jobName;
   }
 
 

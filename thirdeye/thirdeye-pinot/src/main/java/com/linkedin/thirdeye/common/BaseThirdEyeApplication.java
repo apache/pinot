@@ -1,9 +1,5 @@
 package com.linkedin.thirdeye.common;
 
-import com.linkedin.thirdeye.anomaly.AnomalyJobSpec;
-import com.linkedin.thirdeye.anomaly.AnomalyJobSpecDAO;
-import com.linkedin.thirdeye.anomaly.AnomalyTaskSpec;
-import com.linkedin.thirdeye.anomaly.AnomalyTaskSpecDAO;
 import com.linkedin.thirdeye.api.CollectionSchema;
 import com.linkedin.thirdeye.dashboard.ThirdEyeDashboardApplication;
 import com.linkedin.thirdeye.dashboard.configs.AbstractConfigDAO;
@@ -13,13 +9,17 @@ import com.linkedin.thirdeye.dashboard.configs.FileBasedConfigDAOFactory;
 import com.linkedin.thirdeye.dashboard.configs.WidgetConfig;
 import com.linkedin.thirdeye.detector.api.AnomalyFunctionRelation;
 import com.linkedin.thirdeye.detector.api.AnomalyFunctionSpec;
+import com.linkedin.thirdeye.detector.api.AnomalyJobSpec;
 import com.linkedin.thirdeye.detector.api.AnomalyResult;
+import com.linkedin.thirdeye.detector.api.AnomalyTaskSpec;
 import com.linkedin.thirdeye.detector.api.ContextualEvent;
 import com.linkedin.thirdeye.detector.api.EmailConfiguration;
 import com.linkedin.thirdeye.detector.api.EmailFunctionDependency;
 import com.linkedin.thirdeye.detector.db.AnomalyFunctionRelationDAO;
 import com.linkedin.thirdeye.detector.db.AnomalyFunctionSpecDAO;
+import com.linkedin.thirdeye.detector.db.AnomalyJobSpecDAO;
 import com.linkedin.thirdeye.detector.db.AnomalyResultDAO;
+import com.linkedin.thirdeye.detector.db.AnomalyTaskSpecDAO;
 import com.linkedin.thirdeye.detector.db.ContextualEventDAO;
 import com.linkedin.thirdeye.detector.db.EmailConfigurationDAO;
 import com.linkedin.thirdeye.detector.db.EmailFunctionDependencyDAO;

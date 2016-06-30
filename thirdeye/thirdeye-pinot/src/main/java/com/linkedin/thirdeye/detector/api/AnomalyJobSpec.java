@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.anomaly;
+package com.linkedin.thirdeye.detector.api;
 
 import java.util.List;
 import java.util.Objects;
@@ -18,6 +18,7 @@ import javax.persistence.OneToMany;
 import javax.persistence.Table;
 
 import com.google.common.base.MoreObjects;
+import com.linkedin.thirdeye.anomaly.JobRunner;
 import com.linkedin.thirdeye.anomaly.JobRunner.JobStatus;
 
 @Entity
@@ -43,6 +44,12 @@ public class AnomalyJobSpec {
 
   @Column(name = "schedule_end_time", nullable = false)
   private long scheduleEndTime;
+
+  @Column(name = "window_start_time", nullable = false)
+  private long windowStartTime;
+
+  @Column(name = "window_end_time", nullable = false)
+  private long windowEndTime;
 
   @OneToMany(fetch = FetchType.LAZY)
   @JoinColumn(name = "job_execution_id")
@@ -71,6 +78,7 @@ public class AnomalyJobSpec {
     this.jobName = jobName;
   }
 
+
   public JobStatus getStatus() {
     return status;
   }
@@ -98,6 +106,27 @@ public class AnomalyJobSpec {
 
   public void setScheduleEndTime(long scheduleEndTime) {
     this.scheduleEndTime = scheduleEndTime;
+  }
+
+
+
+  public long getWindowStartTime() {
+    return windowStartTime;
+  }
+
+
+  public void setWindowStartTime(long windowStartTime) {
+    this.windowStartTime = windowStartTime;
+  }
+
+
+  public long getWindowEndTime() {
+    return windowEndTime;
+  }
+
+
+  public void setWindowEndTime(long windowEndTime) {
+    this.windowEndTime = windowEndTime;
   }
 
 

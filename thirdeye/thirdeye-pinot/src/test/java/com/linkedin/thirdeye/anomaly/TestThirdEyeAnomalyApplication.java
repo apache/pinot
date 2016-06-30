@@ -61,7 +61,8 @@ public class TestThirdEyeAnomalyApplication
 
     final JobScheduler jobScheduler = new JobScheduler(anomalyJobSpecDAO, anomalyTaskSpecDAO, anomalyFunctionSpecDAO,
         hibernateBundle.getSessionFactory());
-    final TesterClass myclass = new TesterClass(anomalyJobSpecDAO);
+    final TaskDriver taskDriver = new TaskDriver(anomalyTaskSpecDAO, hibernateBundle.getSessionFactory());
+    final TesterClass myclass = new TesterClass(anomalyTaskSpecDAO);
 
     environment.lifecycle().manage(new Managed() {
       @Override
@@ -70,8 +71,9 @@ public class TestThirdEyeAnomalyApplication
         .execute(new Callable<Void>() {
           @Override
           public Void call() throws Exception {
-            jobScheduler.start();
-            //myclass.start();
+            //taskDriver.start();
+            //jobScheduler.start();
+            myclass.start();
             return null;
           }
         });
@@ -79,7 +81,8 @@ public class TestThirdEyeAnomalyApplication
 
       @Override
       public void stop() throws Exception {
-        jobScheduler.stop();
+        //taskDriver.stop();
+        //jobScheduler.stop();
       }
     });
   }

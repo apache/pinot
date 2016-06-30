@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.anomaly;
 
-import java.util.Date;
 
 import org.hibernate.SessionFactory;
 import org.joda.time.DateTime;
@@ -8,12 +7,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.thirdeye.detector.db.AnomalyFunctionSpecDAO;
+import com.linkedin.thirdeye.detector.db.AnomalyJobSpecDAO;
+import com.linkedin.thirdeye.detector.db.AnomalyTaskSpecDAO;
 
 
 public class ThirdEyeJobContext {
 
   private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeJobContext.class);
-
 
   private AnomalyJobSpecDAO anomalyJobSpecDAO;
   private AnomalyTaskSpecDAO anomalyTaskSpecDAO;
@@ -23,11 +23,23 @@ public class ThirdEyeJobContext {
   private Long anomalyFunctionId;
   private String windowStartIso;
   private String windowEndIso;
-  private Date scheduledFireTime;
+  private DateTime windowStart;
+  private DateTime windowEnd;
   private String jobName;
+
+  private long jobExecutionId;
 
   public ThirdEyeJobContext() {
 
+  }
+
+
+  public long getJobExecutionId() {
+    return jobExecutionId;
+  }
+
+  public void setJobExecutionId(long jobExecutionId) {
+    this.jobExecutionId = jobExecutionId;
   }
 
   public AnomalyJobSpecDAO getAnomalyJobSpecDAO() {
@@ -86,13 +98,6 @@ public class ThirdEyeJobContext {
     this.windowEndIso = windowEndIso;
   }
 
-  public Date getScheduledFireTime() {
-    return scheduledFireTime;
-  }
-
-  public void setScheduledFireTime(Date scheduledFireTime) {
-    this.scheduledFireTime = scheduledFireTime;
-  }
 
   public String getJobName() {
     return jobName;
@@ -100,6 +105,22 @@ public class ThirdEyeJobContext {
 
   public void setJobName(String jobName) {
     this.jobName = jobName;
+  }
+
+  public DateTime getWindowStart() {
+    return windowStart;
+  }
+
+  public void setWindowStart(DateTime windowStart) {
+    this.windowStart = windowStart;
+  }
+
+  public DateTime getWindowEnd() {
+    return windowEnd;
+  }
+
+  public void setWindowEnd(DateTime windowEnd) {
+    this.windowEnd = windowEnd;
   }
 
 

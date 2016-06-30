@@ -8,20 +8,18 @@ import com.linkedin.thirdeye.util.CustomDateSerializer;
 
 public class TaskInfo {
 
-  private String jobName;
   private long jobExecutionId;
 
   @JsonSerialize(using = CustomDateSerializer.class)
   private DateTime windowStartTime;
-  
+
   @JsonSerialize(using = CustomDateSerializer.class)
   private DateTime windowEndTime;
   private AnomalyFunctionSpec anomalyFunctionSpec;
   private String groupByDimension;
 
-  public TaskInfo(String jobName, long jobExecutionId, DateTime windowStartTime,
+  public TaskInfo(long jobExecutionId, DateTime windowStartTime,
       DateTime windowEndTime, AnomalyFunctionSpec anomalyFunctionSpec, String groupByDimension) {
-    this.jobName = jobName;
     this.jobExecutionId = jobExecutionId;
     this.windowStartTime = windowStartTime;
     this.windowEndTime = windowEndTime;
@@ -31,14 +29,6 @@ public class TaskInfo {
 
   public TaskInfo() {
 
-  }
-
-  public String getJobName() {
-    return jobName;
-  }
-
-  public void setJobName(String jobName) {
-    this.jobName = jobName;
   }
 
   public long getJobExecutionId() {
