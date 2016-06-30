@@ -29,20 +29,21 @@ public abstract class SegmentName {
   }
 
   public static RealtimeSegmentType getSegmentType(String segmentName) {
-    try {
+    if (isHighLevelConsumerSegmentName(segmentName)) {
       HLCSegmentName segName = new HLCSegmentName(segmentName);
+
       if (segName.isOldStyleNaming()) {
         return RealtimeSegmentType.HLC_LONG;
-      } else
+      } else {
         return RealtimeSegmentType.HLC_SHORT;
-    } catch (Exception e1) {
-      try {
-        LLCSegmentName segName = new LLCSegmentName(segmentName);
-        return RealtimeSegmentType.LLC;
-      } catch (Exception e2) {
-        return RealtimeSegmentType.UNSUPPORTED;
       }
     }
+
+    if (isLowLevelConsumerSegmentName(segmentName)) {
+      return RealtimeSegmentType.LLC;
+    }
+
+    return RealtimeSegmentType.UNSUPPORTED;
   }
 
   protected boolean isValidComponentName(String string) {
@@ -72,5 +73,31 @@ public abstract class SegmentName {
 
   public String getPartitionRange() {
     throw new RuntimeException("No partitionRange in " + getSegmentName());
+  }
+
+  public static boolean isHighLevelConsumerSegmentName(String segmentName) {
+    if (segmentName.endsWith(SEPARATOR) || segmentName.startsWith(SEPARATOR)) {
+      return false;
+    }
+
+    String[] parts =  segmentName.split(SEPARATOR);
+    if (parts.length != 3 && parts.length != 5) {
+      return false;
+    }
+
+    return true;
+  }
+
+  public static boolean isLowLevelConsumerSegmentName(String segmentName) {
+    if (segmentName.endsWith(SEPARATOR) || segmentName.startsWith(SEPARATOR)) {
+      return false;
+    }
+
+    String[] parts =  segmentName.split(SEPARATOR);
+    if (parts.length != 4) {
+      return false;
+    }
+
+    return true;
   }
 }

@@ -29,13 +29,11 @@ public class LLCSegmentName extends SegmentName implements Comparable {
   private final String _segmentName;
 
   public LLCSegmentName(String segmentName) {
-    if (segmentName.endsWith(SEPARATOR) || segmentName.startsWith(SEPARATOR)) {
+    if (!isLowLevelConsumerSegmentName(segmentName)) {
       throw new RuntimeException(segmentName + " is not a Low level consumer segment name");
     }
-    String[] parts =  segmentName.split(SEPARATOR);
-    if (parts.length != 4) {
-      throw new RuntimeException(segmentName + " is not a Low level consumer segment name");
-    }
+
+    String[] parts = segmentName.split(SEPARATOR);
     _segmentName = segmentName;
     _tableName = parts[0];
     _partitionId = Integer.valueOf(parts[1]);

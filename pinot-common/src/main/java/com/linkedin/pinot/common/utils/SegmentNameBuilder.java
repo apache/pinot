@@ -145,12 +145,7 @@ public class SegmentNameBuilder {
      * @return true if realtime short segment name
      */
     public static boolean isRealtimeV2Name(String segmentId) {
-      try {
-        LLCSegmentName holder = new LLCSegmentName(segmentId);
-      } catch (Exception e) {
-        return false;
-      }
-      return true;
+      return SegmentName.isLowLevelConsumerSegmentName(segmentId);
     }
 
     private static boolean isOldV1StyleName(String segmentId) {

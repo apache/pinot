@@ -51,7 +51,7 @@ public class HLCSegmentName extends SegmentName {
   // Can be called with old or new style naming.
   public HLCSegmentName(String segmentName) {
     // Decide if it is old style or new style v1 naming here.
-    if (segmentName.endsWith(SEPARATOR) || segmentName.startsWith(SEPARATOR)) {
+    if (!isHighLevelConsumerSegmentName(segmentName)) {
       throw new RuntimeException(segmentName + " is not a HighLevelConsumer segment name");
     }
     String parts[] = segmentName.split(SEPARATOR);
