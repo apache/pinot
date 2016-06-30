@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.segment.creator.impl;
 
+import com.google.common.collect.BiMap;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -155,9 +156,9 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     starTreeBuilderConfig.setDimensionsSplitOrder(dimensionsSplitOrder);
     starTreeBuilderConfig.setMaxLeafRecords(starTreeIndexSpec.getMaxLeafRecords());
     starTreeBuilderConfig.setSkipStarNodeCreationForDimensions(starTreeIndexSpec.getSkipStarNodeCreationForDimensions());
-    Set<String> skipMaterializationForDimensions = starTreeIndexSpec.getskipMaterializationForDimensions();
+    Set<String> skipMaterializationForDimensions = starTreeIndexSpec.getSkipMaterializationForDimensions();
     starTreeBuilderConfig.setSkipMaterializationForDimensions(skipMaterializationForDimensions);
-    starTreeBuilderConfig.setSkipMaterializationCardinalityThreshold(starTreeIndexSpec.getskipMaterializationCardinalityThreshold());
+    starTreeBuilderConfig.setSkipMaterializationCardinalityThreshold(starTreeIndexSpec.getSkipMaterializationCardinalityThreshold());
     starTreeBuilderConfig.setOutDir(starTreeTempDir);
     //initialize star tree builder
     StarTreeBuilder starTreeBuilder = new OffHeapStarTreeBuilder();
@@ -228,9 +229,9 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     //star tree was built using its own dictionary, we need to re-map dimension value id
     Map<String, HashBiMap<Object, Integer>> dictionaryMap = starTreeBuilder.getDictionaryMap();
     StarTree tree = starTreeBuilder.getTree();
-    HashBiMap<String, Integer> dimensionNameToIndexMap = starTreeBuilder.getDimensionNameToIndexMap();
-    StarTreeIndexNode node = tree.getRoot();
-    updateTree(node, dictionaryMap, dimensionNameToIndexMap);
+    StarTreeIndexNode root = tree.getRoot();
+    List<String> dimensionList = tree.getDimensionList();
+    updateTree(root, dictionaryMap, dimensionList);
     tree.writeTree(new FileOutputStream(new File(tempIndexDir, V1Constants.STAR_TREE_INDEX_FILE)));
   }
 
@@ -239,39 +240,32 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
    * This method updates the tree with new mapping
    * @param node
    * @param dictionaryMap
-   * @param dimensionNameToIndexMap
+   * @param dimensionList
    */
   private void updateTree(StarTreeIndexNode node, Map<String, HashBiMap<Object, Integer>> dictionaryMap,
-      HashBiMap<String, Integer> dimensionNameToIndexMap) {
-    //current node needs to update only if its not star
-    if (node.getDimensionName() != StarTreeIndexNode.all()) {
-      String dimName = dimensionNameToIndexMap.inverse().get(node.getDimensionName());
-      int dimensionValue = node.getDimensionValue();
-      if (dimensionValue != StarTreeIndexNode.all()) {
-        Object sortedValuesForDim = indexCreationInfoMap.get(dimName).getSortedUniqueElementsArray();
-        int indexForDimValue =
-            searchValueInArray(sortedValuesForDim, dictionaryMap.get(dimName).inverse().get(dimensionValue));
-        node.setDimensionValue(indexForDimValue);
-      }
+      List<String> dimensionList) {
+    // Only update non leaf node.
+    if (node.isLeaf()) {
+      return;
     }
-    //update children map
+
+    String childDimensionName = dimensionList.get(node.getChildDimension());
+    BiMap<Integer, Object> dictionary = dictionaryMap.get(childDimensionName).inverse();
+    Object sortedValuesForDim = indexCreationInfoMap.get(childDimensionName).getSortedUniqueElementsArray();
     Map<Integer, StarTreeIndexNode> children = node.getChildren();
-    Map<Integer, StarTreeIndexNode> newChildren = new HashMap<>();
-    if (children != null && !children.isEmpty()) {
-      String childDimName = dimensionNameToIndexMap.inverse().get(node.getChildDimensionName());
-      Object sortedValuesForDim = indexCreationInfoMap.get(childDimName).getSortedUniqueElementsArray();
-      for (Entry<Integer, StarTreeIndexNode> entry : children.entrySet()) {
-        int childDimValue = entry.getKey();
-        int childMappedDimValue = StarTreeIndexNode.all();
-        if (childDimValue != StarTreeIndexNode.all()) {
-          childMappedDimValue = searchValueInArray(sortedValuesForDim,
-              dictionaryMap.get(childDimName).inverse().get(childDimValue));
-        }
-        newChildren.put(childMappedDimValue, entry.getValue());
-        updateTree(entry.getValue(), dictionaryMap, dimensionNameToIndexMap);
+    Map<Integer, StarTreeIndexNode> updatedChildren = new HashMap<>();
+
+    for (Entry<Integer, StarTreeIndexNode> entry : children.entrySet()) {
+      int childValue = entry.getKey();
+      StarTreeIndexNode child = entry.getValue();
+      if (childValue == StarTreeIndexNode.ALL) {
+        updatedChildren.put(childValue, child);
+      } else {
+        updatedChildren.put(searchValueInArray(sortedValuesForDim, dictionary.get(childValue)), child);
       }
-      node.setChildren(newChildren);
+      updateTree(child, dictionaryMap, dimensionList);
     }
+    node.setChildren(updatedChildren);
   }
 
   public void buildRaw() throws Exception {

@@ -21,51 +21,47 @@ import java.nio.IntBuffer;
 
 public class DimensionBuffer {
 
-  IntBuffer buffer;
-  private int numDimensions;
+  IntBuffer _intBuffer;
 
   public DimensionBuffer(int numDimensions) {
-    this(numDimensions, ByteBuffer.wrap(new byte[numDimensions * 4]).asIntBuffer());
-    this.numDimensions = numDimensions;
+    this(ByteBuffer.wrap(new byte[numDimensions * Integer.SIZE / 8]).asIntBuffer());
   }
 
-  public DimensionBuffer(int numDimensions, IntBuffer intBuffer) {
-    this.numDimensions = numDimensions;
-    buffer = intBuffer;
+  public DimensionBuffer(IntBuffer intBuffer) {
+    _intBuffer = intBuffer;
   }
 
   static DimensionBuffer fromBytes(byte[] byteArray) {
-    return new DimensionBuffer(byteArray.length / 4, ByteBuffer.wrap(byteArray).asIntBuffer());
+    return new DimensionBuffer(ByteBuffer.wrap(byteArray.clone()).asIntBuffer());
+  }
+
+  public void setDimension(int index, int value) {
+    _intBuffer.put(index, value);
   }
 
   public int getDimension(int index) {
-    return buffer.get(index);
+    return _intBuffer.get(index);
+  }
+
+  @Override
+  public int hashCode() {
+    return _intBuffer.hashCode();
   }
 
   @Override
   public boolean equals(Object obj) {
-    DimensionBuffer that = (DimensionBuffer) obj;
-    for (int i = 0; i < numDimensions; i++) {
-      if (buffer.get(i) != that.getDimension(i)) {
-        return false;
-      }
-    }
-    return true;
+    return (obj instanceof DimensionBuffer) && _intBuffer.equals(((DimensionBuffer) obj)._intBuffer);
   }
 
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder("[");
     String delim = "";
-    for (int i = 0; i < numDimensions; i++) {
-      sb.append(delim).append(buffer.get(i));
+    for (int i = 0; i < _intBuffer.limit(); i++) {
+      sb.append(delim).append(_intBuffer.get(i));
       delim = ", ";
     }
     sb.append("]");
     return sb.toString();
-  }
-
-  public void setDimension(int index, int value) {
-    buffer.put(index, value);
   }
 }

@@ -15,96 +15,89 @@
  */
 package com.linkedin.pinot.core.startree;
 
+import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.StarTreeIndexSpec;
 import java.io.File;
 import java.util.List;
-
-import com.linkedin.pinot.common.data.Schema;
 import java.util.Set;
 
 
 public class StarTreeBuilderConfig {
 
-  public Schema schema;
-
-  public List<String> dimensionsSplitOrder;
-
-  public int maxLeafRecords;
-
-  File outDir;
-
-  private Set<String> skipStarNodeCreationForDimensions;
+  private Schema _schema;
+  private File _outDir;
+  private List<String> _dimensionsSplitOrder;
+  private Set<String> _skipStarNodeCreationForDimensions;
   private Set<String> _skipMaterializationFroDimensions;
+  private int _maxLeafRecords = StarTreeIndexSpec.DEFAULT_MAX_LEAF_RECORDS;
   private int _skipMaterializationCardinalityThreshold =
       StarTreeIndexSpec.DEFAULT_SKIP_MATERIALIZATION_CARDINALITY_THRESHOLD;
+  private int _skipSplitOnTimeColumnThreshold = StarTreeIndexSpec.DEFAULT_SKIP_SPLIT_ON_TIME_COLUMN_THRESHOLD;
 
   public StarTreeBuilderConfig() {
   }
 
-  public File getOutDir() {
-    return outDir;
-  }
-
-  public void setOutDir(File outDir) {
-    this.outDir = outDir;
+  public void setSchema(Schema schema) {
+    _schema = schema;
   }
 
   public Schema getSchema() {
-    return schema;
+    return _schema;
   }
 
-  public void setSchema(Schema schema) {
-    this.schema = schema;
+  public void setOutDir(File outDir) {
+    _outDir = outDir;
   }
 
-  public List<String> getDimensionsSplitOrder() {
-    return dimensionsSplitOrder;
+  public File getOutDir() {
+    return _outDir;
   }
 
   public void setDimensionsSplitOrder(List<String> dimensionsSplitOrder) {
-    this.dimensionsSplitOrder = dimensionsSplitOrder;
+    _dimensionsSplitOrder = dimensionsSplitOrder;
   }
 
-  public int getMaxLeafRecords() {
-    return maxLeafRecords;
-  }
-
-  public void setMaxLeafRecords(int maxLeafRecords) {
-    this.maxLeafRecords = maxLeafRecords;
-  }
-
-  public void setSkipStarNodeCreationForDimensions(Set<String> excludedStarDimensions) {
-    this.skipStarNodeCreationForDimensions = excludedStarDimensions;
-  }
-
-  public int getSkipMaterializationCardinalityThreshold() {
-    return _skipMaterializationCardinalityThreshold;
+  public List<String> getDimensionsSplitOrder() {
+    return _dimensionsSplitOrder;
   }
 
   public void setSkipMaterializationCardinalityThreshold(int skipMaterializationCardinalityThreshold) {
     _skipMaterializationCardinalityThreshold = skipMaterializationCardinalityThreshold;
   }
 
-  /**
-   * Get of dimension names for which not to create star nodes at split.
-   */
-  public Set<String> getSkipStarNodeCreationForDimensions() {
-    return skipStarNodeCreationForDimensions;
+  public int getSkipMaterializationCardinalityThreshold() {
+    return _skipMaterializationCardinalityThreshold;
   }
 
-  /**
-   * Get the set of dimension names that should be skipped from materialization.
-   * @return
-   */
+  public void setMaxLeafRecords(int maxLeafRecords) {
+    _maxLeafRecords = maxLeafRecords;
+  }
+
+  public int getMaxLeafRecords() {
+    return _maxLeafRecords;
+  }
+
+  public void setSkipStarNodeCreationForDimensions(Set<String> excludedStarDimensions) {
+    _skipStarNodeCreationForDimensions = excludedStarDimensions;
+  }
+
+  public Set<String> getSkipStarNodeCreationForDimensions() {
+    return _skipStarNodeCreationForDimensions;
+  }
+
+  public void setSkipMaterializationForDimensions(Set<String> skipMaterializationForDimensions) {
+    _skipMaterializationFroDimensions = skipMaterializationForDimensions;
+  }
+
   public Set<String> getSkipMaterializationForDimensions() {
     return _skipMaterializationFroDimensions;
   }
 
-  /**
-   * Set the set of dimensions for which to skip materialization
-   * @param skipMaterializationForDimensions
-   */
-  public void setSkipMaterializationForDimensions(Set<String> skipMaterializationForDimensions) {
-    _skipMaterializationFroDimensions = skipMaterializationForDimensions;
+  public void setSkipSplitOnTimeColumnThreshold(int skipSplitOnTimeColumnThreshold) {
+    _skipSplitOnTimeColumnThreshold = skipSplitOnTimeColumnThreshold;
+  }
+
+  public int getSkipSplitOnTimeColumnThreshold() {
+    return _skipSplitOnTimeColumnThreshold;
   }
 }

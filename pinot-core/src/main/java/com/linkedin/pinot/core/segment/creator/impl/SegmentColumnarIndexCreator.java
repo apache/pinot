@@ -31,7 +31,6 @@ import com.linkedin.pinot.core.segment.creator.impl.fwd.MultiValueUnsortedForwar
 import com.linkedin.pinot.core.segment.creator.impl.fwd.SingleValueSortedForwardIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.fwd.SingleValueUnsortedForwardIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.inv.OffHeapBitmapInvertedIndexCreator;
-import com.linkedin.pinot.core.segment.creator.impl.stats.StringColumnPreIndexStatsCollector;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
@@ -232,9 +231,9 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       properties.setProperty(STAR_TREE_SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS,
           starTreeIndexSpec.getSkipStarNodeCreationForDimensions());
       properties.setProperty(STAR_TREE_SKIP_MATERIALIZATION_CARDINALITY,
-          starTreeIndexSpec.getskipMaterializationCardinalityThreshold());
+          starTreeIndexSpec.getSkipMaterializationCardinalityThreshold());
       properties.setProperty(STAR_TREE_SKIP_MATERIALIZATION_FOR_DIMENSIONS,
-          starTreeIndexSpec.getskipMaterializationForDimensions());
+          starTreeIndexSpec.getSkipMaterializationForDimensions());
     }
 
     if (indexCreationInfoMap.get(timeColumn) != null) {

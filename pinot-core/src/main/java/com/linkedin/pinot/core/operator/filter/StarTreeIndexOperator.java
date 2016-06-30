@@ -362,8 +362,7 @@ public class StarTreeIndexOperator extends BaseFilterOperator {
   private Queue<SearchEntry> findMatchingLeafNodes() {
     Queue<SearchEntry> matchedEntries = new LinkedList<>();
     Queue<SearchEntry> searchQueue = new LinkedList<>();
-    HashBiMap<String, Integer> dimensionIndexToNameMapping =
-        segment.getStarTree().getDimensionNameToIndexMap();
+    List<String> dimensionList = segment.getStarTree().getDimensionList();
 
     SearchEntry startEntry = new SearchEntry();
     startEntry.starTreeIndexnode = segment.getStarTree().getRoot();
@@ -384,8 +383,7 @@ public class StarTreeIndexOperator extends BaseFilterOperator {
         continue;
       }
       // Find next set of nodes to search
-      String nextDimension =
-          dimensionIndexToNameMapping.inverse().get(current.getChildDimensionName());
+      String nextDimension = dimensionList.get(current.getChildDimension());
 
       HashSet<String> newRemainingPredicateColumns = new HashSet<>();
       newRemainingPredicateColumns.addAll(remainingPredicateColumns);
@@ -433,19 +431,20 @@ public class StarTreeIndexOperator extends BaseFilterOperator {
     } else {
       int nextValueId;
       if (groupByColumns.contains(column) || predicatesMap.containsKey(column)
-          || !children.containsKey(StarTreeIndexNode.all())) {
-        for (StarTreeIndexNode indexNode : children.values()) {
-          if (indexNode.getDimensionValue() != StarTreeIndexNode.all()) {
+          || !children.containsKey(StarTreeIndexNode.ALL)) {
+        for (Map.Entry<Integer, StarTreeIndexNode> entry : children.entrySet()) {
+          int childValue = entry.getKey();
+          StarTreeIndexNode child = entry.getValue();
+          if (childValue != StarTreeIndexNode.ALL) {
             remainingPredicateColumns.remove(column);
             remainingGroupByColumns.remove(column);
-            addNodeToSearchQueue(searchQueue, indexNode, remainingPredicateColumns,
-                remainingGroupByColumns);
+            addNodeToSearchQueue(searchQueue, child, remainingPredicateColumns, remainingGroupByColumns);
           }
         }
       } else {
         // Since we have a star node and no group by on this column we can take lose this dimension
         // by taking star node path
-        nextValueId = StarTreeIndexNode.all();
+        nextValueId = StarTreeIndexNode.ALL;
         addNodeToSearchQueue(searchQueue, children.get(nextValueId), remainingPredicateColumns,
             remainingGroupByColumns);
       }

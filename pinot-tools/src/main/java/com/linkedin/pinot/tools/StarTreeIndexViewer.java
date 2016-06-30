@@ -68,7 +68,7 @@ public class StarTreeIndexViewer {
    * MAX num children to show in the UI
    */
   static int MAX_CHILDREN = 100;
-  private HashBiMap<String, Integer> dimensionNameToIndexMap;
+  private List<String> dimensionList;
   private Map<String, Dictionary> dictionaries;
   private Map<String, BlockSingleValIterator> valueIterators;
 
@@ -89,8 +89,8 @@ public class StarTreeIndexViewer {
       dictionaries.put(columnName, dataSource.getDictionary());
     }
     File starTreeFile = new File(segmentDir, V1Constants.STAR_TREE_INDEX_FILE);
-    StarTree tree = StarTree.fromBytes(new FileInputStream(starTreeFile));
-    dimensionNameToIndexMap = tree.getDimensionNameToIndexMap();
+    StarTree tree = StarTree.readTree(new FileInputStream(starTreeFile));
+    dimensionList = tree.getDimensionList();
     StarTreeJsonNode jsonRoot = new StarTreeJsonNode("ROOT");
     build(tree.getRoot(), jsonRoot);
     ObjectMapper objectMapper = new ObjectMapper();
@@ -106,8 +106,8 @@ public class StarTreeIndexViewer {
     if (children == null) {
       return 0;
     }
-    int childDimensionId = indexNode.getChildDimensionName();
-    String childDimensionName = dimensionNameToIndexMap.inverse().get(childDimensionId);
+    int childDimensionId = indexNode.getChildDimension();
+    String childDimensionName = dimensionList.get(childDimensionId);
     Dictionary dictionary = dictionaries.get(childDimensionName);
     int totalChildNodes = children.size();
 
@@ -125,12 +125,12 @@ public class StarTreeIndexViewer {
       int childDimensionValueId = entry.getKey();
       StarTreeIndexNode childIndexNode = entry.getValue();
       String childDimensionValue = "ALL";
-      if (childDimensionValueId != StarTreeIndexNode.all()) {
+      if (childDimensionValueId != StarTreeIndexNode.ALL) {
         childDimensionValue = dictionary.get(childDimensionValueId).toString();
       }
       StarTreeJsonNode childJson = new StarTreeJsonNode(childDimensionValue);
       totalChildNodes += build(childIndexNode, childJson);
-      if (childDimensionValueId != StarTreeIndexNode.all()) {
+      if (childDimensionValueId != StarTreeIndexNode.ALL) {
         json.addChild(childJson);
         queue.add(ImmutablePair.of(childDimensionValue, totalChildNodes));
       } else {

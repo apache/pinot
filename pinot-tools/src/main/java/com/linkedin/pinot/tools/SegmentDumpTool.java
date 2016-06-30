@@ -19,12 +19,9 @@ import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.BlockSingleValIterator;
-import com.linkedin.pinot.core.common.BlockValIterator;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.DataSource;
-import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
@@ -39,7 +36,6 @@ import org.kohsuke.args4j.Option;
 import java.io.File;
 import java.io.FileInputStream;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -109,7 +105,7 @@ public class SegmentDumpTool {
     if (dumpStarTree) {
       System.out.println();
       File starTreeFile = new File(segmentDir, V1Constants.STAR_TREE_INDEX_FILE);
-      StarTree tree = StarTree.fromBytes(new FileInputStream(starTreeFile));
+      StarTree tree = StarTree.readTree(new FileInputStream(starTreeFile));
       StarTreeIndexNode.printTree(tree.getRoot(), 0);
     }
   }

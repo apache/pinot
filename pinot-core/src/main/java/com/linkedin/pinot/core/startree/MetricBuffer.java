@@ -23,20 +23,17 @@ import com.linkedin.pinot.common.data.FieldSpec.DataType;
 
 
 public class MetricBuffer {
-  Number[] numbers;
+  private Number[] _numbers;
 
   public MetricBuffer(Number[] numbers) {
-    this.numbers = numbers;
-  }
-
-  public MetricBuffer(MetricBuffer copy) {
-    this.numbers = Arrays.copyOf(copy.numbers, copy.numbers.length);
+    _numbers = numbers;
   }
 
   public static MetricBuffer fromBytes(byte[] bytes, List<DataType> metricTypes) {
     ByteBuffer buffer = ByteBuffer.wrap(bytes);
-    Number[] numbers = new Number[metricTypes.size()];
-    for (int i = 0; i < metricTypes.size(); i++) {
+    int numMetrics = metricTypes.size();
+    Number[] numbers = new Number[numMetrics];
+    for (int i = 0; i < numMetrics; i++) {
       switch (metricTypes.get(i)) {
         case SHORT:
           numbers[i] = buffer.getShort();
@@ -60,29 +57,25 @@ public class MetricBuffer {
     return new MetricBuffer(numbers);
   }
 
-  public Number get(int index) {
-    return numbers[index];
-  }
-
   public byte[] toBytes(int numBytes, List<DataType> metricTypes) {
     byte[] bytes = new byte[numBytes];
     ByteBuffer buffer = ByteBuffer.wrap(bytes);
     for (int i = 0; i < metricTypes.size(); i++) {
       switch (metricTypes.get(i)) {
         case SHORT:
-          buffer.putShort(numbers[i].shortValue());
+          buffer.putShort(_numbers[i].shortValue());
           break;
         case INT:
-          buffer.putInt(numbers[i].intValue());
+          buffer.putInt(_numbers[i].intValue());
           break;
         case LONG:
-          buffer.putLong(numbers[i].longValue());
+          buffer.putLong(_numbers[i].longValue());
           break;
         case FLOAT:
-          buffer.putFloat(numbers[i].floatValue());
+          buffer.putFloat(_numbers[i].floatValue());
           break;
         case DOUBLE:
-          buffer.putDouble(numbers[i].doubleValue());
+          buffer.putDouble(_numbers[i].doubleValue());
           break;
         default:
           throw new IllegalArgumentException("Unsupported metric type " + metricTypes.get(i));
@@ -91,23 +84,27 @@ public class MetricBuffer {
     return bytes;
   }
 
+  public Number get(int index) {
+    return _numbers[index];
+  }
+
   public void aggregate(MetricBuffer metrics, List<DataType> metricTypes) {
     for (int i = 0; i < metricTypes.size(); i++) {
       switch (metricTypes.get(i)) {
         case SHORT:
-          numbers[i] = numbers[i].shortValue() + metrics.get(i).shortValue();
+          _numbers[i] = _numbers[i].shortValue() + metrics.get(i).shortValue();
           break;
         case INT:
-          numbers[i] = numbers[i].intValue() + metrics.get(i).intValue();
+          _numbers[i] = _numbers[i].intValue() + metrics.get(i).intValue();
           break;
         case LONG:
-          numbers[i] = numbers[i].longValue() + metrics.get(i).longValue();
+          _numbers[i] = _numbers[i].longValue() + metrics.get(i).longValue();
           break;
         case FLOAT:
-          numbers[i] = numbers[i].floatValue() + metrics.get(i).floatValue();
+          _numbers[i] = _numbers[i].floatValue() + metrics.get(i).floatValue();
           break;
         case DOUBLE:
-          numbers[i] = numbers[i].doubleValue() + metrics.get(i).doubleValue();
+          _numbers[i] = _numbers[i].doubleValue() + metrics.get(i).doubleValue();
           break;
         default:
           throw new IllegalArgumentException("Unsupported metric type " + metricTypes.get(i));
@@ -117,6 +114,6 @@ public class MetricBuffer {
 
   @Override
   public String toString() {
-    return Arrays.toString(numbers);
+    return Arrays.toString(_numbers);
   }
 }
