@@ -213,7 +213,7 @@ public class QueryRunner {
             }
             long startTime = System.currentTimeMillis();
             try {
-              System.out.println(driver.postQuery(query));
+              driver.postQuery(query);
               counter.getAndIncrement();
               totalResponseTime.getAndAdd(System.currentTimeMillis() - startTime);
             } catch (Exception e) {
