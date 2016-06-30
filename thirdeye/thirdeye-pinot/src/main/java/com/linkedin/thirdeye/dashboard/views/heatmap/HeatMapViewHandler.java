@@ -94,7 +94,6 @@ public class HeatMapViewHandler implements ViewHandler<HeatMapViewRequest, HeatM
     }
 
     List<String> expressionNames = new ArrayList<>();
-    Map<String, String> cellSizeExpressions = new HashMap<>();
     Map<String, String> metricExpressions = new HashMap<>();
     Set<String> metricOrExpressionNames = new HashSet<>();
     for (MetricExpression expression : request.getMetricExpressions()) {
@@ -189,7 +188,6 @@ public class HeatMapViewHandler implements ViewHandler<HeatMapViewRequest, HeatM
             context.put(denominator, denominatorCurrent);
             String cellSizeExpression =
                 collectionConfig.getCellSizeExpression().get(metricName).getExpression();
-            cellSizeExpressions.put(metricName, cellSizeExpression);
             Double cellSize = MetricExpression.evaluateExpression(cellSizeExpression, context);
 
             heatMapBuilder.addCell(dimensionValue, metric.getBaselineValue(),
@@ -276,7 +274,7 @@ public class HeatMapViewHandler implements ViewHandler<HeatMapViewRequest, HeatM
     heatMapViewResponse.setMetrics(expressionNames);
     heatMapViewResponse.setDimensions(groupByDimensions);
     heatMapViewResponse.setData(heatMapViewResponseData);
-    heatMapViewResponse.setCellSizeExpression(cellSizeExpressions);
+    heatMapViewResponse.setMetricExpression(metricExpressions);
     heatMapViewResponse.setSummary(summary);
 
     return heatMapViewResponse;
