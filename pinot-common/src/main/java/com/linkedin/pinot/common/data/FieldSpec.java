@@ -162,6 +162,7 @@ public abstract class FieldSpec {
         _defaultNullValue = Double.valueOf(value);
         return;
       case STRING:
+      case BOOLEAN:
         _defaultNullValue = value;
         return;
       default:
