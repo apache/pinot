@@ -10,6 +10,7 @@ import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.commons.lang.StringUtils;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,12 +41,50 @@ public class UserRuleAnomalyFunction extends BaseAnomalyFunction {
   public static final String BASELINE = "baseline";
   public static final String CHANGE_THRESHOLD = "changeThreshold";
   public static final String AVERAGE_VOLUME_THRESHOLD = "averageVolumeThreshold";
+  public static final String MIN_CONSECUTIVE_SIZE = "minConsecutiveSize";
   public static final String DEFAULT_MESSAGE_TEMPLATE = "threshold=%s, %s value is %s / %s (%s)";
   private static final Joiner CSV = Joiner.on(",");
+  private static final Joiner ANOMALY_RESULT_MESSAGE_JOINER = Joiner.on("...");
   private static final NumberFormat PERCENT_FORMATTER = NumberFormat.getPercentInstance();
   static {
     // limit number of decimal points shown, for readability
     PERCENT_FORMATTER.setMaximumFractionDigits(2);
+  }
+
+  private AnomalyResult getMergedAnomalyResults(List<AnomalyResult> anomalyResults) {
+    int n = anomalyResults.size();
+    AnomalyResult firstAnomalyResult = anomalyResults.get(0);
+    AnomalyResult lastAnomalyResult = anomalyResults.get(n - 1);
+    AnomalyResult mergedAnomalyResult = new AnomalyResult();
+    mergedAnomalyResult.setCollection(firstAnomalyResult.getCollection());
+    mergedAnomalyResult.setMetric(firstAnomalyResult.getMetric());
+    mergedAnomalyResult.setDimensions(firstAnomalyResult.getDimensions());
+    mergedAnomalyResult.setFunctionId(firstAnomalyResult.getFunctionId());
+    mergedAnomalyResult.setProperties(firstAnomalyResult.getProperties());
+    mergedAnomalyResult.setStartTimeUtc(firstAnomalyResult.getStartTimeUtc());
+    mergedAnomalyResult.setEndTimeUtc(lastAnomalyResult.getEndTimeUtc());
+    mergedAnomalyResult.setWeight(firstAnomalyResult.getWeight());
+    mergedAnomalyResult.setFilters(firstAnomalyResult.getFilters());
+
+    double summedScore = 0;
+    for (AnomalyResult anomalyResult : anomalyResults) {
+      summedScore += anomalyResult.getScore();
+    }
+    mergedAnomalyResult.setScore(summedScore / n);
+
+    List<String> messages = new ArrayList<>();
+    String firstMessage = anomalyResults.get(0).getMessage();
+    String lastMessage = anomalyResults.get(anomalyResults.size() - 1).getMessage();
+    messages.add(firstMessage);
+    messages.add(lastMessage);
+
+    mergedAnomalyResult.setMessage(ANOMALY_RESULT_MESSAGE_JOINER.join(messages));
+
+    System.out.println("XXX");
+    System.out.println(mergedAnomalyResult);
+    System.out.println("YYY");
+
+    return mergedAnomalyResult;
   }
 
   @Override
@@ -89,8 +128,9 @@ public class UserRuleAnomalyFunction extends BaseAnomalyFunction {
       return anomalyResults; // empty list
     }
     // iterate through baseline keys
-    Set<Long> filteredBaselineTimes = filterTimeWindowSet(timeSeries.getTimeWindowSet(),
-        windowStart.getMillis(), windowEnd.minus(baselineMillis).getMillis());
+    Set<Long> filteredBaselineTimes =
+        filterTimeWindowSet(timeSeries.getTimeWindowSet(), windowStart.getMillis(), windowEnd
+            .minus(baselineMillis).getMillis());
     Long min = Collections.min(timeSeries.getTimeWindowSet());
     Long max = Collections.max(timeSeries.getTimeWindowSet());
     for (Long baselineKey : filteredBaselineTimes) {
@@ -116,19 +156,95 @@ public class UserRuleAnomalyFunction extends BaseAnomalyFunction {
 
       }
     }
-    return anomalyResults;
+
+    String minConsecutiveSizeStr = props.getProperty(MIN_CONSECUTIVE_SIZE);
+    int minConsecutiveSize = 1;
+    if (StringUtils.isNotBlank(minConsecutiveSizeStr)) {
+      minConsecutiveSize = Integer.valueOf(minConsecutiveSizeStr);
+    }
+
+    return getFilteredAndMergedAnomalyResults(anomalyResults, minConsecutiveSize, bucketMillis);
 
   }
 
-  private String getAnomalyResultMessage(double threshold, String baselineProp, double currentValue,
-      double baselineValue) {
+  /**
+   * Merge consecutive anomaly results. If anomaly results are not consecutive they are
+   * rejected.
+   * @param anomalyResults
+   * @param minConsecutiveSize
+   * @param bucketMillis
+   * @return
+   */
+  List<AnomalyResult> getFilteredAndMergedAnomalyResults(List<AnomalyResult> anomalyResults,
+      int minConsecutiveSize, long bucketMillis) {
+
+    int anomalyResultsSize = anomalyResults.size();
+    if (minConsecutiveSize > 1) {
+      List<AnomalyResult> anomalyResultsAggregated = new ArrayList<>();
+
+      if (anomalyResultsSize >= minConsecutiveSize) {
+        int remainingSize = anomalyResultsSize;
+
+        List<AnomalyResult> currentConsecutiveResults = new ArrayList<>();
+        for (AnomalyResult anomalyResult : anomalyResults) {
+          if (currentConsecutiveResults.isEmpty()) {
+            currentConsecutiveResults.add(anomalyResult);
+            remainingSize--;
+          } else {
+            AnomalyResult lastConsecutiveAnomalyResult =
+                currentConsecutiveResults.get(currentConsecutiveResults.size() - 1);
+            long lastStartTime = lastConsecutiveAnomalyResult.getStartTimeUtc();
+            long currentStarTime = anomalyResult.getStartTimeUtc();
+
+            if ((lastStartTime + bucketMillis) == currentStarTime) {
+              currentConsecutiveResults.add(anomalyResult);
+              remainingSize--;
+
+              // End of loop. Last element.
+              if (remainingSize == 0) {
+                anomalyResultsAggregated.add(getMergedAnomalyResults(currentConsecutiveResults));
+              }
+
+            } else {
+
+              if (currentConsecutiveResults.size() >= minConsecutiveSize) {
+                // Current consecutives have been all added.
+                anomalyResultsAggregated.add(getMergedAnomalyResults(currentConsecutiveResults));
+              }
+
+              // Condition for start collecting new consecutives.
+              if (remainingSize >= minConsecutiveSize) {
+                // Reset current consecutive results. Start collecting new consecutives.
+                currentConsecutiveResults.clear();
+                currentConsecutiveResults.add(anomalyResult);
+                remainingSize--;
+              } else {
+                break;
+
+              }
+            }
+
+          }
+        }
+      }
+
+      return anomalyResultsAggregated;
+
+    } else {
+      return anomalyResults;
+    }
+  }
+
+  private String getAnomalyResultMessage(double threshold, String baselineProp,
+      double currentValue, double baselineValue) {
     double change = calculatePercentChange(currentValue, baselineValue);
     NumberFormat percentInstance = NumberFormat.getPercentInstance();
     percentInstance.setMaximumFractionDigits(2);
     String thresholdPercent = percentInstance.format(threshold);
     String changePercent = percentInstance.format(change);
-    String message = String.format(DEFAULT_MESSAGE_TEMPLATE, thresholdPercent, baselineProp,
-        currentValue, baselineValue, changePercent);
+    String message =
+        String.format(DEFAULT_MESSAGE_TEMPLATE, thresholdPercent, baselineProp, currentValue,
+            baselineValue, changePercent);
     return message;
   }
 
@@ -160,8 +276,8 @@ public class UserRuleAnomalyFunction extends BaseAnomalyFunction {
   boolean isAnomaly(double currentValue, double baselineValue, double changeThreshold) {
     if (baselineValue > 0) {
       double percentChange = calculatePercentChange(currentValue, baselineValue);
-      if (changeThreshold > 0 && percentChange > changeThreshold
-          || changeThreshold < 0 && percentChange < changeThreshold) {
+      if (changeThreshold > 0 && percentChange > changeThreshold || changeThreshold < 0
+          && percentChange < changeThreshold) {
         return true;
       }
     }
