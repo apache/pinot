@@ -5,7 +5,6 @@ import java.util.List;
 import io.dropwizard.hibernate.AbstractDAO;
 
 import org.hibernate.HibernateException;
-import org.hibernate.Query;
 import org.hibernate.SessionFactory;
 
 import com.linkedin.thirdeye.anomaly.JobRunner.JobStatus;
@@ -36,11 +35,14 @@ public class AnomalyTaskSpecDAO extends AbstractDAO<AnomalyTaskSpec> {
             .setParameter("status", status));
   }
 
-  //also update the worker id that is picking up the task
-  public boolean updateStatus(Long taskId) {
+  // also update the worker id that is picking up the task
+  public boolean updateStatus(Long taskId, JobStatus oldStatus, JobStatus newStatus) {
     try {
-      int executeUpdate = namedQuery("com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#updateStatus").setParameter("taskId", taskId).executeUpdate();
-      return executeUpdate == 1;
+      int numRowsUpdated = namedQuery("com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#updateStatus")
+          .setParameter("taskId", taskId).setParameter("oldStatus", oldStatus).setParameter("newStatus", newStatus)
+          .executeUpdate();
+      System.out.println("numRowsUpdated:" + numRowsUpdated);
+      return numRowsUpdated == 1;
     } catch (HibernateException exception) {
       exception.printStackTrace();
       return false;

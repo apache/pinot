@@ -16,5 +16,5 @@ public class CustomDateSerializer extends JsonSerializer<DateTime> {
       throws IOException, JsonProcessingException {
     gen.writeString(value.toString());
   }
-
+  
 }

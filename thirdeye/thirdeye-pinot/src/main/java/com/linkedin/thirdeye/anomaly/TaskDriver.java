@@ -15,10 +15,12 @@ import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.anomaly.JobRunner.JobStatus;
+import com.linkedin.thirdeye.detector.api.AnomalyResult;
 import com.linkedin.thirdeye.detector.api.AnomalyTaskSpec;
 import com.linkedin.thirdeye.detector.db.AnomalyFunctionRelationDAO;
 import com.linkedin.thirdeye.detector.db.AnomalyResultDAO;
 import com.linkedin.thirdeye.detector.db.AnomalyTaskSpecDAO;
+import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 
 public class TaskDriver {
 
@@ -35,13 +37,16 @@ public class TaskDriver {
 
   volatile boolean shutdown = false;
   private static int MAX_PARALLEL_TASK = 3;
+  private AnomalyFunctionFactory anomalyFunctionFactory;
 
   public TaskDriver(AnomalyTaskSpecDAO anomalyTaskSpecDAO, AnomalyResultDAO anomalyResultDAO,
-      AnomalyFunctionRelationDAO anomalyFunctionRelationDAO, SessionFactory sessionFactory) {
+      AnomalyFunctionRelationDAO anomalyFunctionRelationDAO, SessionFactory sessionFactory,
+      AnomalyFunctionFactory anomalyFunctionFactory) {
     this.anomalyTaskSpecDAO = anomalyTaskSpecDAO;
     this.anomalyResultDAO = anomalyResultDAO;
     this.anomalyFunctionRelationDAO = anomalyFunctionRelationDAO;
     this.sessionFactory = sessionFactory;
+    this.anomalyFunctionFactory = anomalyFunctionFactory;
     taskExecutorService = Executors.newFixedThreadPool(MAX_PARALLEL_TASK);
 
     taskContext = new TaskContext();
@@ -63,17 +68,37 @@ public class TaskDriver {
                 Thread.currentThread().getId());
 
             AnomalyTaskSpec anomalyTaskSpec = selectAndUpdate();
-            LOG.info("Executing task: {} {}", anomalyTaskSpec.getTaskId(), anomalyTaskSpec.getTaskInfo());
-            TaskRunner taskRunner = new TaskRunner();
+            LOG.info("Executing task: {} {}", anomalyTaskSpec.getTaskId(),
+                anomalyTaskSpec.getTaskInfo());
+            TaskRunner taskRunner = new TaskRunner(anomalyFunctionFactory);
             TaskInfo taskInfo = null;
             try {
               taskInfo = OBJECT_MAPPER.readValue(anomalyTaskSpec.getTaskInfo(), TaskInfo.class);
             } catch (Exception e) {
-              LOG.error("Exception in converting taskInfo string to TaskInfo {}", anomalyTaskSpec.getTaskInfo(), e);
+              LOG.error("Exception in converting taskInfo string to TaskInfo {}",
+                  anomalyTaskSpec.getTaskInfo(), e);
             }
             LOG.info("Task Info {}", taskInfo);
-            taskRunner.execute(taskInfo, taskContext);
+            List<AnomalyResult> anomalyResults = taskRunner.execute(taskInfo, taskContext);
             LOG.info("DONE Executing task: {}", anomalyTaskSpec.getTaskId());
+            Session session = sessionFactory.openSession();
+            ManagedSessionContext.bind(session);
+            Transaction transaction = null;
+            try {
+              transaction = session.beginTransaction();
+              anomalyTaskSpecDAO.updateStatus(anomalyTaskSpec.getTaskId(), JobStatus.RUNNING,
+                  JobStatus.COMPLETED);
+              if (!transaction.wasCommitted()) {
+                transaction.commit();
+              }
+            } catch (Exception e) {
+              if (transaction != null) {
+                transaction.rollback();
+              }
+            } finally {
+              session.close();
+              ManagedSessionContext.unbind(sessionFactory);
+            }
           }
           return null;
         }
@@ -102,11 +127,12 @@ public class TaskDriver {
 
         List<AnomalyTaskSpec> anomalyTasks =
             anomalyTaskSpecDAO.findByStatusOrderByCreateTimeAscending(JobStatus.WAITING);
-        LOG.info("Found {} tasks in waiting state", anomalyTasks.size());
+        LOG.debug("Found {} tasks in waiting state", anomalyTasks.size());
         for (AnomalyTaskSpec anomalyTaskSpec : anomalyTasks) {
           transaction = session.beginTransaction();
           LOG.info("Trying to acquire task : {}", anomalyTaskSpec.getTaskId());
-          boolean success = anomalyTaskSpecDAO.updateStatus(anomalyTaskSpec.getTaskId());
+          boolean success = anomalyTaskSpecDAO.updateStatus(anomalyTaskSpec.getTaskId(),
+              JobStatus.WAITING, JobStatus.RUNNING);
           LOG.info("Task acquired success: {}", success);
           if (success) {
             acquiredTask = anomalyTaskSpec;

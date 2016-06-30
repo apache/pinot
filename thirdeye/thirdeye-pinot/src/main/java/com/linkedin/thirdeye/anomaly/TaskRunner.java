@@ -36,12 +36,14 @@ import com.linkedin.thirdeye.detector.api.AnomalyResult;
 import com.linkedin.thirdeye.detector.db.AnomalyFunctionRelationDAO;
 import com.linkedin.thirdeye.detector.db.AnomalyResultDAO;
 import com.linkedin.thirdeye.detector.function.AnomalyFunction;
+import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 public class TaskRunner {
 
   private static final Logger LOG = LoggerFactory.getLogger(TaskRunner.class);
-  private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
+  private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE =
+      ThirdEyeCacheRegistry.getInstance();
 
   private QueryCache queryCache;
   private TimeSeriesHandler timeSeriesHandler;
@@ -60,29 +62,30 @@ public class TaskRunner {
   private int anomalyCounter;
   private AnomalyFunction anomalyFunction;
   private AnomalyFunctionSpec anomalyFunctionSpec;
+  private AnomalyFunctionFactory anomalyFunctionFactory;
 
-  public TaskRunner() {
+  public TaskRunner(AnomalyFunctionFactory anomalyFunctionFactory) {
+    this.anomalyFunctionFactory = anomalyFunctionFactory;
     queryCache = CACHE_REGISTRY_INSTANCE.getQueryCache();
     timeSeriesHandler = new TimeSeriesHandler(queryCache);
     timeSeriesResponseConverter = TimeSeriesResponseConverter.getInstance();
   }
 
-  public List<TaskResult> execute(TaskInfo taskInfo, TaskContext taskContext)
-      throws Exception {
+  public List<AnomalyResult> execute(TaskInfo taskInfo, TaskContext taskContext) throws Exception {
 
     LOG.info("Begin executing task {}", taskInfo);
     resultDAO = taskContext.getResultDAO();
     relationDAO = taskContext.getRelationDAO();
     sessionFactory = taskContext.getSessionFactory();
 
-    anomalyFunction = taskInfo.getAnomalyFunction();
     anomalyFunctionSpec = taskInfo.getAnomalyFunctionSpec();
+    anomalyFunction = anomalyFunctionFactory.fromSpec(anomalyFunctionSpec);
     windowStart = taskInfo.getWindowStartTime();
     windowEnd = taskInfo.getWindowEndTime();
 
     // Compute metric function
-    TimeGranularity timeGranularity =
-        new TimeGranularity(anomalyFunctionSpec.getBucketSize(), anomalyFunctionSpec.getBucketUnit());
+    TimeGranularity timeGranularity = new TimeGranularity(anomalyFunctionSpec.getBucketSize(),
+        anomalyFunctionSpec.getBucketUnit());
     // TODO put sum into the function config
     metricFunction = new MetricFunction(MetricFunction.SUM, anomalyFunctionSpec.getMetric());
 
@@ -121,7 +124,8 @@ public class TaskRunner {
     }
     String exploreDimension = taskInfo.getGroupByDimension();
     if (StringUtils.isNotBlank(exploreDimension)) {
-      topLevelRequest.setGroupByDimensions(Collections.singletonList(taskInfo.getGroupByDimension()));
+      topLevelRequest
+          .setGroupByDimensions(Collections.singletonList(taskInfo.getGroupByDimension()));
     }
 
     LOG.info(
@@ -131,7 +135,7 @@ public class TaskRunner {
     List<AnomalyResult> results = exploreCombination(topLevelRequest);
     LOG.info("{} anomalies found in total", anomalyCounter);
 
-    return null;
+    return results;
   }
 
   private List<AnomalyResult> exploreCombination(TimeSeriesRequest request) throws Exception {
@@ -159,12 +163,11 @@ public class TaskRunner {
         // Run algorithm
         DimensionKey dimensionKey = entry.getKey();
         MetricTimeSeries metricTimeSeries = entry.getValue();
-        LOG.info(
-            "Analyzing anomaly function with dimensionKey: {}, windowStart: {}, windowEnd: {}",
+        LOG.info("Analyzing anomaly function with dimensionKey: {}, windowStart: {}, windowEnd: {}",
             dimensionKey, windowStart, windowEnd);
 
         results = anomalyFunction.analyze(dimensionKey, metricTimeSeries, windowStart, windowEnd,
-                knownAnomalies);
+            knownAnomalies);
 
         // Handle results
         handleResults(results);
@@ -205,7 +208,7 @@ public class TaskRunner {
         transaction.commit();
       } catch (Exception e) {
         transaction.rollback();
-        throw new RuntimeException(e);
+        e.printStackTrace();
       }
     } finally {
       session.close();

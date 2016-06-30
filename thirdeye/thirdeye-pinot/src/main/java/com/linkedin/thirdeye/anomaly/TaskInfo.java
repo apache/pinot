@@ -2,9 +2,11 @@ package com.linkedin.thirdeye.anomaly;
 
 import org.joda.time.DateTime;
 
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.linkedin.thirdeye.detector.api.AnomalyFunctionSpec;
 import com.linkedin.thirdeye.detector.function.AnomalyFunction;
+import com.linkedin.thirdeye.util.CustomDateDeserializer;
 import com.linkedin.thirdeye.util.CustomDateSerializer;
 
 public class TaskInfo {
@@ -12,15 +14,14 @@ public class TaskInfo {
   private long jobExecutionId;
 
   @JsonSerialize(using = CustomDateSerializer.class)
+  @JsonDeserialize(using = CustomDateDeserializer.class)
   private DateTime windowStartTime;
 
   @JsonSerialize(using = CustomDateSerializer.class)
+  @JsonDeserialize(using = CustomDateDeserializer.class)
   private DateTime windowEndTime;
   private AnomalyFunctionSpec anomalyFunctionSpec;
   private String groupByDimension;
-
-  private AnomalyFunction anomalyFunction;
-
 
   public TaskInfo(long jobExecutionId, DateTime windowStartTime,
       DateTime windowEndTime, AnomalyFunctionSpec anomalyFunctionSpec, String groupByDimension,
@@ -30,7 +31,6 @@ public class TaskInfo {
     this.windowEndTime = windowEndTime;
     this.anomalyFunctionSpec = anomalyFunctionSpec;
     this.groupByDimension = groupByDimension;
-    this.anomalyFunction = anomalyFunction;
   }
 
   public TaskInfo() {
@@ -76,15 +76,4 @@ public class TaskInfo {
   public void setGroupByDimension(String groupByDimension) {
     this.groupByDimension = groupByDimension;
   }
-
-  public AnomalyFunction getAnomalyFunction() {
-    return anomalyFunction;
-  }
-
-  public void setAnomalyFunction(AnomalyFunction anomalyFunction) {
-    this.anomalyFunction = anomalyFunction;
-  }
-
-
-
 }

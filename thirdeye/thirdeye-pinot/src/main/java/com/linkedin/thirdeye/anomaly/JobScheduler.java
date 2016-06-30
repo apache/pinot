@@ -35,12 +35,11 @@ public class JobScheduler {
   private ThirdEyeJobContext thirdEyeJobContext;
 
   public JobScheduler(AnomalyJobSpecDAO anomalyJobSpecDAO, AnomalyTaskSpecDAO anomalyTaskSpecDAO,
-      AnomalyFunctionSpecDAO anomalyFunctionSpecDAO, AnomalyFunctionFactory anomalyFunctionFactory,
+      AnomalyFunctionSpecDAO anomalyFunctionSpecDAO,
       SessionFactory sessionFactory) {
     this.anomalyJobSpecDAO = anomalyJobSpecDAO;
     this.anomalyTaskSpecDAO = anomalyTaskSpecDAO;
     this.anomalyFunctionSpecDAO = anomalyFunctionSpecDAO;
-    this.anomalyFunctionFactory = anomalyFunctionFactory;
     this.sessionFactory = sessionFactory;
 
     schedulerFactory = new StdSchedulerFactory();

@@ -65,11 +65,10 @@ public class TestThirdEyeAnomalyApplication
         new AnomalyFunctionFactory(config.getFunctionConfigPath());
 
     final JobScheduler jobScheduler = new JobScheduler(anomalyJobSpecDAO, anomalyTaskSpecDAO,
-        anomalyFunctionSpecDAO, anomalyFunctionFactory, hibernateBundle.getSessionFactory());
+        anomalyFunctionSpecDAO, hibernateBundle.getSessionFactory());
     final TaskDriver taskDriver =
-        new TaskDriver(anomalyTaskSpecDAO, anomalyResultDAO, anomalyFunctionRelationDAO, hibernateBundle.getSessionFactory());
+        new TaskDriver(anomalyTaskSpecDAO, anomalyResultDAO, anomalyFunctionRelationDAO, hibernateBundle.getSessionFactory(), anomalyFunctionFactory);
 
-    final TesterClass testerClass = new TesterClass(anomalyTaskSpecDAO);
 
     environment.lifecycle().manage(new Managed() {
       @Override
