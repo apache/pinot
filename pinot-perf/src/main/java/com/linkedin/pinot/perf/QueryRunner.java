@@ -19,33 +19,100 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileReader;
+import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.io.IOUtils;
 import org.json.JSONObject;
+import org.kohsuke.args4j.CmdLineParser;
+import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Simple code to run queries against a server
- * USAGE: QueryRunner QueryFile ({BrokerHost} {BrokerPort} <single-threaded/multi-threaded>)
- */
+
 public class QueryRunner {
-  private QueryRunner() {
-  }
+  @Option(name = "-queryFile", required = true, usage = "query file path")
+  private String _queryFile;
+  @Option(name = "-mode", required = true, usage = "query runner mode (singleThread|multiThreads|targetQPS)")
+  private String _mode;
+  @Option(name = "-numThreads", required = false,
+      usage = "number of threads sending queries for multiThread mode and targetQPS mode")
+  private int _numThreads;
+  @Option(name = "-startQPS", required = false, usage = "start QPS for targetQPS mode")
+  private double _startQPS;
+  @Option(name = "-deltaQPS", required = false, usage = "delta QPS for targetQPS mode")
+  private double _deltaQPS;
+  @Option(name = "-brokerHost", required = false, usage = "broker host name (default: localhost)")
+  private String _brokerHost = "localhost";
+  @Option(name = "-brokerPort", required = false, usage = "broker port number (default: 8099)")
+  private String _brokerPort = "8099";
+  @Option(name = "-help", required = false, help = true, aliases = { "-h" }, usage = "print this message")
+  private boolean _help;
 
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryRunner.class);
   private static final int MILLIS_PER_SECOND = 1000;
 
+  /**
+   * Use single thread to run queries as fast as possible.
+   *
+   * Use a single thread to send queries back to back and log statistic information periodically.
+   *
+   * @param conf perf benchmark driver config.
+   * @param queryFile query file.
+   * @throws Exception
+   */
+  public static void singleThreadedQueryRunner(PerfBenchmarkDriverConf conf, String queryFile)
+      throws Exception {
+    final PerfBenchmarkDriver driver = new PerfBenchmarkDriver(conf);
+
+    try (BufferedReader bufferedReader = new BufferedReader(new FileReader(queryFile))) {
+      int numQueries = 0;
+      int totalServerTime = 0;
+      int totalBrokerTime = 0;
+      int totalClientTime = 0;
+
+      String query;
+      while ((query = bufferedReader.readLine()) != null) {
+        long startTime = System.currentTimeMillis();
+        JSONObject response = driver.postQuery(query);
+        numQueries++;
+        totalClientTime += System.currentTimeMillis() - startTime;
+        totalServerTime += response.getLong("timeUsedMs");
+        totalBrokerTime += response.getLong("totalTime");
+
+        if (numQueries % 1000 == 0) {
+          LOGGER.info(
+              "Processed {} Queries, Total Server Time: {}ms, Total Broker Time: {}ms, Total Client Time : {}ms.",
+              numQueries, totalServerTime, totalBrokerTime, totalClientTime);
+        }
+      }
+
+      LOGGER.info("Processed {} Queries, Total Server Time: {}ms, Total Broker Time: {}ms, Total Client Time : {}ms.",
+          numQueries, totalServerTime, totalBrokerTime, totalClientTime);
+    }
+  }
+
+  /**
+   * Use multiple threads to run queries as fast as possible.
+   *
+   * Start {numThreads} worker threads to send queries (blocking call) back to back, and use the main thread to collect
+   * the statistic information and log them periodically.
+   *
+   * @param conf perf benchmark driver config.
+   * @param queryFile query file.
+   * @param numThreads number of threads sending queries.
+   * @throws Exception
+   */
   @SuppressWarnings("InfiniteLoopStatement")
-  public static void multiThreadedQueryRunner(PerfBenchmarkDriverConf conf, String queryFile)
+  public static void multiThreadedsQueryRunner(PerfBenchmarkDriverConf conf, String queryFile, int numThreads)
       throws Exception {
     final long randomSeed = 123456789L;
-    final int numClients = 10;
+    final Random random = new Random(randomSeed);
     final int reportIntervalMillis = 3000;
 
     final List<String> queries;
@@ -53,24 +120,23 @@ public class QueryRunner {
       queries = IOUtils.readLines(input);
     }
 
-    final int queryNum = queries.size();
+    final int numQueries = queries.size();
     final PerfBenchmarkDriver driver = new PerfBenchmarkDriver(conf);
-    final Random random = new Random(randomSeed);
     final AtomicInteger counter = new AtomicInteger(0);
     final AtomicLong totalResponseTime = new AtomicLong(0L);
-    final ExecutorService executorService = Executors.newFixedThreadPool(numClients);
+    final ExecutorService executorService = Executors.newFixedThreadPool(numThreads);
 
-    for (int i = 0; i < numClients; i++) {
+    for (int i = 0; i < numThreads; i++) {
       executorService.submit(new Runnable() {
         @Override
         public void run() {
           while (true) {
-            String query = queries.get(random.nextInt(queryNum));
-            long start = System.currentTimeMillis();
+            String query = queries.get(random.nextInt(numQueries));
+            long startTime = System.currentTimeMillis();
             try {
               driver.postQuery(query);
               counter.getAndIncrement();
-              totalResponseTime.getAndAdd(System.currentTimeMillis() - start);
+              totalResponseTime.getAndAdd(System.currentTimeMillis() - startTime);
             } catch (Exception e) {
               LOGGER.error("Caught exception while running query: {}", query, e);
               return;
@@ -91,92 +157,168 @@ public class QueryRunner {
     }
   }
 
-  public static void singleThreadedQueryRunner(PerfBenchmarkDriverConf conf, String queryFile)
-      throws Exception {
-    File file = new File(queryFile);
-    FileReader fileReader = new FileReader(file);
-    BufferedReader bufferedReader = new BufferedReader(fileReader);
-    String query;
-
-    int numQueries = 0;
-    long totalQueryTime = 0;
-    long totalClientTime = 0;
-
-    while ((query = bufferedReader.readLine()) != null) {
-      JSONObject response = runSingleQuery(conf, query, 1);
-
-      totalQueryTime += response.getLong("timeUsedMs");
-      totalClientTime += response.getLong("totalTime");
-
-      if ((numQueries > 0) && (numQueries % 1000) == 0) {
-        LOGGER.info(
-            "Processed  {} queries, Total Query time: {} ms Total Client side time : {} ms.",
-            numQueries, totalQueryTime, totalClientTime);
-      }
-
-      ++numQueries;
-    }
-    LOGGER.info("Processed  {} queries, Total Query time: {} Total Client side time : {}.",
-        numQueries, totalQueryTime, totalClientTime);
-    fileReader.close();
-  }
-
-  public static JSONObject runSingleQuery(PerfBenchmarkDriverConf conf, String query, int numRuns)
-      throws Exception {
-    PerfBenchmarkDriver driver = new PerfBenchmarkDriver(conf);
-    JSONObject response = null;
-
-    for (int i = 0; i < numRuns; i++) {
-      response = driver.postQuery(query);
-    }
-    return response;
-  }
-
-  /*
-   * USAGE: QueryRunner <queryFile> <brokerHost(optional. default=localhost)> <brokerPort (optional.
-   * default=8099)> <mode(optional.(single-threaded(optional)|multi-threaded))>)
+  /**
+   * Use multiple threads to run query at an increasing target QPS.
+   *
+   * Use a concurrent linked queue to buffer the queries to be sent. Use the main thread to insert queries into the
+   * queue at the target QPS, and start {numThreads} worker threads to fetch queries from the queue and send them.
+   * We start with the start QPS, and keep adding delta QPS to the start QPS during the test. The main thread is
+   * responsible for collecting the statistic information and log them periodically.
+   *
+   * @param conf perf benchmark driver config.
+   * @param queryFile query file.
+   * @param numThreads number of threads sending queries.
+   * @param startQPS start QPS
+   * @param deltaQPS delta QPS
+   * @throws Exception
    */
+  @SuppressWarnings("InfiniteLoopStatement")
+  public static void targetQPSQueryRunner(PerfBenchmarkDriverConf conf, String queryFile, int numThreads,
+      double startQPS, double deltaQPS)
+      throws Exception {
+    final long randomSeed = 123456789L;
+    final Random random = new Random(randomSeed);
+    final int timePerTargetQPSMillis = 60000;
+    final int queueLengthThreshold = Math.max(20, (int) startQPS);
 
-  public static void main(String[] args) throws Exception {
+    final List<String> queries;
+    try (FileInputStream input = new FileInputStream(new File(queryFile))) {
+      queries = IOUtils.readLines(input);
+    }
+    final int numQueries = queries.size();
 
-    String queryFile = null;
-    if (args.length >= 1) {
-      queryFile = args[0];
-    } else {
-      System.out.println(
-          "QueryRunner <queryFile> <brokerHost(optional. default=localhost)> <brokerPort (optional. default=8099)> <mode(optional.(single-threaded(optional)|multi-threaded))>)");
-      System.exit(1);
+    final PerfBenchmarkDriver driver = new PerfBenchmarkDriver(conf);
+    final AtomicInteger counter = new AtomicInteger(0);
+    final AtomicLong totalResponseTime = new AtomicLong(0L);
+    final ExecutorService executorService = Executors.newFixedThreadPool(numThreads);
+
+    final ConcurrentLinkedQueue<String> queryQueue = new ConcurrentLinkedQueue<>();
+    double currentQPS = startQPS;
+    int intervalMillis = (int) (MILLIS_PER_SECOND / currentQPS);
+
+    for (int i = 0; i < numThreads; i++) {
+      executorService.submit(new Runnable() {
+        @Override
+        public void run() {
+          while (true) {
+            String query = queryQueue.poll();
+            if (query == null) {
+              try {
+                Thread.sleep(1);
+                continue;
+              } catch (InterruptedException e) {
+                LOGGER.error("Interrupted.", e);
+                return;
+              }
+            }
+            long startTime = System.currentTimeMillis();
+            try {
+              System.out.println(driver.postQuery(query));
+              counter.getAndIncrement();
+              totalResponseTime.getAndAdd(System.currentTimeMillis() - startTime);
+            } catch (Exception e) {
+              LOGGER.error("Caught exception while running query: {}", query, e);
+              return;
+            }
+          }
+        }
+      });
     }
 
-    String brokerHost = null;
-    String brokerPort = null;
-    if (args.length >= 3) {
-      brokerHost = args[1];
-      brokerPort = args[2];
+    LOGGER.info("Start with QPS: {}, delta QPS: {}", startQPS, deltaQPS);
+    while (true) {
+      long startTime = System.currentTimeMillis();
+      while (System.currentTimeMillis() - startTime <= timePerTargetQPSMillis) {
+        if (queryQueue.size() > queueLengthThreshold) {
+          executorService.shutdownNow();
+          throw new RuntimeException("Cannot achieve target QPS of: " + currentQPS);
+        }
+        queryQueue.add(queries.get(random.nextInt(numQueries)));
+        Thread.sleep(intervalMillis);
+      }
+      double timePassedSeconds = ((double) (System.currentTimeMillis() - startTime)) / MILLIS_PER_SECOND;
+      int count = counter.getAndSet(0);
+      double avgResponseTime = ((double) totalResponseTime.getAndSet(0)) / count;
+      LOGGER.info("Target QPS: {}, Interval: {}ms, Actual QPS: {}, Avg Response Time: {}ms", currentQPS, intervalMillis,
+          count / timePassedSeconds, avgResponseTime);
+
+      // Find a new interval
+      int newIntervalMillis;
+      do {
+        currentQPS += deltaQPS;
+        newIntervalMillis = (int) (MILLIS_PER_SECOND / currentQPS);
+      } while (newIntervalMillis == intervalMillis);
+      intervalMillis = newIntervalMillis;
     }
-    boolean multiThreaded = false;
-    if (args.length >= 4) {
-      if ("multi-threaded".equals(args[3])) {
-        multiThreaded = true;
+  }
+
+  private static void printUsage() {
+    System.out.println("Usage: QueryRunner");
+    for (Field field : QueryRunner.class.getDeclaredFields()) {
+      if (field.isAnnotationPresent(Option.class)) {
+        Option option = field.getAnnotation(Option.class);
+        System.out.println(String.format("\t%-15s: %s (required=%s)", option.name(), option.usage(), option.required()));
       }
     }
-    PerfBenchmarkDriverConf conf = new PerfBenchmarkDriverConf();
-    // since its only to run queries, we should ensure no services get started
-    if (brokerHost != null) {
-      conf.setBrokerHost(brokerHost);
-      conf.setBrokerPort(Integer.parseInt(brokerPort));
+  }
+
+  public static void main(String[] args)
+      throws Exception {
+    QueryRunner queryRunner = new QueryRunner();
+    CmdLineParser parser = new CmdLineParser(queryRunner);
+    parser.parseArgument(args);
+
+    if (queryRunner._help) {
+      printUsage();
+      return;
     }
-    conf.setStartBroker(false);
-    conf.setStartController(false);
-    conf.setStartServer(false);
-    conf.setStartZookeeper(false);
-    conf.setUploadIndexes(false);
+
+    PerfBenchmarkDriverConf conf = new PerfBenchmarkDriverConf();
+    conf.setBrokerHost(queryRunner._brokerHost);
+    conf.setBrokerPort(Integer.parseInt(queryRunner._brokerPort));
     conf.setRunQueries(true);
+    conf.setStartZookeeper(false);
+    conf.setStartController(false);
+    conf.setStartBroker(false);
+    conf.setStartServer(false);
+    conf.setUploadIndexes(false);
     conf.setConfigureResources(false);
-    if (multiThreaded) {
-      multiThreadedQueryRunner(conf, queryFile);
-    } else {
-      singleThreadedQueryRunner(conf, queryFile);
+
+    switch (queryRunner._mode) {
+      case "singleThread":
+        singleThreadedQueryRunner(conf, queryRunner._queryFile);
+        break;
+      case "multiThreads":
+        if (queryRunner._numThreads <= 0) {
+          System.out.println("For multiThreads mode, need to specify a positive numThreads");
+          printUsage();
+          return;
+        }
+        multiThreadedsQueryRunner(conf, queryRunner._queryFile, queryRunner._numThreads);
+        break;
+      case "targetQPS":
+        if (queryRunner._numThreads <= 0) {
+          System.out.println("For targetQPS mode, need to specify a positive numThreads");
+          printUsage();
+          return;
+        }
+        if (queryRunner._startQPS <= 0) {
+          System.out.println("For targetQPS mode, need to specify a positive startQPS");
+          printUsage();
+          return;
+        }
+        if (queryRunner._deltaQPS <= 0) {
+          System.out.println("For targetQPS mode, need to specify a positive deltaQPS");
+          printUsage();
+          return;
+        }
+        targetQPSQueryRunner(conf, queryRunner._queryFile, queryRunner._numThreads, queryRunner._startQPS,
+            queryRunner._deltaQPS);
+        break;
+      default:
+        System.out.println("Invalid mode: " + queryRunner._mode);
+        printUsage();
+        break;
     }
   }
 }
