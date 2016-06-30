@@ -114,10 +114,10 @@ public class TabularViewHandler implements ViewHandler<TabularViewRequest, Tabul
     TabularViewResponse tabularViewResponse = new TabularViewResponse();
 
     Map<String, String> summary = new HashMap<>();
-    summary.put("baselineStart", comparisonRequest.getBaselineStart().toString());
-    summary.put("baselineEnd", comparisonRequest.getBaselineEnd().toString());
-    summary.put("currentStart", comparisonRequest.getCurrentStart().toString());
-    summary.put("currentEnd", comparisonRequest.getCurrentEnd().toString());
+    summary.put("baselineStart", Long.toString(comparisonRequest.getBaselineStart().getMillis()));
+    summary.put("baselineEnd", Long.toString(comparisonRequest.getBaselineEnd().getMillis()));
+    summary.put("currentStart", Long.toString(comparisonRequest.getCurrentStart().getMillis()));
+    summary.put("currentEnd", Long.toString(comparisonRequest.getCurrentEnd().getMillis()));
 
     tabularViewResponse.setSummary(summary);
     List<String> expressionNames = new ArrayList<>();
