@@ -179,8 +179,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           try {
             row = kafkaStreamProvider.next();
 
-            row = extractor.transform(row);
             if (row != null) {
+              row = extractor.transform(row);
               notFull = realtimeSegment.index(row);
               exceptionSleepMillis = 50L;
             }

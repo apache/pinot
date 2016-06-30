@@ -99,6 +99,7 @@ public class KafkaHighLevelConsumerStreamProvider implements StreamProvider {
         INSTANCE_LOGGER.warn("Caught exception while consuming events", e);
         serverMetrics.addMeteredTableValue(tableAndStreamName, ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS, 1L);
         serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS, 1L);
+        throw e;
       }
     }
     return null;
