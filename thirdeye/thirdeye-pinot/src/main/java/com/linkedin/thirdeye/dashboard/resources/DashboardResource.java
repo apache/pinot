@@ -545,9 +545,13 @@ public class DashboardResource {
           valueArray.put(metricTimeSeries.getValue());
         }
       }
+      JSONObject summaryMap = new JSONObject();
+      summaryMap.put("currentStart", start);
+      summaryMap.put("currentEnd", end);
       JSONObject jsonResponseObject = new JSONObject();
       jsonResponseObject.put("timeSeriesData", timeseriesMap);
       jsonResponseObject.put("keys", new JSONArray(keys));
+      jsonResponseObject.put("summary", summaryMap);
       jsonResponse = jsonResponseObject.toString();
     } catch (Exception e) {
       throw e;
