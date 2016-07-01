@@ -407,7 +407,7 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
   private void splitLeafNodesOnTimeColumn() throws Exception {
     Queue<StarTreeIndexNode> nodes = new LinkedList<>();
     nodes.add(starTreeRootIndexNode);
-
+    StarTreeDataTableOptimized table = new StarTreeDataTableOptimized(dataFile, dimensionSizeBytes, metricSizeBytes);
     while (!nodes.isEmpty()) {
       StarTreeIndexNode node = nodes.remove();
       if (node.isLeaf()) {
@@ -416,14 +416,12 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
           int level = node.getLevel();
           int[] newSortOrder = moveColumnInSortOrder(timeColumnName, getSortOrder(), level);
 
-          StarTreeDataTable leafDataTable =
-              new StarTreeDataTable(dataFile, dimensionSizeBytes, metricSizeBytes, newSortOrder);
           int startDocId = node.getStartDocumentId();
           int endDocId = node.getEndDocumentId();
-          leafDataTable.sort(startDocId, endDocId);
+          table.sort(startDocId, endDocId, newSortOrder);
           int timeColIndex = dimensionNameToIndexMap.get(timeColumnName);
           Map<Integer, IntPair> timeColumnRangeMap =
-              leafDataTable.groupByIntColumnCount(startDocId, endDocId, timeColIndex);
+              table.groupByIntColumnCount(startDocId, endDocId, timeColIndex);
 
           node.setChildDimensionName(timeColIndex);
           node.setChildren(new HashMap<Integer, StarTreeIndexNode>());
@@ -444,6 +442,7 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
         nodes.addAll(node.getChildren().values());
       }
     }
+    table.close();
   }
 
   /**
