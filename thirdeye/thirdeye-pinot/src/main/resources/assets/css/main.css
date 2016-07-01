@@ -502,7 +502,7 @@ body a{
 
 .chart.legend span {
     display: inline-block;
-    margin-right: 5px; 
+    margin-right: 5px;
     text-align: center;
     cursor: pointer;
     color: white;
@@ -750,6 +750,7 @@ body a{
 
 #tooltip table {
     width: 100%;
+    padding: 0;
 }
 
 #tooltip tr {
@@ -862,7 +863,7 @@ body a{
 
 
 /* D3 START*/
-path { 
+path {
     stroke: steelblue;
     stroke-width: 2;
     fill: none;
