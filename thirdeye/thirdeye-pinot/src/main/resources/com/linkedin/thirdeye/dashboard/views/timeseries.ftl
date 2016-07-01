@@ -6,21 +6,15 @@
 	</select>
 {{/each}}
 
-{{#with timeSeriesData/time}}
+{{#with summary}}
 <div  class="title-box full-width">
     <table title="{{displayDate this.baselineUTC}}">
         <tbody>
         <tr>
-            {{#each this as |timeStamp Index|}}
-            {{#if @first}}
             <th><b>Start:</b></th>
-            <td class="baseline-date-time">{{displayDate  timeStamp}}</td>
-            {{/if}}
-            {{#if @last}}
+            <td class="baseline-date-time">{{millisToDate currentStart}}</td>
             <th><b>End:</b></th>
-            <td class="baseline-date-time">{{displayDate  timeStamp}}</td>
-            {{/if}}
-            {{/each}}
+            <td class="baseline-date-time">{{millisToDate currentEnd}}</td>
         </tr>
         </tbody>
     </table>
