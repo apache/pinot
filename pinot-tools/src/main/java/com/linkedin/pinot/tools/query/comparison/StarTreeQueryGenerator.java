@@ -16,6 +16,14 @@
 package com.linkedin.pinot.tools.query.comparison;
 
 import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.common.utils.request.RequestUtils;
+import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.segment.index.loader.Loaders;
+import com.linkedin.pinot.pql.parsers.Pql2Compiler;
+import java.io.File;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
@@ -289,5 +297,49 @@ public class StarTreeQueryGenerator {
    */
   public String nextQuery() {
     return buildQuery(generateAggregations(), generatePredicates(), generateGroupBys());
+  }
+
+  /**
+   * Given star tree segments directory and number of queries, generate star tree queries.
+   * Usage: StarTreeQueryGenerator starTreeSegmentsDirectory numQueries
+   *
+   * @param args arguments.
+   */
+  public static void main(String[] args)
+      throws Exception {
+    if (args.length != 2) {
+      System.err.println("Usage: StarTreeQueryGenerator starTreeSegmentsDirectory numQueries");
+      return;
+    }
+
+    // Get segment metadata for the first segment to get table name and verify query is fit for star tree.
+    File segmentsDir = new File(args[0]);
+    Preconditions.checkState(segmentsDir.exists());
+    Preconditions.checkState(segmentsDir.isDirectory());
+    File[] segments = segmentsDir.listFiles();
+    Preconditions.checkNotNull(segments);
+    File segment = segments[0];
+    IndexSegment indexSegment = Loaders.IndexSegment.load(segment, ReadMode.heap);
+    SegmentMetadata segmentMetadata = indexSegment.getSegmentMetadata();
+    String tableName = segmentMetadata.getTableName();
+
+    // Set up star tree query generator.
+    int numQueries = Integer.parseInt(args[1]);
+    SegmentInfoProvider infoProvider = new SegmentInfoProvider(args[0]);
+    StarTreeQueryGenerator generator =
+        new StarTreeQueryGenerator(tableName, infoProvider.getSingleValueDimensionColumns(),
+            infoProvider.getMetricColumns(), infoProvider.getSingleValueDimensionValuesMap());
+    Pql2Compiler compiler = new Pql2Compiler();
+
+    for (int i = 0; i < numQueries; i++) {
+      String query = generator.nextQuery();
+      System.out.println(query);
+
+      // Verify that query is fit for star tree.
+      BrokerRequest brokerRequest = compiler.compileToBrokerRequest(query);
+      Preconditions.checkState(
+          RequestUtils.isFitForStarTreeIndex(segmentMetadata, RequestUtils.generateFilterQueryTree(brokerRequest),
+              brokerRequest));
+    }
   }
 }
