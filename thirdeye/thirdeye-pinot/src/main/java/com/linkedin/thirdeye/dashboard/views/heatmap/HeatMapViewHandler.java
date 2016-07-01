@@ -241,10 +241,10 @@ public class HeatMapViewHandler implements ViewHandler<HeatMapViewRequest, HeatM
             currentTotalPerMetricAndDimension.get(expression.getExpressionName()).values()
                 .iterator().next();
       }
-      summary.addSimpleField("baselineStart", comparisonRequest.getBaselineStart().toString());
-      summary.addSimpleField("baselineEnd", comparisonRequest.getBaselineEnd().toString());
-      summary.addSimpleField("currentStart", comparisonRequest.getCurrentStart().toString());
-      summary.addSimpleField("currentEnd", comparisonRequest.getCurrentEnd().toString());
+      summary.addSimpleField("baselineStart", Long.toString(comparisonRequest.getBaselineStart().getMillis()));
+      summary.addSimpleField("baselineEnd", Long.toString(comparisonRequest.getBaselineEnd().getMillis()));
+      summary.addSimpleField("currentStart", Long.toString(comparisonRequest.getCurrentStart().getMillis()));
+      summary.addSimpleField("currentEnd", Long.toString(comparisonRequest.getCurrentEnd().getMillis()));
 
       summary.addSimpleField("baselineTotal", HeatMapCell.format(baselineTotal));
       summary.addSimpleField("currentTotal", HeatMapCell.format(currentTotal));

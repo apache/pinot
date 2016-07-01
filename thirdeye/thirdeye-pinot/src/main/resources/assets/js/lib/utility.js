@@ -839,13 +839,13 @@ function transformUTCToTZTime(cell, format){
         var tz = getTimeZone();
 
         var currentMillis = parseInt(cellObj.attr('currentUTC'));
-        var baselineMillis = parseInt(cellObj.attr('title'));
+        var baselineMillis = parseInt(cellObj.attr('baselineUTC'));
 
         var currentTime = moment(currentMillis);
         var baselineTime = moment(baselineMillis);
 
         cellObj.html(currentTime.tz(tz).format(format));
-        cellObj.attr('title', baselineTime.tz(tz).format(format));
+        cellObj.attr('title', "baseline: "+ baselineTime.tz(tz).format(format));
     };
 
 /** Transform UTC time into user selected or browser's timezone **/

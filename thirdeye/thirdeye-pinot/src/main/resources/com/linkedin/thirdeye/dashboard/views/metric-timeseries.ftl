@@ -8,16 +8,16 @@
                     <tr>
                         <th>BASELINE</th>
                         <th><b>Start:</b></th>
-                        <td class="baseline-date-time">{{displayDate  baselineStart}}</td>
+                        <td class="baseline-date-time">{{millisToDate  baselineStart}}</td>
                         <th><b>End:</b></th>
-                        <td class="baseline-date-time">{{displayDate  baselineEnd}}</td>
+                        <td class="baseline-date-time">{{millisToDate  baselineEnd}}</td>
                     </tr>
                     <tr>
                         <th>CURRENT</th>
                         <th><b>Start:</b></th>
-                        <td class="current-date-time">{{displayDate  currentStart}}</td>
+                        <td class="current-date-time">{{millisToDate  currentStart}}</td>
                         <th><b>End:</b></th>
-                        <td class="current-date-time">{{displayDate currentEnd}}</td>
+                        <td class="current-date-time">{{millisToDate currentEnd}}</td>
                     </tr>
                     </tbody>
                 </table>

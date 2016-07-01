@@ -9,16 +9,16 @@
                         <tr>
                             <th>BASELINE</th>
                             <th><b>Start:</b></th>
-                            <td class="baseline-date-time">{{displayDate  @root/summary/simpleFields/baselineStart}}</td>
+                            <td class="baseline-date-time">{{millisToDate  @root/summary/simpleFields/baselineStart}}</td>
                             <th><b>End:</b></th>
-                            <td class="baseline-date-time">{{displayDate  @root/summary/simpleFields/baselineEnd}}</td>
+                            <td class="baseline-date-time">{{millisToDate  @root/summary/simpleFields/baselineEnd}}</td>
                         </tr>
                         <tr>
                             <th>CURRENT</th>
                             <th><b>Start:</b></th>
-                            <td class="current-date-time">{{displayDate  @root/summary/simpleFields/currentStart}}</td>
+                            <td class="current-date-time">{{millisToDate  @root/summary/simpleFields/currentStart}}</td>
                             <th><b>End:</b></th>
-                            <td class="current-date-time">{{displayDate  @root/summary/simpleFields/currentEnd}}</td>
+                            <td class="current-date-time">{{millisToDate  @root/summary/simpleFields/currentEnd}}</td>
                         </tr>
                         <tr><td colspan="5" style="border-bottom: 1px solid #ddd;"></td></tr>
 
