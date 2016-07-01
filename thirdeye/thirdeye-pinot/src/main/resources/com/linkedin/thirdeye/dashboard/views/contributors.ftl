@@ -1,6 +1,5 @@
 <section id="contributors-section" width="100%">
-	<script id="contributors-table-template"
-		type="text/x-handlebars-template">
+	<script id="contributors-table-template" type="text/x-handlebars-template">
 
         {{#each metrics as |metricName metricIndex|}}
         <div class="metric-section-wrapper" rel="{{metricName}}">
@@ -103,7 +102,7 @@
                             <th class="contributors-table-date border-left" currentUTC="{{@root/timeBuckets.[0]/currentStart}}" baselineUTC="{{@root/timeBuckets.[0]/currentStart}}"  title="Baseline Start: {{millisToDate  @root/timeBuckets.[0]/baselineStart}}">Current Start: {{millisToDate @root/timeBuckets.[0]/currentStart}}
                             </th>
                             {{#each @root/timeBuckets as |timeBucket timeBucketIndex|}}
-                            <th class="table-time-cell border-left" currentUTC="{{timeBucket/currentStart}}" title="baseline: {{timeBucket/baselineStart}}" colspan="1">{{timeBucket/currentStart}}
+                            <th class="table-time-cell border-left" currentUTC="{{timeBucket/currentStart}}" baselineUTC="{{timeBucket/baselineStart}}" title="baseline: {{millisToDate timeBucket/baselineStart}}" colspan="1">{{timeBucket/currentStart}}
                             </th>
                             {{/each}}
                         </tr>
