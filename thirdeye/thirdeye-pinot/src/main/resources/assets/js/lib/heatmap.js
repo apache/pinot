@@ -119,12 +119,12 @@ function renderD3heatmap(data, tab) {
             var width = 0.65 * window.innerWidth;
             var height = window.innerHeight * 0.7 / numDimensions;
 
-
             var placeholder_0 = '#metric_' + metric + '_dim_' + d + '_treemap_0'
             var placeholder_1 = '#metric_' + metric + '_dim_' + d + '_treemap_1'
             var placeholder_2 = '#metric_' + metric + '_dim_' + d + '_treemap_2'
 
-
+            var tooltipWidthPx = $("#tooltip").css("width") ;
+            var tooltipHeightPx = $("#tooltip").css("height");
 
             var mousemove = function(d) {
 
@@ -135,13 +135,17 @@ function renderD3heatmap(data, tab) {
                 var value = target.attr("id");
 
                 var treemapOffset = $($(".dimension-treemap")[0]).offset();
-                var tooltipWidth = $("#tooltip").css("width") ;
-                var tooltipHeight = $("#tooltip").css("height");
 
-                var tooltipWidthOffset = parseInt(tooltipWidth.substring(0, tooltipWidth.length -2) ) / 2;
-                var tooltipHeightOffset = parseInt(tooltipHeight.substring(0, tooltipHeight.length -2) ) / 2;
+                var fontWidth = 10;
+                var textWidth = value.length * fontWidth;
+                var tooltipWidth = tooltipWidthPx.substring(0, tooltipWidthPx.length-2);
+                if (textWidth > (2/3) * tooltipWidth ) {
+                    tooltipWidth = 85 + textWidth;
+                }
+                var tooltipHeightOffset = parseInt(tooltipHeightPx.substring(0, tooltipHeightPx.length -2) ) / 2;
+                var tooltipWidthOffset = tooltipWidth/2;
 
-                var directionX = d3.event.pageX - treemapOffset.left < window.innerWidth /2 ? "-1" : "1";
+                var directionX = d3.event.pageX - treemapOffset.left < (window.innerWidth - treemapOffset.left)/2 ? "-1" : "1";
                 var directionY = d3.event.pageY - treemapOffset.top < window.innerHeight /2 ? "-1" : "1";
                 var distanceFromMousePointer = 50;
 
@@ -165,27 +169,19 @@ function renderD3heatmap(data, tab) {
                     d3.select("#tooltip #contribution-diff").text( dimData[valueId][schema["contributionDifference"]] + '%');
                     d3.select("#tooltip").classed("hidden", false);
 
+                d3.select("#tooltip").style("width", (tooltipWidth) + "px");
 
                 if (cellSizeExpression != null && undefined != cellSizeExpression) {
                     var cellSizeExpressionDisplay = dimData[valueId][schema["deltaSize"]] + " (" + cellSizeExpression + ")";
-                    //dynamic width  cellSizeExpressionDisplay + tooltip width - last column width
-                    var width = (cellSizeExpressionDisplay.length * 12) + 50 ;
-                    d3.select("#tooltip").style("width", width + "px")
                     d3.select("#tooltip #baseline-value").text( dimData[valueId][schema["baselineValue"]] + " (" + dimData[valueId][schema["numeratorBaseline"]] + "/" + dimData[valueId][schema["denominatorBaseline"]] +")");
                     d3.select("#tooltip #current-value").text( dimData[valueId][schema["currentValue"]] + " (" + dimData[valueId][schema["numeratorCurrent"]] + "/" + dimData[valueId][schema["denominatorCurrent"]] + ")");
                     d3.select("#tooltip #cell-size").text( cellSizeExpressionDisplay );
                     d3.select("#tooltip #cell-size-row").classed("hidden", false);
-
-
                 } else {
-
                     d3.select("#tooltip #baseline-value").text( dimData[valueId][schema["baselineValue"]]);
                     d3.select("#tooltip #current-value").text( dimData[valueId][schema["currentValue"]]);
-
                 }
-
             };
-
 
             var mouseleave = function() {
                 d3.select("#tooltip").classed("hidden", true);
@@ -247,8 +243,6 @@ function renderD3heatmap(data, tab) {
                         });
                 }
             }
-
-
 
             drawTreemap(root_0, placeholder_0 )
             drawTreemap(root_1, placeholder_1 )
