@@ -18,9 +18,8 @@ package com.linkedin.pinot.tools.query.comparison;
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
-import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
+import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import java.io.File;
@@ -35,6 +34,7 @@ import org.apache.commons.io.FileUtils;
 
 /**
  * Given a segments directory, pick all segments and read the dictionaries for all single-value dimension columns.
+ * Here we will treat time column (if exists) as a single-value dimension column.
  */
 public class SegmentInfoProvider {
   private static final String TMP_DIR = System.getProperty("java.io.tmpdir");
@@ -87,9 +87,9 @@ public class SegmentInfoProvider {
   private void readOneSegment(File segmentFile, Set<String> uniqueMetrics, Set<String> uniqueSingleValueDimensions,
       Map<String, Set<Object>> singleValueDimensionValuesMap)
       throws Exception {
+    // Get segment directory from segment file (decompress if necessary).
     File segmentDir;
     File tmpDir = null;
-
     if (segmentFile.isFile()) {
       tmpDir = File.createTempFile(SEGMENT_INFO_PROVIDER, null, new File(TMP_DIR));
       FileUtils.deleteQuietly(tmpDir);
@@ -100,34 +100,54 @@ public class SegmentInfoProvider {
       segmentDir = segmentFile;
     }
 
-    IndexSegmentImpl indexSegment = (IndexSegmentImpl) Loaders.IndexSegment.load(segmentDir, ReadMode.heap);
+    IndexSegment indexSegment = Loaders.IndexSegment.load(segmentDir, ReadMode.heap);
     Schema schema = indexSegment.getSegmentMetadata().getSchema();
 
+    // Add time column if exists.
+    String timeColumn = schema.getTimeColumnName();
+    if (timeColumn != null) {
+      uniqueSingleValueDimensions.add(timeColumn);
+      loadValuesForSingleValueDimension(indexSegment, singleValueDimensionValuesMap, timeColumn);
+    }
+
+    // Add all metric columns.
     uniqueMetrics.addAll(schema.getMetricNames());
 
+    // Add all single-value dimension columns.
     for (DimensionFieldSpec fieldSpec : schema.getDimensionFieldSpecs()) {
       if (!fieldSpec.isSingleValueField()) {
         continue;
       }
-
       String column = fieldSpec.getName();
       uniqueSingleValueDimensions.add(column);
-      Dictionary dictionary = indexSegment.getDictionaryFor(column);
-
-      Set<Object> values = singleValueDimensionValuesMap.get(column);
-      if (values == null) {
-        values = new HashSet<>();
-        singleValueDimensionValuesMap.put(column, values);
-      }
-
-      int length = dictionary.length();
-      for (int i = 0; i < length; i++) {
-        values.add(dictionary.get(i));
-      }
+      loadValuesForSingleValueDimension(indexSegment, singleValueDimensionValuesMap, column);
     }
 
     if (tmpDir != null) {
       FileUtils.deleteQuietly(tmpDir);
+    }
+  }
+
+  /**
+   * Helper method to load values for a single-value dimension.
+   *
+   * @param indexSegment index segment.
+   * @param singleValueDimensionValuesMap single-value dimension columns to unique values map buffer.
+   * @param column single-value dimension name.
+   */
+  private void loadValuesForSingleValueDimension(IndexSegment indexSegment,
+      Map<String, Set<Object>> singleValueDimensionValuesMap, String column) {
+    Dictionary dictionary = indexSegment.getDataSource(column).getDictionary();
+
+    Set<Object> values = singleValueDimensionValuesMap.get(column);
+    if (values == null) {
+      values = new HashSet<>();
+      singleValueDimensionValuesMap.put(column, values);
+    }
+
+    int length = dictionary.length();
+    for (int i = 0; i < length; i++) {
+      values.add(dictionary.get(i));
     }
   }
 
