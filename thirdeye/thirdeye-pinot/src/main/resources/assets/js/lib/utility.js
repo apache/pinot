@@ -36,7 +36,6 @@ function getData(url, tab){
     })
 }
 
-
 function submitData(url){
     return $.ajax({
         url: url,
@@ -774,6 +773,7 @@ function getLocalTimeZone() {
  * @public
  * @returns {String} Local timezone from getLocalTimeZone() or hash params if present
  * timezone
+ * //with adding timezone to the hash we would enable the usage of timezone other than the users local timezone
  */
 function getTimeZone() {
     var timeZone = jstz()
@@ -789,7 +789,6 @@ function getTimeZone() {
     }
     return tz
 }
-
 
 
 

@@ -196,7 +196,6 @@ $(document).ready(function() {
         //Without the options.fn()  the raw object would be returned to be the html content
         return options.fn(obj[options.hash.dimName])
     });
-
   //takes an object and a key as option param and returns an object as a scope
     Handlebars.registerHelper('lookupInMapByKey', function(mapObj, key) {
         var val = mapObj[key];

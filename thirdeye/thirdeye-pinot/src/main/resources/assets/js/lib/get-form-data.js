@@ -10,12 +10,11 @@ function getDataSetList(){
         $(".landing-dataset").each(function(){ $(this).html(result_datasets_template)});
 
         /* Handelbars template for anomaly form datasets dropdown */
-        var anomalyFormDatasetData = {data: data, scope: "anomaly-"}
+        var anomalyFormDatasetData = {data: data, scope: "-manage-alert"}
         var result_anomly_datasets_template = HandleBarsTemplates.template_datasets(anomalyFormDatasetData);
         $(".anomaly-dataset").each(function(){ $(this).html(result_anomly_datasets_template)});
 
         $(".selected-dataset").text("Select dataset");
-
 
         if (hash.hasOwnProperty('dataset')) {
             //Populate the selected item on the form element
@@ -56,7 +55,7 @@ function getAllFormData(){
     getDashboardList();
     getMetricList();
     getAnomalyMetricList();
-    getDimensionNFilterList();
+    getDimensionNValueList();
 }
 
 function getDashboardList(){
@@ -94,11 +93,6 @@ function getMetricList() {
         var result_query_form_metric_list_template = HandleBarsTemplates.template_metric_list(queryFormMetricListData);
         $(".metric-list").each(function(){ $(this).html(result_query_form_metric_list_template )});
 
-        /* Handelbars template for manage anomalies form metric list */
-        var anomalyFormMetricListData = {data: data, scope: "anomaly-", singleMetricSelector: false};
-        var result_anomaly_form_metric_list_template = HandleBarsTemplates.template_metric_list(anomalyFormMetricListData);
-        $(".create-anomaly-metric-list").each(function(){ $(this).html(result_anomaly_form_metric_list_template)});
-
         window.responseDataPopulated++
         formComponentPopulated()
     });
@@ -125,7 +119,7 @@ function getAnomalyMetricList() {
 
 
 
-function getDimensionNFilterList() {
+function getDimensionNValueList() {
 
     //Create dimension dropdown and filters
     var url = "/dashboard/data/filters?dataset=" + hash.dataset;
@@ -148,7 +142,6 @@ function getDimensionNFilterList() {
             filterDimensionListHtml += "<li class='filter-dimension-option' value='" + k + "'><a href='#' class='radio-options'>" + k + "</a></li>";
             window.datasetConfig.datasetDimensions.push(k)
         }
-
         $(".dimension-list").html(dimensionListHtml);
 
         //append filter dimension list
@@ -252,7 +245,7 @@ function getDatasetConfig() {
         var maxDate = moment(maxMillis).format("YYYY-MM-DD");
 
         //Add max and min time as a label time selection dropdown var minMillis = data["minTime"];
-        var maxDateTime = maxMillis ? moment(maxMillis).format("YYYY-MM-DD h a") : "n.a.";
+        var maxDateTime = maxMillis ? moment(maxMillis).format("YYYY-MM-DD h a z") : "n.a.";
         $(".max-time").text(maxDateTime);
 
         //todo add min time to info endpoint

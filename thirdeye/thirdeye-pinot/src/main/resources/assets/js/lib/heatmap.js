@@ -150,7 +150,7 @@ function renderD3heatmap(data, tab) {
                 var distanceFromMousePointer = 50;
 
                 var xPosition = d3.event.pageX - treemapOffset.left - directionX * (tooltipWidthOffset + distanceFromMousePointer);
-                var yPosition = d3.event.pageY - treemapOffset.top - directionY * (tooltipHeightOffset  + distanceFromMousePointer) ;
+                var yPosition = d3.event.pageY - (tooltipHeightOffset  + distanceFromMousePointer) ;
 
                 var dimData = data["data"][metric + "." + dimension]["responseData"]
 
