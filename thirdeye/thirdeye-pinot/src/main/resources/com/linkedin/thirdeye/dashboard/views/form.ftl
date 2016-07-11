@@ -210,7 +210,7 @@
         {{#if showConfigAnomaly}}
         <!-- This is a button toggling the modal -->
 
-        <button class="uk-button uk-margin-large uk-" data-uk-modal="{target:'#manage-alert-modal', center:true}">Configure anomaly alerts</button>
+        <button class="uk-button uk-margin-large uk-hidden" data-uk-modal="{target:'#manage-alert-modal', center:true}">Configure anomaly alerts</button>
 
         <div id="manage-alert-modal" class="uk-modal">
             <div class="uk-modal-dialog uk-modal-dialog-large">
