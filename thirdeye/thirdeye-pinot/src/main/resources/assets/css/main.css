@@ -331,6 +331,13 @@ body a{
     width: 120px;
 }
 
+#filter-panel-manage-alert .value-filter{
+    width:90%;
+    line-height: 30px;
+    display: table-cell;
+    padding: 5px;
+}
+
 /** Chart area **/
 
 .chart-area{

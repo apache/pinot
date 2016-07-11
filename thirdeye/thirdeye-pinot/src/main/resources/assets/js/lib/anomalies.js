@@ -53,8 +53,9 @@ var lineChart;
 function drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab) {
 
   var currentView = $("#" + tab + "-display-chart-section");
+  var aggTimeGranularity = (window.datasetConfig.dataGranularity) ? window.datasetConfig.dataGranularity : "HOURS";
   var dateTimeFormat = "%I:%M %p";
-  if(hash.hasOwnProperty("aggTimeGranularity") && hash.aggTimeGranularity == "DAYS"){
+  if(aggTimeGranularity == "DAYS"){
         dateTimeFormat = "%m-%d"
   }
 
@@ -62,8 +63,6 @@ function drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab) {
   // Metric(s)
   var metrics = timeSeriesData["metrics"];
   var lineChartData = {};
-  var dateTimeformat = (hash.hasOwnProperty("aggTimeGranularity") && hash.aggTimeGranularity.toLowerCase().indexOf("days") > -1) ? "MM-DD" : "h a";
-  var xTickFormat = dateTimeformat;
   var xTicksBaseline = [];
   var xTicksCurrent = [];
   var colors = {};

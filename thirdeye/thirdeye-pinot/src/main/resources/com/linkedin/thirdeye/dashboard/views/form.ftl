@@ -71,7 +71,7 @@
 			{{/if}}
 			{{#if showFilterSelection}}
             <div class="view-filter-selector" rel="{{tabName}}">
-                 <label class="uk-form-label  uk-display-inline-block">Filters</label>
+                <label class="uk-form-label  uk-display-inline-block">Filters</label>
                 <div id="{{tabName}}-add-filter" class="add-filter add-btn uk-display-inline-block" rel="{{tabName}}" data-uk-dropdown="{mode:'click'}">
                     <button class="uk-button uk-button-primary" type="button"><i class="uk-icon-plus"></i></button>
                     <div id="{{tabName}}-filter-panel" class="filter-panel uk-dropdown" rel="{{tabName}}" style="width:420px; display:none;">
@@ -158,7 +158,6 @@
 
                             <input id="{{tabName}}-baseline-end-date-input" class="baseline-end-date-input uk-margin-small" rel="{{tabName}}" type="text" placeholder="YYYY-MM-DD" data-uk-datepicker="{weekstart:0, format:'YYYY-MM-DD'}" style="width:110px;">
                             <input id="{{tabName}}-baseline-end-time-input" class="baseline-end-time-input" rel="{{tabName}}" type="text" data-uk-timepicker="{format:'24h'}" placeholder="HH:MM" style="width:50px;">
-
                         </div>
                         {{/if}}
 
@@ -211,15 +210,18 @@
         {{#if showConfigAnomaly}}
         <!-- This is a button toggling the modal -->
 
-        <button class="uk-button uk-margin-large" data-uk-modal="{target:'#manage-alert-modal', center:true}">Configure anomaly alerts</button>
+        <button class="uk-button uk-margin-large uk-" data-uk-modal="{target:'#manage-alert-modal', center:true}">Configure anomaly alerts</button>
 
         <div id="manage-alert-modal" class="uk-modal">
             <div class="uk-modal-dialog uk-modal-dialog-large">
-                <a class="uk-button uk-modal-close uk-close"></a>
-                <div class="uk-modal-header">Configure anomaly alerts</div>
+                <a class="uk-button uk-modal-close uk-close">
+                </a>
+                <div class="uk-modal-header">Configure anomaly alerts
+                </div>
             <form id="configure-alert-form" class="uk-form">
                 <div class="uk-form-row">
-                    <label class="uk-form-label bold-label required">Rule</label>
+                    <label class="uk-form-label bold-label required">Rule
+                    </label>
                     <input id="rule" type="text" maxlength="80">
                 </div>
                 <div class="uk-form-row">
@@ -233,6 +235,7 @@
                         </div>
                     </div>
                 </div>
+
                 <div class="uk-display-inline-block">Alert me when </div>
                 <div id="metric-selector-manage-alert" class="uk-form-row uk-display-inline-block">
                 <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group uk-display-inline-block">
@@ -240,7 +243,7 @@
                             <div class="uk-button uk-button-primary" type="button"><i class="uk-icon-caret-down"></i>
                         </div>
                         <div class="uk-dropdown uk-dropdown-small uk-dropdown-bottom" style="top: 30px; left: 0px;">
-                            <ul class="manage-alert-metric-list uk-nav uk-nav-dropdown">
+                            <ul class="manage-alert-metric-list uk-nav uk-nav-dropdown single-select">
                             </ul>
                         </div>
                     </div>
@@ -253,7 +256,7 @@
                         <div class="uk-button uk-button-primary" type="button"><i class="uk-icon-caret-down"></i>
                         </div>
                         <div class="uk-dropdown uk-dropdown-small uk-dropdown-bottom" style="top: 30px; left: 0px;">
-                            <ul class="uk-nav uk-nav-dropdown">
+                            <ul class="uk-nav uk-nav-dropdown single-select">
                                 <li class="anomaly-condition-option" value="DROPS"><a href="#" class="uk-dropdown-close">DROPS</a></li>
                                 <li class="anomaly-condition-option" value="INCREASES"><a href="#" class="uk-dropdown-close">INCREASES</a></li>
                             </ul>
@@ -296,10 +299,41 @@
                     </div>
                 </div>
 
+                <div class="uk-form-row">
+                    <div id="{{tabName}}-view-single-dimension-selector" class="view-single-dimension-selector uk-display-inline-block" rel="{{tabName}}">
+                        <label class="uk-form-label">in </label>
+                        <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group">
+                        <div id="selected-dimension" class="uk-button">dimension</div>
+                            <button class="add-single-dimension-btn uk-button uk-button-primary" type="button"><i class="uk-icon-caret-down"></i></button>
+                            <div class="uk-dropdown uk-dropdown-small">
+                                <ul class="dimension-list-manage-alert uk-nav uk-nav-dropdown single-select">
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="filter-selector-manage-alert uk-display-inline-block">
+                        <div id="{{tabName}}-add-filter-manage-alert" class="add-filter-manage-alert add-btn uk-display-inline-block hidden" rel="{{tabName}}" data-uk-dropdown="{mode:'click'}">
+                            <button class="uk-button uk-button-primary" type="button"><i class="uk-icon-plus"></i></button>
+                            <div id="filter-panel-manage-alert" class="filter-panel uk-dropdown" rel="{{tabName}}" style="width:300px; display:none;">
+                                <i class="close-dropdown-btn uk-icon-close" style="position: absolute; right:5px; top: 5px;"></i>
+                                <a href="#" class="uk-dropdown-close">
+                                    <button id="apply-filter-btn-manage-alert" class="apply-filter-btn uk-button uk-button-primary"  rel="{{tabName}}"  style="float:right; margin: 5px;" disabled>Apply
+                                    </button>
+                                </a>
+                               <span class="dimension-values-manage-alert"></span>
+                            </div>
+                        </div>
+                        <ul  id="selected-filters-list-manage-alert" class="uk-display-inline-block" rel="{{tabName}}"></ul>
+                    </div>
+                </div>
+
+
 
                 <!--<div class="uk-form-row">
                     <input class="" rel="{{tabName}}" type="checkbox" checked><span>Send me an email when this alert triggers. Email address: </span><input type="email" autocomplete="on">
                 </div>-->
+
 
 
 
@@ -353,6 +387,7 @@
                         <span> at
                         </span>
                         <input id="monitoring-schedule-time" class="thin-input" type="text" data-uk-timepicker="{format:'24h'}" placeholder="HH:MM">
+                        <span id="local-timezone"></span>
                     </span>
                 </div>
 
@@ -374,5 +409,8 @@
             </form>
         </div>
         {{/if}}
+
+
+
     </script>
 </section>

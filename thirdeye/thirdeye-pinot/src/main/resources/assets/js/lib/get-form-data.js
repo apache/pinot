@@ -55,7 +55,7 @@ function getAllFormData(){
     getDashboardList();
     getMetricList();
     getAnomalyMetricList();
-    getDimensionNFilterList();
+    getDimensionNValueList();
 }
 
 function getDashboardList(){
@@ -119,7 +119,7 @@ function getAnomalyMetricList() {
 
 
 
-function getDimensionNFilterList() {
+function getDimensionNValueList() {
 
     //Create dimension dropdown and filters
     var url = "/dashboard/data/filters?dataset=" + hash.dataset;
@@ -142,7 +142,6 @@ function getDimensionNFilterList() {
             filterDimensionListHtml += "<li class='filter-dimension-option' value='" + k + "'><a href='#' class='radio-options'>" + k + "</a></li>";
             window.datasetConfig.datasetDimensions.push(k)
         }
-
         $(".dimension-list").html(dimensionListHtml);
 
         //append filter dimension list
@@ -246,7 +245,7 @@ function getDatasetConfig() {
         var maxDate = moment(maxMillis).format("YYYY-MM-DD");
 
         //Add max and min time as a label time selection dropdown var minMillis = data["minTime"];
-        var maxDateTime = maxMillis ? moment(maxMillis).format("YYYY-MM-DD h a") : "n.a.";
+        var maxDateTime = maxMillis ? moment(maxMillis).format("YYYY-MM-DD h a z") : "n.a.";
         $(".max-time").text(maxDateTime);
 
         //todo add min time to info endpoint

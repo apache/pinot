@@ -36,6 +36,68 @@ $("#main-view").on("keyup, click","#monitoring-window-size", function(){
     setMonitoringWindowSize()
 });
 
+/** Monitoring window size selection **/
+$("#main-view").on("click",".dimension-option-manage-alert", function(){
+    selectAnomalyDimension(this)
+});
+
+$("#main-view").on("change", ".filter-value-checkbox, .filter-select-all-checkbox", function(){
+    enableApplyButton( $("#apply-filter-btn-manage-alert") )
+});
+
+
+/** Apply filter **/
+$("#main-view").on("click","#apply-filter-btn-manage-alert", function(){
+    applyFilterSelectionManageAlert()
+    function applyFilterSelectionManageAlert(){
+
+        var currentTabFilters = $("#filter-panel-manage-alert");
+
+        //Set hash params
+        var filters = {};
+        var labels = {};
+
+        $(".filter-value-checkbox", currentTabFilters).each(function(i, checkbox) {
+            var checkboxObj = $(checkbox);
+
+            if (checkboxObj.is(':checked')) {
+                var key = $(checkbox).attr("rel");
+                var value = $(checkbox).attr("value");
+                var valueAlias = $(checkbox).parent().text();
+
+                if(filters[key]){
+                    filters[key].push(value) ;
+                    //using alias for "", "?" values
+                    labels[key].push(valueAlias) ;
+                }else{
+                    filters[key] = [value];
+                    labels[key] = [valueAlias];
+                }
+            }
+        });
+
+
+        //Disable Apply filters button and close popup
+
+        //Todo: Show selected filters on dashboard
+        //empty previous filters labels
+        //$(".added-filter[tab='"+ hash.view +"']").remove()
+
+        //append new labels
+        var html = "";
+        for(k in labels){
+            var values = decodeURIComponent(labels[k])
+            html +=  "<li class='added-filter uk-button remove-filter-selection' rel='" + k + "' value='" + labels[k] + "' title='" + k + ": " + values +  "'>" + k + ": " + values + "<i class='uk-icon-close'></i></li>";
+        }
+        console.log('html')
+        console.log(html)
+
+        $("#selected-filters-list-manage-alert").html(html);
+
+        //$("#filter-panel-manage-alert").hide();
+    }
+});
+
 /** Monitoring repeat size selection **/
 $("#main-view").on("click",".monitoring-window-unit-option", function(){
     selectMonitoringWindowUnit(this)
@@ -67,21 +129,37 @@ function nameRule(){
     $("#manage-alert-success").hide();
 }
 
-function selectAnomalyDataset(target){
-    var value = $(target).attr("value");
-    //Populate the selected item on the form element
-    $("#selected-anomaly-dataset").text($(target).text());
-    $("#selected-anomaly-dataset").attr("value",value);
+function selectAnomalyDataset(target) {
 
-
-    var url = "/dashboard/data/metrics?dataset=" + value;
-    getData(url).done(function (data) {
+    var value = $(target).attr("value")
+    //Get metric list
+    var metricListUrl = "/dashboard/data/metrics?dataset=" + value;
+    getData(metricListUrl).done(function (data) {
 
         /* Handelbars template for manage anomalies form metric list */
         var anomalyFormMetricListData = {data: data, scope: "-manage-alert", singleMetricSelector: true};
         var result_anomaly_form_metric_list_template = HandleBarsTemplates.template_metric_list(anomalyFormMetricListData);
-        $(".manage-alert-metric-list").each(function(){ $(this).html(result_anomaly_form_metric_list_template)});
+        $(".manage-alert-metric-list").each(function () {
+            $(this).html(result_anomaly_form_metric_list_template)
+        });
     });
+
+    //Get dimension and filter list
+    var dimensionNDimensionValueListUrl = "/dashboard/data/filters?dataset=" + value;
+    getData(dimensionNDimensionValueListUrl).done(function (data){
+
+        var dimensionListHtml = "";
+        for (var k in  data) {
+            dimensionListHtml += "<li class='dimension-option-manage-alert' rel='dimensions' value='" + k + "'><a href='#' class='uk-dropdown-close'>" + k + "</a></li>";
+        }
+        $(".dimension-list-manage-alert").html(dimensionListHtml);
+
+        /* Handelbars template for dimensionvalues in filter dropdown */
+        var result_filter_dimension_value_template = HandleBarsTemplates.template_filter_dimension_value(data);
+        $(".dimension-values-manage-alert").after(result_filter_dimension_value_template);
+
+    })
+
 
     //close uikit dropdown
     $(target).closest("[data-uk-dropdown]").removeClass("uk-open");
@@ -97,11 +175,6 @@ function selectAnomalyDataset(target){
 }
 
 function selectAnomalyMetric(target){
-    var value = $(target).attr("value");
-
-    //Populate the selected item on the form element
-    $("#selected-metric-manage-alert").text($(target).text());
-    $("#selected-metric-manage-alert").attr("value",value);
 
     //If previously error was shown hide it
     if($("#manage-alert-error").attr("data-error-source") == "single-metric-option-manage-alert") {
@@ -113,11 +186,6 @@ function selectAnomalyMetric(target){
 };
 
 function selectAnomalyCondition(target){
-    var value = $(target).attr("value");
-    //Populate the selected item on the form element
-    $("#selected-anomaly-condition").text($(target).text());
-    $("#selected-anomaly-condition").attr("value",value);
-
     //If previously error was shown hide it
     if($("#manage-alert-error").attr("data-error-source") == "anomaly-condition") {
         $("#manage-alert-error").hide();
@@ -162,17 +230,27 @@ function setMonitoringWindowSize(){
 
 function selectMonitoringWindowUnit(target){
 
-    var unit = $(target).attr("unit");
-
-    //Update selectors
+    var value = $(target).attr("unit");
+    //Populate the selected item on the form element
     $("#selected-monitoring-window-unit").text($(target).text());
-    $("#selected-monitoring-window-unit").attr("unit", unit);
-
+    $("#selected-monitoring-window-unit").attr("value",value);
     //close uikit dropdown
     $(target).closest("[data-uk-dropdown]").removeClass("uk-open");
     $(target).closest("[data-uk-dropdown]").attr("aria-expanded", false);
-
 };
+
+
+function selectAnomalyDimension(target) {
+    //Hide success message
+    $("#manage-alert-success").hide();
+
+    $(".add-filter-manage-alert").removeClass("hidden")
+
+    //Unhide dimension values
+    $(".value-filter").hide();
+    var dimension= $(target).attr("value");
+    $(".value-filter[rel='"+ dimension +"']").css("display", "block");
+}
 
 function setMonitoringRepeatSize(){
 
@@ -188,22 +266,26 @@ function setMonitoringRepeatSize(){
 
 function selectAnomalyMonitoringRepeatUnit(target){
 
-    var unit = $(target).attr("unit");
+    var value = $(target).attr("unit");
+    //Populate the selected item on the form element
+    $("#selected-anomaly-monitoring-repeat-unit").text($(target).text());
+    $("#selected-anomaly-monitoring-repeat-unit").attr("value", value);
 
-    //Update selectors
-    $("#selected-monitoring-repeat-unit").text($(target).text());
-    $("#selected-monitoring-repeat-unit").attr("unit", unit);
     //close uikit dropdown
     $(target).closest("[data-uk-dropdown]").removeClass("uk-open");
     $(target).closest("[data-uk-dropdown]").attr("aria-expanded", false);
 
-    if(unit == "DAYS" ){
+    if(value == "DAYS" ){
+
+        //Display the inputfield for hours and timezone next to the hours
+        var timezone = getTimeZone();  //example: America/Los_Angeles
+        $("#local-timezone").html(moment().tz(timezone).format("z"));  //example: PST
         $("#monitoring-schedule").removeClass("hidden");
-    }else if(unit == "HOURS"){
+
+    }else if(value == "HOURS"){
         $("#monitoring-schedule").addClass("hidden");
         $("#monitoring-schedule-time").val("")
     }
-
 };
 
 function saveAlert(){
@@ -212,7 +294,6 @@ function saveAlert(){
     $("[data-uk-dropdown]").removeClass("uk-open");
     $("[data-uk-dropdown]").attr("aria-expanded", false);
     $(".uk-dropdown").addClass("hidden");
-
 
     //Currently only supporting 'user rule' type alert configuration on the front end
     // KALMAN and SCAN Statistics are set up by the backend
@@ -230,8 +311,7 @@ function saveAlert(){
     var windowUnit = $("#selected-monitoring-window-unit").attr("unit");
     var repeatEverySize = $("#monitoring-repeat-size").val();
     var repeatEveryUnit = $("#selected-monitoring-repeat-unit").attr("unit");
-
-    var monitoringScheduleTime = $("#monitoring-schedule-time").val() == "" ? $("#monitoring-schedule-time").val() : "00:00"; //Todo: in case of daily data granularity set the default schedule to time when datapoint is created
+    var monitoringScheduleTime = $("#monitoring-schedule-time").val() == "" ?  "00:00" : $("#monitoring-schedule-time").val() //Todo: in case of daily data granularity set the default schedule to time when datapoint is created
     var scheduleMinute = monitoringScheduleTime.substring(3, monitoringScheduleTime.length);
     var scheduleHour = monitoringScheduleTime.substring(0, monitoringScheduleTime.length -3);
 
@@ -240,6 +320,31 @@ function saveAlert(){
     }else{
        var isActive = false;
     }
+
+    readFiltersApplied();
+    function readFiltersApplied(){
+        var currentFilterContainer = $(".filter-selector-manage-alert")
+        var filters = {};
+
+        $(".added-filter",currentFilterContainer).each(function(){
+            var keyValue = $(this).attr("title").trim().split(":");
+            var dimension = keyValue[0];
+            var valuesAryToTrim = keyValue[1].trim().split(",")
+            var valuesAry = [];
+            for(var index=0, len= valuesAryToTrim.length; index < len; index++){
+                var value = valuesAryToTrim[index].trim();
+                if(value == "UNKNOWN"){
+                    value = "";
+                }
+
+                valuesAry.push(value)
+            }
+            filters[dimension] = valuesAry;
+        })
+        console.log(filters)
+        return filters
+    }
+
 
     var exploreDimension = "";
     var properties = "";
@@ -327,7 +432,11 @@ function saveAlert(){
 
 
     /* Submit form */
-    var url = "/dashboard/anomaly-function/create?dataset=" + dataset + "&metric=" + metric + "&type=" + type + "&functionName=" + functionName + "&windowSize=" + windowSize + "&windowUnit=" + windowUnit + "&windowDelay=" + windowDelay + "&scheduleMinute=" + scheduleMinute  + "&scheduleHour=" + scheduleHour + "&repeatEverySize=" + repeatEverySize + "&repeatEveryUnit=" + repeatEveryUnit + "&exploreDimension=" + exploreDimension + "&isActive=" +  isActive + "&properties=baseline=" + "w/w" + ";changeThreshold=" + condition + changeThreshold + ";";
+    var url = "/dashboard/anomaly-function/create?dataset=" + dataset + "&metric=" + metric + "&type=" + type + "&functionName=" + functionName
+    + "&windowSize=" + windowSize + "&windowUnit=" + windowUnit + "&windowDelay=" + windowDelay
+    + "&scheduleMinute=" + scheduleMinute  + "&scheduleHour=" + scheduleHour
+    + "&repeatEverySize=" + repeatEverySize + "&repeatEveryUnit=" + repeatEveryUnit
+    + "&exploreDimension=" + exploreDimension + "&isActive=" +  isActive + "&properties=baseline=" + "w/w" + ";changeThreshold=" + condition + changeThreshold + ";";
 
    submitData(url).done(function(){
 

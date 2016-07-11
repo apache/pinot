@@ -17,6 +17,11 @@
         radioButtons(this)
     });
 
+    $("#main-view").on("click",".uk-nav-dropdown.single-select li",function(){
+        populateSingleSelect(this);
+
+    });
+
     /** Dataset selection **/
     $("#main-view").on("click",".dataset-option", function(){
         selectDatasetNGetFormData(this)
@@ -45,25 +50,25 @@
         selectDashboard(this)
     });
 
-    /** Metric selection **/
+    /** Metric selection multi-select**/
     $("#main-view").on("click",".metric-option", function(){
         selectMetrics(this)
-    })
+    });
 
-    /** Metric selection **/
+    /** Metric selection single-select **/
     $("#main-view").on("click",".single-metric-option", function(){
         selectSingleMetric(this)
-    })
+    });
 
     /** Dimension selection **/
     $("#main-view").on("click",".dimension-option", function(){
        selectDimension(this)
-    })
+    });
 
     /** Dimension select all **/
     $("#main-view").on("click",".dropdown-toggle-all", function(){
         toggleAllDimensions(this)
-    })
+    });
 
     /** Remove selected Metric or Dimension item **/
     $("#main-view").on("click",".remove-selection", function(){
@@ -88,6 +93,14 @@
         }
     }
 
+    function populateSingleSelect(target){
+
+        var selectorRoot = $(target).closest("[data-uk-dropdown]");
+        var value = $(target).attr("value");
+        $("div:first-child", selectorRoot).text(value);
+        $("div:first-child", selectorRoot).attr("value", value);
+    }
+
     //Advanced settings
     function closeClosestDropDown(target){
 
@@ -102,7 +115,6 @@
     }
 
     function selectDatasetNGetFormData(target){
-
 
 
         //Cleanup form: Remove added-item and added-filter, metrics of the previous dataset
@@ -141,10 +153,6 @@
         //get the latest available data timestamp of a dataset
         getAllFormData()
 
-        //Populate the selected item on the form element
-        $(".selected-dataset").text($(target).text());
-        $(".selected-dataset").attr("value",value);
-
         //Close uikit dropdown
         $(target).closest("[data-uk-dropdown]").removeClass("uk-open");
         $(target).closest("[data-uk-dropdown]").attr("aria-expanded", false);
@@ -164,8 +172,8 @@
         hash.dashboard = value;
 
         //Update selectors
-        $("#selected-dashboard").text($(target).text());
-        $("#selected-dashboard").attr("value",value);
+//        $("#selected-dashboard").text($(target).text());
+//        $("#selected-dashboard").attr("value",value);
 
         //If previously error was shown hide it
         if($("#"+ hash.view +"-time-input-form-error").attr("data-error-source") == "dashboard-option"){
@@ -237,7 +245,6 @@
         enableFormSubmit()
 
     }
-
 
     function selectDimension(target){
 
