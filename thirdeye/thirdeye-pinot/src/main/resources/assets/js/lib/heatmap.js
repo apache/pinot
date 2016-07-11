@@ -123,10 +123,15 @@ function renderD3heatmap(data, tab) {
             var placeholder_1 = '#metric_' + metric + '_dim_' + d + '_treemap_1'
             var placeholder_2 = '#metric_' + metric + '_dim_' + d + '_treemap_2'
 
-            var tooltipWidthPx = $("#tooltip").css("width") ;
-            var tooltipHeightPx = $("#tooltip").css("height");
+
+
 
             var mousemove = function(d) {
+
+                var tooltipWidthPx = $("#tooltip").css("width") ;
+                var tooltipHeightPx = $("#tooltip").css("height");
+                var tooltipWidth = tooltipWidthPx.substring(0, tooltipWidthPx.length-2);
+
 
                 var target = $(this)//$(event.target)
                 var dimension = target.attr("data-dimension");
@@ -136,12 +141,6 @@ function renderD3heatmap(data, tab) {
 
                 var treemapOffset = $($(".dimension-treemap")[0]).offset();
 
-                var fontWidth = 10;
-                var textWidth = value.length * fontWidth;
-                var tooltipWidth = tooltipWidthPx.substring(0, tooltipWidthPx.length-2);
-                if (textWidth > (2/3) * tooltipWidth ) {
-                    tooltipWidth = 85 + textWidth;
-                }
                 var tooltipHeightOffset = parseInt(tooltipHeightPx.substring(0, tooltipHeightPx.length -2) ) / 2;
                 var tooltipWidthOffset = tooltipWidth/2;
 
@@ -167,20 +166,17 @@ function renderD3heatmap(data, tab) {
                     d3.select("#tooltip #baseline-contribution").text( dimData[valueId][schema["baselineContribution"]]);
                     d3.select("#tooltip #current-contribution").text( dimData[valueId][schema["currentContribution"]]);
                     d3.select("#tooltip #contribution-diff").text( dimData[valueId][schema["contributionDifference"]] + '%');
-                    d3.select("#tooltip").classed("hidden", false);
-
-                d3.select("#tooltip").style("width", (tooltipWidth) + "px");
 
                 if (cellSizeExpression != null && undefined != cellSizeExpression) {
                     var cellSizeExpressionDisplay = dimData[valueId][schema["deltaSize"]] + " (" + cellSizeExpression + ")";
                     d3.select("#tooltip #baseline-value").text( dimData[valueId][schema["baselineValue"]] + " (" + dimData[valueId][schema["numeratorBaseline"]] + "/" + dimData[valueId][schema["denominatorBaseline"]] +")");
                     d3.select("#tooltip #current-value").text( dimData[valueId][schema["currentValue"]] + " (" + dimData[valueId][schema["numeratorCurrent"]] + "/" + dimData[valueId][schema["denominatorCurrent"]] + ")");
                     d3.select("#tooltip #cell-size").text( cellSizeExpressionDisplay );
-                    d3.select("#tooltip #cell-size-row").classed("hidden", false);
                 } else {
                     d3.select("#tooltip #baseline-value").text( dimData[valueId][schema["baselineValue"]]);
                     d3.select("#tooltip #current-value").text( dimData[valueId][schema["currentValue"]]);
                 }
+                d3.select("#tooltip").classed("hidden", false);
             };
 
             var mouseleave = function() {

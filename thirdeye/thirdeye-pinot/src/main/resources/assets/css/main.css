@@ -765,17 +765,27 @@ body a{
 }
 
 #tooltip table {
+    table-layout:fixed;
     width: 100%;
+    max-width: 230px;
     padding: 0;
 }
+
 
 #tooltip tr {
     height:20px;
 }
 
+#tooltip td:first-child {
+    white-space: nowrap;
+}
+
 #tooltip td:nth-child(2) {
     text-align:right;
+    word-wrap:break-word;
 }
+
+
 
 .dimension-treemap{
     cursor: pointer;
