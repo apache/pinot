@@ -153,6 +153,10 @@
         //get the latest available data timestamp of a dataset
         getAllFormData()
 
+        //Populate the selected item on the form element
+        $(".selected-dataset").text($(target).text());
+        $(".selected-dataset").attr("value",value);
+
         //Close uikit dropdown
         $(target).closest("[data-uk-dropdown]").removeClass("uk-open");
         $(target).closest("[data-uk-dropdown]").attr("aria-expanded", false);
