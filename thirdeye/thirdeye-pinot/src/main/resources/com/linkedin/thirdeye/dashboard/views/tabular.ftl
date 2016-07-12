@@ -1,4 +1,4 @@
-<section id="custom-funnel-section" class="hidden" style="margin: 0;">
+<section id="metrics-section" class="hidden" style="margin: 0;">
 	<script id="funnels-table-template" type="text/x-handlebars-template">
     <ul class="uk-display-inline-block uk-float-left">
         <li id="sum-detail" class="uk-display-inline-block uk-button-group uk-margin" data-uk-button-radio="">
@@ -41,7 +41,6 @@
                     <th>Ratio</th>
                     {{/each}}
                 </tr>
-
             </thead>
 
             <!-- Table of discrete values -->
@@ -61,7 +60,6 @@
                 </tr>
                 {{/each}}
             </tbody>
-
 
             <!-- Table of cumulative values -->
             <tbody class="cumulative-values hidden">

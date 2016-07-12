@@ -9,11 +9,6 @@ function getDataSetList(){
         var result_datasets_template = HandleBarsTemplates.template_datasets(queryFormDatasetData);
         $(".landing-dataset").each(function(){ $(this).html(result_datasets_template)});
 
-        /* Handelbars template for anomaly form datasets dropdown */
-        var anomalyFormDatasetData = {data: data, scope: "-manage-alert"}
-        var result_anomly_datasets_template = HandleBarsTemplates.template_datasets(anomalyFormDatasetData);
-        $(".anomaly-dataset").each(function(){ $(this).html(result_anomly_datasets_template)});
-
         $(".selected-dataset").text("Select dataset");
 
         if (hash.hasOwnProperty('dataset')) {

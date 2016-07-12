@@ -347,7 +347,8 @@ body a{
 }
 
 
-.display-chart-section{
+.display-chart-section,
+.display-main-content-section{
     height: 100%;
     padding: 12px;;
 }
@@ -822,7 +823,6 @@ body a{
     height: 300px;
 
 }
-
 
 #anomalies-display-chart-section #barchart-placeholder {
     display: none;

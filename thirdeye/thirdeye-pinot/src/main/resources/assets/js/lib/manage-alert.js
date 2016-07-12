@@ -3,7 +3,8 @@
 
 /** Dataset selection **/
 $("#main-view").on("click",".dataset-option-manage-alert", function(){
-    selectAnomalyDataset(this)
+    selectDatasetNGetFormData(this)
+    //selectAnomalyDataset(this)
 });
 
 $("#main-view").on("keyup", "#rule", function(){
@@ -303,7 +304,7 @@ function saveAlert(){
 
     //Collect the form values
     var functionName = $("#rule").val();
-    var dataset = $("#selected-anomaly-dataset").attr("value");
+    var dataset = $(".selected-dataset").attr("value");
     var metric = $("#selected-metric-manage-alert").attr("value");
     var condition =( $("#selected-anomaly-condition").attr("value") == "DROPS" ) ? "-" :  ( $("#selected-anomaly-condition").attr("value") == "INCREASES" )  ? "" : null;
     var changeThreshold = parseFloat( $("#anomaly-threshold").val() / 100);

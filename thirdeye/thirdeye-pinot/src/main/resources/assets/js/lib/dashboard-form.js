@@ -160,8 +160,6 @@
         //Close uikit dropdown
         $(target).closest("[data-uk-dropdown]").removeClass("uk-open");
         $(target).closest("[data-uk-dropdown]").attr("aria-expanded", false);
-
-
     }
 
     function switchHeaderTab(target){

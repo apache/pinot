@@ -1,4 +1,4 @@
-<section id="custom-funnel-section" class="hidden" style="margin: 0;">
+<section id="time-series-section" class="hidden" style="margin: 0;">
 	<script id="time-series-template" type="text/x-handlebars-template">
 {{#each metrics as |metricName metricIndex|}}
       <br>Select Metric: <select>
