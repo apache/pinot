@@ -28,7 +28,7 @@ import com.linkedin.thirdeye.util.ThirdEyeUtils;
     @NamedQuery(name = "com.linkedin.thirdeye.api.AnomalyFunctionSpec#findAll", query = "SELECT af FROM AnomalyFunctionSpec af"),
     @NamedQuery(name = "com.linkedin.thirdeye.api.AnomalyFunctionSpec#findAllByCollection", query = "SELECT af FROM AnomalyFunctionSpec af WHERE af.collection = :collection"),
     @NamedQuery(name = "com.linkedin.thirdeye.api.AnomalyFunctionSpec#toggleActive", query = "UPDATE AnomalyFunctionSpec set isActive = :isActive WHERE id = :id"),
-    @NamedQuery(name = "com.linkedin.thirdeye.api.AnomalyFunctionSpec#findDistinctMetricsByCollection", query = "SELECT DISTINCT(af.metric) FROM AnomalyFunctionSpec af WHERE af.collection = :collection"),
+    @NamedQuery(name = "com.linkedin.thirdeye.api.AnomalyFunctionSpec#findDistinctMetricsByCollection", query = "SELECT DISTINCT(af.metric) FROM AnomalyFunctionSpec af WHERE af.collection = :collection")
 })
 public class AnomalyFunctionSpec {
   @Id
@@ -215,6 +215,7 @@ public class AnomalyFunctionSpec {
     return filters;
   }
 
+  @JsonIgnore
   public Multimap<String, String> getFilterSet() {
     return ThirdEyeUtils.getFilterSet(filters);
   }
