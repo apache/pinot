@@ -14,9 +14,12 @@ import javax.persistence.NamedQuery;
 import javax.persistence.Table;
 
 import com.google.common.base.MoreObjects;
-import com.linkedin.thirdeye.anomaly.JobRunner;
 import com.linkedin.thirdeye.anomaly.JobRunner.JobStatus;
 
+/**
+ * This class corresponds to anomaly tasks. An execution of an anomaly function creates an anomaly job, which in turn
+ * spawns into 1 or more anomaly tasks. The anomaly tasks are picked by the workers
+ */
 @Entity
 @Table(name = "anomaly_tasks")
 @NamedQueries({

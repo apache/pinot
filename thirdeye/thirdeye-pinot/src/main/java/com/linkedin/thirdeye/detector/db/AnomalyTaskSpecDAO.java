@@ -41,7 +41,6 @@ public class AnomalyTaskSpecDAO extends AbstractDAO<AnomalyTaskSpec> {
       int numRowsUpdated = namedQuery("com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#updateStatus")
           .setParameter("taskId", taskId).setParameter("oldStatus", oldStatus).setParameter("newStatus", newStatus)
           .executeUpdate();
-      System.out.println("numRowsUpdated:" + numRowsUpdated);
       return numRowsUpdated == 1;
     } catch (HibernateException exception) {
       exception.printStackTrace();

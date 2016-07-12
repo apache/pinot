@@ -12,6 +12,9 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.Callable;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
 import com.linkedin.thirdeye.detector.ThirdEyeDetectorConfiguration;
@@ -20,6 +23,10 @@ import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 
 public class ThirdEyeAnomalyApplication
     extends BaseThirdEyeApplication<ThirdEyeAnomalyConfiguration> {
+
+  private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeAnomalyApplication.class);
+  private JobScheduler jobScheduler = null;
+  private TaskDriver taskDriver = null;
 
   public static void main(final String[] args) throws Exception {
     List<String> argList = new ArrayList<String>(Arrays.asList(args));
@@ -58,20 +65,22 @@ public class ThirdEyeAnomalyApplication
   public void run(final ThirdEyeAnomalyConfiguration config, final Environment environment)
       throws Exception {
 
-    System.out.println("Starting............");
-    System.out.println("------------------------" + config.isScheduler() + " " + config.isWorker());
-
+    LOG.info("Starting ThirdeyeAnomalyApplication : Scheduler {} Worker {}", config.isScheduler(), config.isWorker());
     super.initDetectorRelatedDAO();
     ThirdEyeCacheRegistry.initializeDetectorCaches(config);
 
     final AnomalyFunctionFactory anomalyFunctionFactory =
         new AnomalyFunctionFactory(config.getFunctionConfigPath());
 
-    final JobScheduler jobScheduler = new JobScheduler(anomalyJobSpecDAO, anomalyTaskSpecDAO,
-        anomalyFunctionSpecDAO, hibernateBundle.getSessionFactory());
-    final TaskDriver taskDriver =
-        new TaskDriver(anomalyTaskSpecDAO, anomalyResultDAO, anomalyFunctionRelationDAO, hibernateBundle.getSessionFactory(), anomalyFunctionFactory);
-
+    if (config.isScheduler()) {
+      jobScheduler = new JobScheduler(anomalyJobSpecDAO, anomalyTaskSpecDAO,
+          anomalyFunctionSpecDAO, hibernateBundle.getSessionFactory());
+    }
+    if (config.isWorker()) {
+      taskDriver =
+        new TaskDriver(anomalyTaskSpecDAO, anomalyResultDAO, anomalyFunctionRelationDAO,
+            hibernateBundle.getSessionFactory(), anomalyFunctionFactory);
+    }
 
 
     environment.lifecycle().manage(new Managed() {

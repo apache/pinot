@@ -19,7 +19,6 @@ import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.joda.JodaModule;
 import com.linkedin.thirdeye.detector.api.AnomalyFunctionSpec;
 import com.linkedin.thirdeye.detector.api.AnomalyJobSpec;
 import com.linkedin.thirdeye.detector.api.AnomalyTaskSpec;
@@ -31,9 +30,6 @@ public class JobRunner implements Job {
 
   private static final Logger LOG = LoggerFactory.getLogger(JobRunner.class);
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-
-  static {
-  }
 
   public static final String THIRDEYE_JOB_CONTEXT = "THIRDEYE_JOB_CONTEXT";
 
@@ -103,15 +99,15 @@ public class JobRunner implements Job {
     thirdEyeJobContext.setWindowEnd(windowEnd);
 
     // write to anomaly_jobs
-    Long jobExecutionId = createAnomlyJob(jobName);
+    Long jobExecutionId = createAnomalyJob(jobName);
     thirdEyeJobContext.setJobExecutionId(jobExecutionId);
 
     // write to anomaly_tasks
-    List<Long> taskIds = createAnomlyTasks(anomalyFunctionSpec);
+    List<Long> taskIds = createAnomalyTasks(anomalyFunctionSpec);
 
   }
 
-  private long createAnomlyJob(String jobName) {
+  private long createAnomalyJob(String jobName) {
     Session session = sessionFactory.openSession();
     Long jobExecutionId = null;
     try {
@@ -142,7 +138,7 @@ public class JobRunner implements Job {
     return jobExecutionId;
   }
 
-  private List<Long> createAnomlyTasks(AnomalyFunctionSpec anomalyFunctionSpec) {
+  private List<Long> createAnomalyTasks(AnomalyFunctionSpec anomalyFunctionSpec) {
     Session session = sessionFactory.openSession();
     List<Long> taskIds = new ArrayList<>();
     try {

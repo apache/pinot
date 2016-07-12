@@ -56,17 +56,19 @@ public class JobScheduler {
     //read the anomaly function specs
     List<AnomalyFunctionSpec>  functionSpecs = readAnomalyFunctionSpecs();
     for (AnomalyFunctionSpec anomalyFunctionSpec : functionSpecs) {
-      thirdEyeJobContext = new ThirdEyeJobContext();
-      thirdEyeJobContext.setAnomalyFunctionSpecDAO(anomalyFunctionSpecDAO);
-      thirdEyeJobContext.setAnomalyJobSpecDAO(anomalyJobSpecDAO);
-      thirdEyeJobContext.setAnomalyTaskSpecDAO(anomalyTaskSpecDAO);
-      thirdEyeJobContext.setAnomalyFunctionFactory(anomalyFunctionFactory);
-      thirdEyeJobContext.setSessionFactory(sessionFactory);
-      thirdEyeJobContext.setAnomalyFunctionId(anomalyFunctionSpec.getId());
-      String jobName = String.format("%s_%d", anomalyFunctionSpec.getFunctionName(), anomalyFunctionSpec.getId());
-      thirdEyeJobContext.setJobName(jobName);
+      if (anomalyFunctionSpec.getIsActive()) {
+        thirdEyeJobContext = new ThirdEyeJobContext();
+        thirdEyeJobContext.setAnomalyFunctionSpecDAO(anomalyFunctionSpecDAO);
+        thirdEyeJobContext.setAnomalyJobSpecDAO(anomalyJobSpecDAO);
+        thirdEyeJobContext.setAnomalyTaskSpecDAO(anomalyTaskSpecDAO);
+        thirdEyeJobContext.setAnomalyFunctionFactory(anomalyFunctionFactory);
+        thirdEyeJobContext.setSessionFactory(sessionFactory);
+        thirdEyeJobContext.setAnomalyFunctionId(anomalyFunctionSpec.getId());
+        String jobName = String.format("%s_%d", anomalyFunctionSpec.getFunctionName(), anomalyFunctionSpec.getId());
+        thirdEyeJobContext.setJobName(jobName);
 
-      scheduleJob(thirdEyeJobContext, anomalyFunctionSpec);
+        scheduleJob(thirdEyeJobContext, anomalyFunctionSpec);
+      }
     }
   }
 

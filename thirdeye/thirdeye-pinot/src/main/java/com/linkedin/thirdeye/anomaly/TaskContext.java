@@ -2,22 +2,15 @@ package com.linkedin.thirdeye.anomaly;
 
 import org.hibernate.SessionFactory;
 
-import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClient;
 import com.linkedin.thirdeye.detector.db.AnomalyFunctionRelationDAO;
 import com.linkedin.thirdeye.detector.db.AnomalyResultDAO;
 
 public class TaskContext {
 
-  PinotThirdEyeClient thirdEyeClient;
   private AnomalyResultDAO resultDAO;
   private AnomalyFunctionRelationDAO relationDAO;
   private SessionFactory sessionFactory;
-  public PinotThirdEyeClient getThirdEyeClient() {
-    return thirdEyeClient;
-  }
-  public void setThirdEyeClient(PinotThirdEyeClient thirdEyeClient) {
-    this.thirdEyeClient = thirdEyeClient;
-  }
+
   public AnomalyResultDAO getResultDAO() {
     return resultDAO;
   }

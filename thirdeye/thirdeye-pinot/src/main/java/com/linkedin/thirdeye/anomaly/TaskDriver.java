@@ -96,7 +96,7 @@ public class TaskDriver {
     for (Callable<Void> callable : callables) {
       taskExecutorService.submit(callable);
     }
-    System.out.println(Thread.currentThread().getId() + " : Started task driver");
+    LOG.info(Thread.currentThread().getId() + " : Started task driver");
   }
 
   public void stop() {
