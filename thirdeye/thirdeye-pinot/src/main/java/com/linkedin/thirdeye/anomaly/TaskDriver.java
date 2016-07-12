@@ -64,12 +64,15 @@ public class TaskDriver {
         public Void call() throws Exception {
           while (!shutdown) {
 
-            LOG.info("Finding next task to execute for threadId:{}",
+            LOG.info(Thread.currentThread().getId() + " : Finding next task to execute for threadId:{}",
                 Thread.currentThread().getId());
 
+            // select a task to execute, and update it to RUNNING
             AnomalyTaskSpec anomalyTaskSpec = selectAndUpdate();
-            LOG.info("Executing task: {} {}", anomalyTaskSpec.getTaskId(),
+            LOG.info(Thread.currentThread().getId() + " : Executing task: {} {}", anomalyTaskSpec.getTaskId(),
                 anomalyTaskSpec.getTaskInfo());
+
+            // execute the selected task
             TaskRunner taskRunner = new TaskRunner(anomalyFunctionFactory);
             TaskInfo taskInfo = null;
             try {
@@ -78,27 +81,12 @@ public class TaskDriver {
               LOG.error("Exception in converting taskInfo string to TaskInfo {}",
                   anomalyTaskSpec.getTaskInfo(), e);
             }
-            LOG.info("Task Info {}", taskInfo);
+            LOG.info(Thread.currentThread().getId() + " : Task Info {}", taskInfo);
             List<AnomalyResult> anomalyResults = taskRunner.execute(taskInfo, taskContext);
-            LOG.info("DONE Executing task: {}", anomalyTaskSpec.getTaskId());
-            Session session = sessionFactory.openSession();
-            ManagedSessionContext.bind(session);
-            Transaction transaction = null;
-            try {
-              transaction = session.beginTransaction();
-              anomalyTaskSpecDAO.updateStatus(anomalyTaskSpec.getTaskId(), JobStatus.RUNNING,
-                  JobStatus.COMPLETED);
-              if (!transaction.wasCommitted()) {
-                transaction.commit();
-              }
-            } catch (Exception e) {
-              if (transaction != null) {
-                transaction.rollback();
-              }
-            } finally {
-              session.close();
-              ManagedSessionContext.unbind(sessionFactory);
-            }
+            LOG.info(Thread.currentThread().getId() + " : DONE Executing task: {}", anomalyTaskSpec.getTaskId());
+
+            // update status to COMPLETED
+            updateStatus(anomalyTaskSpec.getTaskId(), JobStatus.RUNNING, JobStatus.COMPLETED);
           }
           return null;
         }
@@ -108,7 +96,7 @@ public class TaskDriver {
     for (Callable<Void> callable : callables) {
       taskExecutorService.submit(callable);
     }
-    System.out.println("Started task driver");
+    System.out.println(Thread.currentThread().getId() + " : Started task driver");
   }
 
   public void stop() {
@@ -116,9 +104,9 @@ public class TaskDriver {
   }
 
   private AnomalyTaskSpec selectAndUpdate() throws Exception {
-    LOG.info("Starting selectAndUpdate {}", Thread.currentThread().getId());
+    LOG.info(Thread.currentThread().getId() + " : Starting selectAndUpdate {}", Thread.currentThread().getId());
     AnomalyTaskSpec acquiredTask = null;
-    LOG.info("Trying to find a task to execute");
+    LOG.info(Thread.currentThread().getId() + " : Trying to find a task to execute");
     do {
       Session session = sessionFactory.openSession();
       ManagedSessionContext.bind(session);
@@ -127,20 +115,22 @@ public class TaskDriver {
 
         List<AnomalyTaskSpec> anomalyTasks =
             anomalyTaskSpecDAO.findByStatusOrderByCreateTimeAscending(JobStatus.WAITING);
-        LOG.debug("Found {} tasks in waiting state", anomalyTasks.size());
+        if (anomalyTasks.size() > 0)
+          LOG.info(Thread.currentThread().getId() + " : Found {} tasks in waiting state", anomalyTasks.size());
+
         for (AnomalyTaskSpec anomalyTaskSpec : anomalyTasks) {
           transaction = session.beginTransaction();
-          LOG.info("Trying to acquire task : {}", anomalyTaskSpec.getTaskId());
+          LOG.info(Thread.currentThread().getId() + " : Trying to acquire task : {}", anomalyTaskSpec.getTaskId());
           boolean success = anomalyTaskSpecDAO.updateStatus(anomalyTaskSpec.getTaskId(),
               JobStatus.WAITING, JobStatus.RUNNING);
-          LOG.info("Task acquired success: {}", success);
+          LOG.info(Thread.currentThread().getId() + " : Task acquired success: {}", success);
           if (success) {
             acquiredTask = anomalyTaskSpec;
-            if (!transaction.wasCommitted()) {
-              transaction.commit();
-            }
             break;
           }
+        }
+        if (!transaction.wasCommitted()) {
+          transaction.commit();
         }
         Thread.sleep(1000);
       } catch (Exception e) {
@@ -152,9 +142,34 @@ public class TaskDriver {
         ManagedSessionContext.unbind(sessionFactory);
       }
     } while (acquiredTask == null);
-    LOG.info("Acquired task ======" + acquiredTask);
+    LOG.info(Thread.currentThread().getId() + " : Acquired task ======" + acquiredTask);
 
     return acquiredTask;
+  }
+
+  private void updateStatus(long taskId, JobStatus oldStatus, JobStatus newStatus) throws Exception {
+    LOG.info(Thread.currentThread().getId() + " : Starting updateStatus {}", Thread.currentThread().getId());
+
+    Session session = sessionFactory.openSession();
+    ManagedSessionContext.bind(session);
+    Transaction transaction = null;
+    try {
+      transaction = session.beginTransaction();
+
+      boolean updateStatus = anomalyTaskSpecDAO.updateStatus(taskId, oldStatus, newStatus);
+      LOG.info(Thread.currentThread().getId() + " : update status {}", updateStatus);
+
+      if (!transaction.wasCommitted()) {
+        transaction.commit();
+      }
+    } catch (Exception e) {
+      if (transaction != null) {
+        transaction.rollback();
+      }
+    } finally {
+      session.close();
+      ManagedSessionContext.unbind(sessionFactory);
+    }
   }
 
 }

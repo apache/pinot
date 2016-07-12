@@ -18,8 +18,8 @@ import com.linkedin.thirdeye.detector.ThirdEyeDetectorConfiguration;
 import com.linkedin.thirdeye.detector.db.HibernateSessionWrapper;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 
-public class TestThirdEyeAnomalyApplication
-    extends BaseThirdEyeApplication<ThirdEyeDetectorConfiguration> {
+public class ThirdEyeAnomalyApplication
+    extends BaseThirdEyeApplication<ThirdEyeAnomalyConfiguration> {
 
   public static void main(final String[] args) throws Exception {
     List<String> argList = new ArrayList<String>(Arrays.asList(args));
@@ -41,10 +41,10 @@ public class TestThirdEyeAnomalyApplication
   }
 
   @Override
-  public void initialize(final Bootstrap<ThirdEyeDetectorConfiguration> bootstrap) {
-    bootstrap.addBundle(new MigrationsBundle<ThirdEyeDetectorConfiguration>() {
+  public void initialize(final Bootstrap<ThirdEyeAnomalyConfiguration> bootstrap) {
+    bootstrap.addBundle(new MigrationsBundle<ThirdEyeAnomalyConfiguration>() {
       @Override
-      public DataSourceFactory getDataSourceFactory(ThirdEyeDetectorConfiguration config) {
+      public DataSourceFactory getDataSourceFactory(ThirdEyeAnomalyConfiguration config) {
         return config.getDatabase();
       }
     });
@@ -55,8 +55,11 @@ public class TestThirdEyeAnomalyApplication
   }
 
   @Override
-  public void run(final ThirdEyeDetectorConfiguration config, final Environment environment)
+  public void run(final ThirdEyeAnomalyConfiguration config, final Environment environment)
       throws Exception {
+
+    System.out.println("Starting............");
+    System.out.println("------------------------" + config.isScheduler() + " " + config.isWorker());
 
     super.initDetectorRelatedDAO();
     ThirdEyeCacheRegistry.initializeDetectorCaches(config);
@@ -70,6 +73,7 @@ public class TestThirdEyeAnomalyApplication
         new TaskDriver(anomalyTaskSpecDAO, anomalyResultDAO, anomalyFunctionRelationDAO, hibernateBundle.getSessionFactory(), anomalyFunctionFactory);
 
 
+
     environment.lifecycle().manage(new Managed() {
       @Override
       public void start() throws Exception {
@@ -77,9 +81,12 @@ public class TestThirdEyeAnomalyApplication
             .execute(new Callable<Void>() {
           @Override
           public Void call() throws Exception {
-            taskDriver.start();
-            jobScheduler.start();
-            //testerClass.start();
+            if (config.isWorker()) {
+              taskDriver.start();
+            }
+            if (config.isScheduler()) {
+              jobScheduler.start();
+            }
             return null;
           }
         });
@@ -87,8 +94,12 @@ public class TestThirdEyeAnomalyApplication
 
       @Override
       public void stop() throws Exception {
-        taskDriver.stop();
-        jobScheduler.stop();
+        if (config.isWorker()) {
+          taskDriver.stop();
+        }
+        if (config.isScheduler()) {
+          jobScheduler.stop();
+        }
       }
     });
   }
