@@ -34,14 +34,16 @@ public class TaskDriver {
   private AnomalyFunctionRelationDAO anomalyFunctionRelationDAO;
   private SessionFactory sessionFactory;
   private TaskContext taskContext;
+  private long workerId;
 
   volatile boolean shutdown = false;
   private static int MAX_PARALLEL_TASK = 3;
   private AnomalyFunctionFactory anomalyFunctionFactory;
 
-  public TaskDriver(AnomalyTaskSpecDAO anomalyTaskSpecDAO, AnomalyResultDAO anomalyResultDAO,
+  public TaskDriver(long workerId, AnomalyTaskSpecDAO anomalyTaskSpecDAO, AnomalyResultDAO anomalyResultDAO,
       AnomalyFunctionRelationDAO anomalyFunctionRelationDAO, SessionFactory sessionFactory,
       AnomalyFunctionFactory anomalyFunctionFactory) {
+    this.workerId = workerId;
     this.anomalyTaskSpecDAO = anomalyTaskSpecDAO;
     this.anomalyResultDAO = anomalyResultDAO;
     this.anomalyFunctionRelationDAO = anomalyFunctionRelationDAO;
@@ -121,7 +123,7 @@ public class TaskDriver {
         for (AnomalyTaskSpec anomalyTaskSpec : anomalyTasks) {
           transaction = session.beginTransaction();
           LOG.info(Thread.currentThread().getId() + " : Trying to acquire task : {}", anomalyTaskSpec.getTaskId());
-          boolean success = anomalyTaskSpecDAO.updateStatus(anomalyTaskSpec.getTaskId(),
+          boolean success = anomalyTaskSpecDAO.updateStatusAndWorkerId(workerId, anomalyTaskSpec.getTaskId(),
               JobStatus.WAITING, JobStatus.RUNNING);
           LOG.info(Thread.currentThread().getId() + " : Task acquired success: {}", success);
           if (success) {

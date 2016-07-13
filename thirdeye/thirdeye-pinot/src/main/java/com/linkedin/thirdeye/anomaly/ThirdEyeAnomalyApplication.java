@@ -78,7 +78,7 @@ public class ThirdEyeAnomalyApplication
     }
     if (config.isWorker()) {
       taskDriver =
-        new TaskDriver(anomalyTaskSpecDAO, anomalyResultDAO, anomalyFunctionRelationDAO,
+        new TaskDriver(config.getId(), anomalyTaskSpecDAO, anomalyResultDAO, anomalyFunctionRelationDAO,
             hibernateBundle.getSessionFactory(), anomalyFunctionFactory);
     }
 
