@@ -87,7 +87,7 @@ public class TaskRunner {
     TimeGranularity timeGranularity = new TimeGranularity(anomalyFunctionSpec.getBucketSize(),
         anomalyFunctionSpec.getBucketUnit());
     // TODO put sum into the function config
-    metricFunction = new MetricFunction(MetricFunction.SUM, anomalyFunctionSpec.getMetric());
+    metricFunction = new MetricFunction(MetricFunction.Function.SUM, anomalyFunctionSpec.getMetric());
 
     // Collection
     collection = anomalyFunctionSpec.getCollection();

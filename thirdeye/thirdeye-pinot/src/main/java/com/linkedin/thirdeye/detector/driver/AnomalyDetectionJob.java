@@ -164,8 +164,8 @@ public class AnomalyDetectionJob implements Job {
     // Compute metric function
     TimeGranularity timeGranularity =
         new TimeGranularity(spec.getBucketSize(), spec.getBucketUnit());
-    // TODO put sum into the function config
-    metricFunction = new MetricFunction(MetricFunction.SUM, spec.getMetric());
+
+    metricFunction = new MetricFunction(anomalyFunction.getFunction(), spec.getMetric());
 
     // Collection
     collection = spec.getCollection();
@@ -182,7 +182,23 @@ public class AnomalyDetectionJob implements Job {
     }
     // Get existing anomalies for this time range
     knownAnomalies = getExistingAnomalies();
+    Queue<TimeSeriesRequest> timeSeriesRequestQueue =
+        getTimeSeriesRequests(spec, windowEndProp, windowStartProp, timeGranularity);
 
+    while (!timeSeriesRequestQueue.isEmpty()) {
+      try {
+        List<TimeSeriesRequest> nextRequests = exploreCombination(timeSeriesRequestQueue.remove());
+        // TODO support further/deeper exploration
+        // timeSeriesRequestQueue.addAll(nextRequests);
+      } catch (Exception e) {
+        throw new JobExecutionException(e);
+      }
+    }
+    LOG.info("{} anomalies found in total", anomalyCounter);
+  }
+
+  private Queue<TimeSeriesRequest> getTimeSeriesRequests(AnomalyFunctionSpec spec,
+      String windowEndProp, String windowStartProp, TimeGranularity timeGranularity) {
     // Seed request with top-level...
     Queue<TimeSeriesRequest> timeSeriesRequestQueue = new LinkedList<>();
     TimeSeriesRequest topLevelRequest = new TimeSeriesRequest();
@@ -221,17 +237,7 @@ public class AnomalyDetectionJob implements Job {
         timeSeriesRequestQueue.add(groupByRequest);
       }
     }
-
-    while (!timeSeriesRequestQueue.isEmpty()) {
-      try {
-        List<TimeSeriesRequest> nextRequests = exploreCombination(timeSeriesRequestQueue.remove());
-        // TODO support further/deeper exploration
-        // timeSeriesRequestQueue.addAll(nextRequests);
-      } catch (Exception e) {
-        throw new JobExecutionException(e);
-      }
-    }
-    LOG.info("{} anomalies found in total", anomalyCounter);
+    return timeSeriesRequestQueue;
   }
 
   private List<TimeSeriesRequest> exploreCombination(TimeSeriesRequest request) throws Exception {
@@ -316,7 +322,6 @@ public class AnomalyDetectionJob implements Job {
       session.close();
       ManagedSessionContext.unbind(sessionFactory);
     }
-
     return results;
   }
 
