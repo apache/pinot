@@ -135,6 +135,12 @@ function drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab) {
         tick: {
             format: dateTimeFormat
         }
+      },
+      y: {
+        tick: {
+            //format integers with comma-grouping for thousands
+            format: d3.format(',.0f')
+        }
       }
     },
     regions: regions,
@@ -288,6 +294,9 @@ function renderAnomalyTable(data, tab) {
     /* Handelbars template for table */
     var result_anomalies_template = HandleBarsTemplates.template_anomalies(data);
     $("#" + tab + "-display-chart-section").append(result_anomalies_template);
+
+    /** Create Datatables instance of the anomalies table **/
+    $("#anomalies-table").DataTable();
 
 
     //Eventlisteners of anomalies table

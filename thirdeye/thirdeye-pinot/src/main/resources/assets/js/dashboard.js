@@ -141,9 +141,9 @@ $(document).ready( function() {
     $("#self-service-section #form-area").append(result_form_template);
 
 
-    /** Handelbars template for main content on tabs ie. chart or other main content* */
-    //SELF SERVICE
-    var result_self_service_template = HandleBarsTemplates.template_self_service("")
+    /** Handelbars template for main content on self service tab * */
+    //SELF SERVICE TAB
+    var result_self_service_template = HandleBarsTemplates.template_self_service("");
     $("#self-service-display-main-content-section").append(result_self_service_template);
 
 
@@ -158,8 +158,6 @@ $(document).ready( function() {
     // dashboard list, metric, dimension and dimension value list, and the dataset configs
     //ie. maxDate etc.
     getDataSetList();
-
-
 
     //Add onhashchange event listener to window object to enable back button usage on the browser
     window.onhashchange = locationHashChanged;
@@ -206,7 +204,7 @@ $(document).ready( function() {
 
                         var tab = "anomalies";
                       getAnomalies(tab);
-                      break;
+                    break;
                     default://dashboard tab
 
                         var tab = "dashboard"

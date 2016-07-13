@@ -44,9 +44,8 @@ function submitData(url){
         //contentType: 'application/json',
         //data: data,
         //processData: false,
-        success: function( data, textStatus, jQxhr ){
-            //$('#response pre').html( JSON.stringify( data ) );
-        },
+        //success: function( data, textStatus, jQxhr ){
+        //},
         error: function( jqXhr, textStatus, errorThrown ){
             console.log( errorThrown );
         }

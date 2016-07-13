@@ -1,9 +1,15 @@
 <section id="self-service-forms-section">
     <script id="self-service-template" type="text/x-handlebars-template">
         <ul id="self-service-forms" class="uk-switcher">
-            <li id="">
-                <div  class="title-box full-width"><h3>Configure anomaly alerts</h3></div>
-                <form id="configure-alert-form" class="uk-form">
+
+            <!-- CREATE ANOMALY FUNCTIONS -->
+            <li id="create-anomaly-functions-tab">
+
+                <div  class="title-box full-width" style="margin-top:15px;">
+                    <h3>Ceate anomaly functions</h3>
+                </div>
+
+                <form id="configure-alert-form" class="uk-form" >
                     <div class="uk-form-row">
                         <label class="uk-form-label bold-label required">Rule
                         </label>
@@ -33,7 +39,7 @@
                             </div>
                         </div>
                     </div>
-                    <div id="anomaly-condition-selector" class="uk-form-row uk-form-row uk-display-inline-block" rel="{{tabName}}">
+                    <div id="anomaly-condition-selector" class="uk-form-row uk-form-row uk-display-inline-block" rel="self-service">
                         <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group uk-display-inline-block">
                             <div id="selected-anomaly-condition" class="uk-button" value="">Condition
                             </div>
@@ -49,10 +55,10 @@
                         </div>
                     </div>
                     <span> by </span>
-                    <div class="uk-form-row uk-form-row uk-display-inline-block" rel="{{tabName}}">
+                    <div class="uk-form-row uk-form-row uk-display-inline-block" rel="self-service">
                         <input id="anomaly-threshold" type="text" placeholder="threshold (1-100)" ><span>%</span>
                     </div>
-                    <div id="anomaly-compare-mode-selector uk-display-inline-block" class="uk-form-row uk-form-row uk-display-inline-block" rel="{{tabName}}">
+                    <div id="anomaly-compare-mode-selector uk-display-inline-block" class="uk-form-row uk-form-row uk-display-inline-block" rel="self-service">
                         <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group uk-display-inline-block">
                             <div id="selected-anomaly-compare-mode" class="uk-button" value="WoW">WoW</div>
                             <div class="uk-button uk-button-primary" type="button"><i class="uk-icon-caret-down"></i>
@@ -69,7 +75,7 @@
                     <span>for</span>
                     <input id="monitoring-window-size" class="thin-input" type="number">
                     <span>consecutive</span>
-                    <div id="monitoring-unit-selector uk-display-inline-block" class="uk-form-row uk-form-row uk-display-inline-block" rel="{{tabName}}">
+                    <div id="monitoring-unit-selector uk-display-inline-block" class="uk-form-row uk-form-row uk-display-inline-block" rel="self-service">
                         <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group uk-display-inline-block">
                             <div id="selected-monitoring-window-unit" class="uk-button" unit="HOURS">HOUR(S)</div>
                             <div class="uk-button uk-button-primary" type="button"><i class="uk-icon-caret-down"></i></div>
@@ -85,7 +91,7 @@
                     </div>
 
                     <div class="uk-form-row">
-                        <div id="{{tabName}}-view-single-dimension-selector" class="view-single-dimension-selector uk-display-inline-block" rel="{{tabName}}">
+                        <div id="self-service-view-single-dimension-selector" class="view-single-dimension-selector uk-display-inline-block" rel="self-service">
                             <label class="uk-form-label">in </label>
                             <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group">
                                 <div id="selected-dimension" class="uk-button">dimension</div>
@@ -98,76 +104,46 @@
                         </div>
 
                         <!--<div class="filter-selector-manage-alert uk-display-inline-block">
-                            <div id="{{tabName}}-add-filter-manage-alert" class="add-filter-manage-alert add-btn uk-display-inline-block hidden" rel="{{tabName}}" data-uk-dropdown="{mode:'click'}">
+                            <div id="self-service-add-filter-manage-alert" class="add-filter-manage-alert add-btn uk-display-inline-block hidden" rel="self-service" data-uk-dropdown="{mode:'click'}">
                                 <button class="uk-button uk-button-primary" type="button"><i class="uk-icon-plus"></i></button>
-                                <div id="filter-panel-manage-alert" class="filter-panel uk-dropdown" rel="{{tabName}}" style="width:300px; display:none;">
+                                <div id="filter-panel-manage-alert" class="filter-panel uk-dropdown" rel="self-service" style="width:300px; display:none;">
                                     <i class="close-dropdown-btn uk-icon-close" style="position: absolute; right:5px; top: 5px;"></i>
                                     <a href="#" class="uk-dropdown-close">
-                                        <button id="apply-filter-btn-manage-alert" class="apply-filter-btn uk-button uk-button-primary"  rel="{{tabName}}"  style="float:right; margin: 5px;" disabled>Apply
+                                        <button id="apply-filter-btn-manage-alert" class="apply-filter-btn uk-button uk-button-primary"  rel="self-service"  style="float:right; margin: 5px;" disabled>Apply
                                         </button>
                                     </a>
                                     <span class="dimension-values-manage-alert"></span>
                                 </div>
                             </div>
-                            <ul  id="selected-filters-list-manage-alert" class="uk-display-inline-block" rel="{{tabName}}"></ul>
+                            <ul  id="selected-filters-list-manage-alert" class="uk-display-inline-block" rel="self-service"></ul>
                         </div>-->
-                    </div>
 
-                    <div class="view-filter-selector  uk-display-inline-block" rel="{{tabName}}">
-                        <label class="uk-form-label  uk-display-inline-block">Filters</label>
-                        <div id="{{tabName}}-add-filter" class="add-filter add-btn uk-display-inline-block" rel="{{tabName}}" data-uk-dropdown="{mode:'click'}">
-                            <button class="uk-button uk-button-primary" type="button"><i class="uk-icon-plus"></i></button>
-                            <div id="{{tabName}}-filter-panel" class="filter-panel uk-dropdown" rel="{{tabName}}" style="width:420px; display:none;">
-                                <i class="close-dropdown-btn uk-icon-close" style="position: absolute; right:5px; top: 5px;"></i>
-                                <a href="#" class="uk-dropdown-close">
-                                    <button id="{{tabName}}-apply-filter-btn" class="apply-filter-btn uk-button uk-button-primary"  rel="{{tabName}}"  style="float:right; margin: 5px;" disabled>Apply
-                                    </button>
-                                </a>
-                                <div class="dimension-filter" rel="{{tabName}}" style="width:150px;">
-                                    <ul  class="filter-dimension-list">
-                                    </ul>
+
+                        <div class="view-filter-selector  uk-display-inline-block" rel="self-service">
+                            <label class="uk-form-label  uk-display-inline-block">Filters</label>
+                            <div id="self-service-add-filter" class="add-filter add-btn uk-display-inline-block" rel="self-service" data-uk-dropdown="{mode:'click'}">
+                                <button class="uk-button uk-button-primary" type="button"><i class="uk-icon-plus"></i></button>
+                                <div id="self-service-filter-panel" class="filter-panel uk-dropdown" rel="self-service" style="width:420px; display:none;">
+                                    <i class="close-dropdown-btn uk-icon-close" style="position: absolute; right:5px; top: 5px;"></i>
+                                    <a href="#" class="uk-dropdown-close">
+                                        <button id="self-service-apply-filter-btn" class="apply-filter-btn uk-button uk-button-primary"  rel="self-service"  style="float:right; margin: 5px;" disabled>Apply
+                                        </button>
+                                    </a>
+                                    <div class="dimension-filter" rel="self-service" style="width:150px;">
+                                        <ul  class="filter-dimension-list">
+                                        </ul>
+                                    </div>
                                 </div>
                             </div>
+                            <ul  class="selected-filters-list" rel="self-service"</ul>
                         </div>
-                        <ul  class="selected-filters-list" rel="{{tabName}}"</ul>
+
                     </div>
 
                     <!-- EMAIL ADDRESS CONFIG currently not supported by the back end
                     <div class="uk-form-row">
-                        <input class="" rel="{{tabName}}" type="checkbox" checked><span>Send me an email when this alert triggers. Email address: </span><input type="email" autocomplete="on">
+                        <input class="" rel="self-service" type="checkbox" checked><span>Send me an email when this alert triggers. Email address: </span><input type="email" autocomplete="on">
                     </div>-->
-
-                    <!-- ELEMENTS NEEDED FOR KALMAN STATISTICS
-                    <#--<div class="uk-form-row hidden">-->
-                        <#--<label class="uk-form-label bold-label uk-display-inline-block">Monitoring window</label><br>-->
-                        <#--<label class="uk-form-label bold-label uk-display-inline-block">Window size</label>-->
-                        <#--<input type="number" class="thin-input">-->
-                        <#--<label class="uk-form-label bold-label uk-display-inline-block">Window unit</label>-->
-                        <#--<div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group uk-display-inline-block">-->
-                            <#--<div class="" uk-button" value="">-->
-                            <#--</div>-->
-                            <#--<div class="uk-button uk-button-primary" type="button"><i class="uk-icon-caret-down"></i>-->
-                            <#--</div>-->
-                            <#--<div class="uk-dropdown uk-dropdown-small uk-dropdown-bottom" style="top: 14px; left: 0px;">-->
-                            <#--</div>-->
-                        <#--</div>-->
-                    <#--</div>-->
-
-                    <#--<div class="uk-form-row hidden">-->
-                        <#--<label class="uk-form-label bold-label uk-display-inline-block">Training window</label><br>-->
-                        <#--<label class="uk-form-label bold-label uk-display-inline-block">Window size</label>-->
-                        <#--<input type="number" class="thin-input">-->
-                        <#--<label class="uk-form-label bold-label uk-display-inline-block">Window unit</label>-->
-                        <#--<div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group uk-display-inline-block">-->
-                            <#--<div class="selected-anomaly-training-window-unit uk-button" value="">-->
-                            <#--</div>-->
-                            <#--<div class="uk-button uk-button-primary" type="button"><i class="uk-icon-caret-down"></i>-->
-                            <#--</div>-->
-                            <#--<div class="uk-dropdown uk-dropdown-small uk-dropdown-bottom" style="top: 30px; left: 0px;">-->
-                            <#--</div>-->
-                        <#--</div>-->
-                    <#--</div>-->
-                -->
 
                     <div class="uk-form-row">
                         <span class="uk-form-label uk-display-inline-block">Monitor the data every </span>
@@ -192,24 +168,32 @@
                     </div>
 
                     <div class="uk-form-row">
-                        <input id="active-alert" rel="{{tabName}}" type="checkbox" checked><span> Keep this alert active.</span>
+                        <input id="active-alert" rel="self-service" type="checkbox" checked><span> Keep this alert active.</span>
                     </div>
 
-                    <div id="manage-alert-error" class="uk-alert uk-alert-danger hidden" rel="{{tabName}}">
+                    <div id="manage-alert-error" class="uk-alert uk-alert-danger hidden" rel="self-service">
                         <p></p>
                     </div>
-                    <div id="manage-alert-success" class="uk-alert uk-alert-success hidden" rel="{{tabName}}">
+                    <div id="manage-alert-success" class="uk-alert uk-alert-success hidden" rel="self-service">
                         <p></p>
                     </div>
 
                     <div>
-                        <button type="button" id="save-alert" class="uk-button uk-button-primary" rel="{{tabName}}">Save Alert</button>
+                        <button type="button" id="save-alert" class="uk-button uk-button-primary" rel="self-service">Save Alert</button>
                         <button class="uk-button">Cancel</button>
                     </div>
                 </form>
 
             </li>
-            <li id="">Add dataset configuration</li>
+
+
+            <!-- MANAGE EXISTING ANOMALY FUNCTIONS -->
+            <li id="manage-existing-anomaly-functions-tab">
+                <div  class="title-box full-width">
+                    <h3>Manage existing anomaly functions</h3>
+                </div>
+
+            </li>
         </ul>
     </script>
 </section>

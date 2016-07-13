@@ -124,21 +124,33 @@ $(document).ready(function() {
         }
     });
 
-    //takes utc date iso format ie. 2016-04-06T07:00:00.000Z, returns date and time in users tz
+    //returns in users timezone
+    Handlebars.registerHelper('returnUserTimeZone', function() {
+        var tz = getTimeZone();
+        return moment().tz(tz).format('z');
+    });
+
+   //takes utc date iso format ie. 2016-04-06T07:00:00.000Z, returns date and time in users timezone
     Handlebars.registerHelper('displayDate', function(date) {
         var tz = getTimeZone();
         return moment(date).tz(tz).format('YYYY-MM-DD h a z');
     });
 
-    //takes utc timestamp (milliseconds ie. 1462626000000), returns date and time in users tz
-    Handlebars.registerHelper('millisToDate', function(millis) {
+    //takes utc timestamp (milliseconds ie. 1462626000000), returns date and time in users timezone
+    //the options contain showTimeZone boolean param
+    Handlebars.registerHelper('millisToDate', function(millis, options) {
 
         if(!millis){
            return "n.a"
         }
+
+       //Options
+       var showTimeZone  = options.hash.hasOwnProperty("showTimeZone") ? (options.hash.showTimeZone == false ? false : true) : true
+
+       var displayDateFormat = showTimeZone ? 'YYYY-MM-DD h a z' : 'YYYY-MM-DD h a'
         millis = parseInt(millis);
         var tz = getTimeZone();
-        return moment(millis).tz(tz).format('YYYY-MM-DD h a z');
+        return moment(millis).tz(tz).format(displayDateFormat);
     });
 
     //takes utc timestamp (milliseconds ie. 1462626000000), returns date and time in users tz in a format in sync with the hash aggregate granularity
@@ -263,5 +275,9 @@ $(document).ready(function() {
 
     var source_self_service_template = $("#self-service-template").html();
     HandleBarsTemplates.template_self_service = Handlebars.compile(source_self_service_template);
+
+
+    var source_existing_anomaly_functions_template = $("#self-service-existing-anomaly-functions-template").html();
+    HandleBarsTemplates.template_existing_anomaly_functions = Handlebars.compile(source_existing_anomaly_functions_template);
 
 })

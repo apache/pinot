@@ -166,6 +166,7 @@ body a{
 .view-metric-selector,
 .view-single-metric-selector,
 .view-dimension-selector,
+.view-single-dimension-selector,
 .view-filter-selector,
 .view-date-range-selector{
     margin-top: 10px;
@@ -832,7 +833,6 @@ body a{
     font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
     margin: auto;
     position: relative;
-    width: 960px;
 }
 
 #anomalies-display-chart-section form {
@@ -868,8 +868,8 @@ body a{
 
 #anomalies-table td,
 #anomalies-table th{
-    line-height: 8px;
-    font-size: 0.65em;
+    line-height: 12px;
+    font-size: 0.9em;
     padding: 6px;
     font-family: Arial, sans-serif;
     color: #000;
@@ -885,6 +885,11 @@ body a{
 
 #anomalies-table .checkbox-cell label{
     padding: 6px;
+}
+
+/* Self-service view related */
+.self-service-view-single-dimension-selector{
+   vertical-align: top;
 }
 
 

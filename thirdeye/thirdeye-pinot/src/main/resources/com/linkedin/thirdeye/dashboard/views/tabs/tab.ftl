@@ -13,11 +13,13 @@
             </div>
             {{#if showChartSection}}
             <section id="{{tabName}}-display-chart-section" class="display-chart-section">
+            </section>
             {{/if}}
             {{#if showSelfServiceForms}}
             <section id="{{tabName}}-display-main-content-section" class="display-main-content-section">
-            {{/if}}
             </section>
+            {{/if}}
+
 
         </div>
     </div>
