@@ -15,12 +15,12 @@
  */
 package com.linkedin.pinot.common.data;
 
-import com.google.common.base.Preconditions;
 import org.apache.avro.Schema.Type;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+import com.google.common.base.Preconditions;
 
 
 public abstract class FieldSpec {
@@ -220,9 +220,15 @@ public abstract class FieldSpec {
 
   @Override
   public String toString() {
+    Object defaultNullValue = new String("N/A");
+    try {
+      defaultNullValue = getDefaultNullValue();
+    } catch (UnsupportedOperationException e) {
+      // Ignore the exception
+    }
     return "< data type: " + getDataType() + " , field type: " + getFieldType()
         + (isSingleValueField() ? ", single value column" : ", multi value column, delimiter: '" + getDelimiter() + "'")
-        + ", default null value: " + getDefaultNullValue() + " >";
+        + ", default null value: " + defaultNullValue + " >";
   }
 
   @Override
