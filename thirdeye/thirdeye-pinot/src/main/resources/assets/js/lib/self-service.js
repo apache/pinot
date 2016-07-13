@@ -1,10 +1,5 @@
-
-    renderSelfService(tab);
+    renderSelfService();
    //getExistingAnomalyFunctions(hash.dataset)
-
-
-
-
 
 function getExistingAnomalyFunctions(dataset){
     var url = "/dashboard/anomaly-function/view?dataset=" + dataset;
@@ -23,7 +18,7 @@ function getExistingAnomalyFunctions(dataset){
     });
 }
 
-function renderSelfService(tab){
+function renderSelfService(){
 
 
 
