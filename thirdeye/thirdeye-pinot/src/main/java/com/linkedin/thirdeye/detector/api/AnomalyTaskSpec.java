@@ -26,7 +26,8 @@ import com.linkedin.thirdeye.anomaly.JobRunner.JobStatus;
     @NamedQuery(name = "com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#findAll", query = "SELECT at FROM AnomalyTaskSpec at"),
     @NamedQuery(name = "com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#findByJobExecutionId", query = "SELECT at FROM AnomalyTaskSpec at WHERE at.jobExecutionId = :jobExecutionId"),
     @NamedQuery(name = "com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#findByStatusOrderByCreateTimeAscending", query = "SELECT at FROM AnomalyTaskSpec at WHERE at.status = :status order by at.taskStartTime asc"),
-    @NamedQuery(name = "com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#updateStatus", query = "UPDATE AnomalyTaskSpec SET status = :newStatus WHERE status = :oldStatus and taskId = :taskId")
+    @NamedQuery(name = "com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#updateStatus", query = "UPDATE AnomalyTaskSpec SET status = :newStatus WHERE status = :oldStatus and taskId = :taskId"),
+    @NamedQuery(name = "com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#updateStatusAndWorkerId", query = "UPDATE AnomalyTaskSpec SET status = :newStatus, workerId = :workerId WHERE status = :oldStatus and taskId = :taskId")
 })
 public class AnomalyTaskSpec {
   @Id
@@ -36,6 +37,9 @@ public class AnomalyTaskSpec {
 
   @Column(name = "job_execution_id", nullable = false)
   private long jobExecutionId;
+
+  @Column(name = "worker_id", nullable = true)
+  private Long workerId;
 
   @Column(name = "job_name", nullable = false)
   private String jobName;
@@ -72,6 +76,18 @@ public class AnomalyTaskSpec {
 
   public long getJobExecutionId() {
     return jobExecutionId;
+  }
+
+
+
+  public Long getWorkerId() {
+    return workerId;
+  }
+
+
+
+  public void setWorkerId(Long workerId) {
+    this.workerId = workerId;
   }
 
 
