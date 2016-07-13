@@ -7,7 +7,7 @@ import io.dropwizard.hibernate.AbstractDAO;
 import org.hibernate.HibernateException;
 import org.hibernate.SessionFactory;
 
-import com.linkedin.thirdeye.anomaly.JobRunner.JobStatus;
+import com.linkedin.thirdeye.anomaly.ThirdeyeAnomalyConstants.TaskStatus;
 import com.linkedin.thirdeye.detector.api.AnomalyTaskSpec;
 
 public class AnomalyTaskSpecDAO extends AbstractDAO<AnomalyTaskSpec> {
@@ -29,17 +29,30 @@ public class AnomalyTaskSpecDAO extends AbstractDAO<AnomalyTaskSpec> {
         .setParameter("jobExecutionId", jobExecutionId));
   }
 
-  public List<AnomalyTaskSpec> findByStatusOrderByCreateTimeAscending(JobStatus status) {
+  public List<AnomalyTaskSpec> findByStatusOrderByCreateTimeAscending(TaskStatus status) {
     return list(namedQuery(
         "com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#findByStatusOrderByCreateTimeAscending")
             .setParameter("status", status));
   }
 
-  // also update the worker id that is picking up the task
-  public boolean updateStatus(Long taskId, JobStatus oldStatus, JobStatus newStatus) {
+  public boolean updateStatus(Long taskId, TaskStatus oldStatus, TaskStatus newStatus) {
     try {
       int numRowsUpdated = namedQuery("com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#updateStatus")
           .setParameter("taskId", taskId).setParameter("oldStatus", oldStatus).setParameter("newStatus", newStatus)
+          .executeUpdate();
+      return numRowsUpdated == 1;
+    } catch (HibernateException exception) {
+      exception.printStackTrace();
+      return false;
+    }
+  }
+
+  //also update the worker id that is picking up the task
+  public boolean updateStatusAndWorkerId(Long workerId, Long taskId, TaskStatus oldStatus, TaskStatus newStatus) {
+    try {
+      int numRowsUpdated = namedQuery("com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#updateStatusAndWorkerId")
+          .setParameter("taskId", taskId).setParameter("workerId", workerId)
+          .setParameter("oldStatus", oldStatus).setParameter("newStatus", newStatus)
           .executeUpdate();
       return numRowsUpdated == 1;
     } catch (HibernateException exception) {

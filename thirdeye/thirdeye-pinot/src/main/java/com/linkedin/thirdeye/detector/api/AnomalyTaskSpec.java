@@ -14,7 +14,7 @@ import javax.persistence.NamedQuery;
 import javax.persistence.Table;
 
 import com.google.common.base.MoreObjects;
-import com.linkedin.thirdeye.anomaly.JobRunner.JobStatus;
+import com.linkedin.thirdeye.anomaly.ThirdeyeAnomalyConstants.TaskStatus;
 
 /**
  * This class corresponds to anomaly tasks. An execution of an anomaly function creates an anomaly job, which in turn
@@ -26,7 +26,8 @@ import com.linkedin.thirdeye.anomaly.JobRunner.JobStatus;
     @NamedQuery(name = "com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#findAll", query = "SELECT at FROM AnomalyTaskSpec at"),
     @NamedQuery(name = "com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#findByJobExecutionId", query = "SELECT at FROM AnomalyTaskSpec at WHERE at.jobExecutionId = :jobExecutionId"),
     @NamedQuery(name = "com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#findByStatusOrderByCreateTimeAscending", query = "SELECT at FROM AnomalyTaskSpec at WHERE at.status = :status order by at.taskStartTime asc"),
-    @NamedQuery(name = "com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#updateStatus", query = "UPDATE AnomalyTaskSpec SET status = :newStatus WHERE status = :oldStatus and taskId = :taskId")
+    @NamedQuery(name = "com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#updateStatus", query = "UPDATE AnomalyTaskSpec SET status = :newStatus WHERE status = :oldStatus and taskId = :taskId"),
+    @NamedQuery(name = "com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#updateStatusAndWorkerId", query = "UPDATE AnomalyTaskSpec SET status = :newStatus, workerId = :workerId WHERE status = :oldStatus and taskId = :taskId")
 })
 public class AnomalyTaskSpec {
   @Id
@@ -37,12 +38,15 @@ public class AnomalyTaskSpec {
   @Column(name = "job_execution_id", nullable = false)
   private long jobExecutionId;
 
+  @Column(name = "worker_id", nullable = true)
+  private Long workerId;
+
   @Column(name = "job_name", nullable = false)
   private String jobName;
 
   @Enumerated(EnumType.STRING)
   @Column(name = "status", nullable = false)
-  private JobStatus status;
+  private TaskStatus status;
 
   @Column(name = "task_start_time", nullable = false)
   private long taskStartTime;
@@ -76,6 +80,18 @@ public class AnomalyTaskSpec {
 
 
 
+  public Long getWorkerId() {
+    return workerId;
+  }
+
+
+
+  public void setWorkerId(Long workerId) {
+    this.workerId = workerId;
+  }
+
+
+
   public void setJobName(String jobName) {
     this.jobName = jobName;
   }
@@ -93,13 +109,13 @@ public class AnomalyTaskSpec {
 
 
 
-  public JobStatus getStatus() {
+  public TaskStatus getStatus() {
     return status;
   }
 
 
 
-  public void setStatus(JobStatus status) {
+  public void setStatus(TaskStatus status) {
     this.status = status;
   }
 

@@ -14,7 +14,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkedin.thirdeye.anomaly.JobRunner.JobStatus;
+import com.linkedin.thirdeye.anomaly.ThirdeyeAnomalyConstants.TaskStatus;
 import com.linkedin.thirdeye.detector.api.AnomalyResult;
 import com.linkedin.thirdeye.detector.api.AnomalyTaskSpec;
 import com.linkedin.thirdeye.detector.db.AnomalyFunctionRelationDAO;
@@ -34,14 +34,16 @@ public class TaskDriver {
   private AnomalyFunctionRelationDAO anomalyFunctionRelationDAO;
   private SessionFactory sessionFactory;
   private TaskContext taskContext;
+  private long workerId;
 
   volatile boolean shutdown = false;
   private static int MAX_PARALLEL_TASK = 3;
   private AnomalyFunctionFactory anomalyFunctionFactory;
 
-  public TaskDriver(AnomalyTaskSpecDAO anomalyTaskSpecDAO, AnomalyResultDAO anomalyResultDAO,
+  public TaskDriver(long workerId, AnomalyTaskSpecDAO anomalyTaskSpecDAO, AnomalyResultDAO anomalyResultDAO,
       AnomalyFunctionRelationDAO anomalyFunctionRelationDAO, SessionFactory sessionFactory,
       AnomalyFunctionFactory anomalyFunctionFactory) {
+    this.workerId = workerId;
     this.anomalyTaskSpecDAO = anomalyTaskSpecDAO;
     this.anomalyResultDAO = anomalyResultDAO;
     this.anomalyFunctionRelationDAO = anomalyFunctionRelationDAO;
@@ -86,7 +88,7 @@ public class TaskDriver {
             LOG.info(Thread.currentThread().getId() + " : DONE Executing task: {}", anomalyTaskSpec.getTaskId());
 
             // update status to COMPLETED
-            updateStatus(anomalyTaskSpec.getTaskId(), JobStatus.RUNNING, JobStatus.COMPLETED);
+            updateStatus(anomalyTaskSpec.getTaskId(), TaskStatus.RUNNING, TaskStatus.COMPLETED);
           }
           return null;
         }
@@ -114,15 +116,15 @@ public class TaskDriver {
       try {
 
         List<AnomalyTaskSpec> anomalyTasks =
-            anomalyTaskSpecDAO.findByStatusOrderByCreateTimeAscending(JobStatus.WAITING);
+            anomalyTaskSpecDAO.findByStatusOrderByCreateTimeAscending(TaskStatus.WAITING);
         if (anomalyTasks.size() > 0)
           LOG.info(Thread.currentThread().getId() + " : Found {} tasks in waiting state", anomalyTasks.size());
 
         for (AnomalyTaskSpec anomalyTaskSpec : anomalyTasks) {
           transaction = session.beginTransaction();
           LOG.info(Thread.currentThread().getId() + " : Trying to acquire task : {}", anomalyTaskSpec.getTaskId());
-          boolean success = anomalyTaskSpecDAO.updateStatus(anomalyTaskSpec.getTaskId(),
-              JobStatus.WAITING, JobStatus.RUNNING);
+          boolean success = anomalyTaskSpecDAO.updateStatusAndWorkerId(workerId, anomalyTaskSpec.getTaskId(),
+              TaskStatus.WAITING, TaskStatus.RUNNING);
           LOG.info(Thread.currentThread().getId() + " : Task acquired success: {}", success);
           if (success) {
             acquiredTask = anomalyTaskSpec;
@@ -147,7 +149,7 @@ public class TaskDriver {
     return acquiredTask;
   }
 
-  private void updateStatus(long taskId, JobStatus oldStatus, JobStatus newStatus) throws Exception {
+  private void updateStatus(long taskId, TaskStatus oldStatus, TaskStatus newStatus) throws Exception {
     LOG.info(Thread.currentThread().getId() + " : Starting updateStatus {}", Thread.currentThread().getId());
 
     Session session = sessionFactory.openSession();

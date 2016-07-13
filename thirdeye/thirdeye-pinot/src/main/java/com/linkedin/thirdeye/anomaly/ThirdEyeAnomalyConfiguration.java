@@ -6,6 +6,7 @@ import com.linkedin.thirdeye.detector.driver.FailureEmailConfiguration;
 public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
   private boolean scheduler = false;
   private boolean worker = false;
+  private long id;
   private String dashboardHost;
   private FailureEmailConfiguration failureEmailConfig;
 
@@ -19,6 +20,14 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
 
   public void setDashboardHost(String dashboardHost) {
     this.dashboardHost = dashboardHost;
+  }
+
+  public long getId() {
+    return id;
+  }
+
+  public void setId(long id) {
+    this.id = id;
   }
 
   public boolean isScheduler() {

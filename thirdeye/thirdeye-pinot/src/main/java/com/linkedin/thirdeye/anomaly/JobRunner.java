@@ -25,6 +25,8 @@ import com.linkedin.thirdeye.detector.api.AnomalyTaskSpec;
 import com.linkedin.thirdeye.detector.db.AnomalyFunctionSpecDAO;
 import com.linkedin.thirdeye.detector.db.AnomalyJobSpecDAO;
 import com.linkedin.thirdeye.detector.db.AnomalyTaskSpecDAO;
+import com.linkedin.thirdeye.anomaly.ThirdeyeAnomalyConstants.JobStatus;
+import com.linkedin.thirdeye.anomaly.ThirdeyeAnomalyConstants.TaskStatus;
 
 public class JobRunner implements Job {
 
@@ -44,13 +46,6 @@ public class JobRunner implements Job {
   private ThirdEyeJobContext thirdEyeJobContext;
 
   private TaskGenerator taskGenerator;
-
-  public enum JobStatus {
-    WAITING,
-    RUNNING,
-    COMPLETED,
-    FAILED
-  };
 
   public JobRunner() {
     taskGenerator = new TaskGenerator();
@@ -158,7 +153,7 @@ public class JobRunner implements Job {
           AnomalyTaskSpec anomalyTaskSpec = new AnomalyTaskSpec();
           anomalyTaskSpec.setJobExecutionId(thirdEyeJobContext.getJobExecutionId());
           anomalyTaskSpec.setJobName(thirdEyeJobContext.getJobName());
-          anomalyTaskSpec.setStatus(JobStatus.WAITING);
+          anomalyTaskSpec.setStatus(TaskStatus.WAITING);
           anomalyTaskSpec.setTaskStartTime(System.currentTimeMillis());
           anomalyTaskSpec.setTaskInfo(taskInfoJson);
           long taskId = anomalyTasksSpecDAO.createOrUpdate(anomalyTaskSpec);

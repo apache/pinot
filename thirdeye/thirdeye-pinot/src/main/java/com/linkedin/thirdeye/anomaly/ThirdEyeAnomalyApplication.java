@@ -17,7 +17,6 @@ import org.slf4j.LoggerFactory;
 
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
-import com.linkedin.thirdeye.detector.ThirdEyeDetectorConfiguration;
 import com.linkedin.thirdeye.detector.db.HibernateSessionWrapper;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 
@@ -78,7 +77,7 @@ public class ThirdEyeAnomalyApplication
     }
     if (config.isWorker()) {
       taskDriver =
-        new TaskDriver(anomalyTaskSpecDAO, anomalyResultDAO, anomalyFunctionRelationDAO,
+        new TaskDriver(config.getId(), anomalyTaskSpecDAO, anomalyResultDAO, anomalyFunctionRelationDAO,
             hibernateBundle.getSessionFactory(), anomalyFunctionFactory);
     }
 
