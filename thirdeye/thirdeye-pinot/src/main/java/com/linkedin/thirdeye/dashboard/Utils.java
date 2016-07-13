@@ -69,7 +69,7 @@ public class Utils {
       String requestReference, String metricName, List<String> dimensions, DateTime start,
       DateTime end) throws Exception {
 
-    MetricFunction metricFunction = new MetricFunction("COUNT", "*");
+    MetricFunction metricFunction = new MetricFunction(MetricFunction.Function.COUNT, "*");
 
     List<ThirdEyeRequest> requests =
         generateRequests(collection, requestReference, metricFunction, dimensions, start, end);

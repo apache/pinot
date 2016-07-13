@@ -291,7 +291,7 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
     builder.setCollection("login_mobile");
     builder.setStartTimeInclusive(DateTime.parse("2016-05-11"));
     builder.setEndTimeExclusive(DateTime.parse("2016-05-17"));
-    builder.setMetricFunctions(Lists.newArrayList(new MetricFunction("SUM", "loginAttempt")));
+    builder.setMetricFunctions(Lists.newArrayList(new MetricFunction(MetricFunction.Function.SUM, "loginAttempt")));
     TimeGranularity timeGranularity = new TimeGranularity(1, TimeUnit.HOURS);
     builder.setGroupByTimeGranularity(timeGranularity);
     ThirdEyeRequest thirdEyeRequest = builder.build("asd");

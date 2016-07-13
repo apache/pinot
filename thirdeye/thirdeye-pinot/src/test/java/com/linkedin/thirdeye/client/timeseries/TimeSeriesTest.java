@@ -25,7 +25,7 @@ public class TimeSeriesTest {
   private static final String THIRDEYE_ABOOK_OFFLINE = "thirdeyeAbook_OFFLINE";
   private static final String COUNT = "__COUNT";
   private static final MetricFunction DEFAULT_METRIC_FUNCTION =
-      new MetricFunction(MetricFunction.SUM, COUNT);
+      new MetricFunction(MetricFunction.Function.SUM, COUNT);
   private static final MetricExpression SUBMIT_RATE_EXPRESSION =
       new MetricExpression("submit_rate", "submits/impressions");
   private static final DateTime START = new DateTime(2016, 4, 1, 00, 00);
