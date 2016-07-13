@@ -36,7 +36,7 @@ function getData(url, tab){
     })
 }
 
-function submitData(url){
+function submitData(url, data){
     return $.ajax({
         url: url,
         type: 'post',

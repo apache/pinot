@@ -97,7 +97,8 @@
 
         var selectorRoot = $(target).closest("[data-uk-dropdown]");
         var value = $(target).attr("value");
-        $("div:first-child", selectorRoot).text(value);
+        var text = $(target).text();
+        $("div:first-child", selectorRoot).text(text);
         $("div:first-child", selectorRoot).attr("value", value);
     }
 

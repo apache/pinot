@@ -52,7 +52,6 @@
                         </ul>
                     </div>
                 </div>
-
             </div>
             {{/if}}
 			{{#if showDimensionSelection}}
