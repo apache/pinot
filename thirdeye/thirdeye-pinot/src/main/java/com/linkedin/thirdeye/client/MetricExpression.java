@@ -73,7 +73,7 @@ public class MetricExpression {
         if(metricName.equals(COUNT_METRIC_ESCAPED)){
           metricName = COUNT_METRIC;
         }
-        metricFunctions.add(MetricFunction.from(MetricFunction.SUM, metricName));
+        metricFunctions.add(new MetricFunction(MetricFunction.Function.SUM, metricName));
       }
       return metricFunctions;
     } catch (ParseException e) {

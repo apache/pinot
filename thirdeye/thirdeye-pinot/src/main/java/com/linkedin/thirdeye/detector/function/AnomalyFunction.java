@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.detector.function;
 
+import static com.linkedin.thirdeye.client.MetricFunction.Function;
 import java.util.List;
 
 import org.joda.time.DateTime;
@@ -15,6 +16,8 @@ public interface AnomalyFunction {
 
   /** Returns the specification for this function instance */
   AnomalyFunctionSpec getSpec();
+
+  Function getFunction();
 
   /**
    * Analyzes a metric time series and returns any anomalous points / intervals.

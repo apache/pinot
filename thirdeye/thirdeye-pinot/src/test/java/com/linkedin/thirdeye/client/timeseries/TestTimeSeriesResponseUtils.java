@@ -133,7 +133,7 @@ public class TestTimeSeriesResponseUtils {
   private List<MetricFunction> createSumFunctions(String... metricNames) {
     List<MetricFunction> result = new ArrayList<>();
     for (String metricName : metricNames) {
-      result.add(new MetricFunction(MetricFunction.SUM, metricName));
+      result.add(new MetricFunction(MetricFunction.Function.SUM, metricName));
     }
     return result;
   }
