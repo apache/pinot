@@ -14,7 +14,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkedin.thirdeye.anomaly.JobRunner.JobStatus;
+import com.linkedin.thirdeye.anomaly.ThirdeyeAnomalyConstants.TaskStatus;
 import com.linkedin.thirdeye.detector.api.AnomalyResult;
 import com.linkedin.thirdeye.detector.api.AnomalyTaskSpec;
 import com.linkedin.thirdeye.detector.db.AnomalyFunctionRelationDAO;
@@ -88,7 +88,7 @@ public class TaskDriver {
             LOG.info(Thread.currentThread().getId() + " : DONE Executing task: {}", anomalyTaskSpec.getTaskId());
 
             // update status to COMPLETED
-            updateStatus(anomalyTaskSpec.getTaskId(), JobStatus.RUNNING, JobStatus.COMPLETED);
+            updateStatus(anomalyTaskSpec.getTaskId(), TaskStatus.RUNNING, TaskStatus.COMPLETED);
           }
           return null;
         }
@@ -116,7 +116,7 @@ public class TaskDriver {
       try {
 
         List<AnomalyTaskSpec> anomalyTasks =
-            anomalyTaskSpecDAO.findByStatusOrderByCreateTimeAscending(JobStatus.WAITING);
+            anomalyTaskSpecDAO.findByStatusOrderByCreateTimeAscending(TaskStatus.WAITING);
         if (anomalyTasks.size() > 0)
           LOG.info(Thread.currentThread().getId() + " : Found {} tasks in waiting state", anomalyTasks.size());
 
@@ -124,7 +124,7 @@ public class TaskDriver {
           transaction = session.beginTransaction();
           LOG.info(Thread.currentThread().getId() + " : Trying to acquire task : {}", anomalyTaskSpec.getTaskId());
           boolean success = anomalyTaskSpecDAO.updateStatusAndWorkerId(workerId, anomalyTaskSpec.getTaskId(),
-              JobStatus.WAITING, JobStatus.RUNNING);
+              TaskStatus.WAITING, TaskStatus.RUNNING);
           LOG.info(Thread.currentThread().getId() + " : Task acquired success: {}", success);
           if (success) {
             acquiredTask = anomalyTaskSpec;
@@ -149,7 +149,7 @@ public class TaskDriver {
     return acquiredTask;
   }
 
-  private void updateStatus(long taskId, JobStatus oldStatus, JobStatus newStatus) throws Exception {
+  private void updateStatus(long taskId, TaskStatus oldStatus, TaskStatus newStatus) throws Exception {
     LOG.info(Thread.currentThread().getId() + " : Starting updateStatus {}", Thread.currentThread().getId());
 
     Session session = sessionFactory.openSession();
