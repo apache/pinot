@@ -47,7 +47,7 @@ public class AnomalyFunctionSpec {
   @Column(name = "metric", nullable = false)
   private String metric;
 
-  @Column(name = "metric_function", nullable = true)
+  @Column(name = "metric_function", nullable = false)
   @Enumerated(EnumType.STRING)
   private MetricFunction.Function metricFunction;
 
@@ -264,7 +264,9 @@ public class AnomalyFunctionSpec {
     }
     AnomalyFunctionSpec af = (AnomalyFunctionSpec) o;
     return Objects.equals(id, af.getId()) && Objects.equals(collection, af.getCollection())
-        && Objects.equals(metric, af.getMetric()) && Objects.equals(type, af.getType())
+        && Objects.equals(metric, af.getMetric())
+        && Objects.equals(metricFunction, af.getMetricFunction())
+        && Objects.equals(type, af.getType())
         && Objects.equals(isActive, af.getIsActive()) && Objects.equals(cron, af.getCron())
         && Objects.equals(properties, af.getProperties())
         && Objects.equals(bucketSize, af.getBucketSize())
@@ -279,9 +281,9 @@ public class AnomalyFunctionSpec {
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, collection, metric, type, isActive, cron, properties, bucketSize,
-        bucketUnit, windowSize, windowUnit, windowDelay, windowDelayUnit, exploreDimensions,
-        filters);
+    return Objects.hash(id, collection, metric, metricFunction, type, isActive, cron, properties,
+        bucketSize, bucketUnit, windowSize, windowUnit, windowDelay, windowDelayUnit,
+        exploreDimensions, filters);
   }
 
   @Override

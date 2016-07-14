@@ -30,6 +30,12 @@ public abstract class BaseAnomalyFunction implements AnomalyFunction {
     return props;
   }
 
+  /**
+   * Returns unit change from baseline value
+   * @param currentValue
+   * @param baselineValue
+   * @return
+   */
   protected double calculateChange(double currentValue, double baselineValue) {
     return (currentValue - baselineValue) / baselineValue;
   }

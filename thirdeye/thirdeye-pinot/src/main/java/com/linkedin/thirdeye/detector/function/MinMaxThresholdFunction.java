@@ -69,7 +69,7 @@ public class MinMaxThresholdFunction extends BaseAnomalyFunction {
       Double value = timeSeries.get(timeBucket, metric).doubleValue();
       double deviationFromThreshold = getDeviationFromThreshold(value, min, max);
 
-      if (deviationFromThreshold > 0) {
+      if (deviationFromThreshold != 0) {
         AnomalyResult anomalyResult = new AnomalyResult();
         anomalyResult.setCollection(getSpec().getCollection());
         anomalyResult.setMetric(metric);
