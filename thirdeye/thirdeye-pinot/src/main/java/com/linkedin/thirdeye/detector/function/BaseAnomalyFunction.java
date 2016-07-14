@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.detector.function;
 
-import static com.linkedin.thirdeye.client.MetricFunction.Function;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.Properties;
@@ -20,12 +19,6 @@ public abstract class BaseAnomalyFunction implements AnomalyFunction {
     return spec;
   }
 
-  @Override
-  public Function getFunction() {
-    // default
-    return Function.SUM;
-  }
-
   protected Properties getProperties() throws IOException {
     Properties props = new Properties();
     if (spec.getProperties() != null) {
@@ -35,5 +28,15 @@ public abstract class BaseAnomalyFunction implements AnomalyFunction {
       }
     }
     return props;
+  }
+
+  /**
+   * Returns unit change from baseline value
+   * @param currentValue
+   * @param baselineValue
+   * @return
+   */
+  protected double calculateChange(double currentValue, double baselineValue) {
+    return (currentValue - baselineValue) / baselineValue;
   }
 }

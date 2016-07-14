@@ -165,7 +165,7 @@ public class AnomalyDetectionJob implements Job {
     TimeGranularity timeGranularity =
         new TimeGranularity(spec.getBucketSize(), spec.getBucketUnit());
 
-    metricFunction = new MetricFunction(anomalyFunction.getFunction(), spec.getMetric());
+    metricFunction = new MetricFunction(spec.getMetricFunction(), spec.getMetric());
 
     // Collection
     collection = spec.getCollection();

@@ -1,11 +1,14 @@
 package com.linkedin.thirdeye.detector.api;
 
+import com.linkedin.thirdeye.client.MetricFunction;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
 import javax.persistence.Column;
 import javax.persistence.Entity;
+import javax.persistence.EnumType;
+import javax.persistence.Enumerated;
 import javax.persistence.FetchType;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
@@ -41,9 +44,12 @@ public class AnomalyFunctionSpec {
   @Column(name = "function_name", nullable = false)
   private String functionName;
 
-
   @Column(name = "metric", nullable = false)
   private String metric;
+
+  @Column(name = "metric_function", nullable = false)
+  @Enumerated(EnumType.STRING)
+  private MetricFunction.Function metricFunction;
 
   @Column(name = "type", nullable = false)
   private String type;
@@ -121,6 +127,14 @@ public class AnomalyFunctionSpec {
 
   public void setMetric(String metric) {
     this.metric = metric;
+  }
+
+  public MetricFunction.Function getMetricFunction() {
+    return metricFunction;
+  }
+
+  public void setMetricFunction(MetricFunction.Function metricFunction) {
+    this.metricFunction = metricFunction;
   }
 
   public String getType() {
@@ -250,7 +264,9 @@ public class AnomalyFunctionSpec {
     }
     AnomalyFunctionSpec af = (AnomalyFunctionSpec) o;
     return Objects.equals(id, af.getId()) && Objects.equals(collection, af.getCollection())
-        && Objects.equals(metric, af.getMetric()) && Objects.equals(type, af.getType())
+        && Objects.equals(metric, af.getMetric())
+        && Objects.equals(metricFunction, af.getMetricFunction())
+        && Objects.equals(type, af.getType())
         && Objects.equals(isActive, af.getIsActive()) && Objects.equals(cron, af.getCron())
         && Objects.equals(properties, af.getProperties())
         && Objects.equals(bucketSize, af.getBucketSize())
@@ -265,17 +281,18 @@ public class AnomalyFunctionSpec {
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, collection, metric, type, isActive, cron, properties, bucketSize,
-        bucketUnit, windowSize, windowUnit, windowDelay, windowDelayUnit, exploreDimensions,
-        filters);
+    return Objects.hash(id, collection, metric, metricFunction, type, isActive, cron, properties,
+        bucketSize, bucketUnit, windowSize, windowUnit, windowDelay, windowDelayUnit,
+        exploreDimensions, filters);
   }
 
   @Override
   public String toString() {
     return MoreObjects.toStringHelper(this).add("id", id).add("collection", collection)
-        .add("metric", metric).add("type", type).add("isActive", isActive).add("cron", cron)
-        .add("properties", properties).add("bucketSize", bucketSize).add("bucketUnit", bucketUnit)
-        .add("windowSize", windowSize).add("windowUnit", windowUnit).add("windowDelay", windowDelay)
+        .add("metric", metric).add("metric_function", metricFunction.name()).add("type", type)
+        .add("isActive", isActive).add("cron", cron).add("properties", properties)
+        .add("bucketSize", bucketSize).add("bucketUnit", bucketUnit).add("windowSize", windowSize)
+        .add("windowUnit", windowUnit).add("windowDelay", windowDelay)
         .add("windowDelayUnit", windowDelayUnit).add("exploreDimensions", exploreDimensions)
         .add("filters", filters).toString();
   }

@@ -46,12 +46,6 @@ public class UserRuleAnomalyFunction extends BaseAnomalyFunction {
   public static final String DEFAULT_MERGED_MESSAGE_TEMPLATE =
       "threshold=%s, %s values: %s (%s / %s)";
   private static final Joiner CSV = Joiner.on(",");
-  private static final Joiner ANOMALY_RESULT_MESSAGE_JOINER = Joiner.on("...");
-  private static final NumberFormat PERCENT_FORMATTER = NumberFormat.getPercentInstance();
-  static {
-    // limit number of decimal points shown, for readability
-    PERCENT_FORMATTER.setMaximumFractionDigits(2);
-  }
 
   private String getMergedAnomalyResultMessage(double threshold, String baselineProp,
       List<Double> currentValues, List<Double> baselineValues) {
@@ -65,7 +59,7 @@ public class UserRuleAnomalyFunction extends BaseAnomalyFunction {
     for (int i = 0; i < n; i++) {
       double currentValue = currentValues.get(i);
       double baselineValue = baselineValues.get(i);
-      double change = calculatePercentChange(currentValue, baselineValue);
+      double change = calculateChange(currentValue, baselineValue);
       String changePercent = percentInstance.format(change);
       percentChanges.add(changePercent);
     }
@@ -166,7 +160,7 @@ public class UserRuleAnomalyFunction extends BaseAnomalyFunction {
         anomalyResult.setProperties(getSpec().getProperties());
         anomalyResult.setStartTimeUtc(currentKey);
         anomalyResult.setEndTimeUtc(currentKey + bucketMillis); // point-in-time
-        anomalyResult.setScore(calculatePercentChange(currentValue, baselineValue));
+        anomalyResult.setScore(calculateChange(currentValue, baselineValue));
         anomalyResult.setWeight(averageValue);
         String message =
             getAnomalyResultMessage(changeThreshold, baselineProp, currentValue, baselineValue);
@@ -277,7 +271,7 @@ public class UserRuleAnomalyFunction extends BaseAnomalyFunction {
 
   private String getAnomalyResultMessage(double threshold, String baselineProp,
       double currentValue, double baselineValue) {
-    double change = calculatePercentChange(currentValue, baselineValue);
+    double change = calculateChange(currentValue, baselineValue);
     NumberFormat percentInstance = NumberFormat.getPercentInstance();
     percentInstance.setMaximumFractionDigits(2);
     String thresholdPercent = percentInstance.format(threshold);
@@ -315,16 +309,12 @@ public class UserRuleAnomalyFunction extends BaseAnomalyFunction {
 
   boolean isAnomaly(double currentValue, double baselineValue, double changeThreshold) {
     if (baselineValue > 0) {
-      double percentChange = calculatePercentChange(currentValue, baselineValue);
+      double percentChange = calculateChange(currentValue, baselineValue);
       if (changeThreshold > 0 && percentChange > changeThreshold || changeThreshold < 0
           && percentChange < changeThreshold) {
         return true;
       }
     }
     return false;
-  }
-
-  private double calculatePercentChange(double currentValue, double baselineValue) {
-    return (currentValue - baselineValue) / baselineValue;
   }
 }
