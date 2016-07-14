@@ -62,7 +62,7 @@ public class MetricExpression {
 
       // expression parser errors out on variables starting with _
       // we're replacing the __COUNT default metric, with an escaped string
-      // after evaluatin, we replace the escaped string back with the original
+      // after evaluating, we replace the escaped string back with the original
       String modifiedExpressions = expression.replace(COUNT_METRIC, COUNT_METRIC_ESCAPED);
 
       Parser.parse(modifiedExpressions, scope);

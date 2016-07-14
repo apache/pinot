@@ -8,6 +8,8 @@ import java.util.Properties;
 
 import javax.persistence.Column;
 import javax.persistence.Entity;
+import javax.persistence.EnumType;
+import javax.persistence.Enumerated;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
@@ -68,6 +70,8 @@ public class AnomalyResult implements Comparable<AnomalyResult> {
   private static Joiner SEMICOLON = Joiner.on(";");
   private static Joiner EQUALS = Joiner.on("=");
 
+  public enum FEEDBACK {ANOMALY, NOT_ANOMALY}
+
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private long id;
@@ -113,6 +117,10 @@ public class AnomalyResult implements Comparable<AnomalyResult> {
 
   @Column(name = "filters", nullable = true)
   private String filters;
+
+  @Column(name = "feedback", nullable = true)
+  @Enumerated(EnumType.STRING)
+  private FEEDBACK feedback;
 
   public AnomalyResult() {
     creationTimeUtc = DateTime.now().getMillis();
@@ -239,6 +247,14 @@ public class AnomalyResult implements Comparable<AnomalyResult> {
     this.filters = sortedFilters;
   }
 
+  public FEEDBACK getFeedback() {
+    return feedback;
+  }
+
+  public void setFeedback(FEEDBACK feedback) {
+    this.feedback = feedback;
+  }
+
   @Override
   public String toString() {
     return MoreObjects.toStringHelper(this).add("id", id).add("functionId", functionId)
@@ -247,7 +263,7 @@ public class AnomalyResult implements Comparable<AnomalyResult> {
         .add("endTimeUtc", endTimeUtc).add("dimensions", dimensions).add("metric", metric)
         .add("score", score).add("weight", weight).add("properties", properties)
         .add("message", message).add("creationTimeUtc", creationTimeUtc).add("filters", filters)
-        .toString();
+        .add("feedback", feedback).toString();
   }
 
   @Override
