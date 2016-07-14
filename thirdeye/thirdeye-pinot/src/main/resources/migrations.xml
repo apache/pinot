@@ -321,4 +321,17 @@
     </addColumn>
   </changeSet>
 
+  <changeSet id="11" author="pjaiswal">
+    <addColumn tableName="anomaly_functions">
+      <column name="metric_function" type="varchar(100)" defaultValue="SUM">
+        <constraints nullable="false"/>
+      </column>
+    </addColumn>
+    <addColumn tableName="anomaly_results">
+      <column name="feedback" type="varchar(100)">
+        <constraints nullable="true"/>
+      </column>
+    </addColumn>
+  </changeSet>
+
 </databaseChangeLog>

@@ -1,11 +1,14 @@
 package com.linkedin.thirdeye.detector.api;
 
+import com.linkedin.thirdeye.client.MetricFunction;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
 import javax.persistence.Column;
 import javax.persistence.Entity;
+import javax.persistence.EnumType;
+import javax.persistence.Enumerated;
 import javax.persistence.FetchType;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
@@ -41,9 +44,12 @@ public class AnomalyFunctionSpec {
   @Column(name = "function_name", nullable = false)
   private String functionName;
 
-
   @Column(name = "metric", nullable = false)
   private String metric;
+
+  @Column(name = "metric_function", nullable = true)
+  @Enumerated(EnumType.STRING)
+  private MetricFunction.Function metricFunction;
 
   @Column(name = "type", nullable = false)
   private String type;
@@ -121,6 +127,14 @@ public class AnomalyFunctionSpec {
 
   public void setMetric(String metric) {
     this.metric = metric;
+  }
+
+  public MetricFunction.Function getMetricFunction() {
+    return metricFunction;
+  }
+
+  public void setMetricFunction(MetricFunction.Function metricFunction) {
+    this.metricFunction = metricFunction;
   }
 
   public String getType() {
@@ -273,9 +287,10 @@ public class AnomalyFunctionSpec {
   @Override
   public String toString() {
     return MoreObjects.toStringHelper(this).add("id", id).add("collection", collection)
-        .add("metric", metric).add("type", type).add("isActive", isActive).add("cron", cron)
-        .add("properties", properties).add("bucketSize", bucketSize).add("bucketUnit", bucketUnit)
-        .add("windowSize", windowSize).add("windowUnit", windowUnit).add("windowDelay", windowDelay)
+        .add("metric", metric).add("metric_function", metricFunction.name()).add("type", type)
+        .add("isActive", isActive).add("cron", cron).add("properties", properties)
+        .add("bucketSize", bucketSize).add("bucketUnit", bucketUnit).add("windowSize", windowSize)
+        .add("windowUnit", windowUnit).add("windowDelay", windowDelay)
         .add("windowDelayUnit", windowDelayUnit).add("exploreDimensions", exploreDimensions)
         .add("filters", filters).toString();
   }

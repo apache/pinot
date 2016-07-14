@@ -1,6 +1,8 @@
 {
   "collection": "myCollection",
+  "functionName": "impression percent threshold",
   "metric": "impressions",
+  "metricFunction": "SUM",
   "type": "USER_RULE",
   "isActive": true,
   "cron": "* 0/5 * * * ?",
