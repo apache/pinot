@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.detector.api;
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
 import com.linkedin.thirdeye.constant.FeedbackStatus;
 import java.io.Serializable;
+import java.util.Objects;
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.EnumType;
@@ -74,26 +75,13 @@ public class AnomalyFeedback implements Serializable{
     }
 
     AnomalyFeedback that = (AnomalyFeedback) o;
-
-    if (id != that.id) {
-      return false;
-    }
-    if (feedbackType != that.feedbackType) {
-      return false;
-    }
-    if (status != that.status) {
-      return false;
-    }
-    return comment != null ? comment.equals(that.comment) : that.comment == null;
+    return Objects.equals(id, that.getId()) && Objects.equals(feedbackType, that.getFeedbackType())
+        && Objects.equals(status, that.getStatus()) && Objects.equals(comment, that.getComment());
   }
 
   @Override
   public int hashCode() {
-    int result = (int) (id ^ (id >>> 32));
-    result = 31 * result + (feedbackType != null ? feedbackType.hashCode() : 0);
-    result = 31 * result + (status != null ? status.hashCode() : 0);
-    result = 31 * result + (comment != null ? comment.hashCode() : 0);
-    return result;
+    return Objects.hash(id, feedbackType, status, comment);
   }
 
   @Override
