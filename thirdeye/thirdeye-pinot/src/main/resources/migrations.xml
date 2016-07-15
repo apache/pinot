@@ -334,4 +334,33 @@
     </addColumn>
   </changeSet>
 
+  <changeSet id="12" author="pjaiswal">
+    <addColumn tableName="anomaly_results">
+      <column name="anomaly_feedback_id" type="bigint" defaultValue="null">
+        <constraints nullable="true"/>
+      </column>
+    </addColumn>
+
+    <dropColumn tableName="anomaly_results" columnName="feedback"/>
+
+    <createTable tableName="anomaly_feedback">
+      <column name="id" type="bigint" autoIncrement="true">
+        <constraints primaryKey="true" nullable="false"/>
+      </column>
+      <column name="feedback_type" type="varchar(100)"/>
+      <column name="comment" type="varchar(500)"/>
+      <column name="status" type="varchar(100)"/>
+    </createTable>
+    <sql dbms="mysql">
+      ALTER TABLE anomaly_feedback ENGINE = InnoDb;
+    </sql>
+    <addForeignKeyConstraint
+        constraintName="fk_anomaly_results_feedback_fk"
+        baseTableName="anomaly_results"
+        baseColumnNames="anomaly_feedback_id"
+        referencedTableName="anomaly_feedback"
+        referencedColumnNames="id"
+        onDelete="CASCADE"
+    />
+  </changeSet>
 </databaseChangeLog>

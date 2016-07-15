@@ -1,6 +1,9 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
-import com.linkedin.thirdeye.constant.AnomalyFeedback;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
+import com.linkedin.thirdeye.constant.FeedbackStatus;
+import com.linkedin.thirdeye.detector.api.AnomalyFeedback;
 import io.dropwizard.hibernate.UnitOfWork;
 
 import java.io.IOException;
@@ -12,7 +15,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-import javax.transaction.Transactional;
 import javax.validation.constraints.NotNull;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
@@ -67,8 +69,7 @@ public class AnomalyResource {
   private ThirdEyeDashboardConfiguration dashboardConfiguration;
 
   public AnomalyResource(AnomalyFunctionSpecDAO anomalyFunctionSpecDAO,
-      AnomalyResultDAO anomalyResultDAO,
-      EmailConfigurationDAO emailConfigurationDAO,
+      AnomalyResultDAO anomalyResultDAO, EmailConfigurationDAO emailConfigurationDAO,
       ThirdEyeDashboardConfiguration dashboardConfiguration) {
 
     this.dashboardConfiguration = dashboardConfiguration;
@@ -653,20 +654,44 @@ public class AnomalyResource {
   @GET
   @Path(value = "anomaly-result/feedback")
   @Produces(MediaType.APPLICATION_JSON)
-  public AnomalyFeedback[] getAnomalyFeedbackTypes() {
-    return AnomalyFeedback.values();
+  public AnomalyFeedbackType[] getAnomalyFeedbackTypes() {
+    return AnomalyFeedbackType.values();
   }
 
+  /**
+   * @param anomalyResultId : anomaly result id
+   * @param payload         : Json payload containing feedback @see com.linkedin.thirdeye.constant.AnomalyFeedbackType
+   *                        eg. payload
+   *                        <p/>
+   *                        { "feedback": "NOT_ANOMALY", "comment": "this is not an anomaly" }
+   */
   @POST
-  @Path(value = "anomaly-result/feedback/{id}/{feedback}")
-  @Transactional(Transactional.TxType.REQUIRES_NEW)
-  public void updateAnomalyResultFeedback(@PathParam("id") long anomalyResultId,
-      @PathParam("feedback") AnomalyFeedback feedBack) {
-    AnomalyResult result = anomalyResultDAO.findById(anomalyResultId);
-    if(result == null) {
-      throw new IllegalArgumentException("AnomalyResult not found with id " + anomalyResultId);
+  @Path(value = "anomaly-result/feedback/{anomaly_result_id}")
+  @UnitOfWork
+  public void updateAnomalyResultFeedback(@PathParam("anomaly_result_id") long anomalyResultId, String payload) {
+    try {
+      AnomalyResult result = anomalyResultDAO.findById(anomalyResultId);
+      if (result == null) {
+        throw new IllegalArgumentException("AnomalyResult not found with id " + anomalyResultId);
+      }
+      ObjectMapper mapper = new ObjectMapper();
+      AnomalyFeedback feedbackRequest = mapper.readValue(payload, AnomalyFeedback.class);
+      AnomalyFeedback feedback = result.getFeedback();
+      if (feedback == null) {
+        feedback = new AnomalyFeedback();
+        result.setFeedback(feedback);
+      }
+      if (feedbackRequest.getStatus() == null) {
+        feedback.setStatus(FeedbackStatus.NEW);
+      } else {
+        feedback.setStatus(feedbackRequest.getStatus());
+      }
+      feedback.setComment(feedbackRequest.getComment());
+      feedback.setFeedbackType(feedbackRequest.getFeedbackType());
+
+      anomalyResultDAO.createOrUpdate(result);
+    } catch (IOException e) {
+      throw new IllegalArgumentException("Invalid payload");
     }
-    result.setFeedback(feedBack);
-    anomalyResultDAO.createOrUpdate(result);
   }
 }

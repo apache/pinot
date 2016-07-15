@@ -1,5 +1,5 @@
 package com.linkedin.thirdeye.constant;
 
-public enum AnomalyFeedback {
+public enum AnomalyFeedbackType {
   ANOMALY, NOT_ANOMALY
 }
