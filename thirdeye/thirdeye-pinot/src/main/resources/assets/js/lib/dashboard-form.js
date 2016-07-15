@@ -7,7 +7,6 @@
        event.preventDefault();
     });
 
-
     //Radio selection will highlight selected element
     $("#main-view").on("click", ".radio-options",function(){
         radioOptions(this)
@@ -76,97 +75,34 @@
     });
 
 
+    /** Time input related events are defined in dashboard-form-time.js
+     *  Filters related events are defined in dashboard-form-filter.js **/
+
+
 
     /** DASHBOARD FORM RELATED METHODS **/
-
-    /* takes a clicked anchor tag and applies active class to it's prent (li, button) */
-    function  radioOptions(target){
-        $(target).parent().siblings().removeClass("uk-active");
-        $(target).parent().addClass("uk-active");
-    }
-
-    function radioButtons(target){
-
-        if(!$(target).hasClass("uk-active")) {
-            $(target).siblings().removeClass("uk-active");
-            $(target).addClass("uk-active");
-        }
-    }
-
-    function populateSingleSelect(target){
-
-        var selectorRoot = $(target).closest("[data-uk-dropdown]");
-        var value = $(target).attr("value");
-        $("div:first-child", selectorRoot).text(value);
-        $("div:first-child", selectorRoot).attr("value", value);
-    }
-
-    //Advanced settings
-    function closeClosestDropDown(target){
-
-        $(target).closest($("[data-uk-dropdown]")).removeClass("uk-open");
-        $(target).closest($("[data-uk-dropdown]")).attr("aria-expanded", false);
-        $(target).closest(".uk-dropdown").hide();
-    }
-
-    function disableApplyButton(button){
-        $(button).prop("disabled", true);
-        $(button).attr("disabled", true);
-    }
-
-    function selectDatasetNGetFormData(target){
-
-
-        //Cleanup form: Remove added-item and added-filter, metrics of the previous dataset
-        $("#"+  hash.view  +"-chart-area-error").hide();
-        $(".view-metric-selector .added-item").remove();
-        $(".view-dimension-selector .added-item").remove();
-        $(".metric-list").empty();
-        $(".single-metric-list").empty();
-        $("#selected-metric").html("Select metric");
-        $("#selected-metric").attr("value", "");
-        $(".dimension-list").empty();
-        $(".filter-dimension-list").empty()
-        $(".filter-panel .value-filter").remove();
-        $(".added-filter").remove();
-        $(".filter-panel .value-filter").remove();
-
-
-        //Remove previous dataset's hash values
-        delete hash.baselineStart;
-        delete hash.baselineEnd;
-        delete hash.currentStart;
-        delete hash.currentEnd;
-        delete hash.compareMode;
-        delete hash.dashboard;
-        delete hash.metrics;
-        delete hash.dimensions;
-        delete hash.filters;
-        delete hash.aggTimeGranularity;
-        $(".display-chart-section").empty();
-
-
-        var value = $(target).attr("value");
-        hash.dataset = value;
-
-        //Trigger AJAX calls
-        //get the latest available data timestamp of a dataset
-        getAllFormData()
-
-        //Populate the selected item on the form element
-        $(".selected-dataset").text($(target).text());
-        $(".selected-dataset").attr("value",value);
-
-        //Close uikit dropdown
-        $(target).closest("[data-uk-dropdown]").removeClass("uk-open");
-        $(target).closest("[data-uk-dropdown]").attr("aria-expanded", false);
-
-
-    }
-
     function switchHeaderTab(target){
         radioButtons(target)
         hash.view = $(target).attr("rel");
+
+        if(hash.view == "self-service"){
+
+            //Clear hash, only keep dataset & view as those are required to display the view
+            if(hash.dataset){
+            var dataset = hash.dataset;
+            hash = {}
+            hash.dataset = dataset;
+            hash.view == "self-service";
+
+
+                getExistingAnomalyFunctions(hash.dataset);
+
+            }else{
+                getExistingAnomalyFunctions();
+            }
+            renderSelfService();
+
+        }
     }
 
     function  selectDashboard(target){
@@ -310,3 +246,6 @@
         //Enable Go btn
         enableFormSubmit()
     }
+
+
+

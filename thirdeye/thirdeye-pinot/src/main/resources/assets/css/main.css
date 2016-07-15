@@ -166,6 +166,7 @@ body a{
 .view-metric-selector,
 .view-single-metric-selector,
 .view-dimension-selector,
+.view-single-dimension-selector,
 .view-filter-selector,
 .view-date-range-selector{
     margin-top: 10px;
@@ -347,7 +348,8 @@ body a{
 }
 
 
-.display-chart-section{
+.display-chart-section,
+.display-main-content-section{
     height: 100%;
     padding: 12px;;
 }
@@ -733,7 +735,7 @@ body a{
 }
 
 .title-box th {
-    font-size: 0.75em;
+    font-size: 1rem;
     font-weight: 400;
     padding: 5px;
 }
@@ -823,7 +825,6 @@ body a{
 
 }
 
-
 #anomalies-display-chart-section #barchart-placeholder {
     display: none;
 }
@@ -832,7 +833,6 @@ body a{
     font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
     margin: auto;
     position: relative;
-    width: 960px;
 }
 
 #anomalies-display-chart-section form {
@@ -847,8 +847,12 @@ body a{
 
 #anomalies-table{
     width:100%;
-    border: 1px solid #444;
-    margin-top: 0px;
+    font-size: 1rem;
+    vertical-align: middle;
+}
+
+#anomalies-table td{
+    vertical-align: middle;
 }
 
 #anomalies-table .metric-label:hover,
@@ -857,30 +861,9 @@ body a{
     text-decoration: underline;
 }
 
-#anomalies-table thead{
-    border-top: 1px solid #666;
-}
-
 #anomalies-table .color-box{
     width: 10px;
     height: 10px;
-}
-
-#anomalies-table td,
-#anomalies-table th{
-    line-height: 8px;
-    font-size: 0.65em;
-    padding: 6px;
-    font-family: Arial, sans-serif;
-    color: #000;
-    vertical-align: middle;
-    text-align: center;
-    border-bottom: 1px solid #666;
-
-}
-
-#anomalies-table .checkbox-cell{
-    padding: 0px;
 }
 
 #anomalies-table .checkbox-cell label{

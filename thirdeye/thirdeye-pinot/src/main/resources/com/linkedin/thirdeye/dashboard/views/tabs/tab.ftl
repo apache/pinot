@@ -1,4 +1,4 @@
-<section id="tabs">
+<section id="tabs-section">
 <script id="tab-template" type="text/x-handlebars-template">
 <section id="{{tabName}}-section"  class="uk-grid">
 
@@ -11,7 +11,17 @@
             <div id="{{tabName}}-chart-area-loader" class="loader hidden">
                 <i class="uk-icon-spinner uk-icon-spin uk-icon-large"></i>
             </div>
-            <section id="{{tabName}}-display-chart-section" class="display-chart-section"></section>
+            {{#if showChartSection}}
+            <section id="{{tabName}}-display-chart-section" class="display-chart-section">
+            </section>
+            {{/if}}
+            {{#if showSelfServiceForms}}
+            <section id="{{tabName}}-display-main-content-section" class="display-main-content-section">
+                <#include "../self-service.ftl">
+            </section>
+            {{/if}}
+
+
         </div>
     </div>
 

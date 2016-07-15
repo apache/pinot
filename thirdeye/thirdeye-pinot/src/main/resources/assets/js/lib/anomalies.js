@@ -1,6 +1,5 @@
 function getAnomalies(tab) {
 
-  //var dashboardName = "Default_Dashboard"; //Change it to be the first option:  $(".dashboard-option:first-child a").html().trim()
   var baselineStart = moment(parseInt(hash.currentStart)).add(-7, 'days')
   var baselineEnd = moment(parseInt(hash.currentEnd)).add(-7, 'days')
   var aggTimeGranularity = (window.datasetConfig.dataGranularity) ? window.datasetConfig.dataGranularity : "HOURS";
@@ -15,8 +14,8 @@ function getAnomalies(tab) {
   + "&baselineStart=" + baselineStart + "&baselineEnd=" + baselineEnd   //
   + "&aggTimeGranularity=" + aggTimeGranularity + "&metrics=" + metrics;
 
-  var currentStartISO = moment(parseInt(hash.currentStart)).toISOString();
-  var currentEndISO = moment(parseInt(hash.currentEnd)).toISOString();
+  var currentStartISO = moment(parseInt(currentStart)).toISOString();
+  var currentEndISO = moment(parseInt(currentEnd)).toISOString();
   var anomaliesUrl = "/dashboard/anomalies/view?dataset=" + hash.dataset + "&startTimeIso=" + currentStartISO + "&endTimeIso=" + currentEndISO + "&metric=" + hash.metrics + "&filters=" + hash.filters;
 
   getData(anomaliesUrl).done(function(anomalyData) {
@@ -40,6 +39,8 @@ function getAnomalies(tab) {
 };
 
 function renderAnomalyLineChart(timeSeriesData, anomalyData, tab) {
+
+
   $("#"+  tab  +"-display-chart-section").empty();
 
   /* Handelbars template for time series legend */
@@ -48,6 +49,7 @@ function renderAnomalyLineChart(timeSeriesData, anomalyData, tab) {
 
   drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab);
 }
+
 
 var lineChart;
 function drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab) {
@@ -134,6 +136,12 @@ function drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab) {
         type : 'timeseries',
         tick: {
             format: dateTimeFormat
+        }
+      },
+      y: {
+        tick: {
+            //format integers with comma-grouping for thousands
+            format: d3.format(',.0f')
         }
       }
     },
@@ -289,6 +297,9 @@ function renderAnomalyTable(data, tab) {
     var result_anomalies_template = HandleBarsTemplates.template_anomalies(data);
     $("#" + tab + "-display-chart-section").append(result_anomalies_template);
 
+    /** Create Datatables instance of the anomalies table **/
+    $("#anomalies-table").DataTable();
+
 
     //Eventlisteners of anomalies table
 
@@ -315,6 +326,11 @@ function renderAnomalyTable(data, tab) {
     //Clicking a checkbox in the table takes user to related heatmap chart
     $("#anomalies-table").on("click",".heatmap-link", function(){
         showHeatMapOfAnomaly(this);
+    });
+
+    //Clicking a checkbox in the table takes user to related heatmap chart
+    $("#anomalies-table").on("click",".anomaly-feedback-option", function(){
+        submitAnomalyFeedback(this)
     });
 
     /** Compare/Tabular view and dashboard view heat-map-cell click switches the view to compare/heat-map
@@ -345,6 +361,27 @@ function renderAnomalyTable(data, tab) {
         //update hash will trigger window.onhashchange event:
         // update the form area and trigger the ajax call
         window.location.hash = encodeHashParameters(hash);
+    }
+
+
+    function submitAnomalyFeedback(target){
+
+        //value 1, 2 or 3 as on anomaly dashboard of data scientists. 1 = False Alarm, 2 = Confirmed Anomaly, 3 = Confirmed  - Not Actionable
+        var value =  $(target).attr("value");
+        var text =  $(target).text();
+        var selector = $(target).closest(".feedback-selector")
+        var anomalyID = selector.attr("data-anomaly-id");
+        var dataset = selector.attr("data-dataset");
+        //Todo: need endpoint and the format required by the BE?
+//        var data ={"dataset" : dataset, "anomalyID" : anomalyID, "feedback" : value }
+//        var url = "";
+//      //post anomaly feedback
+//        submitData(url, data).done(function(){
+//            //Todo: define success message/icon if any to the user
+//            console.log("Thank you for your feedback.")
+              selector.html("<p>Feedback sent:</p><p>" + text + "</p>")
+
+//        })
     }
 
 

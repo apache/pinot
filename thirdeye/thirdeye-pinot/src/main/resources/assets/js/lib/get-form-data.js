@@ -9,11 +9,6 @@ function getDataSetList(){
         var result_datasets_template = HandleBarsTemplates.template_datasets(queryFormDatasetData);
         $(".landing-dataset").each(function(){ $(this).html(result_datasets_template)});
 
-        /* Handelbars template for anomaly form datasets dropdown */
-        var anomalyFormDatasetData = {data: data, scope: "-manage-alert"}
-        var result_anomly_datasets_template = HandleBarsTemplates.template_datasets(anomalyFormDatasetData);
-        $(".anomaly-dataset").each(function(){ $(this).html(result_anomly_datasets_template)});
-
         $(".selected-dataset").text("Select dataset");
 
         if (hash.hasOwnProperty('dataset')) {
@@ -243,20 +238,22 @@ function getDatasetConfig() {
 
 
         var maxDate = moment(maxMillis).format("YYYY-MM-DD");
+        var tz = getTimeZone();
 
         //Add max and min time as a label time selection dropdown var minMillis = data["minTime"];
-        var maxDateTime = maxMillis ? moment(maxMillis).format("YYYY-MM-DD h a z") : "n.a.";
+        var maxDateTime = maxMillis ? moment(maxMillis).tz(tz).format("YYYY-MM-DD h a z") : "n.a.";
         $(".max-time").text(maxDateTime);
 
         //todo add min time to info endpoint
         var minMillis = parseInt(data["minTime"]);
-        var minDateTime = minMillis ? moment(minMillis).format("YYYY-MM-DD h a") : "n.a.";
+        var minDateTime = minMillis ? moment(minMillis).tz(tz).format("YYYY-MM-DD h a") : "n.a.";
         $(".min-time").text(minDateTime);
 
 
         //if no data available for today 12am hide today and yesterday option from time selection
         //if( moment(parseInt(maxMillis)) < moment(parseInt(Date.now())) ){
         var dateToday = moment().format("YYYY-MM-DD")
+
 
         if(  moment(dateToday).isAfter( moment(maxDate) )  ){
 

@@ -16,7 +16,7 @@ function formSubmit(target){
 
     /*Update hash*/
     //update hash.dataset
-    var selectedDataset = $("#selected-dataset").attr("value");
+    var selectedDataset = $("#" + currentTab + "-selected-dataset").attr("value");
     if(selectedDataset != "none" && selectedDataset != undefined && selectedDataset != ""){
         hash.dataset= selectedDataset;
     }

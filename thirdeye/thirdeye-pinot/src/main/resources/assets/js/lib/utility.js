@@ -36,7 +36,7 @@ function getData(url, tab){
     })
 }
 
-function submitData(url){
+function submitData(url, data){
     return $.ajax({
         url: url,
         type: 'post',
@@ -44,9 +44,8 @@ function submitData(url){
         //contentType: 'application/json',
         //data: data,
         //processData: false,
-        success: function( data, textStatus, jQxhr ){
-            //$('#response pre').html( JSON.stringify( data ) );
-        },
+        //success: function( data, textStatus, jQxhr ){
+        //},
         error: function( jqXhr, textStatus, errorThrown ){
             console.log( errorThrown );
         }
@@ -115,6 +114,8 @@ function updateDashboardFormFromHash(){
     if (hash.hasOwnProperty('view')){
         $(".header-tab[rel='"+ hash.view +"']").click();
     }else{
+        var defaultLandingView = 'dashboard'
+        hash.view = defaultLandingView;
         $(".header-tab[rel='dashboard']").click();
     }
 
@@ -166,7 +167,8 @@ function updateDashboardFormFromHash(){
 
     //UPDATE DATE TIME
     var tz = getTimeZone();
-    var maxMillis = window.datasetConfig.maxMillis;
+
+
     var currentStartDateTime;
     var currentEndDateTime;
     var baselineStartDateTime;
@@ -183,6 +185,11 @@ function updateDashboardFormFromHash(){
 
     var baselineStartTimeString;
     var baselineEndTimeString;
+
+    var maxMillis;
+    if(window.datasetConfig){
+        window.datasetConfig.maxMillis;
+    }
 
     if (hash.hasOwnProperty("currentStart")) {
         currentStartDateTimeUTC = moment(parseInt(hash.currentStart)).tz('UTC');
@@ -367,16 +374,95 @@ function formComponentPopulated(){
     }
 }
 
-/* Event listeners used in multiple instances in FORM area*/
+/* Event listeners used in multiple instances in FORM area and chart area*/
+
+/* takes a clicked anchor tag and applies active class to it's prent (li, button) */
+function  radioOptions(target){
+    $(target).parent().siblings().removeClass("uk-active");
+    $(target).parent().addClass("uk-active");
+}
+
+function radioButtons(target){
+
+    if(!$(target).hasClass("uk-active")) {
+        $(target).siblings().removeClass("uk-active");
+        $(target).addClass("uk-active");
+    }
+}
+
+function populateSingleSelect(target){
+
+    var selectorRoot = $(target).closest("[data-uk-dropdown]");
+    var value = $(target).attr("value");
+    var text = $(target).text();
+    $("div:first-child", selectorRoot).text(text);
+    $("div:first-child", selectorRoot).attr("value", value);
+}
+
+//Advanced settings
+function closeClosestDropDown(target){
+
+    $(target).closest($("[data-uk-dropdown]")).removeClass("uk-open");
+    $(target).closest($("[data-uk-dropdown]")).attr("aria-expanded", false);
+    $(target).closest(".uk-dropdown").hide();
+}
+
+function disableApplyButton(button){
+    $(button).prop("disabled", true);
+    $(button).attr("disabled", true);
+}
+
 function enableApplyButton(button){
     $(button).prop("disabled", false);
     $(button).removeAttr("disabled");
 }
 
+function selectDatasetNGetFormData(target){
+    //Cleanup form: Remove added-item and added-filter, metrics of the previous dataset
+    $("#"+  hash.view  +"-chart-area-error").hide();
+    $(".view-metric-selector .added-item").remove();
+    $(".view-dimension-selector .added-item").remove();
+    $(".metric-list").empty();
+    $(".single-metric-list").empty();
+    $("#selected-metric").html("Select metric");
+    $("#selected-metric").attr("value", "");
+    $(".dimension-list").empty();
+    $(".filter-dimension-list").empty()
+    $(".filter-panel .value-filter").remove();
+    $(".added-filter").remove();
+    $(".filter-panel .value-filter").remove();
 
 
+    //Remove previous dataset's hash values
+    delete hash.baselineStart;
+    delete hash.baselineEnd;
+    delete hash.currentStart;
+    delete hash.currentEnd;
+    delete hash.compareMode;
+    delete hash.dashboard;
+    delete hash.metrics;
+    delete hash.dimensions;
+    delete hash.filters;
+    delete hash.aggTimeGranularity;
+    $(".display-chart-section").empty();
 
-/* Event listeners used in FORM area and chart area*/
+
+    var value = $(target).attr("value");
+    hash.dataset = value;
+
+    //Trigger AJAX calls
+    //get the latest available data timestamp of a dataset
+    getAllFormData()
+
+    //Populate the selected item on the form element
+    $(".selected-dataset").text($(target).text());
+    $(".selected-dataset").attr("value",value);
+
+    //Close uikit dropdown
+    $(target).closest("[data-uk-dropdown]").removeClass("uk-open");
+    $(target).closest("[data-uk-dropdown]").attr("aria-expanded", false);
+}
+
 function closeAllUIKItDropdowns(){
 
     $("[data-uk-dropdown]").removeClass("uk-open");
@@ -391,8 +477,7 @@ function closeAllUIKItDropdowns(){
 //If you change this method, change the assignColorByID handlebars helper too the 2 serves all the time series type charts
 function assignColorByID(len, index){
 
-    var colorAry =  colorScale(len)
-
+    var colorAry =  colorScale(len);
     return colorAry[index]
 }
 
