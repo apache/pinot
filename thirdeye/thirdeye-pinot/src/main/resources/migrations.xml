@@ -347,7 +347,7 @@
       <column name="id" type="bigint" autoIncrement="true">
         <constraints primaryKey="true" nullable="false"/>
       </column>
-      <column name="feedback" type="varchar(100)"/>
+      <column name="feedback_type" type="varchar(100)"/>
       <column name="comment" type="varchar(500)"/>
       <column name="status" type="varchar(100)"/>
     </createTable>
@@ -355,7 +355,7 @@
       ALTER TABLE anomaly_feedback ENGINE = InnoDb;
     </sql>
     <addForeignKeyConstraint
-        constraintName="fk_anomaly_results_fk"
+        constraintName="fk_anomaly_results_feedback_fk"
         baseTableName="anomaly_results"
         baseColumnNames="anomaly_feedback_id"
         referencedTableName="anomaly_feedback"

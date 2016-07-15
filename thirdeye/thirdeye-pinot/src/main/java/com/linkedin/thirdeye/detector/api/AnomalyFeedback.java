@@ -21,9 +21,9 @@ public class AnomalyFeedback implements Serializable{
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private long id;
 
-  @Column(name = "feedback", nullable = false)
+  @Column(name = "feedback_type", nullable = false)
   @Enumerated(EnumType.STRING)
-  private AnomalyFeedbackType feedback;
+  private AnomalyFeedbackType feedbackType;
 
   @Column(name = "status", nullable = false)
   @Enumerated(EnumType.STRING)
@@ -40,12 +40,12 @@ public class AnomalyFeedback implements Serializable{
     this.id = id;
   }
 
-  public AnomalyFeedbackType getFeedback() {
-    return feedback;
+  public AnomalyFeedbackType getFeedbackType() {
+    return feedbackType;
   }
 
-  public void setFeedback(AnomalyFeedbackType feedback) {
-    this.feedback = feedback;
+  public void setFeedbackType(AnomalyFeedbackType feedbackType) {
+    this.feedbackType = feedbackType;
   }
 
   public FeedbackStatus getStatus() {
@@ -78,20 +78,19 @@ public class AnomalyFeedback implements Serializable{
     if (id != that.id) {
       return false;
     }
-    if (feedback != that.feedback) {
+    if (feedbackType != that.feedbackType) {
       return false;
     }
     if (status != that.status) {
       return false;
     }
     return comment != null ? comment.equals(that.comment) : that.comment == null;
-
   }
 
   @Override
   public int hashCode() {
     int result = (int) (id ^ (id >>> 32));
-    result = 31 * result + (feedback != null ? feedback.hashCode() : 0);
+    result = 31 * result + (feedbackType != null ? feedbackType.hashCode() : 0);
     result = 31 * result + (status != null ? status.hashCode() : 0);
     result = 31 * result + (comment != null ? comment.hashCode() : 0);
     return result;
@@ -99,11 +98,7 @@ public class AnomalyFeedback implements Serializable{
 
   @Override
   public String toString() {
-    return "AnomalyFeedback{" +
-        "id=" + id +
-        ", feedback=" + feedback +
-        ", status=" + status +
-        ", comment='" + comment + '\'' +
-        '}';
+    return "AnomalyFeedback{" + "id=" + id + ", feedback=" + feedbackType + ", status=" + status
+        + ", comment='" + comment + '\'' + '}';
   }
 }

@@ -687,7 +687,7 @@ public class AnomalyResource {
         feedback.setStatus(feedbackRequest.getStatus());
       }
       feedback.setComment(feedbackRequest.getComment());
-      feedback.setFeedback(feedbackRequest.getFeedback());
+      feedback.setFeedbackType(feedbackRequest.getFeedbackType());
 
       anomalyResultDAO.createOrUpdate(result);
     } catch (IOException e) {
