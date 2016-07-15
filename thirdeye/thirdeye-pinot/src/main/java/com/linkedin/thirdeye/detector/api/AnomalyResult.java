@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.detector.api;
 
+import com.linkedin.thirdeye.constant.AnomalyFeedback;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -70,8 +71,6 @@ public class AnomalyResult implements Comparable<AnomalyResult> {
   private static Joiner SEMICOLON = Joiner.on(";");
   private static Joiner EQUALS = Joiner.on("=");
 
-  public enum FEEDBACK {ANOMALY, NOT_ANOMALY}
-
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private long id;
@@ -120,7 +119,7 @@ public class AnomalyResult implements Comparable<AnomalyResult> {
 
   @Column(name = "feedback", nullable = true)
   @Enumerated(EnumType.STRING)
-  private FEEDBACK feedback;
+  private AnomalyFeedback feedback;
 
   public AnomalyResult() {
     creationTimeUtc = DateTime.now().getMillis();
@@ -247,11 +246,11 @@ public class AnomalyResult implements Comparable<AnomalyResult> {
     this.filters = sortedFilters;
   }
 
-  public FEEDBACK getFeedback() {
+  public AnomalyFeedback getFeedback() {
     return feedback;
   }
 
-  public void setFeedback(FEEDBACK feedback) {
+  public void setFeedback(AnomalyFeedback feedback) {
     this.feedback = feedback;
   }
 

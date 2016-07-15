@@ -344,7 +344,7 @@ public class AnomalyDetectionJob implements Job {
           // make sure score and weight are valid numbers
           result.setScore(normalize(result.getScore()));
           result.setWeight(normalize(result.getWeight()));
-          resultDAO.create(result);
+          resultDAO.createOrUpdate(result);
         }
         transaction.commit();
       } catch (Exception e) {

@@ -558,7 +558,6 @@ public class DashboardResource {
     }
     LOG.info("Response:{}", jsonResponse);
     return jsonResponse;
-
   }
 
   @GET
@@ -608,5 +607,4 @@ public class DashboardResource {
     }
     return response;
   }
-
 }

@@ -40,7 +40,7 @@ public class AnomalyResultResource {
   @Timed
   @UnitOfWork
   public Response create(AnomalyResult anomalyResult) {
-    Long id = dao.create(anomalyResult);
+    Long id = dao.createOrUpdate(anomalyResult);
     return Response.ok(id).build();
   }
 

@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.client;
 
+import com.linkedin.thirdeye.constant.MetricAggFunction;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -73,7 +74,7 @@ public class MetricExpression {
         if(metricName.equals(COUNT_METRIC_ESCAPED)){
           metricName = COUNT_METRIC;
         }
-        metricFunctions.add(new MetricFunction(MetricFunction.Function.SUM, metricName));
+        metricFunctions.add(new MetricFunction(MetricAggFunction.SUM, metricName));
       }
       return metricFunctions;
     } catch (ParseException e) {

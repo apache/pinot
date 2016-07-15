@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.dashboard;
 
+import com.linkedin.thirdeye.constant.MetricAggFunction;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -69,7 +70,7 @@ public class Utils {
       String requestReference, String metricName, List<String> dimensions, DateTime start,
       DateTime end) throws Exception {
 
-    MetricFunction metricFunction = new MetricFunction(MetricFunction.Function.COUNT, "*");
+    MetricFunction metricFunction = new MetricFunction(MetricAggFunction.COUNT, "*");
 
     List<ThirdEyeRequest> requests =
         generateRequests(collection, requestReference, metricFunction, dimensions, start, end);

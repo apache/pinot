@@ -19,7 +19,7 @@ public class AnomalyResultDAO extends AbstractDAO<AnomalyResult> {
     return get(id);
   }
 
-  public Long create(AnomalyResult anomalyResult) {
+  public Long createOrUpdate(AnomalyResult anomalyResult) {
     return persist(anomalyResult).getId();
   }
 
