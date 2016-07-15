@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
+import com.linkedin.thirdeye.constant.AnomalyFeedback;
 import io.dropwizard.hibernate.UnitOfWork;
 
 import java.io.IOException;
@@ -11,11 +12,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+import javax.transaction.Transactional;
 import javax.validation.constraints.NotNull;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
@@ -647,4 +650,23 @@ public class AnomalyResource {
     return Response.ok(id).build();
   }
 
+  @GET
+  @Path(value = "anomaly-result/feedback")
+  @Produces(MediaType.APPLICATION_JSON)
+  public AnomalyFeedback[] getAnomalyFeedbackTypes() {
+    return AnomalyFeedback.values();
+  }
+
+  @POST
+  @Path(value = "anomaly-result/feedback/{id}/{feedback}")
+  @Transactional(Transactional.TxType.REQUIRES_NEW)
+  public void updateAnomalyResultFeedback(@PathParam("id") long anomalyResultId,
+      @PathParam("feedback") AnomalyFeedback feedBack) {
+    AnomalyResult result = anomalyResultDAO.findById(anomalyResultId);
+    if(result == null) {
+      throw new IllegalArgumentException("AnomalyResult not found with id " + anomalyResultId);
+    }
+    result.setFeedback(feedBack);
+    anomalyResultDAO.createOrUpdate(result);
+  }
 }

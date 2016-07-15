@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.client.timeseries;
 
+import com.linkedin.thirdeye.constant.MetricAggFunction;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -133,7 +134,7 @@ public class TestTimeSeriesResponseUtils {
   private List<MetricFunction> createSumFunctions(String... metricNames) {
     List<MetricFunction> result = new ArrayList<>();
     for (String metricName : metricNames) {
-      result.add(new MetricFunction(MetricFunction.Function.SUM, metricName));
+      result.add(new MetricFunction(MetricAggFunction.SUM, metricName));
     }
     return result;
   }

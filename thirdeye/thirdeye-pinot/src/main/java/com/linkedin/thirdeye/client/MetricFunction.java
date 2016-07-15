@@ -2,21 +2,18 @@ package com.linkedin.thirdeye.client;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Objects;
+import com.linkedin.thirdeye.constant.MetricAggFunction;
 
 public class MetricFunction implements Comparable<MetricFunction> {
 
-  public enum Function {
-    SUM, COUNT, AVG
-  }
-
-  private Function functionName;
+  private MetricAggFunction functionName;
   private String metricName;
 
   public MetricFunction(){
 
   }
 
-  public MetricFunction(@JsonProperty("functionName") Function functionName,
+  public MetricFunction(@JsonProperty("functionName") MetricAggFunction functionName,
       @JsonProperty("metricName") String metricName) {
     this.functionName = functionName;
     this.metricName = metricName;
@@ -53,7 +50,7 @@ public class MetricFunction implements Comparable<MetricFunction> {
     return this.toString().compareTo(o.toString());
   }
 
-  public Function getFunctionName() {
+  public MetricAggFunction getFunctionName() {
     return functionName;
   }
 
@@ -65,7 +62,7 @@ public class MetricFunction implements Comparable<MetricFunction> {
     this.metricName = metricName;
   }
 
-  public void setFunctionName(Function functionName) {
+  public void setFunctionName(MetricAggFunction functionName) {
     this.functionName = functionName;
   }
 }

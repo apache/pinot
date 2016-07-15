@@ -1,6 +1,6 @@
 package com.linkedin.thirdeye.detector.api;
 
-import com.linkedin.thirdeye.client.MetricFunction;
+import com.linkedin.thirdeye.constant.MetricAggFunction;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
@@ -49,7 +49,7 @@ public class AnomalyFunctionSpec {
 
   @Column(name = "metric_function", nullable = false)
   @Enumerated(EnumType.STRING)
-  private MetricFunction.Function metricFunction;
+  private MetricAggFunction metricFunction;
 
   @Column(name = "type", nullable = false)
   private String type;
@@ -129,11 +129,11 @@ public class AnomalyFunctionSpec {
     this.metric = metric;
   }
 
-  public MetricFunction.Function getMetricFunction() {
+  public MetricAggFunction getMetricFunction() {
     return metricFunction;
   }
 
-  public void setMetricFunction(MetricFunction.Function metricFunction) {
+  public void setMetricFunction(MetricAggFunction metricFunction) {
     this.metricFunction = metricFunction;
   }
 

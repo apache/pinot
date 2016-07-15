@@ -1,7 +1,7 @@
 package com.linkedin.thirdeye.anomaly;
 
+import com.linkedin.thirdeye.constant.MetricAggFunction;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -16,7 +16,6 @@ import org.quartz.JobExecutionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.collect.ImmutableList;
 import com.linkedin.thirdeye.api.CollectionSchema;
 import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
@@ -87,7 +86,7 @@ public class TaskRunner {
     TimeGranularity timeGranularity = new TimeGranularity(anomalyFunctionSpec.getBucketSize(),
         anomalyFunctionSpec.getBucketUnit());
     // TODO put sum into the function config
-    metricFunction = new MetricFunction(MetricFunction.Function.SUM, anomalyFunctionSpec.getMetric());
+    metricFunction = new MetricFunction(MetricAggFunction.SUM, anomalyFunctionSpec.getMetric());
 
     // Collection
     collection = anomalyFunctionSpec.getCollection();
@@ -237,7 +236,7 @@ public class TaskRunner {
           // make sure score and weight are valid numbers
           result.setScore(normalize(result.getScore()));
           result.setWeight(normalize(result.getWeight()));
-          resultDAO.create(result);
+          resultDAO.createOrUpdate(result);
         }
         transaction.commit();
       } catch (Exception e) {

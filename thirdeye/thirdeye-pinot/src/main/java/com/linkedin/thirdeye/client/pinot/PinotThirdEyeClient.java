@@ -18,20 +18,14 @@ import org.joda.time.format.DateTimeFormatter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.collect.Lists;
 import com.linkedin.pinot.client.ResultSet;
 import com.linkedin.pinot.client.ResultSetGroup;
 import com.linkedin.thirdeye.api.CollectionSchema;
-import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.client.MetricFunction;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.client.ThirdEyeRequest;
-import com.linkedin.thirdeye.client.ThirdEyeRequest.ThirdEyeRequestBuilder;
-import com.linkedin.thirdeye.client.ThirdEyeResponse;
-import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
-import com.linkedin.thirdeye.dashboard.ThirdEyeDashboardConfiguration;
 import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
 
 public class PinotThirdEyeClient implements ThirdEyeClient {
@@ -261,44 +255,13 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
   @Deprecated
   public static PinotThirdEyeClient getDefaultTestClient() {
     // TODO REPLACE WITH CONFIGS
-    String controllerHost = "lva1-app0086.corp.linkedin.com";
+    String controllerHost = "localhost";
     int controllerPort = 11984;
-    String zkUrl = "zk-lva1-pinot.corp.linkedin.com:12913/pinot-cluster";// "zk-lva1-pinot.corp:12913/pinot-cluster";
+    String zkUrl =
+        "localhost:12913/pinot-cluster";
     String clusterName = "mpSprintDemoCluster";
     String tag = "thirdeye_BROKER";
     // return fromZookeeper(controllerHost, controllerPort, zkUrl, clusterName, tag);
-
-    return fromHostList(controllerHost, controllerPort, "lva1-app0091.corp.linkedin.com:7001");
+    return fromHostList(controllerHost, controllerPort, "localhost:7001");
   }
-
-  public static void main(String[] args) throws Exception {
-
-    ThirdEyeConfiguration thirdEyeConfig = new ThirdEyeDashboardConfiguration();
-    thirdEyeConfig.setWhitelistCollections("login_mobile");
-
-    PinotThirdEyeClientConfig pinotThirdEyeClientConfig = new PinotThirdEyeClientConfig();
-    pinotThirdEyeClientConfig.setControllerHost("lva1-app0086.corp.linkedin.com");
-    pinotThirdEyeClientConfig.setControllerPort(11984);
-    pinotThirdEyeClientConfig
-        .setZookeeperUrl("zk-lva1-pinot.corp.linkedin.com:12913/pinot-cluster");
-    pinotThirdEyeClientConfig.setClusterName("mpSprintDemoCluster");
-
-    ThirdEyeCacheRegistry.initializeWebappCaches(thirdEyeConfig, pinotThirdEyeClientConfig);
-
-    ThirdEyeClient thirdEyeClient = ThirdEyeCacheRegistry.getInstance().getQueryCache().getClient();
-
-    ThirdEyeRequestBuilder builder = new ThirdEyeRequestBuilder();
-    builder.setCollection("login_mobile");
-    builder.setStartTimeInclusive(DateTime.parse("2016-05-11"));
-    builder.setEndTimeExclusive(DateTime.parse("2016-05-17"));
-    builder.setMetricFunctions(Lists.newArrayList(new MetricFunction(MetricFunction.Function.SUM, "loginAttempt")));
-    TimeGranularity timeGranularity = new TimeGranularity(1, TimeUnit.HOURS);
-    builder.setGroupByTimeGranularity(timeGranularity);
-    ThirdEyeRequest thirdEyeRequest = builder.build("asd");
-    ThirdEyeResponse response = thirdEyeClient.execute(thirdEyeRequest);
-    System.out.println("Response: \n" + response);
-    thirdEyeClient.close();
-    System.exit(0);
-  }
-
 }
