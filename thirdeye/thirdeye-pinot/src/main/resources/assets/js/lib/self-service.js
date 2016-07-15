@@ -3,16 +3,26 @@ function getExistingAnomalyFunctions(dataset){
     if(dataset) {
         var url = "/dashboard/anomaly-function/view?dataset=" + dataset;
         var tab = "self-service";
+        var result_existing_anomaly_functions_template;
+
         getData(url, tab).done(function (data) {
+            console.log("data")
+            console.log(data)
+            /** Handelbars template for EXISTING ANOMALY FUNCTIONS TABLE **/
+            result_existing_anomaly_functions_template = HandleBarsTemplates.template_existing_anomaly_functions(data);
+            $("#existing-anomaly-functions-table-placeholder").html(result_existing_anomaly_functions_template);
 
-            //EXISTING ANOMALY FUNCTIONS TABLE
-            var result_existing_anomaly_functions_template = HandleBarsTemplates.template_existing_anomaly_functions(data);
-             $("#existing-anomaly-functions-table-placeholder").html(result_existing_anomaly_functions_template);
-
-            /** Reinstanciate Datatables on self service view **/
+            /** Instanciate Datatables on self service view **/
             $("#existing-anomaly-functions-table").DataTable();
-
         });
+    }else{
+        /** Handelbars template for EXISTING ANOMALY FUNCTIONS TABLE **/
+        result_existing_anomaly_functions_template = HandleBarsTemplates.template_existing_anomaly_functions({});
+        $("#existing-anomaly-functions-table-placeholder").html(result_existing_anomaly_functions_template);
+
+        /** Instanciate Datatables on self service view **/
+        $("#existing-anomaly-functions-table").DataTable();
+
     }
 }
 
@@ -426,7 +436,7 @@ function renderSelfService(){
 
             var successMessage = $("#manage-alert-success");
 
-            $("p", successMessage).append("SUCCESS");
+            $("p", successMessage).html("success");
             successMessage.fadeIn(100);
        })
     }

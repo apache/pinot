@@ -86,13 +86,21 @@
         hash.view = $(target).attr("rel");
 
         if(hash.view == "self-service"){
+
+            //Clear hash, only keep dataset & view as those are required to display the view
             if(hash.dataset){
+            var dataset = hash.dataset;
+            hash = {}
+            hash.dataset = dataset;
+            hash.view == "self-service";
+
+
                 getExistingAnomalyFunctions(hash.dataset);
-                renderSelfService();
+
             }else{
                 getExistingAnomalyFunctions();
-                renderSelfService();
             }
+            renderSelfService();
 
         }
     }

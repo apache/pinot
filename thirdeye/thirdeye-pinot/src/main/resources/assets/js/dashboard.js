@@ -151,6 +151,8 @@ $(document).ready( function() {
     //Global object with the query params
     hash = parseHashParameters(window.location.hash);
     hash.view = hash.hasOwnProperty("view") ? hash.view : "dashboard";
+    $("#" + hash.view + "-header-tab").click();
+
 
     /** --- ) Set initial view on pageload ---**/
 

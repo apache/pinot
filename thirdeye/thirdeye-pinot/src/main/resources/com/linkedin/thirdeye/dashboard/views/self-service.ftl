@@ -177,7 +177,7 @@
                 </div>
 
                 <label class="uk-form-label bold-label required">Dataset</label>
-                <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group uk-display-inline-block">
+                <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group uk-display-inline-block uk-margin-bottom">
                     <div class="selected-dataset uk-button" value="">Select dataset
                     </div>
                     <div class="uk-button uk-button-primary" type="button"><i class="uk-icon-caret-down"></i>
