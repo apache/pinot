@@ -8,7 +8,7 @@
                 <p class="dimension-title hidden"> {{dimensionName}}</p>
                 <p class="dimension-title hidden"> {{dimensionName}}</p>
 
-                <h3 class="uk-margin-top"> Break down of metric: <b>{{metricName}}</b> by dimension: <b>{{dimensionName}}</b><span class="filters-title"></span></h3>
+                <h2 class="uk-margin-top"> Break down of metric: <b>{{metricName}}</b> by dimension: <b>{{dimensionName}}</b><span class="filters-title"></span></h2>
                 <div class="dimension-timeseries-section clear-fix uk-margin-large-bottom" dimension="{{dimensionName}}" style="width: 100%; position: relative;">
                     {{#with @root/timeBuckets}}
                     <div  class="title-box full-width">
@@ -75,7 +75,7 @@
                     </div>
                 </div>
 
-	            <h3 class="uk-margin-top"> Break down of metric: <b>{{metricName}}</b> by dimension: <b>{{dimensionName}}</b><span class="filters-title"></span></h3>
+	            <h2 class="uk-margin-top"> Break down of metric: <b>{{metricName}}</b> by dimension: <b>{{dimensionName}}</b><span class="filters-title"></span></h2>
 
                 <!-- Contributors table -->
                 <!--Summary and details buttons -->

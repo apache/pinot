@@ -11,6 +11,7 @@
     <link rel="stylesheet" href="../../../assets/css/uikit/components/form-select.almost-flat.min.css"/>
     <link rel="stylesheet" href="../../../assets/css/uikit/components/datepicker.almost-flat.min.css"/>
     <link rel="stylesheet" href="../../../assets/css/datatables.min.css"/>
+    <link rel="stylesheet" href="DataTables/datatables.min.css"/>
     <link rel="stylesheet" href="../../../assets/css/main.css"/>
     <link rel="stylesheet" href="../../../assets/css/d3.css"/>
     <link rel="stylesheet" href="../../../assets/css/c3.css"/>
@@ -43,6 +44,9 @@
     <script src="../../../assets/js/uikit/components/used-components.compiled.js" defer></script>
     <!--<script type="text/javascript" src="https://www.google.com/jsapi"></script>-->
 
+
+
+    <script type="text/javascript" src="DataTables/datatables.min.js"></script>
     <script src="../../../assets/js/lib/utility.js" defer></script>
     <script src="../../../assets/js/lib/get-form-data.js" defer></script>
     <script src="../../../assets/js/lib/tabular.js" defer></script>

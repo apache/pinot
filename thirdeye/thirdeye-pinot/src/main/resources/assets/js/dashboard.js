@@ -141,16 +141,16 @@ $(document).ready( function() {
     $("#self-service-section #form-area").append(result_form_template);
 
 
-    /** Handelbars template for main content on self service tab * */
-    //SELF SERVICE TAB
-    var result_self_service_template = HandleBarsTemplates.template_self_service("");
-    $("#self-service-display-main-content-section").append(result_self_service_template);
+    /** Handelbars template for main content
+     * Todo: based on the requirements of the manage existing anomaly functions decide to use or remove this template **/
+//    //SELF SERVICE TAB
+//    var result_self_service_template = HandleBarsTemplates.template_self_service("");
+//    $("#self-service-display-main-content-section").append(result_self_service_template);
 
 
     //Global object with the query params
     hash = parseHashParameters(window.location.hash);
     hash.view = hash.hasOwnProperty("view") ? hash.view : "dashboard";
-    $("#" + hash.view + "-header-tab").click();
 
     /** --- ) Set initial view on pageload ---**/
 

@@ -17,6 +17,7 @@
             {{/if}}
             {{#if showSelfServiceForms}}
             <section id="{{tabName}}-display-main-content-section" class="display-main-content-section">
+                <#include "../self-service.ftl">
             </section>
             {{/if}}
 

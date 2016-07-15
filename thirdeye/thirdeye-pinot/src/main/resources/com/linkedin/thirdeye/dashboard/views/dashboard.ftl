@@ -44,8 +44,7 @@
     <#include "contributors.ftl">
     <#include "timeseries.ftl">
     <#include "anomalies.ftl">
-    <#include "self-service.ftl">
-    <#include "self-service-exisiting-anomaly-functions.ftl">
+    <#include "self-service-exisiting-functions.ftl">
 
 </body>
 

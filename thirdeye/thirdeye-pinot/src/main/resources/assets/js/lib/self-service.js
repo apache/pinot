@@ -1,26 +1,23 @@
-    renderSelfService();
-   //getExistingAnomalyFunctions(hash.dataset)
 
 function getExistingAnomalyFunctions(dataset){
-    var url = "/dashboard/anomaly-function/view?dataset=" + dataset;
-    var tab = "self-service"
-    getData(url, tab).done(function (data) {
-//        console.log("self service data arrived")
-//        console.log(data)
+    if(dataset) {
+        var url = "/dashboard/anomaly-function/view?dataset=" + dataset;
+        var tab = "self-service";
+        getData(url, tab).done(function (data) {
 
-        //EXISTING ANOMALY FUNCTIONS TABLE
-        var result_existing_anomaly_functions_template = HandleBarsTemplates.template_existing_anomaly_functions("")
-        $("#manage-existing-anomaly-functions-tab").append(result_existing_anomaly_functions_template);
+            //EXISTING ANOMALY FUNCTIONS TABLE
+            var result_existing_anomaly_functions_template = HandleBarsTemplates.template_existing_anomaly_functions(data);
+             $("#existing-anomaly-functions-table-placeholder").html(result_existing_anomaly_functions_template);
 
-        /** Create Datatables instance on self service view **/
-        $("#existing-rules").DataTable();
+            /** Reinstanciate Datatables on self service view **/
+            $("#existing-anomaly-functions-table").DataTable();
 
-    });
+        });
+    }
 }
 
+
 function renderSelfService(){
-
-
 
     /**--- Eventlisteners on manage alerts form ---**/
 
@@ -65,59 +62,15 @@ function renderSelfService(){
         selectAnomalyDimension(this)
     });
 
-    $("#main-view").on("change", ".filter-value-checkbox, .filter-select-all-checkbox", function(){
-        enableApplyButton( $("#apply-filter-btn-manage-alert") )
+    $("#main-view").on("click",".remove-filter-selection[tab='self-service']", function() {
+           hideErrorAndSuccess("filter-selection")
     });
 
+
     /** Apply filter **/
-    /*$("#main-view").on("click","#apply-filter-btn-manage-alert", function(){
-        applyFilterSelectionManageAlert()
-        function applyFilterSelectionManageAlert(){
-
-            var currentTabFilters = $("#filter-panel-manage-alert");
-
-            //Set hash params
-            var filters = {};
-            var labels = {};
-
-            $(".filter-value-checkbox", currentTabFilters).each(function(i, checkbox) {
-                var checkboxObj = $(checkbox);
-
-                if (checkboxObj.is(':checked')) {
-                    var key = $(checkbox).attr("rel");
-                    var value = $(checkbox).attr("value");
-                    var valueAlias = $(checkbox).parent().text();
-
-                    if(filters[key]){
-                        filters[key].push(value) ;
-                        //using alias for "", "?" values
-                        labels[key].push(valueAlias) ;
-                    }else{
-                        filters[key] = [value];
-                        labels[key] = [valueAlias];
-                    }
-                }
-            });
-
-
-            //Disable Apply filters button and close popup
-
-            //Todo: Show selected filters on dashboard
-            //empty previous filters labels
-            //$(".added-filter[tab='"+ hash.view +"']").remove()
-
-            //append new labels
-            var html = "";
-            for(k in labels){
-                var values = decodeURIComponent(labels[k])
-                html +=  "<li class='added-filter uk-button remove-filter-selection' rel='" + k + "' value='" + labels[k] + "' title='" + k + ": " + values +  "'>" + k + ": " + values + "<i class='uk-icon-close'></i></li>";
-            }
-
-            $("#selected-filters-list-manage-alert").html(html);
-
-            //$("#filter-panel-manage-alert").hide();
-        }
-    });*/
+//    $("#main-view").on("click","#", function(){
+//
+//    });
 
     /** Monitoring repeat size selection **/
     $("#main-view").on("click",".monitoring-window-unit-option", function(){
@@ -149,50 +102,50 @@ function renderSelfService(){
         $("#manage-alert-success").hide();
     }
 
-    function selectAnomalyDataset(target) {
-
-        var value = $(target).attr("value")
-        //Get metric list
-        var metricListUrl = "/dashboard/data/metrics?dataset=" + value;
-        getData(metricListUrl).done(function (data) {
-
-            /* Handelbars template for manage anomalies form metric list */
-            var anomalyFormMetricListData = {data: data, scope: "-manage-alert", singleMetricSelector: true};
-            var result_anomaly_form_metric_list_template = HandleBarsTemplates.template_metric_list(anomalyFormMetricListData);
-            $(".manage-alert-metric-list").each(function () {
-                $(this).html(result_anomaly_form_metric_list_template)
-            });
-        });
-
-        //Get dimension and filter list
-        var dimensionNDimensionValueListUrl = "/dashboard/data/filters?dataset=" + value;
-        getData(dimensionNDimensionValueListUrl).done(function (data){
-
-            var dimensionListHtml = "";
-            for (var k in  data) {
-                dimensionListHtml += "<li class='dimension-option-manage-alert' rel='dimensions' value='" + k + "'><a href='#' class='uk-dropdown-close'>" + k + "</a></li>";
-            }
-            $(".dimension-list-manage-alert").html(dimensionListHtml);
-
-            /* Handelbars template for dimensionvalues in filter dropdown */
-            var result_filter_dimension_value_template = HandleBarsTemplates.template_filter_dimension_value(data);
-            $(".dimension-values-manage-alert").after(result_filter_dimension_value_template);
-
-        })
-
-
-        //close uikit dropdown
-        $(target).closest("[data-uk-dropdown]").removeClass("uk-open");
-        $(target).closest("[data-uk-dropdown]").attr("aria-expanded", false);
-
-        //If previously error was shown hide it
-        if($("#manage-alert-error").attr("data-error-source") == "dataset-option-manage-alert"){
-            $("#manage-alert-error").hide();
-        }
-
-        //Hide success message
-        $("#manage-alert-success").hide();
-    }
+//    function selectAnomalyDataset(target) {
+//
+//        var value = $(target).attr("value")
+//        //Get metric list
+//        var metricListUrl = "/dashboard/data/metrics?dataset=" + value;
+//        getData(metricListUrl).done(function (data) {
+//
+//            /* Handelbars template for manage anomalies form metric list */
+//            var anomalyFormMetricListData = {data: data, scope: "-manage-alert", singleMetricSelector: true};
+//            var result_anomaly_form_metric_list_template = HandleBarsTemplates.template_metric_list(anomalyFormMetricListData);
+//            $(".manage-alert-metric-list").each(function () {
+//                $(this).html(result_anomaly_form_metric_list_template)
+//            });
+//        });
+//
+//        //Get dimension and filter list
+//        var dimensionNDimensionValueListUrl = "/dashboard/data/filters?dataset=" + value;
+//        getData(dimensionNDimensionValueListUrl).done(function (data){
+//
+//            var dimensionListHtml = "";
+//            for (var k in  data) {
+//                dimensionListHtml += "<li class='dimension-option-manage-alert' rel='dimensions' value='" + k + "'><a href='#' class='uk-dropdown-close'>" + k + "</a></li>";
+//            }
+//            $(".dimension-list-manage-alert").html(dimensionListHtml);
+//
+//            /* Handelbars template for dimensionvalues in filter dropdown */
+//            var result_filter_dimension_value_template = HandleBarsTemplates.template_filter_dimension_value(data);
+//            $(".dimension-values-manage-alert").after(result_filter_dimension_value_template);
+//
+//        })
+//
+//
+//        //close uikit dropdown
+//        $(target).closest("[data-uk-dropdown]").removeClass("uk-open");
+//        $(target).closest("[data-uk-dropdown]").attr("aria-expanded", false);
+//
+//        //If previously error was shown hide it
+//        if($("#manage-alert-error").attr("data-error-source") == "dataset-option-manage-alert"){
+//            $("#manage-alert-error").hide();
+//        }
+//
+//        //Hide success message
+//        $("#manage-alert-success").hide();
+//    }
 
     function selectAnomalyMetric(target){
 
@@ -228,7 +181,7 @@ function renderSelfService(){
     };
 
     function selectAnomalyCompareMode(target){
-        var value = $(target).attr("unit");
+        var value = $(target).attr("value");
         //Populate the selected item on the form element
         $("#selected-anomaly-compare-mode").text($(target).text());
         $("#selected-anomaly-compare-mode").attr("value",value);
@@ -250,7 +203,7 @@ function renderSelfService(){
 
     function selectMonitoringWindowUnit(target){
 
-        var value = $(target).attr("unit");
+        var value = $(target).attr("value");
         //Populate the selected item on the form element
         $("#selected-monitoring-window-unit").text($(target).text());
         $("#selected-monitoring-window-unit").attr("value",value);
@@ -272,7 +225,16 @@ function renderSelfService(){
         $(".value-filter[rel='"+ dimension +"']").css("display", "block");
     }
 
+    function hideErrorAndSuccess(source) {
 
+        //If previously error was shown hide it
+        if($("#manage-alert-error").attr("data-error-source") == source) {
+            $("#manage-alert-error").hide();
+        }
+
+        //Hide success message
+        $("#manage-alert-success").hide();
+    }
 
     function setMonitoringRepeatSize(){
 
@@ -288,7 +250,7 @@ function renderSelfService(){
 
     function selectAnomalyMonitoringRepeatUnit(target){
 
-        var value = $(target).attr("unit");
+        var value = $(target).attr("value");
         //Populate the selected item on the form element
         $("#selected-anomaly-monitoring-repeat-unit").text($(target).text());
         $("#selected-anomaly-monitoring-repeat-unit").attr("value", value);
@@ -329,10 +291,11 @@ function renderSelfService(){
         var metric = $("#selected-metric-manage-alert").attr("value");
         var condition =( $("#selected-anomaly-condition").attr("value") == "DROPS" ) ? "-" :  ( $("#selected-anomaly-condition").attr("value") == "INCREASES" )  ? "" : null;
         var changeThreshold = parseFloat( $("#anomaly-threshold").val() / 100);
+        var baseline = $("#selected-anomaly-compare-mode").attr("value");
         var windowSize = $("#monitoring-window-size").val();
-        var windowUnit = $("#selected-monitoring-window-unit").attr("unit");
+        var windowUnit = $("#selected-monitoring-window-unit").attr("value");
         var repeatEverySize = $("#monitoring-repeat-size").val();
-        var repeatEveryUnit = $("#selected-monitoring-repeat-unit").attr("unit");
+        var repeatEveryUnit = $("#selected-monitoring-repeat-unit").attr("value");
         var monitoringScheduleTime = $("#monitoring-schedule-time").val() == "" ?  "00:00" : $("#monitoring-schedule-time").val() //Todo: in case of daily data granularity set the default schedule to time when datapoint is created
         var scheduleMinute = monitoringScheduleTime.substring(3, monitoringScheduleTime.length);
         var scheduleHour = monitoringScheduleTime.substring(0, monitoringScheduleTime.length -3);
@@ -343,32 +306,13 @@ function renderSelfService(){
            var isActive = false;
         }
 
-        readFiltersApplied();
-        function readFiltersApplied(){
-            var currentFilterContainer = $(".filter-selector-manage-alert")
-            var filters = {};
-
-            $(".added-filter",currentFilterContainer).each(function(){
-                var keyValue = $(this).attr("title").trim().split(":");
-                var dimension = keyValue[0];
-                var valuesAryToTrim = keyValue[1].trim().split(",")
-                var valuesAry = [];
-                for(var index=0, len= valuesAryToTrim.length; index < len; index++){
-                    var value = valuesAryToTrim[index].trim();
-                    if(value == "UNKNOWN"){
-                        value = "";
-                    }
-
-                    valuesAry.push(value)
-                }
-                filters[dimension] = valuesAry;
-            })
-
-            return filters
-        }
+        var filters = readFiltersAppliedInCurrentView("self-service");
 
 
-        var exploreDimension = "";
+        filters = encodeURIComponent(JSON.stringify(filters));
+
+
+        var exploreDimension = $("#self-service-view-single-dimension-selector #selected-dimension").attr("value");
         var properties = "";
 
 
@@ -397,6 +341,7 @@ function renderSelfService(){
             }
             return true;
         };
+
         if(!isAlphaNumeric(functionName)){
             errorMessage.html("Please only use alphanumeric (0-9, A-Z, a-z) characters in 'Rule' field. No space, no '_', no '-' is accepted.");
             errorAlert.attr("data-error-source", "rule");
@@ -444,6 +389,18 @@ function renderSelfService(){
             return
         }
 
+
+        //Check if repeatEverySize is positive integer
+        function isPositiveInteger(str) {
+            return /^\+?[1-9][\d]*$/.test(str);
+        }
+        if(!isPositiveInteger(repeatEverySize)){
+            errorMessage.html("Monitor data every X hours/days/weeks etc., where X should be positive integer.");
+            errorAlert.attr("data-error-source", "monitoring-repeat-size");
+            errorAlert.fadeIn(100);
+            return
+        }
+
         //Check if repeatEvery has value
         if(!repeatEverySize) {
             errorMessage.html("Please fill in how frequently should ThirdEye monitor the data.");
@@ -458,13 +415,18 @@ function renderSelfService(){
         + "&windowSize=" + windowSize + "&windowUnit=" + windowUnit + "&windowDelay=" + windowDelay
         + "&scheduleMinute=" + scheduleMinute  + "&scheduleHour=" + scheduleHour
         + "&repeatEverySize=" + repeatEverySize + "&repeatEveryUnit=" + repeatEveryUnit
-        + "&exploreDimension=" + exploreDimension + "&isActive=" +  isActive + "&properties=baseline=" + "w/w" + ";changeThreshold=" + condition + changeThreshold + ";";
+        + "&exploreDimension=" + exploreDimension + "&isActive=" +  isActive + "&properties=baseline=" + baseline + ";changeThreshold=" + condition + changeThreshold //+ ";&filters=" + filters ;
+
+//        var successMessage = $("#manage-alert-success");
+//        $("p", successMessage).append("url to be submitted: " + url);
+//            successMessage.fadeIn(100);
+
 
        submitData(url).done(function(){
 
             var successMessage = $("#manage-alert-success");
 
-            $("p", successMessage).html("success");
+            $("p", successMessage).append("SUCCESS");
             successMessage.fadeIn(100);
        })
     }

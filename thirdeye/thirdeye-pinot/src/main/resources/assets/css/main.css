@@ -735,7 +735,7 @@ body a{
 }
 
 .title-box th {
-    font-size: 0.75em;
+    font-size: 1rem;
     font-weight: 400;
     padding: 5px;
 }
@@ -868,11 +868,6 @@ body a{
 
 #anomalies-table .checkbox-cell label{
     padding: 6px;
-}
-
-/* Self-service view related */
-.self-service-view-single-dimension-selector{
-   vertical-align: top;
 }
 
 
