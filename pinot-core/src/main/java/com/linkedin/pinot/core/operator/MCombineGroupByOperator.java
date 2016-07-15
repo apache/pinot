@@ -23,17 +23,15 @@ import com.linkedin.pinot.common.response.ProcessingException;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Operator;
-import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
 import com.linkedin.pinot.core.operator.aggregation.groupby.AggregationGroupByResult;
 import com.linkedin.pinot.core.operator.aggregation.groupby.GroupKeyGenerator;
+import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
 import com.linkedin.pinot.core.operator.query.MAggregationGroupByOperator;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionFactory;
 import com.linkedin.pinot.core.query.aggregation.groupby.AggregationGroupByOperatorService;
 import com.linkedin.pinot.core.util.trace.TraceRunnable;
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -41,6 +39,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -172,9 +171,8 @@ public class MCombineGroupByOperator extends BaseOperator {
         public void runJob() {
           AggregationGroupByResult groupByResult;
 
-          // If block is null (unexpected error), or there's no group-by result, then return as there's nothing to do.
-          blocks[index] = (IntermediateResultsBlock) _operators.get(index).nextBlock();
-          if (blocks[index] != null) {
+          try {
+            blocks[index] = (IntermediateResultsBlock) _operators.get(index).nextBlock();
             groupByResult = blocks[index].getAggregationGroupByResult();
 
             if (groupByResult != null) {
@@ -195,7 +193,6 @@ public class MCombineGroupByOperator extends BaseOperator {
                     for (int j = 0; j < numAggrFunctions; j++) {
                       results[j] = groupByResult.getResultForKey(groupKey, j);
                     }
-
                     resultsMap.put(groupKeyString, results);
                   } else {
                     for (int j = 0; j < numAggrFunctions; j++) {
@@ -206,6 +203,10 @@ public class MCombineGroupByOperator extends BaseOperator {
                 }
               }
             }
+          } catch (Exception e) {
+            LOGGER.error("Exception processing CombineGroupBy for index {}, operator {}",
+                index, _operators.get(index).getClass().getName(), e);
+            blocks[index] = new IntermediateResultsBlock(e);
           }
 
           operatorLatch.countDown();
@@ -213,7 +214,12 @@ public class MCombineGroupByOperator extends BaseOperator {
       });
     }
 
-    operatorLatch.await(_timeOutMs, TimeUnit.SECONDS);
+    boolean opCompleted = operatorLatch.await(_timeOutMs, TimeUnit.SECONDS);
+    if (!opCompleted) {
+      // If this happens, the broker side should already timed out, just log the error in server side.
+      LOGGER.error("Timed out while combining group-by results, after {}ms.", _timeOutMs);
+      return new IntermediateResultsBlock(new TimeoutException("CombineGroupBy timed out."));
+    }
 
     // Use aggregationGroupByOperatorService to trim the resultsMap
     AggregationGroupByOperatorService aggregationGroupByOperatorService =
@@ -236,7 +242,7 @@ public class MCombineGroupByOperator extends BaseOperator {
   private IntermediateResultsBlock buildResultBlock(List<AggregationFunction> aggregationFunctions,
       List<Map<String, Serializable>> trimmedResults, IntermediateResultsBlock[] blocks) {
 
-    IntermediateResultsBlock resultBlock = new IntermediateResultsBlock(aggregationFunctions, trimmedResults, true);
+    IntermediateResultsBlock resultBlock = new IntermediateResultsBlock(aggregationFunctions, null, true);
     List<ProcessingException> exceptions = null;
 
     long numDocsScanned = 0;
@@ -253,6 +259,9 @@ public class MCombineGroupByOperator extends BaseOperator {
         } else {
           exceptions.addAll(blockExceptions);
         }
+      } else {
+        // If there are blocks without exception, set the aggregation group-by result.
+        resultBlock.setAggregationGroupByResult(trimmedResults);
       }
     }
 
