@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.detector.api;
 
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
+import com.linkedin.thirdeye.constant.FeedbackStatus;
 import java.io.Serializable;
 import javax.persistence.Column;
 import javax.persistence.Entity;
@@ -16,10 +17,6 @@ import javax.persistence.Table;
 public class AnomalyFeedback implements Serializable{
   private static final long serialVersionUID = 1L;
 
-  public enum STATUS {
-    NEW, IN_PROGRESS, RESOLVED, WONT_FIX
-  }
-
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private long id;
@@ -30,7 +27,7 @@ public class AnomalyFeedback implements Serializable{
 
   @Column(name = "status", nullable = false)
   @Enumerated(EnumType.STRING)
-  private STATUS status;
+  private FeedbackStatus status;
 
   @Column(name = "comment", length = 500)
   private String comment;
@@ -51,11 +48,11 @@ public class AnomalyFeedback implements Serializable{
     this.feedback = feedback;
   }
 
-  public STATUS getStatus() {
+  public FeedbackStatus getStatus() {
     return status;
   }
 
-  public void setStatus(STATUS status) {
+  public void setStatus(FeedbackStatus status) {
     this.status = status;
   }
 

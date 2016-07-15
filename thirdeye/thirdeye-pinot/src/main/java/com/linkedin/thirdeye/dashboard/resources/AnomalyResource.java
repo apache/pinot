@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.dashboard.resources;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
+import com.linkedin.thirdeye.constant.FeedbackStatus;
 import com.linkedin.thirdeye.detector.api.AnomalyFeedback;
 import io.dropwizard.hibernate.UnitOfWork;
 
@@ -659,7 +660,7 @@ public class AnomalyResource {
 
   /**
    * @param anomalyResultId : anomaly result id
-   * @param payload         : Feedback type {@link com.linkedin.thirdeye.constant.AnomalyFeedbackType}
+   * @param payload         : Json payload containing feedback @see com.linkedin.thirdeye.constant.AnomalyFeedbackType
    *                        eg. payload
    *                        <p/>
    *                        { "feedback": "NOT_ANOMALY", "comment": "this is not an anomaly" }
@@ -680,13 +681,14 @@ public class AnomalyResource {
         feedback = new AnomalyFeedback();
         result.setFeedback(feedback);
       }
-      feedback.setComment(feedbackRequest.getComment());
       if (feedbackRequest.getStatus() == null) {
-        feedback.setStatus(AnomalyFeedback.STATUS.NEW);
+        feedback.setStatus(FeedbackStatus.NEW);
       } else {
         feedback.setStatus(feedbackRequest.getStatus());
       }
+      feedback.setComment(feedbackRequest.getComment());
       feedback.setFeedback(feedbackRequest.getFeedback());
+
       anomalyResultDAO.createOrUpdate(result);
     } catch (IOException e) {
       throw new IllegalArgumentException("Invalid payload");
