@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.client.pinot;
 
-import com.linkedin.thirdeye.constant.MetricAggFunction;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -19,20 +18,14 @@ import org.joda.time.format.DateTimeFormatter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.collect.Lists;
 import com.linkedin.pinot.client.ResultSet;
 import com.linkedin.pinot.client.ResultSetGroup;
 import com.linkedin.thirdeye.api.CollectionSchema;
-import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.client.MetricFunction;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.client.ThirdEyeRequest;
-import com.linkedin.thirdeye.client.ThirdEyeRequest.ThirdEyeRequestBuilder;
-import com.linkedin.thirdeye.client.ThirdEyeResponse;
-import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
-import com.linkedin.thirdeye.dashboard.ThirdEyeDashboardConfiguration;
 import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
 
 public class PinotThirdEyeClient implements ThirdEyeClient {
@@ -256,5 +249,19 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
   @Override
   public void close() throws Exception {
     controllerClient.close();
+  }
+
+  /** TESTING ONLY - WE SHOULD NOT BE USING THIS. */
+  @Deprecated
+  public static PinotThirdEyeClient getDefaultTestClient() {
+    // TODO REPLACE WITH CONFIGS
+    String controllerHost = "localhost";
+    int controllerPort = 11984;
+    String zkUrl =
+        "localhost:12913/pinot-cluster";
+    String clusterName = "mpSprintDemoCluster";
+    String tag = "thirdeye_BROKER";
+    // return fromZookeeper(controllerHost, controllerPort, zkUrl, clusterName, tag);
+    return fromHostList(controllerHost, controllerPort, "localhost:7001");
   }
 }
