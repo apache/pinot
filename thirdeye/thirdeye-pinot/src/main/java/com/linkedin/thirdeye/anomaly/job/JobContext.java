@@ -1,7 +1,5 @@
-package com.linkedin.thirdeye.anomaly;
+package com.linkedin.thirdeye.anomaly.job;
 
-
-import java.util.Date;
 
 import org.hibernate.SessionFactory;
 import org.joda.time.DateTime;
@@ -14,9 +12,9 @@ import com.linkedin.thirdeye.detector.db.AnomalyTaskSpecDAO;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 
 
-public class ThirdEyeJobContext {
+public class JobContext {
 
-  private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeJobContext.class);
+  private static final Logger LOG = LoggerFactory.getLogger(JobContext.class);
 
   private AnomalyJobSpecDAO anomalyJobSpecDAO;
   private AnomalyTaskSpecDAO anomalyTaskSpecDAO;
@@ -32,11 +30,6 @@ public class ThirdEyeJobContext {
   private String jobName;
 
   private long jobExecutionId;
-
-  public ThirdEyeJobContext() {
-
-  }
-
 
   public long getJobExecutionId() {
     return jobExecutionId;

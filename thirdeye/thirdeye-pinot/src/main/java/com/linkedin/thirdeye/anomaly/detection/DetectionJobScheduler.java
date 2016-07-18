@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.anomaly;
+package com.linkedin.thirdeye.anomaly.detection;
 
 import java.util.List;
 
@@ -15,15 +15,16 @@ import org.quartz.impl.StdSchedulerFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.thirdeye.anomaly.job.JobContext;
 import com.linkedin.thirdeye.detector.api.AnomalyFunctionSpec;
 import com.linkedin.thirdeye.detector.db.AnomalyFunctionSpecDAO;
 import com.linkedin.thirdeye.detector.db.AnomalyJobSpecDAO;
 import com.linkedin.thirdeye.detector.db.AnomalyTaskSpecDAO;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 
-public class JobScheduler {
+public class DetectionJobScheduler {
 
-  private static final Logger LOG = LoggerFactory.getLogger(JobScheduler.class);
+  private static final Logger LOG = LoggerFactory.getLogger(DetectionJobScheduler.class);
   private SchedulerFactory schedulerFactory;
   private Scheduler quartzScheduler;
   private AnomalyJobSpecDAO anomalyJobSpecDAO;
@@ -32,9 +33,9 @@ public class JobScheduler {
   private AnomalyFunctionFactory anomalyFunctionFactory;
   private SessionFactory sessionFactory;
 
-  private ThirdEyeJobContext thirdEyeJobContext;
+  private JobContext jobContext;
 
-  public JobScheduler(AnomalyJobSpecDAO anomalyJobSpecDAO, AnomalyTaskSpecDAO anomalyTaskSpecDAO,
+  public DetectionJobScheduler(AnomalyJobSpecDAO anomalyJobSpecDAO, AnomalyTaskSpecDAO anomalyTaskSpecDAO,
       AnomalyFunctionSpecDAO anomalyFunctionSpecDAO,
       SessionFactory sessionFactory) {
     this.anomalyJobSpecDAO = anomalyJobSpecDAO;
@@ -57,22 +58,22 @@ public class JobScheduler {
     List<AnomalyFunctionSpec>  functionSpecs = readAnomalyFunctionSpecs();
     for (AnomalyFunctionSpec anomalyFunctionSpec : functionSpecs) {
       if (anomalyFunctionSpec.getIsActive()) {
-        thirdEyeJobContext = new ThirdEyeJobContext();
-        thirdEyeJobContext.setAnomalyFunctionSpecDAO(anomalyFunctionSpecDAO);
-        thirdEyeJobContext.setAnomalyJobSpecDAO(anomalyJobSpecDAO);
-        thirdEyeJobContext.setAnomalyTaskSpecDAO(anomalyTaskSpecDAO);
-        thirdEyeJobContext.setAnomalyFunctionFactory(anomalyFunctionFactory);
-        thirdEyeJobContext.setSessionFactory(sessionFactory);
-        thirdEyeJobContext.setAnomalyFunctionId(anomalyFunctionSpec.getId());
+        jobContext = new JobContext();
+        jobContext.setAnomalyFunctionSpecDAO(anomalyFunctionSpecDAO);
+        jobContext.setAnomalyJobSpecDAO(anomalyJobSpecDAO);
+        jobContext.setAnomalyTaskSpecDAO(anomalyTaskSpecDAO);
+        jobContext.setAnomalyFunctionFactory(anomalyFunctionFactory);
+        jobContext.setSessionFactory(sessionFactory);
+        jobContext.setAnomalyFunctionId(anomalyFunctionSpec.getId());
         String jobName = String.format("%s_%d", anomalyFunctionSpec.getFunctionName(), anomalyFunctionSpec.getId());
-        thirdEyeJobContext.setJobName(jobName);
+        jobContext.setJobName(jobName);
 
-        scheduleJob(thirdEyeJobContext, anomalyFunctionSpec);
+        scheduleJob(jobContext, anomalyFunctionSpec);
       }
     }
   }
 
-  private void scheduleJob(ThirdEyeJobContext thirdEyeJobContext, AnomalyFunctionSpec anomalyFunctionSpec) {
+  private void scheduleJob(JobContext jobContext, AnomalyFunctionSpec anomalyFunctionSpec) {
 
     String triggerKey = String.format("anomaly_scheduler_trigger_%d", anomalyFunctionSpec.getId());
     CronTrigger trigger =
@@ -80,9 +81,9 @@ public class JobScheduler {
             .withSchedule(CronScheduleBuilder.cronSchedule(anomalyFunctionSpec.getCron())).build();
 
     String jobKey = String.format("%s_%d", anomalyFunctionSpec.getFunctionName(), anomalyFunctionSpec.getId());
-    JobDetail job = JobBuilder.newJob(JobRunner.class).withIdentity(thirdEyeJobContext.getJobName()).build();
+    JobDetail job = JobBuilder.newJob(DetectionJobRunner.class).withIdentity(jobContext.getJobName()).build();
 
-    job.getJobDataMap().put(JobRunner.THIRDEYE_JOB_CONTEXT, thirdEyeJobContext);
+    job.getJobDataMap().put(DetectionJobRunner.THIRDEYE_JOB_CONTEXT, jobContext);
 
     try {
       quartzScheduler.scheduleJob(job, trigger);

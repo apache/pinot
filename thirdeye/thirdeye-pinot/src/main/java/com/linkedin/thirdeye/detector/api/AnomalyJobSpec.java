@@ -18,7 +18,7 @@ import javax.persistence.OneToMany;
 import javax.persistence.Table;
 
 import com.google.common.base.MoreObjects;
-import com.linkedin.thirdeye.anomaly.ThirdeyeAnomalyConstants.JobStatus;
+import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
 
 /**
  * This class corresponds to an anomaly job. An anomaly job is created for every execution of an anomaly function spec

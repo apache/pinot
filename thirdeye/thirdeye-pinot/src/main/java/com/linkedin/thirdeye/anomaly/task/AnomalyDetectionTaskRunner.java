@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.anomaly;
+package com.linkedin.thirdeye.anomaly.task;
 
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 import java.util.ArrayList;
@@ -38,9 +38,9 @@ import com.linkedin.thirdeye.detector.function.AnomalyFunction;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
-public class TaskRunner {
+public class AnomalyDetectionTaskRunner implements TaskRunner {
 
-  private static final Logger LOG = LoggerFactory.getLogger(TaskRunner.class);
+  private static final Logger LOG = LoggerFactory.getLogger(AnomalyDetectionTaskRunner.class);
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE =
       ThirdEyeCacheRegistry.getInstance();
 
@@ -63,19 +63,20 @@ public class TaskRunner {
   private AnomalyFunctionSpec anomalyFunctionSpec;
   private AnomalyFunctionFactory anomalyFunctionFactory;
 
-  public TaskRunner(AnomalyFunctionFactory anomalyFunctionFactory) {
-    this.anomalyFunctionFactory = anomalyFunctionFactory;
+  public AnomalyDetectionTaskRunner() {
     queryCache = CACHE_REGISTRY_INSTANCE.getQueryCache();
     timeSeriesHandler = new TimeSeriesHandler(queryCache);
     timeSeriesResponseConverter = TimeSeriesResponseConverter.getInstance();
   }
 
-  public List<AnomalyResult> execute(TaskInfo taskInfo, TaskContext taskContext) throws Exception {
+  public List<TaskResult> execute(TaskInfo taskInfo, TaskContext taskContext) throws Exception {
 
+    List<TaskResult> taskResult = new ArrayList<>();
     LOG.info("Begin executing task {}", taskInfo);
     resultDAO = taskContext.getResultDAO();
     relationDAO = taskContext.getRelationDAO();
     sessionFactory = taskContext.getSessionFactory();
+    anomalyFunctionFactory = taskContext.getAnomalyFunctionFactory();
 
     anomalyFunctionSpec = taskInfo.getAnomalyFunctionSpec();
     anomalyFunction = anomalyFunctionFactory.fromSpec(anomalyFunctionSpec);
@@ -134,7 +135,7 @@ public class TaskRunner {
     List<AnomalyResult> results = exploreCombination(topLevelRequest);
     LOG.info("{} anomalies found in total", anomalyCounter);
 
-    return results;
+    return taskResult;
   }
 
   private List<AnomalyResult> exploreCombination(TimeSeriesRequest request) throws Exception {

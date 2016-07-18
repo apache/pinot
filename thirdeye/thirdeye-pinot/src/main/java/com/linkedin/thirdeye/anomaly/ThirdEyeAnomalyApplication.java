@@ -15,6 +15,8 @@ import java.util.concurrent.Callable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.thirdeye.anomaly.detection.DetectionJobScheduler;
+import com.linkedin.thirdeye.anomaly.task.TaskDriver;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
 import com.linkedin.thirdeye.detector.db.HibernateSessionWrapper;
@@ -24,7 +26,7 @@ public class ThirdEyeAnomalyApplication
     extends BaseThirdEyeApplication<ThirdEyeAnomalyConfiguration> {
 
   private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeAnomalyApplication.class);
-  private JobScheduler jobScheduler = null;
+  private DetectionJobScheduler jobScheduler = null;
   private TaskDriver taskDriver = null;
 
   public static void main(final String[] args) throws Exception {
@@ -72,7 +74,7 @@ public class ThirdEyeAnomalyApplication
         new AnomalyFunctionFactory(config.getFunctionConfigPath());
 
     if (config.isScheduler()) {
-      jobScheduler = new JobScheduler(anomalyJobSpecDAO, anomalyTaskSpecDAO,
+      jobScheduler = new DetectionJobScheduler(anomalyJobSpecDAO, anomalyTaskSpecDAO,
           anomalyFunctionSpecDAO, hibernateBundle.getSessionFactory());
     }
     if (config.isWorker()) {

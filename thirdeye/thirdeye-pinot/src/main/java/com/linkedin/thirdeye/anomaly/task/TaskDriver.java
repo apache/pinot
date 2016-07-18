@@ -1,5 +1,6 @@
-package com.linkedin.thirdeye.anomaly;
+package com.linkedin.thirdeye.anomaly.task;
 
+import java.lang.reflect.Constructor;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -14,8 +15,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkedin.thirdeye.anomaly.ThirdeyeAnomalyConstants.TaskStatus;
-import com.linkedin.thirdeye.detector.api.AnomalyResult;
+import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
+import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
 import com.linkedin.thirdeye.detector.api.AnomalyTaskSpec;
 import com.linkedin.thirdeye.detector.db.AnomalyFunctionRelationDAO;
 import com.linkedin.thirdeye.detector.db.AnomalyResultDAO;
@@ -33,12 +34,12 @@ public class TaskDriver {
   private AnomalyResultDAO anomalyResultDAO;
   private AnomalyFunctionRelationDAO anomalyFunctionRelationDAO;
   private SessionFactory sessionFactory;
+  private AnomalyFunctionFactory anomalyFunctionFactory;
   private TaskContext taskContext;
   private long workerId;
 
   volatile boolean shutdown = false;
   private static int MAX_PARALLEL_TASK = 3;
-  private AnomalyFunctionFactory anomalyFunctionFactory;
 
   public TaskDriver(long workerId, AnomalyTaskSpecDAO anomalyTaskSpecDAO, AnomalyResultDAO anomalyResultDAO,
       AnomalyFunctionRelationDAO anomalyFunctionRelationDAO, SessionFactory sessionFactory,
@@ -55,6 +56,7 @@ public class TaskDriver {
     taskContext.setRelationDAO(anomalyFunctionRelationDAO);
     taskContext.setResultDAO(anomalyResultDAO);
     taskContext.setSessionFactory(sessionFactory);
+    taskContext.setAnomalyFunctionFactory(anomalyFunctionFactory);
 
   }
 
@@ -69,26 +71,28 @@ public class TaskDriver {
             LOG.info(Thread.currentThread().getId() + " : Finding next task to execute for threadId:{}",
                 Thread.currentThread().getId());
 
-            // select a task to execute, and update it to RUNNING
-            AnomalyTaskSpec anomalyTaskSpec = selectAndUpdate();
-            LOG.info(Thread.currentThread().getId() + " : Executing task: {} {}", anomalyTaskSpec.getTaskId(),
-                anomalyTaskSpec.getTaskInfo());
-
-            // execute the selected task
-            TaskRunner taskRunner = new TaskRunner(anomalyFunctionFactory);
-            TaskInfo taskInfo = null;
             try {
-              taskInfo = OBJECT_MAPPER.readValue(anomalyTaskSpec.getTaskInfo(), TaskInfo.class);
-            } catch (Exception e) {
-              LOG.error("Exception in converting taskInfo string to TaskInfo {}",
-                  anomalyTaskSpec.getTaskInfo(), e);
-            }
-            LOG.info(Thread.currentThread().getId() + " : Task Info {}", taskInfo);
-            List<AnomalyResult> anomalyResults = taskRunner.execute(taskInfo, taskContext);
-            LOG.info(Thread.currentThread().getId() + " : DONE Executing task: {}", anomalyTaskSpec.getTaskId());
+              // select a task to execute, and update it to RUNNING
+              AnomalyTaskSpec anomalyTaskSpec = selectAndUpdate();
+              LOG.info(Thread.currentThread().getId() + " : Executing task: {} {}", anomalyTaskSpec.getTaskId(),
+                  anomalyTaskSpec.getTaskInfo());
 
-            // update status to COMPLETED
-            updateStatus(anomalyTaskSpec.getTaskId(), TaskStatus.RUNNING, TaskStatus.COMPLETED);
+              // execute the selected task
+              TaskType taskType = anomalyTaskSpec.getTaskType();
+              Constructor<?> taskRunnerConstructor = TaskExecutorFactory.getTaskExecutorClassFromTaskType(taskType)
+                  .getConstructor();
+              TaskRunner taskRunner = (TaskRunner) taskRunnerConstructor.newInstance();
+
+              TaskInfo taskInfo = OBJECT_MAPPER.readValue(anomalyTaskSpec.getTaskInfo(), TaskInfo.class);
+              LOG.info(Thread.currentThread().getId() + " : Task Info {}", taskInfo);
+              List<TaskResult> taskResults = taskRunner.execute(taskInfo, taskContext);
+              LOG.info(Thread.currentThread().getId() + " : DONE Executing task: {}", anomalyTaskSpec.getTaskId());
+
+              // update status to COMPLETED
+              updateStatus(anomalyTaskSpec.getTaskId(), TaskStatus.RUNNING, TaskStatus.COMPLETED);
+            } catch (Exception e) {
+              LOG.error("Exception in electing and executing task", e);
+            }
           }
           return null;
         }

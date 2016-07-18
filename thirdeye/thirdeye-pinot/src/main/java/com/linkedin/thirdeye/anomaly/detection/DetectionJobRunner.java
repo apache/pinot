@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.anomaly;
+package com.linkedin.thirdeye.anomaly.detection;
 
 import java.util.ArrayList;
 import java.util.Date;
@@ -25,12 +25,16 @@ import com.linkedin.thirdeye.detector.api.AnomalyTaskSpec;
 import com.linkedin.thirdeye.detector.db.AnomalyFunctionSpecDAO;
 import com.linkedin.thirdeye.detector.db.AnomalyJobSpecDAO;
 import com.linkedin.thirdeye.detector.db.AnomalyTaskSpecDAO;
-import com.linkedin.thirdeye.anomaly.ThirdeyeAnomalyConstants.JobStatus;
-import com.linkedin.thirdeye.anomaly.ThirdeyeAnomalyConstants.TaskStatus;
+import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
+import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
+import com.linkedin.thirdeye.anomaly.job.JobContext;
+import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
+import com.linkedin.thirdeye.anomaly.task.TaskGenerator;
+import com.linkedin.thirdeye.anomaly.task.TaskInfo;
 
-public class JobRunner implements Job {
+public class DetectionJobRunner implements Job {
 
-  private static final Logger LOG = LoggerFactory.getLogger(JobRunner.class);
+  private static final Logger LOG = LoggerFactory.getLogger(DetectionJobRunner.class);
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   public static final String THIRDEYE_JOB_CONTEXT = "THIRDEYE_JOB_CONTEXT";
@@ -43,11 +47,11 @@ public class JobRunner implements Job {
   private String jobName;
   private DateTime windowStart;
   private DateTime windowEnd;
-  private ThirdEyeJobContext thirdEyeJobContext;
+  private JobContext thirdEyeJobContext;
 
   private TaskGenerator taskGenerator;
 
-  public JobRunner() {
+  public DetectionJobRunner() {
     taskGenerator = new TaskGenerator();
   }
 
@@ -55,7 +59,7 @@ public class JobRunner implements Job {
   public void execute(JobExecutionContext jobExecutionContext) throws JobExecutionException {
     LOG.info("Running " + jobExecutionContext.getJobDetail().getKey().toString());
 
-    thirdEyeJobContext = (ThirdEyeJobContext) jobExecutionContext.getJobDetail().getJobDataMap()
+    thirdEyeJobContext = (JobContext) jobExecutionContext.getJobDetail().getJobDataMap()
         .get(THIRDEYE_JOB_CONTEXT);
     sessionFactory = thirdEyeJobContext.getSessionFactory();
     anomalyJobSpecDAO = thirdEyeJobContext.getAnomalyJobSpecDAO();
@@ -152,6 +156,7 @@ public class JobRunner implements Job {
           }
           AnomalyTaskSpec anomalyTaskSpec = new AnomalyTaskSpec();
           anomalyTaskSpec.setJobExecutionId(thirdEyeJobContext.getJobExecutionId());
+          anomalyTaskSpec.setTaskType(TaskType.ANOMALY_DETECTION);
           anomalyTaskSpec.setJobName(thirdEyeJobContext.getJobName());
           anomalyTaskSpec.setStatus(TaskStatus.WAITING);
           anomalyTaskSpec.setTaskStartTime(System.currentTimeMillis());
