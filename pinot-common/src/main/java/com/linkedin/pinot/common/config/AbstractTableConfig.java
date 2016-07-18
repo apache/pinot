@@ -43,34 +43,42 @@ public abstract class AbstractTableConfig {
   protected SegmentsValidationAndRetentionConfig validationConfig;
   protected TenantConfig tenantConfig;
   protected TableCustomConfig customConfigs;
+  private final QuotaConfig quotaConfig;
 
   protected AbstractTableConfig(String tableName, String tableType,
-      SegmentsValidationAndRetentionConfig validationConfig, TenantConfig tenantConfig, TableCustomConfig customConfigs) {
+      SegmentsValidationAndRetentionConfig validationConfig,
+      TenantConfig tenantConfig, TableCustomConfig customConfigs,
+      QuotaConfig quotaConfig) {
     this.tableName = new TableNameBuilder(TableType.valueOf(tableType.toUpperCase())).forTable(tableName);
     this.tableType = tableType;
     this.validationConfig = validationConfig;
     this.tenantConfig = tenantConfig;
     this.customConfigs = customConfigs;
+    this.quotaConfig = quotaConfig;
   }
 
-  public static AbstractTableConfig init(String jsonString) throws JSONException, JsonParseException,
-      JsonMappingException, JsonProcessingException, IOException {
-    JSONObject o = new JSONObject(jsonString);
-    String tableType = o.getString("tableType").toLowerCase();
+  public static AbstractTableConfig init(String jsonString) throws JSONException, IOException {
+    JSONObject tableJson = new JSONObject(jsonString);
+    String tableType = tableJson.getString("tableType").toLowerCase();
     String tableName =
-        new TableNameBuilder(TableType.valueOf(tableType.toUpperCase())).forTable(o.getString("tableName"));
+        new TableNameBuilder(TableType.valueOf(tableType.toUpperCase())).forTable(tableJson.getString("tableName"));
     SegmentsValidationAndRetentionConfig validationConfig =
-        loadSegmentsConfig(new ObjectMapper().readTree(o.getJSONObject("segmentsConfig").toString()));
-    TenantConfig tenantConfig = loadTenantsConfig(new ObjectMapper().readTree(o.getJSONObject("tenants").toString()));
+        loadSegmentsConfig(new ObjectMapper().readTree(tableJson.getJSONObject("segmentsConfig").toString()));
+    TenantConfig tenantConfig = loadTenantsConfig(new ObjectMapper().readTree(tableJson.getJSONObject("tenants").toString()));
     TableCustomConfig customConfig =
-        loadCustomConfig(new ObjectMapper().readTree(o.getJSONObject("metadata").toString()));
+        loadCustomConfig(new ObjectMapper().readTree(tableJson.getJSONObject("metadata").toString()));
     IndexingConfig indexingConfig =
-        loadIndexingConfig(new ObjectMapper().readTree(o.getJSONObject("tableIndexConfig").toString()));
+        loadIndexingConfig(new ObjectMapper().readTree(tableJson.getJSONObject("tableIndexConfig").toString()));
+    QuotaConfig quotaConfig = null;
+    if (tableJson.has(QuotaConfig.QUOTA_SECTION_NAME)) {
+      quotaConfig = loadQuotaConfig(new ObjectMapper().readTree(
+          tableJson.getJSONObject(QuotaConfig.QUOTA_SECTION_NAME).toString()));
+    }
 
     if (tableType.equals("offline")) {
-      return new OfflineTableConfig(tableName, tableType, validationConfig, tenantConfig, customConfig, indexingConfig);
+      return new OfflineTableConfig(tableName, tableType, validationConfig, tenantConfig, customConfig, indexingConfig, quotaConfig);
     } else if (tableType.equals(TABLE_TYPE_REALTIME)) {
-      return new RealtimeTableConfig(tableName, tableType, validationConfig, tenantConfig, customConfig, indexingConfig);
+      return new RealtimeTableConfig(tableName, tableType, validationConfig, tenantConfig, customConfig, indexingConfig, quotaConfig);
     }
     throw new UnsupportedOperationException("unknown tableType : " + tableType);
   }
@@ -85,6 +93,10 @@ public abstract class AbstractTableConfig {
     str.put("tenants", new JSONObject(simpleFields.get("tenants")));
     str.put("tableIndexConfig", new JSONObject(simpleFields.get("tableIndexConfig")));
     str.put("metadata", new JSONObject(simpleFields.get("metadata")));
+    String quotaConfig = simpleFields.get(QuotaConfig.QUOTA_SECTION_NAME);
+    if (quotaConfig != null) {
+      str.put(QuotaConfig.QUOTA_SECTION_NAME, new JSONObject(quotaConfig));
+    }
     return init(str.toString());
   }
 
@@ -120,6 +132,13 @@ public abstract class AbstractTableConfig {
   public static IndexingConfig loadIndexingConfig(JsonNode node) throws JsonParseException, JsonMappingException,
       IOException {
     return new ObjectMapper().readValue(node, IndexingConfig.class);
+  }
+
+  private static QuotaConfig loadQuotaConfig(JsonNode jsonNode)
+      throws IOException {
+    QuotaConfig quotaConfig = new ObjectMapper().readValue(jsonNode, QuotaConfig.class);
+    quotaConfig.validate();
+    return quotaConfig;
   }
 
   public void setTableName(String tableName) {
