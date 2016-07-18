@@ -57,11 +57,25 @@ public class AnomalyFunctionResource {
     }
   }
 
-  @GET public Map<String, Object> getAnomalyFunctionMetadata() {
+  /**
+   * @return map of function name vs function property keys
+   * <p/>
+   * eg. { "USER_RULE":["baseline","changeThreshold","averageVolumeThreshold"],
+   * "MIN_MAX_THRESHOLD":["min","max"] }
+   */
+  @GET
+  public Map<String, Object> getAnomalyFunctionMetadata() {
     return anomalyFunctionMetadata;
   }
 
-  @GET @Path("metric-function") public MetricAggFunction[] getMetricFunctions() {
+  /**
+   * @return List of metric functions
+   * <p/>
+   * eg. ["SUM","AVG","COUNT"]
+   */
+  @GET
+  @Path("metric-function")
+  public MetricAggFunction[] getMetricFunctions() {
     return MetricAggFunction.values();
   }
 }
