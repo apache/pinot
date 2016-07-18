@@ -31,11 +31,6 @@ public class JobContext {
 
   private long jobExecutionId;
 
-  public JobContext() {
-
-  }
-
-
   public long getJobExecutionId() {
     return jobExecutionId;
   }

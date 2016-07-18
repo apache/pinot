@@ -79,7 +79,8 @@ public class TaskDriver {
 
               // execute the selected task
               TaskType taskType = anomalyTaskSpec.getTaskType();
-              Constructor<?> taskRunnerConstructor = taskType.getKlazz().getConstructor();
+              Constructor<?> taskRunnerConstructor = TaskExecutorFactory.getTaskExecutorClassFromTaskType(taskType)
+                  .getConstructor();
               TaskRunner taskRunner = (TaskRunner) taskRunnerConstructor.newInstance();
 
               TaskInfo taskInfo = OBJECT_MAPPER.readValue(anomalyTaskSpec.getTaskInfo(), TaskInfo.class);

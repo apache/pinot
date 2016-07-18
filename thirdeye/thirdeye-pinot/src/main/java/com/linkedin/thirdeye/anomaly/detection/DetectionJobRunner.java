@@ -156,7 +156,7 @@ public class DetectionJobRunner implements Job {
           }
           AnomalyTaskSpec anomalyTaskSpec = new AnomalyTaskSpec();
           anomalyTaskSpec.setJobExecutionId(thirdEyeJobContext.getJobExecutionId());
-          anomalyTaskSpec.setTaskType(TaskType.AnomalyDetection);
+          anomalyTaskSpec.setTaskType(TaskType.ANOMALY_DETECTION);
           anomalyTaskSpec.setJobName(thirdEyeJobContext.getJobName());
           anomalyTaskSpec.setStatus(TaskStatus.WAITING);
           anomalyTaskSpec.setTaskStartTime(System.currentTimeMillis());
