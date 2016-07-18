@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.anomaly;
+package com.linkedin.thirdeye.anomaly.task;
 
 import org.joda.time.DateTime;
 

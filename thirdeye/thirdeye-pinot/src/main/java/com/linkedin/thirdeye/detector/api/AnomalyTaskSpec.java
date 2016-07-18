@@ -13,8 +13,11 @@ import javax.persistence.NamedQueries;
 import javax.persistence.NamedQuery;
 import javax.persistence.Table;
 
+
 import com.google.common.base.MoreObjects;
-import com.linkedin.thirdeye.anomaly.ThirdeyeAnomalyConstants.TaskStatus;
+import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
+import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
+
 
 /**
  * This class corresponds to anomaly tasks. An execution of an anomaly function creates an anomaly job, which in turn
@@ -37,6 +40,10 @@ public class AnomalyTaskSpec {
 
   @Column(name = "job_execution_id", nullable = false)
   private long jobExecutionId;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "task_type", nullable = false)
+  private TaskType taskType;
 
   @Column(name = "worker_id", nullable = true)
   private Long workerId;
@@ -153,6 +160,14 @@ public class AnomalyTaskSpec {
 
   public void setTaskInfo(String taskInfo) {
     this.taskInfo = taskInfo;
+  }
+
+  public TaskType getTaskType() {
+    return taskType;
+  }
+
+  public void setTaskType(TaskType taskType) {
+    this.taskType = taskType;
   }
 
 

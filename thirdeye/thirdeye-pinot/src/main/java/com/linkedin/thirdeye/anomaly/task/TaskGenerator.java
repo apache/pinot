@@ -1,21 +1,15 @@
-package com.linkedin.thirdeye.anomaly;
+package com.linkedin.thirdeye.anomaly.task;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Date;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
-
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
-import org.joda.time.format.ISODateTimeFormat;
-import org.quartz.JobExecutionContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.thirdeye.anomaly.job.JobContext;
 import com.linkedin.thirdeye.detector.api.AnomalyFunctionSpec;
-import com.linkedin.thirdeye.detector.function.AnomalyFunction;
-import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 
 public class TaskGenerator {
 
@@ -23,7 +17,7 @@ public class TaskGenerator {
 
 
 
-  public List<TaskInfo> createTasks(ThirdEyeJobContext thirdeyeJobContext, AnomalyFunctionSpec anomalyFunctionSpec)
+  public List<TaskInfo> createTasks(JobContext thirdeyeJobContext, AnomalyFunctionSpec anomalyFunctionSpec)
       throws Exception{
 
     List<TaskInfo> tasks = new ArrayList<>();
