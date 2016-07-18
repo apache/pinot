@@ -34,4 +34,12 @@ public interface AnomalyFunction {
   List<AnomalyResult> analyze(DimensionKey dimensionKey, MetricTimeSeries timeSeries,
       DateTime windowStart, DateTime windowEnd, List<AnomalyResult> knownAnomalies)
       throws Exception;
+
+  /**
+   *
+   * @return List of property keys applied in case of specific anomaly function
+   */
+  static String [] getPropertyKeys() {
+    return new String[] {};
+  }
 }

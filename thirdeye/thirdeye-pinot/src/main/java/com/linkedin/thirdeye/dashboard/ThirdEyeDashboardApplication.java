@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.dashboard;
 
+import com.linkedin.thirdeye.dashboard.resources.AnomalyFunctionResource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,7 +51,7 @@ public class ThirdEyeDashboardApplication
     } catch (Exception e) {
       LOG.error("Exception while loading caches", e);
     }
-
+    env.jersey().register(new AnomalyFunctionResource(config));
     env.jersey().register(new DashboardResource(BaseThirdEyeApplication.getDashboardConfigDAO(config)));
     env.jersey().register(new CacheResource());
     env.jersey().register(

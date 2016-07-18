@@ -7,10 +7,6 @@ public class ThirdEyeDetectorConfiguration extends ThirdEyeConfiguration {
   private String dashboardHost;
   private FailureEmailConfiguration failureEmailConfig;
 
-  public String getFunctionConfigPath() {
-    return getRootDir() + "/detector-config/anomaly-functions/functions.properties";
-  }
-
   public String getDashboardHost() {
     return dashboardHost;
   }
@@ -26,5 +22,4 @@ public class ThirdEyeDetectorConfiguration extends ThirdEyeConfiguration {
   public void setFailureEmailConfig(FailureEmailConfiguration failureEmailConfig) {
     this.failureEmailConfig = failureEmailConfig;
   }
-
 }
