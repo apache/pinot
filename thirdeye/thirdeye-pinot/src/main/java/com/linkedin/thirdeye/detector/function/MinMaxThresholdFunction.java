@@ -29,6 +29,10 @@ public class MinMaxThresholdFunction extends BaseAnomalyFunction {
   public static final String MAX_VAL = "max";
   private static final Joiner CSV = Joiner.on(",");
 
+  public static String[] getPropertyKeys() {
+    return new String [] {MIN_VAL, MAX_VAL};
+  }
+
   @Override
   public List<AnomalyResult> analyze(DimensionKey dimensionKey,
       MetricTimeSeries timeSeries, DateTime windowStart, DateTime windowEnd,

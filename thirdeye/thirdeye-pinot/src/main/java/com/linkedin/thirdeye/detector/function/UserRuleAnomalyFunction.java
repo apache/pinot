@@ -47,6 +47,10 @@ public class UserRuleAnomalyFunction extends BaseAnomalyFunction {
       "threshold=%s, %s values: %s (%s / %s)";
   private static final Joiner CSV = Joiner.on(",");
 
+  public static String[] getPropertyKeys() {
+    return new String [] {BASELINE, CHANGE_THRESHOLD, AVERAGE_VOLUME_THRESHOLD};
+  }
+
   private String getMergedAnomalyResultMessage(double threshold, String baselineProp,
       List<Double> currentValues, List<Double> baselineValues) {
 
