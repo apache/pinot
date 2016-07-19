@@ -1,8 +1,10 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.linkedin.thirdeye.client.MetricFunction;
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
 import com.linkedin.thirdeye.constant.FeedbackStatus;
+import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.detector.api.AnomalyFeedback;
 import io.dropwizard.hibernate.UnitOfWork;
 
@@ -205,6 +207,7 @@ public class AnomalyResource {
   public Response createAnomalyFunction(@NotNull @QueryParam("dataset") String dataset,
       @NotNull @QueryParam("functionName") String functionName,
       @NotNull @QueryParam("metric") String metric,
+      @NotNull @QueryParam("metricFunction") String metric_function,
       @QueryParam("type") String type,
       @NotNull @QueryParam("windowSize") String windowSize,
       @NotNull @QueryParam("windowUnit") String windowUnit,
@@ -231,6 +234,7 @@ public class AnomalyResource {
 
     AnomalyFunctionSpec anomalyFunctionSpec = new AnomalyFunctionSpec();
     anomalyFunctionSpec.setIsActive(false);
+    anomalyFunctionSpec.setMetricFunction(MetricAggFunction.valueOf(metric_function));
     anomalyFunctionSpec.setCollection(dataset);
     anomalyFunctionSpec.setFunctionName(functionName);
     anomalyFunctionSpec.setMetric(metric);

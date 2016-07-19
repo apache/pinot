@@ -1,6 +1,6 @@
 <section id="self-service-existing-anomaly-functions">
     <script id="self-service-existing-anomaly-functions-template" type="text/x-handlebars-template">
-        <table id="existing-anomaly-functions-table" class="display">
+        <table id="existing-anomaly-functions-table" class="display" >
             <thead>
             <tr>
                 <th>Rule name</th>
@@ -17,7 +17,7 @@
                 <td data-rule-id="{{anomalyFunction/id}}">{{anomalyFunction/functionName}}</td>
                 <td>{{anomalyFunction/metric}}</td>
                 <td>{{anomalyFunction/properties}}</td>
-                <td><input type="checkbox" checked="{{anomalyFunction/isActive}}"</span></td>
+                <td><input type="checkbox" {{#if anomalyFunction/isActive}}checked{{/if}} ></span></td>
                 <td><span class="uk-button"><i class="uk-icon-pencil"></i></span></td>
                 <td><span class="uk-button"><i class="uk-icon-times"></i></span></td>
             </tr>

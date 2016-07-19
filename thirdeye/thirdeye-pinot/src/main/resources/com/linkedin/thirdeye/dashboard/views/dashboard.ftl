@@ -14,7 +14,7 @@
 				<li id="compare-header-tab" class="header-tab" rel="compare"><a href="#">Time over time comparison</a></li>
 				<li id="timeseries-header-tab" class="header-tab" rel="timeseries"><a href="#">Timeseries</a></li>
 				<li id="anomalies-header-tab" class="header-tab" rel="anomalies"><a href="#">Anomalies</a></li>
-				<!--<li id="anomalies-header-tab" class="header-tab" rel="self-service"><a href="#">Self Service</a></li>-->
+				<li id="anomalies-header-tab" class="header-tab" rel="self-service"><a href="#">Self Service</a></li>
 			</ul>
 
 
@@ -34,17 +34,17 @@
 </div>
 
     <#include "tabs/tab.ftl">
-    <#include "form.ftl">
-    <#include "dataset-list.ftl">
-    <#include "metric-list.ftl">
-    <#include "filter-value.ftl">
-    <#include "metric-timeseries.ftl">
-    <#include "tabular.ftl">
-    <#include "heat-map.ftl">
-    <#include "contributors.ftl">
-    <#include "timeseries.ftl">
-    <#include "anomalies.ftl">
-    <#include "self-service-exisiting-functions.ftl">
+    <#include "tabs/common/form.ftl">
+    <#include "tabs/common/dataset-list.ftl">
+    <#include "tabs/common/metric-list.ftl">
+    <#include "tabs/common/filter-value.ftl">
+    <#include "tabs/compare-tab/metric-timeseries.ftl">
+    <#include "tabs/compare-tab/tabular.ftl">
+    <#include "tabs/compare-tab/heat-map.ftl">
+    <#include "tabs/compare-tab/contributors.ftl">
+    <#include "tabs/timeseries-tab/timeseries.ftl">
+    <#include "tabs/anomalies-tab/anomalies.ftl">
+    <#include "tabs/self-service-tab/self-service-exisiting-functions.ftl">
 
 </body>
 
