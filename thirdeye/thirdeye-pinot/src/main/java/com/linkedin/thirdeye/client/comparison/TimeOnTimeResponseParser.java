@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.client.comparison;
 
 import static com.linkedin.thirdeye.client.ResponseParserUtils.OTHER;
 
+import com.linkedin.thirdeye.dashboard.Utils;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -36,7 +37,7 @@ public class TimeOnTimeResponseParser {
 
   private CollectionConfig collectionConfig = null;
   public static final Logger LOGGER = LoggerFactory.getLogger(TimeOnTimeResponseParser.class);
-
+  private static final double DEFAULT_THRESHOLD_PERCENT_FOR_OTHER = 0.1;
   private double metricThreshold = CollectionConfig.DEFAULT_THRESHOLD;
 
   private Map<String, ThirdEyeResponseRow> baselineResponseMap;
@@ -321,7 +322,10 @@ public class TimeOnTimeResponseParser {
           // Add only a non zero metric
           boolean addMetric = false;
           for (Row.Metric metric : otherBuilder.row.getMetrics()) {
-            if (metric.getCurrentValue() > 0.0 || metric.getBaselineValue() > 0.0) {
+            // If absolute percentage change is more than default threshold for OTHER
+            if (Utils
+                .getChangeFromBaseline(metric.getCurrentValue(), metric.getBaselineValue(), true,
+                    true) >= DEFAULT_THRESHOLD_PERCENT_FOR_OTHER) {
               addMetric = true;
             }
           }

@@ -63,7 +63,6 @@ public class Utils {
     }
 
     return requests;
-
   }
 
   public static Map<String, List<String>> getFilters(QueryCache queryCache, String collection,
@@ -223,5 +222,17 @@ public class Utils {
       metricExpressions.add(new MetricExpression(function.getMetricName()));
     }
     return metricExpressions;
+  }
+
+  public static Double getChangeFromBaseline(Double currentVal, Double baseLine,
+      boolean isPercentage, boolean isAbsolute) {
+    Double change = (currentVal - baseLine) / baseLine;
+    if (isPercentage) {
+      change = change * 100;
+    }
+    if (isAbsolute) {
+      change = Math.abs(change);
+    }
+    return change;
   }
 }
