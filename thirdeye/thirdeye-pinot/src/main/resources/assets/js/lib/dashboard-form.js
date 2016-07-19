@@ -7,6 +7,11 @@
        event.preventDefault();
     });
 
+    //Prevent double submit when buttons are doubleclicked
+    $("#main-view").on("dblclick","button", function(event){
+       event.preventDefault();
+    });
+
     $("#main-view").on("click", ".radio-options",function(){
         radioOptions(this)
     });

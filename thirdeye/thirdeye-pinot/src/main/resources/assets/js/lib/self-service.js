@@ -105,6 +105,10 @@ function renderSelfService(){
         createAnomalyFunction()
     });
 
+    $("#main-view").on("click","#delete-anomaly-function", function(){
+        deleteAnomalyFunction(this)
+    });
+
     function selectMonitoringWindowUnit(target){
 
         var value = $(target).attr("value");
@@ -178,9 +182,20 @@ function renderSelfService(){
         }
 
         var filters = readFiltersAppliedInCurrentView("self-service");
+        console.log('filters')
+        console.log(filters)
 
-
-        filters = encodeURIComponent(JSON.stringify(filters));
+        //Transform filters Todo: clarify if filters object should be consistent on FE and BE
+        //filters = encodeURIComponent(JSON.stringify(filters));
+        var filtersString = "";
+        for(key in filters){
+            var numValues = filters[key].length;
+            for(var index = 0; index < numValues; index++ ){
+                filtersString += key + "=" + filters[key][index] + ";";
+            }
+        }
+        console.log('filtersString')
+        console.log(filtersString)
 
 
         var exploreDimension = $("#self-service-view-single-dimension-selector #selected-dimension").attr("value");
@@ -288,7 +303,7 @@ function renderSelfService(){
         + "&repeatEverySize=" + repeatEverySize + "&repeatEveryUnit=" + repeatEveryUnit
         + "&isActive=" +  isActive + "&properties=baseline=" + baseline + ";changeThreshold=" + condition + changeThreshold;
         url += (exploreDimension) ? "&exploreDimension=" + exploreDimension : "";
-        //  url += (filters) ? + ";&filters=" + filters : "";
+        url += (filters) ? "&filters=" + filtersString : "";
 
 //        var successMessage = $("#manage-alert-success");
 //        $("p", successMessage).append("url to be submitted: " + url);
@@ -302,6 +317,10 @@ function renderSelfService(){
             $("p", successMessage).html("success");
             successMessage.fadeIn(100);
        })
+    }
+
+    function  deleteAnomalyFunction(target){
+        //Todo
     }
 
 }

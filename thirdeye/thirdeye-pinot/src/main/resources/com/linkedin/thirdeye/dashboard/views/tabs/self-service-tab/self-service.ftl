@@ -82,8 +82,6 @@
                                 <ul class="uk-nav uk-nav-dropdown single-select">
                                     <li class="monitoring-window-unit-option" value="HOURS"><a href="#" class="uk-dropdown-close">HOUR(S)</a></li>
                                     <li class="monitoring-window-unit-option" value="DAYS"><a href="#" class="uk-dropdown-close" >DAY(S)</a></li>
-                                    <li class="monitoring-window-unit-option" value="WEEKS"><a href="#" class="uk-dropdown-close">WEEK(S)</a></li>
-                                    <li class="monitoring-window-unit-option" value="MONTHS"><a href="#" class="uk-dropdown-close">MONTH(S)</a></li>
                                 </ul>
                             </div>
                         </div>
@@ -187,6 +185,29 @@
 
                 <div id="existing-anomaly-functions-table-placeholder"></div>
 
+
+                <div id="toggle-alert-modal" class="uk-modal">
+                    <div class="uk-modal-dialog">
+                        <div class="uk-modal-header">...</div>
+                        <a class="uk-modal-close uk-close"></a>
+                        <p>Are you sure about turning off ... function alert?</p>
+                        <div class="uk-modal-footer">
+                            <button type="button" id=""  class="uk-button">Turn it off</button>
+                            <button type="button" id=""  class="uk-button">Keep it active</button>
+                        </div>
+                    </div>
+                </div>
+                <div id="delete-function-modal" class="uk-modal">
+                    <div class="uk-modal-dialog">
+                        <div class="uk-modal-header">...</div>
+                        <a class="uk-modal-close uk-close"></a>
+                        <p>Are you sure about deleting ... function?</p>
+                        <div class="uk-modal-footer">
+                            <button type="button" id="delete-anomaly-function"  class="uk-button">Delete</button>
+                            <button type="button" id="close"  class="uk-button uk-modal-close">Do not delete</button>
+                        </div>
+                    </div>
+                </div>
             </li>
         </ul>
 </section>
