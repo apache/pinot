@@ -19,7 +19,6 @@ import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@Path(value = "anomaly-function")
 @Produces(MediaType.APPLICATION_JSON)
 public class AnomalyFunctionResource {
 
@@ -43,6 +42,7 @@ public class AnomalyFunctionResource {
     } finally {
       IOUtils.closeQuietly(input);
     }
+    LOG.info("Loaded functions : " + props.keySet() + " from path : " + functionConfigPath);
     for (Object key : props.keySet()) {
       String functionName = key.toString();
       try {
@@ -64,6 +64,7 @@ public class AnomalyFunctionResource {
    * "MIN_MAX_THRESHOLD":["min","max"] }
    */
   @GET
+  @Path("metadata/anomaly-function")
   public Map<String, Object> getAnomalyFunctionMetadata() {
     return anomalyFunctionMetadata;
   }
@@ -74,7 +75,7 @@ public class AnomalyFunctionResource {
    * eg. ["SUM","AVG","COUNT"]
    */
   @GET
-  @Path("metric-function")
+  @Path("metadata/metric-function")
   public MetricAggFunction[] getMetricFunctions() {
     return MetricAggFunction.values();
   }

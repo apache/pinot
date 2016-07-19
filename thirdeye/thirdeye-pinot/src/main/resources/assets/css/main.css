@@ -63,6 +63,10 @@ body a{
    width:65px;
 }
 
+.green-border {
+    border-left: 2px solid green;
+}
+
 .required:after {
     content:" *";
 }
