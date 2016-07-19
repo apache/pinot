@@ -107,7 +107,7 @@ public class TableSizeReader {
   // Estimated sizes indicates the size estimated size with approximated calculations for errored servers
   //
   @JsonIgnoreProperties(ignoreUnknown = true)
-  public class TableSizeDetails {
+  static public class TableSizeDetails {
     public String tableName;
     public long reportedSizeInBytes = 0;
     // estimated size if servers are down
@@ -121,14 +121,14 @@ public class TableSizeReader {
   }
 
   @JsonIgnoreProperties(ignoreUnknown = true)
-  public class TableSubTypeSizeDetails {
+  static public class TableSubTypeSizeDetails {
     public long reportedSizeInBytes = 0;
     public long estimatedSizeInBytes = 0;
     public Map<String, SegmentSizeDetails> segments = new HashMap<>();
   }
 
   @JsonIgnoreProperties(ignoreUnknown = true)
-  public class SegmentSizeDetails {
+  static public class SegmentSizeDetails {
     public long reportedSizeInBytes = 0;
     public long estimatedSizeInBytes = 0;
     public Map<String, SegmentSizeInfo> serverInfo = new HashMap<>();
