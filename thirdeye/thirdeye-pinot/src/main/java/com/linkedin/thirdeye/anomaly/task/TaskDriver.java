@@ -74,7 +74,7 @@ public class TaskDriver {
             try {
               // select a task to execute, and update it to RUNNING
               AnomalyTaskSpec anomalyTaskSpec = selectAndUpdate();
-              LOG.info(Thread.currentThread().getId() + " : Executing task: {} {}", anomalyTaskSpec.getTaskId(),
+              LOG.info(Thread.currentThread().getId() + " : Executing task: {} {}", anomalyTaskSpec.getId(),
                   anomalyTaskSpec.getTaskInfo());
 
               // execute the selected task
@@ -86,10 +86,10 @@ public class TaskDriver {
               TaskInfo taskInfo = OBJECT_MAPPER.readValue(anomalyTaskSpec.getTaskInfo(), TaskInfo.class);
               LOG.info(Thread.currentThread().getId() + " : Task Info {}", taskInfo);
               List<TaskResult> taskResults = taskRunner.execute(taskInfo, taskContext);
-              LOG.info(Thread.currentThread().getId() + " : DONE Executing task: {}", anomalyTaskSpec.getTaskId());
+              LOG.info(Thread.currentThread().getId() + " : DONE Executing task: {}", anomalyTaskSpec.getId());
 
               // update status to COMPLETED
-              updateStatus(anomalyTaskSpec.getTaskId(), TaskStatus.RUNNING, TaskStatus.COMPLETED);
+              updateStatus(anomalyTaskSpec.getId(), TaskStatus.RUNNING, TaskStatus.COMPLETED);
             } catch (Exception e) {
               LOG.error("Exception in electing and executing task", e);
             }
@@ -126,8 +126,8 @@ public class TaskDriver {
 
         for (AnomalyTaskSpec anomalyTaskSpec : anomalyTasks) {
           transaction = session.beginTransaction();
-          LOG.info(Thread.currentThread().getId() + " : Trying to acquire task : {}", anomalyTaskSpec.getTaskId());
-          boolean success = anomalyTaskSpecDAO.updateStatusAndWorkerId(workerId, anomalyTaskSpec.getTaskId(),
+          LOG.info(Thread.currentThread().getId() + " : Trying to acquire task : {}", anomalyTaskSpec.getId());
+          boolean success = anomalyTaskSpecDAO.updateStatusAndWorkerId(workerId, anomalyTaskSpec.getId(),
               TaskStatus.WAITING, TaskStatus.RUNNING);
           LOG.info(Thread.currentThread().getId() + " : Task acquired success: {}", success);
           if (success) {

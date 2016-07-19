@@ -363,4 +363,63 @@
         onDelete="CASCADE"
     />
   </changeSet>
+
+  <changeSet id="13" author="npawar">
+    <!-- AnomalyJobSpec -->
+    <createTable tableName="anomaly_jobs">
+      <column name="id" type="bigint" autoIncrement="true">
+        <constraints primaryKey="true" nullable="false"/>
+      </column>
+      <column name="job_name" type="varchar(127)">
+        <constraints nullable="false"/>
+      </column>
+      <column name="status" type="varchar(31)">
+        <constraints nullable="false"/>
+      </column>
+      <column name="schedule_start_time" type="bigint">
+        <constraints nullable="true"/>
+      </column>
+      <column name="schedule_end_time" type="bigint">
+        <constraints nullable="true"/>
+      </column>
+      <column name="window_start_time" type="bigint">
+        <constraints nullable="true"/>
+      </column>
+      <column name="window_end_time" type="bigint">
+        <constraints nullable="true"/>
+      </column>
+    </createTable>
+
+    <!-- AnomalyTaskSpec -->
+    <createTable tableName="anomaly_tasks">
+      <column name="id" type="bigint" autoIncrement="true">
+        <constraints primaryKey="true" nullable="false"/>
+      </column>
+      <column name="job_id" type="bigint">
+        <constraints nullable="false" foreignKeyName="fk_task_job" references="anomaly_jobs(id)"/>
+      </column>
+      <column name="job_name" type="varchar(127)">
+        <constraints nullable="false"/>
+      </column>
+      <column name="worker_id" type="bigint">
+        <constraints nullable="true"/>
+      </column>
+      <column name="status" type="varchar(31)">
+        <constraints nullable="false"/>
+      </column>
+      <column name="task_type" type="varchar(63)">
+        <constraints nullable="false"/>
+      </column>
+      <column name="task_start_time" type="bigint">
+        <constraints nullable="true"/>
+      </column>
+      <column name="task_end_time" type="bigint">
+        <constraints nullable="true"/>
+      </column>
+      <column name="task_info" type="text">
+        <constraints nullable="false"/>
+      </column>
+    </createTable>
+  </changeSet>
+
 </databaseChangeLog>

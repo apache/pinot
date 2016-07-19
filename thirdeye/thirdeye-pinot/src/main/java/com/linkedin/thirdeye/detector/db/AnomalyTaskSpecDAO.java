@@ -15,8 +15,8 @@ public class AnomalyTaskSpecDAO extends AbstractDAO<AnomalyTaskSpec> {
     super(sessionFactory);
   }
 
-  public AnomalyTaskSpec findById(Long taskId) {
-    AnomalyTaskSpec anomalyTasksSpec = get(taskId);
+  public AnomalyTaskSpec findById(Long id) {
+    AnomalyTaskSpec anomalyTasksSpec = get(id);
     return anomalyTasksSpec;
   }
 
@@ -24,9 +24,9 @@ public class AnomalyTaskSpecDAO extends AbstractDAO<AnomalyTaskSpec> {
     return list(namedQuery("com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#findAll"));
   }
 
-  public List<AnomalyTaskSpec> findByJobExecutionId(Long jobExecutionId) {
-    return list(namedQuery("com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#findByJobExecutionId")
-        .setParameter("jobExecutionId", jobExecutionId));
+  public List<AnomalyTaskSpec> findByJobId(Long jobId) {
+    return list(namedQuery("com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#findByJobId")
+        .setParameter("jobId", jobId));
   }
 
   public List<AnomalyTaskSpec> findByStatusOrderByCreateTimeAscending(TaskStatus status) {
@@ -35,10 +35,10 @@ public class AnomalyTaskSpecDAO extends AbstractDAO<AnomalyTaskSpec> {
             .setParameter("status", status));
   }
 
-  public boolean updateStatus(Long taskId, TaskStatus oldStatus, TaskStatus newStatus) {
+  public boolean updateStatus(Long id, TaskStatus oldStatus, TaskStatus newStatus) {
     try {
       int numRowsUpdated = namedQuery("com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#updateStatus")
-          .setParameter("taskId", taskId).setParameter("oldStatus", oldStatus).setParameter("newStatus", newStatus)
+          .setParameter("id", id).setParameter("oldStatus", oldStatus).setParameter("newStatus", newStatus)
           .executeUpdate();
       return numRowsUpdated == 1;
     } catch (HibernateException exception) {
@@ -48,10 +48,10 @@ public class AnomalyTaskSpecDAO extends AbstractDAO<AnomalyTaskSpec> {
   }
 
   //also update the worker id that is picking up the task
-  public boolean updateStatusAndWorkerId(Long workerId, Long taskId, TaskStatus oldStatus, TaskStatus newStatus) {
+  public boolean updateStatusAndWorkerId(Long workerId, Long id, TaskStatus oldStatus, TaskStatus newStatus) {
     try {
       int numRowsUpdated = namedQuery("com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#updateStatusAndWorkerId")
-          .setParameter("taskId", taskId).setParameter("workerId", workerId)
+          .setParameter("id", id).setParameter("workerId", workerId)
           .setParameter("oldStatus", oldStatus).setParameter("newStatus", newStatus)
           .executeUpdate();
       return numRowsUpdated == 1;
@@ -62,14 +62,14 @@ public class AnomalyTaskSpecDAO extends AbstractDAO<AnomalyTaskSpec> {
   }
 
   public Long createOrUpdate(AnomalyTaskSpec anomalyTasksSpec) {
-    long id = persist(anomalyTasksSpec).getTaskId();
+    long id = persist(anomalyTasksSpec).getId();
     currentSession().getTransaction().commit();
     return id;
   }
 
-  public void delete(Long taskId) {
+  public void delete(Long id) {
     AnomalyTaskSpec anomalyTasksSpec = new AnomalyTaskSpec();
-    anomalyTasksSpec.setTaskId(taskId);
+    anomalyTasksSpec.setId(id);
     currentSession().delete(anomalyTasksSpec);
   }
 

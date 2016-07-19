@@ -1,11 +1,9 @@
 package com.linkedin.thirdeye.detector.db;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import org.hibernate.SessionFactory;
 
-import com.linkedin.thirdeye.detector.api.AnomalyFunctionSpec;
 import com.linkedin.thirdeye.detector.api.AnomalyJobSpec;
 
 import io.dropwizard.hibernate.AbstractDAO;
@@ -27,14 +25,14 @@ public class AnomalyJobSpecDAO extends AbstractDAO<AnomalyJobSpec> {
 
   @UnitOfWork
   public Long createOrUpdate(AnomalyJobSpec anomalyJobsSpec) {
-    long id = persist(anomalyJobsSpec).getJobExecutionId();
+    long id = persist(anomalyJobsSpec).getId();
     currentSession().getTransaction().commit();
     return id;
   }
 
   public void delete(Long id) {
     AnomalyJobSpec anomalyJobsSpec = new AnomalyJobSpec();
-    anomalyJobsSpec.setJobExecutionId(id);
+    anomalyJobsSpec.setId(id);
     currentSession().delete(anomalyJobsSpec);
   }
 
