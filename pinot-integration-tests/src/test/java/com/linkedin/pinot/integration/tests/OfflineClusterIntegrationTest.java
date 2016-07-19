@@ -65,7 +65,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
 
   protected void setUpTable(File schemaFile, int numBroker, int numOffline) throws Exception {
     addSchema(schemaFile, "schemaFile");
-    addOfflineTable("mytable", "DaysSinceEpoch", "daysSinceEpoch", 3000, "DAYS", null, null);
+    addOfflineTable("mytable", "DaysSinceEpoch", "daysSinceEpoch", -1, "", null, null);
   }
 
   protected void dropTable() throws Exception {

@@ -231,8 +231,8 @@ public abstract class ClusterTest extends ControllerTest {
   protected void addHybridTable(String tableName, String timeColumnName, String timeColumnType, String kafkaZkUrl,
       String kafkaTopic, String schemaName, String serverTenant, String brokerTenant, File avroFile,
       String sortedColumn, List<String> invertedIndexColumns, String loadMode) throws Exception {
-    int retentionDays = 900;
-    String retentionTimeUnit = "Days";
+    int retentionDays = -1;
+    String retentionTimeUnit = "";
     addRealtimeTable(tableName, timeColumnName, timeColumnType, retentionDays, retentionTimeUnit, kafkaZkUrl,
         kafkaTopic, schemaName, serverTenant, brokerTenant, avroFile, 20000, sortedColumn, invertedIndexColumns, loadMode);
     addOfflineTable(tableName, timeColumnName, timeColumnType, retentionDays, retentionTimeUnit, brokerTenant,

@@ -70,9 +70,9 @@ public class StarTreeClusterIntegrationTest extends ClusterTest {
 
   private static final String TIME_COLUMN_NAME = "DaysSinceEpoch";
   private static final String TIME_UNIT = "daysSinceEpoch";
-  private static final String RETENTION_TIME_UNIT = "DAYS";
+  private static final String RETENTION_TIME_UNIT = "";
 
-  private static final int RETENTION_TIME = 3000;
+  private static final int RETENTION_TIME = -1;
   private static final int SEGMENT_COUNT = 12;
   private static final long TIMEOUT_IN_MILLISECONDS = 30 * 1000;
   private static final long TIMEOUT_IN_SECONDS = 3600;

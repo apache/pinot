@@ -21,7 +21,7 @@ import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.data.Schema;
 /**
- * enables indexes on a bunch of columns 
+ * enables indexes on a bunch of columns
  *
  */
 @Test
@@ -30,7 +30,7 @@ public class InvertedIndexOfflineIntegrationTest extends OfflineClusterIntegrati
   protected void setUpTable(File schemaFile, int numBroker, int numOffline) throws Exception {
     addSchema(schemaFile, "schemaFile");
     Schema schema = Schema.fromFile(schemaFile);
-    addOfflineTable("mytable", "DaysSinceEpoch", "daysSinceEpoch", 3000, "DAYS", null, null, schema.getDimensionNames(),
+    addOfflineTable("mytable", "DaysSinceEpoch", "daysSinceEpoch", -1, "", null, null, schema.getDimensionNames(),
         null);
   }
 
