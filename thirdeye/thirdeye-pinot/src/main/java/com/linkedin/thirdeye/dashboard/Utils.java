@@ -63,7 +63,6 @@ public class Utils {
     }
 
     return requests;
-
   }
 
   public static Map<String, List<String>> getFilters(QueryCache queryCache, String collection,

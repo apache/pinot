@@ -35,8 +35,8 @@ public class TimeOnTimeResponseParser {
   private final List<String> groupByDimensions;
 
   private CollectionConfig collectionConfig = null;
+  private static final double DEFAULT_THRESHOLD_PERCENT_FOR_OTHER = 0.001; // 0.1 %
   public static final Logger LOGGER = LoggerFactory.getLogger(TimeOnTimeResponseParser.class);
-
   private double metricThreshold = CollectionConfig.DEFAULT_THRESHOLD;
 
   private Map<String, ThirdEyeResponseRow> baselineResponseMap;
@@ -128,10 +128,10 @@ public class TimeOnTimeResponseParser {
     otherBuilder.setCurrentEnd(currentRanges.get(0).upperEndpoint());
     otherBuilder.setDimensionName(dimensionName);
     otherBuilder.setDimensionValue(OTHER);
-    double[] otherBaseline = new double[numMetrics];
-    Arrays.fill(otherBaseline, 0);
-    double[] otherCurrent = new double[numMetrics];
-    Arrays.fill(otherCurrent, 0);
+    Double[] otherBaseline = new Double[numMetrics];
+    Arrays.fill(otherBaseline, 0.0);
+    Double[] otherCurrent = new Double[numMetrics];
+    Arrays.fill(otherCurrent, 0.0);
     boolean includeOther = false;
 
     // for every dimension value, we check if the row we constructed passes metric threshold
@@ -165,6 +165,7 @@ public class TimeOnTimeResponseParser {
           otherBaseline[i] += metric.getBaselineValue();
           otherCurrent[i] += metric.getCurrentValue();
         }
+
       }
     }
     if (includeOther) {
@@ -172,7 +173,10 @@ public class TimeOnTimeResponseParser {
         otherBuilder.addMetric(metricFunctions.get(i).getMetricName(), otherBaseline[i],
             otherCurrent[i]);
       }
-      rows.add(otherBuilder.build());
+      Row row = otherBuilder.build();
+      if (isValidMetric(row, Arrays.asList(otherBaseline), Arrays.asList(otherCurrent), DEFAULT_THRESHOLD_PERCENT_FOR_OTHER)) {
+        rows.add(row);
+      }
     }
   }
 
@@ -224,8 +228,8 @@ public class TimeOnTimeResponseParser {
 
     // other row
     List<Row.Builder> otherBuilders = new ArrayList<>();
-    List<double[]> otherBaselineMetrics = new ArrayList<>();
-    List<double[]> otherCurrentMetrics = new ArrayList<>();
+    List<Double[]> otherBaselineMetrics = new ArrayList<>();
+    List<Double[]> otherCurrentMetrics = new ArrayList<>();
     boolean includeOther = false;
     // constructing an OTHER rows, 1 for each time bucket
     for (int timeBucketId = 0; timeBucketId < numTimeBuckets; timeBucketId++) {
@@ -240,10 +244,10 @@ public class TimeOnTimeResponseParser {
       builder.setDimensionName(dimensionName);
       builder.setDimensionValue(OTHER);
       otherBuilders.add(builder);
-      double[] otherBaseline = new double[numMetrics];
-      Arrays.fill(otherBaseline, 0);
-      double[] otherCurrent = new double[numMetrics];
-      Arrays.fill(otherCurrent, 0);
+      Double[] otherBaseline = new Double[numMetrics];
+      Arrays.fill(otherBaseline, 0.0);
+      Double[] otherCurrent = new Double[numMetrics];
+      Arrays.fill(otherCurrent, 0.0);
       otherBaselineMetrics.add(otherBaseline);
       otherCurrentMetrics.add(otherCurrent);
     }
@@ -310,13 +314,16 @@ public class TimeOnTimeResponseParser {
     if (includeOther) {
       for (int timeBucketId = 0; timeBucketId < numTimeBuckets; timeBucketId++) {
         Builder otherBuilder = otherBuilders.get(timeBucketId);
-        double[] otherBaseline = otherBaselineMetrics.get(timeBucketId);
-        double[] otherCurrent = otherCurrentMetrics.get(timeBucketId);
+        Double[] otherBaseline = otherBaselineMetrics.get(timeBucketId);
+        Double[] otherCurrent = otherCurrentMetrics.get(timeBucketId);
         for (int i = 0; i < numMetrics; i++) {
           otherBuilder.addMetric(metricFunctions.get(i).getMetricName(), otherBaseline[i],
               otherCurrent[i]);
         }
-        rows.add(otherBuilder.build());
+        Row row = otherBuilder.build();
+        if (isValidMetric(row, Arrays.asList(otherBaseline), Arrays.asList(otherCurrent), DEFAULT_THRESHOLD_PERCENT_FOR_OTHER)) {
+          rows.add(row);
+        }
       }
     }
   }
@@ -343,6 +350,11 @@ public class TimeOnTimeResponseParser {
   private boolean checkMetricSums(Row row, List<Double> baselineMetricSums,
       List<Double> currentMetricSums) {
     List<Metric> metrics = row.getMetrics();
+    return isValidMetric(row, baselineMetricSums, currentMetricSums, metricThreshold);
+  }
+
+  boolean isValidMetric(Row row, List<Double> baselineMetricSums, List<Double> currentMetricSums, Double thresholdFraction) {
+    List<Metric> metrics = row.getMetrics();
 
     for (int i = 0; i < metrics.size(); i++) {
       Metric metric = metrics.get(i);
@@ -355,12 +367,11 @@ public class TimeOnTimeResponseParser {
       if (currentMetricSums != null) {
         currentSum = currentMetricSums.get(i);
       }
-      if (metric.getBaselineValue() > metricThreshold * baselineSum
-          || metric.getCurrentValue() > metricThreshold * currentSum) {
+      if (metric.getBaselineValue() > thresholdFraction * baselineSum
+          || metric.getCurrentValue() > thresholdFraction * currentSum) {
         return true;
       }
     }
     return false;
   }
-
 }
