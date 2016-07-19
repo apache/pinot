@@ -7,11 +7,6 @@
        event.preventDefault();
     });
 
-    //Prevent double submit when buttons are doubleclicked
-    $("#main-view").on("dblclick","button", function(event){
-       event.preventDefault();
-    });
-
     $("#main-view").on("click", ".radio-options",function(){
         radioOptions(this)
     });
@@ -71,6 +66,12 @@
     /** Remove selected Metric or Dimension item **/
     $("#main-view").on("click",".remove-selection", function(){
         removeSelection(this)
+    });
+
+
+    /** Remove selected Metric or Dimension item **/
+    $("#main-view").on("click","#get-existing-anomaly-functions", function(){
+        getExistingAnomalyFunctions();
     });
 
 

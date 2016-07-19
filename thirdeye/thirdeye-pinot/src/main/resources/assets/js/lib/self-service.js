@@ -309,11 +309,14 @@ function renderSelfService(){
 //        $("p", successMessage).append("url to be submitted: " + url);
 //            successMessage.fadeIn(100);
 
+        //Disable submit btn
+        $("#create-anomaly-function").prop("disabled", true);
 
        submitData(url).done(function(){
+           //Enable submit btn
+           $("#create-anomaly-function").prop("disabled", false);
 
             var successMessage = $("#manage-alert-success");
-
             $("p", successMessage).html("success");
             successMessage.fadeIn(100);
        })

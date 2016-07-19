@@ -160,11 +160,10 @@
                     </div>
 
                     <div>
-                        <button type="button" id="create-anomaly-function" class="uk-button uk-button-primary" rel="self-service">Save</button>
+                        <button type="button" id="create-anomaly-function" class="uk-button uk-button-primary" rel="self-service">Create</button>
                         <button type="button" id="clear-create-form"  class="uk-button">Clear</button>
                     </div>
                 </form>
-
             </li>
 
             <!-- MANAGE EXISTING ANOMALY FUNCTIONS -->
