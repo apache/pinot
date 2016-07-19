@@ -19,7 +19,7 @@
                 <!--{{!--<th >Function type</th>--}}-->
                 <th>Dimension</th>
                 <th>Heatmap <br>of timerange</th>
-                <#--<th>Is this an anomaly?</th>-->
+                <th>Is this an anomaly?</th>
             </tr>
             </thead>
 
@@ -44,10 +44,10 @@
                         <span class="uk-button" data-uk-tooltip title="See heatmap of this timerange"><i class="uk-icon-eye"></i></span>
                     </a>
                 </td>
-               <!--{{!-<td>
+                <td>
                    <div class="feedback-selector" data-anomaly-id="{{anomalyData/id}}" data-dataset="{{anomalyData/collection}}">
                         <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group"
-                            <!--<div class="add-feedback add-btn uk-display-inline-block" rel="{{tabName}}" data-uk-dropdown="{mode:'click'}">
+                            <!--<div class="add-feedback add-btn uk-display-inline-block" rel="{{tabName}}" data-uk-dropdown="{mode:'click'}">-->
                             <div id="selected-feedback" class="uk-button"  value="">Feedback</div>
                             <button class="add-single-metric-btn uk-button uk-button-primary" type="button"><i class="uk-icon-caret-down"></i></button>
                             <div class="uk-dropdown uk-dropdown-small">
@@ -59,7 +59,7 @@
                             </div>
                         </div>
                    </div>
-               </td>--}}-->
+               </td>
 </tr>
 
 {{/each}}

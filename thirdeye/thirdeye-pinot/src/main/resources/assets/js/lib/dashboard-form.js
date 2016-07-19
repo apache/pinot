@@ -7,7 +7,6 @@
        event.preventDefault();
     });
 
-    //Radio selection will highlight selected element
     $("#main-view").on("click", ".radio-options",function(){
         radioOptions(this)
     });
@@ -72,6 +71,12 @@
     /** Remove selected Metric or Dimension item **/
     $("#main-view").on("click",".remove-selection", function(){
         removeSelection(this)
+    });
+
+
+    /** Remove selected Metric or Dimension item **/
+    $("#main-view").on("click","#get-existing-anomaly-functions", function(){
+        getExistingAnomalyFunctions();
     });
 
 
