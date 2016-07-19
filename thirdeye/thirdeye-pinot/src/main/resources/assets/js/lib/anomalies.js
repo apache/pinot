@@ -328,7 +328,7 @@ function renderAnomalyTable(data, tab) {
         showHeatMapOfAnomaly(this);
     });
 
-    //Clicking a checkbox in the table takes user to related heatmap chart
+    //Clicking the feedback option will trigger the ajax - post
     $("#anomalies-table").on("click",".anomaly-feedback-option", function(){
         submitAnomalyFeedback(this)
     });
