@@ -87,10 +87,6 @@
         var value = $(target).attr("value");
         hash.dashboard = value;
 
-        //Update selectors
-//        $("#selected-dashboard").text($(target).text());
-//        $("#selected-dashboard").attr("value",value);
-
         //If previously error was shown hide it
         if($("#"+ hash.view +"-time-input-form-error").attr("data-error-source") == "dashboard-option"){
             $("#"+ hash.view +"-time-input-form-error").hide();
