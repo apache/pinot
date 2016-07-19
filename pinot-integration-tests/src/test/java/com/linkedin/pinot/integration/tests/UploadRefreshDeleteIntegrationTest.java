@@ -80,7 +80,7 @@ public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTe
     startBroker();
     startServer();
 
-    addOfflineTable("mytable", "DaysSinceEpoch", "daysSinceEpoch", 3000, "DAYS", null, null);
+    addOfflineTable("mytable", "DaysSinceEpoch", "daysSinceEpoch", -1, "", null, null);
 
     ensureDirectoryExistsAndIsEmpty(_tmpDir);
     ensureDirectoryExistsAndIsEmpty(_segmentsDir);
