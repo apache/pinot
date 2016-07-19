@@ -43,6 +43,7 @@ public class AnomalyFunctionResource {
     } finally {
       IOUtils.closeQuietly(input);
     }
+    LOG.info("Found functions : " + props.keySet());
     for (Object key : props.keySet()) {
       String functionName = key.toString();
       try {
@@ -64,6 +65,7 @@ public class AnomalyFunctionResource {
    * "MIN_MAX_THRESHOLD":["min","max"] }
    */
   @GET
+  @Path("metadata")
   public Map<String, Object> getAnomalyFunctionMetadata() {
     return anomalyFunctionMetadata;
   }
@@ -74,7 +76,7 @@ public class AnomalyFunctionResource {
    * eg. ["SUM","AVG","COUNT"]
    */
   @GET
-  @Path("metric-function")
+  @Path("metadata/metric-function")
   public MetricAggFunction[] getMetricFunctions() {
     return MetricAggFunction.values();
   }
