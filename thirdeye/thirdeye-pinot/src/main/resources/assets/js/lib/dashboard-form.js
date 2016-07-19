@@ -7,11 +7,6 @@
        event.preventDefault();
     });
 
-    //Prevent double submit when buttons are doubleclicked
-    $("#main-view").on("dblclick","button", function(event){
-       event.preventDefault();
-    });
-
     $("#main-view").on("click", ".radio-options",function(){
         radioOptions(this)
     });
@@ -74,6 +69,12 @@
     });
 
 
+    /** Remove selected Metric or Dimension item **/
+    $("#main-view").on("click","#get-existing-anomaly-functions", function(){
+        getExistingAnomalyFunctions();
+    });
+
+
     /** Time input related events are defined in dashboard-form-time.js
      *  Filters related events are defined in dashboard-form-filter.js **/
 
@@ -85,10 +86,6 @@
         //Update hash values
         var value = $(target).attr("value");
         hash.dashboard = value;
-
-        //Update selectors
-//        $("#selected-dashboard").text($(target).text());
-//        $("#selected-dashboard").attr("value",value);
 
         //If previously error was shown hide it
         if($("#"+ hash.view +"-time-input-form-error").attr("data-error-source") == "dashboard-option"){
