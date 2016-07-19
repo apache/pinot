@@ -27,19 +27,19 @@ import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
 @Table(name = "anomaly_tasks")
 @NamedQueries({
     @NamedQuery(name = "com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#findAll", query = "SELECT at FROM AnomalyTaskSpec at"),
-    @NamedQuery(name = "com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#findByJobExecutionId", query = "SELECT at FROM AnomalyTaskSpec at WHERE at.jobExecutionId = :jobExecutionId"),
+    @NamedQuery(name = "com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#findByJobId", query = "SELECT at FROM AnomalyTaskSpec at WHERE at.jobId = :jobId"),
     @NamedQuery(name = "com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#findByStatusOrderByCreateTimeAscending", query = "SELECT at FROM AnomalyTaskSpec at WHERE at.status = :status order by at.taskStartTime asc"),
-    @NamedQuery(name = "com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#updateStatus", query = "UPDATE AnomalyTaskSpec SET status = :newStatus WHERE status = :oldStatus and taskId = :taskId"),
-    @NamedQuery(name = "com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#updateStatusAndWorkerId", query = "UPDATE AnomalyTaskSpec SET status = :newStatus, workerId = :workerId WHERE status = :oldStatus and taskId = :taskId")
+    @NamedQuery(name = "com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#updateStatus", query = "UPDATE AnomalyTaskSpec SET status = :newStatus WHERE status = :oldStatus and id = :id"),
+    @NamedQuery(name = "com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#updateStatusAndWorkerId", query = "UPDATE AnomalyTaskSpec SET status = :newStatus, workerId = :workerId WHERE status = :oldStatus and id = :id")
 })
 public class AnomalyTaskSpec {
   @Id
-  @Column(name = "task_id")
+  @Column(name = "id")
   @GeneratedValue(strategy = GenerationType.IDENTITY)
-  private long taskId;
+  private long id;
 
-  @Column(name = "job_execution_id", nullable = false)
-  private long jobExecutionId;
+  @Column(name = "job_id", nullable = false)
+  private long jobId;
 
   @Enumerated(EnumType.STRING)
   @Column(name = "task_type", nullable = false)
@@ -69,20 +69,20 @@ public class AnomalyTaskSpec {
 
 
 
-  public long getTaskId() {
-    return taskId;
+  public long getId() {
+    return id;
   }
 
 
 
-  public void setTaskId(long taskId) {
-    this.taskId = taskId;
+  public void setId(long id) {
+    this.id = id;
   }
 
 
 
-  public long getJobExecutionId() {
-    return jobExecutionId;
+  public long getJobId() {
+    return jobId;
   }
 
 
@@ -110,8 +110,8 @@ public class AnomalyTaskSpec {
 
 
 
-  public void setJobExecutionId(long jobExecutionId) {
-    this.jobExecutionId = jobExecutionId;
+  public void setJobId(long jobId) {
+    this.jobId = jobId;
   }
 
 
@@ -178,19 +178,19 @@ public class AnomalyTaskSpec {
       return false;
     }
     AnomalyTaskSpec af = (AnomalyTaskSpec) o;
-    return Objects.equals(taskId, af.getTaskId()) && Objects.equals(jobExecutionId, af.getJobExecutionId())
+    return Objects.equals(id, af.getId()) && Objects.equals(jobId, af.getJobId())
         && Objects.equals(status, af.getStatus()) && Objects.equals(taskStartTime, af.getTaskStartTime())
         && Objects.equals(taskEndTime, af.getTaskEndTime()) && Objects.equals(taskInfo, af.getTaskInfo());
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(taskId, jobExecutionId, status, taskStartTime, taskEndTime, taskInfo);
+    return Objects.hash(id, jobId, status, taskStartTime, taskEndTime, taskInfo);
   }
 
   @Override
   public String toString() {
-    return MoreObjects.toStringHelper(this).add("taskId", taskId).add("jobExecutionId", jobExecutionId)
+    return MoreObjects.toStringHelper(this).add("id", id).add("jobId", jobId)
         .add("status", status).add("startTime", taskStartTime).add("endTime", taskEndTime).add("taskInfo", taskInfo).toString();
   }
 }

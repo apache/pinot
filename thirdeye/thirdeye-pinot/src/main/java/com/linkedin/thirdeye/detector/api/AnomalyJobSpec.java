@@ -31,9 +31,9 @@ import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
 })
 public class AnomalyJobSpec {
   @Id
-  @Column(name = "job_execution_id")
+  @Column(name = "id")
   @GeneratedValue(strategy = GenerationType.IDENTITY)
-  private long jobExecutionId;
+  private long id;
 
   @Column(name = "job_name", nullable = false)
   private String jobName;
@@ -55,20 +55,20 @@ public class AnomalyJobSpec {
   private long windowEndTime;
 
   @OneToMany(fetch = FetchType.LAZY)
-  @JoinColumn(name = "job_execution_id")
+  @JoinColumn(name = "job_execution_id", referencedColumnName = "id")
   private List<AnomalyTaskSpec> anomalyTasks;
 
   public AnomalyJobSpec() {
   }
 
 
-  public long getJobExecutionId() {
-    return jobExecutionId;
+  public long getId() {
+    return id;
   }
 
 
-  public void setJobExecutionId(long jobExecutionId) {
-    this.jobExecutionId = jobExecutionId;
+  public void setId(long id) {
+    this.id = id;
   }
 
 
@@ -149,18 +149,18 @@ public class AnomalyJobSpec {
       return false;
     }
     AnomalyJobSpec af = (AnomalyJobSpec) o;
-    return Objects.equals(jobExecutionId, af.getJobExecutionId()) && Objects.equals(jobName, af.getJobName())
+    return Objects.equals(id, af.getId()) && Objects.equals(jobName, af.getJobName())
         && Objects.equals(status, af.getStatus()) && Objects.equals(scheduleStartTime, af.getScheduleStartTime());
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(jobExecutionId, jobName, status, scheduleStartTime);
+    return Objects.hash(id, jobName, status, scheduleStartTime);
   }
 
   @Override
   public String toString() {
-    return MoreObjects.toStringHelper(this).add("jobExecutionId", jobExecutionId).add("jobName", jobName)
+    return MoreObjects.toStringHelper(this).add("id", id).add("jobName", jobName)
         .add("status", status).add("startTime", scheduleStartTime).add("endTime", scheduleEndTime).toString();
   }
 }

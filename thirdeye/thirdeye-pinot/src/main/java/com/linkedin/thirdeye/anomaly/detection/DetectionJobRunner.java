@@ -47,7 +47,7 @@ public class DetectionJobRunner implements Job {
   private String jobName;
   private DateTime windowStart;
   private DateTime windowEnd;
-  private JobContext thirdEyeJobContext;
+  private JobContext jobContext;
 
   private TaskGenerator taskGenerator;
 
@@ -59,18 +59,18 @@ public class DetectionJobRunner implements Job {
   public void execute(JobExecutionContext jobExecutionContext) throws JobExecutionException {
     LOG.info("Running " + jobExecutionContext.getJobDetail().getKey().toString());
 
-    thirdEyeJobContext = (JobContext) jobExecutionContext.getJobDetail().getJobDataMap()
+    jobContext = (JobContext) jobExecutionContext.getJobDetail().getJobDataMap()
         .get(THIRDEYE_JOB_CONTEXT);
-    sessionFactory = thirdEyeJobContext.getSessionFactory();
-    anomalyJobSpecDAO = thirdEyeJobContext.getAnomalyJobSpecDAO();
-    anomalyTasksSpecDAO = thirdEyeJobContext.getAnomalyTaskSpecDAO();
-    anomalyFunctionSpecDAO = thirdEyeJobContext.getAnomalyFunctionSpecDAO();
-    anomalyFunctionId = thirdEyeJobContext.getAnomalyFunctionId();
-    jobName = thirdEyeJobContext.getJobName();
+    sessionFactory = jobContext.getSessionFactory();
+    anomalyJobSpecDAO = jobContext.getAnomalyJobSpecDAO();
+    anomalyTasksSpecDAO = jobContext.getAnomalyTaskSpecDAO();
+    anomalyFunctionSpecDAO = jobContext.getAnomalyFunctionSpecDAO();
+    anomalyFunctionId = jobContext.getAnomalyFunctionId();
+    jobName = jobContext.getJobName();
 
     AnomalyFunctionSpec anomalyFunctionSpec = getAnomalyFunctionSpec(anomalyFunctionId);
-    String windowEndProp = thirdEyeJobContext.getWindowEndIso();
-    String windowStartProp = thirdEyeJobContext.getWindowStartIso();
+    String windowEndProp = jobContext.getWindowEndIso();
+    String windowStartProp = jobContext.getWindowStartIso();
 
     // Compute window end
     if (windowEndProp == null) {
@@ -94,12 +94,12 @@ public class DetectionJobRunner implements Job {
     } else {
       windowStart = ISODateTimeFormat.dateTimeParser().parseDateTime(windowStartProp);
     }
-    thirdEyeJobContext.setWindowStart(windowStart);
-    thirdEyeJobContext.setWindowEnd(windowEnd);
+    jobContext.setWindowStart(windowStart);
+    jobContext.setWindowEnd(windowEnd);
 
     // write to anomaly_jobs
     Long jobExecutionId = createAnomalyJob(jobName);
-    thirdEyeJobContext.setJobExecutionId(jobExecutionId);
+    jobContext.setJobId(jobExecutionId);
 
     // write to anomaly_tasks
     List<Long> taskIds = createAnomalyTasks(anomalyFunctionSpec);
@@ -115,8 +115,8 @@ public class DetectionJobRunner implements Job {
       try {
         AnomalyJobSpec anomalyJobSpec = new AnomalyJobSpec();
         anomalyJobSpec.setJobName(jobName);
-        anomalyJobSpec.setWindowStartTime(thirdEyeJobContext.getWindowStart().getMillis());
-        anomalyJobSpec.setWindowEndTime(thirdEyeJobContext.getWindowEnd().getMillis());
+        anomalyJobSpec.setWindowStartTime(jobContext.getWindowStart().getMillis());
+        anomalyJobSpec.setWindowEndTime(jobContext.getWindowEnd().getMillis());
         anomalyJobSpec.setScheduleStartTime(System.currentTimeMillis());
         anomalyJobSpec.setStatus(JobStatus.WAITING);
         jobExecutionId = anomalyJobSpecDAO.createOrUpdate(anomalyJobSpec);
@@ -145,7 +145,7 @@ public class DetectionJobRunner implements Job {
       Transaction transaction = session.beginTransaction();
       try {
 
-        List<TaskInfo> tasks = taskGenerator.createTasks(thirdEyeJobContext, anomalyFunctionSpec);
+        List<TaskInfo> tasks = taskGenerator.createTasks(jobContext, anomalyFunctionSpec);
 
         for (TaskInfo taskInfo : tasks) {
           String taskInfoJson = null;
@@ -155,9 +155,9 @@ public class DetectionJobRunner implements Job {
             LOG.error("Exception when converting TaskInfo {} to jsonString", taskInfo, e);
           }
           AnomalyTaskSpec anomalyTaskSpec = new AnomalyTaskSpec();
-          anomalyTaskSpec.setJobExecutionId(thirdEyeJobContext.getJobExecutionId());
+          anomalyTaskSpec.setJobId(jobContext.getJobId());
           anomalyTaskSpec.setTaskType(TaskType.ANOMALY_DETECTION);
-          anomalyTaskSpec.setJobName(thirdEyeJobContext.getJobName());
+          anomalyTaskSpec.setJobName(jobContext.getJobName());
           anomalyTaskSpec.setStatus(TaskStatus.WAITING);
           anomalyTaskSpec.setTaskStartTime(System.currentTimeMillis());
           anomalyTaskSpec.setTaskInfo(taskInfoJson);

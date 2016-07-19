@@ -367,7 +367,7 @@
   <changeSet id="13" author="npawar">
     <!-- AnomalyJobSpec -->
     <createTable tableName="anomaly_jobs">
-      <column name="job_execution_id" type="bigint" autoIncrement="true">
+      <column name="id" type="bigint" autoIncrement="true">
         <constraints primaryKey="true" nullable="false"/>
       </column>
       <column name="job_name" type="varchar(127)">
@@ -392,11 +392,11 @@
 
     <!-- AnomalyTaskSpec -->
     <createTable tableName="anomaly_tasks">
-      <column name="task_id" type="bigint" autoIncrement="true">
+      <column name="id" type="bigint" autoIncrement="true">
         <constraints primaryKey="true" nullable="false"/>
       </column>
-      <column name="job_execution_id" type="bigint">
-        <constraints nullable="false" foreignKeyName="fk_task_job" references="anomaly_jobs(job_execution_id)"/>
+      <column name="job_id" type="bigint">
+        <constraints nullable="false" foreignKeyName="fk_task_job" references="anomaly_jobs(id)"/>
       </column>
       <column name="job_name" type="varchar(127)">
         <constraints nullable="false"/>

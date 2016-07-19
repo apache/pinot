@@ -29,14 +29,14 @@ public class JobContext {
   private DateTime windowEnd;
   private String jobName;
 
-  private long jobExecutionId;
+  private long jobId;
 
-  public long getJobExecutionId() {
-    return jobExecutionId;
+  public long getJobId() {
+    return jobId;
   }
 
-  public void setJobExecutionId(long jobExecutionId) {
-    this.jobExecutionId = jobExecutionId;
+  public void setJobId(long jobId) {
+    this.jobId = jobId;
   }
 
   public AnomalyJobSpecDAO getAnomalyJobSpecDAO() {
