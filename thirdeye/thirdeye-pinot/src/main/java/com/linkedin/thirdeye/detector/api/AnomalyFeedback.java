@@ -86,7 +86,7 @@ public class AnomalyFeedback implements Serializable{
 
   @Override
   public String toString() {
-    return "AnomalyFeedback{" + "id=" + id + ", feedback=" + feedbackType + ", status=" + status
+    return "AnomalyFeedback{" + "id=" + id + ", feedbackType=" + feedbackType + ", status=" + status
         + ", comment='" + comment + '\'' + '}';
   }
 }

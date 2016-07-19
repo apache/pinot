@@ -42,7 +42,7 @@ function submitData(url, data){
         type: 'post',
         dataType: 'json',
         //contentType: 'application/json',
-        //data: data,
+        data: data,
         //processData: false,
         //success: function( data, textStatus, jQxhr ){
         //},

@@ -363,28 +363,19 @@ function renderAnomalyTable(data, tab) {
         window.location.hash = encodeHashParameters(hash);
     }
 
-
-    function submitAnomalyFeedback(target){
-
-        //value 1, 2 or 3 as on anomaly dashboard of data scientists. 1 = False Alarm, 2 = Confirmed Anomaly, 3 = Confirmed  - Not Actionable
-        var value =  $(target).attr("value");
-        var text =  $(target).text();
-        var selector = $(target).closest(".feedback-selector")
-        var anomalyID = selector.attr("data-anomaly-id");
-        var dataset = selector.attr("data-dataset");
-        //Todo: need endpoint and the format required by the BE?
-//        var data ={"dataset" : dataset, "anomalyID" : anomalyID, "feedback" : value }
-//        var url = "";
-//      //post anomaly feedback
-//        submitData(url, data).done(function(){
-//            //Todo: define success message/icon if any to the user
-//            console.log("Thank you for your feedback.")
-              selector.html("<p>Feedback sent:</p><p>" + text + "</p>")
-
-//        })
-    }
-
-
+  function submitAnomalyFeedback(target) {
+    var $target = $(target);
+    var feedbackType = $target.attr("value");
+    var selector = $target.closest(".feedback-selector");
+    var anomalyId = selector.attr("data-anomaly-id");
+    var data = '{ "feedbackType": "' + feedbackType + '"}';
+    var url = "/dashboard/anomaly-result/feedback/" + anomalyId;
+    //post anomaly feedback
+    submitData(url, data).done(function () {
+      // selector resized
+      $target.closest(".feedback-selector").addClass("green-border");
+    })
+  }
 }
 
 

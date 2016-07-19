@@ -667,7 +667,7 @@ public class AnomalyResource {
    * @param payload         : Json payload containing feedback @see com.linkedin.thirdeye.constant.AnomalyFeedbackType
    *                        eg. payload
    *                        <p/>
-   *                        { "feedback": "NOT_ANOMALY", "comment": "this is not an anomaly" }
+   *                        { "feedbackType": "NOT_ANOMALY", "comment": "this is not an anomaly" }
    */
   @POST
   @Path(value = "anomaly-result/feedback/{anomaly_result_id}")
@@ -695,7 +695,7 @@ public class AnomalyResource {
 
       anomalyResultDAO.createOrUpdate(result);
     } catch (IOException e) {
-      throw new IllegalArgumentException("Invalid payload");
+      throw new IllegalArgumentException("Invalid payload " + payload, e);
     }
   }
 }
