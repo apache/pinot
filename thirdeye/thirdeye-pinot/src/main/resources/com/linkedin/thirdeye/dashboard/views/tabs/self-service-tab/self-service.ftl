@@ -82,8 +82,6 @@
                                 <ul class="uk-nav uk-nav-dropdown single-select">
                                     <li class="monitoring-window-unit-option" value="HOURS"><a href="#" class="uk-dropdown-close">HOUR(S)</a></li>
                                     <li class="monitoring-window-unit-option" value="DAYS"><a href="#" class="uk-dropdown-close" >DAY(S)</a></li>
-                                    <li class="monitoring-window-unit-option" value="WEEKS"><a href="#" class="uk-dropdown-close">WEEK(S)</a></li>
-                                    <li class="monitoring-window-unit-option" value="MONTHS"><a href="#" class="uk-dropdown-close">MONTH(S)</a></li>
                                 </ul>
                             </div>
                         </div>
@@ -91,9 +89,9 @@
 
                     <div class="uk-form-row">
                         <div id="self-service-view-single-dimension-selector" class="view-single-dimension-selector uk-display-inline-block" rel="self-service">
-                            <label class="uk-form-label">in </label>
+                            <label class="uk-form-label">in dimension</label>
                             <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group">
-                                <div id="selected-dimension" class="uk-button" value="">dimension</div>
+                                <div id="selected-dimension" class="uk-button" value="">All</div>
                                 <button class="add-single-dimension-btn uk-button uk-button-primary" type="button"><i class="uk-icon-caret-down"></i></button>
                                 <div class="uk-dropdown uk-dropdown-small">
                                     <ul class="dimension-list uk-nav uk-nav-dropdown single-select">
@@ -101,8 +99,8 @@
                                 </div>
                             </div>
                         </div>
-
-
+                    </div>
+                    <div class="uk-form-row">
                         <div class="view-filter-selector  uk-display-inline-block" rel="self-service">
                             <label class="uk-form-label  uk-display-inline-block">Filters</label>
                             <div id="self-service-add-filter" class="add-filter add-btn uk-display-inline-block" rel="self-service" data-uk-dropdown="{mode:'click'}">
@@ -121,7 +119,6 @@
                             </div>
                             <ul  class="selected-filters-list uk-display-inline-block" rel="self-service"</ul>
                         </div>
-
                     </div>
 
                     <!-- EMAIL ADDRESS CONFIG currently not supported by the back end
@@ -163,8 +160,8 @@
                     </div>
 
                     <div>
-                        <button type="button" id="save-alert" class="uk-button uk-button-primary" rel="self-service">Save</button>
-                        <button class="uk-button">Clear</button>
+                        <button type="button" id="create-anomaly-function" class="uk-button uk-button-primary" rel="self-service">Save</button>
+                        <button type="button" id="clear-create-form"  class="uk-button">Clear</button>
                     </div>
                 </form>
 
@@ -189,7 +186,28 @@
                 <div id="existing-anomaly-functions-table-placeholder"></div>
 
 
-
+                <div id="toggle-alert-modal" class="uk-modal">
+                    <div class="uk-modal-dialog">
+                        <div class="uk-modal-header">...</div>
+                        <a class="uk-modal-close uk-close"></a>
+                        <p>Are you sure about turning off ... function alert?</p>
+                        <div class="uk-modal-footer">
+                            <button type="button" id=""  class="uk-button">Turn it off</button>
+                            <button type="button" id=""  class="uk-button">Keep it active</button>
+                        </div>
+                    </div>
+                </div>
+                <div id="delete-function-modal" class="uk-modal">
+                    <div class="uk-modal-dialog">
+                        <div class="uk-modal-header">...</div>
+                        <a class="uk-modal-close uk-close"></a>
+                        <p>Are you sure about deleting ... function?</p>
+                        <div class="uk-modal-footer">
+                            <button type="button" id="delete-anomaly-function"  class="uk-button">Delete</button>
+                            <button type="button" id="close"  class="uk-button uk-modal-close">Do not delete</button>
+                        </div>
+                    </div>
+                </div>
             </li>
         </ul>
 </section>

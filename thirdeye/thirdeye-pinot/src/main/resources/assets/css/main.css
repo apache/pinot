@@ -773,7 +773,6 @@ body a{
     padding: 0;
 }
 
-
 #tooltip tr {
     height:20px;
 }
@@ -786,8 +785,6 @@ body a{
     text-align:right;
     word-wrap:break-word;
 }
-
-
 
 .dimension-treemap{
     cursor: pointer;
@@ -817,7 +814,7 @@ body a{
    max-height: 350px;
 }
 
-/* Anommalies view related*/
+/* Anommalies view related */
 #linechart-placeholder {
     display: inline-block;
     width: 83%;
@@ -868,6 +865,15 @@ body a{
 
 #anomalies-table .checkbox-cell label{
     padding: 6px;
+}
+
+/* Self service related */
+#existing-anomaly-functions-table{
+    table-layout:fixed;
+}
+
+#existing-anomaly-functions-table td{
+    word-break: break-all;
 }
 
 

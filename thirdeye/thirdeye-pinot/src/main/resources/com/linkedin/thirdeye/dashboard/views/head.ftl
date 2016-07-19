@@ -57,6 +57,7 @@
     <script src="../../../assets/js/lib/self-service.js" defer></script>
     <script src="../../../assets/js/lib/custom-dashboard.js" defer></script>
     <script src="../../../assets/js/lib/handlebars-methods.js" defer></script>
+    <script src="../../../assets/js/lib/dashboard-header.js" defer></script>
     <script src="../../../assets/js/lib/dashboard-form.js" defer></script>
     <script src="../../../assets/js/lib/dashboard-form-filter.js" defer></script>
     <script src="../../../assets/js/lib/dashboard-form-time.js" defer></script>

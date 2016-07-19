@@ -7,7 +7,11 @@
        event.preventDefault();
     });
 
-    //Radio selection will highlight selected element
+    //Prevent double submit when buttons are doubleclicked
+    $("#main-view").on("dblclick","button", function(event){
+       event.preventDefault();
+    });
+
     $("#main-view").on("click", ".radio-options",function(){
         radioOptions(this)
     });
@@ -19,11 +23,6 @@
     $("#main-view").on("click",".uk-nav-dropdown.single-select li",function(){
         populateSingleSelect(this);
 
-    });
-
-    /** Dataset selection **/
-    $("#main-view").on("click",".dataset-option", function(){
-        selectDatasetNGetFormData(this)
     });
 
     $("#main-view").on("click",".close-dropdown-btn", function(){
@@ -38,10 +37,10 @@
         $(this).parent().hide();
     })
 
-    /* Form tab selection */
 
-    $("#main-view").on("click",".header-tab", function(){
-        switchHeaderTab(this)
+    /** Dataset selection **/
+    $("#main-view").on("click",".dataset-option", function(){
+        selectDatasetNGetFormData(this)
     });
 
     /** Dashboard selection **/
@@ -81,30 +80,6 @@
 
 
     /** DASHBOARD FORM RELATED METHODS **/
-    function switchHeaderTab(target){
-        radioButtons(target)
-        hash.view = $(target).attr("rel");
-
-        if(hash.view == "self-service"){
-
-            //Clear hash, only keep dataset & view as those are required to display the view
-            if(hash.dataset){
-            var dataset = hash.dataset;
-            hash = {}
-            hash.dataset = dataset;
-            hash.view == "self-service";
-
-
-                getExistingAnomalyFunctions(hash.dataset);
-
-            }else{
-                getExistingAnomalyFunctions();
-            }
-            renderSelfService();
-
-        }
-    }
-
     function  selectDashboard(target){
 
         //Update hash values

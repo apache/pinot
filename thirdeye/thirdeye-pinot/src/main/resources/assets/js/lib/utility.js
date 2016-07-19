@@ -399,7 +399,6 @@ function populateSingleSelect(target){
     $("div:first-child", selectorRoot).attr("value", value);
 }
 
-//Advanced settings
 function closeClosestDropDown(target){
 
     $(target).closest($("[data-uk-dropdown]")).removeClass("uk-open");
@@ -431,6 +430,7 @@ function selectDatasetNGetFormData(target){
     $(".filter-panel .value-filter").remove();
     $(".added-filter").remove();
     $(".filter-panel .value-filter").remove();
+    clearCreateForm();
 
 
     //Remove previous dataset's hash values
@@ -792,6 +792,31 @@ function calcHeatMapBG(){
         calcHeatMapCellBackground(cell);
     })
 };
+
+
+/** SELF SERVICE related methods **/
+function clearCreateForm(){
+
+    document.getElementById("configure-alert-form").reset()
+
+    resetSelector("#selected-metric-manage-alert", "Metric", "");
+    resetSelector("#selected-anomaly-condition", "Condition", "");
+    resetSelector("#selected-anomaly-compare-mode", "WoW", "w/w");
+    resetSelector("#selected-monitoring-window-unit", "HOUR(S)", "HOURS");
+    resetSelector("#selected-dimension", "All", "");
+    resetSelector("#selected-monitoring-repeat-unit", "HOUR(S)", "HOURS");
+
+    function resetSelector(element, defaultText, defaultValue){
+        $(element).text(defaultText);
+        $(element).attr("value", defaultValue);
+    }
+
+    $("monitoring-schedule").hide();
+    $("#active-alert").attr("checked","checked");
+
+    $("#configure-alert-form .remove-filter-selection").click();
+
+}
 
 
 
