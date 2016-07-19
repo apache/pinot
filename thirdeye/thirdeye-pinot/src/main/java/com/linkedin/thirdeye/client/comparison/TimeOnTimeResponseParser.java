@@ -316,7 +316,19 @@ public class TimeOnTimeResponseParser {
           otherBuilder.addMetric(metricFunctions.get(i).getMetricName(), otherBaseline[i],
               otherCurrent[i]);
         }
-        rows.add(otherBuilder.build());
+
+        if (otherBuilder.row.getMetrics().size() > 0) {
+          // Add only a non zero metric
+          boolean addMetric = false;
+          for (Row.Metric metric : otherBuilder.row.getMetrics()) {
+            if (metric.getCurrentValue() > 0.0 || metric.getBaselineValue() > 0.0) {
+              addMetric = true;
+            }
+          }
+          if (addMetric) {
+            rows.add(otherBuilder.build());
+          }
+        }
       }
     }
   }
