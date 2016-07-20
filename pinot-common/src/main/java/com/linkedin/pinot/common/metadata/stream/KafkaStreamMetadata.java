@@ -52,6 +52,9 @@ public class KafkaStreamMetadata implements StreamMetadata {
     for (String part : parts) {
       _consumerTypes.add(ConsumerType.valueOf(part));
     }
+    if (_consumerTypes.isEmpty()) {
+      throw new RuntimeException("Empty consumer types: Must have 'highLevel' or 'simple'");
+    }
     Collections.sort(_consumerTypes);
 
     _kafkaTopicName =
@@ -75,7 +78,14 @@ public class KafkaStreamMetadata implements StreamMetadata {
             streamConfigMap.get(key));
       }
     }
+  }
 
+  public boolean hasHighLevelKafkaConsumerType() {
+    return _consumerTypes.contains(ConsumerType.highLevel);
+  }
+
+  public boolean hasSimpleKafkaConsumerType() {
+    return _consumerTypes.contains(ConsumerType.simple);
   }
 
   public String getKafkaTopicName() {

@@ -33,6 +33,7 @@ import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
+import com.linkedin.pinot.common.utils.SegmentName;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.common.utils.retry.RetryPolicies;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -41,7 +42,7 @@ import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineSt
 
 public class PinotLLCRealtimeSegmentManager {
   public static final Logger LOGGER = LoggerFactory.getLogger(PinotLLCRealtimeSegmentManager.class);
-  private static final String KAFKA_PARTITIONS_PATH = "KAFKA_PARTITIONS";
+  private static final String KAFKA_PARTITIONS_PATH = "/KAFKA_PARTITIONS";
 
   private static PinotLLCRealtimeSegmentManager INSTANCE = null;
 
@@ -83,13 +84,14 @@ public class PinotLLCRealtimeSegmentManager {
    * method.
    */
   public void setupHelixEntries(final String topicName, final String realtimeTableName, int nPartitions,
-      final List<String> instanceNames, int nReplicas, long startOffset) {
+      final List<String> instanceNames, int nReplicas, long startOffset, IdealState idealState, boolean create) {
     if (nReplicas > instanceNames.size()) {
       throw new RuntimeException("Replicas requested(" + nReplicas + ") cannot fit within number of instances(" +
           instanceNames.size() + ") for table " + realtimeTableName + " topic " + topicName);
     }
     /*
-     Cannot do this because of https://issues.apache.org/jira/browse/HELIX-631
+     Due to a bug in auto-rebalance (https://issues.apache.org/jira/browse/HELIX-631)
+     we do the kafka partition allocation with local code in this class.
     {
       final String resourceName = topicName;
 
@@ -107,6 +109,8 @@ public class PinotLLCRealtimeSegmentManager {
       znRecord.setMapFields(new HashMap<String, Map<String, String>>(0));
     }
     */
+
+    // Allocate kafka partitions across server instances.
     ZNRecord znRecord = new ZNRecord(topicName);
     int serverId = 0;
     for (int p = 0; p < nPartitions; p++) {
@@ -120,7 +124,7 @@ public class PinotLLCRealtimeSegmentManager {
       znRecord.setListField(Integer.toString(p), instances);
     }
     writeKafkaPartitionAssignemnt(realtimeTableName, znRecord);
-    setupInitialSegments(realtimeTableName, znRecord, startOffset);
+    setupInitialSegments(realtimeTableName, znRecord, startOffset, idealState, create);
   }
 
   protected void writeKafkaPartitionAssignemnt(final String realtimeTableName, ZNRecord znRecord) {
@@ -128,7 +132,19 @@ public class PinotLLCRealtimeSegmentManager {
     _propertyStore.set(path, znRecord, AccessOption.PERSISTENT);
   }
 
-  protected void setupInitialSegments(String realtimeTableName, ZNRecord partitionAssignment, long startOffset) {
+  protected void setupInitialSegments(String realtimeTableName, ZNRecord partitionAssignment, long startOffset,
+      IdealState idealState, boolean create) {
+    List<String> currentSegments = getExistingLLCSegments(realtimeTableName);
+    // Make sure that there are no low-level segments existing.
+    if (currentSegments != null) {
+      for (String segment : currentSegments) {
+        if (!SegmentName.isHighLevelConsumerSegmentName(segment)) {
+          // For now, we don't support changing of kafka partitions, or otherwise re-creating the low-level
+          // realtime segments for any other reason.
+          throw new RuntimeException("Low-level segments already exist for table " + realtimeTableName);
+        }
+      }
+    }
     // Map of segment names to the server-instances that hold the segment.
     final Map<String, List<String>> idealStateEntries = new HashMap<String, List<String>>(4);
     final Map<String, List<String>> partitionMap = partitionAssignment.getListFields();
@@ -161,36 +177,47 @@ public class PinotLLCRealtimeSegmentManager {
       idealStateEntries.put(segName, instances);
     }
 
-    updateHelixIdealState(realtimeTableName, idealStateEntries, paths, records);
-  }
-
-  // Marking this method protected so it is easier to test
-  protected void updateHelixIdealState(String realtimeTableName, final Map<String, List<String>> idealStateEntries,
-      List<String> paths, List<ZNRecord> records) {
-    _propertyStore.createChildren(paths, records, AccessOption.PERSISTENT);
+    writeSegmentsToPropertyStore(paths, records);
     LOGGER.info("Added {} segments to propertyStore for table {}", paths.size(), realtimeTableName);
 
-    HelixHelper.updateIdealState(_helixManager, realtimeTableName, new Function<IdealState, IdealState>() {
-      @Override
-      public IdealState apply(IdealState idealState) {
-        return addOrUpdateRealtimeSegmentInIdealState(idealState, idealStateEntries);
-      }
-    }, RetryPolicies.exponentialBackoffRetryPolicy(5, 500L, 2.0f));
-    LOGGER.info("Updated IDEALSTATE for {} segments for table {}", paths.size(), realtimeTableName);
+    updateHelixIdealState(idealState, realtimeTableName, idealStateEntries, create);
   }
 
-  private static IdealState addOrUpdateRealtimeSegmentInIdealState(IdealState state, Map<String, List<String>> isEntryMap) {
-    for (Map.Entry<String, List<String>> entry : isEntryMap.entrySet()) {
+  protected void updateHelixIdealState(final IdealState idealState, String realtimeTableName, final Map<String, List<String>> idealStateEntries,
+      boolean create) {
+    if (create) {
+      addLLCRealtimeSegmentsInIdealState(idealState, idealStateEntries);
+      _helixAdmin.addResource(_clusterName, realtimeTableName, idealState);
+    } else {
+      HelixHelper.updateIdealState(_helixManager, realtimeTableName, new Function<IdealState, IdealState>() {
+        @Override
+        public IdealState apply(IdealState idealState) {
+          return addLLCRealtimeSegmentsInIdealState(idealState, idealStateEntries);
+        }
+      }, RetryPolicies.exponentialBackoffRetryPolicy(5, 500L, 2.0f));
+    }
+  }
+
+  private IdealState addLLCRealtimeSegmentsInIdealState(final IdealState idealState, Map<String, List<String>> idealStateEntries) {
+    for (Map.Entry<String, List<String>> entry : idealStateEntries.entrySet()) {
       final String segmentId = entry.getKey();
-      final Map<String, String> stateMap = state.getInstanceStateMap(segmentId);
-      // if the segment name already exists, clear it.
+      final Map<String, String> stateMap = idealState.getInstanceStateMap(segmentId);
       if (stateMap != null) {
+        // Replace the segment if it already exists
         stateMap.clear();
       }
       for (String instanceName : entry.getValue()) {
-        state.setPartitionState(segmentId, instanceName, PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE);
+        idealState.setPartitionState(segmentId, instanceName, PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE);
       }
     }
-    return state;
+    return idealState;
+  }
+
+  protected List<String> getExistingLLCSegments(String realtimeTableName) {
+    return  _propertyStore.getChildNames(PinotRealtimeSegmentManager.getSegmentsPath() + "/" + realtimeTableName, AccessOption.PERSISTENT);
+  }
+
+  protected void writeSegmentsToPropertyStore(List<String> paths, List<ZNRecord> records) {
+    _propertyStore.createChildren(paths, records, AccessOption.PERSISTENT);
   }
 }

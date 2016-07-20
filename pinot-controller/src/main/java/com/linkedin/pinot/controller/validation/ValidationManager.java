@@ -15,6 +15,20 @@
  */
 package com.linkedin.pinot.controller.validation;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.joda.time.Duration;
+import org.joda.time.Interval;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
@@ -22,26 +36,12 @@ import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metrics.ValidationMetrics;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
-import com.linkedin.pinot.common.utils.SegmentNameBuilder;
+import com.linkedin.pinot.common.utils.HLCSegmentName;
+import com.linkedin.pinot.common.utils.SegmentName;
 import com.linkedin.pinot.common.utils.time.TimeUtils;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import com.linkedin.pinot.core.operator.query.MAggregationFunctionGroupByWithDictionaryOperator;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-
-import java.util.*;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.TimeUnit;
-
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
-import org.apache.helix.ZNRecord;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.joda.time.Duration;
-import org.joda.time.Interval;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -205,6 +205,7 @@ public class ValidationManager {
     return totalDocumentCount;
   }
 
+  // TODO If both high-level and low-level consumers are present, count only one of them, not both
   public static long computeRealtimeTotalDocumentInSegments(List<SegmentMetadata> segmentMetadataList)  {
     long totalDocumentCount = 0;
 
@@ -212,7 +213,11 @@ public class ValidationManager {
 
     for (SegmentMetadata segmentMetadata : segmentMetadataList) {
       String segmentName = segmentMetadata.getName();
-      String segmentGroupIdName = SegmentNameBuilder.Realtime.extractGroupIdName(segmentName);
+      if (!SegmentName.isHighLevelConsumerSegmentName(segmentName)) {
+        continue;
+      }
+      HLCSegmentName hlcSegmentName = new HLCSegmentName(segmentName);
+      String segmentGroupIdName = hlcSegmentName.getGroupId();
 
       if (groupId.isEmpty()) {
         groupId = segmentGroupIdName;
