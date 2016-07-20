@@ -37,7 +37,7 @@ public class DetectionJobRunner implements Job {
   private static final Logger LOG = LoggerFactory.getLogger(DetectionJobRunner.class);
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
-  public static final String THIRDEYE_JOB_CONTEXT = "THIRDEYE_JOB_CONTEXT";
+  public static final String DETECTION_JOB_CONTEXT = "DETECTION_JOB_CONTEXT";
 
   private AnomalyJobSpecDAO anomalyJobSpecDAO;
   private AnomalyTaskSpecDAO anomalyTasksSpecDAO;
@@ -60,7 +60,7 @@ public class DetectionJobRunner implements Job {
     LOG.info("Running " + jobExecutionContext.getJobDetail().getKey().toString());
 
     jobContext = (JobContext) jobExecutionContext.getJobDetail().getJobDataMap()
-        .get(THIRDEYE_JOB_CONTEXT);
+        .get(DETECTION_JOB_CONTEXT);
     sessionFactory = jobContext.getSessionFactory();
     anomalyJobSpecDAO = jobContext.getAnomalyJobSpecDAO();
     anomalyTasksSpecDAO = jobContext.getAnomalyTaskSpecDAO();
@@ -99,7 +99,7 @@ public class DetectionJobRunner implements Job {
 
     // write to anomaly_jobs
     Long jobExecutionId = createAnomalyJob(jobName);
-    jobContext.setJobId(jobExecutionId);
+    jobContext.setJobExecutionId(jobExecutionId);
 
     // write to anomaly_tasks
     List<Long> taskIds = createAnomalyTasks(anomalyFunctionSpec);
@@ -155,7 +155,7 @@ public class DetectionJobRunner implements Job {
             LOG.error("Exception when converting TaskInfo {} to jsonString", taskInfo, e);
           }
           AnomalyTaskSpec anomalyTaskSpec = new AnomalyTaskSpec();
-          anomalyTaskSpec.setJobId(jobContext.getJobId());
+          anomalyTaskSpec.setJobId(jobContext.getJobExecutionId());
           anomalyTaskSpec.setTaskType(TaskType.ANOMALY_DETECTION);
           anomalyTaskSpec.setJobName(jobContext.getJobName());
           anomalyTaskSpec.setStatus(TaskStatus.WAITING);

@@ -15,6 +15,7 @@ import java.util.concurrent.Callable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.thirdeye.anomaly.detection.DetectionJobResource;
 import com.linkedin.thirdeye.anomaly.detection.DetectionJobScheduler;
 import com.linkedin.thirdeye.anomaly.task.TaskDriver;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
@@ -26,7 +27,7 @@ public class ThirdEyeAnomalyApplication
     extends BaseThirdEyeApplication<ThirdEyeAnomalyConfiguration> {
 
   private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeAnomalyApplication.class);
-  private DetectionJobScheduler jobScheduler = null;
+  private DetectionJobScheduler detectionJobScheduler = null;
   private TaskDriver taskDriver = null;
 
   public static void main(final String[] args) throws Exception {
@@ -74,7 +75,7 @@ public class ThirdEyeAnomalyApplication
         new AnomalyFunctionFactory(config.getFunctionConfigPath());
 
     if (config.isScheduler()) {
-      jobScheduler = new DetectionJobScheduler(anomalyJobSpecDAO, anomalyTaskSpecDAO,
+      detectionJobScheduler = new DetectionJobScheduler(anomalyJobSpecDAO, anomalyTaskSpecDAO,
           anomalyFunctionSpecDAO, hibernateBundle.getSessionFactory());
     }
     if (config.isWorker()) {
@@ -95,7 +96,9 @@ public class ThirdEyeAnomalyApplication
               taskDriver.start();
             }
             if (config.isScheduler()) {
-              jobScheduler.start();
+              detectionJobScheduler.start();
+              environment.jersey()
+              .register(new DetectionJobResource(detectionJobScheduler, anomalyFunctionSpecDAO));
             }
             return null;
           }
@@ -108,10 +111,12 @@ public class ThirdEyeAnomalyApplication
           taskDriver.stop();
         }
         if (config.isScheduler()) {
-          jobScheduler.stop();
+          detectionJobScheduler.stop();
         }
       }
     });
+
+
   }
 
 }
