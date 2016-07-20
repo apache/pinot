@@ -363,6 +363,30 @@ function renderAnomalyTable(data, tab) {
         window.location.hash = encodeHashParameters(hash);
     }
 
+  function fetchAnomalyFunctions() {
+    $.ajax({
+      url: "/thirdeye/function/metadata",
+      cache: true,
+      dataType: "json",
+      complete: function(data) {
+          console.log(data);
+      }
+    });
+  }
+
+  function fetchMetricFunctionType() {
+    $.ajax({
+      url: "/thirdeye/function/metric-function",
+      cache: true,
+      dataType: "json",
+      complete: function(data) {
+          console.log(data);
+      }
+    });
+  }
+  fetchAnomalyFunctions();
+  fetchMetricFunctionType();
+
   function submitAnomalyFeedback(target) {
     var $target = $(target);
     var feedbackType = $target.attr("value");
