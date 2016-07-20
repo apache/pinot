@@ -29,11 +29,14 @@ public class SegmentsValidationAndRetentionConfig {
   private String retentionTimeValue;
   private String segmentPushFrequency;
   private String segmentPushType;
-  private String replication;
+  private String replication; // For high-level kafka consumers, the number of replicas should be same as num server instances
   private String schemaName;
   private String timeColumnName;
   private String timeType;
   private String segmentAssignmentStrategy;
+
+  // Number of replicas per partition of low-level kafka consumers. This config is used for realtime tables only.
+  private String replicasPerPartition;
 
   public String getSegmentAssignmentStrategy() {
     return segmentAssignmentStrategy;
@@ -108,6 +111,14 @@ public class SegmentsValidationAndRetentionConfig {
 
   public void setSchemaName(String schemaName) {
     this.schemaName = schemaName;
+  }
+
+  public String getReplicasPerPartition() {
+    return replicasPerPartition;
+  }
+
+  public void setReplicasPerPartition(String replicasPerPartition) {
+    this.replicasPerPartition = replicasPerPartition;
   }
 
   @Override

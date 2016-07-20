@@ -35,7 +35,7 @@ public class TableNameBuilder {
   public String forTable(String tableName) {
     Preconditions.checkNotNull(tableName);
     Preconditions.checkArgument(!tableName.contains(SegmentName.SEPARATOR),
-        "Table name cannot contain two consecutive underscore characters");
+        "Table name(" + tableName + ") cannot contain two consecutive underscore characters");
 
     if (needsPostfix(tableName)) {
       return StringUtil.join("_", tableName, type.toString().toUpperCase());
