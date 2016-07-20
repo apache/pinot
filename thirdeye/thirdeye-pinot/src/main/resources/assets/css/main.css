@@ -323,13 +323,13 @@ body a{
 }
 
 /* Form: Anomaly config related */
-#configure-alert-form .uk-form-row{
+#configure-anomaly-function-form .uk-form-row{
    margin-bottom: 15px;
 }
 
 
-#rule{
-    margin-left: 20px;
+#name{
+    margin-left: 13px;
 }
 
 #anomaly-threshold{

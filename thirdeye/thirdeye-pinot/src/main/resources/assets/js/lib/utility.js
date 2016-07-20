@@ -797,7 +797,7 @@ function calcHeatMapBG(){
 /** SELF SERVICE related methods **/
 function clearCreateForm(){
 
-    document.getElementById("configure-alert-form").reset()
+    document.getElementById("configure-anomaly-function-form").reset()
 
     resetSelector("#selected-metric-manage-alert", "Metric", "");
     resetSelector("#selected-anomaly-condition", "Condition", "");
@@ -814,7 +814,7 @@ function clearCreateForm(){
     $("monitoring-schedule").hide();
     $("#active-alert").attr("checked","checked");
 
-    $("#configure-alert-form .remove-filter-selection").click();
+    $("#configure-anomaly-function-form .remove-filter-selection").click();
 
 }
 

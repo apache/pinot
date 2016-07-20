@@ -82,18 +82,6 @@ e&&(m[1]=3*(k(e)-1));break;case "M":case "MM":null!=e&&(m[1]=k(e)-1);break;case 
     function(){return this.as("s")};d.duration.fn.asMinutes=function(){return this.as("m")};d.duration.fn.asHours=function(){return this.as("h")};d.duration.fn.asDays=function(){return this.as("d")};d.duration.fn.asWeeks=function(){return this.as("weeks")};d.duration.fn.asMonths=function(){return this.as("M")};d.duration.fn.asYears=function(){return this.as("y")};d.locale("en",{ordinalParse:/\d{1,2}(th|st|nd|rd)/,ordinal:function(a){var b=a%10,b=1===k(a%100/10)?"th":1===b?"st":2===b?"nd":3===b?"rd":"th";
     return a+b}});pa?module.exports=d:"function"===typeof define&&define.amd?(define(function(a,b,c){c.config&&c.config()&&!0===c.config().noGlobal&&(X.moment=Aa);return d}),za(!0)):za()}).call(this);
 
-/*
- * This combined file was created by the DataTables downloader builder:
- *   https://datatables.net/download
- *
- * To rebuild or modify this file with the latest versions of the included
- * software please visit:
- *   https://datatables.net/download/#dt/dt-1.10.8
- *
- * Included libraries:
- *   DataTables 1.10.8
- */
-
 /*!
  DataTables 1.10.12
  ©2008-2014 SpryMedia Ltd - datatables.net/license

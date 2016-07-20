@@ -14,7 +14,7 @@
 				<li id="compare-header-tab" class="header-tab" rel="compare"><a href="#">Time over time comparison</a></li>
 				<li id="timeseries-header-tab" class="header-tab" rel="timeseries"><a href="#">Timeseries</a></li>
 				<li id="anomalies-header-tab" class="header-tab" rel="anomalies"><a href="#">Anomalies</a></li>
-				<li id="anomalies-header-tab" class="header-tab" rel="self-service"><a href="#">Self Service</a></li>
+				<!--<li id="anomalies-header-tab" class="header-tab" rel="self-service"><a href="#">Self Service</a></li>-->
 			</ul>
 
 
@@ -44,6 +44,8 @@
     <#include "tabs/compare-tab/contributors.ftl">
     <#include "tabs/timeseries-tab/timeseries.ftl">
     <#include "tabs/anomalies-tab/anomalies.ftl">
+    <#include "tabs/self-service-tab/self-service.ftl">
+    <#include "tabs/self-service-tab/anomaly-function-form.ftl">
     <#include "tabs/self-service-tab/self-service-exisiting-functions.ftl">
 
 </body>

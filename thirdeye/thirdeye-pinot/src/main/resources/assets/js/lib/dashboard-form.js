@@ -71,7 +71,7 @@
 
     /** Remove selected Metric or Dimension item **/
     $("#main-view").on("click","#get-existing-anomaly-functions", function(){
-        getExistingAnomalyFunctions();
+        getExistingAnomalyFunctions(hash.dataset);
     });
 
 

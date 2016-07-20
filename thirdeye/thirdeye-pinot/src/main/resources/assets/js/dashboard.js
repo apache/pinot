@@ -142,11 +142,9 @@ $(document).ready( function() {
 
 
     /** Handelbars template for main content
-     * Todo: based on the requirements of the manage existing anomaly functions decide to use or remove this template **/
-//    //SELF SERVICE TAB
-//    var result_self_service_template = HandleBarsTemplates.template_self_service("");
-//    $("#self-service-display-main-content-section").append(result_self_service_template);
-
+     /** Handelbars template for SELF SERVICE tab ANOMALY FUNCTION FORM **/
+    var result_anomaly_function_form_template = HandleBarsTemplates.template_anomaly_function_form("");
+    $("#create-anomaly-functions-tab").html(result_anomaly_function_form_template);
 
     //Global object with the query params
     hash = parseHashParameters(window.location.hash);

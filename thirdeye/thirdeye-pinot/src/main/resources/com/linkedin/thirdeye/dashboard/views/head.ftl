@@ -11,7 +11,6 @@
     <link rel="stylesheet" href="../../../assets/css/uikit/components/form-select.almost-flat.min.css"/>
     <link rel="stylesheet" href="../../../assets/css/uikit/components/datepicker.almost-flat.min.css"/>
     <link rel="stylesheet" href="../../../assets/css/datatables.min.css"/>
-    <link rel="stylesheet" href="DataTables/datatables.min.css"/>
     <link rel="stylesheet" href="../../../assets/css/main.css"/>
     <link rel="stylesheet" href="../../../assets/css/d3.css"/>
     <link rel="stylesheet" href="../../../assets/css/c3.css"/>
@@ -35,18 +34,15 @@
 	<script src="../../../assets/js/d3/d3linewithlegend.js"  defer></script>
    <script src="../../../assets/js/c3/c3.js"  defer></script>
 
-    <!--Compiled JSTZ.min.js, Moment.min.js, DataTables 1.10.8, jquery.dataTables.columnFilter.min.js, moment-timezone-with-data-2010-2020.min.js into vendorplugins.compiled.js-->
+    <!--Compiled JSTZ.min.js, Moment.min.js, DataTables 1.10.12, jquery.dataTables.columnFilter.min.js, moment-timezone-with-data-2010-2020.min.js into vendorplugins.compiled.js-->
    <script src="../../../assets/js/vendor/vendorplugins.compiled.js" defer></script>
    <script src="../../../assets/js/uikit/uikit.min.js" defer></script>
    <script src="../../../assets/js/uikit/core/dropdown.min.js" defer></script>
    <!--Compiled uikit components as used-components.compiled.js consists of: sticky.min.js, datepicker.min.js, timepicker.min.js,
    autocomplete.min.js, sortable.min.js, form-select.min.js-->
     <script src="../../../assets/js/uikit/components/used-components.compiled.js" defer></script>
-    <!--<script type="text/javascript" src="https://www.google.com/jsapi"></script>-->
 
 
-
-    <script type="text/javascript" src="DataTables/datatables.min.js"></script>
     <script src="../../../assets/js/lib/utility.js" defer></script>
     <script src="../../../assets/js/lib/get-form-data.js" defer></script>
     <script src="../../../assets/js/lib/tabular.js" defer></script>
