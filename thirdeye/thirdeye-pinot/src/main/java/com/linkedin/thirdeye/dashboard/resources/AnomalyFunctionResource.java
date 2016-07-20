@@ -19,7 +19,7 @@ import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@Path("thirdeye")
+@Path("thirdeye/function")
 @Produces(MediaType.APPLICATION_JSON)
 public class AnomalyFunctionResource {
 
@@ -65,7 +65,7 @@ public class AnomalyFunctionResource {
    * "MIN_MAX_THRESHOLD":["min","max"] }
    */
   @GET
-  @Path("metadata/anomaly-function")
+  @Path("metadata")
   public Map<String, Object> getAnomalyFunctionMetadata() {
     return anomalyFunctionMetadata;
   }
@@ -76,7 +76,7 @@ public class AnomalyFunctionResource {
    * eg. ["SUM","AVG","COUNT"]
    */
   @GET
-  @Path("metadata/metric-function")
+  @Path("metric-function")
   public MetricAggFunction[] getMetricFunctions() {
     return MetricAggFunction.values();
   }
