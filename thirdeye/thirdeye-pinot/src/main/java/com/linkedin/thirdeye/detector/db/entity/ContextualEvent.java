@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.detector.api;
+package com.linkedin.thirdeye.detector.db.entity;
 
 import java.util.Objects;
 
@@ -17,14 +17,9 @@ import com.google.common.base.MoreObjects;
 @Entity
 @Table(name = "contextual_events")
 @NamedQueries({
-
     @NamedQuery(name = "com.linkedin.thirdeye.api.ContextualEvent#findAllByTime", query = "SELECT e FROM ContextualEvent e WHERE e.timeUtc >= :startTimeUtc AND e.timeUtc <= :endTimeUtc")
 })
-public class ContextualEvent implements Comparable<ContextualEvent> {
-  @Id
-  @GeneratedValue(strategy = GenerationType.IDENTITY)
-  private long id;
-
+public class ContextualEvent extends AbstractEntity implements Comparable<ContextualEvent> {
   @Column(name = "time_utc", nullable = false)
   private long timeUtc;
 
@@ -36,17 +31,6 @@ public class ContextualEvent implements Comparable<ContextualEvent> {
 
   @Column(name = "reference", nullable = true)
   private String reference;
-
-  public ContextualEvent() {
-  }
-
-  public long getId() {
-    return id;
-  }
-
-  public void setId(long id) {
-    this.id = id;
-  }
 
   public long getTimeUtc() {
     return timeUtc;
@@ -87,7 +71,7 @@ public class ContextualEvent implements Comparable<ContextualEvent> {
 
   @Override
   public String toString() {
-    return MoreObjects.toStringHelper(this).add("id", id).add("timeUtc", timeUtc)
+    return MoreObjects.toStringHelper(this).add("id", getId()).add("timeUtc", timeUtc)
         .add("title", title).add("description", description).add("reference", reference).toString();
   }
 
@@ -97,13 +81,13 @@ public class ContextualEvent implements Comparable<ContextualEvent> {
       return false;
     }
     ContextualEvent e = (ContextualEvent) o;
-    return Objects.equals(id, e.getId()) && Objects.equals(timeUtc, e.getTimeUtc())
+    return Objects.equals(getId(), e.getId()) && Objects.equals(timeUtc, e.getTimeUtc())
         && Objects.equals(title, e.getTitle()) && Objects.equals(description, e.getDescription())
         && Objects.equals(reference, e.getReference());
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, timeUtc, title, description, reference);
+    return Objects.hash(getId(), timeUtc, title, description, reference);
   }
 }

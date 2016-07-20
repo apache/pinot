@@ -9,7 +9,7 @@ import io.dropwizard.hibernate.UnitOfWork;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.anomaly.task.TaskInfo;
-import com.linkedin.thirdeye.detector.api.AnomalyTaskSpec;
+import com.linkedin.thirdeye.detector.db.entity.AnomalyTaskSpec;
 import com.linkedin.thirdeye.detector.db.AnomalyTaskSpecDAO;
 
 

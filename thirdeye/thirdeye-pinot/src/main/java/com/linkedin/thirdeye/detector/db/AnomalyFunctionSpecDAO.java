@@ -5,7 +5,7 @@ import java.util.List;
 
 import org.hibernate.SessionFactory;
 
-import com.linkedin.thirdeye.detector.api.AnomalyFunctionSpec;
+import com.linkedin.thirdeye.detector.db.entity.AnomalyFunctionSpec;
 
 import io.dropwizard.hibernate.AbstractDAO;
 
@@ -15,8 +15,7 @@ public class AnomalyFunctionSpecDAO extends AbstractDAO<AnomalyFunctionSpec> {
   }
 
   public AnomalyFunctionSpec findById(Long id) {
-    AnomalyFunctionSpec anomalyFunctionSpec = get(id);
-    return anomalyFunctionSpec;
+    return get(id);
   }
 
   public Long createOrUpdate(AnomalyFunctionSpec anomalyFunctionSpec) {

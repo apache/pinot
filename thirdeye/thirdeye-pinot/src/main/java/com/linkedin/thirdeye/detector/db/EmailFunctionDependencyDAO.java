@@ -4,7 +4,7 @@ import java.util.List;
 
 import org.hibernate.SessionFactory;
 
-import com.linkedin.thirdeye.detector.api.EmailFunctionDependency;
+import com.linkedin.thirdeye.detector.db.entity.EmailFunctionDependency;
 
 import io.dropwizard.hibernate.AbstractDAO;
 

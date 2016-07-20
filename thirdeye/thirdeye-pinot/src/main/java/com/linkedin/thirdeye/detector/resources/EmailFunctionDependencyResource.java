@@ -12,7 +12,7 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
-import com.linkedin.thirdeye.detector.api.EmailFunctionDependency;
+import com.linkedin.thirdeye.detector.db.entity.EmailFunctionDependency;
 import com.linkedin.thirdeye.detector.db.EmailFunctionDependencyDAO;
 
 import io.dropwizard.hibernate.UnitOfWork;

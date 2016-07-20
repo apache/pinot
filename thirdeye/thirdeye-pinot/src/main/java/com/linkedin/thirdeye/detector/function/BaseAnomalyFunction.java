@@ -2,10 +2,9 @@ package com.linkedin.thirdeye.detector.function;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.util.List;
 import java.util.Properties;
 
-import com.linkedin.thirdeye.detector.api.AnomalyFunctionSpec;
+import com.linkedin.thirdeye.detector.db.entity.AnomalyFunctionSpec;
 
 public abstract class BaseAnomalyFunction implements AnomalyFunction {
   private AnomalyFunctionSpec spec;
