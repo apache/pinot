@@ -24,7 +24,7 @@ public class TaskGenerator {
 
     DateTime windowStart = thirdeyeJobContext.getWindowStart();
     DateTime windowEnd = thirdeyeJobContext.getWindowEnd();
-    long jobExecutionId = thirdeyeJobContext.getJobId();
+    long jobExecutionId = thirdeyeJobContext.getJobExecutionId();
     // generate tasks
     String exploreDimensionsString = anomalyFunctionSpec.getExploreDimensions();
     if (StringUtils.isBlank(exploreDimensionsString)) {
