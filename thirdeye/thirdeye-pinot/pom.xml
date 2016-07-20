@@ -161,7 +161,7 @@
     <plugins>
       <plugin>
         <artifactId>maven-shade-plugin</artifactId>
-        <version>1.8</version>
+        <version>1.7</version>
         <configuration>
           <createDependencyReducedPom>true</createDependencyReducedPom>
           <transformers>
