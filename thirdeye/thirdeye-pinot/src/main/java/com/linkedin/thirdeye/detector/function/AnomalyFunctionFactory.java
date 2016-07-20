@@ -11,7 +11,7 @@ import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.thirdeye.detector.api.AnomalyFunctionSpec;
+import com.linkedin.thirdeye.detector.db.entity.AnomalyFunctionSpec;
 
 public class AnomalyFunctionFactory {
   private static Logger LOGGER = LoggerFactory.getLogger(AnomalyFunctionFactory.class);

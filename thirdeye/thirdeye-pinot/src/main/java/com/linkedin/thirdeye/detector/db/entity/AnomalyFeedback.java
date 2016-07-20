@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.detector.api;
+package com.linkedin.thirdeye.detector.db.entity;
 
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
 import com.linkedin.thirdeye.constant.FeedbackStatus;
@@ -8,19 +8,12 @@ import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.EnumType;
 import javax.persistence.Enumerated;
-import javax.persistence.GeneratedValue;
-import javax.persistence.GenerationType;
-import javax.persistence.Id;
 import javax.persistence.Table;
 
 @Entity
 @Table(name = "anomaly_feedback")
-public class AnomalyFeedback implements Serializable{
+public class AnomalyFeedback extends AbstractEntity implements Serializable{
   private static final long serialVersionUID = 1L;
-
-  @Id
-  @GeneratedValue(strategy = GenerationType.IDENTITY)
-  private long id;
 
   @Column(name = "feedback_type", nullable = false)
   @Enumerated(EnumType.STRING)
@@ -32,14 +25,6 @@ public class AnomalyFeedback implements Serializable{
 
   @Column(name = "comment", length = 500)
   private String comment;
-
-  public long getId() {
-    return id;
-  }
-
-  public void setId(long id) {
-    this.id = id;
-  }
 
   public AnomalyFeedbackType getFeedbackType() {
     return feedbackType;
@@ -75,18 +60,18 @@ public class AnomalyFeedback implements Serializable{
     }
 
     AnomalyFeedback that = (AnomalyFeedback) o;
-    return Objects.equals(id, that.getId()) && Objects.equals(feedbackType, that.getFeedbackType())
+    return Objects.equals(getId(), that.getId()) && Objects.equals(feedbackType, that.getFeedbackType())
         && Objects.equals(status, that.getStatus()) && Objects.equals(comment, that.getComment());
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, feedbackType, status, comment);
+    return Objects.hash(getId(), feedbackType, status, comment);
   }
 
   @Override
   public String toString() {
-    return "AnomalyFeedback{" + "id=" + id + ", feedbackType=" + feedbackType + ", status=" + status
+    return "AnomalyFeedback{" + "id=" + getId() + ", feedbackType=" + feedbackType + ", status=" + status
         + ", comment='" + comment + '\'' + '}';
   }
 }

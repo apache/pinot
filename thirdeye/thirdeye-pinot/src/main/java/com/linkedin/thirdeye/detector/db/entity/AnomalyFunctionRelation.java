@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.detector.api;
+package com.linkedin.thirdeye.detector.db.entity;
 
 import java.io.Serializable;
 import java.util.Objects;
@@ -11,6 +11,8 @@ import javax.persistence.NamedQuery;
 import javax.persistence.Table;
 
 import com.google.common.base.MoreObjects;
+
+//TODO: Manage this through JPA
 
 @Entity
 @Table(name = "anomaly_function_relations")

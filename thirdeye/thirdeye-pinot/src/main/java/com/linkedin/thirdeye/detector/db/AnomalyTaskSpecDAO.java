@@ -8,7 +8,7 @@ import org.hibernate.HibernateException;
 import org.hibernate.SessionFactory;
 
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
-import com.linkedin.thirdeye.detector.api.AnomalyTaskSpec;
+import com.linkedin.thirdeye.detector.db.entity.AnomalyTaskSpec;
 
 public class AnomalyTaskSpecDAO extends AbstractDAO<AnomalyTaskSpec> {
   public AnomalyTaskSpecDAO(SessionFactory sessionFactory) {

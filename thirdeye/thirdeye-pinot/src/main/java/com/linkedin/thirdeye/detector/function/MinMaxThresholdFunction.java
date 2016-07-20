@@ -3,7 +3,7 @@ package com.linkedin.thirdeye.detector.function;
 import com.google.common.base.Joiner;
 import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
-import com.linkedin.thirdeye.detector.api.AnomalyResult;
+import com.linkedin.thirdeye.detector.db.entity.AnomalyResult;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;

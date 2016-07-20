@@ -1,11 +1,10 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkedin.thirdeye.client.MetricFunction;
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
 import com.linkedin.thirdeye.constant.FeedbackStatus;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
-import com.linkedin.thirdeye.detector.api.AnomalyFeedback;
+import com.linkedin.thirdeye.detector.db.entity.AnomalyFeedback;
 import io.dropwizard.hibernate.UnitOfWork;
 
 import java.io.IOException;
@@ -44,9 +43,9 @@ import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.dashboard.DetectorHttpUtils;
 import com.linkedin.thirdeye.dashboard.ThirdEyeDashboardConfiguration;
-import com.linkedin.thirdeye.detector.api.AnomalyFunctionSpec;
-import com.linkedin.thirdeye.detector.api.AnomalyResult;
-import com.linkedin.thirdeye.detector.api.EmailConfiguration;
+import com.linkedin.thirdeye.detector.db.entity.AnomalyFunctionSpec;
+import com.linkedin.thirdeye.detector.db.entity.AnomalyResult;
+import com.linkedin.thirdeye.detector.db.entity.EmailConfiguration;
 import com.linkedin.thirdeye.detector.db.AnomalyFunctionSpecDAO;
 import com.linkedin.thirdeye.detector.db.AnomalyResultDAO;
 import com.linkedin.thirdeye.detector.db.EmailConfigurationDAO;

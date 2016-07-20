@@ -4,7 +4,7 @@ import java.util.List;
 
 import org.hibernate.SessionFactory;
 
-import com.linkedin.thirdeye.detector.api.AnomalyJobSpec;
+import com.linkedin.thirdeye.detector.db.entity.AnomalyJobSpec;
 
 import io.dropwizard.hibernate.AbstractDAO;
 import io.dropwizard.hibernate.UnitOfWork;

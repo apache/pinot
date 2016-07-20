@@ -8,7 +8,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.hibernate.SessionFactory;
-import org.joda.time.DateTime;
 import org.quartz.CronScheduleBuilder;
 import org.quartz.CronTrigger;
 import org.quartz.JobBuilder;
@@ -28,7 +27,7 @@ import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesHandler;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesResponseConverter;
-import com.linkedin.thirdeye.detector.api.AnomalyFunctionSpec;
+import com.linkedin.thirdeye.detector.db.entity.AnomalyFunctionSpec;
 import com.linkedin.thirdeye.detector.db.AnomalyFunctionRelationDAO;
 import com.linkedin.thirdeye.detector.db.AnomalyFunctionSpecDAO;
 import com.linkedin.thirdeye.detector.db.AnomalyResultDAO;

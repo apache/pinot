@@ -4,8 +4,8 @@ import java.util.List;
 
 import org.hibernate.SessionFactory;
 
-import com.linkedin.thirdeye.detector.api.AnomalyFunctionSpec;
-import com.linkedin.thirdeye.detector.api.EmailConfiguration;
+import com.linkedin.thirdeye.detector.db.entity.AnomalyFunctionSpec;
+import com.linkedin.thirdeye.detector.db.entity.EmailConfiguration;
 
 import io.dropwizard.hibernate.AbstractDAO;
 

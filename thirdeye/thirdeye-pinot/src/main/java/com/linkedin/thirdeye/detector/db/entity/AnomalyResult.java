@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.detector.api;
+package com.linkedin.thirdeye.detector.db.entity;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -10,9 +10,6 @@ import javax.persistence.CascadeType;
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.FetchType;
-import javax.persistence.GeneratedValue;
-import javax.persistence.GenerationType;
-import javax.persistence.Id;
 import javax.persistence.JoinColumn;
 import javax.persistence.NamedQueries;
 import javax.persistence.NamedQuery;
@@ -68,13 +65,9 @@ import com.linkedin.thirdeye.util.ThirdEyeUtils;
             + "AND ((r.startTimeUtc >= :startTimeUtc AND r.startTimeUtc <= :endTimeUtc) "
             + "OR (r.endTimeUtc >= :startTimeUtc AND r.endTimeUtc <= :endTimeUtc))")
 })
-public class AnomalyResult implements Comparable<AnomalyResult> {
+public class AnomalyResult extends AbstractEntity implements Comparable<AnomalyResult> {
   private static Joiner SEMICOLON = Joiner.on(";");
   private static Joiner EQUALS = Joiner.on("=");
-
-  @Id
-  @GeneratedValue(strategy = GenerationType.IDENTITY)
-  private long id;
 
   @Column(name = "function_id", nullable = false)
   private long functionId;
@@ -124,14 +117,6 @@ public class AnomalyResult implements Comparable<AnomalyResult> {
 
   public AnomalyResult() {
     creationTimeUtc = DateTime.now().getMillis();
-  }
-
-  public long getId() {
-    return id;
-  }
-
-  public void setId(long id) {
-    this.id = id;
   }
 
   public long getFunctionId() {
@@ -257,7 +242,7 @@ public class AnomalyResult implements Comparable<AnomalyResult> {
 
   @Override
   public String toString() {
-    return MoreObjects.toStringHelper(this).add("id", id).add("functionId", functionId)
+    return MoreObjects.toStringHelper(this).add("id", getId()).add("functionId", functionId)
         .add("functionType", functionType).add("functionProperties", functionProperties)
         .add("collection", collection).add("startTimeUtc", startTimeUtc)
         .add("endTimeUtc", endTimeUtc).add("dimensions", dimensions).add("metric", metric)
@@ -310,7 +295,7 @@ public class AnomalyResult implements Comparable<AnomalyResult> {
     if (diff != 0) {
       return diff;
     }
-    return ObjectUtils.compare(id, o.getId());
+    return ObjectUtils.compare(getId(), o.getId());
   }
 
   public static String encodeCompactedProperties(Properties props) {

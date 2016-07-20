@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.detector.api;
 
+import com.linkedin.thirdeye.detector.db.entity.AnomalyResult;
 import java.util.List;
 import java.util.Map;
 

@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.detector.api;
+package com.linkedin.thirdeye.detector.db.entity;
 
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 import java.util.List;
@@ -10,9 +10,6 @@ import javax.persistence.Entity;
 import javax.persistence.EnumType;
 import javax.persistence.Enumerated;
 import javax.persistence.FetchType;
-import javax.persistence.GeneratedValue;
-import javax.persistence.GenerationType;
-import javax.persistence.Id;
 import javax.persistence.JoinColumn;
 import javax.persistence.ManyToMany;
 import javax.persistence.NamedQueries;
@@ -33,10 +30,7 @@ import com.linkedin.thirdeye.util.ThirdEyeUtils;
     @NamedQuery(name = "com.linkedin.thirdeye.api.AnomalyFunctionSpec#toggleActive", query = "UPDATE AnomalyFunctionSpec set isActive = :isActive WHERE id = :id"),
     @NamedQuery(name = "com.linkedin.thirdeye.api.AnomalyFunctionSpec#findDistinctMetricsByCollection", query = "SELECT DISTINCT(af.metric) FROM AnomalyFunctionSpec af WHERE af.collection = :collection")
 })
-public class AnomalyFunctionSpec {
-  @Id
-  @GeneratedValue(strategy = GenerationType.IDENTITY)
-  private long id;
+public class AnomalyFunctionSpec extends AbstractEntity {
 
   @Column(name = "collection", nullable = false)
   private String collection;
@@ -93,17 +87,6 @@ public class AnomalyFunctionSpec {
   @OneToMany(fetch = FetchType.LAZY)
   @JoinColumn(name = "function_id", referencedColumnName = "id")
   private List<AnomalyResult> anomalies;
-
-  public AnomalyFunctionSpec() {
-  }
-
-  public long getId() {
-    return id;
-  }
-
-  public void setId(long id) {
-    this.id = id;
-  }
 
   public String getCollection() {
     return collection;
@@ -263,7 +246,7 @@ public class AnomalyFunctionSpec {
       return false;
     }
     AnomalyFunctionSpec af = (AnomalyFunctionSpec) o;
-    return Objects.equals(id, af.getId()) && Objects.equals(collection, af.getCollection())
+    return Objects.equals(getId(), af.getId()) && Objects.equals(collection, af.getCollection())
         && Objects.equals(metric, af.getMetric())
         && Objects.equals(metricFunction, af.getMetricFunction())
         && Objects.equals(type, af.getType())
@@ -281,14 +264,14 @@ public class AnomalyFunctionSpec {
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, collection, metric, metricFunction, type, isActive, cron, properties,
+    return Objects.hash(getId(), collection, metric, metricFunction, type, isActive, cron, properties,
         bucketSize, bucketUnit, windowSize, windowUnit, windowDelay, windowDelayUnit,
         exploreDimensions, filters);
   }
 
   @Override
   public String toString() {
-    return MoreObjects.toStringHelper(this).add("id", id).add("collection", collection)
+    return MoreObjects.toStringHelper(this).add("id", getId()).add("collection", collection)
         .add("metric", metric).add("metric_function", metricFunction.name()).add("type", type)
         .add("isActive", isActive).add("cron", cron).add("properties", properties)
         .add("bucketSize", bucketSize).add("bucketUnit", bucketUnit).add("windowSize", windowSize)

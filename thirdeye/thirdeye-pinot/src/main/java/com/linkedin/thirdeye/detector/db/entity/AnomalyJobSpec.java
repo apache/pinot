@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.detector.api;
+package com.linkedin.thirdeye.detector.db.entity;
 
 import java.util.List;
 import java.util.Objects;
@@ -8,9 +8,6 @@ import javax.persistence.Entity;
 import javax.persistence.EnumType;
 import javax.persistence.Enumerated;
 import javax.persistence.FetchType;
-import javax.persistence.GeneratedValue;
-import javax.persistence.GenerationType;
-import javax.persistence.Id;
 import javax.persistence.JoinColumn;
 import javax.persistence.NamedQueries;
 import javax.persistence.NamedQuery;
@@ -29,11 +26,7 @@ import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
 @NamedQueries({
     @NamedQuery(name = "com.linkedin.thirdeye.anomaly.AnomalyJobSpec#findAll", query = "SELECT af FROM AnomalyJobSpec af")
 })
-public class AnomalyJobSpec {
-  @Id
-  @Column(name = "id")
-  @GeneratedValue(strategy = GenerationType.IDENTITY)
-  private long id;
+public class AnomalyJobSpec extends AbstractEntity{
 
   @Column(name = "job_name", nullable = false)
   private String jobName;
@@ -58,85 +51,57 @@ public class AnomalyJobSpec {
   @JoinColumn(name = "job_execution_id", referencedColumnName = "id")
   private List<AnomalyTaskSpec> anomalyTasks;
 
-  public AnomalyJobSpec() {
-  }
-
-
-  public long getId() {
-    return id;
-  }
-
-
-  public void setId(long id) {
-    this.id = id;
-  }
-
-
   public String getJobName() {
     return jobName;
   }
-
 
   public void setJobName(String jobName) {
     this.jobName = jobName;
   }
 
-
   public JobStatus getStatus() {
     return status;
   }
-
 
   public void setStatus(JobStatus status) {
     this.status = status;
   }
 
-
   public long getScheduleStartTime() {
     return scheduleStartTime;
   }
-
 
   public void setScheduleStartTime(long scheduleStartTime) {
     this.scheduleStartTime = scheduleStartTime;
   }
 
-
   public long getScheduleEndTime() {
     return scheduleEndTime;
   }
-
 
   public void setScheduleEndTime(long scheduleEndTime) {
     this.scheduleEndTime = scheduleEndTime;
   }
 
-
-
   public long getWindowStartTime() {
     return windowStartTime;
   }
-
 
   public void setWindowStartTime(long windowStartTime) {
     this.windowStartTime = windowStartTime;
   }
 
-
   public long getWindowEndTime() {
     return windowEndTime;
   }
-
 
   public void setWindowEndTime(long windowEndTime) {
     this.windowEndTime = windowEndTime;
   }
 
-
   public List<AnomalyTaskSpec> getAnomalyTasks() {
     return anomalyTasks;
   }
-
 
   public void setAnomalyTasks(List<AnomalyTaskSpec> anomalyTasks) {
     this.anomalyTasks = anomalyTasks;
@@ -149,18 +114,18 @@ public class AnomalyJobSpec {
       return false;
     }
     AnomalyJobSpec af = (AnomalyJobSpec) o;
-    return Objects.equals(id, af.getId()) && Objects.equals(jobName, af.getJobName())
+    return Objects.equals(getId(), af.getId()) && Objects.equals(jobName, af.getJobName())
         && Objects.equals(status, af.getStatus()) && Objects.equals(scheduleStartTime, af.getScheduleStartTime());
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, jobName, status, scheduleStartTime);
+    return Objects.hash(getId(), jobName, status, scheduleStartTime);
   }
 
   @Override
   public String toString() {
-    return MoreObjects.toStringHelper(this).add("id", id).add("jobName", jobName)
+    return MoreObjects.toStringHelper(this).add("id", getId()).add("jobName", jobName)
         .add("status", status).add("startTime", scheduleStartTime).add("endTime", scheduleEndTime).toString();
   }
 }
