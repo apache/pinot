@@ -161,11 +161,12 @@ public class PinotLLCRealtimeSegmentManager {
       idealStateEntries.put(segName, instances);
     }
 
-    updateHelix(realtimeTableName, idealStateEntries, paths, records);
+    updateHelixIdealState(realtimeTableName, idealStateEntries, paths, records);
   }
 
   // Marking this method protected so it is easier to test
-  protected void updateHelix(String realtimeTableName,  final Map<String, List<String>> idealStateEntries, List<String> paths, List<ZNRecord> records) {
+  protected void updateHelixIdealState(String realtimeTableName, final Map<String, List<String>> idealStateEntries,
+      List<String> paths, List<ZNRecord> records) {
     _propertyStore.createChildren(paths, records, AccessOption.PERSISTENT);
     LOGGER.info("Added {} segments to propertyStore for table {}", paths.size(), realtimeTableName);
 

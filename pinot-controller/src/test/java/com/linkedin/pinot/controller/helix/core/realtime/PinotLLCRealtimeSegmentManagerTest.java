@@ -207,7 +207,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
 
     @Override
-    protected void updateHelix(String realtimeTableName,  final Map<String, List<String>> idealStateEntries, List<String> paths, List<ZNRecord> records) {
+    protected void updateHelixIdealState(String realtimeTableName, final Map<String, List<String>> idealStateEntries,
+        List<String> paths, List<ZNRecord> records) {
       _realtimeTableName = realtimeTableName;
       _idealStateEntries = idealStateEntries;
       _paths = paths;

@@ -21,11 +21,15 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import com.google.common.base.Splitter;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource.Realtime.Kafka.ConsumerType;
 import com.linkedin.pinot.common.utils.StringUtil;
-import static com.linkedin.pinot.common.utils.EqualityUtils.*;
+import static com.linkedin.pinot.common.utils.EqualityUtils.hashCodeOf;
+import static com.linkedin.pinot.common.utils.EqualityUtils.isEqual;
+import static com.linkedin.pinot.common.utils.EqualityUtils.isNullOrNotSameClass;
+import static com.linkedin.pinot.common.utils.EqualityUtils.isSameReference;
 
 
 public class KafkaStreamMetadata implements StreamMetadata {
@@ -44,7 +48,7 @@ public class KafkaStreamMetadata implements StreamMetadata {
             Helix.DataSource.Realtime.Kafka.HighLevelConsumer.ZK_CONNECTION_STRING));
 
     String consumerTypesCsv =streamConfigMap.get(StringUtil.join(".", Helix.DataSource.STREAM_PREFIX, Helix.DataSource.Realtime.Kafka.CONSUMER_TYPE));
-    String[] parts = consumerTypesCsv.split(",");
+    Iterable<String> parts = Splitter.on(',').trimResults().split(consumerTypesCsv);
     for (String part : parts) {
       _consumerTypes.add(ConsumerType.valueOf(part));
     }

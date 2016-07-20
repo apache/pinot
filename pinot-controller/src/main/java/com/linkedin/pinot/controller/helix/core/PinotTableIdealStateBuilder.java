@@ -192,20 +192,22 @@ public class PinotTableIdealStateBuilder {
         final KafkaStreamMetadata kafkaMetadata = new KafkaStreamMetadata(realtimeTableConfig.getIndexingConfig().getStreamConfigs());
         final String topicName = kafkaMetadata.getKafkaTopicName();
         final PinotLLCRealtimeSegmentManager segmentManager = PinotLLCRealtimeSegmentManager.getInstance();
-        final int nPartitions = getNPartitions(kafkaMetadata);
+        final int nPartitions = getPartitionsCount(kafkaMetadata);
         // TODO Get/Infer the initial offset from table Config?
         final long startOffset = 0L;
         segmentManager.setupHelixEntries(topicName, realtimeTableName, nPartitions, realtimeInstances, nReplicas, 0L);
         nConsumers++;
+      } else {
+        LOGGER.warn("Unsupported consumer type {} for table {}", consumerType.name(), realtimeTableName);
       }
     }
     if (nConsumers == 0) {
-      throw new UnsupportedOperationException("Unknown kafka consumer types: " + consumerTypes);
+      throw new UnsupportedOperationException("Unknown kafka consumer types: " + consumerTypes + " for table " + realtimeTableName);
     }
     return idealState;
   }
 
-  private static int getNPartitions(KafkaStreamMetadata kafkaMetadata) {
+  private static int getPartitionsCount(KafkaStreamMetadata kafkaMetadata) {
     // TODO Get the number of partitions from Kafka
     return 8;
   }

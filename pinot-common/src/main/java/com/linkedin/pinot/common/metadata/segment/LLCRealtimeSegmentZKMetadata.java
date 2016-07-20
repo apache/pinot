@@ -40,7 +40,7 @@ public class LLCRealtimeSegmentZKMetadata extends RealtimeSegmentZKMetadata {
   public LLCRealtimeSegmentZKMetadata(ZNRecord znRecord) {
     super(znRecord);
     _startOffset = Long.valueOf(znRecord.getSimpleField(START_OFFSET));
-    _numReplicas = Byte.valueOf(znRecord.getSimpleField(NUM_REPLICAS));
+    _numReplicas = Integer.valueOf(znRecord.getSimpleField(NUM_REPLICAS));
     _endOffset = Long.valueOf(znRecord.getSimpleField(END_OFFSET));
   }
 
