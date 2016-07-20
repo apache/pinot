@@ -17,12 +17,18 @@ package com.linkedin.pinot.controller.api.restlet.resources;
 
 import com.alibaba.fastjson.JSONObject;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metrics.ControllerMeter;
+import com.linkedin.pinot.common.restlet.swagger.HttpVerb;
+import com.linkedin.pinot.common.restlet.swagger.Parameter;
+import com.linkedin.pinot.common.restlet.swagger.Paths;
 import com.linkedin.pinot.common.restlet.swagger.Response;
 import com.linkedin.pinot.common.restlet.swagger.Responses;
+import com.linkedin.pinot.common.restlet.swagger.Summary;
+import com.linkedin.pinot.common.restlet.swagger.Tags;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.fetcher.SegmentFetcher;
 import com.linkedin.pinot.common.segment.fetcher.SegmentFetcherFactory;
@@ -33,14 +39,9 @@ import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.common.utils.time.TimeUtils;
 import com.linkedin.pinot.controller.api.ControllerRestApplication;
-import com.linkedin.pinot.common.restlet.swagger.HttpVerb;
-import com.linkedin.pinot.common.restlet.swagger.Parameter;
-import com.linkedin.pinot.common.restlet.swagger.Paths;
-import com.linkedin.pinot.common.restlet.swagger.Summary;
-import com.linkedin.pinot.common.restlet.swagger.Tags;
 import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
+import com.linkedin.pinot.controller.validation.StorageQuotaChecker;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-
 import java.io.File;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
@@ -50,6 +51,7 @@ import java.net.URLEncoder;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
+import javax.annotation.Nonnull;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.fileupload.FileItem;
 import org.apache.commons.fileupload.disk.DiskFileItemFactory;
@@ -73,8 +75,6 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Sep 24, 2014
- *
  * sample curl call : curl -F campaignInsights_adsAnalysis-bmCamp_11=@campaignInsights_adsAnalysis-bmCamp_11      http://localhost:8998/segments
  *
  */
@@ -101,7 +101,8 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
       tempUntarredPath.mkdirs();
     }
 
-    vip = StringUtil.join("://", _controllerConf.getControllerVipProtocol(), StringUtil.join(":", _controllerConf.getControllerVipHost(), _controllerConf.getControllerPort()));
+    vip = StringUtil.join("://", _controllerConf.getControllerVipProtocol(),
+        StringUtil.join(":", _controllerConf.getControllerVipHost(), _controllerConf.getControllerPort()));
     LOGGER.info("controller download url base is : " + vip);
   }
 
@@ -414,6 +415,7 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
   })
   @Responses({
       @Response(statusCode = "200", description = "The segment was successfully uploaded"),
+      @Response(statusCode = "403", description = "Forbidden operation typically because it exceeds configured quota"),
       @Response(statusCode = "500", description = "There was an error when uploading the segment")
   })
   private Representation uploadSegment(File indexDir, File dataFile, String downloadUrl)
@@ -421,6 +423,17 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
     final SegmentMetadata metadata = new SegmentMetadataImpl(indexDir);
     final File tableDir = new File(baseDataDir, metadata.getTableName());
     File segmentFile = new File(tableDir, dataFile.getName());
+    StorageQuotaChecker.QuotaCheckerResponse quotaResponse = checkStorageQuota(indexDir, metadata);
+    if (!quotaResponse.isSegmentWithinQuota) {
+      // this is not an "error" hence we don't increment segment upload errors
+      LOGGER.info("Rejecting segment upload for table: {}, segment: {}, reason: {}",
+          metadata.getTableName(), metadata.getName(), quotaResponse.reason);
+      setStatus(Status.CLIENT_ERROR_FORBIDDEN);
+      StringRepresentation repr = new StringRepresentation("{\"error\" : \"" + quotaResponse.reason + "\"}");
+      repr.setMediaType(MediaType.APPLICATION_JSON);
+      return repr;
+    }
+
     if (segmentFile.exists()) {
       FileUtils.deleteQuietly(segmentFile);
     }
@@ -554,4 +567,21 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
       throw new AssertionError("UTF-8 encoding should always be supported", e);
     }
   }
+
+  /**
+   * check if the segment represented by segmentFile is within the storage quota
+   * @param segmentFile untarred segment. This should not be null.
+   *                    segmentFile must exist on disk and must be a directory
+   * @param metadata segment metadata. This should not be null
+   */
+  private StorageQuotaChecker.QuotaCheckerResponse checkStorageQuota(@Nonnull File segmentFile, @Nonnull SegmentMetadata metadata) {
+    TableSizeReader tableSizeReader = new TableSizeReader(executor, connectionManager, _pinotHelixResourceManager);
+    AbstractTableConfig offlineTableConfig = ZKMetadataProvider
+        .getOfflineTableConfig(_pinotHelixResourceManager.getPropertyStore(), metadata.getTableName());
+    StorageQuotaChecker quotaChecker = new StorageQuotaChecker(offlineTableConfig, tableSizeReader);
+    String offlineTableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(metadata.getTableName());
+    return quotaChecker.isSegmentStorageWithinQuota(segmentFile, offlineTableName,
+        metadata.getName(), _controllerConf.getServerAdminRequestTimeoutSeconds());
+  }
+
 }
