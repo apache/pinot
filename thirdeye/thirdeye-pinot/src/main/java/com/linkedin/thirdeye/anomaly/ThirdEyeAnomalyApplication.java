@@ -17,6 +17,7 @@ import org.slf4j.LoggerFactory;
 
 import com.linkedin.thirdeye.anomaly.detection.DetectionJobResource;
 import com.linkedin.thirdeye.anomaly.detection.DetectionJobScheduler;
+import com.linkedin.thirdeye.anomaly.monitor.MonitorJobScheduler;
 import com.linkedin.thirdeye.anomaly.task.TaskDriver;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
@@ -29,6 +30,7 @@ public class ThirdEyeAnomalyApplication
   private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeAnomalyApplication.class);
   private DetectionJobScheduler detectionJobScheduler = null;
   private TaskDriver taskDriver = null;
+  private MonitorJobScheduler monitorJobScheduler = null;
 
   public static void main(final String[] args) throws Exception {
     List<String> argList = new ArrayList<String>(Arrays.asList(args));
@@ -80,8 +82,12 @@ public class ThirdEyeAnomalyApplication
     }
     if (config.isWorker()) {
       taskDriver =
-        new TaskDriver(config.getId(), anomalyTaskSpecDAO, anomalyResultDAO, anomalyFunctionRelationDAO,
-            hibernateBundle.getSessionFactory(), anomalyFunctionFactory);
+        new TaskDriver(config.getId(), anomalyJobSpecDAO, anomalyTaskSpecDAO, anomalyResultDAO,
+            anomalyFunctionRelationDAO, hibernateBundle.getSessionFactory(), anomalyFunctionFactory);
+    }
+    if (config.isMonitor()) {
+      monitorJobScheduler = new MonitorJobScheduler(anomalyJobSpecDAO, anomalyTaskSpecDAO,
+          hibernateBundle.getSessionFactory(), config.getMonitorConfiguration());
     }
 
 
@@ -100,6 +106,9 @@ public class ThirdEyeAnomalyApplication
               environment.jersey()
               .register(new DetectionJobResource(detectionJobScheduler, anomalyFunctionSpecDAO));
             }
+            if (config.isMonitor()) {
+              monitorJobScheduler.start();
+            }
             return null;
           }
         });
@@ -112,6 +121,9 @@ public class ThirdEyeAnomalyApplication
         }
         if (config.isScheduler()) {
           detectionJobScheduler.stop();
+        }
+        if (config.isMonitor()) {
+          monitorJobScheduler.stop();
         }
       }
     });

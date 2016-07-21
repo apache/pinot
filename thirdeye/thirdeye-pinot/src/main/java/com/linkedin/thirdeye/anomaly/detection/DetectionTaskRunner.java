@@ -1,6 +1,7 @@
-package com.linkedin.thirdeye.anomaly.task;
+package com.linkedin.thirdeye.anomaly.detection;
 
 import com.linkedin.thirdeye.constant.MetricAggFunction;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -16,6 +17,10 @@ import org.quartz.JobExecutionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.thirdeye.anomaly.task.TaskContext;
+import com.linkedin.thirdeye.anomaly.task.TaskInfo;
+import com.linkedin.thirdeye.anomaly.task.TaskResult;
+import com.linkedin.thirdeye.anomaly.task.TaskRunner;
 import com.linkedin.thirdeye.api.CollectionSchema;
 import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
@@ -38,9 +43,9 @@ import com.linkedin.thirdeye.detector.function.AnomalyFunction;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
-public class AnomalyDetectionTaskRunner implements TaskRunner {
+public class DetectionTaskRunner implements TaskRunner {
 
-  private static final Logger LOG = LoggerFactory.getLogger(AnomalyDetectionTaskRunner.class);
+  private static final Logger LOG = LoggerFactory.getLogger(DetectionTaskRunner.class);
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE =
       ThirdEyeCacheRegistry.getInstance();
 
@@ -63,7 +68,7 @@ public class AnomalyDetectionTaskRunner implements TaskRunner {
   private AnomalyFunctionSpec anomalyFunctionSpec;
   private AnomalyFunctionFactory anomalyFunctionFactory;
 
-  public AnomalyDetectionTaskRunner() {
+  public DetectionTaskRunner() {
     queryCache = CACHE_REGISTRY_INSTANCE.getQueryCache();
     timeSeriesHandler = new TimeSeriesHandler(queryCache);
     timeSeriesResponseConverter = TimeSeriesResponseConverter.getInstance();
@@ -71,6 +76,7 @@ public class AnomalyDetectionTaskRunner implements TaskRunner {
 
   public List<TaskResult> execute(TaskInfo taskInfo, TaskContext taskContext) throws Exception {
 
+    DetectionTaskInfo detectionTaskInfo = (DetectionTaskInfo) taskInfo;
     List<TaskResult> taskResult = new ArrayList<>();
     LOG.info("Begin executing task {}", taskInfo);
     resultDAO = taskContext.getResultDAO();
@@ -78,10 +84,10 @@ public class AnomalyDetectionTaskRunner implements TaskRunner {
     sessionFactory = taskContext.getSessionFactory();
     anomalyFunctionFactory = taskContext.getAnomalyFunctionFactory();
 
-    anomalyFunctionSpec = taskInfo.getAnomalyFunctionSpec();
+    anomalyFunctionSpec = detectionTaskInfo.getAnomalyFunctionSpec();
     anomalyFunction = anomalyFunctionFactory.fromSpec(anomalyFunctionSpec);
-    windowStart = taskInfo.getWindowStartTime();
-    windowEnd = taskInfo.getWindowEndTime();
+    windowStart = detectionTaskInfo.getWindowStartTime();
+    windowEnd = detectionTaskInfo.getWindowEndTime();
 
     // Compute metric function
     TimeGranularity timeGranularity = new TimeGranularity(anomalyFunctionSpec.getBucketSize(),
@@ -122,10 +128,10 @@ public class AnomalyDetectionTaskRunner implements TaskRunner {
     if (StringUtils.isNotBlank(filters)) {
       topLevelRequest.setFilterSet(ThirdEyeUtils.getFilterSet(filters));
     }
-    String exploreDimension = taskInfo.getGroupByDimension();
+    String exploreDimension = detectionTaskInfo.getGroupByDimension();
     if (StringUtils.isNotBlank(exploreDimension)) {
       topLevelRequest
-          .setGroupByDimensions(Collections.singletonList(taskInfo.getGroupByDimension()));
+          .setGroupByDimensions(Collections.singletonList(detectionTaskInfo.getGroupByDimension()));
     }
 
     LOG.info(

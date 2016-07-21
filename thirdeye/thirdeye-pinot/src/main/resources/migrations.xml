@@ -422,4 +422,24 @@
     </createTable>
   </changeSet>
 
+  <changeSet id="14" author="npawar">
+    <addColumn tableName="anomaly_jobs">
+      <column name="last_modified" type="timestamp">
+        <constraints nullable="false"/>
+      </column>
+    </addColumn>
+    <sql dbms="mysql">
+      ALTER TABLE anomaly_jobs MODIFY COLUMN last_modified TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP;
+    </sql>
+
+    <addColumn tableName="anomaly_tasks">
+      <column name="last_modified" type="timestamp">
+        <constraints nullable="false"/>
+      </column>
+    </addColumn>
+    <sql dbms="mysql">
+      ALTER TABLE anomaly_tasks MODIFY COLUMN last_modified TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP;
+    </sql>
+  </changeSet>
+
 </databaseChangeLog>

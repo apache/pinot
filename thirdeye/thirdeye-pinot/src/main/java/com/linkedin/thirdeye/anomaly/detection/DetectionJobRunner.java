@@ -30,7 +30,6 @@ import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
 import com.linkedin.thirdeye.anomaly.job.JobContext;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
 import com.linkedin.thirdeye.anomaly.task.TaskGenerator;
-import com.linkedin.thirdeye.anomaly.task.TaskInfo;
 
 public class DetectionJobRunner implements Job {
 
@@ -118,8 +117,9 @@ public class DetectionJobRunner implements Job {
         anomalyJobSpec.setWindowStartTime(jobContext.getWindowStart().getMillis());
         anomalyJobSpec.setWindowEndTime(jobContext.getWindowEnd().getMillis());
         anomalyJobSpec.setScheduleStartTime(System.currentTimeMillis());
-        anomalyJobSpec.setStatus(JobStatus.WAITING);
+        anomalyJobSpec.setStatus(JobStatus.SCHEDULED);
         jobExecutionId = anomalyJobSpecDAO.save(anomalyJobSpec);
+
         if (!transaction.wasCommitted()) {
           transaction.commit();
         }
@@ -145,14 +145,14 @@ public class DetectionJobRunner implements Job {
       Transaction transaction = session.beginTransaction();
       try {
 
-        List<TaskInfo> tasks = taskGenerator.createTasks(jobContext, anomalyFunctionSpec);
+        List<DetectionTaskInfo> tasks = taskGenerator.createDetectionTasks(jobContext, anomalyFunctionSpec);
 
-        for (TaskInfo taskInfo : tasks) {
+        for (DetectionTaskInfo taskInfo : tasks) {
           String taskInfoJson = null;
           try {
             taskInfoJson = OBJECT_MAPPER.writeValueAsString(taskInfo);
           } catch (JsonProcessingException e) {
-            LOG.error("Exception when converting TaskInfo {} to jsonString", taskInfo, e);
+            LOG.error("Exception when converting DetectionTaskInfo {} to jsonString", taskInfo, e);
           }
           AnomalyTaskSpec anomalyTaskSpec = new AnomalyTaskSpec();
           anomalyTaskSpec.setJobId(jobContext.getJobExecutionId());
