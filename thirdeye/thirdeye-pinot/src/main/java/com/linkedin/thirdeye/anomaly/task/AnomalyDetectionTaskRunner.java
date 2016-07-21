@@ -33,7 +33,7 @@ import com.linkedin.thirdeye.detector.db.entity.AnomalyFunctionRelation;
 import com.linkedin.thirdeye.detector.db.entity.AnomalyFunctionSpec;
 import com.linkedin.thirdeye.detector.db.entity.AnomalyResult;
 import com.linkedin.thirdeye.detector.db.AnomalyFunctionRelationDAO;
-import com.linkedin.thirdeye.detector.db.AnomalyResultDAO;
+import com.linkedin.thirdeye.detector.db.dao.AnomalyResultDAO;
 import com.linkedin.thirdeye.detector.function.AnomalyFunction;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
@@ -237,7 +237,7 @@ public class AnomalyDetectionTaskRunner implements TaskRunner {
           // make sure score and weight are valid numbers
           result.setScore(normalize(result.getScore()));
           result.setWeight(normalize(result.getWeight()));
-          resultDAO.createOrUpdate(result);
+          resultDAO.save(result);
         }
         transaction.commit();
       } catch (Exception e) {

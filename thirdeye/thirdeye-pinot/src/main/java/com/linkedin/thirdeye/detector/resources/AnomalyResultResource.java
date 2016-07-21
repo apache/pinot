@@ -22,7 +22,7 @@ import org.joda.time.format.ISODateTimeFormat;
 
 import com.codahale.metrics.annotation.Timed;
 import com.linkedin.thirdeye.detector.db.entity.AnomalyResult;
-import com.linkedin.thirdeye.detector.db.AnomalyResultDAO;
+import com.linkedin.thirdeye.detector.db.dao.AnomalyResultDAO;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 import io.dropwizard.hibernate.UnitOfWork;
@@ -40,7 +40,7 @@ public class AnomalyResultResource {
   @Timed
   @UnitOfWork
   public Response create(AnomalyResult anomalyResult) {
-    Long id = dao.createOrUpdate(anomalyResult);
+    Long id = dao.save(anomalyResult);
     return Response.ok(id).build();
   }
 
@@ -49,7 +49,7 @@ public class AnomalyResultResource {
   @UnitOfWork
   @Path("/id/{id}")
   public Response delete(@PathParam("id") Long id) {
-    dao.delete(id);
+    dao.deleteById(id);
     return Response.noContent().build();
   }
 

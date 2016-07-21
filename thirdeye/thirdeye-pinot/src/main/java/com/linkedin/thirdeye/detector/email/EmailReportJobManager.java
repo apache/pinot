@@ -27,8 +27,8 @@ import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.client.comparison.TimeOnTimeComparisonHandler;
 import com.linkedin.thirdeye.detector.db.entity.EmailConfiguration;
-import com.linkedin.thirdeye.detector.db.AnomalyResultDAO;
-import com.linkedin.thirdeye.detector.db.EmailConfigurationDAO;
+import com.linkedin.thirdeye.detector.db.dao.AnomalyResultDAO;
+import com.linkedin.thirdeye.detector.db.dao.EmailConfigurationDAO;
 import com.linkedin.thirdeye.detector.driver.FailureEmailConfiguration;
 
 public class EmailReportJobManager{

@@ -14,7 +14,7 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
-import com.linkedin.thirdeye.detector.db.EmailConfigurationDAO;
+import com.linkedin.thirdeye.detector.db.dao.EmailConfigurationDAO;
 import com.linkedin.thirdeye.detector.email.EmailReportJobManager;
 
 @Path("/email-jobs")

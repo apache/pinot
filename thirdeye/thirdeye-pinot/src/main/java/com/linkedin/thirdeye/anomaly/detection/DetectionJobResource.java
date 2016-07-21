@@ -16,7 +16,7 @@ import javax.ws.rs.core.Response;
 
 import org.quartz.SchedulerException;
 
-import com.linkedin.thirdeye.detector.db.AnomalyFunctionSpecDAO;
+import com.linkedin.thirdeye.detector.db.dao.AnomalyFunctionSpecDAO;
 
 @Path("/detection-job")
 @Produces(MediaType.APPLICATION_JSON)

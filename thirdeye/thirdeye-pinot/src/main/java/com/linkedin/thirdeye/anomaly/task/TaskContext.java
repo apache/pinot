@@ -3,7 +3,7 @@ package com.linkedin.thirdeye.anomaly.task;
 import org.hibernate.SessionFactory;
 
 import com.linkedin.thirdeye.detector.db.AnomalyFunctionRelationDAO;
-import com.linkedin.thirdeye.detector.db.AnomalyResultDAO;
+import com.linkedin.thirdeye.detector.db.dao.AnomalyResultDAO;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 
 public class TaskContext {
