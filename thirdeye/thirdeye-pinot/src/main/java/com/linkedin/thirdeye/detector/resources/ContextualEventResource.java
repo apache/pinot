@@ -16,7 +16,7 @@ import org.joda.time.format.ISODateTimeFormat;
 
 import com.codahale.metrics.annotation.Timed;
 import com.linkedin.thirdeye.detector.db.entity.ContextualEvent;
-import com.linkedin.thirdeye.detector.db.ContextualEventDAO;
+import com.linkedin.thirdeye.detector.db.dao.ContextualEventDAO;
 
 import io.dropwizard.hibernate.UnitOfWork;
 
@@ -33,7 +33,7 @@ public class ContextualEventResource {
   @Timed
   @UnitOfWork
   public Response create(ContextualEvent anomalyResult) {
-    Long id = dao.create(anomalyResult);
+    Long id = dao.save(anomalyResult);
     return Response.ok(id).build();
   }
 
@@ -42,7 +42,7 @@ public class ContextualEventResource {
   @UnitOfWork
   @Path("/{id}")
   public Response delete(@PathParam("id") Long id) {
-    dao.delete(id);
+    dao.deleteById(id);
     return Response.noContent().build();
   }
 

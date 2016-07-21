@@ -46,9 +46,9 @@ import com.linkedin.thirdeye.dashboard.ThirdEyeDashboardConfiguration;
 import com.linkedin.thirdeye.detector.db.entity.AnomalyFunctionSpec;
 import com.linkedin.thirdeye.detector.db.entity.AnomalyResult;
 import com.linkedin.thirdeye.detector.db.entity.EmailConfiguration;
-import com.linkedin.thirdeye.detector.db.AnomalyFunctionSpecDAO;
-import com.linkedin.thirdeye.detector.db.AnomalyResultDAO;
-import com.linkedin.thirdeye.detector.db.EmailConfigurationDAO;
+import com.linkedin.thirdeye.detector.db.dao.AnomalyFunctionSpecDAO;
+import com.linkedin.thirdeye.detector.db.dao.AnomalyResultDAO;
+import com.linkedin.thirdeye.detector.db.dao.EmailConfigurationDAO;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 @Path(value = "/dashboard")
@@ -272,7 +272,7 @@ public class AnomalyResource {
     }
     anomalyFunctionSpec.setCron(cron);
 
-    Long id = anomalyFunctionSpecDAO.createOrUpdate(anomalyFunctionSpec);
+    Long id = anomalyFunctionSpecDAO.save(anomalyFunctionSpec);
 
     if (isActive) { // this call will set isActive and schedule it
       detectorHttpUtils.enableAnomalyFunction(String.valueOf(id));
@@ -354,7 +354,7 @@ public class AnomalyResource {
     }
     anomalyFunctionSpec.setCron(cron);
 
-    Long responseId = anomalyFunctionSpecDAO.createOrUpdate(anomalyFunctionSpec);
+    Long responseId = anomalyFunctionSpecDAO.save(anomalyFunctionSpec);
 
     if (isActive) {
       detectorHttpUtils.enableAnomalyFunction(String.valueOf(responseId));
@@ -519,7 +519,7 @@ public class AnomalyResource {
     }
     emailConfiguration.setFunctions(anomalyFunctionSpecs);
 
-    Long id = emailConfigurationDAO.createOrUpdate(emailConfiguration);
+    Long id = emailConfigurationDAO.save(emailConfiguration);
     // enable id isActive
     if (isActive) {
       detectorHttpUtils.enableEmailConfiguration(String.valueOf(id));
@@ -605,7 +605,7 @@ public class AnomalyResource {
     }
     emailConfiguration.setFunctions(anomalyFunctionSpecs);
 
-    Long responseId = emailConfigurationDAO.createOrUpdate(emailConfiguration);
+    Long responseId = emailConfigurationDAO.save(emailConfiguration);
 
     // call endpoint to start, if active
     if (isActive) {
@@ -692,7 +692,7 @@ public class AnomalyResource {
       feedback.setComment(feedbackRequest.getComment());
       feedback.setFeedbackType(feedbackRequest.getFeedbackType());
 
-      anomalyResultDAO.createOrUpdate(result);
+      anomalyResultDAO.save(result);
     } catch (IOException e) {
       throw new IllegalArgumentException("Invalid payload " + payload, e);
     }

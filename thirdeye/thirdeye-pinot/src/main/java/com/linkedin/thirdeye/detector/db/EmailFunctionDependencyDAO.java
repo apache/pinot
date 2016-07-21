@@ -8,6 +8,8 @@ import com.linkedin.thirdeye.detector.db.entity.EmailFunctionDependency;
 
 import io.dropwizard.hibernate.AbstractDAO;
 
+// TODO: EmailFunctionDependency is a mapping, should be handled through parent entity
+
 /**
  * DAO for handling dependencies between email reports and functions.
  */

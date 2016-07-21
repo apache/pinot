@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.detector.db;
+package com.linkedin.thirdeye.detector.db.dao;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -7,37 +7,14 @@ import org.hibernate.SessionFactory;
 
 import com.linkedin.thirdeye.detector.db.entity.AnomalyFunctionSpec;
 
-import io.dropwizard.hibernate.AbstractDAO;
-
-public class AnomalyFunctionSpecDAO extends AbstractDAO<AnomalyFunctionSpec> {
+public class AnomalyFunctionSpecDAO extends AbstractBaseDAO<AnomalyFunctionSpec> {
   public AnomalyFunctionSpecDAO(SessionFactory sessionFactory) {
     super(sessionFactory);
   }
 
-  public AnomalyFunctionSpec findById(Long id) {
-    return get(id);
-  }
-
-  public Long createOrUpdate(AnomalyFunctionSpec anomalyFunctionSpec) {
-    long id = persist(anomalyFunctionSpec).getId();
-    currentSession().getTransaction().commit();
-    return id;
-  }
-
-
   public void toggleActive(Long id, boolean isActive) {
     namedQuery("com.linkedin.thirdeye.api.AnomalyFunctionSpec#toggleActive").setParameter("id", id)
         .setParameter("isActive", isActive).executeUpdate();
-  }
-
-  public void delete(Long id) {
-    AnomalyFunctionSpec anomalyFunctionSpec = new AnomalyFunctionSpec();
-    anomalyFunctionSpec.setId(id);
-    currentSession().delete(anomalyFunctionSpec);
-  }
-
-  public void delete(AnomalyFunctionSpec anomalyFunctionSpec) {
-    currentSession().delete(anomalyFunctionSpec);
   }
 
   public List<AnomalyFunctionSpec> findAll() {

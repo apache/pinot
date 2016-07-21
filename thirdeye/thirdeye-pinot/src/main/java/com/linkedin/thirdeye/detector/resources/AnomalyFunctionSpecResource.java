@@ -17,7 +17,7 @@ import javax.ws.rs.core.Response;
 
 import com.codahale.metrics.annotation.Timed;
 import com.linkedin.thirdeye.detector.db.entity.AnomalyFunctionSpec;
-import com.linkedin.thirdeye.detector.db.AnomalyFunctionSpecDAO;
+import com.linkedin.thirdeye.detector.db.dao.AnomalyFunctionSpecDAO;
 
 @Path("/anomaly-functions")
 @Produces(MediaType.APPLICATION_JSON)
@@ -30,18 +30,16 @@ public class AnomalyFunctionSpecResource {
 
   @POST
   @Timed
-  @UnitOfWork
   public Response create(AnomalyFunctionSpec anomalyFunctionSpec) {
-    Long id = dao.createOrUpdate(anomalyFunctionSpec);
+    Long id = dao.save(anomalyFunctionSpec);
     return Response.ok(id).build();
   }
 
   @DELETE
   @Timed
-  @UnitOfWork
   @Path("/{id}")
   public Response delete(@PathParam("id") Long id) {
-    dao.delete(id);
+    dao.deleteById(id);
     return Response.noContent().build();
   }
 

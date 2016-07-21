@@ -4,9 +4,6 @@ import java.util.Objects;
 
 import javax.persistence.Column;
 import javax.persistence.Entity;
-import javax.persistence.GeneratedValue;
-import javax.persistence.GenerationType;
-import javax.persistence.Id;
 import javax.persistence.NamedQueries;
 import javax.persistence.NamedQuery;
 import javax.persistence.Table;
@@ -19,7 +16,7 @@ import com.google.common.base.MoreObjects;
 @NamedQueries({
     @NamedQuery(name = "com.linkedin.thirdeye.api.ContextualEvent#findAllByTime", query = "SELECT e FROM ContextualEvent e WHERE e.timeUtc >= :startTimeUtc AND e.timeUtc <= :endTimeUtc")
 })
-public class ContextualEvent extends AbstractEntity implements Comparable<ContextualEvent> {
+public class ContextualEvent extends AbstractBaseEntity implements Comparable<ContextualEvent> {
   @Column(name = "time_utc", nullable = false)
   private long timeUtc;
 

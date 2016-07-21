@@ -17,12 +17,12 @@ import com.linkedin.thirdeye.detector.db.entity.ContextualEvent;
 import com.linkedin.thirdeye.detector.db.entity.EmailConfiguration;
 import com.linkedin.thirdeye.detector.db.entity.EmailFunctionDependency;
 import com.linkedin.thirdeye.detector.db.AnomalyFunctionRelationDAO;
-import com.linkedin.thirdeye.detector.db.AnomalyFunctionSpecDAO;
-import com.linkedin.thirdeye.detector.db.AnomalyJobSpecDAO;
-import com.linkedin.thirdeye.detector.db.AnomalyResultDAO;
-import com.linkedin.thirdeye.detector.db.AnomalyTaskSpecDAO;
-import com.linkedin.thirdeye.detector.db.ContextualEventDAO;
-import com.linkedin.thirdeye.detector.db.EmailConfigurationDAO;
+import com.linkedin.thirdeye.detector.db.dao.AnomalyFunctionSpecDAO;
+import com.linkedin.thirdeye.detector.db.dao.AnomalyJobSpecDAO;
+import com.linkedin.thirdeye.detector.db.dao.AnomalyResultDAO;
+import com.linkedin.thirdeye.detector.db.dao.AnomalyTaskSpecDAO;
+import com.linkedin.thirdeye.detector.db.dao.ContextualEventDAO;
+import com.linkedin.thirdeye.detector.db.dao.EmailConfigurationDAO;
 import com.linkedin.thirdeye.detector.db.EmailFunctionDependencyDAO;
 
 import io.dropwizard.Application;

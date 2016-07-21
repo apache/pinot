@@ -8,6 +8,8 @@ import com.linkedin.thirdeye.detector.db.entity.AnomalyFunctionRelation;
 
 import io.dropwizard.hibernate.AbstractDAO;
 
+// TODO: AnomalyFunctionRelation is a mapping, should be handled through parent entity
+
 public class AnomalyFunctionRelationDAO extends AbstractDAO<AnomalyFunctionRelation> {
   public AnomalyFunctionRelationDAO(SessionFactory sessionFactory) {
     super(sessionFactory);

@@ -22,9 +22,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.detector.db.entity.AnomalyFunctionSpec;
 import com.linkedin.thirdeye.detector.db.entity.AnomalyJobSpec;
 import com.linkedin.thirdeye.detector.db.entity.AnomalyTaskSpec;
-import com.linkedin.thirdeye.detector.db.AnomalyFunctionSpecDAO;
-import com.linkedin.thirdeye.detector.db.AnomalyJobSpecDAO;
-import com.linkedin.thirdeye.detector.db.AnomalyTaskSpecDAO;
+import com.linkedin.thirdeye.detector.db.dao.AnomalyFunctionSpecDAO;
+import com.linkedin.thirdeye.detector.db.dao.AnomalyJobSpecDAO;
+import com.linkedin.thirdeye.detector.db.dao.AnomalyTaskSpecDAO;
 import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
 import com.linkedin.thirdeye.anomaly.job.JobContext;
@@ -119,7 +119,7 @@ public class DetectionJobRunner implements Job {
         anomalyJobSpec.setWindowEndTime(jobContext.getWindowEnd().getMillis());
         anomalyJobSpec.setScheduleStartTime(System.currentTimeMillis());
         anomalyJobSpec.setStatus(JobStatus.WAITING);
-        jobExecutionId = anomalyJobSpecDAO.createOrUpdate(anomalyJobSpec);
+        jobExecutionId = anomalyJobSpecDAO.save(anomalyJobSpec);
         if (!transaction.wasCommitted()) {
           transaction.commit();
         }
@@ -161,7 +161,7 @@ public class DetectionJobRunner implements Job {
           anomalyTaskSpec.setStatus(TaskStatus.WAITING);
           anomalyTaskSpec.setTaskStartTime(System.currentTimeMillis());
           anomalyTaskSpec.setTaskInfo(taskInfoJson);
-          long taskId = anomalyTasksSpecDAO.createOrUpdate(anomalyTaskSpec);
+          long taskId = anomalyTasksSpecDAO.save(anomalyTaskSpec);
           taskIds.add(taskId);
           LOG.info("Created anomalyTask {} with taskId {}", anomalyTaskSpec, taskId);
         }

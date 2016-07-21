@@ -1,5 +1,6 @@
-package com.linkedin.thirdeye.detector.db;
+package com.linkedin.thirdeye.detector.db.dao;
 
+import com.linkedin.thirdeye.detector.db.dao.AbstractBaseDAO;
 import java.util.List;
 
 import io.dropwizard.hibernate.AbstractDAO;
@@ -10,14 +11,9 @@ import org.hibernate.SessionFactory;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
 import com.linkedin.thirdeye.detector.db.entity.AnomalyTaskSpec;
 
-public class AnomalyTaskSpecDAO extends AbstractDAO<AnomalyTaskSpec> {
+public class AnomalyTaskSpecDAO extends AbstractBaseDAO<AnomalyTaskSpec> {
   public AnomalyTaskSpecDAO(SessionFactory sessionFactory) {
     super(sessionFactory);
-  }
-
-  public AnomalyTaskSpec findById(Long id) {
-    AnomalyTaskSpec anomalyTasksSpec = get(id);
-    return anomalyTasksSpec;
   }
 
   public List<AnomalyTaskSpec> findAll() {
@@ -59,21 +55,5 @@ public class AnomalyTaskSpecDAO extends AbstractDAO<AnomalyTaskSpec> {
       exception.printStackTrace();
       return false;
     }
-  }
-
-  public Long createOrUpdate(AnomalyTaskSpec anomalyTasksSpec) {
-    long id = persist(anomalyTasksSpec).getId();
-    currentSession().getTransaction().commit();
-    return id;
-  }
-
-  public void delete(Long id) {
-    AnomalyTaskSpec anomalyTasksSpec = new AnomalyTaskSpec();
-    anomalyTasksSpec.setId(id);
-    currentSession().delete(anomalyTasksSpec);
-  }
-
-  public void delete(AnomalyTaskSpec anomalyTasksSpec) {
-    currentSession().delete(anomalyTasksSpec);
   }
 }
