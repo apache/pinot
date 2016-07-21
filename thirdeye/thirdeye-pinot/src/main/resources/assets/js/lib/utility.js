@@ -36,21 +36,32 @@ function getData(url, tab){
     })
 }
 
-function submitData(url, data){
+function submitData(url, data ){
+    console.log("post url:", url)
     return $.ajax({
         url: url,
         type: 'post',
         dataType: 'json',
-        //contentType: 'application/json',
         data: data,
-        //processData: false,
-        //success: function( data, textStatus, jQxhr ){
-        //},
         error: function( jqXhr, textStatus, errorThrown ){
             console.log( errorThrown );
         }
-        //,
-        //beforeSend: showLoader(tab)
+    }).always(function(){
+
+    })
+
+}
+
+function deleteData(url, data){
+    console.log("delete url:", url)
+    return $.ajax({
+        url: url,
+        type: 'delete',
+        dataType: 'json',
+        data: data,
+        error: function( jqXhr, textStatus, errorThrown ){
+            console.log( errorThrown );
+        }
     }).always(function(){
 
     })
@@ -406,7 +417,7 @@ function closeClosestDropDown(target){
     $(target).closest(".uk-dropdown").hide();
 }
 
-function disableApplyButton(button){
+function disableButton(button){
     $(button).prop("disabled", true);
     $(button).attr("disabled", true);
 }

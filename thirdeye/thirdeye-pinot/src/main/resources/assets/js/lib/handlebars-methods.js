@@ -78,7 +78,6 @@ $(document).ready(function() {
 
     //parse anomaly data properties value and returns the requested param
     Handlebars.registerHelper('lookupAnomalyProperty', function(propertiestSring, param){
-
         var propertiesAry = propertiestSring.split(";");
         for ( var i= 0, numProp = propertiesAry.length; i<numProp; i++){
            var keyValue = propertiesAry[i];
@@ -87,9 +86,30 @@ $(document).ready(function() {
            var key = keyValue[0];
            if( key == param){
                var value = keyValue[1]
-               return key + " = " + value
+               return value
            }
         }
+    });
+
+    //returns classname negative or positive or no classname. The classname related css creates a :before pseudo element triangle up or down
+    Handlebars.registerHelper('displayDeltaIcon', function(propertiestSring, param, key){
+        var delta = Handlebars.helpers.lookupAnomalyProperty(propertiestSring, param);
+
+        var describeChange;
+        if(delta > 0){
+            describeChange = {
+                iconClass : 'positive-icon',
+                description :  'INCREASES'}
+        }else if (delta < 0){
+            describeChange = {
+                iconClass : 'positive-icon',
+                description :  'INCREASES'}
+        }else{
+            return
+        }
+
+        return describeChange[key]
+
     });
 
         //takes a value and if alias is available displays the alias

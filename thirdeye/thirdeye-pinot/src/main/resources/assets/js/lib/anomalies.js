@@ -397,7 +397,7 @@ function renderAnomalyTable(data, tab) {
     //post anomaly feedback
     submitData(url, data).done(function () {
       // selector resized
-      $target.closest(".feedback-selector").addClass("green-border");
+      $(".selected-feedback",selector).addClass("green-background");
     })
   }
 }

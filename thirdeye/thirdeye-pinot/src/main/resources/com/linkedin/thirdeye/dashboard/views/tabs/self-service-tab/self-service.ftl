@@ -38,13 +38,16 @@
                 <!-- DELETE FUNCTION MODAL-->
                 <div id="delete-function-modal" class="uk-modal">
                     <div class="uk-modal-dialog">
-                        <div class="uk-modal-header">Delete anomaly function <a class="uk-modal-close uk-close"></a>
+                        <div class="uk-modal-header">Delete anomaly function <a class="uk-modal-close uk-close  uk-float-right"></a>
                         </div>
 
-                        <p>Are you sure about deleting ... function?</p>
+                        <p>Are you sure about deleting <span id="function-to-delete"></span> function?</p>
                         <div class="uk-modal-footer">
-                            <button type="button" id="delete-anomaly-function"  class="uk-button">Delete</button>
-                            <button type="button" id="close"  class="uk-button uk-modal-close">Do not delete</button>
+                            <div id="delete-anomaly-function-success" class="uk-alert uk-alert-success hidden" rel="self-service">
+                                <p></p>
+                            </div>
+                            <button type="button" id="confirm-delete-anomaly-function"  class="uk-button uk-button-primary">Delete</button>
+                            <button type="button" id="close"  class="uk-button uk-modal-close">Close</button>
                         </div>
                     </div>
                 </div>
@@ -52,9 +55,8 @@
                 <div id="update-function-modal" class="uk-modal">
                     <div class="uk-modal-dialog">
                         <div class="uk-modal-header">
-                            <h3>Update anomaly function</h3>
+                            <h3>Update anomaly function</h3><a class="uk-modal-close uk-close uk-float-right"></a>
                         </div>
-                        <a class="uk-modal-close uk-close"></a>
                         <div id="update-anomaly-functions-form-placeholder"></div>
                     </div>
                 </div>

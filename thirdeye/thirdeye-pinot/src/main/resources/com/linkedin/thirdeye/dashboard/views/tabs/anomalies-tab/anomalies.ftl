@@ -48,7 +48,7 @@
                    <div class="feedback-selector" data-anomaly-id="{{anomalyData/id}}" data-dataset="{{anomalyData/collection}}">
                         <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group"
                             <!--<div class="add-feedback add-btn uk-display-inline-block" rel="{{tabName}}" data-uk-dropdown="{mode:'click'}">-->
-                            <div id="selected-feedback" class="uk-button"  value="{{#if anomalyData/feedback/feedbackType}}{{anomalyData/feedback/feedbackType}}{{/if}}">{{#if anomalyData/feedback/feedbackType}}{{anomalyData/feedback/feedbackType}}{{else}}Provide Feedback{{/if}}</div>
+                            <div class="selected-feedback uk-button"  value="{{#if anomalyData/feedback/feedbackType}}{{anomalyData/feedback/feedbackType}}{{/if}}">{{#if anomalyData/feedback/feedbackType}}{{anomalyData/feedback/feedbackType}}{{else}}Provide Feedback{{/if}}</div>
                             <button class="add-single-metric-btn uk-button uk-button-primary" type="button"><i class="uk-icon-caret-down"></i></button>
                             <div class="uk-dropdown uk-dropdown-small">
                                 <ul class="feedback-list uk-nav uk-nav-dropdown single-select">
