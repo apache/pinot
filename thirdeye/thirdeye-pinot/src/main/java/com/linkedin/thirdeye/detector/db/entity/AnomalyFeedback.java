@@ -12,7 +12,7 @@ import javax.persistence.Table;
 
 @Entity
 @Table(name = "anomaly_feedback")
-public class AnomalyFeedback extends AbstractEntity implements Serializable{
+public class AnomalyFeedback extends AbstractBaseEntity implements Serializable{
   private static final long serialVersionUID = 1L;
 
   @Column(name = "feedback_type", nullable = false)

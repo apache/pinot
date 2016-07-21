@@ -45,7 +45,7 @@ import com.linkedin.thirdeye.client.comparison.TimeOnTimeComparisonRequest;
 import com.linkedin.thirdeye.client.comparison.TimeOnTimeComparisonResponse;
 import com.linkedin.thirdeye.detector.db.entity.AnomalyResult;
 import com.linkedin.thirdeye.detector.db.entity.EmailConfiguration;
-import com.linkedin.thirdeye.detector.db.AnomalyResultDAO;
+import com.linkedin.thirdeye.detector.db.dao.AnomalyResultDAO;
 import com.linkedin.thirdeye.detector.db.HibernateSessionWrapper;
 import com.linkedin.thirdeye.detector.driver.FailureEmailConfiguration;
 import com.linkedin.thirdeye.detector.lib.util.JobUtils;

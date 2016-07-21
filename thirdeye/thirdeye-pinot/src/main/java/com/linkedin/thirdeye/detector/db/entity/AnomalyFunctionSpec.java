@@ -30,7 +30,7 @@ import com.linkedin.thirdeye.util.ThirdEyeUtils;
     @NamedQuery(name = "com.linkedin.thirdeye.api.AnomalyFunctionSpec#toggleActive", query = "UPDATE AnomalyFunctionSpec set isActive = :isActive WHERE id = :id"),
     @NamedQuery(name = "com.linkedin.thirdeye.api.AnomalyFunctionSpec#findDistinctMetricsByCollection", query = "SELECT DISTINCT(af.metric) FROM AnomalyFunctionSpec af WHERE af.collection = :collection")
 })
-public class AnomalyFunctionSpec extends AbstractEntity {
+public class AnomalyFunctionSpec extends AbstractBaseEntity {
 
   @Column(name = "collection", nullable = false)
   private String collection;

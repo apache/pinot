@@ -65,7 +65,7 @@ import com.linkedin.thirdeye.util.ThirdEyeUtils;
             + "AND ((r.startTimeUtc >= :startTimeUtc AND r.startTimeUtc <= :endTimeUtc) "
             + "OR (r.endTimeUtc >= :startTimeUtc AND r.endTimeUtc <= :endTimeUtc))")
 })
-public class AnomalyResult extends AbstractEntity implements Comparable<AnomalyResult> {
+public class AnomalyResult extends AbstractBaseEntity implements Comparable<AnomalyResult> {
   private static Joiner SEMICOLON = Joiner.on(";");
   private static Joiner EQUALS = Joiner.on("=");
 

@@ -6,9 +6,6 @@ import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.EnumType;
 import javax.persistence.Enumerated;
-import javax.persistence.GeneratedValue;
-import javax.persistence.GenerationType;
-import javax.persistence.Id;
 import javax.persistence.NamedQueries;
 import javax.persistence.NamedQuery;
 import javax.persistence.Table;
@@ -32,11 +29,7 @@ import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
     @NamedQuery(name = "com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#updateStatus", query = "UPDATE AnomalyTaskSpec SET status = :newStatus WHERE status = :oldStatus and id = :id"),
     @NamedQuery(name = "com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#updateStatusAndWorkerId", query = "UPDATE AnomalyTaskSpec SET status = :newStatus, workerId = :workerId WHERE status = :oldStatus and id = :id")
 })
-public class AnomalyTaskSpec {
-  @Id
-  @Column(name = "id")
-  @GeneratedValue(strategy = GenerationType.IDENTITY)
-  private long id;
+public class AnomalyTaskSpec extends AbstractBaseEntity {
 
   @Column(name = "job_id", nullable = false)
   private long jobId;
@@ -64,99 +57,57 @@ public class AnomalyTaskSpec {
   @Column(name = "task_info", nullable = false)
   private String taskInfo;
 
-  public AnomalyTaskSpec() {
-  }
-
-
-
-  public long getId() {
-    return id;
-  }
-
-
-
-  public void setId(long id) {
-    this.id = id;
-  }
-
-
-
   public long getJobId() {
     return jobId;
   }
-
-
 
   public Long getWorkerId() {
     return workerId;
   }
 
-
-
   public void setWorkerId(Long workerId) {
     this.workerId = workerId;
   }
-
-
 
   public void setJobName(String jobName) {
     this.jobName = jobName;
   }
 
-
   public String getJobName() {
     return jobName;
   }
-
-
 
   public void setJobId(long jobId) {
     this.jobId = jobId;
   }
 
-
-
   public TaskStatus getStatus() {
     return status;
   }
-
-
 
   public void setStatus(TaskStatus status) {
     this.status = status;
   }
 
-
-
   public long getTaskStartTime() {
     return taskStartTime;
   }
-
-
 
   public void setTaskStartTime(long startTime) {
     this.taskStartTime = startTime;
   }
 
-
-
   public long getTaskEndTime() {
     return taskEndTime;
   }
-
-
 
   public void setTaskEndTime(long endTime) {
     this.taskEndTime = endTime;
   }
 
-
-
   public String getTaskInfo() {
     return taskInfo;
   }
-
-
 
   public void setTaskInfo(String taskInfo) {
     this.taskInfo = taskInfo;
@@ -170,27 +121,24 @@ public class AnomalyTaskSpec {
     this.taskType = taskType;
   }
 
-
-
-  @Override
-  public boolean equals(Object o) {
+  @Override public boolean equals(Object o) {
     if (!(o instanceof AnomalyTaskSpec)) {
       return false;
     }
     AnomalyTaskSpec af = (AnomalyTaskSpec) o;
-    return Objects.equals(id, af.getId()) && Objects.equals(jobId, af.getJobId())
-        && Objects.equals(status, af.getStatus()) && Objects.equals(taskStartTime, af.getTaskStartTime())
-        && Objects.equals(taskEndTime, af.getTaskEndTime()) && Objects.equals(taskInfo, af.getTaskInfo());
+    return Objects.equals(getId(), af.getId()) && Objects.equals(jobId, af.getJobId()) && Objects
+        .equals(status, af.getStatus()) && Objects.equals(taskStartTime, af.getTaskStartTime())
+        && Objects.equals(taskEndTime, af.getTaskEndTime()) && Objects
+        .equals(taskInfo, af.getTaskInfo());
   }
 
-  @Override
-  public int hashCode() {
-    return Objects.hash(id, jobId, status, taskStartTime, taskEndTime, taskInfo);
+  @Override public int hashCode() {
+    return Objects.hash(getId(), jobId, status, taskStartTime, taskEndTime, taskInfo);
   }
 
-  @Override
-  public String toString() {
-    return MoreObjects.toStringHelper(this).add("id", id).add("jobId", jobId)
-        .add("status", status).add("startTime", taskStartTime).add("endTime", taskEndTime).add("taskInfo", taskInfo).toString();
+  @Override public String toString() {
+    return MoreObjects.toStringHelper(this).add("id", getId()).add("jobId", jobId).add("status", status)
+        .add("startTime", taskStartTime).add("endTime", taskEndTime).add("taskInfo", taskInfo)
+        .toString();
   }
 }

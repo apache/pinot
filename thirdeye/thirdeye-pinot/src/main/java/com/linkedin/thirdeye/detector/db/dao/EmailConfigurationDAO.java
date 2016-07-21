@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.detector.db;
+package com.linkedin.thirdeye.detector.db.dao;
 
 import java.util.List;
 
@@ -7,9 +7,7 @@ import org.hibernate.SessionFactory;
 import com.linkedin.thirdeye.detector.db.entity.AnomalyFunctionSpec;
 import com.linkedin.thirdeye.detector.db.entity.EmailConfiguration;
 
-import io.dropwizard.hibernate.AbstractDAO;
-
-public class EmailConfigurationDAO extends AbstractDAO<EmailConfiguration> {
+public class EmailConfigurationDAO extends AbstractBaseDAO<EmailConfiguration> {
   public EmailConfigurationDAO(SessionFactory sessionFactory) {
     super(sessionFactory);
   }
@@ -18,26 +16,6 @@ public class EmailConfigurationDAO extends AbstractDAO<EmailConfiguration> {
   public void toggleActive(Long id, boolean isActive) {
     namedQuery("com.linkedin.thirdeye.api.EmailConfiguration#toggleActive").setParameter("id", id)
         .setParameter("isActive", isActive).executeUpdate();
-  }
-
-  public EmailConfiguration findById(Long id) {
-    return get(id);
-  }
-
-  public Long createOrUpdate(EmailConfiguration emailConfiguration) {
-    long id = persist(emailConfiguration).getId();
-    currentSession().getTransaction().commit();
-    return id;
-  }
-
-  public void delete(Long id) {
-    EmailConfiguration anomalyResult = new EmailConfiguration();
-    anomalyResult.setId(id);
-    currentSession().delete(anomalyResult);
-  }
-
-  public void delete(EmailConfiguration emailConfiguration) {
-    currentSession().delete(emailConfiguration);
   }
 
   public List<EmailConfiguration> findAll() {

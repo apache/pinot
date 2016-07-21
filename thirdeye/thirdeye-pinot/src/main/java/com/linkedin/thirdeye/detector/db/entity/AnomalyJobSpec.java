@@ -26,7 +26,7 @@ import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
 @NamedQueries({
     @NamedQuery(name = "com.linkedin.thirdeye.anomaly.AnomalyJobSpec#findAll", query = "SELECT af FROM AnomalyJobSpec af")
 })
-public class AnomalyJobSpec extends AbstractEntity{
+public class AnomalyJobSpec extends AbstractBaseEntity {
 
   @Column(name = "job_name", nullable = false)
   private String jobName;

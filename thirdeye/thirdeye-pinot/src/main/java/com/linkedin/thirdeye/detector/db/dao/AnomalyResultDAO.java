@@ -1,6 +1,4 @@
-package com.linkedin.thirdeye.detector.db;
-
-import io.dropwizard.hibernate.AbstractDAO;
+package com.linkedin.thirdeye.detector.db.dao;
 
 import java.util.List;
 
@@ -10,25 +8,10 @@ import org.joda.time.DateTimeZone;
 
 import com.linkedin.thirdeye.detector.db.entity.AnomalyResult;
 
-public class AnomalyResultDAO extends AbstractDAO<AnomalyResult> {
+public class AnomalyResultDAO extends AbstractBaseDAO<AnomalyResult> {
   public AnomalyResultDAO(SessionFactory sessionFactory) {
     super(sessionFactory);
   }
-
-  public AnomalyResult findById(Long id) {
-    return get(id);
-  }
-
-  public Long createOrUpdate(AnomalyResult anomalyResult) {
-    return persist(anomalyResult).getId();
-  }
-
-  public void delete(Long id) {
-    AnomalyResult anomalyResult = new AnomalyResult();
-    anomalyResult.setId(id);
-    currentSession().delete(id);
-  }
-
   public List<AnomalyResult> findAllByCollectionAndTime(String collection, DateTime startTime,
       DateTime endTime) {
     return list(namedQuery("com.linkedin.thirdeye.api.AnomalyResult#findAllByCollectionAndTime")
