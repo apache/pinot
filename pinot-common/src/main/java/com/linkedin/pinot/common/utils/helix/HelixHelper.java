@@ -68,7 +68,7 @@ public class HelixHelper {
    */
   public static void updateIdealState(final HelixManager helixManager, final String resourceName,
       final Function<IdealState, IdealState> updater, RetryPolicy policy) {
-    policy.attempt(new Callable<Boolean>() {
+    boolean successful = policy.attempt(new Callable<Boolean>() {
       @Override
       public Boolean call() {
         HelixDataAccessor dataAccessor = helixManager.getHelixDataAccessor();
@@ -117,6 +117,10 @@ public class HelixHelper {
         }
       }
     });
+
+    if (!successful) {
+      throw new RuntimeException("Failed to update ideal state for resource " + resourceName);
+    }
   }
 
   /**
