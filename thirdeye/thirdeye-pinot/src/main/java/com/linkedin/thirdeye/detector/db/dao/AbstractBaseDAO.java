@@ -30,6 +30,7 @@ public abstract class AbstractBaseDAO<E extends AbstractBaseEntity> extends Abst
    *
    * @return
    */
+  @UnitOfWork
   public E findById(Long id) {
     return get(id);
   }

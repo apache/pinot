@@ -30,6 +30,7 @@ public class AnomalyFunctionSpecResource {
 
   @POST
   @Timed
+  @UnitOfWork
   public Response create(AnomalyFunctionSpec anomalyFunctionSpec) {
     Long id = dao.save(anomalyFunctionSpec);
     return Response.ok(id).build();
@@ -37,6 +38,7 @@ public class AnomalyFunctionSpecResource {
 
   @DELETE
   @Timed
+  @UnitOfWork
   @Path("/{id}")
   public Response delete(@PathParam("id") Long id) {
     dao.deleteById(id);
