@@ -59,7 +59,12 @@
         </div>
         <div id="anomaly-condition-selector" class="uk-form-row uk-form-row uk-display-inline-block" rel="self-service">
             <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group uk-display-inline-block">
-                <div id="selected-anomaly-condition" class="uk-button" value="">Condition
+                <div id="selected-anomaly-condition" class="uk-button" value="{{#if properties}}{{displayDeltaIcon properties 'changeThreshold' 'description'}}{{/if}}">
+                    {{#if properties}}
+                        {{displayDeltaIcon properties 'changeThreshold' 'description'}}
+                    {{else}}
+                         Condition
+                    {{/if}}
                 </div>
 
                 <div class="uk-button uk-button-primary" type="button"><i class="uk-icon-caret-down"></i>
@@ -74,18 +79,18 @@
         </div>
         <span> by </span>
         <div class="uk-form-row uk-form-row uk-display-inline-block" rel="self-service">
-            <input id="anomaly-threshold" type="text" placeholder="threshold (1-100)" ><span>%</span>
+            <input id="anomaly-threshold" type="text" placeholder="threshold (1-100)" value="{{#if properties}}{{lookupAnomalyProperty properties 'changeThreshold'}}{{/if}}"><span>%</span>
         </div>
         <div id="anomaly-compare-mode-selector uk-display-inline-block" class="uk-form-row uk-form-row uk-display-inline-block" rel="self-service">
             <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group uk-display-inline-block">
-                <div id="selected-anomaly-compare-mode" class="uk-button" value="w/w">WoW</div>
+                <div id="selected-anomaly-compare-mode" class="uk-button" value="{{#if properties}}{{lookupAnomalyProperty properties 'baseline'}}{{else}}w/w{{/if}}">{{#if properties}}{{lookupAnomalyProperty properties 'baseline'}}{{else}}w/w{{/if}}</div>
                 <div class="uk-button uk-button-primary" type="button"><i class="uk-icon-caret-down"></i>
                 </div>
                 <div class="uk-dropdown uk-dropdown-small uk-dropdown-bottom" style="top: 30px; left: 0px;">
                     <ul class="uk-nav uk-nav-dropdown single-select">
-                        <li class="anomaly-compare-mode-option" value="w/w"><a href="#" class="uk-dropdown-close">WoW</a></li>
-                        <li class="anomaly-compare-mode-option" value="w/2w"><a href="#" class="uk-dropdown-close">Wo2W</a></li>
-                        <li class="anomaly-compare-mode-option" value="w/3w"><a href="#" class="uk-dropdown-close">Wo3W</a></li>
+                        <li class="anomaly-compare-mode-option" value="w/w"><a href="#" class="uk-dropdown-close">w/w</a></li>
+                        <li class="anomaly-compare-mode-option" value="w/2w"><a href="#" class="uk-dropdown-close">w/2w</a></li>
+                        <li class="anomaly-compare-mode-option" value="w/3w"><a href="#" class="uk-dropdown-close">w/3w</a></li>
                     </ul>
                 </div>
             </div>
@@ -95,12 +100,12 @@
         <span>consecutive</span>
         <div id="monitoring-window-unit-selector uk-display-inline-block" class="uk-form-row uk-form-row uk-display-inline-block" rel="self-service">
             <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group uk-display-inline-block">
-                <div id="selected-monitoring-window-unit" class="uk-button" value="HOURS">HOUR(S)</div>
+                <div id="selected-monitoring-window-unit" class="uk-button" value="{{#if windowUnit}}{{windowUnit}}{{else}}HOURS{{/if}}">{{#if windowUnit}}{{windowUnit}}{{else}}HOURS{{/if}}</div>
                 <div class="uk-button uk-button-primary" type="button"><i class="uk-icon-caret-down"></i></div>
                 <div class="uk-dropdown uk-dropdown-small uk-dropdown-bottom" style="top: 30px; left: 0px;">
                     <ul class="uk-nav uk-nav-dropdown single-select">
-                        <li class="monitoring-window-unit-option" value="HOURS"><a href="#" class="uk-dropdown-close">HOUR(S)</a></li>
-                        <li class="monitoring-window-unit-option" value="DAYS"><a href="#" class="uk-dropdown-close" >DAY(S)</a></li>
+                        <li class="monitoring-window-unit-option" value="HOURS"><a href="#" class="uk-dropdown-close">HOURS</a></li>
+                        <li class="monitoring-window-unit-option" value="DAYS"><a href="#" class="uk-dropdown-close" >DAYS</a></li>
                     </ul>
                 </div>
             </div>
@@ -110,7 +115,7 @@
             <div id="self-service-view-single-dimension-selector" class="view-single-dimension-selector uk-display-inline-block" rel="self-service">
                 <label class="uk-form-label">in dimension</label>
                 <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group">
-                    <div id="selected-dimension" class="uk-button" value="">All</div>
+                    <div id="selected-dimension" class="uk-button" value="{{#if exploreDimensions}}{{exploreDimensions}}{{/if}}">{{#if exploreDimensions}}{{exploreDimensions}}{{else}}All{{/if}}</div>
                     <button class="add-single-dimension-btn uk-button uk-button-primary" type="button"><i class="uk-icon-caret-down"></i></button>
                     <div class="uk-dropdown uk-dropdown-small">
                         <ul class="dimension-list uk-nav uk-nav-dropdown single-select">
@@ -154,8 +159,8 @@
                 </div>
                 <div class="uk-dropdown uk-dropdown-small uk-dropdown-bottom" style="top: 30px; left: 0px;">
                     <ul class="uk-nav uk-nav-dropdown  single-select">
-                        <li class="anomaly-monitoring-repeat-unit-option" value="HOURS" ><a href="#" class="uk-dropdown-close">HOUR(S)</a></li>
-                        <li class="anomaly-monitoring-repeat-unit-option" value="DAYS" ><a href="#" class="uk-dropdown-close">DAY(S)</a></li>
+                        <li class="anomaly-monitoring-repeat-unit-option" value="HOURS" ><a href="#" class="uk-dropdown-close">HOURS</a></li>
+                        <li class="anomaly-monitoring-repeat-unit-option" value="DAYS" ><a href="#" class="uk-dropdown-close">DAYS</a></li>
                     </ul>
                 </div>
             </div>
@@ -174,13 +179,13 @@
         <div id="manage-alert-error" class="uk-alert uk-alert-danger hidden" rel="self-service">
             <p></p>
         </div>
-        <div id="manage-alert-success" class="uk-alert uk-alert-success hidden" rel="self-service">
+        <div id="manage-anomaly-function-success" class="uk-alert uk-alert-success hidden" rel="self-service">
             <p></p>
         </div>
 
         <div>
             {{#if id}}
-            <button type="button" id="update-anomaly-function" class="uk-button uk-button-primary" rel="self-service">Create</button>
+            <button type="button" id="update-anomaly-function" class="uk-button uk-button-primary" rel="self-service">Update</button>
             <button type="button"  class="uk-button uk-modal-close">Cancel</button>
             {{else}}
             <button type="button" id="create-anomaly-function" class="uk-button uk-button-primary" rel="self-service">Create</button>

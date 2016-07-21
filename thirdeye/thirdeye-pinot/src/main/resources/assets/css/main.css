@@ -63,8 +63,8 @@ body a{
    width:65px;
 }
 
-.green-border {
-    border-left: 2px solid green;
+.green-background {
+    background: #f2fae3;
 }
 
 .required:after {

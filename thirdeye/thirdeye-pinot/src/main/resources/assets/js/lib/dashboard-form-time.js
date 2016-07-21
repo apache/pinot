@@ -319,7 +319,7 @@
         var currentStartDate = $(".current-start-date-input[rel='" + currentTab + "']").val();
         if (!currentStartDate) {
             errorMsg.html("Must provide start date");
-            disableApplyButton($(".time-input-apply-btn[rel='" + currentTab + "']"))
+            disableButton($(".time-input-apply-btn[rel='" + currentTab + "']"))
             errorAlrt.fadeIn(100);
 
             //show the dropdown
@@ -335,7 +335,7 @@
             errorAlrt.fadeIn(100);
 
 
-            disableApplyButton($(".time-input-apply-btn[rel='" + currentTab + "']"))
+            disableButton($(".time-input-apply-btn[rel='" + currentTab + "']"))
 
             //show the dropdown
             $(".time-range-selector-dropdown[data-uk-dropdown]").addClass("uk-open");
@@ -348,7 +348,7 @@
         if (!currentStartTime) {
             errorMsg.html("Start time is required.");
             errorAlrt.fadeIn(100);
-            disableApplyButton($(".time-input-apply-btn[rel='" + currentTab + "']"))
+            disableButton($(".time-input-apply-btn[rel='" + currentTab + "']"))
 
             //show the dropdown
             $(".time-range-selector-dropdown[data-uk-dropdown]").addClass("uk-open");
@@ -361,7 +361,7 @@
         if (!currentEndTime) {
             errorMsg.html("End time is required.");
             errorAlrt.fadeIn(100);
-            disableApplyButton($(".time-input-apply-btn[rel='" + currentTab + "']"))
+            disableButton($(".time-input-apply-btn[rel='" + currentTab + "']"))
 
             //show the dropdown
             $(".time-range-selector-dropdown[data-uk-dropdown]").addClass("uk-open");
@@ -383,7 +383,7 @@
 
             errorMsg.html("Please choose a start date that is earlier than the end date.");
             errorAlrt.fadeIn(100);
-            disableApplyButton($(".time-input-apply-btn[rel='" + currentTab + "']"))
+            disableButton($(".time-input-apply-btn[rel='" + currentTab + "']"))
 
             //show the dropdown
             $(".time-range-selector-dropdown[data-uk-dropdown]").addClass("uk-open");
@@ -405,7 +405,7 @@
 
                 errorMsg.html("The data is available till: " + moment(maxMillis).format("YYYY-MM-DD h a") + ". Please select a time range prior to this date and time.");
                 errorAlrt.fadeIn(100);
-                disableApplyButton($(".time-input-apply-btn[rel='" + currentTab + "']"));
+                disableButton($(".time-input-apply-btn[rel='" + currentTab + "']"));
 
                 //show the dropdown
                 $(".time-range-selector-dropdown[data-uk-dropdown]").addClass("uk-open");
@@ -431,7 +431,7 @@
             if (baselineEndMillisUTC > currentStartMillisUTC && baselineStartMillisUTC < currentStartMillisUTC) {
 
                 errorMsg.html("The compared time-periods overlap each-other, please adjust the request.");
-                disableApplyButton($(".time-input-apply-btn[rel='" + currentTab + "']"))
+                disableButton($(".time-input-apply-btn[rel='" + currentTab + "']"))
                 errorAlrt.fadeIn(100);
 
                 //show the dropdown

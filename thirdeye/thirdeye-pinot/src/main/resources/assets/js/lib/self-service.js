@@ -116,7 +116,19 @@ function renderSelfService(){
         createAnomalyFunction()
     });
 
-    $("#main-view").on("click","#delete-anomaly-function", function(){
+
+
+    $("#main-view").on("click",".init-delete-anomaly-function", function(){
+
+        var functionId = $(this).attr("data-function-id");
+        var functionName = $(this).attr("data-function-name");
+        $("#confirm-delete-anomaly-function").attr("data-function-id", functionId);
+        $("#function-to-delete").text(functionName);
+        $("#delete-anomaly-function-success").hide();
+    });
+
+  $("#main-view").on("click","#confirm-delete-anomaly-function", function(){
+
         deleteAnomalyFunction(this)
     });
 
@@ -139,7 +151,7 @@ function renderSelfService(){
         }
 
         //Hide success message
-        $("#manage-alert-success").hide();
+        $("#manage-anomaly-function-success").hide();
     }
 
     function selectAnomalyMonitoringRepeatUnit(target){
@@ -164,7 +176,7 @@ function renderSelfService(){
         $("[data-uk-dropdown]").attr("aria-expanded", false);
         $(".uk-dropdown").addClass("hidden");
 
-        //Currently only supporting 'user rule' type alert configuration on the front end
+        //Currently only supporting 'user rule' type alert configuration on the front end-
         // KALMAN and SCAN Statistics are set up by the backend
         var type = "USER_RULE";
         var metricFunction = "SUM";
@@ -318,15 +330,33 @@ function renderSelfService(){
            //Enable submit btn
            $("#create-anomaly-function").prop("disabled", false);
 
-            var successMessage = $("#manage-alert-success");
+            var successMessage = $("#manage-anomaly-function-success");
             $("p", successMessage).html("success");
             successMessage.fadeIn(100);
        })
     }
 
     function  deleteAnomalyFunction(target){
-        var url = "/anomaly-function/delete";
-        //Todo
+
+        disableButton($("#confirm-delete-anomaly-function"));
+
+        var functionId = $(target).attr("data-function-id");
+        var url = "/dashboard/anomaly-function/delete?id=" + functionId;
+
+
+        deleteData(url, "").done(function(){
+            //Remove row from the dataTable
+            var table = $("#existing-anomaly-functions-table").DataTable();
+            table
+                .row( $(".existing-function-row[data-function-id='" + functionId + "']") )
+                .remove()
+                .draw();
+
+
+            var successMessage = $("#delete-anomaly-function-success");
+            $("p", successMessage).html("success");
+            successMessage.fadeIn(100);
+        })
     }
 
     function populateUpdateForm(target){
@@ -335,12 +365,6 @@ function renderSelfService(){
         var existingAnomalyFunctionsDataStr = window.sessionStorage.getItem('existingAnomalyFunctions');
         var existingAnomalyFunctionsData = JSON.parse(existingAnomalyFunctionsDataStr);
 
-        console.log("functionId")
-        console.log(functionId)
-        console.log("existingAnomalyFunctionsData")
-        console.log(existingAnomalyFunctionsData)
-        console.log('existingAnomalyFunctionsData.functionId')
-        console.log(existingAnomalyFunctionsData[functionId])
         //existingAnomalyFunctionsData[functionId]
         /** Handelbars template for ANOMALY FUNCTION FORM **/
         var result_anomaly_function_form_template = HandleBarsTemplates.template_anomaly_function_form(existingAnomalyFunctionsData[functionId]);
