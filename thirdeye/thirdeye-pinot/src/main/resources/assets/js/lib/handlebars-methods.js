@@ -273,9 +273,8 @@ $(document).ready(function() {
     var source_anomalies_template = $("#anomalies-template").html();
     HandleBarsTemplates.template_anomalies = Handlebars.compile(source_anomalies_template);
 
-//    var source_self_service_template = $("#self-service-template").html();
-//    HandleBarsTemplates.template_self_service = Handlebars.compile(source_self_service_template);
-
+    var source_anomaly_function_form_template = $("#anomaly-function-form-template").html();
+    HandleBarsTemplates.template_anomaly_function_form = Handlebars.compile(source_anomaly_function_form_template);
 
     var source_existing_anomaly_functions_template = $("#self-service-existing-anomaly-functions-template").html();
     HandleBarsTemplates.template_existing_anomaly_functions = Handlebars.compile(source_existing_anomaly_functions_template);

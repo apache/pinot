@@ -7,6 +7,9 @@ function getExistingAnomalyFunctions(dataset){
         var result_existing_anomaly_functions_template;
 
         getData(url, tab).done(function (data) {
+            if(data){
+                window.sessionStorage.setItem('existingAnomalyFunctions', JSON.stringify(data) );
+            }
             /** Handelbars template for EXISTING ANOMALY FUNCTIONS TABLE **/
             result_existing_anomaly_functions_template = HandleBarsTemplates.template_existing_anomaly_functions(data);
             $("#existing-anomaly-functions-table-placeholder").html(result_existing_anomaly_functions_template);
@@ -36,9 +39,9 @@ function renderSelfService(){
         //selectAnomalyDataset(this)
     });
 
-    $("#main-view").on("keyup", "#rule", function(){
+    $("#main-view").on("keyup", "#name", function(){
 
-        hideErrorAndSuccess("rule")
+        hideErrorAndSuccess("name")
 
     })
 
@@ -71,8 +74,16 @@ function renderSelfService(){
         hideErrorAndSuccess("monitoring-window-size")
     });
 
+    /** ExploreDimension and filter selection selection**/
     $("#main-view").on("click",".dimension-option, .remove-filter-selection[tab='self-service'], #self-service-apply-filter-btn", function() {
         hideErrorAndSuccess("")
+    });
+
+    /** Manage anomaly tab related listeners **/
+
+    /**  selection**/
+    $("#main-view").on("click",".update-function-btn", function() {
+        populateUpdateForm(this)
     });
 
 
@@ -161,7 +172,7 @@ function renderSelfService(){
 
 
         //Collect the form values
-        var functionName = $("#rule").val();
+        var functionName = $("#name").val();
         var dataset = $(".selected-dataset").attr("value");
         var metric = $("#selected-metric-manage-alert").attr("value");
         var condition =( $("#selected-anomaly-condition").attr("value") == "DROPS" ) ? "-" :  ( $("#selected-anomaly-condition").attr("value") == "INCREASES" )  ? "" : null;
@@ -182,8 +193,6 @@ function renderSelfService(){
         }
 
         var filters = readFiltersAppliedInCurrentView("self-service");
-        console.log('filters')
-        console.log(filters)
 
         //Transform filters Todo: clarify if filters object should be consistent on FE and BE
         //filters = encodeURIComponent(JSON.stringify(filters));
@@ -194,9 +203,6 @@ function renderSelfService(){
                 filtersString += key + "=" + filters[key][index] + ";";
             }
         }
-        console.log('filtersString')
-        console.log(filtersString)
-
 
         var exploreDimension = $("#self-service-view-single-dimension-selector #selected-dimension").attr("value");
         var properties = "";
@@ -209,7 +215,7 @@ function renderSelfService(){
 
         //Check if rule name is present
         if(functionName == ""){
-            errorMessage.html("Please give a name to the rule in the 'Rule' field.");
+            errorMessage.html("Please give a name to the anomaly function.");
             errorAlert.attr("data-error-source", "rule");
             errorAlert.fadeIn(100);
             return
@@ -230,7 +236,7 @@ function renderSelfService(){
 
         if(!isAlphaNumeric(functionName)){
             errorMessage.html("Please only use alphanumeric (0-9, A-Z, a-z) characters in 'Rule' field. No space, no '_', no '-' is accepted.");
-            errorAlert.attr("data-error-source", "rule");
+            errorAlert.attr("data-error-source", "name");
             errorAlert.fadeIn(100);
             return
         }
@@ -305,10 +311,6 @@ function renderSelfService(){
         url += (exploreDimension) ? "&exploreDimension=" + exploreDimension : "";
         url += (filters) ? "&filters=" + filtersString : "";
 
-//        var successMessage = $("#manage-alert-success");
-//        $("p", successMessage).append("url to be submitted: " + url);
-//            successMessage.fadeIn(100);
-
         //Disable submit btn
         $("#create-anomaly-function").prop("disabled", true);
 
@@ -323,7 +325,30 @@ function renderSelfService(){
     }
 
     function  deleteAnomalyFunction(target){
+        var url = "/anomaly-function/delete";
         //Todo
+    }
+
+    function populateUpdateForm(target){
+
+        var functionId = $(target).attr("data-row-id");
+        var existingAnomalyFunctionsDataStr = window.sessionStorage.getItem('existingAnomalyFunctions');
+        var existingAnomalyFunctionsData = JSON.parse(existingAnomalyFunctionsDataStr);
+
+        console.log("functionId")
+        console.log(functionId)
+        console.log("existingAnomalyFunctionsData")
+        console.log(existingAnomalyFunctionsData)
+        console.log('existingAnomalyFunctionsData.functionId')
+        console.log(existingAnomalyFunctionsData[functionId])
+        //existingAnomalyFunctionsData[functionId]
+        /** Handelbars template for ANOMALY FUNCTION FORM **/
+        var result_anomaly_function_form_template = HandleBarsTemplates.template_anomaly_function_form(existingAnomalyFunctionsData[functionId]);
+        $("#update-anomaly-functions-form-placeholder").html(result_anomaly_function_form_template);
+    }
+
+    function  updateAnomalyFunction(target){
+
     }
 
 }
