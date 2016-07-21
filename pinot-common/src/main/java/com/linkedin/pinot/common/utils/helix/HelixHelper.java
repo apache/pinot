@@ -50,6 +50,7 @@ import com.linkedin.pinot.common.utils.retry.RetryPolicy;
 public class HelixHelper {
   private static final RetryPolicy DEFAULT_RETRY_POLICY = RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 2.0f);
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixHelper.class);
+  private static final int MAX_PARTITION_COUNT_IN_UNCOMPRESSED_IDEAL_STATE = 1000;
 
   private static final String ONLINE = "ONLINE";
   private static final String OFFLINE = "OFFLINE";
@@ -95,13 +96,20 @@ public class HelixHelper {
           BaseDataAccessor<ZNRecord> baseDataAccessor = dataAccessor.getBaseDataAccessor();
           boolean success;
 
+          // If the ideal state is large enough, enable compression
+          if (MAX_PARTITION_COUNT_IN_UNCOMPRESSED_IDEAL_STATE < updatedIdealState.getPartitionSet().size()) {
+            updatedIdealState.getRecord().setBooleanField("enableCompression", true);
+          }
+
           try {
             success =
                 baseDataAccessor.set(path, updatedIdealState.getRecord(), idealState.getRecord().getVersion(),
                     AccessOption.PERSISTENT);
           } catch (Exception e) {
-            LOGGER.warn("Caught exception: {} while updating ideal state for resource {}, retrying.", resourceName,
-                e.getMessage());
+            boolean idealStateIsCompressed = updatedIdealState.getRecord().getBooleanField("enableCompression", false);
+
+            LOGGER.warn("Caught exception while updating ideal state for resource {} (compressed={}), retrying.",
+                resourceName, idealStateIsCompressed, e);
             return false;
           }
 
