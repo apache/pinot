@@ -45,12 +45,14 @@ import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import com.linkedin.pinot.common.metadata.stream.KafkaStreamMetadata;
 import com.linkedin.pinot.common.metrics.ControllerMeter;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.SegmentType;
 import com.linkedin.pinot.common.utils.HLCSegmentName;
+import com.linkedin.pinot.common.utils.SegmentName;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.common.utils.retry.RetryPolicies;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -123,8 +125,15 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
     Map<String, IdealState> idealStateMap = new HashMap<String, IdealState>();
 
     for (String resource : _pinotHelixResourceManager.getAllRealtimeTables()) {
-      idealStateMap.put(resource, _pinotHelixResourceManager.getHelixAdmin()
-          .getResourceIdealState(_pinotHelixResourceManager.getHelixClusterName(), resource));
+      final String tableName = TableNameBuilder.extractRawTableName(resource);
+      AbstractTableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableName, TableType.REALTIME);
+      KafkaStreamMetadata metadata = new KafkaStreamMetadata(tableConfig.getIndexingConfig().getStreamConfigs());
+      if (metadata.hasHighLevelKafkaConsumerType()) {
+        idealStateMap.put(resource, _pinotHelixResourceManager.getHelixAdmin()
+            .getResourceIdealState(_pinotHelixResourceManager.getHelixClusterName(), resource));
+      } else {
+        LOGGER.debug("Not considering table {} for realtime segment assignment");
+      }
     }
 
     List<Pair<String, String>> listOfSegmentsToAddToInstances = new ArrayList<Pair<String, String>>();
@@ -181,11 +190,14 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
           // Remove server instances that are currently processing a segment
           for (String partition : state.getPartitionSet()) {
             // Helix partition is the segment name
-            HLCSegmentName segName = new HLCSegmentName(partition);
-            RealtimeSegmentZKMetadata realtimeSegmentZKMetadata = ZKMetadataProvider.getRealtimeSegmentZKMetadata(_pinotHelixResourceManager.getPropertyStore(),
-                segName.getTableName(), partition);
-            if (realtimeSegmentZKMetadata.getStatus() == Status.IN_PROGRESS) {
-              instancesToAssignRealtimeSegment.removeAll(state.getInstanceSet(partition));
+            if (SegmentName.isHighLevelConsumerSegmentName(partition)) {
+              HLCSegmentName segName = new HLCSegmentName(partition);
+              RealtimeSegmentZKMetadata realtimeSegmentZKMetadata = ZKMetadataProvider
+                  .getRealtimeSegmentZKMetadata(_pinotHelixResourceManager.getPropertyStore(), segName.getTableName(),
+                      partition);
+              if (realtimeSegmentZKMetadata.getStatus() == Status.IN_PROGRESS) {
+                instancesToAssignRealtimeSegment.removeAll(state.getInstanceSet(partition));
+              }
             }
           }
 
@@ -308,24 +320,29 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
       try {
         AbstractTableConfig abstractTableConfig = AbstractTableConfig.fromZnRecord(tableConfig);
         if (abstractTableConfig.isRealTime()) {
-          String realtimeTable = abstractTableConfig.getTableName();
-          String realtimeSegmentsPathForTable = _propertyStorePath + SEGMENTS_PATH + "/" + realtimeTable;
+          KafkaStreamMetadata metadata = new KafkaStreamMetadata(abstractTableConfig.getIndexingConfig().getStreamConfigs());
+          if (metadata.hasHighLevelKafkaConsumerType()) {
+            String realtimeTable = abstractTableConfig.getTableName();
+            String realtimeSegmentsPathForTable = _propertyStorePath + SEGMENTS_PATH + "/" + realtimeTable;
 
-          LOGGER.info("Setting data/child changes watch for real-time table '{}'", realtimeTable);
-          _zkClient.subscribeDataChanges(realtimeSegmentsPathForTable, this);
-          _zkClient.subscribeChildChanges(realtimeSegmentsPathForTable, this);
+            LOGGER.info("Setting data/child changes watch for real-time table '{}'", realtimeTable);
+            _zkClient.subscribeDataChanges(realtimeSegmentsPathForTable, this);
+            _zkClient.subscribeChildChanges(realtimeSegmentsPathForTable, this);
 
-          List<String> childNames =
-              _pinotHelixResourceManager.getPropertyStore().getChildNames(SEGMENTS_PATH + "/" + realtimeTable, 0);
+            List<String> childNames =
+                _pinotHelixResourceManager.getPropertyStore().getChildNames(SEGMENTS_PATH + "/" + realtimeTable, 0);
 
-          if (childNames != null && !childNames.isEmpty()) {
-            for (String segmentName : childNames) {
-              String segmentPath = realtimeSegmentsPathForTable + "/" + segmentName;
-              RealtimeSegmentZKMetadata realtimeSegmentZKMetadata = ZKMetadataProvider.getRealtimeSegmentZKMetadata(
-                  _pinotHelixResourceManager.getPropertyStore(), abstractTableConfig.getTableName(), segmentName);
-              if (realtimeSegmentZKMetadata.getStatus() == Status.IN_PROGRESS) {
-                LOGGER.info("Setting data change watch for real-time segment currently being consumed: {}", segmentPath);
-                _zkClient.subscribeDataChanges(segmentPath, this);
+            if (childNames != null && !childNames.isEmpty()) {
+              for (String segmentName : childNames) {
+                String segmentPath = realtimeSegmentsPathForTable + "/" + segmentName;
+                RealtimeSegmentZKMetadata realtimeSegmentZKMetadata = ZKMetadataProvider
+                    .getRealtimeSegmentZKMetadata(_pinotHelixResourceManager.getPropertyStore(),
+                        abstractTableConfig.getTableName(), segmentName);
+                if (realtimeSegmentZKMetadata.getStatus() == Status.IN_PROGRESS) {
+                  LOGGER.info("Setting data change watch for real-time segment currently being consumed: {}",
+                      segmentPath);
+                  _zkClient.subscribeDataChanges(segmentPath, this);
+                }
               }
             }
           }

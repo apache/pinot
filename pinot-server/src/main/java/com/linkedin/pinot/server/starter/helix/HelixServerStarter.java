@@ -15,19 +15,6 @@
  */
 package com.linkedin.pinot.server.starter.helix;
 
-import com.linkedin.pinot.common.Utils;
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
-import com.linkedin.pinot.common.metrics.ServerMeter;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
-import com.linkedin.pinot.common.utils.MmapUtils;
-import com.linkedin.pinot.common.utils.NetUtil;
-import com.linkedin.pinot.common.utils.ZkUtils;
-import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentMetadataLoader;
-import com.linkedin.pinot.server.conf.ServerConf;
-import com.linkedin.pinot.server.starter.ServerInstance;
-import com.yammer.metrics.core.MetricsRegistry;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -50,6 +37,19 @@ import org.apache.helix.participant.statemachine.StateModelFactory;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.linkedin.pinot.common.Utils;
+import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
+import com.linkedin.pinot.common.metrics.ServerMeter;
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
+import com.linkedin.pinot.common.utils.MmapUtils;
+import com.linkedin.pinot.common.utils.NetUtil;
+import com.linkedin.pinot.common.utils.ZkUtils;
+import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentMetadataLoader;
+import com.linkedin.pinot.server.conf.ServerConf;
+import com.linkedin.pinot.server.starter.ServerInstance;
+import com.yammer.metrics.core.MetricsRegistry;
 
 
 /**
@@ -256,14 +256,19 @@ public class HelixServerStarter {
   public static void main(String[] args) throws Exception {
     /*
     // Another way to start a server via IDE
-    final int port = 3800;
-    final String serverFQDN = "server.host.foo";
-    final String server = "Server_" + serverFQDN + "_" + port;
-    final Configuration configuration = new PropertiesConfiguration();
-    configuration.addProperty("pinot.server.instance.dataDir", "/tmp/PinotServer/test" + port + "/index");
-    configuration.addProperty("pinot.server.instance.segmentTarDir", "/tmp/PinotServer/test" + port + "/segmentTar");
-    configuration.addProperty("instanceId",  server);
-    final HelixServerStarter pinotHelixStarter = new HelixServerStarter("pinotDevDeploy", "localhost:2181", configuration);
+    if (args.length < 1) {
+      throw new RuntimeException("Usage: cmd <port>");
+    }
+    for (int i = 0; i < args.length; i++) {
+      final int port = Integer.valueOf(args[i]);
+      final String serverFQDN = "localhost";
+      final String server = "Server_" + serverFQDN + "_" + port;
+      final Configuration configuration = new PropertiesConfiguration();
+      configuration.addProperty("pinot.server.instance.dataDir", "/tmp/PinotServer/test" + port + "/index");
+      configuration.addProperty("pinot.server.instance.segmentTarDir", "/tmp/PinotServer/test" + port + "/segmentTar");
+      configuration.addProperty("instanceId", server);
+      final HelixServerStarter pinotHelixStarter = new HelixServerStarter("PinotPerfTestCluster", "localhost:2191", configuration);
+    }
     */
     startDefault();
   }
