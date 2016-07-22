@@ -18,6 +18,9 @@ import com.linkedin.thirdeye.anomaly.monitor.MonitorConstants.MonitorType;
 import com.linkedin.thirdeye.anomaly.monitor.MonitorJobContext;
 import com.linkedin.thirdeye.anomaly.monitor.MonitorTaskInfo;
 
+/**
+ * Generates tasks for a job depending on the task type
+ */
 public class TaskGenerator {
 
   private static Logger LOG = LoggerFactory.getLogger(TaskGenerator.class);

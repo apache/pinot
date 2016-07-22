@@ -14,7 +14,6 @@ import org.slf4j.LoggerFactory;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
-import com.linkedin.thirdeye.anomaly.job.JobContext;
 import com.linkedin.thirdeye.anomaly.job.JobRunner;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
@@ -77,7 +76,7 @@ public class MonitorJobRunner implements JobRunner {
       LOG.info("Created anomalyJobSpec {} with jobExecutionId {}", anomalyJobSpec,
           jobExecutionId);
     } catch (Exception e) {
-      throw new RuntimeException(e);
+      LOG.error("Exception in creating monitor job", e);
     } finally {
       session.close();
       ManagedSessionContext.unbind(sessionFactory);
@@ -115,7 +114,7 @@ public class MonitorJobRunner implements JobRunner {
         LOG.info("Created monitorTask {} with taskId {}", anomalyTaskSpec, taskId);
       }
     } catch (Exception e) {
-      throw new RuntimeException(e);
+      LOG.error("Exception in creating anomaly tasks", e);
     } finally {
       session.close();
       ManagedSessionContext.unbind(sessionFactory);
@@ -132,7 +131,7 @@ public class MonitorJobRunner implements JobRunner {
       ManagedSessionContext.bind(session);
       anomalyJobSpecs = anomalyJobSpecDAO.findByStatus(JobStatus.SCHEDULED);
     } catch (Exception e) {
-      throw new RuntimeException(e);
+      LOG.error("Exception in finding anomaly jobs with status scheduled", e);
     } finally {
       session.close();
       ManagedSessionContext.unbind(sessionFactory);

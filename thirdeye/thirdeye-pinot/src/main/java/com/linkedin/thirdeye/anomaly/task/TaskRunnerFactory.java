@@ -4,6 +4,9 @@ import com.linkedin.thirdeye.anomaly.detection.DetectionTaskRunner;
 import com.linkedin.thirdeye.anomaly.monitor.MonitorTaskRunner;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
 
+/**
+ * This class returns an instance of the task runner depending on the task type
+ */
 public class TaskRunnerFactory {
 
   public static TaskRunner getTaskRunnerFromTaskType(TaskType taskType) {

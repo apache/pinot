@@ -12,6 +12,10 @@ import com.linkedin.thirdeye.anomaly.detection.DetectionTaskInfo;
 import com.linkedin.thirdeye.anomaly.monitor.MonitorTaskInfo;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
 
+/**
+ * This class returns deserializes the task info json and returns the TaskInfo,
+ * depending on the task type
+ */
 public class TaskInfoFactory {
 
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();

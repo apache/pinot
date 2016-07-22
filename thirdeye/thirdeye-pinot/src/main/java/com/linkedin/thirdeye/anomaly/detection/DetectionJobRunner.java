@@ -124,7 +124,7 @@ public class DetectionJobRunner implements Job {
       LOG.info("Created anomalyJobSpec {} with jobExecutionId {}", anomalyJobSpec,
           jobExecutionId);
     } catch (Exception e) {
-      throw new RuntimeException(e);
+      LOG.error("Exception in creating detection job", e);
     } finally {
       session.close();
       ManagedSessionContext.unbind(sessionFactory);
@@ -161,7 +161,7 @@ public class DetectionJobRunner implements Job {
         LOG.info("Created anomalyTask {} with taskId {}", anomalyTaskSpec, taskId);
       }
     } catch (Exception e) {
-      throw new RuntimeException(e);
+      LOG.error("Exception in creating detection tasks", e);
     } finally {
       session.close();
       ManagedSessionContext.unbind(sessionFactory);
@@ -178,7 +178,7 @@ public class DetectionJobRunner implements Job {
       ManagedSessionContext.bind(session);
       anomalyFunctionSpec = anomalyFunctionSpecDAO.findById(anomalyFunctionId);
     } catch (Exception e)  {
-      throw new RuntimeException(e);
+      LOG.error("Exception in getting anomalyFunctionSpec by id", e);
     } finally {
       session.close();
       ManagedSessionContext.unbind(sessionFactory);

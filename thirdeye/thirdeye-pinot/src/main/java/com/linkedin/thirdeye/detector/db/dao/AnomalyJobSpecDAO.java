@@ -6,11 +6,15 @@ import java.util.List;
 import org.hibernate.HibernateException;
 import org.hibernate.SessionFactory;
 import org.joda.time.DateTime;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
 import com.linkedin.thirdeye.detector.db.entity.AnomalyJobSpec;
 
 public class AnomalyJobSpecDAO extends AbstractBaseDAO<AnomalyJobSpec> {
+
+  private static final Logger LOG = LoggerFactory.getLogger(AnomalyJobSpecDAO.class);
   public AnomalyJobSpecDAO(SessionFactory sessionFactory) {
     super(sessionFactory);
   }
@@ -32,8 +36,8 @@ public class AnomalyJobSpecDAO extends AbstractBaseDAO<AnomalyJobSpec> {
           .setParameter("jobEndTime", jobEndTime)
           .executeUpdate();
       return numRowsUpdated == 1;
-    } catch (HibernateException exception) {
-      exception.printStackTrace();
+    } catch (HibernateException e) {
+      LOG.error("Exception in updateStatusAndJobEndTime", e);
       return false;
     }
   }

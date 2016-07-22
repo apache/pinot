@@ -213,7 +213,7 @@ public class DetectionTaskRunner implements TaskRunner {
             windowEnd, relation.getChildId()));
       }
     } catch (Exception e) {
-      throw new RuntimeException(e);
+      LOG.error("Exception in getting existing anomalies", e);
     } finally {
       session.close();
       ManagedSessionContext.unbind(sessionFactory);
@@ -243,7 +243,7 @@ public class DetectionTaskRunner implements TaskRunner {
         resultDAO.save(result);
       }
     } catch (Exception e) {
-      throw new RuntimeException(e);
+      LOG.error("Exception in saving anomaly results", e);
     } finally {
       session.close();
       ManagedSessionContext.unbind(sessionFactory);

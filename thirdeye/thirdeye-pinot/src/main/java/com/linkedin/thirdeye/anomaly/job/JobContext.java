@@ -8,7 +8,6 @@ import com.linkedin.thirdeye.detector.db.dao.AnomalyJobSpecDAO;
 import com.linkedin.thirdeye.detector.db.dao.AnomalyTaskSpecDAO;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 
-
 public abstract class JobContext {
 
   private AnomalyJobSpecDAO anomalyJobSpecDAO;

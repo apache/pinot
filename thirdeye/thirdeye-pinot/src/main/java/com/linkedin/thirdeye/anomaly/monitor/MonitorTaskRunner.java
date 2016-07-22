@@ -6,7 +6,6 @@ import java.util.List;
 
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
-import org.hibernate.Transaction;
 import org.hibernate.context.internal.ManagedSessionContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -65,7 +64,7 @@ public class MonitorTaskRunner implements TaskRunner {
         LOG.info("COMPLETED anomaly job {}", jobExecutionId);
       }
     } catch (Exception e) {
-      throw new RuntimeException(e);
+      LOG.error("Exception in monitor update task", e);
     } finally {
       session.close();
       ManagedSessionContext.unbind(sessionFactory);
@@ -84,7 +83,7 @@ public class MonitorTaskRunner implements TaskRunner {
       int numAnomalyTasksDeleted = anomalyTaskSpecDAO.deleteRecordsOlderThanDaysWithStatus(expireDaysAgo, TaskStatus.COMPLETED);
       LOG.info("Deleted {} anomaly jobs and {} anomaly tasks", numAnomalyJobsDeleted, numAnomalyTasksDeleted);
     } catch (Exception e) {
-      throw new RuntimeException(e);
+      LOG.error("Exception in monitor expire task", e);
     } finally {
       session.close();
       ManagedSessionContext.unbind(sessionFactory);

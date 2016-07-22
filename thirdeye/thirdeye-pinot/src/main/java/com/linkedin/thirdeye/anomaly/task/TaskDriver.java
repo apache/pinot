@@ -139,7 +139,7 @@ public class TaskDriver {
         }
         Thread.sleep(1000);
       } catch (Exception e) {
-        throw new RuntimeException(e);
+        LOG.error("Exception in select and update", e);
       } finally {
         session.close();
         ManagedSessionContext.unbind(sessionFactory);
@@ -161,7 +161,7 @@ public class TaskDriver {
       LOG.info(Thread.currentThread().getId() + " : update status {}", updateStatus);
 
     } catch (Exception e) {
-      throw new RuntimeException(e);
+      LOG.error("Exception in updating status and task end time", e);
     } finally {
       session.close();
       ManagedSessionContext.unbind(sessionFactory);
