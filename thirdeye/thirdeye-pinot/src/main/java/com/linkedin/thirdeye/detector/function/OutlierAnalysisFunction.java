@@ -17,17 +17,22 @@ import org.joda.time.DateTime;
  */
 public class OutlierAnalysisFunction extends BaseAnomalyFunction {
   private static final Joiner CSV = Joiner.on(",");
-  public static final String DEFAULT_MESSAGE_TEMPLATE = "mean %s, standard deviation %s, value %s, deviation from mean %s";
 
+  static final String DEFAULT_MESSAGE_TEMPLATE = "mean %s, standard deviation %s, value %s, deviation from mean %s";
+  static final String MEAN_STD_DISTANCE_FACTOR_PROP = "meanStdDistanceFactor";
   /**
    * 1, 2, 3 covers 68, 95, 99.7 percent of the distribution mass respectively
    */
-  int meanStDevDistance = 3;
+  final int DEFAULT_MEAN_STD_DISTANCE_FACTOR = 3;
+
+  public static String[] getPropertyKeys() {
+    return new String[] { MEAN_STD_DISTANCE_FACTOR_PROP };
+  }
 
   @Override
-  public List<AnomalyResult> analyze(DimensionKey dimensionKey,
-      MetricTimeSeries timeSeries, DateTime windowStart, DateTime windowEnd,
-      List<AnomalyResult> knownAnomalies) throws Exception {
+  public List<AnomalyResult> analyze(DimensionKey dimensionKey, MetricTimeSeries timeSeries,
+      DateTime windowStart, DateTime windowEnd, List<AnomalyResult> knownAnomalies)
+      throws Exception {
 
     List<AnomalyResult> outliers = new ArrayList<>();
 
@@ -50,8 +55,14 @@ public class OutlierAnalysisFunction extends BaseAnomalyFunction {
 
     // weight of this time series
     double averageValue = totalSum / numBuckets;
+    int meanStdDistFactor = DEFAULT_MEAN_STD_DISTANCE_FACTOR;
 
-    StatisticalResult statParam = new StatisticalResult(meanStDevDistance, values);
+    if (getProperties().containsKey(MEAN_STD_DISTANCE_FACTOR_PROP)) {
+      meanStdDistFactor =
+          Integer.valueOf(getProperties().getProperty(MEAN_STD_DISTANCE_FACTOR_PROP));
+    }
+
+    StatisticalResult statParam = new StatisticalResult(meanStdDistFactor, values);
 
     for (Long timeBucket : timeSeries.getTimeWindowSet()) {
       Double value = timeSeries.get(timeBucket, metric).doubleValue();
@@ -67,8 +78,9 @@ public class OutlierAnalysisFunction extends BaseAnomalyFunction {
         Double deviation = statParam.getMean() - value;
         outlierResult.setScore(Math.abs(deviation)); // higher change, higher the score
         outlierResult.setWeight(averageValue);
-        String message = String.format(DEFAULT_MESSAGE_TEMPLATE, statParam.getMean(),
-            statParam.getStDeviation(), value, deviation);
+        String message = String
+            .format(DEFAULT_MESSAGE_TEMPLATE, statParam.getMean(), statParam.getStDeviation(),
+                value, deviation);
         outlierResult.setMessage(message);
         outlierResult.setFilters(getSpec().getFilters());
         outliers.add(outlierResult);
@@ -80,10 +92,10 @@ public class OutlierAnalysisFunction extends BaseAnomalyFunction {
   private static class StatisticalResult {
     private Double mean;
     private Double stDeviation;
-    private final int meanStDevDistance;
+    private final int meanStdDistFactor;
 
-    StatisticalResult(int meanStDevDistance, List<Double> values) {
-      this.meanStDevDistance = meanStDevDistance;
+    StatisticalResult(int meanStdDistFactor, List<Double> values) {
+      this.meanStdDistFactor = meanStdDistFactor;
       analyzeData(values);
     }
 
@@ -96,11 +108,11 @@ public class OutlierAnalysisFunction extends BaseAnomalyFunction {
     }
 
     Double getLowerBound() {
-      return mean - meanStDevDistance * stDeviation;
+      return mean - meanStdDistFactor * stDeviation;
     }
 
     Double getUpperBound() {
-      return mean + meanStDevDistance * stDeviation;
+      return mean + meanStdDistFactor * stDeviation;
     }
 
     private void analyzeData(List<Double> values) {

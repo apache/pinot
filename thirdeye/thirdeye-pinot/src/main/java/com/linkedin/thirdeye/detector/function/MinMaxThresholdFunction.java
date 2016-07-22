@@ -1,18 +1,13 @@
 package com.linkedin.thirdeye.detector.function;
 
-import com.google.common.base.Joiner;
 import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.detector.db.entity.AnomalyResult;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import org.joda.time.DateTime;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * See params for property configuration.
@@ -24,9 +19,9 @@ import org.slf4j.LoggerFactory;
  * (strictly greater than)
  */
 public class MinMaxThresholdFunction extends BaseAnomalyFunction {
-  public static final String DEFAULT_MESSAGE_TEMPLATE = "min=%s, max=%s, value %s, change %s";
-  public static final String MIN_VAL = "min";
-  public static final String MAX_VAL = "max";
+  static final String DEFAULT_MESSAGE_TEMPLATE = "min=%s, max=%s, value %s, change %s";
+  static final String MIN_VAL = "min";
+  static final String MAX_VAL = "max";
 
   public static String[] getPropertyKeys() {
     return new String [] {MIN_VAL, MAX_VAL};
