@@ -42,7 +42,6 @@ import com.linkedin.thirdeye.detector.function.AnomalyFunction;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 
 public class AnomalyDetectionJobManager {
-  public static final String MONITORING_WINDOW_KEY = "monitoringWindow";
   private static final Logger LOG = LoggerFactory.getLogger(AnomalyDetectionJobManager.class);
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry
       .getInstance();
@@ -244,7 +243,7 @@ public class AnomalyDetectionJobManager {
     for (Interval simulationInterval : simulationIntervals) {
       DateTime intervalStart = simulationInterval.getStart();
       DateTime intervalEnd = simulationInterval.getEnd();
-      LOG.info("Running {} with monitoring window: {} to {}", id, intervalStart, intervalEnd);
+      LOG.info("Running {} with interval: {} to {}", id, intervalStart, intervalEnd);
       try {
         String triggerKey =
             String.format("simulate_period_anomaly_function_trigger_%d_%s-%s", id, intervalStart,
