@@ -15,6 +15,10 @@
  */
 package com.linkedin.pinot.common.utils;
 
+import com.linkedin.pinot.common.Utils;
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import com.linkedin.pinot.common.response.ProcessingException;
+import com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
@@ -30,15 +34,9 @@ import java.nio.charset.Charset;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
-
 import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.linkedin.pinot.common.Utils;
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.common.response.ProcessingException;
-import com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema;
 
 
 /**
@@ -631,6 +629,21 @@ public class DataTable {
     char[] ret = new char[size];
     for (int i = 0; i < size; i++) {
       ret[i] = variableSizeData.getChar();
+    }
+    return ret;
+  }
+
+  /**
+   *
+   * @param rowId
+   * @param colId
+   * @return
+   */
+  public short[] getShortArray(int rowId, int colId) {
+    final int size = positionCursorInVariableBuffer(rowId, colId);
+    short[] ret = new short[size];
+    for (int i = 0; i < size; i++) {
+      ret[i] = variableSizeData.getShort();
     }
     return ret;
   }

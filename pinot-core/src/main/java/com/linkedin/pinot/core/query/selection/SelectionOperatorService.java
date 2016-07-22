@@ -15,171 +15,239 @@
  */
 package com.linkedin.pinot.core.query.selection;
 
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.request.Selection;
 import com.linkedin.pinot.common.request.SelectionSort;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.response.broker.SelectionResults;
 import com.linkedin.pinot.common.utils.DataTable;
-import com.linkedin.pinot.common.utils.DataTableBuilder;
 import com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
-import com.linkedin.pinot.core.common.BlockMultiValIterator;
-import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.core.common.Constants;
-import com.linkedin.pinot.core.common.DataSource;
-import com.linkedin.pinot.core.common.DataSourceMetadata;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.operator.blocks.MultiValueBlock;
-import com.linkedin.pinot.core.operator.blocks.RealtimeMultiValueBlock;
-import com.linkedin.pinot.core.operator.blocks.RealtimeSingleValueBlock;
-import com.linkedin.pinot.core.operator.blocks.SortedSingleValueBlock;
-import com.linkedin.pinot.core.operator.blocks.UnSortedSingleValueBlock;
 import com.linkedin.pinot.core.query.selection.comparator.CompositeDocIdValComparator;
-import com.linkedin.pinot.core.realtime.impl.dictionary.DoubleMutableDictionary;
-import com.linkedin.pinot.core.realtime.impl.dictionary.FloatMutableDictionary;
-import com.linkedin.pinot.core.realtime.impl.dictionary.IntMutableDictionary;
-import com.linkedin.pinot.core.realtime.impl.dictionary.LongMutableDictionary;
-import com.linkedin.pinot.core.realtime.impl.dictionary.StringMutableDictionary;
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
-import com.linkedin.pinot.core.segment.index.readers.DoubleDictionary;
-import com.linkedin.pinot.core.segment.index.readers.FloatDictionary;
-import com.linkedin.pinot.core.segment.index.readers.IntDictionary;
-import com.linkedin.pinot.core.segment.index.readers.LongDictionary;
-import com.linkedin.pinot.core.segment.index.readers.StringDictionary;
 import java.io.Serializable;
-import java.text.DecimalFormat;
-import java.text.DecimalFormatSymbols;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.PriorityQueue;
-import javax.activation.UnsupportedDataTypeException;
 import org.json.JSONArray;
-import org.json.JSONException;
 import org.json.JSONObject;
 
 
 /**
- * SelectionOperator provides the apis for selection query.
+ * SelectionOperatorService provides the services for selection query with capability of both un-sorting and sorting.
  *
- *
+ * Expected behavior:
+ * - Return selection results with the same order of columns as user passed in.
+ *   Eg. SELECT colB, colA, colC FROM table -> [valB, valA, valC]
+ * - For 'select *', return columns with alphabetically order.
+ *   Eg. SELECT * FROM table -> [valA, valB, valC]
+ * - Order by does not change the order of columns in selection results.
+ *   Eg. SELECT colB, colA, colC FROM table ORDER BY calC -> [valB, valA, valC]
  */
 public class SelectionOperatorService {
 
   private int _numDocsScanned = 0;
+
   private final List<SelectionSort> _sortSequence;
+  private final boolean _doOrdering;
   private final List<String> _selectionColumns;
-  private final int _selectionSize;
   private final int _selectionOffset;
   private final int _maxRowSize;
   private final DataSchema _dataSchema;
   private final Comparator<Serializable[]> _rowComparator;
   private final Collection<Serializable[]> _rowEventsSet;
 
-  private Comparator<Integer> _rowDocIdComparator;
-  private Collection<Integer> _rowDocIdSet;
-
-  private final IndexSegment _indexSegment;
-  private final boolean _doOrdering;
-
-  public static final Map<DataType, DecimalFormat> DEFAULT_FORMAT_STRING_MAP = new HashMap<DataType, DecimalFormat>();
-
-  static {
-    DEFAULT_FORMAT_STRING_MAP
-        .put(DataType.INT, new DecimalFormat("##########", DecimalFormatSymbols.getInstance(Locale.US)));
-    DEFAULT_FORMAT_STRING_MAP
-        .put(DataType.LONG, new DecimalFormat("####################", DecimalFormatSymbols.getInstance(Locale.US)));
-    DEFAULT_FORMAT_STRING_MAP
-        .put(DataType.FLOAT, new DecimalFormat("##########.#####", DecimalFormatSymbols.getInstance(Locale.US)));
-    DEFAULT_FORMAT_STRING_MAP.put(DataType.DOUBLE,
-        new DecimalFormat("####################.##########", DecimalFormatSymbols.getInstance(Locale.US)));
-    DEFAULT_FORMAT_STRING_MAP
-        .put(DataType.INT_ARRAY, new DecimalFormat("##########", DecimalFormatSymbols.getInstance(Locale.US)));
-    DEFAULT_FORMAT_STRING_MAP.put(DataType.LONG_ARRAY,
-        new DecimalFormat("####################", DecimalFormatSymbols.getInstance(Locale.US)));
-    DEFAULT_FORMAT_STRING_MAP
-        .put(DataType.FLOAT_ARRAY, new DecimalFormat("##########.#####", DecimalFormatSymbols.getInstance(Locale.US)));
-    DEFAULT_FORMAT_STRING_MAP.put(DataType.DOUBLE_ARRAY,
-        new DecimalFormat("####################.##########", DecimalFormatSymbols.getInstance(Locale.US)));
-  }
-
+  /**
+   * Constructor for SelectionOperatorService using index segment. (Server side)
+   *
+   * @param selections selection query.
+   * @param indexSegment index segment.
+   */
   public SelectionOperatorService(Selection selections, IndexSegment indexSegment) {
-    _indexSegment = indexSegment;
-    if ((selections.getSelectionSortSequence() == null) || selections.getSelectionSortSequence().isEmpty()) {
-      _doOrdering = false;
-    } else {
-      _doOrdering = true;
-    }
     _sortSequence = selections.getSelectionSortSequence();
-    _selectionColumns = getSelectionColumns(selections.getSelectionColumns());
-    _selectionSize = selections.getSize();
-    _selectionOffset = selections.getOffset();
-    _maxRowSize = _selectionOffset + _selectionSize;
-    _dataSchema = getDataSchema(_sortSequence, _selectionColumns, _indexSegment);
-    _rowComparator = getComparator(_sortSequence, _dataSchema);
-    if (_doOrdering) {
-      _rowEventsSet = new PriorityQueue<Serializable[]>(_maxRowSize, _rowComparator);
+    _doOrdering = _sortSequence != null && !_sortSequence.isEmpty();
+    _selectionColumns = SelectionOperatorUtils.getSelectionColumns(selections.getSelectionColumns(), indexSegment);
+    int selectionSize = selections.getSize();
+    int selectionOffset = selections.getOffset();
+    if (selectionSize == 0) {
+      // No need to select any row.
+      _selectionOffset = 0;
+      _maxRowSize = 0;
     } else {
-      _rowEventsSet = new ArrayList<Serializable[]>(_maxRowSize);
+      // Select rows from offset to offset + size.
+      _selectionOffset = selectionOffset;
+      _maxRowSize = _selectionOffset + selectionSize;
     }
-    _rowDocIdComparator = null;
-    _rowDocIdSet = null;
+    _dataSchema = SelectionOperatorUtils.extractDataSchema(_sortSequence, _selectionColumns, indexSegment);
+    _rowComparator = getComparator();
+    if (_doOrdering) {
+      _rowEventsSet = new PriorityQueue<>(Math.max(_maxRowSize, 1), _rowComparator);
+    } else {
+      _rowEventsSet = new ArrayList<>(_maxRowSize);
+    }
   }
 
-  private List<String> getSelectionColumns(List<String> selectionColumns) {
-    if ((selectionColumns.size() == 1) && selectionColumns.get(0).equals("*")) {
-      final List<String> newSelectionColumns = new ArrayList<String>();
-      for (final String columnName : _indexSegment.getColumnNames()) {
-        newSelectionColumns.add(columnName);
-      }
-      return newSelectionColumns;
-    }
-    return selectionColumns;
-  }
-
+  /**
+   * Constructor for SelectionOperatorService using data schema. (Broker side)
+   *
+   * @param selections selection query.
+   * @param dataSchema data schema.
+   */
   public SelectionOperatorService(Selection selections, DataSchema dataSchema) {
-    _indexSegment = null;
-    if ((selections.getSelectionSortSequence() == null) || selections.getSelectionSortSequence().isEmpty()) {
-      _doOrdering = false;
-    } else {
-      _doOrdering = true;
-    }
     _sortSequence = selections.getSelectionSortSequence();
-    _selectionColumns = getSelectionColumns(selections.getSelectionColumns(), dataSchema);
-    _selectionSize = selections.getSize();
-    _selectionOffset = selections.getOffset();
-    _maxRowSize = _selectionOffset + _selectionSize;
-    _dataSchema = dataSchema;
-    _rowComparator = getComparator(_sortSequence, _dataSchema);
-    if (_doOrdering) {
-      _rowEventsSet = new PriorityQueue<Serializable[]>(_maxRowSize, _rowComparator);
+    _doOrdering = _sortSequence != null && !_sortSequence.isEmpty();
+    _selectionColumns = SelectionOperatorUtils.getSelectionColumns(selections.getSelectionColumns(), dataSchema);
+    int selectionSize = selections.getSize();
+    int selectionOffset = selections.getOffset();
+    if (selectionSize == 0) {
+      // No need to select any row.
+      _selectionOffset = 0;
+      _maxRowSize = 0;
     } else {
-      _rowEventsSet = new ArrayList<Serializable[]>(_maxRowSize);
+      // Select rows from offset to offset + size.
+      _selectionOffset = selectionOffset;
+      _maxRowSize = _selectionOffset + selectionSize;
     }
-    _rowDocIdComparator = null;
-    _rowDocIdSet = null;
+    _dataSchema = dataSchema;
+    _rowComparator = getComparator();
+    if (_doOrdering) {
+      _rowEventsSet = new PriorityQueue<>(Math.max(_maxRowSize, 1), _rowComparator);
+    } else {
+      _rowEventsSet = new ArrayList<>(_maxRowSize);
+    }
   }
 
-  private List<String> getSelectionColumns(List<String> selectionColumns, DataSchema dataSchema) {
-    if ((selectionColumns.size() == 1) && selectionColumns.get(0).equals("*")) {
-      final List<String> newSelectionColumns = new ArrayList<String>();
-      for (int i = 0; i < dataSchema.size(); ++i) {
-        newSelectionColumns.add(dataSchema.getColumnName(i));
+  /**
+   * Helper method to get the comparator for sorting selection rows.
+   *
+   * @return comparator for sorting selection rows.
+   */
+  private Comparator<Serializable[]> getComparator() {
+    return new Comparator<Serializable[]>() {
+      @Override
+      public int compare(Serializable[] o1, Serializable[] o2) {
+        int numSortColumns = _sortSequence.size();
+        for (int i = 0; i < numSortColumns; i++) {
+          int ret = 0;
+
+          // Only compare single-value columns.
+          switch (_dataSchema.getColumnType(i)) {
+            case BOOLEAN:
+              if (!_sortSequence.get(i).isIsAsc()) {
+                ret = Boolean.valueOf((String) o1[i]).compareTo(Boolean.valueOf((String) o2[i]));
+              } else {
+                ret = Boolean.valueOf((String) o2[i]).compareTo(Boolean.valueOf((String) o1[i]));
+              }
+              break;
+            case BYTE:
+              if (!_sortSequence.get(i).isIsAsc()) {
+                ret = ((Byte) o1[i]).compareTo((Byte) o2[i]);
+              } else {
+                ret = ((Byte) o2[i]).compareTo((Byte) o1[i]);
+              }
+              break;
+            case CHAR:
+              if (!_sortSequence.get(i).isIsAsc()) {
+                ret = ((Character) o1[i]).compareTo((Character) o2[i]);
+              } else {
+                ret = ((Character) o2[i]).compareTo((Character) o1[i]);
+              }
+              break;
+            case SHORT:
+              if (!_sortSequence.get(i).isIsAsc()) {
+                ret = ((Short) o1[i]).compareTo((Short) o2[i]);
+              } else {
+                ret = ((Short) o2[i]).compareTo((Short) o1[i]);
+              }
+              break;
+            case INT:
+              if (!_sortSequence.get(i).isIsAsc()) {
+                ret = ((Integer) o1[i]).compareTo((Integer) o2[i]);
+              } else {
+                ret = ((Integer) o2[i]).compareTo((Integer) o1[i]);
+              }
+              break;
+            case LONG:
+              if (!_sortSequence.get(i).isIsAsc()) {
+                ret = ((Long) o1[i]).compareTo((Long) o2[i]);
+              } else {
+                ret = ((Long) o2[i]).compareTo((Long) o1[i]);
+              }
+              break;
+            case FLOAT:
+              if (!_sortSequence.get(i).isIsAsc()) {
+                ret = ((Float) o1[i]).compareTo((Float) o2[i]);
+              } else {
+                ret = ((Float) o2[i]).compareTo((Float) o1[i]);
+              }
+              break;
+            case DOUBLE:
+              if (!_sortSequence.get(i).isIsAsc()) {
+                ret = ((Double) o1[i]).compareTo((Double) o2[i]);
+              } else {
+                ret = ((Double) o2[i]).compareTo((Double) o1[i]);
+              }
+              break;
+            case STRING:
+              if (!_sortSequence.get(i).isIsAsc()) {
+                ret = ((String) o1[i]).compareTo((String) o2[i]);
+              } else {
+                ret = ((String) o2[i]).compareTo((String) o1[i]);
+              }
+              break;
+            // Do not support Object and Array type.
+            default:
+              break;
+          }
+          if (ret != 0) {
+            return ret;
+          }
+        }
+        return 0;
       }
-      return newSelectionColumns;
-    }
-    return selectionColumns;
+    };
   }
 
+  /**
+   * Get the selection results.
+   *
+   * @return collection of selection rows.
+   */
+  public Collection<Serializable[]> getRowEventsSet() {
+    return _rowEventsSet;
+  }
+
+  /**
+   * Get the data schema.
+   *
+   * @return data schema.
+   */
+  public DataSchema getDataSchema() {
+    return _dataSchema;
+  }
+
+  /**
+   * Get number of documents scanned.
+   *
+   * @return number of documents scanned.
+   */
+  public long getNumDocsScanned() {
+    return _numDocsScanned;
+  }
+
+  /**
+   * Merge two partial results for selection query.
+   *
+   * @param rowEventsSet1 partial results 1.
+   * @param rowEventsSet2 partial results 2.
+   * @return merged result.
+   */
   public Collection<Serializable[]> merge(Collection<Serializable[]> rowEventsSet1,
       Collection<Serializable[]> rowEventsSet2) {
     if (rowEventsSet1 == null) {
@@ -191,49 +259,40 @@ public class SelectionOperatorService {
     if (_doOrdering) {
       PriorityQueue<Serializable[]> queue1 = (PriorityQueue<Serializable[]>) rowEventsSet1;
       PriorityQueue<Serializable[]> queue2 = (PriorityQueue<Serializable[]>) rowEventsSet2;
-      final Iterator<Serializable[]> iterator = queue2.iterator();
-      while (iterator.hasNext()) {
-        final Serializable[] row = iterator.next();
-        if (queue1.size() < _maxRowSize) {
-          queue1.add(row);
-        } else {
-          if (_rowComparator.compare(queue1.peek(), row) < 0) {
-            queue1.add(row);
-            queue1.poll();
-          }
-        }
+      for (Serializable[] row : queue2) {
+        addToPriorityQueue(row, queue1, _rowComparator);
       }
     } else {
-      final Iterator<Serializable[]> iterator = rowEventsSet2.iterator();
+      Iterator<Serializable[]> iterator = rowEventsSet2.iterator();
       while (rowEventsSet1.size() < _maxRowSize && iterator.hasNext()) {
-        final Serializable[] row = iterator.next();
-        rowEventsSet1.add(row);
+        rowEventsSet1.add(iterator.next());
       }
     }
     return rowEventsSet1;
   }
 
+  /**
+   * Reduce a collection of data tables to selection results for selection query.
+   *
+   * @param selectionResults map from server instance to data table.
+   * @return reduced result.
+   */
   public Collection<Serializable[]> reduce(Map<ServerInstance, DataTable> selectionResults) {
     _rowEventsSet.clear();
     if (_doOrdering) {
       PriorityQueue<Serializable[]> queue = (PriorityQueue<Serializable[]>) _rowEventsSet;
-      for (final DataTable dt : selectionResults.values()) {
-        for (int rowId = 0; rowId < dt.getNumberOfRows(); ++rowId) {
-          final Serializable[] row = getRowFromDataTable(dt, rowId);
-          if (queue.size() < _maxRowSize) {
-            queue.add(row);
-          } else {
-            if (_rowComparator.compare(queue.peek(), row) < 0) {
-              queue.add(row);
-              queue.poll();
-            }
-          }
+      for (DataTable dataTable : selectionResults.values()) {
+        int numRows = dataTable.getNumberOfRows();
+        for (int rowId = 0; rowId < numRows; rowId++) {
+          Serializable[] row = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
+          addToPriorityQueue(row, queue, _rowComparator);
         }
       }
     } else {
-      for (final DataTable dt : selectionResults.values()) {
-        for (int rowId = 0; rowId < dt.getNumberOfRows(); ++rowId) {
-          final Serializable[] row = getRowFromDataTable(dt, rowId);
+      for (DataTable dataTable : selectionResults.values()) {
+        int numRows = dataTable.getNumberOfRows();
+        for (int rowId = 0; rowId < numRows; rowId++) {
+          Serializable[] row = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
           if (_rowEventsSet.size() < _maxRowSize) {
             _rowEventsSet.add(row);
           } else {
@@ -245,597 +304,120 @@ public class SelectionOperatorService {
     return _rowEventsSet;
   }
 
-  public JSONObject render(Collection<Serializable[]> finalResults, DataSchema dataSchema, int offset)
+  /**
+   * Helper method to add a value to the priority queue.
+   *
+   * @param value value to be added.
+   * @param queue priority queue.
+   * @param comparator comparator for the value.
+   * @param <T> type for the value.
+   */
+  private <T> void addToPriorityQueue(T value, PriorityQueue<T> queue, Comparator<T> comparator) {
+    if (queue.size() < _maxRowSize) {
+      queue.add(value);
+    } else if (comparator.compare(queue.peek(), value) < 0) {
+      queue.poll();
+      queue.add(value);
+    }
+  }
+
+  /**
+   * Render the final selection results to a JSONObject for selection query.
+   * Only render the selection rows from offset to offset + selection size.
+   *
+   * @param finalResults final selection results.
+   * @return final JSONObject result.
+   * @throws Exception
+   */
+  public JSONObject render(Collection<Serializable[]> finalResults)
       throws Exception {
-    final LinkedList<JSONArray> rowEventsJSonList = new LinkedList<JSONArray>();
-    if (finalResults instanceof PriorityQueue<?>) {
+    LinkedList<JSONArray> rowEventsJsonList = new LinkedList<>();
+
+    if (_doOrdering) {
       PriorityQueue<Serializable[]> queue = (PriorityQueue<Serializable[]>) finalResults;
-      while (finalResults.size() > offset) {
-        rowEventsJSonList.addFirst(getJSonArrayFromRow(queue.poll(), dataSchema));
-      }
-    } else if (finalResults instanceof ArrayList<?>) {
-      List<Serializable[]> list = (List<Serializable[]>) finalResults;
-      //TODO: check if the offset is inclusive or exclusive
-      for (int i = offset; i < list.size(); i++) {
-        rowEventsJSonList.add(getJSonArrayFromRow(list.get(i), dataSchema));
+      while (queue.size() > _selectionOffset) {
+        rowEventsJsonList.addFirst(
+            SelectionOperatorUtils.getJSonArrayFromRow(queue.poll(), _selectionColumns, _dataSchema));
       }
     } else {
-      throw new UnsupportedDataTypeException(
-          "type of results Expected: (PriorityQueue| ArrayList)) actual:" + finalResults.getClass());
+      List<Serializable[]> list = (List<Serializable[]>) finalResults;
+      int numRows = list.size();
+      for (int i = _selectionOffset; i < numRows; i++) {
+        rowEventsJsonList.add(SelectionOperatorUtils.getJSonArrayFromRow(list.get(i), _selectionColumns, _dataSchema));
+      }
     }
-    final JSONObject resultJsonObject = new JSONObject();
-    resultJsonObject.put("results", new JSONArray(rowEventsJSonList));
-    resultJsonObject.put("columns", getSelectionColumnsJsonArrayFromDataSchema(dataSchema));
+
+    JSONObject resultJsonObject = new JSONObject();
+    resultJsonObject.put("results", new JSONArray(rowEventsJsonList));
+    resultJsonObject.put("columns", new JSONArray(_selectionColumns));
     return resultJsonObject;
   }
 
   /**
-   * Given a collection of selection results from broker, translate them to SelectionResults object
-   * to be used for building BrokerResponse.
+   * Render the final selection results to a SelectionResults object for selection query.
+   * SelectionResults object will be used in building the BrokerResponse.
    *
-   * @param reducedResults
-   * @param dataSchema
-   * @param offset
-   * @return
+   * @param finalResults final selection results.
+   * @return SelectionResults object result.
    * @throws Exception
    */
-  public SelectionResults renderSelectionResults(Collection<Serializable[]> reducedResults, DataSchema dataSchema,
-      int offset)
+  public SelectionResults renderSelectionResults(Collection<Serializable[]> finalResults)
       throws Exception {
-    final LinkedList<Serializable[]> rows = new LinkedList<Serializable[]>();
+    LinkedList<Serializable[]> rowEvents = new LinkedList<>();
 
-    if (reducedResults instanceof PriorityQueue<?>) {
-      PriorityQueue<Serializable[]> queue = (PriorityQueue<Serializable[]>) reducedResults;
-      while (reducedResults.size() > offset) {
-        rows.addFirst(SelectionOperatorUtils.getFormattedRow(queue.poll(), _selectionColumns, dataSchema));
-      }
-    } else if (reducedResults instanceof ArrayList<?>) {
-      List<Serializable[]> list = (List<Serializable[]>) reducedResults;
-      for (int i = offset; i < list.size(); i++) {
-        rows.add(SelectionOperatorUtils.getFormattedRow(list.get(i), _selectionColumns, dataSchema));
+    if (_doOrdering) {
+      PriorityQueue<Serializable[]> queue = (PriorityQueue<Serializable[]>) finalResults;
+      while (queue.size() > _selectionOffset) {
+        rowEvents.addFirst(
+            SelectionOperatorUtils.getFormattedRow(queue.poll(), _selectionColumns, _dataSchema));
       }
     } else {
-      throw new UnsupportedDataTypeException(
-          "type of results Expected: (PriorityQueue| ArrayList)) actual:" + reducedResults.getClass());
-    }
-
-    return new SelectionResults(_selectionColumns, rows);
-  }
-
-  private JSONArray getSelectionColumnsJsonArrayFromDataSchema(DataSchema dataSchema) {
-    final JSONArray jsonArray = new JSONArray();
-    for (String column: _selectionColumns) {
-      jsonArray.put(column);
-    }
-    return jsonArray;
-  }
-
-  private List<String> getSelectionColumnsFromDataSchema(DataSchema dataSchema) {
-    List<String> columns = new ArrayList<String>();
-
-    for (int i = 0; i < dataSchema.size(); i++) {
-      if (_selectionColumns.contains(dataSchema.getColumnName(i))) {
-        columns.add(dataSchema.getColumnName(i));
+      List<Serializable[]> list = (List<Serializable[]>) finalResults;
+      int numRows = list.size();
+      for (int i = _selectionOffset; i < numRows; i++) {
+        rowEvents.add(SelectionOperatorUtils.getFormattedRow(list.get(i), _selectionColumns, _dataSchema));
       }
     }
-    return columns;
-  }
 
-  public Collection<Serializable[]> getRowEventsSet() {
-    return _rowEventsSet;
-  }
-
-  public DataSchema getDataSchema() {
-    return _dataSchema;
-  }
-
-  public long getNumDocsScanned() {
-    return _numDocsScanned;
-  }
-
-  private Comparator<Serializable[]> getComparator(final List<SelectionSort> sortSequence,
-      final DataSchema dataSchema) {
-    return new Comparator<Serializable[]>() {
-      @Override
-      public int compare(Serializable[] o1, Serializable[] o2) {
-        for (int i = 0; i < sortSequence.size(); ++i) {
-          int ret = 0;
-          switch (dataSchema.getColumnType(i)) {
-            case INT:
-              if (!sortSequence.get(i).isIsAsc()) {
-                ret = ((Integer) o1[i]).compareTo((Integer) o2[i]);
-              } else {
-                ret = ((Integer) o2[i]).compareTo((Integer) o1[i]);
-              }
-              break;
-            case SHORT:
-              if (!sortSequence.get(i).isIsAsc()) {
-                ret = ((Short) o1[i]).compareTo((Short) o2[i]);
-              } else {
-                ret = ((Short) o2[i]).compareTo((Short) o1[i]);
-              }
-              break;
-            case LONG:
-              if (!sortSequence.get(i).isIsAsc()) {
-                ret = ((Long) o1[i]).compareTo((Long) o2[i]);
-              } else {
-                ret = ((Long) o2[i]).compareTo((Long) o1[i]);
-              }
-              break;
-            case FLOAT:
-              if (!sortSequence.get(i).isIsAsc()) {
-                ret = ((Float) o1[i]).compareTo((Float) o2[i]);
-              } else {
-                ret = ((Float) o2[i]).compareTo((Float) o1[i]);
-              }
-              break;
-            case DOUBLE:
-              if (!sortSequence.get(i).isIsAsc()) {
-                ret = ((Double) o1[i]).compareTo((Double) o2[i]);
-              } else {
-                ret = ((Double) o2[i]).compareTo((Double) o1[i]);
-              }
-              break;
-            case STRING:
-              if (!sortSequence.get(i).isIsAsc()) {
-                ret = ((String) o1[i]).compareTo((String) o2[i]);
-              } else {
-                ret = ((String) o2[i]).compareTo((String) o1[i]);
-              }
-              break;
-            default:
-              break;
-          }
-          if (ret != 0) {
-            return ret;
-          }
-        }
-        return 0;
-      }
-
-      ;
-    };
-  }
-
-  public JSONObject render(Collection<Serializable[]> reduceResults)
-      throws Exception {
-    return render(reduceResults, _dataSchema, _selectionOffset);
+    return new SelectionResults(_selectionColumns, rowEvents);
   }
 
   /**
-   * Translate the selection results from broker to SelectionResults object to be used
-   * for building BrokerResponse.
+   * Iterate over a list of blocks, extract values from them and merge the values to the selection results.
    *
-   * @param reduceResults
-   * @return
+   * @param blockDocIdIterator block document id iterator.
+   * @param blocks list of blocks.
    * @throws Exception
    */
-  public SelectionResults renderSelectionResults(Collection<Serializable[]> reduceResults)
-      throws Exception {
-    return renderSelectionResults(reduceResults, _dataSchema, _selectionOffset);
-  }
-
-  private DataSchema getDataSchema(List<SelectionSort> sortSequence, List<String> selectionColumns,
-      IndexSegment indexSegment) {
-    final List<String> columns = new ArrayList<String>();
-
-    if (sortSequence != null && !sortSequence.isEmpty()) {
-      for (final SelectionSort selectionSort : sortSequence) {
-        columns.add(selectionSort.getColumn());
-      }
-    }
-    String[] selectionColumnArray = selectionColumns.toArray(new String[selectionColumns.size()]);
-    Arrays.sort(selectionColumnArray);
-    for (int i = 0; i < selectionColumnArray.length; ++i) {
-      String selectionColumn = selectionColumnArray[i];
-      if (!columns.contains(selectionColumn)) {
-        columns.add(selectionColumn);
-      }
-    }
-    final DataType[] dataTypes = new DataType[columns.size()];
-    for (int i = 0; i < dataTypes.length; ++i) {
-      DataSource ds = indexSegment.getDataSource(columns.get(i));
-      DataSourceMetadata m = ds.getDataSourceMetadata();
-      dataTypes[i] = m.getDataType();
-      if (!m.isSingleValue()) {
-        dataTypes[i] = DataType.valueOf(dataTypes[i] + "_ARRAY");
-      }
-    }
-    return new DataSchema(columns.toArray(new String[0]), dataTypes);
-  }
-
   public void iterateOnBlock(BlockDocIdIterator blockDocIdIterator, Block[] blocks)
       throws Exception {
-    int docId = 0;
-    _rowDocIdComparator = getDocValBasedComparator(_sortSequence, _dataSchema, blocks);
-    if (_doOrdering) {
-      _rowDocIdSet = new PriorityQueue<Integer>(_maxRowSize, _rowDocIdComparator);
-    } else {
-      _rowDocIdSet = new ArrayList<Integer>(_maxRowSize);
-    }
-    while ((docId = blockDocIdIterator.next()) != Constants.EOF) {
-      _numDocsScanned++;
-      if (_rowDocIdSet.size() < _maxRowSize) {
-        _rowDocIdSet.add(docId);
+    if (_maxRowSize > 0) {
+      SelectionFetcher selectionFetcher = new SelectionFetcher(blocks, _dataSchema);
+      int docId;
+      if (_doOrdering) {
+        Comparator<Integer> rowDocIdComparator = new CompositeDocIdValComparator(_sortSequence, blocks);
+        PriorityQueue<Integer> queue = new PriorityQueue<>(_maxRowSize, rowDocIdComparator);
+        while ((docId = blockDocIdIterator.next()) != Constants.EOF) {
+          _numDocsScanned++;
+          addToPriorityQueue(docId, queue, rowDocIdComparator);
+        }
+        PriorityQueue<Serializable[]> rowEventsPriorityQueue = new PriorityQueue<>(queue.size(), _rowComparator);
+        while (!queue.isEmpty()) {
+          rowEventsPriorityQueue.add(selectionFetcher.getRow(queue.poll()));
+        }
+        merge(_rowEventsSet, rowEventsPriorityQueue);
       } else {
-        if (!_doOrdering) {
-          break;
-        }
-        PriorityQueue<Integer> queue = (PriorityQueue<Integer>) _rowDocIdSet;
-        if (_doOrdering && (_rowDocIdComparator.compare(docId, queue.peek()) > 0)) {
-          queue.add(docId);
-          queue.poll();
-        }
-      }
-    }
-    mergeToRowEventsSet(blocks);
-  }
-
-  public Collection<Serializable[]> mergeToRowEventsSet(Block[] blocks)
-      throws Exception {
-    SelectionFetcher selectionFetcher = new SelectionFetcher(blocks, _dataSchema);
-    if (_doOrdering) {
-      final PriorityQueue<Serializable[]> rowEventsPriorityQueue =
-          new PriorityQueue<Serializable[]>(_maxRowSize, _rowComparator);
-      PriorityQueue<Integer> queue = (PriorityQueue<Integer>) _rowDocIdSet;
-      while (!queue.isEmpty()) {
-        Serializable[] rowFromBlockValSets = selectionFetcher.getRow(queue.poll());
-        rowEventsPriorityQueue.add(rowFromBlockValSets);
-      }
-      merge(_rowEventsSet, rowEventsPriorityQueue);
-    } else {
-      final List<Serializable[]> rowEventsList = new ArrayList<Serializable[]>(_maxRowSize);
-      List<Integer> list = (List<Integer>) _rowDocIdSet;
-      for (int i = 0; i < Math.min(_maxRowSize, list.size()); i++) {
-        Serializable[] rowFromBlockValSets = selectionFetcher.getRow(list.get(i));
-        rowEventsList.add(rowFromBlockValSets);
-      }
-      merge(_rowEventsSet, rowEventsList);
-    }
-
-    return _rowEventsSet;
-  }
-
-  private Comparator<Integer> getDocValBasedComparator(final List<SelectionSort> sortSequence,
-      final DataSchema dataSchema, final Block[] blocks) {
-
-    return new CompositeDocIdValComparator(sortSequence, blocks);
-  }
-
-  @Deprecated
-  private Serializable[] getRowFromBlockValSets(int docId, Block[] blocks)
-      throws Exception {
-
-    final Serializable[] row = new Serializable[_dataSchema.size()];
-    int j = 0;
-    for (int i = 0; i < _dataSchema.size(); ++i) {
-      if (blocks[j] instanceof RealtimeSingleValueBlock) {
-        if (blocks[j].getMetadata().hasDictionary()) {
-          Dictionary dictionaryReader = blocks[j].getMetadata().getDictionary();
-          BlockSingleValIterator bvIter = (BlockSingleValIterator) blocks[j].getBlockValueSet().iterator();
-          bvIter.skipTo(docId);
-          switch (_dataSchema.getColumnType(i)) {
-            case INT:
-              row[i] = (Integer) ((IntMutableDictionary) dictionaryReader).get(bvIter.nextIntVal());
-              break;
-            case FLOAT:
-              row[i] = (Float) ((FloatMutableDictionary) dictionaryReader).get(bvIter.nextIntVal());
-              break;
-            case LONG:
-              row[i] = (Long) ((LongMutableDictionary) dictionaryReader).get(bvIter.nextIntVal());
-              break;
-            case DOUBLE:
-              row[i] = (Double) ((DoubleMutableDictionary) dictionaryReader).get(bvIter.nextIntVal());
-              break;
-            case STRING:
-              row[i] = (String) ((StringMutableDictionary) dictionaryReader).get(bvIter.nextIntVal());
-              break;
-            default:
-              break;
-          }
-        } else {
-          BlockSingleValIterator bvIter = (BlockSingleValIterator) blocks[j].getBlockValueSet().iterator();
-          bvIter.skipTo(docId);
-          switch (_dataSchema.getColumnType(i)) {
-            case INT:
-              row[i] = bvIter.nextIntVal();
-              break;
-            case FLOAT:
-              row[i] = bvIter.nextFloatVal();
-              break;
-            case LONG:
-              row[i] = bvIter.nextLongVal();
-              break;
-            case DOUBLE:
-              row[i] = bvIter.nextDoubleVal();
-              break;
-            default:
-              break;
-          }
-        }
-      } else if (blocks[j] instanceof RealtimeMultiValueBlock) {
-        Dictionary dictionaryReader = blocks[j].getMetadata().getDictionary();
-        BlockMultiValIterator bvIter = (BlockMultiValIterator) blocks[j].getBlockValueSet().iterator();
-        bvIter.skipTo(docId);
-        int[] dictIds = new int[blocks[j].getMetadata().getMaxNumberOfMultiValues()];
-        int dictSize;
-        switch (_dataSchema.getColumnType(i)) {
-          case INT_ARRAY:
-            dictSize = bvIter.nextIntVal(dictIds);
-            int[] rawIntRow = new int[dictSize];
-            for (int dictIdx = 0; dictIdx < dictSize; ++dictIdx) {
-              rawIntRow[dictIdx] = (Integer) ((IntMutableDictionary) dictionaryReader).get(dictIds[dictIdx]);
-            }
-            row[i] = rawIntRow;
-            break;
-          case FLOAT_ARRAY:
-            dictSize = bvIter.nextIntVal(dictIds);
-            Float[] rawFloatRow = new Float[dictSize];
-            for (int dictIdx = 0; dictIdx < dictSize; ++dictIdx) {
-              rawFloatRow[dictIdx] = (Float) ((FloatMutableDictionary) dictionaryReader).get(dictIds[dictIdx]);
-            }
-            row[i] = rawFloatRow;
-            break;
-          case LONG_ARRAY:
-            dictSize = bvIter.nextIntVal(dictIds);
-            Long[] rawLongRow = new Long[dictSize];
-            for (int dictIdx = 0; dictIdx < dictSize; ++dictIdx) {
-              rawLongRow[dictIdx] = (Long) ((LongMutableDictionary) dictionaryReader).get(dictIds[dictIdx]);
-            }
-            row[i] = rawLongRow;
-            break;
-          case DOUBLE_ARRAY:
-            dictSize = bvIter.nextIntVal(dictIds);
-            Double[] rawDoubleRow = new Double[dictSize];
-            for (int dictIdx = 0; dictIdx < dictSize; ++dictIdx) {
-              rawDoubleRow[dictIdx] = (Double) ((DoubleMutableDictionary) dictionaryReader).get(dictIds[dictIdx]);
-            }
-            row[i] = rawDoubleRow;
-            break;
-          case STRING_ARRAY:
-            dictSize = bvIter.nextIntVal(dictIds);
-            String[] rawStringRow = new String[dictSize];
-            for (int dictIdx = 0; dictIdx < dictSize; ++dictIdx) {
-              rawStringRow[dictIdx] = (String) (((StringMutableDictionary) dictionaryReader).get(dictIds[dictIdx]));
-            }
-            row[i] = rawStringRow;
-            break;
-          default:
-            break;
-        }
-      } else if (blocks[j] instanceof UnSortedSingleValueBlock || blocks[j] instanceof SortedSingleValueBlock) {
-        if (blocks[j].getMetadata().hasDictionary()) {
-          Dictionary dictionaryReader = blocks[j].getMetadata().getDictionary();
-          BlockSingleValIterator bvIter = (BlockSingleValIterator) blocks[j].getBlockValueSet().iterator();
-          bvIter.skipTo(docId);
-          switch (_dataSchema.getColumnType(i)) {
-            case INT:
-              int dicId = bvIter.nextIntVal();
-              row[i] = ((IntDictionary) dictionaryReader).get(dicId);
-              break;
-            case FLOAT:
-              row[i] = ((FloatDictionary) dictionaryReader).get(bvIter.nextIntVal());
-              break;
-            case LONG:
-              row[i] = ((LongDictionary) dictionaryReader).get(bvIter.nextIntVal());
-              break;
-            case DOUBLE:
-              row[i] = ((DoubleDictionary) dictionaryReader).get(bvIter.nextIntVal());
-              break;
-            case STRING:
-              row[i] = ((StringDictionary) dictionaryReader).get(bvIter.nextIntVal());
-              break;
-            default:
-              break;
-          }
-        } else {
-          BlockSingleValIterator bvIter = (BlockSingleValIterator) blocks[j].getBlockValueSet().iterator();
-          bvIter.skipTo(docId);
-          switch (_dataSchema.getColumnType(i)) {
-            case INT:
-              row[i] = new Integer(bvIter.nextIntVal());
-              break;
-            case FLOAT:
-              row[i] = new Float(bvIter.nextFloatVal());
-              break;
-            case LONG:
-              row[i] = new Long(bvIter.nextLongVal());
-              break;
-            case DOUBLE:
-              row[i] = new Double(bvIter.nextDoubleVal());
-              break;
-            default:
-              break;
-          }
-        }
-      } else if (blocks[j] instanceof MultiValueBlock) {
-        Dictionary dictionaryReader = blocks[j].getMetadata().getDictionary();
-        BlockMultiValIterator bvIter = (BlockMultiValIterator) blocks[j].getBlockValueSet().iterator();
-        bvIter.skipTo(docId);
-        int[] dictIds = new int[blocks[j].getMetadata().getMaxNumberOfMultiValues()];
-        int dictSize;
-        switch (_dataSchema.getColumnType(i)) {
-          case INT_ARRAY:
-            dictSize = bvIter.nextIntVal(dictIds);
-            int[] rawIntRow = new int[dictSize];
-            for (int dictIdx = 0; dictIdx < dictSize; ++dictIdx) {
-              rawIntRow[dictIdx] = ((IntDictionary) dictionaryReader).get(dictIds[dictIdx]);
-            }
-            row[i] = rawIntRow;
-            break;
-          case FLOAT_ARRAY:
-            dictSize = bvIter.nextIntVal(dictIds);
-            Float[] rawFloatRow = new Float[dictSize];
-            for (int dictIdx = 0; dictIdx < dictSize; ++dictIdx) {
-              rawFloatRow[dictIdx] = ((FloatDictionary) dictionaryReader).get(dictIds[dictIdx]);
-            }
-            row[i] = rawFloatRow;
-            break;
-          case LONG_ARRAY:
-            dictSize = bvIter.nextIntVal(dictIds);
-            Long[] rawLongRow = new Long[dictSize];
-            for (int dictIdx = 0; dictIdx < dictSize; ++dictIdx) {
-              rawLongRow[dictIdx] = ((LongDictionary) dictionaryReader).get(dictIds[dictIdx]);
-            }
-            row[i] = rawLongRow;
-            break;
-          case DOUBLE_ARRAY:
-            dictSize = bvIter.nextIntVal(dictIds);
-            Double[] rawDoubleRow = new Double[dictSize];
-            for (int dictIdx = 0; dictIdx < dictSize; ++dictIdx) {
-              rawDoubleRow[dictIdx] = ((DoubleDictionary) dictionaryReader).get(dictIds[dictIdx]);
-            }
-            row[i] = rawDoubleRow;
-            break;
-          case STRING_ARRAY:
-            dictSize = bvIter.nextIntVal(dictIds);
-            String[] rawStringRow = new String[dictSize];
-            for (int dictIdx = 0; dictIdx < dictSize; ++dictIdx) {
-              rawStringRow[dictIdx] = (((StringDictionary) dictionaryReader).get(dictIds[dictIdx]));
-            }
-            row[i] = rawStringRow;
-            break;
-          default:
-            break;
-        }
-      }
-      j++;
-    }
-    return row;
-  }
-
-  private JSONArray getJSonArrayFromRow(Serializable[] poll, DataSchema dataSchema)
-      throws JSONException {
-
-    final JSONArray jsonArray = new JSONArray();
-    Map<String, Integer> columnToIdxMapping = buildColumnToIdxMappingForDataSchema(dataSchema);
-    for (int i = 0; i < _selectionColumns.size(); ++i) {
-      if (!columnToIdxMapping.containsKey(_selectionColumns.get(i))) {
-        jsonArray.put((String)null);
-      } else {
-        int colIdx = columnToIdxMapping.get(_selectionColumns.get(i));
-        if (dataSchema.getColumnType(colIdx).isSingleValue()) {
-          if (dataSchema.getColumnType(colIdx) == DataType.STRING) {
-            jsonArray.put(poll[colIdx]);
+        List<Serializable[]> rowEventsList = new ArrayList<>(_maxRowSize);
+        while ((docId = blockDocIdIterator.next()) != Constants.EOF) {
+          _numDocsScanned++;
+          if (rowEventsList.size() < _maxRowSize) {
+            rowEventsList.add(selectionFetcher.getRow(docId));
           } else {
-            jsonArray.put(DEFAULT_FORMAT_STRING_MAP.get(dataSchema.getColumnType(colIdx)).format(poll[colIdx]));
+            break;
           }
-        } else {
-          // Multi-value;
-
-          JSONArray stringJsonArray = new JSONArray();
-          //          stringJsonArray.put(poll[i]);
-          switch (dataSchema.getColumnType(colIdx)) {
-            case STRING_ARRAY:
-              String[] stringValues = (String[]) poll[colIdx];
-              for (String s : stringValues) {
-                stringJsonArray.put(s);
-              }
-              break;
-            case INT_ARRAY:
-              int[] intValues = (int[]) poll[colIdx];
-              for (int s : intValues) {
-                stringJsonArray.put(DEFAULT_FORMAT_STRING_MAP.get(dataSchema.getColumnType(colIdx)).format(s));
-              }
-              break;
-            case FLOAT_ARRAY:
-              float[] floatValues = (float[]) poll[colIdx];
-              for (float s : floatValues) {
-                stringJsonArray.put(DEFAULT_FORMAT_STRING_MAP.get(dataSchema.getColumnType(colIdx)).format(s));
-              }
-              break;
-            case LONG_ARRAY:
-              long[] longValues = (long[]) poll[colIdx];
-              for (long s : longValues) {
-                stringJsonArray.put(DEFAULT_FORMAT_STRING_MAP.get(dataSchema.getColumnType(colIdx)).format(s));
-              }
-              break;
-            case DOUBLE_ARRAY:
-              double[] doubleValues = (double[]) poll[colIdx];
-              for (double s : doubleValues) {
-                stringJsonArray.put(DEFAULT_FORMAT_STRING_MAP.get(dataSchema.getColumnType(colIdx)).format(s));
-              }
-              break;
-            default:
-              break;
-          }
-          jsonArray.put(stringJsonArray);
         }
+        merge(_rowEventsSet, rowEventsList);
       }
     }
-    return jsonArray;
-  }
-
-  private static Map<String, Integer> buildColumnToIdxMappingForDataSchema(DataSchema dataSchema) {
-    Map<String, Integer> columnToIdxMapping = new HashMap<String, Integer>();
-    for (int i = 0; i < dataSchema.size(); ++i) {
-      columnToIdxMapping.put(dataSchema.getColumnName(i), i);
-    }
-    return columnToIdxMapping;
-  }
-
-  private static Serializable[] getRowFromDataTable(DataTable dt, int rowId) {
-    final Serializable[] row = new Serializable[dt.getDataSchema().size()];
-    for (int i = 0; i < dt.getDataSchema().size(); ++i) {
-      if (dt.getDataSchema().getColumnType(i).isSingleValue()) {
-        switch (dt.getDataSchema().getColumnType(i)) {
-          case INT:
-            row[i] = dt.getInt(rowId, i);
-            break;
-          case LONG:
-            row[i] = dt.getLong(rowId, i);
-            break;
-          case DOUBLE:
-            row[i] = dt.getDouble(rowId, i);
-            break;
-          case FLOAT:
-            row[i] = dt.getFloat(rowId, i);
-            break;
-          case STRING:
-            row[i] = dt.getString(rowId, i);
-            break;
-          case SHORT:
-            row[i] = dt.getShort(rowId, i);
-            break;
-          case CHAR:
-            row[i] = dt.getChar(rowId, i);
-            break;
-          case BYTE:
-            row[i] = dt.getByte(rowId, i);
-            break;
-          default:
-            row[i] = dt.getObject(rowId, i);
-            break;
-        }
-      } else {
-        switch (dt.getDataSchema().getColumnType(i)) {
-          case INT_ARRAY:
-            row[i] = dt.getIntArray(rowId, i);
-            break;
-          case LONG_ARRAY:
-            row[i] = dt.getLongArray(rowId, i);
-            break;
-          case DOUBLE_ARRAY:
-            row[i] = dt.getDoubleArray(rowId, i);
-            break;
-          case FLOAT_ARRAY:
-            row[i] = dt.getFloatArray(rowId, i);
-            break;
-          case STRING_ARRAY:
-            row[i] = dt.getStringArray(rowId, i);
-            break;
-          case CHAR_ARRAY:
-            row[i] = dt.getCharArray(rowId, i);
-            break;
-          case BYTE_ARRAY:
-            row[i] = dt.getByteArray(rowId, i);
-            break;
-          default:
-            row[i] = dt.getObject(rowId, i);
-            break;
-        }
-      }
-    }
-    return row;
   }
 }
