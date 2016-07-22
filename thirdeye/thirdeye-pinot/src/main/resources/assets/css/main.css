@@ -67,6 +67,12 @@ body a{
     background: #f2fae3;
 }
 
+.position-top-right{
+    position: absolute;
+    top: 10px;
+    right: 10px;
+}
+
 .required:after {
     content:" *";
 }

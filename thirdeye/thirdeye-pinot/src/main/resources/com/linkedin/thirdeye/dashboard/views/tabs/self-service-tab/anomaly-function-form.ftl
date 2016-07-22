@@ -2,7 +2,8 @@
 <script id="anomaly-function-form-template" type="text/x-handlebars-template">
     <form id="configure-anomaly-function-form" class="uk-form" >
         {{#if id}}
-        <div class="uk-form-row">Function id: {{id}}</div>
+        <div class="uk-form-row">
+            <label class="bold-label">Function id: </label>#<span> {{id}}</span></div>
         {{else}}
         <div  class="title-box full-width" style="margin-top:15px;">
             <h3>Create anomaly function</h3>
@@ -30,6 +31,19 @@
                 <div class="uk-button uk-button-primary" type="button"><i class="uk-icon-caret-down"></i>
                 </div>
                 <div class="landing-dataset uk-dropdown uk-dropdown-small uk-dropdown-bottom" style="top: 30px; left: 0px;">
+                </div>
+            </div>
+        </div>
+
+        <div class="uk-form-row">
+            <label class="uk-form-label bold-label required">Function Type</label>
+            <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group uk-display-inline-block">
+                <div id="selected-function-type" class="uk-button" value="USER_RULE">USER_RULE</div>
+                <div class="uk-button uk-button-primary" type="button"><i class="uk-icon-caret-down"></i></div>
+                <div class="uk-dropdown uk-dropdown-small uk-dropdown-bottom" style="top: 30px; left: 0px;">
+                    <ul class="uk-nav uk-nav-dropdown single-select">
+                        <li class="function-type-option" value="USER_RULE"><a href="#" class="uk-dropdown-close">USER_RULE</a></li>
+                    </ul>
                 </div>
             </div>
         </div>
@@ -66,7 +80,6 @@
                          Condition
                     {{/if}}
                 </div>
-
                 <div class="uk-button uk-button-primary" type="button"><i class="uk-icon-caret-down"></i>
                 </div>
                 <div class="uk-dropdown uk-dropdown-small uk-dropdown-bottom" style="top: 30px; left: 0px;">
@@ -79,7 +92,7 @@
         </div>
         <span> by </span>
         <div class="uk-form-row uk-form-row uk-display-inline-block" rel="self-service">
-            <input id="anomaly-threshold" type="text" placeholder="threshold (1-100)" value="{{#if properties}}{{lookupAnomalyProperty properties 'changeThreshold'}}{{/if}}"><span>%</span>
+            <input id="anomaly-threshold" type="text" placeholder="threshold (1-100)" value="{{#if properties}}{{populateAnomalyFunctionProp properties 'changeThreshold'}}{{/if}}"><span>%</span>
         </div>
         <div id="anomaly-compare-mode-selector uk-display-inline-block" class="uk-form-row uk-form-row uk-display-inline-block" rel="self-service">
             <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group uk-display-inline-block">
@@ -151,10 +164,13 @@
         </div>-->
 
         <div class="uk-form-row">
+            {{#if cron}}
+            cron: {{cron}}
+            {{else}}
             <span class="uk-form-label uk-display-inline-block">Monitor the data every </span>
             <input id="monitoring-repeat-size" type="number" class="thin-input" {{#if repeatEverySize}}value="{{repeatEverySize}}"{{/if}}>
             <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group uk-display-inline-block">
-                <div id="selected-monitoring-repeat-unit" class="uk-button" value="HOURS">HOUR(S)</div>
+                <div id="selected-monitoring-repeat-unit" class="uk-button" value="HOURS">HOURS</div>
                 <div class="uk-button uk-button-primary" type="button"><i class="uk-icon-caret-down"></i>
                 </div>
                 <div class="uk-dropdown uk-dropdown-small uk-dropdown-bottom" style="top: 30px; left: 0px;">
@@ -170,10 +186,11 @@
                         <input id="monitoring-schedule-time" class="thin-input" type="text" data-uk-timepicker="{format:'24h'}" placeholder="HH:MM">
                         <span id="local-timezone"></span>
                     </span>
+            {{/if}}
         </div>
 
         <div class="uk-form-row">
-            <input id="active-alert" rel="self-service" type="checkbox"  {{#if isActive}}checked{{/if}}><span> Keep this alert active.</span>
+            <input id="active-alert" rel="self-service" type="checkbox"  {{#if isActive}}checked{{else}}{{/if}}><span> Keep this alert active.</span>
         </div>
 
         <div id="manage-alert-error" class="uk-alert uk-alert-danger hidden" rel="self-service">

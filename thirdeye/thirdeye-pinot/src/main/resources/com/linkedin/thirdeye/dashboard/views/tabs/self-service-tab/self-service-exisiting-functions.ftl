@@ -7,8 +7,8 @@
                 <th>Metric</th>
                 <th>Properties</th>
                 <th>Active</th>
-                <th></th>
-                <th></th>
+                <th>Edit</th>
+                <th>Delete</th>
             </tr>
             </thead>
             <tbody id="existing-anomaly-functions-tbody">

@@ -38,7 +38,7 @@
                 <!-- DELETE FUNCTION MODAL-->
                 <div id="delete-function-modal" class="uk-modal">
                     <div class="uk-modal-dialog">
-                        <div class="uk-modal-header">Delete anomaly function <a class="uk-modal-close uk-close  uk-float-right"></a>
+                        <div class="uk-modal-header">Delete anomaly function <a class="uk-modal-close uk-close position-top-right"></a>
                         </div>
 
                         <p>Are you sure about deleting <span id="function-to-delete"></span> function?</p>
@@ -55,7 +55,7 @@
                 <div id="update-function-modal" class="uk-modal">
                     <div class="uk-modal-dialog">
                         <div class="uk-modal-header">
-                            <h3>Update anomaly function</h3><a class="uk-modal-close uk-close uk-float-right"></a>
+                            <h3>Update anomaly function</h3><a class="uk-modal-close uk-close position-top-right"></a>
                         </div>
                         <div id="update-anomaly-functions-form-placeholder"></div>
                     </div>

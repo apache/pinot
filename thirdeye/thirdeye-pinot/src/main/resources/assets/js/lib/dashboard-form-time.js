@@ -30,11 +30,11 @@
 
     $("#main-view").on("change",".current-start-date-input, .current-start-time-input, .current-end-date-input, .current-end-time-input", function(){
         selectBaselineDateRange(this)
-        enableApplyButton( $(".time-input-apply-btn[rel='"+ hash.view +"']"));
+        enableButton( $(".time-input-apply-btn[rel='"+ hash.view +"']"));
     });
 
     $("#main-view").on("change",".baseline-start-date-input, .baseline-start-time-input, .baseline-end-date-input, .baseline-end-time-input", function(){
-        enableApplyButton( $(".time-input-apply-btn[rel='"+ hash.view +"']"))
+        enableButton( $(".time-input-apply-btn[rel='"+ hash.view +"']"))
     });
 
     //Date & Time selector dropdown apply

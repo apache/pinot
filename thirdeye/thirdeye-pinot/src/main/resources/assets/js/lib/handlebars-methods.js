@@ -91,6 +91,15 @@ $(document).ready(function() {
         }
     });
 
+    //Helper for anomaly function form, here we can set the desired display of any function property
+    Handlebars.registerHelper('populateAnomalyFunctionProp', function(propertiestSring, param, key){
+        var value = Handlebars.helpers.lookupAnomalyProperty(propertiestSring, param);
+        if(param == "changeThreshold"){
+            value = Math.abs( parseFloat(value) ) * 100
+        }
+        return value
+    });
+
     //returns classname negative or positive or no classname. The classname related css creates a :before pseudo element triangle up or down
     Handlebars.registerHelper('displayDeltaIcon', function(propertiestSring, param, key){
         var delta = Handlebars.helpers.lookupAnomalyProperty(propertiestSring, param);

@@ -198,8 +198,8 @@ function updateDashboardFormFromHash(){
     var baselineEndTimeString;
 
     var maxMillis;
-    if(window.datasetConfig){
-        window.datasetConfig.maxMillis;
+    if(window.datasetConfig.maxMillis){
+        maxMillis = window.datasetConfig.maxMillis;
     }
 
     if (hash.hasOwnProperty("currentStart")) {
@@ -422,7 +422,7 @@ function disableButton(button){
     $(button).attr("disabled", true);
 }
 
-function enableApplyButton(button){
+function enableButton(button){
     $(button).prop("disabled", false);
     $(button).removeAttr("disabled");
 }
@@ -825,7 +825,12 @@ function clearCreateForm(){
     $("monitoring-schedule").hide();
     $("#active-alert").attr("checked","checked");
 
-    $("#configure-anomaly-function-form .remove-filter-selection").click();
+    $("#configure-anomaly-function-form .remove-filter-selection").each(function(){
+        $(this).click();
+    });
+
+    $("#manage-alert-error").hide();
+    $("#manage-anomaly-function-success").hide();
 
 }
 
