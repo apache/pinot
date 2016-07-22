@@ -10,6 +10,7 @@ import java.util.Properties;
 
 import org.hibernate.SessionFactory;
 import org.joda.time.DateTime;
+import org.joda.time.Interval;
 import org.joda.time.format.ISODateTimeFormat;
 import org.quartz.CronScheduleBuilder;
 import org.quartz.CronTrigger;
@@ -42,8 +43,8 @@ import com.linkedin.thirdeye.detector.lib.util.JobUtils;
 public class AnomalyDetectionJobManager {
   public static final String MONITORING_WINDOW_KEY = "monitoringWindow";
   private static final Logger LOG = LoggerFactory.getLogger(AnomalyDetectionJobManager.class);
-  private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE =
-      ThirdEyeCacheRegistry.getInstance();
+  private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry
+      .getInstance();
 
   private final Scheduler quartzScheduler;
   private final TimeSeriesHandler timeSeriesHandler;
@@ -100,12 +101,14 @@ public class AnomalyDetectionJobManager {
       }
       AnomalyFunction anomalyFunction = anomalyFunctionFactory.fromSpec(spec);
 
-      String triggerKey = String.format("ad_hoc_anomaly_function_trigger_%d_%s-%s", spec.getId(),
-          windowStartIsoString, windowEndIsoString);
+      String triggerKey =
+          String.format("ad_hoc_anomaly_function_trigger_%d_%s-%s", spec.getId(),
+              windowStartIsoString, windowEndIsoString);
       Trigger trigger = TriggerBuilder.newTrigger().withIdentity(triggerKey).startNow().build();
 
-      String jobKey = String.format("ad_hoc_anomaly_function_job_%d_%s-%s", spec.getId(),
-          windowStartIsoString, windowEndIsoString);
+      String jobKey =
+          String.format("ad_hoc_anomaly_function_job_%d_%s-%s", spec.getId(), windowStartIsoString,
+              windowEndIsoString);
       buildAndScheduleJob(jobKey, trigger, anomalyFunction, spec, windowStartIsoString,
           windowEndIsoString);
     }
@@ -157,8 +160,9 @@ public class AnomalyDetectionJobManager {
       AnomalyFunction anomalyFunction = anomalyFunctionFactory.fromSpec(spec);
 
       String triggerKey = String.format("scheduled_anomaly_function_trigger_%d", spec.getId());
-      CronTrigger trigger = TriggerBuilder.newTrigger().withIdentity(triggerKey)
-          .withSchedule(CronScheduleBuilder.cronSchedule(spec.getCron())).build();
+      CronTrigger trigger =
+          TriggerBuilder.newTrigger().withIdentity(triggerKey)
+              .withSchedule(CronScheduleBuilder.cronSchedule(spec.getCron())).build();
 
       String jobKey = String.format("scheduled_anomaly_function_job_%d", spec.getId());
       scheduledJobKeys.put(id, jobKey);
@@ -225,38 +229,54 @@ public class AnomalyDetectionJobManager {
     long dataWindowMillis =
         new TimeGranularity(spec.getWindowSize(), spec.getWindowUnit()).toMillis();
     long monitorWindowMillis = getMonitoringWindowGranularity(spec).toMillis();
-    int numBuckets = (int) Math
-        .ceil((double) (endTime.getMillis() - startTime.getMillis()) / monitorWindowMillis);
-    LOG.info("Found {} windows for function {} from {} to {}, with monitoring window of {} ms",
-        numBuckets, id, startTime, endTime, monitorWindowMillis);
-    DateTime currentMonitoringWindowStart;
-    DateTime currentMonitoringWindowEnd = startTime.plus(monitorWindowMillis);
 
     String functionIDString = String.format("%s(%d)", spec.getFunctionName(), id);
-    while (currentMonitoringWindowEnd.isBefore(endTime)
-        || currentMonitoringWindowEnd.isEqual(endTime)) {
-      currentMonitoringWindowStart = currentMonitoringWindowEnd.minus(dataWindowMillis);
-      LOG.info("Running {} with monitoring window: {} to {}", id, currentMonitoringWindowStart,
-          currentMonitoringWindowEnd);
+    List<Interval> simulationIntervals =
+        getSimulationIntervals(startTime, endTime, dataWindowMillis, monitorWindowMillis);
+    LOG.info(
+        "Found {} intervals for function {} from {} to {}, with simulation frequency of {} ms",
+        simulationIntervals.size(), id, startTime, endTime, dataWindowMillis);
+
+    for (Interval simulationInterval : simulationIntervals) {
+      DateTime intervalStart = simulationInterval.getStart();
+      DateTime intervalEnd = simulationInterval.getEnd();
+      LOG.info("Running {} with monitoring window: {} to {}", id, intervalStart, intervalEnd);
       try {
-        String triggerKey = String.format("simulate_period_anomaly_function_trigger_%d_%s-%s", id,
-            currentMonitoringWindowStart, currentMonitoringWindowEnd);
+        String triggerKey =
+            String.format("simulate_period_anomaly_function_trigger_%d_%s-%s", id, intervalStart,
+                intervalEnd);
         Trigger trigger = TriggerBuilder.newTrigger().withIdentity(triggerKey).startNow().build();
 
-        String jobKey = String.format("simulate_period_anomaly_function_job_%d_%s-%s", id,
-            currentMonitoringWindowStart, currentMonitoringWindowEnd);
-        buildAndScheduleJob(jobKey, trigger, anomalyFunction, spec,
-            currentMonitoringWindowStart.toString(), currentMonitoringWindowEnd.toString());
+        String jobKey =
+            String.format("simulate_period_anomaly_function_job_%d_%s-%s", id, intervalStart,
+                intervalEnd);
+        buildAndScheduleJob(jobKey, trigger, anomalyFunction, spec, intervalStart.toString(),
+            intervalEnd.toString());
       } catch (Exception e) {
-        LOG.error("Error encountered for {}, {}, {}:\n {}", functionIDString,
-            currentMonitoringWindowStart, currentMonitoringWindowEnd, e);
+        LOG.error("Error encountered for {}, {}, {}:\n {}", functionIDString, intervalStart,
+            intervalEnd, e);
       }
-      currentMonitoringWindowEnd = currentMonitoringWindowEnd.plus(monitorWindowMillis);
+      intervalEnd = intervalEnd.plus(monitorWindowMillis);
     }
-    if (!currentMonitoringWindowEnd.equals(endTime)) {
-      LOG.error("Time windows did not line up with monitoring window!: {}, {}",
-          currentMonitoringWindowEnd, endTime);
+  }
+
+  private List<Interval> getSimulationIntervals(DateTime start, DateTime end,
+      long dataWindowMillis, long millisBetweenSimulations) {
+    List<Interval> results = new ArrayList<>();
+    DateTime currentWindowStart = start;
+    DateTime currentWindowEnd = start.plus(dataWindowMillis);
+    while (!currentWindowEnd.isAfter(end)) {
+      currentWindowStart = currentWindowEnd.minus(dataWindowMillis);
+      results.add(new Interval(currentWindowStart, currentWindowEnd));
+      if (currentWindowEnd.isBefore(end)) {
+        currentWindowEnd = currentWindowEnd.plus(millisBetweenSimulations);
+      }
     }
+    if (!currentWindowEnd.equals(end)) {
+      LOG.error("Time windows did not line up with monitoring window!: {}, {}", currentWindowEnd,
+          end);
+    }
+    return results;
   }
 
   private TimeGranularity getMonitoringWindowGranularity(AnomalyFunctionSpec spec) {
