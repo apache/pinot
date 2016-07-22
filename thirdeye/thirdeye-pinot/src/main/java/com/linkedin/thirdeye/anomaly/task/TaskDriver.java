@@ -137,7 +137,6 @@ public class TaskDriver {
             break;
           }
         }
-        Thread.sleep(1000);
       } catch (Exception e) {
         LOG.error("Exception in select and update", e);
       } finally {
