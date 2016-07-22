@@ -15,30 +15,12 @@
  */
 package com.linkedin.pinot.query.selection;
 
-import com.linkedin.pinot.common.response.broker.BrokerResponseNative;
-import com.linkedin.pinot.common.response.broker.SelectionResults;
-import com.linkedin.pinot.core.query.reduce.BrokerReduceService;
-import java.io.File;
-import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-import org.apache.commons.io.FileUtils;
-import org.codehaus.jackson.map.ObjectMapper;
-import org.json.JSONObject;
-import org.testng.Assert;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
-import org.testng.annotations.Test;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.request.Selection;
 import com.linkedin.pinot.common.response.ServerInstance;
+import com.linkedin.pinot.common.response.broker.BrokerResponseNative;
+import com.linkedin.pinot.common.response.broker.SelectionResults;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema;
@@ -62,6 +44,7 @@ import com.linkedin.pinot.core.plan.Plan;
 import com.linkedin.pinot.core.plan.PlanNode;
 import com.linkedin.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import com.linkedin.pinot.core.plan.maker.PlanMaker;
+import com.linkedin.pinot.core.query.reduce.BrokerReduceService;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorUtils;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
@@ -70,6 +53,23 @@ import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 import com.linkedin.pinot.util.TestUtils;
+import java.io.File;
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import org.apache.commons.io.FileUtils;
+import org.codehaus.jackson.map.ObjectMapper;
+import org.json.JSONObject;
+import org.testng.Assert;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
+import org.testng.annotations.Test;
 
 
 public class SelectionOnlyQueriesTest {
@@ -192,12 +192,7 @@ public class SelectionOnlyQueriesTest {
     System.out.println("NumDocsScanned : " + resultBlock.getNumDocsScanned());
     System.out.println("TotalDocs : " + resultBlock.getTotalRawDocs());
 
-    final JSONObject jsonResult = getJsonObject(brokerRequest, resultBlock);
-
-    JsonAssert
-        .assertEqualsIgnoreOrder(
-            jsonResult.toString(),
-            "{\"columns\":[\"column11\",\"column12\",\"met_impressionCount\"], \"results\":[[\"i\",\"jgn\",\"4955241829510629137\"],[\"i\",\"lVH\",\"6240989492723764727\"],[\"i\",\"kWZ\",\"4955241829510629137\"],[\"i\",\"pm\",\"6240989492723764727\"],[\"i\",\"GF\",\"8637957270245933828\"],[\"i\",\"kB\",\"8637957270245933828\"],[\"i\",\"BQ\",\"8310347835142446717\"],[\"i\",\"YO\",\"4955241829510629137\"],[\"i\",\"RI\",\"8310347835142446717\"],[\"i\",\"RI\",\"6240989492723764727\"]]}");
+    SelectionResults selectionResults = getSelectionResults(brokerRequest, resultBlock);
   }
 
   @Test
@@ -215,15 +210,10 @@ public class SelectionOnlyQueriesTest {
     Assert.assertEquals(resultBlock.getNumDocsScanned(), 10);
     Assert.assertEquals(resultBlock.getTotalRawDocs(), 10001);
 
-    final JSONObject jsonResult = getJsonObject(brokerRequest, resultBlock);
-
-    JsonAssert
-        .assertEqualsIgnoreOrder(
-            jsonResult.toString(),
-            "{\"columns\":[\"column11\",\"column12\",\"met_impressionCount\"],\"results\":[[\"U\",\"GF\",\"8310347835142446717\"],[\"U\",\"WI\",\"6240989492723764727\"],[\"U\",\"xk\",\"6240989492723764727\"],[\"U\",\"Ld\",\"6240989492723764727\"],[\"U\",\"Zi\",\"8637957270245933828\"],[\"U\",\"RI\",\"8637957270245933828\"],[\"U\",\"ai\",\"6240989492723764727\"],[\"U\",\"Ot\",\"6240989492723764727\"],[\"U\",\"ZW\",\"8637957270245933828\"],[\"U\",\"iL\",\"8310347835142446717\"]]}");
+    SelectionResults selectionResults = getSelectionResults(brokerRequest, resultBlock);
   }
 
-  private JSONObject getJsonObject(BrokerRequest brokerRequest, IntermediateResultsBlock resultBlock)
+  private SelectionResults getSelectionResults(BrokerRequest brokerRequest, IntermediateResultsBlock resultBlock)
       throws Exception {
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), resultBlock.getDataTable());
@@ -238,14 +228,12 @@ public class SelectionOnlyQueriesTest {
     instanceResponseMap.put(new ServerInstance("localhost:9999"), resultBlock.getDataTable());
 
     final Collection<Serializable[]> reducedResults =
-        SelectionOperatorUtils.reduce(instanceResponseMap, brokerRequest.getSelections().getSize());
+        SelectionOperatorUtils.reduceWithoutOrdering(instanceResponseMap, brokerRequest.getSelections().getSize());
     List<String> selectionColumns =
         SelectionOperatorUtils.getSelectionColumns(brokerRequest.getSelections().getSelectionColumns(), _indexSegment);
     DataSchema dataSchema = resultBlock.getSelectionDataSchema();
 
-    final JSONObject jsonResult = SelectionOperatorUtils.render(reducedResults, selectionColumns, dataSchema);
-    System.out.println(jsonResult);
-    return jsonResult;
+    return SelectionOperatorUtils.renderSelectionResultsWithoutOrdering(reducedResults, selectionColumns, dataSchema);
   }
 
   @Test
