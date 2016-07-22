@@ -87,7 +87,6 @@ function renderSelfService(){
 
     // Monitoring repeat size selection
     $("#main-view").on("click",".monitoring-window-unit-option", function(){
-        selectMonitoringWindowUnit(this)
         hideErrorAndSuccess("")
     });
 
@@ -98,7 +97,7 @@ function renderSelfService(){
 
     // Monitoring repeat unit selection
     $("#main-view").on("click",".anomaly-monitoring-repeat-unit-option", function(){
-        selectAnomalyMonitoringRepeatUnit(this)
+        toggleMonitoringTimeField(this)
     });
 
     //Clear form
@@ -114,12 +113,14 @@ function renderSelfService(){
     /** Manage anomaly tab related listeners **/
 
     //Edit button
-    $("#main-view").on("click",".update-function-btn", function() {
+    $("#main-view").on("click",".init-update-function-btn", function() {
         populateUpdateForm(this)
     });
 
     //Delete button - will open modal for confirmation
     $("#main-view").on("click",".init-delete-anomaly-function", function(){
+
+
         var functionId = $(this).attr("data-function-id");
         var functionName = $(this).attr("data-function-name");
         $("#confirm-delete-anomaly-function").attr("data-function-id", functionId);
@@ -131,6 +132,11 @@ function renderSelfService(){
     //Confirm delete button
     $("#main-view").on("click","#confirm-delete-anomaly-function", function(){
         deleteAnomalyFunction(this)
+    });
+
+    //Update button
+    $("#main-view").on("click","#update-anomaly-function", function(){
+        updateAnomalyFunction()
     });
 
 
@@ -147,34 +153,23 @@ function renderSelfService(){
         $("#manage-anomaly-function-success").hide();
     }
 
-//    function selectMonitoringWindowUnit(target){
-//
-//        var value = $(target).attr("value");
-//        //Populate the selected item on the form element
-//        $("#selected-monitoring-window-unit").text($(target).text());
-//        $("#selected-monitoring-window-unit").attr("value",value);
-//        //close uikit dropdown
-//        $(target).closest("[data-uk-dropdown]").removeClass("uk-open");
-//        $(target).closest("[data-uk-dropdown]").attr("aria-expanded", false);
-//    };
-//
-//
-//    function selectAnomalyMonitoringRepeatUnit(target){
-//        var value = $(target).attr("value");
-//        if(value == "DAYS" ){
-//
-//            //Display the inputfield for hours and timezone next to the hours
-//            var timezone = getTimeZone();  //example: America/Los_Angeles
-//            $("#local-timezone").html(moment().tz(timezone).format("z"));  //example: PST
-//            $("#monitoring-schedule").removeClass("hidden");
-//
-//        }else if(value == "HOURS"){
-//            $("#monitoring-schedule").addClass("hidden");
-//            $("#monitoring-schedule-time").val("")
-//        }
-//    };
+    function toggleMonitoringTimeField(target){
+        var value = $(target).attr("value");
+        if(value == "DAYS" ){
 
-    function collectAnomalyFnFormValues(){
+            //Display the inputfield for hours and timezone next to the hours
+            var timezone = getTimeZone();  //example: America/Los_Angeles
+            $("#local-timezone").html(moment().tz(timezone).format("z"));  //example: PST
+            $("#monitoring-schedule").removeClass("hidden");
+
+        }else if(value == "HOURS"){
+            $("#monitoring-schedule").addClass("hidden");
+            $("#monitoring-schedule-time").val("")
+        }
+    };
+
+    //Takes the css selector of the placeholder of the form
+    function collectAnomalyFnFormValues(form) {
         var formData = {};
 
         //Close uikit dropdowns
@@ -184,35 +179,47 @@ function renderSelfService(){
 
         /** Collect the form values **/
 
-        //Currently only supporting 'user rule' type alert configuration on the front end-
-        // KALMAN and SCAN Statistics are set up by the backend
-        formData.functionType = $("#selected-function-type").attr("value");
+            //Currently only supporting 'user rule' type alert configuration on the front end-
+            // KALMAN and SCAN Statistics are set up by the backend
+        formData.functionType = $("#selected-function-type", form).attr("value");
         formData.metricFunction = "SUM";
-        formData.windowDelay =  "1";  //Todo:consider max time ?
-        formData.functionName = $("#name").val();
-        formData.dataset = $(".selected-dataset").attr("value");
-        formData.metric = $("#selected-metric-manage-alert").attr("value");
-        formData.condition =( $("#selected-anomaly-condition").attr("value") == "DROPS" ) ? "-" :  ( $("#selected-anomaly-condition").attr("value") == "INCREASES" )  ? "" : null;
+        formData.windowDelay = "1";  //Todo:consider max time ?
 
+        formData.functionName = $("#name", form).val();
+        formData.dataset =  $(".selected-dataset", form).attr("value");
+        formData.metric =  $("#selected-metric-manage-alert", form).attr("value");
+        formData.condition = ( $("#selected-anomaly-condition", form).attr("value") == "DROPS" ) ? "-" : ( $("#selected-anomaly-condition", form).attr("value") == "INCREASES" ) ? "" : null;
+        formData.baseline = $("#selected-anomaly-compare-mode", form).attr("value");
+        formData.windowSize = $("#monitoring-window-size", form).val();
+        formData.windowUnit = $("#selected-monitoring-window-unit", form).attr("value");
 
+        //Todo add monitoring schedule time when it's available for update
+        if ($("#monitoring-repeat-size", form).length > 0) {
+            formData.repeatEverySize = $("#monitoring-repeat-size", form).val();
+            formData.repeatEveryUnit = $("#selected-monitoring-repeat-unit", form).attr("value");
+            var monitoringScheduleTime = $("#monitoring-schedule-time", form).val() == "" ? "00:00" : $("#monitoring-schedule-time", form).val() //Todo: in case of daily data granularity set the default schedule to time when datapoint is created
+            formData.scheduleMinute = monitoringScheduleTime.substring(3, monitoringScheduleTime.length);
+            formData.scheduleHour = monitoringScheduleTime.substring(0, monitoringScheduleTime.length - 3);
+        } else {
+            formData.scheduleMinutescheduleMinute = "00";
+            formData.scheduleHour = "00";
+        }
 
+        if ($("#function-id", form).length > 0){
+            formData.functionId = $("#function-id", form).text();
+            console.log('#function-id, form')
+            console.log($("#function-id", form))
+        }else{
+            console.log("no fn id present")
+        }
 
-        formData.baseline = $("#selected-anomaly-compare-mode").attr("value");
-        formData.windowSize = $("#monitoring-window-size").val();
-        formData.windowUnit = $("#selected-monitoring-window-unit").attr("value");
-        formData.repeatEverySize = $("#monitoring-repeat-size").val();
-        formData.repeatEveryUnit = $("#selected-monitoring-repeat-unit").attr("value");
-        formData.monitoringScheduleTime = $("#monitoring-schedule-time").val() == "" ?  "00:00" : $("#monitoring-schedule-time").val() //Todo: in case of daily data granularity set the default schedule to time when datapoint is created
-        formData.scheduleMinute = formData.monitoringScheduleTime.substring(3, formData.monitoringScheduleTime.length);
-        formData.scheduleHour = formData.monitoringScheduleTime.substring(0, formData.monitoringScheduleTime.length -3);
-
-        if($("#active-alert").is(':checked')){
+        if($("#active-alert", form).is(':checked')){
             formData.isActive = true;
         }else{
             formData.isActive = false;
         }
 
-        formData.filters = readFiltersAppliedInCurrentView("self-service");
+        formData.filters = readFiltersAppliedInCurrentView("self-service", {form:form});
 
         //Transform filters Todo: clarify if filters object should be consistent on FE and BE
         //filters = encodeURIComponent(JSON.stringify(filters));
@@ -225,23 +232,23 @@ function renderSelfService(){
             }
         }
 
-        formData.exploreDimension = $("#self-service-view-single-dimension-selector #selected-dimension").attr("value");
+        formData.exploreDimension = $("#self-service-view-single-dimension-selector #selected-dimension",form).attr("value");
 
         //Function type: USER RULE; Metric function: SUM
-        formData.changeThreshold = parseFloat( $("#anomaly-threshold").val() / 100);
+        formData.changeThreshold = parseFloat( $("#anomaly-threshold", form).val() / 100);
 
         return formData;
     }
 
 
     //VALIDATE FORM: takes an object returns true or undefined = falsy value
-    function validateAnomalyFnFormData(formData){
+    function validateAnomalyFnFormData(formData, form){
 
-        var valid = true
+        var valid = true;
 
         /* Validate form */
-        var errorMessage = $("#manage-alert-error p");
-        var errorAlert = $("#manage-alert-error");
+        var errorMessage = $("#manage-alert-error p", form);
+        var errorAlert = $("#manage-alert-error", form);
 
         //Check if rule name is present
         if(formData.functionName == ""){
@@ -316,30 +323,34 @@ function renderSelfService(){
         function isPositiveInteger(str) {
             return /^\+?[1-9][\d]*$/.test(str);
         }
-        if(!isPositiveInteger(formData.repeatEverySize)){
-            errorMessage.html('Please fill in: "Monitor data every" X hours/days/weeks etc., where X should be positive integer.');
-            errorAlert.attr("data-error-source", "monitoring-repeat-size");
-            errorAlert.fadeIn(100);
-            return
-        }
 
-        //Check if repeatEvery has value
-        if(!formData.repeatEverySize) {
-            errorMessage.html("Please fill in how frequently should ThirdEye monitor the data.");
-            errorAlert.attr("data-error-source", "monitoring-repeat-size");
-            errorAlert.fadeIn(100);
-            return
-        }
+        //Todo:Remove this condition if the repeatEverySize and repeatEveryUnit are available on all forms all
+        if(formData.hasOwnProperty("repeatEverySize")) {
 
+            if (!isPositiveInteger(formData.repeatEverySize)) {
+                errorMessage.html('Please fill in: "Monitor data every" X hours/days/weeks etc., where X should be positive integer.');
+                errorAlert.attr("data-error-source", "monitoring-repeat-size");
+                errorAlert.fadeIn(100);
+                return
+            }
+
+            //Check if repeatEvery has value
+            if (!formData.repeatEverySize) {
+                errorMessage.html("Please fill in how frequently should ThirdEye monitor the data.");
+                errorAlert.attr("data-error-source", "monitoring-repeat-size");
+                errorAlert.fadeIn(100);
+                return
+            }
+        }
         return valid
     }
 
 
     //SUBMIT CREATED ANOMALY FUNCTION
     function createAnomalyFunction(){
-
-        var formData = collectAnomalyFnFormValues();
-        var valid = validateAnomalyFnFormData(formData);
+        var form = $("#create-anomaly-functions-tab");
+        var formData = collectAnomalyFnFormValues(form);
+        var valid = validateAnomalyFnFormData(formData, form);
 
         if(valid){
 
@@ -363,8 +374,6 @@ function renderSelfService(){
                 $("p", successMessage).html("success");
                 successMessage.fadeIn(100);
            })
-        }else{
-            console.log("user needs to correct the form values")
         }
     }
 
@@ -427,6 +436,10 @@ function renderSelfService(){
             dimensionListHtml += "<li class='dimension-option' rel='dimensions' value='" + dimnsionList[index] + "'><a href='#' class='uk-dropdown-close'>" + dimnsionList[index] + "</a></li>";
             filterDimensionListHtml += "<li class='filter-dimension-option' value='" + dimnsionList[index] + "'><a href='#' class='radio-options'>" + dimnsionList[index] + "</a></li>";
         }
+
+        enableButton($("#update-anomaly-function"));
+        $("#manage-anomaly-function-success").hide();
+
         $("#update-function-modal .dimension-list").html(dimensionListHtml);
 
         //append filter dimension list
@@ -444,17 +457,41 @@ function renderSelfService(){
             $(this).click();
             $(".radio-options",this).click();
         });
-
-
-
-
-
-
     }
 
-    function  updateAnomalyFunction(target){
-         //collectAnomalyFnFormValues(form)
-        //validateAnomalyFnFormData(formData)
+    function  updateAnomalyFunction(){
+
+        disableButton($("#update-anomaly-function"));
+
+        var form = $("#update-function-modal");
+        var formData = collectAnomalyFnFormValues(form);
+        var valid = validateAnomalyFnFormData(formData,form);
+
+
+
+        if(valid){
+            var url = "/dashboard/anomaly-function/update?id=" + formData.functionId + "&dataset=" + formData.dataset + "&metric=" + formData.metric + "&type=" + formData.functionType + "&metricFunction=" + formData.metricFunction + "&functionName=" + formData.functionName
+                + "&windowSize=" + formData.windowSize + "&windowUnit=" + formData.windowUnit + "&windowDelay=" + formData.windowDelay
+                + "&isActive=" +  formData.isActive + "&properties=baseline=" + formData.baseline + ";changeThreshold=" + formData.condition + formData.changeThreshold;
+
+            //Optional params
+            url += (formData.repeatEverySize) ? "&scheduleMinute=" + formData.scheduleMinute  + "&scheduleHour=" + formData.scheduleHour
+                   + "&repeatEverySize=" + formData.repeatEverySize + "&repeatEveryUnit=" + formData.repeatEveryUnit : "";
+            url += (formData.exploreDimension) ? "&exploreDimension=" + formData.exploreDimension : "";
+            url += (formData.filters) ? "&filters=" + formData.filtersString : "";
+
+            submitData(url).done(function(){
+
+                //Enable submit btn
+                enableButton($("#update-anomaly-function"))
+
+                var successMessage = $("#manage-anomaly-function-success", form);
+                $("p", successMessage).html("success");
+                successMessage.fadeIn(100);
+
+            })
+        }
     }
+
 
 }

@@ -3,7 +3,7 @@
     <form id="configure-anomaly-function-form" class="uk-form" >
         {{#if id}}
         <div class="uk-form-row">
-            <label class="bold-label">Function id: </label>#<span> {{id}}</span></div>
+            <label class="bold-label">Function id: </label>#<span id="function-id">{{id}}</span></div>
         {{else}}
         <div  class="title-box full-width" style="margin-top:15px;">
             <h3>Create anomaly function</h3>
@@ -18,10 +18,7 @@
             <label class="uk-form-label bold-label required">Dataset</label>
             <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group uk-display-inline-block">
                 <div class="selected-dataset uk-button"
-                     value="{{#if collection}}
-                                {{collection}}
-                           {{/if}}
-                ">
+                     value="{{#if collection}}{{collection}}{{/if}}">
                     {{#if collection}}
                         {{collection}}
                     {{else}}
@@ -52,11 +49,7 @@
         <div id="metric-selector-manage-alert" class="uk-form-row uk-display-inline-block">
             <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group uk-display-inline-block">
                 <div id="selected-metric-manage-alert" class="uk-button"
-                value="
-                    {{#if metric}}
-                        {{metric}}
-                    {{/if}}
-                ">
+                value=" {{#if metric}}{{metric}}{{/if}}">
                     {{#if metric}}
                        {{metric}}
                     {{else}}

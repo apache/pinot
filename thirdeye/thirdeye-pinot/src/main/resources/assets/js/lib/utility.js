@@ -36,7 +36,10 @@ function getData(url, tab){
     })
 }
 
-function submitData(url, data ){
+function submitData(url, data="" ){
+//    if(!data){
+//        data = ""
+//    }
     console.log("post url:", url)
     return $.ajax({
         url: url,
@@ -47,9 +50,7 @@ function submitData(url, data ){
             console.log( errorThrown );
         }
     }).always(function(){
-
     })
-
 }
 
 function deleteData(url, data){
@@ -65,7 +66,6 @@ function deleteData(url, data){
     }).always(function(){
 
     })
-
 }
 
 function showLoader(tab){

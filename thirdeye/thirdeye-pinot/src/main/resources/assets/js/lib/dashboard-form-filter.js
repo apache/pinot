@@ -155,8 +155,11 @@
         }
     }
 
-    function readFiltersAppliedInCurrentView(currentTab){
+    function readFiltersAppliedInCurrentView(currentTab, options){
         var currentFilterContainer = $(".view-filter-selector[rel='"+ currentTab +"']")
+        if(options.form){
+            currentFilterContainer = $(".view-filter-selector[rel='"+ currentTab +"']", options.form)
+        }
         var filters = {};
 
         $(".added-filter",currentFilterContainer).each(function(){

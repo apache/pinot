@@ -146,8 +146,6 @@ $(document).ready( function() {
     var result_anomaly_function_form_template = HandleBarsTemplates.template_anomaly_function_form("");
     $("#create-anomaly-functions-tab").html(result_anomaly_function_form_template);
 
-
-
     //Global object where the dataset params will be cached
     window.datasetConfig = {};
     //Global object with the query params
