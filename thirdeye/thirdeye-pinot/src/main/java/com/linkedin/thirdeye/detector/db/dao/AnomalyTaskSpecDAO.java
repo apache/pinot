@@ -1,9 +1,6 @@
 package com.linkedin.thirdeye.detector.db.dao;
 
-import com.linkedin.thirdeye.detector.db.dao.AbstractBaseDAO;
 import java.util.List;
-
-import io.dropwizard.hibernate.AbstractDAO;
 
 import org.hibernate.HibernateException;
 import org.hibernate.SessionFactory;

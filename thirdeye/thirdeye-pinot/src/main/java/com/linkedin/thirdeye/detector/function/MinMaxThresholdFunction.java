@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.detector.function;
 
-import com.google.common.base.Joiner;
 import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.detector.db.entity.AnomalyResult;
@@ -9,8 +8,6 @@ import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import org.joda.time.DateTime;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * See params for property configuration.
@@ -22,12 +19,9 @@ import org.slf4j.LoggerFactory;
  * (strictly greater than)
  */
 public class MinMaxThresholdFunction extends BaseAnomalyFunction {
-  private static final Logger LOGGER =
-      LoggerFactory.getLogger(MinMaxThresholdFunction.class);
-  public static final String DEFAULT_MESSAGE_TEMPLATE = "min=%s, max=%s, value %s, change %s";
-  public static final String MIN_VAL = "min";
-  public static final String MAX_VAL = "max";
-  private static final Joiner CSV = Joiner.on(",");
+  static final String DEFAULT_MESSAGE_TEMPLATE = "min=%s, max=%s, value %s, change %s";
+  static final String MIN_VAL = "min";
+  static final String MAX_VAL = "max";
 
   public static String[] getPropertyKeys() {
     return new String [] {MIN_VAL, MAX_VAL};
@@ -56,9 +50,9 @@ public class MinMaxThresholdFunction extends BaseAnomalyFunction {
     }
 
     // Compute the weight of this time series (average across whole)
-    double averageValue = 0;
+    double totalSum = 0;
     for (Long time : timeSeries.getTimeWindowSet()) {
-      averageValue += timeSeries.get(time, metric).doubleValue();
+      totalSum += timeSeries.get(time, metric).doubleValue();
     }
     // Compute the bucket size, so we can iterate in those steps
     long bucketMillis =
@@ -67,7 +61,7 @@ public class MinMaxThresholdFunction extends BaseAnomalyFunction {
     long numBuckets = (windowEnd.getMillis() - windowStart.getMillis()) / bucketMillis;
 
     // weight of this time series
-    averageValue /= numBuckets;
+    double averageValue = totalSum / numBuckets;
 
     for (Long timeBucket : timeSeries.getTimeWindowSet()) {
       Double value = timeSeries.get(timeBucket, metric).doubleValue();
@@ -79,6 +73,7 @@ public class MinMaxThresholdFunction extends BaseAnomalyFunction {
         anomalyResult.setMetric(metric);
         anomalyResult.setDimensions(CSV.join(dimensionKey.getDimensionValues()));
         anomalyResult.setFunctionId(getSpec().getId());
+        anomalyResult.setFunctionType(getSpec().getType());
         anomalyResult.setProperties(getSpec().getProperties());
         anomalyResult.setStartTimeUtc(timeBucket);
         anomalyResult.setEndTimeUtc(timeBucket + bucketMillis); // point-in-time
@@ -90,7 +85,8 @@ public class MinMaxThresholdFunction extends BaseAnomalyFunction {
         anomalyResult.setFilters(getSpec().getFilters());
         anomalyResults.add(anomalyResult);
       }
-    } return anomalyResults;
+    }
+    return mergeResults(anomalyResults, DEFAULT_MERGE_TIME_DELTA_MILLIS);
   }
 
   private double getDeviationFromThreshold(double currentValue, Double min, Double max) {
