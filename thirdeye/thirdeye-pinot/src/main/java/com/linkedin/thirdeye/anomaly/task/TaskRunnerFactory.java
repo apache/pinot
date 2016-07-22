@@ -4,18 +4,18 @@ import com.linkedin.thirdeye.anomaly.detection.DetectionTaskRunner;
 import com.linkedin.thirdeye.anomaly.monitor.MonitorTaskRunner;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
 
-public class TaskExecutorFactory {
+public class TaskRunnerFactory {
 
-  public static Class<?> getTaskExecutorClassFromTaskType(TaskType taskType) {
-    Class<?> taskExecutorClass = null;
+  public static TaskRunner getTaskRunnerFromTaskType(TaskType taskType) {
+    TaskRunner taskRunner = null;
     switch(taskType) {
       case ANOMALY_DETECTION:
-        taskExecutorClass = DetectionTaskRunner.class;
+        taskRunner = new DetectionTaskRunner();
         break;
       case MERGE:
         break;
       case MONITOR:
-        taskExecutorClass = MonitorTaskRunner.class;
+        taskRunner = new MonitorTaskRunner();
         break;
       case REPORTER:
         break;
@@ -23,7 +23,7 @@ public class TaskExecutorFactory {
         break;
 
     }
-    return taskExecutorClass;
+    return taskRunner;
   }
 
 }

@@ -1,9 +1,11 @@
 package com.linkedin.thirdeye.anomaly.monitor;
 
+
+
 public class MonitorConfiguration {
 
-  private int expireDaysAgo = 7;
-  private int monitorFrequencyHours = 1;
+  private int expireDaysAgo = MonitorConstants.DEFAULT_EXPIRE_DAYS_AGO;
+  private int monitorFrequencyHours = MonitorConstants.DEFAULT_MONITOR_FREQUENCY_HOURS;
 
   public int getExpireDaysAgo() {
     return expireDaysAgo;

@@ -22,6 +22,7 @@ public class MonitorJobScheduler {
   private SessionFactory sessionFactory;
   private MonitorConfiguration monitorConfiguration;
   private MonitorJobRunner monitorJobRunner;
+  private MonitorJobContext monitorJobContext;
 
   public MonitorJobScheduler(AnomalyJobSpecDAO anomalyJobSpecDAO, AnomalyTaskSpecDAO anomalyTaskSpecDAO,
       SessionFactory sessionFactory, MonitorConfiguration monitorConfiguration) {
@@ -35,7 +36,13 @@ public class MonitorJobScheduler {
   public void start() {
     LOG.info("Starting monitor service");
 
-    monitorJobRunner = new MonitorJobRunner(anomalyJobSpecDAO, anomalyTaskSpecDAO, sessionFactory, monitorConfiguration);
+    monitorJobContext = new MonitorJobContext();
+    monitorJobContext.setAnomalyJobSpecDAO(anomalyJobSpecDAO);
+    monitorJobContext.setAnomalyTaskSpecDAO(anomalyTaskSpecDAO);
+    monitorJobContext.setSessionFactory(sessionFactory);
+    monitorJobContext.setMonitorConfiguration(monitorConfiguration);
+
+    monitorJobRunner = new MonitorJobRunner(monitorJobContext);
     scheduledExecutorService
       .scheduleWithFixedDelay(monitorJobRunner, 0, monitorConfiguration.getMonitorFrequencyHours(), TimeUnit.HOURS);
   }

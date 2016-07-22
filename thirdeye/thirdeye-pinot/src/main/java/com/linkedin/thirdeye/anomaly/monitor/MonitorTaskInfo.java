@@ -12,6 +12,10 @@ public class MonitorTaskInfo implements TaskInfo {
   private MonitorType monitorType;
   private int expireDaysAgo;
 
+  public MonitorTaskInfo() {
+
+  }
+
   public Long getJobExecutionId() {
     return jobExecutionId;
   }

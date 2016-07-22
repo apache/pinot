@@ -1,11 +1,12 @@
 package com.linkedin.thirdeye.anomaly.monitor;
 
+import io.dropwizard.hibernate.UnitOfWork;
+
 import java.util.ArrayList;
 import java.util.List;
 
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
-import org.hibernate.Transaction;
 import org.hibernate.context.internal.ManagedSessionContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,6 +15,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
 import com.linkedin.thirdeye.anomaly.job.JobContext;
+import com.linkedin.thirdeye.anomaly.job.JobRunner;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
 import com.linkedin.thirdeye.anomaly.task.TaskGenerator;
@@ -22,7 +24,7 @@ import com.linkedin.thirdeye.detector.db.dao.AnomalyTaskSpecDAO;
 import com.linkedin.thirdeye.detector.db.entity.AnomalyJobSpec;
 import com.linkedin.thirdeye.detector.db.entity.AnomalyTaskSpec;
 
-public class MonitorJobRunner implements Runnable {
+public class MonitorJobRunner implements JobRunner {
 
   private static final Logger LOG = LoggerFactory.getLogger(MonitorJobRunner.class);
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -30,19 +32,16 @@ public class MonitorJobRunner implements Runnable {
   private AnomalyJobSpecDAO anomalyJobSpecDAO;
   private AnomalyTaskSpecDAO anomalyTaskSpecDAO;
   private SessionFactory sessionFactory;
-  private MonitorConfiguration monitorConfiguration;
   private TaskGenerator taskGenerator;
-  private JobContext jobContext;
+  private MonitorJobContext monitorJobContext;
 
-  public MonitorJobRunner(AnomalyJobSpecDAO anomalyJobSpecDAO, AnomalyTaskSpecDAO anomalyTaskSpecDAO,
-      SessionFactory sessionFactory, MonitorConfiguration monitorConfiguration) {
-    this.anomalyJobSpecDAO = anomalyJobSpecDAO;
-    this.anomalyTaskSpecDAO = anomalyTaskSpecDAO;
-    this.sessionFactory = sessionFactory;
-    this.monitorConfiguration = monitorConfiguration;
+  public MonitorJobRunner(MonitorJobContext monitorJobContext) {
+    this.monitorJobContext = monitorJobContext;
+    this.anomalyJobSpecDAO = monitorJobContext.getAnomalyJobSpecDAO();
+    this.anomalyTaskSpecDAO = monitorJobContext.getAnomalyTaskSpecDAO();
+    this.sessionFactory = monitorJobContext.getSessionFactory();
 
     taskGenerator = new TaskGenerator();
-    jobContext = new JobContext();
   }
 
   @Override
@@ -51,38 +50,34 @@ public class MonitorJobRunner implements Runnable {
       LOG.info("Starting monitor job");
 
       List<AnomalyJobSpec> anomalyJobSpecs = findAnomalyJobsWithStatusScheduled();
-      jobContext.setJobName(TaskType.MONITOR.toString());
-      long jobExecutionId = createAnomalyJob();
-      jobContext.setJobExecutionId(jobExecutionId);
-      List<Long> taskIds = createAnomalyTasks(anomalyJobSpecs);
+      monitorJobContext.setJobName(TaskType.MONITOR.toString());
+      monitorJobContext.setAnomalyJobSpecs(anomalyJobSpecs);
+      long jobExecutionId = createJob();
+      monitorJobContext.setJobExecutionId(jobExecutionId);
+      List<Long> taskIds = createTasks();
 
     } catch (Exception e) {
       LOG.error("Exception in monitor job runner", e);
     }
   }
 
-  private long createAnomalyJob() {
+  @UnitOfWork
+  public long createJob() {
     Session session = sessionFactory.openSession();
     Long jobExecutionId = null;
     try {
       ManagedSessionContext.bind(session);
-      Transaction transaction = session.beginTransaction();
-      try {
-        LOG.info("Creating monitor job");
-        AnomalyJobSpec anomalyJobSpec = new AnomalyJobSpec();
-        anomalyJobSpec.setJobName(jobContext.getJobName());
-        anomalyJobSpec.setScheduleStartTime(System.currentTimeMillis());
-        anomalyJobSpec.setStatus(JobStatus.SCHEDULED);
-        jobExecutionId = anomalyJobSpecDAO.save(anomalyJobSpec);
-        if (!transaction.wasCommitted()) {
-          transaction.commit();
-        }
-        LOG.info("Created anomalyJobSpec {} with jobExecutionId {}", anomalyJobSpec,
-            jobExecutionId);
-      } catch (Exception e) {
-        transaction.rollback();
-        throw new RuntimeException(e);
-      }
+
+      LOG.info("Creating monitor job");
+      AnomalyJobSpec anomalyJobSpec = new AnomalyJobSpec();
+      anomalyJobSpec.setJobName(monitorJobContext.getJobName());
+      anomalyJobSpec.setScheduleStartTime(System.currentTimeMillis());
+      anomalyJobSpec.setStatus(JobStatus.SCHEDULED);
+      jobExecutionId = anomalyJobSpecDAO.save(anomalyJobSpec);
+      LOG.info("Created anomalyJobSpec {} with jobExecutionId {}", anomalyJobSpec,
+          jobExecutionId);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
     } finally {
       session.close();
       ManagedSessionContext.unbind(sessionFactory);
@@ -91,13 +86,14 @@ public class MonitorJobRunner implements Runnable {
   }
 
 
-  private List<Long> createAnomalyTasks(List<AnomalyJobSpec> anomalyJobSpecs) {
+  @UnitOfWork
+  public List<Long> createTasks() {
     Session session = sessionFactory.openSession();
     List<Long> taskIds = new ArrayList<>();
     try {
       ManagedSessionContext.bind(session);
       LOG.info("Creating monitor tasks");
-      List<MonitorTaskInfo> monitorTasks = taskGenerator.createMonitorTasks(anomalyJobSpecs, monitorConfiguration);
+      List<MonitorTaskInfo> monitorTasks = taskGenerator.createMonitorTasks(monitorJobContext);
       LOG.info("Monitor tasks {}", monitorTasks);
       for (MonitorTaskInfo taskInfo : monitorTasks) {
         String taskInfoJson = null;
@@ -107,26 +103,19 @@ public class MonitorJobRunner implements Runnable {
           LOG.error("Exception when converting MonitorTaskInfo {} to jsonString", taskInfo, e);
         }
 
-        Transaction transaction = session.beginTransaction();
-        try {
-          AnomalyTaskSpec anomalyTaskSpec = new AnomalyTaskSpec();
-          anomalyTaskSpec.setJobId(jobContext.getJobExecutionId());
-          anomalyTaskSpec.setTaskType(TaskType.MONITOR);
-          anomalyTaskSpec.setJobName(jobContext.getJobName());
-          anomalyTaskSpec.setStatus(TaskStatus.WAITING);
-          anomalyTaskSpec.setTaskStartTime(System.currentTimeMillis());
-          anomalyTaskSpec.setTaskInfo(taskInfoJson);
-          long taskId = anomalyTaskSpecDAO.save(anomalyTaskSpec);
-          taskIds.add(taskId);
-          LOG.info("Created monitorTask {} with taskId {}", anomalyTaskSpec, taskId);
-          if (!transaction.wasCommitted()) {
-            transaction.commit();
-          }
-        } catch (Exception e) {
-          transaction.rollback();
-          throw new RuntimeException(e);
-        }
+        AnomalyTaskSpec anomalyTaskSpec = new AnomalyTaskSpec();
+        anomalyTaskSpec.setJobId(monitorJobContext.getJobExecutionId());
+        anomalyTaskSpec.setTaskType(TaskType.MONITOR);
+        anomalyTaskSpec.setJobName(monitorJobContext.getJobName());
+        anomalyTaskSpec.setStatus(TaskStatus.WAITING);
+        anomalyTaskSpec.setTaskStartTime(System.currentTimeMillis());
+        anomalyTaskSpec.setTaskInfo(taskInfoJson);
+        long taskId = anomalyTaskSpecDAO.save(anomalyTaskSpec);
+        taskIds.add(taskId);
+        LOG.info("Created monitorTask {} with taskId {}", anomalyTaskSpec, taskId);
       }
+    } catch (Exception e) {
+      throw new RuntimeException(e);
     } finally {
       session.close();
       ManagedSessionContext.unbind(sessionFactory);
@@ -135,21 +124,15 @@ public class MonitorJobRunner implements Runnable {
 
   }
 
+  @UnitOfWork
   private List<AnomalyJobSpec> findAnomalyJobsWithStatusScheduled() {
     List<AnomalyJobSpec> anomalyJobSpecs = null;
     Session session = sessionFactory.openSession();
     try {
       ManagedSessionContext.bind(session);
-      Transaction transaction = session.beginTransaction();
-      try {
-        anomalyJobSpecs = anomalyJobSpecDAO.findByStatus(JobStatus.SCHEDULED);
-        if (!transaction.wasCommitted()) {
-          transaction.commit();
-        }
-      } catch (Exception e) {
-        transaction.rollback();
-        throw new RuntimeException(e);
-      }
+      anomalyJobSpecs = anomalyJobSpecDAO.findByStatus(JobStatus.SCHEDULED);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
     } finally {
       session.close();
       ManagedSessionContext.unbind(sessionFactory);

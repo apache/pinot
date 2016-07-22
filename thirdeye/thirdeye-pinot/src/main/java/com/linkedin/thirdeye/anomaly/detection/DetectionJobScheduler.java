@@ -73,17 +73,17 @@ public class DetectionJobScheduler {
     List<AnomalyFunctionSpec>  functionSpecs = readAnomalyFunctionSpecs();
     for (AnomalyFunctionSpec anomalyFunctionSpec : functionSpecs) {
       if (anomalyFunctionSpec.getIsActive()) {
-        JobContext jobContext = new JobContext();
-        jobContext.setAnomalyFunctionSpecDAO(anomalyFunctionSpecDAO);
-        jobContext.setAnomalyJobSpecDAO(anomalyJobSpecDAO);
-        jobContext.setAnomalyTaskSpecDAO(anomalyTaskSpecDAO);
-        jobContext.setAnomalyFunctionFactory(anomalyFunctionFactory);
-        jobContext.setSessionFactory(sessionFactory);
-        jobContext.setAnomalyFunctionId(anomalyFunctionSpec.getId());
+        DetectionJobContext detectionJobContext = new DetectionJobContext();
+        detectionJobContext.setAnomalyFunctionSpecDAO(anomalyFunctionSpecDAO);
+        detectionJobContext.setAnomalyJobSpecDAO(anomalyJobSpecDAO);
+        detectionJobContext.setAnomalyTaskSpecDAO(anomalyTaskSpecDAO);
+        detectionJobContext.setAnomalyFunctionFactory(anomalyFunctionFactory);
+        detectionJobContext.setSessionFactory(sessionFactory);
+        detectionJobContext.setAnomalyFunctionId(anomalyFunctionSpec.getId());
         String jobKey = getJobKey(anomalyFunctionSpec.getId(), anomalyFunctionSpec.getFunctionName());
-        jobContext.setJobName(jobKey);
+        detectionJobContext.setJobName(jobKey);
 
-        scheduleJob(jobContext, anomalyFunctionSpec);
+        scheduleJob(detectionJobContext, anomalyFunctionSpec);
       }
     }
   }
@@ -105,16 +105,16 @@ public class DetectionJobScheduler {
       throw new IllegalStateException("Anomaly function with id " + id + " is already scheduled");
     }
 
-    JobContext jobContext = new JobContext();
-    jobContext.setAnomalyFunctionSpecDAO(anomalyFunctionSpecDAO);
-    jobContext.setAnomalyJobSpecDAO(anomalyJobSpecDAO);
-    jobContext.setAnomalyTaskSpecDAO(anomalyTaskSpecDAO);
-    jobContext.setAnomalyFunctionFactory(anomalyFunctionFactory);
-    jobContext.setSessionFactory(sessionFactory);
-    jobContext.setAnomalyFunctionId(anomalyFunctionSpec.getId());
-    jobContext.setJobName(jobKey);
+    DetectionJobContext detectionJobContext = new DetectionJobContext();
+    detectionJobContext.setAnomalyFunctionSpecDAO(anomalyFunctionSpecDAO);
+    detectionJobContext.setAnomalyJobSpecDAO(anomalyJobSpecDAO);
+    detectionJobContext.setAnomalyTaskSpecDAO(anomalyTaskSpecDAO);
+    detectionJobContext.setAnomalyFunctionFactory(anomalyFunctionFactory);
+    detectionJobContext.setSessionFactory(sessionFactory);
+    detectionJobContext.setAnomalyFunctionId(anomalyFunctionSpec.getId());
+    detectionJobContext.setJobName(jobKey);
 
-    scheduleJob(jobContext, anomalyFunctionSpec);
+    scheduleJob(detectionJobContext, anomalyFunctionSpec);
   }
 
   public void stop(Long id) throws SchedulerException {
@@ -139,18 +139,18 @@ public class DetectionJobScheduler {
     String jobKey = "adhoc_" + getJobKey(anomalyFunctionSpec.getId(), anomalyFunctionSpec.getFunctionName());
     JobDetail job = JobBuilder.newJob(DetectionJobRunner.class).withIdentity(jobKey).build();
 
-    JobContext jobContext = new JobContext();
-    jobContext.setAnomalyFunctionSpecDAO(anomalyFunctionSpecDAO);
-    jobContext.setAnomalyJobSpecDAO(anomalyJobSpecDAO);
-    jobContext.setAnomalyTaskSpecDAO(anomalyTaskSpecDAO);
-    jobContext.setAnomalyFunctionFactory(anomalyFunctionFactory);
-    jobContext.setSessionFactory(sessionFactory);
-    jobContext.setAnomalyFunctionId(anomalyFunctionSpec.getId());
-    jobContext.setJobName(jobKey);
-    jobContext.setWindowStartIso(windowStartIso);
-    jobContext.setWindowEndIso(windowEndIso);
+    DetectionJobContext detectionJobContext = new DetectionJobContext();
+    detectionJobContext.setAnomalyFunctionSpecDAO(anomalyFunctionSpecDAO);
+    detectionJobContext.setAnomalyJobSpecDAO(anomalyJobSpecDAO);
+    detectionJobContext.setAnomalyTaskSpecDAO(anomalyTaskSpecDAO);
+    detectionJobContext.setAnomalyFunctionFactory(anomalyFunctionFactory);
+    detectionJobContext.setSessionFactory(sessionFactory);
+    detectionJobContext.setAnomalyFunctionId(anomalyFunctionSpec.getId());
+    detectionJobContext.setJobName(jobKey);
+    detectionJobContext.setWindowStartIso(windowStartIso);
+    detectionJobContext.setWindowEndIso(windowEndIso);
 
-    job.getJobDataMap().put(DetectionJobRunner.DETECTION_JOB_CONTEXT, jobContext);
+    job.getJobDataMap().put(DetectionJobRunner.DETECTION_JOB_CONTEXT, detectionJobContext);
 
     try {
       quartzScheduler.scheduleJob(job, trigger);

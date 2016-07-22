@@ -2,6 +2,8 @@ package com.linkedin.thirdeye.anomaly.detection;
 
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 
+import io.dropwizard.hibernate.UnitOfWork;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -191,65 +193,57 @@ public class DetectionTaskRunner implements TaskRunner {
     return results;
   }
 
+  @UnitOfWork
   private List<AnomalyResult> getExistingAnomalies() {
     List<AnomalyResult> results = new ArrayList<>();
 
     Session session = sessionFactory.openSession();
     try {
       ManagedSessionContext.bind(session);
-      Transaction transaction = session.beginTransaction();
-      try {
-        // The ones for this function
+
+      // The ones for this function
+      results.addAll(resultDAO.findAllByCollectionTimeAndFunction(collection, windowStart,
+          windowEnd, anomalyFunction.getSpec().getId()));
+
+      // The ones for any related functions
+      List<AnomalyFunctionRelation> relations =
+          relationDAO.findByParent(anomalyFunction.getSpec().getId());
+      for (AnomalyFunctionRelation relation : relations) {
         results.addAll(resultDAO.findAllByCollectionTimeAndFunction(collection, windowStart,
-            windowEnd, anomalyFunction.getSpec().getId()));
-
-        // The ones for any related functions
-        List<AnomalyFunctionRelation> relations =
-            relationDAO.findByParent(anomalyFunction.getSpec().getId());
-        for (AnomalyFunctionRelation relation : relations) {
-          results.addAll(resultDAO.findAllByCollectionTimeAndFunction(collection, windowStart,
-              windowEnd, relation.getChildId()));
-        }
-
-        transaction.commit();
-      } catch (Exception e) {
-        transaction.rollback();
-        e.printStackTrace();
+            windowEnd, relation.getChildId()));
       }
+    } catch (Exception e) {
+      throw new RuntimeException(e);
     } finally {
       session.close();
       ManagedSessionContext.unbind(sessionFactory);
     }
-
     return results;
   }
 
+  @UnitOfWork
   private void handleResults(List<AnomalyResult> results) {
     Session session = sessionFactory.openSession();
     try {
       ManagedSessionContext.bind(session);
-      Transaction transaction = session.beginTransaction();
-      try {
-        for (AnomalyResult result : results) {
-          // Properties that always come from the function spec
-          AnomalyFunctionSpec spec = anomalyFunction.getSpec();
-          result.setFunctionId(spec.getId());
-          result.setFunctionType(spec.getType());
-          result.setFunctionProperties(spec.getProperties());
-          result.setCollection(spec.getCollection());
-          result.setMetric(spec.getMetric());
-          result.setFilters(spec.getFilters());
 
-          // make sure score and weight are valid numbers
-          result.setScore(normalize(result.getScore()));
-          result.setWeight(normalize(result.getWeight()));
-          resultDAO.save(result);
-        }
-        transaction.commit();
-      } catch (Exception e) {
-        transaction.rollback();
-        throw new RuntimeException(e);
+      for (AnomalyResult result : results) {
+        // Properties that always come from the function spec
+        AnomalyFunctionSpec spec = anomalyFunction.getSpec();
+        result.setFunctionId(spec.getId());
+        result.setFunctionType(spec.getType());
+        result.setFunctionProperties(spec.getProperties());
+        result.setCollection(spec.getCollection());
+        result.setMetric(spec.getMetric());
+        result.setFilters(spec.getFilters());
+
+        // make sure score and weight are valid numbers
+        result.setScore(normalize(result.getScore()));
+        result.setWeight(normalize(result.getWeight()));
+        resultDAO.save(result);
       }
+    } catch (Exception e) {
+      throw new RuntimeException(e);
     } finally {
       session.close();
       ManagedSessionContext.unbind(sessionFactory);

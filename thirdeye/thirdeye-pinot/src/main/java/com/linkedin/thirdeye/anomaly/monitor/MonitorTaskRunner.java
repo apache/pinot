@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.anomaly.monitor;
 
+import io.dropwizard.hibernate.UnitOfWork;
+
 import java.util.List;
 
 import org.hibernate.Session;
@@ -48,53 +50,41 @@ public class MonitorTaskRunner implements TaskRunner {
     return null;
   }
 
+  @UnitOfWork
   private void executeMonitorUpdate(MonitorTaskInfo monitorTaskInfo) {
     LOG.info("Execute monitor udpate {}", monitorTaskInfo);
     Session session = sessionFactory.openSession();
     try {
       ManagedSessionContext.bind(session);
-      Transaction transaction = session.beginTransaction();
-      try {
-        Long jobExecutionId = monitorTaskInfo.getJobExecutionId();
-        List<AnomalyTaskSpec> anomalyTaskSpecs = anomalyTaskSpecDAO
-            .findByJobIdAndStatusNotIn(jobExecutionId, TaskStatus.COMPLETED);
-        if (anomalyTaskSpecs.isEmpty()) {
-          anomalyJobSpecDAO.updateStatusAndJobEndTime(jobExecutionId, JobStatus.COMPLETED, System.currentTimeMillis());
-          LOG.info("COMPLETED anomaly job {}", jobExecutionId);
-        }
 
-        if (!transaction.wasCommitted()) {
-          transaction.commit();
-        }
-
-      } catch (Exception e) {
-        transaction.rollback();
-        throw new RuntimeException(e);
+      Long jobExecutionId = monitorTaskInfo.getJobExecutionId();
+      List<AnomalyTaskSpec> anomalyTaskSpecs = anomalyTaskSpecDAO
+          .findByJobIdAndStatusNotIn(jobExecutionId, TaskStatus.COMPLETED);
+      if (anomalyTaskSpecs.isEmpty()) {
+        anomalyJobSpecDAO.updateStatusAndJobEndTime(jobExecutionId, JobStatus.COMPLETED, System.currentTimeMillis());
+        LOG.info("COMPLETED anomaly job {}", jobExecutionId);
       }
+    } catch (Exception e) {
+      throw new RuntimeException(e);
     } finally {
       session.close();
       ManagedSessionContext.unbind(sessionFactory);
     }
   }
 
+  @UnitOfWork
   private void executeMonitorExpire(MonitorTaskInfo monitorTaskInfo) {
     LOG.info("Execute monitor expire {}", monitorTaskInfo);
     Session session = sessionFactory.openSession();
     try {
       ManagedSessionContext.bind(session);
-      Transaction transaction = session.beginTransaction();
-      try {
-        int expireDaysAgo = monitorTaskInfo.getExpireDaysAgo();
-        int numAnomalyJobsDeleted = anomalyJobSpecDAO.deleteRecordsOlderThanDaysWithStatus(expireDaysAgo, JobStatus.COMPLETED);
-        int numAnomalyTasksDeleted = anomalyTaskSpecDAO.deleteRecordsOlderThanDaysWithStatus(expireDaysAgo, TaskStatus.COMPLETED);
-        LOG.info("Deleted {} anomaly jobs and {} anomaly tasks", numAnomalyJobsDeleted, numAnomalyTasksDeleted);
-        if (!transaction.wasCommitted()) {
-          transaction.commit();
-        }
-      } catch (Exception e) {
-        transaction.rollback();
-        throw new RuntimeException(e);
-      }
+
+      int expireDaysAgo = monitorTaskInfo.getExpireDaysAgo();
+      int numAnomalyJobsDeleted = anomalyJobSpecDAO.deleteRecordsOlderThanDaysWithStatus(expireDaysAgo, JobStatus.COMPLETED);
+      int numAnomalyTasksDeleted = anomalyTaskSpecDAO.deleteRecordsOlderThanDaysWithStatus(expireDaysAgo, TaskStatus.COMPLETED);
+      LOG.info("Deleted {} anomaly jobs and {} anomaly tasks", numAnomalyJobsDeleted, numAnomalyTasksDeleted);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
     } finally {
       session.close();
       ManagedSessionContext.unbind(sessionFactory);

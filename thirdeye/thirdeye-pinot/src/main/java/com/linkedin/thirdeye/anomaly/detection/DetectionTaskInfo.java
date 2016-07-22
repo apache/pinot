@@ -35,6 +35,10 @@ public class DetectionTaskInfo implements TaskInfo {
     this.groupByDimension = groupByDimension;
   }
 
+  public DetectionTaskInfo() {
+
+  }
+
   public long getJobExecutionId() {
     return jobExecutionId;
   }
