@@ -36,10 +36,10 @@ function getData(url, tab){
     })
 }
 
-function submitData(url, data="" ){
-//    if(!data){
-//        data = ""
-//    }
+function submitData(url, data ){
+    if(data === undefined){
+        data = ""
+    }
     console.log("post url:", url)
     return $.ajax({
         url: url,
@@ -54,6 +54,9 @@ function submitData(url, data="" ){
 }
 
 function deleteData(url, data){
+    if(data === undefined){
+        data = ""
+    }
     console.log("delete url:", url)
     return $.ajax({
         url: url,

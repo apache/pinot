@@ -157,7 +157,10 @@
 
     function readFiltersAppliedInCurrentView(currentTab, options){
         var currentFilterContainer = $(".view-filter-selector[rel='"+ currentTab +"']")
-        if(options.form){
+        if(options === undefined){
+            options = {};
+        }
+        if(options.hasOwnProperty("form")){
             currentFilterContainer = $(".view-filter-selector[rel='"+ currentTab +"']", options.form)
         }
         var filters = {};
