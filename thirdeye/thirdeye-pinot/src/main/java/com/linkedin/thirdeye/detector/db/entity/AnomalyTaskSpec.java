@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.detector.db.entity;
 
+import java.sql.Timestamp;
 import java.util.Objects;
 
 import javax.persistence.Column;
@@ -9,7 +10,6 @@ import javax.persistence.Enumerated;
 import javax.persistence.NamedQueries;
 import javax.persistence.NamedQuery;
 import javax.persistence.Table;
-
 
 import com.google.common.base.MoreObjects;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
@@ -25,9 +25,11 @@ import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
 @NamedQueries({
     @NamedQuery(name = "com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#findAll", query = "SELECT at FROM AnomalyTaskSpec at"),
     @NamedQuery(name = "com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#findByJobId", query = "SELECT at FROM AnomalyTaskSpec at WHERE at.jobId = :jobId"),
+    @NamedQuery(name = "com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#findByJobIdAndStatusNotIn", query = "SELECT at FROM AnomalyTaskSpec at WHERE at.jobId = :jobId AND at.status != :status"),
     @NamedQuery(name = "com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#findByStatusOrderByCreateTimeAscending", query = "SELECT at FROM AnomalyTaskSpec at WHERE at.status = :status order by at.taskStartTime asc"),
-    @NamedQuery(name = "com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#updateStatus", query = "UPDATE AnomalyTaskSpec SET status = :newStatus WHERE status = :oldStatus and id = :id"),
-    @NamedQuery(name = "com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#updateStatusAndWorkerId", query = "UPDATE AnomalyTaskSpec SET status = :newStatus, workerId = :workerId WHERE status = :oldStatus and id = :id")
+    @NamedQuery(name = "com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#updateStatusAndTaskEndTime", query = "UPDATE AnomalyTaskSpec SET status = :newStatus, taskEndTime = :taskEndTime WHERE status = :oldStatus and id = :id"),
+    @NamedQuery(name = "com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#updateStatusAndWorkerId", query = "UPDATE AnomalyTaskSpec SET status = :newStatus, workerId = :workerId WHERE status = :oldStatus and id = :id"),
+    @NamedQuery(name = "com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#deleteRecordsOlderThanDaysWithStatus", query = "DELETE FROM AnomalyTaskSpec WHERE status = :status AND lastModified < :expireTimestamp")
 })
 public class AnomalyTaskSpec extends AbstractBaseEntity {
 
@@ -38,7 +40,7 @@ public class AnomalyTaskSpec extends AbstractBaseEntity {
   @Column(name = "task_type", nullable = false)
   private TaskType taskType;
 
-  @Column(name = "worker_id", nullable = true)
+  @Column(name = "worker_id")
   private Long workerId;
 
   @Column(name = "job_name", nullable = false)
@@ -48,14 +50,17 @@ public class AnomalyTaskSpec extends AbstractBaseEntity {
   @Column(name = "status", nullable = false)
   private TaskStatus status;
 
-  @Column(name = "task_start_time", nullable = false)
+  @Column(name = "task_start_time")
   private long taskStartTime;
 
-  @Column(name = "task_end_time", nullable = false)
+  @Column(name = "task_end_time")
   private long taskEndTime;
 
   @Column(name = "task_info", nullable = false)
   private String taskInfo;
+
+  @Column(name = "last_modified", nullable = false)
+  private Timestamp lastModified;
 
   public long getJobId() {
     return jobId;
@@ -121,7 +126,14 @@ public class AnomalyTaskSpec extends AbstractBaseEntity {
     this.taskType = taskType;
   }
 
-  @Override public boolean equals(Object o) {
+
+  public Timestamp getLastModified() {
+    return lastModified;
+  }
+
+
+  @Override
+  public boolean equals(Object o) {
     if (!(o instanceof AnomalyTaskSpec)) {
       return false;
     }
@@ -136,9 +148,11 @@ public class AnomalyTaskSpec extends AbstractBaseEntity {
     return Objects.hash(getId(), jobId, status, taskStartTime, taskEndTime, taskInfo);
   }
 
-  @Override public String toString() {
-    return MoreObjects.toStringHelper(this).add("id", getId()).add("jobId", jobId).add("status", status)
-        .add("startTime", taskStartTime).add("endTime", taskEndTime).add("taskInfo", taskInfo)
-        .toString();
+
+  @Override
+  public String toString() {
+    return MoreObjects.toStringHelper(this).add("id", getId()).add("jobId", jobId)
+        .add("status", status).add("startTime", taskStartTime).add("endTime", taskEndTime)
+        .add("taskInfo", taskInfo).add("lastModified", lastModified).toString();
   }
 }

@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.detector.db.entity;
 
+import java.sql.Timestamp;
 import java.util.List;
 import java.util.Objects;
 
@@ -24,7 +25,10 @@ import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
 @Entity
 @Table(name = "anomaly_jobs")
 @NamedQueries({
-    @NamedQuery(name = "com.linkedin.thirdeye.anomaly.AnomalyJobSpec#findAll", query = "SELECT af FROM AnomalyJobSpec af")
+    @NamedQuery(name = "com.linkedin.thirdeye.anomaly.AnomalyJobSpec#findAll", query = "SELECT aj FROM AnomalyJobSpec aj"),
+    @NamedQuery(name = "com.linkedin.thirdeye.anomaly.AnomalyJobSpec#findByStatus", query = "SELECT aj FROM AnomalyJobSpec aj WHERE aj.status = :status"),
+    @NamedQuery(name = "com.linkedin.thirdeye.anomaly.AnomalyJobSpec#updateStatusAndJobEndTime", query = "UPDATE AnomalyJobSpec SET status = :status, scheduleEndTime = :jobEndTime WHERE id = :id"),
+    @NamedQuery(name = "com.linkedin.thirdeye.anomaly.AnomalyJobSpec#deleteRecordsOlderThanDaysWithStatus", query = "DELETE FROM AnomalyJobSpec WHERE status = :status AND lastModified < :expireTimestamp")
 })
 public class AnomalyJobSpec extends AbstractBaseEntity {
 
@@ -35,17 +39,20 @@ public class AnomalyJobSpec extends AbstractBaseEntity {
   @Column(name = "status", nullable = false)
   private JobStatus status;
 
-  @Column(name = "schedule_start_time", nullable = false)
+  @Column(name = "schedule_start_time")
   private long scheduleStartTime;
 
-  @Column(name = "schedule_end_time", nullable = false)
+  @Column(name = "schedule_end_time")
   private long scheduleEndTime;
 
-  @Column(name = "window_start_time", nullable = false)
+  @Column(name = "window_start_time")
   private long windowStartTime;
 
-  @Column(name = "window_end_time", nullable = false)
+  @Column(name = "window_end_time")
   private long windowEndTime;
+
+  @Column(name = "last_modified")
+  private Timestamp lastModified;
 
   @OneToMany(fetch = FetchType.LAZY)
   @JoinColumn(name = "job_execution_id", referencedColumnName = "id")
@@ -99,6 +106,11 @@ public class AnomalyJobSpec extends AbstractBaseEntity {
     this.windowEndTime = windowEndTime;
   }
 
+  public Timestamp getLastModified() {
+    return lastModified;
+  }
+
+
   public List<AnomalyTaskSpec> getAnomalyTasks() {
     return anomalyTasks;
   }
@@ -125,7 +137,10 @@ public class AnomalyJobSpec extends AbstractBaseEntity {
 
   @Override
   public String toString() {
-    return MoreObjects.toStringHelper(this).add("id", getId()).add("jobName", jobName)
-        .add("status", status).add("startTime", scheduleStartTime).add("endTime", scheduleEndTime).toString();
+
+    return MoreObjects.toStringHelper(this).add("id", getId()).add("jobName", jobName).add("status", status)
+        .add("scheduleStartTime", scheduleStartTime).add("scheduleEndTime", scheduleEndTime)
+        .add("windowStartTime", windowStartTime).add("windowEndTime", windowEndTime)
+        .add("lastModified", lastModified).toString();
   }
 }

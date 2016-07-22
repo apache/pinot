@@ -2,19 +2,13 @@ package com.linkedin.thirdeye.anomaly.job;
 
 
 import org.hibernate.SessionFactory;
-import org.joda.time.DateTime;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.linkedin.thirdeye.detector.db.dao.AnomalyFunctionSpecDAO;
 import com.linkedin.thirdeye.detector.db.dao.AnomalyJobSpecDAO;
 import com.linkedin.thirdeye.detector.db.dao.AnomalyTaskSpecDAO;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 
-
-public class JobContext {
-
-  private static final Logger LOG = LoggerFactory.getLogger(JobContext.class);
+public abstract class JobContext {
 
   private AnomalyJobSpecDAO anomalyJobSpecDAO;
   private AnomalyTaskSpecDAO anomalyTaskSpecDAO;
@@ -22,14 +16,8 @@ public class JobContext {
   private AnomalyFunctionFactory anomalyFunctionFactory;
   private SessionFactory sessionFactory;
 
-  private Long anomalyFunctionId;
-  private String windowStartIso;
-  private String windowEndIso;
-  private DateTime windowStart;
-  private DateTime windowEnd;
   private String jobName;
   private long jobExecutionId;
-
 
 
   public long getJobExecutionId() {
@@ -72,53 +60,12 @@ public class JobContext {
     this.sessionFactory = sessionFactory;
   }
 
-  public Long getAnomalyFunctionId() {
-    return anomalyFunctionId;
-  }
-
-  public void setAnomalyFunctionId(Long anomalyFunctionId) {
-    this.anomalyFunctionId = anomalyFunctionId;
-  }
-
-  public String getWindowStartIso() {
-    return windowStartIso;
-  }
-
-  public void setWindowStartIso(String windowStartIso) {
-    this.windowStartIso = windowStartIso;
-  }
-
-  public String getWindowEndIso() {
-    return windowEndIso;
-  }
-
-  public void setWindowEndIso(String windowEndIso) {
-    this.windowEndIso = windowEndIso;
-  }
-
-
   public String getJobName() {
     return jobName;
   }
 
   public void setJobName(String jobName) {
     this.jobName = jobName;
-  }
-
-  public DateTime getWindowStart() {
-    return windowStart;
-  }
-
-  public void setWindowStart(DateTime windowStart) {
-    this.windowStart = windowStart;
-  }
-
-  public DateTime getWindowEnd() {
-    return windowEnd;
-  }
-
-  public void setWindowEnd(DateTime windowEnd) {
-    this.windowEnd = windowEnd;
   }
 
   public AnomalyFunctionFactory getAnomalyFunctionFactory() {
