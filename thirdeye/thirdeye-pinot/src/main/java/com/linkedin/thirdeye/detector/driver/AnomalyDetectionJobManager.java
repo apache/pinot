@@ -1,17 +1,19 @@
 package com.linkedin.thirdeye.detector.driver;
 
 import java.io.File;
+import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 
 import org.hibernate.SessionFactory;
 import org.joda.time.DateTime;
 import org.joda.time.Interval;
 import org.joda.time.format.ISODateTimeFormat;
+import org.quartz.CronExpression;
 import org.quartz.CronScheduleBuilder;
 import org.quartz.CronTrigger;
 import org.quartz.JobBuilder;
@@ -38,7 +40,6 @@ import com.linkedin.thirdeye.detector.db.AnomalyFunctionSpecDAO;
 import com.linkedin.thirdeye.detector.db.AnomalyResultDAO;
 import com.linkedin.thirdeye.detector.function.AnomalyFunction;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
-import com.linkedin.thirdeye.detector.lib.util.JobUtils;
 
 public class AnomalyDetectionJobManager {
   public static final String MONITORING_WINDOW_KEY = "monitoringWindow";
@@ -215,6 +216,10 @@ public class AnomalyDetectionJobManager {
         windowEndIsoString);
   }
 
+  /**
+   * Runs the given spec for all fire times that would have occurred during the provided time
+   * window, [start, end) based on the spec's cron schedule.
+   */
   public void simulatePeriod(Long id, String startIsoString, String endIsoString) throws Exception {
     // TODO error checks
     AnomalyFunctionSpec spec = specDAO.findById(id);
@@ -228,11 +233,10 @@ public class AnomalyDetectionJobManager {
 
     long dataWindowMillis =
         new TimeGranularity(spec.getWindowSize(), spec.getWindowUnit()).toMillis();
-    long monitorWindowMillis = getMonitoringWindowGranularity(spec).toMillis();
 
     String functionIDString = String.format("%s(%d)", spec.getFunctionName(), id);
     List<Interval> simulationIntervals =
-        getSimulationIntervals(startTime, endTime, dataWindowMillis, monitorWindowMillis);
+        getSimulationIntervals(startTime, endTime, dataWindowMillis, spec.getCron());
     LOG.info(
         "Found {} intervals for function {} from {} to {}, with simulation frequency of {} ms",
         simulationIntervals.size(), id, startTime, endTime, dataWindowMillis);
@@ -256,40 +260,39 @@ public class AnomalyDetectionJobManager {
         LOG.error("Error encountered for {}, {}, {}:\n {}", functionIDString, intervalStart,
             intervalEnd, e);
       }
-      intervalEnd = intervalEnd.plus(monitorWindowMillis);
     }
   }
 
-  private List<Interval> getSimulationIntervals(DateTime start, DateTime end,
-      long dataWindowMillis, long millisBetweenSimulations) {
-    List<Interval> results = new ArrayList<>();
-    DateTime currentWindowStart = start;
-    DateTime currentWindowEnd = start.plus(dataWindowMillis);
-    while (!currentWindowEnd.isAfter(end)) {
-      currentWindowStart = currentWindowEnd.minus(dataWindowMillis);
-      results.add(new Interval(currentWindowStart, currentWindowEnd));
-      if (currentWindowEnd.isBefore(end)) {
-        currentWindowEnd = currentWindowEnd.plus(millisBetweenSimulations);
-      }
+  static List<Interval> getSimulationIntervals(DateTime start, DateTime end, long dataWindowMillis,
+      String cronSchedule) throws ParseException {
+    CronExpression cron = new CronExpression(cronSchedule);
+    List<Interval> intervals = new ArrayList<>();
+    // TODO force UTC handling?
+    // cron.setTimeZone(...);
+    Date currentDate = start.toDate();
+    Date endDate = end.toDate();
+    if (!cron.isSatisfiedBy(currentDate)) {
+      currentDate = cron.getNextValidTimeAfter(currentDate);
     }
-    if (!currentWindowEnd.equals(end)) {
-      LOG.error("Time windows did not line up with monitoring window!: {}, {}", currentWindowEnd,
-          end);
+
+    while (currentDate.before(endDate)) {
+      addToIntervalList(intervals, currentDate, dataWindowMillis);
+      currentDate = cron.getNextValidTimeAfter(currentDate);
     }
-    return results;
+    if (!currentDate.equals(endDate)) {
+      LOG.error("Last fire time does not line up with end time!: {}, {}, {}", new DateTime(
+          currentDate), end, cronSchedule);
+    }
+    return intervals;
   }
 
-  private TimeGranularity getMonitoringWindowGranularity(AnomalyFunctionSpec spec) {
-    // TODO fully implement the monitoring window property within AFS
-    Properties props = JobUtils.decodeCompactedProperties(spec.getProperties());
-    // if specified in props, adjust start as needed.
-    int monitoringWindowSize = Integer.parseInt(props.getProperty(MONITORING_WINDOW_KEY, "-1"));
-    if (monitoringWindowSize > 0) {
-      return new TimeGranularity(monitoringWindowSize * spec.getBucketSize(), spec.getBucketUnit());
-    } else {
-      // otherwise use full window
-      return new TimeGranularity(spec.getWindowSize(), spec.getWindowUnit());
-    }
+  private static void addToIntervalList(List<Interval> intervals, Date currentDate,
+      long dataWindowMillis) {
+    DateTime intervalEnd = new DateTime(currentDate);
+    DateTime intervalStart = intervalEnd.minus(dataWindowMillis);
+    Interval interval = new Interval(intervalStart, intervalEnd);
+    // LOG.info("Added interval {}", interval);
+    intervals.add(interval);
   }
 
 }
