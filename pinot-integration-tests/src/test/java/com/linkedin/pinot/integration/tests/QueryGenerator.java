@@ -15,103 +15,147 @@
  */
 package com.linkedin.pinot.integration.tests;
 
-import com.linkedin.pinot.common.utils.StringUtil;
+import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
-import java.util.SortedSet;
-import java.util.TreeSet;
 import org.apache.avro.Schema;
 import org.apache.avro.file.DataFileReader;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
-import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang.StringUtils;
+import org.json.JSONArray;
+import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 /**
- * Utility class to generate random SQL queries based on an Avro file.
- *
+ * The <code>QueryGenerator</code> class is used to generate random equivalent PQL/SQL query pairs based on Avro files.
+ * <ul>
+ *   <li>
+ *     Supports COMPARISON, IN and BETWEEN predicate for both single-value and multi-value columns.
+ *     <ul>
+ *       <li>For multi-value columns, does not support NOT EQUAL and NOT IN.</li>
+ *       <li>The reason for this restriction is that number of elements in multi-value columns is not fixed.</li>
+ *     </ul>
+ *   </li>
+ *   <li>Supports single-value data type: BOOLEAN, INT, LONG, FLOAT, DOUBLE, STRING.</li>
+ *   <li>Supports multi-value data type: INT, LONG, FLOAT, DOUBLE, STRING.</li>
+ *   <li>
+ *     Supports aggregation function: SUM, MIN, MAX, AVG, COUNT, DISTINCTCOUNT.
+ *     <ul>
+ *       <li>SUM, MIN, MAX, AVG can only work on numeric single-value columns.</li>
+ *       <li>COUNT, DISTINCTCOUNT can work on any single-value columns.</li>
+ *     </ul>
+ *   </li>
+ * </ul>
  */
 public class QueryGenerator {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryGenerator.class);
-  private Map<String, SortedSet<String>> _columnToValues = new HashMap<String, SortedSet<String>>();
-  private Map<String, List<String>> _columnToValueList = new HashMap<String, List<String>>();
-  private List<String> _columnNames = new ArrayList<String>();
-  private List<String> _nonMultivalueColumnNames = new ArrayList<String>();
-  private List<String> _nonMultivalueNumericalColumnNames = new ArrayList<String>();
-  private Map<String, Integer> _multivalueColumnCardinality = new HashMap<String, Integer>();
 
-  // The reason for only generating aggregation queries is that currently we don't verify the results or selection
-  // queries, and the schema merging is not working properly (if realtime and offline schemas do not match).
-  // Old value is: Arrays.asList(new SelectionQueryGenerationStrategy(), new AggregationQueryGenerationStrategy());
-  // TODO: Add back SelectionQueryGenerationStrategy after adding selection query results verification
-  private List<QueryGenerationStrategy> _queryGenerationStrategies =
-      Collections.<QueryGenerationStrategy>singletonList(new AggregationQueryGenerationStrategy());
+  // Configurable variables.
+  private static final int MAX_NUM_SELECTION_COLUMNS = 3;
+  private static final int MAX_NUM_AGGREGATION_COLUMNS = 3;
+  private static final int MAX_NUM_ORDER_BY_COLUMNS = 3;
+  private static final int MAX_NUM_GROUP_BY_COLUMNS = 3;
+  private static final int MAX_NUM_PREDICATES = 3;
+  private static final int MAX_NUM_IN_CLAUSE_VALUES = 5;
+  private static final int MAX_RESULT_LIMIT = 30;
 
-  private List<String> _booleanOperators = Arrays.asList("OR", "AND");
-  private List<PredicateGenerator> _predicateGenerators = Arrays.asList(new ComparisonOperatorPredicateGenerator(),
-      new InPredicateGenerator(), new BetweenPredicateGenerator());
-  private static final int MAX_MULTIVALUE_CARDINALITY = 5;
+  private static final List<String> BOOLEAN_OPERATORS = Arrays.asList("OR", "AND");
+  private static final List<String> COMPARISON_OPERATORS = Arrays.asList("=", "<>", "<", ">", "<=", ">=");
+
+  // TODO: fix DISTINCTCOUNT implementation and add it back.
+  // Currently for DISTINCTCOUNT we use hashcode as the key, should change it to use raw values.
+  private static final List<String> AGGREGATION_FUNCTIONS =
+      Arrays.asList("SUM", "MIN", "MAX", "AVG", "COUNT"/*, "DISTINCTCOUNT"*/);
   private static final Random RANDOM = new Random();
-  private final String _pqlTableName;
+
+  private final Map<String, Set<String>> _columnToValueSet = new HashMap<>();
+  private final Map<String, List<String>> _columnToValueList = new HashMap<>();
+  private final List<String> _columnNames = new ArrayList<>();
+  private final List<String> _singleValueColumnNames = new ArrayList<>();
+  private final List<String> _singleValueNumericalColumnNames = new ArrayList<>();
+  private final Map<String, Integer> _multiValueColumnMaxNumElements = new HashMap<>();
+
+  private final List<QueryGenerationStrategy> _queryGenerationStrategies =
+      Arrays.asList(new SelectionQueryGenerationStrategy(), new AggregationQueryGenerationStrategy());
+  private final List<PredicateGenerator> _singleValuePredicateGenerators =
+      Arrays.asList(new SingleValueComparisonPredicateGenerator(), new SingleValueInPredicateGenerator(),
+          new SingleValueBetweenPredicateGenerator());
+  private final List<PredicateGenerator> _multiValuePredicateGenerators =
+      Arrays.asList(new MultiValueComparisonPredicateGenerator(), new MultiValueInPredicateGenerator(),
+          new MultiValueBetweenPredicateGenerator());
+
+  private final String _pinotTableName;
   private final String _h2TableName;
-  private boolean skipMultivaluePredicates;
+  private boolean _skipMultiValuePredicates = false;
 
-  public QueryGenerator(final List<File> avroFiles, final String pqlTableName, String h2TableName) {
-    _pqlTableName = pqlTableName;
+  /**
+   * Constructor for <code>QueryGenerator</code>.
+   *
+   * @param avroFiles list of Avro files.
+   * @param pinotTableName Pinot table name.
+   * @param h2TableName H2 table name.
+   */
+  public QueryGenerator(List<File> avroFiles, String pinotTableName, String h2TableName) {
+    _pinotTableName = pinotTableName;
     _h2TableName = h2TableName;
-    // Read schema and initialize storage
-    File schemaAvroFile = avroFiles.get(0);
-    GenericDatumReader<GenericRecord> datumReader = new GenericDatumReader<GenericRecord>();
-    DataFileReader<GenericRecord> fileReader = null;
-    try {
-      fileReader = new DataFileReader<GenericRecord>(schemaAvroFile, datumReader);
 
+    // Read Avro schema and initialize storage.
+    File schemaAvroFile = avroFiles.get(0);
+    GenericDatumReader<GenericRecord> datumReader = new GenericDatumReader<>();
+    try (DataFileReader<GenericRecord> fileReader = new DataFileReader<>(schemaAvroFile, datumReader)) {
       Schema schema = fileReader.getSchema();
       for (Schema.Field field : schema.getFields()) {
+        String fieldName = field.name();
         Schema fieldSchema = field.schema();
         Schema.Type fieldType = fieldSchema.getType();
-        String fieldName = field.name();
 
         switch (fieldType) {
           case UNION:
-            List<Schema> unionTypes = fieldSchema.getTypes();
-
             _columnNames.add(fieldName);
-            _columnToValues.put(fieldName, new TreeSet<String>());
-
-            // We assume here that we can only have strings and numerical values, no arrays, unions, etc.
-            if (unionTypes.get(0).getType() == Schema.Type.ARRAY) {
-              _columnNames.add(fieldName);
-              _multivalueColumnCardinality.put(fieldName, 0);
-            } else if (unionTypes.get(0).getType() != Schema.Type.STRING) {
-              _nonMultivalueNumericalColumnNames.add(fieldName);
+            _columnToValueSet.put(fieldName, new HashSet<String>());
+            Schema.Type type = fieldSchema.getTypes().get(0).getType();
+            if (type == Schema.Type.ARRAY) {
+              _multiValueColumnMaxNumElements.put(fieldName, 0);
+            } else {
+              _singleValueColumnNames.add(fieldName);
+              if (type != Schema.Type.STRING && type != Schema.Type.BOOLEAN) {
+                _singleValueNumericalColumnNames.add(fieldName);
+              }
             }
             break;
           case ARRAY:
             _columnNames.add(fieldName);
-            _multivalueColumnCardinality.put(fieldName, 0);
+            _columnToValueSet.put(fieldName, new HashSet<String>());
+            _multiValueColumnMaxNumElements.put(fieldName, 0);
             break;
           case INT:
           case LONG:
           case FLOAT:
           case DOUBLE:
             _columnNames.add(fieldName);
-            _columnToValues.put(fieldName, new TreeSet<String>());
-            _nonMultivalueNumericalColumnNames.add(fieldName);
+            _columnToValueSet.put(fieldName, new HashSet<String>());
+            _singleValueColumnNames.add(fieldName);
+            _singleValueNumericalColumnNames.add(fieldName);
             break;
-          case RECORD:
-            LOGGER.warn("Ignoring field {} of type RECORD", fieldName);
+          case BOOLEAN:
+          case STRING:
+            _columnNames.add(fieldName);
+            _columnToValueSet.put(fieldName, new HashSet<String>());
+            _singleValueColumnNames.add(fieldName);
             break;
           default:
             LOGGER.warn("Ignoring field {} of type {}", fieldName, fieldType);
@@ -120,51 +164,46 @@ public class QueryGenerator {
       }
     } catch (Exception e) {
       throw new RuntimeException(e);
-    } finally {
-      IOUtils.closeQuietly(fileReader);
     }
 
+    // Load Avro data into storage.
     for (File avroFile : avroFiles) {
       addAvroData(avroFile);
     }
 
+    // Ignore multi-value columns with too many elements.
     prepareToGenerateQueries();
   }
 
   /**
-   * Reads in an avro file to add it to the set of data that can be queried
+   * Helper method to read in an Avro file and add data to the storage.
+   *
+   * @param avroFile Avro file.
    */
-  public void addAvroData(File avroFile) {
-    // Read in records and update the values stored
-    GenericDatumReader<GenericRecord> datumReader = new GenericDatumReader<GenericRecord>();
-    DataFileReader<GenericRecord> fileReader = null;
-    try {
-      fileReader = new DataFileReader<GenericRecord>(avroFile, datumReader);
-
+  private void addAvroData(File avroFile) {
+    // Read in records and update the values stored.
+    GenericDatumReader<GenericRecord> datumReader = new GenericDatumReader<>();
+    try (DataFileReader<GenericRecord> fileReader = new DataFileReader<>(avroFile, datumReader)) {
       for (GenericRecord genericRecord : fileReader) {
         for (String columnName : _columnNames) {
-          SortedSet<String> values = _columnToValues.get(columnName);
-          if (values == null) {
-            values = new TreeSet<String>();
-            _columnToValues.put(columnName, values);
-          }
+          Set<String> values = _columnToValueSet.get(columnName);
 
+          // Turn the Avro value into a valid SQL String token.
           Object avroValue = genericRecord.get(columnName);
-
-          // Turn the value into a valid SQL token
-          if (avroValue == null) {
-            continue;
-          } else {
-            if (_multivalueColumnCardinality.containsKey(columnName)) {
+          if (avroValue != null) {
+            Integer storedMaxNumElements = _multiValueColumnMaxNumElements.get(columnName);
+            if (storedMaxNumElements != null) {
+              // Multi-value column
               GenericData.Array array = (GenericData.Array) avroValue;
-              Integer storedCardinality = _multivalueColumnCardinality.get(columnName);
-              if (storedCardinality < array.size()) {
-                _multivalueColumnCardinality.put(columnName, array.size());
+              int numElements = array.size();
+              if (storedMaxNumElements < numElements) {
+                _multiValueColumnMaxNumElements.put(columnName, numElements);
               }
               for (Object element : array) {
                 storeAvroValueIntoValueSet(values, element);
               }
             } else {
+              // Single-value column
               storeAvroValueIntoValueSet(values, avroValue);
             }
           }
@@ -172,114 +211,350 @@ public class QueryGenerator {
       }
     } catch (Exception e) {
       throw new RuntimeException(e);
-    } finally {
-      IOUtils.closeQuietly(fileReader);
     }
   }
 
-  private void storeAvroValueIntoValueSet(Set<String> valueSet, Object avroValue) {
+  /**
+   * Helper method to store an Avro value into the valid SQL String value set.
+   *
+   * @param valueSet value set.
+   * @param avroValue Avro value.
+   */
+  private static void storeAvroValueIntoValueSet(Set<String> valueSet, Object avroValue) {
     if (avroValue instanceof Number) {
+      // For Number object, store raw value.
       valueSet.add(avroValue.toString());
     } else {
+      // For non-Number object, escape single quote.
       valueSet.add("'" + avroValue.toString().replace("'", "''") + "'");
     }
   }
 
   /**
-   * Finishes initialization of the query generator, once all Avro data has been loaded.
+   * Helper method to finish initialization of the <code>QueryGenerator</code>, removing multi-value columns with too
+   * many elements and dumping storage into the final map from column name to list of column values.
+   * <p>Called after all Avro data loaded.
    */
-  public void prepareToGenerateQueries() {
-    for (String columnName : _columnNames) {
-      _columnToValueList.put(columnName, new ArrayList<String>(_columnToValues.get(columnName)));
-      if (!_multivalueColumnCardinality.containsKey(columnName)) {
-        _nonMultivalueColumnNames.add(columnName);
+  private void prepareToGenerateQueries() {
+    Iterator<String> columnNameIterator = _columnNames.iterator();
+    while (columnNameIterator.hasNext()) {
+      String columnName = columnNameIterator.next();
+
+      // Remove multi-value columns with more than MAX_ELEMENTS_IN_MULTI_VALUE elements.
+      Integer maxNumElements = _multiValueColumnMaxNumElements.get(columnName);
+      if (maxNumElements != null && maxNumElements > BaseClusterIntegrationTest.MAX_ELEMENTS_IN_MULTI_VALUE) {
+        LOGGER.debug("Ignoring column {} with max number of {} elements", columnName, maxNumElements);
+        columnNameIterator.remove();
+        _multiValueColumnMaxNumElements.remove(columnName);
+      } else {
+        _columnToValueList.put(columnName, new ArrayList<>(_columnToValueSet.get(columnName)));
       }
     }
 
-    for (Map.Entry<String, Integer> entry : _multivalueColumnCardinality.entrySet()) {
-      String columnName = entry.getKey();
-      Integer columnCardinality = entry.getValue();
-      if (MAX_MULTIVALUE_CARDINALITY < columnCardinality) {
-        LOGGER.warn("Ignoring column {} with a cardinality of {}, exceeds maximum multivalue column cardinality of {}",
-            columnName, columnCardinality, MAX_MULTIVALUE_CARDINALITY);
-        _columnNames.remove(columnName);
+    // Free the other copy of the data.
+    _columnToValueSet.clear();
+  }
+
+  /**
+   * Set whether to skip predicates on multi-value columns.
+   *
+   * @param skipMultiValuePredicates whether to skip predicates on multi-value columns.
+   */
+  public void setSkipMultiValuePredicates(boolean skipMultiValuePredicates) {
+    _skipMultiValuePredicates = skipMultiValuePredicates;
+  }
+
+  /**
+   * Helper method to pick a random value from the values list.
+   *
+   * @param list values list.
+   * @param <T> type of the value.
+   * @return randomly picked value.
+   */
+  private <T> T pickRandom(List<T> list) {
+    return list.get(RANDOM.nextInt(list.size()));
+  }
+
+  /**
+   * Helper method to join several {@link String} elements with ' '.
+   *
+   * @param elements elements to be joined.
+   * @return joined result.
+   */
+  private static String joinWithSpaces(String... elements) {
+    StringBuilder stringBuilder = new StringBuilder();
+    for (String element : elements) {
+      if (!element.isEmpty()) {
+        stringBuilder.append(element).append(' ');
       }
     }
-
-    // Free the other copy of the data
-    _columnToValues = null;
+    return stringBuilder.substring(0, stringBuilder.length() - 1);
   }
 
-  public void setSkipMultivaluePredicates(boolean skipMultivaluePredicates) {
-    this.skipMultivaluePredicates = skipMultivaluePredicates;
-  }
-
-  private interface QueryFragment {
-    String generatePql();
-
-    String generateH2Sql();
-  }
-
+  /**
+   * Query interface with capability of generating PQL and H2 SQL query.
+   */
   public interface Query {
+
+    /**
+     * Generate PQL query.
+     *
+     * @return generated PQL query.
+     */
     String generatePql();
 
+    /**
+     * Generate H2 SQL queries equivalent to the PQL query.
+     *
+     * @return generated H2 SQL queries.
+     */
     List<String> generateH2Sql();
   }
 
-  private <T> T pickRandom(List<T> items) {
-    return items.get(RANDOM.nextInt(items.size()));
-  }
+  /**
+   * Selection query.
+   */
+  private class SelectionQuery implements Query {
+    private final List<String> _projectionColumns;
+    private final PredicateQueryFragment _predicate;
+    private final OrderByQueryFragment _orderBy;
+    private final LimitQueryFragment _limit;
 
-  public Query generateQuery() {
-    return pickRandom(_queryGenerationStrategies).generateQuery();
-  }
-
-  private interface QueryGenerationStrategy {
-    Query generateQuery();
-  }
-
-  private class StringQueryFragment implements QueryFragment {
-    private String pql;
-    private String hql;
-
-    private StringQueryFragment(String querySql) {
-      pql = querySql;
-      hql = querySql;
-    }
-
-    public StringQueryFragment(String pql, String hql) {
-      this.pql = pql;
-      this.hql = hql;
+    /**
+     * Constructor for <code>SelectionQuery</code>.
+     *
+     * @param projectionColumns projection columns.
+     * @param orderBy order by fragment.
+     * @param predicate predicate fragment.
+     * @param limit limit fragment.
+     */
+    public SelectionQuery(List<String> projectionColumns, PredicateQueryFragment predicate,
+        OrderByQueryFragment orderBy, LimitQueryFragment limit) {
+      _projectionColumns = projectionColumns;
+      _orderBy = orderBy;
+      _predicate = predicate;
+      _limit = limit;
     }
 
     @Override
     public String generatePql() {
-      return pql;
+      return joinWithSpaces("SELECT", StringUtils.join(_projectionColumns, ", "), "FROM", _pinotTableName,
+          _predicate.generatePql(), _orderBy.generatePql(), _limit.generatePql());
+    }
+
+    @Override
+    public List<String> generateH2Sql() {
+      List<String> h2ProjectionColumns = new ArrayList<>();
+      for (String projectionColumn : _projectionColumns) {
+        if (_multiValueColumnMaxNumElements.containsKey(projectionColumn)) {
+          // Multi-value column.
+          for (int i = 0; i < BaseClusterIntegrationTest.MAX_ELEMENTS_IN_MULTI_VALUE; i++) {
+            h2ProjectionColumns.add(projectionColumn + "__MV" + i);
+          }
+        } else {
+          // Single-value column.
+          h2ProjectionColumns.add(projectionColumn);
+        }
+      }
+      return Collections.singletonList(
+          joinWithSpaces("SELECT", StringUtils.join(h2ProjectionColumns, ", "), "FROM", _h2TableName,
+              _predicate.generateH2Sql(), _orderBy.generateH2Sql(), _limit.generateH2Sql()));
+    }
+  }
+
+  /**
+   * Aggregation query.
+   */
+  private class AggregationQuery implements Query {
+    private List<String> _aggregateColumnsAndFunctions;
+    private PredicateQueryFragment _predicate;
+    private Set<String> _groupColumns;
+    private TopQueryFragment _top;
+
+    /**
+     * Constructor for <code>AggregationQuery</code>.
+     *
+     * @param aggregateColumnsAndFunctions aggregation functions.
+     * @param predicate predicate fragment.
+     * @param groupColumns group-by columns.
+     * @param top top fragment.
+     */
+    public AggregationQuery(List<String> aggregateColumnsAndFunctions, PredicateQueryFragment predicate,
+        Set<String> groupColumns, TopQueryFragment top) {
+      _aggregateColumnsAndFunctions = aggregateColumnsAndFunctions;
+      _predicate = predicate;
+      _groupColumns = groupColumns;
+      _top = top;
+    }
+
+    @Override
+    public String generatePql() {
+      if (_groupColumns.isEmpty()) {
+        return joinWithSpaces("SELECT", StringUtils.join(_aggregateColumnsAndFunctions, ", "), "FROM", _pinotTableName,
+            _predicate.generatePql(), _top.generatePql());
+      } else {
+        return joinWithSpaces("SELECT", StringUtils.join(_aggregateColumnsAndFunctions, ", "), "FROM", _pinotTableName,
+            _predicate.generatePql(), "GROUP BY", StringUtils.join(_groupColumns, ", "), _top.generatePql());
+      }
+    }
+
+    @Override
+    public List<String> generateH2Sql() {
+      List<String> queries = new ArrayList<>();
+
+      // For each aggregation function, generate one separate H2 SQL query.
+      for (String aggregateColumnAndFunction : _aggregateColumnsAndFunctions) {
+        // Make 'AVG' and 'DISTINCTCOUNT' compatible with H2 SQL query.
+        if (aggregateColumnAndFunction.startsWith("AVG(")) {
+          aggregateColumnAndFunction =
+              aggregateColumnAndFunction.replace("AVG(", "AVG(CAST(").replace(")", " AS DOUBLE))");
+        } else if (aggregateColumnAndFunction.startsWith("DISTINCTCOUNT(")) {
+          aggregateColumnAndFunction = aggregateColumnAndFunction.replace("DISTINCTCOUNT(", "COUNT(DISTINCT ");
+        }
+
+        if (_groupColumns.isEmpty()) {
+          // Aggregation query.
+          queries.add(
+              joinWithSpaces("SELECT", aggregateColumnAndFunction, "FROM", _h2TableName, _predicate.generateH2Sql(),
+                  _top.generateH2Sql()));
+        } else {
+          // Group-by query.
+
+          // Unlike PQL, SQL expects the group columns in select statements.
+          String groupByColumns = StringUtils.join(_groupColumns, ", ");
+          queries.add(joinWithSpaces("SELECT", groupByColumns + ",", aggregateColumnAndFunction, "FROM", _h2TableName,
+              _predicate.generateH2Sql(), "GROUP BY", groupByColumns, _top.generateH2Sql()));
+        }
+      }
+
+      return queries;
+    }
+  }
+
+  /**
+   * Generate one selection or aggregation query.
+   *
+   * @return generated query.
+   */
+  public Query generateQuery() {
+    return pickRandom(_queryGenerationStrategies).generateQuery();
+  }
+
+  /**
+   * Query fragment interface with capability of generating PQL and H2 SQL query fragment.
+   */
+  private interface QueryFragment {
+
+    /**
+     * Generate PQL query fragment.
+     *
+     * @return generated PQL query fragment.
+     */
+    String generatePql();
+
+    /**
+     * Generate H2 SQL query fragment equivalent to the PQL query fragment.
+     *
+     * @return generated H2 SQL query fragment.
+     */
+    String generateH2Sql();
+  }
+
+  /**
+   * Most basic query fragment.
+   */
+  private class StringQueryFragment implements QueryFragment {
+    String _pql;
+    String _sql;
+
+    /**
+     * Constructor for with same PQL and H2 SQL query fragment.
+     *
+     * @param pql PQL (H2 SQL) query fragment.
+     */
+    StringQueryFragment(String pql) {
+      _pql = pql;
+      _sql = pql;
+    }
+
+    /**
+     * Constructor for <code>StringQueryFragment</code> with different PQL and H2 SQL query fragment.
+     *
+     * @param pql PQL query fragment.
+     * @param sql H2 SQL query fragment.
+     */
+    StringQueryFragment(String pql, String sql) {
+      _pql = pql;
+      _sql = sql;
+    }
+
+    @Override
+    public String generatePql() {
+      return _pql;
     }
 
     @Override
     public String generateH2Sql() {
-      return hql;
+      return _sql;
     }
   }
 
+  /**
+   * Limit query fragment for selection queries.
+   * <ul>
+   *   <li>SELECT ... FROM ... WHERE ... 'LIMIT ...'</li>
+   * </ul>
+   */
   private class LimitQueryFragment extends StringQueryFragment {
-    private LimitQueryFragment(int limit) {
-      super(0 <= limit ? "LIMIT " + limit : "", "LIMIT 10000");
+    LimitQueryFragment(int limit) {
+      // When limit is MAX_RESULT_LIMIT, construct query without LIMIT.
+      super(limit == MAX_RESULT_LIMIT ? "" : "LIMIT " + limit,
+          "LIMIT " + BaseClusterIntegrationTest.MAX_COMPARISON_LIMIT);
     }
   }
 
+  /**
+   * Top query fragment for aggregation queries.
+   * <ul>
+   *   <li>SELECT ... FROM ... WHERE ... 'TOP ...'</li>
+   * </ul>
+   */
+  private class TopQueryFragment extends StringQueryFragment {
+    TopQueryFragment(int top) {
+      // When top is MAX_RESULT_LIMIT, construct query without TOP.
+      super(top == MAX_RESULT_LIMIT ? "" : "TOP " + top, "LIMIT " + BaseClusterIntegrationTest.MAX_COMPARISON_LIMIT);
+    }
+  }
+
+  /**
+   * Order by query fragment for aggregation queries.
+   * <ul>
+   *   <li>SELECT ... FROM ... WHERE ... 'ORDER BY ...'</li>
+   * </ul>
+   */
   private class OrderByQueryFragment extends StringQueryFragment {
-    private OrderByQueryFragment(Set<String> columns) {
-      super(columns.isEmpty() ? "" : "ORDER BY " + joinWithCommas(new ArrayList<String>(columns)));
+    OrderByQueryFragment(Set<String> columns) {
+      super(columns.isEmpty() ? "" : "ORDER BY " + StringUtils.join(columns, ", "));
     }
   }
 
+  /**
+   * Predicate query fragment.
+   * <ul>
+   *   <li>SELECT ... FROM ... 'WHERE ...'</li>
+   * </ul>
+   */
   private class PredicateQueryFragment implements QueryFragment {
     List<QueryFragment> _predicates;
     List<QueryFragment> _operators;
 
-    public PredicateQueryFragment(List<QueryFragment> predicates, List<QueryFragment> operators) {
+    /**
+     * Constructor for <code>PredicateQueryFragment</code>.
+     *
+     * @param predicates predicates.
+     * @param operators operators between predicates.
+     */
+    PredicateQueryFragment(List<QueryFragment> predicates, List<QueryFragment> operators) {
       _predicates = predicates;
       _operators = operators;
     }
@@ -288,363 +563,337 @@ public class QueryGenerator {
     public String generatePql() {
       if (_predicates.isEmpty()) {
         return "";
-      } else if (_predicates.size() == 1) {
-        return " WHERE " + _predicates.get(0).generatePql();
+      } else {
+        StringBuilder pql = new StringBuilder("WHERE ");
+
+        // One less than the number of predicates.
+        int operatorCount = _operators.size();
+        for (int i = 0; i < operatorCount; i++) {
+          pql.append(_predicates.get(i).generatePql()).append(' ').append(_operators.get(i).generatePql()).append(' ');
+        }
+        pql.append(_predicates.get(operatorCount).generatePql());
+
+        return pql.toString();
       }
-
-      String pql = " WHERE ";
-
-      // One less than the number of predicates
-      int operatorCount = _operators.size();
-      for (int i = 0; i < operatorCount; i++) {
-        pql += _predicates.get(i).generatePql() + " " + _operators.get(i).generatePql() + " ";
-      }
-
-      pql += _predicates.get(operatorCount).generatePql();
-      return pql;
     }
 
     @Override
     public String generateH2Sql() {
       if (_predicates.isEmpty()) {
         return "";
-      } else if (_predicates.size() == 1) {
-        return " WHERE " + _predicates.get(0).generateH2Sql();
+      } else {
+        StringBuilder sql = new StringBuilder("WHERE ");
+
+        // One less than the number of predicates.
+        int operatorCount = _operators.size();
+        for (int i = 0; i < operatorCount; i++) {
+          sql.append(_predicates.get(i).generateH2Sql())
+              .append(' ')
+              .append(_operators.get(i).generateH2Sql())
+              .append(' ');
+        }
+        sql.append(_predicates.get(operatorCount).generateH2Sql());
+
+        return sql.toString();
       }
-
-      String h2sql = " WHERE ";
-
-      // One less than the number of predicates
-      int operatorCount = _operators.size();
-      for (int i = 0; i < operatorCount; i++) {
-        h2sql += _predicates.get(i).generateH2Sql() + " " + _operators.get(i).generateH2Sql() + " ";
-      }
-
-      h2sql += _predicates.get(operatorCount).generateH2Sql();
-      return h2sql;
     }
   }
 
-  private QueryFragment generatePredicate() {
-    int predicateCount = RANDOM.nextInt(3);
+  /**
+   * Helper method to generate a predicate query fragment.
+   *
+   * @return generated predicate query fragment.
+   */
+  private PredicateQueryFragment generatePredicate() {
+    // Generate at most MAX_NUM_PREDICATES predicates.
+    int predicateCount = RANDOM.nextInt(MAX_NUM_PREDICATES + 1);
 
-    List<QueryFragment> predicates = new ArrayList<QueryFragment>();
-    for (int i = 0; i < predicateCount; i++) {
+    List<QueryFragment> predicates = new ArrayList<>(predicateCount);
+    while (predicates.size() < predicateCount) {
       String columnName = pickRandom(_columnNames);
       if (!_columnToValueList.get(columnName).isEmpty()) {
-        if (!_multivalueColumnCardinality.containsKey(columnName)) {
-          predicates.add(pickRandom(_predicateGenerators).generatePredicate(columnName));
-        } else {
-          if (!skipMultivaluePredicates) {
-            predicates.add(new MultivaluePredicateGenerator().generatePredicate(columnName));
-          }
+        if (!_multiValueColumnMaxNumElements.containsKey(columnName)) {
+          // Single-value column.
+          predicates.add(pickRandom(_singleValuePredicateGenerators).generatePredicate(columnName));
+        } else if (!_skipMultiValuePredicates) {
+          // Multi-value column.
+          predicates.add(pickRandom(_multiValuePredicateGenerators).generatePredicate(columnName));
         }
       }
     }
 
-    if (predicates.size() < 2) {
-      return new PredicateQueryFragment(predicates, Collections.<QueryFragment> emptyList());
+    if (predicateCount < 2) {
+      // No need to join.
+      return new PredicateQueryFragment(predicates, Collections.<QueryFragment>emptyList());
+    } else {
+      // Join predicates with ANDs and ORs.
+      List<QueryFragment> operators = new ArrayList<>(predicateCount - 1);
+      for (int i = 1; i < predicateCount; i++) {
+        operators.add(new StringQueryFragment(pickRandom(BOOLEAN_OPERATORS)));
+      }
+      return new PredicateQueryFragment(predicates, operators);
     }
-
-    // Join predicates with ANDs and ORs
-    List<QueryFragment> operators = new ArrayList<QueryFragment>(predicates.size() - 1);
-    for (int i = 1; i < predicates.size(); i++) {
-      operators.add(new StringQueryFragment(pickRandom(_booleanOperators)));
-    }
-
-    return new PredicateQueryFragment(predicates, operators);
   }
 
   /**
-   * Queries similar to SELECT blah FROM blah WHERE ... LIMIT blah
+   * Query generation strategy interface with capability of generating query using specific strategy.
+   */
+  private interface QueryGenerationStrategy {
+
+    /**
+     * Generate a query using specific strategy.
+     *
+     * @return generated query.
+     */
+    Query generateQuery();
+  }
+
+  /**
+   * Strategy to generate selection queries.
+   * <ul>
+   *   <li>SELECT a, b FROM table WHERE a = 'foo' AND b = 'bar' ORDER BY c LIMIT 10</li>
+   * </ul>
    */
   private class SelectionQueryGenerationStrategy implements QueryGenerationStrategy {
+
     @Override
     public Query generateQuery() {
-      // Select 0-9 columns, map 0 columns to SELECT *
-      Set<String> projectionColumns = new HashSet<String>();
-      int projectionColumnCount = RANDOM.nextInt(3);
-      for (int i = 0; i < projectionColumnCount; i++) {
-        projectionColumns.add(pickRandom(_nonMultivalueColumnNames));
-      }
-      if (projectionColumns.isEmpty()) {
-        projectionColumns.add("*");
+      // Select at most MAX_NUM_SELECTION_COLUMNS columns.
+      int projectionColumnCount = Math.min(RANDOM.nextInt(MAX_NUM_SELECTION_COLUMNS) + 1, _columnNames.size());
+      Set<String> projectionColumns = new HashSet<>();
+      while (projectionColumns.size() < projectionColumnCount) {
+        projectionColumns.add(pickRandom(_columnNames));
       }
 
-      // Select 0-9 columns for ORDER BY clause
-      Set<String> orderByColumns = new HashSet<String>();
-      int orderByColumnCount = RANDOM.nextInt(1);
-      for (int i = 0; i < orderByColumnCount; i++) {
-        orderByColumns.add(pickRandom(_nonMultivalueColumnNames));
+      // Select at most MAX_NUM_ORDER_BY_COLUMNS columns for ORDER BY clause.
+      int orderByColumnCount = Math.min(RANDOM.nextInt(MAX_NUM_ORDER_BY_COLUMNS + 1), _singleValueColumnNames.size());
+      Set<String> orderByColumns = new HashSet<>();
+      while (orderByColumns.size() < orderByColumnCount) {
+        orderByColumns.add(pickRandom(_singleValueColumnNames));
       }
 
-      // Generate a predicate
-      QueryFragment predicate = generatePredicate();
+      // Generate a predicate.
+      PredicateQueryFragment predicate = generatePredicate();
 
-      // Generate a result limit between 1 and 30 as negative numbers mean no limit
-      int resultLimit = RANDOM.nextInt(30) + 1;
+      // Generate a result limit of at most MAX_RESULT_LIMIT columns for ORDER BY clause.
+      int resultLimit = RANDOM.nextInt(MAX_RESULT_LIMIT + 1);
       LimitQueryFragment limit = new LimitQueryFragment(resultLimit);
 
-      return new SelectionQuery(projectionColumns, new OrderByQueryFragment(orderByColumns), predicate, limit);
-    }
-  }
-
-  private class ValueQueryFragment implements QueryFragment {
-    private String pql;
-    private String hql;
-
-    public ValueQueryFragment(String value) {
-      hql = value;
-
-      if (!value.startsWith("'")) {
-        pql = "'" + value + "'";
-      } else {
-        pql = value;
-      }
-    }
-
-    @Override
-    public String generatePql() {
-      return pql;
-    }
-
-    @Override
-    public String generateH2Sql() {
-      return hql;
-    }
-  }
-
-  private class SelectionQuery implements Query {
-    private final List<String> _projectionColumns;
-    private final QueryFragment _orderBy;
-    private final QueryFragment _predicate;
-    private final QueryFragment _limit;
-
-    public SelectionQuery(Set<String> projectionColumns, QueryFragment orderBy, QueryFragment predicate,
-        QueryFragment limit) {
-      _projectionColumns = new ArrayList<String>(projectionColumns);
-      _orderBy = orderBy;
-      _predicate = predicate;
-      _limit = limit;
-    }
-
-    @Override
-    public String generatePql() {
-      return joinWithSpaces("SELECT", joinWithCommas(_projectionColumns), "FROM", _pqlTableName,
-          _predicate.generatePql(), _orderBy.generatePql(), _limit.generatePql());
-    }
-
-    @Override
-    public List<String> generateH2Sql() {
-      return Collections.singletonList(joinWithSpaces("SELECT", joinWithCommas(_projectionColumns), "FROM",
-          _h2TableName, _predicate.generateH2Sql(), _orderBy.generateH2Sql(), _limit.generateH2Sql()));
-    }
-  }
-
-  private static String joinWithCommas(List<String>... elements) {
-    List<String> joinedList = new ArrayList<String>();
-    for (List<String> element : elements) {
-      joinedList.addAll(element);
-    }
-
-    return StringUtil.join(", ", joinedList.toArray(new String[joinedList.size()]));
-  }
-
-  private static String joinWithSpaces(String... elements) {
-    return StringUtil.join(" ", elements);
-  }
-
-  private class AggregationQuery implements Query {
-    private List<String> _groupColumns;
-    private List<String> _aggregateColumnsAndFunctions;
-    private QueryFragment _predicate;
-    private QueryFragment _limit;
-
-    public AggregationQuery(List<String> groupColumns, List<String> aggregateColumnsAndFunctions,
-        QueryFragment predicate, QueryFragment limit) {
-      this._groupColumns = groupColumns;
-      this._aggregateColumnsAndFunctions = aggregateColumnsAndFunctions;
-      this._predicate = predicate;
-      _limit = limit;
-    }
-
-    @Override
-    public String generatePql() {
-      // Unlike SQL, PQL doesn't expect the group columns in select statements
-      String queryBody =
-          joinWithSpaces("SELECT", joinWithCommas(_aggregateColumnsAndFunctions), "FROM", _pqlTableName,
-              _predicate.generatePql());
-
-      if (_groupColumns.isEmpty()) {
-        return queryBody + " " + _limit.generatePql();
-      } else {
-        return queryBody + " GROUP BY " + joinWithCommas(_groupColumns) + " " + _limit.generatePql();
-      }
-    }
-
-    @Override
-    public List<String> generateH2Sql() {
-      List<String> queries = new ArrayList<String>();
-      if (_groupColumns.isEmpty()) {
-        for (String aggregateColumnAndFunction : _aggregateColumnsAndFunctions) {
-          queries.add(joinWithSpaces("SELECT", aggregateColumnAndFunction, "FROM", _h2TableName,
-              _predicate.generateH2Sql(), _limit.generateH2Sql()));
-        }
-      } else {
-        for (String aggregateColumnAndFunction : _aggregateColumnsAndFunctions) {
-          if (aggregateColumnAndFunction.startsWith("avg(")) {
-            aggregateColumnAndFunction = aggregateColumnAndFunction.replace("avg(", "avg(cast(").replace(")", " as double))");
-          }
-          queries.add(joinWithSpaces("SELECT", joinWithCommas(_groupColumns) + ",", aggregateColumnAndFunction, "FROM",
-              _h2TableName, _predicate.generateH2Sql(), "GROUP BY", joinWithCommas(_groupColumns), _limit.generateH2Sql()));
-        }
-      }
-      return queries;
+      return new SelectionQuery(new ArrayList<>(projectionColumns), predicate, new OrderByQueryFragment(orderByColumns),
+          limit);
     }
   }
 
   /**
-   * Queries similar to SELECT foo, SUM(bar) FROM blah WHERE ... GROUP BY foo
+   * Strategy to generate aggregation queries.
+   * <ul>
+   *   <li>SELECT SUM(a), MAX(b) FROM table WHERE a = 'foo' AND b = 'bar' GROUP BY c TOP 10</li>
+   * </ul>
    */
   private class AggregationQueryGenerationStrategy implements QueryGenerationStrategy {
-    private final List<String> aggregationFunctions = Arrays.asList("sum", "min", "max", "count", "avg");
 
     @Override
     public Query generateQuery() {
-      // Generate 0-3 columns on which to group
-      Set<String> groupColumns = new HashSet<String>();
-      int groupColumnCount = RANDOM.nextInt(2) + 1;
-      for (int i = 0; i < groupColumnCount; i++) {
-        groupColumns.add(pickRandom(_nonMultivalueColumnNames));
-      }
-
-      // Generate a disjoint set of 0-3 columns on which to aggregate
-      int aggregationColumnCount = RANDOM.nextInt(2) + 1;
-      Set<String> aggregationColumns = new HashSet<String>();
-      for (int i = 0; i < aggregationColumnCount; i++) {
-        String randomColumn = pickRandom(_nonMultivalueNumericalColumnNames);
-        if (!groupColumns.contains(randomColumn)) {
-          aggregationColumns.add(randomColumn);
-        }
-      }
-      List<String> aggregationColumnsAndFunctions = new ArrayList<String>();
-      if (aggregationColumns.isEmpty()) {
+      // Generate at most MAX_NUM_AGGREGATION_COLUMNS columns on which to aggregate, map 0 to 'COUNT(*)'.
+      int aggregationColumnCount = RANDOM.nextInt(MAX_NUM_AGGREGATION_COLUMNS + 1);
+      Set<String> aggregationColumnsAndFunctions = new HashSet<>();
+      if (aggregationColumnCount == 0) {
         aggregationColumnsAndFunctions.add("COUNT(*)");
       } else {
-        for (String aggregationColumn : aggregationColumns) {
-          int aggregationFunctionCount = RANDOM.nextInt(aggregationFunctions.size()) + 1;
-          for (int i = 0; i < aggregationFunctionCount; i++) {
-            aggregationColumnsAndFunctions.add(pickRandom(aggregationFunctions) + "(" + aggregationColumn + ")");
+        while (aggregationColumnsAndFunctions.size() < aggregationColumnCount) {
+          String aggregationFunction = pickRandom(AGGREGATION_FUNCTIONS);
+          String aggregationColumn;
+          switch (aggregationFunction) {
+            // "COUNT" and "DISTINCTCOUNT" support all single-value columns.
+            case "COUNT":
+            case "DISTINCTCOUNT":
+              aggregationColumn = pickRandom(_singleValueColumnNames);
+              break;
+            // Other functions only support single-value numeric columns.
+            default:
+              aggregationColumn = pickRandom(_singleValueNumericalColumnNames);
           }
+          aggregationColumnsAndFunctions.add(aggregationFunction + "(" + aggregationColumn + ")");
         }
       }
 
-      // FIXME Always only one aggregation function
-      aggregationColumnsAndFunctions = Collections.singletonList(aggregationColumnsAndFunctions.get(0));
+      // Generate a predicate.
+      PredicateQueryFragment predicate = generatePredicate();
 
-      // Generate a predicate
-      QueryFragment predicate = generatePredicate();
+      // Generate at most MAX_NUM_GROUP_BY_COLUMNS columns on which to group.
+      int groupColumnCount = Math.min(RANDOM.nextInt(MAX_NUM_GROUP_BY_COLUMNS + 1), _singleValueColumnNames.size());
+      Set<String> groupColumns = new HashSet<>();
+      while (groupColumns.size() < groupColumnCount) {
+        groupColumns.add(pickRandom(_singleValueColumnNames));
+      }
 
-      // Generate a result limit between 0 and 30 as negative numbers mean no limit
-      int resultLimit = RANDOM.nextInt(30);
-      LimitQueryFragment limit = new LimitQueryFragment(resultLimit);
+      // Generate a result limit of at most MAX_RESULT_LIMIT.
+      TopQueryFragment top = new TopQueryFragment(RANDOM.nextInt(MAX_RESULT_LIMIT + 1));
 
-      return new AggregationQuery(new ArrayList<String>(groupColumns), aggregationColumnsAndFunctions, predicate, limit);
+      return new AggregationQuery(new ArrayList<>(aggregationColumnsAndFunctions), predicate, groupColumns, top);
     }
   }
 
+  /**
+   * Predicate generator interface with capability of generating a predicate query fragment on a column.
+   */
   private interface PredicateGenerator {
+
+    /**
+     * Generate a predicate query fragment on a column.
+     *
+     * @param columnName column name.
+     * @return generated predicate query fragment.
+     */
     QueryFragment generatePredicate(String columnName);
   }
 
-  private class ComparisonOperatorPredicateGenerator implements PredicateGenerator {
-    private List<String> _comparisonOperators = Arrays.asList("=", "<>", "<", ">", "<=", ">=");
+  /**
+   * Generator for single-value column comparison predicate query fragment.
+   */
+  private class SingleValueComparisonPredicateGenerator implements PredicateGenerator {
 
     @Override
     public QueryFragment generatePredicate(String columnName) {
-      List<String> columnValues = _columnToValueList.get(columnName);
-      ValueQueryFragment value = new ValueQueryFragment(pickRandom(columnValues));
-      String comparisonOperator = pickRandom(_comparisonOperators);
-      return new StringQueryFragment(
-          columnName + " " + comparisonOperator + " " + value.generatePql(),
-          columnName + " " + comparisonOperator + " " + value.generateH2Sql());
+      String columnValue = pickRandom(_columnToValueList.get(columnName));
+      String comparisonOperator = pickRandom(COMPARISON_OPERATORS);
+      return new StringQueryFragment(joinWithSpaces(columnName, comparisonOperator, columnValue));
     }
   }
 
-  private class InPredicateGenerator implements PredicateGenerator {
+  /**
+   * Generator for single-value column <code>IN</code> predicate query fragment.
+   */
+  private class SingleValueInPredicateGenerator implements PredicateGenerator {
+
     @Override
     public QueryFragment generatePredicate(String columnName) {
       List<String> columnValues = _columnToValueList.get(columnName);
 
-      int inValueCount = RANDOM.nextInt(10) + 1;
-      List<String> pqlInValueList = new ArrayList<String>(inValueCount);
-      List<String> h2InValueList = new ArrayList<String>(inValueCount);
-      for (int i = 0; i < inValueCount; i++) {
-        ValueQueryFragment value = new ValueQueryFragment(pickRandom(columnValues));
-        pqlInValueList.add(value.generatePql());
-        h2InValueList.add(value.generateH2Sql());
+      int numValues = Math.min(RANDOM.nextInt(MAX_NUM_IN_CLAUSE_VALUES) + 1, columnValues.size());
+      Set<String> values = new HashSet<>();
+      while (values.size() < numValues) {
+        values.add(pickRandom(columnValues));
       }
-      String pqlInValues = StringUtil.join(", ", pqlInValueList.toArray(new String[pqlInValueList.size()]));
-      String h2InValues = StringUtil.join(", ", h2InValueList.toArray(new String[h2InValueList.size()]));
+      String inValues = StringUtils.join(values, ", ");
 
       boolean notIn = RANDOM.nextBoolean();
-
       if (notIn) {
-        return new StringQueryFragment(
-            columnName + " NOT IN (" + pqlInValues + ")",
-            columnName + " NOT IN (" + h2InValues + ")");
+        return new StringQueryFragment(columnName + " NOT IN (" + inValues + ")");
       } else {
-        return new StringQueryFragment(
-            columnName + " IN (" + pqlInValues + ")",
-            columnName + " IN (" + h2InValues + ")");
+        return new StringQueryFragment(columnName + " IN (" + inValues + ")");
       }
     }
   }
 
-  private class MultivaluePredicateGenerator implements PredicateGenerator {
+  /**
+   * Generator for single-value column <code>BETWEEN</code> predicate query fragment.
+   */
+  private class SingleValueBetweenPredicateGenerator implements PredicateGenerator {
+
+    @Override
+    public QueryFragment generatePredicate(String columnName) {
+      List<String> columnValues = _columnToValueList.get(columnName);
+      String leftValue = pickRandom(columnValues);
+      String rightValue = pickRandom(columnValues);
+      return new StringQueryFragment(columnName + " BETWEEN " + leftValue + " AND " + rightValue);
+    }
+  }
+
+  /**
+   * Generator for multi-value column comparison predicate query fragment.
+   * <p>DO NOT SUPPORT '<code>NOT EQUAL</code>'.
+   */
+  private class MultiValueComparisonPredicateGenerator implements PredicateGenerator {
+
+    @Override
+    public QueryFragment generatePredicate(String columnName) {
+      String columnValue = pickRandom(_columnToValueList.get(columnName));
+      String comparisonOperator = pickRandom(COMPARISON_OPERATORS);
+
+      // Not equal works differently on multi-value, so avoid '<>' comparison.
+      while (comparisonOperator.equals("<>")) {
+        comparisonOperator = pickRandom(COMPARISON_OPERATORS);
+      }
+
+      List<String> h2ComparisonClauses = new ArrayList<>(BaseClusterIntegrationTest.MAX_ELEMENTS_IN_MULTI_VALUE);
+      for (int i = 0; i < BaseClusterIntegrationTest.MAX_ELEMENTS_IN_MULTI_VALUE; i++) {
+        h2ComparisonClauses.add(joinWithSpaces(columnName + "__MV" + i, comparisonOperator, columnValue));
+      }
+
+      return new StringQueryFragment(joinWithSpaces(columnName, comparisonOperator, columnValue),
+          "(" + StringUtils.join(h2ComparisonClauses, " OR ") + ")");
+    }
+  }
+
+  /**
+   * Generator for multi-value column <code>IN</code> predicate query fragment.
+   * <p>DO NOT SUPPORT '<code>NOT IN</code>'.
+   */
+  private class MultiValueInPredicateGenerator implements PredicateGenerator {
+
     @Override
     public QueryFragment generatePredicate(String columnName) {
       List<String> columnValues = _columnToValueList.get(columnName);
 
-      int inValueCount = RANDOM.nextInt(10) + 1;
-      List<String> pqlInValueList = new ArrayList<String>(inValueCount);
-      List<String> h2InValueList = new ArrayList<String>(inValueCount);
-      for (int i = 0; i < inValueCount; i++) {
-        ValueQueryFragment value = new ValueQueryFragment(pickRandom(columnValues));
-        pqlInValueList.add(value.generatePql());
-        h2InValueList.add(value.generateH2Sql());
+      int numValues = Math.min(RANDOM.nextInt(MAX_NUM_IN_CLAUSE_VALUES) + 1, columnValues.size());
+      Set<String> values = new HashSet<>();
+      while (values.size() < numValues) {
+        values.add(pickRandom(columnValues));
       }
-      String pqlInValues = StringUtil.join(", ", pqlInValueList.toArray(new String[pqlInValueList.size()]));
-      String h2InValues = StringUtil.join(", ", h2InValueList.toArray(new String[h2InValueList.size()]));
-      String[] h2InClauses = new String[MAX_MULTIVALUE_CARDINALITY];
-      for (int i = 0; i < MAX_MULTIVALUE_CARDINALITY; i++) {
-        h2InClauses[i] = columnName + i + " IN (" + h2InValues + ")";
-      }
-      String h2QueryFragment = "(" + StringUtil.join(" OR ", h2InClauses) + ")";
+      String inValues = StringUtils.join(values, ", ");
 
-      return new StringQueryFragment(
-          columnName + " IN (" + pqlInValues + ")",
-          h2QueryFragment);
+      List<String> h2InClauses = new ArrayList<>(BaseClusterIntegrationTest.MAX_ELEMENTS_IN_MULTI_VALUE);
+      for (int i = 0; i < BaseClusterIntegrationTest.MAX_ELEMENTS_IN_MULTI_VALUE; i++) {
+        h2InClauses.add(columnName + "__MV" + i + " IN (" + inValues + ")");
+      }
+
+      return new StringQueryFragment(columnName + " IN (" + inValues + ")",
+          "(" + StringUtils.join(h2InClauses, " OR ") + ")");
     }
   }
 
-  private class BetweenPredicateGenerator implements PredicateGenerator {
+  /**
+   * Generator for multi-value column <code>BETWEEN</code> predicate query fragment.
+   */
+  private class MultiValueBetweenPredicateGenerator implements PredicateGenerator {
+
     @Override
     public QueryFragment generatePredicate(String columnName) {
       List<String> columnValues = _columnToValueList.get(columnName);
-      ValueQueryFragment leftValue = new ValueQueryFragment(pickRandom(columnValues));
-      ValueQueryFragment rightValue = new ValueQueryFragment(pickRandom(columnValues));
-      return new StringQueryFragment(
-          columnName + " BETWEEN " + leftValue.generatePql() + " AND " + rightValue.generatePql(),
-          columnName + " BETWEEN " + leftValue.generateH2Sql() + " AND " + rightValue.generateH2Sql());
+      String leftValue = pickRandom(columnValues);
+      String rightValue = pickRandom(columnValues);
+
+      List<String> h2ComparisonClauses = new ArrayList<>(BaseClusterIntegrationTest.MAX_ELEMENTS_IN_MULTI_VALUE);
+      for (int i = 0; i < BaseClusterIntegrationTest.MAX_ELEMENTS_IN_MULTI_VALUE; i++) {
+        h2ComparisonClauses.add(columnName + "__MV" + i + " BETWEEN " + leftValue + " AND " + rightValue);
+      }
+
+      return new StringQueryFragment(columnName + " BETWEEN " + leftValue + " AND " + rightValue,
+          "(" + StringUtils.join(h2ComparisonClauses, " OR ") + ")");
     }
   }
 
-  public static void main(String[] args) {
+  /**
+   * Sample main class for the query generator.
+   *
+   * @param args arguments.
+   */
+  public static void main(String[] args)
+      throws Exception {
     File avroFile = new File("pinot-integration-tests/src/test/resources/On_Time_On_Time_Performance_2014_1.avro");
-    QueryGenerator qg = new QueryGenerator(Collections.singletonList(avroFile), "whatever", "whatever");
-    for (int i = 0; i < 100; i++) {
-      System.out.println(qg.generateQuery().generatePql());
+    QueryGenerator queryGenerator = new QueryGenerator(Collections.singletonList(avroFile), "mytable", "mytable");
+    File outputFile = new File(
+        "pinot-integration-tests/src/test/resources/On_Time_On_Time_Performance_2014_100k_subset.test_queries_10K");
+    try (BufferedWriter writer = new BufferedWriter(new FileWriter(outputFile))) {
+      for (int i = 0; i < 10000; i++) {
+        Query query = queryGenerator.generateQuery();
+        JSONObject queryJson = new JSONObject();
+        queryJson.put("pql", query.generatePql());
+        queryJson.put("hsqls", new JSONArray(query.generateH2Sql()));
+        writer.write(queryJson.toString());
+        writer.newLine();
+      }
     }
   }
 }

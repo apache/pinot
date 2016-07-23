@@ -15,6 +15,15 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import com.google.common.base.Preconditions;
+import com.google.common.util.concurrent.Uninterruptibles;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.utils.FileUploadUtils;
+import com.linkedin.pinot.common.utils.KafkaStarterUtils;
+import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
+import com.linkedin.pinot.tools.query.comparison.QueryComparison;
+import com.linkedin.pinot.tools.scan.query.QueryResponse;
+import com.linkedin.pinot.tools.scan.query.ScanBasedQueryProcessor;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileWriter;
@@ -45,15 +54,6 @@ import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-import com.google.common.base.Preconditions;
-import com.google.common.util.concurrent.Uninterruptibles;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.utils.FileUploadUtils;
-import com.linkedin.pinot.common.utils.KafkaStarterUtils;
-import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
-import com.linkedin.pinot.tools.query.comparison.QueryComparison;
-import com.linkedin.pinot.tools.scan.query.QueryResponse;
-import com.linkedin.pinot.tools.scan.query.ScanBasedQueryProcessor;
 
 
 /**
@@ -448,18 +448,6 @@ public abstract class HybridClusterScanComparisonIntegrationTest extends HybridC
     return _emptyResults.get();
   }
 
-  @Override
-  @Test(enabled = false)
-  public void testMultipleQueries() throws Exception {
-    runTestLoop(new Callable<Object>() {
-      @Override
-      public Object call() throws Exception {
-        HybridClusterScanComparisonIntegrationTest.super.testMultipleQueries();
-        return null;
-      }
-    });
-  }
-
   private void purgeKafkaTopicAndResetRealtimeTable() throws Exception {
     // Drop the realtime table
     dropRealtimeTable("mytable");
@@ -478,11 +466,13 @@ public abstract class HybridClusterScanComparisonIntegrationTest extends HybridC
 
   @Override
   @Test(enabled = false)
-  public void testSingleQuery() throws Exception {
+  public void testHardcodedQueries()
+      throws Exception {
     runTestLoop(new Callable<Object>() {
       @Override
-      public Object call() throws Exception {
-        HybridClusterScanComparisonIntegrationTest.super.testSingleQuery();
+      public Object call()
+          throws Exception {
+        HybridClusterScanComparisonIntegrationTest.super.testHardcodedQueries();
         return null;
       }
     });
@@ -490,10 +480,12 @@ public abstract class HybridClusterScanComparisonIntegrationTest extends HybridC
 
   @Override
   @Test(enabled = false)
-  public void testHardcodedQuerySet() throws Exception {
+  public void testHardcodedQuerySet()
+      throws Exception {
     runTestLoop(new Callable<Object>() {
       @Override
-      public Object call() throws Exception {
+      public Object call()
+          throws Exception {
         HybridClusterScanComparisonIntegrationTest.super.testHardcodedQuerySet();
         return null;
       }
@@ -502,11 +494,13 @@ public abstract class HybridClusterScanComparisonIntegrationTest extends HybridC
 
   @Override
   @Test(enabled = false)
-  public void testGeneratedQueries() throws Exception {
+  public void testGeneratedQueriesWithoutMultiValues()
+      throws Exception {
     runTestLoop(new Callable<Object>() {
       @Override
-      public Object call() throws Exception {
-        HybridClusterScanComparisonIntegrationTest.super.testGeneratedQueries();
+      public Object call()
+          throws Exception {
+        HybridClusterScanComparisonIntegrationTest.super.testGeneratedQueriesWithoutMultiValues();
         return null;
       }
     });
@@ -514,19 +508,15 @@ public abstract class HybridClusterScanComparisonIntegrationTest extends HybridC
 
   @Override
   @Test(enabled = false)
-  public void testGeneratedQueriesWithMultivalues() throws Exception {
+  public void testGeneratedQueriesWithMultiValues()
+      throws Exception {
     runTestLoop(new Callable<Object>() {
       @Override
-      public Object call() throws Exception {
-        HybridClusterScanComparisonIntegrationTest.super.testGeneratedQueriesWithMultivalues();
+      public Object call()
+          throws Exception {
+        HybridClusterScanComparisonIntegrationTest.super.testGeneratedQueriesWithMultiValues();
         return null;
       }
     });
-  }
-
-  @Override
-  @Test(enabled = false)
-  public void testMetricAndDimColumns() throws Exception {
-    // This test will not work by calling super() since we depend on h2 queries.
   }
 }

@@ -16,30 +16,48 @@
 package com.linkedin.pinot.integration.tests;
 
 import com.google.common.primitives.Longs;
+import com.google.common.util.concurrent.AsyncFunction;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListenableFutureTask;
+import com.google.common.util.concurrent.Uninterruptibles;
+import com.linkedin.pinot.client.ConnectionFactory;
 import com.linkedin.pinot.common.data.StarTreeIndexSpec;
+import com.linkedin.pinot.common.utils.KafkaStarterUtils;
+import com.linkedin.pinot.common.utils.StringUtil;
+import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
+import com.linkedin.pinot.common.utils.ZkStarter;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import com.linkedin.pinot.core.indexsegment.utils.AvroUtils;
+import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
+import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
+import com.linkedin.pinot.server.util.SegmentTestUtils;
+import com.linkedin.pinot.util.TestUtils;
+import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.math.BigDecimal;
+import java.net.URL;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Random;
-import java.util.Scanner;
 import java.util.Set;
-import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
@@ -47,6 +65,10 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import javax.annotation.Nullable;
+import kafka.javaapi.producer.Producer;
+import kafka.producer.KeyedMessage;
+import kafka.producer.ProducerConfig;
 import org.apache.avro.Schema;
 import org.apache.avro.file.DataFileReader;
 import org.apache.avro.file.DataFileStream;
@@ -60,7 +82,6 @@ import org.apache.avro.io.EncoderFactory;
 import org.apache.avro.util.Utf8;
 import org.apache.commons.compress.archivers.ArchiveException;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.ExternalViewChangeListener;
@@ -78,26 +99,6 @@ import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
-import com.google.common.util.concurrent.AsyncFunction;
-import com.google.common.util.concurrent.Futures;
-import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.ListenableFutureTask;
-import com.google.common.util.concurrent.Uninterruptibles;
-import com.linkedin.pinot.client.ConnectionFactory;
-import com.linkedin.pinot.common.utils.EqualityUtils;
-import com.linkedin.pinot.common.utils.KafkaStarterUtils;
-import com.linkedin.pinot.common.utils.StringUtil;
-import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
-import com.linkedin.pinot.common.utils.ZkStarter;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import com.linkedin.pinot.core.indexsegment.utils.AvroUtils;
-import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
-import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
-import com.linkedin.pinot.server.util.SegmentTestUtils;
-import com.linkedin.pinot.util.TestUtils;
-import kafka.javaapi.producer.Producer;
-import kafka.producer.KeyedMessage;
-import kafka.producer.ProducerConfig;
 
 
 /**
@@ -105,274 +106,469 @@ import kafka.producer.ProducerConfig;
  */
 public abstract class BaseClusterIntegrationTest extends ClusterTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseClusterIntegrationTest.class);
+
   private static final AtomicInteger totalAvroRecordWrittenCount = new AtomicInteger(0);
   private static final boolean BATCH_KAFKA_MESSAGES = true;
   private static final int MAX_MESSAGES_PER_BATCH = 10000;
-  private static final int MAX_MULTIVALUE_CARDINALITY = 5;
-  protected static final boolean GATHER_FAILED_QUERIES = false;
 
-  private int failedQueryCount = 0;
-  private int queryCount = 0;
+  // Maximum number of queries skipped when random select queries from hard coded query set.
+  private static final int MAX_NUM_QUERIES_SKIPPED = 200;
+  // Number of queries generated.
+  private static final int GENERATED_QUERY_COUNT = 100;
+  // Gather failed queries or failed immediately.
+  private static final boolean GATHER_FAILED_QUERIES = false;
+
+  private final File _failedQueriesFile = new File(getClass().getSimpleName() + "-failed.txt");
+  private int _failedQueryCount = 0;
+  private int _queryCount = 0;
+
+  private com.linkedin.pinot.client.Connection _pinotConnection;
 
   protected Connection _connection;
   protected QueryGenerator _queryGenerator;
-  protected static long TOTAL_DOCS = 115545;
+  protected static long TOTAL_DOCS = 115545L;
 
-  protected File queriesFile;
-
-  protected com.linkedin.pinot.client.Connection _pinotConnection = null;
-
-  private class NullableStringComparator implements Comparator<String> {
-    @Override
-    public int compare(String left, String right) {
-      if (left == null) {
-        if (right == null) {
-          return 0;
-        } else {
-          return -1;
-        }
-      } else {
-        if (right == null) {
-          return 1;
-        } else {
-          return left.compareTo(right);
-        }
-      }
-    }
-  }
+  public static final int MAX_ELEMENTS_IN_MULTI_VALUE = 5;
+  public static final int MAX_COMPARISON_LIMIT = 10000;
 
   @BeforeMethod
   public void resetQueryCounts() {
-    failedQueryCount = 0;
-    queryCount = 0;
+    _failedQueryCount = 0;
+    _queryCount = 0;
   }
 
   @AfterMethod
   public void checkFailedQueryCount() {
-    if (GATHER_FAILED_QUERIES && failedQueryCount != 0) {
-      File file = new File(getClass().getSimpleName() + "-failed.txt");
-      PrintWriter out = null;
-      try {
-        out = new PrintWriter(new FileWriter(file, true));
-        out.println("# " + failedQueryCount + "/" + queryCount + " queries did not match with H2");
-        out.close();
-      } catch (IOException e) {
-        LOGGER.warn("Failed to write to failed queries file", e);
-      } finally {
-        IOUtils.closeQuietly(out);
-      }
-    }
-
-    Assert.assertTrue(failedQueryCount == 0, "Queries have failed during this test.");
-  }
-
-  protected void runNoH2ComparisonQuery(String pqlQuery) throws Exception {
-    JSONObject ret = postQuery(pqlQuery);
-    ret.put("pql", pqlQuery);
-    try {
-      Assert.assertEquals(ret.getJSONArray("exceptions").length(), 0);
-      Assert.assertEquals(ret.getLong("totalDocs"), TOTAL_DOCS);
-    } catch (AssertionError e) {
-      LOGGER.error("********** pql: {}, result: {}", ret.toString(1), e);
-      throw e;
-    }
-  }
-
-  private void saveFailedQuery(String pqlQuery, List<String> sqlQueries, String... messages) {
-    failedQueryCount++;
-
-    File file = new File(getClass().getSimpleName() + "-failed.txt");
-    PrintWriter out = null;
-    try {
-      out = new PrintWriter(new FileWriter(file, true));
-      for (String message : messages) {
-        out.print("# ");
-        out.println(message);
-        LOGGER.warn(message);
-      }
-      out.print(pqlQuery);
-      out.print("\t");
-      out.println(StringUtil.join("\t", sqlQueries.toArray(new String[sqlQueries.size()])));
-      out.println();
-      out.close();
-    } catch (IOException e) {
-      LOGGER.warn("Failed to write to failed queries file", e);
-    } finally {
-      IOUtils.closeQuietly(out);
-    }
-  }
-
-  protected void runQuery(final String pqlQuery, List<String> sqlQueries) throws Exception {
-    try {
-      // TODO Use Pinot client API for this
-      queryCount++;
-      Statement statement = _connection.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
-
-      // Run the query
-      JSONObject response = postQuery(pqlQuery);
-      if (response.getJSONArray("exceptions").length() > 0) {
-        String processingException = response.getJSONArray("exceptions").get(0).toString();
-        if (GATHER_FAILED_QUERIES) {
-          saveFailedQuery(pqlQuery, sqlQueries, "Got exceptions in pql query " + pqlQuery + ", got " + response + " " +
-              processingException);
-        } else {
-          Assert.fail("Got exceptions in pql query: " + pqlQuery + " " + processingException);
+    if (GATHER_FAILED_QUERIES) {
+      if (_failedQueryCount != 0) {
+        try (PrintWriter printWriter = new PrintWriter(new FileWriter(_failedQueriesFile, true))) {
+          printWriter.println("# " + _failedQueryCount + "/" + _queryCount + " queries did not match with H2");
+        } catch (IOException e) {
+          LOGGER.warn("Caught exception while writing to failed queries file", e);
         }
+        Assert.fail("Queries have failed during this test, check" + _failedQueriesFile + " for details.");
+      }
+    }
+  }
+
+  /**
+   * Helper method to report failures.
+   *
+   * @param pqlQuery Pinot PQL query.
+   * @param sqlQueries H2 SQL queries.
+   * @param failureMessage failure message.
+   * @param e exception.
+   */
+  private void failure(String pqlQuery, @Nullable List<String> sqlQueries, String failureMessage,
+      @Nullable Exception e) {
+    if (GATHER_FAILED_QUERIES) {
+      if (e == null) {
+        saveFailedQuery(pqlQuery, sqlQueries, failureMessage);
+      } else {
+        saveFailedQuery(pqlQuery, sqlQueries, failureMessage, e.toString());
+      }
+    } else {
+      failureMessage += "\nPQL: " + pqlQuery;
+      if (sqlQueries != null) {
+        failureMessage += "\nSQL: " + sqlQueries;
+      }
+      if (e == null) {
+        Assert.fail(failureMessage);
+      } else {
+        Assert.fail(failureMessage, e);
+      }
+    }
+  }
+
+  private void failure(String pqlQuery, @Nullable List<String> sqlQueries, String failureMessage) {
+    failure(pqlQuery, sqlQueries, failureMessage, null);
+  }
+
+  /**
+   * Helper method to save failed queries.
+   *
+   * @param pqlQuery Pinot PQL query.
+   * @param sqlQueries H2 SQL queries.
+   * @param messages failure messages.
+   */
+  private void saveFailedQuery(String pqlQuery, @Nullable List<String> sqlQueries, String... messages) {
+    _failedQueryCount++;
+
+    try (PrintWriter printWriter = new PrintWriter(new FileWriter(_failedQueriesFile, true))) {
+      printWriter.println("PQL: " + pqlQuery);
+      if (sqlQueries != null) {
+        printWriter.println("SQL: " + sqlQueries);
+      }
+      printWriter.println("Failure Messages:");
+      for (String message : messages) {
+        printWriter.println(message);
+      }
+      printWriter.println();
+    } catch (IOException e) {
+      LOGGER.warn("Caught exception while writing failed query to file.", e);
+    }
+  }
+
+  /**
+   * Run equivalent Pinot and H2 query and compare the results.
+   * <p>LIMITATIONS:
+   * <ul>
+   *   <li>Skip comparison for selection and aggregation group-by when H2 results are too large to exhaust.</li>
+   *   <li>Do not examine the order of result records.</li>
+   * </ul>
+   *
+   * @param pqlQuery Pinot PQL query.
+   * @param sqlQueries H2 SQL queries.
+   * @throws Exception
+   */
+  protected void runQuery(String pqlQuery, @Nullable List<String> sqlQueries)
+      throws Exception {
+    try {
+      _queryCount++;
+
+      // Run the query.
+      // TODO Use Pinot client API for this
+      JSONObject response = postQuery(pqlQuery);
+
+      // Check exceptions.
+      JSONArray exceptions = response.getJSONArray("exceptions");
+      if (exceptions.length() > 0) {
+        String failureMessage = "Got exceptions: " + exceptions;
+        failure(pqlQuery, sqlQueries, failureMessage, null);
+        return;
       }
 
-      if (response.has("aggregationResults") && response.getJSONArray("aggregationResults").length() != 0) {
+      // Check total docs.
+      long numTotalDocs = response.getLong("totalDocs");
+      if (numTotalDocs != TOTAL_DOCS) {
+        String failureMessage =
+            "Number of total documents does not match, expected: " + TOTAL_DOCS + ", got: " + numTotalDocs;
+        failure(pqlQuery, sqlQueries, failureMessage, null);
+        return;
+      }
+
+      // Skip comparison if SQL queries not specified.
+      if (sqlQueries == null) {
+        return;
+      }
+
+      // Check results.
+      Statement h2statement = _connection.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
+      int numDocsScanned = response.getInt("numDocsScanned");
+      if (response.has("aggregationResults")) {
+        // Aggregation and Group-by results.
+
+        // Get results type.
         JSONArray aggregationResultsArray = response.getJSONArray("aggregationResults");
+        int numAggregationResults = aggregationResultsArray.length();
+        int numSqlQueries = sqlQueries.size();
+        if (numAggregationResults != numSqlQueries) {
+          String failureMessage =
+              "Number of aggregation results: " + numAggregationResults + " does not match number of SQL queries: "
+                  + numSqlQueries;
+          failure(pqlQuery, sqlQueries, failureMessage);
+        }
         JSONObject firstAggregationResult = aggregationResultsArray.getJSONObject(0);
+
         if (firstAggregationResult.has("value")) {
-          LOGGER.debug("Trying to execute sql query: " + sqlQueries.get(0));
-          statement.execute(sqlQueries.get(0));
-          ResultSet rs = statement.getResultSet();
-          LOGGER.debug("Trying to get result from sql: " + rs);
-          // Single value result for the aggregation, compare with the actual value
-          final String bqlValue = firstAggregationResult.getString("value");
+          // Aggregation results.
 
-          rs.first();
-          final String sqlValue = rs.getString(1);
+          // Check over all aggregation functions.
+          for (int i = 0; i < numAggregationResults; i++) {
+            // Get expected value for the aggregation.
+            h2statement.execute(sqlQueries.get(i));
+            ResultSet sqlResultSet = h2statement.getResultSet();
+            sqlResultSet.first();
+            String sqlValue = sqlResultSet.getString(1);
 
-          LOGGER.debug("bql value: " + bqlValue);
-          LOGGER.debug("sql value: " + sqlValue);
-          long compareSqlValue = -1;
-          long compareBqlValue = -1;
-
-          if (bqlValue != null && sqlValue != null) {
-            // H2 returns float and double values in scientific notation. Convert them to plain notation first..
-            try {
-              compareSqlValue = new BigDecimal(sqlValue).longValue();
-              compareBqlValue = new BigDecimal(bqlValue).longValue();
-            } catch (NumberFormatException e) {
-              LOGGER.warn("Ignoring number format excection in " + sqlValue);
-              compareBqlValue=-2; // So comparison will fail below
+            // If SQL value is null, it means no record selected in H2.
+            if (sqlValue == null) {
+              // Check number of documents scanned is 0.
+              if (numDocsScanned != 0) {
+                String failureMessage =
+                    "No record selected in H2 but number of records selected in Pinot: " + numDocsScanned;
+                failure(pqlQuery, sqlQueries, failureMessage);
+              }
+              // Skip further comparison.
+              return;
             }
-          }
 
-          if (GATHER_FAILED_QUERIES) {
-            if (!EqualityUtils.isEqual(compareBqlValue, compareSqlValue)) {
-              saveFailedQuery(pqlQuery, sqlQueries, "Values did not match for query " + pqlQuery + ", expected "
-                  + sqlValue + ", got " + bqlValue);
+            // Get actual value for the aggregation.
+            String pqlValue = aggregationResultsArray.getJSONObject(i).getString("value");
+
+            // Fuzzy compare expected value and actual value.
+            double expectedValue = Double.parseDouble(sqlValue);
+            double actualValue = Double.parseDouble(pqlValue);
+            if (Math.abs(actualValue - expectedValue) >= 1.0) {
+              String failureMessage = "Value: " + i + " does not match, expected: " + sqlValue + ", got: " + pqlValue;
+              failure(pqlQuery, sqlQueries, failureMessage);
+              return;
             }
-          } else {
-            Assert.assertEquals(compareBqlValue, compareSqlValue, "Values did not match for query " + pqlQuery + ",SQL:" + sqlValue + ",BQL:" + bqlValue);
           }
         } else if (firstAggregationResult.has("groupByResult")) {
-          // Load values from the query result
-          for (int aggregationGroupIndex = 0; aggregationGroupIndex < aggregationResultsArray.length(); aggregationGroupIndex++) {
-            JSONArray groupByResults =
-                aggregationResultsArray.getJSONObject(aggregationGroupIndex).getJSONArray("groupByResult");
-            if (groupByResults.length() != 0) {
-              int groupKeyCount = groupByResults.getJSONObject(0).getJSONArray("group").length();
+          // Group-by results.
 
-              Map<String, String> actualValues = new TreeMap<String, String>(new NullableStringComparator());
-              for (int resultIndex = 0; resultIndex < groupByResults.length(); ++resultIndex) {
-                JSONArray group = groupByResults.getJSONObject(resultIndex).getJSONArray("group");
-                String pinotGroupKey = group.getString(0);
-                for (int groupKeyIndex = 1; groupKeyIndex < groupKeyCount; groupKeyIndex++) {
-                  pinotGroupKey += "\t" + group.getString(groupKeyIndex);
+          // Get number of groups and number of group keys in each group.
+          JSONArray firstGroupByResults = aggregationResultsArray.getJSONObject(0).getJSONArray("groupByResult");
+          int numGroups = firstGroupByResults.length();
+          // If no group-by result returned by Pinot, set numGroupKeys to 0 since no comparison needed.
+          int numGroupKeys;
+          if (numGroups == 0) {
+            numGroupKeys = 0;
+          } else {
+            numGroupKeys = firstGroupByResults.getJSONObject(0).getJSONArray("group").length();
+          }
+
+          // Check over all aggregation functions.
+          for (int i = 0; i < numAggregationResults; i++) {
+            // Get number of group keys.
+            JSONArray groupByResults = aggregationResultsArray.getJSONObject(i).getJSONArray("groupByResult");
+
+            // Construct expected result map from group keys to value.
+            h2statement.execute(sqlQueries.get(i));
+            ResultSet sqlResultSet = h2statement.getResultSet();
+            Map<String, String> expectedValues = new HashMap<>();
+            int sqlNumGroups;
+            for (sqlNumGroups = 0; sqlResultSet.next() && sqlNumGroups < MAX_COMPARISON_LIMIT; sqlNumGroups++) {
+              if (numGroupKeys != 0) {
+                StringBuilder groupKey = new StringBuilder();
+                for (int groupKeyIndex = 1; groupKeyIndex <= numGroupKeys; groupKeyIndex++) {
+                  // Convert boolean value to lower case.
+                  groupKey.append(convertBooleanToLowerCase(sqlResultSet.getString(groupKeyIndex))).append(' ');
                 }
-
-                actualValues.put(pinotGroupKey, groupByResults.getJSONObject(resultIndex).getString("value"));
-              }
-
-              // Grouped result, build correct values and iterate through to compare both
-              Map<String, String> correctValues = new TreeMap<String, String>(new NullableStringComparator());
-              LOGGER.debug("Trying to execute sql query:{}", sqlQueries.get(aggregationGroupIndex));
-              statement.execute(sqlQueries.get(aggregationGroupIndex));
-              ResultSet rs = statement.getResultSet();
-              LOGGER.debug("Trying to get result from sql: " + rs);
-              rs.beforeFirst();
-              try {
-                while (rs.next()) {
-                  String h2GroupKey = rs.getString(1);
-                  for (int groupKeyIndex = 1; groupKeyIndex < groupKeyCount; groupKeyIndex++) {
-                    h2GroupKey += "\t" + rs.getString(groupKeyIndex + 1);
-                  }
-                  correctValues.put(h2GroupKey, rs.getString(groupKeyCount + 1));
-                }
-              } catch (Exception e) {
-                LOGGER.error("Catch exception when constructing H2 results for group by query", e);
-              }
-              LOGGER.debug("Trying to get result from sql: " + correctValues.toString());
-              LOGGER.debug("Trying to compare result from bql: " + actualValues);
-              LOGGER.debug("Trying to compare result from sql: " + correctValues);
-
-              if (correctValues.size() < 10000) {
-                // Check that Pinot results are contained in the SQL results
-                Set<String> pinotKeys = actualValues.keySet();
-                for (String pinotKey : pinotKeys) {
-                  if (GATHER_FAILED_QUERIES) {
-                    if (!correctValues.containsKey((pinotKey))) {
-                      saveFailedQuery(pqlQuery, sqlQueries, "Result group '" + pinotKey
-                          + "' returned by Pinot was not returned by H2 for query " + pqlQuery, "Bql values: "
-                          + actualValues, "Sql values: " + correctValues);
-                      break;
-                    } else {
-                      double actualValue = Double.parseDouble(actualValues.get(pinotKey));
-                      double correctValue = Double.parseDouble(correctValues.get(pinotKey));
-                      if (1.0 < Math.abs(actualValue - correctValue)) {
-                        saveFailedQuery(pqlQuery, sqlQueries, "Results differ between Pinot and H2 for query "
-                            + pqlQuery + ", expected " + correctValue + ", got " + actualValue + " for group "
-                            + pinotKey, "Bql values: " + actualValues, "Sql values: " + correctValues);
-                        break;
-                      }
-                    }
-                  } else {
-                    if(!correctValues.containsKey(pinotKey)){
-                      LOGGER.error("actualValues from Pinot: " + actualValues);
-                      LOGGER.error("correct values from H2: " + correctValues);
-                    }
-                    Assert.assertTrue(correctValues.containsKey(pinotKey), "Result group '" + pinotKey
-                        + "' returned by Pinot was not returned by H2 for query " + pqlQuery);
-                    Assert.assertEquals(
-                        Double.parseDouble(actualValues.get(pinotKey)),
-                        Double.parseDouble(correctValues.get(pinotKey)),
-                        1.0d,
-                        "Results differ between Pinot and H2 for query " + pqlQuery + ", expected "
-                            + correctValues.get(pinotKey) + ", got " + actualValues.get(pinotKey) + " for group "
-                            + pinotKey + "\nBql values: " + actualValues + "\nSql values: " + correctValues);
-                  }
-                }
-              } else {
-                LOGGER.warn("SQL: {} returned more than 10k rows, skipping comparison", sqlQueries.get(aggregationGroupIndex));
-                queryCount--;
-              }
-            } else {
-              // No records in group by, check that the result set is empty
-              statement.execute(sqlQueries.get(aggregationGroupIndex));
-              ResultSet rs = statement.getResultSet();
-              rs.beforeFirst();
-              int rowCount = 0;
-              while (rs.next()) {
-                rowCount++;
-              }
-
-              if (rowCount != 0) {
-                // Resultset not empty, while Pinot has no results
-                if (GATHER_FAILED_QUERIES) {
-                  saveFailedQuery(pqlQuery, sqlQueries, "Pinot did not return any results while " + rowCount
-                      + " rows were expected for query " + pqlQuery);
-                } else {
-                  Assert.fail("Pinot did not return any results while " + rowCount
-                      + " results were expected for query " + pqlQuery);
-                }
+                expectedValues.put(groupKey.toString(), sqlResultSet.getString(numGroupKeys + 1));
               }
             }
+
+            if (sqlNumGroups == 0) {
+              // No record selected in H2.
+
+              // Check if no record selected in Pinot.
+              if (numGroups != 0) {
+                String failureMessage = "No group returned in H2 but number of groups returned in Pinot: " + numGroups;
+                failure(pqlQuery, sqlQueries, failureMessage);
+                return;
+              }
+
+              // Check if number of documents scanned is 0.
+              if (numDocsScanned != 0) {
+                String failureMessage = "No group returned in Pinot but number of records selected: " + numDocsScanned;
+                failure(pqlQuery, sqlQueries, failureMessage);
+              }
+
+              // Skip further comparison.
+              return;
+            } else if (sqlNumGroups < MAX_COMPARISON_LIMIT) {
+              // Only compare exhausted results.
+
+              // Check that all Pinot results are contained in the H2 results.
+              for (int resultIndex = 0; resultIndex < numGroups; resultIndex++) {
+                // Fetch Pinot group keys.
+                JSONObject groupByResult = groupByResults.getJSONObject(resultIndex);
+                JSONArray group = groupByResult.getJSONArray("group");
+                StringBuilder groupKeyBuilder = new StringBuilder();
+                for (int groupKeyIndex = 0; groupKeyIndex < numGroupKeys; groupKeyIndex++) {
+                  groupKeyBuilder.append(group.getString(groupKeyIndex)).append(' ');
+                }
+                String groupKey = groupKeyBuilder.toString();
+
+                // Check if Pinot group keys contained in H2 results.
+                if (!expectedValues.containsKey(groupKey)) {
+                  String failureMessage = "Group returned in Pinot but not in H2: " + groupKey;
+                  failure(pqlQuery, sqlQueries, failureMessage);
+                  return;
+                }
+
+                // Fuzzy compare expected value and actual value.
+                String sqlValue = expectedValues.get(groupKey);
+                String pqlValue = groupByResult.getString("value");
+                double expectedValue = Double.parseDouble(sqlValue);
+                double actualValue = Double.parseDouble(pqlValue);
+                if (Math.abs(actualValue - expectedValue) >= 1.0) {
+                  String failureMessage =
+                      "Value: " + i + " does not match, expected: " + sqlValue + ", got: " + pqlValue + ", for group: "
+                          + groupKey;
+                  failure(pqlQuery, sqlQueries, failureMessage);
+                  return;
+                }
+              }
+            } else {
+              // Cannot get exhausted results.
+
+              // Skip further comparison.
+              LOGGER.debug("SQL: {} returned at least {} rows, skipping comparison.", sqlQueries.get(0),
+                  MAX_COMPARISON_LIMIT);
+              return;
+            }
           }
+        } else {
+          // Neither aggregation or group-by results.
+          String failureMessage = "Inside aggregation results, no aggregation or group-by results found";
+          failure(pqlQuery, sqlQueries, failureMessage);
+        }
+      } else if (response.has("selectionResults")) {
+        // Selection results.
+
+        // Construct expected result set.
+        h2statement.execute(sqlQueries.get(0));
+        ResultSet sqlResultSet = h2statement.getResultSet();
+        ResultSetMetaData sqlMetaData = sqlResultSet.getMetaData();
+
+        Set<String> expectedValues = new HashSet<>();
+        Map<String, String> reusableExpectedValueMap = new HashMap<>();
+        Map<String, List<String>> reusableMultiValuesMap = new HashMap<>();
+        List<String> reusableColumnOrder = new ArrayList<>();
+        int numResults;
+        for (numResults = 0; sqlResultSet.next() && numResults < MAX_COMPARISON_LIMIT; numResults++) {
+          reusableExpectedValueMap.clear();
+          reusableMultiValuesMap.clear();
+          reusableColumnOrder.clear();
+
+          int numColumns = sqlMetaData.getColumnCount();
+          for (int i = 1; i <= numColumns; i++) {
+            String columnName = sqlMetaData.getColumnName(i);
+
+            // Handle null result and convert boolean value to lower case.
+            String columnValue = sqlResultSet.getString(i);
+            if (columnValue == null) {
+              columnValue = "null";
+            } else {
+              columnValue = convertBooleanToLowerCase(columnValue);
+            }
+
+            // Handle multi-value columns.
+            int length = columnName.length();
+            if (length > 5 && columnName.substring(length - 5, length - 1).equals("__MV")) {
+              // Multi-value column.
+              String multiValueColumnName = columnName.substring(0, length - 5);
+              List<String> multiValue = reusableMultiValuesMap.get(multiValueColumnName);
+              if (multiValue == null) {
+                multiValue = new ArrayList<>();
+                reusableMultiValuesMap.put(multiValueColumnName, multiValue);
+                reusableColumnOrder.add(multiValueColumnName);
+              }
+              multiValue.add(columnValue);
+            } else {
+              // Single-value column.
+              reusableExpectedValueMap.put(columnName, columnValue);
+              reusableColumnOrder.add(columnName);
+            }
+          }
+
+          // Add multi-value column results to the expected values.
+          // The reason for this step is that Pinot does not maintain order of elements in multi-value columns.
+          for (Map.Entry<String, List<String>> entry : reusableMultiValuesMap.entrySet()) {
+            List<String> multiValue = entry.getValue();
+            Collections.sort(multiValue);
+            reusableExpectedValueMap.put(entry.getKey(), multiValue.toString());
+          }
+
+          // Build expected value String.
+          StringBuilder expectedValue = new StringBuilder();
+          for (String column : reusableColumnOrder) {
+            expectedValue.append(column).append(':').append(reusableExpectedValueMap.get(column)).append(' ');
+          }
+
+          expectedValues.add(expectedValue.toString());
+        }
+
+        JSONObject selectionColumnsAndResults = response.getJSONObject("selectionResults");
+        JSONArray selectionColumns = selectionColumnsAndResults.getJSONArray("columns");
+        JSONArray selectionResults = selectionColumnsAndResults.getJSONArray("results");
+        int numSelectionResults = selectionResults.length();
+
+        if (numResults == 0) {
+          // No record selected in H2.
+
+          // Check if no record selected in Pinot.
+          if (numSelectionResults != 0) {
+            String failureMessage =
+                "No record selected in H2 but number of records selected in Pinot: " + numSelectionResults;
+            failure(pqlQuery, sqlQueries, failureMessage);
+            return;
+          }
+
+          // Check if number of documents scanned is 0.
+          if (numDocsScanned != 0) {
+            String failureMessage =
+                "No selection result returned in Pinot but number of records selected: " + numDocsScanned;
+            failure(pqlQuery, sqlQueries, failureMessage);
+          }
+        } else if (numResults < MAX_COMPARISON_LIMIT) {
+          // Only compare exhausted results.
+
+          // Check that Pinot results are contained in the H2 results.
+          int numColumns = selectionColumns.length();
+          for (int i = 0; i < numSelectionResults; i++) {
+            // Build actual value String.
+            StringBuilder actualValueBuilder = new StringBuilder();
+            JSONArray selectionResult = selectionResults.getJSONArray(i);
+
+            for (int columnIndex = 0; columnIndex < numColumns; columnIndex++) {
+              // Convert column name to all uppercase to make it compatible with H2.
+              String columnName = selectionColumns.getString(columnIndex).toUpperCase();
+
+              Object columnResult = selectionResult.get(columnIndex);
+              if (columnResult instanceof JSONArray) {
+                // Multi-value column.
+                JSONArray columnResultsArray = (JSONArray) columnResult;
+                List<String> multiValue = new ArrayList<>();
+                int length = columnResultsArray.length();
+                for (int elementIndex = 0; elementIndex < length; elementIndex++) {
+                  multiValue.add(columnResultsArray.getString(elementIndex));
+                }
+                for (int elementIndex = length; elementIndex < MAX_ELEMENTS_IN_MULTI_VALUE; elementIndex++) {
+                  multiValue.add("null");
+                }
+                Collections.sort(multiValue);
+                actualValueBuilder.append(columnName).append(':').append(multiValue.toString()).append(' ');
+              } else {
+                // Single-value column.
+                actualValueBuilder.append(columnName).append(':').append((String) columnResult).append(' ');
+              }
+            }
+            String actualValue = actualValueBuilder.toString();
+
+            // Check actual value in expected values set.
+            if (!expectedValues.contains(actualValue)) {
+              String failureMessage = "Selection result returned in Pinot but not in H2: " + actualValue;
+              failure(pqlQuery, sqlQueries, failureMessage);
+              return;
+            }
+          }
+        } else {
+          // Cannot get exhausted results.
+          LOGGER.debug("SQL: {} returned at least {} rows, skipping comparison.", sqlQueries.get(0),
+              MAX_COMPARISON_LIMIT);
         }
       } else {
-        // Don't compare selection results for now
+        // Neither aggregation or selection results.
+        String failureMessage = "No aggregation or selection results found for query: " + pqlQuery;
+        failure(pqlQuery, sqlQueries, failureMessage);
       }
-    } catch (JSONException exception) {
-      if (GATHER_FAILED_QUERIES) {
-        saveFailedQuery(pqlQuery, sqlQueries, "Query did not return valid JSON while running query " + pqlQuery);
-        exception.printStackTrace();
-      } else {
-        Assert.fail("Query did not return valid JSON while running query " + pqlQuery, exception);
-      }
+    } catch (Exception e) {
+      String failureMessage = "Caught exception while running query.";
+      failure(pqlQuery, sqlQueries, failureMessage, e);
     }
+  }
+
+  /**
+   * Helper method to convert boolean value to lower case.
+   * <p>The reason for this method is that boolean values in H2 results are all uppercase characters, while in Pinot
+   * they are all lowercase characters.
+   * <p>If value is neither <code>TRUE</code> or <code>FALSE</code>, return itself.
+   *
+   * @param value raw value.
+   * @return converted value.
+   */
+  private static String convertBooleanToLowerCase(String value) {
+    if (value.equals("TRUE")) {
+      return "true";
+    }
+    if (value.equals("FALSE")) {
+      return "false";
+    }
+    return value;
   }
 
   public static void createH2SchemaAndInsertAvroFiles(List<File> avroFiles, Connection connection) {
@@ -400,9 +596,9 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
             }
 
             if (types.size() == 1) {
-              columnNameAndType = field.name() + " " + typeName + " not null";
+              columnNameAndType = fieldName + " " + typeName + " not null";
             } else {
-              columnNameAndType = field.name() + " " + typeName;
+              columnNameAndType = fieldName + " " + typeName;
             }
 
             columnNamesAndTypes.add(columnNameAndType.replace("string", "varchar(128)"));
@@ -417,22 +613,24 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
             elementTypeName = elementTypeName.replace("string", "varchar(128)");
 
-            for (int i = 0; i < MAX_MULTIVALUE_CARDINALITY; i++) {
-              columnNamesAndTypes.add(field.name() + i + " " + elementTypeName);
+            for (int i = 0; i < MAX_ELEMENTS_IN_MULTI_VALUE; i++) {
+              columnNamesAndTypes.add(fieldName + "__MV" + i + " " + elementTypeName);
             }
             ++columnCount;
             break;
+          case BOOLEAN:
           case INT:
           case LONG:
           case FLOAT:
           case DOUBLE:
+          case STRING:
             String fieldTypeName = fieldType.getName();
 
             if (fieldTypeName.equalsIgnoreCase("int")) {
               fieldTypeName = "bigint";
             }
 
-            columnNameAndType = field.name() + " " + fieldTypeName + " not null";
+            columnNameAndType = fieldName + " " + fieldTypeName + " not null";
 
             columnNamesAndTypes.add(columnNameAndType.replace("string", "varchar(128)"));
             ++columnCount;
@@ -442,8 +640,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
             continue;
           default:
             // Ignore other avro types
-            LOGGER.warn("Ignoring field {} of type {}", field.name(), field.schema());
-            continue;
+            LOGGER.warn("Ignoring field {} of type {}", fieldName, field.schema());
         }
       }
 
@@ -472,7 +669,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
             Object value = record.get(avroIndex);
             if (value instanceof GenericData.Array) {
               GenericData.Array array = (GenericData.Array) value;
-              for (int i = 0; i < MAX_MULTIVALUE_CARDINALITY; i++) {
+              for (int i = 0; i < MAX_ELEMENTS_IN_MULTI_VALUE; i++) {
                 if (i < array.size()) {
                   value = array.get(i);
                   if (value instanceof Utf8) {
@@ -863,31 +1060,6 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     tmpDir.mkdirs();
   }
 
-  @Test
-  public void testMultipleQueries() throws Exception {
-    queriesFile =
-        new File(TestUtils.getFileFromResourceUrl(BaseClusterIntegrationTest.class.getClassLoader().getResource(
-            "On_Time_On_Time_Performance_2014_100k_subset.test_queries_10K")));
-
-    Scanner scanner = new Scanner(queriesFile);
-    scanner.useDelimiter("\n");
-    String[] pqls = new String[1000];
-
-    for (int i = 0; i < pqls.length; i++) {
-      JSONObject test_case = new JSONObject(scanner.next());
-      pqls[i] = test_case.getString("pql");
-    }
-
-    for (String query : pqls) {
-      try {
-        runNoH2ComparisonQuery(query);
-      } catch (Exception e) {
-        LOGGER.error("Getting error query: {}" + query);
-        throw new RuntimeException(e.getMessage());
-      }
-    }
-  }
-
   public static List<File> unpackAvroData(File tmpDir, int segmentCount)
       throws IOException, ArchiveException {
     TarGzCompressionUtils.unTar(new File(TestUtils.getFileFromResourceUrl(
@@ -918,7 +1090,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     executor.execute(new Runnable() {
       @Override
       public void run() {
-        _queryGenerator = new QueryGenerator(avroFiles, "'mytable'", "mytable");
+        _queryGenerator = new QueryGenerator(avroFiles, "mytable", "mytable");
       }
     });
   }
@@ -941,58 +1113,107 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         .getResource("On_Time_On_Time_Performance_2014_100k_subset_nonulls.schema").getFile());
   }
 
+  /**
+   * NOTE:
+   * <p>
+   * For queries with <code>LIMIT</code> or <code>TOP</code>, need to remove limit or add <code>LIMIT 10000</code> to
+   * the H2 SQL query because the comparison only works on exhausted result with at most 10000 rows.
+   * <ul>
+   *   <li>Eg. <code>SELECT a FROM table LIMIT 15 -> [SELECT a FROM table LIMIT 10000]</code></li>
+   * </ul>
+   * <p>
+   * For queries with multiple aggregation functions, need to split each of them into a separate H2 SQL query.
+   * <ul>
+   *   <li>Eg. <code>SELECT SUM(a), MAX(b) FROM table -> [SELECT SUM(a) FROM table, SELECT MAX(b) FROM table]</code></li>
+   * </ul>
+   * <p>
+   * For group-by queries, need to add group-by columns to the select clause for H2 SQL query.
+   * <ul>
+   *   <li>Eg. <code>SELECT SUM(a) FROM table GROUP BY b -> [SELECT b, SUM(a) FROM table GROUP BY b]</code></li>
+   * </ul>
+   *
+   * @throws Exception
+   */
+  @Test(enabled = false)
+  public void testHardcodedQueries()
+      throws Exception {
+    // Here are some sample queries.
+    String query;
+    query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch = 16312 AND Carrier = 'DL'";
+    runQuery(query, Collections.singletonList(query));
+    query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch <> 16312 AND Carrier = 'DL'";
+    runQuery(query, Collections.singletonList(query));
+    query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch > 16312 AND Carrier = 'DL'";
+    runQuery(query, Collections.singletonList(query));
+    query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch >= 16312 AND Carrier = 'DL'";
+    runQuery(query, Collections.singletonList(query));
+    query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch < 16312 AND Carrier = 'DL'";
+    runQuery(query, Collections.singletonList(query));
+    query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL'";
+    runQuery(query, Collections.singletonList(query));
+    query = "SELECT MAX(ArrTime), MIN(ArrTime) FROM mytable WHERE DaysSinceEpoch >= 16312";
+    runQuery(query, Arrays.asList("SELECT MAX(ArrTime) FROM mytable WHERE DaysSinceEpoch >= 15312",
+        "SELECT MIN(ArrTime) FROM mytable WHERE DaysSinceEpoch >= 15312"));
+  }
+
   @Test
-  public void testHardcodedQuerySet() throws Exception {
-    for (String query : getHardCodedQuerySet()) {
-      try {
-        LOGGER.debug("Trying to send query : {}", query);
-        runQuery(query, Collections.singletonList(query.replace("'mytable'", "mytable")));
-      } catch (Exception e) {
-        LOGGER.error("Getting error for query : {}", query, e);
+  public void testHardcodedQuerySet()
+      throws Exception {
+    URL resourceUrl = BaseClusterIntegrationTest.class.getClassLoader()
+        .getResource("On_Time_On_Time_Performance_2014_100k_subset.test_queries_10K");
+    Assert.assertNotNull(resourceUrl);
+    File queriesFile = new File(resourceUrl.getFile());
+    Random random = new Random();
+
+    try (BufferedReader reader = new BufferedReader(new FileReader(queriesFile))) {
+      while (true) {
+        // Skip up to MAX_NUM_QUERIES_SKIPPED queries.
+        int numQueriesSkipped = random.nextInt(MAX_NUM_QUERIES_SKIPPED);
+        for (int i = 0; i < numQueriesSkipped; i++) {
+          reader.readLine();
+        }
+
+        String queryString = reader.readLine();
+        // Reach end of file.
+        if (queryString == null) {
+          return;
+        }
+
+        JSONObject query = new JSONObject(queryString);
+        String pqlQuery = query.getString("pql");
+        JSONArray hsqls = query.getJSONArray("hsqls");
+        List<String> sqlQueries = new ArrayList<>();
+        int length = hsqls.length();
+        for (int i = 0; i < length; i++) {
+          sqlQueries.add(hsqls.getString(i));
+        }
+        runQuery(pqlQuery, sqlQueries);
       }
-
     }
   }
 
-  @Test(enabled = false)  // jfim: This is disabled because testGeneratedQueriesWithMultivalues covers the same thing
-  public void testGeneratedQueries() throws Exception {
-    int generatedQueryCount = getGeneratedQueryCount();
-
-    String generatedQueryCountProperty = System.getProperty("integration.test.generatedQueryCount");
-    if (generatedQueryCountProperty != null) {
-      generatedQueryCount = Integer.parseInt(generatedQueryCountProperty);
-    }
-
-    QueryGenerator.Query[] queries = new QueryGenerator.Query[generatedQueryCount];
-    _queryGenerator.setSkipMultivaluePredicates(true);
-    for (int i = 0; i < queries.length; i++) {
-      queries[i] = _queryGenerator.generateQuery();
-    }
-
-    for (QueryGenerator.Query query : queries) {
-      LOGGER.debug("Trying to send query : {}", query.generatePql());
-      runQuery(query.generatePql(), query.generateH2Sql());
-    }
+  // This is disabled because testGeneratedQueriesWithMultiValues covers the same thing.
+  @Test(enabled = false)
+  public void testGeneratedQueriesWithoutMultiValues()
+      throws Exception {
+    testGeneratedQueries(false);
   }
 
   @Test
-  public void testGeneratedQueriesWithMultivalues() throws Exception {
+  public void testGeneratedQueriesWithMultiValues()
+      throws Exception {
+    testGeneratedQueries(true);
+  }
+
+  protected void testGeneratedQueries(boolean withMultiValues)
+      throws Exception {
+    _queryGenerator.setSkipMultiValuePredicates(!withMultiValues);
     int generatedQueryCount = getGeneratedQueryCount();
-
-    String generatedQueryCountProperty = System.getProperty("integration.test.generatedQueryCount");
-    if (generatedQueryCountProperty != null) {
-      generatedQueryCount = Integer.parseInt(generatedQueryCountProperty);
-    }
-
-    QueryGenerator.Query[] queries = new QueryGenerator.Query[generatedQueryCount];
-    _queryGenerator.setSkipMultivaluePredicates(false);
-    for (int i = 0; i < queries.length; i++) {
-      queries[i] = _queryGenerator.generateQuery();
-    }
-
-    for (QueryGenerator.Query query : queries) {
-      LOGGER.debug("Trying to send query : {}", query.generatePql());
-      runQuery(query.generatePql(), query.generateH2Sql());
+    for (int i = 0; i < generatedQueryCount; i++) {
+      QueryGenerator.Query query = _queryGenerator.generateQuery();
+      String pqlQuery = query.generatePql();
+      LOGGER.debug("Running query: {}", pqlQuery);
+      runQuery(pqlQuery, query.generateH2Sql());
     }
   }
 
@@ -1002,46 +1223,6 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
   protected JSONArray getGroupByArrayFromJSONAggregationResults(JSONObject jsonObject) throws JSONException {
     return jsonObject.getJSONArray("aggregationResults").getJSONObject(0).getJSONArray("groupByResult");
-  }
-
-  protected String[] getHardCodedQuerySet() {
-    String[] queries =
-        new String[] { "SELECT AirTime, avg(TotalAddGTime) FROM 'mytable'  WHERE DivAirportLandings BETWEEN 0 AND 0 OR Quarter IN (2, 2, 4, 2, 3, 1, 1, 1) GROUP BY AirTime LIMIT 10000",
-            "SELECT count(*) FROM 'mytable'  WHERE DayofMonth IN ('19', '10', '28', '1', '25', '2') ",
-            "SELECT count(*) FROM 'mytable'  WHERE TaxiOut IN ('35', '70', '29', '74', '126', '106', '70', '134', '118', '43') OR DayofMonth IN ('19', '10', '28', '1', '25') ",
-            "SELECT ArrDelay, avg(DestCityMarketID) FROM 'mytable'  WHERE TaxiOut IN ('35', '70', '29', '74', '126', '106', '70', '134', '118', '43') OR DayofMonth IN ('19', '10', '28', '1', '25') GROUP BY ArrDelay LIMIT 10000",
-            "SELECT OriginAirportSeqID, min(CRSArrTime) FROM 'mytable'  WHERE TaxiOut BETWEEN 140 AND 26 OR DestCityName >= 'Gainesville, FL' GROUP BY OriginAirportSeqID LIMIT 10000",
-            "SELECT NASDelay, DestAirportSeqID, min(DayOfWeek) FROM 'mytable'  WHERE DaysSinceEpoch IN ('16426', '16176', '16314', '16321') GROUP BY NASDelay, DestAirportSeqID LIMIT 10000",
-            "SELECT DestState, avg(DistanceGroup) FROM 'mytable'  GROUP BY DestState LIMIT 10000",
-            "SELECT ActualElapsedTime, DestCityMarketID, sum(OriginAirportSeqID) FROM 'mytable'  WHERE DestStateName > 'Oklahoma' GROUP BY ActualElapsedTime, DestCityMarketID LIMIT 10000",
-            "SELECT sum(CarrierDelay) FROM 'mytable'  WHERE CRSDepTime < '1047' OR DestWac = '84' LIMIT 16",
-            "SELECT Year, sum(CarrierDelay) FROM 'mytable'  WHERE DestWac BETWEEN '84' AND '37' OR CRSDepTime < '1047' GROUP BY Year LIMIT 10000",
-            "select count(*) from 'mytable'", "select sum(DepDelay) from 'mytable'",
-            "select count(DepDelay) from 'mytable'",
-            "select min(DepDelay) from 'mytable'",
-            "select max(DepDelay) from 'mytable'",
-            "select avg(DepDelay) from 'mytable'",
-            "select Carrier, count(*) from 'mytable' group by Carrier  ",
-            "select Carrier, count(*) from 'mytable' where ArrDelay > 15 group by Carrier  ",
-            "select Carrier, count(*) from 'mytable' where Cancelled = 1 group by Carrier  ",
-            "select Carrier, count(*) from 'mytable' where DepDelay >= 15 group by Carrier  ",
-            "select Carrier, count(*) from 'mytable' where DepDelay < 15 group by Carrier ",
-            "select Carrier, count(*) from 'mytable' where ArrDelay <= 15 group by Carrier  ",
-            "select Carrier, count(*) from 'mytable' where DepDelay >= 15 or ArrDelay >= 15 group by Carrier  ",
-            "select Carrier, count(*) from 'mytable' where DepDelay < 15 and ArrDelay <= 15 group by Carrier ",
-            "select Carrier, count(*) from 'mytable' where DepDelay between 5 and 15 group by Carrier  ",
-            "select Carrier, count(*) from 'mytable' where DepDelay in (2, 8, 42) group by Carrier ",
-            "select Carrier, count(*) from 'mytable' where DepDelay not in (4, 16) group by Carrier ",
-            "select Carrier, count(*) from 'mytable' where Cancelled <> 1 group by Carrier ",
-            "select Carrier, min(ArrDelay) from 'mytable' group by Carrier ",
-            "select Carrier, max(ArrDelay) from 'mytable' group by Carrier ",
-            "select Carrier, sum(ArrDelay) from 'mytable' group by Carrier ",
-            "select TailNum, avg(ArrDelay) from 'mytable' group by TailNum ",
-            "select FlightNum, avg(ArrDelay) from 'mytable' group by FlightNum ",
-            "select distinctCount(Carrier) from 'mytable' where TailNum = 'D942DN' ",
-            "SELECT count(*) FROM 'mytable'  WHERE OriginStateName BETWEEN 'U.S. Pacific Trust Territories and Possessions' AND 'Maryland'  ",
-        };
-    return queries;
   }
 
   protected void ensurePinotConnectionIsCreated() {
@@ -1065,6 +1246,11 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   protected int getGeneratedQueryCount() {
-    return -1;
+    String generatedQueryCountProperty = System.getProperty("integration.test.generatedQueryCount");
+    if (generatedQueryCountProperty != null) {
+      return Integer.parseInt(generatedQueryCountProperty);
+    } else {
+      return GENERATED_QUERY_COUNT;
+    }
   }
 }

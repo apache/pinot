@@ -15,6 +15,10 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import com.google.common.util.concurrent.MoreExecutors;
+import com.linkedin.pinot.common.utils.FileUploadUtils;
+import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
+import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
 import java.io.FileInputStream;
 import java.util.Collections;
@@ -34,10 +38,6 @@ import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-import com.google.common.util.concurrent.MoreExecutors;
-import com.linkedin.pinot.common.utils.FileUploadUtils;
-import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
-import com.linkedin.pinot.util.TestUtils;
 
 
 /**
@@ -51,26 +51,6 @@ public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTe
   protected final File _tmpDir = new File("/tmp/" + getClass().getSimpleName());
   protected final File _segmentsDir = new File(_tmpDir, "segments");
   protected final File _tarsDir = new File(_tmpDir, "tars");
-
-  @Override
-  public void testMultipleQueries() throws Exception {
-    // Ignore this inherited test
-  }
-
-  @Override
-  public void testHardcodedQuerySet() throws Exception {
-    // Ignore this inherited test
-  }
-
-  @Override
-  public void testGeneratedQueries() throws Exception {
-    // Ignore this inherited test
-  }
-
-  @Override
-  public void testGeneratedQueriesWithMultivalues() throws Exception {
-    // Ignore this inherited test
-  }
 
   @BeforeClass
   public void setUp() throws Exception {
@@ -267,6 +247,34 @@ public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTe
     }
   }
 
+  @Override
+  @Test(enabled = false)
+  public void testHardcodedQueries()
+      throws Exception {
+    // Ignored.
+  }
+
+  @Override
+  @Test(enabled = false)
+  public void testHardcodedQuerySet()
+      throws Exception {
+    // Ignored.
+  }
+
+  @Override
+  @Test(enabled = false)
+  public void testGeneratedQueriesWithoutMultiValues()
+      throws Exception {
+    // Ignored.
+  }
+
+  @Override
+  @Test(enabled = false)
+  public void testGeneratedQueriesWithMultiValues()
+      throws Exception {
+    // Ignored.
+  }
+
   @AfterClass
   public void tearDown() {
     stopServer();
@@ -274,10 +282,5 @@ public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTe
     stopController();
     stopZk();
     FileUtils.deleteQuietly(_tmpDir);
-  }
-
-  @Override
-  protected int getGeneratedQueryCount() {
-    return 0;
   }
 }
