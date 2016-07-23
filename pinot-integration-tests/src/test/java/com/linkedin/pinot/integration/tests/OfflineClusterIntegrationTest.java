@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import com.linkedin.pinot.common.utils.FileUploadUtils;
+import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
 import java.io.FileInputStream;
 import java.util.Collections;
@@ -23,7 +25,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.commons.io.FileUtils;
 import org.json.JSONArray;
 import org.slf4j.Logger;
@@ -32,9 +33,6 @@ import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-
-import com.linkedin.pinot.common.utils.FileUploadUtils;
-import com.linkedin.pinot.util.TestUtils;
 
 /**
  * Integration test that converts Avro data for 12 segments and runs queries against it.
@@ -124,54 +122,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
         Assert.fail("Segments were not completely loaded within two minutes");
       }
     }
-  }
-
-  @Override
-  @Test
-  public void testMultipleQueries() throws Exception {
-    super.testMultipleQueries();
-  }
-
-  @Override
-  @Test
-  public void testHardcodedQuerySet() throws Exception {
-    super.testHardcodedQuerySet();
-  }
-
-  @Override
-  @Test(enabled = false)  // jfim: This is disabled because the multivalue one covers the same thing
-  public void testGeneratedQueries() throws Exception {
-    super.testGeneratedQueries();
-  }
-
-  @Override
-  @Test
-  public void testGeneratedQueriesWithMultivalues() throws Exception {
-    super.testGeneratedQueriesWithMultivalues();
-  }
-
-  /**
-   * NOTE:
-   * If you are copying a failed query to test in isolation, you might have to do the following for group by queries
-   * -- remove limit, pinot sets default limit to 10, we get all values from H2 to ensure that pinot results valid results
-   * -- Add the group by column name in the select clause. Pinot does not care but H2 requires it. e.g select col1,sum(col2) from T group by col1
-   * If you forget this, you will see this test fail all the time and have no clue whats going on :)
-   * @throws Exception
-   */
-  @Test
-  public void testSingleQuery() throws Exception {
-    String query;
-    query = "select max(ArrTime), min(ArrTime) from 'mytable' where DaysSinceEpoch >= 16312";
-    super.runQuery(query, Collections.singletonList(query.replace("'mytable'", "mytable")));
-    query = "select count(*) from 'mytable' where DaysSinceEpoch < 16312";
-    super.runQuery(query, Collections.singletonList(query.replace("'mytable'", "mytable")));
-    query = "select count(*) from 'mytable' where DaysSinceEpoch <= 16312";
-    super.runQuery(query, Collections.singletonList(query.replace("'mytable'", "mytable")));
-    query = "select count(*) from 'mytable' where DaysSinceEpoch > 16312";
-    super.runQuery(query, Collections.singletonList(query.replace("'mytable'", "mytable")));
-    query = "select * from 'mytable' limit 5";
-    super.runQuery(query, Collections.singletonList(query.replace("'mytable'", "mytable")));
-
   }
 
   /**

@@ -15,26 +15,21 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.utils.KafkaStarterUtils;
 import java.io.File;
 import java.sql.ResultSet;
 import java.sql.Statement;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-
 import kafka.server.KafkaServerStartable;
-
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
-import org.testng.annotations.Test;
-
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.utils.KafkaStarterUtils;
 
 
 /**
@@ -108,38 +103,6 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
     rs.close();
 
     waitForRecordCountToStabilizeToExpectedCount(h2RecordCount, timeInFiveMinutes);
-  }
-
-  @Override
-  @Test
-  public void testHardcodedQuerySet() throws Exception {
-    super.testHardcodedQuerySet();
-  }
-
-  @Override
-  @Test(enabled = false)  // jfim: This is disabled because the multivalue one covers the same thing
-  public void testGeneratedQueries() throws Exception {
-    super.testGeneratedQueries();
-  }
-
-  @Test
-  public void testSingleQuery() throws Exception {
-    String query;
-    query = "select count(*) from 'mytable' where DaysSinceEpoch >= 16312";
-    super.runQuery(query, Collections.singletonList(query.replace("'mytable'", "mytable")));
-    query = "select count(*) from 'mytable' where DaysSinceEpoch < 16312";
-    super.runQuery(query, Collections.singletonList(query.replace("'mytable'", "mytable")));
-    query = "select count(*) from 'mytable' where DaysSinceEpoch <= 16312";
-    super.runQuery(query, Collections.singletonList(query.replace("'mytable'", "mytable")));
-    query = "select count(*) from 'mytable' where DaysSinceEpoch > 16312";
-    super.runQuery(query, Collections.singletonList(query.replace("'mytable'", "mytable")));
-
-  }
-
-  @Override
-  @Test
-  public void testMultipleQueries() throws Exception {
-    super.testMultipleQueries();
   }
 
   @AfterClass

@@ -53,6 +53,11 @@ public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTe
   protected final File _tarsDir = new File(_tmpDir, "tars");
 
   @Override
+  public void testSingleQuery() throws Exception {
+    // Ignore this inherited test
+  }
+
+  @Override
   public void testMultipleQueries() throws Exception {
     // Ignore this inherited test
   }
@@ -274,10 +279,5 @@ public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTe
     stopController();
     stopZk();
     FileUtils.deleteQuietly(_tmpDir);
-  }
-
-  @Override
-  protected int getGeneratedQueryCount() {
-    return 0;
   }
 }
