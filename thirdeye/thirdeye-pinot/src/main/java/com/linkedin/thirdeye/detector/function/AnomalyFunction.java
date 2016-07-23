@@ -6,8 +6,8 @@ import org.joda.time.DateTime;
 
 import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
-import com.linkedin.thirdeye.detector.db.entity.AnomalyFunctionSpec;
-import com.linkedin.thirdeye.detector.db.entity.AnomalyResult;
+import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
+import com.linkedin.thirdeye.db.entity.AnomalyResult;
 
 public interface AnomalyFunction {
   /** Initializes this function with its configuration, call before analyze */

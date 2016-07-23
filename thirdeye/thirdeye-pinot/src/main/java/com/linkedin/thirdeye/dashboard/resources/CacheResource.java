@@ -29,10 +29,6 @@ public class CacheResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(CacheResource.class);
   private ThirdEyeCacheRegistry CACHE_INSTANCE = ThirdEyeCacheRegistry.getInstance();
 
-  public CacheResource() {
-
-  }
-
   @GET
   @Path(value = "/")
   @Produces(MediaType.TEXT_HTML)

@@ -16,7 +16,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
 import com.codahale.metrics.annotation.Timed;
-import com.linkedin.thirdeye.detector.db.entity.AnomalyFunctionSpec;
+import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
 import com.linkedin.thirdeye.detector.db.dao.AnomalyFunctionSpecDAO;
 
 @Path("/anomaly-functions")

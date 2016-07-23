@@ -20,9 +20,9 @@ import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkedin.thirdeye.detector.db.entity.AnomalyFunctionSpec;
-import com.linkedin.thirdeye.detector.db.entity.AnomalyJobSpec;
-import com.linkedin.thirdeye.detector.db.entity.AnomalyTaskSpec;
+import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
+import com.linkedin.thirdeye.db.entity.AnomalyJobSpec;
+import com.linkedin.thirdeye.db.entity.AnomalyTaskSpec;
 import com.linkedin.thirdeye.detector.db.dao.AnomalyFunctionSpecDAO;
 import com.linkedin.thirdeye.detector.db.dao.AnomalyJobSpecDAO;
 import com.linkedin.thirdeye.detector.db.dao.AnomalyTaskSpecDAO;

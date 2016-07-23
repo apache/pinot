@@ -4,8 +4,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
 import com.linkedin.thirdeye.constant.FeedbackStatus;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
-import com.linkedin.thirdeye.detector.db.entity.AnomalyFeedback;
-import io.dropwizard.hibernate.UnitOfWork;
+import com.linkedin.thirdeye.db.dao.AnomalyFunctionDAO;
+import com.linkedin.thirdeye.db.dao.AnomalyResultDAO;
+import com.linkedin.thirdeye.db.dao.EmailConfigurationDAO;
+import com.linkedin.thirdeye.db.entity.AnomalyFeedback;
 
 import java.io.IOException;
 import java.net.URLDecoder;
@@ -43,12 +45,9 @@ import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.dashboard.DetectorHttpUtils;
 import com.linkedin.thirdeye.dashboard.ThirdEyeDashboardConfiguration;
-import com.linkedin.thirdeye.detector.db.entity.AnomalyFunctionSpec;
-import com.linkedin.thirdeye.detector.db.entity.AnomalyResult;
-import com.linkedin.thirdeye.detector.db.entity.EmailConfiguration;
-import com.linkedin.thirdeye.detector.db.dao.AnomalyFunctionSpecDAO;
-import com.linkedin.thirdeye.detector.db.dao.AnomalyResultDAO;
-import com.linkedin.thirdeye.detector.db.dao.EmailConfigurationDAO;
+import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
+import com.linkedin.thirdeye.db.entity.AnomalyResult;
+import com.linkedin.thirdeye.db.entity.EmailConfiguration;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 @Path(value = "/dashboard")
@@ -63,40 +62,35 @@ public class AnomalyResource {
   private static final String DIMENSION_JOINER = ",";
   private static final String DEFAULT_FUNCTION_TYPE = "USER_RULE";
 
-  private AnomalyFunctionSpecDAO anomalyFunctionSpecDAO;
+  private AnomalyFunctionDAO anomalyFunctionDAO;
   private AnomalyResultDAO anomalyResultDAO;
   private EmailConfigurationDAO emailConfigurationDAO;
+
   private DetectorHttpUtils detectorHttpUtils;
   private ThirdEyeDashboardConfiguration dashboardConfiguration;
 
-  public AnomalyResource(AnomalyFunctionSpecDAO anomalyFunctionSpecDAO,
-      AnomalyResultDAO anomalyResultDAO, EmailConfigurationDAO emailConfigurationDAO,
-      ThirdEyeDashboardConfiguration dashboardConfiguration) {
-
+  public AnomalyResource(ThirdEyeDashboardConfiguration dashboardConfiguration, AnomalyFunctionDAO anomalyFunctionDAO, AnomalyResultDAO anomalyResultDAO, EmailConfigurationDAO emailConfigurationDAO) {
     this.dashboardConfiguration = dashboardConfiguration;
     this.detectorHttpUtils = new DetectorHttpUtils(dashboardConfiguration.getDetectorHost(),
         dashboardConfiguration.getDetectorPort());
-    this.anomalyFunctionSpecDAO = anomalyFunctionSpecDAO;
+    this.anomalyFunctionDAO = anomalyFunctionDAO;
     this.anomalyResultDAO = anomalyResultDAO;
     this.emailConfigurationDAO = emailConfigurationDAO;
   }
 
   /************** CRUD for anomalies of a collection ********************************************************/
-
   @GET
-  @UnitOfWork
   @Path("/anomalies/metrics")
   public List<String> viewMetricsForDataset(@QueryParam("dataset") String dataset) {
     if (StringUtils.isBlank(dataset)) {
       throw new IllegalArgumentException("dataset is a required query param");
     }
-    List<String> metrics = anomalyFunctionSpecDAO.findDistinctMetricsByCollection(dataset);
+    List<String> metrics = anomalyFunctionDAO.findDistinctMetricsByCollection(dataset);
     return metrics;
   }
 
   // View anomalies for collection
   @GET
-  @UnitOfWork
   @Path("/anomalies/view")
   public List<AnomalyResult> viewAnomaliesInRange(@NotNull @QueryParam("dataset") String dataset,
       @QueryParam("startTimeIso") String startTimeIso,
@@ -176,7 +170,6 @@ public class AnomalyResource {
 
   // View all anomaly functions
   @GET
-  @UnitOfWork
   @Path("/anomaly-function/view")
   public List<AnomalyFunctionSpec> viewAnomalyFunctions(@NotNull @QueryParam("dataset") String dataset,
       @QueryParam("metric") String metric) {
@@ -185,7 +178,7 @@ public class AnomalyResource {
       throw new IllegalArgumentException("dataset is a required query param");
     }
 
-    List<AnomalyFunctionSpec> anomalyFunctionSpecs = anomalyFunctionSpecDAO.findAllByCollection(dataset);
+    List<AnomalyFunctionSpec> anomalyFunctionSpecs = anomalyFunctionDAO.findAllByCollection(dataset);
     List<AnomalyFunctionSpec> anomalyFunctions = anomalyFunctionSpecs;
 
     if (StringUtils.isNotEmpty(metric)) {
@@ -201,7 +194,6 @@ public class AnomalyResource {
 
   // Add anomaly function
   @POST
-  @UnitOfWork
   @Path("/anomaly-function/create")
   public Response createAnomalyFunction(@NotNull @QueryParam("dataset") String dataset,
       @NotNull @QueryParam("functionName") String functionName,
@@ -272,7 +264,7 @@ public class AnomalyResource {
     }
     anomalyFunctionSpec.setCron(cron);
 
-    Long id = anomalyFunctionSpecDAO.save(anomalyFunctionSpec);
+    Long id = anomalyFunctionDAO.save(anomalyFunctionSpec);
 
     if (isActive) { // this call will set isActive and schedule it
       detectorHttpUtils.enableAnomalyFunction(String.valueOf(id));
@@ -283,7 +275,6 @@ public class AnomalyResource {
 
   // Edit anomaly function
   @POST
-  @UnitOfWork
   @Path("/anomaly-function/update")
   public Response updateAnomalyFunction(@NotNull @QueryParam("id") Long id,
       @NotNull @QueryParam("dataset") String dataset,
@@ -311,7 +302,7 @@ public class AnomalyResource {
           + ", properties" + properties);
     }
 
-    AnomalyFunctionSpec anomalyFunctionSpec = anomalyFunctionSpecDAO.findById(id);
+    AnomalyFunctionSpec anomalyFunctionSpec = anomalyFunctionDAO.findById(id);
     if (anomalyFunctionSpec == null) {
       throw new IllegalStateException("AnomalyFunctionSpec with id " + id + " does not exist");
     }
@@ -354,7 +345,7 @@ public class AnomalyResource {
     }
     anomalyFunctionSpec.setCron(cron);
 
-    Long responseId = anomalyFunctionSpecDAO.save(anomalyFunctionSpec);
+    Long responseId = anomalyFunctionDAO.save(anomalyFunctionSpec);
 
     if (isActive) {
       detectorHttpUtils.enableAnomalyFunction(String.valueOf(responseId));
@@ -365,7 +356,6 @@ public class AnomalyResource {
 
   // Delete anomaly function
   @DELETE
-  @UnitOfWork
   @Path("/anomaly-function/delete")
   public Response deleteAnomalyFunctions(@NotNull @QueryParam("id") Long id,
       @QueryParam("functionName") String functionName)
@@ -376,7 +366,7 @@ public class AnomalyResource {
     }
 
     // call endpoint to stop if active
-    AnomalyFunctionSpec anomalyFunctionSpec = anomalyFunctionSpecDAO.findById(id);
+    AnomalyFunctionSpec anomalyFunctionSpec = anomalyFunctionDAO.findById(id);
     if (anomalyFunctionSpec == null) {
       throw new IllegalStateException("No anomalyFunctionSpec with id " + id);
     }
@@ -385,14 +375,13 @@ public class AnomalyResource {
     }
 
     // delete from db
-    anomalyFunctionSpecDAO.delete(anomalyFunctionSpec);
+    anomalyFunctionDAO.delete(anomalyFunctionSpec);
 
     return Response.noContent().build();
   }
 
   // Run anomaly function ad hoc
   @POST
-  @UnitOfWork
   @Path("/anomaly-function/adhoc")
   public Response runAdhocAnomalyFunctions(@NotNull @QueryParam("id") Long id,
       @QueryParam("functionName") String functionName,
@@ -404,7 +393,7 @@ public class AnomalyResource {
       throw new IllegalArgumentException("id is a required query param");
     }
 
-    AnomalyFunctionSpec anomalyFunctionSpec = anomalyFunctionSpecDAO.findById(id);
+    AnomalyFunctionSpec anomalyFunctionSpec = anomalyFunctionDAO.findById(id);
     if (anomalyFunctionSpec == null) {
       throw new IllegalStateException("No anomalyFunctionSpec with id " + id);
     }
@@ -429,7 +418,6 @@ public class AnomalyResource {
 
   // View all email functions
   @GET
-  @UnitOfWork
   @Path("/email-config/view")
   public List<EmailConfiguration> viewEmailConfigs(@NotNull @QueryParam("dataset") String dataset,
       @QueryParam("metric") String metric) {
@@ -453,7 +441,6 @@ public class AnomalyResource {
 
   // Add email function
   @POST
-  @UnitOfWork
   @Path("/email-config/create")
   public Response createEmailConfigs(@NotNull @QueryParam("dataset") String dataset,
       @NotNull @QueryParam("metric") String metric,
@@ -514,7 +501,7 @@ public class AnomalyResource {
 
     List<AnomalyFunctionSpec> anomalyFunctionSpecs = new ArrayList<>();
     for (String functionIdString : functionIds.split(",")) {
-      AnomalyFunctionSpec anomalyFunctionSpec = anomalyFunctionSpecDAO.findById(Long.valueOf(functionIdString));
+      AnomalyFunctionSpec anomalyFunctionSpec = anomalyFunctionDAO.findById(Long.valueOf(functionIdString));
       anomalyFunctionSpecs.add(anomalyFunctionSpec);
     }
     emailConfiguration.setFunctions(anomalyFunctionSpecs);
@@ -530,7 +517,6 @@ public class AnomalyResource {
 
   // Update email function
   @POST
-  @UnitOfWork
   @Path("/email-config/update")
   public Response updateEmailConfigs(@NotNull @QueryParam("id") Long id,
       @NotNull @QueryParam("dataset") String dataset,
@@ -600,7 +586,7 @@ public class AnomalyResource {
 
     List<AnomalyFunctionSpec> anomalyFunctionSpecs = new ArrayList<>();
     for (String functionIdString : functionIds.split(",")) {
-      AnomalyFunctionSpec anomalyFunctionSpec = anomalyFunctionSpecDAO.findById(Long.valueOf(functionIdString));
+      AnomalyFunctionSpec anomalyFunctionSpec = anomalyFunctionDAO.findById(Long.valueOf(functionIdString));
       anomalyFunctionSpecs.add(anomalyFunctionSpec);
     }
     emailConfiguration.setFunctions(anomalyFunctionSpecs);
@@ -617,7 +603,6 @@ public class AnomalyResource {
 
   // Delete email function
   @DELETE
-  @UnitOfWork
   @Path("/email-config/delete")
   public Response deleteEmailConfigs(@NotNull @QueryParam("id") Long id) throws ClientProtocolException, IOException {
 
@@ -639,7 +624,6 @@ public class AnomalyResource {
 
   // Run email function ad hoc
   @POST
-  @UnitOfWork
   @Path("/email-config/adhoc")
   public Response runAdhocEmailConfig(@NotNull @QueryParam("id") Long id) throws Exception {
 
@@ -670,7 +654,6 @@ public class AnomalyResource {
    */
   @POST
   @Path(value = "anomaly-result/feedback/{anomaly_result_id}")
-  @UnitOfWork
   public void updateAnomalyResultFeedback(@PathParam("anomaly_result_id") long anomalyResultId, String payload) {
     try {
       AnomalyResult result = anomalyResultDAO.findById(anomalyResultId);

@@ -4,7 +4,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.Properties;
 
-import com.linkedin.thirdeye.detector.db.entity.AnomalyFunctionSpec;
+import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
 
 public abstract class BaseAnomalyFunction implements AnomalyFunction {
   private AnomalyFunctionSpec spec;

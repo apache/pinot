@@ -83,9 +83,6 @@ public class DashboardResource {
   private LoadingCache<String, String> dimensionFiltersCache;
   private AbstractConfigDAO<DashboardConfig> dashboardConfigDAO;
 
-  public DashboardResource() {
-  }
-
   public DashboardResource(AbstractConfigDAO<DashboardConfig> dashboardConfigDAO) {
     this.queryCache = CACHE_REGISTRY_INSTANCE.getQueryCache();
     this.collectionsCache = CACHE_REGISTRY_INSTANCE.getCollectionsCache();

@@ -1,0 +1,68 @@
+package com.linkedin.thirdeye.db;
+
+import com.linkedin.thirdeye.constant.MetricAggFunction;
+import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+import org.testng.Assert;
+import org.testng.annotations.Test;
+
+public class TestAnomalyFunctionDAO extends AbstractDbTestBase {
+
+  private Long anomalyFunctionId;
+  private static String collection = "my dataset";
+  private static String metricName = "__counts";
+
+  @Test
+  public void testCreate() {
+    anomalyFunctionId = anomalyFunctionDAO.save(getTestFunctionSpec());
+    Assert.assertNotNull(anomalyFunctionId);
+  }
+
+  @Test(dependsOnMethods = {"testCreate"})
+  public void testFindAllByCollection() {
+    List<AnomalyFunctionSpec> functions = anomalyFunctionDAO.findAllByCollection(collection);
+    Assert.assertEquals(functions.size(), 1);
+  }
+
+  @Test(dependsOnMethods = {"testFindAllByCollection"})
+  public void testDistinctMetricsByCollection() {
+    List<String> metrics = anomalyFunctionDAO.findDistinctMetricsByCollection(collection);
+    Assert.assertEquals(metrics.get(0), metricName);
+  }
+
+  @Test(dependsOnMethods = { "testDistinctMetricsByCollection" })
+  public void testUpdate() {
+    AnomalyFunctionSpec spec = anomalyFunctionDAO.findById(anomalyFunctionId);
+    Assert.assertNotNull(spec);
+    Assert.assertEquals(spec.getMetricFunction(), MetricAggFunction.SUM);
+    spec.setMetricFunction(MetricAggFunction.COUNT);
+    anomalyFunctionDAO.save(spec);
+    AnomalyFunctionSpec specReturned = anomalyFunctionDAO.findById(anomalyFunctionId);
+    Assert.assertEquals(specReturned.getMetricFunction(), MetricAggFunction.COUNT);
+  }
+
+  @Test(dependsOnMethods = { "testUpdate" })
+  public void testDelete() {
+    anomalyFunctionDAO.deleteById(anomalyFunctionId);
+    AnomalyFunctionSpec spec = anomalyFunctionDAO.findById(anomalyFunctionId);
+    Assert.assertNull(spec);
+  }
+
+  static AnomalyFunctionSpec getTestFunctionSpec() {
+    AnomalyFunctionSpec functionSpec = new AnomalyFunctionSpec();
+    functionSpec.setMetricFunction(MetricAggFunction.SUM);
+    functionSpec.setMetric(metricName);
+    functionSpec.setBucketSize(5);
+    functionSpec.setCollection(collection);
+    functionSpec.setBucketUnit(TimeUnit.MINUTES);
+    functionSpec.setCron("0 0/5 * * * ?");
+    functionSpec.setFunctionName("my awesome test function");
+    functionSpec.setType("USER_RULE");
+    functionSpec.setWindowDelay(1);
+    functionSpec.setWindowDelayUnit(TimeUnit.HOURS);
+    functionSpec.setWindowSize(10);
+    functionSpec.setWindowUnit(TimeUnit.HOURS);
+    return functionSpec;
+  }
+}

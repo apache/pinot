@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.detector.db.entity;
+package com.linkedin.thirdeye.db.entity;
 
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 import java.util.List;

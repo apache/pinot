@@ -1,6 +1,6 @@
 package com.linkedin.thirdeye.detector.db.dao;
 
-import com.linkedin.thirdeye.detector.db.entity.AbstractBaseEntity;
+import com.linkedin.thirdeye.db.entity.AbstractBaseEntity;
 import io.dropwizard.hibernate.AbstractDAO;
 import io.dropwizard.hibernate.UnitOfWork;
 import org.hibernate.SessionFactory;

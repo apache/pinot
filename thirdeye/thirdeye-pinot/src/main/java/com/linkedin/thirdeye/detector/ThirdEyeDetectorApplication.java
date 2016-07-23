@@ -35,8 +35,8 @@ import org.slf4j.LoggerFactory;
 
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
-import com.linkedin.thirdeye.detector.db.entity.AnomalyFunctionSpec;
-import com.linkedin.thirdeye.detector.db.entity.EmailConfiguration;
+import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
+import com.linkedin.thirdeye.db.entity.EmailConfiguration;
 import com.linkedin.thirdeye.detector.db.HibernateSessionWrapper;
 import com.linkedin.thirdeye.detector.driver.AnomalyDetectionJobManager;
 import com.linkedin.thirdeye.detector.email.EmailReportJobManager;
@@ -95,6 +95,7 @@ public class ThirdEyeDetectorApplication
 
   @Override
   public void initialize(final Bootstrap<ThirdEyeDetectorConfiguration> bootstrap) {
+//    super.initializeDataLayer(bootstrap);
     bootstrap.addBundle(new MigrationsBundle<ThirdEyeDetectorConfiguration>() {
       @Override
       public DataSourceFactory getDataSourceFactory(ThirdEyeDetectorConfiguration config) {

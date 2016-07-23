@@ -20,7 +20,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.thirdeye.anomaly.job.JobContext;
-import com.linkedin.thirdeye.detector.db.entity.AnomalyFunctionSpec;
+import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
 import com.linkedin.thirdeye.detector.db.dao.AnomalyFunctionSpecDAO;
 import com.linkedin.thirdeye.detector.db.dao.AnomalyJobSpecDAO;
 import com.linkedin.thirdeye.detector.db.dao.AnomalyTaskSpecDAO;

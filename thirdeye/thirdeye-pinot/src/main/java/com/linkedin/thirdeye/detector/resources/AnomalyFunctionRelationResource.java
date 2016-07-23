@@ -13,7 +13,7 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
-import com.linkedin.thirdeye.detector.db.entity.AnomalyFunctionRelation;
+import com.linkedin.thirdeye.db.entity.AnomalyFunctionRelation;
 import com.linkedin.thirdeye.detector.db.AnomalyFunctionRelationDAO;
 
 import io.dropwizard.hibernate.UnitOfWork;

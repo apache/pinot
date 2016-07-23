@@ -15,7 +15,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
 import com.codahale.metrics.annotation.Timed;
-import com.linkedin.thirdeye.detector.db.entity.EmailConfiguration;
+import com.linkedin.thirdeye.db.entity.EmailConfiguration;
 import com.linkedin.thirdeye.detector.db.dao.EmailConfigurationDAO;
 import com.linkedin.thirdeye.detector.email.EmailReportJobManager;
 

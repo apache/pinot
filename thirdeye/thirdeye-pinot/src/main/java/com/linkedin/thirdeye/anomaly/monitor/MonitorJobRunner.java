@@ -20,8 +20,8 @@ import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
 import com.linkedin.thirdeye.anomaly.task.TaskGenerator;
 import com.linkedin.thirdeye.detector.db.dao.AnomalyJobSpecDAO;
 import com.linkedin.thirdeye.detector.db.dao.AnomalyTaskSpecDAO;
-import com.linkedin.thirdeye.detector.db.entity.AnomalyJobSpec;
-import com.linkedin.thirdeye.detector.db.entity.AnomalyTaskSpec;
+import com.linkedin.thirdeye.db.entity.AnomalyJobSpec;
+import com.linkedin.thirdeye.db.entity.AnomalyTaskSpec;
 
 public class MonitorJobRunner implements JobRunner {
 

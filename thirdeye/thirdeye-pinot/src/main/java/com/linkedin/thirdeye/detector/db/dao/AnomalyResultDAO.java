@@ -6,7 +6,7 @@ import org.hibernate.SessionFactory;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 
-import com.linkedin.thirdeye.detector.db.entity.AnomalyResult;
+import com.linkedin.thirdeye.db.entity.AnomalyResult;
 
 public class AnomalyResultDAO extends AbstractBaseDAO<AnomalyResult> {
   public AnomalyResultDAO(SessionFactory sessionFactory) {

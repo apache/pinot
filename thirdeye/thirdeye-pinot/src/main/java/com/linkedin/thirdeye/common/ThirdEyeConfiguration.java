@@ -1,6 +1,6 @@
 package com.linkedin.thirdeye.common;
 
-import io.dropwizard.Configuration;
+import com.linkedin.thirdeye.common.persistence.PersistenceConfig;
 import io.dropwizard.db.DataSourceFactory;
 
 import javax.validation.Valid;
@@ -8,7 +8,7 @@ import javax.validation.constraints.NotNull;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-public abstract class ThirdEyeConfiguration extends Configuration {
+public class ThirdEyeConfiguration extends PersistenceConfig {
   /**
    * Root directory for all other configuration
    */
@@ -36,6 +36,7 @@ public abstract class ThirdEyeConfiguration extends Configuration {
   private int smtpPort = 0;
 
 
+  // TODO : remove data source config
   @Valid
   @NotNull
   private final DataSourceFactory database = new DataSourceFactory();

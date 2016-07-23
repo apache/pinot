@@ -1,6 +1,11 @@
 package com.linkedin.thirdeye.dashboard;
 
+import com.linkedin.thirdeye.common.persistence.PersistenceUtil;
 import com.linkedin.thirdeye.dashboard.resources.AnomalyFunctionResource;
+import com.linkedin.thirdeye.db.dao.AnomalyFunctionDAO;
+import com.linkedin.thirdeye.db.dao.AnomalyResultDAO;
+import com.linkedin.thirdeye.db.dao.EmailConfigurationDAO;
+import java.io.File;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -21,9 +26,6 @@ public class ThirdEyeDashboardApplication
 
   public static final String WEBAPP_CONFIG = "/webapp-config";
 
-  public ThirdEyeDashboardApplication() {
-  }
-
   @Override
   public String getName() {
     return "Thirdeye Dashboard";
@@ -33,7 +35,6 @@ public class ThirdEyeDashboardApplication
   public void initialize(Bootstrap<ThirdEyeDashboardConfiguration> bootstrap) {
     bootstrap.addBundle(new ViewBundle());
     bootstrap.addBundle(new HelperBundle());
-    bootstrap.addBundle(hibernateBundle);
     bootstrap.addBundle(new AssetsBundle("/assets", "/assets"));
     bootstrap.addBundle(new AssetsBundle("/assets/css", "/assets/css", null, "css"));
     bootstrap.addBundle(new AssetsBundle("/assets/js", "/assets/js", null, "js"));
@@ -44,8 +45,13 @@ public class ThirdEyeDashboardApplication
 
   @Override
   public void run(ThirdEyeDashboardConfiguration config, Environment env) throws Exception {
-    super.initDetectorRelatedDAO();
-
+    String persistenceConfig = System.getProperty("dw.rootDir") + "/persistence.yml";
+    LOG.info("Reading persistence config from {}", persistenceConfig);
+    PersistenceUtil.init(new File(persistenceConfig));
+    AnomalyFunctionDAO anomalyFunctionDAO = PersistenceUtil.getInstance(AnomalyFunctionDAO.class);
+    AnomalyResultDAO anomalyResultDAO = PersistenceUtil.getInstance(AnomalyResultDAO.class);
+    EmailConfigurationDAO emailConfigurationDAO =
+        PersistenceUtil.getInstance(EmailConfigurationDAO.class);
     try {
       ThirdEyeCacheRegistry.initializeWebappCaches(config);
     } catch (Exception e) {
@@ -55,11 +61,13 @@ public class ThirdEyeDashboardApplication
     env.jersey().register(new DashboardResource(BaseThirdEyeApplication.getDashboardConfigDAO(config)));
     env.jersey().register(new CacheResource());
     env.jersey().register(
-        new AnomalyResource(anomalyFunctionSpecDAO, anomalyResultDAO, emailConfigurationDAO,
-            config));
+        new AnomalyResource(config, anomalyFunctionDAO, anomalyResultDAO, emailConfigurationDAO));
   }
 
   public static void main(String[] args) throws Exception {
+    if (args.length == 0) {
+      throw new IllegalArgumentException("Please provide config directory as parameter");
+    }
     String thirdEyeConfigDir = args[0];
     System.setProperty("dw.rootDir", thirdEyeConfigDir);
     String dashboardApplicationConfigFile = thirdEyeConfigDir + "/" + "dashboard.yml";
@@ -67,4 +75,5 @@ public class ThirdEyeDashboardApplication
         "server", dashboardApplicationConfigFile
     });
   }
+
 }

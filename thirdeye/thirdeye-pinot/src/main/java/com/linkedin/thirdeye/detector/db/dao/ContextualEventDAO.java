@@ -6,7 +6,7 @@ import org.hibernate.SessionFactory;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 
-import com.linkedin.thirdeye.detector.db.entity.ContextualEvent;
+import com.linkedin.thirdeye.db.entity.ContextualEvent;
 
 public class ContextualEventDAO extends AbstractBaseDAO<ContextualEvent> {
   public ContextualEventDAO(SessionFactory sessionFactory) {

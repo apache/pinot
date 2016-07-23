@@ -3,7 +3,7 @@ package com.linkedin.thirdeye.anomaly.monitor;
 import java.util.List;
 
 import com.linkedin.thirdeye.anomaly.job.JobContext;
-import com.linkedin.thirdeye.detector.db.entity.AnomalyJobSpec;
+import com.linkedin.thirdeye.db.entity.AnomalyJobSpec;
 
 public class MonitorJobContext extends JobContext {
 

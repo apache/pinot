@@ -1,11 +1,10 @@
 package com.linkedin.thirdeye.detector.db.dao;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import org.hibernate.SessionFactory;
 
-import com.linkedin.thirdeye.detector.db.entity.AnomalyFunctionSpec;
+import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
 
 public class AnomalyFunctionSpecDAO extends AbstractBaseDAO<AnomalyFunctionSpec> {
   public AnomalyFunctionSpecDAO(SessionFactory sessionFactory) {
@@ -24,17 +23,6 @@ public class AnomalyFunctionSpecDAO extends AbstractBaseDAO<AnomalyFunctionSpec>
   public List<AnomalyFunctionSpec> findAllByCollection(String collection) {
     return list(namedQuery("com.linkedin.thirdeye.api.AnomalyFunctionSpec#findAllByCollection")
         .setParameter("collection", collection));
-  }
-
-  public List<String> findDistinctMetricsByCollection(String collection) {
-    List<String> metrics = new ArrayList<>();
-    // although query returns list of strings, JPA returns List<AnomalyFunctionSpec> for list(Query) call
-    List<AnomalyFunctionSpec> distinctMetricsList = list(namedQuery("com.linkedin.thirdeye.api.AnomalyFunctionSpec#findDistinctMetricsByCollection")
-        .setParameter("collection", collection));
-    for (Object metric : distinctMetricsList) {
-      metrics.add(metric.toString());
-    }
-    return metrics;
   }
 
 }

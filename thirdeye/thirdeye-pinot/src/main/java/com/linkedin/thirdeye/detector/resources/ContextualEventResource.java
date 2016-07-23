@@ -15,7 +15,7 @@ import org.joda.time.DateTime;
 import org.joda.time.format.ISODateTimeFormat;
 
 import com.codahale.metrics.annotation.Timed;
-import com.linkedin.thirdeye.detector.db.entity.ContextualEvent;
+import com.linkedin.thirdeye.db.entity.ContextualEvent;
 import com.linkedin.thirdeye.detector.db.dao.ContextualEventDAO;
 
 import io.dropwizard.hibernate.UnitOfWork;

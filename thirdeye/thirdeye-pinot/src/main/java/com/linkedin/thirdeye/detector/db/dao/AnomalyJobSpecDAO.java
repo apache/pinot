@@ -10,7 +10,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
-import com.linkedin.thirdeye.detector.db.entity.AnomalyJobSpec;
+import com.linkedin.thirdeye.db.entity.AnomalyJobSpec;
 
 public class AnomalyJobSpecDAO extends AbstractBaseDAO<AnomalyJobSpec> {
 

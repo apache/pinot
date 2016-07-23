@@ -11,8 +11,8 @@ import org.slf4j.LoggerFactory;
 
 import com.linkedin.thirdeye.anomaly.detection.DetectionJobContext;
 import com.linkedin.thirdeye.anomaly.detection.DetectionTaskInfo;
-import com.linkedin.thirdeye.detector.db.entity.AnomalyFunctionSpec;
-import com.linkedin.thirdeye.detector.db.entity.AnomalyJobSpec;
+import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
+import com.linkedin.thirdeye.db.entity.AnomalyJobSpec;
 import com.linkedin.thirdeye.anomaly.monitor.MonitorConfiguration;
 import com.linkedin.thirdeye.anomaly.monitor.MonitorConstants.MonitorType;
 import com.linkedin.thirdeye.anomaly.monitor.MonitorJobContext;

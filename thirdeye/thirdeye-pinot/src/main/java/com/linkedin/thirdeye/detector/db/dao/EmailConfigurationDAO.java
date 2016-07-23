@@ -4,8 +4,8 @@ import java.util.List;
 
 import org.hibernate.SessionFactory;
 
-import com.linkedin.thirdeye.detector.db.entity.AnomalyFunctionSpec;
-import com.linkedin.thirdeye.detector.db.entity.EmailConfiguration;
+import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
+import com.linkedin.thirdeye.db.entity.EmailConfiguration;
 
 public class EmailConfigurationDAO extends AbstractBaseDAO<EmailConfiguration> {
   public EmailConfigurationDAO(SessionFactory sessionFactory) {

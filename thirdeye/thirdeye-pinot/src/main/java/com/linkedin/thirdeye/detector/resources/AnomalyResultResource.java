@@ -21,7 +21,7 @@ import org.joda.time.DateTime;
 import org.joda.time.format.ISODateTimeFormat;
 
 import com.codahale.metrics.annotation.Timed;
-import com.linkedin.thirdeye.detector.db.entity.AnomalyResult;
+import com.linkedin.thirdeye.db.entity.AnomalyResult;
 import com.linkedin.thirdeye.detector.db.dao.AnomalyResultDAO;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
