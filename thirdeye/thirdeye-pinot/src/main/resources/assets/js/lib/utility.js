@@ -36,9 +36,13 @@ function getData(url, tab){
     })
 }
 
-function submitData(url, data ){
+function submitData(url, data, tab ){
+
     if(data === undefined){
         data = ""
+    }
+    if(!tab){
+       tab = hash.view;
     }
     console.log("post url:", url)
     return $.ajax({

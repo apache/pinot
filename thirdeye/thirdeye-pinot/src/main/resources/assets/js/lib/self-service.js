@@ -207,10 +207,6 @@ function renderSelfService(){
 
         if ($("#function-id", form).length > 0){
             formData.functionId = $("#function-id", form).text();
-            console.log('#function-id, form')
-            console.log($("#function-id", form))
-        }else{
-            console.log("no fn id present")
         }
 
         if($("#active-alert", form).is(':checked')){
@@ -219,10 +215,10 @@ function renderSelfService(){
             formData.isActive = false;
         }
 
-        formData.filters = readFiltersAppliedInCurrentView("self-service", {form:form});
+        var filters = readFiltersAppliedInCurrentView("self-service", {form:form});
 
         //Transform filters Todo: clarify if filters object should be consistent on FE and BE
-        //filters = encodeURIComponent(JSON.stringify(filters));
+        formData.filters = encodeURIComponent(JSON.stringify(filters));
         formData.filtersString = "";
 
         for(key in formData.filters){
@@ -232,6 +228,7 @@ function renderSelfService(){
             }
         }
 
+        console.log( formData.filtersString)
         formData.exploreDimension = $("#self-service-view-single-dimension-selector #selected-dimension",form).attr("value");
 
         //Function type: USER RULE; Metric function: SUM
@@ -361,7 +358,7 @@ function renderSelfService(){
             + "&repeatEverySize=" + formData.repeatEverySize + "&repeatEveryUnit=" + formData.repeatEveryUnit
             + "&isActive=" +  formData.isActive + "&properties=baseline=" + formData.baseline + ";changeThreshold=" + formData.condition + formData.changeThreshold;
             url += (formData.exploreDimension) ? "&exploreDimension=" + formData.exploreDimension : "";
-            url += (formData.filters) ? "&filters=" + formData.filtersString : "";
+            url += (formData.filters && formData.filters != encodeURIComponent(JSON.stringify({}))) ? "&filters=" + formData.filters : "";
 
             //Disable submit btn
             disableButton( $("#create-anomaly-function"));
@@ -478,7 +475,7 @@ function renderSelfService(){
             url += (formData.repeatEverySize) ? "&scheduleMinute=" + formData.scheduleMinute  + "&scheduleHour=" + formData.scheduleHour
                    + "&repeatEverySize=" + formData.repeatEverySize + "&repeatEveryUnit=" + formData.repeatEveryUnit : "";
             url += (formData.exploreDimension) ? "&exploreDimension=" + formData.exploreDimension : "";
-            url += (formData.filters) ? "&filters=" + formData.filtersString : "";
+            url += (formData.filters  ) ? "&filters=" + formData.filtersString : "";
 
             submitData(url).done(function(){
 
