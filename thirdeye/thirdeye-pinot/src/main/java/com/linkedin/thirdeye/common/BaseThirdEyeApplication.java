@@ -17,7 +17,6 @@ import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
 import com.linkedin.thirdeye.db.entity.AnomalyJobSpec;
 import com.linkedin.thirdeye.db.entity.AnomalyResult;
 import com.linkedin.thirdeye.db.entity.AnomalyTaskSpec;
-import com.linkedin.thirdeye.db.entity.ContextualEvent;
 import com.linkedin.thirdeye.db.entity.EmailConfiguration;
 import com.linkedin.thirdeye.db.entity.EmailFunctionDependency;
 import com.linkedin.thirdeye.detector.db.AnomalyFunctionRelationDAO;
@@ -35,9 +34,9 @@ public abstract class BaseThirdEyeApplication<T extends Configuration> extends A
 
   protected final HibernateBundle<ThirdEyeConfiguration> hibernateBundle =
       new HibernateBundle<ThirdEyeConfiguration>(AnomalyFunctionSpec.class,
-          AnomalyFunctionRelation.class, AnomalyResult.class, ContextualEvent.class,
-          EmailConfiguration.class, EmailFunctionDependency.class, AnomalyJobSpec.class,
-          AnomalyTaskSpec.class, AnomalyFeedback.class) {
+          AnomalyFunctionRelation.class, AnomalyResult.class, EmailConfiguration.class,
+          EmailFunctionDependency.class, AnomalyJobSpec.class, AnomalyTaskSpec.class,
+          AnomalyFeedback.class) {
         @Override
         public DataSourceFactory getDataSourceFactory(ThirdEyeConfiguration config) {
           return config.getDatabase();
