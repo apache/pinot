@@ -1,10 +1,10 @@
 package com.linkedin.thirdeye.anomaly.task;
 
+import com.linkedin.thirdeye.db.dao.AnomalyResultDAO;
 import org.hibernate.SessionFactory;
 
 import com.linkedin.thirdeye.detector.db.AnomalyFunctionRelationDAO;
 import com.linkedin.thirdeye.detector.db.dao.AnomalyJobSpecDAO;
-import com.linkedin.thirdeye.detector.db.dao.AnomalyResultDAO;
 import com.linkedin.thirdeye.detector.db.dao.AnomalyTaskSpecDAO;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 

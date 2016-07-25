@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.anomaly.task;
 
+import com.linkedin.thirdeye.db.dao.AnomalyResultDAO;
 import io.dropwizard.hibernate.UnitOfWork;
 
 import java.util.ArrayList;
@@ -20,7 +21,6 @@ import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
 import com.linkedin.thirdeye.db.entity.AnomalyTaskSpec;
 import com.linkedin.thirdeye.detector.db.AnomalyFunctionRelationDAO;
 import com.linkedin.thirdeye.detector.db.dao.AnomalyJobSpecDAO;
-import com.linkedin.thirdeye.detector.db.dao.AnomalyResultDAO;
 import com.linkedin.thirdeye.detector.db.dao.AnomalyTaskSpecDAO;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 

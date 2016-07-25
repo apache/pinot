@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.anomaly.detection;
 
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 
+import com.linkedin.thirdeye.db.dao.AnomalyResultDAO;
 import io.dropwizard.hibernate.UnitOfWork;
 
 import java.util.ArrayList;
@@ -39,7 +40,6 @@ import com.linkedin.thirdeye.db.entity.AnomalyFunctionRelation;
 import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
 import com.linkedin.thirdeye.db.entity.AnomalyResult;
 import com.linkedin.thirdeye.detector.db.AnomalyFunctionRelationDAO;
-import com.linkedin.thirdeye.detector.db.dao.AnomalyResultDAO;
 import com.linkedin.thirdeye.detector.function.AnomalyFunction;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;

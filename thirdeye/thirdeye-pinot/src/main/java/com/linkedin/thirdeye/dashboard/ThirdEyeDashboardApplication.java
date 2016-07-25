@@ -45,13 +45,8 @@ public class ThirdEyeDashboardApplication
 
   @Override
   public void run(ThirdEyeDashboardConfiguration config, Environment env) throws Exception {
-    String persistenceConfig = System.getProperty("dw.rootDir") + "/persistence.yml";
-    LOG.info("Reading persistence config from {}", persistenceConfig);
-    PersistenceUtil.init(new File(persistenceConfig));
-    AnomalyFunctionDAO anomalyFunctionDAO = PersistenceUtil.getInstance(AnomalyFunctionDAO.class);
-    AnomalyResultDAO anomalyResultDAO = PersistenceUtil.getInstance(AnomalyResultDAO.class);
-    EmailConfigurationDAO emailConfigurationDAO =
-        PersistenceUtil.getInstance(EmailConfigurationDAO.class);
+    super.initDetectorRelatedDAO();
+
     try {
       ThirdEyeCacheRegistry.initializeWebappCaches(config);
     } catch (Exception e) {
@@ -61,7 +56,7 @@ public class ThirdEyeDashboardApplication
     env.jersey().register(new DashboardResource(BaseThirdEyeApplication.getDashboardConfigDAO(config)));
     env.jersey().register(new CacheResource());
     env.jersey().register(
-        new AnomalyResource(config, anomalyFunctionDAO, anomalyResultDAO, emailConfigurationDAO));
+        new AnomalyResource(config, anomalyFunctionSpecDAO, anomalyResultDAO, emailConfigurationDAO));
   }
 
   public static void main(String[] args) throws Exception {

@@ -23,6 +23,32 @@ public class AnomalyResultDAO extends AbstractJpaDAO<AnomalyResult> {
           + "AND ((r.startTimeUtc >= :startTimeUtc AND r.startTimeUtc <= :endTimeUtc) "
           + "OR (r.endTimeUtc >= :startTimeUtc AND r.endTimeUtc <= :endTimeUtc)) ";
 
+  private static final String FIND_BY_COLLECTION_TIME_FILTERS =
+      "SELECT r FROM AnomalyResult r WHERE r.collection = :collection "
+          + "AND ((r.filters = :filters) or (r.filters is NULL and :filters is NULL)) "
+          + "AND ((r.startTimeUtc >= :startTimeUtc AND r.startTimeUtc <= :endTimeUtc) "
+          + "OR (r.endTimeUtc >= :startTimeUtc AND r.endTimeUtc <= :endTimeUtc))";
+
+  private static final String FIND_BY_COLLECTION_TIME_METRIC_FILTERS =
+      "SELECT r FROM AnomalyResult r WHERE r.collection = :collection " + "AND r.metric = :metric "
+          + "AND ((r.filters = :filters) or (r.filters is NULL and :filters is NULL)) "
+          + "AND ((r.startTimeUtc >= :startTimeUtc AND r.startTimeUtc <= :endTimeUtc) "
+          + "OR (r.endTimeUtc >= :startTimeUtc AND r.endTimeUtc <= :endTimeUtc))";
+
+  private static final String FIND_BY_TIME_AND_FUNCTION_ID = "SELECT r FROM AnomalyResult r WHERE r.functionId = :functionId "
+      + "AND ((r.startTimeUtc >= :startTimeUtc AND r.startTimeUtc <= :endTimeUtc) "
+      + "OR (r.endTimeUtc >= :startTimeUtc AND r.endTimeUtc <= :endTimeUtc))";
+
+  private static final String FIND_BY_COLLECTION_TIME_AND_FUNCTION_ID = "SELECT r FROM AnomalyResult r WHERE r.collection = :collection "
+      + "AND r.functionId = :functionId "
+      + "AND ((r.startTimeUtc >= :startTimeUtc AND r.startTimeUtc <= :endTimeUtc) "
+      + "OR (r.endTimeUtc >= :startTimeUtc AND r.endTimeUtc <= :endTimeUtc))";
+
+  private static final String FIND_BY_TIME_EMAIL_ID = "SELECT r FROM EmailConfiguration d JOIN d.functions f JOIN f.anomalies r "
+      + "WHERE d.id = :emailId "
+      + "AND ((r.startTimeUtc >= :startTimeUtc AND r.startTimeUtc <= :endTimeUtc) "
+      + "OR (r.endTimeUtc >= :startTimeUtc AND r.endTimeUtc <= :endTimeUtc))";
+
   public AnomalyResultDAO() {
     super(AnomalyResult.class);
   }
@@ -47,11 +73,53 @@ public class AnomalyResultDAO extends AbstractJpaDAO<AnomalyResult> {
 
   public List<AnomalyResult> findAllByCollectionTimeMetricAndDimensions(String collection,
       String metric, DateTime startTime, DateTime endTime, String[] dimensions) {
-    return getEntityManager()
-        .createQuery(FIND_BY_COLLECTION_TIME_METRIC_DIMENSION, entityClass)
+    return getEntityManager().createQuery(FIND_BY_COLLECTION_TIME_METRIC_DIMENSION, entityClass)
         .setParameter("collection", collection)
         .setParameter("startTimeUtc", startTime.toDateTime(DateTimeZone.UTC).getMillis())
         .setParameter("endTimeUtc", endTime.toDateTime(DateTimeZone.UTC).getMillis())
         .setParameter("metric", metric).setParameter("dimensions", dimensions).getResultList();
+  }
+
+  public List<AnomalyResult> findAllByTimeAndFunctionId(DateTime startTime, DateTime endTime,
+      long functionId) {
+    return getEntityManager().createQuery(FIND_BY_TIME_AND_FUNCTION_ID, entityClass)
+        .setParameter("startTimeUtc", startTime.toDateTime(DateTimeZone.UTC).getMillis())
+        .setParameter("endTimeUtc", endTime.toDateTime(DateTimeZone.UTC).getMillis())
+        .setParameter("functionId", functionId).getResultList();
+  }
+
+  public List<AnomalyResult> findAllByCollectionTimeAndFilters(String collection,
+      DateTime startTime, DateTime endTime, String filters) {
+    return getEntityManager().createQuery(FIND_BY_COLLECTION_TIME_FILTERS, entityClass)
+            .setParameter("collection", collection)
+            .setParameter("startTimeUtc", startTime.toDateTime(DateTimeZone.UTC).getMillis())
+            .setParameter("endTimeUtc", endTime.toDateTime(DateTimeZone.UTC).getMillis())
+            .setParameter("filters", filters).getResultList();
+  }
+
+  public List<AnomalyResult> findAllByCollectionTimeMetricAndFilters(String collection,
+      String metric, DateTime startTime, DateTime endTime, String filters) {
+    return getEntityManager().createQuery(FIND_BY_COLLECTION_TIME_METRIC_FILTERS, entityClass)
+        .setParameter("collection", collection)
+        .setParameter("startTimeUtc", startTime.toDateTime(DateTimeZone.UTC).getMillis())
+        .setParameter("endTimeUtc", endTime.toDateTime(DateTimeZone.UTC).getMillis())
+        .setParameter("metric", metric).setParameter("filters", filters).getResultList();
+  }
+
+  public List<AnomalyResult> findAllByTimeAndEmailId(DateTime startTime, DateTime endTime,
+      long emailId) {
+    return getEntityManager().createQuery(FIND_BY_TIME_EMAIL_ID, entityClass)
+        .setParameter("startTimeUtc", startTime.toDateTime(DateTimeZone.UTC).getMillis())
+        .setParameter("endTimeUtc", endTime.toDateTime(DateTimeZone.UTC).getMillis())
+        .setParameter("emailId", emailId).getResultList();
+  }
+
+  public List<AnomalyResult> findAllByCollectionTimeAndFunction(String collection,
+      DateTime startTime, DateTime endTime, long functionId) {
+    return getEntityManager().createQuery(FIND_BY_COLLECTION_TIME_AND_FUNCTION_ID, entityClass)
+            .setParameter("collection", collection)
+            .setParameter("startTimeUtc", startTime.toDateTime(DateTimeZone.UTC).getMillis())
+            .setParameter("endTimeUtc", endTime.toDateTime(DateTimeZone.UTC).getMillis())
+            .setParameter("functionId", functionId).getResultList();
   }
 }

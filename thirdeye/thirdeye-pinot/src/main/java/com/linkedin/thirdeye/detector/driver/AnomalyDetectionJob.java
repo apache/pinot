@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.detector.driver;
 
 import static com.linkedin.thirdeye.detector.driver.FailureEmailConfiguration.FAILURE_EMAIL_CONFIG_KEY;
 
+import com.linkedin.thirdeye.db.dao.AnomalyResultDAO;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -45,7 +46,6 @@ import com.linkedin.thirdeye.db.entity.AnomalyFunctionRelation;
 import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
 import com.linkedin.thirdeye.db.entity.AnomalyResult;
 import com.linkedin.thirdeye.detector.db.AnomalyFunctionRelationDAO;
-import com.linkedin.thirdeye.detector.db.dao.AnomalyResultDAO;
 import com.linkedin.thirdeye.detector.function.AnomalyFunction;
 import com.linkedin.thirdeye.detector.lib.util.JobUtils;
 

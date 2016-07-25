@@ -1,9 +1,9 @@
 package com.linkedin.thirdeye.anomaly.job;
 
 
+import com.linkedin.thirdeye.db.dao.AnomalyFunctionDAO;
 import org.hibernate.SessionFactory;
 
-import com.linkedin.thirdeye.detector.db.dao.AnomalyFunctionSpecDAO;
 import com.linkedin.thirdeye.detector.db.dao.AnomalyJobSpecDAO;
 import com.linkedin.thirdeye.detector.db.dao.AnomalyTaskSpecDAO;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
@@ -12,7 +12,7 @@ public abstract class JobContext {
 
   private AnomalyJobSpecDAO anomalyJobSpecDAO;
   private AnomalyTaskSpecDAO anomalyTaskSpecDAO;
-  private AnomalyFunctionSpecDAO anomalyFunctionSpecDAO;
+  private AnomalyFunctionDAO anomalyFunctionSpecDAO;
   private AnomalyFunctionFactory anomalyFunctionFactory;
   private SessionFactory sessionFactory;
 
@@ -44,11 +44,11 @@ public abstract class JobContext {
     this.anomalyTaskSpecDAO = anomalyTaskSpecDAO;
   }
 
-  public AnomalyFunctionSpecDAO getAnomalyFunctionSpecDAO() {
+  public AnomalyFunctionDAO getAnomalyFunctionSpecDAO() {
     return anomalyFunctionSpecDAO;
   }
 
-  public void setAnomalyFunctionSpecDAO(AnomalyFunctionSpecDAO anomalyFunctionSpecDAO) {
+  public void setAnomalyFunctionSpecDAO(AnomalyFunctionDAO anomalyFunctionSpecDAO) {
     this.anomalyFunctionSpecDAO = anomalyFunctionSpecDAO;
   }
 

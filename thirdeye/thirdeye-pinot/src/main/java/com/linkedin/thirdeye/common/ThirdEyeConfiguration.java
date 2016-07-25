@@ -8,7 +8,7 @@ import javax.validation.constraints.NotNull;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-public class ThirdEyeConfiguration extends Configuration {
+public abstract class ThirdEyeConfiguration extends Configuration {
   /**
    * Root directory for all other configuration
    */

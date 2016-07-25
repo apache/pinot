@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.anomaly.detection;
 
+import com.linkedin.thirdeye.db.dao.AnomalyFunctionDAO;
+import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
 import io.dropwizard.hibernate.UnitOfWork;
 
 import java.util.List;
@@ -14,18 +16,17 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import org.apache.commons.lang.NullArgumentException;
 import org.quartz.SchedulerException;
-
-import com.linkedin.thirdeye.detector.db.dao.AnomalyFunctionSpecDAO;
 
 @Path("/detection-job")
 @Produces(MediaType.APPLICATION_JSON)
 public class DetectionJobResource {
   private final DetectionJobScheduler detectionJobScheduler;
-  private final AnomalyFunctionSpecDAO anomalyFunctionSpecDAO;
+  private final AnomalyFunctionDAO anomalyFunctionSpecDAO;
 
   public DetectionJobResource(DetectionJobScheduler detectionJobScheduler,
-      AnomalyFunctionSpecDAO anomalyFunctionSpecDAO) {
+      AnomalyFunctionDAO anomalyFunctionSpecDAO) {
     this.detectionJobScheduler = detectionJobScheduler;
     this.anomalyFunctionSpecDAO = anomalyFunctionSpecDAO;
   }
@@ -38,9 +39,8 @@ public class DetectionJobResource {
 
   @POST
   @Path("/{id}")
-  @UnitOfWork
   public Response enable(@PathParam("id") Long id) throws Exception {
-    anomalyFunctionSpecDAO.toggleActive(id, true);
+    toggleActive(id, true);
     detectionJobScheduler.start(id);
     return Response.ok().build();
   }
@@ -59,8 +59,17 @@ public class DetectionJobResource {
   @Path("/{id}")
   @UnitOfWork
   public Response disable(@PathParam("id") Long id) throws Exception {
-    anomalyFunctionSpecDAO.toggleActive(id, false);
+    toggleActive(id, false);
     detectionJobScheduler.stop(id);
     return Response.ok().build();
+  }
+
+  private void toggleActive(Long id, boolean state) {
+    AnomalyFunctionSpec anomalyFunctionSpec = anomalyFunctionSpecDAO.findById(id);
+    if(anomalyFunctionSpec == null) {
+      throw new NullArgumentException("Function spec not found");
+    }
+    anomalyFunctionSpec.setIsActive(state);
+    anomalyFunctionSpecDAO.save(anomalyFunctionSpec);
   }
 }

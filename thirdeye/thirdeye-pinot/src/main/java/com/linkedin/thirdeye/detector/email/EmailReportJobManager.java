@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.detector.email;
 
+import com.linkedin.thirdeye.db.dao.AnomalyResultDAO;
+import com.linkedin.thirdeye.db.dao.EmailConfigurationDAO;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -27,8 +29,6 @@ import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.client.comparison.TimeOnTimeComparisonHandler;
 import com.linkedin.thirdeye.db.entity.EmailConfiguration;
-import com.linkedin.thirdeye.detector.db.dao.AnomalyResultDAO;
-import com.linkedin.thirdeye.detector.db.dao.EmailConfigurationDAO;
 import com.linkedin.thirdeye.detector.driver.FailureEmailConfiguration;
 
 public class EmailReportJobManager{
