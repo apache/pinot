@@ -98,10 +98,6 @@
 
     <!-- DB specific -->
     <dependency>
-      <groupId>com.hubspot.dropwizard</groupId>
-      <artifactId>dropwizard-guice</artifactId>
-    </dependency>
-    <dependency>
       <groupId>com.google.inject.extensions</groupId>
       <artifactId>guice-persist</artifactId>
     </dependency>

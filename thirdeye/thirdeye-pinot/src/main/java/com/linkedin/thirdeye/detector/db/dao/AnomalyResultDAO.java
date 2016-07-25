@@ -8,6 +8,7 @@ import org.joda.time.DateTimeZone;
 
 import com.linkedin.thirdeye.db.entity.AnomalyResult;
 
+@Deprecated
 public class AnomalyResultDAO extends AbstractBaseDAO<AnomalyResult> {
   public AnomalyResultDAO(SessionFactory sessionFactory) {
     super(sessionFactory);

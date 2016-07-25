@@ -1,6 +1,6 @@
 package com.linkedin.thirdeye.common;
 
-import com.linkedin.thirdeye.common.persistence.PersistenceConfig;
+import io.dropwizard.Configuration;
 import io.dropwizard.db.DataSourceFactory;
 
 import javax.validation.Valid;
@@ -8,7 +8,7 @@ import javax.validation.constraints.NotNull;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-public class ThirdEyeConfiguration extends PersistenceConfig {
+public class ThirdEyeConfiguration extends Configuration {
   /**
    * Root directory for all other configuration
    */

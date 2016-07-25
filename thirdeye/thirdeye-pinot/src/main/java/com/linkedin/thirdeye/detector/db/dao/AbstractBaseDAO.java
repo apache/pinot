@@ -5,6 +5,8 @@ import io.dropwizard.hibernate.AbstractDAO;
 import io.dropwizard.hibernate.UnitOfWork;
 import org.hibernate.SessionFactory;
 
+@Deprecated
+// Use @link com.linkedin.thirdeye.db.dao.AbstractJpaDAO
 public abstract class AbstractBaseDAO<E extends AbstractBaseEntity> extends AbstractDAO<E> {
 
   public AbstractBaseDAO(SessionFactory sessionFactory) {

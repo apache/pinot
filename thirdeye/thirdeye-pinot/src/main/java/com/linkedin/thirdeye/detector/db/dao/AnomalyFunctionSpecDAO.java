@@ -1,11 +1,10 @@
 package com.linkedin.thirdeye.detector.db.dao;
 
 import java.util.List;
-
 import org.hibernate.SessionFactory;
-
 import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
 
+@Deprecated
 public class AnomalyFunctionSpecDAO extends AbstractBaseDAO<AnomalyFunctionSpec> {
   public AnomalyFunctionSpecDAO(SessionFactory sessionFactory) {
     super(sessionFactory);

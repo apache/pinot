@@ -46,7 +46,6 @@
     <mockito.version>1.8.4</mockito.version>
     <jcommander.version>1.35</jcommander.version>
     <hsqldb.version>2.3.4</hsqldb.version>
-    <dropwizard-guice.version>0.8.4.0</dropwizard-guice.version>
     <guice-persist.version>4.1.0</guice-persist.version>
     <hibernate-jpa-2.1-api.version>1.0.0.Final</hibernate-jpa-2.1-api.version>
     <hibernate-entirymanager.version>4.3.10.Final</hibernate-entirymanager.version>
@@ -259,11 +258,6 @@
         <groupId>mysql</groupId>
         <artifactId>mysql-connector-java</artifactId>
         <version>${mysql.connector.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.hubspot.dropwizard</groupId>
-        <artifactId>dropwizard-guice</artifactId>
-        <version>${dropwizard-guice.version}</version>
       </dependency>
       <dependency>
         <groupId>com.google.inject.extensions</groupId>
