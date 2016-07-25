@@ -31,8 +31,10 @@ import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
 import com.linkedin.pinot.server.util.SegmentTestUtils;
 import com.linkedin.pinot.util.TestUtils;
+import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -52,7 +54,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Random;
-import java.util.Scanner;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
@@ -108,6 +109,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   protected static final int MAX_ELEMENTS_FOR_MULTI_VALUE = 5;
   protected static final int MAX_COMPARISON_LIMIT = 10000;
   protected static final boolean GATHER_FAILED_QUERIES = false;
+  protected static final int NUM_LINES_QUERY_SET = 10000;
+  protected static final int MAX_QUERY_SELECTION_STEP = 100;
   protected static final String PINOT_SCHEMA_FILE = "OnTimeSchema.json";
   private int failedQueryCount = 0;
   private int queryCount = 0;
@@ -115,8 +118,6 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   protected Connection _connection;
   protected QueryGenerator _queryGenerator;
   protected static long TOTAL_DOCS = 115545;
-
-  protected File queriesFile;
 
   protected com.linkedin.pinot.client.Connection _pinotConnection = null;
 
@@ -1161,64 +1162,52 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   @Test
   public void testHardcodedQuerySet() throws Exception {
     for (String query : getHardCodedQuerySet()) {
-      try {
-        LOGGER.debug("Trying to send query : {}", query);
-        runQuery(query, Collections.singletonList(query.replace("'mytable'", "mytable")));
-      } catch (Exception e) {
-        LOGGER.error("Getting error for query : {}", query, e);
-      }
-
+      runQuery(query, Collections.singletonList(query));
     }
   }
 
   @Test
   public void testMultipleQueries() throws Exception {
-    queriesFile =
-        new File(TestUtils.getFileFromResourceUrl(BaseClusterIntegrationTest.class.getClassLoader().getResource(
-            "On_Time_On_Time_Performance_2014_100k_subset.test_queries_10K")));
+    String queriesFile = TestUtils.getFileFromResourceUrl(BaseClusterIntegrationTest.class.getClassLoader()
+        .getResource("On_Time_On_Time_Performance_2014_100k_subset.test_queries_10K"));
+    Random random = new Random();
 
-    Scanner scanner = new Scanner(queriesFile);
-    scanner.useDelimiter("\n");
-    String[] pqls = new String[1000];
+    int numLinesRead = 0;
+    try (BufferedReader reader = new BufferedReader(new FileReader(queriesFile))) {
+      int nextStep = random.nextInt(MAX_QUERY_SELECTION_STEP);
+      while (numLinesRead + nextStep + 1 <= NUM_LINES_QUERY_SET) {
+        for (int i = 0; i < nextStep; i++) {
+          reader.readLine();
+        }
+        JSONObject query = new JSONObject(reader.readLine());
+        String pqlQuery = query.getString("pql");
+        JSONArray hsqls = query.getJSONArray("hsqls");
+        List<String> sqlQueries = new ArrayList<>();
+        int length = hsqls.length();
+        for (int i = 0; i < length; i++) {
+          sqlQueries.add(hsqls.getString(i));
+        }
+        runQuery(pqlQuery, sqlQueries);
 
-    for (int i = 0; i < pqls.length; i++) {
-      JSONObject test_case = new JSONObject(scanner.next());
-      pqls[i] = test_case.getString("pql");
-    }
-
-    for (String query : pqls) {
-      try {
-        runNoH2ComparisonQuery(query);
-      } catch (Exception e) {
-        LOGGER.error("Getting error query: {}" + query);
-        throw new RuntimeException(e.getMessage());
+        numLinesRead += nextStep + 1;
+        nextStep = random.nextInt(MAX_QUERY_SELECTION_STEP);
       }
     }
   }
 
-  @Test(enabled = false)  // jfim: This is disabled because testGeneratedQueriesWithMultivalues covers the same thing
-  public void testGeneratedQueries() throws Exception {
-    int generatedQueryCount = getGeneratedQueryCount();
-
-    String generatedQueryCountProperty = System.getProperty("integration.test.generatedQueryCount");
-    if (generatedQueryCountProperty != null) {
-      generatedQueryCount = Integer.parseInt(generatedQueryCountProperty);
-    }
-
-    QueryGenerator.Query[] queries = new QueryGenerator.Query[generatedQueryCount];
+  @Test(enabled = false)  // jfim: This is disabled because testGeneratedQueriesWithMultiValues covers the same thing
+  public void testGeneratedQueriesWithoutMultiValues() throws Exception {
     _queryGenerator.setSkipMultiValuePredicates(true);
-    for (int i = 0; i < queries.length; i++) {
-      queries[i] = _queryGenerator.generateQuery();
-    }
-
-    for (QueryGenerator.Query query : queries) {
-      LOGGER.debug("Trying to send query : {}", query.generatePql());
-      runQuery(query.generatePql(), query.generateH2Sql());
-    }
+    testGeneratedQueries();
   }
 
   @Test
-  public void testGeneratedQueriesWithMultivalues() throws Exception {
+  public void testGeneratedQueriesWithMultiValues() throws Exception {
+    _queryGenerator.setSkipMultiValuePredicates(false);
+    testGeneratedQueries();
+  }
+
+  private void testGeneratedQueries() throws Exception {
     int generatedQueryCount = getGeneratedQueryCount();
 
     String generatedQueryCountProperty = System.getProperty("integration.test.generatedQueryCount");
@@ -1227,7 +1216,6 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     }
 
     QueryGenerator.Query[] queries = new QueryGenerator.Query[generatedQueryCount];
-    _queryGenerator.setSkipMultiValuePredicates(false);
     for (int i = 0; i < queries.length; i++) {
       queries[i] = _queryGenerator.generateQuery();
     }
@@ -1247,43 +1235,41 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   protected String[] getHardCodedQuerySet() {
-    String[] queries =
-        new String[] { "SELECT AirTime, avg(TotalAddGTime) FROM 'mytable'  WHERE DivAirportLandings BETWEEN 0 AND 0 OR Quarter IN (2, 2, 4, 2, 3, 1, 1, 1) GROUP BY AirTime LIMIT 10000",
-            "SELECT count(*) FROM 'mytable'  WHERE DayofMonth IN ('19', '10', '28', '1', '25', '2') ",
-            "SELECT count(*) FROM 'mytable'  WHERE TaxiOut IN ('35', '70', '29', '74', '126', '106', '70', '134', '118', '43') OR DayofMonth IN ('19', '10', '28', '1', '25') ",
-            "SELECT ArrDelay, avg(DestCityMarketID) FROM 'mytable'  WHERE TaxiOut IN ('35', '70', '29', '74', '126', '106', '70', '134', '118', '43') OR DayofMonth IN ('19', '10', '28', '1', '25') GROUP BY ArrDelay LIMIT 10000",
-            "SELECT OriginAirportSeqID, min(CRSArrTime) FROM 'mytable'  WHERE TaxiOut BETWEEN 140 AND 26 OR DestCityName >= 'Gainesville, FL' GROUP BY OriginAirportSeqID LIMIT 10000",
-            "SELECT NASDelay, DestAirportSeqID, min(DayOfWeek) FROM 'mytable'  WHERE DaysSinceEpoch IN ('16426', '16176', '16314', '16321') GROUP BY NASDelay, DestAirportSeqID LIMIT 10000",
-            "SELECT DestState, avg(DistanceGroup) FROM 'mytable'  GROUP BY DestState LIMIT 10000",
-            "SELECT ActualElapsedTime, DestCityMarketID, sum(OriginAirportSeqID) FROM 'mytable'  WHERE DestStateName > 'Oklahoma' GROUP BY ActualElapsedTime, DestCityMarketID LIMIT 10000",
-            "SELECT sum(CarrierDelay) FROM 'mytable'  WHERE CRSDepTime < '1047' OR DestWac = '84' LIMIT 16",
-            "SELECT Year, sum(CarrierDelay) FROM 'mytable'  WHERE DestWac BETWEEN '84' AND '37' OR CRSDepTime < '1047' GROUP BY Year LIMIT 10000",
-            "select count(*) from 'mytable'", "select sum(DepDelay) from 'mytable'",
-            "select count(DepDelay) from 'mytable'",
-            "select min(DepDelay) from 'mytable'",
-            "select max(DepDelay) from 'mytable'",
-            "select avg(DepDelay) from 'mytable'",
-            "select Carrier, count(*) from 'mytable' group by Carrier  ",
-            "select Carrier, count(*) from 'mytable' where ArrDelay > 15 group by Carrier  ",
-            "select Carrier, count(*) from 'mytable' where Cancelled = 1 group by Carrier  ",
-            "select Carrier, count(*) from 'mytable' where DepDelay >= 15 group by Carrier  ",
-            "select Carrier, count(*) from 'mytable' where DepDelay < 15 group by Carrier ",
-            "select Carrier, count(*) from 'mytable' where ArrDelay <= 15 group by Carrier  ",
-            "select Carrier, count(*) from 'mytable' where DepDelay >= 15 or ArrDelay >= 15 group by Carrier  ",
-            "select Carrier, count(*) from 'mytable' where DepDelay < 15 and ArrDelay <= 15 group by Carrier ",
-            "select Carrier, count(*) from 'mytable' where DepDelay between 5 and 15 group by Carrier  ",
-            "select Carrier, count(*) from 'mytable' where DepDelay in (2, 8, 42) group by Carrier ",
-            "select Carrier, count(*) from 'mytable' where DepDelay not in (4, 16) group by Carrier ",
-            "select Carrier, count(*) from 'mytable' where Cancelled <> 1 group by Carrier ",
-            "select Carrier, min(ArrDelay) from 'mytable' group by Carrier ",
-            "select Carrier, max(ArrDelay) from 'mytable' group by Carrier ",
-            "select Carrier, sum(ArrDelay) from 'mytable' group by Carrier ",
-            "select TailNum, avg(ArrDelay) from 'mytable' group by TailNum ",
-            "select FlightNum, avg(ArrDelay) from 'mytable' group by FlightNum ",
-            "select distinctCount(Carrier) from 'mytable' where TailNum = 'D942DN' ",
-            "SELECT count(*) FROM 'mytable'  WHERE OriginStateName BETWEEN 'U.S. Pacific Trust Territories and Possessions' AND 'Maryland'  ",
-        };
-    return queries;
+    return new String[] {
+        "SELECT AirTime, AVG(TotalAddGTime) FROM mytable WHERE DivAirportLandings BETWEEN 0 AND 0 OR Quarter IN (2, 2, 4, 2, 3, 1, 1, 1) GROUP BY AirTime LIMIT 10000",
+        "SELECT COUNT(*) FROM mytable WHERE DayofMonth IN ('19', '10', '28', '1', '25', '2')",
+        "SELECT COUNT(*) FROM mytable WHERE TaxiOut IN ('35', '70', '29', '74', '126', '106', '70', '134', '118', '43') OR DayofMonth IN ('19', '10', '28', '1', '25')",
+        "SELECT ArrDelay, AVG(DestCityMarketID) FROM mytable WHERE TaxiOut IN ('35', '70', '29', '74', '126', '106', '70', '134', '118', '43') OR DayofMonth IN ('19', '10', '28', '1', '25') GROUP BY ArrDelay LIMIT 10000",
+        "SELECT OriginAirportSeqID, MIN(CRSArrTime) FROM mytable WHERE TaxiOut BETWEEN 140 AND 26 OR DestCityName >= 'Gainesville, FL' GROUP BY OriginAirportSeqID LIMIT 10000",
+        "SELECT NASDelay, DestAirportSeqID, MIN(DayOfWeek) FROM mytable WHERE DaysSinceEpoch IN ('16426', '16176', '16314', '16321') GROUP BY NASDelay, DestAirportSeqID LIMIT 10000",
+        "SELECT DestState, AVG(DistanceGroup) FROM mytable GROUP BY DestState LIMIT 10000",
+        "SELECT ActualElapsedTime, DestCityMarketID, SUM(OriginAirportSeqID) FROM mytable WHERE DestStateName > 'Oklahoma' GROUP BY ActualElapsedTime, DestCityMarketID LIMIT 10000",
+        "SELECT SUM(CarrierDelay) FROM mytable WHERE CRSDepTime < '1047' OR DestWac = '84' LIMIT 16",
+        "SELECT Year, SUM(CarrierDelay) FROM mytable WHERE DestWac BETWEEN '84' AND '37' OR CRSDepTime < '1047' GROUP BY Year LIMIT 10000",
+        "SELECT COUNT(*) FROM mytable",
+        "SELECT SUM(DepDelay) FROM mytable",
+        "SELECT COUNT(DepDelay) FROM mytable",
+        "SELECT MIN(DepDelay) FROM mytable",
+        "SELECT MAX(DepDelay) FROM mytable",
+        "SELECT AVG(DepDelay) FROM mytable",
+        "SELECT Carrier, COUNT(*) FROM mytable GROUP BY Carrier",
+        "SELECT Carrier, COUNT(*) FROM mytable WHERE ArrDelay > 15 GROUP BY Carrier",
+        "SELECT Carrier, COUNT(*) FROM mytable WHERE Cancelled = 'true' GROUP BY Carrier",
+        "SELECT Carrier, COUNT(*) FROM mytable WHERE DepDelay >= 15 GROUP BY Carrier",
+        "SELECT Carrier, COUNT(*) FROM mytable WHERE DepDelay < 15 GROUP BY Carrier",
+        "SELECT Carrier, COUNT(*) FROM mytable WHERE DepDelay >= 15 OR ArrDelay >= 15 GROUP BY Carrier",
+        "SELECT Carrier, COUNT(*) FROM mytable WHERE DepDelay < 15 AND ArrDelay <= 15 GROUP BY Carrier",
+        "SELECT Carrier, COUNT(*) FROM mytable WHERE DepDelay BETWEEN 5 AND 15 GROUP BY Carrier",
+        "SELECT Carrier, COUNT(*) FROM mytable WHERE DepDelay IN (2, 8, 42) GROUP BY Carrier",
+        "SELECT Carrier, COUNT(*) FROM mytable WHERE DepDelay NOT IN (4, 16) GROUP BY Carrier",
+        "SELECT Carrier, COUNT(*) FROM mytable WHERE Cancelled <> 'true' GROUP BY Carrier",
+        "SELECT Carrier, MIN(ArrDelay) FROM mytable GROUP BY Carrier",
+        "SELECT Carrier, MAX(ArrDelay) FROM mytable GROUP BY Carrier",
+        "SELECT Carrier, SUM(ArrDelay) FROM mytable GROUP BY Carrier",
+        "SELECT TailNum, AVG(ArrDelay) FROM mytable GROUP BY TailNum",
+        "SELECT FlightNum, AVG(ArrDelay) FROM mytable GROUP BY FlightNum",
+        "SELECT COUNT(*) FROM mytable WHERE OriginStateName BETWEEN 'U.S. Pacific Trust Territories and Possessions' AND 'Maryland'"
+    };
   }
 
   protected void ensurePinotConnectionIsCreated() {

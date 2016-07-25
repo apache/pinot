@@ -32,11 +32,6 @@
     },
     {
       "dataType": "INT",
-      "name": "Cancelled",
-      "singleValueField": true
-    },
-    {
-      "dataType": "INT",
       "name": "CarrierDelay",
       "singleValueField": true
     },
@@ -116,6 +111,11 @@
     {
       "dataType": "STRING",
       "name": "CancellationCode",
+      "singleValueField": true
+    },
+    {
+      "dataType": "BOOLEAN",
+      "name": "Cancelled",
       "singleValueField": true
     },
     {
@@ -264,7 +264,7 @@
       "singleValueField": false
     },
     {
-      "dataType": "INT",
+      "dataType": "BOOLEAN",
       "name": "Diverted",
       "singleValueField": true
     },

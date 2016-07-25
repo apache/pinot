@@ -318,41 +318,6 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
     FileUtils.deleteDirectory(_tmpDir);
   }
 
-  @Test
-  public void testMetricAndDimColumns() throws Exception {
-    List<String> dimensions = schema.getDimensionNames();
-    for (String dim : dimensions) {
-      FieldSpec fieldSpec = schema.getFieldSpecFor(dim);
-      if (!fieldSpec.isSingleValueField()) {
-        LOGGER.info("Skipping multi-valued dimension field " + dim);
-        continue;
-      }
-      if (isNotWorkingColumn(dim)) {
-        LOGGER.error("Distnct count does not match for column " + dim);
-        continue;
-      }
-      String pqlQuery = "select distinctCount(" + dim + ") from mytable";
-      String sqlQuery = "select COUNT(DISTINCT " + dim + ") from mytable";
-      super.runQuery(pqlQuery, Collections.singletonList(sqlQuery));
-    }
-    List<String> metrics = schema.getMetricNames();
-    for (String metric : metrics) {
-      String query = "select sum(" + metric + ") from mytable";
-      super.runQuery(query, Collections.singletonList(query.replace("'mytable'", "mytable")));
-    }
-  }
-
-  // See PINOT-2887. distinctCount on string dimension does not work correctly in this test
-  private boolean isNotWorkingColumn(String dim) {
-    final String[] badColumns = {"TailNum"};
-    for (String col : badColumns) {
-      if (dim.equals(col)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
   @Override
   protected int getGeneratedQueryCount() {
     return QUERY_COUNT;
