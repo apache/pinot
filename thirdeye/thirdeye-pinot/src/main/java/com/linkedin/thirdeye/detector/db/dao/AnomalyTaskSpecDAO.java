@@ -19,11 +19,6 @@ public class AnomalyTaskSpecDAO extends AbstractBaseDAO<AnomalyTaskSpec> {
     return list(namedQuery("com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#findAll"));
   }
 
-  public List<AnomalyTaskSpec> findByJobId(Long jobId) {
-    return list(namedQuery("com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#findByJobId")
-        .setParameter("jobId", jobId));
-  }
-
   public List<AnomalyTaskSpec> findByJobIdAndStatusNotIn(Long jobId, TaskStatus status) {
     return list(namedQuery("com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#findByJobIdAndStatusNotIn")
         .setParameter("jobId", jobId)

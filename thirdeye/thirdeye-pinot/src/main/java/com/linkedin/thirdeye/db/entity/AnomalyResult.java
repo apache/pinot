@@ -19,6 +19,7 @@ import com.linkedin.thirdeye.util.ThirdEyeUtils;
 @Table(name = "anomaly_results")
 public class AnomalyResult extends AbstractBaseEntity implements Comparable<AnomalyResult> {
 
+  // TODO : User AnomalyFunctionSpec instead of id
   @Column(name = "function_id", nullable = false)
   private long functionId;
 

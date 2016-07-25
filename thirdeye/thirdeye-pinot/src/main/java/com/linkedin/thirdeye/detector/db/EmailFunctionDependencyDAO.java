@@ -16,7 +16,7 @@ import io.dropwizard.hibernate.AbstractDAO;
 public class EmailFunctionDependencyDAO extends AbstractDAO<EmailFunctionDependency> {
   /*
    * Note: You can also use the corresponding entity DAOs to update the entity objects themselves
-   * and use the persist method to save the changes, eg EmailConfigurationDAO.addFunctionDependency
+   * and use the persist method to save the changes
    */
 
   public EmailFunctionDependencyDAO(SessionFactory sessionFactory) {
