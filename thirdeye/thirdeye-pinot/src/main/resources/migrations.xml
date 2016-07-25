@@ -442,4 +442,8 @@
     </sql>
   </changeSet>
 
+  <changeSet id="15" author="pjaiswal">
+    <dropTable tableName="contextual_events"></dropTable>
+  </changeSet>
+
 </databaseChangeLog>

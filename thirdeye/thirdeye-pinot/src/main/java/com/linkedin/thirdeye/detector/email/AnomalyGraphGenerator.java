@@ -38,7 +38,7 @@ import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.client.comparison.Row;
 import com.linkedin.thirdeye.client.comparison.Row.Metric;
 import com.linkedin.thirdeye.client.comparison.TimeOnTimeComparisonResponse;
-import com.linkedin.thirdeye.detector.db.entity.AnomalyResult;
+import com.linkedin.thirdeye.db.entity.AnomalyResult;
 
 /** Creates JFreeChart images from Thirdeye Data. */
 public class AnomalyGraphGenerator {

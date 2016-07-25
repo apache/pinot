@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.detector.driver;
 
+import com.linkedin.thirdeye.db.dao.AnomalyFunctionDAO;
+import com.linkedin.thirdeye.db.dao.AnomalyResultDAO;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -27,10 +29,8 @@ import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesHandler;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesResponseConverter;
-import com.linkedin.thirdeye.detector.db.entity.AnomalyFunctionSpec;
+import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
 import com.linkedin.thirdeye.detector.db.AnomalyFunctionRelationDAO;
-import com.linkedin.thirdeye.detector.db.dao.AnomalyFunctionSpecDAO;
-import com.linkedin.thirdeye.detector.db.dao.AnomalyResultDAO;
 import com.linkedin.thirdeye.detector.function.AnomalyFunction;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 
@@ -41,7 +41,7 @@ public class AnomalyDetectionJobManager {
   private final Scheduler quartzScheduler;
   private final TimeSeriesHandler timeSeriesHandler;
   private final TimeSeriesResponseConverter timeSeriesResponseConverter;
-  private final AnomalyFunctionSpecDAO specDAO;
+  private final AnomalyFunctionDAO specDAO;
   private final AnomalyFunctionRelationDAO relationDAO;
   private final AnomalyResultDAO resultDAO;
   private final SessionFactory sessionFactory;
@@ -54,7 +54,7 @@ public class AnomalyDetectionJobManager {
 
   private static final ObjectMapper reader = new ObjectMapper(new YAMLFactory());
 
-  public AnomalyDetectionJobManager(Scheduler quartzScheduler, AnomalyFunctionSpecDAO specDAO,
+  public AnomalyDetectionJobManager(Scheduler quartzScheduler, AnomalyFunctionDAO specDAO,
       AnomalyFunctionRelationDAO relationDAO, AnomalyResultDAO resultDAO,
       SessionFactory sessionFactory, MetricRegistry metricRegistry,
       AnomalyFunctionFactory anomalyFunctionFactory, FailureEmailConfiguration failureEmailConfig) {

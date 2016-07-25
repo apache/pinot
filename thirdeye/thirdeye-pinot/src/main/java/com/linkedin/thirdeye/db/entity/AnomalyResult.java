@@ -1,74 +1,25 @@
-package com.linkedin.thirdeye.detector.db.entity;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+package com.linkedin.thirdeye.db.entity;
 import java.util.Objects;
-import java.util.Properties;
 
 import javax.persistence.CascadeType;
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.FetchType;
 import javax.persistence.JoinColumn;
-import javax.persistence.NamedQueries;
-import javax.persistence.NamedQuery;
 import javax.persistence.OneToOne;
 import javax.persistence.Table;
 
 import org.apache.commons.lang.ObjectUtils;
 import org.joda.time.DateTime;
 
-import com.google.common.base.Joiner;
 import com.google.common.base.MoreObjects;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 @Entity
 @Table(name = "anomaly_results")
-@NamedQueries({
-    @NamedQuery(name = "com.linkedin.thirdeye.api.AnomalyResult#findAll", query = "SELECT r FROM AnomalyResult r"),
-    @NamedQuery(name = "com.linkedin.thirdeye.api.AnomalyResult#findAllByCollection", query = "SELECT r FROM AnomalyResult r WHERE r.collection = :collection"),
-    @NamedQuery(name = "com.linkedin.thirdeye.api.AnomalyResult#findAllByCollectionAndTime", query = "SELECT r FROM AnomalyResult r WHERE r.collection = :collection "
-        + "AND ((r.startTimeUtc >= :startTimeUtc AND r.startTimeUtc <= :endTimeUtc) "
-        + "OR (r.endTimeUtc >= :startTimeUtc AND r.endTimeUtc <= :endTimeUtc))"),
-    @NamedQuery(name = "com.linkedin.thirdeye.api.AnomalyResult#findAllByCollectionTimeAndFunction", query = "SELECT r FROM AnomalyResult r WHERE r.collection = :collection "
-        + "AND r.functionId = :functionId "
-        + "AND ((r.startTimeUtc >= :startTimeUtc AND r.startTimeUtc <= :endTimeUtc) "
-        + "OR (r.endTimeUtc >= :startTimeUtc AND r.endTimeUtc <= :endTimeUtc))"),
-    @NamedQuery(name = "com.linkedin.thirdeye.api.AnomalyResult#findAllByCollectionTimeAndMetric", query = "SELECT r FROM AnomalyResult r WHERE r.collection = :collection "
-        + "AND r.metric = :metric "
-        + "AND ((r.startTimeUtc >= :startTimeUtc AND r.startTimeUtc <= :endTimeUtc) "
-        + "OR (r.endTimeUtc >= :startTimeUtc AND r.endTimeUtc <= :endTimeUtc))"),
-    @NamedQuery(name = "com.linkedin.thirdeye.api.AnomalyResult#findAllByCollectionTimeFunctionIdAndMetric", query = "SELECT r FROM AnomalyResult r WHERE r.collection = :collection "
-        + "AND r.functionId = :functionId " + "AND r.metric = :metric "
-        + "AND ((r.startTimeUtc >= :startTimeUtc AND r.startTimeUtc <= :endTimeUtc) "
-        + "OR (r.endTimeUtc >= :startTimeUtc AND r.endTimeUtc <= :endTimeUtc))"),
-    @NamedQuery(name = "com.linkedin.thirdeye.api.AnomalyResult#findAllByCollectionTimeMetricAndFilters", query = "SELECT r FROM AnomalyResult r WHERE r.collection = :collection "
-        + "AND r.metric = :metric "
-        + "AND ((r.filters = :filters) or (r.filters is NULL and :filters is NULL)) "
-        + "AND ((r.startTimeUtc >= :startTimeUtc AND r.startTimeUtc <= :endTimeUtc) "
-        + "OR (r.endTimeUtc >= :startTimeUtc AND r.endTimeUtc <= :endTimeUtc))"),
-    @NamedQuery(name = "com.linkedin.thirdeye.api.AnomalyResult#findAllByCollectionTimeAndFilters", query = "SELECT r FROM AnomalyResult r WHERE r.collection = :collection "
-        + "AND ((r.filters = :filters) or (r.filters is NULL and :filters is NULL)) "
-        + "AND ((r.startTimeUtc >= :startTimeUtc AND r.startTimeUtc <= :endTimeUtc) "
-        + "OR (r.endTimeUtc >= :startTimeUtc AND r.endTimeUtc <= :endTimeUtc))"),
-    @NamedQuery(name = "com.linkedin.thirdeye.api.AnomalyResult#findAllByTimeAndFunctionId", query = "SELECT r FROM AnomalyResult r WHERE r.functionId = :functionId "
-        + "AND ((r.startTimeUtc >= :startTimeUtc AND r.startTimeUtc <= :endTimeUtc) "
-        + "OR (r.endTimeUtc >= :startTimeUtc AND r.endTimeUtc <= :endTimeUtc))"),
-    @NamedQuery(name = "com.linkedin.thirdeye.api.AnomalyResult#findAllByTimeAndEmailId", query = "SELECT r FROM EmailConfiguration d JOIN d.functions f JOIN f.anomalies r "
-        + "WHERE d.id = :emailId "
-        + "AND ((r.startTimeUtc >= :startTimeUtc AND r.startTimeUtc <= :endTimeUtc) "
-        + "OR (r.endTimeUtc >= :startTimeUtc AND r.endTimeUtc <= :endTimeUtc))"),
-        @NamedQuery(name = "com.linkedin.thirdeye.api.AnomalyResult#findAllByCollectionTimeMetricAndDimensions", query = "SELECT r FROM AnomalyResult r WHERE r.collection = :collection "
-            + "AND r.metric = :metric "
-            + "AND r.dimensions IN :dimensions "
-            + "AND ((r.startTimeUtc >= :startTimeUtc AND r.startTimeUtc <= :endTimeUtc) "
-            + "OR (r.endTimeUtc >= :startTimeUtc AND r.endTimeUtc <= :endTimeUtc))")
-})
 public class AnomalyResult extends AbstractBaseEntity implements Comparable<AnomalyResult> {
-  private static Joiner SEMICOLON = Joiner.on(";");
-  private static Joiner EQUALS = Joiner.on("=");
 
+  // TODO : User AnomalyFunctionSpec instead of id
   @Column(name = "function_id", nullable = false)
   private long functionId;
 
@@ -296,13 +247,5 @@ public class AnomalyResult extends AbstractBaseEntity implements Comparable<Anom
       return diff;
     }
     return ObjectUtils.compare(getId(), o.getId());
-  }
-
-  public static String encodeCompactedProperties(Properties props) {
-    List<String> parts = new ArrayList<String>();
-    for (Map.Entry<Object, Object> entry : props.entrySet()) {
-      parts.add(EQUALS.join(entry.getKey(), entry.getValue()));
-    }
-    return SEMICOLON.join(parts);
   }
 }

@@ -69,6 +69,4 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
     this.monitorConfiguration = monitorConfiguration;
   }
 
-
-
 }

@@ -1,7 +1,5 @@
 package com.linkedin.thirdeye.detector.db.dao;
 
-import com.linkedin.thirdeye.detector.db.dao.AbstractBaseDAO;
-
 import java.sql.Timestamp;
 import java.util.List;
 
@@ -10,7 +8,7 @@ import org.hibernate.SessionFactory;
 import org.joda.time.DateTime;
 
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
-import com.linkedin.thirdeye.detector.db.entity.AnomalyTaskSpec;
+import com.linkedin.thirdeye.db.entity.AnomalyTaskSpec;
 
 public class AnomalyTaskSpecDAO extends AbstractBaseDAO<AnomalyTaskSpec> {
   public AnomalyTaskSpecDAO(SessionFactory sessionFactory) {
@@ -19,11 +17,6 @@ public class AnomalyTaskSpecDAO extends AbstractBaseDAO<AnomalyTaskSpec> {
 
   public List<AnomalyTaskSpec> findAll() {
     return list(namedQuery("com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#findAll"));
-  }
-
-  public List<AnomalyTaskSpec> findByJobId(Long jobId) {
-    return list(namedQuery("com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#findByJobId")
-        .setParameter("jobId", jobId));
   }
 
   public List<AnomalyTaskSpec> findByJobIdAndStatusNotIn(Long jobId, TaskStatus status) {

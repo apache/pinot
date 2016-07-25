@@ -3,7 +3,7 @@ package com.linkedin.thirdeye.anomaly.detection;
 import org.joda.time.DateTime;
 
 import com.linkedin.thirdeye.anomaly.job.JobContext;
-import com.linkedin.thirdeye.detector.db.entity.AnomalyFunctionSpec;
+import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
 
 public class DetectionJobContext extends JobContext {
 

@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.anomaly.detection;
 
+import com.linkedin.thirdeye.db.dao.AnomalyFunctionDAO;
 import io.dropwizard.hibernate.UnitOfWork;
 
 import java.util.ArrayList;
@@ -20,10 +21,9 @@ import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkedin.thirdeye.detector.db.entity.AnomalyFunctionSpec;
-import com.linkedin.thirdeye.detector.db.entity.AnomalyJobSpec;
-import com.linkedin.thirdeye.detector.db.entity.AnomalyTaskSpec;
-import com.linkedin.thirdeye.detector.db.dao.AnomalyFunctionSpecDAO;
+import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
+import com.linkedin.thirdeye.db.entity.AnomalyJobSpec;
+import com.linkedin.thirdeye.db.entity.AnomalyTaskSpec;
 import com.linkedin.thirdeye.detector.db.dao.AnomalyJobSpecDAO;
 import com.linkedin.thirdeye.detector.db.dao.AnomalyTaskSpecDAO;
 import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
@@ -40,7 +40,7 @@ public class DetectionJobRunner implements Job {
 
   private AnomalyJobSpecDAO anomalyJobSpecDAO;
   private AnomalyTaskSpecDAO anomalyTasksSpecDAO;
-  private AnomalyFunctionSpecDAO anomalyFunctionSpecDAO;
+  private AnomalyFunctionDAO anomalyFunctionSpecDAO;
   private SessionFactory sessionFactory;
   private long anomalyFunctionId;
   private DateTime windowStart;

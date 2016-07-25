@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.detector.resources;
 
+import com.linkedin.thirdeye.db.dao.AnomalyResultDAO;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.util.ArrayList;
@@ -21,8 +22,7 @@ import org.joda.time.DateTime;
 import org.joda.time.format.ISODateTimeFormat;
 
 import com.codahale.metrics.annotation.Timed;
-import com.linkedin.thirdeye.detector.db.entity.AnomalyResult;
-import com.linkedin.thirdeye.detector.db.dao.AnomalyResultDAO;
+import com.linkedin.thirdeye.db.entity.AnomalyResult;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 import io.dropwizard.hibernate.UnitOfWork;
@@ -38,7 +38,6 @@ public class AnomalyResultResource {
 
   @POST
   @Timed
-  @UnitOfWork
   public Response create(AnomalyResult anomalyResult) {
     Long id = dao.save(anomalyResult);
     return Response.ok(id).build();
@@ -46,7 +45,6 @@ public class AnomalyResultResource {
 
   @DELETE
   @Timed
-  @UnitOfWork
   @Path("/id/{id}")
   public Response delete(@PathParam("id") Long id) {
     dao.deleteById(id);
@@ -55,7 +53,6 @@ public class AnomalyResultResource {
 
   @GET
   @Timed
-  @UnitOfWork
   @Path("/id/{id}")
   public AnomalyResult findById(@PathParam("id") Long id) {
     AnomalyResult result = dao.findById(id);
@@ -67,7 +64,6 @@ public class AnomalyResultResource {
 
   @GET
   @Timed
-  @UnitOfWork
   @Path("/collection/{collection}")
   public List<AnomalyResult> find(@PathParam("collection") String collection) {
     DateTime endTime = DateTime.now();
@@ -77,7 +73,6 @@ public class AnomalyResultResource {
 
   @GET
   @Timed
-  @UnitOfWork
   @Path("/collection/{collection}/{startIsoTime}")
   public List<AnomalyResult> find(@PathParam("collection") String collection,
       @PathParam("startIsoTime") String startIsoTime) {
@@ -88,7 +83,6 @@ public class AnomalyResultResource {
 
   @GET
   @Timed
-  @UnitOfWork
   @Path("/collection/{collection}/{startIsoTime}/{endIsoTime}")
   public List<AnomalyResult> find(@PathParam("collection") String collection,
       @PathParam("startIsoTime") String startIsoTime, @PathParam("endIsoTime") String endIsoTime,
@@ -133,7 +127,6 @@ public class AnomalyResultResource {
 
   @GET
   @Timed
-  @UnitOfWork
   @Path("/function/{functionId}")
   public List<AnomalyResult> findByFunction(@PathParam("functionId") Long functionId) {
     DateTime endTime = DateTime.now();
@@ -143,7 +136,6 @@ public class AnomalyResultResource {
 
   @GET
   @Timed
-  @UnitOfWork
   @Path("/function/{functionId}/{startIsoTime}")
   public List<AnomalyResult> findByFunction(@PathParam("functionId") Long functionId,
       @PathParam("startIsoTime") String startIsoTime) {

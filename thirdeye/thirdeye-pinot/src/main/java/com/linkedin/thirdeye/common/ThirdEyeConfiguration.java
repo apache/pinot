@@ -36,6 +36,7 @@ public abstract class ThirdEyeConfiguration extends Configuration {
   private int smtpPort = 0;
 
 
+  // TODO : remove data source config
   @Valid
   @NotNull
   private final DataSourceFactory database = new DataSourceFactory();

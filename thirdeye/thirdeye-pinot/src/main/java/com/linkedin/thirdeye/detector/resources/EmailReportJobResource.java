@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.detector.resources;
 
+import com.linkedin.thirdeye.db.dao.EmailConfigurationDAO;
+import com.linkedin.thirdeye.db.entity.EmailConfiguration;
 import io.dropwizard.hibernate.UnitOfWork;
 
 import java.util.List;
@@ -14,7 +16,6 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
-import com.linkedin.thirdeye.detector.db.dao.EmailConfigurationDAO;
 import com.linkedin.thirdeye.detector.email.EmailReportJobManager;
 
 @Path("/email-jobs")
@@ -37,9 +38,10 @@ public class EmailReportJobResource {
 
   @POST
   @Path("/{id}")
-  @UnitOfWork
   public Response enable(@PathParam("id") Long id) throws Exception {
-    configDAO.toggleActive(id, true);
+    EmailConfiguration emailConfiguration = configDAO.findById(id);
+    emailConfiguration.setIsActive(true);
+    configDAO.save(emailConfiguration);
     manager.start(id);
     return Response.ok().build();
   }
@@ -64,7 +66,9 @@ public class EmailReportJobResource {
   @Path("/{id}")
   @UnitOfWork
   public Response disable(@PathParam("id") Long id) throws Exception {
-    configDAO.toggleActive(id, false);
+    EmailConfiguration emailConfiguration = configDAO.findById(id);
+    emailConfiguration.setIsActive(false);
+    configDAO.save(emailConfiguration);
     manager.stop(id);
     return Response.ok().build();
   }

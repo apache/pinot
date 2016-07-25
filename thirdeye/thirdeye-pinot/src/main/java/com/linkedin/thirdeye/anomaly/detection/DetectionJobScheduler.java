@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.anomaly.detection;
 
+import com.linkedin.thirdeye.db.dao.AnomalyFunctionDAO;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -20,8 +21,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.thirdeye.anomaly.job.JobContext;
-import com.linkedin.thirdeye.detector.db.entity.AnomalyFunctionSpec;
-import com.linkedin.thirdeye.detector.db.dao.AnomalyFunctionSpecDAO;
+import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
 import com.linkedin.thirdeye.detector.db.dao.AnomalyJobSpecDAO;
 import com.linkedin.thirdeye.detector.db.dao.AnomalyTaskSpecDAO;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
@@ -36,12 +36,12 @@ public class DetectionJobScheduler {
   private Scheduler quartzScheduler;
   private AnomalyJobSpecDAO anomalyJobSpecDAO;
   private AnomalyTaskSpecDAO anomalyTaskSpecDAO;
-  private AnomalyFunctionSpecDAO anomalyFunctionSpecDAO;
+  private AnomalyFunctionDAO anomalyFunctionSpecDAO;
   private AnomalyFunctionFactory anomalyFunctionFactory;
   private SessionFactory sessionFactory;
 
   public DetectionJobScheduler(AnomalyJobSpecDAO anomalyJobSpecDAO, AnomalyTaskSpecDAO anomalyTaskSpecDAO,
-      AnomalyFunctionSpecDAO anomalyFunctionSpecDAO,
+      AnomalyFunctionDAO anomalyFunctionSpecDAO,
       SessionFactory sessionFactory) {
     this.anomalyJobSpecDAO = anomalyJobSpecDAO;
     this.anomalyTaskSpecDAO = anomalyTaskSpecDAO;

@@ -18,7 +18,7 @@ import org.slf4j.LoggerFactory;
 import com.google.common.base.Joiner;
 import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
-import com.linkedin.thirdeye.detector.db.entity.AnomalyResult;
+import com.linkedin.thirdeye.db.entity.AnomalyResult;
 
 /**
  * See params for property configuration.

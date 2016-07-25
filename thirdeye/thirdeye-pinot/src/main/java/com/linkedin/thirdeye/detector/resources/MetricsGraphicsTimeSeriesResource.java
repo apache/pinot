@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.detector.resources;
 
+import com.linkedin.thirdeye.db.dao.AnomalyResultDAO;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -32,9 +33,8 @@ import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.client.comparison.TimeOnTimeComparisonHandler;
-import com.linkedin.thirdeye.detector.db.entity.AnomalyResult;
+import com.linkedin.thirdeye.db.entity.AnomalyResult;
 import com.linkedin.thirdeye.detector.api.MetricsGraphicsTimeSeries;
-import com.linkedin.thirdeye.detector.db.dao.AnomalyResultDAO;
 
 import io.dropwizard.hibernate.UnitOfWork;
 

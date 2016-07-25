@@ -19,7 +19,7 @@
     <pinot.version>0.016</pinot.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <jdk.version>1.8</jdk.version>
-    <dropwizard.version>0.8.2</dropwizard.version>
+    <dropwizard.version>0.8.4</dropwizard.version>
     <jackson.version>2.5.1</jackson.version>
     <mysql.connector.version>5.1.36</mysql.connector.version>
     <quartz.version>2.2.1</quartz.version>
@@ -45,6 +45,10 @@
     <testng.version>6.8</testng.version>
     <mockito.version>1.8.4</mockito.version>
     <jcommander.version>1.35</jcommander.version>
+    <hsqldb.version>2.3.4</hsqldb.version>
+    <guice-persist.version>4.1.0</guice-persist.version>
+    <hibernate-jpa-2.1-api.version>1.0.0.Final</hibernate-jpa-2.1-api.version>
+    <hibernate-entirymanager.version>4.3.10.Final</hibernate-entirymanager.version>
   </properties>
 
   <build>
@@ -111,6 +115,7 @@
         <version>${dropwizard.version}</version>
       </dependency>
       <dependency>
+        <!-- TODO: remove this once completely moved to jpa -->
         <groupId>io.dropwizard</groupId>
         <artifactId>dropwizard-hibernate</artifactId>
         <version>${dropwizard.version}</version>
@@ -254,6 +259,21 @@
         <artifactId>mysql-connector-java</artifactId>
         <version>${mysql.connector.version}</version>
       </dependency>
+      <dependency>
+        <groupId>com.google.inject.extensions</groupId>
+        <artifactId>guice-persist</artifactId>
+        <version>${guice-persist.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.hibernate.javax.persistence</groupId>
+        <artifactId>hibernate-jpa-2.1-api</artifactId>
+        <version>${hibernate-jpa-2.1-api.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.hibernate</groupId>
+        <artifactId>hibernate-entitymanager</artifactId>
+        <version>${hibernate-entirymanager.version}</version>
+      </dependency>
 
       <!-- test dependencies -->
       <dependency>
@@ -276,6 +296,11 @@
         <artifactId>mrunit</artifactId>
         <version>${mrunit.version}</version>
         <classifier>hadoop2</classifier>
+      </dependency>
+      <dependency>
+        <groupId>org.hsqldb</groupId>
+        <artifactId>hsqldb</artifactId>
+        <version>${hsqldb.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>

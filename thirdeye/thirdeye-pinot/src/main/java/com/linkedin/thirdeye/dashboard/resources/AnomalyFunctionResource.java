@@ -25,10 +25,12 @@ public class AnomalyFunctionResource {
 
   private static final Logger LOG = LoggerFactory.getLogger(AnomalyFunctionResource.class);
 
-  private final Map<String, Object> anomalyFunctionMetadata;
+  private final Map<String, Object> anomalyFunctionMetadata = new HashMap<>();;
+
+  public AnomalyFunctionResource() {
+  }
 
   public AnomalyFunctionResource(ThirdEyeDashboardConfiguration configuration) {
-    anomalyFunctionMetadata = new HashMap<>();
     buildFunctionMetadata(configuration.getFunctionConfigPath());
   }
 

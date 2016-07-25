@@ -35,8 +35,8 @@ import org.slf4j.LoggerFactory;
 
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
-import com.linkedin.thirdeye.detector.db.entity.AnomalyFunctionSpec;
-import com.linkedin.thirdeye.detector.db.entity.EmailConfiguration;
+import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
+import com.linkedin.thirdeye.db.entity.EmailConfiguration;
 import com.linkedin.thirdeye.detector.db.HibernateSessionWrapper;
 import com.linkedin.thirdeye.detector.driver.AnomalyDetectionJobManager;
 import com.linkedin.thirdeye.detector.email.EmailReportJobManager;
@@ -46,7 +46,6 @@ import com.linkedin.thirdeye.detector.resources.AnomalyDetectionJobResource;
 import com.linkedin.thirdeye.detector.resources.AnomalyFunctionRelationResource;
 import com.linkedin.thirdeye.detector.resources.AnomalyFunctionSpecResource;
 import com.linkedin.thirdeye.detector.resources.AnomalyResultResource;
-import com.linkedin.thirdeye.detector.resources.ContextualEventResource;
 import com.linkedin.thirdeye.detector.resources.EmailFunctionDependencyResource;
 import com.linkedin.thirdeye.detector.resources.EmailReportJobResource;
 import com.linkedin.thirdeye.detector.resources.EmailReportResource;
@@ -95,6 +94,7 @@ public class ThirdEyeDetectorApplication
 
   @Override
   public void initialize(final Bootstrap<ThirdEyeDetectorConfiguration> bootstrap) {
+//    super.initializeDataLayer(bootstrap);
     bootstrap.addBundle(new MigrationsBundle<ThirdEyeDetectorConfiguration>() {
       @Override
       public DataSourceFactory getDataSourceFactory(ThirdEyeDetectorConfiguration config) {
@@ -262,10 +262,8 @@ public class ThirdEyeDetectorApplication
     environment.jersey().register(new AnomalyFunctionSpecResource(anomalyFunctionSpecDAO));
     environment.jersey().register(new AnomalyFunctionRelationResource(anomalyFunctionRelationDAO));
     environment.jersey().register(new AnomalyResultResource(anomalyResultDAO));
-    environment.jersey().register(new ContextualEventResource(contextualEventDAO));
     environment.jersey().register(new MetricsGraphicsTimeSeriesResource(anomalyResultDAO));
-    environment.jersey()
-        .register(new AnomalyDetectionJobResource(anomalyDetectionJobManager, anomalyFunctionSpecDAO));
+    environment.jersey().register(new AnomalyDetectionJobResource(anomalyDetectionJobManager, anomalyFunctionSpecDAO));
     environment.jersey().register(new EmailReportJobResource(emailReportJobManager, emailConfigurationDAO));
     environment.jersey().register(new EmailReportResource(emailConfigurationDAO, emailReportJobManager));
     environment.jersey().register(new EmailFunctionDependencyResource(emailFunctionDependencyDAO));

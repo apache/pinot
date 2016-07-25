@@ -1,6 +1,6 @@
 package com.linkedin.thirdeye.detector.resources;
 
-import io.dropwizard.hibernate.UnitOfWork;
+import com.linkedin.thirdeye.db.dao.EmailConfigurationDAO;
 
 import java.util.List;
 
@@ -15,8 +15,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
 import com.codahale.metrics.annotation.Timed;
-import com.linkedin.thirdeye.detector.db.entity.EmailConfiguration;
-import com.linkedin.thirdeye.detector.db.dao.EmailConfigurationDAO;
+import com.linkedin.thirdeye.db.entity.EmailConfiguration;
 import com.linkedin.thirdeye.detector.email.EmailReportJobManager;
 
 @Path("/email-reports")
@@ -32,7 +31,6 @@ public class EmailReportResource {
 
   @POST
   @Timed
-  @UnitOfWork
   public Response create(EmailConfiguration configuration) {
     Long id = dao.save(configuration);
     return Response.ok(id).build();
@@ -40,7 +38,6 @@ public class EmailReportResource {
 
   @DELETE
   @Timed
-  @UnitOfWork
   @Path("/{id}")
   public Response delete(@PathParam("id") Long id) {
     dao.deleteById(id);
@@ -49,7 +46,6 @@ public class EmailReportResource {
 
   @GET
   @Timed
-  @UnitOfWork
   @Path("/{id}")
   public EmailConfiguration find(@PathParam("id") Long id) {
     EmailConfiguration configuration = dao.findById(id);
@@ -61,7 +57,6 @@ public class EmailReportResource {
 
   @GET
   @Timed
-  @UnitOfWork
   public List<EmailConfiguration> findAll() {
     return dao.findAll();
   }

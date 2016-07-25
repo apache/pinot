@@ -1,7 +1,6 @@
 package com.linkedin.thirdeye.detector.function;
 
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Map.Entry;
@@ -11,7 +10,7 @@ import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.thirdeye.detector.db.entity.AnomalyFunctionSpec;
+import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
 
 public class AnomalyFunctionFactory {
   private static Logger LOGGER = LoggerFactory.getLogger(AnomalyFunctionFactory.class);
@@ -23,10 +22,8 @@ public class AnomalyFunctionFactory {
     try {
       input = new FileInputStream(functionConfigPath);
       props.load(input);
-    } catch (FileNotFoundException e) {
-      e.printStackTrace();
     } catch (IOException e) {
-      e.printStackTrace();
+      LOGGER.error("Error loading the functions from config", e);
     } finally {
       IOUtils.closeQuietly(input);
     }
@@ -48,7 +45,6 @@ public class AnomalyFunctionFactory {
     anomalyFunction = (AnomalyFunction) Class.forName(className).newInstance();
 
     anomalyFunction.init(functionSpec);
-
     return anomalyFunction;
   }
 }

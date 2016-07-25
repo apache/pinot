@@ -12,7 +12,7 @@ import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import com.linkedin.thirdeye.detector.db.entity.AnomalyResult;
+import com.linkedin.thirdeye.db.entity.AnomalyResult;
 
 public class TestUserRuleAnomalyFunction {
   private static final UserRuleAnomalyFunction function = new UserRuleAnomalyFunction();

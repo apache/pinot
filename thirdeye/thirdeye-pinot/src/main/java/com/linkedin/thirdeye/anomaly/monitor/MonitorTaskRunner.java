@@ -19,7 +19,7 @@ import com.linkedin.thirdeye.anomaly.task.TaskResult;
 import com.linkedin.thirdeye.anomaly.task.TaskRunner;
 import com.linkedin.thirdeye.detector.db.dao.AnomalyJobSpecDAO;
 import com.linkedin.thirdeye.detector.db.dao.AnomalyTaskSpecDAO;
-import com.linkedin.thirdeye.detector.db.entity.AnomalyTaskSpec;
+import com.linkedin.thirdeye.db.entity.AnomalyTaskSpec;
 
 public class MonitorTaskRunner implements TaskRunner {
 

@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.detector.db.entity;
+package com.linkedin.thirdeye.db.entity;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -11,8 +11,6 @@ import javax.persistence.FetchType;
 import javax.persistence.JoinColumn;
 import javax.persistence.JoinTable;
 import javax.persistence.ManyToMany;
-import javax.persistence.NamedQueries;
-import javax.persistence.NamedQuery;
 import javax.persistence.Table;
 import javax.validation.Valid;
 import javax.validation.constraints.NotNull;
@@ -25,10 +23,6 @@ import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 @Entity
 @Table(name = "email_configurations")
-@NamedQueries({
-    @NamedQuery(name = "com.linkedin.thirdeye.api.EmailConfiguration#findAll", query = "SELECT c FROM EmailConfiguration c"),
-    @NamedQuery(name = "com.linkedin.thirdeye.api.EmailConfiguration#toggleActive", query = "UPDATE EmailConfiguration set isActive = :isActive WHERE id = :id")
-})
 public class EmailConfiguration extends AbstractBaseEntity {
 
   @Valid

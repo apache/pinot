@@ -1,6 +1,6 @@
 package com.linkedin.thirdeye.detector.resources;
 
-import io.dropwizard.hibernate.UnitOfWork;
+import com.linkedin.thirdeye.db.dao.AnomalyFunctionDAO;
 
 import java.util.List;
 
@@ -16,21 +16,19 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
 import com.codahale.metrics.annotation.Timed;
-import com.linkedin.thirdeye.detector.db.entity.AnomalyFunctionSpec;
-import com.linkedin.thirdeye.detector.db.dao.AnomalyFunctionSpecDAO;
+import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
 
 @Path("/anomaly-functions")
 @Produces(MediaType.APPLICATION_JSON)
 public class AnomalyFunctionSpecResource {
-  private final AnomalyFunctionSpecDAO dao;
+  private final AnomalyFunctionDAO dao;
 
-  public AnomalyFunctionSpecResource(AnomalyFunctionSpecDAO dao) {
+  public AnomalyFunctionSpecResource(AnomalyFunctionDAO dao) {
     this.dao = dao;
   }
 
   @POST
   @Timed
-  @UnitOfWork
   public Response create(AnomalyFunctionSpec anomalyFunctionSpec) {
     Long id = dao.save(anomalyFunctionSpec);
     return Response.ok(id).build();
@@ -38,7 +36,6 @@ public class AnomalyFunctionSpecResource {
 
   @DELETE
   @Timed
-  @UnitOfWork
   @Path("/{id}")
   public Response delete(@PathParam("id") Long id) {
     dao.deleteById(id);
@@ -47,7 +44,6 @@ public class AnomalyFunctionSpecResource {
 
   @GET
   @Timed
-  @UnitOfWork
   @Path("/{id}")
   public AnomalyFunctionSpec find(@PathParam("id") Long id) {
     AnomalyFunctionSpec anomalyFunctionSpec = dao.findById(id);
@@ -59,7 +55,6 @@ public class AnomalyFunctionSpecResource {
 
   @GET
   @Timed
-  @UnitOfWork
   public List<AnomalyFunctionSpec> findAll(@QueryParam("collection") String collection) {
     if (collection == null) {
       return dao.findAll();
