@@ -6,6 +6,7 @@ import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.FetchType;
 import javax.persistence.JoinColumn;
+import javax.persistence.ManyToOne;
 import javax.persistence.OneToOne;
 import javax.persistence.Table;
 
@@ -19,10 +20,11 @@ import com.linkedin.thirdeye.util.ThirdEyeUtils;
 @Table(name = "anomaly_results")
 public class AnomalyResult extends AbstractBaseEntity implements Comparable<AnomalyResult> {
 
-  // TODO : User AnomalyFunctionSpec instead of id
-  @Column(name = "function_id", nullable = false)
-  private long functionId;
+  @ManyToOne(cascade = CascadeType.ALL)
+  @JoinColumn(name = "function_id")
+  private AnomalyFunctionSpec function;
 
+  // TODO: remove function specific columns
   @Column(name = "function_type", nullable = false)
   private String functionType;
 
@@ -70,12 +72,21 @@ public class AnomalyResult extends AbstractBaseEntity implements Comparable<Anom
     creationTimeUtc = DateTime.now().getMillis();
   }
 
-  public long getFunctionId() {
-    return functionId;
+  public AnomalyFunctionSpec getFunction() {
+    return function;
+  }
+
+  public void setFunction(AnomalyFunctionSpec function) {
+    this.function = function;
+  }
+
+  public Long getFunctionId() {
+    if(function == null) return null;
+    return function.getId();
   }
 
   public void setFunctionId(long functionId) {
-    this.functionId = functionId;
+    throw new IllegalArgumentException("Use JPA to set function");
   }
 
   public String getFunctionType() {
@@ -193,7 +204,7 @@ public class AnomalyResult extends AbstractBaseEntity implements Comparable<Anom
 
   @Override
   public String toString() {
-    return MoreObjects.toStringHelper(this).add("id", getId()).add("functionId", functionId)
+    return MoreObjects.toStringHelper(this).add("id", getId()).add("functionId", getFunctionId())
         .add("functionType", functionType).add("functionProperties", functionProperties)
         .add("collection", collection).add("startTimeUtc", startTimeUtc)
         .add("endTimeUtc", endTimeUtc).add("dimensions", dimensions).add("metric", metric)
@@ -208,7 +219,7 @@ public class AnomalyResult extends AbstractBaseEntity implements Comparable<Anom
       return false;
     }
     AnomalyResult r = (AnomalyResult) o;
-    return Objects.equals(functionId, r.getFunctionId())
+    return Objects.equals(getFunctionId(), r.getFunctionId())
         && Objects.equals(functionType, r.getFunctionType())
         && Objects.equals(functionProperties, r.getFunctionProperties())
         && Objects.equals(collection, r.getCollection())
@@ -224,7 +235,7 @@ public class AnomalyResult extends AbstractBaseEntity implements Comparable<Anom
 
   @Override
   public int hashCode() {
-    return Objects.hash(functionId, functionType, functionProperties, collection, startTimeUtc,
+    return Objects.hash(getFunctionId(), functionType, functionProperties, collection, startTimeUtc,
         endTimeUtc, dimensions, metric, score, weight, properties, message, filters);
     // Intentionally omit creationTimeUtc, since start/end are the truly significant dates for
     // anomalies
@@ -242,7 +253,7 @@ public class AnomalyResult extends AbstractBaseEntity implements Comparable<Anom
     if (diff != 0) {
       return diff;
     }
-    diff = ObjectUtils.compare(functionId, o.getFunctionId());
+    diff = ObjectUtils.compare(getFunctionId(), o.getFunctionId());
     if (diff != 0) {
       return diff;
     }

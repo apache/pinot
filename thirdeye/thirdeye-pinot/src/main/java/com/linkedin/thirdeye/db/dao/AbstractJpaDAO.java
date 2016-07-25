@@ -47,7 +47,7 @@ public class AbstractJpaDAO<E extends AbstractBaseEntity> {
   }
 
   public List<E> findAll() {
-    return this.emf.get().createNamedQuery(
-        entityClass.getSimpleName() + ".GetAll").getResultList();
+    return this.emf.get().createQuery("from " + entityClass.getSimpleName(), entityClass)
+        .getResultList();
   }
 }

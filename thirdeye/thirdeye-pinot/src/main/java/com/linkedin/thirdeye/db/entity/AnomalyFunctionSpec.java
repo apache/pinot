@@ -76,8 +76,7 @@ public class AnomalyFunctionSpec extends AbstractBaseEntity {
   @ManyToMany(mappedBy = "functions", fetch = FetchType.LAZY)
   private List<EmailConfiguration> emails;
 
-  @OneToMany(fetch = FetchType.LAZY)
-  @JoinColumn(name = "function_id", referencedColumnName = "id")
+  @OneToMany(fetch = FetchType.LAZY, mappedBy = "function")
   private List<AnomalyResult> anomalies;
 
   public String getCollection() {

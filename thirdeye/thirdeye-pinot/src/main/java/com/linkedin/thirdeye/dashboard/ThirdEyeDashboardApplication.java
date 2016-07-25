@@ -33,6 +33,7 @@ public class ThirdEyeDashboardApplication
 
   @Override
   public void initialize(Bootstrap<ThirdEyeDashboardConfiguration> bootstrap) {
+    bootstrap.addBundle(hibernateBundle);
     bootstrap.addBundle(new ViewBundle());
     bootstrap.addBundle(new HelperBundle());
     bootstrap.addBundle(new AssetsBundle("/assets", "/assets"));
