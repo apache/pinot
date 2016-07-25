@@ -209,7 +209,7 @@
         {{/if}}
 
        {{#if showSelfServiceBoard}}
-       <ul data-uk-switcher="{connect:'#self-service-forms'}"  class="uk-tab uk-tab-left" style="position: relative;left: 11px;">
+       <ul id="self-service-tabs" data-uk-switcher="{connect:'#self-service-forms'}"  class="uk-tab uk-tab-left" style="position: relative;left: 11px;">
            <li><a href="#">Configure anomaly functions</a></li>
            <li id="get-existing-anomaly-functions"><a href="#">Manage existing anomaly functions</a></li>
        </ul>

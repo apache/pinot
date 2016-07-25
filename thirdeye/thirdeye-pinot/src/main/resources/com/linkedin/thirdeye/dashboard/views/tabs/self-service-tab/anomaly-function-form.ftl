@@ -3,7 +3,7 @@
     <form id="configure-anomaly-function-form" class="uk-form" >
         {{#if id}}
         <div class="uk-form-row">
-            <label class="bold-label">Function id: </label>#<span id="function-id">{{id}}</span></div>
+            <label class="uk-form-label bold-label">Function id: </label>#<span id="function-id">{{id}}</span></div>
         {{else}}
         <div  class="title-box full-width" style="margin-top:15px;">
             <h3>Create anomaly function</h3>
@@ -12,11 +12,11 @@
         <div class="uk-form-row">
             <label class="uk-form-label bold-label required">Name
             </label>
-            <input id="name" type="text" maxlength="80" {{#if functionName}}value="{{functionName}}"{{/if}}>
+            <input id="name" type="text" maxlength="160" {{#if functionName}}value="{{functionName}}"{{/if}} placeholder="anomaly_function_name">
         </div>
         <div class="uk-form-row">
             <label class="uk-form-label bold-label required">Dataset</label>
-            <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group uk-display-inline-block">
+            <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group">
                 <div class="selected-dataset uk-button"
                      value="{{#if collection}}{{collection}}{{/if}}">
                     {{#if collection}}

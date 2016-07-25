@@ -336,6 +336,7 @@ body a{
 
 #name{
     margin-left: 13px;
+    width: 250px;
 }
 
 #anomaly-threshold{
@@ -382,8 +383,6 @@ body a{
     left: 50%;
 }
 
-
-
 #chart-control{
     font-size: 16px;
     font-weight: 300;
@@ -394,7 +393,6 @@ body a{
     border-right: 1px solid #d4d4d5;
     padding:10px;
 }
-
 
 #chart-types button{
     min-width:105px;
@@ -886,6 +884,9 @@ body a{
     word-break: break-all;
 }
 
+#configure-anomaly-function-form{
+    font-size: 16px;
+}
 
 /* D3 START*/
 path {
