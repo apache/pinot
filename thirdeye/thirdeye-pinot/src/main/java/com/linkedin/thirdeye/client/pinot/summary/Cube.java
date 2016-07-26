@@ -1,18 +1,20 @@
 package com.linkedin.thirdeye.client.pinot.summary;
 
-import java.io.BufferedReader;
-import java.io.FileReader;
-import java.io.FileWriter;
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 
-import com.google.gson.Gson;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.linkedin.thirdeye.client.ThirdEyeResponse;
 
 
 // TODO: The cube should be queried from the backend database during runtime.
@@ -20,7 +22,43 @@ public class Cube { // the cube (Ca|Cb)
   private double ga; // sum of all ta
   private double gb; // sum of all tb
   private double rg; // global ratio, i.e., gb / ga
-  private List<Record> records = new ArrayList<>();
+
+  @JsonProperty("records")
+  private List<Record> records = new ArrayList<Record>();
+
+  public void setGlobalInfo(ThirdEyeResponse responseGa, ThirdEyeResponse responseGb, int multiplier) {
+    this.ga = responseGa.getRow(0).getMetrics().get(0) * multiplier;
+    this.gb = responseGb.getRow(0).getMetrics().get(0) * multiplier;
+    this.rg = this.gb / this.ga;
+  }
+
+  public void addRecordForOneDimension(String dimensionName, ThirdEyeResponse responseTa,
+      ThirdEyeResponse responseTb) {
+    Map<String, Integer> recordTable = new HashMap<>();
+
+    for (int i = 0; i < responseTa.getNumRows(); ++i) {
+      Record record = new Record();
+      record.dimensionName = dimensionName;
+      record.dimensionValue = responseTa.getRow(i).getDimensions().get(0);
+      record.metricA = responseTa.getRow(i).getMetrics().get(0);
+      recordTable.put(record.dimensionValue, records.size());
+      records.add(record);
+    }
+
+    for (int i = 0; i < responseTb.getNumRows(); ++i) {
+      String dimensionValue = responseTb.getRow(i).getDimensions().get(0);
+      if (recordTable.containsKey(dimensionValue)) {
+        int idx = recordTable.get(dimensionValue);
+        records.get(idx).metricB = responseTb.getRow(i).getMetrics().get(0);
+      } else {
+        Record record = new Record();
+        record.dimensionName = dimensionName;
+        record.dimensionValue = dimensionValue;
+        record.metricB = responseTb.getRow(i).getMetrics().get(0);
+        records.add(record);
+      }
+    }
+  }
 
   public int size() {
     return records.size();
@@ -42,38 +80,20 @@ public class Cube { // the cube (Ca|Cb)
     return rg;
   }
 
-  public void setRg(double rg) {
-    this.rg = rg;
-  }
-
   public double getGa() {
     return ga;
-  }
-
-  public void setGa(double ga) {
-    this.ga = ga;
   }
 
   public double getGb() {
     return gb;
   }
 
-  public void setGb(double gb) {
-    this.gb = gb;
-  }
-
   public void toJson(String fileName) throws IOException {
-    FileWriter fw = new FileWriter(fileName);
-    Gson gson = new Gson();
-    fw.write(gson.toJson(this));
-    fw.flush();
+    new ObjectMapper().writeValue(new File(fileName), this);
   }
 
   public static Cube fromJson(String fileName) throws IOException {
-    BufferedReader br = new BufferedReader(new FileReader(fileName));
-    String stringGa = br.readLine();
-    Gson gson = new Gson();
-    return gson.fromJson(stringGa, Cube.class);
+    return new ObjectMapper().readValue(new File(fileName), Cube.class);
   }
 
   public void removeEmptyRecords() {

@@ -6,6 +6,7 @@ import org.apache.commons.lang3.builder.ToStringStyle;
 
 public class Record {
   public String dimensionName;
+  public String dimensionValue;
   public double metricA;
   public double metricB;
 

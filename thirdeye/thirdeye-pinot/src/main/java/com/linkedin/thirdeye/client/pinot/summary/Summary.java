@@ -69,7 +69,7 @@ public class Summary {
     StringBuilder sb = res;
     for (Cell cell : resRecords) {
       sb = dir & (Double.compare(1.0, cell.ratio) <= 0) ? res : nres;
-      sb.append(String.format(dimensionSpace, cell.dimensionName));
+      sb.append(String.format(dimensionSpace, cell.dimensionName + '/' + cell.dimensionValue));
       sb.append('\t');
       sb.append(String.format(metricSpace, (int) cell.metricA));
       sb.append('\t');
@@ -86,12 +86,14 @@ public class Summary {
 
   static class Cell {
     String dimensionName;
+    String dimensionValue;
     double metricA;
     double metricB;
     double ratio;
 
     Cell(Record record) {
       this.dimensionName = record.dimensionName;
+      this.dimensionValue = record.dimensionValue;
       this.metricA = record.metricA;
       this.metricB = record.metricB;
       this.ratio = record.metricB / record.metricA;
