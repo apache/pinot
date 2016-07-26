@@ -130,7 +130,7 @@ public class SummaryCalculator {
       Summary summary = computeSummary(records, answerSize);
       System.out.println(summary.toString());
     } catch (IOException e) {
-      System.err.println(e.getStackTrace());
+      e.printStackTrace();
       System.exit(1);
     }
   }
