@@ -317,12 +317,12 @@ public class PinotHelixResourceManager {
     }
     final SegmentMetadata existedSegmentMetadata = new SegmentMetadataImpl(offlineSegmentZKMetadata);
     if (segmentMetadata.getIndexCreationTime() <= existedSegmentMetadata.getIndexCreationTime()) {
-      LOGGER.info("Rejecting because of older creation time {} (we have {}) for segment {} of table {}",
+      LOGGER.info("Rejecting because of older or same creation time {} (we have {}) for segment {} of table {}",
           segmentMetadata.getIndexCreationTime(), existedSegmentMetadata.getIndexCreationTime(), segmentName, tableName);
       return false;
     }
     if (segmentMetadata.getCrc().equals(existedSegmentMetadata.getCrc())) {
-      LOGGER.info("Rejecting because of mismatching CRC (incoming={}, existing={}) for {} of table {}",
+      LOGGER.info("Rejecting because of matching CRC exists (incoming={}, existing={}) for {} of table {}",
           segmentMetadata.getCrc(), existedSegmentMetadata.getCrc(), segmentName, tableName);
       return false;
     }
