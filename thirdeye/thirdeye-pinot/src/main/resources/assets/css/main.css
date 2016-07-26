@@ -67,6 +67,12 @@ body a{
     background: #f2fae3;
 }
 
+.position-top-right{
+    position: absolute;
+    top: 10px;
+    right: 10px;
+}
+
 .required:after {
     content:" *";
 }
@@ -325,15 +331,21 @@ body a{
 /* Form: Anomaly config related */
 #configure-anomaly-function-form .uk-form-row{
    margin-bottom: 15px;
+   margin-left: 10px;
+}
+
+#configure-form-table td{
+    padding: 0 10px 15px 10px;
+
 }
 
 
 #name{
-    margin-left: 13px;
+    width: 250px;
 }
 
 #anomaly-threshold{
-    width: 120px;
+    width: 135px;
 }
 
 #filter-panel-manage-alert .value-filter{
@@ -376,8 +388,6 @@ body a{
     left: 50%;
 }
 
-
-
 #chart-control{
     font-size: 16px;
     font-weight: 300;
@@ -388,7 +398,6 @@ body a{
     border-right: 1px solid #d4d4d5;
     padding:10px;
 }
-
 
 #chart-types button{
     min-width:105px;
@@ -879,6 +888,28 @@ body a{
 #existing-anomaly-functions-table td{
     word-break: break-all;
 }
+
+#configure-anomaly-function-form{
+    font-size: 16px;
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: 20% 80%;
+    align-content: flex-start;
+
+}
+
+.col-1{
+    grid-column: 1;
+}
+
+.col-2{
+    grid-column: 2;
+}
+
+
+
 
 
 /* D3 START*/

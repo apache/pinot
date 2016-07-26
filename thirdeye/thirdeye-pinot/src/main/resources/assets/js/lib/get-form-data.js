@@ -4,7 +4,10 @@ function getDataSetList(){
     getData(url).done( function(data){
         validateFormData(data,"No dataset list arrived from the server.", "datasets" )
 
-        /* Handelbars template for datasets dropdown */
+        //cache the data
+        window.sessionStorage.setItem('datasetList', JSON.stringify(data) );
+
+        /* Handelbars template for dataset dropdowns */
         var queryFormDatasetData = {data: data}
         var result_datasets_template = HandleBarsTemplates.template_datasets(queryFormDatasetData);
         $(".landing-dataset").each(function(){ $(this).html(result_datasets_template)});
@@ -67,7 +70,6 @@ function getDashboardList(){
         }
         $("#dashboard-list").html(dashboardListHtml);
         $("#selected-dashboard").text("Select dashboard");
-        $("#dashboard-list").html(dashboardListHtml);
 
         window.responseDataPopulated++
         formComponentPopulated()
@@ -82,6 +84,8 @@ function getMetricList() {
     getData(url).done(function (data) {
 
         validateFormData(data, "No metrics available in the server." , "metrics" )
+
+        window.datasetConfig.datasetMetrics = data;
 
         /* Handelbars template for query form multi select metric list */
         var queryFormMetricListData = {data: data, singleMetricSelector: false};
@@ -127,16 +131,15 @@ function getDimensionNValueList() {
         /* Create dimensions and filter dimensions dropdown */
         var dimensionListHtml = "";
         var filterDimensionListHtml = "";
-
-        //Global - public
-        datasetDimensions = [];
         window.datasetConfig.datasetDimensions = [];
+        window.datasetConfig.datasetFilters = data;
 
         for (var k in  data) {
             dimensionListHtml += "<li class='dimension-option' rel='dimensions' value='" + k + "'><a href='#' class='uk-dropdown-close'>" + k + "</a></li>";
             filterDimensionListHtml += "<li class='filter-dimension-option' value='" + k + "'><a href='#' class='radio-options'>" + k + "</a></li>";
             window.datasetConfig.datasetDimensions.push(k)
         }
+
         $(".dimension-list").html(dimensionListHtml);
 
         //append filter dimension list
@@ -162,8 +165,6 @@ function getDimensionNValueList() {
 
 
 function getDatasetConfig() {
-
-    window.datasetConfig = {}
 
     //Till the endpoint is ready no ajax call is triggered and works with  hardcoded data in local data variable
     var url = "/dashboard/data/info?dataset=" + hash.dataset;

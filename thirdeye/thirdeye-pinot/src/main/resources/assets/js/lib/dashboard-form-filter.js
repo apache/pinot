@@ -2,7 +2,7 @@
 
     //Enable Apply btn
     $("#main-view").on("change", ".filter-value-checkbox, .filter-select-all-checkbox", function(){
-        enableApplyButton( $("#"+hash.view+"-apply-filter-btn") )
+        enableButton( $("#"+hash.view+"-apply-filter-btn") )
     });
 
     //Apply filters
@@ -61,7 +61,7 @@
         hash.filters = encodeURIComponent(JSON.stringify(filters));
 
         //Disable Apply filters button and close popup
-        enableApplyButton()
+        enableButton()
 
         //Todo: Show selected filters on dashboard
         //empty previous filters labels
@@ -155,8 +155,14 @@
         }
     }
 
-    function readFiltersAppliedInCurrentView(currentTab){
+    function readFiltersAppliedInCurrentView(currentTab, options){
         var currentFilterContainer = $(".view-filter-selector[rel='"+ currentTab +"']")
+        if(options === undefined){
+            options = {};
+        }
+        if(options.hasOwnProperty("form")){
+            currentFilterContainer = $(".view-filter-selector[rel='"+ currentTab +"']", options.form)
+        }
         var filters = {};
 
         $(".added-filter",currentFilterContainer).each(function(){

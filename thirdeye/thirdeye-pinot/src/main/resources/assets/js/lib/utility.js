@@ -36,23 +36,49 @@ function getData(url, tab){
     })
 }
 
-function submitData(url, data ){
+function submitData(url, data, tab ){
+
+    if(data === undefined){
+        data = ""
+    }
+    if(!tab){
+       tab = hash.view;
+    }
     console.log("post url:", url)
     return $.ajax({
         url: url,
         type: 'post',
         dataType: 'json',
         data: data,
+        statusCode: {
+            404: function () {
+                $("#" + tab + "-chart-area-error").empty()
+                var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' })
+                warning.append($('<p></p>', { html: 'No data available. (Error code: 404)' }))
+                $("#" + tab + "-chart-area-error").append(warning)
+                $("#" + tab + "-chart-area-error").fadeIn(100);
+                return
+            },
+            500: function () {
+                $("#" + tab + "-chart-area-error").empty()
+                var error = $('<div></div>', { class: 'uk-alert uk-alert-danger' })
+                error.append($('<p></p>', { html: 'Internal server error' }))
+                $("#" + tab + "-chart-area-error").append(error)
+                $("#" + tab + "-chart-area-error").fadeIn(100);
+                return
+            }
+        },
         error: function( jqXhr, textStatus, errorThrown ){
             console.log( errorThrown );
         }
     }).always(function(){
-
     })
-
 }
 
 function deleteData(url, data){
+    if(data === undefined){
+        data = ""
+    }
     console.log("delete url:", url)
     return $.ajax({
         url: url,
@@ -65,7 +91,6 @@ function deleteData(url, data){
     }).always(function(){
 
     })
-
 }
 
 function showLoader(tab){
@@ -198,8 +223,8 @@ function updateDashboardFormFromHash(){
     var baselineEndTimeString;
 
     var maxMillis;
-    if(window.datasetConfig){
-        window.datasetConfig.maxMillis;
+    if(window.datasetConfig.maxMillis){
+        maxMillis = window.datasetConfig.maxMillis;
     }
 
     if (hash.hasOwnProperty("currentStart")) {
@@ -422,7 +447,7 @@ function disableButton(button){
     $(button).attr("disabled", true);
 }
 
-function enableApplyButton(button){
+function enableButton(button){
     $(button).prop("disabled", false);
     $(button).removeAttr("disabled");
 }
@@ -825,7 +850,12 @@ function clearCreateForm(){
     $("monitoring-schedule").hide();
     $("#active-alert").attr("checked","checked");
 
-    $("#configure-anomaly-function-form .remove-filter-selection").click();
+    $("#configure-anomaly-function-form .remove-filter-selection").each(function(){
+        $(this).click();
+    });
+
+    $("#manage-alert-error").hide();
+    $("#manage-anomaly-function-success").hide();
 
 }
 
