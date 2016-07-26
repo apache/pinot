@@ -326,36 +326,25 @@ public class AnomalyDetectionJob implements Job {
   }
 
   private void handleResults(List<AnomalyResult> results) {
-    Session session = sessionFactory.openSession();
     try {
-      ManagedSessionContext.bind(session);
-      Transaction transaction = session.beginTransaction();
-      try {
-        for (AnomalyResult result : results) {
-          // Properties that always come from the function spec
-          AnomalyFunctionSpec spec = anomalyFunction.getSpec();
-          result.setFunctionId(spec.getId());
-          result.setFunctionType(spec.getType());
-          result.setFunctionProperties(spec.getProperties());
-          result.setCollection(spec.getCollection());
-          result.setMetric(spec.getMetric());
-          result.setFilters(spec.getFilters());
+      for (AnomalyResult result : results) {
+        // Properties that always come from the function spec
+        AnomalyFunctionSpec spec = anomalyFunction.getSpec();
 
-          // make sure score and weight are valid numbers
-          result.setScore(normalize(result.getScore()));
-          result.setWeight(normalize(result.getWeight()));
-          resultDAO.save(result);
-        }
-        transaction.commit();
-      } catch (Exception e) {
-        transaction.rollback();
-        throw new RuntimeException(e);
+        // make sure score and weight are valid numbers
+        result.setScore(normalize(result.getScore()));
+        result.setWeight(normalize(result.getWeight()));
+        resultDAO.save(result);
+
+        // now save the function entity and update result
+        result.setFunction(spec);
+        resultDAO.update(result);
       }
-    } finally {
-      session.close();
-      ManagedSessionContext.unbind(sessionFactory);
+    } catch (Exception e) {
+      LOG.error("Exception in saving anomaly results", e);
     }
   }
+
 
   /** Handle any infinite or NaN values by replacing them with +/- max value or 0 */
   private double normalize(double value) {
