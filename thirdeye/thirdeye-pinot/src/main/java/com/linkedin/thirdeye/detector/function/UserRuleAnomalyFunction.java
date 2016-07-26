@@ -22,19 +22,21 @@ import com.linkedin.thirdeye.db.entity.AnomalyResult;
 
 /**
  * See params for property configuration.
- * @param baseline baseline comparison period. Value should be one of 'w/w', 'w/2w',
- *          'w/3w'. The anomaly function spec should also be configured to provide a sufficient
- *          window size + additional time buckets for comparison. For example, monitoring one hour
- *          of w/w data would require a window size of 168 (1 week) + an additional 1 (for the
- *          monitoring window), for a total of 169 hours window size.
- * @param changeThreshold detection threshold for percent change relative to baseline, defined as
- *          (current - baseline) / baseline. Positive values detect an increase, while negative
- *          values detect a decrease. This value should be a decimal, eg a 50% increase would have a
- *          threshold of 0.50. Any triggered anomalies must strictly exceed this threshold (no
- *          equality).
- * @param averageVolumeThreshold minimum average threshold across the entire input window. If the
- *          average value does not meet or exceed the threshold, no anomaly results will be
- *          generated. This value should be a double.
+ * <p/>
+ * baseline : baseline comparison period. Value should be one of 'w/w', 'w/2w', 'w/3w'. The anomaly
+ * function spec should also be configured to provide a sufficient window size + additional time
+ * buckets for comparison. For example, monitoring one hour of w/w data would require a window size
+ * of 168 (1 week) + an additional 1 (for the monitoring window), for a total of 169 hours window
+ * size.
+ * <p/>
+ * changeThreshold : detection threshold for percent change relative to baseline, defined as
+ * (current - baseline) / baseline. Positive values detect an increase, while negative values detect
+ * a decrease. This value should be a decimal, eg a 50% increase would have a threshold of 0.50. Any
+ * triggered anomalies must strictly exceed this threshold (no equality).
+ * <p/>
+ * averageVolumeThreshold : minimum average threshold across the entire input window. If the average
+ * value does not meet or exceed the threshold, no anomaly results will be generated. This value
+ * should be a double.
  */
 public class UserRuleAnomalyFunction extends BaseAnomalyFunction {
   private static final Logger LOGGER = LoggerFactory.getLogger(UserRuleAnomalyFunction.class);
@@ -80,16 +82,11 @@ public class UserRuleAnomalyFunction extends BaseAnomalyFunction {
     AnomalyResult firstAnomalyResult = anomalyResults.get(0);
     AnomalyResult lastAnomalyResult = anomalyResults.get(n - 1);
     AnomalyResult mergedAnomalyResult = new AnomalyResult();
-    mergedAnomalyResult.setCollection(firstAnomalyResult.getCollection());
-    mergedAnomalyResult.setMetric(firstAnomalyResult.getMetric());
     mergedAnomalyResult.setDimensions(firstAnomalyResult.getDimensions());
-    mergedAnomalyResult.setFunctionId(firstAnomalyResult.getFunctionId());
     mergedAnomalyResult.setProperties(firstAnomalyResult.getProperties());
     mergedAnomalyResult.setStartTimeUtc(firstAnomalyResult.getStartTimeUtc());
     mergedAnomalyResult.setEndTimeUtc(lastAnomalyResult.getEndTimeUtc());
     mergedAnomalyResult.setWeight(firstAnomalyResult.getWeight());
-    mergedAnomalyResult.setFilters(firstAnomalyResult.getFilters());
-
     double summedScore = 0;
     for (AnomalyResult anomalyResult : anomalyResults) {
       summedScore += anomalyResult.getScore();
@@ -157,10 +154,7 @@ public class UserRuleAnomalyFunction extends BaseAnomalyFunction {
       double baselineValue = timeSeries.get(baselineKey, metric).doubleValue();
       if (isAnomaly(currentValue, baselineValue, changeThreshold)) {
         AnomalyResult anomalyResult = new AnomalyResult();
-        anomalyResult.setCollection(getSpec().getCollection());
-        anomalyResult.setMetric(metric);
         anomalyResult.setDimensions(CSV.join(dimensionKey.getDimensionValues()));
-        anomalyResult.setFunctionId(getSpec().getId());
         anomalyResult.setProperties(getSpec().getProperties());
         anomalyResult.setStartTimeUtc(currentKey);
         anomalyResult.setEndTimeUtc(currentKey + bucketMillis); // point-in-time
@@ -169,7 +163,6 @@ public class UserRuleAnomalyFunction extends BaseAnomalyFunction {
         String message =
             getAnomalyResultMessage(changeThreshold, baselineProp, currentValue, baselineValue);
         anomalyResult.setMessage(message);
-        anomalyResult.setFilters(getSpec().getFilters());
         anomalyResults.add(anomalyResult);
         currentValues.add(currentValue);
         baselineValues.add(baselineValue);

@@ -75,19 +75,15 @@ public class MinMaxThresholdFunction extends BaseAnomalyFunction {
 
       if (deviationFromThreshold != 0) {
         AnomalyResult anomalyResult = new AnomalyResult();
-        anomalyResult.setCollection(getSpec().getCollection());
-        anomalyResult.setMetric(metric);
-        anomalyResult.setDimensions(CSV.join(dimensionKey.getDimensionValues()));
-        anomalyResult.setFunctionId(getSpec().getId());
         anomalyResult.setProperties(getSpec().getProperties());
         anomalyResult.setStartTimeUtc(timeBucket);
         anomalyResult.setEndTimeUtc(timeBucket + bucketMillis); // point-in-time
+        anomalyResult.setDimensions(CSV.join(dimensionKey.getDimensionValues()));
         anomalyResult.setScore(Math.abs(deviationFromThreshold)); // higher change, higher the score
         anomalyResult.setWeight(averageValue);
         String message =
             String.format(DEFAULT_MESSAGE_TEMPLATE, min, max, value, deviationFromThreshold);
         anomalyResult.setMessage(message);
-        anomalyResult.setFilters(getSpec().getFilters());
         anomalyResults.add(anomalyResult);
       }
     } return anomalyResults;

@@ -444,6 +444,11 @@
 
   <changeSet id="15" author="pjaiswal">
     <dropTable tableName="contextual_events"></dropTable>
+    <dropColumn tableName="anomaly_results" columnName="function_type" />
+    <dropColumn tableName="anomaly_results" columnName="function_properties" />
+    <dropColumn tableName="anomaly_results" columnName="collection" />
+    <dropColumn tableName="anomaly_results" columnName="metric" />
+    <dropColumn tableName="anomaly_results" columnName="filters" />
   </changeSet>
 
 </databaseChangeLog>

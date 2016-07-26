@@ -94,7 +94,6 @@ public class ThirdEyeDetectorApplication
 
   @Override
   public void initialize(final Bootstrap<ThirdEyeDetectorConfiguration> bootstrap) {
-//    super.initializeDataLayer(bootstrap);
     bootstrap.addBundle(new MigrationsBundle<ThirdEyeDetectorConfiguration>() {
       @Override
       public DataSourceFactory getDataSourceFactory(ThirdEyeDetectorConfiguration config) {
@@ -103,7 +102,6 @@ public class ThirdEyeDetectorApplication
     });
 
     bootstrap.addBundle(hibernateBundle);
-
     bootstrap.addBundle(new AssetsBundle("/assets/", "/", "index.html"));
   }
 

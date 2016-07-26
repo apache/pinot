@@ -3,7 +3,6 @@ package com.linkedin.thirdeye.anomaly.detection;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 
 import com.linkedin.thirdeye.db.dao.AnomalyResultDAO;
-import io.dropwizard.hibernate.UnitOfWork;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -192,7 +191,6 @@ public class DetectionTaskRunner implements TaskRunner {
     return results;
   }
 
-  @UnitOfWork
   private List<AnomalyResult> getExistingAnomalies() {
     List<AnomalyResult> results = new ArrayList<>();
 
@@ -220,33 +218,25 @@ public class DetectionTaskRunner implements TaskRunner {
     return results;
   }
 
-  @UnitOfWork
   private void handleResults(List<AnomalyResult> results) {
-    Session session = sessionFactory.openSession();
-    try {
-      ManagedSessionContext.bind(session);
 
       for (AnomalyResult result : results) {
-        // Properties that always come from the function spec
-        AnomalyFunctionSpec spec = anomalyFunction.getSpec();
-        result.setFunctionId(spec.getId());
-        result.setFunctionType(spec.getType());
-        result.setFunctionProperties(spec.getProperties());
-        result.setCollection(spec.getCollection());
-        result.setMetric(spec.getMetric());
-        result.setFilters(spec.getFilters());
+        try {
+          // Properties that always come from the function spec
+          AnomalyFunctionSpec spec = anomalyFunction.getSpec();
 
-        // make sure score and weight are valid numbers
-        result.setScore(normalize(result.getScore()));
-        result.setWeight(normalize(result.getWeight()));
-        resultDAO.save(result);
+          // make sure score and weight are valid numbers
+          result.setScore(normalize(result.getScore()));
+          result.setWeight(normalize(result.getWeight()));
+          resultDAO.save(result);
+
+          // now save the function entity and update result
+          result.setFunction(spec);
+          resultDAO.update(result);
+        } catch (Exception e) {
+          LOG.error("Exception in saving anomaly result : " + result.toString(), e);
+        }
       }
-    } catch (Exception e) {
-      LOG.error("Exception in saving anomaly results", e);
-    } finally {
-      session.close();
-      ManagedSessionContext.unbind(sessionFactory);
-    }
   }
 
   /** Handle any infinite or NaN values by replacing them with +/- max value or 0 */

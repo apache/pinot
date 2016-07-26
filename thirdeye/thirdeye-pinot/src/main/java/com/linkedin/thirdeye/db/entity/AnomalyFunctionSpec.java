@@ -5,12 +5,12 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
+import javax.persistence.CascadeType;
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.EnumType;
 import javax.persistence.Enumerated;
 import javax.persistence.FetchType;
-import javax.persistence.JoinColumn;
 import javax.persistence.ManyToMany;
 import javax.persistence.OneToMany;
 import javax.persistence.Table;
@@ -73,11 +73,10 @@ public class AnomalyFunctionSpec extends AbstractBaseEntity {
   @Column(name = "filters", nullable = true)
   private String filters;
 
-  @ManyToMany(mappedBy = "functions", fetch = FetchType.LAZY)
+  @ManyToMany(mappedBy = "functions", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
   private List<EmailConfiguration> emails;
 
-  @OneToMany(fetch = FetchType.LAZY)
-  @JoinColumn(name = "function_id", referencedColumnName = "id")
+  @OneToMany(mappedBy = "function", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
   private List<AnomalyResult> anomalies;
 
   public String getCollection() {

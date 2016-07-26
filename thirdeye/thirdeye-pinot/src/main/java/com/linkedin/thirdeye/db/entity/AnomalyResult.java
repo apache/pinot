@@ -6,6 +6,7 @@ import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.FetchType;
 import javax.persistence.JoinColumn;
+import javax.persistence.ManyToOne;
 import javax.persistence.OneToOne;
 import javax.persistence.Table;
 
@@ -13,24 +14,10 @@ import org.apache.commons.lang.ObjectUtils;
 import org.joda.time.DateTime;
 
 import com.google.common.base.MoreObjects;
-import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 @Entity
 @Table(name = "anomaly_results")
 public class AnomalyResult extends AbstractBaseEntity implements Comparable<AnomalyResult> {
-
-  // TODO : User AnomalyFunctionSpec instead of id
-  @Column(name = "function_id", nullable = false)
-  private long functionId;
-
-  @Column(name = "function_type", nullable = false)
-  private String functionType;
-
-  @Column(name = "function_properties", nullable = false)
-  private String functionProperties;
-
-  @Column(name = "collection", nullable = false)
-  private String collection;
 
   @Column(name = "start_time_utc", nullable = false)
   private Long startTimeUtc;
@@ -40,9 +27,6 @@ public class AnomalyResult extends AbstractBaseEntity implements Comparable<Anom
 
   @Column(name = "dimensions", nullable = false)
   private String dimensions;
-
-  @Column(name = "metric", nullable = false)
-  private String metric;
 
   @Column(name = "score", nullable = false)
   private double score;
@@ -59,48 +43,52 @@ public class AnomalyResult extends AbstractBaseEntity implements Comparable<Anom
   @Column(name = "creation_time_utc", nullable = false)
   private Long creationTimeUtc;
 
-  @Column(name = "filters", nullable = true)
-  private String filters;
-
-  @OneToOne(cascade = CascadeType.ALL, fetch = FetchType.EAGER, orphanRemoval = true)
+  @OneToOne(cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
   @JoinColumn(name="anomaly_feedback_id")
   private AnomalyFeedback feedback;
+
+  @ManyToOne(cascade = CascadeType.ALL, fetch = FetchType.LAZY, optional = true)
+  @JoinColumn(name = "function_id")
+  private AnomalyFunctionSpec function;
 
   public AnomalyResult() {
     creationTimeUtc = DateTime.now().getMillis();
   }
 
-  public long getFunctionId() {
-    return functionId;
+  public AnomalyFunctionSpec getFunction() {
+    return function;
   }
 
-  public void setFunctionId(long functionId) {
-    this.functionId = functionId;
+  public void setFunction(AnomalyFunctionSpec function) {
+    this.function = function;
   }
 
-  public String getFunctionType() {
-    return functionType;
+  public String getDimensions() {
+    return dimensions;
   }
 
-  public void setFunctionType(String functionType) {
-    this.functionType = functionType;
+  public void setDimensions(String dimensions) {
+    this.dimensions = dimensions;
   }
 
-  public String getFunctionProperties() {
-    return functionProperties;
+  // --- TODO: remove methods above this comment ---
+  public Long getFunctionId() {
+    return function.getId();
   }
 
-  public void setFunctionProperties(String functionProperties) {
-    this.functionProperties = functionProperties;
+  public String getMetric() {
+    return function.getMetric();
   }
 
   public String getCollection() {
-    return collection;
+    return function.getCollection();
   }
 
-  public void setCollection(String collection) {
-    this.collection = collection;
+  public String getFilters() {
+    return function.getFilters();
   }
+
+  // --- remove methods above this comment ---
 
   public Long getStartTimeUtc() {
     return startTimeUtc;
@@ -116,22 +104,6 @@ public class AnomalyResult extends AbstractBaseEntity implements Comparable<Anom
 
   public void setEndTimeUtc(Long endTimeUtc) {
     this.endTimeUtc = endTimeUtc;
-  }
-
-  public String getDimensions() {
-    return dimensions;
-  }
-
-  public void setDimensions(String dimensions) {
-    this.dimensions = dimensions;
-  }
-
-  public String getMetric() {
-    return metric;
-  }
-
-  public void setMetric(String metric) {
-    this.metric = metric;
   }
 
   public double getScore() {
@@ -174,15 +146,6 @@ public class AnomalyResult extends AbstractBaseEntity implements Comparable<Anom
     this.creationTimeUtc = creationTimeUtc;
   }
 
-  public String getFilters() {
-    return filters;
-  }
-
-  public void setFilters(String filters) {
-    String sortedFilters = ThirdEyeUtils.getSortedFilters(filters);
-    this.filters = sortedFilters;
-  }
-
   public AnomalyFeedback getFeedback() {
     return feedback;
   }
@@ -193,13 +156,11 @@ public class AnomalyResult extends AbstractBaseEntity implements Comparable<Anom
 
   @Override
   public String toString() {
-    return MoreObjects.toStringHelper(this).add("id", getId()).add("functionId", functionId)
-        .add("functionType", functionType).add("functionProperties", functionProperties)
-        .add("collection", collection).add("startTimeUtc", startTimeUtc)
-        .add("endTimeUtc", endTimeUtc).add("dimensions", dimensions).add("metric", metric)
-        .add("score", score).add("weight", weight).add("properties", properties)
-        .add("message", message).add("creationTimeUtc", creationTimeUtc).add("filters", filters)
-        .add("feedback", feedback).toString();
+    return MoreObjects.toStringHelper(this).add("id", getId()).add("function", getFunction())
+        .add("startTimeUtc", startTimeUtc).add("dimensions", dimensions)
+        .add("endTimeUtc", endTimeUtc).add("score", score).add("weight", weight)
+        .add("properties", properties).add("message", message)
+        .add("creationTimeUtc", creationTimeUtc).add("feedback", feedback).toString();
   }
 
   @Override
@@ -208,24 +169,20 @@ public class AnomalyResult extends AbstractBaseEntity implements Comparable<Anom
       return false;
     }
     AnomalyResult r = (AnomalyResult) o;
-    return Objects.equals(functionId, r.getFunctionId())
-        && Objects.equals(functionType, r.getFunctionType())
-        && Objects.equals(functionProperties, r.getFunctionProperties())
-        && Objects.equals(collection, r.getCollection())
+    return Objects.equals(function, r.getFunction())
         && Objects.equals(startTimeUtc, r.getStartTimeUtc())
+        && Objects.equals(dimensions, r.getDimensions())
         && Objects.equals(endTimeUtc, r.getEndTimeUtc())
-        && Objects.equals(dimensions, r.getDimensions()) && Objects.equals(metric, r.getMetric())
         && Objects.equals(score, r.getScore()) && Objects.equals(weight, r.getWeight())
-        && Objects.equals(properties, r.getProperties()) && Objects.equals(message, r.getMessage())
-        && Objects.equals(filters, r.getFilters());
+        && Objects.equals(properties, r.getProperties()) && Objects.equals(message, r.getMessage());
     // Intentionally omit creationTimeUtc, since start/end are the truly significant dates for
     // anomalies
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(functionId, functionType, functionProperties, collection, startTimeUtc,
-        endTimeUtc, dimensions, metric, score, weight, properties, message, filters);
+    return Objects.hash(getFunction(), dimensions, startTimeUtc,
+        endTimeUtc, score, weight, properties, message);
     // Intentionally omit creationTimeUtc, since start/end are the truly significant dates for
     // anomalies
   }
@@ -233,7 +190,7 @@ public class AnomalyResult extends AbstractBaseEntity implements Comparable<Anom
   @Override
   public int compareTo(AnomalyResult o) {
     // compare by dimension, -startTime, functionId, id
-    int diff = ObjectUtils.compare(dimensions, o.getDimensions());
+    int diff = ObjectUtils.compare(getDimensions(), o.getDimensions());
     if (diff != 0) {
       return diff;
     }
@@ -242,7 +199,7 @@ public class AnomalyResult extends AbstractBaseEntity implements Comparable<Anom
     if (diff != 0) {
       return diff;
     }
-    diff = ObjectUtils.compare(functionId, o.getFunctionId());
+    diff = ObjectUtils.compare(getFunctionId(), o.getFunctionId());
     if (diff != 0) {
       return diff;
     }
