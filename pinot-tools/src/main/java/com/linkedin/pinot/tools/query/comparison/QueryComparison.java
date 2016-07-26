@@ -15,9 +15,13 @@
  */
 package com.linkedin.pinot.tools.query.comparison;
 
+import com.linkedin.pinot.tools.scan.query.GroupByOperator;
+import com.linkedin.pinot.tools.scan.query.QueryResponse;
+import com.linkedin.pinot.tools.scan.query.ScanBasedQueryProcessor;
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileReader;
+import java.io.FileInputStream;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -28,9 +32,6 @@ import org.json.JSONException;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.linkedin.pinot.tools.scan.query.GroupByOperator;
-import com.linkedin.pinot.tools.scan.query.QueryResponse;
-import com.linkedin.pinot.tools.scan.query.ScanBasedQueryProcessor;
 
 
 public class QueryComparison {
@@ -109,11 +110,13 @@ public class QueryComparison {
     BufferedReader resultReader = null;
     ScanBasedQueryProcessor scanBasedQueryProcessor = null;
 
-    try (BufferedReader queryReader = new BufferedReader(new FileReader(_queryFile))) {
+    try (
+        BufferedReader queryReader = new BufferedReader(new InputStreamReader(new FileInputStream(_queryFile), "UTF8"))
+    ) {
       if (_resultFile == null) {
         scanBasedQueryProcessor = new ScanBasedQueryProcessor(_segmentsDir.getAbsolutePath());
       } else {
-        resultReader = new BufferedReader(new FileReader(_resultFile));
+        resultReader = new BufferedReader(new InputStreamReader(new FileInputStream(_resultFile), "UTF8"));
       }
 
       int passed = 0;
@@ -178,16 +181,18 @@ public class QueryComparison {
 
   private void runPerfMode()
       throws Exception {
-    String query;
-    BufferedReader queryReader = new BufferedReader(new FileReader(_queryFile));
+    try (
+        BufferedReader queryReader = new BufferedReader(new InputStreamReader(new FileInputStream(_queryFile), "UTF8"))
+    ) {
+      String query;
+      while ((query = queryReader.readLine()) != null) {
+        if (query.isEmpty() || query.startsWith("#")) {
+          continue;
+        }
 
-    while ((query = queryReader.readLine()) != null) {
-      if (query.isEmpty() || query.startsWith("#")) {
-        continue;
+        int clientTime = _clusterStarter.perfQuery(query);
+        LOGGER.info("Client side response time: {} ms", clientTime);
       }
-
-      int clientTime = _clusterStarter.perfQuery(query);
-      LOGGER.info("Client side response time: {} ms", clientTime);
     }
   }
 
