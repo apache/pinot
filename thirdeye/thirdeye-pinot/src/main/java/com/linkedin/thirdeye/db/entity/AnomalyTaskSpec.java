@@ -3,13 +3,17 @@ package com.linkedin.thirdeye.db.entity;
 import java.sql.Timestamp;
 import java.util.Objects;
 
+
+import javax.persistence.CascadeType;
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.EnumType;
 import javax.persistence.Enumerated;
-import javax.persistence.NamedQueries;
-import javax.persistence.NamedQuery;
+import javax.persistence.FetchType;
+import javax.persistence.JoinColumn;
+import javax.persistence.ManyToOne;
 import javax.persistence.Table;
+import javax.persistence.Version;
 
 import com.google.common.base.MoreObjects;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
@@ -22,19 +26,12 @@ import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
  */
 @Entity
 @Table(name = "anomaly_tasks")
-@NamedQueries({
-    @NamedQuery(name = "com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#findAll", query = "SELECT at FROM AnomalyTaskSpec at"),
-    @NamedQuery(name = "com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#findByJobId", query = "SELECT at FROM AnomalyTaskSpec at WHERE at.jobId = :jobId"),
-    @NamedQuery(name = "com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#findByJobIdAndStatusNotIn", query = "SELECT at FROM AnomalyTaskSpec at WHERE at.jobId = :jobId AND at.status != :status"),
-    @NamedQuery(name = "com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#findByStatusOrderByCreateTimeAscending", query = "SELECT at FROM AnomalyTaskSpec at WHERE at.status = :status order by at.taskStartTime asc"),
-    @NamedQuery(name = "com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#updateStatusAndTaskEndTime", query = "UPDATE AnomalyTaskSpec SET status = :newStatus, taskEndTime = :taskEndTime WHERE status = :oldStatus and id = :id"),
-    @NamedQuery(name = "com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#updateStatusAndWorkerId", query = "UPDATE AnomalyTaskSpec SET status = :newStatus, workerId = :workerId WHERE status = :oldStatus and id = :id"),
-    @NamedQuery(name = "com.linkedin.thirdeye.anomaly.AnomalyTaskSpec#deleteRecordsOlderThanDaysWithStatus", query = "DELETE FROM AnomalyTaskSpec WHERE status = :status AND lastModified < :expireTimestamp")
-})
+
 public class AnomalyTaskSpec extends AbstractBaseEntity {
 
-  @Column(name = "job_id", nullable = false)
-  private long jobId;
+  @ManyToOne(cascade = CascadeType.ALL, fetch = FetchType.EAGER, optional = true)
+  @JoinColumn(name = "job_id")
+  private AnomalyJobSpec job;
 
   @Enumerated(EnumType.STRING)
   @Column(name = "task_type", nullable = false)
@@ -59,11 +56,21 @@ public class AnomalyTaskSpec extends AbstractBaseEntity {
   @Column(name = "task_info", nullable = false)
   private String taskInfo;
 
-  @Column(name = "last_modified", nullable = false)
+  @Column(name = "last_modified", insertable=false, updatable=false,
+      columnDefinition="TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
   private Timestamp lastModified;
 
-  public long getJobId() {
-    return jobId;
+  @Version
+  @Column(name = "version", columnDefinition = "integer DEFAULT 0", nullable = false)
+  private int version;
+
+
+  public AnomalyJobSpec getJob() {
+    return job;
+  }
+
+  public void setJob(AnomalyJobSpec job) {
+    this.job = job;
   }
 
   public Long getWorkerId() {
@@ -80,10 +87,6 @@ public class AnomalyTaskSpec extends AbstractBaseEntity {
 
   public String getJobName() {
     return jobName;
-  }
-
-  public void setJobId(long jobId) {
-    this.jobId = jobId;
   }
 
   public TaskStatus getStatus() {
@@ -131,6 +134,9 @@ public class AnomalyTaskSpec extends AbstractBaseEntity {
     return lastModified;
   }
 
+  public int getVersion() {
+    return version;
+  }
 
   @Override
   public boolean equals(Object o) {
@@ -138,20 +144,18 @@ public class AnomalyTaskSpec extends AbstractBaseEntity {
       return false;
     }
     AnomalyTaskSpec af = (AnomalyTaskSpec) o;
-    return Objects.equals(getId(), af.getId()) && Objects.equals(jobId, af.getJobId()) && Objects
-        .equals(status, af.getStatus()) && Objects.equals(taskStartTime, af.getTaskStartTime())
-        && Objects.equals(taskEndTime, af.getTaskEndTime()) && Objects
-        .equals(taskInfo, af.getTaskInfo());
+    return Objects.equals(getId(), af.getId()) && Objects.equals(status, af.getStatus())
+        && Objects.equals(taskStartTime, af.getTaskStartTime()) && Objects.equals(taskEndTime, af.getTaskEndTime())
+        && Objects.equals(taskInfo, af.getTaskInfo()) && Objects.equals(job, af.getJob());
   }
 
   @Override public int hashCode() {
-    return Objects.hash(getId(), jobId, status, taskStartTime, taskEndTime, taskInfo);
+    return Objects.hash(getId(), job, status, taskStartTime, taskEndTime, taskInfo);
   }
-
 
   @Override
   public String toString() {
-    return MoreObjects.toStringHelper(this).add("id", getId()).add("jobId", jobId)
+    return MoreObjects.toStringHelper(this).add("id", getId()).add("job", getJob())
         .add("status", status).add("startTime", taskStartTime).add("endTime", taskEndTime)
         .add("taskInfo", taskInfo).add("lastModified", lastModified).toString();
   }

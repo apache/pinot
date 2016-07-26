@@ -17,6 +17,7 @@ public class TestAnomalyFunctionDAO extends AbstractDbTestBase {
   public void testCreate() {
     anomalyFunctionId = anomalyFunctionDAO.save(getTestFunctionSpec());
     Assert.assertNotNull(anomalyFunctionId);
+
     // test fetch all
     List<AnomalyFunctionSpec> functions = anomalyFunctionDAO.findAll();
     Assert.assertEquals(functions.size(), 1);

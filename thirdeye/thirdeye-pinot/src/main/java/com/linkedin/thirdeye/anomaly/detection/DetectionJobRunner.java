@@ -1,16 +1,15 @@
 package com.linkedin.thirdeye.anomaly.detection;
 
 import com.linkedin.thirdeye.db.dao.AnomalyFunctionDAO;
-import io.dropwizard.hibernate.UnitOfWork;
+import com.linkedin.thirdeye.db.dao.AnomalyJobDAO;
+import com.linkedin.thirdeye.db.dao.AnomalyTaskDAO;
+
 
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-import org.hibernate.Session;
-import org.hibernate.SessionFactory;
-import org.hibernate.context.internal.ManagedSessionContext;
 import org.joda.time.DateTime;
 import org.joda.time.format.ISODateTimeFormat;
 import org.quartz.Job;
@@ -24,8 +23,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
 import com.linkedin.thirdeye.db.entity.AnomalyJobSpec;
 import com.linkedin.thirdeye.db.entity.AnomalyTaskSpec;
-import com.linkedin.thirdeye.detector.db.dao.AnomalyJobSpecDAO;
-import com.linkedin.thirdeye.detector.db.dao.AnomalyTaskSpecDAO;
 import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
@@ -38,10 +35,9 @@ public class DetectionJobRunner implements Job {
 
   public static final String DETECTION_JOB_CONTEXT = "DETECTION_JOB_CONTEXT";
 
-  private AnomalyJobSpecDAO anomalyJobSpecDAO;
-  private AnomalyTaskSpecDAO anomalyTasksSpecDAO;
+  private AnomalyJobDAO anomalyJobSpecDAO;
+  private AnomalyTaskDAO anomalyTasksSpecDAO;
   private AnomalyFunctionDAO anomalyFunctionSpecDAO;
-  private SessionFactory sessionFactory;
   private long anomalyFunctionId;
   private DateTime windowStart;
   private DateTime windowEnd;
@@ -59,10 +55,9 @@ public class DetectionJobRunner implements Job {
 
     detectionJobContext = (DetectionJobContext) jobExecutionContext.getJobDetail().getJobDataMap()
         .get(DETECTION_JOB_CONTEXT);
-    sessionFactory = detectionJobContext.getSessionFactory();
-    anomalyJobSpecDAO = detectionJobContext.getAnomalyJobSpecDAO();
-    anomalyTasksSpecDAO = detectionJobContext.getAnomalyTaskSpecDAO();
-    anomalyFunctionSpecDAO = detectionJobContext.getAnomalyFunctionSpecDAO();
+    anomalyJobSpecDAO = detectionJobContext.getAnomalyJobDAO();
+    anomalyTasksSpecDAO = detectionJobContext.getAnomalyTaskDAO();
+    anomalyFunctionSpecDAO = detectionJobContext.getAnomalyFunctionDAO();
     anomalyFunctionId = detectionJobContext.getAnomalyFunctionId();
 
     AnomalyFunctionSpec anomalyFunctionSpec = getAnomalyFunctionSpec(anomalyFunctionId);
@@ -105,14 +100,9 @@ public class DetectionJobRunner implements Job {
 
   }
 
-
-  @UnitOfWork
   private long createJob() {
-    Session session = sessionFactory.openSession();
     Long jobExecutionId = null;
     try {
-      ManagedSessionContext.bind(session);
-
       AnomalyJobSpec anomalyJobSpec = new AnomalyJobSpec();
       anomalyJobSpec.setJobName(detectionJobContext.getJobName());
       anomalyJobSpec.setWindowStartTime(detectionJobContext.getWindowStart().getMillis());
@@ -125,20 +115,14 @@ public class DetectionJobRunner implements Job {
           jobExecutionId);
     } catch (Exception e) {
       LOG.error("Exception in creating detection job", e);
-    } finally {
-      session.close();
-      ManagedSessionContext.unbind(sessionFactory);
     }
 
     return jobExecutionId;
   }
 
-  @UnitOfWork
   private List<Long> createTasks() {
-    Session session = sessionFactory.openSession();
     List<Long> taskIds = new ArrayList<>();
     try {
-      ManagedSessionContext.bind(session);
 
       List<DetectionTaskInfo> tasks = taskGenerator.createDetectionTasks(detectionJobContext);
 
@@ -150,38 +134,29 @@ public class DetectionJobRunner implements Job {
           LOG.error("Exception when converting DetectionTaskInfo {} to jsonString", taskInfo, e);
         }
         AnomalyTaskSpec anomalyTaskSpec = new AnomalyTaskSpec();
-        anomalyTaskSpec.setJobId(detectionJobContext.getJobExecutionId());
         anomalyTaskSpec.setTaskType(TaskType.ANOMALY_DETECTION);
         anomalyTaskSpec.setJobName(detectionJobContext.getJobName());
         anomalyTaskSpec.setStatus(TaskStatus.WAITING);
         anomalyTaskSpec.setTaskStartTime(System.currentTimeMillis());
         anomalyTaskSpec.setTaskInfo(taskInfoJson);
+        AnomalyJobSpec anomalyJobSpec = anomalyJobSpecDAO.findById(detectionJobContext.getJobExecutionId());
+        anomalyTaskSpec.setJob(anomalyJobSpec);
         long taskId = anomalyTasksSpecDAO.save(anomalyTaskSpec);
         taskIds.add(taskId);
         LOG.info("Created anomalyTask {} with taskId {}", anomalyTaskSpec, taskId);
       }
     } catch (Exception e) {
       LOG.error("Exception in creating detection tasks", e);
-    } finally {
-      session.close();
-      ManagedSessionContext.unbind(sessionFactory);
     }
-
     return taskIds;
   }
 
-  @UnitOfWork
   private AnomalyFunctionSpec getAnomalyFunctionSpec(Long anomalyFunctionId) {
-    Session session = sessionFactory.openSession();
     AnomalyFunctionSpec anomalyFunctionSpec = null;
     try {
-      ManagedSessionContext.bind(session);
       anomalyFunctionSpec = anomalyFunctionSpecDAO.findById(anomalyFunctionId);
     } catch (Exception e)  {
       LOG.error("Exception in getting anomalyFunctionSpec by id", e);
-    } finally {
-      session.close();
-      ManagedSessionContext.unbind(sessionFactory);
     }
     return anomalyFunctionSpec;
   }

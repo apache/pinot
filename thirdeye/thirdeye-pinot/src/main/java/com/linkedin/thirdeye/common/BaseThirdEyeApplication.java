@@ -9,7 +9,9 @@ import com.linkedin.thirdeye.dashboard.configs.DashboardConfig;
 import com.linkedin.thirdeye.dashboard.configs.FileBasedConfigDAOFactory;
 import com.linkedin.thirdeye.dashboard.configs.WidgetConfig;
 import com.linkedin.thirdeye.db.dao.AnomalyFunctionDAO;
+import com.linkedin.thirdeye.db.dao.AnomalyJobDAO;
 import com.linkedin.thirdeye.db.dao.AnomalyResultDAO;
+import com.linkedin.thirdeye.db.dao.AnomalyTaskDAO;
 import com.linkedin.thirdeye.db.dao.EmailConfigurationDAO;
 import com.linkedin.thirdeye.db.entity.AnomalyFeedback;
 import com.linkedin.thirdeye.db.entity.AnomalyFunctionRelation;
@@ -20,14 +22,13 @@ import com.linkedin.thirdeye.db.entity.AnomalyTaskSpec;
 import com.linkedin.thirdeye.db.entity.EmailConfiguration;
 import com.linkedin.thirdeye.db.entity.EmailFunctionDependency;
 import com.linkedin.thirdeye.detector.db.AnomalyFunctionRelationDAO;
-import com.linkedin.thirdeye.detector.db.dao.AnomalyJobSpecDAO;
-import com.linkedin.thirdeye.detector.db.dao.AnomalyTaskSpecDAO;
 import com.linkedin.thirdeye.detector.db.EmailFunctionDependencyDAO;
 
 import io.dropwizard.Application;
 import io.dropwizard.Configuration;
 import io.dropwizard.db.DataSourceFactory;
 import io.dropwizard.hibernate.HibernateBundle;
+
 import java.io.File;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,22 +47,23 @@ public abstract class BaseThirdEyeApplication<T extends Configuration> extends A
         }
       };
 
-  protected AnomalyFunctionDAO anomalyFunctionSpecDAO;
+  protected AnomalyFunctionDAO anomalyFunctionDAO;
   protected AnomalyResultDAO anomalyResultDAO;
   protected EmailConfigurationDAO emailConfigurationDAO;
+  protected AnomalyJobDAO anomalyJobDAO;
+  protected AnomalyTaskDAO anomalyTaskDAO;
 
   protected AnomalyFunctionRelationDAO anomalyFunctionRelationDAO;
   protected EmailFunctionDependencyDAO emailFunctionDependencyDAO;
-  protected AnomalyJobSpecDAO anomalyJobSpecDAO;
-  protected AnomalyTaskSpecDAO anomalyTaskSpecDAO;
 
   public void initDashboardRelatedDAO() {
     String persistenceConfig = System.getProperty("dw.rootDir") + "/persistence.yml";
     LOG.info("Loading persistence config from [{}]", persistenceConfig);
     PersistenceUtil.init(new File(persistenceConfig));
-    anomalyFunctionSpecDAO = PersistenceUtil.getInstance(AnomalyFunctionDAO.class);
+    anomalyFunctionDAO = PersistenceUtil.getInstance(AnomalyFunctionDAO.class);
     anomalyResultDAO = PersistenceUtil.getInstance(AnomalyResultDAO.class);
     emailConfigurationDAO = PersistenceUtil.getInstance(EmailConfigurationDAO.class);
+
   }
 
   public void initDetectorRelatedDAO() {
@@ -71,8 +73,10 @@ public abstract class BaseThirdEyeApplication<T extends Configuration> extends A
         new AnomalyFunctionRelationDAO(hibernateBundle.getSessionFactory());
     emailFunctionDependencyDAO =
         new EmailFunctionDependencyDAO(hibernateBundle.getSessionFactory());
-    anomalyJobSpecDAO = new AnomalyJobSpecDAO(hibernateBundle.getSessionFactory());
-    anomalyTaskSpecDAO = new AnomalyTaskSpecDAO(hibernateBundle.getSessionFactory());
+
+    anomalyJobDAO = PersistenceUtil.getInstance(AnomalyJobDAO.class);
+    anomalyTaskDAO = PersistenceUtil.getInstance(AnomalyTaskDAO.class);
+
   }
 
   // TODO below two methods depend on webapp configs

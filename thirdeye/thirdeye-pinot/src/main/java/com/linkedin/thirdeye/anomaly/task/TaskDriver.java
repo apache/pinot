@@ -1,6 +1,9 @@
 package com.linkedin.thirdeye.anomaly.task;
 
+import com.linkedin.thirdeye.db.dao.AnomalyJobDAO;
 import com.linkedin.thirdeye.db.dao.AnomalyResultDAO;
+import com.linkedin.thirdeye.db.dao.AnomalyTaskDAO;
+
 import io.dropwizard.hibernate.UnitOfWork;
 
 import java.util.ArrayList;
@@ -20,48 +23,43 @@ import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
 import com.linkedin.thirdeye.db.entity.AnomalyTaskSpec;
 import com.linkedin.thirdeye.detector.db.AnomalyFunctionRelationDAO;
-import com.linkedin.thirdeye.detector.db.dao.AnomalyJobSpecDAO;
-import com.linkedin.thirdeye.detector.db.dao.AnomalyTaskSpecDAO;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 
 public class TaskDriver {
 
   private static final Logger LOG = LoggerFactory.getLogger(TaskDriver.class);
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private ExecutorService taskExecutorService;
 
-  private AnomalyJobSpecDAO anomalyJobSpecDAO;
-  private AnomalyTaskSpecDAO anomalyTaskSpecDAO;
+  private AnomalyJobDAO anomalyJobDAO;
+  private AnomalyTaskDAO anomalyTaskDAO;
   private AnomalyResultDAO anomalyResultDAO;
   private AnomalyFunctionRelationDAO anomalyFunctionRelationDAO;
-  private SessionFactory sessionFactory;
   private AnomalyFunctionFactory anomalyFunctionFactory;
+  private SessionFactory sessionFactory;
   private TaskContext taskContext;
   private long workerId;
 
   volatile boolean shutdown = false;
   private static int MAX_PARALLEL_TASK = 3;
 
-  public TaskDriver(long workerId, AnomalyJobSpecDAO anomalyJobSpecDAO, AnomalyTaskSpecDAO anomalyTaskSpecDAO,
+  public TaskDriver(long workerId, AnomalyJobDAO anomalyJobDAO, AnomalyTaskDAO anomalyTaskDAO,
       AnomalyResultDAO anomalyResultDAO, AnomalyFunctionRelationDAO anomalyFunctionRelationDAO,
-      SessionFactory sessionFactory, AnomalyFunctionFactory anomalyFunctionFactory) {
+      AnomalyFunctionFactory anomalyFunctionFactory, SessionFactory sessionFactory) {
     this.workerId = workerId;
-    this.anomalyTaskSpecDAO = anomalyTaskSpecDAO;
+    this.anomalyTaskDAO = anomalyTaskDAO;
     this.anomalyResultDAO = anomalyResultDAO;
     this.anomalyFunctionRelationDAO = anomalyFunctionRelationDAO;
-    this.sessionFactory = sessionFactory;
     this.anomalyFunctionFactory = anomalyFunctionFactory;
     taskExecutorService = Executors.newFixedThreadPool(MAX_PARALLEL_TASK);
 
     taskContext = new TaskContext();
-    taskContext.setAnomalyJobSpecDAO(anomalyJobSpecDAO);
-    taskContext.setAnomalyTaskSpecDAO(anomalyTaskSpecDAO);
+    taskContext.setAnomalyJobDAO(anomalyJobDAO);
+    taskContext.setAnomalyTaskDAO(anomalyTaskDAO);
     taskContext.setRelationDAO(anomalyFunctionRelationDAO);
     taskContext.setResultDAO(anomalyResultDAO);
-    taskContext.setSessionFactory(sessionFactory);
     taskContext.setAnomalyFunctionFactory(anomalyFunctionFactory);
-
+    taskContext.setSessionFactory(sessionFactory);
   }
 
   public void start() throws Exception {
@@ -110,23 +108,21 @@ public class TaskDriver {
     taskExecutorService.shutdown();
   }
 
-  @UnitOfWork
   private AnomalyTaskSpec selectAndUpdate() throws Exception {
     LOG.info(Thread.currentThread().getId() + " : Starting selectAndUpdate {}", Thread.currentThread().getId());
     AnomalyTaskSpec acquiredTask = null;
     LOG.info(Thread.currentThread().getId() + " : Trying to find a task to execute");
     do {
-      Session session = sessionFactory.openSession();
-      ManagedSessionContext.bind(session);
+
       try {
         List<AnomalyTaskSpec> anomalyTasks =
-            anomalyTaskSpecDAO.findByStatusOrderByCreateTimeAscending(TaskStatus.WAITING);
+            anomalyTaskDAO.findByStatusOrderByCreateTimeAscending(TaskStatus.WAITING);
         if (anomalyTasks.size() > 0)
           LOG.info(Thread.currentThread().getId() + " : Found {} tasks in waiting state", anomalyTasks.size());
 
         for (AnomalyTaskSpec anomalyTaskSpec : anomalyTasks) {
           LOG.info(Thread.currentThread().getId() + " : Trying to acquire task : {}", anomalyTaskSpec.getId());
-          boolean success = anomalyTaskSpecDAO.updateStatusAndWorkerId(workerId, anomalyTaskSpec.getId(),
+          boolean success = anomalyTaskDAO.updateStatusAndWorkerId(workerId, anomalyTaskSpec.getId(),
               TaskStatus.WAITING, TaskStatus.RUNNING);
           LOG.info(Thread.currentThread().getId() + " : Task acquired success: {}", success);
           if (success) {
@@ -136,9 +132,6 @@ public class TaskDriver {
         }
       } catch (Exception e) {
         LOG.error("Exception in select and update", e);
-      } finally {
-        session.close();
-        ManagedSessionContext.unbind(sessionFactory);
       }
     } while (acquiredTask == null);
     LOG.info(Thread.currentThread().getId() + " : Acquired task ======" + acquiredTask);
@@ -146,21 +139,14 @@ public class TaskDriver {
     return acquiredTask;
   }
 
-  @UnitOfWork
   private void updateStatusAndTaskEndime(long taskId, TaskStatus oldStatus, TaskStatus newStatus) throws Exception {
     LOG.info(Thread.currentThread().getId() + " : Starting updateStatus {}", Thread.currentThread().getId());
 
-    Session session = sessionFactory.openSession();
-    ManagedSessionContext.bind(session);
     try {
-      boolean updateStatus = anomalyTaskSpecDAO.updateStatusAndTaskEndTime(taskId, oldStatus, newStatus, System.currentTimeMillis());
-      LOG.info(Thread.currentThread().getId() + " : update status {}", updateStatus);
-
+      anomalyTaskDAO.updateStatusAndTaskEndTime(taskId, oldStatus, newStatus, System.currentTimeMillis());
+      LOG.info(Thread.currentThread().getId() + " : updated status {}", newStatus);
     } catch (Exception e) {
       LOG.error("Exception in updating status and task end time", e);
-    } finally {
-      session.close();
-      ManagedSessionContext.unbind(sessionFactory);
     }
   }
 

@@ -1,7 +1,6 @@
 package com.linkedin.thirdeye.anomaly.detection;
 
 import com.linkedin.thirdeye.constant.MetricAggFunction;
-
 import com.linkedin.thirdeye.db.dao.AnomalyResultDAO;
 
 import java.util.ArrayList;
@@ -55,7 +54,6 @@ public class DetectionTaskRunner implements TaskRunner {
 
   private AnomalyResultDAO resultDAO;
   private AnomalyFunctionRelationDAO relationDAO;
-  private SessionFactory sessionFactory;
 
   private String collection;
   private List<String> collectionDimensions;
@@ -67,6 +65,7 @@ public class DetectionTaskRunner implements TaskRunner {
   private AnomalyFunction anomalyFunction;
   private AnomalyFunctionSpec anomalyFunctionSpec;
   private AnomalyFunctionFactory anomalyFunctionFactory;
+  private SessionFactory sessionFactory;
 
   public DetectionTaskRunner() {
     queryCache = CACHE_REGISTRY_INSTANCE.getQueryCache();
@@ -81,9 +80,8 @@ public class DetectionTaskRunner implements TaskRunner {
     LOG.info("Begin executing task {}", taskInfo);
     resultDAO = taskContext.getResultDAO();
     relationDAO = taskContext.getRelationDAO();
-    sessionFactory = taskContext.getSessionFactory();
     anomalyFunctionFactory = taskContext.getAnomalyFunctionFactory();
-
+    sessionFactory = taskContext.getSessionFactory();
     anomalyFunctionSpec = detectionTaskInfo.getAnomalyFunctionSpec();
     anomalyFunction = anomalyFunctionFactory.fromSpec(anomalyFunctionSpec);
     windowStart = detectionTaskInfo.getWindowStartTime();
@@ -219,24 +217,23 @@ public class DetectionTaskRunner implements TaskRunner {
   }
 
   private void handleResults(List<AnomalyResult> results) {
+    for (AnomalyResult result : results) {
+      try {
+        // Properties that always come from the function spec
+        AnomalyFunctionSpec spec = anomalyFunction.getSpec();
 
-      for (AnomalyResult result : results) {
-        try {
-          // Properties that always come from the function spec
-          AnomalyFunctionSpec spec = anomalyFunction.getSpec();
+        // make sure score and weight are valid numbers
+        result.setScore(normalize(result.getScore()));
+        result.setWeight(normalize(result.getWeight()));
+        resultDAO.save(result);
 
-          // make sure score and weight are valid numbers
-          result.setScore(normalize(result.getScore()));
-          result.setWeight(normalize(result.getWeight()));
-          resultDAO.save(result);
-
-          // now save the function entity and update result
-          result.setFunction(spec);
-          resultDAO.update(result);
-        } catch (Exception e) {
-          LOG.error("Exception in saving anomaly result : " + result.toString(), e);
-        }
+        // now save the function entity and update result
+        result.setFunction(spec);
+        resultDAO.update(result);
+      } catch (Exception e) {
+        LOG.error("Exception in saving anomaly result : " + result.toString(), e);
       }
+    }
   }
 
   /** Handle any infinite or NaN values by replacing them with +/- max value or 0 */

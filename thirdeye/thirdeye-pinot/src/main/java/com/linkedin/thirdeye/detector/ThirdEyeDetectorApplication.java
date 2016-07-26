@@ -139,7 +139,7 @@ public class ThirdEyeDetectorApplication
 
     // ThirdEye driver
     final AnomalyDetectionJobManager anomalyDetectionJobManager = new AnomalyDetectionJobManager(quartzScheduler,
-        anomalyFunctionSpecDAO, anomalyFunctionRelationDAO, anomalyResultDAO, hibernateBundle.getSessionFactory(),
+        anomalyFunctionDAO, anomalyFunctionRelationDAO, anomalyResultDAO, hibernateBundle.getSessionFactory(),
         environment.metrics(), anomalyFunctionFactory, config.getFailureEmailConfig());
 
     // Start all active jobs on startup
@@ -150,7 +150,7 @@ public class ThirdEyeDetectorApplication
             .execute(new Callable<Void>() {
               @Override
               public Void call() throws Exception {
-                List<AnomalyFunctionSpec> functions = anomalyFunctionSpecDAO.findAll();
+                List<AnomalyFunctionSpec> functions = anomalyFunctionDAO.findAll();
                 LinkedList<AnomalyFunctionSpec> failedToStart = new LinkedList<AnomalyFunctionSpec>();
                 for (AnomalyFunctionSpec function : functions) {
                   if (function.getIsActive()) {
@@ -257,11 +257,11 @@ public class ThirdEyeDetectorApplication
     });
 
     // Jersey resources
-    environment.jersey().register(new AnomalyFunctionSpecResource(anomalyFunctionSpecDAO));
+    environment.jersey().register(new AnomalyFunctionSpecResource(anomalyFunctionDAO));
     environment.jersey().register(new AnomalyFunctionRelationResource(anomalyFunctionRelationDAO));
     environment.jersey().register(new AnomalyResultResource(anomalyResultDAO));
     environment.jersey().register(new MetricsGraphicsTimeSeriesResource(anomalyResultDAO));
-    environment.jersey().register(new AnomalyDetectionJobResource(anomalyDetectionJobManager, anomalyFunctionSpecDAO));
+    environment.jersey().register(new AnomalyDetectionJobResource(anomalyDetectionJobManager, anomalyFunctionDAO));
     environment.jersey().register(new EmailReportJobResource(emailReportJobManager, emailConfigurationDAO));
     environment.jersey().register(new EmailReportResource(emailConfigurationDAO, emailReportJobManager));
     environment.jersey().register(new EmailFunctionDependencyResource(emailFunctionDependencyDAO));

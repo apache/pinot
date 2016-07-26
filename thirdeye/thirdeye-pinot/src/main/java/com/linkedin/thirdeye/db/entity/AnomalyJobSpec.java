@@ -4,14 +4,13 @@ import java.sql.Timestamp;
 import java.util.List;
 import java.util.Objects;
 
+import javax.persistence.CascadeType;
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.EnumType;
 import javax.persistence.Enumerated;
 import javax.persistence.FetchType;
 import javax.persistence.JoinColumn;
-import javax.persistence.NamedQueries;
-import javax.persistence.NamedQuery;
 import javax.persistence.OneToMany;
 import javax.persistence.Table;
 
@@ -24,12 +23,7 @@ import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
  */
 @Entity
 @Table(name = "anomaly_jobs")
-@NamedQueries({
-    @NamedQuery(name = "com.linkedin.thirdeye.anomaly.AnomalyJobSpec#findAll", query = "SELECT aj FROM AnomalyJobSpec aj"),
-    @NamedQuery(name = "com.linkedin.thirdeye.anomaly.AnomalyJobSpec#findByStatus", query = "SELECT aj FROM AnomalyJobSpec aj WHERE aj.status = :status"),
-    @NamedQuery(name = "com.linkedin.thirdeye.anomaly.AnomalyJobSpec#updateStatusAndJobEndTime", query = "UPDATE AnomalyJobSpec SET status = :status, scheduleEndTime = :jobEndTime WHERE id = :id"),
-    @NamedQuery(name = "com.linkedin.thirdeye.anomaly.AnomalyJobSpec#deleteRecordsOlderThanDaysWithStatus", query = "DELETE FROM AnomalyJobSpec WHERE status = :status AND lastModified < :expireTimestamp")
-})
+
 public class AnomalyJobSpec extends AbstractBaseEntity {
 
   @Column(name = "job_name", nullable = false)
@@ -51,11 +45,11 @@ public class AnomalyJobSpec extends AbstractBaseEntity {
   @Column(name = "window_end_time")
   private long windowEndTime;
 
-  @Column(name = "last_modified")
+  @Column(name = "last_modified", insertable=false, updatable=false,
+      columnDefinition="TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
   private Timestamp lastModified;
 
-  @OneToMany(fetch = FetchType.LAZY)
-  @JoinColumn(name = "job_execution_id", referencedColumnName = "id")
+  @OneToMany(mappedBy = "job", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
   private List<AnomalyTaskSpec> anomalyTasks;
 
   public String getJobName() {
