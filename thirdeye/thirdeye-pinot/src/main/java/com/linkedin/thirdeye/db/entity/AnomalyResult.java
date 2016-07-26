@@ -43,11 +43,11 @@ public class AnomalyResult extends AbstractBaseEntity implements Comparable<Anom
   @Column(name = "creation_time_utc", nullable = false)
   private Long creationTimeUtc;
 
-  @OneToOne(cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
+  @OneToOne(cascade = CascadeType.ALL, fetch = FetchType.EAGER, orphanRemoval = true)
   @JoinColumn(name="anomaly_feedback_id")
   private AnomalyFeedback feedback;
 
-  @ManyToOne(cascade = CascadeType.ALL, fetch = FetchType.LAZY, optional = true)
+  @ManyToOne(cascade = CascadeType.ALL, fetch = FetchType.EAGER, optional = true)
   @JoinColumn(name = "function_id")
   private AnomalyFunctionSpec function;
 

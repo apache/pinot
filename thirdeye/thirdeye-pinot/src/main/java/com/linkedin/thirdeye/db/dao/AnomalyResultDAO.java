@@ -18,7 +18,7 @@ public class AnomalyResultDAO extends AbstractJpaDAO<AnomalyResult> {
           + "OR (r.endTimeUtc >= :startTimeUtc AND r.endTimeUtc <= :endTimeUtc))";
 
   private static final String FIND_BY_COLLECTION_TIME_METRIC_DIMENSION =
-      "SELECT r FROM AnomalyResult r WHERE r.function.collection = :collection" + "AND r.function.metric = :metric "
+      "SELECT r FROM AnomalyResult r WHERE r.function.collection = :collection AND r.function.metric = :metric "
           + "AND r.dimensions IN :dimensions "
           + "AND ((r.startTimeUtc >= :startTimeUtc AND r.startTimeUtc <= :endTimeUtc) "
           + "OR (r.endTimeUtc >= :startTimeUtc AND r.endTimeUtc <= :endTimeUtc)) ";
@@ -30,7 +30,7 @@ public class AnomalyResultDAO extends AbstractJpaDAO<AnomalyResult> {
           + "OR (r.endTimeUtc >= :startTimeUtc AND r.endTimeUtc <= :endTimeUtc))";
 
   private static final String FIND_BY_COLLECTION_TIME_METRIC_FILTERS =
-      "SELECT r FROM AnomalyResult r WHERE r.function.collection = :collection " + "AND r.function.metric = :metric "
+      "SELECT r FROM AnomalyResult r WHERE r.function.collection = :collection AND r.function.metric = :metric "
           + "AND ((r.function.filters = :filters) or (r.function.filters is NULL and :filters is NULL)) "
           + "AND ((r.startTimeUtc >= :startTimeUtc AND r.startTimeUtc <= :endTimeUtc) "
           + "OR (r.endTimeUtc >= :startTimeUtc AND r.endTimeUtc <= :endTimeUtc))";
@@ -45,8 +45,7 @@ public class AnomalyResultDAO extends AbstractJpaDAO<AnomalyResult> {
       + "OR (r.endTimeUtc >= :startTimeUtc AND r.endTimeUtc <= :endTimeUtc))";
 
   private static final String FIND_BY_TIME_EMAIL_ID = "SELECT r FROM EmailConfiguration d JOIN d.functions f JOIN f.anomalies r "
-      + "WHERE d.id = :emailId "
-      + "AND ((r.startTimeUtc >= :startTimeUtc AND r.startTimeUtc <= :endTimeUtc) "
+      + "WHERE d.id = :emailId AND ((r.startTimeUtc >= :startTimeUtc AND r.startTimeUtc <= :endTimeUtc) "
       + "OR (r.endTimeUtc >= :startTimeUtc AND r.endTimeUtc <= :endTimeUtc))";
 
   public AnomalyResultDAO() {
