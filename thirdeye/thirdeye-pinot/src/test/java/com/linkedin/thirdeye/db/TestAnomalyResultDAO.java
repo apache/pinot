@@ -1,11 +1,16 @@
 package com.linkedin.thirdeye.db;
 
+import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
+import com.linkedin.thirdeye.constant.FeedbackStatus;
+import com.linkedin.thirdeye.db.entity.AnomalyFeedback;
 import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
 import com.linkedin.thirdeye.db.entity.AnomalyResult;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
 public class TestAnomalyResultDAO extends AbstractDbTestBase {
+
+  Long anomalyResultId;
 
   @Test
   public void testAnomalyResultCRUD() {
@@ -24,7 +29,27 @@ public class TestAnomalyResultDAO extends AbstractDbTestBase {
     AnomalyFunctionSpec specRet = anomalyFunctionDAO.findById(spec.getId());
     Assert.assertEquals(specRet.getAnomalies().size(), 1);
 
-    anomalyResultDAO.deleteById(result.getId());
+    anomalyResultId = result.getId();
+  }
+
+  @Test(dependsOnMethods = {"testAnomalyResultCRUD"})
+  public void testResultFeedback() {
+    AnomalyResult result = anomalyResultDAO.findById(anomalyResultId);
+    Assert.assertNotNull(result);
+    Assert.assertNull(result.getFeedback());
+
+    AnomalyFeedback feedback = new AnomalyFeedback();
+    feedback.setComment("this is a good find");
+    feedback.setFeedbackType(AnomalyFeedbackType.ANOMALY);
+    feedback.setStatus(FeedbackStatus.NEW);
+    result.setFeedback(feedback);
+    anomalyResultDAO.update(result);
+
+    AnomalyResult resultRet = anomalyResultDAO.findById(anomalyResultId);
+    Assert.assertEquals(resultRet.getId(), result.getId());
+    Assert.assertNotNull(resultRet.getFeedback());
+
+    anomalyResultDAO.deleteById(anomalyResultId);
   }
 
   static AnomalyResult getAnomalyResult() {
