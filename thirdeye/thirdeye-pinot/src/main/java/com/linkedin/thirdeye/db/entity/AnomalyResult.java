@@ -25,6 +25,9 @@ public class AnomalyResult extends AbstractBaseEntity implements Comparable<Anom
   @Column(name = "end_time_utc", nullable = true)
   private Long endTimeUtc;
 
+  @Column(name = "dimensions", nullable = false)
+  private String dimensions;
+
   @Column(name = "score", nullable = false)
   private double score;
 
@@ -60,12 +63,17 @@ public class AnomalyResult extends AbstractBaseEntity implements Comparable<Anom
     this.function = function;
   }
 
+  public String getDimensions() {
+    return dimensions;
+  }
+
+  public void setDimensions(String dimensions) {
+    this.dimensions = dimensions;
+  }
+
+  // --- TODO: remove methods above this comment ---
   public Long getFunctionId() {
     return function.getId();
-  }
-  // --- TODO: remove methods above this comment ---
-  public String getDimensions() {
-    return function.getExploreDimensions();
   }
 
   public String getMetric() {
@@ -149,8 +157,9 @@ public class AnomalyResult extends AbstractBaseEntity implements Comparable<Anom
   @Override
   public String toString() {
     return MoreObjects.toStringHelper(this).add("id", getId()).add("function", getFunction())
-        .add("startTimeUtc", startTimeUtc).add("endTimeUtc", endTimeUtc).add("score", score)
-        .add("weight", weight).add("properties", properties).add("message", message)
+        .add("startTimeUtc", startTimeUtc).add("dimensions", dimensions)
+        .add("endTimeUtc", endTimeUtc).add("score", score).add("weight", weight)
+        .add("properties", properties).add("message", message)
         .add("creationTimeUtc", creationTimeUtc).add("feedback", feedback).toString();
   }
 
@@ -162,6 +171,7 @@ public class AnomalyResult extends AbstractBaseEntity implements Comparable<Anom
     AnomalyResult r = (AnomalyResult) o;
     return Objects.equals(function, r.getFunction())
         && Objects.equals(startTimeUtc, r.getStartTimeUtc())
+        && Objects.equals(dimensions, r.getDimensions())
         && Objects.equals(endTimeUtc, r.getEndTimeUtc())
         && Objects.equals(score, r.getScore()) && Objects.equals(weight, r.getWeight())
         && Objects.equals(properties, r.getProperties()) && Objects.equals(message, r.getMessage());
@@ -171,7 +181,7 @@ public class AnomalyResult extends AbstractBaseEntity implements Comparable<Anom
 
   @Override
   public int hashCode() {
-    return Objects.hash(getFunction(), startTimeUtc,
+    return Objects.hash(getFunction(), dimensions, startTimeUtc,
         endTimeUtc, score, weight, properties, message);
     // Intentionally omit creationTimeUtc, since start/end are the truly significant dates for
     // anomalies

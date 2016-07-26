@@ -78,6 +78,7 @@ public class MinMaxThresholdFunction extends BaseAnomalyFunction {
         anomalyResult.setProperties(getSpec().getProperties());
         anomalyResult.setStartTimeUtc(timeBucket);
         anomalyResult.setEndTimeUtc(timeBucket + bucketMillis); // point-in-time
+        anomalyResult.setDimensions(CSV.join(dimensionKey.getDimensionValues()));
         anomalyResult.setScore(Math.abs(deviationFromThreshold)); // higher change, higher the score
         anomalyResult.setWeight(averageValue);
         String message =

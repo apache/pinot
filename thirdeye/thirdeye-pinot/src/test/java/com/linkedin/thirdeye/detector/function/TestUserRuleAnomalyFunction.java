@@ -129,6 +129,7 @@ public class TestUserRuleAnomalyFunction {
   private void setAnomalyResultFields(AnomalyResult anomalyResult) {
     anomalyResult.setProperties("properties");
     anomalyResult.setWeight(3);
+    anomalyResult.setDimensions("dimensions");
   }
 
   @DataProvider(name = "getFilteredAndMergedAnomalyResultsProvider")

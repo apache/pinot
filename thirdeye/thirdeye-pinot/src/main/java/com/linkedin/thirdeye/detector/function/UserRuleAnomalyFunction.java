@@ -82,6 +82,7 @@ public class UserRuleAnomalyFunction extends BaseAnomalyFunction {
     AnomalyResult firstAnomalyResult = anomalyResults.get(0);
     AnomalyResult lastAnomalyResult = anomalyResults.get(n - 1);
     AnomalyResult mergedAnomalyResult = new AnomalyResult();
+    mergedAnomalyResult.setDimensions(firstAnomalyResult.getDimensions());
     mergedAnomalyResult.setProperties(firstAnomalyResult.getProperties());
     mergedAnomalyResult.setStartTimeUtc(firstAnomalyResult.getStartTimeUtc());
     mergedAnomalyResult.setEndTimeUtc(lastAnomalyResult.getEndTimeUtc());
@@ -153,6 +154,7 @@ public class UserRuleAnomalyFunction extends BaseAnomalyFunction {
       double baselineValue = timeSeries.get(baselineKey, metric).doubleValue();
       if (isAnomaly(currentValue, baselineValue, changeThreshold)) {
         AnomalyResult anomalyResult = new AnomalyResult();
+        anomalyResult.setDimensions(CSV.join(dimensionKey.getDimensionValues()));
         anomalyResult.setProperties(getSpec().getProperties());
         anomalyResult.setStartTimeUtc(currentKey);
         anomalyResult.setEndTimeUtc(currentKey + bucketMillis); // point-in-time

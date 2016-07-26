@@ -33,6 +33,7 @@ public class TestAnomalyResultDAO extends AbstractDbTestBase {
     anomalyResult.setStartTimeUtc(System.currentTimeMillis());
     anomalyResult.setEndTimeUtc(System.currentTimeMillis());
     anomalyResult.setWeight(10.1);
+    anomalyResult.setDimensions("xyz dimension");
     anomalyResult.setCreationTimeUtc(System.currentTimeMillis());
     return anomalyResult;
   }

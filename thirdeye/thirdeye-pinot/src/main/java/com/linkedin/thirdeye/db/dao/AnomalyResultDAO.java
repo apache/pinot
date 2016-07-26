@@ -19,7 +19,7 @@ public class AnomalyResultDAO extends AbstractJpaDAO<AnomalyResult> {
 
   private static final String FIND_BY_COLLECTION_TIME_METRIC_DIMENSION =
       "SELECT r FROM AnomalyResult r WHERE r.function.collection = :collection" + "AND r.function.metric = :metric "
-          + "AND r.function.dimensions IN :dimensions "
+          + "AND r.dimensions IN :dimensions "
           + "AND ((r.startTimeUtc >= :startTimeUtc AND r.startTimeUtc <= :endTimeUtc) "
           + "OR (r.endTimeUtc >= :startTimeUtc AND r.endTimeUtc <= :endTimeUtc)) ";
 

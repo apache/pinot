@@ -35,7 +35,7 @@ import org.slf4j.LoggerFactory;
 public abstract class BaseThirdEyeApplication<T extends Configuration> extends Application<T> {
   private final Logger LOG = LoggerFactory.getLogger(this.getClass());
 
-  protected final HibernateBundle<ThirdEyeConfiguration> hibernateBundle =
+  protected HibernateBundle<ThirdEyeConfiguration> hibernateBundle =
       new HibernateBundle<ThirdEyeConfiguration>(AnomalyFunctionSpec.class,
           AnomalyFunctionRelation.class, AnomalyResult.class, EmailConfiguration.class,
           EmailFunctionDependency.class, AnomalyJobSpec.class, AnomalyTaskSpec.class,
@@ -45,6 +45,7 @@ public abstract class BaseThirdEyeApplication<T extends Configuration> extends A
           return config.getDatabase();
         }
       };
+
   protected AnomalyFunctionDAO anomalyFunctionSpecDAO;
   protected AnomalyResultDAO anomalyResultDAO;
   protected EmailConfigurationDAO emailConfigurationDAO;
@@ -54,23 +55,24 @@ public abstract class BaseThirdEyeApplication<T extends Configuration> extends A
   protected AnomalyJobSpecDAO anomalyJobSpecDAO;
   protected AnomalyTaskSpecDAO anomalyTaskSpecDAO;
 
-  public void initDetectorRelatedDAO() {
+  public void initDashboardRelatedDAO() {
     String persistenceConfig = System.getProperty("dw.rootDir") + "/persistence.yml";
     LOG.info("Loading persistence config from [{}]", persistenceConfig);
     PersistenceUtil.init(new File(persistenceConfig));
     anomalyFunctionSpecDAO = PersistenceUtil.getInstance(AnomalyFunctionDAO.class);
     anomalyResultDAO = PersistenceUtil.getInstance(AnomalyResultDAO.class);
     emailConfigurationDAO = PersistenceUtil.getInstance(EmailConfigurationDAO.class);
+  }
 
-    if (hibernateBundle != null) {
-      // TODO: change these to new DAO
-      anomalyFunctionRelationDAO =
-          new AnomalyFunctionRelationDAO(hibernateBundle.getSessionFactory());
-      emailFunctionDependencyDAO =
-          new EmailFunctionDependencyDAO(hibernateBundle.getSessionFactory());
-      anomalyJobSpecDAO = new AnomalyJobSpecDAO(hibernateBundle.getSessionFactory());
-      anomalyTaskSpecDAO = new AnomalyTaskSpecDAO(hibernateBundle.getSessionFactory());
-    }
+  public void initDetectorRelatedDAO() {
+    initDashboardRelatedDAO();
+    // TODO: change these to new DAO and remove hibernateBundle
+    anomalyFunctionRelationDAO =
+        new AnomalyFunctionRelationDAO(hibernateBundle.getSessionFactory());
+    emailFunctionDependencyDAO =
+        new EmailFunctionDependencyDAO(hibernateBundle.getSessionFactory());
+    anomalyJobSpecDAO = new AnomalyJobSpecDAO(hibernateBundle.getSessionFactory());
+    anomalyTaskSpecDAO = new AnomalyTaskSpecDAO(hibernateBundle.getSessionFactory());
   }
 
   // TODO below two methods depend on webapp configs

@@ -1,11 +1,6 @@
 package com.linkedin.thirdeye.dashboard;
 
-import com.linkedin.thirdeye.common.persistence.PersistenceUtil;
 import com.linkedin.thirdeye.dashboard.resources.AnomalyFunctionResource;
-import com.linkedin.thirdeye.db.dao.AnomalyFunctionDAO;
-import com.linkedin.thirdeye.db.dao.AnomalyResultDAO;
-import com.linkedin.thirdeye.db.dao.EmailConfigurationDAO;
-import java.io.File;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,7 +28,6 @@ public class ThirdEyeDashboardApplication
 
   @Override
   public void initialize(Bootstrap<ThirdEyeDashboardConfiguration> bootstrap) {
-    bootstrap.addBundle(hibernateBundle);
     bootstrap.addBundle(new ViewBundle());
     bootstrap.addBundle(new HelperBundle());
     bootstrap.addBundle(new AssetsBundle("/assets", "/assets"));
@@ -46,8 +40,7 @@ public class ThirdEyeDashboardApplication
 
   @Override
   public void run(ThirdEyeDashboardConfiguration config, Environment env) throws Exception {
-    super.initDetectorRelatedDAO();
-
+    super.initDashboardRelatedDAO();
     try {
       ThirdEyeCacheRegistry.initializeWebappCaches(config);
     } catch (Exception e) {
