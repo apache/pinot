@@ -18,13 +18,21 @@ package com.linkedin.pinot.core.segment.index.loader;
 import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
+import com.linkedin.pinot.core.data.readers.PinotSegmentRecordReader;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
+import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.converter.SegmentV1V2ToV3FormatConverter;
+import com.linkedin.pinot.core.segment.index.readers.StringDictionary;
+import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
+import com.linkedin.pinot.core.segment.store.ColumnIndexType;
+import com.linkedin.pinot.core.segment.store.SegmentDirectory;
 import com.linkedin.pinot.core.segment.store.SegmentDirectoryPaths;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 import com.linkedin.pinot.util.TestUtils;
@@ -45,6 +53,9 @@ import org.testng.annotations.Test;
 public class LoadersTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(Loaders.class);
   private static final String AVRO_DATA = "data/test_data-mv.avro";
+  private static final String PADDING_OLD = "data/paddingOld.tar.gz";
+  private static final String PADDING_PERCENT = "data/paddingPercent.tar.gz";
+  private static final String PADDING_NULL = "data/paddingNull.tar.gz";
   private File INDEX_DIR;
   private File segmentDirectory;
   private IndexLoadingConfigMetadata v1LoadingConfig;
@@ -147,5 +158,68 @@ public class LoadersTest {
     }
   }
 
+  @Test
+  public void testPadding()
+      throws Exception {
+    // Old Format
+    TarGzCompressionUtils.unTar(new File(TestUtils.getFileFromResourceUrl(
+        Loaders.class.getClassLoader()
+            .getResource(PADDING_OLD))), INDEX_DIR);
+    File segmentDirectory = new File(INDEX_DIR, "paddingOld");
+    SegmentMetadataImpl originalMetadata = new SegmentMetadataImpl(segmentDirectory);
+    Assert.assertEquals(originalMetadata.getColumnMetadataFor("name").getPaddingCharacter(),
+        V1Constants.Str.LEGACY_STRING_PAD_CHAR);
+    SegmentDirectory segmentDir = SegmentDirectory.createFromLocalFS(segmentDirectory, originalMetadata, ReadMode.heap);
+    ColumnMetadata columnMetadataFor = originalMetadata.getColumnMetadataFor("name");
+    SegmentDirectory.Reader reader = segmentDir.createReader();
+    PinotDataBuffer dictionaryBuffer = reader.getIndexFor("name", ColumnIndexType.DICTIONARY);
+    StringDictionary dict = new StringDictionary(dictionaryBuffer, columnMetadataFor);
+    Assert.assertEquals(dict.getStringValue(0), "lynda 2.0");
+    Assert.assertEquals(dict.getStringValue(1), "lynda%%%%");
+    Assert.assertEquals(dict.get(0), "lynda 2.0");
+    Assert.assertEquals(dict.get(1), "lynda");
+    Assert.assertEquals(dict.indexOf("lynda%"), 1);
+    Assert.assertEquals(dict.indexOf("lynda%%"), 1);
+
+    // New Format Padding character %
+    TarGzCompressionUtils.unTar(new File(TestUtils.getFileFromResourceUrl(
+        Loaders.class.getClassLoader()
+            .getResource(PADDING_PERCENT))), INDEX_DIR);
+    segmentDirectory = new File(INDEX_DIR, "paddingPercent");
+    originalMetadata = new SegmentMetadataImpl(segmentDirectory);
+    Assert.assertEquals(originalMetadata.getColumnMetadataFor("name").getPaddingCharacter(),
+        V1Constants.Str.LEGACY_STRING_PAD_CHAR);
+    segmentDir = SegmentDirectory.createFromLocalFS(segmentDirectory, originalMetadata, ReadMode.heap);
+    columnMetadataFor = originalMetadata.getColumnMetadataFor("name");
+    reader = segmentDir.createReader();
+    dictionaryBuffer = reader.getIndexFor("name", ColumnIndexType.DICTIONARY);
+    dict = new StringDictionary(dictionaryBuffer, columnMetadataFor);
+    Assert.assertEquals(dict.getStringValue(0), "lynda 2.0");
+    Assert.assertEquals(dict.getStringValue(1), "lynda%%%%");
+    Assert.assertEquals(dict.get(0), "lynda 2.0");
+    Assert.assertEquals(dict.get(1), "lynda");
+    Assert.assertEquals(dict.indexOf("lynda%"), 1);
+    Assert.assertEquals(dict.indexOf("lynda%%"), 1);
+
+    // New Format Padding character Null
+    TarGzCompressionUtils.unTar(new File(TestUtils.getFileFromResourceUrl(
+        Loaders.class.getClassLoader()
+            .getResource(PADDING_NULL))), INDEX_DIR);
+    segmentDirectory = new File(INDEX_DIR, "paddingNull");
+    originalMetadata = new SegmentMetadataImpl(segmentDirectory);
+    Assert.assertEquals(originalMetadata.getColumnMetadataFor("name").getPaddingCharacter(),
+        V1Constants.Str.DEFAULT_STRING_PAD_CHAR);
+    segmentDir = SegmentDirectory.createFromLocalFS(segmentDirectory, originalMetadata, ReadMode.heap);
+    columnMetadataFor = originalMetadata.getColumnMetadataFor("name");
+    reader = segmentDir.createReader();
+    dictionaryBuffer = reader.getIndexFor("name", ColumnIndexType.DICTIONARY);
+    dict = new StringDictionary(dictionaryBuffer, columnMetadataFor);
+    Assert.assertEquals(dict.getStringValue(0), "lynda\0\0\0\0");
+    Assert.assertEquals(dict.getStringValue(1), "lynda 2.0");
+    Assert.assertEquals(dict.get(0), "lynda");
+    Assert.assertEquals(dict.get(1), "lynda 2.0");
+    Assert.assertEquals(dict.indexOf("lynda\0"), 0);
+    Assert.assertEquals(dict.indexOf("lynda\0\0"), 0);
+  }
 
 }

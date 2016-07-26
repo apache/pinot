@@ -143,5 +143,26 @@ public class ColumnMetadataTest {
     String creatorName = metadata.getCreatorName();
     Assert.assertEquals(creatorName, null);
   }
+
+  @Test public void testPaddingCharacter() throws Exception {
+
+    // Build the Segment metadata
+    SegmentGeneratorConfig config = CreateSegmentConfigWithoutCreator();
+    config.setPaddingCharacter('\0');
+    final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
+    driver.init(config);
+    driver.build();
+
+    // Load segment metadata
+    final IndexSegmentImpl segment = (IndexSegmentImpl) Loaders.IndexSegment.load(INDEX_DIR.listFiles()[0], ReadMode.mmap);
+    SegmentMetadataImpl metadata = (SegmentMetadataImpl) segment.getSegmentMetadata();
+
+    verifySegmentAfterLoading(metadata);
+
+    // Make sure we get null for creator name
+    char paddingCharacter = metadata.getPaddingCharacter();
+    Assert.assertEquals(paddingCharacter, '\0');
+  }
+
 }
 

@@ -19,15 +19,15 @@ import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.nio.charset.Charset;
 
-import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.Str.STRING_PAD_CHAR;
-
 public class StringDictionary extends ImmutableDictionaryReader {
   private final int lengthofMaxEntry;
   private static Charset UTF_8 = Charset.forName("UTF-8");
+  private final char paddingChar;
 
   public StringDictionary(PinotDataBuffer dataBuffer, ColumnMetadata metadata) {
     super(dataBuffer, metadata.getCardinality(), metadata.getStringColumnMaxLength());
     lengthofMaxEntry = metadata.getStringColumnMaxLength();
+    paddingChar = metadata.getPaddingCharacter();
   }
 
   @Override
@@ -37,7 +37,7 @@ public class StringDictionary extends ImmutableDictionaryReader {
     final StringBuilder bld = new StringBuilder();
     bld.append(lookup);
     for (int i = 0; i < differenceInLength; i++) {
-      bld.append(STRING_PAD_CHAR);
+      bld.append(paddingChar);
     }
     return stringIndexOf(bld.toString());
   }
@@ -50,7 +50,7 @@ public class StringDictionary extends ImmutableDictionaryReader {
     String val = getString(dictionaryId);
     byte[] bytes = val.getBytes(UTF_8);
     for (int i = 0; i < lengthofMaxEntry; i++) {
-      if (bytes[i] == STRING_PAD_CHAR) {
+      if (bytes[i] == paddingChar) {
         return new String(bytes, 0, i, UTF_8);
       }
     }
@@ -115,7 +115,7 @@ public class StringDictionary extends ImmutableDictionaryReader {
       String val = outValues[i];
       byte[] bytes = val.getBytes(UTF_8);
       for (int j = 0; j < lengthofMaxEntry; j++) {
-        if (bytes[j] == STRING_PAD_CHAR) {
+        if (bytes[j] == paddingChar) {
           outValues[i] = new String(bytes, 0, j, UTF_8);
           break;
         }

@@ -200,7 +200,7 @@ public class FixedByteWidthRowColDataFileWriterTest {
       final StringBuilder bld = new StringBuilder();
       bld.append(toPut);
       for (int j = 0; j < padding; j++) {
-        bld.append(V1Constants.Str.STRING_PAD_CHAR);
+        bld.append(V1Constants.Str.DEFAULT_STRING_PAD_CHAR);
       }
       data[i] = bld.toString();
       writer.setString(i, 0, data[i]);
@@ -212,9 +212,53 @@ public class FixedByteWidthRowColDataFileWriterTest {
     for (int i = 0; i < rows; i++) {
       String stringInFile = dataFileReader.getString(i, 0);
       Assert.assertEquals(stringInFile, data[i]);
-      Assert.assertEquals(StringUtils.remove(stringInFile, String.valueOf(V1Constants.Str.STRING_PAD_CHAR)),
-          StringUtils.remove(data[i], String.valueOf(V1Constants.Str.STRING_PAD_CHAR)));
+      Assert.assertEquals(StringUtils.remove(stringInFile, String.valueOf(V1Constants.Str.DEFAULT_STRING_PAD_CHAR)),
+          StringUtils.remove(data[i], String.valueOf(V1Constants.Str.DEFAULT_STRING_PAD_CHAR)));
     }
     file.delete();
+  }
+
+  @Test
+  public void testSpecialPaddingCharsForStringReaderWriter() throws Exception {
+    for (int iter = 0; iter < 2; iter++) {
+      char paddingChar = (iter == 0) ? '%' :'\0';
+      final byte[] bytes1 = new byte[]{-17, -65, -67, -17, -65, -67, 32, 69, 120, 101, 99, 117, 116, 105, 118, 101};
+      final byte[] bytes2 = new byte[]{-17, -65, -68, 32, 99, 97, 108, 103, 97, 114, 121, 32, 106, 117, 110, 107, 32, 114, 101, 109, 111, 118, 97, 108};
+      File file = new File("test_single_col_writer.dat");
+      file.delete();
+      int rows = 100;
+      int cols = 1;
+      String testString1 = new String(bytes1);
+      String testString2 = new String(bytes2);
+      System.out.println(Arrays.toString(bytes2));
+      int stringColumnMaxLength = Math.max(testString1.getBytes().length, testString2.getBytes().length);
+      int[] columnSizes = new int[]{stringColumnMaxLength};
+      FixedByteSingleValueMultiColWriter writer = new FixedByteSingleValueMultiColWriter(file, rows, cols, columnSizes);
+      String[] data = new String[rows];
+      for (int i = 0; i < rows; i++) {
+        String toPut = (i % 2 == 0) ? testString1 : testString2;
+        final int padding = stringColumnMaxLength - toPut.getBytes().length;
+
+        final StringBuilder bld = new StringBuilder();
+        bld.append(toPut);
+        for (int j = 0; j < padding; j++) {
+          bld.append(paddingChar);
+        }
+        data[i] = bld.toString();
+        writer.setString(i, 0, data[i]);
+      }
+      writer.close();
+      PinotDataBuffer mmapBuffer =
+          PinotDataBuffer.fromFile(file, ReadMode.mmap, FileChannel.MapMode.READ_ONLY, "testing");
+      FixedByteSingleValueMultiColReader dataFileReader =
+          new FixedByteSingleValueMultiColReader(mmapBuffer, rows, 1, new int[]{stringColumnMaxLength});
+      for (int i = 0; i < rows; i++) {
+        String stringInFile = dataFileReader.getString(i, 0);
+        Assert.assertEquals(stringInFile, data[i]);
+        Assert.assertEquals(StringUtils.remove(stringInFile, String.valueOf(paddingChar)),
+            StringUtils.remove(data[i], String.valueOf(paddingChar)));
+      }
+      file.delete();
+    }
   }
 }

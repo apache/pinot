@@ -1,0 +1,3 @@
+paddingNull.tar.gz, paddingPercent.tar.gz and paddingOld.tar.gz are tar/gzip'ed versions of segments created
+with a padding character of Null, padding character of "%" and a fixed default padding character
+of "%" respectively. The old format was created until 08/2016

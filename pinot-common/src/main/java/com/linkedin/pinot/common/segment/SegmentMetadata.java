@@ -151,6 +151,12 @@ public interface SegmentMetadata {
   String getCreatorName();
 
   /**
+   * returns the padding character
+   * @return
+   */
+  Character getPaddingCharacter();
+
+  /**
    * @return
    */
   public Map<String, String> toMap();
