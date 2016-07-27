@@ -1,10 +1,12 @@
 package com.linkedin.thirdeye.anomaly.detection;
 
 import com.linkedin.thirdeye.db.dao.AnomalyFunctionDAO;
+import com.linkedin.thirdeye.db.dao.AnomalyJobDAO;
+import com.linkedin.thirdeye.db.dao.AnomalyTaskDAO;
+
 import java.util.ArrayList;
 import java.util.List;
 
-import org.hibernate.SessionFactory;
 import org.quartz.CronScheduleBuilder;
 import org.quartz.CronTrigger;
 import org.quartz.JobBuilder;
@@ -22,8 +24,6 @@ import org.slf4j.LoggerFactory;
 
 import com.linkedin.thirdeye.anomaly.job.JobContext;
 import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
-import com.linkedin.thirdeye.detector.db.dao.AnomalyJobSpecDAO;
-import com.linkedin.thirdeye.detector.db.dao.AnomalyTaskSpecDAO;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 
 /**
@@ -34,19 +34,16 @@ public class DetectionJobScheduler {
   private static final Logger LOG = LoggerFactory.getLogger(DetectionJobScheduler.class);
   private SchedulerFactory schedulerFactory;
   private Scheduler quartzScheduler;
-  private AnomalyJobSpecDAO anomalyJobSpecDAO;
-  private AnomalyTaskSpecDAO anomalyTaskSpecDAO;
-  private AnomalyFunctionDAO anomalyFunctionSpecDAO;
+  private AnomalyJobDAO anomalyJobDAO;
+  private AnomalyTaskDAO anomalyTaskDAO;
+  private AnomalyFunctionDAO anomalyFunctionDAO;
   private AnomalyFunctionFactory anomalyFunctionFactory;
-  private SessionFactory sessionFactory;
 
-  public DetectionJobScheduler(AnomalyJobSpecDAO anomalyJobSpecDAO, AnomalyTaskSpecDAO anomalyTaskSpecDAO,
-      AnomalyFunctionDAO anomalyFunctionSpecDAO,
-      SessionFactory sessionFactory) {
-    this.anomalyJobSpecDAO = anomalyJobSpecDAO;
-    this.anomalyTaskSpecDAO = anomalyTaskSpecDAO;
-    this.anomalyFunctionSpecDAO = anomalyFunctionSpecDAO;
-    this.sessionFactory = sessionFactory;
+  public DetectionJobScheduler(AnomalyJobDAO anomalyJobDAO, AnomalyTaskDAO anomalyTaskDAO,
+      AnomalyFunctionDAO anomalyFunctionDAO) {
+    this.anomalyJobDAO = anomalyJobDAO;
+    this.anomalyTaskDAO = anomalyTaskDAO;
+    this.anomalyFunctionDAO = anomalyFunctionDAO;
 
     schedulerFactory = new StdSchedulerFactory();
     try {
@@ -74,11 +71,10 @@ public class DetectionJobScheduler {
     for (AnomalyFunctionSpec anomalyFunctionSpec : functionSpecs) {
       if (anomalyFunctionSpec.getIsActive()) {
         DetectionJobContext detectionJobContext = new DetectionJobContext();
-        detectionJobContext.setAnomalyFunctionSpecDAO(anomalyFunctionSpecDAO);
-        detectionJobContext.setAnomalyJobSpecDAO(anomalyJobSpecDAO);
-        detectionJobContext.setAnomalyTaskSpecDAO(anomalyTaskSpecDAO);
+        detectionJobContext.setAnomalyFunctionDAO(anomalyFunctionDAO);
+        detectionJobContext.setAnomalyJobDAO(anomalyJobDAO);
+        detectionJobContext.setAnomalyTaskDAO(anomalyTaskDAO);
         detectionJobContext.setAnomalyFunctionFactory(anomalyFunctionFactory);
-        detectionJobContext.setSessionFactory(sessionFactory);
         detectionJobContext.setAnomalyFunctionId(anomalyFunctionSpec.getId());
         String jobKey = getJobKey(anomalyFunctionSpec.getId(), anomalyFunctionSpec.getFunctionName());
         detectionJobContext.setJobName(jobKey);
@@ -93,7 +89,7 @@ public class DetectionJobScheduler {
   }
 
   public void start(Long id) throws SchedulerException {
-    AnomalyFunctionSpec anomalyFunctionSpec = anomalyFunctionSpecDAO.findById(id);
+    AnomalyFunctionSpec anomalyFunctionSpec = anomalyFunctionDAO.findById(id);
     if (anomalyFunctionSpec == null) {
       throw new IllegalArgumentException("No function with id " + id);
     }
@@ -106,11 +102,10 @@ public class DetectionJobScheduler {
     }
 
     DetectionJobContext detectionJobContext = new DetectionJobContext();
-    detectionJobContext.setAnomalyFunctionSpecDAO(anomalyFunctionSpecDAO);
-    detectionJobContext.setAnomalyJobSpecDAO(anomalyJobSpecDAO);
-    detectionJobContext.setAnomalyTaskSpecDAO(anomalyTaskSpecDAO);
+    detectionJobContext.setAnomalyFunctionDAO(anomalyFunctionDAO);
+    detectionJobContext.setAnomalyJobDAO(anomalyJobDAO);
+    detectionJobContext.setAnomalyTaskDAO(anomalyTaskDAO);
     detectionJobContext.setAnomalyFunctionFactory(anomalyFunctionFactory);
-    detectionJobContext.setSessionFactory(sessionFactory);
     detectionJobContext.setAnomalyFunctionId(anomalyFunctionSpec.getId());
     detectionJobContext.setJobName(jobKey);
 
@@ -118,7 +113,7 @@ public class DetectionJobScheduler {
   }
 
   public void stop(Long id) throws SchedulerException {
-    AnomalyFunctionSpec anomalyFunctionSpec = anomalyFunctionSpecDAO.findById(id);
+    AnomalyFunctionSpec anomalyFunctionSpec = anomalyFunctionDAO.findById(id);
     String functionName = anomalyFunctionSpec.getFunctionName();
     String jobKey = getJobKey(id, functionName);
     if (!quartzScheduler.checkExists(JobKey.jobKey(jobKey))) {
@@ -129,7 +124,7 @@ public class DetectionJobScheduler {
   }
 
   public void runAdHoc(Long id, String windowStartIso, String windowEndIso) {
-    AnomalyFunctionSpec anomalyFunctionSpec = anomalyFunctionSpecDAO.findById(id);
+    AnomalyFunctionSpec anomalyFunctionSpec = anomalyFunctionDAO.findById(id);
     if (anomalyFunctionSpec == null) {
       throw new IllegalArgumentException("No function with id " + id);
     }
@@ -140,11 +135,10 @@ public class DetectionJobScheduler {
     JobDetail job = JobBuilder.newJob(DetectionJobRunner.class).withIdentity(jobKey).build();
 
     DetectionJobContext detectionJobContext = new DetectionJobContext();
-    detectionJobContext.setAnomalyFunctionSpecDAO(anomalyFunctionSpecDAO);
-    detectionJobContext.setAnomalyJobSpecDAO(anomalyJobSpecDAO);
-    detectionJobContext.setAnomalyTaskSpecDAO(anomalyTaskSpecDAO);
+    detectionJobContext.setAnomalyFunctionDAO(anomalyFunctionDAO);
+    detectionJobContext.setAnomalyJobDAO(anomalyJobDAO);
+    detectionJobContext.setAnomalyTaskDAO(anomalyTaskDAO);
     detectionJobContext.setAnomalyFunctionFactory(anomalyFunctionFactory);
-    detectionJobContext.setSessionFactory(sessionFactory);
     detectionJobContext.setAnomalyFunctionId(anomalyFunctionSpec.getId());
     detectionJobContext.setJobName(jobKey);
     detectionJobContext.setWindowStartIso(windowStartIso);
@@ -184,7 +178,7 @@ public class DetectionJobScheduler {
   }
 
   private List<AnomalyFunctionSpec> readAnomalyFunctionSpecs() {
-    return anomalyFunctionSpecDAO.findAll();
+    return anomalyFunctionDAO.findAll();
   }
 
   private String getJobKey(Long id, String functionName) {

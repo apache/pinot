@@ -8,8 +8,8 @@ import org.hibernate.SessionFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.thirdeye.detector.db.dao.AnomalyJobSpecDAO;
-import com.linkedin.thirdeye.detector.db.dao.AnomalyTaskSpecDAO;
+import com.linkedin.thirdeye.db.dao.AnomalyJobDAO;
+import com.linkedin.thirdeye.db.dao.AnomalyTaskDAO;
 
 public class MonitorJobScheduler {
 
@@ -17,18 +17,16 @@ public class MonitorJobScheduler {
 
   private ScheduledExecutorService scheduledExecutorService;
 
-  private AnomalyJobSpecDAO anomalyJobSpecDAO;
-  private AnomalyTaskSpecDAO anomalyTaskSpecDAO;
-  private SessionFactory sessionFactory;
+  private AnomalyJobDAO anomalyJobDAO;
+  private AnomalyTaskDAO anomalyTaskDAO;
   private MonitorConfiguration monitorConfiguration;
   private MonitorJobRunner monitorJobRunner;
   private MonitorJobContext monitorJobContext;
 
-  public MonitorJobScheduler(AnomalyJobSpecDAO anomalyJobSpecDAO, AnomalyTaskSpecDAO anomalyTaskSpecDAO,
-      SessionFactory sessionFactory, MonitorConfiguration monitorConfiguration) {
-    this.anomalyJobSpecDAO = anomalyJobSpecDAO;
-    this.anomalyTaskSpecDAO = anomalyTaskSpecDAO;
-    this.sessionFactory = sessionFactory;
+  public MonitorJobScheduler(AnomalyJobDAO anomalyJobDAO, AnomalyTaskDAO anomalyTaskDAO,
+      MonitorConfiguration monitorConfiguration) {
+    this.anomalyJobDAO = anomalyJobDAO;
+    this.anomalyTaskDAO = anomalyTaskDAO;
     this.monitorConfiguration = monitorConfiguration;
     scheduledExecutorService = Executors.newScheduledThreadPool(10);
   }
@@ -37,9 +35,8 @@ public class MonitorJobScheduler {
     LOG.info("Starting monitor service");
 
     monitorJobContext = new MonitorJobContext();
-    monitorJobContext.setAnomalyJobSpecDAO(anomalyJobSpecDAO);
-    monitorJobContext.setAnomalyTaskSpecDAO(anomalyTaskSpecDAO);
-    monitorJobContext.setSessionFactory(sessionFactory);
+    monitorJobContext.setAnomalyJobDAO(anomalyJobDAO);
+    monitorJobContext.setAnomalyTaskDAO(anomalyTaskDAO);
     monitorJobContext.setMonitorConfiguration(monitorConfiguration);
 
     monitorJobRunner = new MonitorJobRunner(monitorJobContext);

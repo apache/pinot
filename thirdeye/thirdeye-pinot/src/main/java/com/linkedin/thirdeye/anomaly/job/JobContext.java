@@ -2,19 +2,17 @@ package com.linkedin.thirdeye.anomaly.job;
 
 
 import com.linkedin.thirdeye.db.dao.AnomalyFunctionDAO;
-import org.hibernate.SessionFactory;
+import com.linkedin.thirdeye.db.dao.AnomalyJobDAO;
+import com.linkedin.thirdeye.db.dao.AnomalyTaskDAO;
 
-import com.linkedin.thirdeye.detector.db.dao.AnomalyJobSpecDAO;
-import com.linkedin.thirdeye.detector.db.dao.AnomalyTaskSpecDAO;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 
 public abstract class JobContext {
 
-  private AnomalyJobSpecDAO anomalyJobSpecDAO;
-  private AnomalyTaskSpecDAO anomalyTaskSpecDAO;
-  private AnomalyFunctionDAO anomalyFunctionSpecDAO;
+  private AnomalyJobDAO anomalyJobDAO;
+  private AnomalyTaskDAO anomalyTaskDAO;
+  private AnomalyFunctionDAO anomalyFunctionDAO;
   private AnomalyFunctionFactory anomalyFunctionFactory;
-  private SessionFactory sessionFactory;
 
   private String jobName;
   private long jobExecutionId;
@@ -28,36 +26,28 @@ public abstract class JobContext {
     this.jobExecutionId = jobExecutionId;
   }
 
-  public AnomalyJobSpecDAO getAnomalyJobSpecDAO() {
-    return anomalyJobSpecDAO;
+  public AnomalyJobDAO getAnomalyJobDAO() {
+    return anomalyJobDAO;
   }
 
-  public void setAnomalyJobSpecDAO(AnomalyJobSpecDAO anomalyJobSpecDAO) {
-    this.anomalyJobSpecDAO = anomalyJobSpecDAO;
+  public void setAnomalyJobDAO(AnomalyJobDAO anomalyJobDAO) {
+    this.anomalyJobDAO = anomalyJobDAO;
   }
 
-  public AnomalyTaskSpecDAO getAnomalyTaskSpecDAO() {
-    return anomalyTaskSpecDAO;
+  public AnomalyTaskDAO getAnomalyTaskDAO() {
+    return anomalyTaskDAO;
   }
 
-  public void setAnomalyTaskSpecDAO(AnomalyTaskSpecDAO anomalyTaskSpecDAO) {
-    this.anomalyTaskSpecDAO = anomalyTaskSpecDAO;
+  public void setAnomalyTaskDAO(AnomalyTaskDAO anomalyTaskDAO) {
+    this.anomalyTaskDAO = anomalyTaskDAO;
   }
 
-  public AnomalyFunctionDAO getAnomalyFunctionSpecDAO() {
-    return anomalyFunctionSpecDAO;
+  public AnomalyFunctionDAO getAnomalyFunctionDAO() {
+    return anomalyFunctionDAO;
   }
 
-  public void setAnomalyFunctionSpecDAO(AnomalyFunctionDAO anomalyFunctionSpecDAO) {
-    this.anomalyFunctionSpecDAO = anomalyFunctionSpecDAO;
-  }
-
-  public SessionFactory getSessionFactory() {
-    return sessionFactory;
-  }
-
-  public void setSessionFactory(SessionFactory sessionFactory) {
-    this.sessionFactory = sessionFactory;
+  public void setAnomalyFunctionDAO(AnomalyFunctionDAO anomalyFunctionDAO) {
+    this.anomalyFunctionDAO = anomalyFunctionDAO;
   }
 
   public String getJobName() {
@@ -75,6 +65,5 @@ public abstract class JobContext {
   public void setAnomalyFunctionFactory(AnomalyFunctionFactory anomalyFunctionFactory) {
     this.anomalyFunctionFactory = anomalyFunctionFactory;
   }
-
 
 }
