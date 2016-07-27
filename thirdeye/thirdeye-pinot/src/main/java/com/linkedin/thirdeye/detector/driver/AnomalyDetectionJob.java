@@ -334,11 +334,8 @@ public class AnomalyDetectionJob implements Job {
         // make sure score and weight are valid numbers
         result.setScore(normalize(result.getScore()));
         result.setWeight(normalize(result.getWeight()));
-        resultDAO.save(result);
-
-        // now save the function entity and update result
         result.setFunction(spec);
-        resultDAO.update(result);
+        resultDAO.save(result);
       }
     } catch (Exception e) {
       LOG.error("Exception in saving anomaly results", e);

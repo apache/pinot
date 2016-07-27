@@ -7,6 +7,8 @@ import org.hibernate.SessionFactory;
 import org.hibernate.Transaction;
 import org.hibernate.context.internal.ManagedSessionContext;
 
+@Deprecated
+// TODO: Use thread pool executors in place of this util.
 public class HibernateSessionWrapper<V> {
   private final SessionFactory sessionFactory;
 

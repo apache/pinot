@@ -20,11 +20,11 @@ public class TestAnomalyResultDAO extends AbstractDbTestBase {
 
     // create anomaly result
     AnomalyResult result = getAnomalyResult();
+    result.setFunction(spec);
     anomalyResultDAO.save(result);
 
-    // Now set the function and update
-    result.setFunction(spec);
-    anomalyResultDAO.update(result);
+    AnomalyResult resultRet = anomalyResultDAO.findById(result.getId());
+    Assert.assertEquals(resultRet.getFunction(), spec);
 
     AnomalyFunctionSpec specRet = anomalyFunctionDAO.findById(spec.getId());
     Assert.assertEquals(specRet.getAnomalies().size(), 1);
@@ -49,7 +49,10 @@ public class TestAnomalyResultDAO extends AbstractDbTestBase {
     Assert.assertEquals(resultRet.getId(), result.getId());
     Assert.assertNotNull(resultRet.getFeedback());
 
+    AnomalyFunctionSpec functionSpec = result.getFunction();
+
     anomalyResultDAO.deleteById(anomalyResultId);
+    anomalyFunctionDAO.delete(functionSpec);
   }
 
   static AnomalyResult getAnomalyResult() {
