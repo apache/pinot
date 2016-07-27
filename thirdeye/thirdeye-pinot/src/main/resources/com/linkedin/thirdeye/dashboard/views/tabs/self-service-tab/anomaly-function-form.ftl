@@ -4,7 +4,7 @@
            {{#if id}}
            {{else}}
                <div  class="title-box full-width" style="margin-top:15px;">
-                   <h3>Create anomaly function</h3>
+                   <h2>Create anomaly function</h2>
                </div>
            {{/if}}
     <table id="configure-form-table">
@@ -59,8 +59,6 @@
                             <ul class="uk-nav uk-nav-dropdown single-select">
                                 <li id="user-rule" class="function-type-option" value="USER_RULE"><a class="uk-dropdown-close">USER_RULE</a></li>
                                 <li id="min-max-threshold" class="function-type-option" value="MIN_MAX_THRESHOLD"><a class="uk-dropdown-close">MIN_MAX_THRESHOLD</a></li>
-                                <li id="kalman-filter" class="function-type-option" value="KALMAN_FILTER"><a class="uk-dropdown-close">USER_RULE</a></li>
-                                <li id="scan-statistics" class="function-type-option" value="SCAN_STATISTIC"><a  class="uk-dropdown-close">USER_RULE</a></li>
                             </ul>
                         </div>
                     </div>
@@ -70,10 +68,10 @@
 
         <div class="uk-form-row uk-margin-top">
             <div class="uk-display-inline-block">Alert me when </div>
-            <div id="metric-selector-manage-alert" class="uk-form-row uk-display-inline-block">
+            <div class="uk-form-row uk-display-inline-block">
                 <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group uk-display-inline-block">
-                    <div id="selected-metric-manage-alert" class="uk-button"
-                    value=" {{#if metric}}{{metric}}{{/if}}">
+                    <div id="selected-metric-manage-anomaly-fn" class="uk-button"
+                    value="{{#if metric}}{{metric}}{{/if}}">
                         {{#if metric}}
                            {{metric}}
                         {{else}}
@@ -90,7 +88,7 @@
             </div>
 
             <!-- ** USER_RULE PROPERTIES part 2/1 ** -->
-            <div class="user-rule-fields function-type-fields uk-hidden" >
+            <div class="user-rule-fields function-type-fields uk-display-inline-block {{#if functionype}}uk-hidden{{/if}}">
                 <div id="anomaly-condition-selector" class="uk-form-row uk-form-row uk-display-inline-block" rel="self-service">
                     <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group uk-display-inline-block">
                         <div id="selected-anomaly-condition" class="uk-button" value="{{#if properties}}{{displayDeltaIcon properties 'changeThreshold' 'description'}}{{/if}}">
@@ -251,7 +249,7 @@
             <input id="active-alert" rel="self-service" type="checkbox"  {{#if isActive}}checked{{else}}{{/if}}><span> Keep this alert active.</span>
         </div>
 
-        <div id="manage-alert-error" class="uk-alert uk-alert-danger hidden" rel="self-service">
+        <div id="manage-anomaly-fn-error" class="uk-alert uk-alert-danger hidden" rel="self-service">
             <p></p>
         </div>
         <div id="manage-anomaly-function-success" class="uk-alert uk-alert-success hidden" rel="self-service">

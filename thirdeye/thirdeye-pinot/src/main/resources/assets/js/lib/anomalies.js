@@ -366,6 +366,7 @@ function renderAnomalyTable(data, tab) {
             cache: true,
             dataType: "json",
             complete: function (data) {
+                console.log("function metadata:");
                 console.log(data);
             }
         });
@@ -377,6 +378,7 @@ function renderAnomalyTable(data, tab) {
             cache: true,
             dataType: "json",
             complete: function (data) {
+                console.log("metric function:");
                 console.log(data);
             }
         });

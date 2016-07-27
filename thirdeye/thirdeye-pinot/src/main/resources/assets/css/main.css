@@ -330,6 +330,9 @@ body a{
 /* Form: Anomaly config related */
 #self-service-tabs a{
     color: #444;
+    padding: 30px;
+    font-size: 16px;
+    font-weight: 700;
 }
 
 #configure-anomaly-function-form .uk-form-row{
@@ -346,11 +349,12 @@ body a{
     width: 250px;
 }
 
-#anomaly-threshold{
+#anomaly-threshold,
+#monitoring-schedule-time{
     width: 135px;
 }
 
-#filter-panel-manage-alert .value-filter{
+#filter-panel-manage-anomaly-fn .value-filter{
     width:90%;
     line-height: 30px;
     display: table-cell;

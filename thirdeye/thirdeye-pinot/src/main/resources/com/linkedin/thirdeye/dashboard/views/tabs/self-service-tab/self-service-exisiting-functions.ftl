@@ -1,6 +1,6 @@
 <section id="self-service-existing-anomaly-functions">
     <script id="self-service-existing-anomaly-functions-template" type="text/x-handlebars-template">
-        <table id="existing-anomaly-functions-table" class="display" >
+        <table id="existing-anomaly-functions-table" class="display">
             <thead>
             <tr>
                 <th>Name</th>

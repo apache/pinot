@@ -8,7 +8,7 @@
             <!-- MANAGE EXISTING ANOMALY FUNCTIONS -->
             <li id="manage-existing-anomaly-functions-tab">
                 <div  class="title-box full-width">
-                    <h3>Manage existing anomaly functions</h3>
+                    <h2>Manage existing anomaly functions</h2>
                 </div>
 
                 <label class="uk-form-label bold-label required">Dataset</label>

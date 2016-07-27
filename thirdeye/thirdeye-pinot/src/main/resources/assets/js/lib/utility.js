@@ -832,7 +832,7 @@ function clearCreateForm() {
 
     document.getElementById("configure-anomaly-function-form").reset()
 
-    resetSelector("#selected-metric-manage-alert", "Metric", "");
+    resetSelector("#selected-metric-manage-anomaly-fn", "Metric", "");
     resetSelector("#selected-anomaly-condition", "Condition", "");
     resetSelector("#selected-anomaly-compare-mode", "WoW", "w/w");
     resetSelector("#selected-monitoring-window-unit", "HOUR(S)", "HOURS");
@@ -845,13 +845,13 @@ function clearCreateForm() {
     }
 
     $("monitoring-schedule").hide();
-    $("#active-alert").attr("checked", "checked");
+    $("#active-alert").attr("checked", "false");
 
     $("#configure-anomaly-function-form .remove-filter-selection").each(function () {
         $(this).click();
     });
 
-    $("#manage-alert-error").hide();
+    $("#manage-anomaly-fn-error").hide();
     $("#manage-anomaly-function-success").hide();
 
 }

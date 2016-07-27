@@ -90,7 +90,7 @@ function getMetricList() {
         window.datasetConfig.datasetMetrics = data;
 
         /* Handelbars template for query form multi select metric list */
-        var queryFormMetricListData = {data: data, singleMetricSelector: false};
+        var queryFormMetricListData = {data: data};
         var result_query_form_metric_list_template = HandleBarsTemplates.template_metric_list(queryFormMetricListData);
         $(".metric-list").each(function () {
             $(this).html(result_query_form_metric_list_template)
@@ -111,7 +111,7 @@ function getAnomalyMetricList() {
         validateFormData(data, "No metrics available in the server.", "anomaly metrics")
 
         /* Handelbars template for query form single select metric list on anomaly view */
-        var queryFormMetricListData = {data: data, singleMetricSelector: true};
+        var queryFormMetricListData = {data: data};
         var result_query_form_metric_list_template = HandleBarsTemplates.template_metric_list(queryFormMetricListData);
         $(".single-metric-list").each(function () {
             $(this).html(result_query_form_metric_list_template)
