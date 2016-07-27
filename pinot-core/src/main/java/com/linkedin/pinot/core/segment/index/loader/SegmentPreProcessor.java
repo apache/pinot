@@ -15,14 +15,12 @@
  */
 package com.linkedin.pinot.core.segment.index.loader;
 
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
 import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.io.reader.DataFileReader;
-import com.linkedin.pinot.core.io.reader.ReaderContext;
 import com.linkedin.pinot.core.io.reader.SingleColumnMultiValueReader;
-import com.linkedin.pinot.core.io.reader.SingleColumnSingleValueReader;
 import com.linkedin.pinot.core.io.reader.impl.v1.FixedBitMultiValueReader;
 import com.linkedin.pinot.core.io.reader.impl.v1.FixedBitSingleValueReader;
 import com.linkedin.pinot.core.segment.creator.impl.inv.OffHeapBitmapInvertedIndexCreator;
@@ -39,33 +37,35 @@ import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 /**
  * mmap()'s the segment and performs any pre-processing to generate inverted index
  * This can be slow
  */
 public class SegmentPreProcessor implements AutoCloseable {
-  private static Logger LOGGER = LoggerFactory.getLogger(SegmentPreProcessor.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentPreProcessor.class);
 
   private final File indexDir;
-  private SegmentDirectory segmentDirectory;
-  private final SegmentMetadataImpl metadata;
-  private final Optional<IndexLoadingConfigMetadata> indexConfig;
-  //private IndexLoadingConfigMetadata indexConfig;
+  private final SegmentMetadataImpl segmentMetadata;
+  private final String segmentName;
+  private final SegmentVersion segmentVersion;
+  private final IndexLoadingConfigMetadata indexConfig;
+  private final SegmentDirectory segmentDirectory;
 
-  SegmentPreProcessor(File indexDir, SegmentMetadataImpl metadata,
-      IndexLoadingConfigMetadata indexConfig) {
+  SegmentPreProcessor(File indexDir, SegmentMetadataImpl segmentMetadata, IndexLoadingConfigMetadata indexConfig) {
     Preconditions.checkNotNull(indexDir);
-    Preconditions.checkNotNull(metadata);
-    Preconditions.checkState(indexDir.exists(), "Segment directory: {} does not exist", indexDir);;
+    Preconditions.checkNotNull(segmentMetadata);
+    Preconditions.checkState(indexDir.exists(), "Segment directory: {} does not exist", indexDir);
     Preconditions.checkState(indexDir.isDirectory(), "Segment path: {} is not a directory", indexDir);
 
     this.indexDir = indexDir;
-    this.metadata = metadata;
-    this.indexConfig = Optional.fromNullable(indexConfig);
-    // always use mmap. That's safest and performs well without impact from
-    // -Xmx params
-    // This is not final load of the segment
-    segmentDirectory = SegmentDirectory.createFromLocalFS(indexDir, metadata, ReadMode.mmap);
+    this.segmentMetadata = segmentMetadata;
+    segmentName = segmentMetadata.getName();
+    segmentVersion = SegmentVersion.valueOf(this.segmentMetadata.getVersion());
+    this.indexConfig = indexConfig;
+    // Always use mmap to load the segment because it is safest and performs well without impact from -Xmx params.
+    // This is not the final load of the segment.
+    segmentDirectory = SegmentDirectory.createFromLocalFS(indexDir, segmentMetadata, ReadMode.mmap);
   }
 
   public void process()
@@ -76,154 +76,142 @@ public class SegmentPreProcessor implements AutoCloseable {
       addRemoveInvertedIndices(segmentWriter);
     } finally {
       if (segmentWriter != null) {
-        try {
-          segmentWriter.saveAndClose();
-        } catch (Exception e) {
-          LOGGER.error("Failed to close segment directory: {}", segmentDirectory, e);
-        }
+        segmentWriter.saveAndClose();
       }
     }
   }
 
   private void addRemoveInvertedIndices(SegmentDirectory.Writer segmentWriter)
       throws IOException {
-    Set<String> invertedIndexColumnList = getInvertedIndexColumnList();
+    Set<String> invertedIndexColumns = getInvertedIndexColumns();
 
-    for (String column : invertedIndexColumnList) {
-      ColumnMetadata columnMetadata = metadata.getColumnMetadataFor(column);
-      createInvertedIndex(segmentWriter, metadata.getColumnMetadataFor(column));
+    for (String column : invertedIndexColumns) {
+      createInvertedIndex(segmentWriter, segmentMetadata.getColumnMetadataFor(column));
     }
   }
 
-  private DataFileReader getForwardIndexReader(ColumnMetadata columnMetadata, SegmentDirectory.Writer segmentWriter)
-      throws IOException {
-    PinotDataBuffer indexBuffer = segmentWriter.getIndexFor(columnMetadata.getColumnName(), ColumnIndexType.FORWARD_INDEX);
-    DataFileReader reader;
-    if (columnMetadata.isSingleValue()) {
-      SingleColumnSingleValueReader fwdIndexReader =
-        new FixedBitSingleValueReader(indexBuffer, columnMetadata.getTotalDocs(),
-            columnMetadata.getBitsPerElement(), columnMetadata.hasNulls());
-      reader = fwdIndexReader;
-    } else {
-      SingleColumnMultiValueReader<? extends ReaderContext> fwdIndexReader =
-          new FixedBitMultiValueReader(indexBuffer, columnMetadata.getTotalDocs(),
-              columnMetadata.getTotalNumberOfEntries(), columnMetadata.getBitsPerElement(), false);
-      reader = fwdIndexReader;
+  private Set<String> getInvertedIndexColumns() {
+    Set<String> invertedIndexColumns = new HashSet<>();
+    if (indexConfig == null) {
+      return invertedIndexColumns;
     }
-    return reader;
+
+    Set<String> invertedIndexColumnsFromConfig = indexConfig.getLoadingInvertedIndexColumns();
+    for (String column : invertedIndexColumnsFromConfig) {
+      ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(column);
+      if (columnMetadata != null && !columnMetadata.isSorted()) {
+        invertedIndexColumns.add(column);
+      }
+    }
+
+    return invertedIndexColumns;
   }
 
   private void createInvertedIndex(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata)
       throws IOException {
-    String segmentName = segmentWriter.toString();
-    String column = columnMetadata.getColumnName();
-    File inProgress = new File(segmentWriter.toSegmentDirectory().getPath().toFile(),
-        column + "_inv.inprogress");
+    String columnName = columnMetadata.getColumnName();
+    File inProgress = new File(segmentWriter.toSegmentDirectory().getPath().toFile(), columnName + ".inv.inprogress");
 
-    // returning existing inverted index only if the marker file does not exist
-    if (!inProgress.exists() && segmentWriter.hasIndexFor(column, ColumnIndexType.INVERTED_INDEX)) {
-      LOGGER.info("Found inverted index for segment: {}, colummn {}, loading it", segmentName, column);
-      return;
-    }
+    if (!inProgress.exists()) {
+      // Marker file does not exist, which means last run ended normally.
 
-    // creating the marker file
-    FileUtils.touch(inProgress);
-    if (segmentWriter.hasIndexFor(column, ColumnIndexType.INVERTED_INDEX)) {
-      LOGGER.info("Deleting stale inverted index for segment: {}, column: {}", segmentName, column);
-      segmentWriter.removeIndex(column, ColumnIndexType.INVERTED_INDEX);
-    }
+      if (segmentWriter.hasIndexFor(columnName, ColumnIndexType.INVERTED_INDEX)) {
+        // Skip creating inverted index if already exists.
 
-    LOGGER.info("Creating new inverted index for segment: {}, column: {}", segmentName, column);
-
-    // creating inverted index for the column now
-    OffHeapBitmapInvertedIndexCreator creator =
-        new OffHeapBitmapInvertedIndexCreator(indexDir, columnMetadata.getCardinality(), columnMetadata.getTotalDocs(),
-            columnMetadata.getTotalNumberOfEntries(), columnMetadata.toFieldSpec());
-    DataFileReader fwdIndex = getForwardIndexReader(columnMetadata, segmentWriter);
-
-    if (!columnMetadata.isSingleValue()) {
-      SingleColumnMultiValueReader mvFwdIndex = (SingleColumnMultiValueReader) fwdIndex;
-      int[] dictIds = new int[columnMetadata.getMaxNumberOfMultiValues()];
-      for (int i = 0; i < metadata.getTotalDocs(); i++) {
-        int len = mvFwdIndex.getIntArray(i, dictIds);
-        creator.add(i, dictIds, len);
+        LOGGER.info("Found inverted index for segment: {}, column: {}", segmentName, columnName);
+        return;
       }
+
+      // Create a marker file.
+      FileUtils.touch(inProgress);
     } else {
-      FixedBitSingleValueReader svFwdIndex = (FixedBitSingleValueReader) fwdIndex;
-      for (int i = 0; i < columnMetadata.getTotalDocs(); i++) {
-        creator.add(i, svFwdIndex.getInt(i));
+      // Marker file exists, which means last run gets interrupted.
+
+      // Remove inverted index for v1 and v2.
+      // For v3, try to reuse the inverted index buffer because v3 does not support removing index.
+      if (segmentVersion == SegmentVersion.v1 || segmentVersion == SegmentVersion.v2) {
+        segmentWriter.removeIndex(columnName, ColumnIndexType.INVERTED_INDEX);
       }
     }
-    creator.seal();
-    File invertedIndexFile = creator.getInvertedIndexFile();
-    // Inverted index creation does not know the size upfront so
-    // we create it in a temporary file and then move to the main
-    // file. For v1/v2 format, this is an overkill but it's required
-    // to avoid corruption of v3 format
-    File tempFile = new File(invertedIndexFile + ".temp");
-    if (tempFile.exists()) {
-      FileUtils.deleteQuietly(tempFile);
-    }
-    FileUtils.moveFile(invertedIndexFile, tempFile);
-    PinotDataBuffer newIndexBuffer = null;
 
-    try {
-      if (segmentWriter.hasIndexFor(column, ColumnIndexType.INVERTED_INDEX)) {
-        PinotDataBuffer tempBuffer = segmentWriter.getIndexFor(column, ColumnIndexType.INVERTED_INDEX);
+    // Create new inverted index for the column.
+    LOGGER.info("Creating new inverted index for segment: {}, column: {}", segmentName, columnName);
+    int totalDocs = columnMetadata.getTotalDocs();
+    OffHeapBitmapInvertedIndexCreator creator =
+        new OffHeapBitmapInvertedIndexCreator(indexDir, columnMetadata.getCardinality(), totalDocs,
+            columnMetadata.getTotalNumberOfEntries(), columnMetadata.toFieldSpec());
 
-        // almost always we will have matching size since segment data is immutable
-        // but it's good to double check
-        if (tempBuffer.size() == tempFile.length()) {
-          newIndexBuffer = tempBuffer;
-        } else {
-          if (segmentWriter.isIndexRemovalSupported()) {
-            segmentWriter.removeIndex(column, ColumnIndexType.INVERTED_INDEX);
-            newIndexBuffer = segmentWriter.newIndexFor(column, ColumnIndexType.INVERTED_INDEX, (int) tempFile.length());
-          } else {
-            LOGGER.error("Segment: {} already has inverted index that can not be removed. Throwing exception to discard and download segment",
-                segmentWriter);
-            throw new IllegalStateException("Inverted Index exists and can not be removed for segment: " +
-                segmentWriter +
-                ". Throwing exception to download fresh segment");
-          }
+    try (DataFileReader fwdIndex = getForwardIndexReader(columnMetadata, segmentWriter)) {
+      if (columnMetadata.isSingleValue()) {
+        // Single-value column.
+
+        FixedBitSingleValueReader svFwdIndex = (FixedBitSingleValueReader) fwdIndex;
+        for (int i = 0; i < totalDocs; i++) {
+          creator.add(i, svFwdIndex.getInt(i));
         }
-      } else { // there was no index earlier
-        newIndexBuffer = segmentWriter.newIndexFor(column,
-            ColumnIndexType.INVERTED_INDEX, (int) tempFile.length());
-      }
-      newIndexBuffer.readFrom(tempFile);
-    } finally {
-      if (newIndexBuffer != null) {
-        newIndexBuffer.close();
+      } else {
+        // Multi-value column.
+
+        SingleColumnMultiValueReader mvFwdIndex = (SingleColumnMultiValueReader) fwdIndex;
+        int[] dictIds = new int[columnMetadata.getMaxNumberOfMultiValues()];
+        for (int i = 0; i < totalDocs; i++) {
+          int len = mvFwdIndex.getIntArray(i, dictIds);
+          creator.add(i, dictIds, len);
+        }
       }
     }
 
-    // delete the marker file
-    FileUtils.deleteQuietly(inProgress);
-    FileUtils.deleteQuietly(tempFile);
+    creator.seal();
 
-    LOGGER.info("Created inverted index for segment: {}, colummn {}", segmentName, column);
+    // For v3, write the generated inverted index file into the single file and remove it.
+    if (segmentVersion == SegmentVersion.v3) {
+      File invertedIndexFile = creator.getInvertedIndexFile();
+      int fileLength = (int) invertedIndexFile.length();
+      PinotDataBuffer buffer = null;
+      try {
+        if (segmentWriter.hasIndexFor(columnName, ColumnIndexType.INVERTED_INDEX)) {
+          // Inverted index already exists, try to reuse it.
+
+          buffer = segmentWriter.getIndexFor(columnName, ColumnIndexType.INVERTED_INDEX);
+          if (buffer.size() != fileLength) {
+            // Existed inverted index size does not equal new generated inverted index size.
+            // Throw an exception here to trigger segment drop and re-download.
+
+            String failureMessage = "V3 format segment: {} already has inverted index that cannot be removed.";
+            LOGGER.error(failureMessage);
+            throw new IllegalStateException(failureMessage);
+          }
+        } else {
+          // Inverted index does not exist, create a new buffer for that.
+
+          buffer = segmentWriter.newIndexFor(columnName, ColumnIndexType.INVERTED_INDEX, fileLength);
+        }
+
+        buffer.readFrom(invertedIndexFile);
+      } finally {
+        FileUtils.deleteQuietly(invertedIndexFile);
+        if (buffer != null) {
+          buffer.close();
+        }
+      }
+    }
+
+    // Delete the marker file.
+    FileUtils.deleteQuietly(inProgress);
+
+    LOGGER.info("Created inverted index for segment: {}, column: {}", segmentName, columnName);
   }
 
-  private Set<String> getInvertedIndexColumnList() {
-    Set<String> invertedIndexColumns = new HashSet<>();
-    Set<String> allColumns = metadata.getAllColumns();
-    Set<String> invertedIndexColumnConfig = new HashSet<>();
-    if (!indexConfig.isPresent() || indexConfig.get().getLoadingInvertedIndexColumns() == null) {
-      return invertedIndexColumnConfig;
+  private DataFileReader getForwardIndexReader(ColumnMetadata columnMetadata, SegmentDirectory.Writer segmentWriter)
+      throws IOException {
+    PinotDataBuffer buffer = segmentWriter.getIndexFor(columnMetadata.getColumnName(), ColumnIndexType.FORWARD_INDEX);
+    if (columnMetadata.isSingleValue()) {
+      return new FixedBitSingleValueReader(buffer, columnMetadata.getTotalDocs(), columnMetadata.getBitsPerElement(),
+          columnMetadata.hasNulls());
+    } else {
+      return new FixedBitMultiValueReader(buffer, columnMetadata.getTotalDocs(),
+          columnMetadata.getTotalNumberOfEntries(), columnMetadata.getBitsPerElement(), false);
     }
-
-    Set<String> inputIIColumnList = indexConfig.get().getLoadingInvertedIndexColumns();
-    for (String column : inputIIColumnList) {
-      ColumnMetadata columnMetadata = metadata.getColumnMetadataFor(column);
-      if (columnMetadata == null) {
-        continue;
-      }
-      if (! columnMetadata.isSorted()) {
-        invertedIndexColumnConfig.add(column);
-      }
-    }
-    return invertedIndexColumnConfig;
   }
 
   @Override
