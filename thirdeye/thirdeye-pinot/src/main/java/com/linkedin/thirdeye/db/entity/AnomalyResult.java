@@ -47,7 +47,7 @@ public class AnomalyResult extends AbstractBaseEntity implements Comparable<Anom
   @JoinColumn(name="anomaly_feedback_id")
   private AnomalyFeedback feedback;
 
-  @ManyToOne(cascade = CascadeType.ALL, fetch = FetchType.EAGER, optional = true)
+  @ManyToOne(fetch = FetchType.EAGER)
   @JoinColumn(name = "function_id")
   private AnomalyFunctionSpec function;
 
