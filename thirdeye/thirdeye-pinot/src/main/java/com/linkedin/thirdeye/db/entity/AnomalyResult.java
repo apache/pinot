@@ -205,4 +205,12 @@ public class AnomalyResult extends AbstractBaseEntity implements Comparable<Anom
     }
     return ObjectUtils.compare(getId(), o.getId());
   }
+
+  public static String encodeCompactedProperties(Properties props) {
+    List<String> parts = new ArrayList<String>();
+    for (Map.Entry<Object, Object> entry : props.entrySet()) {
+      parts.add(EQUALS.join(entry.getKey(), entry.getValue()));
+    }
+    return SEMICOLON.join(parts);
+  }
 }
