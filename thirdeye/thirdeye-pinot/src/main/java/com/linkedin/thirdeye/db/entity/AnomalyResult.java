@@ -219,5 +219,5 @@ public class AnomalyResult extends AbstractBaseEntity implements Comparable<Anom
       parts.add(EQUALS.join(entry.getKey(), entry.getValue()));
     }
     return SEMICOLON.join(parts);
-
+  }
 }
