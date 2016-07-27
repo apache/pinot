@@ -133,7 +133,7 @@ public class BasePinotControllerRestletResource extends ServerResource {
 
   protected static JSONObject getErrorMsgInJson(String errorMsg) {
     JSONObject errorMsgJson = new JSONObject();
-    errorMsgJson.put("ERROR", errorMsgJson);
+    errorMsgJson.put("ERROR", errorMsg);
     return errorMsgJson;
   }
 }
