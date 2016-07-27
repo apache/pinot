@@ -451,4 +451,12 @@
     <dropColumn tableName="anomaly_results" columnName="filters" />
   </changeSet>
 
+  <changeSet id="16" author="npawar">
+    <addColumn tableName="anomaly_tasks">
+      <column name="version" type="bigint" defaultValue="0">
+        <constraints nullable="false"/>
+      </column>
+    </addColumn>
+   </changeSet>
+
 </databaseChangeLog>
