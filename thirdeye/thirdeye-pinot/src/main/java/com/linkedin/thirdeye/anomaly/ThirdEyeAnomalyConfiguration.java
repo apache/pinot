@@ -2,15 +2,15 @@ package com.linkedin.thirdeye.anomaly;
 
 import com.linkedin.thirdeye.anomaly.monitor.MonitorConfiguration;
 import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
-import com.linkedin.thirdeye.detector.driver.FailureEmailConfiguration;
 
 public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
   private boolean scheduler = false;
   private boolean worker = false;
   private boolean monitor = false;
+  private boolean alert = false;
   private long id;
   private String dashboardHost;
-  private FailureEmailConfiguration failureEmailConfig;
+  private ThirdeyeSmtpConfiguration smtpConfiguration;
   private MonitorConfiguration monitorConfiguration = new MonitorConfiguration();
 
   public String getDashboardHost() {
@@ -53,14 +53,6 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
     this.monitor = monitor;
   }
 
-  public FailureEmailConfiguration getFailureEmailConfig() {
-    return failureEmailConfig;
-  }
-
-  public void setFailureEmailConfig(FailureEmailConfiguration failureEmailConfig) {
-    this.failureEmailConfig = failureEmailConfig;
-  }
-
   public MonitorConfiguration getMonitorConfiguration() {
     return monitorConfiguration;
   }
@@ -68,5 +60,22 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
   public void setMonitorConfiguration(MonitorConfiguration monitorConfiguration) {
     this.monitorConfiguration = monitorConfiguration;
   }
+
+  public boolean isAlert() {
+    return alert;
+  }
+
+  public void setAlert(boolean alert) {
+    this.alert = alert;
+  }
+
+  public ThirdeyeSmtpConfiguration getSmtpConfiguration() {
+    return smtpConfiguration;
+  }
+
+  public void setSmtpConfiguration(ThirdeyeSmtpConfiguration smtpConfiguration) {
+    this.smtpConfiguration = smtpConfiguration;
+  }
+
 
 }

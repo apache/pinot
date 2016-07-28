@@ -23,13 +23,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.thirdeye.anomaly.job.JobContext;
+import com.linkedin.thirdeye.anomaly.job.JobScheduler;
 import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 
 /**
  * Scheduler for anomaly detection jobs
  */
-public class DetectionJobScheduler {
+public class DetectionJobScheduler implements JobScheduler {
 
   private static final Logger LOG = LoggerFactory.getLogger(DetectionJobScheduler.class);
   private SchedulerFactory schedulerFactory;

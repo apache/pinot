@@ -5,7 +5,7 @@ public class TaskConstants {
   public enum TaskType {
     ANOMALY_DETECTION,
     MERGE,
-    REPORTER,
+    ALERT,
     MONITOR;
   }
 

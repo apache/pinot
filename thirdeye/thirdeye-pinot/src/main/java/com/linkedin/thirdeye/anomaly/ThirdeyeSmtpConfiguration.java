@@ -1,11 +1,10 @@
-package com.linkedin.thirdeye.detector.driver;
+package com.linkedin.thirdeye.anomaly;
 
 import java.util.Objects;
 
 import com.google.common.base.MoreObjects;
 
-public class FailureEmailConfiguration {
-  public static final String FAILURE_EMAIL_CONFIG_KEY = "FAILURE_EMAIL_CONFIG";
+public class ThirdeyeSmtpConfiguration {
   private String fromAddress;
   private String toAddresses;
   private String smtpHost;
@@ -63,10 +62,10 @@ public class FailureEmailConfiguration {
 
   @Override
   public boolean equals(Object o) {
-    if (!(o instanceof FailureEmailConfiguration)) {
+    if (!(o instanceof ThirdeyeSmtpConfiguration)) {
       return false;
     }
-    FailureEmailConfiguration at = (FailureEmailConfiguration) o;
+    ThirdeyeSmtpConfiguration at = (ThirdeyeSmtpConfiguration) o;
     return Objects.equals(fromAddress, at.getFromAddress())
         && Objects.equals(toAddresses, at.getToAddresses())
         && Objects.equals(smtpHost, at.getSmtpHost())

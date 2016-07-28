@@ -13,8 +13,10 @@ import com.linkedin.thirdeye.db.dao.AnomalyJobDAO;
 import com.linkedin.thirdeye.db.dao.AnomalyResultDAO;
 import com.linkedin.thirdeye.db.dao.AnomalyTaskDAO;
 import com.linkedin.thirdeye.db.dao.EmailConfigurationDAO;
+import com.linkedin.thirdeye.db.entity.AnomalyFeedback;
 import com.linkedin.thirdeye.db.entity.AnomalyFunctionRelation;
 import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
+import com.linkedin.thirdeye.db.entity.AnomalyResult;
 import com.linkedin.thirdeye.db.entity.EmailConfiguration;
 import com.linkedin.thirdeye.detector.db.AnomalyFunctionRelationDAO;
 
@@ -24,6 +26,7 @@ import io.dropwizard.db.DataSourceFactory;
 import io.dropwizard.hibernate.HibernateBundle;
 
 import java.io.File;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,8 +34,8 @@ public abstract class BaseThirdEyeApplication<T extends Configuration> extends A
   private final Logger LOG = LoggerFactory.getLogger(this.getClass());
 
   protected HibernateBundle<ThirdEyeConfiguration> hibernateBundle =
-      new HibernateBundle<ThirdEyeConfiguration>(AnomalyFunctionSpec.class, AnomalyFunctionRelation.class,
-          EmailConfiguration.class) {
+ new HibernateBundle<ThirdEyeConfiguration>(
+      AnomalyFunctionSpec.class, AnomalyFunctionRelation.class, AnomalyResult.class, EmailConfiguration.class, AnomalyFeedback.class) {
         @Override
         public DataSourceFactory getDataSourceFactory(ThirdEyeConfiguration config) {
           return config.getDatabase();

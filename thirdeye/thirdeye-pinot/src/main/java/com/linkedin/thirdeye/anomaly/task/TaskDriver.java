@@ -14,6 +14,7 @@ import org.hibernate.SessionFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
 import com.linkedin.thirdeye.db.entity.AnomalyTaskSpec;
@@ -33,15 +34,17 @@ public class TaskDriver {
   private AnomalyFunctionFactory anomalyFunctionFactory;
   private SessionFactory sessionFactory;
   private TaskContext taskContext;
+  private ThirdEyeAnomalyConfiguration thirdEyeAnomalyConfiguration;
   private long workerId;
 
   volatile boolean shutdown = false;
   private static int MAX_PARALLEL_TASK = 3;
 
-  public TaskDriver(long workerId, AnomalyJobDAO anomalyJobDAO, AnomalyTaskDAO anomalyTaskDAO,
-      AnomalyResultDAO anomalyResultDAO, AnomalyFunctionRelationDAO anomalyFunctionRelationDAO,
-      AnomalyFunctionFactory anomalyFunctionFactory, SessionFactory sessionFactory) {
-    this.workerId = workerId;
+  public TaskDriver(ThirdEyeAnomalyConfiguration thirdEyeAnomalyConfiguration, AnomalyJobDAO anomalyJobDAO,
+      AnomalyTaskDAO anomalyTaskDAO, AnomalyResultDAO anomalyResultDAO,
+      AnomalyFunctionRelationDAO anomalyFunctionRelationDAO, AnomalyFunctionFactory anomalyFunctionFactory,
+      SessionFactory sessionFactory) {
+    this.workerId = thirdEyeAnomalyConfiguration.getId();
     this.anomalyTaskDAO = anomalyTaskDAO;
     this.anomalyResultDAO = anomalyResultDAO;
     this.anomalyFunctionRelationDAO = anomalyFunctionRelationDAO;
@@ -55,6 +58,7 @@ public class TaskDriver {
     taskContext.setResultDAO(anomalyResultDAO);
     taskContext.setAnomalyFunctionFactory(anomalyFunctionFactory);
     taskContext.setSessionFactory(sessionFactory);
+    taskContext.setThirdEyeAnomalyConfiguration(thirdEyeAnomalyConfiguration);
   }
 
   public void start() throws Exception {

@@ -60,12 +60,13 @@ public class AnomalyTaskDAO extends AbstractJpaDAO<AnomalyTaskSpec> {
         anomalyTaskSpec.setStatus(newStatus);
         anomalyTaskSpec.setWorkerId(workerId);
         save(anomalyTaskSpec);
+        return true;
       }
     } catch (Exception e) {
       LOG.info("OptimisticLockException");
-      return false;
     }
-    return true;
+    return false;
+
   }
 
   public void updateStatusAndTaskEndTime(Long id, TaskStatus oldStatus, TaskStatus newStatus, Long taskEndTime) {
