@@ -264,8 +264,7 @@ public class ThirdEyeDetectorApplication
     environment.jersey().register(new AnomalyDetectionJobResource(anomalyDetectionJobManager, anomalyFunctionDAO));
     environment.jersey().register(new EmailReportJobResource(emailReportJobManager, emailConfigurationDAO));
     environment.jersey().register(new EmailReportResource(emailConfigurationDAO, emailReportJobManager));
-    environment.jersey().register(new EmailFunctionDependencyResource(emailFunctionDependencyDAO));
-
+    environment.jersey().register(new EmailFunctionDependencyResource(anomalyFunctionDAO, emailConfigurationDAO));
   }
 
   public static int getApplicationPortNumber(ThirdEyeDetectorConfiguration config) {

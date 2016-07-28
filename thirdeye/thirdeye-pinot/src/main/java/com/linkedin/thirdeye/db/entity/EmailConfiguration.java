@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-import javax.persistence.CascadeType;
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.FetchType;
@@ -91,19 +90,14 @@ public class EmailConfiguration extends AbstractBaseEntity {
   @Column(name = "window_delay_unit", nullable = false)
   private TimeUnit windowDelayUnit;
 
-  @ManyToMany(cascade = {
-      CascadeType.ALL
-  }, fetch = FetchType.LAZY)
-  @JoinTable(name = "email_function_dependencies", joinColumns = {
-      @JoinColumn(name = "email_id", referencedColumnName = "id")
-  }, inverseJoinColumns = {
-      @JoinColumn(name = "function_id", referencedColumnName = "id")
-  })
-  private List<AnomalyFunctionSpec> functions = new ArrayList<>();
-
   public String getCollection() {
     return collection;
   }
+
+  @ManyToMany(fetch = FetchType.LAZY)
+  @JoinTable(name = "email_function_dependencies", joinColumns = { @JoinColumn(name = "email_id")},
+        inverseJoinColumns = { @JoinColumn(name = "function_id") })
+  private List<AnomalyFunctionSpec> functions = new ArrayList<>();
 
   public void setCollection(String collection) {
     this.collection = collection;
@@ -234,6 +228,14 @@ public class EmailConfiguration extends AbstractBaseEntity {
     this.windowDelayUnit = windowDelayUnit;
   }
 
+  public List<AnomalyFunctionSpec> getFunctions() {
+    return functions;
+  }
+
+  public void setFunctions(List<AnomalyFunctionSpec> functions) {
+    this.functions = functions;
+  }
+
   @Override
   public String toString() {
     return MoreObjects.toStringHelper(this).add("collection", collection).add("metric", metric)
@@ -243,13 +245,5 @@ public class EmailConfiguration extends AbstractBaseEntity {
         .add("sendZeroAnomalyEmail", sendZeroAnomalyEmail).add("filters", filters)
         .add("windowDelay", windowDelay).add("windowDelayUnit", windowDelayUnit)
         .add("functions", functions).toString();
-  }
-
-  public List<AnomalyFunctionSpec> getFunctions() {
-    return functions;
-  }
-
-  public void setFunctions(List<AnomalyFunctionSpec> functions) {
-    this.functions = functions;
   }
 }

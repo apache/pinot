@@ -1,5 +1,10 @@
 package com.linkedin.thirdeye.detector.resources;
 
+import com.linkedin.thirdeye.api.dto.EmailFunctionDependency;
+import com.linkedin.thirdeye.db.dao.AnomalyFunctionDAO;
+import com.linkedin.thirdeye.db.dao.EmailConfigurationDAO;
+import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
+import com.linkedin.thirdeye.db.entity.EmailConfiguration;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -12,29 +17,35 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
-import com.linkedin.thirdeye.db.entity.EmailFunctionDependency;
-import com.linkedin.thirdeye.detector.db.EmailFunctionDependencyDAO;
-
-import io.dropwizard.hibernate.UnitOfWork;
-
 @Path("/email-function-dependencies")
 @Produces(MediaType.APPLICATION_JSON)
 public class EmailFunctionDependencyResource {
-  private final EmailFunctionDependencyDAO dao;
+  private final AnomalyFunctionDAO functionDAO;
+  private final EmailConfigurationDAO emailDAO;
 
-  public EmailFunctionDependencyResource(EmailFunctionDependencyDAO dao) {
-    this.dao = dao;
+  public EmailFunctionDependencyResource(AnomalyFunctionDAO functionDAO,
+      EmailConfigurationDAO emailConfigurationDAO) {
+    this.functionDAO = functionDAO;
+    this.emailDAO = emailConfigurationDAO;
   }
 
   @POST
-  @UnitOfWork
   public Response create(EmailFunctionDependency relation) {
-    dao.create(relation);
+    AnomalyFunctionSpec function = functionDAO.findById(relation.getFunctionId());
+    EmailConfiguration emailConfiguration = emailDAO.findById(relation.getEmailId());
+    if (function != null && emailConfiguration != null) {
+      if (!emailConfiguration.getFunctions().contains(function)) {
+        emailConfiguration.getFunctions().add(function);
+        emailDAO.save(emailConfiguration);
+      }
+    } else {
+      throw new IllegalArgumentException(
+          "function or email not found for input : " + relation.toString());
+    }
     return Response.ok().build();
   }
 
   @POST
-  @UnitOfWork
   @Path("/{emailId}/{functionId}")
   public Response create(@PathParam("emailId") Long emailId,
       @PathParam("functionId") Long functionId) {
@@ -44,57 +55,80 @@ public class EmailFunctionDependencyResource {
     return create(relation);
   }
 
+  /**
+   * Removing email from function
+   * @param emailId
+   * @param functionId
+   * @return
+   */
   @DELETE
-  @UnitOfWork
   @Path("/{emailId}/{functionId}")
   public Response delete(@PathParam("emailId") Long emailId,
       @PathParam("functionId") Long functionId) {
-    dao.delete(emailId, functionId);
+    AnomalyFunctionSpec function = functionDAO.findById(functionId);
+    EmailConfiguration emailConfiguration = emailDAO.findById(emailId);
+    if (function != null && emailConfiguration != null) {
+      if (!emailConfiguration.getFunctions().contains(function)) {
+        emailConfiguration.getFunctions().remove(function);
+        emailDAO.save(emailConfiguration);
+      }
+    }
     return Response.noContent().build();
   }
 
   @DELETE
-  @UnitOfWork
   @Path("/email/{emailId}")
   public Response deleteByEmail(@PathParam("emailId") Long emailId) {
-    dao.deleteByEmail(emailId);
+    emailDAO.deleteById(emailId);
     return Response.noContent().build();
   }
 
   @DELETE
-  @UnitOfWork
   @Path("/function/{functionId}")
   public Response deleteByFunction(@PathParam("functionId") Long functionId) {
-    dao.deleteByFunction(functionId);
+    functionDAO.deleteById(functionId);
     return Response.noContent().build();
   }
 
   @GET
-  @UnitOfWork
+  @Deprecated
+  /**
+   * Deprecate use of the end point.
+   */
   public List<EmailFunctionDependency> find() {
-    return dao.find();
+    List<EmailConfiguration> emailConfigurations = emailDAO.findAll();
+    List<EmailFunctionDependency> dependencies = new ArrayList<>();
+    for (EmailConfiguration emailConfiguration : emailConfigurations) {
+      for (AnomalyFunctionSpec spec : emailConfiguration.getFunctions()) {
+        EmailFunctionDependency dependency = new EmailFunctionDependency();
+        dependency.setEmailId(emailConfiguration.getId());
+        dependency.setFunctionId(spec.getId());
+        dependencies.add(dependency);
+      }
+    }
+    return dependencies;
   }
 
   @GET
-  @UnitOfWork
   @Path("/email/{emailId}")
-  public List<Long> findByEmail(@PathParam("emailId") Long emailId) {
-    List<EmailFunctionDependency> result = dao.findByEmail(emailId);
+  public List<Long> findFunctionIdsByEmail(@PathParam("emailId") Long emailId) {
+    EmailConfiguration emailConfiguration = emailDAO.findById(emailId);
+    List<AnomalyFunctionSpec> functionSpecs = emailConfiguration.getFunctions();
     List<Long> functionIds = new ArrayList<>();
-    for (EmailFunctionDependency relation : result) {
-      functionIds.add(relation.getFunctionId());
+    for (AnomalyFunctionSpec functionSpec : functionSpecs) {
+      functionIds.add(functionSpec.getId());
     }
     return functionIds;
   }
 
   @GET
-  @UnitOfWork
   @Path("/function/{functionId}")
-  public List<Long> findByFunction(@PathParam("functionId") Long functionId) {
-    List<EmailFunctionDependency> result = dao.findByFunction(functionId);
+  public List<Long> findEmailIdsByFunction(@PathParam("functionId") Long functionId) {
+    List<EmailConfiguration> emailConfigurations = emailDAO.findByFunctionId(functionId);
     List<Long> emailIds = new ArrayList<>();
-    for (EmailFunctionDependency relation : result) {
-      emailIds.add(relation.getEmailId());
+    for (EmailConfiguration emailConfiguration : emailConfigurations) {
+
+      emailIds.add(emailConfiguration.getId());
     }
     return emailIds;
   }
