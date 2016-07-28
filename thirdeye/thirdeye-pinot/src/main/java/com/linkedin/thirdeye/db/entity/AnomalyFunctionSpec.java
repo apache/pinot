@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.db.entity;
 
 import com.linkedin.thirdeye.constant.MetricAggFunction;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
@@ -11,7 +12,6 @@ import javax.persistence.Entity;
 import javax.persistence.EnumType;
 import javax.persistence.Enumerated;
 import javax.persistence.FetchType;
-import javax.persistence.ManyToMany;
 import javax.persistence.OneToMany;
 import javax.persistence.Table;
 
@@ -73,11 +73,8 @@ public class AnomalyFunctionSpec extends AbstractBaseEntity {
   @Column(name = "filters", nullable = true)
   private String filters;
 
-  @ManyToMany(mappedBy = "functions", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
-  private List<EmailConfiguration> emails;
-
   @OneToMany(mappedBy = "function", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
-  private List<AnomalyResult> anomalies;
+  private List<AnomalyResult> anomalies = new ArrayList<>();
 
   public String getCollection() {
     return collection;
@@ -211,15 +208,6 @@ public class AnomalyFunctionSpec extends AbstractBaseEntity {
   public void setFilters(String filters) {
     String sortedFilters = ThirdEyeUtils.getSortedFilters(filters);
     this.filters = sortedFilters;
-  }
-
-  @JsonIgnore
-  public List<EmailConfiguration> getEmails() {
-    return emails;
-  }
-
-  public void setEmails(List<EmailConfiguration> emails) {
-    this.emails = emails;
   }
 
   @JsonIgnore

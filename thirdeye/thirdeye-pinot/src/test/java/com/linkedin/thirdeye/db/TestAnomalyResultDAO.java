@@ -14,7 +14,7 @@ public class TestAnomalyResultDAO extends AbstractDbTestBase {
 
   @Test
   public void testAnomalyResultCRUD() {
-    AnomalyFunctionSpec spec = TestAnomalyFunctionDAO.getTestFunctionSpec();
+    AnomalyFunctionSpec spec = getTestFunctionSpec("metric", "dataset");
     anomalyFunctionDAO.save(spec);
     Assert.assertNotNull(spec);
 
@@ -43,7 +43,7 @@ public class TestAnomalyResultDAO extends AbstractDbTestBase {
     feedback.setFeedbackType(AnomalyFeedbackType.ANOMALY);
     feedback.setStatus(FeedbackStatus.NEW);
     result.setFeedback(feedback);
-    anomalyResultDAO.update(result);
+    anomalyResultDAO.save(result);
 
     AnomalyResult resultRet = anomalyResultDAO.findById(anomalyResultId);
     Assert.assertEquals(resultRet.getId(), result.getId());

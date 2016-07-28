@@ -11,19 +11,17 @@ public class AbstractJpaDAO<E extends AbstractBaseEntity> {
   @Inject
   private Provider<EntityManager> emf;
 
-  protected final Class<E> entityClass;
-
-  public AbstractJpaDAO(Class<E> entityClass) {
+  final Class<E> entityClass;
+  AbstractJpaDAO(Class<E> entityClass) {
     this.entityClass = entityClass;
   }
-
-  public EntityManager getEntityManager() {
+  EntityManager getEntityManager() {
     return emf.get();
   }
 
   @Transactional
   public Long save(E entity) {
-    emf.get().persist(entity);
+    getEntityManager().persist(entity);
     return entity.getId();
   }
 
@@ -33,21 +31,21 @@ public class AbstractJpaDAO<E extends AbstractBaseEntity> {
   }
 
   public E findById(Long id) {
-    return emf.get().find(entityClass, id);
+    return getEntityManager().find(entityClass, id);
   }
 
   @Transactional
   public void delete(E entity) {
-    emf.get().remove(entity);
+    getEntityManager().remove(entity);
   }
 
   @Transactional
   public void deleteById(Long id) {
-    emf.get().remove(findById(id));
+    getEntityManager().remove(findById(id));
   }
 
   public List<E> findAll() {
-    return this.emf.get().createQuery("from " + entityClass.getSimpleName(), entityClass)
+    return getEntityManager().createQuery("from " + entityClass.getSimpleName(), entityClass)
         .getResultList();
   }
 }

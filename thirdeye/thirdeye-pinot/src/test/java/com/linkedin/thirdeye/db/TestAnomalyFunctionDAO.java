@@ -3,7 +3,6 @@ package com.linkedin.thirdeye.db;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -15,7 +14,7 @@ public class TestAnomalyFunctionDAO extends AbstractDbTestBase {
 
   @Test
   public void testCreate() {
-    anomalyFunctionId = anomalyFunctionDAO.save(getTestFunctionSpec());
+    anomalyFunctionId = anomalyFunctionDAO.save(getTestFunctionSpec(metricName, collection));
     Assert.assertNotNull(anomalyFunctionId);
 
     // test fetch all
@@ -51,22 +50,5 @@ public class TestAnomalyFunctionDAO extends AbstractDbTestBase {
     anomalyFunctionDAO.deleteById(anomalyFunctionId);
     AnomalyFunctionSpec spec = anomalyFunctionDAO.findById(anomalyFunctionId);
     Assert.assertNull(spec);
-  }
-
-  static AnomalyFunctionSpec getTestFunctionSpec() {
-    AnomalyFunctionSpec functionSpec = new AnomalyFunctionSpec();
-    functionSpec.setMetricFunction(MetricAggFunction.SUM);
-    functionSpec.setMetric(metricName);
-    functionSpec.setBucketSize(5);
-    functionSpec.setCollection(collection);
-    functionSpec.setBucketUnit(TimeUnit.MINUTES);
-    functionSpec.setCron("0 0/5 * * * ?");
-    functionSpec.setFunctionName("my awesome test function");
-    functionSpec.setType("USER_RULE");
-    functionSpec.setWindowDelay(1);
-    functionSpec.setWindowDelayUnit(TimeUnit.HOURS);
-    functionSpec.setWindowSize(10);
-    functionSpec.setWindowUnit(TimeUnit.HOURS);
-    return functionSpec;
   }
 }
