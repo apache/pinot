@@ -56,34 +56,40 @@ function renderSelfService() {
 
     // Name
     $("#self-service-forms-section").on("keyup", "#name", function () {
-        hideErrorAndSuccess("name");
+        var form = $(this).closest("form");
+        hideErrorAndSuccess("name",form);
     });
 
     //Function type
     $("#self-service-forms-section").on("click", ".function-type-option", function () {
-        toggleFunctionTypeFields(this);
+        var form = $(this).closest("form");
+        toggleFunctionTypeFields(this,form);
         hideErrorAndSuccess("");
     })
 
     // Metric
     $("#self-service-forms-section").on("click", ".metric-option", function () {
-        hideErrorAndSuccess("metric-option");
+        var form = $(this).closest("form");
+        hideErrorAndSuccess("metric-option",form);
     });
 
 
     // Monitoring window size
     $("#self-service-forms-section").on("keyup, click", "#monitoring-window-size", function () {
-        hideErrorAndSuccess("monitoring-window-size");
+        var form = $(this).closest("form");
+        hideErrorAndSuccess("monitoring-window-size",form);
     });
 
     // Monitoring repeat unit selection
     $("#self-service-forms-section").on("click", ".monitoring-window-unit-option", function () {
-        hideErrorAndSuccess("");
+        var form = $(this).closest("form");
+        hideErrorAndSuccess("",form);
     });
 
     // Monitoring window unit selection
     $("#self-service-forms-section").on("keyup, click", "#monitoring-repeat-size", function () {
-        hideErrorAndSuccess("monitoring-repeat-size");
+        var form = $(this).closest("form");
+        hideErrorAndSuccess("monitoring-repeat-size",form);
     });
 
     // Monitoring repeat unit selection
@@ -95,34 +101,40 @@ function renderSelfService() {
     //USER_RULE FUNCTION TYPE PARAMS
     // Condition selection
     $("#self-service-forms-section").on("click", ".anomaly-condition-option", function () {
-        hideErrorAndSuccess("anomaly-condition");
+        var form = $(this).closest("form");
+        hideErrorAndSuccess("anomaly-condition",form);
     });
 
     // Condition selection
     $("#self-service-forms-section").on("click", ".anomaly-condition-min-max-option", function () {
-        toggleMinMaxInput(this);
-        hideErrorAndSuccess("anomaly-condition");
+        var form = $(this).closest("form");
+        toggleMinMaxInput(this, form);
+        hideErrorAndSuccess("anomaly-condition",form);
     });
 
     // Threshold selection
     $("#self-service-forms-section").on("keyup", "#anomaly-threshold, #anomaly-threshold-min, #anomaly-threshold-max", function () {
-        hideErrorAndSuccess("anomaly-threshold");
+        var form = $(this).closest("form");
+        hideErrorAndSuccess("anomaly-threshold", form);
     });
 
     // Compare mode selection
     $("#self-service-forms-section").on("click", ".anomaly-compare-mode-option", function () {
-        hideErrorAndSuccess("anomaly-compare-mode");
+        var form = $(this).closest("form");
+        hideErrorAndSuccess("anomaly-compare-mode", form);
     });
 
     // ExploreDimension and filter selection selection
     $("#self-service-forms-section").on("click", ".dimension-option, .remove-filter-selection[tab='self-service'], #self-service-apply-filter-btn", function () {
-        hideErrorAndSuccess("");
+        var form = $(this).closest("form");
+        hideErrorAndSuccess("", form);
     });
 
     //MIN_MAX_THRESHOLD FUNCTION TYPE PARAMS
     // Threshold
     $("#self-service-forms-section").on("keyup", "#anomaly-threshold-min-max", function () {
-        hideErrorAndSuccess("anomaly-threshold");
+        var form = $(this).closest("form");
+        hideErrorAndSuccess("anomaly-threshold", form);
     });
 
 
@@ -173,28 +185,35 @@ function renderSelfService() {
         $("." + functionType + "-fields").removeClass("uk-hidden");
     }
 
-    function toggleMinMaxInput(target) {
+    function toggleMinMaxInput(target, form) {
         var value = $(target).attr("value");
         if (value == "MIN") {
+
             $("#anomaly-threshold-max, #and").addClass("uk-hidden");
-            $("#anomaly-threshold-min").removeClass("uk-hidden");
+            $("#anomaly-threshold-max", form).attr("value", "");
+            $("#anomaly-threshold-max", form).val("");
+            $("#anomaly-threshold-min", form).removeClass("uk-hidden");
+
         } else if (value == "MAX") {
             $("#anomaly-threshold-min, #and").addClass("uk-hidden");
-            $("#anomaly-threshold-max").removeClass("uk-hidden");
+            $("#anomaly-threshold-min", form).attr("value", "");
+            $("#anomaly-threshold-min", form).val("");
+            $("#anomaly-threshold-max", form).removeClass("uk-hidden");
+
         } else {
-            $("#anomaly-threshold-max, #anomaly-threshold-min, #and").removeClass("uk-hidden");
+            $("#anomaly-threshold-max, #anomaly-threshold-min, #and", form).removeClass("uk-hidden");
         }
     };
 
-    function hideErrorAndSuccess(source) {
+    function hideErrorAndSuccess(source, form) {
 
         //If previously error was shown hide it
         if ($("#manage-anomaly-fn-error").attr("data-error-source") == source) {
-            $("#manage-anomaly-fn-error").hide();
+            $("#manage-anomaly-fn-error", form).hide();
         }
 
         //Hide success message
-        $("#manage-anomaly-function-success").hide();
+        $("#manage-anomaly-function-success", form).hide();
     }
 
     function toggleMonitoringTimeField(target) {
@@ -422,30 +441,19 @@ function renderSelfService() {
 
         if (valid) {
 
-            /* Submit form */
-            var url = "/dashboard/anomaly-function/create?dataset=" + formData.dataset + "&metric=" + formData.metric + "&type=" + formData.functionType + "&metricFunction=" + formData.metricFunction + "&functionName=" + formData.functionName
-                + "&windowSize=" + formData.windowSize + "&windowUnit=" + formData.windowUnit + "&windowDelay=" + formData.windowDelay
-                + "&scheduleMinute=" + formData.scheduleMinute + "&scheduleHour=" + formData.scheduleHour
-                + "&repeatEverySize=" + formData.repeatEverySize + "&repeatEveryUnit=" + formData.repeatEveryUnit
-                + "&isActive=" + formData.isActive + "&properties="
-            url += (formData.functionType == "USER_RULE") ? "baseline=" + formData.baseline + ";changeThreshold=" + formData.condition + formData.changeThreshold : "";
-            url += (formData.functionType == "MIN_MAX_THRESHOLD" && formData.min ) ? "min=" + formData.min : "";
-            url += (formData.functionType == "MIN_MAX_THRESHOLD" && formData.max ) ? ";max=" + formData.max : "";
-
-            url += (formData.exploreDimension) ? "&exploreDimension=" + formData.exploreDimension : "";
-            url += (formData.filters && formData.filters != encodeURIComponent(JSON.stringify({}))) ? "&filters=" + formData.filters : "";
-
             //Disable submit btn
             disableButton($("#create-anomaly-function"));
 
-           submitData(url).done(function(){
+
+            var urlParams = urlOfAnomalyFn(formData);
+            submitData("/dashboard/anomaly-function/create?" + urlParams).done(function(){
                //Enable submit btn
                enableButton($("#create-anomaly-function"))
 
                 var successMessage = $("#manage-anomaly-function-success");
                 $("p", successMessage).html("success");
                 successMessage.fadeIn(100);
-           })
+            })
         }
     }
 
@@ -477,14 +485,31 @@ function renderSelfService() {
     //Populate modal with data of the selected anomaly function
     function populateUpdateForm(target) {
 
-        var functionId = $(target).attr("data-row-id");
+        var rowId = $(target).attr("data-row-id");
 
         /** Handelbars template for ANOMALY FUNCTION FORM **/
         var existingAnomalyFunctionsDataStr = window.sessionStorage.getItem('existingAnomalyFunctions');
         var existingAnomalyFunctionsData = JSON.parse(existingAnomalyFunctionsDataStr);
-        var result_anomaly_function_form_template = HandleBarsTemplates.template_anomaly_function_form(existingAnomalyFunctionsData[functionId]);
+        var anomalyFunctionObj = existingAnomalyFunctionsData[rowId]
+        var fnProperties = parseFnProperties(anomalyFunctionObj.properties);
+        var result_anomaly_function_form_template = HandleBarsTemplates.template_anomaly_function_form({data: anomalyFunctionObj, fnProperties: fnProperties});
         $("#update-anomaly-functions-form-placeholder").html(result_anomaly_function_form_template);
 
+
+        //Store the rowId on the update form btn
+        $("#update-anomaly-function").attr("data-row-id", rowId )
+
+        //Set function type
+        $(".function-type-option[value='" + existingAnomalyFunctionsData[rowId].type + "']").click()
+
+        //Set min max condition and populate inputfield
+        if(fnProperties && fnProperties.hasOwnProperty("min") && fnProperties.hasOwnProperty("max")){
+            $(".anomaly-condition-min-max-option[value='MINMAX']").click()
+        }else if(fnProperties && fnProperties.hasOwnProperty("min")){
+            $(".anomaly-condition-min-max-option[value='MIN']").click()
+        }else{
+            $(".anomaly-condition-min-max-option[value='MAX']").click()
+        }
 
         /** Handelbars template for dataset dropdown **/
         var datasetList = JSON.parse(window.sessionStorage.getItem('datasetList'));
@@ -514,7 +539,6 @@ function renderSelfService() {
         }
 
         enableButton($("#update-anomaly-function"));
-        $("#manage-anomaly-function-success").hide();
 
         $("#update-function-modal .dimension-list").html(dimensionListHtml);
 
@@ -533,33 +557,41 @@ function renderSelfService() {
             $(this).click();
             $(".radio-options", this).click();
         });
+
+
     }
 
     function updateAnomalyFunction() {
 
-        disableButton($("#update-anomaly-function"));
+
 
         var form = $("#update-function-modal");
         var formData = collectAnomalyFnFormValues(form);
         var valid = validateAnomalyFnFormData(formData, form);
 
 
+
+
         if (valid) {
-            var url = "/dashboard/anomaly-function/update?id=" + formData.functionId + "&dataset=" + formData.dataset + "&metric=" + formData.metric + "&type=" + formData.functionType + "&metricFunction=" + formData.metricFunction + "&functionName=" + formData.functionName
-                + "&windowSize=" + formData.windowSize + "&windowUnit=" + formData.windowUnit + "&windowDelay=" + formData.windowDelay
-                + "&isActive=" + formData.isActive + "&properties=baseline=" + formData.baseline + ";changeThreshold=" + formData.condition + formData.changeThreshold;
 
-            //Optional params
-            url += (formData.repeatEverySize) ? "&scheduleMinute=" + formData.scheduleMinute + "&scheduleHour=" + formData.scheduleHour
-                + "&repeatEverySize=" + formData.repeatEverySize + "&repeatEveryUnit=" + formData.repeatEveryUnit : "";
-            url += (formData.exploreDimension) ? "&exploreDimension=" + formData.exploreDimension : "";
-            url += (formData.filters  ) ? "&filters=" + formData.filtersString : "";
+            disableButton($("#update-anomaly-function"));
 
-            submitData(url).done(function () {
+            var urlParams = urlOfAnomalyFn(formData)
+
+            submitData("/dashboard/anomaly-function/update?" + urlParams).done(function () {
+
+                //Update cached data
+//                var existingAnomalyFunctionsDataStr = window.sessionStorage.getItem('existingAnomalyFunctions');
+//                var existingAnomalyFunctionsData = JSON.parse(existingAnomalyFunctionsDataStr);
+
+                //existingAnomalyFunctionsData[rowId] = {formData}
+
+                getExistingAnomalyFunctions(formData.dataset);
 
                 //Enable submit btn
-                enableButton($("#update-anomaly-function"))
-
+                enableButton($("#update-anomaly-function"));
+                $("#close-update-fn-modal").click();
+                var rowId = $("#update-anomaly-function").attr("data-row-id");
                 var successMessage = $("#manage-anomaly-function-success", form);
                 $("p", successMessage).html("success");
                 successMessage.fadeIn(100);
@@ -568,5 +600,33 @@ function renderSelfService() {
         }
     }
 
+    function urlOfAnomalyFn(formData){
+        /* Submit form */
+        var url = "dataset=" + formData.dataset + "&metric=" + formData.metric + "&type=" + formData.functionType + "&metricFunction=" + formData.metricFunction + "&functionName=" + formData.functionName
+            + "&windowSize=" + formData.windowSize + "&windowUnit=" + formData.windowUnit + "&windowDelay=" + formData.windowDelay
+            + "&scheduleMinute=" + formData.scheduleMinute + "&scheduleHour=" + formData.scheduleHour
+            + "&isActive=" + formData.isActive + "&properties="
+        url += (formData.functionType == "USER_RULE") ? "baseline=" + formData.baseline + ";changeThreshold=" + formData.condition + formData.changeThreshold : "";
+        url += (formData.functionType == "MIN_MAX_THRESHOLD" && formData.min ) ? "min=" + formData.min + ";" : "";
+        url += (formData.functionType == "MIN_MAX_THRESHOLD" && formData.max ) ? "max=" + formData.max : "";
+        //Todo: cron needs to be expressed in order to update these values
+        url += (formData.repeatEverySize) ? "&repeatEverySize=" + formData.repeatEverySize + "&repeatEveryUnit=" + formData.repeatEveryUnit : "";
+        url += (formData.exploreDimension) ? "&exploreDimension=" + formData.exploreDimension : "";
+        url += (formData.filters && formData.filters != encodeURIComponent(JSON.stringify({}))) ? "&filters=" + formData.filters : "";
+        url += (formData.functionId ) ? "&id=" + formData.functionId : "" ;
 
+        return url
+    }
+
+    function parseFnProperties(properties){
+        var fnProperties = {}
+        var propertiesAry = properties.split(";");
+        for (var i = 0, numProp = propertiesAry.length; i < numProp; i++) {
+            var keyValue = propertiesAry[i];
+            keyValue = keyValue.split("=")
+            var key = keyValue[0];
+            fnProperties[key] = keyValue[1];
+        }
+        return fnProperties
+    }
 }

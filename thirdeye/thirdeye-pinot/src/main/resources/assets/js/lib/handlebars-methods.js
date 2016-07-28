@@ -76,9 +76,9 @@ $(document).ready(function () {
         }
     });
 
-    //parse anomaly data properties value and returns the requested param
-    Handlebars.registerHelper('parseAnomalyProperties', function (propertiestSring, param) {
-        var propertiesAry = propertiestSring.split(";");
+    //parse anomaly data properties
+    Handlebars.registerHelper('parseAnomalyProperties', function (propertiesString, param) {
+        var propertiesAry = propertiesString.split(";");
         for (var i = 0, numProp = propertiesAry.length; i < numProp; i++) {
             var keyValue = propertiesAry[i];
             keyValue = keyValue.split("=")
@@ -92,8 +92,8 @@ $(document).ready(function () {
     });
 
     //parse anomaly data properties value and returns the requested param
-    Handlebars.registerHelper('lookupAnomalyProperty', function (propertiestSring, param) {
-        var propertiesAry = propertiestSring.split(";");
+    Handlebars.registerHelper('lookupAnomalyProperty', function (propertiesString, param) {
+        var propertiesAry = propertiesString.split(";");
         for (var i = 0, numProp = propertiesAry.length; i < numProp; i++) {
             var keyValue = propertiesAry[i];
             keyValue = keyValue.split("=")
@@ -107,32 +107,38 @@ $(document).ready(function () {
     });
 
     //Helper for anomaly function form, here we can set the desired display of any function property
-    Handlebars.registerHelper('populateAnomalyFunctionProp', function (propertiestSring, param, key) {
-        var value = Handlebars.helpers.lookupAnomalyProperty(propertiestSring, param);
-        if (param == "changeThreshold") {
-            value = Math.abs(parseFloat(value)) * 100
+    Handlebars.registerHelper('populateAnomalyFunctionProp', function (param , value) {
+
+        switch(param){
+            case "changeThreshold":
+                value = Math.abs(parseFloat(value)) * 100;
+            break;
+            case "":
+
+            break;
+            default:
+            break;
         }
         return value
     });
 
     //returns classname negative or positive or no classname. The classname related css creates a :before pseudo element triangle up or down
-    Handlebars.registerHelper('displayDeltaIcon', function (propertiestSring, param, key) {
-        var delta = Handlebars.helpers.lookupAnomalyProperty(propertiestSring, param);
+    Handlebars.registerHelper('discribeDelta', function (value, describeMode) {
 
         var describeChange;
-        if (delta > 0) {
+        if (value > 0) {
             describeChange = {
                 iconClass: 'positive-icon',
                 description: 'INCREASES'}
-        } else if (delta < 0) {
+        } else if (value < 0) {
             describeChange = {
-                iconClass: 'positive-icon',
-                description: 'INCREASES'}
+                iconClass: 'negative-icon',
+                description: 'DECREASES'}
         } else {
             return
         }
 
-        return describeChange[key]
+        return describeChange[describeMode]
 
     });
 

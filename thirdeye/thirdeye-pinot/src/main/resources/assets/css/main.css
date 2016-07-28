@@ -348,8 +348,12 @@ body a{
 #name{
     width: 250px;
 }
+#anomaly-threshold-max,
+#anomaly-threshold-min,
+#anomaly-threshold{
+    width: 115px;
+}
 
-#anomaly-threshold,
 #monitoring-schedule-time{
     width: 135px;
 }

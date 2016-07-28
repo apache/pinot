@@ -1,20 +1,20 @@
 <section id="anomaly-function-form-section">
 <script id="anomaly-function-form-template" type="text/x-handlebars-template">
     <form id="configure-anomaly-function-form" class="uk-form">
-           {{#if id}}
+           {{#if data/id}}
            {{else}}
                <div  class="title-box full-width" style="margin-top:15px;">
                    <h2>Create anomaly function</h2>
                </div>
            {{/if}}
     <table id="configure-form-table">
-            {{#if id}}
+            {{#if data/id}}
             <tr>
                <td>
                    <label class="uk-form-label bold-label">Function id: </label>
                </td>
                 <td>
-                    #<span id="function-id">{{id}}</span>
+                    #<span id="function-id">{{data/id}}</span>
                 </td>
             {{/if}}
             <tr>
@@ -22,7 +22,7 @@
                     <label class="uk-form-label bold-label required">Name</label>
                 </td>
                 <td>
-                    <input id="name" type="text" maxlength="160" {{#if functionName}}value="{{functionName}}"{{/if}} placeholder="anomaly_function_name">
+                    <input id="name" type="text" maxlength="160" {{#if data/functionName}}value="{{data/functionName}}"{{/if}} placeholder="anomaly_function_name">
                 </td>
             </tr>
             <tr>
@@ -32,9 +32,9 @@
                 <td>
                     <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group">
                         <div class="selected-dataset uk-button"
-                             value="{{#if collection}}{{collection}}{{/if}}">
-                            {{#if collection}}
-                                {{collection}}
+                             value="{{#if data/collection}}{{data/collection}}{{/if}}">
+                            {{#if data/collection}}
+                                {{data/collection}}
                             {{else}}
                                 Select dataset
                             {{/if}}
@@ -53,7 +53,7 @@
                 </td>
                 <td>
                     <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group uk-display-inline-block">
-                        <div id="selected-function-type" class="uk-button" value="{{#if id}}{{type}}{{else}}USER_RULE{{/if}}">{{#if id}}{{type}}{{else}}USER_RULE{{/if}}</div>
+                        <div id="selected-function-type" class="uk-button" value="{{#if data/id}}{{data/type}}{{else}}USER_RULE{{/if}}">{{#if data/id}}{{data/type}}{{else}}USER_RULE{{/if}}</div>
                         <div class="uk-button uk-button-primary" type="button"><i class="uk-icon-caret-down"></i></div>
                         <div class="uk-dropdown uk-dropdown-small uk-dropdown-bottom" style="top: 30px; left: 0px;">
                             <ul class="uk-nav uk-nav-dropdown single-select">
@@ -71,9 +71,9 @@
             <div class="uk-form-row uk-display-inline-block">
                 <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group uk-display-inline-block">
                     <div id="selected-metric-manage-anomaly-fn" class="uk-button"
-                    value="{{#if metric}}{{metric}}{{/if}}">
-                        {{#if metric}}
-                           {{metric}}
+                    value="{{#if data/metric}}{{data/metric}}{{/if}}">
+                        {{#if data/metric}}
+                           {{data/metric}}
                         {{else}}
                             Metric
                         {{/if}}
@@ -88,12 +88,12 @@
             </div>
 
             <!-- ** USER_RULE PROPERTIES part 2/1 ** -->
-            <div class="user-rule-fields function-type-fields uk-display-inline-block {{#if functionype}}uk-hidden{{/if}}">
+            <div class="user-rule-fields function-type-fields uk-display-inline-block {{#if data/functionype}}uk-hidden{{/if}}">
                 <div id="anomaly-condition-selector" class="uk-form-row uk-form-row uk-display-inline-block" rel="self-service">
                     <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group uk-display-inline-block">
-                        <div id="selected-anomaly-condition" class="uk-button" value="{{#if properties}}{{displayDeltaIcon properties 'changeThreshold' 'description'}}{{/if}}">
-                            {{#if properties}}
-                                {{displayDeltaIcon properties 'changeThreshold' 'description'}}
+                        <div id="selected-anomaly-condition" class="uk-button" value="{{#if fnProperties}}{{discribeDelta fnProperties/changeThreshold description}}{{/if}}">
+                            {{#if fnProperties}}
+                                {{discribeDelta fnProperties/changeThreshold description}}
                             {{else}}
                                  Condition
                             {{/if}}
@@ -110,11 +110,11 @@
                 </div>
                 <span>by</span>
                 <div class="uk-display-inline-block">
-                    <input id="anomaly-threshold" type="text" placeholder="threshold" value="{{#if properties}}{{populateAnomalyFunctionProp properties 'changeThreshold'}}{{/if}}"><span>%</span>
+                    <input id="anomaly-threshold" type="text" placeholder="threshold" value="{{#if fnProperties}}{{populateAnomalyFunctionProp 'changeThreshold' fnProperties/changeThreshold}}{{/if}}"><span>%</span>
                 </div>
-                <div id="anomaly-compare-mode-selector uk-display-inline-block" class="uk-form-row uk-form-row uk-display-inline-block" rel="self-service">
+                <div id="anomaly-compare-mode-selector" class="uk-form-row uk-display-inline-block" rel="self-service">
                     <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group uk-display-inline-block">
-                        <div id="selected-anomaly-compare-mode" class="uk-button" value="{{#if properties}}{{lookupAnomalyProperty properties 'baseline'}}{{else}}w/w{{/if}}">{{#if properties}}{{lookupAnomalyProperty properties 'baseline'}}{{else}}w/w{{/if}}</div>
+                        <div id="selected-anomaly-compare-mode" class="uk-button" value="{{#if fnProperties}}{{fnProperties/baseline}}{{else}}w/w{{/if}}">{{#if fnProperties}}{{properties/baseline}}{{else}}w/w{{/if}}</div>
                         <div class="uk-button uk-button-primary" type="button"><i class="uk-icon-caret-down"></i>
                         </div>
                         <div class="uk-dropdown uk-dropdown-small uk-dropdown-bottom" style="top: 30px; left: 0px;">
@@ -133,8 +133,8 @@
             <div class="min-max-threshold-fields function-type-fields uk-display-inline-block uk-hidden">
                 <div id="anomaly-condition-selector-min-max" class="uk-display-inline-block">
                     <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group uk-display-inline-block">
-                        <div id="selected-anomaly-condition-min-max" class="uk-button" value="{{#if properties}}{{else}}MIN{{/if}}">
-                            {{#if properties}}
+                        <div id="selected-anomaly-condition-min-max" class="uk-button" value="{{#if fnProperties}}{{else}}MIN{{/if}}">
+                            {{#if fnProperties}}
                             {{else}}
                             IS LESS THAN
                             {{/if}}
@@ -151,20 +151,20 @@
                     </div>
                 </div>
                 <div class="uk-form-row uk-form-row uk-display-inline-block" rel="self-service">
-                    <input id="anomaly-threshold-min" type="text" placeholder="min threshold" {{!--{{#if populateAnomalyFunctionProp properties 'min'}}value="{{populateAnomalyFunctionProp properties 'min'}}"{{else}} class="uk-hidden"{{/if}}--}}>
+                    <input id="anomaly-threshold-min" type="text" placeholder="min threshold" {{#if fnProperties}}value="{{fnProperties/min}}"{{else}}{{/if}}>
                     <span id="and">and</span>
-                    <input id="anomaly-threshold-max" class="uk-hidden" type="text" placeholder="max threshold" {{!--{{#if populateAnomalyFunctionProp properties 'max'}}value="{{populateAnomalyFunctionProp properties 'max'}}"{{else}} class="uk-hidden"{{/if}}--}}>
+                    <input id="anomaly-threshold-max" class="uk-hidden" type="text" placeholder="max threshold" {{#if fnProperties}}value="{{fnProperties/max}}"{{else}} class="uk-hidden"{{/if}}>
                 </div>
             </div>
             <!-- ** END OF MIN_MAX_THRESHOLD PROPERTIES ** -->
 
             <!-- ** COMMON ANOMALY FUNCTION PARAMS part 3/2** -->
             <span>for</span>
-            <input id="monitoring-window-size" class="thin-input" type="number" {{#if windowSize}}value="{{windowSize}}"{{/if}}>
+            <input id="monitoring-window-size" class="thin-input" type="number" {{#if data/windowSize}}value="{{data/windowSize}}"{{/if}}>
             <span>consecutive</span>
             <div id="monitoring-window-unit-selector uk-display-inline-block" class="uk-form-row uk-form-row uk-display-inline-block" rel="self-service">
                 <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group uk-display-inline-block">
-                    <div id="selected-monitoring-window-unit" class="uk-button" value="{{#if windowUnit}}{{windowUnit}}{{else}}HOURS{{/if}}">{{#if windowUnit}}{{windowUnit}}{{else}}HOURS{{/if}}</div>
+                    <div id="selected-monitoring-window-unit" class="uk-button" value="{{#if data/windowUnit}}{{data/windowUnit}}{{else}}HOURS{{/if}}">{{#if data/windowUnit}}{{data/windowUnit}}{{else}}HOURS{{/if}}</div>
                     <div class="uk-button uk-button-primary" type="button"><i class="uk-icon-caret-down"></i></div>
                     <div class="uk-dropdown uk-dropdown-small uk-dropdown-bottom" style="top: 30px; left: 0px;">
                         <ul class="uk-nav uk-nav-dropdown single-select">
@@ -178,11 +178,11 @@
 
 
             <!-- ** USER_RULE & MIN_MAX_THRESHOLD PROPERTIES ** -->
-            <div class="user-rule-fields min-max-threshold-fields function-type-fields">
+            <div class="user-rule-fields min-max-threshold-fields function-type-fields uk-display-inline-block">
                 <div id="self-service-view-single-dimension-selector" class="view-single-dimension-selector uk-display-inline-block" rel="self-service">
                     <label class="uk-form-label">in dimension</label>
                     <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group">
-                        <div id="selected-dimension" class="uk-button" value="{{#if exploreDimensions}}{{exploreDimensions}}{{/if}}">{{#if exploreDimensions}}{{exploreDimensions}}{{else}}All{{/if}}</div>
+                        <div id="selected-dimension" class="uk-button" value="{{#if data/exploreDimensions}}{{data/exploreDimensions}}{{/if}}">{{#if data/exploreDimensions}}{{data/exploreDimensions}}{{else}}All{{/if}}</div>
                         <button class="add-single-dimension-btn uk-button uk-button-primary" type="button"><i class="uk-icon-caret-down"></i></button>
                         <div class="uk-dropdown uk-dropdown-small">
                             <ul class="dimension-list uk-nav uk-nav-dropdown single-select">
@@ -220,11 +220,11 @@
         </div>-->
 
         <div class="uk-form-row">
-            {{#if cron}}
-            cron: {{cron}}
+            {{#if data/cron}}
+            cron: {{data/cron}}
             {{else}}
             <span class="uk-form-label uk-display-inline-block">Monitor the data every </span>
-            <input id="monitoring-repeat-size" type="number" class="thin-input" {{#if repeatEverySize}}value="{{repeatEverySize}}"{{/if}}>
+            <input id="monitoring-repeat-size" type="number" class="thin-input" {{#if data/repeatEverySize}}value="{{data/repeatEverySize}}"{{/if}}>
             <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group uk-display-inline-block">
                 <div id="selected-monitoring-repeat-unit" class="uk-button" value="HOURS">HOURS</div>
                 <div class="uk-button uk-button-primary" type="button"><i class="uk-icon-caret-down"></i>
@@ -246,7 +246,7 @@
         </div>
 
         <div class="uk-form-row">
-            <input id="active-alert" rel="self-service" type="checkbox"  {{#if isActive}}checked{{else}}{{/if}}><span> Keep this alert active.</span>
+            <input id="active-alert" rel="self-service" type="checkbox"  {{#if data/isActive}}checked{{else}}{{/if}}><span> Keep this alert active.</span>
         </div>
 
         <div id="manage-anomaly-fn-error" class="uk-alert uk-alert-danger hidden" rel="self-service">
@@ -257,9 +257,9 @@
         </div>
 
         <div>
-            {{#if id}}
+            {{#if data/id}}
             <button type="button" id="update-anomaly-function" class="uk-button uk-button-primary" rel="self-service">Update</button>
-            <button type="button"  class="uk-button uk-modal-close">Cancel</button>
+            <button id="close-update-fn-modal" type="button"  class="uk-button uk-modal-close">Cancel</button>
             {{else}}
             <div class="uk-form-row">
                 <button type="button" id="create-anomaly-function" class="uk-button uk-button-primary" rel="self-service">Create</button>
