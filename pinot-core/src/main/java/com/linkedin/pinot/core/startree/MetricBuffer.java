@@ -15,108 +15,168 @@
  */
 package com.linkedin.pinot.core.startree;
 
+import com.clearspring.analytics.stream.cardinality.CardinalityMergeException;
+import com.clearspring.analytics.stream.cardinality.HyperLogLog;
+import com.linkedin.pinot.common.data.MetricFieldSpec;
+import com.linkedin.pinot.common.data.MetricFieldSpec.DerivedMetricType;
+import com.linkedin.pinot.core.startree.hll.HllUtil;
+
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.List;
 
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
-
-
+/**
+ * fromBytes and toBytes methods are used only in {@link OffHeapStarTreeBuilder}, as read and write to temp files.
+ * Thus no serialization of hll type to string is necessary at these steps.
+ */
 public class MetricBuffer {
-  Number[] numbers;
 
-  public MetricBuffer(Number[] numbers) {
-    this.numbers = numbers;
+  /**
+   * stored as number or hyperLogLog, but serialized out as number or string
+   */
+  private final Object[] values;
+  private final List<MetricFieldSpec> metricFieldSpecs;
+
+  public MetricBuffer(Object[] values, List<MetricFieldSpec> metricFieldSpecs) {
+    this.values = values;
+    this.metricFieldSpecs = metricFieldSpecs;
   }
 
   public MetricBuffer(MetricBuffer copy) {
-    this.numbers = Arrays.copyOf(copy.numbers, copy.numbers.length);
-  }
-
-  public static MetricBuffer fromBytes(byte[] bytes, List<DataType> metricTypes) {
-    ByteBuffer buffer = ByteBuffer.wrap(bytes);
-    Number[] numbers = new Number[metricTypes.size()];
-    for (int i = 0; i < metricTypes.size(); i++) {
-      switch (metricTypes.get(i)) {
-        case SHORT:
-          numbers[i] = buffer.getShort();
-          break;
-        case INT:
-          numbers[i] = buffer.getInt();
-          break;
-        case LONG:
-          numbers[i] = buffer.getLong();
-          break;
-        case FLOAT:
-          numbers[i] = buffer.getFloat();
-          break;
-        case DOUBLE:
-          numbers[i] = buffer.getDouble();
-          break;
-        default:
-          throw new IllegalArgumentException("Unsupported metric type " + metricTypes.get(i));
+    this.values = new Object[copy.values.length];
+    for (int i = 0; i < this.values.length; i++) {
+      Object copyValue = copy.values[i];
+      if (copyValue instanceof HyperLogLog) {
+        // deep copy of hll field
+        this.values[i] = HllUtil.clone((HyperLogLog)copyValue,
+            HllUtil.getLog2mFromHllFieldSize(copy.metricFieldSpecs.get(i).getFieldSize()));
+      } else if (copyValue instanceof Number) {
+        // number field is immutable
+        this.values[i] = copyValue;
+      } else {
+        throw new IllegalArgumentException("Unsupported metric type: " + copyValue.getClass());
       }
     }
-    return new MetricBuffer(numbers);
+    this.metricFieldSpecs = copy.metricFieldSpecs;
   }
 
-  public Number get(int index) {
-    return numbers[index];
+  public static MetricBuffer fromBytes(byte[] bytes, List<MetricFieldSpec> metricFieldSpecs) {
+    ByteBuffer buffer = ByteBuffer.wrap(bytes);
+    Object[] values = new Object[metricFieldSpecs.size()];
+
+    for (int i = 0; i < metricFieldSpecs.size(); i++) {
+      MetricFieldSpec metric = metricFieldSpecs.get(i);
+      if (metric.getDerivedMetricType() == DerivedMetricType.HLL) {
+        byte[] hllBytes = new byte[metric.getFieldSize()]; // TODO: buffer reuse
+        buffer.get(hllBytes);
+        values[i] = HllUtil.buildHllFromBytes(hllBytes);
+      } else {
+        switch (metric.getDataType()) {
+          case SHORT:
+            values[i] = buffer.getShort();
+            break;
+          case INT:
+            values[i] = buffer.getInt();
+            break;
+          case LONG:
+            values[i] = buffer.getLong();
+            break;
+          case FLOAT:
+            values[i] = buffer.getFloat();
+            break;
+          case DOUBLE:
+            values[i] = buffer.getDouble();
+            break;
+          default:
+            throw new IllegalArgumentException("Unsupported metric type " + metric.getDataType());
+        }
+      }
+    }
+    return new MetricBuffer(values, metricFieldSpecs);
   }
 
-  public byte[] toBytes(int numBytes, List<DataType> metricTypes) {
+  public byte[] toBytes(int numBytes) throws IOException {
     byte[] bytes = new byte[numBytes];
     ByteBuffer buffer = ByteBuffer.wrap(bytes);
-    for (int i = 0; i < metricTypes.size(); i++) {
-      switch (metricTypes.get(i)) {
-        case SHORT:
-          buffer.putShort(numbers[i].shortValue());
-          break;
-        case INT:
-          buffer.putInt(numbers[i].intValue());
-          break;
-        case LONG:
-          buffer.putLong(numbers[i].longValue());
-          break;
-        case FLOAT:
-          buffer.putFloat(numbers[i].floatValue());
-          break;
-        case DOUBLE:
-          buffer.putDouble(numbers[i].doubleValue());
-          break;
-        default:
-          throw new IllegalArgumentException("Unsupported metric type " + metricTypes.get(i));
+
+    for (int i = 0; i < metricFieldSpecs.size(); i++) {
+      MetricFieldSpec metric = metricFieldSpecs.get(i);
+      if (metric.getDerivedMetricType() == DerivedMetricType.HLL) {
+        buffer.put(((HyperLogLog)values[i]).getBytes());
+      } else {
+        switch (metric.getDataType()) {
+          case SHORT:
+            buffer.putShort(((Number) values[i]).shortValue());
+            break;
+          case INT:
+            buffer.putInt(((Number) values[i]).intValue());
+            break;
+          case LONG:
+            buffer.putLong(((Number) values[i]).longValue());
+            break;
+          case FLOAT:
+            buffer.putFloat(((Number) values[i]).floatValue());
+            break;
+          case DOUBLE:
+            buffer.putDouble(((Number) values[i]).doubleValue());
+            break;
+          default:
+            throw new IllegalArgumentException("Unsupported metric type " + metric.getDataType());
+        }
       }
     }
     return bytes;
   }
 
-  public void aggregate(MetricBuffer metrics, List<DataType> metricTypes) {
-    for (int i = 0; i < metricTypes.size(); i++) {
-      switch (metricTypes.get(i)) {
-        case SHORT:
-          numbers[i] = numbers[i].shortValue() + metrics.get(i).shortValue();
-          break;
-        case INT:
-          numbers[i] = numbers[i].intValue() + metrics.get(i).intValue();
-          break;
-        case LONG:
-          numbers[i] = numbers[i].longValue() + metrics.get(i).longValue();
-          break;
-        case FLOAT:
-          numbers[i] = numbers[i].floatValue() + metrics.get(i).floatValue();
-          break;
-        case DOUBLE:
-          numbers[i] = numbers[i].doubleValue() + metrics.get(i).doubleValue();
-          break;
-        default:
-          throw new IllegalArgumentException("Unsupported metric type " + metricTypes.get(i));
+  public void aggregate(MetricBuffer metrics) {
+    for (int i = 0; i < metricFieldSpecs.size(); i++) {
+      MetricFieldSpec metric = metricFieldSpecs.get(i);
+      if (metric.getDerivedMetricType() == DerivedMetricType.HLL) {
+        try {
+          ((HyperLogLog) values[i]).addAll((HyperLogLog) metrics.values[i]);
+        } catch (CardinalityMergeException e) {
+          throw new RuntimeException(e);
+        }
+      } else {
+        switch (metric.getDataType()) {
+          case SHORT:
+            values[i] = ((Number) values[i]).shortValue() + ((Number) metrics.values[i]).shortValue();
+            break;
+          case INT:
+            values[i] = ((Number) values[i]).intValue() + ((Number) metrics.values[i]).intValue();
+            break;
+          case LONG:
+            values[i] = ((Number) values[i]).longValue() + ((Number) metrics.values[i]).longValue();
+            break;
+          case FLOAT:
+            values[i] = ((Number) values[i]).floatValue() + ((Number) metrics.values[i]).floatValue();
+            break;
+          case DOUBLE:
+            values[i] = ((Number) values[i]).doubleValue() + ((Number) metrics.values[i]).doubleValue();
+            break;
+          default:
+            throw new IllegalArgumentException("Unsupported metric type " + metric.getDataType());
+        }
       }
+    }
+  }
+
+  /**
+   * this method should return correct value conformed to datatype to iterators
+   * @param index
+   * @return
+   */
+  public Object getValueConformToDataType(int index) {
+    if (metricFieldSpecs.get(index).getDerivedMetricType() == DerivedMetricType.HLL) {
+      return HllUtil.convertHllToString((HyperLogLog) values[index]);
+    } else {
+      return values[index];
     }
   }
 
   @Override
   public String toString() {
-    return Arrays.toString(numbers);
+    return Arrays.toString(values);
   }
 }

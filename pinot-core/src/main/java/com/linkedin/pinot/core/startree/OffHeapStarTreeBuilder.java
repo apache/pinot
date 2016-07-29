@@ -23,11 +23,13 @@ import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
+import com.linkedin.pinot.common.data.MetricFieldSpec.DerivedMetricType;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.TimeFieldSpec;
 import com.linkedin.pinot.common.utils.Pairs.IntPair;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import com.linkedin.pinot.core.startree.hll.HllConfig;
 import java.io.BufferedOutputStream;
 import java.io.DataOutputStream;
 import java.io.File;
@@ -44,6 +46,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
+
+import com.linkedin.pinot.core.startree.hll.HllUtil;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.joda.time.DateTime;
@@ -93,6 +97,7 @@ import org.slf4j.LoggerFactory;
 public class OffHeapStarTreeBuilder implements StarTreeBuilder {
   private static final Logger LOG = LoggerFactory.getLogger(OffHeapStarTreeBuilder.class);
   File dataFile;
+  private Schema schema;
   private DataOutputStream dataBuffer;
   int rawRecordCount = 0;
   int aggRecordCount = 0;
@@ -109,7 +114,6 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
   private List<String> metricNames;
   private String timeColumnName;
   private List<DataType> dimensionTypes;
-  private List<DataType> metricTypes;
   private Map<String, Object> dimensionNameToStarValueMap;
   private HashBiMap<String, Integer> dimensionNameToIndexMap;
   private Map<String, Integer> metricNameToIndexMap;
@@ -124,7 +128,7 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
   private boolean enableOffHeapFormat;
 
   public void init(StarTreeBuilderConfig builderConfig) throws Exception {
-    Schema schema = builderConfig.schema;
+    schema = builderConfig.schema;
     timeColumnName = schema.getTimeColumnName();
     this.dimensionsSplitOrder = builderConfig.dimensionsSplitOrder;
     skipStarNodeCreationForDimensions = builderConfig.getSkipStarNodeCreationForDimensions();
@@ -177,7 +181,6 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
     this.numDimensions = dimensionNames.size();
 
     // READ METRIC COLUMNS
-    this.metricTypes = new ArrayList<>();
     this.metricNames = new ArrayList<>();
 
     this.metricNameToIndexMap = new HashMap<>();
@@ -188,13 +191,12 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
       String metricName = spec.getName();
       metricNames.add(metricName);
       metricNameToIndexMap.put(metricName, index);
-      DataType dataType = spec.getDataType();
-      metricTypes.add(dataType);
-      metricSizeBytes += dataType.size();
+      metricSizeBytes += spec.getFieldSize();
     }
-    this.numMetrics = metricNames.size();
+    numMetrics = metricNames.size();
     builderConfig.getOutDir().mkdirs();
     dataFile = new File(outDir, "star-tree.buf");
+    LOG.debug("StarTree output data file: {}", dataFile.getAbsolutePath());
     dataBuffer = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(dataFile)));
 
     // INITIALIZE THE ROOT NODE
@@ -247,7 +249,7 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
     }
     for (int i = 0; i < numMetrics; i++) {
       String metName = metricNames.get(i);
-      map.put(metName, metricsHolder.get(i));
+      map.put(metName, metricsHolder.getValueConformToDataType(i));
     }
     row.init(map);
     return row;
@@ -271,17 +273,20 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
       }
       dimension.setDimension(i, dictionary.get(dimValue));
     }
-    Number[] numbers = new Number[numMetrics];
+    // initialize raw data row
+    Object[] metrics = new Object[numMetrics];
     for (int i = 0; i < numMetrics; i++) {
       String metName = metricNames.get(i);
-      numbers[i] = (Number) row.getValue(metName);
+      if (schema.getMetricFieldSpecs().get(i).getDerivedMetricType() == MetricFieldSpec.DerivedMetricType.HLL) {
+        // hll field is in string format, convert it to hll data type first
+        metrics[i] = HllUtil.convertStringToHll((String) row.getValue(metName));
+      } else {
+        // no conversion for standard data types
+        metrics[i] = row.getValue(metName);
+      }
     }
-    MetricBuffer metrics = new MetricBuffer(numbers);
-    append(dimension, metrics);
-  }
-
-  public void append(DimensionBuffer dimension, MetricBuffer metrics) throws Exception {
-    appendToRawBuffer(dimension, metrics);
+    MetricBuffer metricBuffer = new MetricBuffer(metrics, schema.getMetricFieldSpecs());
+    appendToRawBuffer(dimension, metricBuffer);
   }
 
   private void appendToRawBuffer(DimensionBuffer dimension, MetricBuffer metrics) throws IOException {
@@ -289,8 +294,7 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
     rawRecordCount++;
   }
 
-  private void appendToAggBuffer(DimensionBuffer dimension, MetricBuffer metrics)
-      throws IOException {
+  private void appendToAggBuffer(DimensionBuffer dimension, MetricBuffer metrics) throws IOException {
     appendToBuffer(dataBuffer, dimension, metrics);
     aggRecordCount++;
   }
@@ -300,8 +304,7 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
     for (int i = 0; i < numDimensions; i++) {
       dos.writeInt(dimensions.getDimension(i));
     }
-    dos.write(metricHolder.toBytes(metricSizeBytes, metricTypes));
-
+    dos.write(metricHolder.toBytes(metricSizeBytes));
   }
 
   public void build() throws Exception {
@@ -368,11 +371,11 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
       Iterator<Pair<byte[], byte[]>> iterator =
           leafDataTable.iterator(node.getStartDocumentId(), node.getEndDocumentId());
       Pair<byte[], byte[]> first = iterator.next();
-      aggMetricBuffer = MetricBuffer.fromBytes(first.getRight(), metricTypes);
+      aggMetricBuffer = MetricBuffer.fromBytes(first.getRight(), schema.getMetricFieldSpecs());
       while (iterator.hasNext()) {
         Pair<byte[], byte[]> next = iterator.next();
-        MetricBuffer metricBuffer = MetricBuffer.fromBytes(next.getRight(), metricTypes);
-        aggMetricBuffer.aggregate(metricBuffer, metricTypes);
+        MetricBuffer metricBuffer = MetricBuffer.fromBytes(next.getRight(), schema.getMetricFieldSpecs());
+        aggMetricBuffer.aggregate(metricBuffer);
       }
     } else {
 
@@ -387,7 +390,7 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
         if (aggMetricBuffer == null) {
           aggMetricBuffer = new MetricBuffer(childMetricBuffer);
         } else {
-          aggMetricBuffer.aggregate(childMetricBuffer, metricTypes);
+          aggMetricBuffer.aggregate(childMetricBuffer);
         }
       }
     }
@@ -608,7 +611,7 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
     while (iterator.hasNext()) {
       Pair<byte[], byte[]> next = iterator.next();
       LOG.info("{}, {}", DimensionBuffer.fromBytes(next.getLeft()),
-          MetricBuffer.fromBytes(next.getRight(), metricTypes));
+          MetricBuffer.fromBytes(next.getRight(), schema.getMetricFieldSpecs()));
       if (counter++ == numRecordsToPrint) {
         break;
       }
@@ -775,18 +778,18 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
           byte[] metricBuffer = next.getRight();
           if (prev == null) {
             prev = Pair.of(DimensionBuffer.fromBytes(dimBuffer),
-                MetricBuffer.fromBytes(metricBuffer, metricTypes));
+                MetricBuffer.fromBytes(metricBuffer, schema.getMetricFieldSpecs()));
           } else {
             Pair<DimensionBuffer, MetricBuffer> current =
                 Pair.of(DimensionBuffer.fromBytes(dimBuffer),
-                    MetricBuffer.fromBytes(metricBuffer, metricTypes));
+                    MetricBuffer.fromBytes(metricBuffer, schema.getMetricFieldSpecs()));
             if (!current.getLeft().equals(prev.getLeft())) {
               Pair<DimensionBuffer, MetricBuffer> ret = prev;
               prev = current;
               LOG.debug("Returning unique {}", prev.getLeft());
               return ret;
             } else {
-              prev.getRight().aggregate(current.getRight(), metricTypes);
+              prev.getRight().aggregate(current.getRight());
             }
           }
         }
@@ -836,7 +839,7 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
       public GenericRow next() {
         Pair<byte[], byte[]> pair = iterator.next();
         DimensionBuffer dimensionKey = DimensionBuffer.fromBytes(pair.getLeft());
-        MetricBuffer metricsHolder = MetricBuffer.fromBytes(pair.getRight(), metricTypes);
+        MetricBuffer metricsHolder = MetricBuffer.fromBytes(pair.getRight(), schema.getMetricFieldSpecs());
         return toGenericRow(dimensionKey, metricsHolder);
       }
     };

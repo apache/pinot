@@ -40,6 +40,7 @@ public abstract class FieldSpec {
   private static final Float DEFAULT_DIM_NULL_VALUE_OF_FLOAT = Float.NEGATIVE_INFINITY;
   private static final Double DEFAULT_DIM_NULL_VALUE_OF_DOUBLE = Double.NEGATIVE_INFINITY;
 
+  private static final String DEFAULT_METRIC_NULL_VALUE_OF_STRING = "null";
   private static final Integer DEFAULT_METRIC_NULL_VALUE_OF_INT = 0;
   private static final Long DEFAULT_METRIC_NULL_VALUE_OF_LONG = 0L;
   private static final Float DEFAULT_METRIC_NULL_VALUE_OF_FLOAT = 0.0F;
@@ -149,6 +150,9 @@ public abstract class FieldSpec {
                 break;
               case DOUBLE:
                 _cachedDefaultNullValue = DEFAULT_METRIC_NULL_VALUE_OF_DOUBLE;
+                break;
+              case STRING:
+                _cachedDefaultNullValue = DEFAULT_METRIC_NULL_VALUE_OF_STRING;
                 break;
               default:
                 throw new UnsupportedOperationException(

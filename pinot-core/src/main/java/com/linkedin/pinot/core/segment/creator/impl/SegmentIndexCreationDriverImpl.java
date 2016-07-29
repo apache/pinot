@@ -15,24 +15,9 @@
  */
 package com.linkedin.pinot.core.segment.creator.impl;
 
-import com.linkedin.pinot.core.startree.StarTreeIndexNodeInterf;
-import com.linkedin.pinot.core.startree.StarTreeSerDe;
-import java.io.DataOutputStream;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang.mutable.MutableLong;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import com.google.common.collect.HashBiMap;
 import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.StarTreeIndexSpec;
 import com.linkedin.pinot.common.utils.SegmentNameBuilder;
@@ -57,8 +42,27 @@ import com.linkedin.pinot.core.startree.StarTree;
 import com.linkedin.pinot.core.startree.StarTreeBuilder;
 import com.linkedin.pinot.core.startree.StarTreeBuilderConfig;
 import com.linkedin.pinot.core.startree.StarTreeIndexNode;
+import com.linkedin.pinot.core.startree.StarTreeIndexNodeInterf;
+import com.linkedin.pinot.core.startree.StarTreeSerDe;
+import com.linkedin.pinot.core.startree.hll.HllConfig;
+import com.linkedin.pinot.core.startree.hll.HllUtil;
 import com.linkedin.pinot.core.util.CrcUtils;
-
+import java.io.DataOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang.mutable.MutableLong;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Implementation of an index segment creator.
@@ -85,6 +89,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   long totalIndexTime = 0;
   long totalStatsCollectorTime = 0;
   boolean createStarTree = false;
+  boolean enableHllIndex = false;
 
   private File starTreeTempDir;
 
@@ -100,6 +105,17 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     recordReader = reader;
     recordReader.init();
     dataSchema = recordReader.getSchema();
+    enableHllIndex = (config.getHllConfig() != null) && (config.getHllConfig().isEnableHllIndex());
+
+    if (enableHllIndex && !createStarTree) {
+      LOGGER.warn("Hll configuration works only with star tree. " +
+          "Star Tree generation is not specified. " +
+          "This will not add derived hll fields.");
+      enableHllIndex = false;
+    }
+
+    addDerivedFieldsInSchema();
+
     extractor = (PlainFieldExtractor) FieldExtractorFactory.getPlainFieldExtractor(dataSchema);
 
     // Initialize stats collection
@@ -123,6 +139,40 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     starTreeTempDir = new File(indexDir, com.linkedin.pinot.common.utils.FileUtils.getRandomFileName());
     LOGGER.debug("tempIndexDir:{}", tempIndexDir);
     LOGGER.debug("starTreeTempDir:{}", starTreeTempDir);
+  }
+
+  private void addDerivedFieldsInSchema() {
+    if (enableHllIndex) {
+      Collection<String> columnNames = dataSchema.getColumnNames();
+      HllConfig hllConfig = config.getHllConfig();
+      for (Entry<String, String> entry : hllConfig.getDerivedHllFieldsMap().entrySet()) {
+        String originFieldName = entry.getKey();
+        String derivedFieldName = entry.getValue();
+        if (columnNames.contains(derivedFieldName)) {
+          throw new IllegalArgumentException("Can not add derivedField " + derivedFieldName
+              + " since it already exists in schema.");
+        } else {
+          dataSchema.addField(derivedFieldName,
+              new MetricFieldSpec(derivedFieldName, FieldSpec.DataType.STRING, hllConfig.getHllFieldSize(),
+                  MetricFieldSpec.DerivedMetricType.HLL));
+        }
+      }
+    }
+  }
+
+  private void populateDefaultDerivedColumnValues(GenericRow row) throws IOException {
+    //add default hll value in each row
+    if (enableHllIndex) {
+      HllConfig hllConfig = config.getHllConfig();
+      for (Entry<String, String> entry : hllConfig.getDerivedHllFieldsMap().entrySet()) {
+        String originFieldName = entry.getKey();
+        String derivedFieldName = entry.getValue();
+        row.putField(
+            derivedFieldName,
+            HllUtil.singleValueHllAsString(hllConfig.getHllLog2m(), row.getValue(originFieldName))
+        );
+      }
+    }
   }
 
   @Override
@@ -172,7 +222,10 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     LOGGER.info("Start building star tree!");
     totalDocs = 0;
     while (recordReader.hasNext()) {
+      //PlainFieldExtractor conducts necessary type conversions
       GenericRow row = readNextRowSanitized();
+      //must be called after previous step since type conversion for derived values is unnecessary
+      populateDefaultDerivedColumnValues(row);
       starTreeBuilder.append(row);
       statsCollector.collectRow(row);
       totalRawDocs++;

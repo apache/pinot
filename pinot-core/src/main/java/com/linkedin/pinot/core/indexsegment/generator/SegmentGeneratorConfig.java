@@ -35,8 +35,11 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+
+import com.linkedin.pinot.core.startree.hll.HllConfig;
 import org.apache.commons.lang.StringUtils;
 import org.codehaus.jackson.annotate.JsonIgnore;
+import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,6 +47,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Configuration properties used in the creation of index segments.
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class SegmentGeneratorConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentGeneratorConfig.class);
 
@@ -72,6 +76,8 @@ public class SegmentGeneratorConfig {
   private StarTreeIndexSpec _starTreeIndexSpec = null;
   private String _creatorVersion = null;
   private char _paddingCharacter = V1Constants.Str.DEFAULT_STRING_PAD_CHAR;
+
+  private HllConfig _hllConfig = null;
 
   public SegmentGeneratorConfig() {
   }
@@ -103,6 +109,7 @@ public class SegmentGeneratorConfig {
     _starTreeIndexSpec = config._starTreeIndexSpec;
     _creatorVersion = config._creatorVersion;
     _paddingCharacter = config._paddingCharacter;
+    _hllConfig = config._hllConfig;
   }
 
   public SegmentGeneratorConfig(Schema schema) {
@@ -373,6 +380,14 @@ public class SegmentGeneratorConfig {
 
   public void setStarTreeIndexSpec(StarTreeIndexSpec starTreeIndexSpec) {
     _starTreeIndexSpec = starTreeIndexSpec;
+  }
+
+  public HllConfig getHllConfig() {
+    return _hllConfig;
+  }
+
+  public void setHllConfig(HllConfig hllConfig) {
+    _hllConfig = hllConfig;
   }
 
   @JsonIgnore
