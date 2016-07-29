@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.client.pinot.summary.calculator;
+package com.linkedin.thirdeye.client.pinot.slsummary;
 
 import java.util.ArrayList;
 import java.util.BitSet;
@@ -74,6 +74,26 @@ public class DPArray {
 
     public double getSubMetricB() {
       return subMetricB;
+    }
+
+    public void setCost(double cost) {
+      this.cost = cost;
+    }
+
+    public void setAns(BitSet ans) {
+      this.ans = ans;
+    }
+
+    public void setRatio(double ratio) {
+      this.ratio = ratio;
+    }
+
+    public void setSubMetricA(double subMetricA) {
+      this.subMetricA = subMetricA;
+    }
+
+    public void setSubMetricB(double subMetricB) {
+      this.subMetricB = subMetricB;
     }
 
     public String toString() {

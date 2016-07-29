@@ -1,12 +1,8 @@
-package com.linkedin.thirdeye.client.pinot.summary.calculator;
+package com.linkedin.thirdeye.client.pinot.slsummary;
 
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Comparator;
-
-import com.linkedin.thirdeye.client.pinot.summary.Cube;
-import com.linkedin.thirdeye.client.pinot.summary.Record;
-import com.linkedin.thirdeye.client.pinot.summary.Summary;
 
 
 public class SummaryCalculator {
@@ -18,16 +14,16 @@ public class SummaryCalculator {
   private final static boolean isDescendant = true;
   private final static boolean removeEmptyRecords = true; // remove the record that contains ta or tb = 0
 
-  public static Summary computeSummary(Cube records, int N) {
-    preprocessingCube(records);
-    DPArray dp = new DPArray(N, records.getRg(), records.getGa(), records.getGb(), records.size());
+  public static Summary computeSummary(Cube cube, int N) {
+    preprocessingCube(cube);
+    DPArray dp = new DPArray(N, cube.getRg(), cube.getGa(), cube.getGb(), cube.size());
 
-    for (int idx = 0; idx < records.size(); ++idx) {
+    for (int idx = 0; idx < cube.size(); ++idx) {
       // println: the answer of each iteration
       //      System.out.println(idx + ":");
       //      System.out.println(dp);
 
-      Record tab = records.get(idx);
+      Record tab = cube.get(idx);
       double tabCost = err(tab.metricA, tab.metricB, dp.get(0).ratio);
 
       for (int n = N; n > 0; --n) {
@@ -56,7 +52,7 @@ public class SummaryCalculator {
     //    System.out.println("Answer:");
     //    System.out.println(dp);
 
-    return new Summary(records, dp);
+    return new Summary(cube, dp);
   }
 
   public static double err(double va, double vb, double r) {
