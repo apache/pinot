@@ -28,11 +28,4 @@ if [ $? -ne 0 ]; then
   exit 0
 fi
 
-# If install fails, log the error message and package status
-mvn clean install -DskipTests=true -Dmaven.javadoc.skip=true -Dassembly.skipAssembly=true > install.out
-if [ $? -ne 0 ]; then
-  egrep '(ERROR|SUCCESS|FAILURE|SKIPPED)' install.out
-  rm install.out
-  exit 1
-fi
-rm install.out
+mvn clean install -DskipTests=true -Dmaven.javadoc.skip=true -Dassembly.skipAssembly=true
