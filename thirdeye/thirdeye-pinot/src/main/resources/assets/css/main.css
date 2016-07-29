@@ -323,12 +323,18 @@ body a{
     font-size: 0.65em;
 }
 
-
 .granularity-btn-group.vertical button{
     width: 250px;
 }
 
 /* Form: Anomaly config related */
+#self-service-tabs a{
+    color: #444;
+    padding: 30px;
+    font-size: 16px;
+    font-weight: 700;
+}
+
 #configure-anomaly-function-form .uk-form-row{
    margin-bottom: 15px;
    margin-left: 10px;
@@ -339,16 +345,20 @@ body a{
 
 }
 
-
 #name{
     width: 250px;
 }
-
+#anomaly-threshold-max,
+#anomaly-threshold-min,
 #anomaly-threshold{
+    width: 115px;
+}
+
+#monitoring-schedule-time{
     width: 135px;
 }
 
-#filter-panel-manage-alert .value-filter{
+#filter-panel-manage-anomaly-fn .value-filter{
     width:90%;
     line-height: 30px;
     display: table-cell;
@@ -665,8 +675,6 @@ body a{
     border-bottom: 1px solid #666;
 }
 
-
-
 .date-time-selector-box{
     background-color: #fff;
     border: 2px solid #efefef;
@@ -892,25 +900,6 @@ body a{
 #configure-anomaly-function-form{
     font-size: 16px;
 }
-
-.grid {
-    display: grid;
-    grid-template-columns: 20% 80%;
-    align-content: flex-start;
-
-}
-
-.col-1{
-    grid-column: 1;
-}
-
-.col-2{
-    grid-column: 2;
-}
-
-
-
-
 
 /* D3 START*/
 path {

@@ -1,6 +1,6 @@
 /** AJAX and HASH RELATED METHODS **/
 
-function getData(url, tab){
+function getData(url, tab) {
     console.log("request url:", url)
 
     tab = tab ? tab : hash.view;
@@ -9,40 +9,39 @@ function getData(url, tab){
         type: 'get',
         dataType: 'json',
         statusCode: {
-            404: function() {
-                $("#"+  tab  +"-chart-area-error").empty()
+            404: function () {
+                $("#" + tab + "-chart-area-error").empty()
                 var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' })
                 warning.append($('<p></p>', { html: 'No data available. (Error code: 404)' }))
-                $("#"+  tab  +"-chart-area-error").append(warning)
-                $("#"+  tab +"-chart-area-error").fadeIn(100);
+                $("#" + tab + "-chart-area-error").append(warning)
+                $("#" + tab + "-chart-area-error").fadeIn(100);
                 return
             },
-            500: function() {
-                $("#"+  tab  +"-chart-area-error").empty()
+            500: function () {
+                $("#" + tab + "-chart-area-error").empty()
                 var error = $('<div></div>', { class: 'uk-alert uk-alert-danger' })
                 error.append($('<p></p>', { html: 'Internal server error' }))
-                $("#"+  tab  +"-chart-area-error").append(error)
-                $("#"+  tab  +"-chart-area-error").fadeIn(100);
+                $("#" + tab + "-chart-area-error").append(error)
+                $("#" + tab + "-chart-area-error").fadeIn(100);
                 return
             }
-        }
-        ,
+        },
         beforeSend: showLoader(tab)
-    }).always(function(){
-      hideLoader(tab);
-      if(tab != "anomalies"){
-        $("#"+  tab  +"-display-chart-section").empty();
-      }
+    }).always(function () {
+        hideLoader(tab);
+        if (tab != "anomalies") {
+            $("#" + tab + "-display-chart-section").empty();
+        }
     })
 }
 
-function submitData(url, data, tab ){
+function submitData(url, data, tab) {
 
-    if(data === undefined){
+    if (data === undefined) {
         data = ""
     }
-    if(!tab){
-       tab = hash.view;
+    if (!tab) {
+        tab = hash.view;
     }
     console.log("post url:", url)
     return $.ajax({
@@ -68,15 +67,15 @@ function submitData(url, data, tab ){
                 return
             }
         },
-        error: function( jqXhr, textStatus, errorThrown ){
-            console.log( errorThrown );
+        error: function (jqXhr, textStatus, errorThrown) {
+            console.log(errorThrown);
         }
-    }).always(function(){
+    }).always(function () {
     })
 }
 
-function deleteData(url, data){
-    if(data === undefined){
+function deleteData(url, data) {
+    if (data === undefined) {
         data = ""
     }
     console.log("delete url:", url)
@@ -85,20 +84,20 @@ function deleteData(url, data){
         type: 'delete',
         dataType: 'json',
         data: data,
-        error: function( jqXhr, textStatus, errorThrown ){
-            console.log( errorThrown );
+        error: function (jqXhr, textStatus, errorThrown) {
+            console.log(errorThrown);
         }
-    }).always(function(){
+    }).always(function () {
 
     })
 }
 
-function showLoader(tab){
-   $("#"+  tab  +"-chart-area-loader").show();
+function showLoader(tab) {
+    $("#" + tab + "-chart-area-loader").show();
 }
 
-function hideLoader(tab){
-    $("#"+  tab +"-chart-area-loader").hide();
+function hideLoader(tab) {
+    $("#" + tab + "-chart-area-loader").hide();
 
 }
 
@@ -112,13 +111,13 @@ function parseHashParameters(hashString) {
 
         var keyValuePairs = hashString.split('&');
 
-        $.each(keyValuePairs, function(i, pair) {
+        $.each(keyValuePairs, function (i, pair) {
             var tokens = pair.split('=');
             var key = decodeURIComponent(tokens[0]);
             var value = decodeURIComponent(tokens[1]);
-            if(key != "filters") {
+            if (key != "filters") {
                 params[key] = value;
-            }else{
+            } else {
                 params["filters"] = decodeURIComponent(value)
             }
         })
@@ -129,57 +128,57 @@ function parseHashParameters(hashString) {
 
 function encodeHashParameters(hashParameters) {
     var keyValuePairs = [];
-    $.each(hashParameters, function(key, value) {
+    $.each(hashParameters, function (key, value) {
         keyValuePairs.push(encodeURIComponent(key) + '=' + encodeURIComponent(value));
     })
     return '#' + keyValuePairs.join('&');
 }
 
-function updateHashParam(param, value){
+function updateHashParam(param, value) {
     hash[param] = value;
 }
 
-function updateDashboardFormFromHash(){
+function updateDashboardFormFromHash() {
 
     //Preselect dataset if present in hash
-    if (!hash.hasOwnProperty('dataset')){
+    if (!hash.hasOwnProperty('dataset')) {
         $(".selected-dataset").text("Select dataset");
     }
 
     //Preselect header-tab if present in hash
-    if (hash.hasOwnProperty('view')){
-        $(".header-tab[rel='"+ hash.view +"']").click();
-    }else{
+    if (hash.hasOwnProperty('view')) {
+        $(".header-tab[rel='" + hash.view + "']").click();
+    } else {
         var defaultLandingView = 'dashboard'
         hash.view = defaultLandingView;
         $(".header-tab[rel='dashboard']").click();
     }
 
     //Preselect dashboard if present in hash
-    if (hash.hasOwnProperty('dashboard')){
+    if (hash.hasOwnProperty('dashboard')) {
 
-        $(".dashboard-option[value='"+ hash.dashboard +"']").click();
-    }else if (hash.view == "dashboard"){
+        $(".dashboard-option[value='" + hash.dashboard + "']").click();
+    } else if (hash.view == "dashboard") {
 
         //Preselect first dashboard in the list
         $(".dashboard-option:first-child").click();
     }
 
-    var currentForm =  $("#"+hash.view +"-form") ;
+    var currentForm = $("#" + hash.view + "-form");
 
     //Preselect metrics if present in hash
     $(".view-metric-selector .added-item").remove();
 
-    if (hash.hasOwnProperty('metrics')){
+    if (hash.hasOwnProperty('metrics')) {
 
         //the value is a string so need to transform it into array
         var metricAry = hash.metrics.split(',');
 
         for (var i = 0, len = metricAry.length; i < len; i++) {
 
-            if(hash.view == "anomalies"){
+            if (hash.view == "anomalies") {
                 $(".single-metric-option[value='" + metricAry[i] + "']", currentForm).click();
-            }else{
+            } else {
                 $(".metric-option[value='" + metricAry[i] + "']", currentForm).click();
             }
         }
@@ -223,7 +222,7 @@ function updateDashboardFormFromHash(){
     var baselineEndTimeString;
 
     var maxMillis;
-    if(window.datasetConfig.maxMillis){
+    if (window.datasetConfig.maxMillis) {
         maxMillis = window.datasetConfig.maxMillis;
     }
 
@@ -234,22 +233,22 @@ function updateDashboardFormFromHash(){
         currentStartDateString = currentStartDateTime.format("YYYY-MM-DD");
         currentStartTimeString = currentStartDateTime.format("HH:mm");
 
-    } else if(maxMillis){
+    } else if (maxMillis) {
         // populate max date -1 day
         currentStartDateTime = moment(maxMillis).add(-1, 'days');
 
         //If time granularity is DAYS have default 7 days in the time selector on pageload
-        if(window.datasetConfig.dataGranularity && window.datasetConfig.dataGranularity == "DAYS"){
+        if (window.datasetConfig.dataGranularity && window.datasetConfig.dataGranularity == "DAYS") {
             currentStartDateTime = moment(maxMillis).add(-7, 'days');
         }
 
         currentStartDateString = currentStartDateTime.format("YYYY-MM-DD");
         currentStartTimeString = currentStartDateTime.format("HH:00");
 
-        if(datasetConfig.dataGranularity && datasetConfig.dataGranularity == "DAYS"){
+        if (datasetConfig.dataGranularity && datasetConfig.dataGranularity == "DAYS") {
             currentStartTimeString = "00:00"
         }
-    }else{
+    } else {
 
         // populate todays date
         currentStartDateTime = moment();
@@ -261,16 +260,16 @@ function updateDashboardFormFromHash(){
         currentEndDateTime = moment(parseInt(hash.currentEnd)).tz('UTC').clone().tz(tz);
         currentEndDateString = currentEndDateTime.format("YYYY-MM-DD");
         currentEndTimeString = currentEndDateTime.format("HH:mm");
-    } else if(maxMillis) {
+    } else if (maxMillis) {
 
         currentEndDateTime = moment(maxMillis);
         currentEndDateString = currentEndDateTime.format("YYYY-MM-DD");
         currentEndTimeString = currentEndDateTime.format("HH:00");
 
-        if(datasetConfig.dataGranularity && datasetConfig.dataGranularity == "DAYS"){
+        if (datasetConfig.dataGranularity && datasetConfig.dataGranularity == "DAYS") {
             currentEndTimeString = "00:00"
         }
-    }else{
+    } else {
         currentEndDateTime = moment();
         currentEndDateString = currentEndDateTime.format("YYYY-MM-DD");
         currentEndTimeString = currentEndDateTime.format("HH:00");
@@ -284,7 +283,7 @@ function updateDashboardFormFromHash(){
 
     } else {
 
-        baselineStartDateTime = currentStartDateTime.add(-7,'days');
+        baselineStartDateTime = currentStartDateTime.add(-7, 'days');
         baselineStartDateString = baselineStartDateTime.format("YYYY-MM-DD");
         baselineStartTimeString = currentStartTimeString;
     }
@@ -333,27 +332,27 @@ function updateDashboardFormFromHash(){
 
     // Update aggTimeGranularity from hash
     if (hash.hasOwnProperty("aggTimeGranularity")) {
-        $(".baseline-aggregate[rel='"+ hash.view +"'][unit='"+ hash.aggTimeGranularity + "']").click();
+        $(".baseline-aggregate[rel='" + hash.view + "'][unit='" + hash.aggTimeGranularity + "']").click();
     }
 
-    var compareMode ="WoW";
+    var compareMode = "WoW";
     //update compareMode
     if (hash.hasOwnProperty("compareMode") && hash.compareMode != "") {
         compareMode = hash.compareMode;
     }
-    $(".compare-mode[rel='"+ hash.view +"']").html(compareMode);
+    $(".compare-mode[rel='" + hash.view + "']").html(compareMode);
 
     $(".compare-mode-selector option[unit='" + compareMode + "']").change();
 
     //Populate filters from hash
-    if(hash.hasOwnProperty("filters")){
+    if (hash.hasOwnProperty("filters")) {
 
         var filterParams = JSON.parse(decodeURIComponent(hash.filters));
 
         updateFilterSelection(filterParams)
 
-    }else{
-        $(".remove-filter-selection[tab='" + hash.view + "']").each(function(index,label){
+    } else {
+        $(".remove-filter-selection[tab='" + hash.view + "']").each(function (index, label) {
             $(label).click()
         })
     }
@@ -365,9 +364,8 @@ function updateDashboardFormFromHash(){
 }
 
 
-
-function formComponentPopulated(){
-    if(window.responseDataPopulated == window.numFormComponents){
+function formComponentPopulated() {
+    if (window.responseDataPopulated == window.numFormComponents) {
         delete window.responseDataPopulated;
         delete window.numFormComponents;
 
@@ -376,30 +374,30 @@ function formComponentPopulated(){
         //Trigger form submit if enough elements present for a query
 
         //If hash has dataset && dashboard trigger form submit
-        if( hash.hasOwnProperty("dataset")){
+        if (hash.hasOwnProperty("dataset")) {
 
             //If dashboard is present in hash and present in current dataset
             //If hash has dataset && dashboard or metric name trigger form submit
-            if(hash.view == "dashboard" && hash.hasOwnProperty("dashboard")){
+            if (hash.view == "dashboard" && hash.hasOwnProperty("dashboard")) {
 
                 //if the dashboard is present in the current dataset
-                if( $(".dashboard-option[value='"+ hash.dashboard +"']").length>0 ){
+                if ($(".dashboard-option[value='" + hash.dashboard + "']").length > 0) {
                     //Adding random number to hash
                     //for the usecase of pagereload: the hash would not change so ajax would not be triggered
-                    var rand= Math.random() + ""
-                    hash.rand = rand.substring(3,6);
+                    var rand = Math.random() + ""
+                    hash.rand = rand.substring(3, 6);
                     enableFormSubmit();
                     $("#" + hash.view + "-form-submit").click();
                 }
-            } else if(hash.hasOwnProperty("metrics")){
+            } else if (hash.hasOwnProperty("metrics")) {
                 //if the metric is present in the current dataset
                 var metricList = hash.metrics.split(",");
-                for(var i=0, len = metricList.length; i<len;i++){
-                    if($(".metric-option[value='"+ metricList[i] +"']").length>0){
+                for (var i = 0, len = metricList.length; i < len; i++) {
+                    if ($(".metric-option[value='" + metricList[i] + "']").length > 0) {
                         //Adding random number to hash
                         //for the usecase when on pagereload the hash would not change so ajax would not be triggered
-                        var rand= Math.random() + ""
-                        hash.rand = rand.substring(3,6);
+                        var rand = Math.random() + ""
+                        hash.rand = rand.substring(3, 6);
                         enableFormSubmit();
                         $("#" + hash.view + "-form-submit").click();
                     }
@@ -413,20 +411,20 @@ function formComponentPopulated(){
 /* Event listeners used in multiple instances in FORM area and chart area*/
 
 /* takes a clicked anchor tag and applies active class to it's prent (li, button) */
-function  radioOptions(target){
+function radioOptions(target) {
     $(target).parent().siblings().removeClass("uk-active");
     $(target).parent().addClass("uk-active");
 }
 
-function radioButtons(target){
+function radioButtons(target) {
 
-    if(!$(target).hasClass("uk-active")) {
+    if (!$(target).hasClass("uk-active")) {
         $(target).siblings().removeClass("uk-active");
         $(target).addClass("uk-active");
     }
 }
 
-function populateSingleSelect(target){
+function populateSingleSelect(target) {
 
     var selectorRoot = $(target).closest("[data-uk-dropdown]");
     var value = $(target).attr("value");
@@ -435,26 +433,26 @@ function populateSingleSelect(target){
     $("div:first-child", selectorRoot).attr("value", value);
 }
 
-function closeClosestDropDown(target){
+function closeClosestDropDown(target) {
 
     $(target).closest($("[data-uk-dropdown]")).removeClass("uk-open");
     $(target).closest($("[data-uk-dropdown]")).attr("aria-expanded", false);
     $(target).closest(".uk-dropdown").hide();
 }
 
-function disableButton(button){
+function disableButton(button) {
     $(button).prop("disabled", true);
     $(button).attr("disabled", true);
 }
 
-function enableButton(button){
+function enableButton(button) {
     $(button).prop("disabled", false);
     $(button).removeAttr("disabled");
 }
 
-function selectDatasetNGetFormData(target){
+function selectDatasetNGetFormData(target) {
     //Cleanup form: Remove added-item and added-filter, metrics of the previous dataset
-    $("#"+  hash.view  +"-chart-area-error").hide();
+    $("#" + hash.view + "-chart-area-error").hide();
     $(".view-metric-selector .added-item").remove();
     $(".view-dimension-selector .added-item").remove();
     $(".metric-list").empty();
@@ -492,14 +490,14 @@ function selectDatasetNGetFormData(target){
 
     //Populate the selected item on the form element
     $(".selected-dataset").text($(target).text());
-    $(".selected-dataset").attr("value",value);
+    $(".selected-dataset").attr("value", value);
 
     //Close uikit dropdown
     $(target).closest("[data-uk-dropdown]").removeClass("uk-open");
     $(target).closest("[data-uk-dropdown]").attr("aria-expanded", false);
 }
 
-function closeAllUIKItDropdowns(){
+function closeAllUIKItDropdowns() {
 
     $("[data-uk-dropdown]").removeClass("uk-open");
     $("[data-uk-dropdown]").attr("aria-expanded", false);
@@ -511,23 +509,23 @@ function closeAllUIKItDropdowns(){
 
 //Assigns an hexadecimal colorcode to each element of an array
 //If you change this method, change the assignColorByID handlebars helper too the 2 serves all the time series type charts
-function assignColorByID(len, index){
+function assignColorByID(len, index) {
 
-    var colorAry =  colorScale(len);
+    var colorAry = colorScale(len);
     return colorAry[index]
 }
 
 /*takes the number of items and returns an array with colors on the full 256^3 colorscale */
 //If you change this method, change the assignColorByID handlebars helper too the 2 serves all the time series type charts
-function colorScale(len){
+function colorScale(len) {
 
     //colorscale 16777216 = 256 ^ 3
     var diff = parseInt(16777216 / len);
 
     //array of integers from 0 to 16777216
     var diffAry = [];
-    for (x=0; x<len; x++){
-        diffAry.push( diff * x)
+    for (x = 0; x < len; x++) {
+        diffAry.push(diff * x)
     }
 
     //create array
@@ -536,24 +534,24 @@ function colorScale(len){
 
     //even elements take the color code from the blue range (0,0,255)
     //odd elements take the color code from the red range (255,0,0)
-    for  (y=0; y<len; y++){
+    for (y = 0; y < len; y++) {
 
-        if(y%2 == 0){
-            integer = diffAry[y/2]
-        }else{
-            integer = diffAry[Math.floor(len - y/2)]
+        if (y % 2 == 0) {
+            integer = diffAry[y / 2]
+        } else {
+            integer = diffAry[Math.floor(len - y / 2)]
         }
 
         var str = (integer.toString(16) + "dddddd")
-        var hex = integer.toString(16).length < 6 ? "#" + str.substr(0,6) : "#" + integer.toString(16)
-        colorAry.push( hex )
+        var hex = integer.toString(16).length < 6 ? "#" + str.substr(0, 6) : "#" + integer.toString(16)
+        colorAry.push(hex)
     }
 
     return colorAry
 
 }
 
-function toggleCumulative(){
+function toggleCumulative() {
     $(".cumulative").toggleClass("uk-active");
     $(".discrete-values").toggleClass("hidden");
     $(".cumulative-values").toggleClass("hidden");
@@ -563,14 +561,14 @@ function toggleCumulative(){
     }
 }
 
-function calcCummulativeTotal(target){
-    $(".contributors-table .select_all_checkbox[rel='cumulative']").each(function(){
+function calcCummulativeTotal(target) {
+    $(".contributors-table .select_all_checkbox[rel='cumulative']").each(function () {
         $(target).trigger("click");
     });
 }
 
 
-function toggleSumDetails(target){
+function toggleSumDetails(target) {
     if (!$(target).hasClass("uk-active")) {
 
         $(target).addClass("uk-active");
@@ -605,7 +603,7 @@ function toggleSumDetails(target){
     }
 }
 
-function showContributors(target){
+function showContributors(target) {
     // Change the view to contributors
 
 //    //either dashboard or metrics param is present in hash
@@ -655,13 +653,12 @@ function showContributors(target){
 //    window.location.hash = encodeHashParameters(hash);
 
 
-
 }
 
 
 /** Compare/Tabular view and dashboard view heat-map-cell click switches the view to compare/heat-map
  * focusing on the timerange of the cell or in case of cumulative values it query the cumulative timerange **/
-function showHeatMap(target){
+function showHeatMap(target) {
     hash.view = "compare"
     hash.aggTimeGranularity = "aggregateAll"
     cellObj = $(target)
@@ -675,13 +672,13 @@ function showHeatMap(target){
 
 
     var currentSection = $(target).closest(".display-chart-section")
-    if( $(".cumulative", currentSection).is(':checked') ){
+    if ($(".cumulative", currentSection).is(':checked')) {
 
         var firstTimeBucketInRow = $("#timebuckets>span")[0]
         currentStartUTC = $($("span", firstTimeBucketInRow)[0]).text().trim();
         baselineStartUTC = $($("span", firstTimeBucketInRow)[2]).text().trim();
 
-    }else{
+    } else {
         currentStartUTC = $($("span", timeBucketForColumnIndex)[0]).text().trim();
         baselineStartUTC = $($("span", timeBucketForColumnIndex)[2]).text().trim();
     }
@@ -708,7 +705,7 @@ function showHeatMap(target){
  * @function
  * @public
  * @returns   Assign background color value to  heat-map-cell **/
-function  calcHeatMapCellBackground(cell){
+function calcHeatMapCellBackground(cell) {
 
     var cellObj = $(cell)
 
@@ -718,8 +715,8 @@ function  calcHeatMapCellBackground(cell){
     var metric = cellObj.attr('data-metric-name')
     var invertColorMetrics = window.datasetConfig.invertColorMetrics;
     if (typeof invertColorMetrics !== "undefined" && invertColorMetrics.indexOf(metric) > -1) { // invert
-      baseForLtZero = 'rgba(0,0,255,'; //lt zero becomes blue
-      baseForGtZero = 'rgba(255,0,0,'; //gt zero becomes red
+        baseForLtZero = 'rgba(0,0,255,'; //lt zero becomes blue
+        baseForGtZero = 'rgba(255,0,0,'; //gt zero becomes red
     }
 
     var value = parseFloat(cellObj.attr('value'))
@@ -747,41 +744,41 @@ function  calcHeatMapCellBackground(cell){
 /** Loop through each columns that's not displaying ratio values,
  take the total of the cells' value in the column (if the row of the cell is checked  and the value id not N/A) and place the total into the total row.
  Then calculate the sum row ratio column cell value based on the 2 previous column's value.  **/
-function sumColumn(col){
+function sumColumn(col) {
 
-    var currentTable =  $(col).closest("table");
+    var currentTable = $(col).closest("table");
 
-    var currentMetric =  $(col).closest(".metric-section-wrapper").attr("rel");
+    var currentMetric = $(col).closest(".metric-section-wrapper").attr("rel");
     var firstDataRow = $("tr.data-row", currentTable)[0];
-    var columns = $("td",firstDataRow);
+    var columns = $("td", firstDataRow);
     var isCumulative = $($("input.cumulative")[0]).hasClass("uk-active");
 
     //Work with the cumulative or hourly total row
 
-    var sumRow = (isCumulative) ?  $("tr.cumulative-values.sum-row",  currentTable)[0] : $("tr.discrete-values.sum-row",  currentTable)[0];
+    var sumRow = (isCumulative) ? $("tr.cumulative-values.sum-row", currentTable)[0] : $("tr.discrete-values.sum-row", currentTable)[0];
 
     //Only summarize for primitive metrics. Filter out derived metrics ie. RATIO(), for those metrics total value is N/A since that would add up the nominal % values
-    if(currentMetric.indexOf("RATIO(") == -1 ){
+    if (currentMetric.indexOf("RATIO(") == -1) {
 
         //Loop through each column, except for column index 0-2 since those have string values
-        for(var z= 3, len = columns.length; z < len; z++){
+        for (var z = 3, len = columns.length; z < len; z++) {
 
 
             //Filter out ratio columns only calc with value columns
-            if( (z + 1 ) % 3 !== 0 ){
+            if ((z + 1 ) % 3 !== 0) {
 
-                var rows =  (isCumulative) ? $("tr.data-row", currentTable) : $("tr.data-row", currentTable)
+                var rows = (isCumulative) ? $("tr.data-row", currentTable) : $("tr.data-row", currentTable)
 
                 //Check if cumulative table is displayed
                 var sum = 0;
 
-                for(var i= 0, rlen = rows.length; i < rlen; i++){
+                for (var i = 0, rlen = rows.length; i < rlen; i++) {
 
                     //Check if checkbox of the row is selected
-                    if( $("input", rows[i]).is(':checked')) {
+                    if ($("input", rows[i]).is(':checked')) {
                         var currentRow = rows[i];
                         var currentCell = $("td", currentRow)[z];
-                        var currentCellVal =  parseInt($(currentCell).html().trim().replace(/[\$,]/g, ''));
+                        var currentCellVal = parseInt($(currentCell).html().trim().replace(/[\$,]/g, ''));
                         //NaN value will be skipped
                         if (!isNaN(currentCellVal)) {
                             sum = sum + currentCellVal;
@@ -794,26 +791,26 @@ function sumColumn(col){
                 $(sumCell).html(sum);
 
                 //In case of ratio columns calculate them based on the baseline and current values of the timebucket
-            }else{
+            } else {
                 //take the 2 previous total row elements
-                var baselineValCell = $("th", sumRow)[z-2];
-                var currentValCell = $("th", sumRow)[z-1];
+                var baselineValCell = $("th", sumRow)[z - 2];
+                var currentValCell = $("th", sumRow)[z - 1];
                 var baselineVal = parseInt($(baselineValCell).html().trim().replace(/[\$,]/g, ''));
                 var currentVal = parseInt($(currentValCell).html().trim().replace(/[\$,]/g, ''));
                 var sumCell = $("th", sumRow)[z];
                 //Round the ratio to 2 decimal places, add 0.00001 to prevent Chrome rounding 0.005 to 0.00
-                var ratioVal = (Math.round(((currentVal - baselineVal) / baselineVal + 0.00001) * 1000)/10).toFixed(1);
+                var ratioVal = (Math.round(((currentVal - baselineVal) / baselineVal + 0.00001) * 1000) / 10).toFixed(1);
 
                 $(sumCell).html(ratioVal + "%");
-                $(sumCell).attr('value' , (ratioVal /100));
+                $(sumCell).attr('value', (ratioVal / 100));
                 calcHeatMapCellBackground(sumCell);
             }
         }
 
         //If the metric is a derived metric = has RATIO() form display N/A in the total row
-    }else{
+    } else {
         var sumCells = $("th", sumRow);
-        for(var i = 3, tLen = sumCells.length; i< tLen; i++){
+        for (var i = 3, tLen = sumCells.length; i < tLen; i++) {
             $(sumCells[i]).html("N/A");
         }
     }
@@ -823,7 +820,7 @@ function sumColumn(col){
 /** @function Assign background color value to each heat-map-cell
  * @public
  * @returns  background color **/
-function calcHeatMapBG(){
+function calcHeatMapBG() {
     $(".heat-map-cell").each(function (i, cell) {
         calcHeatMapCellBackground(cell);
     })
@@ -831,34 +828,33 @@ function calcHeatMapBG(){
 
 
 /** SELF SERVICE related methods **/
-function clearCreateForm(){
+function clearCreateForm() {
 
     document.getElementById("configure-anomaly-function-form").reset()
 
-    resetSelector("#selected-metric-manage-alert", "Metric", "");
+    resetSelector("#selected-metric-manage-anomaly-fn", "Metric", "");
     resetSelector("#selected-anomaly-condition", "Condition", "");
     resetSelector("#selected-anomaly-compare-mode", "WoW", "w/w");
     resetSelector("#selected-monitoring-window-unit", "HOUR(S)", "HOURS");
     resetSelector("#selected-dimension", "All", "");
     resetSelector("#selected-monitoring-repeat-unit", "HOUR(S)", "HOURS");
 
-    function resetSelector(element, defaultText, defaultValue){
+    function resetSelector(element, defaultText, defaultValue) {
         $(element).text(defaultText);
         $(element).attr("value", defaultValue);
     }
 
     $("monitoring-schedule").hide();
-    $("#active-alert").attr("checked","checked");
+    $("#active-alert").attr("checked", "false");
 
-    $("#configure-anomaly-function-form .remove-filter-selection").each(function(){
+    $("#configure-anomaly-function-form .remove-filter-selection").each(function () {
         $(this).click();
     });
 
-    $("#manage-alert-error").hide();
+    $("#manage-anomaly-fn-error").hide();
     $("#manage-anomaly-function-success").hide();
 
 }
-
 
 
 /** DATE, TIME RELATED METHODS **/
@@ -928,9 +924,9 @@ function getLocalTimeZone() {
  */
 function getTimeZone() {
     var timeZone = jstz()
-    if(window.location.hash) {
+    if (window.location.hash) {
         var params = parseHashParameters(window.location.hash)
-        if(params.timezone) {
+        if (params.timezone) {
             var tz = params.timezone.split('-').join('/')
         } else {
             var tz = timeZone.timezone_name
@@ -942,9 +938,8 @@ function getTimeZone() {
 }
 
 
-
 /** Transform UTC time into user selected or browser's timezone and display the date value **/
-function transformUTCToTZDate(element){
+function transformUTCToTZDate(element) {
     var elementObj = $(element);
     var tz = getTimeZone()
     var currentTime = moment(elementObj.attr('currentUTC'));
@@ -954,7 +949,7 @@ function transformUTCToTZDate(element){
 };
 
 /** Transform UTC time into user selected or browser's timezone and display the time value **/
-function transformUTCToTZTime(cell, format){
+function transformUTCToTZTime(cell, format) {
 
     var cellObj = $(cell);
     var tz = getTimeZone()
@@ -966,7 +961,7 @@ function transformUTCToTZTime(cell, format){
 
 /** Transform UTC time into user selected or browser's timezone and display the date value
  + * takes DOM element, date format returns date string in date format **/
-    function transformUTCMillisToTZDate(element, format){
+function transformUTCMillisToTZDate(element, format) {
     var elementObj = $(element);
     var tz = getTimeZone();
 
@@ -974,36 +969,36 @@ function transformUTCToTZTime(cell, format){
     var currentMillis = parseInt(elementObj.attr('currentUTC'));
 
     var baselineTime = moment(baselineMillis);
-    var currentTime = moment(currentMillis );
+    var currentTime = moment(currentMillis);
 
     elementObj.html(currentTime.tz(tz).format('YY-MM-DD z'));
     elementObj.attr('title', baselineTime.tz(tz).format(format));
 };
 
 /** Transform UTC time into user selected or browser's timezone and display the time value **/
-    /** Transform UTC time into user selected or browser's timezone and display the time value,
-      * takes DOM element, time format returns date string in date format**/
-        function transformUTCMillisToTZTime(cell, format){
+/** Transform UTC time into user selected or browser's timezone and display the time value,
+ * takes DOM element, time format returns date string in date format**/
+function transformUTCMillisToTZTime(cell, format) {
 
-        var cellObj = $(cell);
-        var tz = getTimeZone();
+    var cellObj = $(cell);
+    var tz = getTimeZone();
 
-        var currentMillis = parseInt(cellObj.attr('currentUTC'));
-        var baselineMillis = parseInt(cellObj.attr('baselineUTC'));
+    var currentMillis = parseInt(cellObj.attr('currentUTC'));
+    var baselineMillis = parseInt(cellObj.attr('baselineUTC'));
 
-        var currentTime = moment(currentMillis);
-        var baselineTime = moment(baselineMillis);
+    var currentTime = moment(currentMillis);
+    var baselineTime = moment(baselineMillis);
 
-        cellObj.html(currentTime.tz(tz).format(format));
-        cellObj.attr('title', "baseline: "+ baselineTime.tz(tz).format(format));
-    };
+    cellObj.html(currentTime.tz(tz).format(format));
+    cellObj.attr('title', "baseline: " + baselineTime.tz(tz).format(format));
+};
 
 /** Transform UTC time into user selected or browser's timezone **/
 function transformUTCToTZ() {
 
     $(".table-time-cell").each(function (i, cell) {
         var dateTimeFormat = "h a";
-        if(hash.hasOwnProperty("aggTimeGranularity") && hash.aggTimeGranularity == "DAYS"){
+        if (hash.hasOwnProperty("aggTimeGranularity") && hash.aggTimeGranularity == "DAYS") {
             dateTimeFormat = "MM-DD h a"
         }
 
@@ -1014,7 +1009,7 @@ function transformUTCToTZ() {
     $(".funnel-table-time").each(function (i, cell) {
         var dateTimeFormat = "h a";
 
-        if(hash.hasOwnProperty("aggTimeGranularity") && hash.aggTimeGranularity == "DAYS"){
+        if (hash.hasOwnProperty("aggTimeGranularity") && hash.aggTimeGranularity == "DAYS") {
 
             dateTimeFormat = "MM-DD h a"
         }
@@ -1029,7 +1024,7 @@ function formatMillisToTZ() {
 
 
         var dateTimeFormat = "h a";
-        if(hash.hasOwnProperty("aggTimeGranularity") && hash.aggTimeGranularity == "DAYS"){
+        if (hash.hasOwnProperty("aggTimeGranularity") && hash.aggTimeGranularity == "DAYS") {
 
             dateTimeFormat = "MM-DD h a"
         }

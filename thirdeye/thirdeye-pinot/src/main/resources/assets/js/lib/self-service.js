@@ -1,23 +1,22 @@
-function getExistingAnomalyFunctions(dataset){
+function getExistingAnomalyFunctions(dataset) {
     //removing the query until it returns other than 500 error
-    if(dataset) {
+    if (dataset) {
         var url = "/dashboard/anomaly-function/view?dataset=" + dataset;
         var tab = "self-service";
         var result_existing_anomaly_functions_template;
 
         getData(url, tab).done(function (data) {
-            if(data){
-                window.sessionStorage.setItem('existingAnomalyFunctions', JSON.stringify(data) );
+            if (data) {
+                window.sessionStorage.setItem('existingAnomalyFunctions', JSON.stringify(data));
             }
-
             compileAnomalyFnTable(data)
         });
-    }else{
+    } else {
         compileAnomalyFnTable()
     }
 
-    function compileAnomalyFnTable(data){
-        if(!data){
+    function compileAnomalyFnTable(data) {
+        if (!data) {
             data = {}
         }
 
@@ -27,142 +26,206 @@ function getExistingAnomalyFunctions(dataset){
 
         /** Instanciate Datatables on self service view **/
         $("#existing-anomaly-functions-table").DataTable({
+            "bAutoWidth": false,
             "columnDefs": [
-                { "width": "60px", "targets": 3 },
-                { "width": "60px", "targets": 4 },
-                { "width": "60px", "targets": 5 }
+                { "targets": 0 , "width": "100px" },
+                { "targets": 1 , "width": "100px" },
+                { "targets": 2 , "width": "100px" },
+                { "targets": 3 , "width": "100px" },
+
+                { "targets": 4 , "width": "50px", "orderable": false},
+                { "targets": 5 , "width": "50px", "orderable": false},
+                { "targets": 6 , "width": "50px", "orderable": false},
             ]
         });
     }
 }
 
 
-function renderSelfService(){
+function renderSelfService() {
 
     // The elements of the self-service tab are created on the anomaly-function-form template
 
     /**--- Eventlisteners on anomaly function form: create and update functionality ---**/
 
-    // Dataset selection
-    $("#main-view").on("click",".dataset-option-manage-alert", function(){
+        // COMMON PARAMETERS IN EVERY ANOMALY FUNCTION TYPE
+        // Dataset selection
+    $("#self-service-forms-section").on("click", ".dataset-option-manage-anomaly-fn", function () {
         selectDatasetNGetFormData(this);
     });
 
     // Name
-    $("#main-view").on("keyup", "#name", function(){
-        hideErrorAndSuccess("name");
+    $("#self-service-forms-section").on("keyup", "#name", function () {
+        var form = $(this).closest("form");
+        hideErrorAndSuccess("name",form);
+    });
+
+    //Function type
+    $("#self-service-forms-section").on("click", ".function-type-option", function () {
+        var form = $(this).closest("form");
+        toggleFunctionTypeFields(this,form);
+        hideErrorAndSuccess("");
     })
 
-    // Metric selection
-    $("#main-view").on("click",".single-metric-option-manage-alert", function(){
-        hideErrorAndSuccess("single-metric-option-manage-alert")
-    });
-
-    // Condition selection
-    $("#main-view").on("click",".anomaly-condition-option", function(){
-        hideErrorAndSuccess("anomaly-condition")
-
-    });
-
-    // Threshold
-    $("#main-view").on("keyup","#anomaly-threshold", function(){
-        hideErrorAndSuccess("anomaly-threshold")
+    // Metric
+    $("#self-service-forms-section").on("click", ".metric-option", function () {
+        var form = $(this).closest("form");
+        hideErrorAndSuccess("metric-option",form);
     });
 
 
-    // Compare mode selection
-    $("#main-view").on("click",".anomaly-compare-mode-option", function(){
-        hideErrorAndSuccess("anomaly-compare-mode")
-    });
-
-    // Monitoring window size selection
-    $("#main-view").on("keyup, click","#monitoring-window-size", function(){
-        hideErrorAndSuccess("monitoring-window-size")
-    });
-
-    // ExploreDimension and filter selection selection
-    $("#main-view").on("click",".dimension-option, .remove-filter-selection[tab='self-service'], #self-service-apply-filter-btn", function() {
-        hideErrorAndSuccess("")
-    });
-
-    // Monitoring repeat size selection
-    $("#main-view").on("click",".monitoring-window-unit-option", function(){
-        hideErrorAndSuccess("")
-    });
-
-    // Monitoring window unit selection
-    $("#main-view").on("keyup, click","#monitoring-repeat-size", function(){
-        hideErrorAndSuccess("monitoring-repeat-size")
+    // Monitoring window size
+    $("#self-service-forms-section").on("keyup, click", "#monitoring-window-size", function () {
+        var form = $(this).closest("form");
+        hideErrorAndSuccess("monitoring-window-size",form);
     });
 
     // Monitoring repeat unit selection
-    $("#main-view").on("click",".anomaly-monitoring-repeat-unit-option", function(){
-        toggleMonitoringTimeField(this)
+    $("#self-service-forms-section").on("click", ".monitoring-window-unit-option", function () {
+        var form = $(this).closest("form");
+        hideErrorAndSuccess("",form);
     });
 
+    // Monitoring window unit selection
+    $("#self-service-forms-section").on("keyup, click", "#monitoring-repeat-size", function () {
+        var form = $(this).closest("form");
+        hideErrorAndSuccess("monitoring-repeat-size",form);
+    });
+
+    // Monitoring repeat unit selection
+    $("#self-service-forms-section").on("click", ".anomaly-monitoring-repeat-unit-option", function () {
+        toggleMonitoringTimeField(this);
+    });
+
+    //FUNCTION TYPE SPECIFIC PARAMS
+    //USER_RULE FUNCTION TYPE PARAMS
+    // Condition selection
+    $("#self-service-forms-section").on("click", ".anomaly-condition-option", function () {
+        var form = $(this).closest("form");
+        hideErrorAndSuccess("anomaly-condition",form);
+    });
+
+    // Condition selection
+    $("#self-service-forms-section").on("click", ".anomaly-condition-min-max-option", function () {
+        var form = $(this).closest("form");
+        toggleMinMaxInput(this, form);
+        hideErrorAndSuccess("anomaly-condition",form);
+    });
+
+    // Threshold selection
+    $("#self-service-forms-section").on("keyup", "#anomaly-threshold, #anomaly-threshold-min, #anomaly-threshold-max", function () {
+        var form = $(this).closest("form");
+        hideErrorAndSuccess("anomaly-threshold", form);
+    });
+
+    // Compare mode selection
+    $("#self-service-forms-section").on("click", ".anomaly-compare-mode-option", function () {
+        var form = $(this).closest("form");
+        hideErrorAndSuccess("anomaly-compare-mode", form);
+    });
+
+    // ExploreDimension and filter selection selection
+    $("#self-service-forms-section").on("click", ".dimension-option, .remove-filter-selection[tab='self-service'], #self-service-apply-filter-btn", function () {
+        var form = $(this).closest("form");
+        hideErrorAndSuccess("", form);
+    });
+
+    //MIN_MAX_THRESHOLD FUNCTION TYPE PARAMS
+    // Threshold
+    $("#self-service-forms-section").on("keyup", "#anomaly-threshold-min-max", function () {
+        var form = $(this).closest("form");
+        hideErrorAndSuccess("anomaly-threshold", form);
+    });
+
+
+    //COMMON LISTENERS
+
     //Clear form
-    $("#main-view").on("click","#clear-create-form", function(){
-        clearCreateForm()
+    $("#self-service-forms-section").on("click", "#clear-create-form", function () {
+        clearCreateForm();
     });
 
     //Create anomaly function
-    $("#main-view").on("click","#create-anomaly-function", function(){
+    $("#self-service-forms-section").on("click", "#create-anomaly-function", function () {
         createAnomalyFunction()
     });
 
     /** Manage anomaly tab related listeners **/
 
-    //Edit button
-    $("#main-view").on("click",".init-update-function-btn", function() {
+        //Edit button
+    $("#self-service-forms-section").on("click", ".init-update-function-btn", function () {
         populateUpdateForm(this)
     });
 
-    //Delete button - will open modal for confirmation
-    $("#main-view").on("click",".init-delete-anomaly-function", function(){
-
-
+    //Delete button - opens modal for confirmation
+    $("#self-service-forms-section").on("click", ".init-delete-anomaly-function", function () {
         var functionId = $(this).attr("data-function-id");
         var functionName = $(this).attr("data-function-name");
         $("#confirm-delete-anomaly-function").attr("data-function-id", functionId);
         $("#function-to-delete").text(functionName);
         $("#delete-anomaly-function-success").hide();
-        enableButton( $("#confirm-delete-anomaly-function") );
+        enableButton($("#confirm-delete-anomaly-function"));
     });
 
     //Confirm delete button
-    $("#main-view").on("click","#confirm-delete-anomaly-function", function(){
+    $("#self-service-forms-section").on("click", "#confirm-delete-anomaly-function", function () {
         deleteAnomalyFunction(this)
     });
 
     //Update button
-    $("#main-view").on("click","#update-anomaly-function", function(){
+    $("#self-service-forms-section").on("click", "#update-anomaly-function", function () {
         updateAnomalyFunction()
     });
 
-
     /** Event handlers **/
 
-    function hideErrorAndSuccess(source) {
+    function toggleFunctionTypeFields(target) {
+        var functionType = $(target).attr("id");
+        $(".function-type-fields").addClass("uk-hidden");
+        $("." + functionType + "-fields").removeClass("uk-hidden");
+    }
+
+    function toggleMinMaxInput(target, form) {
+        var value = $(target).attr("value");
+        if (value == "MIN") {
+
+            $("#anomaly-threshold-max, #and").addClass("uk-hidden");
+            $("#anomaly-threshold-max", form).attr("value", "");
+            $("#anomaly-threshold-max", form).val("");
+            $("#anomaly-threshold-min", form).removeClass("uk-hidden");
+
+        } else if (value == "MAX") {
+            $("#anomaly-threshold-min, #and").addClass("uk-hidden");
+            $("#anomaly-threshold-min", form).attr("value", "");
+            $("#anomaly-threshold-min", form).val("");
+            $("#anomaly-threshold-max", form).removeClass("uk-hidden");
+
+        } else {
+            $("#anomaly-threshold-max, #anomaly-threshold-min, #and", form).removeClass("uk-hidden");
+        }
+    };
+
+    function hideErrorAndSuccess(source, form) {
 
         //If previously error was shown hide it
-        if($("#manage-alert-error").attr("data-error-source") == source) {
-            $("#manage-alert-error").hide();
+        if ($("#manage-anomaly-fn-error").attr("data-error-source") == source) {
+            $("#manage-anomaly-fn-error", form).hide();
         }
 
         //Hide success message
-        $("#manage-anomaly-function-success").hide();
+        $("#manage-anomaly-function-success", form).hide();
     }
 
-    function toggleMonitoringTimeField(target){
+    function toggleMonitoringTimeField(target) {
         var value = $(target).attr("value");
-        if(value == "DAYS" ){
+        if (value == "DAYS") {
 
             //Display the inputfield for hours and timezone next to the hours
             var timezone = getTimeZone();  //example: America/Los_Angeles
             $("#local-timezone").html(moment().tz(timezone).format("z"));  //example: PST
             $("#monitoring-schedule").removeClass("hidden");
 
-        }else if(value == "HOURS"){
+        } else if (value == "HOURS") {
             $("#monitoring-schedule").addClass("hidden");
             $("#monitoring-schedule-time").val("")
         }
@@ -181,19 +244,16 @@ function renderSelfService(){
 
             //Currently only supporting 'user rule' type alert configuration on the front end-
             // KALMAN and SCAN Statistics are set up by the backend
+        formData.dataset = $(".selected-dataset", form).attr("value");
+        formData.functionName = $("#name", form).val();
+        formData.metric = $("#selected-metric-manage-anomaly-fn", form).attr("value");
         formData.functionType = $("#selected-function-type", form).attr("value");
         formData.metricFunction = "SUM";
         formData.windowDelay = "1";  //Todo:consider max time ?
-
-        formData.functionName = $("#name", form).val();
-        formData.dataset =  $(".selected-dataset", form).attr("value");
-        formData.metric =  $("#selected-metric-manage-alert", form).attr("value");
-        formData.condition = ( $("#selected-anomaly-condition", form).attr("value") == "DROPS" ) ? "-" : ( $("#selected-anomaly-condition", form).attr("value") == "INCREASES" ) ? "" : null;
-        formData.baseline = $("#selected-anomaly-compare-mode", form).attr("value");
         formData.windowSize = $("#monitoring-window-size", form).val();
         formData.windowUnit = $("#selected-monitoring-window-unit", form).attr("value");
 
-        //Todo add monitoring schedule time when it's available for update
+        //Todo add monitoring schedule time to update form when it's available
         if ($("#monitoring-repeat-size", form).length > 0) {
             formData.repeatEverySize = $("#monitoring-repeat-size", form).val();
             formData.repeatEveryUnit = $("#selected-monitoring-repeat-unit", form).attr("value");
@@ -205,50 +265,59 @@ function renderSelfService(){
             formData.scheduleHour = "00";
         }
 
-        if ($("#function-id", form).length > 0){
+        if ($("#function-id", form).length > 0) {
             formData.functionId = $("#function-id", form).text();
         }
 
-        if($("#active-alert", form).is(':checked')){
+        if ($("#active-alert", form).is(':checked')) {
             formData.isActive = true;
-        }else{
+        } else {
             formData.isActive = false;
         }
 
-        var filters = readFiltersAppliedInCurrentView("self-service", {form:form});
+        //USER_RULE & MIN_MAX_THRESHOLD
+        var filters = readFiltersAppliedInCurrentView("self-service", {form: form});
 
         //Transform filters Todo: clarify if filters object should be consistent on FE and BE
         formData.filters = encodeURIComponent(JSON.stringify(filters));
         formData.filtersString = "";
 
-        for(key in formData.filters){
+        for (key in formData.filters) {
             var numValues = formData.filters[key].length;
-            for(var index = 0; index < numValues; index++ ){
+            for (var index = 0; index < numValues; index++) {
                 formData.filtersString += key + "=" + formData.filters[key][index] + ";";
             }
         }
+        formData.exploreDimension = $("#self-service-view-single-dimension-selector #selected-dimension", form).attr("value");
 
-        console.log( formData.filtersString)
-        formData.exploreDimension = $("#self-service-view-single-dimension-selector #selected-dimension",form).attr("value");
+        //USER_RULE Params
+        if (formData.functionType == "USER_RULE") {
 
-        //Function type: USER RULE; Metric function: SUM
-        formData.changeThreshold = parseFloat( $("#anomaly-threshold", form).val() / 100);
+            formData.condition = ( $("#selected-anomaly-condition", form).attr("value") == "DROPS" ) ? "-" : ( $("#selected-anomaly-condition", form).attr("value") == "INCREASES" ) ? "" : null;
+            formData.baseline = $("#selected-anomaly-compare-mode", form).attr("value");
+            formData.changeThreshold = parseFloat($("#anomaly-threshold", form).val() / 100);
 
+            //MIN_MAX_THRESHOLD PARAMS
+        } else if (formData.functionType == "MIN_MAX_THRESHOLD") {
+
+            formData.min = $("#anomaly-threshold-min", form).val();
+            formData.max = $("#anomaly-threshold-max", form).val();
+        }
         return formData;
     }
 
 
     //VALIDATE FORM: takes an object returns true or undefined = falsy value
-    function validateAnomalyFnFormData(formData, form){
+    function validateAnomalyFnFormData(formData, form) {
 
         var valid = true;
 
         /* Validate form */
-        var errorMessage = $("#manage-alert-error p", form);
-        var errorAlert = $("#manage-alert-error", form);
+        var errorMessage = $("#manage-anomaly-fn-error p", form);
+        var errorAlert = $("#manage-anomaly-fn-error", form);
 
         //Check if rule name is present
-        if(formData.functionName == ""){
+        if (formData.functionName == "") {
             errorMessage.html("Please give a name to the anomaly function.");
             errorAlert.attr("data-error-source", "name");
             errorAlert.fadeIn(100);
@@ -268,7 +337,7 @@ function renderSelfService(){
             return true;
         };
 
-        if(!isAlphaNumeric(formData.functionName)){
+        if (!isAlphaNumeric(formData.functionName)) {
             errorMessage.html("Please only use alphanumeric (0-9, A-Z, a-z) characters in 'Rule' field. No space, no '_', no '-' is accepted.");
             errorAlert.attr("data-error-source", "name");
             errorAlert.fadeIn(100);
@@ -276,39 +345,60 @@ function renderSelfService(){
         }
 
         //Check if dataset is selected
-        if(formData.dataset == "") {
+        if (formData.dataset == "") {
             errorMessage.html("Please select a dataset.");
-            errorAlert.attr("data-error-source", "dataset-option-manage-alert");
+            errorAlert.attr("data-error-source", "dataset-option-manage-anomaly-fn");
             errorAlert.fadeIn(100);
             return
         }
 
         //Check if metric is selected
-        if(formData.metric == "") {
+        if (!formData.metric) {
             errorMessage.html("Please select a metric.");
-            errorAlert.attr("data-error-source", "single-metric-option-manage-alert");
+            errorAlert.attr("data-error-source", "metric-option");
             errorAlert.fadeIn(100);
             return
         }
 
-        //Check if condition is selected
-        if(formData.condition == null ) {
-            errorMessage.html("Please select a condition ie. DROP, INCREASE.");
-            errorAlert.attr("data-error-source", "anomaly-condition");
-            errorAlert.fadeIn(100);
-            return
+        if( formData.functionType == "USER_RULE"){
+
+            //Check if condition is selected
+            if ( formData.condition == null) {
+                errorMessage.html("Please select a condition ie. DROP, INCREASE.");
+                errorAlert.attr("data-error-source", "anomaly-condition");
+                errorAlert.fadeIn(100);
+                return
+            }
+
+            //Check if threshold < 0 or the value of the input is not a number
+            if (!formData.changeThreshold || formData.changeThreshold < 0.01) {
+                errorMessage.html("Please provide a threshold percentage using positive numbers greater than 1. Example: write 5 for a 5% threshold. <br> The ratio will be calculated as: (current value - baseline value) / baseline value");
+                errorAlert.attr("data-error-source", "anomaly-threshold");
+                errorAlert.fadeIn(100);
+                return
+            }
         }
 
-        //Check if threshold < 0 or the value of the input is not a number
-        if(!formData.changeThreshold || formData.changeThreshold < 0.01) {
-            errorMessage.html("Please provide a threshold percentage using positive numbers greater than 1. Example: write 5 for a 5% threshold. <br> The ratio will be calculated as: (current value - baseline value) / baseline value");
-            errorAlert.attr("data-error-source", "anomaly-threshold");
-            errorAlert.fadeIn(100);
-            return
+        if(formData.functionType == "MIN_MAX_THRESHOLD"){
+
+            if( parseFloat(formData.min)  >= parseFloat(formData.max)){
+                errorMessage.html("Minimum threshold should be less than maximum threshold.");
+                errorAlert.attr("data-error-source", "anomaly-threshold");
+                errorAlert.fadeIn(100);
+                return
+            }
+
+            if ( !formData.min && !formData.max) {
+                errorMessage.html("Please provide a threshold value.");
+                errorAlert.attr("data-error-source", "anomaly-threshold");
+                errorAlert.fadeIn(100);
+                return
+            }
+
         }
 
         //Check if windowSize has value
-        if(!formData.windowSize || formData.windowSize < 0){
+        if (!formData.windowSize || formData.windowSize < 0) {
             errorMessage.html("Please fill in how many consecutive hours/days/weeks/months should fail the threshold to trigger an alert.");
             errorAlert.attr("data-error-source", "monitoring-window-size");
             errorAlert.fadeIn(100);
@@ -322,7 +412,7 @@ function renderSelfService(){
         }
 
         //Todo:Remove this condition if the repeatEverySize and repeatEveryUnit are available on all forms all
-        if(formData.hasOwnProperty("repeatEverySize")) {
+        if (formData.hasOwnProperty("repeatEverySize")) {
 
             if (!isPositiveInteger(formData.repeatEverySize)) {
                 errorMessage.html('Please fill in: "Monitor data every" X hours/days/weeks etc., where X should be positive integer.');
@@ -344,38 +434,31 @@ function renderSelfService(){
 
 
     //SUBMIT CREATED ANOMALY FUNCTION
-    function createAnomalyFunction(){
+    function createAnomalyFunction() {
         var form = $("#create-anomaly-functions-tab");
         var formData = collectAnomalyFnFormValues(form);
         var valid = validateAnomalyFnFormData(formData, form);
 
-        if(valid){
-
-            /* Submit form */
-            var url = "/dashboard/anomaly-function/create?dataset=" + formData.dataset + "&metric=" + formData.metric + "&type=" + formData.functionType + "&metricFunction=" + formData.metricFunction + "&functionName=" + formData.functionName
-            + "&windowSize=" + formData.windowSize + "&windowUnit=" + formData.windowUnit + "&windowDelay=" + formData.windowDelay
-            + "&scheduleMinute=" + formData.scheduleMinute  + "&scheduleHour=" + formData.scheduleHour
-            + "&repeatEverySize=" + formData.repeatEverySize + "&repeatEveryUnit=" + formData.repeatEveryUnit
-            + "&isActive=" +  formData.isActive + "&properties=baseline=" + formData.baseline + ";changeThreshold=" + formData.condition + formData.changeThreshold;
-            url += (formData.exploreDimension) ? "&exploreDimension=" + formData.exploreDimension : "";
-            url += (formData.filters && formData.filters != encodeURIComponent(JSON.stringify({}))) ? "&filters=" + formData.filters : "";
+        if (valid) {
 
             //Disable submit btn
-            disableButton( $("#create-anomaly-function"));
+            disableButton($("#create-anomaly-function"));
 
-           submitData(url).done(function(){
+
+            var urlParams = urlOfAnomalyFn(formData);
+            submitData("/dashboard/anomaly-function/create?" + urlParams).done(function(){
                //Enable submit btn
                enableButton($("#create-anomaly-function"))
 
                 var successMessage = $("#manage-anomaly-function-success");
                 $("p", successMessage).html("success");
                 successMessage.fadeIn(100);
-           })
+            })
         }
     }
 
     //DELETE ANOMALY FUNCTION
-    function  deleteAnomalyFunction(target){
+    function deleteAnomalyFunction(target) {
 
         disableButton($("#confirm-delete-anomaly-function"));
 
@@ -383,11 +466,11 @@ function renderSelfService(){
         var url = "/dashboard/anomaly-function/delete?id=" + functionId;
 
 
-        deleteData(url, "").done(function(){
+        deleteData(url, "").done(function () {
             //Remove row from the dataTable
             var table = $("#existing-anomaly-functions-table").DataTable();
             table
-                .row( $(".existing-function-row[data-function-id='" + functionId + "']") )
+                .row($(".existing-function-row[data-function-id='" + functionId + "']"))
                 .remove()
                 .draw();
 
@@ -400,42 +483,62 @@ function renderSelfService(){
 
 
     //Populate modal with data of the selected anomaly function
-    function populateUpdateForm(target){
+    function populateUpdateForm(target) {
 
-        var functionId = $(target).attr("data-row-id");
+        var rowId = $(target).attr("data-row-id");
 
         /** Handelbars template for ANOMALY FUNCTION FORM **/
         var existingAnomalyFunctionsDataStr = window.sessionStorage.getItem('existingAnomalyFunctions');
         var existingAnomalyFunctionsData = JSON.parse(existingAnomalyFunctionsDataStr);
-        var result_anomaly_function_form_template = HandleBarsTemplates.template_anomaly_function_form(existingAnomalyFunctionsData[functionId]);
+        var anomalyFunctionObj = existingAnomalyFunctionsData[rowId]
+        var fnProperties = parseFnProperties(anomalyFunctionObj.properties);
+        var result_anomaly_function_form_template = HandleBarsTemplates.template_anomaly_function_form({data: anomalyFunctionObj, fnProperties: fnProperties});
         $("#update-anomaly-functions-form-placeholder").html(result_anomaly_function_form_template);
 
 
+        //Store the rowId on the update form btn
+        $("#update-anomaly-function").attr("data-row-id", rowId )
+
+        //Set function type
+        $(".function-type-option[value='" + existingAnomalyFunctionsData[rowId].type + "']").click()
+
+        //Set min max condition and populate inputfield
+        if(fnProperties && fnProperties.hasOwnProperty("min") && fnProperties.hasOwnProperty("max")){
+            $(".anomaly-condition-min-max-option[value='MINMAX']").click()
+        }else if(fnProperties && fnProperties.hasOwnProperty("min")){
+            $(".anomaly-condition-min-max-option[value='MIN']").click()
+        }else{
+            $(".anomaly-condition-min-max-option[value='MAX']").click()
+        }
+
         /** Handelbars template for dataset dropdown **/
-        var datasetList= JSON.parse(window.sessionStorage.getItem('datasetList'));
+        var datasetList = JSON.parse(window.sessionStorage.getItem('datasetList'));
         var queryFormDatasetData = {data: datasetList};
         var result_datasets_template = HandleBarsTemplates.template_datasets(queryFormDatasetData);
-        $("#update-function-modal .landing-dataset").each(function(){ $(this).html(result_datasets_template)});
+        $("#update-function-modal .landing-dataset").each(function () {
+            $(this).html(result_datasets_template)
+        });
 
 
         /** Handelbars template for query form multi select metric list **/
-        var metricList= window.datasetConfig.datasetMetrics;
-        var queryFormMetricListData = {data: metricList, singleMetricSelector: true};
+        var metricList = window.datasetConfig.datasetMetrics;
+        var queryFormMetricListData = {data: metricList};
         var result_query_form_metric_list_template = HandleBarsTemplates.template_metric_list(queryFormMetricListData);
-        $("#update-function-modal .metric-list").each(function(){ $(this).html(result_query_form_metric_list_template)});
+        $("#update-function-modal .metric-list").each(function () {
+            $(this).html(result_query_form_metric_list_template)
+        });
 
 
         /** Populate dimension list **/
         var dimnsionList = window.datasetConfig.datasetDimensions;
         var dimensionListHtml = "";
         var filterDimensionListHtml = "";
-        for (var index= 0, numDimensions = dimnsionList.length; index <numDimensions; index++) {
+        for (var index = 0, numDimensions = dimnsionList.length; index < numDimensions; index++) {
             dimensionListHtml += "<li class='dimension-option' rel='dimensions' value='" + dimnsionList[index] + "'><a href='#' class='uk-dropdown-close'>" + dimnsionList[index] + "</a></li>";
             filterDimensionListHtml += "<li class='filter-dimension-option' value='" + dimnsionList[index] + "'><a href='#' class='radio-options'>" + dimnsionList[index] + "</a></li>";
         }
 
         enableButton($("#update-anomaly-function"));
-        $("#manage-anomaly-function-success").hide();
 
         $("#update-function-modal .dimension-list").html(dimensionListHtml);
 
@@ -445,43 +548,50 @@ function renderSelfService(){
         /** Handelbars template for dimensionvalues in filter dropdown **/
         var datasetFilters = window.datasetConfig.datasetFilters;
         var result_filter_dimension_value_template = HandleBarsTemplates.template_filter_dimension_value(datasetFilters)
-        $(".dimension-filter").each(function(){
+        $(".dimension-filter").each(function () {
             $(this).after(result_filter_dimension_value_template)
         });
 
         //set value set in display block mode
-        $("#update-function-modal  .filter-dimension-option:first-of-type").each(function(){
+        $("#update-function-modal  .filter-dimension-option:first-of-type").each(function () {
             $(this).click();
-            $(".radio-options",this).click();
+            $(".radio-options", this).click();
         });
+
+
     }
 
-    function  updateAnomalyFunction(){
+    function updateAnomalyFunction() {
 
-        disableButton($("#update-anomaly-function"));
+
 
         var form = $("#update-function-modal");
         var formData = collectAnomalyFnFormValues(form);
-        var valid = validateAnomalyFnFormData(formData,form);
+        var valid = validateAnomalyFnFormData(formData, form);
 
 
 
-        if(valid){
-            var url = "/dashboard/anomaly-function/update?id=" + formData.functionId + "&dataset=" + formData.dataset + "&metric=" + formData.metric + "&type=" + formData.functionType + "&metricFunction=" + formData.metricFunction + "&functionName=" + formData.functionName
-                + "&windowSize=" + formData.windowSize + "&windowUnit=" + formData.windowUnit + "&windowDelay=" + formData.windowDelay
-                + "&isActive=" +  formData.isActive + "&properties=baseline=" + formData.baseline + ";changeThreshold=" + formData.condition + formData.changeThreshold;
 
-            //Optional params
-            url += (formData.repeatEverySize) ? "&scheduleMinute=" + formData.scheduleMinute  + "&scheduleHour=" + formData.scheduleHour
-                   + "&repeatEverySize=" + formData.repeatEverySize + "&repeatEveryUnit=" + formData.repeatEveryUnit : "";
-            url += (formData.exploreDimension) ? "&exploreDimension=" + formData.exploreDimension : "";
-            url += (formData.filters  ) ? "&filters=" + formData.filtersString : "";
+        if (valid) {
 
-            submitData(url).done(function(){
+            disableButton($("#update-anomaly-function"));
+
+            var urlParams = urlOfAnomalyFn(formData)
+
+            submitData("/dashboard/anomaly-function/update?" + urlParams).done(function () {
+
+                //Update cached data
+//                var existingAnomalyFunctionsDataStr = window.sessionStorage.getItem('existingAnomalyFunctions');
+//                var existingAnomalyFunctionsData = JSON.parse(existingAnomalyFunctionsDataStr);
+
+                //existingAnomalyFunctionsData[rowId] = {formData}
+
+                getExistingAnomalyFunctions(formData.dataset);
 
                 //Enable submit btn
-                enableButton($("#update-anomaly-function"))
-
+                enableButton($("#update-anomaly-function"));
+                $("#close-update-fn-modal").click();
+                var rowId = $("#update-anomaly-function").attr("data-row-id");
                 var successMessage = $("#manage-anomaly-function-success", form);
                 $("p", successMessage).html("success");
                 successMessage.fadeIn(100);
@@ -490,5 +600,33 @@ function renderSelfService(){
         }
     }
 
+    function urlOfAnomalyFn(formData){
+        /* Submit form */
+        var url = "dataset=" + formData.dataset + "&metric=" + formData.metric + "&type=" + formData.functionType + "&metricFunction=" + formData.metricFunction + "&functionName=" + formData.functionName
+            + "&windowSize=" + formData.windowSize + "&windowUnit=" + formData.windowUnit + "&windowDelay=" + formData.windowDelay
+            + "&scheduleMinute=" + formData.scheduleMinute + "&scheduleHour=" + formData.scheduleHour
+            + "&isActive=" + formData.isActive + "&properties="
+        url += (formData.functionType == "USER_RULE") ? "baseline=" + formData.baseline + ";changeThreshold=" + formData.condition + formData.changeThreshold : "";
+        url += (formData.functionType == "MIN_MAX_THRESHOLD" && formData.min ) ? "min=" + formData.min + ";" : "";
+        url += (formData.functionType == "MIN_MAX_THRESHOLD" && formData.max ) ? "max=" + formData.max : "";
+        //Todo: cron needs to be expressed in order to update these values
+        url += (formData.repeatEverySize) ? "&repeatEverySize=" + formData.repeatEverySize + "&repeatEveryUnit=" + formData.repeatEveryUnit : "";
+        url += (formData.exploreDimension) ? "&exploreDimension=" + formData.exploreDimension : "";
+        url += (formData.filters && formData.filters != encodeURIComponent(JSON.stringify({}))) ? "&filters=" + formData.filters : "";
+        url += (formData.functionId ) ? "&id=" + formData.functionId : "" ;
 
+        return url
+    }
+
+    function parseFnProperties(properties){
+        var fnProperties = {}
+        var propertiesAry = properties.split(";");
+        for (var i = 0, numProp = propertiesAry.length; i < numProp; i++) {
+            var keyValue = propertiesAry[i];
+            keyValue = keyValue.split("=")
+            var key = keyValue[0];
+            fnProperties[key] = keyValue[1];
+        }
+        return fnProperties
+    }
 }
