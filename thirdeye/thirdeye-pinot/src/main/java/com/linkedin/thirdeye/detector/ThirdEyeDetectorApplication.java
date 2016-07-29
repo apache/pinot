@@ -4,12 +4,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 
 import io.dropwizard.assets.AssetsBundle;
-import io.dropwizard.db.DataSourceFactory;
 import io.dropwizard.jetty.ConnectorFactory;
 import io.dropwizard.jetty.HttpConnectorFactory;
 import io.dropwizard.lifecycle.Managed;
 import io.dropwizard.lifecycle.ServerLifecycleListener;
-import io.dropwizard.migrations.MigrationsBundle;
 import io.dropwizard.server.DefaultServerFactory;
 import io.dropwizard.server.ServerFactory;
 import io.dropwizard.server.SimpleServerFactory;
@@ -28,8 +26,6 @@ import org.eclipse.jetty.server.ServerConnector;
 import org.quartz.Scheduler;
 import org.quartz.SchedulerFactory;
 import org.quartz.impl.StdSchedulerFactory;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
@@ -51,9 +47,6 @@ import com.linkedin.thirdeye.detector.resources.MetricsGraphicsTimeSeriesResourc
 public class ThirdEyeDetectorApplication
     extends BaseThirdEyeApplication<ThirdEyeDetectorConfiguration> {
   private static final String QUARTZ_MISFIRE_THRESHOLD = "3600000"; // 1 hour
-  private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeDetectorApplication.class);
-
-  private static DataSourceFactory dataSourceFactory;
 
   /**
    * Entry point for the detector application, used to start up the app server and handle database
@@ -61,15 +54,6 @@ public class ThirdEyeDetectorApplication
    * configs (including <code>detector.yml</code>) provided as the last argument. If no preceding
    * arguments are provided, the application server will startup using <code>detector.yml</code>.
    * <br>
-   * If additional arguments do precede the root configuration directory, they are passed as
-   * arguments to the Dropwizard application along with the <code>detector.yml</code> file. As an
-   * example, one could pass in the arguments:
-   * <br>
-   * <br>
-   * <code>db migrate <i>config_folder</i></code>
-   * <br>
-   * <br>
-   * to run database migrations using configurations in <code>detector.yml</code>.
    * @throws Exception
    */
   public static void main(final String[] args) throws Exception {
@@ -93,12 +77,6 @@ public class ThirdEyeDetectorApplication
 
   @Override
   public void initialize(final Bootstrap<ThirdEyeDetectorConfiguration> bootstrap) {
-    bootstrap.addBundle(new MigrationsBundle<ThirdEyeDetectorConfiguration>() {
-      @Override
-      public DataSourceFactory getDataSourceFactory(ThirdEyeDetectorConfiguration config) {
-        return dataSourceFactory;
-      }
-    });
     bootstrap.addBundle(new AssetsBundle("/assets/", "/", "index.html"));
   }
 
@@ -247,7 +225,7 @@ public class ThirdEyeDetectorApplication
     environment.jersey().register(new EmailFunctionDependencyResource(anomalyFunctionDAO, emailConfigurationDAO));
   }
 
-  public static int getApplicationPortNumber(ThirdEyeDetectorConfiguration config) {
+  private int getApplicationPortNumber(ThirdEyeDetectorConfiguration config) {
     int httpPort = 0;
     try {
       // https://github.com/dropwizard/dropwizard/issues/745

@@ -24,7 +24,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public abstract class BaseThirdEyeApplication<T extends Configuration> extends Application<T> {
-  private final Logger LOG = LoggerFactory.getLogger(this.getClass());
+  protected final Logger LOG = LoggerFactory.getLogger(this.getClass());
   protected AnomalyFunctionDAO anomalyFunctionDAO;
   protected AnomalyResultDAO anomalyResultDAO;
   protected EmailConfigurationDAO emailConfigurationDAO;

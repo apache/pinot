@@ -9,9 +9,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.linkedin.thirdeye.anomaly.alert.AlertJobResource;
 import com.linkedin.thirdeye.anomaly.alert.AlertJobScheduler;
 import com.linkedin.thirdeye.anomaly.detection.DetectionJobResource;
@@ -25,7 +22,6 @@ import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 public class ThirdEyeAnomalyApplication
     extends BaseThirdEyeApplication<ThirdEyeAnomalyConfiguration> {
 
-  private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeAnomalyApplication.class);
   private DetectionJobScheduler detectionJobScheduler = null;
   private TaskDriver taskDriver = null;
   private MonitorJobScheduler monitorJobScheduler = null;
@@ -59,7 +55,6 @@ public class ThirdEyeAnomalyApplication
   @Override
   public void run(final ThirdEyeAnomalyConfiguration config, final Environment environment)
       throws Exception {
-
     LOG.info("Starting ThirdeyeAnomalyApplication : Scheduler {} Worker {}", config.isScheduler(), config.isWorker());
     super.initDAOs();
     ThirdEyeCacheRegistry.initializeDetectorCaches(config);
