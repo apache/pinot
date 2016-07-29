@@ -7,6 +7,8 @@ import com.linkedin.thirdeye.db.dao.AnomalyTaskDAO;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.commons.lang3.StringUtils;
+import org.joda.time.format.ISODateTimeFormat;
 import org.quartz.CronScheduleBuilder;
 import org.quartz.CronTrigger;
 import org.quartz.JobBuilder;
@@ -23,13 +25,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.thirdeye.anomaly.job.JobContext;
+import com.linkedin.thirdeye.anomaly.job.JobScheduler;
 import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 
 /**
  * Scheduler for anomaly detection jobs
  */
-public class DetectionJobScheduler {
+public class DetectionJobScheduler implements JobScheduler {
 
   private static final Logger LOG = LoggerFactory.getLogger(DetectionJobScheduler.class);
   private SchedulerFactory schedulerFactory;
@@ -88,7 +91,7 @@ public class DetectionJobScheduler {
     quartzScheduler.shutdown();
   }
 
-  public void start(Long id) throws SchedulerException {
+  public void startJob(Long id) throws SchedulerException {
     AnomalyFunctionSpec anomalyFunctionSpec = anomalyFunctionDAO.findById(id);
     if (anomalyFunctionSpec == null) {
       throw new IllegalArgumentException("No function with id " + id);
@@ -112,7 +115,7 @@ public class DetectionJobScheduler {
     scheduleJob(detectionJobContext, anomalyFunctionSpec);
   }
 
-  public void stop(Long id) throws SchedulerException {
+  public void stopJob(Long id) throws SchedulerException {
     AnomalyFunctionSpec anomalyFunctionSpec = anomalyFunctionDAO.findById(id);
     String functionName = anomalyFunctionSpec.getFunctionName();
     String jobKey = getJobKey(id, functionName);
@@ -141,8 +144,12 @@ public class DetectionJobScheduler {
     detectionJobContext.setAnomalyFunctionFactory(anomalyFunctionFactory);
     detectionJobContext.setAnomalyFunctionId(anomalyFunctionSpec.getId());
     detectionJobContext.setJobName(jobKey);
-    detectionJobContext.setWindowStartIso(windowStartIso);
-    detectionJobContext.setWindowEndIso(windowEndIso);
+    if (StringUtils.isNotBlank(windowStartIso)) {
+      detectionJobContext.setWindowStart(ISODateTimeFormat.dateTimeParser().parseDateTime(windowStartIso));
+    }
+    if (StringUtils.isNotBlank(windowEndIso)) {
+      detectionJobContext.setWindowEnd(ISODateTimeFormat.dateTimeParser().parseDateTime(windowEndIso));
+    }
 
     job.getJobDataMap().put(DetectionJobRunner.DETECTION_JOB_CONTEXT, detectionJobContext);
 

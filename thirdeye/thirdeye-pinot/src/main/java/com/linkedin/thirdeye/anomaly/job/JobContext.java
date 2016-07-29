@@ -1,10 +1,9 @@
 package com.linkedin.thirdeye.anomaly.job;
 
-
 import com.linkedin.thirdeye.db.dao.AnomalyFunctionDAO;
 import com.linkedin.thirdeye.db.dao.AnomalyJobDAO;
 import com.linkedin.thirdeye.db.dao.AnomalyTaskDAO;
-
+import com.linkedin.thirdeye.db.dao.EmailConfigurationDAO;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 
 public abstract class JobContext {
@@ -13,6 +12,7 @@ public abstract class JobContext {
   private AnomalyTaskDAO anomalyTaskDAO;
   private AnomalyFunctionDAO anomalyFunctionDAO;
   private AnomalyFunctionFactory anomalyFunctionFactory;
+  private EmailConfigurationDAO emailConfigurationDAO;
 
   private String jobName;
   private long jobExecutionId;
@@ -64,6 +64,14 @@ public abstract class JobContext {
 
   public void setAnomalyFunctionFactory(AnomalyFunctionFactory anomalyFunctionFactory) {
     this.anomalyFunctionFactory = anomalyFunctionFactory;
+  }
+
+  public EmailConfigurationDAO getEmailConfigurationDAO() {
+    return emailConfigurationDAO;
+  }
+
+  public void setEmailConfigurationDAO(EmailConfigurationDAO emailConfigurationDAO) {
+    this.emailConfigurationDAO = emailConfigurationDAO;
   }
 
 }

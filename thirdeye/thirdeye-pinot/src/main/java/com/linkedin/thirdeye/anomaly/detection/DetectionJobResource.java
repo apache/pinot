@@ -41,7 +41,7 @@ public class DetectionJobResource {
   @Path("/{id}")
   public Response enable(@PathParam("id") Long id) throws Exception {
     toggleActive(id, true);
-    detectionJobScheduler.start(id);
+    detectionJobScheduler.startJob(id);
     return Response.ok().build();
   }
 
@@ -60,7 +60,7 @@ public class DetectionJobResource {
   @UnitOfWork
   public Response disable(@PathParam("id") Long id) throws Exception {
     toggleActive(id, false);
-    detectionJobScheduler.stop(id);
+    detectionJobScheduler.stopJob(id);
     return Response.ok().build();
   }
 

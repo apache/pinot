@@ -1,5 +1,9 @@
 package com.linkedin.thirdeye.detector.driver;
 
+import java.util.Objects;
+
+import com.google.common.base.MoreObjects;
+
 public class FailureEmailConfiguration {
   public static final String FAILURE_EMAIL_CONFIG_KEY = "FAILURE_EMAIL_CONFIG";
   private String fromAddress;
@@ -55,6 +59,31 @@ public class FailureEmailConfiguration {
 
   public void setSmtpPassword(String smtpPassword) {
     this.smtpPassword = smtpPassword;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (!(o instanceof FailureEmailConfiguration)) {
+      return false;
+    }
+    FailureEmailConfiguration at = (FailureEmailConfiguration) o;
+    return Objects.equals(fromAddress, at.getFromAddress())
+        && Objects.equals(toAddresses, at.getToAddresses())
+        && Objects.equals(smtpHost, at.getSmtpHost())
+        && Objects.equals(smtpPort, at.getSmtpPort())
+        && Objects.equals(smtpUser, at.getSmtpUser())
+        && Objects.equals(smtpPassword, at.getSmtpPassword());
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(fromAddress, toAddresses, smtpHost, smtpPort, smtpUser, smtpPassword);
+  }
+
+  @Override
+  public String toString() {
+    return MoreObjects.toStringHelper(this).add("fromAddress", fromAddress).add("toAddresses", toAddresses)
+        .add("smtpHost", smtpHost).add("smtpPort", smtpPort).add("smtpUser", smtpUser).toString();
   }
 
 }

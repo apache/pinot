@@ -6,6 +6,10 @@ import com.linkedin.thirdeye.db.entity.AnomalyTaskSpec;
 import java.sql.Timestamp;
 import java.util.List;
 
+import javax.persistence.OptimisticLockException;
+import javax.persistence.RollbackException;
+
+import org.hibernate.StaleObjectStateException;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -60,12 +64,16 @@ public class AnomalyTaskDAO extends AbstractJpaDAO<AnomalyTaskSpec> {
         anomalyTaskSpec.setStatus(newStatus);
         anomalyTaskSpec.setWorkerId(workerId);
         save(anomalyTaskSpec);
+        return true;
       }
+    } catch (OptimisticLockException | RollbackException | StaleObjectStateException e) {
+      LOG.warn("OptimisticLockException while updating workerId {} and status {} for anomalyTaskId {}",
+          workerId, newStatus, id);
     } catch (Exception e) {
-      LOG.info("OptimisticLockException");
-      return false;
+      LOG.error("Exception in updateStatusAndWorkedId", e);
     }
-    return true;
+    return false;
+
   }
 
   public void updateStatusAndTaskEndTime(Long id, TaskStatus oldStatus, TaskStatus newStatus, Long taskEndTime) {

@@ -10,18 +10,18 @@ import io.dropwizard.setup.Environment;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.Callable;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.thirdeye.anomaly.alert.AlertJobResource;
+import com.linkedin.thirdeye.anomaly.alert.AlertJobScheduler;
 import com.linkedin.thirdeye.anomaly.detection.DetectionJobResource;
 import com.linkedin.thirdeye.anomaly.detection.DetectionJobScheduler;
 import com.linkedin.thirdeye.anomaly.monitor.MonitorJobScheduler;
 import com.linkedin.thirdeye.anomaly.task.TaskDriver;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
-import com.linkedin.thirdeye.detector.db.HibernateSessionWrapper;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 
 public class ThirdEyeAnomalyApplication
@@ -31,6 +31,8 @@ public class ThirdEyeAnomalyApplication
   private DetectionJobScheduler detectionJobScheduler = null;
   private TaskDriver taskDriver = null;
   private MonitorJobScheduler monitorJobScheduler = null;
+  private AlertJobScheduler alertJobScheduler = null;
+  private AnomalyFunctionFactory anomalyFunctionFactory = null;
 
   public static void main(final String[] args) throws Exception {
     List<String> argList = new ArrayList<String>(Arrays.asList(args));
@@ -48,7 +50,7 @@ public class ThirdEyeAnomalyApplication
 
   @Override
   public String getName() {
-    return "Thirdeye Detector";
+    return "Thirdeye Controller";
   }
 
   @Override
@@ -59,9 +61,7 @@ public class ThirdEyeAnomalyApplication
         return config.getDatabase();
       }
     });
-
     bootstrap.addBundle(hibernateBundle);
-
     bootstrap.addBundle(new AssetsBundle("/assets/", "/", "index.html"));
   }
 
@@ -73,45 +73,31 @@ public class ThirdEyeAnomalyApplication
     super.initDetectorRelatedDAO();
     ThirdEyeCacheRegistry.initializeDetectorCaches(config);
 
-    final AnomalyFunctionFactory anomalyFunctionFactory =
-        new AnomalyFunctionFactory(config.getFunctionConfigPath());
-
-    if (config.isScheduler()) {
-      detectionJobScheduler = new DetectionJobScheduler(anomalyJobDAO, anomalyTaskDAO,
-          anomalyFunctionDAO);
-    }
-    if (config.isWorker()) {
-      taskDriver =
-        new TaskDriver(config.getId(), anomalyJobDAO, anomalyTaskDAO, anomalyResultDAO,
-            anomalyFunctionRelationDAO, anomalyFunctionFactory, hibernateBundle.getSessionFactory());
-    }
-    if (config.isMonitor()) {
-      monitorJobScheduler = new MonitorJobScheduler(anomalyJobDAO, anomalyTaskDAO,
-          config.getMonitorConfiguration());
-    }
-
-
     environment.lifecycle().manage(new Managed() {
       @Override
       public void start() throws Exception {
-        new HibernateSessionWrapper<Void>(hibernateBundle.getSessionFactory())
-            .execute(new Callable<Void>() {
-          @Override
-          public Void call() throws Exception {
-            if (config.isWorker()) {
-              taskDriver.start();
-            }
-            if (config.isScheduler()) {
-              detectionJobScheduler.start();
-              environment.jersey()
-              .register(new DetectionJobResource(detectionJobScheduler, anomalyFunctionDAO));
-            }
-            if (config.isMonitor()) {
-              monitorJobScheduler.start();
-            }
-            return null;
-          }
-        });
+
+        if (config.isWorker()) {
+          anomalyFunctionFactory = new AnomalyFunctionFactory(config.getFunctionConfigPath());
+          taskDriver = new TaskDriver(config, anomalyJobDAO, anomalyTaskDAO, anomalyResultDAO, anomalyFunctionFactory);
+          taskDriver.start();
+        }
+        if (config.isScheduler()) {
+          detectionJobScheduler = new DetectionJobScheduler(anomalyJobDAO, anomalyTaskDAO, anomalyFunctionDAO);
+          detectionJobScheduler.start();
+          environment.jersey()
+          .register(new DetectionJobResource(detectionJobScheduler, anomalyFunctionDAO));
+        }
+        if (config.isMonitor()) {
+          monitorJobScheduler = new MonitorJobScheduler(anomalyJobDAO, anomalyTaskDAO, config.getMonitorConfiguration());
+          monitorJobScheduler.start();
+        }
+        if (config.isAlert()) {
+          alertJobScheduler = new AlertJobScheduler(anomalyJobDAO, anomalyTaskDAO, emailConfigurationDAO);
+          alertJobScheduler.start();
+          environment.jersey()
+          .register(new AlertJobResource(alertJobScheduler, emailConfigurationDAO));
+        }
       }
 
       @Override
@@ -124,6 +110,9 @@ public class ThirdEyeAnomalyApplication
         }
         if (config.isMonitor()) {
           monitorJobScheduler.stop();
+        }
+        if (config.isAlert()) {
+          alertJobScheduler.stop();
         }
       }
     });

@@ -16,6 +16,7 @@ import javax.validation.constraints.NotNull;
 
 import org.hibernate.validator.constraints.Email;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.base.MoreObjects;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
@@ -203,6 +204,7 @@ public class EmailConfiguration extends AbstractBaseEntity {
     return filters;
   }
 
+  @JsonIgnore
   public Multimap<String, String> getFilterSet() {
     return ThirdEyeUtils.getFilterSet(filters);
   }

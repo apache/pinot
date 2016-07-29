@@ -9,10 +9,13 @@ import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.thirdeye.anomaly.alert.AlertJobContext;
+import com.linkedin.thirdeye.anomaly.alert.AlertTaskInfo;
 import com.linkedin.thirdeye.anomaly.detection.DetectionJobContext;
 import com.linkedin.thirdeye.anomaly.detection.DetectionTaskInfo;
 import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
 import com.linkedin.thirdeye.db.entity.AnomalyJobSpec;
+import com.linkedin.thirdeye.db.entity.EmailConfiguration;
 import com.linkedin.thirdeye.anomaly.monitor.MonitorConfiguration;
 import com.linkedin.thirdeye.anomaly.monitor.MonitorConstants.MonitorType;
 import com.linkedin.thirdeye.anomaly.monitor.MonitorJobContext;
@@ -52,6 +55,22 @@ public class TaskGenerator {
     return tasks;
 
   }
+
+  public List<AlertTaskInfo> createAlertTasks(AlertJobContext alertJobContext)
+      throws Exception{
+
+    List<AlertTaskInfo> tasks = new ArrayList<>();
+    EmailConfiguration alertConfig = alertJobContext.getAlertConfig();
+    DateTime windowStart = alertJobContext.getWindowStart();
+    DateTime windowEnd = alertJobContext.getWindowEnd();
+    long jobExecutionId = alertJobContext.getJobExecutionId();
+
+
+    AlertTaskInfo taskInfo = new AlertTaskInfo(jobExecutionId, windowStart, windowEnd, alertConfig);
+    tasks.add(taskInfo);
+    return tasks;
+  }
+
 
   public List<MonitorTaskInfo> createMonitorTasks(MonitorJobContext monitorJobContext) {
     List<MonitorTaskInfo> tasks = new ArrayList<>();

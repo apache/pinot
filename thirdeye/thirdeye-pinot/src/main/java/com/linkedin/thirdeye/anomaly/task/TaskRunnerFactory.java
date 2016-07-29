@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.anomaly.task;
 
+import com.linkedin.thirdeye.anomaly.alert.AlertTaskRunner;
 import com.linkedin.thirdeye.anomaly.detection.DetectionTaskRunner;
 import com.linkedin.thirdeye.anomaly.monitor.MonitorTaskRunner;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
@@ -20,7 +21,8 @@ public class TaskRunnerFactory {
       case MONITOR:
         taskRunner = new MonitorTaskRunner();
         break;
-      case REPORTER:
+      case ALERT:
+        taskRunner = new AlertTaskRunner();
         break;
       default:
         break;

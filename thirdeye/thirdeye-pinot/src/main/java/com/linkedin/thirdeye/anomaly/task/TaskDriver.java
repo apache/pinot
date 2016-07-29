@@ -10,14 +10,13 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import org.hibernate.SessionFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
 import com.linkedin.thirdeye.db.entity.AnomalyTaskSpec;
-import com.linkedin.thirdeye.detector.db.AnomalyFunctionRelationDAO;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 
 public class TaskDriver {
@@ -29,32 +28,28 @@ public class TaskDriver {
   private AnomalyJobDAO anomalyJobDAO;
   private AnomalyTaskDAO anomalyTaskDAO;
   private AnomalyResultDAO anomalyResultDAO;
-  private AnomalyFunctionRelationDAO anomalyFunctionRelationDAO;
   private AnomalyFunctionFactory anomalyFunctionFactory;
-  private SessionFactory sessionFactory;
   private TaskContext taskContext;
+  private ThirdEyeAnomalyConfiguration thirdEyeAnomalyConfiguration;
   private long workerId;
 
   volatile boolean shutdown = false;
   private static int MAX_PARALLEL_TASK = 3;
 
-  public TaskDriver(long workerId, AnomalyJobDAO anomalyJobDAO, AnomalyTaskDAO anomalyTaskDAO,
-      AnomalyResultDAO anomalyResultDAO, AnomalyFunctionRelationDAO anomalyFunctionRelationDAO,
-      AnomalyFunctionFactory anomalyFunctionFactory, SessionFactory sessionFactory) {
-    this.workerId = workerId;
+  public TaskDriver(ThirdEyeAnomalyConfiguration thirdEyeAnomalyConfiguration, AnomalyJobDAO anomalyJobDAO,
+      AnomalyTaskDAO anomalyTaskDAO, AnomalyResultDAO anomalyResultDAO, AnomalyFunctionFactory anomalyFunctionFactory) {
+    this.workerId = thirdEyeAnomalyConfiguration.getId();
     this.anomalyTaskDAO = anomalyTaskDAO;
     this.anomalyResultDAO = anomalyResultDAO;
-    this.anomalyFunctionRelationDAO = anomalyFunctionRelationDAO;
     this.anomalyFunctionFactory = anomalyFunctionFactory;
     taskExecutorService = Executors.newFixedThreadPool(MAX_PARALLEL_TASK);
 
     taskContext = new TaskContext();
     taskContext.setAnomalyJobDAO(anomalyJobDAO);
     taskContext.setAnomalyTaskDAO(anomalyTaskDAO);
-    taskContext.setRelationDAO(anomalyFunctionRelationDAO);
     taskContext.setResultDAO(anomalyResultDAO);
     taskContext.setAnomalyFunctionFactory(anomalyFunctionFactory);
-    taskContext.setSessionFactory(sessionFactory);
+    taskContext.setThirdEyeAnomalyConfiguration(thirdEyeAnomalyConfiguration);
   }
 
   public void start() throws Exception {
