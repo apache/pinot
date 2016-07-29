@@ -12,9 +12,9 @@ public interface JobScheduler {
 
   public void stop() throws SchedulerException;
 
-  public void start(Long id) throws SchedulerException;
+  public void startJob(Long id) throws SchedulerException;
 
-  public void stop(Long id) throws SchedulerException;
+  public void stopJob(Long id) throws SchedulerException;
 
 
 }

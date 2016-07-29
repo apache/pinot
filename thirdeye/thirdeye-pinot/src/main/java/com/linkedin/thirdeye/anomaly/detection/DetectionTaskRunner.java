@@ -9,9 +9,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.lang3.StringUtils;
-import org.hibernate.Session;
-import org.hibernate.SessionFactory;
-import org.hibernate.context.internal.ManagedSessionContext;
 import org.joda.time.DateTime;
 import org.quartz.JobExecutionException;
 import org.slf4j.Logger;
@@ -34,10 +31,8 @@ import com.linkedin.thirdeye.client.timeseries.TimeSeriesRequest;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesResponse;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesResponseConverter;
 import com.linkedin.thirdeye.dashboard.Utils;
-import com.linkedin.thirdeye.db.entity.AnomalyFunctionRelation;
 import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
 import com.linkedin.thirdeye.db.entity.AnomalyResult;
-import com.linkedin.thirdeye.detector.db.AnomalyFunctionRelationDAO;
 import com.linkedin.thirdeye.detector.function.AnomalyFunction;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
@@ -53,7 +48,6 @@ public class DetectionTaskRunner implements TaskRunner {
   private TimeSeriesResponseConverter timeSeriesResponseConverter;
 
   private AnomalyResultDAO resultDAO;
-  private AnomalyFunctionRelationDAO relationDAO;
 
   private String collection;
   private List<String> collectionDimensions;
@@ -65,7 +59,6 @@ public class DetectionTaskRunner implements TaskRunner {
   private AnomalyFunction anomalyFunction;
   private AnomalyFunctionSpec anomalyFunctionSpec;
   private AnomalyFunctionFactory anomalyFunctionFactory;
-  private SessionFactory sessionFactory;
 
   public DetectionTaskRunner() {
     queryCache = CACHE_REGISTRY_INSTANCE.getQueryCache();
@@ -79,9 +72,7 @@ public class DetectionTaskRunner implements TaskRunner {
     List<TaskResult> taskResult = new ArrayList<>();
     LOG.info("Begin executing task {}", taskInfo);
     resultDAO = taskContext.getResultDAO();
-    relationDAO = taskContext.getRelationDAO();
     anomalyFunctionFactory = taskContext.getAnomalyFunctionFactory();
-    sessionFactory = taskContext.getSessionFactory();
     anomalyFunctionSpec = detectionTaskInfo.getAnomalyFunctionSpec();
     anomalyFunction = anomalyFunctionFactory.fromSpec(anomalyFunctionSpec);
     windowStart = detectionTaskInfo.getWindowStartTime();
@@ -191,27 +182,11 @@ public class DetectionTaskRunner implements TaskRunner {
 
   private List<AnomalyResult> getExistingAnomalies() {
     List<AnomalyResult> results = new ArrayList<>();
-
-    Session session = sessionFactory.openSession();
     try {
-      ManagedSessionContext.bind(session);
-
-      // The ones for this function
       results.addAll(resultDAO.findAllByCollectionTimeAndFunction(collection, windowStart,
           windowEnd, anomalyFunction.getSpec().getId()));
-
-      // The ones for any related functions
-      List<AnomalyFunctionRelation> relations =
-          relationDAO.findByParent(anomalyFunction.getSpec().getId());
-      for (AnomalyFunctionRelation relation : relations) {
-        results.addAll(resultDAO.findAllByCollectionTimeAndFunction(collection, windowStart,
-            windowEnd, relation.getChildId()));
-      }
     } catch (Exception e) {
       LOG.error("Exception in getting existing anomalies", e);
-    } finally {
-      session.close();
-      ManagedSessionContext.unbind(sessionFactory);
     }
     return results;
   }

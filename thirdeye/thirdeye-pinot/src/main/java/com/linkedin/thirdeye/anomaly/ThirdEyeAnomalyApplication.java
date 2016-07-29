@@ -79,9 +79,7 @@ public class ThirdEyeAnomalyApplication
 
         if (config.isWorker()) {
           anomalyFunctionFactory = new AnomalyFunctionFactory(config.getFunctionConfigPath());
-          taskDriver =
-              new TaskDriver(config, anomalyJobDAO, anomalyTaskDAO, anomalyResultDAO,
-                  anomalyFunctionRelationDAO, anomalyFunctionFactory, hibernateBundle.getSessionFactory());
+          taskDriver = new TaskDriver(config, anomalyJobDAO, anomalyTaskDAO, anomalyResultDAO, anomalyFunctionFactory);
           taskDriver.start();
         }
         if (config.isScheduler()) {
@@ -91,8 +89,7 @@ public class ThirdEyeAnomalyApplication
           .register(new DetectionJobResource(detectionJobScheduler, anomalyFunctionDAO));
         }
         if (config.isMonitor()) {
-          monitorJobScheduler = new MonitorJobScheduler(anomalyJobDAO, anomalyTaskDAO,
-              config.getMonitorConfiguration());
+          monitorJobScheduler = new MonitorJobScheduler(anomalyJobDAO, anomalyTaskDAO, config.getMonitorConfiguration());
           monitorJobScheduler.start();
         }
         if (config.isAlert()) {

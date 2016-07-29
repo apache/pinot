@@ -3,8 +3,6 @@ package com.linkedin.thirdeye.anomaly.alert;
 import com.linkedin.thirdeye.db.dao.EmailConfigurationDAO;
 import com.linkedin.thirdeye.db.entity.EmailConfiguration;
 
-import io.dropwizard.hibernate.UnitOfWork;
-
 import java.util.List;
 
 import javax.ws.rs.DELETE;
@@ -33,7 +31,6 @@ public class AlertJobResource {
   }
 
   @GET
-  @UnitOfWork
   public List<String> showActiveJobs() throws SchedulerException {
     return alertJobScheduler.getActiveJobs();
   }
@@ -42,14 +39,13 @@ public class AlertJobResource {
   @Path("/{id}")
   public Response enable(@PathParam("id") Long id) throws Exception {
     toggleActive(id, true);
-    alertJobScheduler.start(id);
+    alertJobScheduler.startJob(id);
     return Response.ok().build();
   }
 
 
   @POST
   @Path("/{id}/ad-hoc")
-  @UnitOfWork
   public Response adHoc(@PathParam("id") Long id, @QueryParam("start") String start,
       @QueryParam("end") String end) throws Exception {
     alertJobScheduler.runAdHoc(id, start, end);
@@ -58,10 +54,9 @@ public class AlertJobResource {
 
   @DELETE
   @Path("/{id}")
-  @UnitOfWork
   public Response disable(@PathParam("id") Long id) throws Exception {
     toggleActive(id, false);
-    alertJobScheduler.stop(id);
+    alertJobScheduler.stopJob(id);
     return Response.ok().build();
   }
 

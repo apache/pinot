@@ -62,11 +62,11 @@ public class AlertJobRunner implements Job {
     EmailConfiguration alertConfig = emailConfigurationDAO.findById(alertConfigId);
     alertJobContext.setAlertConfig(alertConfig);
 
-    String windowEndProp = alertJobContext.getWindowEndIso();
-    String windowStartProp = alertJobContext.getWindowStartIso();
+    windowEnd = alertJobContext.getWindowEnd();
+    windowStart = alertJobContext.getWindowStart();
 
     // Compute window end
-    if (windowEndProp == null) {
+    if (windowEnd == null) {
       long delayMillis = 0;
       if (alertConfig.getWindowDelay() != null) {
         delayMillis = TimeUnit.MILLISECONDS.convert(alertConfig.getWindowDelay(),
@@ -74,18 +74,14 @@ public class AlertJobRunner implements Job {
       }
       Date scheduledFireTime = jobExecutionContext.getScheduledFireTime();
       windowEnd = new DateTime(scheduledFireTime).minus(delayMillis);
-    } else {
-      windowEnd = ISODateTimeFormat.dateTimeParser().parseDateTime(windowEndProp);
     }
 
     // Compute window start
-    if (windowStartProp == null) {
+    if (windowStart == null) {
       int windowSize = alertConfig.getWindowSize();
       TimeUnit windowUnit = alertConfig.getWindowUnit();
       long windowMillis = TimeUnit.MILLISECONDS.convert(windowSize, windowUnit);
       windowStart = windowEnd.minus(windowMillis);
-    } else {
-      windowStart = ISODateTimeFormat.dateTimeParser().parseDateTime(windowStartProp);
     }
     alertJobContext.setWindowStart(windowStart);
     alertJobContext.setWindowEnd(windowEnd);

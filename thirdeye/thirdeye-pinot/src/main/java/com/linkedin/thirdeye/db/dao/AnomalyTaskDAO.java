@@ -63,7 +63,8 @@ public class AnomalyTaskDAO extends AbstractJpaDAO<AnomalyTaskSpec> {
         return true;
       }
     } catch (Exception e) {
-      LOG.info("OptimisticLockException");
+      LOG.info("OptimisticLockException while updating workerId {} and status {} for anomalyTaskId {}",
+          workerId, newStatus, id);
     }
     return false;
 

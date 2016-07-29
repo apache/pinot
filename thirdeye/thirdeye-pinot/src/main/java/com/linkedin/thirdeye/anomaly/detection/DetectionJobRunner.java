@@ -63,11 +63,11 @@ public class DetectionJobRunner implements Job {
     AnomalyFunctionSpec anomalyFunctionSpec = getAnomalyFunctionSpec(anomalyFunctionId);
     detectionJobContext.setAnomalyFunctionSpec(anomalyFunctionSpec);
 
-    String windowEndProp = detectionJobContext.getWindowEndIso();
-    String windowStartProp = detectionJobContext.getWindowStartIso();
+    windowStart = detectionJobContext.getWindowStart();
+    windowEnd = detectionJobContext.getWindowEnd();
 
     // Compute window end
-    if (windowEndProp == null) {
+    if (windowEnd == null) {
       long delayMillis = 0;
       if (anomalyFunctionSpec.getWindowDelay() != null) {
         delayMillis = TimeUnit.MILLISECONDS.convert(anomalyFunctionSpec.getWindowDelay(),
@@ -75,18 +75,14 @@ public class DetectionJobRunner implements Job {
       }
       Date scheduledFireTime = jobExecutionContext.getScheduledFireTime();
       windowEnd = new DateTime(scheduledFireTime).minus(delayMillis);
-    } else {
-      windowEnd = ISODateTimeFormat.dateTimeParser().parseDateTime(windowEndProp);
     }
 
     // Compute window start
-    if (windowStartProp == null) {
+    if (windowStart == null) {
       int windowSize = anomalyFunctionSpec.getWindowSize();
       TimeUnit windowUnit = anomalyFunctionSpec.getWindowUnit();
       long windowMillis = TimeUnit.MILLISECONDS.convert(windowSize, windowUnit);
       windowStart = windowEnd.minus(windowMillis);
-    } else {
-      windowStart = ISODateTimeFormat.dateTimeParser().parseDateTime(windowStartProp);
     }
     detectionJobContext.setWindowStart(windowStart);
     detectionJobContext.setWindowEnd(windowEnd);

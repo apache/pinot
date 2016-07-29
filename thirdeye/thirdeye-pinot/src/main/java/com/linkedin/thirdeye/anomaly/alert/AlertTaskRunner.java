@@ -29,7 +29,8 @@ import org.quartz.JobExecutionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.thirdeye.anomaly.ThirdeyeSmtpConfiguration;
+import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
+import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.task.TaskContext;
 import com.linkedin.thirdeye.anomaly.task.TaskInfo;
 import com.linkedin.thirdeye.anomaly.task.TaskResult;
@@ -73,8 +74,7 @@ public class AlertTaskRunner implements TaskRunner {
   private EmailConfiguration alertConfig;
   private DateTime windowStart;
   private DateTime windowEnd;
-  private ThirdeyeSmtpConfiguration smtpConfiguration;
-  private String dashboardHost;
+  private ThirdEyeAnomalyConfiguration thirdeyeConfig;
 
   private QueryCache queryCache;
   private TimeOnTimeComparisonHandler timeOnTimeComparisonHandler;
@@ -96,8 +96,7 @@ public class AlertTaskRunner implements TaskRunner {
     alertConfig = alertTaskInfo.getAlertConfig();
     windowStart = alertTaskInfo.getWindowStartTime();
     windowEnd = alertTaskInfo.getWindowEndTime();
-    smtpConfiguration = taskContext.getThirdEyeAnomalyConfiguration().getSmtpConfiguration();
-    dashboardHost = taskContext.getThirdEyeAnomalyConfiguration().getDashboardHost();
+    thirdeyeConfig = taskContext.getThirdEyeAnomalyConfiguration();
 
     try {
       LOG.info("Begin executing task {}", taskInfo);
@@ -192,7 +191,7 @@ public class AlertTaskRunner implements TaskRunner {
       templateData.put("metric", metric);
       templateData.put("filters", filtersJsonEncoded);
       templateData.put("windowUnit", windowUnit);
-      templateData.put("dashboardHost", dashboardHost);
+      templateData.put("dashboardHost", thirdeyeConfig.getDashboardHost());
 
       Template template = freemarkerConfig.getTemplate("simple-anomaly-report.ftl");
       template.process(templateData, out);
@@ -206,7 +205,8 @@ public class AlertTaskRunner implements TaskRunner {
       String alertEmailSubject = String.format("Anomaly Alert!: %d anomalies detected for %s:%s",
           results.size(), collectionAlias, alertConfig.getMetric());
       String alertEmailHtml = new String(baos.toByteArray(), CHARSET);
-      AlertJobUtils.sendEmailWithHtml(smtpConfiguration, alertEmailSubject, alertEmailHtml);
+      AlertJobUtils.sendEmailWithHtml(email, thirdeyeConfig.getSmtpConfiguration(), alertEmailSubject, alertEmailHtml,
+          alertConfig.getFromAddress(), alertConfig.getToAddresses());
 
     } catch (Exception e) {
       throw new JobExecutionException(e);
@@ -383,7 +383,8 @@ public class AlertTaskRunner implements TaskRunner {
   }
 
   private void sendFailureEmail(Throwable t) throws JobExecutionException {
-    
+
+    HtmlEmail email = new HtmlEmail();
     String collection = alertConfig.getCollection();
     String metric = alertConfig.getMetric();
 
@@ -392,7 +393,8 @@ public class AlertTaskRunner implements TaskRunner {
     String textBody =
         String.format("%s%n%nException:%s", alertConfig.toString(), ExceptionUtils.getStackTrace(t));
     try {
-      AlertJobUtils.sendEmailWithTextBody(smtpConfiguration, subject, textBody);
+      AlertJobUtils.sendEmailWithTextBody(email, thirdeyeConfig.getSmtpConfiguration(), subject, textBody,
+          thirdeyeConfig.getFailureFromAddress(), thirdeyeConfig.getFailureToAddress());
     } catch (EmailException e) {
       throw new JobExecutionException(e);
     }

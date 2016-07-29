@@ -6,32 +6,29 @@ import org.apache.commons.mail.HtmlEmail;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.thirdeye.anomaly.ThirdeyeSmtpConfiguration;
+import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
 
 public class AlertJobUtils {
   public static final String EMAIL_ADDRESS_SEPARATOR = ",";
   private static final Logger LOG = LoggerFactory.getLogger(AlertJobUtils.class);
 
-  public static void sendEmailWithTextBody(ThirdeyeSmtpConfiguration smtpConfigutation, String subject,
-      String textBody) throws EmailException {
-    HtmlEmail email = new HtmlEmail();
-    email.setSubject(subject);
+  public static void sendEmailWithTextBody(HtmlEmail email, SmtpConfiguration smtpConfigutation, String subject,
+      String textBody, String fromAddress, String toAddress) throws EmailException {
     email.setTextMsg(textBody);
-    sendEmail(smtpConfigutation, email);
+    sendEmail(smtpConfigutation, email, subject, fromAddress, toAddress);
   }
 
-  public static void sendEmailWithHtml(ThirdeyeSmtpConfiguration smtpConfiguration, String subject,
-      String htmlBody) throws EmailException {
-    HtmlEmail email = new HtmlEmail();
-    email.setSubject(subject);
+  public static void sendEmailWithHtml(HtmlEmail email, SmtpConfiguration smtpConfiguration, String subject,
+      String htmlBody, String fromAddress, String toAddress) throws EmailException {
     email.setHtmlMsg(htmlBody);
-    sendEmail(smtpConfiguration, email);
+    sendEmail(smtpConfiguration, email, subject, fromAddress, toAddress);
   }
 
-  /** Sends email according to the provided config. This method does not support html emails. */
-  private static void sendEmail(ThirdeyeSmtpConfiguration config, HtmlEmail email) throws EmailException {
+  /** Sends email according to the provided config. */
+  private static void sendEmail(SmtpConfiguration config, HtmlEmail email, String subject, String fromAddress, String toAddress) throws EmailException {
     if (config != null) {
-      LOG.info("Sending email to {}", config.getToAddresses());
+      email.setSubject(subject);
+      LOG.info("Sending email to {}", toAddress);
       email.setHostName(config.getSmtpHost());
       email.setSmtpPort(config.getSmtpPort());
       if (config.getSmtpUser() != null && config.getSmtpPassword() != null) {
@@ -39,9 +36,9 @@ public class AlertJobUtils {
             new DefaultAuthenticator(config.getSmtpUser(), config.getSmtpPassword()));
         email.setSSLOnConnect(true);
       }
-      email.setFrom(config.getFromAddress());
-      for (String toAddress : config.getToAddresses().split(EMAIL_ADDRESS_SEPARATOR)) {
-        email.addTo(toAddress);
+      email.setFrom(fromAddress);
+      for (String address : toAddress.split(EMAIL_ADDRESS_SEPARATOR)) {
+        email.addTo(address);
       }
       email.send();
       LOG.info("Sent!");

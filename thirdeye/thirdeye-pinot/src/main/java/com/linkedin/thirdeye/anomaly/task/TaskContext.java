@@ -1,7 +1,5 @@
 package com.linkedin.thirdeye.anomaly.task;
 
-import org.hibernate.SessionFactory;
-
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.db.dao.AnomalyJobDAO;
 import com.linkedin.thirdeye.db.dao.AnomalyResultDAO;
@@ -14,9 +12,7 @@ public class TaskContext {
   private AnomalyJobDAO anomalyJobDAO;
   private AnomalyTaskDAO anomalyTaskDAO;
   private AnomalyResultDAO resultDAO;
-  private AnomalyFunctionRelationDAO relationDAO;
   private AnomalyFunctionFactory anomalyFunctionFactory;
-  private SessionFactory sessionFactory;
   private ThirdEyeAnomalyConfiguration thirdEyeAnomalyConfiguration;
 
 
@@ -44,24 +40,11 @@ public class TaskContext {
   public void setResultDAO(AnomalyResultDAO resultDAO) {
     this.resultDAO = resultDAO;
   }
-  public AnomalyFunctionRelationDAO getRelationDAO() {
-    return relationDAO;
-  }
-  public void setRelationDAO(AnomalyFunctionRelationDAO relationDAO) {
-    this.relationDAO = relationDAO;
-  }
   public AnomalyFunctionFactory getAnomalyFunctionFactory() {
     return anomalyFunctionFactory;
   }
   public void setAnomalyFunctionFactory(AnomalyFunctionFactory anomalyFunctionFactory) {
     this.anomalyFunctionFactory = anomalyFunctionFactory;
   }
-  public SessionFactory getSessionFactory() {
-    return sessionFactory;
-  }
-  public void setSessionFactory(SessionFactory sessionFactory) {
-    this.sessionFactory = sessionFactory;
-  }
-
 
 }

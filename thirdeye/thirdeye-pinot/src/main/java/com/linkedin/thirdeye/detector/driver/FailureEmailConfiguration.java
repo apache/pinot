@@ -83,8 +83,7 @@ public class FailureEmailConfiguration {
   @Override
   public String toString() {
     return MoreObjects.toStringHelper(this).add("fromAddress", fromAddress).add("toAddresses", toAddresses)
-        .add("smtpHost", smtpHost).add("smtpPort", smtpPort).add("smtpUser", smtpUser)
-        .add("smtpPassword", smtpPassword).toString();
+        .add("smtpHost", smtpHost).add("smtpPort", smtpPort).add("smtpUser", smtpUser).toString();
   }
 
 }

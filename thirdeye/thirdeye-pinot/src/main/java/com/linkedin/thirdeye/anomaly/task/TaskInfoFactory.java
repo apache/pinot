@@ -31,6 +31,7 @@ public class TaskInfoFactory {
           taskInfo = OBJECT_MAPPER.readValue(taskInfoString, DetectionTaskInfo.class);
           break;
         case MERGE:
+          LOG.error("TaskType MERGE not supported");
           break;
         case MONITOR:
           taskInfo = OBJECT_MAPPER.readValue(taskInfoString, MonitorTaskInfo.class);
@@ -39,6 +40,7 @@ public class TaskInfoFactory {
           taskInfo = OBJECT_MAPPER.readValue(taskInfoString, AlertTaskInfo.class);
           break;
         default:
+          LOG.error("TaskType must be one of ANOMALY_DETECTION, MONITOR, ALERT");
           break;
       }
     } catch (Exception e) {

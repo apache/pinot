@@ -10,8 +10,10 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
   private boolean alert = false;
   private long id;
   private String dashboardHost;
-  private ThirdeyeSmtpConfiguration smtpConfiguration;
+  private SmtpConfiguration smtpConfiguration;
   private MonitorConfiguration monitorConfiguration = new MonitorConfiguration();
+  private String failureFromAddress;
+  private String failureToAddress;
 
   public String getDashboardHost() {
     return dashboardHost;
@@ -69,13 +71,28 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
     this.alert = alert;
   }
 
-  public ThirdeyeSmtpConfiguration getSmtpConfiguration() {
+  public SmtpConfiguration getSmtpConfiguration() {
     return smtpConfiguration;
   }
 
-  public void setSmtpConfiguration(ThirdeyeSmtpConfiguration smtpConfiguration) {
+  public void setSmtpConfiguration(SmtpConfiguration smtpConfiguration) {
     this.smtpConfiguration = smtpConfiguration;
   }
 
+  public String getFailureFromAddress() {
+    return failureFromAddress;
+  }
+
+  public void setFailureFromAddress(String failureFromAddress) {
+    this.failureFromAddress = failureFromAddress;
+  }
+
+  public String getFailureToAddress() {
+    return failureToAddress;
+  }
+
+  public void setFailureToAddress(String failureToAddress) {
+    this.failureToAddress = failureToAddress;
+  }
 
 }

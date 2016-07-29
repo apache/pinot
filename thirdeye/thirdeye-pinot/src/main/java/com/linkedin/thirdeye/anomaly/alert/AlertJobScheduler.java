@@ -7,6 +7,9 @@ import com.linkedin.thirdeye.db.dao.EmailConfigurationDAO;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.commons.lang3.StringUtils;
+import org.joda.time.DateTime;
+import org.joda.time.format.ISODateTimeFormat;
 import org.quartz.CronScheduleBuilder;
 import org.quartz.CronTrigger;
 import org.quartz.JobBuilder;
@@ -87,7 +90,7 @@ public class AlertJobScheduler implements JobScheduler {
     quartzScheduler.shutdown();
   }
 
-  public void start(Long id) throws SchedulerException {
+  public void startJob(Long id) throws SchedulerException {
     EmailConfiguration alertConfig = emailConfigurationDAO.findById(id);
     if (alertConfig == null) {
       throw new IllegalArgumentException("No alert config with id " + id);
@@ -110,7 +113,7 @@ public class AlertJobScheduler implements JobScheduler {
     scheduleJob(alertJobContext, alertConfig);
   }
 
-  public void stop(Long id) throws SchedulerException {
+  public void stopJob(Long id) throws SchedulerException {
     String jobKey = getJobKey(id);
     if (!quartzScheduler.checkExists(JobKey.jobKey(jobKey))) {
       throw new IllegalStateException("Cannot stop alert config with id " + id + ", it has not been scheduled");
@@ -136,9 +139,12 @@ public class AlertJobScheduler implements JobScheduler {
     alertJobContext.setEmailConfigurationDAO(emailConfigurationDAO);
     alertJobContext.setAlertConfigId(id);
     alertJobContext.setJobName(jobKey);
-    alertJobContext.setWindowStartIso(windowStartIso);
-    alertJobContext.setWindowEndIso(windowEndIso);
-
+    if (StringUtils.isNotBlank(windowStartIso)) {
+      alertJobContext.setWindowStart(ISODateTimeFormat.dateTimeParser().parseDateTime(windowStartIso));
+    }
+    if (StringUtils.isNotBlank(windowEndIso)) {
+      alertJobContext.setWindowEnd(ISODateTimeFormat.dateTimeParser().parseDateTime(windowEndIso));
+    }
     job.getJobDataMap().put(AlertJobRunner.ALERT_JOB_CONTEXT, alertJobContext);
 
     try {
