@@ -459,4 +459,19 @@
     </addColumn>
    </changeSet>
 
+  <changeSet id="17" author="pjaiswal">
+    <dropTable tableName="anomaly_function_relations" />
+    <createTable tableName="anomaly_function_relations">
+      <column name="id" autoIncrement="true" type="bigint">
+        <constraints primaryKey="true" nullable="false"/>
+      </column>
+      <column name="parent_id" type="bigint" >
+        <constraints foreignKeyName="fk_anomaly_function_parent" references="anomaly_functions(id)" />
+      </column>
+      <column name="child_id" type="bigint">
+        <constraints foreignKeyName="fk_anomaly_function_child" references="anomaly_functions(id)" />
+      </column>
+    </createTable>
+  </changeSet>
+
 </databaseChangeLog>

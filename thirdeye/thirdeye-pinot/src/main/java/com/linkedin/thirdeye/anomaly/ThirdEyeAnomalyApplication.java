@@ -1,9 +1,7 @@
 package com.linkedin.thirdeye.anomaly;
 
 import io.dropwizard.assets.AssetsBundle;
-import io.dropwizard.db.DataSourceFactory;
 import io.dropwizard.lifecycle.Managed;
-import io.dropwizard.migrations.MigrationsBundle;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
 
@@ -55,13 +53,6 @@ public class ThirdEyeAnomalyApplication
 
   @Override
   public void initialize(final Bootstrap<ThirdEyeAnomalyConfiguration> bootstrap) {
-    bootstrap.addBundle(new MigrationsBundle<ThirdEyeAnomalyConfiguration>() {
-      @Override
-      public DataSourceFactory getDataSourceFactory(ThirdEyeAnomalyConfiguration config) {
-        return config.getDatabase();
-      }
-    });
-    bootstrap.addBundle(hibernateBundle);
     bootstrap.addBundle(new AssetsBundle("/assets/", "/", "index.html"));
   }
 
@@ -70,7 +61,7 @@ public class ThirdEyeAnomalyApplication
       throws Exception {
 
     LOG.info("Starting ThirdeyeAnomalyApplication : Scheduler {} Worker {}", config.isScheduler(), config.isWorker());
-    super.initDetectorRelatedDAO();
+    super.initDAOs();
     ThirdEyeCacheRegistry.initializeDetectorCaches(config);
 
     environment.lifecycle().manage(new Managed() {
@@ -117,5 +108,4 @@ public class ThirdEyeAnomalyApplication
       }
     });
   }
-
 }

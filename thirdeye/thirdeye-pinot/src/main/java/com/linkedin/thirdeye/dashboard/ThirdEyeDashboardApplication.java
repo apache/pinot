@@ -40,7 +40,7 @@ public class ThirdEyeDashboardApplication
 
   @Override
   public void run(ThirdEyeDashboardConfiguration config, Environment env) throws Exception {
-    super.initDashboardRelatedDAO();
+    super.initDAOs();
     try {
       ThirdEyeCacheRegistry.initializeWebappCaches(config);
     } catch (Exception e) {

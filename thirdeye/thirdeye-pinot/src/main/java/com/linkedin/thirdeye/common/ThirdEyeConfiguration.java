@@ -35,21 +35,6 @@ public abstract class ThirdEyeConfiguration extends Configuration {
   private String smtpHost = "";
   private int smtpPort = 0;
 
-
-  // TODO : remove data source config
-  @Valid
-  @NotNull
-  private final DataSourceFactory database = new DataSourceFactory();
-
-  public ThirdEyeConfiguration() {
-
-  }
-
-  @JsonProperty("database")
-  public DataSourceFactory getDatabase() {
-    return database;
-  }
-
   public String getRootDir() {
     return rootDir;
   }
