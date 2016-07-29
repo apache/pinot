@@ -1,11 +1,10 @@
-package com.linkedin.thirdeye.client.pinot.summary;
+package com.linkedin.thirdeye.client.pinot.slsummary;
 
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.List;
 
-import com.linkedin.thirdeye.client.pinot.slsummary.DPArray;
 
 public class Summary {
   double Ga;
@@ -24,10 +23,10 @@ public class Summary {
 
     BitSet ans = dp.getAnswer();
 //    for (int i = ans.nextSetBit(0); i >= 0; i = ans.nextSetBit(i + 1)) {
-    for (int i = 0; i < cube.getRowCount(); ++i) {
-      if (ans.get(i)) this.resRecords.add(new Cell(cube.getRowAt(i)));
+    for (int i = 0; i < cube.size(); ++i) {
+      if (ans.get(i)) this.resRecords.add(new Cell(cube.get(i)));
       else {
-        this.totalCost += CostFunction.err(cube.getRowAt(i).getBaselineValue(), cube.getRowAt(i).getCurrentValue(), this.Rg);
+        this.totalCost += SummaryCalculator.err(cube.get(i).metricA, cube.get(i).metricB, this.Rg);
       }
     }
   }
@@ -67,7 +66,7 @@ public class Summary {
     StringBuilder sb = res;
     for (Cell cell : resRecords) {
       sb = dir & (Double.compare(1.0, cell.ratio) <= 0) ? res : nres;
-      sb.append(String.format(dimensionSpace, cell.dimensionName.toString() + '/' + cell.dimensionValue));
+      sb.append(String.format(dimensionSpace, cell.dimensionName + '/' + cell.dimensionValue));
       sb.append('\t');
       sb.append(String.format(metricSpace, (int) cell.metricA));
       sb.append('\t');
@@ -83,18 +82,18 @@ public class Summary {
   }
 
   static class Cell {
-    Dimensions dimensionName;
-    DimensionValues dimensionValue;
+    String dimensionName;
+    String dimensionValue;
     double metricA;
     double metricB;
     double ratio;
 
-    Cell(Row record) {
-      this.dimensionName = record.dimensions;
-      this.dimensionValue = record.dimensionValues;
-      this.metricA = record.baselineValue;
-      this.metricB = record.currentValue;
-      this.ratio = record.currentValue / record.baselineValue;
+    Cell(Record record) {
+      this.dimensionName = record.dimensionName;
+      this.dimensionValue = record.dimensionValue;
+      this.metricA = record.metricA;
+      this.metricB = record.metricB;
+      this.ratio = record.metricB / record.metricA;
     }
   }
 }

@@ -5,87 +5,127 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
+import org.apache.commons.lang3.tuple.MutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkedin.thirdeye.client.ThirdEyeResponse;
 
 
-// TODO: The cube should be queried from the backend database during runtime.
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class Cube { // the cube (Ca|Cb)
-  private double ga; // sum of all ta
-  private double gb; // sum of all tb
-  private double rg; // global ratio, i.e., gb / ga
+  @JsonProperty("dimensions")
+  Dimensions dimensions;
 
-  @JsonProperty("records")
-  private List<Record> records = new ArrayList<Record>();
+  private double topBaselineValue; // aggregated baseline values
+  private double topCurrentValue; // aggregated current values
+  private double topRatio; // change ratio = topCurrentValue / topBaselineValue
 
-  public void setGlobalInfo(ThirdEyeResponse responseGa, ThirdEyeResponse responseGb, int multiplier) {
-    this.ga = responseGa.getRow(0).getMetrics().get(0) * multiplier;
-    this.gb = responseGb.getRow(0).getMetrics().get(0) * multiplier;
-    this.rg = this.gb / this.ga;
+  @JsonProperty("rows")
+  private List<Row> rows = new ArrayList<Row>();
+
+  public double getTopBaselineValue() {
+    return topBaselineValue;
   }
 
-  public void addRecordForOneDimension(String dimensionName, ThirdEyeResponse responseTa,
-      ThirdEyeResponse responseTb) {
-    Map<String, Integer> recordTable = new HashMap<>();
+  public double getTopCurrentValue() {
+    return topCurrentValue;
+  }
 
-    for (int i = 0; i < responseTa.getNumRows(); ++i) {
-      Record record = new Record();
-      record.dimensionName = dimensionName;
-      record.dimensionValue = responseTa.getRow(i).getDimensions().get(0);
-      record.metricA = responseTa.getRow(i).getMetrics().get(0);
-      recordTable.put(record.dimensionValue, records.size());
-      records.add(record);
+  public double getTopRatio() {
+    return topRatio;
+  }
+
+  public int getRowCount() {
+    return rows.size();
+  }
+
+  public Row getRowAt(int index) {
+    return rows.get(index);
+  }
+
+  public void setGlobalInfo(Double responseGa, Double responseGb, int multiplier) {
+    this.topBaselineValue = responseGa * multiplier;
+    this.topCurrentValue = responseGb * multiplier;
+    this.topRatio = this.topCurrentValue / this.topBaselineValue;
+  }
+
+  public void buildFromOALPDataBase(OLAPDataBaseClient olapClient, Dimensions dimensions) {
+    // Calculate the change ratio of the top aggregated values
+    Pair<Double, Double> topAggValues = olapClient.getTopAggregatedValues();
+    topBaselineValue = topAggValues.getLeft();
+    topCurrentValue = topAggValues.getRight();
+    topRatio = topCurrentValue / topBaselineValue;
+
+    this.dimensions = sortDimensionLevel(olapClient, topRatio, dimensions);
+
+    // Get the rows at each level and sort them in the post-order of their hierarchical relationship,
+    // in which a parent row aggregates the details rows under it. For instance, in the following
+    // hierarchy row b aggregates rows d and e, and row a aggregates rows b and c.
+    //                   a
+    //                  / \
+    //                 b   c
+    //                / \   \
+    //               d   e   f
+    // The Comparator for generating the order is implemented in the class DimensionValues.
+    long startTime = System.currentTimeMillis();
+    for (int i = this.dimensions.size(); i > 0; --i) {
+      rows.addAll(olapClient.getAggregatedValuesAtLevel(this.dimensions, i));
     }
+    long endTime = System.currentTimeMillis();
+    System.out.println("Data preparation time: " + (endTime - startTime));
+    System.out.println("# rows: " + rows.size());
+    rows.sort(new RowDimensionValuesComparator());
+    //    System.out.println(rows);
+  }
 
-    for (int i = 0; i < responseTb.getNumRows(); ++i) {
-      String dimensionValue = responseTb.getRow(i).getDimensions().get(0);
-      if (recordTable.containsKey(dimensionValue)) {
-        int idx = recordTable.get(dimensionValue);
-        records.get(idx).metricB = responseTb.getRow(i).getMetrics().get(0);
-      } else {
-        Record record = new Record();
-        record.dimensionName = dimensionName;
-        record.dimensionValue = dimensionValue;
-        record.metricB = responseTb.getRow(i).getMetrics().get(0);
-        records.add(record);
+  /**
+   * Sort the rows in the post-order of their hierarchical relationship
+   */
+  private static class RowDimensionValuesComparator implements Comparator<Row> {
+    @Override
+    public int compare(Row r1, Row r2) {
+      return r1.dimensionValues.compareTo(r2.dimensionValues);
+    }
+  }
+
+  /**
+   * Sort dimensions according to their cost, which is the sum of the error for aggregating all its children rows.
+   * Dimensions with larger error is sorted in the front of the list.
+   */
+  private static Dimensions sortDimensionLevel(OLAPDataBaseClient olapClient, double topRatio, Dimensions dimensions) {
+    // Calculate the cost of each dimension
+    List<Pair<Double, String>> costOfDimensionPairs = new ArrayList<>(dimensions.size());
+    for (int i = 0; i < dimensions.size(); ++i) {
+      List<Pair<Double, Double>> wowValuesInOneDimension =
+          olapClient.getAggregatedValuesInOneDimension(dimensions.get(i));
+      MutablePair<Double, String> costOfDimensionPair = new MutablePair<>();
+      costOfDimensionPair.setRight(dimensions.get(i));
+      double tmpCost = .0;
+      for (int j = 0; j < wowValuesInOneDimension.size(); ++j) {
+        Pair<Double, Double> wowValues = wowValuesInOneDimension.get(j);
+        tmpCost += CostFunction.err(wowValues.getLeft(), wowValues.getRight(), topRatio);
       }
+      costOfDimensionPair.setLeft(tmpCost);
+      costOfDimensionPairs.add(costOfDimensionPair);
     }
-  }
 
-  public int size() {
-    return records.size();
-  }
+    // Create a new Dimension instance whose dimensions follow the calculated order
+    Collections.sort(costOfDimensionPairs, Collections.reverseOrder());
+    List<String> sortedDimensionsList = new ArrayList<>(costOfDimensionPairs.size());
+    System.out.println("Dimension order:");
+    for (int i = 0; i < costOfDimensionPairs.size(); ++i) {
+      sortedDimensionsList.add(costOfDimensionPairs.get(i).getRight());
+      System.out.print("  Dimension: " + costOfDimensionPairs.get(i).getRight() + ", Cost: ");
+      System.out.println(costOfDimensionPairs.get(i).getLeft());
+    }
 
-  public Record get(int idx) {
-    return records.get(idx);
-  }
-
-  public void addRecord(Record record) {
-    this.records.add(record);
-  }
-
-  public void sort(Comparator<Record> comparator) {
-    Collections.sort(records, comparator);
-  }
-
-  public double getRg() {
-    return rg;
-  }
-
-  public double getGa() {
-    return ga;
-  }
-
-  public double getGb() {
-    return gb;
+    return new Dimensions(sortedDimensionsList);
   }
 
   public void toJson(String fileName) throws IOException {
@@ -97,9 +137,9 @@ public class Cube { // the cube (Ca|Cb)
   }
 
   public void removeEmptyRecords() {
-    for (int i = records.size() - 1; i >= 0; --i) {
-      if (Double.compare(records.get(i).metricA, .0) == 0 || Double.compare(records.get(i).metricB, .0) == 0) {
-        records.remove(i);
+    for (int i = rows.size() - 1; i >= 0; --i) {
+      if (Double.compare(rows.get(i).baselineValue, .0) == 0 || Double.compare(rows.get(i).currentValue, .0) == 0) {
+        rows.remove(i);
       }
     }
   }

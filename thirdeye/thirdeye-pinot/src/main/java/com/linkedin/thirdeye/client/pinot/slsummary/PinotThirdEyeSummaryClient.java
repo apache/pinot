@@ -1,4 +1,6 @@
-package com.linkedin.thirdeye.client.pinot.summary;
+package com.linkedin.thirdeye.client.pinot.slsummary;
+
+import com.linkedin.thirdeye.constant.MetricAggFunction;
 
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
@@ -13,18 +15,17 @@ import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.client.ThirdEyeRequest.ThirdEyeRequestBuilder;
 import com.linkedin.thirdeye.client.ThirdEyeResponse;
 import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClientConfig;
-import com.linkedin.thirdeye.client.pinot.summary.calculator.SummaryCalculator;
 import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
 import com.linkedin.thirdeye.dashboard.ThirdEyeDashboardConfiguration;
 
 
-public class PinotThirdEyeSummaryConnector {
-  private final static String oFileName = "Cube.json";
+public class PinotThirdEyeSummaryClient {
+  private final static String oFileName = "SLCube.json";
 
   public static void main(String[] argc) throws Exception {
     boolean dumpCubeToFile = true;
     String collection = "thirdeyeKbmi";
-    String metricName = "pageViews";
+    String metricName = "desktopPageViews";
     String[] dimensionNames = { "continent", "countryCode", "environment", "osName", "deviceName" };
     DateTime baselineStart = new DateTime(2016, 7, 5, 21, 00);
     TimeGranularity timeGranularity = new TimeGranularity(1, TimeUnit.HOURS);
@@ -47,7 +48,7 @@ public class PinotThirdEyeSummaryConnector {
     // query for testing
     ThirdEyeRequestBuilder builder = new ThirdEyeRequestBuilder();
     builder.setCollection(collection);
-    builder.setMetricFunctions(Lists.newArrayList(new MetricFunction("SUM", metricName)));
+    builder.setMetricFunctions(Lists.newArrayList(new MetricFunction(MetricAggFunction.SUM, metricName)));
     builder.setGroupByTimeGranularity(timeGranularity);
 
     // Ga

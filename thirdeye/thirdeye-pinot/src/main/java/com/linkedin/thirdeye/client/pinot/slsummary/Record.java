@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.client.pinot.summary;
+package com.linkedin.thirdeye.client.pinot.slsummary;
 
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
