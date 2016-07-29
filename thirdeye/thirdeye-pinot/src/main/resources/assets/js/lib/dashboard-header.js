@@ -1,17 +1,17 @@
 /** HEADER related eventlisteners **/
 
-$("#main-view").on("click",".header-tab", function(){
+$("#main-view").on("click", ".header-tab", function () {
     switchHeaderTab(this)
 });
 
-function switchHeaderTab(target){
+function switchHeaderTab(target) {
     radioButtons(target)
     hash.view = $(target).attr("rel");
 
-    if(hash.view == "self-service"){
+    if (hash.view == "self-service") {
 
         //Clear hash, only keep dataset & view as those are required to display the view
-        if(hash.dataset){
+        if (hash.dataset) {
             var dataset = hash.dataset;
             hash = {}
             hash.dataset = dataset;
@@ -23,7 +23,7 @@ function switchHeaderTab(target){
 
             getExistingAnomalyFunctions(hash.dataset);
 
-        }else{
+        } else {
             getExistingAnomalyFunctions();
         }
         renderSelfService();

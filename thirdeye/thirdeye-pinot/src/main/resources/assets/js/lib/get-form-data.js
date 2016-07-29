@@ -1,16 +1,18 @@
-function getDataSetList(){
+function getDataSetList() {
 
     var url = "/dashboard/data/datasets";
-    getData(url).done( function(data){
-        validateFormData(data,"No dataset list arrived from the server.", "datasets" )
+    getData(url).done(function (data) {
+        validateFormData(data, "No dataset list arrived from the server.", "datasets")
 
         //cache the data
-        window.sessionStorage.setItem('datasetList', JSON.stringify(data) );
+        window.sessionStorage.setItem('datasetList', JSON.stringify(data));
 
         /* Handelbars template for dataset dropdowns */
         var queryFormDatasetData = {data: data}
         var result_datasets_template = HandleBarsTemplates.template_datasets(queryFormDatasetData);
-        $(".landing-dataset").each(function(){ $(this).html(result_datasets_template)});
+        $(".landing-dataset").each(function () {
+            $(this).html(result_datasets_template)
+        });
 
         $(".selected-dataset").text("Select dataset");
 
@@ -30,12 +32,12 @@ function getDataSetList(){
 /** GET DATASET LIST RELATED METHODS **/
 
 //takes the data the message
-function validateFormData(data, message, errorSource ){
+function validateFormData(data, message, errorSource) {
     var errorMessage = $(".time-input-form-error p");
     var errorAlert = $(".time-input-form-error");
 
     if (!data) {
-        errorMessage.html(  message + " Error: data = " + data);
+        errorMessage.html(message + " Error: data = " + data);
         errorAlert.fadeIn(100);
         errorAlert.attr("data-error-source", errorSource);
         return
@@ -44,7 +46,7 @@ function validateFormData(data, message, errorSource ){
     }
 }
 
-function getAllFormData(){
+function getAllFormData() {
 
     //Todo: remove these 2 global variables and work with $.when and deferreds
     window.responseDataPopulated = 0;
@@ -56,17 +58,17 @@ function getAllFormData(){
     getDimensionNValueList();
 }
 
-function getDashboardList(){
+function getDashboardList() {
 
     //Till the endpoint is ready no ajax call is triggered and works with  hardcoded data in local data variable
     var url = "/dashboard/data/dashboards?dataset=" + hash.dataset;
 
-    getData(url).done( function(data){
+    getData(url).done(function (data) {
 
         /* Create dashboard dropdown */
         var dashboardListHtml = "";
-        for(var i= 0, len = data.length; i<len; i++){
-            dashboardListHtml += "<li class='dashboard-option' rel='dashboard' value='"+ data[i] +"'><a href='#'>"+ data[i] +"</a></li>";
+        for (var i = 0, len = data.length; i < len; i++) {
+            dashboardListHtml += "<li class='dashboard-option' rel='dashboard' value='" + data[i] + "'><a href='#'>" + data[i] + "</a></li>";
         }
         $("#dashboard-list").html(dashboardListHtml);
         $("#selected-dashboard").text("Select dashboard");
@@ -83,14 +85,16 @@ function getMetricList() {
 
     getData(url).done(function (data) {
 
-        validateFormData(data, "No metrics available in the server." , "metrics" )
+        validateFormData(data, "No metrics available in the server.", "metrics")
 
         window.datasetConfig.datasetMetrics = data;
 
         /* Handelbars template for query form multi select metric list */
-        var queryFormMetricListData = {data: data, singleMetricSelector: false};
+        var queryFormMetricListData = {data: data};
         var result_query_form_metric_list_template = HandleBarsTemplates.template_metric_list(queryFormMetricListData);
-        $(".metric-list").each(function(){ $(this).html(result_query_form_metric_list_template )});
+        $(".metric-list").each(function () {
+            $(this).html(result_query_form_metric_list_template)
+        });
 
         window.responseDataPopulated++
         formComponentPopulated()
@@ -100,22 +104,23 @@ function getMetricList() {
 function getAnomalyMetricList() {
 
     //Create metric dropdown
-        var url = "/dashboard/anomalies/metrics?dataset=" + hash.dataset;
+    var url = "/dashboard/anomalies/metrics?dataset=" + hash.dataset;
 
     getData(url).done(function (data) {
 
-       validateFormData(data, "No metrics available in the server." , "anomaly metrics" )
+        validateFormData(data, "No metrics available in the server.", "anomaly metrics")
 
-       /* Handelbars template for query form single select metric list on anomaly view */
-       var queryFormMetricListData = {data: data, singleMetricSelector: true};
-       var result_query_form_metric_list_template = HandleBarsTemplates.template_metric_list(queryFormMetricListData);
-       $(".single-metric-list").each(function(){ $(this).html(result_query_form_metric_list_template )});
+        /* Handelbars template for query form single select metric list on anomaly view */
+        var queryFormMetricListData = {data: data};
+        var result_query_form_metric_list_template = HandleBarsTemplates.template_metric_list(queryFormMetricListData);
+        $(".single-metric-list").each(function () {
+            $(this).html(result_query_form_metric_list_template)
+        });
 
-       window.responseDataPopulated++
-       formComponentPopulated()
+        window.responseDataPopulated++
+        formComponentPopulated()
     });
 }
-
 
 
 function getDimensionNValueList() {
@@ -124,8 +129,7 @@ function getDimensionNValueList() {
     var url = "/dashboard/data/filters?dataset=" + hash.dataset;
     getData(url).done(function (data) {
 
-        validateFormData(data, "No dimension or dimension values available." , "filters" )
-
+        validateFormData(data, "No dimension or dimension values available.", "filters")
 
 
         /* Create dimensions and filter dimensions dropdown */
@@ -147,14 +151,14 @@ function getDimensionNValueList() {
 
         /* Handelbars template for dimensionvalues in filter dropdown */
         var result_filter_dimension_value_template = HandleBarsTemplates.template_filter_dimension_value(data)
-        $(".dimension-filter").each(function(){
+        $(".dimension-filter").each(function () {
             $(this).after(result_filter_dimension_value_template)
         });
 
 
-        $(".filter-dimension-option:first-of-type").each(function(){
+        $(".filter-dimension-option:first-of-type").each(function () {
             $(this).click();
-            $(".radio-options",this).click();
+            $(".radio-options", this).click();
         });
 
 
@@ -171,18 +175,18 @@ function getDatasetConfig() {
 
     getData(url).done(function (data) {
 
-        validateFormData(data, "No dataset config info available." , "info" )
+        validateFormData(data, "No dataset config info available.", "info")
 
         /** MIN MAX DATE TIME **/
 
-        //global
+            //global
         window.datasetConfig.maxMillis = parseInt(data["maxTime"]);
         var maxMillis = window.datasetConfig.maxMillis
 
         var currentStartDateTime = moment(maxMillis).add(-1, 'days');
 
         //If time granularity is DAYS have default 7 days in the time selector on pageload
-        if(data["dataGranularity"] && data["dataGranularity"] == "DAYS"){
+        if (data["dataGranularity"] && data["dataGranularity"] == "DAYS") {
             currentStartDateTime = moment(maxMillis).add(-7, 'days')
         }
 
@@ -190,7 +194,7 @@ function getDatasetConfig() {
         var currentStartTimeString = currentStartDateTime.format("HH" + ":00");
 
         //If time granularity is DAYS have default 12am on pageload
-        if(data["dataGranularity"] && data["dataGranularity"] == "DAYS"){
+        if (data["dataGranularity"] && data["dataGranularity"] == "DAYS") {
             currentStartTimeString = "00:00";
         }
 
@@ -199,12 +203,12 @@ function getDatasetConfig() {
         var currentEndDateString = currentEndDateTime.format("YYYY-MM-DD");
         var currentEndTimeString = currentEndDateTime.format("HH:00");
         //If time granularity is DAYS have default 12am on pageload
-        if(data["dataGranularity"] && data["dataGranularity"] == "DAYS"){
+        if (data["dataGranularity"] && data["dataGranularity"] == "DAYS") {
             currentEndTimeString = "00:00";
         }
 
         //Populate WoW date
-        var baselineStartDateTime = currentStartDateTime.add(-7,'days');
+        var baselineStartDateTime = currentStartDateTime.add(-7, 'days');
         var baselineStartDateString = baselineStartDateTime.format("YYYY-MM-DD");
         var baselineStartTimeString = currentStartTimeString;
 
@@ -256,7 +260,7 @@ function getDatasetConfig() {
         var dateToday = moment().format("YYYY-MM-DD")
 
 
-        if(  moment(dateToday).isAfter( moment(maxDate) )  ){
+        if (moment(dateToday).isAfter(moment(maxDate))) {
 
             $(".current-date-range-option[value='today']").addClass("uk-hidden")
             $(".current-date-range-option[value='yesterday']").addClass("uk-hidden");
@@ -265,35 +269,35 @@ function getDatasetConfig() {
 
 
         /**CONFIG: DATA GRANULARITY **/
-        if(data["dataGranularity"]){
+        if (data["dataGranularity"]) {
 
 
             window.datasetConfig.dataGranularity = data["dataGranularity"];
             var dataGranularity = window.datasetConfig.dataGranularity;
 
             //Todo: you may remove the following if else if the set of values are known
-            if(dataGranularity.toLowerCase().indexOf("minutes") > -1){
+            if (dataGranularity.toLowerCase().indexOf("minutes") > -1) {
                 dataGranularity = "MINUTES";
-            }else if(dataGranularity.toLowerCase().indexOf("hours") > -1){
+            } else if (dataGranularity.toLowerCase().indexOf("hours") > -1) {
                 dataGranularity = "HOURS";
-            }else if(dataGranularity.toLowerCase().indexOf("days") > -1){
+            } else if (dataGranularity.toLowerCase().indexOf("days") > -1) {
                 dataGranularity = "DAYS";
             }
 
-            switch(dataGranularity){
+            switch (dataGranularity) {
 
                 case "MINUTES":
                     $(".baseline-aggregate[unit='10_MINUTES']").removeClass("uk-hidden");
                     $(".baseline-aggregate[unit='HOURS']").removeClass("uk-hidden");
                     $(".granularity-btn-group").addClass("vertical");
 
-                break;
+                    break;
                 case "HOURS":
                     $(".baseline-aggregate[unit='10_MINUTES']").addClass("uk-hidden");
                     $(".baseline-aggregate[unit='HOURS']").removeClass("uk-hidden");
                     $(".granularity-btn-group").removeClass("vertical");
 
-                break;
+                    break;
                 case "DAYS":
                     $(".baseline-aggregate[unit='10_MINUTES']").addClass("uk-hidden");
                     $(".baseline-aggregate[unit='HOURS']").addClass("uk-hidden");
@@ -303,8 +307,7 @@ function getDatasetConfig() {
                     $(".granularity-btn-group").removeClass("vertical");
 
 
-
-                break;
+                    break;
                 default:
                     $(".baseline-aggregate[unit='10_MINUTES']").addClass("uk-hidden");
                     $(".baseline-aggregate[unit='HOURS']").removeClass("uk-hidden");
@@ -314,7 +317,7 @@ function getDatasetConfig() {
         }
 
         /**CONFIG: INVERT COLOR METRICS **/
-        if(data["invertColorMetrics"]){
+        if (data["invertColorMetrics"]) {
             window.datasetConfig.invertColorMetrics = data["invertColorMetrics"];
         }
 

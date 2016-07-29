@@ -1,9 +1,9 @@
 //Form submit (Go button)
-$("#main-view").on("click",".form-submit-btn",function(){
+$("#main-view").on("click", ".form-submit-btn", function () {
     formSubmit(this)
 });
 
-function formSubmit(target){
+function formSubmit(target) {
 
     var currentTab = $(target).attr("rel")
 
@@ -17,8 +17,8 @@ function formSubmit(target){
     /*Update hash*/
     //update hash.dataset
     var selectedDataset = $("#" + currentTab + "-selected-dataset").attr("value");
-    if(selectedDataset != "none" && selectedDataset != undefined && selectedDataset != ""){
-        hash.dataset= selectedDataset;
+    if (selectedDataset != "none" && selectedDataset != undefined && selectedDataset != "") {
+        hash.dataset = selectedDataset;
     }
 
     //update hash.dashboard
@@ -31,13 +31,13 @@ function formSubmit(target){
     delete hash.metrics
 
     var selectedMetrics;
-    if(currentTab == "anomalies"){
+    if (currentTab == "anomalies") {
         selectedMetrics = $("#selected-metric").attr("value") ? $("#selected-metric").attr("value") : "";
 
-        if(selectedMetrics != ""){
+        if (selectedMetrics != "") {
             hash.metrics = selectedMetrics;
         }
-    }else{
+    } else {
         selectedMetrics = $(".view-metric-selector[rel='" + currentTab + "'] .added-item");
 
         var numSelectedMetrics = selectedMetrics.length;
@@ -75,7 +75,7 @@ function formSubmit(target){
 
     //update hash.aggTimeGranularity
     //If the form has aggregate selector
-    if( $(".baseline-aggregate[rel='"+ currentTab +"']").length > 0 ) {
+    if ($(".baseline-aggregate[rel='" + currentTab + "']").length > 0) {
         // Aggregate
         //var aggregateSize = 1;
         var aggregateUnit = $(".baseline-aggregate.uk-active[rel='" + currentTab + "']").attr("unit");
@@ -84,19 +84,19 @@ function formSubmit(target){
 
     /* Validate form */
 
-    var errorMessage = $("#"+ hash.view +"-time-input-form-error p");
-    var errorAlert = $("#"+ hash.view +"-time-input-form-error");
+    var errorMessage = $("#" + hash.view + "-time-input-form-error p");
+    var errorAlert = $("#" + hash.view + "-time-input-form-error");
 
     //Check if dataset is selected
-    if( !hash.hasOwnProperty("dataset")) {
+    if (!hash.hasOwnProperty("dataset")) {
         errorMessage.html("Please select a dataset.");
         errorAlert.fadeIn(100);
         return
     }
 
     //Check if dashboard is selected in case the current view is dashboard
-    if( hash.view == "dashboard") {
-        if(!hash.dashboard){
+    if (hash.view == "dashboard") {
+        if (!hash.dashboard) {
             errorMessage.html("Please select a dashboard.");
 
             errorAlert.attr("data-error-source", "dashboard-option");
@@ -106,8 +106,8 @@ function formSubmit(target){
     }
 
     //If the form has metric selector metric has to be selected
-    if( $("#"+ hash.view +"-view-metric-selector").length > 0 ){
-        if(!hash.hasOwnProperty("metrics")){
+    if ($("#" + hash.view + "-view-metric-selector").length > 0) {
+        if (!hash.hasOwnProperty("metrics")) {
             errorMessage.html("Please select at least 1 metric.");
             errorAlert.attr("data-error-source", "metric-option");
             errorAlert.fadeIn(100);
@@ -116,13 +116,13 @@ function formSubmit(target){
     }
 
     //If the form has single-metric selector metric has to be selected
-    if( $("#"+ hash.view +"-view-single-metric-selector").length > 0 ) {
-       if( $("#selected-metric").attr("value") == ""){
-           errorMessage.html("Please select a metric.");
-           errorAlert.attr("data-error-source", "metric-option");
-           errorAlert.fadeIn(100);
-           return
-       }
+    if ($("#" + hash.view + "-view-single-metric-selector").length > 0) {
+        if ($("#selected-metric").attr("value") == "") {
+            errorMessage.html("Please select a metric.");
+            errorAlert.attr("data-error-source", "metric-option");
+            errorAlert.fadeIn(100);
+            return
+        }
     }
 
 
@@ -132,26 +132,26 @@ function formSubmit(target){
     //Todo: support timezone selection
 
     // DateTimes
-    var currentStartDate = $(".current-start-date[rel='"+ currentTab +"']").text();
+    var currentStartDate = $(".current-start-date[rel='" + currentTab + "']").text();
     if (!currentStartDate) {
         errorMessage.html("Must provide start date");
         errorAlert.fadeIn(100);
         return
     }
 
-    var currentEndDate = $(".current-end-date[rel='"+ currentTab +"']").text();
+    var currentEndDate = $(".current-end-date[rel='" + currentTab + "']").text();
     if (!currentEndDate) {
         errorMessage.html("Must provide end date");
         errorAlert.fadeIn(100);
         return
     }
 
-    var currentStartTime = $(".current-start-time[rel='"+ currentTab +"']").text();
-    var currentEndTime = $(".current-end-time[rel='"+ currentTab +"']").text();
+    var currentStartTime = $(".current-start-time[rel='" + currentTab + "']").text();
+    var currentEndTime = $(".current-end-time[rel='" + currentTab + "']").text();
 
     var currentStart = moment.tz(currentStartDate + " " + currentStartTime, timezone);
     var currentStartMillisUTC = currentStart.utc().valueOf();
-    var currentEnd = moment.tz(currentEndDate+ " " + currentEndTime, timezone);
+    var currentEnd = moment.tz(currentEndDate + " " + currentEndTime, timezone);
     var currentEndMillisUTC = currentEnd.utc().valueOf();
 
     if (currentStartMillisUTC >= currentEndMillisUTC) {
@@ -166,47 +166,47 @@ function formSubmit(target){
     hash.currentEnd = currentEndMillisUTC;
 
     //Check if baseline date range is present unless the viewtype is timeseries anomalies
-    switch(hash.view) {
+    switch (hash.view) {
         case "anomalies":
         case "timeseries":
             break;
         case "compare":
         default: //when dashboard
-            if($(".baseline-start-date[rel='"+ currentTab +"']").text().length == 0 || $(".baseline-end-date[rel='"+ currentTab +"']").text().length == 0){
-                errorMessage.html("Provide the date range to be compared with " + $(".current-start-date[rel='"+ currentTab +"']").text() + " " +$(".current-start-time[rel='"+ currentTab +"']").text()+" - "+ $(".current-end-date[rel='"+ currentTab +"']").text() + " " + $(".current-end-time[rel='"+ currentTab +"']").text() +". Click the date input below.");
+            if ($(".baseline-start-date[rel='" + currentTab + "']").text().length == 0 || $(".baseline-end-date[rel='" + currentTab + "']").text().length == 0) {
+                errorMessage.html("Provide the date range to be compared with " + $(".current-start-date[rel='" + currentTab + "']").text() + " " + $(".current-start-time[rel='" + currentTab + "']").text() + " - " + $(".current-end-date[rel='" + currentTab + "']").text() + " " + $(".current-end-time[rel='" + currentTab + "']").text() + ". Click the date input below.");
                 errorAlert.fadeIn(100);
                 return
             }
             break
     }
 
-    if($(".baseline-start-date[rel='"+ currentTab +"']").text().length > 0){
+    if ($(".baseline-start-date[rel='" + currentTab + "']").text().length > 0) {
 
-        var baselineStartDate = $(".baseline-start-date[rel='"+ currentTab +"']").text();
-        var baselineEndDate = $(".baseline-end-date[rel='"+ currentTab +"']").text();
-        var baselineStartTime = $(".baseline-start-time[rel='"+ currentTab +"']").text();
-        var baselineEndTime = $(".baseline-end-time[rel='"+ currentTab +"']").text();
-        var baselineStart = moment.tz(baselineStartDate  + " " + baselineStartTime, timezone);
+        var baselineStartDate = $(".baseline-start-date[rel='" + currentTab + "']").text();
+        var baselineEndDate = $(".baseline-end-date[rel='" + currentTab + "']").text();
+        var baselineStartTime = $(".baseline-start-time[rel='" + currentTab + "']").text();
+        var baselineEndTime = $(".baseline-end-time[rel='" + currentTab + "']").text();
+        var baselineStart = moment.tz(baselineStartDate + " " + baselineStartTime, timezone);
         var baselineStartMillisUTC = baselineStart.utc().valueOf();
-        var baselineEnd = moment.tz(baselineEndDate  + " " + baselineEndTime, timezone);
+        var baselineEnd = moment.tz(baselineEndDate + " " + baselineEndTime, timezone);
         var baselineEndMillisUTC = baselineEnd.utc().valueOf();
         hash.baselineStart = baselineStartMillisUTC;
         hash.baselineEnd = baselineEndMillisUTC;
-    }else{
+    } else {
         delete hash.baselineStart
         delete hash.baselineEnd
     }
 
-    if(hash.hasOwnProperty("filters") && JSON.stringify(hash.filters) == "{}"){
+    if (hash.hasOwnProperty("filters") && JSON.stringify(hash.filters) == "{}") {
         delete hash.filters
     }
 
     errorAlert.hide()
-    if(hash.view == "anomalies"){
-        hash.rand = (Math.random() + "").substring(3,6);
+    if (hash.view == "anomalies") {
+        hash.rand = (Math.random() + "").substring(3, 6);
     }
     /* window.location.hash change triggers window.onhashchange event
-    that contains the ajax requests */
+     that contains the ajax requests */
     window.location.hash = encodeHashParameters(hash);
 
     //Disable form submit

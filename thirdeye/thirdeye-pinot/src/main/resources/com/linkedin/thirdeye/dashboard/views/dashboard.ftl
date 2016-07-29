@@ -46,7 +46,7 @@
     <#include "tabs/anomalies-tab/anomalies.ftl">
     <#include "tabs/self-service-tab/self-service.ftl">
     <#include "tabs/self-service-tab/anomaly-function-form.ftl">
-    <#include "tabs/self-service-tab/self-service-exisiting-functions.ftl">
+    <#include "tabs/self-service-tab/self-service-existing-functions.ftl">
 
 </body>
 

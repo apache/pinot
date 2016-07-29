@@ -1,133 +1,154 @@
-$(document).ready(function() {
-   /** --- 1) Register Handelbars helpers --- * */
+$(document).ready(function () {
+    /** --- 1) Register Handelbars helpers --- * */
 
-  //takes a string returns a HEX color code
-    Handlebars.registerHelper('colorById', function( id, numIds, options ) {
+        //takes a string returns a HEX color code
+    Handlebars.registerHelper('colorById', function (id, numIds, options) {
 
-        if(typeof numIds == "object"){
+        if (typeof numIds == "object") {
             var keysAry = Object.keys(numIds);
             numIds = keysAry.length;
         }
 
-        if(parseInt(numIds) < 10){
+        if (parseInt(numIds) < 10) {
 
             return d3.scale.category10().range()[id];
 
         } else if (parseInt(numIds) < 20) {
             return d3.scale.category20().range()[id];
 
-        } else{
-            return  Handlebars.helpers.assignColorByID(numIds,id)
+        } else {
+            return  Handlebars.helpers.assignColorByID(numIds, id)
         }
 
     });
 
-    Handlebars.registerHelper('colorByIdContributors', function( id, dimensionValuesMap, options ) {
+    Handlebars.registerHelper('colorByIdContributors', function (id, dimensionValuesMap, options) {
 
         var numIds = dimensionValuesMap[options.hash.dimName].length
 
-        if(parseInt(numIds) < 10){
+        if (parseInt(numIds) < 10) {
             return d3.scale.category10().range()[id];
 
         } else if (parseInt(numIds) < 20) {
             return d3.scale.category20().range()[id];
 
-        } else{
-            return  Handlebars.helpers.assignColorByID(numIds,id)
+        } else {
+            return  Handlebars.helpers.assignColorByID(numIds, id)
         }
     });
 
 
     //If you change this method change the colorScale() and assignColorByID()functions too
     //those 2 are defining the color of the lines on every timeseries chart when the number of items are > 20
-    Handlebars.registerHelper('assignColorByID', function(len, index){
+    Handlebars.registerHelper('assignColorByID', function (len, index) {
 
         //16777216 = 256 ^ 3
         var diff = parseInt(16777216 / len);
 
         var diffAry = [];
-        for (x=0; x<len; x++){
+        for (x = 0; x < len; x++) {
             diffAry.push(diff * x)
         }
 
         var colorAry = [];
         var num;
-        for  (y=0; y<len; y++){
+        for (y = 0; y < len; y++) {
 
-            if(y%2 == 0){
-                num = diffAry[y/2]
-            }else{
-                num = diffAry[Math.floor(len - y/2)]
+            if (y % 2 == 0) {
+                num = diffAry[y / 2]
+            } else {
+                num = diffAry[Math.floor(len - y / 2)]
             }
 
 
             var str = (num.toString(16) + "dddddd")
-            var hex = num.toString(16).length < 6 ? "#" + str.substr(0,6) : "#" + num.toString(16)
-            colorAry.push( hex )
+            var hex = num.toString(16).length < 6 ? "#" + str.substr(0, 6) : "#" + num.toString(16)
+            colorAry.push(hex)
         }
 
         return colorAry[index]
     });
 
     //Assign hidden class to element if the 2 params are equal
-    Handlebars.registerHelper('hide_if_eq', function(param1, param2){
-       if(param1 == param2){
-           return "uk-hidden"
-       }
+    Handlebars.registerHelper('hide_if_eq', function (param1, param2) {
+        if (param1 == param2) {
+            return "uk-hidden"
+        }
+    });
+
+    //parse anomaly data properties
+    Handlebars.registerHelper('parseAnomalyProperties', function (propertiesString, param) {
+        var propertiesAry = propertiesString.split(";");
+        for (var i = 0, numProp = propertiesAry.length; i < numProp; i++) {
+            var keyValue = propertiesAry[i];
+            keyValue = keyValue.split("=")
+
+            var key = keyValue[0];
+            if (key == param) {
+                var value = keyValue[1]
+                return value
+            }
+        }
     });
 
     //parse anomaly data properties value and returns the requested param
-    Handlebars.registerHelper('lookupAnomalyProperty', function(propertiestSring, param){
-        var propertiesAry = propertiestSring.split(";");
-        for ( var i= 0, numProp = propertiesAry.length; i<numProp; i++){
-           var keyValue = propertiesAry[i];
-           keyValue = keyValue.split("=")
+    Handlebars.registerHelper('lookupAnomalyProperty', function (propertiesString, param) {
+        var propertiesAry = propertiesString.split(";");
+        for (var i = 0, numProp = propertiesAry.length; i < numProp; i++) {
+            var keyValue = propertiesAry[i];
+            keyValue = keyValue.split("=")
 
-           var key = keyValue[0];
-           if( key == param){
-               var value = keyValue[1]
-               return value
-           }
+            var key = keyValue[0];
+            if (key == param) {
+                var value = keyValue[1]
+                return value
+            }
         }
     });
 
     //Helper for anomaly function form, here we can set the desired display of any function property
-    Handlebars.registerHelper('populateAnomalyFunctionProp', function(propertiestSring, param, key){
-        var value = Handlebars.helpers.lookupAnomalyProperty(propertiestSring, param);
-        if(param == "changeThreshold"){
-            value = Math.abs( parseFloat(value) ) * 100
+    Handlebars.registerHelper('populateAnomalyFunctionProp', function (param , value) {
+
+        switch(param){
+            case "changeThreshold":
+                value = Math.abs(parseFloat(value)) * 100;
+            break;
+            case "":
+
+            break;
+            default:
+            break;
         }
         return value
     });
 
     //returns classname negative or positive or no classname. The classname related css creates a :before pseudo element triangle up or down
-    Handlebars.registerHelper('displayDeltaIcon', function(propertiestSring, param, key){
-        var delta = Handlebars.helpers.lookupAnomalyProperty(propertiestSring, param);
+    Handlebars.registerHelper('discribeDelta', function (value, describeMode) {
 
         var describeChange;
-        if(delta > 0){
+        if (value > 0) {
             describeChange = {
-                iconClass : 'positive-icon',
-                description :  'INCREASES'}
-        }else if (delta < 0){
+                iconClass: 'positive-icon',
+                description: 'INCREASES'}
+        } else if (value < 0) {
             describeChange = {
-                iconClass : 'positive-icon',
-                description :  'INCREASES'}
-        }else{
+                iconClass: 'negative-icon',
+                description: 'DECREASES'}
+        } else {
             return
         }
 
-        return describeChange[key]
+        return describeChange[describeMode]
 
     });
 
-        //takes a value and if alias is available displays the alias
+    //takes a value and if alias is available displays the alias
     //in dashboards the derived metrics can have an alias int he configuration
-    Handlebars.registerHelper('displayAlias', function(name, alias) {
+    Handlebars.registerHelper('displayAlias', function (name, alias) {
 
-        if(alias != undefined && alias.length > 0){
+        if (alias != undefined && alias.length > 0) {
             return alias
-        }else{
+        } else {
             return name
         }
     });
@@ -142,56 +163,56 @@ $(document).ready(function() {
     });
 
     // If dimension value is null or "?" replace it with unknown or other
-    Handlebars.registerHelper('displayDimensionValue', function(dimensionValue) {
+    Handlebars.registerHelper('displayDimensionValue', function (dimensionValue) {
 
-        if (dimensionValue == ""){
+        if (dimensionValue == "") {
             return "UNKNOWN";
-        }else if(dimensionValue == "?"){
+        } else if (dimensionValue == "?") {
             return "OTHER";
-        }else {
+        } else {
             return dimensionValue;
         }
     });
 
     //returns in users timezone
-    Handlebars.registerHelper('returnUserTimeZone', function() {
+    Handlebars.registerHelper('returnUserTimeZone', function () {
         var tz = getTimeZone();
         return moment().tz(tz).format('z');
     });
 
-   //takes utc date iso format ie. 2016-04-06T07:00:00.000Z, returns date and time in users timezone
-    Handlebars.registerHelper('displayDate', function(date) {
+    //takes utc date iso format ie. 2016-04-06T07:00:00.000Z, returns date and time in users timezone
+    Handlebars.registerHelper('displayDate', function (date) {
         var tz = getTimeZone();
         return moment(date).tz(tz).format('YYYY-MM-DD h a z');
     });
 
     //takes utc timestamp (milliseconds ie. 1462626000000), returns date and time in users timezone
     //the options contain showTimeZone boolean param
-    Handlebars.registerHelper('millisToDate', function(millis, options) {
+    Handlebars.registerHelper('millisToDate', function (millis, options) {
 
-        if(!millis){
-           return "n.a"
+        if (!millis) {
+            return "n.a"
         }
 
-       //Options
-       var showTimeZone  = options.hash.hasOwnProperty("showTimeZone") ? (options.hash.showTimeZone == false ? false : true) : true
+        //Options
+        var showTimeZone = options.hash.hasOwnProperty("showTimeZone") ? (options.hash.showTimeZone == false ? false : true) : true
 
-       var displayDateFormat = showTimeZone ? 'YYYY-MM-DD h a z' : 'YYYY-MM-DD h a'
+        var displayDateFormat = showTimeZone ? 'YYYY-MM-DD h a z' : 'YYYY-MM-DD h a'
         millis = parseInt(millis);
         var tz = getTimeZone();
         return moment(millis).tz(tz).format(displayDateFormat);
     });
 
     //takes utc timestamp (milliseconds ie. 1462626000000), returns date and time in users tz in a format in sync with the hash aggregate granularity
-    Handlebars.registerHelper('millisToDateTimeInAggregate', function(millis) {
+    Handlebars.registerHelper('millisToDateTimeInAggregate', function (millis) {
 
-        if(!millis){
+        if (!millis) {
             return "n.a"
         }
         millis = parseInt(millis);
         var tz = getTimeZone();
         var dateTimeFormat = "h a";
-        if(hash.hasOwnProperty("aggTimeGranularity") && hash.aggTimeGranularity == "DAYS"){
+        if (hash.hasOwnProperty("aggTimeGranularity") && hash.aggTimeGranularity == "DAYS") {
 
             dateTimeFormat = "MM-DD h a"
         }
@@ -200,7 +221,7 @@ $(document).ready(function() {
         return moment(millis).tz(tz).format(dateTimeFormat);
     });
 
-    Handlebars.registerHelper('parse', function(str, prop) {
+    Handlebars.registerHelper('parse', function (str, prop) {
         str = str.replace("/;/g", ',');
         var obj = JSON.parse(str);
         return obj[prop];
@@ -219,43 +240,43 @@ $(document).ready(function() {
     });
 
     //to get dimensionValue data for timebuckets ary in contributors ajax response
-    Handlebars.registerHelper('returnValue', function(obj, options) {
-    	var responseData = obj.responseData;
+    Handlebars.registerHelper('returnValue', function (obj, options) {
+        var responseData = obj.responseData;
         var schema = obj.schema.columnsToIndexMapping;
         var rowId = options.hash.key;
         var schemaItem = options.hash.schemaItem;
         var indexFordisplayRatioHelper = 0;
-        if(schemaItem == "percentageChange"){
+        if (schemaItem == "percentageChange") {
             indexFordisplayRatioHelper = 2;
         }
 
-        return Handlebars.helpers.displayRatio(responseData[rowId][schema[schemaItem]], indexFordisplayRatioHelper )
+        return Handlebars.helpers.displayRatio(responseData[rowId][schema[schemaItem]], indexFordisplayRatioHelper)
     })
 
     //takes an object and a key as option param and returns an object as a scope
-    Handlebars.registerHelper('lookupDimValues', function(obj, options) {
+    Handlebars.registerHelper('lookupDimValues', function (obj, options) {
         //Without the options.fn()  the raw object would be returned to be the html content
         return options.fn(obj[options.hash.dimName])
     });
-  //takes an object and a key as option param and returns an object as a scope
-    Handlebars.registerHelper('lookupInMapByKey', function(mapObj, key) {
+    //takes an object and a key as option param and returns an object as a scope
+    Handlebars.registerHelper('lookupInMapByKey', function (mapObj, key) {
         var val = mapObj[key];
         if (typeof val !== "undefined") {
-          val = "(" + val + ")";
+            val = "(" + val + ")";
         }
         return val;
     });
 
     //takes an object and a key as option param and returns an object as a scope
-    Handlebars.registerHelper('lookupRowIdList', function(obj, options) {
+    Handlebars.registerHelper('lookupRowIdList', function (obj, options) {
         //Without the options.fn()  the raw object would be returned to be the html content
         return options.fn(obj[options.hash.metricName + '|' + options.hash.dimName + '|' + options.hash.dimValue ])
     });
 
 
     //if param 1 == param 2
-    Handlebars.registerHelper('if_eq', function(a, b, opts) {
-        if(a == b){ // Or === depending on your needs
+    Handlebars.registerHelper('if_eq', function (a, b, opts) {
+        if (a == b) { // Or === depending on your needs
             return opts.fn(this);
         }
         return opts.inverse(this);
@@ -266,10 +287,10 @@ $(document).ready(function() {
     }
     /** --- 2) Create Handelbars templating method --- * */
 
-    var source_tab_template =  $("#tab-template").html();
+    var source_tab_template = $("#tab-template").html();
     HandleBarsTemplates.template_tab = Handlebars.compile(source_tab_template);
 
-    var source_form_template =  $("#form-template").html();
+    var source_form_template = $("#form-template").html();
     HandleBarsTemplates.template_form = Handlebars.compile(source_form_template);
 
     var source_datasets_template = $("#datasets-template").html();
@@ -278,7 +299,7 @@ $(document).ready(function() {
     var source_metric_list_template = $("#metric-list-template").html();
     HandleBarsTemplates.template_metric_list = Handlebars.compile(source_metric_list_template);
 
-    var source_filter_dimension_value_template =  $("#filter-dimension-value-template").html();
+    var source_filter_dimension_value_template = $("#filter-dimension-value-template").html();
     HandleBarsTemplates.template_filter_dimension_value = Handlebars.compile(source_filter_dimension_value_template);
 
     var source_funnels_table = $("#funnels-table-template").html();
@@ -294,9 +315,9 @@ $(document).ready(function() {
     HandleBarsTemplates.template_metric_time_series_section = Handlebars.compile(source_metric_time_series_section);
 
     /* var source_metric_time_series_section_anomaly = $("#metric-time-series-section-anomaly-template").html();
-    HandleBarsTemplates.template_metric_time_series_section_anomaly = Handlebars.compile(source_metric_time_series_section_anomaly);*/
+     HandleBarsTemplates.template_metric_time_series_section_anomaly = Handlebars.compile(source_metric_time_series_section_anomaly);*/
 
-    var source_time_series_template =  $("#time-series-template").html();
+    var source_time_series_template = $("#time-series-template").html();
     HandleBarsTemplates.template_time_series = Handlebars.compile(source_time_series_template);
 
     var source_anomalies_template = $("#anomalies-template").html();

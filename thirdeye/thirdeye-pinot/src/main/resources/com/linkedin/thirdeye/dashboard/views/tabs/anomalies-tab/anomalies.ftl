@@ -60,11 +60,10 @@
                         </div>
                    </div>
                </td>
-</tr>
-
-{{/each}}
-</tbody>
-</table>
+            </tr>
+            {{/each}}
+        </tbody>
+        </table>
 
 <div id="anomaly-table-tooltip" class="hidden">
 <table>
