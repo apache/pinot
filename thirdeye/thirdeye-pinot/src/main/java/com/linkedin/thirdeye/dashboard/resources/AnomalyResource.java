@@ -36,6 +36,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.http.client.ClientProtocolException;
 import org.joda.time.DateTime;
 import org.joda.time.format.ISODateTimeFormat;
+import org.quartz.CronExpression;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -203,10 +204,8 @@ public class AnomalyResource {
       @NotNull @QueryParam("windowSize") String windowSize,
       @NotNull @QueryParam("windowUnit") String windowUnit,
       @QueryParam("windowDelay") String windowDelay,
+      @QueryParam("cron") String cron,
       @QueryParam("windowDelayUnit") String windowDelayUnit,
-      @QueryParam("scheduleMinute") String scheduleMinute,
-      @QueryParam("scheduleHour") String scheduleHour,
-      @QueryParam("repeatEvery") String repeatEvery,
       @QueryParam("exploreDimension") String exploreDimensions,
       @QueryParam("filters") String filters,
       @NotNull @QueryParam("properties") String properties,
@@ -258,9 +257,13 @@ public class AnomalyResource {
     anomalyFunctionSpec.setFilters(filters);
     anomalyFunctionSpec.setProperties(properties);
 
-    String cron = DEFAULT_CRON;
-    if (StringUtils.isNotEmpty(repeatEvery)) {
-      cron = ThirdEyeUtils.constructCron(scheduleMinute, scheduleHour, TimeUnit.valueOf(repeatEvery));
+    if (StringUtils.isEmpty(cron)) {
+      cron = DEFAULT_CRON;
+    } else {
+      // validate cron
+      if (!CronExpression.isValidExpression(cron)) {
+        throw new IllegalArgumentException("Invalid cron expression for cron : " + cron);
+      }
     }
     anomalyFunctionSpec.setCron(cron);
 
@@ -284,10 +287,8 @@ public class AnomalyResource {
       @NotNull @QueryParam("windowSize") String windowSize,
       @NotNull @QueryParam("windowUnit") String windowUnit,
       @NotNull @QueryParam("windowDelay") String windowDelay,
+      @QueryParam("cron") String cron,
       @QueryParam("windowDelayUnit") String windowDelayUnit,
-      @QueryParam("scheduleMinute") String scheduleMinute,
-      @QueryParam("scheduleHour") String scheduleHour,
-      @QueryParam("repeatEvery") String repeatEvery,
       @QueryParam("exploreDimension") String exploreDimensions,
       @QueryParam("filters") String filters,
       @NotNull @QueryParam("properties") String properties,
@@ -339,9 +340,13 @@ public class AnomalyResource {
     anomalyFunctionSpec.setExploreDimensions(exploreDimensions);
     anomalyFunctionSpec.setProperties(properties);
 
-    String cron = DEFAULT_CRON;
-    if (StringUtils.isNotEmpty(repeatEvery)) {
-      cron = ThirdEyeUtils.constructCron(scheduleMinute, scheduleHour, TimeUnit.valueOf(repeatEvery));
+    if (StringUtils.isEmpty(cron)) {
+      cron = DEFAULT_CRON;
+    } else {
+      // validate cron
+      if (!CronExpression.isValidExpression(cron)) {
+        throw new IllegalArgumentException("Invalid cron expression for cron : " + cron);
+      }
     }
     anomalyFunctionSpec.setCron(cron);
 
@@ -456,7 +461,7 @@ public class AnomalyResource {
       @QueryParam("filters") String filters,
       @QueryParam("isActive") boolean isActive,
       @QueryParam("sendZeroAnomalyEmail") boolean sendZeroAnomalyEmail,
-      @QueryParam("functionIds") String functionIds) throws ClientProtocolException, IOException {
+      @QueryParam("functionIds") String functionIds) throws IOException {
 
     if (StringUtils.isEmpty(dataset) || StringUtils.isEmpty(functionIds) || StringUtils.isEmpty(metric)
         || StringUtils.isEmpty(windowSize) || StringUtils.isEmpty(windowUnit) || StringUtils.isEmpty(fromAddress)
@@ -533,7 +538,7 @@ public class AnomalyResource {
       @QueryParam("filters") String filters,
       @QueryParam("isActive") boolean isActive,
       @QueryParam("sendZeroAnomalyEmail") boolean sendZeroAnomalyEmail,
-      @QueryParam("functionIds") String functionIds) throws ClientProtocolException, IOException {
+      @QueryParam("functionIds") String functionIds) throws IOException {
 
     if (id == null || StringUtils.isEmpty(dataset) || StringUtils.isEmpty(functionIds) || StringUtils.isEmpty(metric)
         || StringUtils.isEmpty(windowSize) || StringUtils.isEmpty(windowUnit) || StringUtils.isEmpty(fromAddress)
