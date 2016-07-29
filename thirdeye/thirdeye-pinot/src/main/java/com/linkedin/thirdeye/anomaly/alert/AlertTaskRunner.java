@@ -10,9 +10,11 @@ import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TimeZone;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
@@ -43,6 +45,7 @@ import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.client.comparison.TimeOnTimeComparisonHandler;
 import com.linkedin.thirdeye.client.comparison.TimeOnTimeComparisonRequest;
 import com.linkedin.thirdeye.client.comparison.TimeOnTimeComparisonResponse;
+import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
 import com.linkedin.thirdeye.db.entity.AnomalyResult;
 import com.linkedin.thirdeye.db.entity.EmailConfiguration;
 import com.linkedin.thirdeye.detector.email.AnomalyGraphGenerator;
@@ -174,6 +177,10 @@ public class AlertTaskRunner implements TaskRunner {
       String filtersJson = ThirdEyeUtils.convertMultiMapToJson(alertConfig.getFilterSet());
       String filtersJsonEncoded = URLEncoder.encode(filtersJson, "UTF-8");
       String windowUnit = alertConfig.getWindowUnit().toString();
+      Set<String> functionTypes = new HashSet<>();
+      for (AnomalyFunctionSpec spec : alertConfig.getFunctions()) {
+        functionTypes.add(spec.getType());
+      }
 
       // templateData.put("anomalyResults", results);
       templateData.put("groupedAnomalyResults", groupedResults);
@@ -192,6 +199,7 @@ public class AlertTaskRunner implements TaskRunner {
       templateData.put("filters", filtersJsonEncoded);
       templateData.put("windowUnit", windowUnit);
       templateData.put("dashboardHost", thirdeyeConfig.getDashboardHost());
+      templateData.put("functionTypes", functionTypes.toString());
 
       Template template = freemarkerConfig.getTemplate("simple-anomaly-report.ftl");
       template.process(templateData, out);
