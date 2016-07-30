@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.db.dao;
 
+import com.google.inject.persist.Transactional;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
 import com.linkedin.thirdeye.db.entity.AnomalyTaskSpec;
 
@@ -43,9 +44,11 @@ public class AnomalyTaskDAO extends AbstractJpaDAO<AnomalyTaskSpec> {
         .setParameter("status", status).getResultList();
   }
 
+  @Transactional
   public List<AnomalyTaskSpec> findByStatusOrderByCreateTimeAscending(TaskStatus status) {
     return getEntityManager().createQuery(FIND_BY_STATUS_ORDER_BY_CREATE_TIME_ASC, entityClass)
-            .setParameter("status", status).getResultList();
+            .setParameter("status", status)
+            .getResultList();
   }
 
   public List<AnomalyTaskSpec> findByIdAndStatus(Long id, TaskStatus status) {
@@ -54,7 +57,6 @@ public class AnomalyTaskDAO extends AbstractJpaDAO<AnomalyTaskSpec> {
             .setParameter("id", id)
             .getResultList();
   }
-
 
   public boolean updateStatusAndWorkerId(Long workerId, Long id, TaskStatus oldStatus, TaskStatus newStatus) {
     try {

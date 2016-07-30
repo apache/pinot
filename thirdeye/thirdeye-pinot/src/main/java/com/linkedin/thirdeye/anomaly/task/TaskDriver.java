@@ -10,6 +10,10 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import javax.persistence.OptimisticLockException;
+import javax.persistence.RollbackException;
+
+import org.hibernate.StaleObjectStateException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -120,8 +124,10 @@ public class TaskDriver {
             break;
           }
         }
+      } catch (OptimisticLockException | RollbackException | StaleObjectStateException e) {
+        LOG.warn("OptimisticLockException while select and update, by workerId {}", workerId);
       } catch (Exception e) {
-        LOG.error("Exception in select and update", e);
+        LOG.error("Exception in select ad update", e);
       }
     } while (acquiredTask == null);
     LOG.info(Thread.currentThread().getId() + " : Acquired task ======" + acquiredTask);
