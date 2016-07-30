@@ -9,7 +9,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.hibernate.SessionFactory;
 import org.quartz.CronScheduleBuilder;
 import org.quartz.CronTrigger;
 import org.quartz.JobBuilder;
@@ -30,7 +29,7 @@ import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesHandler;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesResponseConverter;
 import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
-import com.linkedin.thirdeye.detector.db.AnomalyFunctionRelationDAO;
+import com.linkedin.thirdeye.db.dao.AnomalyFunctionRelationDAO;
 import com.linkedin.thirdeye.detector.function.AnomalyFunction;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 
@@ -44,7 +43,6 @@ public class AnomalyDetectionJobManager {
   private final AnomalyFunctionDAO specDAO;
   private final AnomalyFunctionRelationDAO relationDAO;
   private final AnomalyResultDAO resultDAO;
-  private final SessionFactory sessionFactory;
   private final Object sync;
   private final Map<Long, String> scheduledJobKeys;
   private final MetricRegistry metricRegistry;
@@ -56,8 +54,8 @@ public class AnomalyDetectionJobManager {
 
   public AnomalyDetectionJobManager(Scheduler quartzScheduler, AnomalyFunctionDAO specDAO,
       AnomalyFunctionRelationDAO relationDAO, AnomalyResultDAO resultDAO,
-      SessionFactory sessionFactory, MetricRegistry metricRegistry,
-      AnomalyFunctionFactory anomalyFunctionFactory, FailureEmailConfiguration failureEmailConfig) {
+      MetricRegistry metricRegistry, AnomalyFunctionFactory anomalyFunctionFactory,
+      FailureEmailConfiguration failureEmailConfig) {
 
     this.queryCache = CACHE_REGISTRY_INSTANCE.getQueryCache();
 
@@ -68,7 +66,6 @@ public class AnomalyDetectionJobManager {
     this.specDAO = specDAO;
     this.relationDAO = relationDAO;
     this.resultDAO = resultDAO;
-    this.sessionFactory = sessionFactory;
     this.metricRegistry = metricRegistry;
     this.sync = new Object();
     this.scheduledJobKeys = new HashMap<>();
@@ -117,14 +114,12 @@ public class AnomalyDetectionJobManager {
     JobDetail job = JobBuilder.newJob(AnomalyDetectionJob.class).withIdentity(jobKey).build();
 
     job.getJobDataMap().put(AnomalyDetectionJob.FUNCTION, anomalyFunction);
-    // job.getJobDataMap().put(AnomalyDetectionJob.CLIENT, thirdEyeClient);
     job.getJobDataMap().put(AnomalyDetectionJob.TIME_SERIES_HANDLER, timeSeriesHandler);
     job.getJobDataMap().put(AnomalyDetectionJob.TIME_SERIES_RESPONSE_CONVERTER,
         timeSeriesResponseConverter);
     job.getJobDataMap().put(AnomalyDetectionJob.WINDOW_START, windowStartIsoString);
     job.getJobDataMap().put(AnomalyDetectionJob.WINDOW_END, windowEndIsoString);
     job.getJobDataMap().put(AnomalyDetectionJob.RESULT_DAO, resultDAO);
-    job.getJobDataMap().put(AnomalyDetectionJob.SESSION_FACTORY, sessionFactory);
     job.getJobDataMap().put(AnomalyDetectionJob.METRIC_REGISTRY, metricRegistry);
     job.getJobDataMap().put(AnomalyDetectionJob.RELATION_DAO, relationDAO);
 
@@ -192,7 +187,7 @@ public class AnomalyDetectionJobManager {
   }
 
   public void runAdhocConfig(AnomalyFunctionSpec spec, String windowStartIsoString,
-      String windowEndIsoString, String executionName) throws Exception, SchedulerException {
+      String windowEndIsoString, String executionName) throws Exception {
     AnomalyFunction anomalyFunction = anomalyFunctionFactory.fromSpec(spec);
 
     String triggerKey = String.format("file-based_anomaly_function_trigger_%s", executionName);

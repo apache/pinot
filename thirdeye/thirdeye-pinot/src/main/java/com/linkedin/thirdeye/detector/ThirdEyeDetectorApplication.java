@@ -1,16 +1,13 @@
 package com.linkedin.thirdeye.detector;
 
-
 import java.util.ArrayList;
 import java.util.Arrays;
 
 import io.dropwizard.assets.AssetsBundle;
-import io.dropwizard.db.DataSourceFactory;
 import io.dropwizard.jetty.ConnectorFactory;
 import io.dropwizard.jetty.HttpConnectorFactory;
 import io.dropwizard.lifecycle.Managed;
 import io.dropwizard.lifecycle.ServerLifecycleListener;
-import io.dropwizard.migrations.MigrationsBundle;
 import io.dropwizard.server.DefaultServerFactory;
 import io.dropwizard.server.ServerFactory;
 import io.dropwizard.server.SimpleServerFactory;
@@ -19,7 +16,6 @@ import io.dropwizard.setup.Environment;
 
 import java.util.LinkedList;
 import java.util.List;
-import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.commons.lang.StringUtils;
@@ -30,14 +26,11 @@ import org.eclipse.jetty.server.ServerConnector;
 import org.quartz.Scheduler;
 import org.quartz.SchedulerFactory;
 import org.quartz.impl.StdSchedulerFactory;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
 import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
 import com.linkedin.thirdeye.db.entity.EmailConfiguration;
-import com.linkedin.thirdeye.detector.db.HibernateSessionWrapper;
 import com.linkedin.thirdeye.detector.driver.AnomalyDetectionJobManager;
 import com.linkedin.thirdeye.detector.email.EmailReportJobManager;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
@@ -54,7 +47,6 @@ import com.linkedin.thirdeye.detector.resources.MetricsGraphicsTimeSeriesResourc
 public class ThirdEyeDetectorApplication
     extends BaseThirdEyeApplication<ThirdEyeDetectorConfiguration> {
   private static final String QUARTZ_MISFIRE_THRESHOLD = "3600000"; // 1 hour
-  private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeDetectorApplication.class);
 
   /**
    * Entry point for the detector application, used to start up the app server and handle database
@@ -62,15 +54,6 @@ public class ThirdEyeDetectorApplication
    * configs (including <code>detector.yml</code>) provided as the last argument. If no preceding
    * arguments are provided, the application server will startup using <code>detector.yml</code>.
    * <br>
-   * If additional arguments do precede the root configuration directory, they are passed as
-   * arguments to the Dropwizard application along with the <code>detector.yml</code> file. As an
-   * example, one could pass in the arguments:
-   * <br>
-   * <br>
-   * <code>db migrate <i>config_folder</i></code>
-   * <br>
-   * <br>
-   * to run database migrations using configurations in <code>detector.yml</code>.
    * @throws Exception
    */
   public static void main(final String[] args) throws Exception {
@@ -94,22 +77,13 @@ public class ThirdEyeDetectorApplication
 
   @Override
   public void initialize(final Bootstrap<ThirdEyeDetectorConfiguration> bootstrap) {
-    bootstrap.addBundle(new MigrationsBundle<ThirdEyeDetectorConfiguration>() {
-      @Override
-      public DataSourceFactory getDataSourceFactory(ThirdEyeDetectorConfiguration config) {
-        return config.getDatabase();
-      }
-    });
-
-    bootstrap.addBundle(hibernateBundle);
     bootstrap.addBundle(new AssetsBundle("/assets/", "/", "index.html"));
   }
 
   @Override
   public void run(final ThirdEyeDetectorConfiguration config, final Environment environment)
       throws Exception {
-    super.initDetectorRelatedDAO();
-
+    super.initDAOs();
     try {
       ThirdEyeCacheRegistry.initializeDetectorCaches(config);
     } catch (Exception e) {
@@ -139,41 +113,33 @@ public class ThirdEyeDetectorApplication
 
     // ThirdEye driver
     final AnomalyDetectionJobManager anomalyDetectionJobManager = new AnomalyDetectionJobManager(quartzScheduler,
-        anomalyFunctionDAO, anomalyFunctionRelationDAO, anomalyResultDAO, hibernateBundle.getSessionFactory(),
+        anomalyFunctionDAO, anomalyFunctionRelationDAO, anomalyResultDAO,
         environment.metrics(), anomalyFunctionFactory, config.getFailureEmailConfig());
 
     // Start all active jobs on startup
     environment.lifecycle().manage(new Managed() {
       @Override
       public void start() throws Exception {
-        new HibernateSessionWrapper<Void>(hibernateBundle.getSessionFactory())
-            .execute(new Callable<Void>() {
-              @Override
-              public Void call() throws Exception {
-                List<AnomalyFunctionSpec> functions = anomalyFunctionDAO.findAll();
-                LinkedList<AnomalyFunctionSpec> failedToStart = new LinkedList<AnomalyFunctionSpec>();
-                for (AnomalyFunctionSpec function : functions) {
-                  if (function.getIsActive()) {
-                    try {
-                      LOG.info("Starting {}", function);
-                      anomalyDetectionJobManager.start(function.getId());
-                    } catch (Exception e) {
-                      LOG.error("Failed to schedule function " + function.getId(), e);
-                      failedToStart.add(function);
-                    }
-                  }
-                }
-                if (!failedToStart.isEmpty()) {
-                  LOG.warn("{} functions failed to start!: {}", failedToStart.size(),
-                      failedToStart);
-                  String subject = String.format("Startup failed to initialize %d functions",
-                      failedToStart.size());
-                  String body = StringUtils.join(failedToStart, "\n");
-                  JobUtils.sendFailureEmail(config.getFailureEmailConfig(), subject, body);
-                }
-                return null;
-              }
-            });
+        List<AnomalyFunctionSpec> functions = anomalyFunctionDAO.findAll();
+        LinkedList<AnomalyFunctionSpec> failedToStart = new LinkedList<AnomalyFunctionSpec>();
+        for (AnomalyFunctionSpec function : functions) {
+          if (function.getIsActive()) {
+            try {
+              LOG.info("Starting {}", function);
+              anomalyDetectionJobManager.start(function.getId());
+            } catch (Exception e) {
+              LOG.error("Failed to schedule function " + function.getId(), e);
+              failedToStart.add(function);
+            }
+          }
+        }
+        if (!failedToStart.isEmpty()) {
+          LOG.warn("{} functions failed to start!: {}", failedToStart.size(), failedToStart);
+          String subject =
+              String.format("Startup failed to initialize %d functions", failedToStart.size());
+          String body = StringUtils.join(failedToStart, "\n");
+          JobUtils.sendFailureEmail(config.getFailureEmailConfig(), subject, body);
+        }
       }
 
       @Override
@@ -192,8 +158,7 @@ public class ThirdEyeDetectorApplication
 
     final EmailReportJobManager emailReportJobManager =
         new EmailReportJobManager(quartzScheduler, emailConfigurationDAO, anomalyResultDAO,
-            hibernateBundle.getSessionFactory(), applicationPort,
-            config.getDashboardHost(), config.getFailureEmailConfig());
+            applicationPort, config.getDashboardHost(), config.getFailureEmailConfig());
 
     environment.lifecycle().addServerLifecycleListener(new ServerLifecycleListener() {
       @Override
@@ -223,33 +188,26 @@ public class ThirdEyeDetectorApplication
 
         // Start the email report job manager once we know the application port
         try {
-          new HibernateSessionWrapper<Void>(hibernateBundle.getSessionFactory())
-              .execute(new Callable<Void>() {
-                @Override
-                public Void call() throws Exception {
-                  List<EmailConfiguration> configs = emailConfigurationDAO.findAll();
-                  LinkedList<EmailConfiguration> failedToStart = new LinkedList<EmailConfiguration>();
-                  for (EmailConfiguration config : configs) {
-                    if (config.getIsActive()) {
-                      try {
-                        LOG.info("Starting {}", config);
-                        emailReportJobManager.start(config.getId());
-                      } catch (Exception e) {
-                        LOG.error("Failed to schedule report " + config.getId(), e);
-                        failedToStart.add(config);
-                      }
-                    }
-                  }
-                  if (!failedToStart.isEmpty()) {
-                    LOG.warn("{} reports failed to start!: {}", failedToStart.size(), failedToStart);
-                    String subject = String.format("Startup failed to initialize %d reports",
-                        failedToStart.size());
-                    String body = StringUtils.join(failedToStart, "\n");
-                    JobUtils.sendFailureEmail(config.getFailureEmailConfig(), subject, body);
-                  }
-                  return null;
-                }
-              });
+          List<EmailConfiguration> configs = emailConfigurationDAO.findAll();
+          LinkedList<EmailConfiguration> failedToStart = new LinkedList<EmailConfiguration>();
+          for (EmailConfiguration config : configs) {
+            if (config.getIsActive()) {
+              try {
+                LOG.info("Starting {}", config);
+                emailReportJobManager.start(config.getId());
+              } catch (Exception e) {
+                LOG.error("Failed to schedule report " + config.getId(), e);
+                failedToStart.add(config);
+              }
+            }
+          }
+          if (!failedToStart.isEmpty()) {
+            LOG.warn("{} reports failed to start!: {}", failedToStart.size(), failedToStart);
+            String subject =
+                String.format("Startup failed to initialize %d reports", failedToStart.size());
+            String body = StringUtils.join(failedToStart, "\n");
+            JobUtils.sendFailureEmail(config.getFailureEmailConfig(), subject, body);
+          }
         } catch (Exception e) {
           throw new IllegalStateException(e);
         }
@@ -267,7 +225,7 @@ public class ThirdEyeDetectorApplication
     environment.jersey().register(new EmailFunctionDependencyResource(anomalyFunctionDAO, emailConfigurationDAO));
   }
 
-  public static int getApplicationPortNumber(ThirdEyeDetectorConfiguration config) {
+  private int getApplicationPortNumber(ThirdEyeDetectorConfiguration config) {
     int httpPort = 0;
     try {
       // https://github.com/dropwizard/dropwizard/issues/745

@@ -17,11 +17,10 @@ import com.google.common.base.MoreObjects;
 @Entity
 @Table(name = "anomaly_function_relations")
 @NamedQueries({
-    @NamedQuery(name = "com.linkedin.thirdeye.api.AnomalyFunctionRelation#find", query = "SELECT r FROM AnomalyFunctionRelation r"),
     @NamedQuery(name = "com.linkedin.thirdeye.api.AnomalyFunctionRelation#findByParent", query = "SELECT r FROM AnomalyFunctionRelation r WHERE r.parentId = :parentId"),
     @NamedQuery(name = "com.linkedin.thirdeye.api.AnomalyFunctionRelation#deleteByParent", query = "DELETE FROM AnomalyFunctionRelation r WHERE r.parentId = :parentId")
 })
-public class AnomalyFunctionRelation implements Serializable {
+public class AnomalyFunctionRelation extends AbstractBaseEntity implements Serializable {
   private static final long serialVersionUID = 7526472295622776147L;
 
   @Id
@@ -31,9 +30,6 @@ public class AnomalyFunctionRelation implements Serializable {
   @Id
   @Column(name = "child_id", nullable = false)
   private long childId;
-
-  public AnomalyFunctionRelation() {
-  }
 
   public long getParentId() {
     return parentId;

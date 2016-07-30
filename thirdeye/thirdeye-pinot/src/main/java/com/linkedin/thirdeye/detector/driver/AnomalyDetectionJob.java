@@ -45,7 +45,7 @@ import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.db.entity.AnomalyFunctionRelation;
 import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
 import com.linkedin.thirdeye.db.entity.AnomalyResult;
-import com.linkedin.thirdeye.detector.db.AnomalyFunctionRelationDAO;
+import com.linkedin.thirdeye.db.dao.AnomalyFunctionRelationDAO;
 import com.linkedin.thirdeye.detector.function.AnomalyFunction;
 import com.linkedin.thirdeye.detector.lib.util.JobUtils;
 

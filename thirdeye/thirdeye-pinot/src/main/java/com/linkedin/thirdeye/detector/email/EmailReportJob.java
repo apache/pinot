@@ -18,7 +18,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
 import java.util.TreeMap;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
@@ -28,7 +27,6 @@ import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.commons.mail.DefaultAuthenticator;
 import org.apache.commons.mail.EmailException;
 import org.apache.commons.mail.HtmlEmail;
-import org.hibernate.SessionFactory;
 import org.jfree.chart.JFreeChart;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -46,7 +44,6 @@ import com.linkedin.thirdeye.client.comparison.TimeOnTimeComparisonRequest;
 import com.linkedin.thirdeye.client.comparison.TimeOnTimeComparisonResponse;
 import com.linkedin.thirdeye.db.entity.AnomalyResult;
 import com.linkedin.thirdeye.db.entity.EmailConfiguration;
-import com.linkedin.thirdeye.detector.db.HibernateSessionWrapper;
 import com.linkedin.thirdeye.detector.driver.FailureEmailConfiguration;
 import com.linkedin.thirdeye.detector.lib.util.JobUtils;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
@@ -110,8 +107,6 @@ public class EmailReportJob implements Job {
   private void run(final JobExecutionContext context, final EmailConfiguration config)
       throws JobExecutionException, ExecutionException {
     LOG.info("Starting email report {}", config.getId());
-    SessionFactory sessionFactory =
-        (SessionFactory) context.getJobDetail().getJobDataMap().get(SESSION_FACTORY);
     int applicationPort = context.getJobDetail().getJobDataMap().getInt(APPLICATION_PORT);
     TimeOnTimeComparisonHandler timeOnTimeComparisonHandler =
         (TimeOnTimeComparisonHandler) context.getJobDetail().getJobDataMap()
@@ -134,7 +129,7 @@ public class EmailReportJob implements Job {
 
     // Get the anomalies in that range
     final List<AnomalyResult> results =
-        getAnomalyResults(context, config, sessionFactory, then, now);
+        getAnomalyResults(context, config, then, now);
 
     if (results.isEmpty() && !config.getSendZeroAnomalyEmail()) {
       LOG.info("Zero anomalies found, skipping sending email");
@@ -292,20 +287,13 @@ public class EmailReportJob implements Job {
   }
 
   private List<AnomalyResult> getAnomalyResults(final JobExecutionContext context,
-      final EmailConfiguration config, SessionFactory sessionFactory, final DateTime start,
+      final EmailConfiguration config, final DateTime start,
       final DateTime end) throws JobExecutionException {
     final List<AnomalyResult> results;
     try {
-      results =
-          new HibernateSessionWrapper<List<AnomalyResult>>(sessionFactory)
-              .execute(new Callable<List<AnomalyResult>>() {
-                @Override
-                public List<AnomalyResult> call() throws Exception {
-                  AnomalyResultDAO resultDAO =
-                      (AnomalyResultDAO) context.getJobDetail().getJobDataMap().get(RESULT_DAO);
-                  return resultDAO.findAllByTimeAndEmailId(start, end, config.getId());
-                }
-              });
+      AnomalyResultDAO resultDAO =
+          (AnomalyResultDAO) context.getJobDetail().getJobDataMap().get(RESULT_DAO);
+      results = resultDAO.findAllByTimeAndEmailId(start, end, config.getId());
     } catch (Exception e) {
       throw new JobExecutionException(e);
     }

@@ -7,9 +7,13 @@ import java.util.Map;
 
 public class PersistenceConfig extends Configuration {
 
-  @JsonProperty
+  /**
+   * Persistence specific file will be in
+   * <configRootDir>/persistence.yml
+   */
   private DatabaseConfiguration databaseConfiguration;
 
+  @JsonProperty
   public DatabaseConfiguration getDatabaseConfiguration() {
     return databaseConfiguration;
   }

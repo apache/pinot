@@ -13,17 +13,10 @@ import com.linkedin.thirdeye.db.dao.AnomalyJobDAO;
 import com.linkedin.thirdeye.db.dao.AnomalyResultDAO;
 import com.linkedin.thirdeye.db.dao.AnomalyTaskDAO;
 import com.linkedin.thirdeye.db.dao.EmailConfigurationDAO;
-import com.linkedin.thirdeye.db.entity.AnomalyFeedback;
-import com.linkedin.thirdeye.db.entity.AnomalyFunctionRelation;
-import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
-import com.linkedin.thirdeye.db.entity.AnomalyResult;
-import com.linkedin.thirdeye.db.entity.EmailConfiguration;
-import com.linkedin.thirdeye.detector.db.AnomalyFunctionRelationDAO;
+import com.linkedin.thirdeye.db.dao.AnomalyFunctionRelationDAO;
 
 import io.dropwizard.Application;
 import io.dropwizard.Configuration;
-import io.dropwizard.db.DataSourceFactory;
-import io.dropwizard.hibernate.HibernateBundle;
 
 import java.io.File;
 
@@ -31,42 +24,22 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public abstract class BaseThirdEyeApplication<T extends Configuration> extends Application<T> {
-  private final Logger LOG = LoggerFactory.getLogger(this.getClass());
-
-  protected HibernateBundle<ThirdEyeConfiguration> hibernateBundle =
- new HibernateBundle<ThirdEyeConfiguration>(
-      AnomalyFunctionSpec.class, AnomalyFunctionRelation.class, AnomalyResult.class, EmailConfiguration.class, AnomalyFeedback.class) {
-        @Override
-        public DataSourceFactory getDataSourceFactory(ThirdEyeConfiguration config) {
-          return config.getDatabase();
-        }
-      };
-
+  protected final Logger LOG = LoggerFactory.getLogger(this.getClass());
   protected AnomalyFunctionDAO anomalyFunctionDAO;
   protected AnomalyResultDAO anomalyResultDAO;
   protected EmailConfigurationDAO emailConfigurationDAO;
   protected AnomalyJobDAO anomalyJobDAO;
   protected AnomalyTaskDAO anomalyTaskDAO;
-
-  //TODO : remove this
   protected AnomalyFunctionRelationDAO anomalyFunctionRelationDAO;
 
-  public void initDashboardRelatedDAO() {
+  public void initDAOs() {
     String persistenceConfig = System.getProperty("dw.rootDir") + "/persistence.yml";
     LOG.info("Loading persistence config from [{}]", persistenceConfig);
     PersistenceUtil.init(new File(persistenceConfig));
     anomalyFunctionDAO = PersistenceUtil.getInstance(AnomalyFunctionDAO.class);
     anomalyResultDAO = PersistenceUtil.getInstance(AnomalyResultDAO.class);
     emailConfigurationDAO = PersistenceUtil.getInstance(EmailConfigurationDAO.class);
-  }
-
-  public void initDetectorRelatedDAO() {
-    initDashboardRelatedDAO();
-
-    // TODO: change these to new DAO and remove hibernateBundle
-    anomalyFunctionRelationDAO =
-        new AnomalyFunctionRelationDAO(hibernateBundle.getSessionFactory());
-
+    anomalyFunctionRelationDAO = PersistenceUtil.getInstance(AnomalyFunctionRelationDAO.class);
     anomalyJobDAO = PersistenceUtil.getInstance(AnomalyJobDAO.class);
     anomalyTaskDAO = PersistenceUtil.getInstance(AnomalyTaskDAO.class);
   }

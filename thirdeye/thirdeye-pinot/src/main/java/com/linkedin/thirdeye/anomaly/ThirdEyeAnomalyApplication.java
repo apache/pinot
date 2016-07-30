@@ -1,18 +1,13 @@
 package com.linkedin.thirdeye.anomaly;
 
 import io.dropwizard.assets.AssetsBundle;
-import io.dropwizard.db.DataSourceFactory;
 import io.dropwizard.lifecycle.Managed;
-import io.dropwizard.migrations.MigrationsBundle;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.linkedin.thirdeye.anomaly.alert.AlertJobResource;
 import com.linkedin.thirdeye.anomaly.alert.AlertJobScheduler;
@@ -27,7 +22,6 @@ import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 public class ThirdEyeAnomalyApplication
     extends BaseThirdEyeApplication<ThirdEyeAnomalyConfiguration> {
 
-  private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeAnomalyApplication.class);
   private DetectionJobScheduler detectionJobScheduler = null;
   private TaskDriver taskDriver = null;
   private MonitorJobScheduler monitorJobScheduler = null;
@@ -55,22 +49,14 @@ public class ThirdEyeAnomalyApplication
 
   @Override
   public void initialize(final Bootstrap<ThirdEyeAnomalyConfiguration> bootstrap) {
-    bootstrap.addBundle(new MigrationsBundle<ThirdEyeAnomalyConfiguration>() {
-      @Override
-      public DataSourceFactory getDataSourceFactory(ThirdEyeAnomalyConfiguration config) {
-        return config.getDatabase();
-      }
-    });
-    bootstrap.addBundle(hibernateBundle);
     bootstrap.addBundle(new AssetsBundle("/assets/", "/", "index.html"));
   }
 
   @Override
   public void run(final ThirdEyeAnomalyConfiguration config, final Environment environment)
       throws Exception {
-
     LOG.info("Starting ThirdeyeAnomalyApplication : Scheduler {} Worker {}", config.isScheduler(), config.isWorker());
-    super.initDetectorRelatedDAO();
+    super.initDAOs();
     ThirdEyeCacheRegistry.initializeDetectorCaches(config);
 
     environment.lifecycle().manage(new Managed() {
@@ -117,5 +103,4 @@ public class ThirdEyeAnomalyApplication
       }
     });
   }
-
 }
