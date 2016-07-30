@@ -1,9 +1,6 @@
 package com.linkedin.thirdeye.dashboard;
 
 import com.linkedin.thirdeye.dashboard.resources.AnomalyFunctionResource;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
 import com.linkedin.thirdeye.dashboard.resources.AnomalyResource;
@@ -17,8 +14,6 @@ import io.dropwizard.views.ViewBundle;
 
 public class ThirdEyeDashboardApplication
     extends BaseThirdEyeApplication<ThirdEyeDashboardConfiguration> {
-  private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeDashboardApplication.class);
-
   public static final String WEBAPP_CONFIG = "/webapp-config";
 
   @Override
@@ -40,7 +35,7 @@ public class ThirdEyeDashboardApplication
 
   @Override
   public void run(ThirdEyeDashboardConfiguration config, Environment env) throws Exception {
-    super.initDashboardRelatedDAO();
+    super.initDAOs();
     try {
       ThirdEyeCacheRegistry.initializeWebappCaches(config);
     } catch (Exception e) {

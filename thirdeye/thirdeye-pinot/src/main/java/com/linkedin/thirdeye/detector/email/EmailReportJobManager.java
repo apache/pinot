@@ -10,7 +10,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.hibernate.SessionFactory;
 import org.quartz.CronScheduleBuilder;
 import org.quartz.CronTrigger;
 import org.quartz.JobBuilder;
@@ -39,7 +38,6 @@ public class EmailReportJobManager{
   private final EmailConfigurationDAO configurationDAO;
   private final Map<Long, String> scheduledJobKeys;
   private final AnomalyResultDAO resultDAO;
-  private final SessionFactory sessionFactory;
   private final AtomicInteger applicationPort;
   private final TimeOnTimeComparisonHandler timeOnTimeComparisonHandler;
   private final Object sync;
@@ -49,13 +47,12 @@ public class EmailReportJobManager{
   private final QueryCache queryCache;
 
   public EmailReportJobManager(Scheduler quartzScheduler, EmailConfigurationDAO configurationDAO,
-      AnomalyResultDAO resultDAO, SessionFactory sessionFactory, AtomicInteger applicationPort,
+      AnomalyResultDAO resultDAO, AtomicInteger applicationPort,
       String dashboardHost, FailureEmailConfiguration failureEmailConfig) {
 
     this.queryCache = CACHE_REGISTRY_INSTANCE.getQueryCache();
     this.quartzScheduler = quartzScheduler;
     this.configurationDAO = configurationDAO;
-    this.sessionFactory = sessionFactory;
     this.resultDAO = resultDAO;
     this.applicationPort = applicationPort;
     this.timeOnTimeComparisonHandler = new TimeOnTimeComparisonHandler(queryCache);
@@ -91,7 +88,6 @@ public class EmailReportJobManager{
 
     job.getJobDataMap().put(EmailReportJob.RESULT_DAO, resultDAO);
     job.getJobDataMap().put(EmailReportJob.CONFIG, emailConfig);
-    job.getJobDataMap().put(EmailReportJob.SESSION_FACTORY, sessionFactory);
     job.getJobDataMap().put(EmailReportJob.APPLICATION_PORT, applicationPort.get());
     job.getJobDataMap().put(EmailReportJob.TIME_ON_TIME_COMPARISON_HANDLER,
         timeOnTimeComparisonHandler);
