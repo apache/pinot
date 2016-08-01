@@ -44,11 +44,11 @@ public class AnomalyResultDAO extends AbstractJpaDAO<AnomalyResult> {
       + "AND ((r.startTimeUtc >= :startTimeUtc AND r.startTimeUtc <= :endTimeUtc) "
       + "OR (r.endTimeUtc >= :startTimeUtc AND r.endTimeUtc <= :endTimeUtc))";
 
-  private static final String FIND_BY_TIME_EMAIL_ID =
+  private static final String FIND_VALID_BY_TIME_EMAIL_ID =
       "SELECT r FROM EmailConfiguration d JOIN d.functions f JOIN f.anomalies r "
       + "WHERE d.id = :emailId AND ((r.startTimeUtc >= :startTimeUtc AND r.startTimeUtc <= :endTimeUtc) "
       + "OR (r.endTimeUtc >= :startTimeUtc AND r.endTimeUtc <= :endTimeUtc)) "
-          + "AND r.dataComplete=:dataComplete";
+          + "AND r.dataMissing=:dataMissing";
 
   public AnomalyResultDAO() {
     super(AnomalyResult.class);
@@ -109,11 +109,11 @@ public class AnomalyResultDAO extends AbstractJpaDAO<AnomalyResult> {
 
   public List<AnomalyResult> findValidAllByTimeAndEmailId(DateTime startTime, DateTime endTime,
       long emailId) {
-    return getEntityManager().createQuery(FIND_BY_TIME_EMAIL_ID, entityClass)
+    return getEntityManager().createQuery(FIND_VALID_BY_TIME_EMAIL_ID, entityClass)
         .setParameter("startTimeUtc", startTime.toDateTime(DateTimeZone.UTC).getMillis())
         .setParameter("endTimeUtc", endTime.toDateTime(DateTimeZone.UTC).getMillis())
         .setParameter("emailId", emailId)
-        .setParameter("dataComplete", true)
+        .setParameter("dataMissing", false)
         .getResultList();
   }
 
