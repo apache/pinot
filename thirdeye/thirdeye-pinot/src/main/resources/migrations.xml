@@ -474,4 +474,12 @@
     </createTable>
   </changeSet>
 
+  <changeSet id="18" author="pjaiswal">
+    <addColumn tableName="anomaly_results">
+      <column name="data_missing" type="boolean" defaultValue="false">
+        <constraints nullable="false"/>
+      </column>
+    </addColumn>
+  </changeSet>
+
 </databaseChangeLog>
