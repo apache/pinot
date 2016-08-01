@@ -16,26 +16,25 @@
 
 package com.linkedin.pinot.controller.helix.core.realtime;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
-import org.apache.helix.HelixAdmin;
-import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.IdealState;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.testng.Assert;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
-import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
 import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
-import static org.mockito.Mockito.mock;
 
 
 public class PinotLLCRealtimeSegmentManagerTest {
@@ -203,30 +202,153 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
   }
 
+  @Test
+  public void testCommittingSegment() throws Exception {
+    MockPinotLLCRealtimeSegmentManager segmentManager = new MockPinotLLCRealtimeSegmentManager(true, null);
+
+    final String topic = "someTopic";
+    final String rtTableName = "table_REALTIME";
+    final String rawTableName = TableNameBuilder.extractRawTableName(rtTableName);
+    final int nInstances = 6;
+    final int nPartitions = 16;
+    final int nReplicas = 3;
+    final boolean existingIS = false;
+    List<String> instances = getInstanceList(nInstances);
+    final long startOffset = 81L;
+
+    IdealState  idealState = PinotTableIdealStateBuilder.buildEmptyKafkaConsumerRealtimeIdealStateFor(rtTableName);
+    segmentManager.setupHelixEntries(topic, rtTableName, nPartitions, instances, nReplicas, startOffset, idealState,
+        !existingIS);
+    // Now commit the first segment of partition 6.
+    final int committingPartition = 6;
+    final long nextOffset = 3425666L;
+    LLCRealtimeSegmentZKMetadata committingSegmentMetadata =  new LLCRealtimeSegmentZKMetadata(segmentManager._records.get(committingPartition));
+    boolean status = segmentManager.commitSegment(rawTableName, committingSegmentMetadata.getSegmentName(), nextOffset);
+    Assert.assertTrue(status);
+
+    // Get the old and new segment metadata and make sure that they are correct.
+    Assert.assertEquals(segmentManager._paths.size(), 2);
+    ZNRecord oldZnRec = segmentManager._records.get(0);
+    ZNRecord newZnRec = segmentManager._records.get(1);
+
+    LLCRealtimeSegmentZKMetadata oldMetadata = new LLCRealtimeSegmentZKMetadata(oldZnRec);
+    LLCRealtimeSegmentZKMetadata newMetadata = new LLCRealtimeSegmentZKMetadata(newZnRec);
+
+    LLCSegmentName oldSegmentName = new LLCSegmentName(oldMetadata.getSegmentName());
+    LLCSegmentName newSegmentName = new LLCSegmentName(newMetadata.getSegmentName());
+
+    // Assert on propertystore entries
+    Assert.assertEquals(oldSegmentName.getSegmentName(), committingSegmentMetadata.getSegmentName());
+    Assert.assertEquals(newSegmentName.getPartitionId(), oldSegmentName.getPartitionId());
+    Assert.assertEquals(newSegmentName.getSequenceNumber(), oldSegmentName.getSequenceNumber()+1);
+    Assert.assertEquals(oldMetadata.getStatus(), CommonConstants.Segment.Realtime.Status.DONE);
+    Assert.assertEquals(newMetadata.getStatus(), CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
+  }
+
+  @Test
+  public void testUpdateHelixForSegmentClosing() throws Exception {
+    final IdealState  idealState = PinotTableIdealStateBuilder.buildEmptyKafkaConsumerRealtimeIdealStateFor("someTable_REALTIME");
+    final String s1 = "S1";
+    final String s2 = "S2";
+    final String s3 = "S3";
+    String[] instanceArr = {s1, s2, s3};
+    final String oldSegmentNameStr = "oldSeg";
+    final String newSegmentNameStr = "newSeg";
+
+    idealState.setPartitionState(oldSegmentNameStr, s1, PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE);
+    idealState.setPartitionState(oldSegmentNameStr, s2, PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE);
+    idealState.setPartitionState(oldSegmentNameStr, s3, PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE);
+    PinotLLCRealtimeSegmentManager.updateForNewRealtimeSegment(idealState, Arrays.asList(instanceArr),
+        oldSegmentNameStr, newSegmentNameStr);
+    // Now verify that the old segment state is online in the idealstate and the new segment state is CONSUMING
+    Map<String, String> oldsegStateMap = idealState.getInstanceStateMap(oldSegmentNameStr);
+    Assert.assertEquals(oldsegStateMap.get(s1), PinotHelixSegmentOnlineOfflineStateModelGenerator.ONLINE_STATE);
+    Assert.assertEquals(oldsegStateMap.get(s2), PinotHelixSegmentOnlineOfflineStateModelGenerator.ONLINE_STATE);
+    Assert.assertEquals(oldsegStateMap.get(s3), PinotHelixSegmentOnlineOfflineStateModelGenerator.ONLINE_STATE);
+
+    Map<String, String> newsegStateMap = idealState.getInstanceStateMap(oldSegmentNameStr);
+    Assert.assertEquals(oldsegStateMap.get(s1), PinotHelixSegmentOnlineOfflineStateModelGenerator.ONLINE_STATE);
+    Assert.assertEquals(oldsegStateMap.get(s2), PinotHelixSegmentOnlineOfflineStateModelGenerator.ONLINE_STATE);
+    Assert.assertEquals(oldsegStateMap.get(s3), PinotHelixSegmentOnlineOfflineStateModelGenerator.ONLINE_STATE);
+  }
+
+  @Test
+  public void testCompleteCommittingSegments() throws Exception {
+    // Run multiple times randomizing the situation.
+    for (int i = 0; i < 100; i++) {
+      final List<ZNRecord> existingSegmentMetadata = new ArrayList<>(64);
+      final int nPartitions = 16;
+      final long seed = new Random().nextLong();
+      Random random = new Random(seed);
+      final int maxSeq = 10;
+      final long now = System.currentTimeMillis();
+      final String tableName = "table";
+      final String realtimeTableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName);
+      final IdealState idealState = PinotTableIdealStateBuilder.buildEmptyKafkaConsumerRealtimeIdealStateFor(realtimeTableName);
+      int nIncompleteCommits = 0;
+      final String topic = "someTopic";
+      final int nInstances = 5;
+      final int nReplicas = 3;
+      List<String> instances = getInstanceList(nInstances);
+      final long startOffset = 0L;
+
+      MockPinotLLCRealtimeSegmentManager segmentManager = new MockPinotLLCRealtimeSegmentManager(false, null);
+      segmentManager.setupHelixEntries(topic, realtimeTableName, nPartitions, instances, nReplicas, startOffset, null, false);
+      ZNRecord partitionAssignment = segmentManager.getKafkaPartitionAssignment(realtimeTableName);
+
+      for (int p = 0; p < nPartitions; p++) {
+        int curSeq = random.nextInt(maxSeq);  // Current segment sequence ID for that partition
+        if (curSeq == 0) {
+          curSeq++;
+        }
+        boolean incomplete = false;
+        if (random.nextBoolean()) {
+          incomplete = true;
+        }
+        for (int s = 0; s < curSeq; s++) {
+          LLCSegmentName segmentName = new LLCSegmentName(tableName, p, s, now);
+          String segNameStr = segmentName.getSegmentName();
+          String state = PinotHelixSegmentOnlineOfflineStateModelGenerator.ONLINE_STATE;
+          CommonConstants.Segment.Realtime.Status status = CommonConstants.Segment.Realtime.Status.DONE;
+          if (s == curSeq - 1) {
+            state = PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE;
+            if (!incomplete) {
+              status = CommonConstants.Segment.Realtime.Status.IN_PROGRESS;
+            }
+          }
+          List<String> instancesForThisSeg = partitionAssignment.getListField(Integer.toString(p));
+          for (String instance : instancesForThisSeg) {
+            idealState.setPartitionState(segNameStr, instance, state);
+          }
+          LLCRealtimeSegmentZKMetadata metadata = new LLCRealtimeSegmentZKMetadata();
+          metadata.setSegmentName(segNameStr);
+          metadata.setStatus(status);
+          existingSegmentMetadata.add(metadata.toZNRecord());
+        }
+        // Add an incomplete commit to some of them
+        if (incomplete) {
+          nIncompleteCommits++;
+          LLCSegmentName segmentName = new LLCSegmentName(tableName, p, curSeq, now);
+          LLCRealtimeSegmentZKMetadata metadata = new LLCRealtimeSegmentZKMetadata();
+          metadata.setSegmentName(segmentName.getSegmentName());
+          metadata.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
+          existingSegmentMetadata.add(metadata.toZNRecord());
+        }
+      }
+
+      segmentManager._tableIdealState = idealState;
+      segmentManager._existingSegmentMetadata = existingSegmentMetadata;
+
+      segmentManager.completeCommittingSegments(TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName));
+
+      Assert.assertEquals(segmentManager._nCallsToUpdateHelix, nIncompleteCommits, "Failed with seed " + seed);
+    }
+  }
+
   static class MockPinotLLCRealtimeSegmentManager extends PinotLLCRealtimeSegmentManager {
 
     private final boolean _setupInitialSegments;
     private final List<String> _existingLLCSegments;
-
-    private static HelixManager createMockHelixManager() {
-      HelixManager helixManager = mock(HelixManager.class);
-      return  helixManager;
-    }
-
-    private static HelixAdmin createMockHelixAdmin() {
-      HelixAdmin helixAdmin = mock(HelixAdmin.class);
-      return helixAdmin;
-    }
-
-    private static ZkHelixPropertyStore createMockPropertyStore() {
-      ZkHelixPropertyStore propertyStore = mock(ZkHelixPropertyStore.class);
-      return propertyStore;
-    }
-
-    private static PinotHelixResourceManager createMockHelixResourceManager() {
-      PinotHelixResourceManager helixResourceManager = mock(PinotHelixResourceManager.class);
-      return helixResourceManager;
-    }
 
     public String _realtimeTableName;
     public Map<String, List<String>> _idealStateEntries;
@@ -236,9 +358,17 @@ public class PinotLLCRealtimeSegmentManagerTest {
     public long _startOffset;
     public boolean _createNew;
 
+    public List<String> _newInstances;
+    public String _oldSegmentNameStr;
+    public String _newSegmentNameStr;
+
+    public List<ZNRecord> _existingSegmentMetadata;
+
+    public int _nCallsToUpdateHelix = 0;
+    public IdealState _tableIdealState;
+
     protected MockPinotLLCRealtimeSegmentManager(boolean setupInitialSegments, List<String> existingLLCSegments) {
-      super(createMockHelixAdmin(), clusterName, createMockHelixManager(), createMockPropertyStore(),
-          createMockHelixResourceManager());
+      super(null, clusterName, null, null, null);
       _setupInitialSegments = setupInitialSegments;
       _existingLLCSegments = existingLLCSegments;
     }
@@ -261,7 +391,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
 
     @Override
-    protected List<String> getExistingLLCSegments(String realtimeTableName) {
+    protected List<String> getExistingSegments(String realtimeTableName) {
       return _existingLLCSegments;
     }
 
@@ -271,6 +401,39 @@ public class PinotLLCRealtimeSegmentManagerTest {
       _realtimeTableName = realtimeTableName;
       _idealStateEntries = idealStateEntries;
       _createNew = create;
+    }
+
+    protected void updateHelixIdealState(final String realtimeTableName, final List<String> newInstances,
+        final String oldSegmentNameStr, final String newSegmentNameStr) {
+      _realtimeTableName = realtimeTableName;
+      _newInstances = newInstances;
+      _oldSegmentNameStr = oldSegmentNameStr;
+      _newSegmentNameStr = newSegmentNameStr;
+      _nCallsToUpdateHelix++;
+    }
+
+    protected void writeKafkaPartitionAssignemnt(final String realtimeTableName, ZNRecord znRecord) {
+      _partitionAssignment = znRecord;
+    }
+
+    protected ZNRecord getKafkaPartitionAssignment(final String realtimeTableName) {
+      return _partitionAssignment;
+    }
+
+    public LLCRealtimeSegmentZKMetadata getRealtimeSegmentZKMetadata(String realtimeTableName, String segmentName) {
+      LLCRealtimeSegmentZKMetadata metadata = new LLCRealtimeSegmentZKMetadata();
+      metadata.setSegmentName(segmentName);
+      return metadata;
+    }
+
+    @Override
+    protected List<ZNRecord> getExistingSegmentMetadata(String realtimeTableName) {
+      return _existingSegmentMetadata;
+    }
+
+    @Override
+    protected IdealState getTableIdealState(String realtimeTableName) {
+      return _tableIdealState;
     }
   }
 }
