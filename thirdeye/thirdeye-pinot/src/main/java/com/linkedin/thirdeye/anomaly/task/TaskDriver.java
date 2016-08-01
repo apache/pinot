@@ -108,26 +108,25 @@ public class TaskDriver {
     LOG.info(Thread.currentThread().getId() + " : Trying to find a task to execute");
     do {
 
+      List<AnomalyTaskSpec> anomalyTasks = new ArrayList<>();
       try {
-        List<AnomalyTaskSpec> anomalyTasks =
-            anomalyTaskDAO.findByStatusOrderByCreateTimeAscending(TaskStatus.WAITING);
-        if (anomalyTasks.size() > 0)
-          LOG.info(Thread.currentThread().getId() + " : Found {} tasks in waiting state", anomalyTasks.size());
-
-        for (AnomalyTaskSpec anomalyTaskSpec : anomalyTasks) {
-          LOG.info(Thread.currentThread().getId() + " : Trying to acquire task : {}", anomalyTaskSpec.getId());
-          boolean success = anomalyTaskDAO.updateStatusAndWorkerId(workerId, anomalyTaskSpec.getId(),
-              TaskStatus.WAITING, TaskStatus.RUNNING);
-          LOG.info(Thread.currentThread().getId() + " : Task acquired success: {}", success);
-          if (success) {
-            acquiredTask = anomalyTaskSpec;
-            break;
-          }
-        }
+      anomalyTasks =
+          anomalyTaskDAO.findByStatusOrderByCreateTimeAscending(TaskStatus.WAITING);
       } catch (OptimisticLockException | RollbackException | StaleObjectStateException e) {
         LOG.warn("OptimisticLockException while select and update, by workerId {}", workerId);
-      } catch (Exception e) {
-        LOG.error("Exception in select ad update", e);
+      }
+      if (anomalyTasks.size() > 0)
+        LOG.info(Thread.currentThread().getId() + " : Found {} tasks in waiting state", anomalyTasks.size());
+
+      for (AnomalyTaskSpec anomalyTaskSpec : anomalyTasks) {
+        LOG.info(Thread.currentThread().getId() + " : Trying to acquire task : {}", anomalyTaskSpec.getId());
+        boolean success = anomalyTaskDAO.updateStatusAndWorkerId(workerId, anomalyTaskSpec.getId(),
+            TaskStatus.WAITING, TaskStatus.RUNNING);
+        LOG.info(Thread.currentThread().getId() + " : Task acquired success: {}", success);
+        if (success) {
+          acquiredTask = anomalyTaskSpec;
+          break;
+        }
       }
     } while (acquiredTask == null);
     LOG.info(Thread.currentThread().getId() + " : Acquired task ======" + acquiredTask);
