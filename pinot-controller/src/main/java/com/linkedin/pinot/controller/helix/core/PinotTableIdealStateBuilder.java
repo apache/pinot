@@ -15,9 +15,12 @@
  */
 package com.linkedin.pinot.controller.helix.core;
 
+import com.linkedin.pinot.core.realtime.impl.kafka.KafkaSimpleConsumerFactoryImpl;
+import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.compress.utils.IOUtils;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.IdealState;
@@ -203,8 +206,15 @@ public class PinotTableIdealStateBuilder {
   }
 
   private static int getPartitionsCount(KafkaStreamMetadata kafkaMetadata) {
-    // TODO Get the number of partitions from Kafka
-    return 8;
+    SimpleConsumerWrapper consumerWrapper = SimpleConsumerWrapper.forMetadataConsumption(
+        new KafkaSimpleConsumerFactoryImpl(), kafkaMetadata.getBootstrapHosts(),
+        PinotTableIdealStateBuilder.class.getSimpleName() + "-" + kafkaMetadata.getKafkaTopicName());
+
+    try {
+      return consumerWrapper.getPartitionCount(kafkaMetadata.getKafkaTopicName());
+    } finally {
+      IOUtils.closeQuietly(consumerWrapper);
+    }
   }
 
   public static IdealState buildEmptyKafkaConsumerRealtimeIdealStateFor(String realtimeTableName) {

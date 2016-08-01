@@ -76,7 +76,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 
     request = ControllerRequestBuilder.buildCreateRealtimeTableJSON("bad__table__name", "default", "default",
         "potato", "DAYS", "DAYS", "5", 3, "BalanceNumSegmentAssignmentStrategy", metadata, "fakeSchema", "fakeColumn",
-        Collections.<String>emptyList(), "MMAP");
+        Collections.<String>emptyList(), "MMAP", true);
 
     try {
       sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTableCreate(),
@@ -89,7 +89,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     // Create a table with a valid name
     request = ControllerRequestBuilder.buildCreateRealtimeTableJSON("valid_table_name", "default", "default",
         "potato", "DAYS", "DAYS", "5", 3, "BalanceNumSegmentAssignmentStrategy", metadata, "fakeSchema", "fakeColumn",
-        Collections.<String>emptyList(), "MMAP");
+        Collections.<String>emptyList(), "MMAP", true);
 
     sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTableCreate(), request.toString());
   }

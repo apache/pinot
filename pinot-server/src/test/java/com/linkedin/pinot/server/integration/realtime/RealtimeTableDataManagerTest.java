@@ -50,7 +50,7 @@ import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.data.manager.config.TableDataManagerConfig;
-import com.linkedin.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
+import com.linkedin.pinot.core.data.manager.realtime.HLRealtimeSegmentDataManager;
 import com.linkedin.pinot.core.data.manager.realtime.TimerService;
 import com.linkedin.pinot.core.realtime.RealtimeFileBasedReaderTest;
 import com.linkedin.pinot.core.realtime.RealtimeSegment;
@@ -128,8 +128,8 @@ public class RealtimeTableDataManagerTest {
   }
 
   public void testSetup() throws Exception {
-    final RealtimeSegmentDataManager manager =
-        new RealtimeSegmentDataManager(realtimeSegmentZKMetadata, tableConfig, instanceZKMetadata, null,
+    final HLRealtimeSegmentDataManager manager =
+        new HLRealtimeSegmentDataManager(realtimeSegmentZKMetadata, tableConfig, instanceZKMetadata, null,
             tableDataManagerConfig.getDataDir(), ReadMode.valueOf(tableDataManagerConfig.getReadMode()),
             getTestSchema(), new ServerMetrics(new MetricsRegistry()));
 

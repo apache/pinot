@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.data.manager.realtime;
 
+import com.linkedin.pinot.common.utils.SegmentName;
 import java.io.File;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -128,10 +129,14 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
         LOGGER.error("Not adding segment {}", segmentId);
         throw new RuntimeException("Mismatching schema/table config for " + _tableName);
       }
-      SegmentDataManager manager =
-          new RealtimeSegmentDataManager(segmentZKMetadata, tableConfig,
-              instanceZKMetadata, this, _indexDir.getAbsolutePath(), _readMode, Schema.fromZNRecord(record),
-              _serverMetrics);
+      SegmentDataManager manager;
+      if (SegmentName.isHighLevelConsumerSegmentName(segmentId)) {
+        manager = new HLRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, instanceZKMetadata, this, _indexDir.getAbsolutePath(), _readMode, Schema.fromZNRecord(record),
+            _serverMetrics);
+      } else {
+        manager = new LLRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, instanceZKMetadata, this, _indexDir.getAbsolutePath(), _readMode, Schema.fromZNRecord(record),
+            _serverMetrics);
+      }
       LOGGER.info("Initialize RealtimeSegmentDataManager - " + segmentId);
       try {
         _rwLock.writeLock().lock();

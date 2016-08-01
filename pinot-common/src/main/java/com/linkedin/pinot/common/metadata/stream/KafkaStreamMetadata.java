@@ -37,6 +37,7 @@ public class KafkaStreamMetadata implements StreamMetadata {
   private final String _kafkaTopicName;
   private final List<ConsumerType> _consumerTypes = new ArrayList<>(2);
   private final String _zkBrokerUrl;
+  private final String _bootstrapHosts;
   private final String _decoderClass;
   private final Map<String, String> _decoderProperties = new HashMap<String, String>();
   private final Map<String, String> _kafkaConsumerProperties = new HashMap<String, String>();
@@ -46,6 +47,13 @@ public class KafkaStreamMetadata implements StreamMetadata {
     _zkBrokerUrl =
         streamConfigMap.get(StringUtil.join(".", Helix.DataSource.STREAM_PREFIX,
             Helix.DataSource.Realtime.Kafka.HighLevelConsumer.ZK_CONNECTION_STRING));
+
+    final String bootstrapHostConfigKey = Helix.DataSource.STREAM_PREFIX + "." + Helix.DataSource.Realtime.Kafka.KAFKA_BROKER_LIST;
+    if (streamConfigMap.containsKey(bootstrapHostConfigKey)) {
+      _bootstrapHosts = streamConfigMap.get(bootstrapHostConfigKey);
+    } else {
+      _bootstrapHosts = null;
+    }
 
     String consumerTypesCsv =streamConfigMap.get(StringUtil.join(".", Helix.DataSource.STREAM_PREFIX, Helix.DataSource.Realtime.Kafka.CONSUMER_TYPE));
     Iterable<String> parts = Splitter.on(',').trimResults().split(consumerTypesCsv);
@@ -174,5 +182,9 @@ public class KafkaStreamMetadata implements StreamMetadata {
   @Override
   public Map<String, String> toMap() {
     return _streamConfigMap;
+  }
+
+  public String getBootstrapHosts() {
+    return _bootstrapHosts;
   }
 }

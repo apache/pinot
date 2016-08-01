@@ -211,7 +211,7 @@ public abstract class ClusterTest extends ControllerTest {
       String retentionTimeUnit, String kafkaZkUrl, String kafkaTopic, String schemaName, String serverTenant,
       String brokerTenant, File avroFile, int realtimeSegmentFlushSize, String sortedColumn,
       List<String> invertedIndexColumns, String loadMode)
-          throws Exception {
+      throws Exception {
     JSONObject metadata = new JSONObject();
     metadata.put("streamType", "kafka");
     metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.CONSUMER_TYPE, Kafka.ConsumerType.highLevel.toString());
@@ -226,11 +226,34 @@ public abstract class ClusterTest extends ControllerTest {
 
     JSONObject request = ControllerRequestBuilder.buildCreateRealtimeTableJSON(tableName, serverTenant, brokerTenant,
         timeColumnName, timeColumnType, retentionTimeUnit, Integer.toString(retentionDays), 1,
-        "BalanceNumSegmentAssignmentStrategy", metadata, schemaName, sortedColumn, invertedIndexColumns, null);
+        "BalanceNumSegmentAssignmentStrategy", metadata, schemaName, sortedColumn, invertedIndexColumns, null, true);
     sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTableCreate(), request.toString());
 
     AvroFileSchemaKafkaAvroMessageDecoder.avroFile = avroFile;
+  }
 
+  protected void addLLCRealtimeTable(String tableName, String timeColumnName, String timeColumnType, int retentionDays,
+      String retentionTimeUnit, String kafkaBrokerList, String kafkaTopic, String schemaName, String serverTenant,
+      String brokerTenant, File avroFile, int realtimeSegmentFlushSize, String sortedColumn,
+      List<String> invertedIndexColumns, String loadMode)
+          throws Exception {
+    JSONObject metadata = new JSONObject();
+    metadata.put("streamType", "kafka");
+    metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.CONSUMER_TYPE, Kafka.ConsumerType.simple.toString());
+    metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.TOPIC_NAME, kafkaTopic);
+    metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.DECODER_CLASS,
+        AvroFileSchemaKafkaAvroMessageDecoder.class.getName());
+    metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.KAFKA_BROKER_LIST, kafkaBrokerList);
+    metadata.put(DataSource.Realtime.REALTIME_SEGMENT_FLUSH_SIZE, Integer.toString(realtimeSegmentFlushSize));
+    metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.KAFKA_CONSUMER_PROPS_PREFIX + "." + "auto.offset.reset",
+        "smallest");
+
+    JSONObject request = ControllerRequestBuilder.buildCreateRealtimeTableJSON(tableName, serverTenant, brokerTenant,
+        timeColumnName, timeColumnType, retentionTimeUnit, Integer.toString(retentionDays), 1,
+        "BalanceNumSegmentAssignmentStrategy", metadata, schemaName, sortedColumn, invertedIndexColumns, null, false);
+    sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTableCreate(), request.toString());
+
+    AvroFileSchemaKafkaAvroMessageDecoder.avroFile = avroFile;
   }
 
   protected void addHybridTable(String tableName, String timeColumnName, String timeColumnType, String kafkaZkUrl,
