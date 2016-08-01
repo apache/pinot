@@ -54,6 +54,9 @@ public class AnomalyResult extends AbstractBaseEntity implements Comparable<Anom
   @JoinColumn(name="anomaly_feedback_id")
   private AnomalyFeedback feedback;
 
+  @Column(name = "data_complete")
+  private boolean dataComplete = true;
+
   @ManyToOne(fetch = FetchType.EAGER)
   @JoinColumn(name = "function_id")
   private AnomalyFunctionSpec function;
@@ -159,6 +162,14 @@ public class AnomalyResult extends AbstractBaseEntity implements Comparable<Anom
 
   public void setFeedback(AnomalyFeedback feedback) {
     this.feedback = feedback;
+  }
+
+  public boolean isDataComplete() {
+    return dataComplete;
+  }
+
+  public void setDataComplete(boolean dataComplete) {
+    this.dataComplete = dataComplete;
   }
 
   @Override

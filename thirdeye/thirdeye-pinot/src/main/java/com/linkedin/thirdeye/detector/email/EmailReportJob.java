@@ -293,7 +293,7 @@ public class EmailReportJob implements Job {
     try {
       AnomalyResultDAO resultDAO =
           (AnomalyResultDAO) context.getJobDetail().getJobDataMap().get(RESULT_DAO);
-      results = resultDAO.findAllByTimeAndEmailId(start, end, config.getId());
+      results = resultDAO.findValidAllByTimeAndEmailId(start, end, config.getId());
     } catch (Exception e) {
       throw new JobExecutionException(e);
     }

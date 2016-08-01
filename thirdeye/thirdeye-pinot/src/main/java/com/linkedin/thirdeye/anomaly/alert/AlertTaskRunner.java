@@ -31,7 +31,6 @@ import org.quartz.JobExecutionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.task.TaskContext;
 import com.linkedin.thirdeye.anomaly.task.TaskInfo;
@@ -259,7 +258,7 @@ public class AlertTaskRunner implements TaskRunner {
   private List<AnomalyResult> getAnomalyResults(DateTime start, DateTime end) throws JobExecutionException {
     final List<AnomalyResult> results;
     try {
-      results = anomalyResultDAO.findAllByTimeAndEmailId(start, end, alertConfig.getId());
+      results = anomalyResultDAO.findValidAllByTimeAndEmailId(start, end, alertConfig.getId());
 
     } catch (Exception e) {
       throw new JobExecutionException(e);
