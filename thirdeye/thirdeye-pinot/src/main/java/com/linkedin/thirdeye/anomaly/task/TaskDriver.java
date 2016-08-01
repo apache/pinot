@@ -10,6 +10,10 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import javax.persistence.OptimisticLockException;
+import javax.persistence.RollbackException;
+
+import org.hibernate.StaleObjectStateException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -104,24 +108,25 @@ public class TaskDriver {
     LOG.info(Thread.currentThread().getId() + " : Trying to find a task to execute");
     do {
 
+      List<AnomalyTaskSpec> anomalyTasks = new ArrayList<>();
       try {
-        List<AnomalyTaskSpec> anomalyTasks =
-            anomalyTaskDAO.findByStatusOrderByCreateTimeAscending(TaskStatus.WAITING);
-        if (anomalyTasks.size() > 0)
-          LOG.info(Thread.currentThread().getId() + " : Found {} tasks in waiting state", anomalyTasks.size());
+      anomalyTasks =
+          anomalyTaskDAO.findByStatusOrderByCreateTimeAscending(TaskStatus.WAITING);
+      } catch (OptimisticLockException | RollbackException | StaleObjectStateException e) {
+        LOG.warn("OptimisticLockException while select and update, by workerId {}", workerId);
+      }
+      if (anomalyTasks.size() > 0)
+        LOG.info(Thread.currentThread().getId() + " : Found {} tasks in waiting state", anomalyTasks.size());
 
-        for (AnomalyTaskSpec anomalyTaskSpec : anomalyTasks) {
-          LOG.info(Thread.currentThread().getId() + " : Trying to acquire task : {}", anomalyTaskSpec.getId());
-          boolean success = anomalyTaskDAO.updateStatusAndWorkerId(workerId, anomalyTaskSpec.getId(),
-              TaskStatus.WAITING, TaskStatus.RUNNING);
-          LOG.info(Thread.currentThread().getId() + " : Task acquired success: {}", success);
-          if (success) {
-            acquiredTask = anomalyTaskSpec;
-            break;
-          }
+      for (AnomalyTaskSpec anomalyTaskSpec : anomalyTasks) {
+        LOG.info(Thread.currentThread().getId() + " : Trying to acquire task : {}", anomalyTaskSpec.getId());
+        boolean success = anomalyTaskDAO.updateStatusAndWorkerId(workerId, anomalyTaskSpec.getId(),
+            TaskStatus.WAITING, TaskStatus.RUNNING);
+        LOG.info(Thread.currentThread().getId() + " : Task acquired success: {}", success);
+        if (success) {
+          acquiredTask = anomalyTaskSpec;
+          break;
         }
-      } catch (Exception e) {
-        LOG.error("Exception in select and update", e);
       }
     } while (acquiredTask == null);
     LOG.info(Thread.currentThread().getId() + " : Acquired task ======" + acquiredTask);
