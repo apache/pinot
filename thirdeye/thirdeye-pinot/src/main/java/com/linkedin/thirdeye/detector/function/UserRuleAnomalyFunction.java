@@ -166,7 +166,7 @@ public class UserRuleAnomalyFunction extends BaseAnomalyFunction {
         anomalyResults.add(anomalyResult);
         currentValues.add(currentValue);
         baselineValues.add(baselineValue);
-        if(currentValue == 0.0 || baselineValue == 0.0) {
+        if (currentValue == 0.0 || baselineValue == 0.0) {
           anomalyResult.setDataMissing(true);
         }
       }
@@ -256,7 +256,6 @@ public class UserRuleAnomalyFunction extends BaseAnomalyFunction {
 
               }
             }
-
           }
         }
       }
