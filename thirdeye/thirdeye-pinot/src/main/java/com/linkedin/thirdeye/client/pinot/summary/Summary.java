@@ -1,100 +1,157 @@
 package com.linkedin.thirdeye.client.pinot.summary;
 
-import java.text.DecimalFormat;
 import java.util.ArrayList;
-import java.util.BitSet;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
-import com.linkedin.thirdeye.client.pinot.slsummary.DPArray;
 
 public class Summary {
-  double Ga;
-  double Gb;
-  double Rg;
-  double totalCost;
+  private static int N = 12;
 
-  List<Cell> resRecords = new ArrayList<>();
+  public static void computeSummary(List<List<HierarchyNode>> nodes) {
+    HierarchyNode root = nodes.get(0).get(0);
+    DPArray dpArray = buildSummary(root, .0);
 
-  public Summary(Cube cube, DPArray dp) {
-    this.Ga = dp.get(dp.size() - 1).getSubMetricA();
-    this.Gb = dp.get(dp.size() - 1).getSubMetricB();
-    this.Rg = dp.get(0).getRatio();
-//    this.totalCost = dp.get(dp.size() - 1).getCost();
-    this.totalCost = .0;
+    // Print summary
+    List<HierarchyNode> answer = new ArrayList<>();
+    for (HierarchyNode node : dpArray.getAnswer()) {
+      answer.add(node);
+    }
+    answer.sort(new NodeDimensionValuesComparator().reversed());
+    double baselineValues = root.data.baselineValue;
+    double currentValues = root.data.currentValue;
+    for (HierarchyNode node : answer) {
+      baselineValues -= node.baselineValue;
+      currentValues -= node.currentValue;
+    }
+    System.out.println("ALL: " + baselineValues + " " + currentValues + " " + (currentValues / baselineValues));
+    for (HierarchyNode node : answer) {
+      System.out.print(node.data + ": ");
+      System.out.print(node.baselineValue + ", " + node.currentValue + ", ");
+      System.out.println(node.currentValue / node.baselineValue);
+    }
+  }
 
-    BitSet ans = dp.getAnswer();
-//    for (int i = ans.nextSetBit(0); i >= 0; i = ans.nextSetBit(i + 1)) {
-    for (int i = 0; i < cube.getRowCount(); ++i) {
-      if (ans.get(i)) this.resRecords.add(new Cell(cube.getRowAt(i)));
-      else {
-        this.totalCost += CostFunction.err(cube.getRowAt(i).getBaselineValue(), cube.getRowAt(i).getCurrentValue(), this.Rg);
+  static class NodeDimensionValuesComparator implements Comparator<HierarchyNode> {
+    @Override
+    public int compare(HierarchyNode n1, HierarchyNode n2) {
+      return n1.data.dimensionValues.compareTo(n2.data.dimensionValues);
+    }
+  }
+
+  /**
+   * Build the summary recursively.
+   * The parentTargetRatio for the root node can be any arbitrary value.
+   */
+  static DPArray buildSummary(HierarchyNode node, double parentTargetRatio) {
+    DPArray dpArray = new DPArray(N);
+    double targetRatio = node.data.currentValue / node.data.baselineValue;
+    dpArray.targetRatio = targetRatio;
+    if (!node.isWorker) {
+      for (HierarchyNode child : node.children) {
+        DPArray childDpArray = buildSummary(child, targetRatio);
+        dpArray = mergeSummary(node, dpArray, childDpArray);
+        targetRatio = updateTargetRatio(node, dpArray.getAnswer());
+      }
+    } else {
+      dpArray = buildSummary(node, dpArray);
+    }
+
+    if (!node.isRoot) {
+      // if all children of the current node are picked, then aggregate them all
+      if (Double.compare(0., node.baselineValue) == 0 && Double.compare(0., node.currentValue) == 0) {
+        node.baselineValue = node.data.baselineValue;
+        node.currentValue = node.data.currentValue;
+        dpArray = new DPArray(N);
+        insertRowToSummary(dpArray, node, parentTargetRatio);
+      } else {
+        insertRowToSummary(dpArray, node, parentTargetRatio);
+        updateValues(node, dpArray.getAnswer());
       }
     }
+
+    return dpArray;
   }
 
-  public String toString() {
-    String dimensionSpace = "%-16s";
-    String metricSpace = "%-8s";
-    DecimalFormat dFormat = new DecimalFormat("0.000");
-
-    StringBuilder res = new StringBuilder("Summary:\n");
-    // header
-    res.append(String.format(dimensionSpace, "Name"));
-    res.append('\t');
-    res.append(String.format(metricSpace, "ta"));
-    res.append('\t');
-    res.append(String.format(metricSpace, "tb"));
-    res.append('\t');
-    res.append(String.format(metricSpace, "ratio"));
-    res.append('\t');
-    res.append(String.format(metricSpace, "cost"));
-    res.append('\n');
-
-    // (ALL)- row
-    res.append(String.format(dimensionSpace, "(ALL)-"));
-    res.append('\t');
-    res.append(String.format(metricSpace, (int) Ga));
-    res.append('\t');
-    res.append(String.format(metricSpace, (int) Gb));
-    res.append('\t');
-    res.append(String.format(metricSpace, dFormat.format(Rg)));
-    res.append('\t');
-    res.append(String.format(metricSpace, dFormat.format(totalCost)));
-    res.append('\n');
-
-    boolean dir = Double.compare(1.0, Rg) <= 0;
-    StringBuilder nres = new StringBuilder();
-    StringBuilder sb = res;
-    for (Cell cell : resRecords) {
-      sb = dir & (Double.compare(1.0, cell.ratio) <= 0) ? res : nres;
-      sb.append(String.format(dimensionSpace, cell.dimensionName.toString() + '/' + cell.dimensionValue));
-      sb.append('\t');
-      sb.append(String.format(metricSpace, (int) cell.metricA));
-      sb.append('\t');
-      sb.append(String.format(metricSpace, (int) cell.metricB));
-      sb.append('\t');
-      sb.append(String.format(metricSpace, dFormat.format(cell.ratio)));
-      sb.append('\n');
+  static void updateValues(HierarchyNode node, Set<HierarchyNode> answer) {
+    node.baselineValue = node.data.baselineValue;
+    node.currentValue = node.data.currentValue;
+    for (HierarchyNode child : answer) {
+      if (child == node) continue;
+      node.baselineValue -= child.baselineValue;
+      node.currentValue -= child.currentValue;
     }
-
-    res.append(nres.toString());
-
-    return res.toString();
   }
 
-  static class Cell {
-    Dimensions dimensionName;
-    DimensionValues dimensionValue;
-    double metricA;
-    double metricB;
-    double ratio;
-
-    Cell(Row record) {
-      this.dimensionName = record.dimensions;
-      this.dimensionValue = record.dimensionValues;
-      this.metricA = record.baselineValue;
-      this.metricB = record.currentValue;
-      this.ratio = record.currentValue / record.baselineValue;
+  static double updateTargetRatio(HierarchyNode node, Set<HierarchyNode> answer) {
+    node.baselineValue = node.data.baselineValue;
+    node.currentValue = node.data.currentValue;
+    for (HierarchyNode child : answer) {
+      node.baselineValue -= child.baselineValue;
+      node.currentValue -= child.currentValue;
     }
+    double ratio = node.currentValue / node.baselineValue;
+    if (Double.isInfinite(ratio)) {
+      ratio = node.data.currentValue / node.data.baselineValue;
+    }
+    return ratio;
+  }
+
+  static DPArray buildSummary(HierarchyNode node, DPArray nodeDpArray) {
+    double targetRatio = nodeDpArray.targetRatio;
+    for (HierarchyNode child : node.children) {
+      insertRowToSummary(nodeDpArray, child, targetRatio);
+      targetRatio = updateTargetRatio(node, nodeDpArray.getAnswer());
+      nodeDpArray.targetRatio = targetRatio;
+    }
+    return nodeDpArray;
+  }
+
+  static DPArray mergeSummary(HierarchyNode parentNode, DPArray parentArray, DPArray childArray) {
+    double targetRatio = (parentArray.targetRatio + childArray.targetRatio) / 2.;
+    Set<HierarchyNode> removedNodes = new HashSet<>(parentArray.getAnswer());
+    removedNodes.addAll(childArray.getAnswer());
+    for (HierarchyNode childNode : childArray.getAnswer()) {
+      insertRowToSummary(parentArray, childNode, targetRatio);
+    }
+    // Update an internal node's baseline and current value if any of its child is remove due to the merge
+    removedNodes.removeAll(parentArray.getAnswer());
+    List<HierarchyNode> removedNodesList = new ArrayList<>();
+    removedNodesList.addAll(removedNodes);
+    removedNodesList.sort(new NodeDimensionValuesComparator()); // Process lower level nodes first
+    for (HierarchyNode node : removedNodesList) {
+      HierarchyNode parents = node;
+      while ((parents = parents.parent) != parentNode) {
+        parents.baselineValue += node.baselineValue;
+        parents.currentValue += node.currentValue;
+        if (parentArray.getAnswer().contains(parents)) {
+          break;
+        }
+      }
+    }
+    parentArray.targetRatio = updateTargetRatio(parentNode, parentArray.getAnswer());
+    return parentArray;
+  }
+
+  static void insertRowToSummary(DPArray dp, HierarchyNode node, double targetRatio) {
+    double baselineValue = node.baselineValue;
+    double currentValue = node.currentValue;
+    double cost = CostFunction.err4EmptyValues(baselineValue, currentValue, targetRatio);
+    node.data.targetRatios.add(targetRatio);
+
+    for (int n = N; n > 0; --n) {
+      double val1 = dp.get(n - 1).cost;
+      double val2 = dp.get(n).cost + cost; // fixed r per iteration
+      if (Double.compare(val1, val2) < 0) {
+        dp.get(n).cost = val1;
+        dp.get(n).ans.retainAll(dp.get(n - 1).ans); // dp[n].ans = dp[n-1].ans
+        dp.get(n).ans.add(node);
+      } else {
+        dp.get(n).cost = val2;
+      }
+    }
+    dp.get(0).cost = dp.get(0).cost + cost;
   }
 }

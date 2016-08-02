@@ -14,12 +14,16 @@ public class DimensionValues implements Comparable<DimensionValues> {
   @JsonProperty("values")
   List<String> values;
 
-  DimensionValues() {
+  public DimensionValues() {
     this.values = new ArrayList<String>();
   }
 
-  DimensionValues(List<String> values) {
+  public DimensionValues(List<String> values) {
     this.values = values;
+  }
+
+  public String get(int index) {
+    return values.get(index);
   }
 
   /**
