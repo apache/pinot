@@ -16,6 +16,7 @@
 package com.linkedin.pinot.core.segment.index.loader;
 
 import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.CommonConstants;
@@ -38,41 +39,52 @@ public class Loaders {
   private static final Logger LOGGER = LoggerFactory.getLogger(Loaders.class);
 
   public static class IndexSegment {
-    public static com.linkedin.pinot.core.indexsegment.IndexSegment load(File indexDir, ReadMode mode) throws Exception {
-      return load(indexDir, mode, null);
+    public static com.linkedin.pinot.core.indexsegment.IndexSegment load(File indexDir, ReadMode readMode)
+        throws Exception {
+      return load(indexDir, readMode, null, null);
     }
 
     public static com.linkedin.pinot.core.indexsegment.IndexSegment load(File indexDir, ReadMode readMode,
-        IndexLoadingConfigMetadata indexLoadingConfigMetadata) throws Exception {
+        IndexLoadingConfigMetadata indexLoadingConfigMetadata)
+        throws Exception {
+      return load(indexDir, readMode, indexLoadingConfigMetadata, null);
+    }
 
+    public static com.linkedin.pinot.core.indexsegment.IndexSegment load(File indexDir, ReadMode readMode,
+        IndexLoadingConfigMetadata indexLoadingConfigMetadata, Schema schema)
+        throws Exception {
       Preconditions.checkNotNull(indexDir);
       Preconditions.checkArgument(indexDir.exists(), "Index directory: {} does not exist", indexDir);
       Preconditions.checkArgument(indexDir.isDirectory(), "Index directory: {} is not a directory", indexDir);
-      //NOTE: indexLoadingConfigMetadata can be null
+      // NOTE: indexLoadingConfigMetadata and schema can be null.
 
       SegmentMetadataImpl metadata = new SegmentMetadataImpl(indexDir);
       SegmentVersion configuredVersionToLoad = getSegmentVersionToLoad(indexLoadingConfigMetadata);
       SegmentVersion metadataVersion = metadata.getSegmentVersion();
-      if (shouldConvertFormat(metadataVersion, configuredVersionToLoad) &&
-          ! targetFormatAlreadyExists(indexDir, configuredVersionToLoad)) {
+      if (shouldConvertFormat(metadataVersion, configuredVersionToLoad)
+          && !targetFormatAlreadyExists(indexDir, configuredVersionToLoad)) {
         LOGGER.info("segment:{} needs to be converted from :{} to {} version.", indexDir.getName(),
             metadataVersion, configuredVersionToLoad);
-        SegmentFormatConverter converter = SegmentFormatConverterFactory.getConverter(metadataVersion, configuredVersionToLoad);
+        SegmentFormatConverter converter =
+            SegmentFormatConverterFactory.getConverter(metadataVersion, configuredVersionToLoad);
         LOGGER.info("Using converter:{} to up-convert the format", converter.getClass().getName());
         converter.convert(indexDir);
         LOGGER.info("Successfully up-converted segment:{} from :{} to {} version.",
             indexDir.getName(), metadataVersion, configuredVersionToLoad);
       }
 
-      File segmentDirectoryPath = SegmentDirectoryPaths.segmentDirectoryFor(indexDir, configuredVersionToLoad);
-      // load the metadata again since converter may have changed it
-      metadata = new SegmentMetadataImpl(segmentDirectoryPath);
 
       // add or removes indexes based on indexLoadingConfigurationMetadata
-      try (SegmentPreProcessor preProcessor = new SegmentPreProcessor(segmentDirectoryPath, metadata, indexLoadingConfigMetadata)) {
+      // add or replace new columns with default value
+      // NOTE: this step may modify the segment metadata.
+      File segmentDirectoryPath = SegmentDirectoryPaths.segmentDirectoryFor(indexDir, configuredVersionToLoad);
+      try (SegmentPreProcessor preProcessor = new SegmentPreProcessor(segmentDirectoryPath, indexLoadingConfigMetadata,
+          schema)) {
         preProcessor.process();
       }
 
+      // load the metadata again since converter and pre-processor may have changed it
+      metadata = new SegmentMetadataImpl(segmentDirectoryPath);
       SegmentDirectory segmentDirectory = SegmentDirectory.createFromLocalFS(segmentDirectoryPath, metadata, readMode);
 
       Map<String, ColumnIndexContainer> indexContainerMap = new HashMap<String, ColumnIndexContainer>();

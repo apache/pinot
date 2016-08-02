@@ -171,6 +171,10 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     setSchema(schema);
   }
 
+  public PropertiesConfiguration getSegmentMetadataPropertiesConfiguration() {
+    return _segmentMetadataPropertiesConfiguration;
+  }
+
   private void setSchema(Schema schema) {
     for (String columnName : schema.getColumnNames()) {
       _schema.addField(columnName, schema.getFieldSpecFor(columnName));

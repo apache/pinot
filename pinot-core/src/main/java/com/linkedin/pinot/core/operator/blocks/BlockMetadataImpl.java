@@ -46,7 +46,7 @@ public final class BlockMetadataImpl implements BlockMetadata {
 
   @Override
   public boolean hasInvertedIndex() {
-    return columnMetadata.isHasInvertedIndex();
+    return columnMetadata.hasInvertedIndex();
   }
 
   @Override

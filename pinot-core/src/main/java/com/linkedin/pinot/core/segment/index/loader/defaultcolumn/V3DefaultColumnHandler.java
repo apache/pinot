@@ -1,0 +1,81 @@
+/**
+ * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package com.linkedin.pinot.core.segment.index.loader.defaultcolumn;
+
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import com.linkedin.pinot.core.segment.index.loader.LoaderUtils;
+import com.linkedin.pinot.core.segment.store.ColumnIndexType;
+import com.linkedin.pinot.core.segment.store.SegmentDirectory;
+import java.io.File;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+
+public class V3DefaultColumnHandler extends BaseDefaultColumnHandler {
+  private static final Logger LOGGER = LoggerFactory.getLogger(V3DefaultColumnHandler.class);
+
+  private final SegmentDirectory.Writer segmentWriter;
+
+  public V3DefaultColumnHandler(File indexDir, Schema schema, SegmentMetadataImpl segmentMetadata,
+      SegmentDirectory.Writer segmentWriter) {
+    super(indexDir, schema, segmentMetadata);
+    this.segmentWriter = segmentWriter;
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  protected void updateDefaultColumn(String column, DefaultColumnAction action)
+      throws Exception {
+    LOGGER.info("Starting default column action: {} on column: {}", action, column);
+
+    // Column indices cannot be removed for segment format v3.
+    // Throw exception to drop and re-download the segment.
+    if (action.isRemoveAction()) {
+      String failureMessage =
+          "Default value indices for column: " + column + " cannot be removed for segment format v3, throw exception to"
+              + " drop and re-download the segment.";
+      LOGGER.error(failureMessage);
+      throw new RuntimeException(failureMessage);
+    }
+
+    // Delete existing dictionary and forward index for the column. For V3, this is for error handling.
+    removeColumnV1Indices(column);
+
+    // Now we finished all the work needed for REMOVE action.
+    // For ADD and UPDATE action, need to create new dictionary and forward index, and update column metadata.
+    if (!action.isRemoveAction()) {
+      createColumnV1Indices(column);
+
+      // Write index to V3 format.
+      FieldSpec fieldSpec = schema.getFieldSpecFor(column);
+      boolean isSingleValue = fieldSpec.isSingleValueField();
+      File dictionaryFile = new File(indexDir, column + V1Constants.Dict.FILE_EXTENTION);
+      File forwardIndexFile;
+      if (isSingleValue) {
+        forwardIndexFile = new File(indexDir, column + V1Constants.Indexes.SORTED_FWD_IDX_FILE_EXTENTION);
+      } else {
+        forwardIndexFile = new File(indexDir, column + V1Constants.Indexes.UN_SORTED_MV_FWD_IDX_FILE_EXTENTION);
+      }
+      LoaderUtils.writeIndexToV3Format(segmentWriter, column, dictionaryFile, ColumnIndexType.DICTIONARY);
+      LoaderUtils.writeIndexToV3Format(segmentWriter, column, forwardIndexFile, ColumnIndexType.FORWARD_INDEX);
+    }
+  }
+}

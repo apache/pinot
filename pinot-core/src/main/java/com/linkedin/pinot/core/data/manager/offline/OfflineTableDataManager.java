@@ -15,15 +15,17 @@
  */
 package com.linkedin.pinot.core.data.manager.offline;
 
-import org.apache.helix.ZNRecord;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
+import java.io.File;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -44,15 +46,17 @@ public class OfflineTableDataManager extends AbstractTableDataManager {
   }
 
   @Override
-  public void addSegment(SegmentMetadata segmentMetadata) throws Exception {
-    IndexSegment indexSegment =
-        ColumnarSegmentLoader.loadSegment(segmentMetadata, _readMode, _indexLoadingConfigMetadata);
+  public void addSegment(SegmentMetadata segmentMetadata, Schema schema)
+      throws Exception {
+    IndexSegment indexSegment = ColumnarSegmentLoader.loadSegment(new File(segmentMetadata.getIndexDir()), _readMode,
+        _indexLoadingConfigMetadata, schema);
     addSegment(indexSegment);
   }
 
   @Override
   public void addSegment(ZkHelixPropertyStore<ZNRecord> propertyStore, AbstractTableConfig tableConfig,
-      InstanceZKMetadata instanceZKMetadata, SegmentZKMetadata segmentZKMetadata) throws Exception {
+      InstanceZKMetadata instanceZKMetadata, SegmentZKMetadata segmentZKMetadata)
+      throws Exception {
     throw new UnsupportedOperationException("Not supported for Offline segments");
   }
 }

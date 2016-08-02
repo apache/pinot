@@ -120,7 +120,7 @@ public class TableSizeResourceTest {
     driver.build();
     File segmentDirectory = new File(INDEX_DIR, driver.getSegmentName());
     indexSegment = ColumnarSegmentLoader.load(segmentDirectory, ReadMode.mmap);
-    serverInstance.getInstanceDataManager().addSegment(indexSegment.getSegmentMetadata(), null);
+    serverInstance.getInstanceDataManager().addSegment(indexSegment.getSegmentMetadata(), null, null);
   }
 
   @Test

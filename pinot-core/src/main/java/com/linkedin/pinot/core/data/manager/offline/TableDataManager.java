@@ -17,6 +17,7 @@ package com.linkedin.pinot.core.data.manager.offline;
 
 import com.google.common.collect.ImmutableList;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
@@ -62,9 +63,10 @@ public interface TableDataManager {
    * Adding a Segment into the TableDataManager by given SegmentMetadata.
    *
    * @param segmentMetaToAdd
+   * @param schema
    * @throws Exception
    */
-  void addSegment(SegmentMetadata segmentMetaToAdd) throws Exception;
+  void addSegment(SegmentMetadata segmentMetaToAdd, Schema schema) throws Exception;
 
   /**
    * Adding a Segment into the TableDataManager by given DataTableZKMetadata, InstanceZKMetadata, SegmentZKMetadata.
