@@ -254,10 +254,12 @@ public class AnomalyResource {
     anomalyFunctionSpec.setBucketUnit(dataGranularity.getUnit());
 
     anomalyFunctionSpec.setExploreDimensions(exploreDimensions);
-    filters = URLDecoder.decode(filters, UTF8);
-    String filterString = ThirdEyeUtils.getSortedFiltersFromJson(filters);
 
-    anomalyFunctionSpec.setFilters(filterString);
+    if (!StringUtils.isBlank(filters)) {
+      filters = URLDecoder.decode(filters, UTF8);
+      String filterString = ThirdEyeUtils.getSortedFiltersFromJson(filters);
+      anomalyFunctionSpec.setFilters(filterString);
+    }
     anomalyFunctionSpec.setProperties(properties);
 
     if (StringUtils.isEmpty(cron)) {
@@ -339,9 +341,11 @@ public class AnomalyResource {
     anomalyFunctionSpec.setBucketSize(dataGranularity.getSize());
     anomalyFunctionSpec.setBucketUnit(dataGranularity.getUnit());
 
-    filters = URLDecoder.decode(filters, UTF8);
-    String filterString = ThirdEyeUtils.getSortedFiltersFromJson(filters);
-    anomalyFunctionSpec.setFilters(filterString);
+    if (!StringUtils.isBlank(filters)) {
+      filters = URLDecoder.decode(filters, UTF8);
+      String filterString = ThirdEyeUtils.getSortedFiltersFromJson(filters);
+      anomalyFunctionSpec.setFilters(filterString);
+    }
     anomalyFunctionSpec.setExploreDimensions(exploreDimensions);
     anomalyFunctionSpec.setProperties(properties);
 
