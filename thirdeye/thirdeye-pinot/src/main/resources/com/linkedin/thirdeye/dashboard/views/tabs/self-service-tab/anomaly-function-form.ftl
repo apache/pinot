@@ -91,9 +91,9 @@
             <div class="user-rule-fields function-type-fields uk-display-inline-block {{#if data/functionype}}uk-hidden{{/if}}">
                 <div id="anomaly-condition-selector" class="uk-form-row uk-form-row uk-display-inline-block" rel="self-service">
                     <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group uk-display-inline-block">
-                        <div id="selected-anomaly-condition" class="uk-button" value="{{#if fnProperties}}{{discribeDelta fnProperties/changeThreshold description}}{{/if}}">
+                        <div id="selected-anomaly-condition" class="uk-button" value={{#if fnProperties}}"{{discribeDelta fnProperties/changeThreshold 'description'}}"{{/if}}>
                             {{#if fnProperties}}
-                                {{discribeDelta fnProperties/changeThreshold description}}
+                                {{discribeDelta fnProperties/changeThreshold 'description'}}
                             {{else}}
                                  Condition
                             {{/if}}
@@ -220,13 +220,13 @@
         </div>-->
 
         <div class="uk-form-row">
-            {{#if data/cron}}
-            cron: {{data/cron}}
-            {{else}}
-            <span class="uk-form-label uk-display-inline-block">Monitor the data every </span>
-            <input id="monitoring-repeat-size" type="number" class="thin-input" {{#if data/repeatEverySize}}value="{{data/repeatEverySize}}"{{/if}}>
+
+
+            <span class="uk-form-label uk-display-inline-block">Monitor the data every
+            </span>
+            <input id="monitoring-repeat-size" type="number" class="thin-input" value="{{#if schedule/repeatEverySize}}{{schedule/repeatEverySize}}{{/if}}">
             <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group uk-display-inline-block">
-                <div id="selected-monitoring-repeat-unit" class="uk-button" value="HOURS">HOURS</div>
+                <div id="selected-monitoring-repeat-unit" class="uk-button" value={{#if schedule/repeatEveryUnit}}"{{schedule/repeatEveryUnit}}"{{else}}"HOURS"{{/if}}>{{#if schedule/repeatEveryUnit}}{{schedule/repeatEveryUnit}}{{else}}HOURS{{/if}}</div>
                 <div class="uk-button uk-button-primary" type="button"><i class="uk-icon-caret-down"></i>
                 </div>
                 <div class="uk-dropdown uk-dropdown-small uk-dropdown-bottom" style="top: 30px; left: 0px;">
@@ -236,13 +236,14 @@
                     </ul>
                 </div>
             </div>
-                    <span id="monitoring-schedule" class="hidden">
+                    <span id="monitoring-schedule" class="{{#if schedule}}{{hide_if_eq schedule/repeatEveryUnit 'HOURS'}}{{else}}uk-hidden{{/if}}">
                         <span> at
                         </span>
-                        <input id="monitoring-schedule-time" class="thin-input" type="text" data-uk-timepicker="{format:'24h'}" placeholder="HH:MM">
-                        <span id="local-timezone"></span>
+                        <input id="monitoring-schedule-time" class="thin-input" type="text" data-uk-timepicker="{format:'24h'}" placeholder="HH:MM" value="{{#if schedule/scheduleHour}}{{schedule/scheduleHour}}:{{#if schedule/scheduleMinute}}{{schedule/scheduleMinute}}{{/if}}{{/if}}">
+                        <span id="schedule-timezone">UTC</span>
                     </span>
-            {{/if}}
+           {{#if data.cron}}<span class="form-row">cron: {{data/cron}}</span>{{/if}}
+
         </div>
 
         <div class="uk-form-row">

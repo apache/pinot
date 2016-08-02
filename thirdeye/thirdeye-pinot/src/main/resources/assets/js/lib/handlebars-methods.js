@@ -77,18 +77,24 @@ $(document).ready(function () {
     });
 
     //parse anomaly data properties
-    Handlebars.registerHelper('parseAnomalyProperties', function (propertiesString, param) {
+    Handlebars.registerHelper('listAnomalyProperties', function (propertiesString) {
+
+        //Remove trailing ";"
+        if(propertiesString.substr(propertiesString.length - 1) == ";"){
+            propertiesString = propertiesString.substring(0, propertiesString.length-1)
+
+        }
+
         var propertiesAry = propertiesString.split(";");
+        var html = "";
         for (var i = 0, numProp = propertiesAry.length; i < numProp; i++) {
             var keyValue = propertiesAry[i];
             keyValue = keyValue.split("=")
 
-            var key = keyValue[0];
-            if (key == param) {
-                var value = keyValue[1]
-                return value
-            }
+            html += "<span class='prop-key'<b>" + keyValue[0] + " : </b></span><span class='prop-value'>" + keyValue[1] + ",</span><br>"
+
         }
+        return html
     });
 
     //parse anomaly data properties value and returns the requested param
@@ -126,14 +132,14 @@ $(document).ready(function () {
     Handlebars.registerHelper('discribeDelta', function (value, describeMode) {
 
         var describeChange;
-        if (value > 0) {
+        if (parseFloat(value) > 0) {
             describeChange = {
                 iconClass: 'positive-icon',
                 description: 'INCREASES'}
-        } else if (value < 0) {
+        } else if (parseFloat(value) < 0) {
             describeChange = {
                 iconClass: 'negative-icon',
-                description: 'DECREASES'}
+                description: 'DROPS'}
         } else {
             return
         }

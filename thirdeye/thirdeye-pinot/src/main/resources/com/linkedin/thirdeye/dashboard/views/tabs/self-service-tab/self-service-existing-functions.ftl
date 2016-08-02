@@ -17,7 +17,7 @@
             <tr class="existing-function-row" data-function-id="{{anomalyFunction/id}}">
                 <td>{{anomalyFunction/functionName}}</td>
                 <td>{{anomalyFunction/metric}}</td>
-                <td>{{anomalyFunction/properties}}</td>
+                <td>{{{listAnomalyProperties anomalyFunction/properties}}}</td>
                 <td>{{anomalyFunction/filters}}</td>
                 <td><input type="checkbox" {{#if anomalyFunction/isActive}}checked{{/if}} data-uk-modal="{target:'#toggle-alert-modal'}"></span></td>
                 <td><span class="init-update-function-btn uk-button" data-row-id="{{anomalyFunctionIndex}}" data-uk-modal="{target:'#update-function-modal'}" data-uk-tooltip title="Edit"><i class="uk-icon-pencil"></i></span></td>

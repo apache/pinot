@@ -53,7 +53,7 @@
                 </div>
                 <!-- UPDATE FUNCTION MODAL-->
                 <div id="update-function-modal" class="uk-modal">
-                    <div class="uk-modal-dialog">
+                    <div class="uk-modal-dialog uk-modal-dialog-large">
                         <div class="uk-modal-header">
                             <h3>Update anomaly function</h3><a class="uk-modal-close uk-close position-top-right"></a>
                         </div>

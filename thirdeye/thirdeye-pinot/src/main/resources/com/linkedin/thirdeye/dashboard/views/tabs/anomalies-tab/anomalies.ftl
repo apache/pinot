@@ -12,11 +12,8 @@
             <thead>
             <tr>
                 <th class="select_all_cell"><input class="select-all-checkbox" value="1" type="checkbox" rel="anomalies" checked>ID</th>
-                <!--{{!--<th >Metric</th>--}}-->
                 <th>Start / End ({{returnUserTimeZone}})</th>
                 <th>Alert reason</th>
-				<!--<th >Function ID</th>-->
-                <!--{{!--<th >Function type</th>--}}-->
                 <th>Dimension</th>
                 <th>Heatmap <br>of timerange</th>
                 <th>Is this an anomaly?</th>
@@ -30,14 +27,11 @@
                 <td class="checkbox-cell"><label class="anomaly-table-checkbox"><input type="checkbox" data-value="{{anomalyData/metric}}" id="{{anomalyData/id}}" checked><div class="color-box uk-display-inline-block" style="background:{{colorById anomalyIndex @root.length}}">
                 </div> {{anomalyData/id}}</label>
                 </td>
-                <!--{{!--<td>{{anomalyData/metric}}</td>--}}-->
                 <td>
                     <p>{{millisToDate anomalyData/startTimeUtc showTimeZone=false}} </p>
                     <p> {{millisToDate anomalyData/endTimeUtc showTimeZone=false}}</p>
                 </td>
                 <td>{{anomalyData/message}}</td>
-				<!--{{!--<td>{{anomalyData/functionId}}</td>--}}-->
-                <!--{{!--<td>{{anomalyData/functionType}}</td>--}}-->
                 <td>{{anomalyData/dimensions}}</td>
                 <td>
                     <a class="heatmap-link" href="#" data-start-utc-millis="{{anomalyData/startTimeUtc}}" data-end-utc-millis="{{anomalyData/endTimeUtc}}"  data-metric="{{anomalyData/metric}}">
@@ -47,7 +41,6 @@
                 <td>
                    <div class="feedback-selector" data-anomaly-id="{{anomalyData/id}}" data-dataset="{{anomalyData/collection}}">
                         <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group"
-                            <!--<div class="add-feedback add-btn uk-display-inline-block" rel="{{tabName}}" data-uk-dropdown="{mode:'click'}">-->
                             <div class="selected-feedback uk-button"  value="{{#if anomalyData/feedback/feedbackType}}{{anomalyData/feedback/feedbackType}}{{/if}}">{{#if anomalyData/feedback/feedbackType}}{{anomalyData/feedback/feedbackType}}{{else}}Provide Feedback{{/if}}</div>
                             <button class="add-single-metric-btn uk-button uk-button-primary" type="button"><i class="uk-icon-caret-down"></i></button>
                             <div class="uk-dropdown uk-dropdown-small">
