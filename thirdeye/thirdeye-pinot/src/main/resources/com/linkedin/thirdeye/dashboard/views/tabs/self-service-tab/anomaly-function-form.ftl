@@ -160,25 +160,26 @@
 
             <!-- ** COMMON ANOMALY FUNCTION PARAMS part 3/2** -->
             <span>for</span>
-            <input id="monitoring-window-size" class="thin-input" type="number" {{#if data/windowSize}}value="{{data/windowSize}}"{{/if}}>
+            <input id="monitoring-window-size" class="thin-input" type="number" value="{{#if data/windowSize}}{{data/windowSize}}{{else}}1{{/if}}">
             <span>consecutive</span>
             <div id="monitoring-window-unit-selector uk-display-inline-block" class="uk-form-row uk-form-row uk-display-inline-block" rel="self-service">
                 <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group uk-display-inline-block">
-                    <div id="selected-monitoring-window-unit" class="uk-button" value="{{#if data/windowUnit}}{{data/windowUnit}}{{else}}HOURS{{/if}}">{{#if data/windowUnit}}{{data/windowUnit}}{{else}}HOURS{{/if}}</div>
+                    <div id="selected-monitoring-window-unit" class="uk-button" value="{{#if data/windowUnit}}{{data/windowUnit}}{{else}}HOUR(S){{/if}}">{{#if data/windowUnit}}{{data/windowUnit}}{{else}}HOUR(S){{/if}}</div>
                     <div class="uk-button uk-button-primary" type="button"><i class="uk-icon-caret-down"></i></div>
                     <div class="uk-dropdown uk-dropdown-small uk-dropdown-bottom" style="top: 30px; left: 0px;">
                         <ul class="uk-nav uk-nav-dropdown single-select">
-                            <li class="monitoring-window-unit-option" value="HOURS"><a href="#" class="uk-dropdown-close">HOURS</a></li>
-                            <li class="monitoring-window-unit-option" value="DAYS"><a href="#" class="uk-dropdown-close" >DAYS</a></li>
+                            <li class="monitoring-window-unit-option" value="HOURS"><a href="#" class="uk-dropdown-close">HOUR(S)</a></li>
+                            <li class="monitoring-window-unit-option" value="DAYS"><a href="#" class="uk-dropdown-close" >DAY(S)</a></li>
                         </ul>
                     </div>
                 </div>
             </div>
             <!-- END OF COMMON ANOMALY FUNCTION PARAMS part 3/2 ** -->
-
+        </div>
+        <div class="uk-form-row uk-margin-top">
 
             <!-- ** USER_RULE & MIN_MAX_THRESHOLD PROPERTIES ** -->
-            <div class="user-rule-fields min-max-threshold-fields function-type-fields uk-display-inline-block">
+            <div class="user-rule-fields min-max-threshold-fields function-type-fields">
                 <div id="self-service-view-single-dimension-selector" class="view-single-dimension-selector uk-display-inline-block" rel="self-service">
                     <label class="uk-form-label">in dimension</label>
                     <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group">
@@ -190,7 +191,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="view-filter-selector  uk-hidden" rel="self-service">
+                <div class="view-filter-selector uk-display-inline-block" rel="self-service">
                     <label class="uk-form-label  uk-display-inline-block">with filters:</label>
                     <div id="self-service-add-filter" class="add-filter add-btn uk-display-inline-block" rel="self-service" data-uk-dropdown="{mode:'click'}">
                         <button class="uk-button uk-button-primary" type="button"><i class="uk-icon-plus"></i></button>
@@ -224,22 +225,22 @@
 
             <span class="uk-form-label uk-display-inline-block">Monitor the data every
             </span>
-            <input id="monitoring-repeat-size" type="number" class="thin-input" value="{{#if schedule/repeatEverySize}}{{schedule/repeatEverySize}}{{/if}}">
+            <input id="monitoring-repeat-size" type="number" class="thin-input" value="{{#if schedule/repeatEverySize}}{{schedule/repeatEverySize}}{{else}}1{{/if}}">
             <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group uk-display-inline-block">
-                <div id="selected-monitoring-repeat-unit" class="uk-button" value={{#if schedule/repeatEveryUnit}}"{{schedule/repeatEveryUnit}}"{{else}}"HOURS"{{/if}}>{{#if schedule/repeatEveryUnit}}{{schedule/repeatEveryUnit}}{{else}}HOURS{{/if}}</div>
+                <div id="selected-monitoring-repeat-unit" class="uk-button" value="{{#if schedule/repeatEveryUnit}}{{schedule/repeatEveryUnit}}{{else}}HOURS{{/if}}">{{#if schedule/repeatEveryUnit}}{{schedule/repeatEveryUnit}}{{else}}HOUR(S){{/if}}</div>
                 <div class="uk-button uk-button-primary" type="button"><i class="uk-icon-caret-down"></i>
                 </div>
                 <div class="uk-dropdown uk-dropdown-small uk-dropdown-bottom" style="top: 30px; left: 0px;">
                     <ul class="uk-nav uk-nav-dropdown  single-select">
-                        <li class="anomaly-monitoring-repeat-unit-option" value="HOURS" ><a href="#" class="uk-dropdown-close">HOURS</a></li>
-                        <li class="anomaly-monitoring-repeat-unit-option" value="DAYS" ><a href="#" class="uk-dropdown-close">DAYS</a></li>
+                        <li class="anomaly-monitoring-repeat-unit-option" value="HOURS" ><a class="uk-dropdown-close">HOUR(S)</a></li>
+                        <li class="anomaly-monitoring-repeat-unit-option" value="DAYS" ><a class="uk-dropdown-close">DAY(S)</a></li>
                     </ul>
                 </div>
             </div>
                     <span id="monitoring-schedule" class="{{#if schedule}}{{hide_if_eq schedule/repeatEveryUnit 'HOURS'}}{{else}}uk-hidden{{/if}}">
                         <span> at
                         </span>
-                        <input id="monitoring-schedule-time" class="thin-input" type="text" data-uk-timepicker="{format:'24h'}" placeholder="HH:MM" value="{{#if schedule/scheduleHour}}{{schedule/scheduleHour}}:{{#if schedule/scheduleMinute}}{{schedule/scheduleMinute}}{{/if}}{{/if}}">
+                        <input id="monitoring-schedule-time" class="thin-input" type="text" data-uk-timepicker="{format:'24h'}" placeholder="HH:MM" value="{{#if schedule/scheduleHour}}{{schedule/scheduleHour}}{{else}}00:{{#if schedule/scheduleMinute}}{{schedule/scheduleMinute}}{{else}}00{{/if}}{{/if}}">
                         <span id="schedule-timezone">UTC</span>
                     </span>
            {{#if data.cron}}<span class="form-row">cron: {{data/cron}}</span>{{/if}}

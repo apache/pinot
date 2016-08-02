@@ -58,6 +58,7 @@ function renderSelfService() {
     $("#self-service-forms-section").on("keyup", "#name", function () {
         var form = $(this).closest("form");
         hideErrorAndSuccess("name",form);
+        enableButton($("#create-anomaly-function"));
     });
 
     //Function type
@@ -165,6 +166,7 @@ function renderSelfService() {
         $("#confirm-delete-anomaly-function").attr("data-function-id", functionId);
         $("#function-to-delete").text(functionName);
         $("#delete-anomaly-function-success").hide();
+        $("#delete-anomaly-function-error").hide();
         enableButton($("#confirm-delete-anomaly-function"));
     });
 
@@ -222,13 +224,18 @@ function renderSelfService() {
         if (value == "DAYS") {
 
             //Display the inputfield for hours and timezone next to the hours
-            var timezone = getTimeZone();  //example: America/Los_Angeles
+            //Todo: support local timezone in cron encoding
+            // var timezone = getTimeZone();  //example: America/Los_Angeles
             //$("#schedule-timezone", form).html("UTC");  //moment().tz(timezone).format("z") example: PST
             $("#monitoring-schedule", form).removeClass("uk-hidden");
+            $("#monitoring-repeat-size", form).addClass("uk-hidden");
+            $("#monitoring-repeat-size", form).val("")
+
 
         } else if (value == "HOURS") {
             $("#monitoring-schedule", form).addClass("uk-hidden");
             $("#monitoring-schedule-time", form).val("")
+            $("#monitoring-repeat-size", form).removeClass("uk-hidden");
         }
     };
 
@@ -255,16 +262,13 @@ function renderSelfService() {
         formData.windowUnit = $("#selected-monitoring-window-unit", form).attr("value");
 
         //Todo add monitoring schedule time to update form when it's available
-        if ($("#monitoring-repeat-size", form).length > 0) {
-            formData.repeatEverySize = $("#monitoring-repeat-size", form).val();
-            formData.repeatEveryUnit = $("#selected-monitoring-repeat-unit", form).attr("value");
-            var monitoringScheduleTime = $("#monitoring-schedule-time", form).val() == "" ? "00:00" : $("#monitoring-schedule-time", form).val() //Todo: in case of daily data granularity set the default schedule to time when datapoint is created
+
+        formData.repeatEverySize = $("#monitoring-repeat-size", form).val();
+        formData.repeatEveryUnit = $("#selected-monitoring-repeat-unit", form).attr("value");
+        var monitoringScheduleTime = ( $("#monitoring-schedule-time", form).val() == "" ) ? "" : $("#monitoring-schedule-time", form).val() //Todo: in case of daily data granularity set the default schedule to time when datapoint is created
+        if(monitoringScheduleTime){
             formData.scheduleMinute = monitoringScheduleTime.substring(3, monitoringScheduleTime.length);
             formData.scheduleHour = monitoringScheduleTime.substring(0, monitoringScheduleTime.length - 3);
-        } else {
-
-            formData.scheduleMinutescheduleMinute = "00";
-            formData.scheduleHour = "00";
         }
 
         if ($("#function-id", form).length > 0) {
@@ -282,14 +286,6 @@ function renderSelfService() {
 
         //Transform filters Todo: clarify if filters object should be consistent on FE and BE
         formData.filters = encodeURIComponent(JSON.stringify(filters));
-        formData.filtersString = "";
-
-        for (key in formData.filters) {
-            var numValues = formData.filters[key].length;
-            for (var index = 0; index < numValues; index++) {
-                formData.filtersString += key + "=" + formData.filters[key][index] + ";";
-            }
-        }
         formData.exploreDimension = $("#self-service-view-single-dimension-selector #selected-dimension", form).attr("value");
 
         //USER_RULE Params
@@ -326,8 +322,10 @@ function renderSelfService() {
             return
         }
 
-        //Check if rule name is alphanumeric
+        //Check if rule name contains only alphanumeric and "_" characters
         function isAlphaNumeric(str) {
+
+            str = str.replace(/_/g, '');
             for (var i = 0, len = str.length; i < len; i++) {
                 var code = str.charCodeAt(i);
                 if (!(code > 47 && code < 58) && // numeric (0-9)
@@ -340,7 +338,7 @@ function renderSelfService() {
         };
 
         if (!isAlphaNumeric(formData.functionName)) {
-            errorMessage.html("Please only use alphanumeric (0-9, A-Z, a-z) characters in 'Name' field. No space, no '_', no '-' is accepted.");
+            errorMessage.html("Please only use alphanumeric (0-9, A-Z, a-z) and '_' characters in 'Name' field. No space, no '-' is accepted.");
             errorAlert.attr("data-error-source", "name");
             errorAlert.fadeIn(100);
             return
@@ -480,6 +478,10 @@ function renderSelfService() {
             var successMessage = $("#delete-anomaly-function-success");
             $("p", successMessage).html("success");
             successMessage.fadeIn(100);
+        }).fail(function(){
+            var errorMessage = $("#delete-anomaly-function-error");
+            $("p", errorMessage).html("There was an error completing you request. Please try again.");
+            successMessage.fadeIn(100);
         })
     }
 
@@ -610,9 +612,8 @@ function renderSelfService() {
         url += (formData.functionType == "USER_RULE") ? "baseline=" + formData.baseline + ";changeThreshold=" + formData.condition + formData.changeThreshold : "";
         url += (formData.functionType == "MIN_MAX_THRESHOLD" && formData.min ) ? "min=" + formData.min + ";" : "";
         url += (formData.functionType == "MIN_MAX_THRESHOLD" && formData.max ) ? "max=" + formData.max : "";
-        //Todo: cron needs to be expressed in order to update these values
         url += (formData.repeatEveryUnit) ? "&cron=" + cron : "";
-        url += (formData.repeatEveryUnit) ? "&repeatEverySize=" + formData.repeatEverySize + "&repeatEveryUnit=" + formData.repeatEveryUnit : "";
+        url += (formData.repeatEveryUnit) ? "&repeatEvery=" + formData.repeatEveryUnit : "";
         url += (formData.repeatEveryUnit == "DAYS") ?  "&scheduleMinute=" + formData.scheduleMinute + "&scheduleHour=" + formData.scheduleHour : "";
         url += (formData.exploreDimension) ? "&exploreDimension=" + formData.exploreDimension : "";
         url += (formData.filters && formData.filters != encodeURIComponent(JSON.stringify({}))) ? "&filters=" + formData.filters : "";

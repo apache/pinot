@@ -40,6 +40,7 @@ function submitData(url, data, tab) {
     if (data === undefined) {
         data = ""
     }
+
     if (!tab) {
         tab = hash.view;
     }
@@ -74,9 +75,13 @@ function submitData(url, data, tab) {
     })
 }
 
-function deleteData(url, data) {
+function deleteData(url, data, tab) {
     if (data === undefined) {
         data = ""
+    }
+
+    if (!tab) {
+        tab = hash.view;
     }
     console.log("delete url:", url)
     return $.ajax({
@@ -84,9 +89,29 @@ function deleteData(url, data) {
         type: 'delete',
         dataType: 'json',
         data: data,
-        error: function (jqXhr, textStatus, errorThrown) {
-            console.log(errorThrown);
+        statusCode: {
+            404: function () {
+                $("#" + tab + "-chart-area-error").empty()
+                var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' })
+                warning.append($('<p></p>', { html: 'No data available. (Error code: 404)' }))
+                $("#" + tab + "-chart-area-error").append(warning)
+                $("#" + tab + "-chart-area-error").fadeIn(100);
+                return
+            },
+            500: function () {
+                $("#" + tab + "-chart-area-error").empty()
+                var error = $('<div></div>', { class: 'uk-alert uk-alert-danger' })
+                error.append($('<p></p>', { html: 'Internal server error' }))
+                $("#" + tab + "-chart-area-error").append(error)
+                $("#" + tab + "-chart-area-error").fadeIn(100);
+                return
+            }
         }
+        //,
+//        error: function (jqXhr, textStatus, errorThrown) {
+//            console.log(errorThrown);
+//
+//        }
     }).always(function () {
 
     })
@@ -844,6 +869,7 @@ function clearCreateForm() {
         $(element).attr("value", defaultValue);
     }
 
+    $("#configure-anomaly-function-form .metric-option").show();
     $("monitoring-schedule").hide();
     $("#active-alert").removeAttr("checked");
 
@@ -1101,8 +1127,8 @@ function encodeCron(repeatEveryUnit, repeatEverySize, scheduleMinute, scheduleHo
     switch(repeatEveryUnit){
         case "DAYS":
                 DAY_OF_MONTH  = (repeatEverySize == 1) ? "*" : "0/" + repeatEverySize;
-                HOUR = scheduleHour;
-                MIN  = scheduleMinute;
+                HOUR = parseInt(scheduleHour);
+                MIN  = parseInt(scheduleMinute);
         break;
         default: //case "HOURS"
                 DAY_OF_MONTH= "*";

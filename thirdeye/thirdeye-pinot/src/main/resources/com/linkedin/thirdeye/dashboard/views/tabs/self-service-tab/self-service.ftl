@@ -3,6 +3,7 @@
 
             <!-- CREATE ANOMALY FUNCTIONS -->
             <li id="create-anomaly-functions-tab">
+                <!-- PLACEHOLDER OF ANOMALY FUNCTION FORM TEMPLATE -->
             </li>
 
             <!-- MANAGE EXISTING ANOMALY FUNCTIONS -->
@@ -43,6 +44,9 @@
 
                         <p>Are you sure about deleting <span id="function-to-delete"></span> function?</p>
                         <div class="uk-modal-footer">
+                            <div id="delete-anomaly-function-error" class="uk-alert uk-alert-alert hidden" rel="self-service">
+                                <p></p>
+                            </div>
                             <div id="delete-anomaly-function-success" class="uk-alert uk-alert-success hidden" rel="self-service">
                                 <p></p>
                             </div>
@@ -57,7 +61,9 @@
                         <div class="uk-modal-header">
                             <h3>Update anomaly function</h3><a class="uk-modal-close uk-close position-top-right"></a>
                         </div>
-                        <div id="update-anomaly-functions-form-placeholder"></div>
+                        <div id="update-anomaly-functions-form-placeholder">
+                            <!-- PLACEHOLDER OF ANOMALY FUNCTION FORM TEMPLATE -->
+                        </div>
                     </div>
                 </div>
             </li>
