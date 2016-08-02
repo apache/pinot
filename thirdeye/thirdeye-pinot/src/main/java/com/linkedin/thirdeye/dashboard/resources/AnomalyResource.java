@@ -41,10 +41,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.collect.Multimap;
+import com.linkedin.thirdeye.anomaly.utils.AlertResourceHttpUtils;
+import com.linkedin.thirdeye.anomaly.utils.DetectionResourceHttpUtils;
 import com.linkedin.thirdeye.api.CollectionSchema;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
-import com.linkedin.thirdeye.dashboard.DetectorHttpUtils;
 import com.linkedin.thirdeye.dashboard.ThirdEyeDashboardConfiguration;
 import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
 import com.linkedin.thirdeye.db.entity.AnomalyResult;
@@ -67,13 +68,16 @@ public class AnomalyResource {
   private AnomalyResultDAO anomalyResultDAO;
   private EmailConfigurationDAO emailConfigurationDAO;
 
-  private DetectorHttpUtils detectorHttpUtils;
+  private DetectionResourceHttpUtils detectionResourceHttpUtils;
+  private AlertResourceHttpUtils alertResourceHttpUtils;
   private ThirdEyeDashboardConfiguration dashboardConfiguration;
 
   public AnomalyResource(ThirdEyeDashboardConfiguration dashboardConfiguration, AnomalyFunctionDAO anomalyFunctionDAO, AnomalyResultDAO anomalyResultDAO, EmailConfigurationDAO emailConfigurationDAO) {
     this.dashboardConfiguration = dashboardConfiguration;
-    this.detectorHttpUtils = new DetectorHttpUtils(dashboardConfiguration.getDetectorHost(),
+    this.detectionResourceHttpUtils = new DetectionResourceHttpUtils(dashboardConfiguration.getDetectorHost(),
         dashboardConfiguration.getDetectorPort());
+    this.alertResourceHttpUtils = new AlertResourceHttpUtils(dashboardConfiguration.getAlertHost(),
+        dashboardConfiguration.getAlertPort());
     this.anomalyFunctionDAO = anomalyFunctionDAO;
     this.anomalyResultDAO = anomalyResultDAO;
     this.emailConfigurationDAO = emailConfigurationDAO;
@@ -275,7 +279,7 @@ public class AnomalyResource {
     Long id = anomalyFunctionDAO.save(anomalyFunctionSpec);
 
     if (isActive) { // this call will set isActive and schedule it
-      detectorHttpUtils.enableAnomalyFunction(String.valueOf(id));
+      detectionResourceHttpUtils.enableAnomalyFunction(String.valueOf(id));
     }
 
     return Response.ok(id).build();
@@ -314,7 +318,7 @@ public class AnomalyResource {
     }
     // call endpoint to stop if active
     if (anomalyFunctionSpec.getIsActive()) {
-      detectorHttpUtils.disableAnomalyFunction(String.valueOf(id));
+      detectionResourceHttpUtils.disableAnomalyFunction(String.valueOf(id));
     }
 
     CollectionSchema schema = CACHE_REGISTRY_INSTANCE.getCollectionSchemaCache().get(dataset);
@@ -362,7 +366,7 @@ public class AnomalyResource {
     Long responseId = anomalyFunctionDAO.save(anomalyFunctionSpec);
 
     if (isActive) {
-      detectorHttpUtils.enableAnomalyFunction(String.valueOf(responseId));
+      detectionResourceHttpUtils.enableAnomalyFunction(String.valueOf(responseId));
     }
 
     return Response.ok(responseId).build();
@@ -385,7 +389,7 @@ public class AnomalyResource {
       throw new IllegalStateException("No anomalyFunctionSpec with id " + id);
     }
     if (anomalyFunctionSpec.getIsActive()) {
-      detectorHttpUtils.disableAnomalyFunction(String.valueOf(id));
+      detectionResourceHttpUtils.disableAnomalyFunction(String.valueOf(id));
     }
 
     // delete from db
@@ -424,7 +428,7 @@ public class AnomalyResource {
       windowStartIso = windowStart.toString();
     }
     // call endpoint to run adhoc
-    detectorHttpUtils.runAdhocAnomalyFunction(String.valueOf(id), windowStartIso, windowEndIso);
+    detectionResourceHttpUtils.runAdhocAnomalyFunction(String.valueOf(id), windowStartIso, windowEndIso);
     return Response.noContent().build();
   }
 
@@ -523,7 +527,7 @@ public class AnomalyResource {
     Long id = emailConfigurationDAO.save(emailConfiguration);
     // enable id isActive
     if (isActive) {
-      detectorHttpUtils.enableEmailConfiguration(String.valueOf(id));
+      alertResourceHttpUtils.enableEmailConfiguration(String.valueOf(id));
     }
 
     return Response.ok(id).build();
@@ -564,7 +568,7 @@ public class AnomalyResource {
       throw new IllegalStateException("No email configuration for id " + id);
     }
     if (emailConfiguration.getIsActive()) {
-      detectorHttpUtils.disableEmailConfiguration(String.valueOf(id));
+      alertResourceHttpUtils.disableEmailConfiguration(String.valueOf(id));
     }
     emailConfiguration.setIsActive(false);
     emailConfiguration.setId(id);
@@ -609,7 +613,7 @@ public class AnomalyResource {
 
     // call endpoint to start, if active
     if (isActive) {
-      detectorHttpUtils.enableEmailConfiguration(String.valueOf(id));
+      alertResourceHttpUtils.enableEmailConfiguration(String.valueOf(id));
     }
     return Response.ok(responseId).build();
   }
@@ -629,7 +633,7 @@ public class AnomalyResource {
       throw new IllegalStateException("No emailConfiguraiton for id " + id);
     }
     if (emailConfiguration.getIsActive()) {
-      detectorHttpUtils.disableEmailConfiguration(String.valueOf(id));
+      alertResourceHttpUtils.disableEmailConfiguration(String.valueOf(id));
     }
     // delete from db
     emailConfigurationDAO.delete(emailConfiguration);
@@ -639,7 +643,9 @@ public class AnomalyResource {
   // Run email function ad hoc
   @POST
   @Path("/email-config/adhoc")
-  public Response runAdhocEmailConfig(@NotNull @QueryParam("id") Long id) throws Exception {
+  public Response runAdhocEmailConfig(@NotNull @QueryParam("id") Long id,
+      @QueryParam("windowStartIso") String windowStartIso,
+      @QueryParam("windowEndIso") String windowEndIso) throws Exception {
 
     if (id == null) {
       throw new IllegalArgumentException("id is a required query param");
@@ -648,7 +654,7 @@ public class AnomalyResource {
     if (emailConfiguration == null) {
       throw new IllegalStateException("No emailConfiguraiton for id " + id);
     }
-    detectorHttpUtils.runAdhocEmailConfiguration(String.valueOf(id));
+    alertResourceHttpUtils.runAdhocEmailConfiguration(String.valueOf(id), windowStartIso, windowEndIso);
     return Response.ok(id).build();
   }
 
