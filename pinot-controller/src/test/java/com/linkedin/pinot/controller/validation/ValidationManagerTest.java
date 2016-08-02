@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.controller.validation;
 
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -36,9 +35,11 @@ import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.StarTreeMetadata;
 import com.linkedin.pinot.common.utils.HLCSegmentName;
+import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import javax.annotation.Nullable;
 
@@ -165,8 +166,18 @@ public class ValidationManagerTest {
     segmentMetadataList.add(metadata3);
     segmentMetadataList.add(metadata4);
 
-    Assert.assertEquals(ValidationManager.computeRealtimeTotalDocumentInSegments(segmentMetadataList), 60);
+    Assert.assertEquals(ValidationManager.computeRealtimeTotalDocumentInSegments(segmentMetadataList, true), 60);
 
+    // Now add some low level segment names
+    String segmentName5 = new LLCSegmentName(testTableName, 1, 0, 1000).getSegmentName();
+    String segmentName6 = new LLCSegmentName(testTableName, 2, 27, 10000).getSegmentName();
+    DummyMetadata metadata5 = new DummyMetadata(testTableName, segmentName5, 10);
+    DummyMetadata metadata6 = new DummyMetadata(testTableName, segmentName6, 5);
+    segmentMetadataList.add(metadata5);
+    segmentMetadataList.add(metadata6);
+
+    // Only the LLC segments should get counted.
+    Assert.assertEquals(ValidationManager.computeRealtimeTotalDocumentInSegments(segmentMetadataList, false), 15);
   }
 
   @AfterTest
