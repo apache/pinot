@@ -94,7 +94,8 @@ function renderSelfService() {
 
     // Monitoring repeat unit selection
     $("#self-service-forms-section").on("click", ".anomaly-monitoring-repeat-unit-option", function () {
-        toggleMonitoringTimeField(this);
+        var form = $(this).closest("form");
+        toggleMonitoringTimeField(this, form);
     });
 
     //FUNCTION TYPE SPECIFIC PARAMS
@@ -216,18 +217,18 @@ function renderSelfService() {
         $("#manage-anomaly-function-success", form).hide();
     }
 
-    function toggleMonitoringTimeField(target) {
+    function toggleMonitoringTimeField(target, form) {
         var value = $(target).attr("value");
         if (value == "DAYS") {
 
             //Display the inputfield for hours and timezone next to the hours
             var timezone = getTimeZone();  //example: America/Los_Angeles
-            $("#local-timezone").html(moment().tz(timezone).format("z"));  //example: PST
-            $("#monitoring-schedule").removeClass("hidden");
+            //$("#schedule-timezone", form).html("UTC");  //moment().tz(timezone).format("z") example: PST
+            $("#monitoring-schedule", form).removeClass("uk-hidden");
 
         } else if (value == "HOURS") {
-            $("#monitoring-schedule").addClass("hidden");
-            $("#monitoring-schedule-time").val("")
+            $("#monitoring-schedule", form).addClass("uk-hidden");
+            $("#monitoring-schedule-time", form).val("")
         }
     };
 
@@ -261,6 +262,7 @@ function renderSelfService() {
             formData.scheduleMinute = monitoringScheduleTime.substring(3, monitoringScheduleTime.length);
             formData.scheduleHour = monitoringScheduleTime.substring(0, monitoringScheduleTime.length - 3);
         } else {
+
             formData.scheduleMinutescheduleMinute = "00";
             formData.scheduleHour = "00";
         }
@@ -338,7 +340,7 @@ function renderSelfService() {
         };
 
         if (!isAlphaNumeric(formData.functionName)) {
-            errorMessage.html("Please only use alphanumeric (0-9, A-Z, a-z) characters in 'Rule' field. No space, no '_', no '-' is accepted.");
+            errorMessage.html("Please only use alphanumeric (0-9, A-Z, a-z) characters in 'Name' field. No space, no '_', no '-' is accepted.");
             errorAlert.attr("data-error-source", "name");
             errorAlert.fadeIn(100);
             return
@@ -490,9 +492,13 @@ function renderSelfService() {
         /** Handelbars template for ANOMALY FUNCTION FORM **/
         var existingAnomalyFunctionsDataStr = window.sessionStorage.getItem('existingAnomalyFunctions');
         var existingAnomalyFunctionsData = JSON.parse(existingAnomalyFunctionsDataStr);
-        var anomalyFunctionObj = existingAnomalyFunctionsData[rowId]
+        var anomalyFunctionObj = existingAnomalyFunctionsData[rowId];
         var fnProperties = parseFnProperties(anomalyFunctionObj.properties);
-        var result_anomaly_function_form_template = HandleBarsTemplates.template_anomaly_function_form({data: anomalyFunctionObj, fnProperties: fnProperties});
+        var schedule = parseCron(anomalyFunctionObj.cron);
+
+        var templateData = {data: anomalyFunctionObj, fnProperties: fnProperties, schedule :schedule}
+
+        var result_anomaly_function_form_template = HandleBarsTemplates.template_anomaly_function_form(templateData );
         $("#update-anomaly-functions-form-placeholder").html(result_anomaly_function_form_template);
 
 
@@ -563,14 +569,9 @@ function renderSelfService() {
 
     function updateAnomalyFunction() {
 
-
-
         var form = $("#update-function-modal");
         var formData = collectAnomalyFnFormValues(form);
         var valid = validateAnomalyFnFormData(formData, form);
-
-
-
 
         if (valid) {
 
@@ -580,12 +581,7 @@ function renderSelfService() {
 
             submitData("/dashboard/anomaly-function/update?" + urlParams).done(function () {
 
-                //Update cached data
-//                var existingAnomalyFunctionsDataStr = window.sessionStorage.getItem('existingAnomalyFunctions');
-//                var existingAnomalyFunctionsData = JSON.parse(existingAnomalyFunctionsDataStr);
-
                 //existingAnomalyFunctionsData[rowId] = {formData}
-
                 getExistingAnomalyFunctions(formData.dataset);
 
                 //Enable submit btn
@@ -595,22 +591,29 @@ function renderSelfService() {
                 var successMessage = $("#manage-anomaly-function-success", form);
                 $("p", successMessage).html("success");
                 successMessage.fadeIn(100);
-
             })
         }
     }
 
     function urlOfAnomalyFn(formData){
+        //Todo: remove the condition once the create and update form both has the inputfields for cron
+        if(formData.repeatEveryUnit){
+            var cron = encodeCron(formData.repeatEveryUnit, formData.repeatEverySize, formData.scheduleMinute, formData.scheduleHour )
+        }
+
+
         /* Submit form */
         var url = "dataset=" + formData.dataset + "&metric=" + formData.metric + "&type=" + formData.functionType + "&metricFunction=" + formData.metricFunction + "&functionName=" + formData.functionName
             + "&windowSize=" + formData.windowSize + "&windowUnit=" + formData.windowUnit + "&windowDelay=" + formData.windowDelay
-            + "&scheduleMinute=" + formData.scheduleMinute + "&scheduleHour=" + formData.scheduleHour
+
             + "&isActive=" + formData.isActive + "&properties="
         url += (formData.functionType == "USER_RULE") ? "baseline=" + formData.baseline + ";changeThreshold=" + formData.condition + formData.changeThreshold : "";
         url += (formData.functionType == "MIN_MAX_THRESHOLD" && formData.min ) ? "min=" + formData.min + ";" : "";
         url += (formData.functionType == "MIN_MAX_THRESHOLD" && formData.max ) ? "max=" + formData.max : "";
         //Todo: cron needs to be expressed in order to update these values
-        url += (formData.repeatEverySize) ? "&repeatEverySize=" + formData.repeatEverySize + "&repeatEveryUnit=" + formData.repeatEveryUnit : "";
+        url += (formData.repeatEveryUnit) ? "&cron=" + cron : "";
+        url += (formData.repeatEveryUnit) ? "&repeatEverySize=" + formData.repeatEverySize + "&repeatEveryUnit=" + formData.repeatEveryUnit : "";
+        url += (formData.repeatEveryUnit == "DAYS") ?  "&scheduleMinute=" + formData.scheduleMinute + "&scheduleHour=" + formData.scheduleHour : "";
         url += (formData.exploreDimension) ? "&exploreDimension=" + formData.exploreDimension : "";
         url += (formData.filters && formData.filters != encodeURIComponent(JSON.stringify({}))) ? "&filters=" + formData.filters : "";
         url += (formData.functionId ) ? "&id=" + formData.functionId : "" ;

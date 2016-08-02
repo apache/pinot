@@ -845,7 +845,7 @@ function clearCreateForm() {
     }
 
     $("monitoring-schedule").hide();
-    $("#active-alert").attr("checked", "false");
+    $("#active-alert").removeAttr("checked");
 
     $("#configure-anomaly-function-form .remove-filter-selection").each(function () {
         $(this).click();
@@ -853,7 +853,7 @@ function clearCreateForm() {
 
     $("#manage-anomaly-fn-error").hide();
     $("#manage-anomaly-function-success").hide();
-
+    enableButton($("#create-anomaly-function"));
 }
 
 
@@ -1038,6 +1038,82 @@ function formatMillisToTZ() {
 
 
 
+/** Transforms cron expression into date time schedule for documentation: http://www.quartz-scheduler.org/documentation/quartz-2.x/tutorials/tutorial-lesson-06.html **/
 
+function parseCron(cron){
+    var cronAry = cron.split(" ");
+
+    var SEC = cronAry[0];
+    var MIN = cronAry[1];  //(integer 0-60) 30 > scheduleMinute = 30; 00 > no assumption
+    var HOUR = cronAry[2]; // * > repeatEverySize = 1 & repeatEveryUnit = HOURS;  "0/size" > repeatEverySize = size repeatEveryUnit = HOURS; (integer 0-23) ie. 10  > scheduleHour = 10, repeatEveryUnit = DAYS
+    var DAY_OF_MONTH = cronAry[3]; // * > repeatEverySize = 1;  0/size > repeatEverySize = size  & repeatEveryUnit = DAYS
+    var DAY_OF_WEEK = cronAry[4];  // *
+    var YEAR =  cronAry[5];  // ?
+
+    var schedule = {} //repeatEveryUnit: "", repeatEverySize: "", scheduleMinute: "", scheduleHour: ""
+
+    if( parseInt(MIN) > 0 ){
+        schedule.scheduleMinute = MIN;
+
+    }else if(parseInt(MIN) == 0) {
+        schedule.scheduleMinute = "00";
+    }
+
+    if(HOUR == "*"){
+        schedule.repeatEverySize = 1;
+        schedule.repeatEveryUnit = "HOURS";
+
+    }else if( 0 <=  parseInt(HOUR) < 24 ){
+        schedule.scheduleHour = (HOUR.length == 2)? HOUR : "0" + HOUR;
+        schedule.repeatEveryUnit = "DAYS";
+        schedule.repeatEverySize = 1;
+
+    } else if(HOUR.substring(0,2) == "0/" ){
+        schedule.repeatEverySize = HOUR.substring(2);
+        schedule.repeatEveryUnit = "HOURS";
+    }
+
+    if(DAY_OF_MONTH == "*"){
+        schedule.repeatEverySize = 1;
+
+    }else if(DAY_OF_MONTH.substring(0,2) == "0/"){
+        schedule.repeatEverySize = DAY_OF_MONTH.substring(2);
+        schedule.repeatEveryUnit = "DAYS";
+
+    }
+    return schedule
+}
+
+
+/** Transforms schedule into cron expression. documentation: http://www.quartz-scheduler.org/documentation/quartz-2.x/tutorials/tutorial-lesson-06.html **/
+function encodeCron(repeatEveryUnit, repeatEverySize, scheduleMinute, scheduleHour ){
+
+
+
+
+    var SEC = 0;
+    var MIN;
+    var HOUR;
+    var DAY_OF_MONTH;
+    var DAY_OF_WEEK = "*";
+    var YEAR = "?";
+
+    switch(repeatEveryUnit){
+        case "DAYS":
+                DAY_OF_MONTH  = (repeatEverySize == 1) ? "*" : "0/" + repeatEverySize;
+                HOUR = scheduleHour;
+                MIN  = scheduleMinute;
+        break;
+        default: //case "HOURS"
+                DAY_OF_MONTH= "*";
+                HOUR = (repeatEverySize == 1) ? "*" : "0/" + repeatEverySize;
+                MIN = 0
+        break
+    }
+
+    var cronAry = [SEC, MIN, HOUR, DAY_OF_MONTH, DAY_OF_WEEK,YEAR];
+
+    return cronAry.join(" ");
+}
 
 
