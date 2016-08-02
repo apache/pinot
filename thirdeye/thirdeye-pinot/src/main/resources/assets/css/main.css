@@ -354,10 +354,6 @@ body a{
     width: 115px;
 }
 
-#monitoring-schedule-time{
-    width: 135px;
-}
-
 #filter-panel-manage-anomaly-fn .value-filter{
     width:90%;
     line-height: 30px;
