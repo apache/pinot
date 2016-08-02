@@ -1,5 +1,8 @@
 package com.linkedin.thirdeye.client.pinot.summary;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 
@@ -10,6 +13,7 @@ public class Row {
   int level;
   double baselineValue;
   double currentValue;
+  public List<Double> targetRatios = new ArrayList<>(); // for development purpose
 
   public Dimensions getDimensions() {
     return dimensions;
@@ -49,6 +53,10 @@ public class Row {
 
   public void setCurrentValue(double currentValue) {
     this.currentValue = currentValue;
+  }
+
+  boolean hasSameParentFast(Row o) {
+    return dimensionValues.get(level-2).equals(o.dimensionValues.get(level-2));
   }
 
   public String toString() {

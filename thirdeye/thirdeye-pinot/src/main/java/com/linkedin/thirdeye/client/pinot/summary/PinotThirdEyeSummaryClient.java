@@ -164,7 +164,7 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
       return Collections.<Row>emptyList();
     }
 
-    List<Row> rows = new ArrayList<>();
+    List<Row> rows = new ArrayList<>(responses.getLeft().getNumRows());
     // TODO: (Performance) Replace the key: List<String>
     Map<List<String>, Integer> rowTable = new HashMap<>();
     {
@@ -232,13 +232,26 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
   public static void main(String[] argc) throws Exception {
     String oFileName = "MLCube.json";
     boolean dumpCubeToFile = true;
-    int answerSize = 10;
-    String collection = "thirdeyeKbmi";
-    String metricName = "desktopPageViews";
-//    String[] dimensionNames = { "continent", "environment", "osName", "countryCode" };
-    String[] dimensionNames = { "continent", "environment", "osName" };
-    DateTime baselineStart = new DateTime(2016, 7, 5, 21, 00);
-    TimeGranularity timeGranularity = new TimeGranularity(1, TimeUnit.HOURS);
+    int answerSize = 5;
+//    String collection = "thirdeyeKbmi";
+//    String metricName = "desktopPageViews";
+//    String[] dimensionNames = { "continent", "environment", "osName", "browserName" };
+
+//    List<List<String>> hierarchy = new ArrayList<>();
+//    hierarchy.add(Lists.newArrayList("continent", "countryCode"));
+
+
+//    DateTime baselineStart = new DateTime(2016, 7, 5, 21, 00);
+//    TimeGranularity timeGranularity = new TimeGranularity(1, TimeUnit.HOURS);
+
+    String collection = "thirdeyeAbook";
+    String metricName = "totalFlows";
+    String[] dimensionNames = { "continent", "environment", "osName", "browserName", "countryCode", "contactsOrigin", "deviceName", "locale", "pageKey"};
+    List<List<String>> hierarchy = new ArrayList<>();
+    hierarchy.add(Lists.newArrayList("continent", "countryCode"));
+
+    DateTime baselineStart = new DateTime(2016, 7, 12, 00, 00);
+    TimeGranularity timeGranularity = new TimeGranularity(1, TimeUnit.DAYS);
 
     // Create ThirdEye client
     ThirdEyeConfiguration thirdEyeConfig = new ThirdEyeDashboardConfiguration();
@@ -263,13 +276,14 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
 
     // Build the cube for computing the summary
     Cube initCube = new Cube();
-    initCube.buildFromOALPDataBase(pinotClient, new Dimensions(Lists.newArrayList(dimensionNames)));
+    initCube.buildFromOALPDataBase(pinotClient, new Dimensions(Lists.newArrayList(dimensionNames)), hierarchy);
 
     Cube cube;
     if (dumpCubeToFile) {
       try {
         initCube.toJson(oFileName);
         cube = Cube.fromJson(oFileName);
+        cube.buildHierarchy();
         System.out.println("Restored Cube:");
         System.out.println(cube);
       } catch (IOException e) {
@@ -281,9 +295,7 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
       cube = initCube;
     }
 
-    cube.removeEmptyRecords();
-    Summary summary = SummaryCalculator.computeSummary(cube, answerSize);
-    System.out.println(summary.toString());
+    Summary.computeSummary(cube.getHierarchicalNodes());
 
     // closing
     thirdEyeClient.close();
