@@ -36,8 +36,6 @@ import com.linkedin.thirdeye.client.comparison.TimeOnTimeComparisonHandler;
 import com.linkedin.thirdeye.db.entity.AnomalyResult;
 import com.linkedin.thirdeye.detector.api.MetricsGraphicsTimeSeries;
 
-import io.dropwizard.hibernate.UnitOfWork;
-
 @Path("/time-series/metrics-graphics")
 public class MetricsGraphicsTimeSeriesResource {
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
@@ -263,7 +261,6 @@ public class MetricsGraphicsTimeSeriesResource {
 
   @GET
   @Path("/dummy")
-  @UnitOfWork
   @Produces(MediaType.APPLICATION_JSON)
   public MetricsGraphicsTimeSeries getDummyTimeSeries() throws Exception {
     ObjectMapper objectMapper = new ObjectMapper();

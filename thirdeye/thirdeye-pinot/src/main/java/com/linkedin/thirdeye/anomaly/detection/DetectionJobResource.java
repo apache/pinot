@@ -2,7 +2,6 @@ package com.linkedin.thirdeye.anomaly.detection;
 
 import com.linkedin.thirdeye.db.dao.AnomalyFunctionDAO;
 import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
-import io.dropwizard.hibernate.UnitOfWork;
 
 import java.util.List;
 
@@ -32,7 +31,6 @@ public class DetectionJobResource {
   }
 
   @GET
-  @UnitOfWork
   public List<String> showActiveJobs() throws SchedulerException {
     return detectionJobScheduler.getActiveJobs();
   }
@@ -48,7 +46,6 @@ public class DetectionJobResource {
 
   @POST
   @Path("/{id}/ad-hoc")
-  @UnitOfWork
   public Response adHoc(@PathParam("id") Long id, @QueryParam("start") String start,
       @QueryParam("end") String end) throws Exception {
     detectionJobScheduler.runAdHoc(id, start, end);
@@ -57,7 +54,6 @@ public class DetectionJobResource {
 
   @DELETE
   @Path("/{id}")
-  @UnitOfWork
   public Response disable(@PathParam("id") Long id) throws Exception {
     toggleActive(id, false);
     detectionJobScheduler.stopJob(id);

@@ -1,10 +1,7 @@
 package com.linkedin.thirdeye.detector.resources;
 
 import com.linkedin.thirdeye.db.dao.AnomalyFunctionDAO;
-import io.dropwizard.hibernate.UnitOfWork;
-
 import java.util.List;
-
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
 import javax.ws.rs.NotFoundException;
@@ -32,7 +29,6 @@ public class AnomalyDetectionJobResource {
   }
 
   @GET
-  @UnitOfWork
   public List<Long> showActiveJobs() {
     return manager.getActiveJobs();
   }

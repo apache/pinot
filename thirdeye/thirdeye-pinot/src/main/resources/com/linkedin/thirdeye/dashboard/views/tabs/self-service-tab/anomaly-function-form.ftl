@@ -145,7 +145,7 @@
                             <ul class="uk-nav uk-nav-dropdown single-select">
                                 <li class="anomaly-condition-min-max-option" value="MIN"><a href="#" class="uk-dropdown-close">IS LESS THAN</a></li>
                                 <li class="anomaly-condition-min-max-option" value="MAX"><a href="#" class="uk-dropdown-close">IS MORE THAN</a></li>
-                                <li class="anomaly-condition-min-max-option" value="MINMAX"><a href="#" class="uk-dropdown-close">IS BETWEEN</a></li>
+                                <li class="anomaly-condition-min-max-option" value="MINMAX"><a href="#" class="uk-dropdown-close">IS NOT BETWEEN</a></li>
                             </ul>
                         </div>
                     </div>

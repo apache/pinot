@@ -2,7 +2,6 @@ package com.linkedin.thirdeye.detector.resources;
 
 import com.linkedin.thirdeye.db.dao.EmailConfigurationDAO;
 import com.linkedin.thirdeye.db.entity.EmailConfiguration;
-import io.dropwizard.hibernate.UnitOfWork;
 
 import java.util.List;
 
@@ -31,7 +30,6 @@ public class EmailReportJobResource {
   }
 
   @GET
-  @UnitOfWork
   public List<Long> showActiveJobs() {
     return manager.getActiveJobs();
   }
@@ -48,7 +46,6 @@ public class EmailReportJobResource {
 
   @POST
   @Path("/{id}/ad-hoc")
-  @UnitOfWork
   public Response adHoc(@PathParam("id") Long id) throws Exception {
     manager.sendAdHoc(id);
     return Response.ok().build();
@@ -56,7 +53,6 @@ public class EmailReportJobResource {
 
   @POST
   @Path("/from-file")
-  @UnitOfWork
   public Response adHocFromFile(@QueryParam("filePath") String filePath) throws Exception {
     manager.runAdhocFile(filePath);
     return Response.ok().build();
@@ -64,7 +60,6 @@ public class EmailReportJobResource {
 
   @DELETE
   @Path("/{id}")
-  @UnitOfWork
   public Response disable(@PathParam("id") Long id) throws Exception {
     EmailConfiguration emailConfiguration = configDAO.findById(id);
     emailConfiguration.setIsActive(false);

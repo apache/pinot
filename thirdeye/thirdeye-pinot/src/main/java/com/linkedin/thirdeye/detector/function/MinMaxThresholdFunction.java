@@ -84,7 +84,7 @@ public class MinMaxThresholdFunction extends BaseAnomalyFunction {
         String message =
             String.format(DEFAULT_MESSAGE_TEMPLATE, min, max, value, deviationFromThreshold);
         anomalyResult.setMessage(message);
-        if(value == 0.0) {
+        if (value == 0.0) {
           anomalyResult.setDataMissing(true);
         }
         anomalyResults.add(anomalyResult);

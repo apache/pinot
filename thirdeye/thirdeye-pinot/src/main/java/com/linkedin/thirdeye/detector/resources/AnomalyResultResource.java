@@ -25,8 +25,6 @@ import com.codahale.metrics.annotation.Timed;
 import com.linkedin.thirdeye.db.entity.AnomalyResult;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
-import io.dropwizard.hibernate.UnitOfWork;
-
 @Path("/anomaly-results")
 @Produces(MediaType.APPLICATION_JSON)
 public class AnomalyResultResource {
@@ -121,7 +119,6 @@ public class AnomalyResultResource {
         results.addAll(metricResults);
       }
     }
-
     return results;
   }
 
@@ -146,7 +143,6 @@ public class AnomalyResultResource {
 
   @GET
   @Timed
-  @UnitOfWork
   @Path("/function/{functionId}/{startIsoTime}/{endIsoTime}")
   public List<AnomalyResult> findByFunction(@PathParam("functionId") Long functionId,
       @PathParam("startIsoTime") String startIsoTime, @PathParam("endIsoTime") String endIsoTime) {
