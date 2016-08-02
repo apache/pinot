@@ -199,8 +199,8 @@ public class DefaultReduceService implements ReduceService<BrokerResponseJSON> {
               new SelectionOperatorService(brokerRequest.getSelections(), dt.getDataSchema());
           return selectionService.render(selectionService.reduce(instanceResponseMap));
         } else {
-          Collection<Serializable[]> reduceResult = SelectionOperatorUtils.reduce(instanceResponseMap, brokerRequest.getSelections().getSize());
-          return SelectionOperatorUtils.render(reduceResult, brokerRequest.getSelections().getSelectionColumns(), dt.getDataSchema());
+          Collection<Serializable[]> reduceResult = SelectionOperatorUtils.reduceWithoutOrdering(instanceResponseMap, brokerRequest.getSelections().getSize());
+          return SelectionOperatorUtils.renderWithoutOrdering(reduceResult, brokerRequest.getSelections().getSelectionColumns(), dt.getDataSchema());
         }
       } else {
         return null;

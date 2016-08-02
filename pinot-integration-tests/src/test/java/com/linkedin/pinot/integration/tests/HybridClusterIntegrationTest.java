@@ -15,6 +15,13 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.utils.FileUploadUtils;
+import com.linkedin.pinot.common.utils.KafkaStarterUtils;
+import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
+import com.linkedin.pinot.common.utils.ZkStarter;
+import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
 import java.io.FileInputStream;
 import java.sql.ResultSet;
@@ -29,6 +36,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import kafka.server.KafkaServerStartable;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.ExternalViewChangeListener;
 import org.apache.helix.HelixManager;
@@ -41,14 +49,6 @@ import org.slf4j.LoggerFactory;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.utils.FileUploadUtils;
-import com.linkedin.pinot.common.utils.KafkaStarterUtils;
-import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
-import com.linkedin.pinot.common.utils.ZkStarter;
-import com.linkedin.pinot.util.TestUtils;
-import kafka.server.KafkaServerStartable;
 
 
 /**
@@ -321,71 +321,5 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
   @Override
   protected int getGeneratedQueryCount() {
     return QUERY_COUNT;
-  }
-
-  @Override
-  @Test
-  public void testMultipleQueries() throws Exception {
-    super.testMultipleQueries();
-  }
-
-  @Test
-  public void testSingleQuery() throws Exception {
-    String query;
-    query = "select count(*) from 'mytable' where DaysSinceEpoch >= 16312 and Carrier = 'DL'";
-    super.runQuery(query, Collections.singletonList(query.replace("'mytable'", "mytable")));
-    query = "select count(*) from 'mytable' where DaysSinceEpoch < 16312 and Carrier = 'DL'";
-    super.runQuery(query, Collections.singletonList(query.replace("'mytable'", "mytable")));
-    query = "select count(*) from 'mytable' where DaysSinceEpoch <= 16312 and Carrier = 'DL'";
-    super.runQuery(query, Collections.singletonList(query.replace("'mytable'", "mytable")));
-    query = "select count(*) from 'mytable' where DaysSinceEpoch > 16312 and Carrier = 'DL'";
-    super.runQuery(query, Collections.singletonList(query.replace("'mytable'", "mytable")));
-  }
-
-  @Test
-  public void testMetricAndDimColumns() throws Exception {
-    List<String> dimensions = schema.getDimensionNames();
-    for (String dim : dimensions) {
-      FieldSpec fieldSpec = schema.getFieldSpecFor(dim);
-      if (!fieldSpec.isSingleValueField()) {
-        LOGGER.info("Skipping multi-valued dimension field " + dim);
-        continue;
-      }
-      if (isNotWorkingColumn(dim)) {
-        LOGGER.error("Distnct count does not match for column " + dim);
-        continue;
-      }
-      String pqlQuery = "select distinctCount(" + dim + ") from mytable";
-      String sqlQuery = "select COUNT(DISTINCT " + dim + ") from mytable";
-      super.runQuery(pqlQuery, Collections.singletonList(sqlQuery));
-    }
-    List<String> metrics = schema.getMetricNames();
-    for (String metric : metrics) {
-      String query = "select sum(" + metric + ") from mytable";
-      super.runQuery(query, Collections.singletonList(query.replace("'mytable'", "mytable")));
-    }
-  }
-
-  // See PINOT-2887. distinctCount on string dimension does not work correctly in this test
-  private boolean isNotWorkingColumn(String dim) {
-    final String[] badColumns = {"TailNum"};
-    for (String col : badColumns) {
-      if (dim.equals(col)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  @Override
-  @Test
-  public void testHardcodedQuerySet() throws Exception {
-    super.testHardcodedQuerySet();
-  }
-
-  @Override
-  @Test(enabled = false)  // jfim: This is disabled because testGeneratedQueriesWithMultivalues covers the same thing
-  public void testGeneratedQueries() throws Exception {
-    super.testGeneratedQueries();
   }
 }

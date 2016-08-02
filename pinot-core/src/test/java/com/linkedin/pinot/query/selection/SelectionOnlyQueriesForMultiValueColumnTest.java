@@ -15,24 +15,6 @@
  */
 package com.linkedin.pinot.query.selection;
 
-import java.io.File;
-import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-
-import org.apache.commons.io.FileUtils;
-import org.json.JSONObject;
-import org.testng.Assert;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
-import org.testng.annotations.Test;
-
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.request.Selection;
@@ -70,6 +52,22 @@ import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 import com.linkedin.pinot.util.TestUtils;
+import java.io.File;
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import org.apache.commons.io.FileUtils;
+import org.json.JSONObject;
+import org.testng.Assert;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
+import org.testng.annotations.Test;
 
 
 public class SelectionOnlyQueriesForMultiValueColumnTest {
@@ -206,11 +204,11 @@ public class SelectionOnlyQueriesForMultiValueColumnTest {
     instanceResponseMap.put(new ServerInstance("localhost:8888"), resultBlock.getDataTable());
     instanceResponseMap.put(new ServerInstance("localhost:9999"), resultBlock.getDataTable());
     final Collection<Serializable[]> reducedResults =
-        SelectionOperatorUtils.reduce(instanceResponseMap, brokerRequest.getSelections().getSize());
+        SelectionOperatorUtils.reduceWithoutOrdering(instanceResponseMap, brokerRequest.getSelections().getSize());
     List<String> selectionColumns =
         SelectionOperatorUtils.getSelectionColumns(brokerRequest.getSelections().getSelectionColumns(), _indexSegment);
     DataSchema dataSchema = resultBlock.getSelectionDataSchema();
-    final JSONObject jsonResult = SelectionOperatorUtils.render(reducedResults, selectionColumns, dataSchema);
+    final JSONObject jsonResult = SelectionOperatorUtils.renderWithoutOrdering(reducedResults, selectionColumns, dataSchema);
     System.out.println(jsonResult);
     JsonAssert
         .assertEqualsIgnoreOrder(
@@ -256,11 +254,11 @@ public class SelectionOnlyQueriesForMultiValueColumnTest {
     instanceResponseMap.put(new ServerInstance("localhost:8888"), resultBlock.getDataTable());
     instanceResponseMap.put(new ServerInstance("localhost:9999"), resultBlock.getDataTable());
     final Collection<Serializable[]> reducedResults =
-        SelectionOperatorUtils.reduce(instanceResponseMap, brokerRequest.getSelections().getSize());
+        SelectionOperatorUtils.reduceWithoutOrdering(instanceResponseMap, brokerRequest.getSelections().getSize());
     List<String> selectionColumns =
         SelectionOperatorUtils.getSelectionColumns(brokerRequest.getSelections().getSelectionColumns(), _indexSegment);
     DataSchema dataSchema = resultBlock.getSelectionDataSchema();
-    final JSONObject jsonResult = SelectionOperatorUtils.render(reducedResults, selectionColumns, dataSchema);
+    final JSONObject jsonResult = SelectionOperatorUtils.renderWithoutOrdering(reducedResults, selectionColumns, dataSchema);
     System.out.println(jsonResult);
     JsonAssert
         .assertEqualsIgnoreOrder(
@@ -344,11 +342,11 @@ public class SelectionOnlyQueriesForMultiValueColumnTest {
   private Selection getSelectionQuery() {
     final Selection selection = new Selection();
     final List<String> selectionColumns = new ArrayList<String>();
-    selectionColumns.add("column2");
     selectionColumns.add("column1");
+    selectionColumns.add("column2");
+    selectionColumns.add("column5");
     selectionColumns.add("column6");
     selectionColumns.add("column7");
-    selectionColumns.add("column5");
     selectionColumns.add("count");
     selection.setSelectionColumns(selectionColumns);
     selection.setOffset(0);

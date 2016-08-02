@@ -52,26 +52,6 @@ public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTe
   protected final File _segmentsDir = new File(_tmpDir, "segments");
   protected final File _tarsDir = new File(_tmpDir, "tars");
 
-  @Override
-  public void testMultipleQueries() throws Exception {
-    // Ignore this inherited test
-  }
-
-  @Override
-  public void testHardcodedQuerySet() throws Exception {
-    // Ignore this inherited test
-  }
-
-  @Override
-  public void testGeneratedQueries() throws Exception {
-    // Ignore this inherited test
-  }
-
-  @Override
-  public void testGeneratedQueriesWithMultivalues() throws Exception {
-    // Ignore this inherited test
-  }
-
   @BeforeClass
   public void setUp() throws Exception {
     // Start an empty Pinot cluster
@@ -277,7 +257,32 @@ public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTe
   }
 
   @Override
-  protected int getGeneratedQueryCount() {
-    return 0;
+  @Test(enabled = false)
+  public void testSingleQuery() throws Exception {
+    // Ignore this inherited test
+  }
+
+  @Override
+  @Test(enabled = false)
+  public void testMultipleQueries() throws Exception {
+    // Ignore this inherited test
+  }
+
+  @Override
+  @Test(enabled = false)
+  public void testHardcodedQuerySet() throws Exception {
+    // Ignore this inherited test
+  }
+
+  @Override
+  @Test(enabled = false)
+  public void testGeneratedQueriesWithoutMultiValues() throws Exception {
+    // Ignore this inherited test
+  }
+
+  @Override
+  @Test(enabled = false)
+  public void testGeneratedQueriesWithMultiValues() throws Exception {
+    // Ignore this inherited test
   }
 }

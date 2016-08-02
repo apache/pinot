@@ -502,11 +502,11 @@ public abstract class HybridClusterScanComparisonIntegrationTest extends HybridC
 
   @Override
   @Test(enabled = false)
-  public void testGeneratedQueries() throws Exception {
+  public void testGeneratedQueriesWithoutMultiValues() throws Exception {
     runTestLoop(new Callable<Object>() {
       @Override
       public Object call() throws Exception {
-        HybridClusterScanComparisonIntegrationTest.super.testGeneratedQueries();
+        HybridClusterScanComparisonIntegrationTest.super.testGeneratedQueriesWithoutMultiValues();
         return null;
       }
     });
@@ -514,19 +514,13 @@ public abstract class HybridClusterScanComparisonIntegrationTest extends HybridC
 
   @Override
   @Test(enabled = false)
-  public void testGeneratedQueriesWithMultivalues() throws Exception {
+  public void testGeneratedQueriesWithMultiValues() throws Exception {
     runTestLoop(new Callable<Object>() {
       @Override
       public Object call() throws Exception {
-        HybridClusterScanComparisonIntegrationTest.super.testGeneratedQueriesWithMultivalues();
+        HybridClusterScanComparisonIntegrationTest.super.testGeneratedQueriesWithMultiValues();
         return null;
       }
     });
-  }
-
-  @Override
-  @Test(enabled = false)
-  public void testMetricAndDimColumns() throws Exception {
-    // This test will not work by calling super() since we depend on h2 queries.
   }
 }

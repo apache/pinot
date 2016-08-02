@@ -15,8 +15,6 @@
  */
 package com.linkedin.pinot.core.query.selection;
 
-import java.io.Serializable;
-
 import com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.operator.blocks.MultiValueBlock;
@@ -45,6 +43,7 @@ import com.linkedin.pinot.core.segment.index.readers.FloatDictionary;
 import com.linkedin.pinot.core.segment.index.readers.IntDictionary;
 import com.linkedin.pinot.core.segment.index.readers.LongDictionary;
 import com.linkedin.pinot.core.segment.index.readers.StringDictionary;
+import java.io.Serializable;
 
 /**
  * Selection fetcher is used for querying rows from given blocks and schema.
@@ -74,6 +73,7 @@ public class SelectionFetcher {
           case DOUBLE:
             selectionColumnIterators[i] = new SelectionSingleValueColumnWithDictIterator<Double, DoubleMutableDictionary>(blocks[i]);
             break;
+          case BOOLEAN:
           case STRING:
             selectionColumnIterators[i] = new SelectionSingleValueColumnWithDictIterator<String, StringMutableDictionary>(blocks[i]);
             break;
@@ -94,6 +94,7 @@ public class SelectionFetcher {
           case DOUBLE:
             selectionColumnIterators[i] = new SelectionSingleValueColumnWithDictIterator<Double, DoubleDictionary>(blocks[i]);
             break;
+          case BOOLEAN:
           case STRING:
             selectionColumnIterators[i] = new SelectionSingleValueColumnWithDictIterator<String, StringDictionary>(blocks[i]);
             break;

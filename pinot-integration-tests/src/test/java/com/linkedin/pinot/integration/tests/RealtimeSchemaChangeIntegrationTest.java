@@ -80,31 +80,31 @@ public class RealtimeSchemaChangeIntegrationTest extends RealtimeClusterIntegrat
 
   @Override
   @Test(enabled = false)
-  public void testHardcodedQuerySet() throws Exception {
-    // Ignored
-  }
-
-  @Override
-  @Test(enabled = false)
-  public void testGeneratedQueries() throws Exception {
-    // Ignored
-  }
-
-  @Override
-  @Test(enabled = false)
   public void testSingleQuery() throws Exception {
-    // Ignored
+    // Ignore this inherited test
   }
 
   @Override
   @Test(enabled = false)
   public void testMultipleQueries() throws Exception {
-    // Ignored
+    // Ignore this inherited test
   }
 
   @Override
   @Test(enabled = false)
-  public void testGeneratedQueriesWithMultivalues() throws Exception {
-    // Ignored
+  public void testHardcodedQuerySet() throws Exception {
+    // Ignore this inherited test
+  }
+
+  @Override
+  @Test(enabled = false)
+  public void testGeneratedQueriesWithoutMultiValues() throws Exception {
+    // Ignore this inherited test
+  }
+
+  @Override
+  @Test(enabled = false)
+  public void testGeneratedQueriesWithMultiValues() throws Exception {
+    // Ignore this inherited test
   }
 }

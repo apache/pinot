@@ -15,22 +15,6 @@
  */
 package com.linkedin.pinot.query.selection;
 
-import java.io.File;
-import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-import org.apache.commons.io.FileUtils;
-import org.json.JSONObject;
-import org.testng.Assert;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
-import org.testng.annotations.Test;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.request.Selection;
@@ -68,6 +52,22 @@ import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 import com.linkedin.pinot.util.TestUtils;
+import java.io.File;
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import org.apache.commons.io.FileUtils;
+import org.json.JSONObject;
+import org.testng.Assert;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
+import org.testng.annotations.Test;
 
 
 public class SelectionOnlyQueriesTest {
@@ -236,12 +236,12 @@ public class SelectionOnlyQueriesTest {
     instanceResponseMap.put(new ServerInstance("localhost:9999"), resultBlock.getDataTable());
 
     final Collection<Serializable[]> reducedResults =
-        SelectionOperatorUtils.reduce(instanceResponseMap, brokerRequest.getSelections().getSize());
+        SelectionOperatorUtils.reduceWithoutOrdering(instanceResponseMap, brokerRequest.getSelections().getSize());
     List<String> selectionColumns =
         SelectionOperatorUtils.getSelectionColumns(brokerRequest.getSelections().getSelectionColumns(), _indexSegment);
     DataSchema dataSchema = resultBlock.getSelectionDataSchema();
 
-    final JSONObject jsonResult = SelectionOperatorUtils.render(reducedResults, selectionColumns, dataSchema);
+    final JSONObject jsonResult = SelectionOperatorUtils.renderWithoutOrdering(reducedResults, selectionColumns, dataSchema);
     System.out.println(jsonResult);
     return jsonResult;
   }

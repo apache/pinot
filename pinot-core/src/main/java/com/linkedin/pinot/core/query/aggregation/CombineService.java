@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.query.aggregation;
 
+import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.response.ProcessingException;
@@ -42,14 +43,10 @@ public class CombineService {
   public static void mergeTwoBlocks(BrokerRequest brokerRequest, IntermediateResultsBlock mergedBlock,
       IntermediateResultsBlock blockToMerge) {
     // Sanity check
+    Preconditions.checkNotNull(mergedBlock);
     if (blockToMerge == null) {
       return;
     }
-    if (mergedBlock == null) {
-      mergedBlock = blockToMerge;
-      return;
-    }
-
 
     // Combine NumDocsScanned
     mergedBlock.setNumDocsScanned(mergedBlock.getNumDocsScanned() + blockToMerge.getNumDocsScanned());
@@ -107,7 +104,7 @@ public class CombineService {
             new SelectionOperatorService(brokerRequest.getSelections(), mergedBlockSchema);
         mergedBlock.setSelectionResult(selectionService.merge(mergedResultSet, toMergeResultSet));
       } else {
-        mergedBlock.setSelectionResult(SelectionOperatorUtils.merge(mergedResultSet,
+        mergedBlock.setSelectionResult(SelectionOperatorUtils.mergeWithoutOrdering(mergedResultSet,
             toMergeResultSet,
             brokerRequest.getSelections().getSize()));
       }

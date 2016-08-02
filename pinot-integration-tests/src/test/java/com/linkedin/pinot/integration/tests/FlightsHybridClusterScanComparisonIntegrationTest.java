@@ -28,12 +28,6 @@ import org.testng.annotations.Test;
  */
 public class FlightsHybridClusterScanComparisonIntegrationTest extends HybridClusterScanComparisonIntegrationTest {
   @Override
-  @Test(enabled = false) // jfim: This should already be covered by our tests against H2
-  public void testGeneratedQueries() throws Exception {
-    super.testGeneratedQueries();
-  }
-
-  @Override
   protected String getTimeColumnName() {
     return "DaysSinceEpoch";
   }
