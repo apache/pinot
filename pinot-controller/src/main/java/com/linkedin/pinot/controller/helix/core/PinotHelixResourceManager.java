@@ -1592,6 +1592,11 @@ public class PinotHelixResourceManager {
     return getAllPinotTableNames().contains(actualTableName);
   }
 
+  public AbstractTableConfig getRealtimeTableConfig(String realtimeTableName) throws JsonParseException,
+      JsonMappingException, JsonProcessingException, JSONException, IOException {
+    return ZKMetadataProvider.getRealtimeTableConfig(getPropertyStore(), realtimeTableName);
+  }
+
   public AbstractTableConfig getTableConfig(String tableName, TableType type) throws JsonParseException,
       JsonMappingException, JsonProcessingException, JSONException, IOException {
     String actualTableName = new TableNameBuilder(type).forTable(tableName);

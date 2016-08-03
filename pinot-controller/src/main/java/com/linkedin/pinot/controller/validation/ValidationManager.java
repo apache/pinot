@@ -29,10 +29,12 @@ import org.joda.time.Duration;
 import org.joda.time.Interval;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import com.linkedin.pinot.common.metadata.stream.KafkaStreamMetadata;
 import com.linkedin.pinot.common.metrics.ValidationMetrics;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
@@ -126,12 +128,25 @@ public class ValidationManager {
       // For each table, fetch the metadata for all its segments
       if (TableNameBuilder.getTableTypeFromTableName(tableName) != TableType.OFFLINE) {
         List<RealtimeSegmentZKMetadata> realtimeSegmentZKMetadatas = ZKMetadataProvider.getRealtimeSegmentZKMetadataListForTable(propertyStore, tableName);
+        boolean countHLCSegments = true;
+        try {
+          AbstractTableConfig tableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(tableName);
+          KafkaStreamMetadata streamMetadata = new KafkaStreamMetadata(tableConfig.getIndexingConfig().getStreamConfigs());
+          if (streamMetadata.hasSimpleKafkaConsumerType() && !streamMetadata.hasHighLevelKafkaConsumerType()) {
+            countHLCSegments = false;
+          }
+        } catch (Exception e) {
+          // TableConfig not present. skip it.
+          LOGGER.warn("Cannot get tableconfig for {}", tableName);
+          continue;
+        }
         for (RealtimeSegmentZKMetadata realtimeSegmentZKMetadata : realtimeSegmentZKMetadatas) {
           SegmentMetadata segmentMetadata = new SegmentMetadataImpl(realtimeSegmentZKMetadata);
           segmentMetadataList.add(segmentMetadata);
         }
         // Update the gauge to contain the total document count in the segments
-        _validationMetrics.updateTotalDocumentsGauge(tableName, computeRealtimeTotalDocumentInSegments(segmentMetadataList));
+        _validationMetrics.updateTotalDocumentsGauge(tableName, computeRealtimeTotalDocumentInSegments(segmentMetadataList,
+            countHLCSegments));
       } else {
         List<OfflineSegmentZKMetadata> offlineSegmentZKMetadatas = ZKMetadataProvider.getOfflineSegmentZKMetadataListForTable(propertyStore, tableName);
         for (OfflineSegmentZKMetadata offlineSegmentZKMetadata : offlineSegmentZKMetadatas) {
@@ -206,25 +221,32 @@ public class ValidationManager {
   }
 
   // TODO If both high-level and low-level consumers are present, count only one of them, not both
-  public static long computeRealtimeTotalDocumentInSegments(List<SegmentMetadata> segmentMetadataList)  {
+  public static long computeRealtimeTotalDocumentInSegments(List<SegmentMetadata> segmentMetadataList,
+      boolean countHLCSegments)  {
     long totalDocumentCount = 0;
 
     String groupId = "";
 
     for (SegmentMetadata segmentMetadata : segmentMetadataList) {
       String segmentName = segmentMetadata.getName();
-      if (!SegmentName.isHighLevelConsumerSegmentName(segmentName)) {
-        continue;
-      }
-      HLCSegmentName hlcSegmentName = new HLCSegmentName(segmentName);
-      String segmentGroupIdName = hlcSegmentName.getGroupId();
+      if (SegmentName.isHighLevelConsumerSegmentName(segmentName)) {
+        if (countHLCSegments) {
+          HLCSegmentName hlcSegmentName = new HLCSegmentName(segmentName);
+          String segmentGroupIdName = hlcSegmentName.getGroupId();
 
-      if (groupId.isEmpty()) {
-        groupId = segmentGroupIdName;
-      }
-      // Discard all segments with different groupids as they are replicas
-      if (groupId.equals(segmentGroupIdName) && segmentMetadata.getTotalRawDocs() >= 0) {
-        totalDocumentCount += segmentMetadata.getTotalRawDocs();
+          if (groupId.isEmpty()) {
+            groupId = segmentGroupIdName;
+          }
+          // Discard all segments with different groupids as they are replicas
+          if (groupId.equals(segmentGroupIdName) && segmentMetadata.getTotalRawDocs() >= 0) {
+            totalDocumentCount += segmentMetadata.getTotalRawDocs();
+          }
+        }
+      } else {
+        // Low level segments
+        if (!countHLCSegments) {
+          totalDocumentCount += segmentMetadata.getTotalRawDocs();
+        }
       }
     }
     return totalDocumentCount;
