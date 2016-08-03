@@ -107,11 +107,6 @@ function deleteData(url, data, tab) {
                 return
             }
         }
-        //,
-//        error: function (jqXhr, textStatus, errorThrown) {
-//            console.log(errorThrown);
-//
-//        }
     }).always(function () {
 
     })
@@ -628,59 +623,6 @@ function toggleSumDetails(target) {
     }
 }
 
-function showContributors(target) {
-    // Change the view to contributors
-
-//    //either dashboard or metrics param is present in hash
-//    delete hash.dashboard;
-//
-//    //switch to time ver time tab
-//    hash.view = "compare";
-//
-//    //set start and end date to the starte and end date of the table
-//    var timeBuckets = $("#timebuckets>span")
-//    var numTimeBuckets = timeBuckets.length;
-//
-//    var firstTimeBucketInRow = $("#timebuckets>span")[0];
-//    var lastTimeBucketInRow = $("#timebuckets>span")[numTimeBuckets - 1];
-//
-//    var currentStartUTC = $($("span", firstTimeBucketInRow)[0]).text().trim();
-//    var baselineStartUTC = $($("span", firstTimeBucketInRow)[2]).text().trim();
-//
-//    var currentEndUTC = $($("span", lastTimeBucketInRow)[1]).text().trim();
-//    var baselineEndUTC = $($("span", lastTimeBucketInRow)[3]).text().trim();
-//
-//    hash.baselineStart = baselineStartUTC;
-//    hash.baselineEnd = baselineEndUTC;
-//    hash.currentStart = currentStartUTC;
-//    hash.currentEnd = currentEndUTC;
-//
-//
-//    //check the current granularity of the data on the table
-//    var endOfFirstTimeBucket =  $($("span", firstTimeBucketInRow)[1]).text().trim();
-//    var diff = parseInt(endOfFirstTimeBucket) - parseInt(currentStartUTC)
-//    var diffProperties = describeMillis(diff)
-//    var aggTimeGranularity = diffProperties ? diffProperties.unit : "HOURS"
-//
-//    hash.aggTimeGranularity = aggTimeGranularity
-//
-//    //set the metrics
-//    metrics = [];
-//    // Todo: if metric label it's a derived metric so title contains
-//    metrics.push($(target).attr("title"))
-//    hash.metrics = metrics.toString();
-//
-//    //select only the first dimension to retrieve less data
-//    hash.dimensions = $($(".dimension-option")[0]).attr("value");
-//
-//    //update hash will trigger window.onhashchange event:
-//    // update the form area and trigger the ajax call
-//    window.location.hash = encodeHashParameters(hash);
-
-
-}
-
-
 /** Compare/Tabular view and dashboard view heat-map-cell click switches the view to compare/heat-map
  * focusing on the timerange of the cell or in case of cumulative values it query the cumulative timerange **/
 function showHeatMap(target) {
@@ -1070,19 +1012,19 @@ function parseCron(cron){
     var cronAry = cron.split(" ");
 
     var SEC = cronAry[0];
-    var MIN = cronAry[1];  //(integer 0-60) 30 > scheduleMinute = 30; 00 > no assumption
-    var HOUR = cronAry[2]; // * > repeatEverySize = 1 & repeatEveryUnit = HOURS;  "0/size" > repeatEverySize = size repeatEveryUnit = HOURS; (integer 0-23) ie. 10  > scheduleHour = 10, repeatEveryUnit = DAYS
-    var DAY_OF_MONTH = cronAry[3]; // * > repeatEverySize = 1;  0/size > repeatEverySize = size  & repeatEveryUnit = DAYS
-    var DAY_OF_WEEK = cronAry[4];  // *
-    var YEAR =  cronAry[5];  // ?
+    var MIN = cronAry[1];  //supported values: (integer 0-60) 30 -> scheduleMinute = integer, * -> not supported by backend as of 8/3/2016
+    var HOUR = cronAry[2]; //supported values:  * -> repeatEverySize = 1 & repeatEveryUnit = HOURS;  "0/size" -> repeatEverySize = size repeatEveryUnit = HOURS; (integer 0-23) ie. 10  -> scheduleHour = 10, repeatEveryUnit = DAYS
+    var DAY_OF_MONTH = cronAry[3]; //supported values: * -> repeatEverySize = 1;  0/size -> not supported by backend as of 8/3/2016
+    var DAY_OF_WEEK = cronAry[4];  //supported values: *
+    var YEAR =  cronAry[5];  //supported values: ?
 
     var schedule = {} //repeatEveryUnit: "", repeatEverySize: "", scheduleMinute: "", scheduleHour: ""
 
-    if( parseInt(MIN) > 0 ){
+    if( parseInt(MIN) ){
+        if(MIN < 10){
+            MIN = "0" + MIN
+        }
         schedule.scheduleMinute = MIN;
-
-    }else if(parseInt(MIN) == 0) {
-        schedule.scheduleMinute = "00";
     }
 
     if(HOUR == "*"){
@@ -1113,9 +1055,6 @@ function parseCron(cron){
 
 /** Transforms schedule into cron expression. documentation: http://www.quartz-scheduler.org/documentation/quartz-2.x/tutorials/tutorial-lesson-06.html **/
 function encodeCron(repeatEveryUnit, repeatEverySize, scheduleMinute, scheduleHour ){
-
-
-
 
     var SEC = 0;
     var MIN;

@@ -128,6 +128,15 @@ $(document).ready(function () {
         return value
     });
 
+    //Takes the value of an hour or minute
+    //returns the value to be displayed on the ui
+    Handlebars.registerHelper('displayScheduleTime', function (value) {
+        if(parseInt(value) && parseInt(value) < 10){
+            value = "0" + value;
+        }
+        return value
+    });
+
     //returns classname negative or positive or no classname. The classname related css creates a :before pseudo element triangle up or down
     Handlebars.registerHelper('discribeDelta', function (value, describeMode) {
 

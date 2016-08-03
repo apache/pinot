@@ -2,12 +2,13 @@
 
 //Enable Apply btn
 $("#main-view").on("change", ".filter-value-checkbox, .filter-select-all-checkbox", function () {
-    enableButton($("#" + hash.view + "-apply-filter-btn"))
+    var scope = $(this).closest(".view-filter-selector")
+    enableButton($("#" + hash.view + "-apply-filter-btn", scope))
 });
 
 //Apply filters
 $("#main-view").on("click", ".apply-filter-btn", function () {
-    applyFilterSelection()
+    applyFilterSelection(this)
 });
 
 $("#main-view").on("click", ".filter-select-all-checkbox", function () {
@@ -31,9 +32,10 @@ function selectFilterDimensionOption(target) {
     $(".value-filter[rel='" + dimension + "' ]").show();
 }
 
-function applyFilterSelection() {
+function applyFilterSelection(target) {
 
-    var currentTabFilters = $("#" + hash.view + "-filter-panel");
+    var scope = $(target).closest(".view-filter-selector")
+    var currentTabFilters = $("#" + hash.view + "-filter-panel", scope);
 
     //Set hash params
     var filters = {};
@@ -60,9 +62,6 @@ function applyFilterSelection() {
 
     hash.filters = encodeURIComponent(JSON.stringify(filters));
 
-    //Disable Apply filters button and close popup
-    enableButton()
-
     //Todo: Show selected filters on dashboard
     //empty previous filters labels
     $(".added-filter[tab='" + hash.view + "']").remove()
@@ -73,8 +72,7 @@ function applyFilterSelection() {
         var values = decodeURIComponent(labels[k])
         html += "<li class='added-filter uk-button remove-filter-selection' tab=" + hash.view + " rel='" + k + "' value='" + labels[k] + "' title='" + k + ": " + values + "'>" + k + ": " + values + "<i class='uk-icon-close'></i></li>";
     }
-
-    $(".selected-filters-list[rel='" + hash.view + "']").append(html);
+    $(".selected-filters-list[rel='" + hash.view + "']", scope).append(html);
 
     //Enable Go btn
     enableFormSubmit()
@@ -95,6 +93,7 @@ function toggleSelectAllFilterCheckBox(target) {
 
 
 function removeFilterSelection(target) {
+
     var currentTabFilters = $(".filter-panel[rel='" + hash.view + "']");
     //remove the item from the hash by unchecking checkboxes on the panel and applying new selection
     var dimension = $(target).attr("rel");
@@ -128,12 +127,17 @@ function removeFilterSelection(target) {
 
 
 /*takes an object with dimensionNames as keys and an array of dimensionValues as values,
- applies them to the current form and enables form submit */
-function updateFilterSelection(filterParams) {
+ applies them to the current form and enables form submit
+ the options object can have context key where the value is a jquery object of a parent container of the view-filter-selector ie: $("#your-form-id") */
+function updateFilterSelection(filterParams, options) {
+
     var currentFilterContainer = $(".view-filter-selector[rel='" + hash.view + "']");
+    if(options !== undefined && options.hasOwnProperty('scope')){
+        currentFilterContainer = $(".view-filter-selector[rel='" + hash.view + "']", options.scope);
+    }
     var elementsPresent = 1;
     $(".filter-value-checkbox", currentFilterContainer).prop("checked", false);
-    $(".filter-select-all-checkbox").prop("checked", false);
+    $(".filter-select-all-checkbox", currentFilterContainer).prop("checked", false);
 
     for (var f in filterParams) {
         var dimensionValues = filterParams[f];
@@ -149,11 +153,12 @@ function updateFilterSelection(filterParams) {
 
     if (elementsPresent == 1) {
         //Enable then trigger apply btn
-        $('.apply-filter-btn', currentFilterContainer).prop("disabled", false);
+        enableButton($('.apply-filter-btn', currentFilterContainer));
         $(".apply-filter-btn", currentFilterContainer).click();
         $(".apply-filter-btn", currentFilterContainer).parent("a.uk-dropdown-close").click();
     }
 }
+
 
 function readFiltersAppliedInCurrentView(currentTab, options) {
     var currentFilterContainer = $(".view-filter-selector[rel='" + currentTab + "']")

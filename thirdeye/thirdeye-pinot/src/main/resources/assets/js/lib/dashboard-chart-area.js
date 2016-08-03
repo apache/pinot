@@ -18,11 +18,6 @@ $("#main-view").on("click", "#sum-detail button", function () {
 
 /** Dashboard and tabular related listeners * */
 
-// Click metric name in the table
-$("#main-view").on("click", ".metric-label", function () {
-    showContributors(this)
-});
-
 // Clicking heat-map-cell should choose the related metrics and the derived
 // metric the current time to the related hour then loading heatmap view
 $("#main-view").on("click", "#funnels-table .heat-map-cell", function () {

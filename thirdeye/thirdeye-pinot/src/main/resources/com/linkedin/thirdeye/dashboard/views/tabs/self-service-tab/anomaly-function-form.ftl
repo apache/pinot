@@ -114,7 +114,7 @@
                 </div>
                 <div id="anomaly-compare-mode-selector" class="uk-form-row uk-display-inline-block" rel="self-service">
                     <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group uk-display-inline-block">
-                        <div id="selected-anomaly-compare-mode" class="uk-button" value="{{#if fnProperties}}{{fnProperties/baseline}}{{else}}w/w{{/if}}">{{#if fnProperties}}{{properties/baseline}}{{else}}w/w{{/if}}</div>
+                        <div id="selected-anomaly-compare-mode" class="uk-button" value="{{#if fnProperties}}{{#if properties/baseline}}{{properties/baseline}}{{else}}w/w{{/if}}{{else}}w/w{{/if}}">{{#if fnProperties}}{{#if properties/baseline}}{{properties/baseline}}{{else}}w/w{{/if}}{{else}}w/w{{/if}}</div>
                         <div class="uk-button uk-button-primary" type="button"><i class="uk-icon-caret-down"></i>
                         </div>
                         <div class="uk-dropdown uk-dropdown-small uk-dropdown-bottom" style="top: 30px; left: 0px;">
@@ -164,7 +164,7 @@
             <span>consecutive</span>
             <div id="monitoring-window-unit-selector uk-display-inline-block" class="uk-form-row uk-form-row uk-display-inline-block" rel="self-service">
                 <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group uk-display-inline-block">
-                    <div id="selected-monitoring-window-unit" class="uk-button" value="{{#if data/windowUnit}}{{data/windowUnit}}{{else}}HOUR(S){{/if}}">{{#if data/windowUnit}}{{data/windowUnit}}{{else}}HOUR(S){{/if}}</div>
+                    <div id="selected-monitoring-window-unit" class="uk-button" value="{{#if data/windowUnit}}{{data/windowUnit}}{{else}}HOURS{{/if}}">{{#if data/windowUnit}}{{data/windowUnit}}{{else}}HOUR(S){{/if}}</div>
                     <div class="uk-button uk-button-primary" type="button"><i class="uk-icon-caret-down"></i></div>
                     <div class="uk-dropdown uk-dropdown-small uk-dropdown-bottom" style="top: 30px; left: 0px;">
                         <ul class="uk-nav uk-nav-dropdown single-select">
@@ -240,7 +240,7 @@
                     <span id="monitoring-schedule" class="{{#if schedule}}{{hide_if_eq schedule/repeatEveryUnit 'HOURS'}}{{else}}uk-hidden{{/if}}">
                         <span> at
                         </span>
-                        <input id="monitoring-schedule-time" class="thin-input" type="text" data-uk-timepicker="{format:'24h'}" placeholder="HH:MM" value="{{#if schedule/scheduleHour}}{{schedule/scheduleHour}}{{else}}00:{{#if schedule/scheduleMinute}}{{schedule/scheduleMinute}}{{else}}00{{/if}}{{/if}}">
+                        <input id="monitoring-schedule-time" class="thin-input" type="text" data-uk-timepicker="{format:'24h'}" placeholder="HH:MM" value="{{#if schedule/scheduleHour}}{{displayScheduleTime schedule/scheduleHour}}:{{else}}00:{{/if}}{{#if schedule/scheduleMinute}}{{displayScheduleTime schedule/scheduleMinute}}{{else}}00{{/if}}">
                         <span id="schedule-timezone">UTC</span>
                     </span>
            {{#if data.cron}}<span class="form-row">cron: {{data/cron}}</span>{{/if}}
