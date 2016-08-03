@@ -476,7 +476,6 @@ public class PinotHelixResourceManager {
     int numberBrokersToUntag = instancesInClusterWithTag.size() - tenant.getNumberOfInstances();
     for (int i = 0; i < numberBrokersToUntag; ++i) {
       retagInstance(instancesInClusterWithTag.get(i), brokerTenantTag, CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE);
-      _helixAdmin.dropInstance(_helixClusterName, new InstanceConfig(instancesInClusterWithTag.get(i)));
     }
     res.status = ResponseStatus.success;
     return res;
