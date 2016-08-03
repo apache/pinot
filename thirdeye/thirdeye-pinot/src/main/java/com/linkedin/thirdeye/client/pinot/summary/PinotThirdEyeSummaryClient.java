@@ -157,7 +157,7 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
   public List<Row> getAggregatedValuesAtLevel(Dimensions dimensions, int level) {
     Pair<ThirdEyeResponse, ThirdEyeResponse> responses;
     try {
-      List<String> groupBy = dimensions.getGroupByStringsAtLevel(level);
+      List<String> groupBy = dimensions.groupByStringsAtLevel(level);
       responses = getTimeOnTimeResponse(groupBy);
     } catch (Exception e) {
       e.printStackTrace();
@@ -177,7 +177,6 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
           Row row = new Row();
           row.dimensions = dimensions;
           row.dimensionValues = new DimensionValues(responseTa.getRow(j).getDimensions());
-          row.level = level;
           row.baselineValue = value;
           rowTable.put(dimensionValues, rows.size());
           rows.add(row);
@@ -198,7 +197,6 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
             Row row = new Row();
             row.dimensions = dimensions;
             row.dimensionValues = new DimensionValues(responseTb.getRow(j).getDimensions());
-            row.level = level;
             row.currentValue = value;
             rows.add(row);
           }
@@ -231,8 +229,6 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
   @SuppressWarnings("deprecation")
   public static void main(String[] argc) throws Exception {
     String oFileName = "MLCube.json";
-    boolean dumpCubeToFile = true;
-    int answerSize = 5;
 //    String collection = "thirdeyeKbmi";
 //    String metricName = "desktopPageViews";
 //    String[] dimensionNames = { "continent", "environment", "osName", "browserName" };
@@ -246,9 +242,14 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
 
     String collection = "thirdeyeAbook";
     String metricName = "totalFlows";
-    String[] dimensionNames = { "continent", "environment", "osName", "browserName", "countryCode", "contactsOrigin", "deviceName", "locale", "pageKey"};
+//    String[] dimensionNames = { "continent", "environment", "osName", "browserName", "countryCode", "contactsOrigin", "deviceName", "locale", "pageKey"};
+//    String[] dimensionNames = { "osName", "browserName", "contactsOrigin", "deviceName", "pageKey"};
+//    List<List<String>> hierarchy = new ArrayList<>();
+//    hierarchy.add(Lists.newArrayList("continent", "countryCode"));
+    String[] dimensionNames = { "osName", "browserName", "countryCode", "continent" };
     List<List<String>> hierarchy = new ArrayList<>();
     hierarchy.add(Lists.newArrayList("continent", "countryCode"));
+    hierarchy.add(Lists.newArrayList("osName", "browserName"));
 
     DateTime baselineStart = new DateTime(2016, 7, 12, 00, 00);
     TimeGranularity timeGranularity = new TimeGranularity(1, TimeUnit.DAYS);
@@ -276,26 +277,21 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
 
     // Build the cube for computing the summary
     Cube initCube = new Cube();
-    initCube.buildFromOALPDataBase(pinotClient, new Dimensions(Lists.newArrayList(dimensionNames)), hierarchy);
+    // Three different ways to build the cube
+//    initCube.buildFromOALPDataBase(pinotClient, new Dimensions(Lists.newArrayList(dimensionNames)));
+    initCube.buildFromOALPDataBaseAutoDimensions(pinotClient, new Dimensions(Lists.newArrayList(dimensionNames)), hierarchy);
+//    initCube.buildFromOALPDataBaseManualDimensions(pinotClient, new Dimensions(Lists.newArrayList(dimensionNames)));
 
-    Cube cube;
-    if (dumpCubeToFile) {
-      try {
-        initCube.toJson(oFileName);
-        cube = Cube.fromJson(oFileName);
-        cube.buildHierarchy();
-        System.out.println("Restored Cube:");
-        System.out.println(cube);
-      } catch (IOException e) {
-        System.err.println("WARN: Unable to save the cube to the file: " + oFileName);
-        e.printStackTrace();
-        cube = initCube;
-      }
-    } else {
-      cube = initCube;
+    try {
+      initCube.toJson(oFileName);
+      Cube cube = Cube.fromJson(oFileName);
+      cube.buildHierarchy();
+      System.out.println("Restored Cube:");
+      System.out.println(cube);
+    } catch (IOException e) {
+      System.err.println("WARN: Unable to save the cube to the file: " + oFileName);
+      e.printStackTrace();
     }
-
-    Summary.computeSummary(cube.getHierarchicalNodes());
 
     // closing
     thirdEyeClient.close();

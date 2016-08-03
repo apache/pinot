@@ -20,16 +20,24 @@ public class DPArray {
     }
   }
 
-  public DPSlot get(int index) {
+  public DPSlot slotAt(int index) {
     return slots.get(index);
   }
 
   public int size() {
-    return slots.size();
+    return slots.size()-1;
   }
 
   public Set<HierarchyNode> getAnswer() {
     return new HashSet<>(slots.get(slots.size() - 1).ans);
+  }
+
+  public void reset() {
+    targetRatio = 0.;
+    for (DPSlot slot : slots) {
+      slot.cost = 0.;
+      slot.ans.clear();
+    }
   }
 
   public String toString() {
@@ -45,8 +53,8 @@ public class DPArray {
   }
 
   public static class DPSlot {
-    Set<HierarchyNode> ans = new HashSet<>();
     double cost;
+    Set<HierarchyNode> ans = new HashSet<>();
 
     public String toString() {
       return ToStringBuilder.reflectionToString(this, ToStringStyle.SHORT_PREFIX_STYLE);

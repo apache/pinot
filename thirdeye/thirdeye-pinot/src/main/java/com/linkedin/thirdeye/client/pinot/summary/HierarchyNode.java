@@ -29,22 +29,24 @@ class HierarchyNode {
     this.parent = parent;
   }
 
+  public double aggregatedRatio() {
+    return data.ratio();
+  }
+
+  public double currentRatio() {
+    return currentValue / baselineValue;
+  }
+
   public String toIDString() {
     return "(" + level + "," + index + ")";
   }
 
   public String toString() {
-    ToStringBuilder sb = new ToStringBuilder(this, ToStringStyle.SHORT_PREFIX_STYLE);
-    sb.append(level).append(index).append(data.dimensionValues.toString());
-    if (parent != null) {
-      sb.append(parent.toIDString());
-    } else { sb.append(parent); }
-    if (isRoot || isWorker) {
-      StringBuilder ssb = new StringBuilder();
-      if (isRoot) ssb.append('r');
-      if (isWorker) ssb.append('w');
-      sb.append("type", ssb.toString());
-    }
-    return sb.toString();
+    ToStringBuilder tsb = new ToStringBuilder(this, ToStringStyle.SHORT_PREFIX_STYLE);
+    tsb.append(data.dimensionValues)//.append(data.baselineValue).append(data.currentValue)
+       .append(baselineValue).append(currentValue).append("ratio", currentRatio());
+    tsb.append("\t parent").append(parent.baselineValue).append(parent.currentValue)
+       .append("ratio", parent.currentRatio());
+    return tsb.toString();
   }
 }
