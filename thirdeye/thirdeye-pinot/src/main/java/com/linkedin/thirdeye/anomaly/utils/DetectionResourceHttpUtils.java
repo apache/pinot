@@ -38,9 +38,9 @@ public class DetectionResourceHttpUtils {
     return callDetectionJobEndpoint(req);
   }
 
-  public String runAdhocAnomalyFunction(String id, String start, String end)
+  public String runAdhocAnomalyFunction(String id, String startTimeIso, String endTimeIso)
       throws ClientProtocolException, IOException {
-    HttpPost req = new HttpPost(DETECTION_JOB_ENDPOINT + id + ADHOC + "?start=" + start + "&end=" + end);
+    HttpPost req = new HttpPost(DETECTION_JOB_ENDPOINT + id + ADHOC + "?start=" + startTimeIso + "&end=" + endTimeIso);
     return callDetectionJobEndpoint(req);
   }
 

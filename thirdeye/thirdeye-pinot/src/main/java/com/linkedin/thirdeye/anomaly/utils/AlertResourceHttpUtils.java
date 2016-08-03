@@ -38,9 +38,9 @@ public class AlertResourceHttpUtils {
     return callAlertJobEndpoint(req);
   }
 
-  public String runAdhocEmailConfiguration(String id, String start, String end)
+  public String runAdhocEmailConfiguration(String id, String startTimeIso, String endTimeIso)
       throws ClientProtocolException, IOException {
-    HttpPost req = new HttpPost(ALERT_JOB_ENDPOINT + id + ADHOC + "?start=" + start + "&end=" + end);
+    HttpPost req = new HttpPost(ALERT_JOB_ENDPOINT + id + ADHOC + "?start=" + startTimeIso + "&end=" + endTimeIso);
     return callAlertJobEndpoint(req);
   }
 
