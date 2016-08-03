@@ -23,11 +23,14 @@ import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.math.stat.descriptive.DescriptiveStatistics;
 import org.json.JSONObject;
 import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
@@ -77,13 +80,17 @@ public class QueryRunner {
       int totalClientTime = 0;
 
       String query;
+      DescriptiveStatistics stats = new DescriptiveStatistics();
       while ((query = bufferedReader.readLine()) != null) {
         long startTime = System.currentTimeMillis();
         JSONObject response = driver.postQuery(query);
         numQueries++;
-        totalClientTime += System.currentTimeMillis() - startTime;
+        long clientTime = System.currentTimeMillis() - startTime;
+        totalClientTime += clientTime;
         totalServerTime += response.getLong("timeUsedMs");
-        totalBrokerTime += response.getLong("totalTime");
+        long brokerTime = response.getLong("totalTime");
+        totalBrokerTime += brokerTime;
+        stats.addValue(clientTime);
 
         if (numQueries % 1000 == 0) {
           LOGGER.info(
@@ -94,7 +101,16 @@ public class QueryRunner {
 
       LOGGER.info("Processed {} Queries, Total Server Time: {}ms, Total Broker Time: {}ms, Total Client Time : {}ms.",
           numQueries, totalServerTime, totalBrokerTime, totalClientTime);
+      printStats(stats);
     }
+  }
+
+  private static void printStats(DescriptiveStatistics stats) {
+    LOGGER.info(stats.toString());
+    LOGGER.info("50th percentile: {}ms", stats.getPercentile(50.0));
+    LOGGER.info("90th percentile: {}ms", stats.getPercentile(90.0));
+    LOGGER.info("95th percentile: {}ms", stats.getPercentile(95.0));
+    LOGGER.info("99th percentile: {}ms", stats.getPercentile(99.0));
   }
 
   /**
@@ -109,7 +125,7 @@ public class QueryRunner {
    * @throws Exception
    */
   @SuppressWarnings("InfiniteLoopStatement")
-  public static void multiThreadedsQueryRunner(PerfBenchmarkDriverConf conf, String queryFile, int numThreads)
+  public static void multiThreadedsQueryRunner(PerfBenchmarkDriverConf conf, String queryFile, final int numThreads)
       throws Exception {
     final long randomSeed = 123456789L;
     final Random random = new Random(randomSeed);
@@ -126,28 +142,39 @@ public class QueryRunner {
     final AtomicLong totalResponseTime = new AtomicLong(0L);
     final ExecutorService executorService = Executors.newFixedThreadPool(numThreads);
 
+    final DescriptiveStatistics stats = new DescriptiveStatistics();
+    final CountDownLatch latch = new CountDownLatch(numThreads);
+
     for (int i = 0; i < numThreads; i++) {
       executorService.submit(new Runnable() {
         @Override
         public void run() {
-          while (true) {
+          for (int j = 0; j < numQueries; j++) {
             String query = queries.get(random.nextInt(numQueries));
             long startTime = System.currentTimeMillis();
             try {
               driver.postQuery(query);
+              long clientTime = System.currentTimeMillis() - startTime;
+              synchronized (stats) {
+                stats.addValue(clientTime);
+              }
+
               counter.getAndIncrement();
-              totalResponseTime.getAndAdd(System.currentTimeMillis() - startTime);
+              totalResponseTime.getAndAdd(clientTime);
             } catch (Exception e) {
               LOGGER.error("Caught exception while running query: {}", query, e);
               return;
             }
           }
+          latch.countDown();
         }
       });
     }
 
+    executorService.shutdown();
+
     long startTime = System.currentTimeMillis();
-    while (true) {
+    while (latch.getCount() > 0) {
       Thread.sleep(reportIntervalMillis);
       double timePassedSeconds = ((double) (System.currentTimeMillis() - startTime)) / MILLIS_PER_SECOND;
       int count = counter.get();
@@ -155,6 +182,8 @@ public class QueryRunner {
       LOGGER.info("Time Passed: {}s, Query Executed: {}, QPS: {}, Avg Response Time: {}ms", timePassedSeconds, count,
           count / timePassedSeconds, avgResponseTime);
     }
+
+    printStats(stats);
   }
 
   /**
@@ -284,6 +313,7 @@ public class QueryRunner {
     conf.setUploadIndexes(false);
     conf.setConfigureResources(false);
 
+    long start = System.currentTimeMillis();
     switch (queryRunner._mode) {
       case "singleThread":
         singleThreadedQueryRunner(conf, queryRunner._queryFile);
@@ -320,6 +350,8 @@ public class QueryRunner {
         printUsage();
         break;
     }
+
+    System.out.println("Overall time: " + (System.currentTimeMillis() - start) + "ms");
   }
 }
 
