@@ -34,19 +34,19 @@ public class TaskGenerator {
     List<DetectionTaskInfo> tasks = new ArrayList<>();
     AnomalyFunctionSpec anomalyFunctionSpec = detectionJobContext.getAnomalyFunctionSpec();
 
-    DateTime windowStart = detectionJobContext.getWindowStart();
-    DateTime windowEnd = detectionJobContext.getWindowEnd();
+    DateTime windowStartTime = detectionJobContext.getWindowStartTime();
+    DateTime windowEndTime = detectionJobContext.getWindowEndTime();
     long jobExecutionId = detectionJobContext.getJobExecutionId();
     // generate tasks
     String exploreDimensionsString = anomalyFunctionSpec.getExploreDimensions();
     if (StringUtils.isBlank(exploreDimensionsString)) {
       DetectionTaskInfo taskInfo = new DetectionTaskInfo(jobExecutionId,
-          windowStart, windowEnd, anomalyFunctionSpec, null);
+          windowStartTime, windowEndTime, anomalyFunctionSpec, null);
       tasks.add(taskInfo);
     } else {
       List<String> exploreDimensions = Arrays.asList(exploreDimensionsString.split(","));
       for (String exploreDimension : exploreDimensions) {
-        DetectionTaskInfo taskInfo = new DetectionTaskInfo(jobExecutionId, windowStart, windowEnd,
+        DetectionTaskInfo taskInfo = new DetectionTaskInfo(jobExecutionId, windowStartTime, windowEndTime,
             anomalyFunctionSpec, exploreDimension);
         tasks.add(taskInfo);
       }
@@ -61,12 +61,12 @@ public class TaskGenerator {
 
     List<AlertTaskInfo> tasks = new ArrayList<>();
     EmailConfiguration alertConfig = alertJobContext.getAlertConfig();
-    DateTime windowStart = alertJobContext.getWindowStart();
-    DateTime windowEnd = alertJobContext.getWindowEnd();
+    DateTime windowStartTime = alertJobContext.getWindowStartTime();
+    DateTime windowEndTime = alertJobContext.getWindowEndTime();
     long jobExecutionId = alertJobContext.getJobExecutionId();
 
 
-    AlertTaskInfo taskInfo = new AlertTaskInfo(jobExecutionId, windowStart, windowEnd, alertConfig);
+    AlertTaskInfo taskInfo = new AlertTaskInfo(jobExecutionId, windowStartTime, windowEndTime, alertConfig);
     tasks.add(taskInfo);
     return tasks;
   }

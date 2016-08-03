@@ -7,8 +7,7 @@ import com.linkedin.thirdeye.db.dao.AnomalyTaskDAO;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.commons.lang3.StringUtils;
-import org.joda.time.format.ISODateTimeFormat;
+import org.joda.time.DateTime;
 import org.quartz.CronScheduleBuilder;
 import org.quartz.CronTrigger;
 import org.quartz.JobBuilder;
@@ -126,7 +125,7 @@ public class DetectionJobScheduler implements JobScheduler {
     LOG.info("Stopped function {}", id);
   }
 
-  public void runAdHoc(Long id, String windowStartIso, String windowEndIso) {
+  public void runAdHoc(Long id, DateTime windowStartTime, DateTime windowEndTime) {
     AnomalyFunctionSpec anomalyFunctionSpec = anomalyFunctionDAO.findById(id);
     if (anomalyFunctionSpec == null) {
       throw new IllegalArgumentException("No function with id " + id);
@@ -144,12 +143,8 @@ public class DetectionJobScheduler implements JobScheduler {
     detectionJobContext.setAnomalyFunctionFactory(anomalyFunctionFactory);
     detectionJobContext.setAnomalyFunctionId(anomalyFunctionSpec.getId());
     detectionJobContext.setJobName(jobKey);
-    if (StringUtils.isNotBlank(windowStartIso)) {
-      detectionJobContext.setWindowStart(ISODateTimeFormat.dateTimeParser().parseDateTime(windowStartIso));
-    }
-    if (StringUtils.isNotBlank(windowEndIso)) {
-      detectionJobContext.setWindowEnd(ISODateTimeFormat.dateTimeParser().parseDateTime(windowEndIso));
-    }
+    detectionJobContext.setWindowStartTime(windowStartTime);
+    detectionJobContext.setWindowEndTime(windowEndTime);
 
     job.getJobDataMap().put(DetectionJobRunner.DETECTION_JOB_CONTEXT, detectionJobContext);
 
