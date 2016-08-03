@@ -17,8 +17,8 @@ public abstract class AnomalySummaryGenerator {
   }
 
   /**
-   * @param anomalies
-   * @param mergeConfig
+   * @param anomalies   : list of raw anomalies to be merged with last mergedAnomaly
+   * @param mergeConfig : merge configuration params
    *
    * @return
    */
@@ -28,9 +28,9 @@ public abstract class AnomalySummaryGenerator {
   }
 
   /**
-   * @param mergedAnomaly
-   * @param anomalies
-   * @param mergeConfig
+   * @param mergedAnomaly : last merged anomaly
+   * @param anomalies     : list of raw anomalies to be merged with last mergedAnomaly
+   * @param mergeConfig   : merge configuration params
    *
    * @return
    */
