@@ -1,4 +1,5 @@
 package com.linkedin.thirdeye.db.entity;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.base.Joiner;
 import java.util.ArrayList;
 import java.util.List;
@@ -57,6 +58,7 @@ public class AnomalyResult extends AbstractBaseEntity implements Comparable<Anom
   @Column(name = "data_missing")
   private boolean dataMissing;
 
+  @JsonIgnore
   @ManyToOne(fetch = FetchType.EAGER)
   @JoinColumn(name = "function_id")
   private AnomalyFunctionSpec function;
@@ -187,7 +189,8 @@ public class AnomalyResult extends AbstractBaseEntity implements Comparable<Anom
       return false;
     }
     AnomalyResult r = (AnomalyResult) o;
-    return Objects.equals(function, r.getFunction())
+    return Objects.equals(getId(), r.getId())
+        && Objects.equals(function, r.getFunction())
         && Objects.equals(startTimeUtc, r.getStartTimeUtc())
         && Objects.equals(dimensions, r.getDimensions())
         && Objects.equals(endTimeUtc, r.getEndTimeUtc())
@@ -199,7 +202,7 @@ public class AnomalyResult extends AbstractBaseEntity implements Comparable<Anom
 
   @Override
   public int hashCode() {
-    return Objects.hash(getFunction(), dimensions, startTimeUtc,
+    return Objects.hash(getId(), getFunction(), dimensions, startTimeUtc,
         endTimeUtc, score, weight, properties, message);
     // Intentionally omit creationTimeUtc, since start/end are the truly significant dates for
     // anomalies
