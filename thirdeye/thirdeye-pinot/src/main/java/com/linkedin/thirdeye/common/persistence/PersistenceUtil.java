@@ -4,13 +4,20 @@ import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.persist.PersistService;
 import com.google.inject.persist.jpa.JpaPersistModule;
+
 import io.dropwizard.configuration.ConfigurationFactory;
 import io.dropwizard.jackson.Jackson;
+
 import java.io.File;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
+
 import javax.validation.Validation;
+
+import org.apache.commons.lang3.StringUtils;
 
 public abstract class PersistenceUtil {
 
@@ -63,6 +70,18 @@ public abstract class PersistenceUtil {
       if (val != null) {
         properties.setProperty(p, val);
       }
+    }
+    Map<String, String> defaultDbcpProperties = new HashMap<>();
+    defaultDbcpProperties.put("hibernate.dbcp.initialSize", "8");
+    defaultDbcpProperties.put("hibernate.dbcp.maxTotal", "50");
+    defaultDbcpProperties.put("hibernate.dbcp.maxIdle", "50");
+    defaultDbcpProperties.put("hibernate.dbcp.minIdle", "0");
+    for (String key : defaultDbcpProperties.keySet()) {
+      String val = databaseConfiguration.getProperties().get(key);
+      if (StringUtils.isBlank(val)) {
+        val = defaultDbcpProperties.get(key);
+      }
+      properties.setProperty(key, val);
     }
     return properties;
   }
