@@ -29,15 +29,15 @@ public class Dimensions {
     return names.get(index);
   }
 
-  public List<String> getGroupByStringsAtLevel(int level) {
+  public List<String> groupByStringsAtLevel(int level) {
     return names.subList(0, level);
   }
 
-  public List<String> getGroupByStringsAtTop() {
+  public List<String> groupByStringsAtTop() {
     return Collections.<String>emptyList();
   }
 
-  public List<String> getGroupByStringsAtLeaf() {
+  public List<String> groupByStringsAtLeaf() {
     return names;
   }
 

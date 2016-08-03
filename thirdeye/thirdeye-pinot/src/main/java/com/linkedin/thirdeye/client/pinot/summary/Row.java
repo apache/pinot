@@ -10,7 +10,6 @@ import org.apache.commons.lang3.builder.ToStringStyle;
 public class Row {
   Dimensions dimensions;
   DimensionValues dimensionValues;
-  int level;
   double baselineValue;
   double currentValue;
   public List<Double> targetRatios = new ArrayList<>(); // for development purpose
@@ -31,14 +30,6 @@ public class Row {
     this.dimensionValues = dimensionValues;
   }
 
-  public int getLevel() {
-    return level;
-  }
-
-  public void setLevel(int level) {
-    this.level = level;
-  }
-
   public double getBaselineValue() {
     return baselineValue;
   }
@@ -55,8 +46,8 @@ public class Row {
     this.currentValue = currentValue;
   }
 
-  boolean hasSameParentFast(Row o) {
-    return dimensionValues.get(level-2).equals(o.dimensionValues.get(level-2));
+  public double ratio() {
+    return currentValue / baselineValue;
   }
 
   public String toString() {
