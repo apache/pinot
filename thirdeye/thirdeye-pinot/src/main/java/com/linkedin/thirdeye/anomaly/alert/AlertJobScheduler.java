@@ -7,9 +7,7 @@ import com.linkedin.thirdeye.db.dao.EmailConfigurationDAO;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
-import org.joda.time.format.ISODateTimeFormat;
 import org.quartz.CronScheduleBuilder;
 import org.quartz.CronTrigger;
 import org.quartz.JobBuilder;
@@ -122,7 +120,7 @@ public class AlertJobScheduler implements JobScheduler {
     LOG.info("Stopped alert config {}", id);
   }
 
-  public void runAdHoc(Long id, String windowStartIso, String windowEndIso) {
+  public void runAdHoc(Long id, DateTime windowStartTime, DateTime windowEndTime) {
     EmailConfiguration alertConfig = emailConfigurationDAO.findById(id);
     if (alertConfig == null) {
       throw new IllegalArgumentException("No alert config with id " + id);
@@ -139,12 +137,9 @@ public class AlertJobScheduler implements JobScheduler {
     alertJobContext.setEmailConfigurationDAO(emailConfigurationDAO);
     alertJobContext.setAlertConfigId(id);
     alertJobContext.setJobName(jobKey);
-    if (StringUtils.isNotBlank(windowStartIso)) {
-      alertJobContext.setWindowStart(ISODateTimeFormat.dateTimeParser().parseDateTime(windowStartIso));
-    }
-    if (StringUtils.isNotBlank(windowEndIso)) {
-      alertJobContext.setWindowEnd(ISODateTimeFormat.dateTimeParser().parseDateTime(windowEndIso));
-    }
+    alertJobContext.setWindowStartTime(windowStartTime);
+    alertJobContext.setWindowEndTime(windowEndTime);
+
     job.getJobDataMap().put(AlertJobRunner.ALERT_JOB_CONTEXT, alertJobContext);
 
     try {

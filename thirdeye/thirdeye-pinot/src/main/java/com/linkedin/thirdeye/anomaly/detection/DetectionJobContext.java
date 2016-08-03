@@ -8,8 +8,8 @@ import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
 public class DetectionJobContext extends JobContext {
 
   private Long anomalyFunctionId;
-  private DateTime windowStart;
-  private DateTime windowEnd;
+  private DateTime windowStartTime;
+  private DateTime windowEndTime;
   private AnomalyFunctionSpec anomalyFunctionSpec;
 
   public Long getAnomalyFunctionId() {
@@ -20,20 +20,20 @@ public class DetectionJobContext extends JobContext {
     this.anomalyFunctionId = anomalyFunctionId;
   }
 
-  public DateTime getWindowStart() {
-    return windowStart;
+  public DateTime getWindowStartTime() {
+    return windowStartTime;
   }
 
-  public void setWindowStart(DateTime windowStart) {
-    this.windowStart = windowStart;
+  public void setWindowStartTime(DateTime windowStartTime) {
+    this.windowStartTime = windowStartTime;
   }
 
-  public DateTime getWindowEnd() {
-    return windowEnd;
+  public DateTime getWindowEndTime() {
+    return windowEndTime;
   }
 
-  public void setWindowEnd(DateTime windowEnd) {
-    this.windowEnd = windowEnd;
+  public void setWindowEndTime(DateTime windowEndTime) {
+    this.windowEndTime = windowEndTime;
   }
 
   public AnomalyFunctionSpec getAnomalyFunctionSpec() {

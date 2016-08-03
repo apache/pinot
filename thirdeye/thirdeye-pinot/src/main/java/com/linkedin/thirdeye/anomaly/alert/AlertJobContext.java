@@ -8,8 +8,8 @@ import com.linkedin.thirdeye.db.entity.EmailConfiguration;
 public class AlertJobContext extends JobContext {
 
   private Long alertConfigId;
-  private DateTime windowStart;
-  private DateTime windowEnd;
+  private DateTime windowStartTime;
+  private DateTime windowEndTime;
   private EmailConfiguration alertConfig;
 
   public Long getAlertConfigId() {
@@ -28,20 +28,20 @@ public class AlertJobContext extends JobContext {
     this.alertConfig = alertConfig;
   }
 
-  public DateTime getWindowStart() {
-    return windowStart;
+  public DateTime getWindowStartTime() {
+    return windowStartTime;
   }
 
-  public void setWindowStart(DateTime windowStart) {
-    this.windowStart = windowStart;
+  public void setWindowStartTime(DateTime windowStartTime) {
+    this.windowStartTime = windowStartTime;
   }
 
-  public DateTime getWindowEnd() {
-    return windowEnd;
+  public DateTime getWindowEndTime() {
+    return windowEndTime;
   }
 
-  public void setWindowEnd(DateTime windowEnd) {
-    this.windowEnd = windowEnd;
+  public void setWindowEndTime(DateTime windowEndTime) {
+    this.windowEndTime = windowEndTime;
   }
 
 

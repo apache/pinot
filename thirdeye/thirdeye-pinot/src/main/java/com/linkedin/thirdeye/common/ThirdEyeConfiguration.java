@@ -31,6 +31,8 @@ public abstract class ThirdEyeConfiguration extends Configuration {
 
   private String detectorHost = "";
   private int detectorPort = 0;
+  private String alertHost = "";
+  private int alertPort = 0;
 
   private String smtpHost = "";
   private int smtpPort = 0;
@@ -93,6 +95,22 @@ public abstract class ThirdEyeConfiguration extends Configuration {
 
   public void setDetectorPort(int detectorPort) {
     this.detectorPort = detectorPort;
+  }
+
+  public String getAlertHost() {
+    return alertHost;
+  }
+
+  public void setAlertHost(String alertHost) {
+    this.alertHost = alertHost;
+  }
+
+  public int getAlertPort() {
+    return alertPort;
+  }
+
+  public void setAlertPort(int alertPort) {
+    this.alertPort = alertPort;
   }
 
   public String getSmtpHost() {

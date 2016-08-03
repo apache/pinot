@@ -16,6 +16,9 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
 import org.apache.commons.lang.NullArgumentException;
+import org.apache.commons.lang3.StringUtils;
+import org.joda.time.DateTime;
+import org.joda.time.format.ISODateTimeFormat;
 import org.quartz.SchedulerException;
 
 @Path("/detection-job")
@@ -46,9 +49,17 @@ public class DetectionJobResource {
 
   @POST
   @Path("/{id}/ad-hoc")
-  public Response adHoc(@PathParam("id") Long id, @QueryParam("start") String start,
-      @QueryParam("end") String end) throws Exception {
-    detectionJobScheduler.runAdHoc(id, start, end);
+  public Response adHoc(@PathParam("id") Long id, @QueryParam("start") String startTimeIso,
+      @QueryParam("end") String endTimeIso) throws Exception {
+    DateTime startTime = null;
+    DateTime endTime = null;
+    if (StringUtils.isNotBlank(startTimeIso)) {
+      startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso);
+    }
+    if (StringUtils.isNotBlank(endTimeIso)) {
+      endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso);
+    }
+    detectionJobScheduler.runAdHoc(id, startTime, endTime);
     return Response.ok().build();
   }
 
