@@ -15,14 +15,9 @@
  */
 package com.linkedin.pinot.transport.common.routing;
 
-import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.routing.HelixExternalViewBasedRouting;
-import com.linkedin.pinot.routing.RoutingTableLookupRequest;
-import com.linkedin.pinot.routing.builder.BalancedRandomRoutingTableBuilder;
-import com.linkedin.pinot.routing.builder.RoutingTableBuilder;
-import com.linkedin.pinot.transport.common.SegmentIdSet;
 import java.io.FileInputStream;
 import java.io.InputStream;
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -39,6 +34,12 @@ import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
 import org.testng.Assert;
 import org.testng.annotations.Test;
+import com.linkedin.pinot.common.response.ServerInstance;
+import com.linkedin.pinot.routing.HelixExternalViewBasedRouting;
+import com.linkedin.pinot.routing.RoutingTableLookupRequest;
+import com.linkedin.pinot.routing.builder.BalancedRandomRoutingTableBuilder;
+import com.linkedin.pinot.routing.builder.RoutingTableBuilder;
+import com.linkedin.pinot.transport.common.SegmentIdSet;
 
 
 public class RandomRoutingTableTest {
@@ -53,7 +54,11 @@ public class RandomRoutingTableTest {
     ZNRecord externalViewRecord = (ZNRecord) znRecordSerializer.deserialize(IOUtils.toByteArray(evInputStream));
     int totalRuns = 10000;
     RoutingTableBuilder routingStrategy = new BalancedRandomRoutingTableBuilder(10);
-    HelixExternalViewBasedRouting routingTable = new HelixExternalViewBasedRouting(routingStrategy, null, null, null);
+    HelixExternalViewBasedRouting routingTable = new HelixExternalViewBasedRouting(null, null);
+    Field offlineRTBField = HelixExternalViewBasedRouting.class.getDeclaredField("_offlineRoutingTableBuilder");
+    offlineRTBField.setAccessible(true);
+    offlineRTBField.set(routingTable, routingStrategy);
+
     ExternalView externalView = new ExternalView(externalViewRecord);
 
     routingTable.markDataResourceOnline(tableName, externalView, getInstanceConfigs(externalView));

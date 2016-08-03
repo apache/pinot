@@ -17,9 +17,11 @@ package com.linkedin.pinot.broker.broker;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.lang.reflect.Field;
 import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
-
 import org.I0Itec.zkclient.ZkClient;
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.HelixAdmin;
@@ -33,7 +35,6 @@ import org.testng.Assert;
 import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
-
 import com.linkedin.pinot.broker.broker.helix.DefaultHelixBrokerConfig;
 import com.linkedin.pinot.broker.broker.helix.HelixBrokerStarter;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
@@ -47,6 +48,7 @@ import com.linkedin.pinot.controller.helix.core.util.HelixSetupUtils;
 import com.linkedin.pinot.controller.helix.starter.HelixConfig;
 import com.linkedin.pinot.core.query.utils.SimpleSegmentMetadata;
 import com.linkedin.pinot.routing.HelixExternalViewBasedRouting;
+import com.linkedin.pinot.routing.ServerToSegmentSetMap;
 
 
 public class HelixBrokerStarterTest {
@@ -123,10 +125,14 @@ public class HelixBrokerStarterTest {
         _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
     Assert.assertEquals(externalView.getStateMap(COMPANY_TABLE_NAME).size(), 6);
     Thread.sleep(2000);
-    HelixExternalViewBasedRouting helixExternalViewBasedRouting =
-        _helixBrokerStarter.getHelixExternalViewBasedRouting();
-    Assert
-        .assertEquals(Arrays.toString(helixExternalViewBasedRouting.getDataTableSet().toArray()), "[company_OFFLINE]");
+    HelixExternalViewBasedRouting helixExternalViewBasedRouting = _helixBrokerStarter.getHelixExternalViewBasedRouting();
+    Field brokerRoutingTableField;
+    brokerRoutingTableField = HelixExternalViewBasedRouting.class.getDeclaredField("_brokerRoutingTable");
+    brokerRoutingTableField.setAccessible(true);
+
+    Map<String, List<ServerToSegmentSetMap>> brokerRoutingTable =
+        (Map<String, List<ServerToSegmentSetMap>>)brokerRoutingTableField.get(helixExternalViewBasedRouting);
+    Assert.assertEquals(Arrays.toString(brokerRoutingTable.keySet().toArray()), "[company_OFFLINE]");
 
     final String tableName = "cap";
     JSONObject buildCreateOfflineTableV2JSON =
@@ -143,14 +149,12 @@ public class HelixBrokerStarterTest {
     externalView =
         _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
     Assert.assertEquals(externalView.getStateMap(CAP_TABLE_NAME).size(), 6);
-    helixExternalViewBasedRouting = _helixBrokerStarter.getHelixExternalViewBasedRouting();
-    Object[] tableArray = helixExternalViewBasedRouting.getDataTableSet().toArray();
+    Object[] tableArray = brokerRoutingTable.keySet().toArray();
     Arrays.sort(tableArray);
     Assert.assertEquals(Arrays.toString(tableArray), "[cap_OFFLINE, company_OFFLINE]");
 
-    Set<String> serverSet =
-        helixExternalViewBasedRouting.getBrokerRoutingTable().get(COMPANY_TABLE_NAME).get(0).getServerSet();
-    Assert.assertEquals(helixExternalViewBasedRouting.getBrokerRoutingTable().get(COMPANY_TABLE_NAME).get(0)
+    Set<String> serverSet = brokerRoutingTable.get(COMPANY_TABLE_NAME).get(0).getServerSet();
+    Assert.assertEquals(brokerRoutingTable.get(COMPANY_TABLE_NAME).get(0)
         .getSegmentSet(serverSet.iterator().next()).size(), 5);
 
     final String dataResource = COMPANY_TABLE_NAME;
@@ -160,12 +164,12 @@ public class HelixBrokerStarterTest {
     externalView = _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, COMPANY_TABLE_NAME);
     Assert.assertEquals(externalView.getPartitionSet().size(), 6);
     helixExternalViewBasedRouting = _helixBrokerStarter.getHelixExternalViewBasedRouting();
-    tableArray = helixExternalViewBasedRouting.getDataTableSet().toArray();
+    tableArray = brokerRoutingTable.keySet().toArray();
     Arrays.sort(tableArray);
     Assert.assertEquals(Arrays.toString(tableArray), "[cap_OFFLINE, company_OFFLINE]");
 
-    serverSet = helixExternalViewBasedRouting.getBrokerRoutingTable().get(COMPANY_TABLE_NAME).get(0).getServerSet();
-    Assert.assertEquals(helixExternalViewBasedRouting.getBrokerRoutingTable().get(COMPANY_TABLE_NAME).get(0)
+    serverSet = brokerRoutingTable.get(COMPANY_TABLE_NAME).get(0).getServerSet();
+    Assert.assertEquals(brokerRoutingTable.get(COMPANY_TABLE_NAME).get(0)
         .getSegmentSet(serverSet.iterator().next()).size(), 6);
 
   }
