@@ -52,24 +52,13 @@ public abstract class PersistenceUtil {
   public static Properties createDbPropertiesFromConfiguration(PersistenceConfig localConfiguration) {
     PersistenceConfig.DatabaseConfiguration databaseConfiguration =
         localConfiguration.getDatabaseConfiguration();
-    List<String> propertiesList = new ArrayList<>();
-    propertiesList.add("hibernate.dialect");
-    propertiesList.add("hibernate.show_sql");
-    propertiesList.add("hibernate.hbm2ddl.auto");
-    propertiesList.add("hibernate.archive.autodetection");
-    propertiesList.add("hibernate.connection.driver_class");
 
     Properties properties = new Properties();
     properties.setProperty("javax.persistence.jdbc.url", databaseConfiguration.getUrl());
     properties.setProperty("javax.persistence.jdbc.user", databaseConfiguration.getUser());
     properties.setProperty("javax.persistence.jdbc.password", databaseConfiguration.getPassword());
-    for (String p : propertiesList) {
-      String val = databaseConfiguration.getProperties().get(p);
-      if (val != null) {
-        properties.setProperty(p, val);
-      }
-    }
-    for (Entry<String, String> entry : databaseConfiguration.getConnectionPoolProperties().entrySet()) {
+
+    for (Entry<String, String> entry : databaseConfiguration.getProperties().entrySet()) {
       properties.setProperty(entry.getKey(), entry.getValue());
     }
     return properties;
