@@ -10,14 +10,12 @@ import io.dropwizard.jackson.Jackson;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Properties;
 
 import javax.validation.Validation;
 
-import org.apache.commons.lang3.StringUtils;
 
 public abstract class PersistenceUtil {
 
@@ -71,19 +69,8 @@ public abstract class PersistenceUtil {
         properties.setProperty(p, val);
       }
     }
-    Map<String, String> defaultDbcpProperties = new HashMap<>();
-    defaultDbcpProperties.put("hibernate.connection.provider_class", "org.hibernate.c3p0.internal.C3P0ConnectionProvider");
-    defaultDbcpProperties.put("hibernate.c3p0.min_size", "5"); // initial pool size
-    defaultDbcpProperties.put("hibernate.c3p0.max_size", "50"); // max number of connections in pool
-    defaultDbcpProperties.put("hibernate.c3p0.timeout", "500");
-    defaultDbcpProperties.put("hibernate.c3p0.max_statements", "100"); // max statements to cache
-    defaultDbcpProperties.put("hibernate.c3p0.idle_test_period", "3000");
-    for (String key : defaultDbcpProperties.keySet()) {
-      String val = databaseConfiguration.getProperties().get(key);
-      if (StringUtils.isBlank(val)) {
-        val = defaultDbcpProperties.get(key);
-      }
-      properties.setProperty(key, val);
+    for (Entry<String, String> entry : databaseConfiguration.getConnectionPoolProperties().entrySet()) {
+      properties.setProperty(entry.getKey(), entry.getValue());
     }
     return properties;
   }

@@ -27,6 +27,7 @@ public class PersistenceConfig extends Configuration {
     private String password;
     private String url;
     private Map<String, String> properties = Maps.newLinkedHashMap();
+    private Map<String, String> connectionPoolProperties = Maps.newLinkedHashMap();
 
     public String getUser() {
       return user;
@@ -50,6 +51,15 @@ public class PersistenceConfig extends Configuration {
 
     public void setProperties(Map<String, String> properties) {
       this.properties = properties;
+    }
+
+
+    public Map<String, String> getConnectionPoolProperties() {
+      return connectionPoolProperties;
+    }
+
+    public void setConnectionPoolProperties(Map<String, String> connectionPoolProperties) {
+      this.connectionPoolProperties = connectionPoolProperties;
     }
 
     public String getUrl() {
