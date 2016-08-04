@@ -72,10 +72,12 @@ public abstract class PersistenceUtil {
       }
     }
     Map<String, String> defaultDbcpProperties = new HashMap<>();
-    defaultDbcpProperties.put("hibernate.dbcp.initialSize", "8");
-    defaultDbcpProperties.put("hibernate.dbcp.maxTotal", "50");
-    defaultDbcpProperties.put("hibernate.dbcp.maxIdle", "50");
-    defaultDbcpProperties.put("hibernate.dbcp.minIdle", "0");
+    defaultDbcpProperties.put("hibernate.connection.provider_class", "org.hibernate.c3p0.internal.C3P0ConnectionProvider");
+    defaultDbcpProperties.put("hibernate.c3p0.min_size", "5"); // initial pool size
+    defaultDbcpProperties.put("hibernate.c3p0.max_size", "50"); // max number of connections in pool
+    defaultDbcpProperties.put("hibernate.c3p0.timeout", "500");
+    defaultDbcpProperties.put("hibernate.c3p0.max_statements", "100"); // max statements to cache
+    defaultDbcpProperties.put("hibernate.c3p0.idle_test_period", "3000");
     for (String key : defaultDbcpProperties.keySet()) {
       String val = databaseConfiguration.getProperties().get(key);
       if (StringUtils.isBlank(val)) {
