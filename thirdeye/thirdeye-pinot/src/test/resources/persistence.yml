@@ -8,3 +8,9 @@ databaseConfiguration:
     hibernate.hbm2ddl.auto: update
     hibernate.archive.autodetection: class, hbm
     hibernate.connection.driver_class: org.hsqldb.jdbcDriver
+    hibernate.connection.provider_class: org.hibernate.c3p0.internal.C3P0ConnectionProvider
+    hibernate.c3p0.min_size: 5
+    hibernate.c3p0.max_size: 50
+    hibernate.c3p0.timeout: 500
+    hibernate.c3p0.max_statements: 100
+    hibernate.c3p0.idle_test_period: 3000
