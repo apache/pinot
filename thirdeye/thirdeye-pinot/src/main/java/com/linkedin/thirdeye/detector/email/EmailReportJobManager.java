@@ -144,7 +144,7 @@ public class EmailReportJobManager{
         throw new IllegalArgumentException("File does not exist or is a directory: " + file);
       }
       EmailConfiguration emailConfig = reader.readValue(file, EmailConfiguration.class);
-      emailConfig.setId(-1);
+      emailConfig.setId(-1l);
       String triggerKey = String.format("file-based_email_trigger_%s", filePath);
       Trigger trigger = TriggerBuilder.newTrigger().withIdentity(triggerKey).startNow().build();
 
