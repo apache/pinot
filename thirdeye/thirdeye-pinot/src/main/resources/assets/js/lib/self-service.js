@@ -263,7 +263,8 @@ function renderSelfService() {
 
         //Todo add monitoring schedule time to update form when it's available
 
-        formData.repeatEverySize = $("#monitoring-repeat-size", form).val();
+
+        formData.repeatEverySize = $("#monitoring-repeat-size", form).val() ? $("#monitoring-repeat-size", form).val() : 1;
         formData.repeatEveryUnit = $("#selected-monitoring-repeat-unit", form).attr("value");
         var monitoringScheduleTime = ( $("#monitoring-schedule-time", form).val() == "" ) ? "" : $("#monitoring-schedule-time", form).val() //Todo: in case of daily data granularity set the default schedule to time when datapoint is created
         if(monitoringScheduleTime){
@@ -412,23 +413,22 @@ function renderSelfService() {
         }
 
         //Todo:Remove this condition if the repeatEverySize and repeatEveryUnit are available on all forms all
-        if (formData.hasOwnProperty("repeatEverySize")) {
 
-            if (!isPositiveInteger(formData.repeatEverySize)) {
-                errorMessage.html('Please fill in: "Monitor data every" X hours/days/weeks etc., where X should be positive integer.');
-                errorAlert.attr("data-error-source", "monitoring-repeat-size");
-                errorAlert.fadeIn(100);
-                return
-            }
-
-            //Check if repeatEvery has value
-            if (!formData.repeatEverySize) {
-                errorMessage.html("Please fill in how frequently should ThirdEye monitor the data.");
-                errorAlert.attr("data-error-source", "monitoring-repeat-size");
-                errorAlert.fadeIn(100);
-                return
-            }
+        if (!isPositiveInteger(formData.repeatEverySize)) {
+            errorMessage.html('Please fill in: "Monitor data every" X hours/days/weeks etc., where X should be positive integer.');
+            errorAlert.attr("data-error-source", "monitoring-repeat-size");
+            errorAlert.fadeIn(100);
+            return
         }
+
+        //Check if repeatEvery has value
+        if (!formData.repeatEverySize) {
+            errorMessage.html("Please fill in how frequently should ThirdEye monitor the data.");
+            errorAlert.attr("data-error-source", "monitoring-repeat-size");
+            errorAlert.fadeIn(100);
+            return
+        }
+
         return valid
     }
 
@@ -481,10 +481,9 @@ function renderSelfService() {
         }).fail(function(){
             var errorMessage = $("#delete-anomaly-function-error");
             $("p", errorMessage).html("There was an error completing you request. Please try again.");
-            successMessage.fadeIn(100);
+            errorMessage.fadeIn(100);
         })
     }
-
 
     //Populate modal with data of the selected anomaly function
     function populateUpdateForm(target) {
@@ -497,6 +496,23 @@ function renderSelfService() {
         var anomalyFunctionObj = existingAnomalyFunctionsData[rowId];
         var fnProperties = parseFnProperties(anomalyFunctionObj.properties);
         var schedule = parseCron(anomalyFunctionObj.cron);
+        var filters = anomalyFunctionObj.filters ? anomalyFunctionObj.filters.split(";"): "";
+
+        //parse filters
+        var filterParams = {};
+        for(var i= 0,len=filters.length; i<len; i++){
+            var keyValue = filters[i];
+            var keyValueAry = keyValue.split("=")
+            var dimension = keyValueAry[0];
+            var value = keyValueAry[1];
+
+            if(filterParams.hasOwnProperty(dimension)){
+                filterParams[dimension].push(value)
+            }else{
+                filterParams[dimension] = [];
+                filterParams[dimension].push(value)
+            }
+        }
 
         var templateData = {data: anomalyFunctionObj, fnProperties: fnProperties, schedule :schedule}
 
@@ -506,6 +522,7 @@ function renderSelfService() {
 
         //Store the rowId on the update form btn
         $("#update-anomaly-function").attr("data-row-id", rowId )
+
 
         //Set function type
         $(".function-type-option[value='" + existingAnomalyFunctionsData[rowId].type + "']").click()
@@ -560,12 +577,11 @@ function renderSelfService() {
             $(this).after(result_filter_dimension_value_template)
         });
 
-        //set value set in display block mode
-        $("#update-function-modal  .filter-dimension-option:first-of-type").each(function () {
-            $(this).click();
-            $(".radio-options", this).click();
-        });
+        updateFilterSelection(filterParams, { scope: $("#update-function-modal")} )
 
+        //value set in display block mode
+       var firstDimension = $("#update-function-modal .filter-dimension-option:first-of-type")
+        firstDimension.click();
 
     }
 
