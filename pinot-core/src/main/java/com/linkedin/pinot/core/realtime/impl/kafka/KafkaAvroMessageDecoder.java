@@ -76,11 +76,16 @@ public class KafkaAvroMessageDecoder implements KafkaMessageDecoder {
 
   @Override
   public GenericRow decode(byte[] payload) {
-    if (payload == null || payload.length == 0) {
+    return decode(payload, 0, payload.length);
+  }
+
+  @Override
+  public GenericRow decode(byte[] payload, int offset, int length) {
+    if (payload == null || payload.length == 0 || length == 0) {
       return null;
     }
 
-    byte[] md5 = Arrays.copyOfRange(payload, SCHEMA_HASH_START_OFFSET, SCHEMA_HASH_END_OFFSET);
+    byte[] md5 = Arrays.copyOfRange(payload, SCHEMA_HASH_START_OFFSET + offset, SCHEMA_HASH_END_OFFSET + offset);
 
     String md5String = hex(md5);
     org.apache.avro.Schema schema = null;
@@ -98,8 +103,8 @@ public class KafkaAvroMessageDecoder implements KafkaMessageDecoder {
     DatumReader<Record> reader = new GenericDatumReader<Record>(schema);
     try {
       GenericData.Record avroRecord =
-          reader.read(null, decoderFactory.createBinaryDecoder(payload, HEADER_LENGTH,
-              payload.length - HEADER_LENGTH, null));
+          reader.read(null, decoderFactory.createBinaryDecoder(payload, HEADER_LENGTH + offset,
+              length - HEADER_LENGTH, null));
       return avroRecordConvetrer.transform(avroRecord, schema);
     } catch (IOException e) {
       LOGGER.error("Caught exception while reading message", e);

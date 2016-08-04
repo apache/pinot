@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.realtime.impl.kafka;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -96,6 +97,11 @@ public class KafkaJSONMessageDecoder implements KafkaMessageDecoder {
       LOGGER.error("error decoding , ", e);
     }
     return null;
+  }
+
+  @Override
+  public GenericRow decode(byte[] payload, int offset, int length) {
+    return decode(Arrays.copyOfRange(payload, offset, offset + length));
   }
 
   private Object stringToDataType(FieldSpec spec, String inString) {

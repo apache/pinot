@@ -182,9 +182,14 @@ public abstract class ClusterTest extends ControllerTest {
 
     @Override
     public GenericRow decode(byte[] payload) {
+      return decode(payload, 0, payload.length);
+    }
+
+    @Override
+    public GenericRow decode(byte[] payload, int offset, int length) {
       try {
         GenericData.Record avroRecord =
-            _reader.read(null, _decoderFactory.binaryDecoder(payload, 0, payload.length, null));
+            _reader.read(null, _decoderFactory.binaryDecoder(payload, offset, length, null));
         return _rowGenerator.transform(avroRecord, _avroSchema);
       } catch (Exception e) {
         LOGGER.error("Caught exception", e);

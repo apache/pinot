@@ -28,13 +28,22 @@ public interface KafkaMessageDecoder {
    * @param props
    * @throws Exception
    */
-  public void init(Map<String, String> props, Schema indexingSchema, String kafkaTopicName) throws Exception;
+  void init(Map<String, String> props, Schema indexingSchema, String kafkaTopicName) throws Exception;
 
   /**
    *
    * @param payload
    * @return
    */
-  public GenericRow decode(byte[] payload);
+  GenericRow decode(byte[] payload);
 
+  /**
+   * Decodes a row.
+   *
+   * @param payload The buffer from which to read the row.
+   * @param offset The offset into the array from which the row contents starts
+   * @param length The length of the row contents in bytes
+   * @return A new row decoded from the buffer
+   */
+  GenericRow decode(byte[] payload, int offset, int length);
 }
