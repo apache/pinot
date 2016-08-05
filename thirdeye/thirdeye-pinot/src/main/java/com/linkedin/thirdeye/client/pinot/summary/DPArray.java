@@ -14,8 +14,8 @@ public class DPArray {
   List<DPSlot> slots;
 
   public DPArray(int N) {
-    slots = new ArrayList<>(N + 1);
-    for (int i = 0; i <= N; ++i) {
+    slots = new ArrayList<>(N);
+    for (int i = 0; i < N; ++i) {
       slots.add(new DPSlot());
     }
   }
@@ -29,7 +29,7 @@ public class DPArray {
   }
 
   public Set<HierarchyNode> getAnswer() {
-    return new HashSet<>(slots.get(slots.size() - 1).ans);
+    return slots.get(slots.size() - 1).ans;
   }
 
   public void reset() {

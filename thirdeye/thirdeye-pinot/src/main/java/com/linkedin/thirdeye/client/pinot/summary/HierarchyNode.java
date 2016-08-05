@@ -12,8 +12,6 @@ class HierarchyNode {
   int index;
   double baselineValue;
   double currentValue;
-  boolean isRoot = false;
-  boolean isWorker = false;
   Row data;
   HierarchyNode parent;
   List<HierarchyNode> children = new ArrayList<>();
@@ -45,8 +43,10 @@ class HierarchyNode {
     ToStringBuilder tsb = new ToStringBuilder(this, ToStringStyle.SHORT_PREFIX_STYLE);
     tsb.append(data.dimensionValues)//.append(data.baselineValue).append(data.currentValue)
        .append(baselineValue).append(currentValue).append("ratio", currentRatio());
-    tsb.append("\t parent").append(parent.baselineValue).append(parent.currentValue)
-       .append("ratio", parent.currentRatio());
+    if (parent != null) {
+      tsb.append("\t parent").append(parent.data.dimensionValues).append(parent.baselineValue).append(parent.currentValue)
+      .append("ratio", parent.currentRatio());
+    }
     return tsb.toString();
   }
 }
