@@ -52,13 +52,10 @@ public class RoutingTableSelectorFactory {
           routingTableSelector = clazz.newInstance();
         } catch (ClassNotFoundException e) {
           LOGGER.warn("Could not load '{}'. Loading {}", selectorClassName, defaultClasssName, e);
-          routingTableSelector = new PercentageBasedRoutingTableSelector();
         } catch (InstantiationException e) {
           LOGGER.warn("Could not instantiate '{}'. Instantiating {}", selectorClassName, defaultClasssName, e);
-          routingTableSelector = new PercentageBasedRoutingTableSelector();
         } catch (IllegalAccessException e) {
           LOGGER.warn("Could not instantiate '{}'. Instantiating {}", selectorClassName, defaultClasssName, e);
-          routingTableSelector = new PercentageBasedRoutingTableSelector();
         }
       }
     }

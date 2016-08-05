@@ -87,7 +87,6 @@ public class HelixBrokerStarter {
 
     _pinotHelixProperties.addProperty("pinot.broker.id", brokerId);
     setupHelixSystemProperties();
-    // TODO read config for ROUTING_TABLE_SELECTOR_CLASS_KEY, construct (or load) a RoutingTableSelector class appropriately
 
     // Remove all white-spaces from the list of zkServers (if any).
     String zkServers = zkServer.replaceAll("\\s+", "");

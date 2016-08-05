@@ -39,6 +39,13 @@ import com.linkedin.pinot.routing.builder.KafkaLowLevelConsumerRoutingTableBuild
 import com.linkedin.pinot.routing.builder.RoutingTableBuilder;
 import com.linkedin.pinot.transport.common.SegmentIdSet;
 
+/*
+ * TODO
+ * Would be better to not have the external view based routing not aware of the fact that there are HLC and LLC
+ * implementations. A better way to do it would be to have a RoutingTable implementation that merges the output
+ * of an offline routing table and a realtime routing table, with the realtime routing table being aware of the
+ * fact that there is both an hlc and llc one.
+ */
 public class HelixExternalViewBasedRouting implements RoutingTable {
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixExternalViewBasedRouting.class);
   private final RoutingTableBuilder _offlineRoutingTableBuilder;
@@ -149,7 +156,7 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
       routingTableBuilder = _offlineRoutingTableBuilder;
     }
 
-    LOGGER.info("Trying to compute routing table for table : " + tableName + " using " + routingTableBuilder);
+    LOGGER.info("Trying to compute routing table for table {} using {}", tableName, routingTableBuilder);
 
     try {
       List<ServerToSegmentSetMap> serverToSegmentSetMap =
@@ -166,19 +173,19 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
         }
       }
     } catch (Exception e) {
-      LOGGER.error("Failed to compute/update the routing table" + e.getCause(), e);
+      LOGGER.error("Failed to compute/update the routing table", e);
     }
 
     try {
-      LOGGER.info("Trying to compute time boundary service for table : " + tableName);
+      LOGGER.info("Trying to compute time boundary service for table {}", tableName);
       _timeBoundaryService.updateTimeBoundaryService(externalView);
     } catch (Exception e) {
-      LOGGER.error("Failed to update the TimeBoundaryService : " + e.getCause(), e);
+      LOGGER.error("Failed to update the TimeBoundaryService", e);
     }
   }
 
   public void markDataResourceOffline(String tableName) {
-    LOGGER.info("Trying to remove data table from broker : " + tableName);
+    LOGGER.info("Trying to remove data table from broker for {}", tableName);
     _brokerRoutingTable.remove(tableName);
     _routingTableLastKnownZkVersionMap.remove(tableName);
     _timeBoundaryService.remove(tableName);
