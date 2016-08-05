@@ -44,9 +44,15 @@ public class SummaryResponse {
       tag.copyNames(node.data.dimensionValues);
     }
     for (HierarchyNode node : nodes) {
-      NameTag parentNameTag = nameTags.get(node.parent);
-      if (parentNameTag != null) {
-        parentNameTag.setNotAll(node.level-1);
+      HierarchyNode parent = node;
+      int levelDiff = 1;
+      while ((parent = parent.parent) != null) {
+        NameTag parentNameTag = nameTags.get(parent);
+        if (parentNameTag != null) {
+          parentNameTag.setNotAll(node.level-levelDiff);
+          break;
+        }
+        ++levelDiff;
       }
     }
     //    Fill in the information of each response row
