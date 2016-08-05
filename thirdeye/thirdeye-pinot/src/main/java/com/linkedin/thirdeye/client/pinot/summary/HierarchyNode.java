@@ -32,7 +32,12 @@ class HierarchyNode {
   }
 
   public double currentRatio() {
-    return currentValue / baselineValue;
+    double ratio = currentValue / baselineValue;
+    if (Double.isInfinite(ratio) || Double.isNaN(ratio)) {
+      return aggregatedRatio();
+    } else {
+      return ratio;
+    }
   }
 
   public String toIDString() {

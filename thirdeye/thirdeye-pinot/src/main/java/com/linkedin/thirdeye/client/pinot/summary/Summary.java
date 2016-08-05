@@ -40,10 +40,9 @@ public class Summary {
       dpArrays.add(new DPArray(answerSize));
     }
     HierarchyNode root = cube.getHierarchicalNodes().get(0).get(0);
-    computeChildDPArray(root, 0.);
+    computeChildDPArray(root);
 
-
-    // Check correctness of the sum of values
+    // Check correctness of the sum of values (The check changes the answer values.)
 //    List<HierarchyNode> nodeList = new ArrayList<>(dpArrays.get(0).getAnswer());
 //    nodeList.sort(NODE_COMPARATOR); // Process lower level nodes first
 //    for (HierarchyNode node : nodeList) {
@@ -79,26 +78,26 @@ public class Summary {
    * The calculated answer for each invocation is put at dpArrays[node.level].
    * So, the final answer is located at dpArray[0].
    */
-  private void computeChildDPArray(HierarchyNode node, double parentTargetRatio) {
-    double targetRatio = node.aggregatedRatio();
+  private void computeChildDPArray(HierarchyNode node) {
+    HierarchyNode parent = node.parent;
     DPArray dpArray = dpArrays.get(node.level);
     dpArray.reset();
+    dpArray.targetRatio = node.currentRatio();
 
     // Compute DPArray if the current node is the lowest internal node.
     // Otherwise, merge DPArrays from its children.
     if (node.level == levelCount - 1) {
       for (HierarchyNode child : node.children) {
-        insertRowToDPArray(dpArray, child, targetRatio);
-        targetRatio = updateCurrentRatio(node, dpArray.getAnswer());
-        dpArray.targetRatio = targetRatio;
+        insertRowToDPArray(dpArray, child, node.currentRatio());
+        updateWowValues(node, dpArray.getAnswer());
+        dpArray.targetRatio = node.currentRatio(); // get updated ratio
       }
     } else {
-      dpArray.targetRatio = targetRatio;
       for (HierarchyNode child : node.children) {
-        computeChildDPArray(child, targetRatio);
+        computeChildDPArray(child);
         mergeDPArray(node, dpArray, dpArrays.get(node.level + 1));
-        targetRatio = updateCurrentRatio(node, dpArray.getAnswer());
-        dpArray.targetRatio = targetRatio;
+        updateWowValues(node, dpArray.getAnswer());
+        dpArray.targetRatio = node.currentRatio(); // get updated ratio
       }
     }
 
@@ -107,7 +106,9 @@ public class Summary {
     // Moreover, if a node is thinned out by its children, then aggregate all children.
     if (node.level != 0) {
       if ( !nodeIsThinnedOut(node) ) {
-        targetRatio = (targetRatio + parentTargetRatio) / 2.;
+        updateWowValues(parent, dpArray.getAnswer());
+//        double targetRatio = (dpArray.targetRatio + parent.currentRatio()) / 2.;
+        double targetRatio = parent.currentRatio();
         updateCost4NewRatio(dpArray, targetRatio);
         dpArray.targetRatio = targetRatio;
         Set<HierarchyNode> removedNode = new HashSet<>(dpArray.getAnswer());
@@ -120,9 +121,12 @@ public class Summary {
       } else {
         node.baselineValue = node.data.baselineValue;
         node.currentValue = node.data.currentValue;
+        parent.baselineValue -= node.baselineValue;
+        parent.currentValue -= node.currentValue;
+        double parentTargetRatio = parent.currentRatio();
         dpArray.reset();
-        insertRowToDPArray(dpArray, node, parentTargetRatio);
         dpArray.targetRatio = parentTargetRatio;
+        insertRowToDPArray(dpArray, node, parentTargetRatio);
       }
     } else {
       dpArray.getAnswer().add(node);
@@ -132,41 +136,7 @@ public class Summary {
   // TODO: Need a better definition for "a node is thinned out by its children."
   // We also need to look into the case where parent node is much smaller than its children.
   private static boolean nodeIsThinnedOut(HierarchyNode node) {
-    return Double.compare(0., node.baselineValue) == 0 || Double.compare(0., node.currentValue) == 0;
-  }
-
-  /**
-   * Recompute the baseline value, current value, and ratio of the node. The change is induced by the chosen nodes in
-   * the answer. The current node cannot be in the answer.
-   */
-  private static double updateCurrentRatio(HierarchyNode node, Set<HierarchyNode> answer) {
-    node.baselineValue = node.data.baselineValue;
-    node.currentValue = node.data.currentValue;
-    for (HierarchyNode child : answer) {
-      node.baselineValue -= child.baselineValue;
-      node.currentValue -= child.currentValue;
-    }
-    double ratio = node.currentRatio();
-//    if (Double.isInfinite(ratio) || Double.isNaN(ratio)) {
-    if (Double.isInfinite(ratio)) {
-      return node.aggregatedRatio();
-    } else {
-      return ratio;
-    }
-  }
-
-  /**
-   * Recompute the baseline value and current value the node. The change is induced by the chosen nodes in
-   * the answer. Note that the current node may be in the answer.
-   */
-  private static void updateWowValues(HierarchyNode node, Set<HierarchyNode> answer) {
-    node.baselineValue = node.data.baselineValue;
-    node.currentValue = node.data.currentValue;
-    for (HierarchyNode child : answer) {
-      if (child == node) continue;
-      node.baselineValue -= child.baselineValue;
-      node.currentValue -= child.currentValue;
-    }
+    return Double.compare(0., node.baselineValue) == 0 && Double.compare(0., node.currentValue) == 0;
   }
 
   /**
@@ -182,13 +152,26 @@ public class Summary {
     updateCost4NewRatio(parentArray, targetRatio);
     List<HierarchyNode> childNodeList = new ArrayList<>(childArray.getAnswer());
     childNodeList.sort(NODE_COMPARATOR);
-//    for (HierarchyNode childNode : childArray.getAnswer()) {
     for (HierarchyNode childNode : childNodeList) {
       insertRowToDPArrayWithAdaptiveRatio(parentArray, childNode, targetRatio);
     }
     // Update an internal node's baseline and current value if any of its child is removed due to the merge
     removedNodes.removeAll(parentArray.getAnswer());
     updateWowValuesDueToRemoval(parentNode, parentArray.getAnswer(), removedNodes);
+  }
+
+  /**
+   * Recompute the baseline value and current value the node. The change is induced by the chosen nodes in
+   * the answer. Note that the current node may be in the answer.
+   */
+  private static void updateWowValues(HierarchyNode node, Set<HierarchyNode> answer) {
+    node.baselineValue = node.data.baselineValue;
+    node.currentValue = node.data.currentValue;
+    for (HierarchyNode child : answer) {
+      if (child == node) continue;
+      node.baselineValue -= child.baselineValue;
+      node.currentValue -= child.currentValue;
+    }
   }
 
   /**
@@ -240,14 +223,11 @@ public class Summary {
    * Insert the given node (i.e., the row of data) into the DPArray using the targetRatio for calculating its cost.
    */
   private static void insertRowToDPArray(DPArray dp, HierarchyNode node, double targetRatio) {
-    double baselineValue = (node.data.baselineValue + node.baselineValue) / 2.;
-    double currentValue = (node.data.currentValue + node.currentValue) / 2.;
-//    double baselineValue = node.data.baselineValue;
-//    double currentValue = node.data.currentValue;
-//    double baselineValue = node.baselineValue;
-//    double currentValue = node.currentValue;
+//    double baselineValue = (node.data.baselineValue + node.baselineValue) / 2.;
+//    double currentValue = (node.data.currentValue + node.currentValue) / 2.;
+    double baselineValue = node.baselineValue;
+    double currentValue = node.currentValue;
     double cost = CostFunction.err4EmptyValues(baselineValue, currentValue, targetRatio);
-//    node.data.targetRatios.add(targetRatio); // for development purpose
 
     for (int n = dp.size(); n > 0; --n) {
       double val1 = dp.slotAt(n - 1).cost;
@@ -265,7 +245,7 @@ public class Summary {
 
   public static void main (String[] argc) {
     String oFileName = "MLCube.json";
-    int maxDimensionSize = 2;
+    int maxDimensionSize = 3;
     int answerSize = 10;
 
     Cube cube = null;
