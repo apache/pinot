@@ -1,20 +1,23 @@
 package com.linkedin.thirdeye.db;
 
+import com.linkedin.thirdeye.api.dto.GroupByKey;
+import com.linkedin.thirdeye.api.dto.GroupByRow;
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
 import com.linkedin.thirdeye.constant.FeedbackStatus;
 import com.linkedin.thirdeye.db.entity.AnomalyFeedback;
 import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
 import com.linkedin.thirdeye.db.entity.AnomalyResult;
+import java.util.List;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
 public class TestAnomalyResultDAO extends AbstractDbTestBase {
 
   Long anomalyResultId;
+  AnomalyFunctionSpec spec = getTestFunctionSpec("metric", "dataset");
 
   @Test
   public void testAnomalyResultCRUD() {
-    AnomalyFunctionSpec spec = getTestFunctionSpec("metric", "dataset");
     anomalyFunctionDAO.save(spec);
     Assert.assertNotNull(spec);
 
@@ -33,6 +36,14 @@ public class TestAnomalyResultDAO extends AbstractDbTestBase {
   }
 
   @Test(dependsOnMethods = {"testAnomalyResultCRUD"})
+  public void testGetCountByFunction() {
+    List<GroupByRow<GroupByKey, Long>> groupByRows = anomalyResultDAO.getCountByFunction();
+    Assert.assertEquals(groupByRows.size(), 1);
+    Assert.assertEquals(groupByRows.get(0).getGroupBy().getFunctionId(), spec.getId());
+    Assert.assertEquals(groupByRows.get(0).getValue().longValue(), 1);
+  }
+
+  @Test(dependsOnMethods = {"testGetCountByFunction"})
   public void testResultFeedback() {
     AnomalyResult result = anomalyResultDAO.findById(anomalyResultId);
     Assert.assertNotNull(result);

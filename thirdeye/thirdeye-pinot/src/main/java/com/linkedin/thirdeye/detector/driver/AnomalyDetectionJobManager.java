@@ -173,7 +173,7 @@ public class AnomalyDetectionJobManager {
    * Available for testing, but anomalies need to be created with a valid anomaly function ID
    * (foreign key constraint).
    */
-  public void runAdhocFile(String filePath, int existingFunctionId, String windowStartIsoString,
+  public void runAdhocFile(String filePath, long existingFunctionId, String windowStartIsoString,
       String windowEndIsoString) throws Exception {
     synchronized (sync) {
       File file = new File(filePath);
