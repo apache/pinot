@@ -58,19 +58,26 @@ public class AnomalyResultDAO extends AbstractJpaDAO<AnomalyResult> {
 
   private static final String COUNT_GROUP_BY_FUNCTION = "select count(r.id) as num, r.function.id,"
       + "r.function.functionName, r.function.collection, r.function.metric from AnomalyResult r "
-      + "WHERE r.function.isActive=true "
+      + "where r.function.isActive=true "
+      + "and ((r.startTimeUtc >= :startTimeUtc and r.startTimeUtc <= :endTimeUtc) "
+      + "or (r.endTimeUtc >= :startTimeUtc and r.endTimeUtc <= :endTimeUtc))"
       + "group by r.function.id, r.function.functionName, r.function.collection, r.function.metric "
       + "order by r.function.collection, num desc";
 
   private static final String COUNT_GROUP_BY_COLLECTION_METRIC = "select count(r.id) as num, "
       + "r.function.collection, r.function.metric from AnomalyResult r "
-      + "WHERE r.function.isActive=true " + "group by r.function.collection, r.function.metric  "
+      + "where r.function.isActive=true "
+      + "and ((r.startTimeUtc >= :startTimeUtc and r.startTimeUtc <= :endTimeUtc) "
+      + "or (r.endTimeUtc >= :startTimeUtc and r.endTimeUtc <= :endTimeUtc))"
+      + "group by r.function.collection, r.function.metric  "
       + "order by r.function.collection, num desc";
 
   private static final String COUNT_GROUP_BY_COLLECTION =
       "select count(r.id) as num, " + "r.function.collection from AnomalyResult r "
-          + "WHERE r.function.isActive=true " + "group by r.function.collection "
-          + "order by r.function.collection, num desc";
+          + "where r.function.isActive=true "
+          + "and ((r.startTimeUtc >= :startTimeUtc and r.startTimeUtc <= :endTimeUtc) "
+          + "or (r.endTimeUtc >= :startTimeUtc and r.endTimeUtc <= :endTimeUtc))"
+          + "group by r.function.collection order by r.function.collection, num desc";
 
   public AnomalyResultDAO() {
     super(AnomalyResult.class);
@@ -146,10 +153,10 @@ public class AnomalyResultDAO extends AbstractJpaDAO<AnomalyResult> {
         .setParameter("functionId", functionId).getResultList();
   }
 
-  public List<GroupByRow<GroupByKey, Long>> getCountByFunction() {
+  public List<GroupByRow<GroupByKey, Long>> getCountByFunction(long startTime, long endTime) {
     List<GroupByRow<GroupByKey, Long>> groupByRecords = new ArrayList<>();
-    TypedQuery<Object[]> q =
-        getEntityManager().createQuery(COUNT_GROUP_BY_FUNCTION, Object[].class);
+    TypedQuery<Object[]> q = getEntityManager().createQuery(COUNT_GROUP_BY_FUNCTION, Object[].class)
+        .setParameter("startTimeUtc", startTime).setParameter("endTimeUtc", endTime);
     List<Object[]> results = q.getResultList();
     for (int i = 0; i < results.size(); i++) {
       Long count = (Long) results.get(i)[0];
@@ -166,10 +173,11 @@ public class AnomalyResultDAO extends AbstractJpaDAO<AnomalyResult> {
     return groupByRecords;
   }
 
-  public List<GroupByRow<GroupByKey, Long>> getCountByCollection() {
+  public List<GroupByRow<GroupByKey, Long>> getCountByCollection(long startTime, long endTime) {
     List<GroupByRow<GroupByKey, Long>> groupByRecords = new ArrayList<>();
     TypedQuery<Object[]> q =
-        getEntityManager().createQuery(COUNT_GROUP_BY_COLLECTION, Object[].class);
+        getEntityManager().createQuery(COUNT_GROUP_BY_COLLECTION, Object[].class)
+            .setParameter("startTimeUtc", startTime).setParameter("endTimeUtc", endTime);
     List<Object[]> results = q.getResultList();
     for (int i = 0; i < results.size(); i++) {
       Long count = (Long) results.get(i)[0];
@@ -183,10 +191,12 @@ public class AnomalyResultDAO extends AbstractJpaDAO<AnomalyResult> {
     return groupByRecords;
   }
 
-  public List<GroupByRow<GroupByKey, Long>> getCountByCollectionMetric() {
+  public List<GroupByRow<GroupByKey, Long>> getCountByCollectionMetric(long startTime,
+      long endTime) {
     List<GroupByRow<GroupByKey, Long>> groupByRecords = new ArrayList<>();
     TypedQuery<Object[]> q =
-        getEntityManager().createQuery(COUNT_GROUP_BY_COLLECTION_METRIC, Object[].class);
+        getEntityManager().createQuery(COUNT_GROUP_BY_COLLECTION_METRIC, Object[].class)
+            .setParameter("startTimeUtc", startTime).setParameter("endTimeUtc", endTime);
     List<Object[]> results = q.getResultList();
     for (int i = 0; i < results.size(); i++) {
       Long count = (Long) results.get(i)[0];
