@@ -170,7 +170,38 @@ function renderSelfService() {
         enableButton($("#confirm-delete-anomaly-function"));
     });
 
-    //Confirm delete button
+    $("#self-service-forms-section").on("click", ".init-toggle-active-state", function () {
+        var rowId = $(this).attr("data-row-id");
+        var functionName = $(this).attr("data-function-name");
+        $("#confirm-toggle-active-state").attr("data-row-id", rowId);
+        $("#close-toggle-alert-modal").attr("data-row-id", rowId);
+        $(".function-to-toggle").text(functionName);
+        if ($(this).is(':checked')) {
+            $("#turn-off-anomaly-function").hide();
+            $("#turn-on-anomaly-function").show();
+        }else{
+            $("#turn-off-anomaly-function").show();
+            $("#turn-on-anomaly-function").hide();
+        }
+        $("#toggle-active-state-success").hide();
+        $("#toggle-active-state-error").hide();
+        enableButton($("#confirm-toggle-active-state"));
+    });
+
+    //Confirm toggle button
+    $("#self-service-forms-section").on("click", "#close-toggle-alert-modal", function () {
+
+        var rowId = $(this).attr("data-row-id")
+        toggleCheckbox($(".init-toggle-active-state[data-row-id='" + rowId + "']"))
+    });
+
+
+    //Confirm toggle button
+    $("#self-service-forms-section").on("click", "#confirm-toggle-active-state", function () {
+        toggleActiveState(this)
+    });
+
+    //Confirm delete
     $("#self-service-forms-section").on("click", "#confirm-delete-anomaly-function", function () {
         deleteAnomalyFunction(this)
     });
@@ -485,6 +516,42 @@ function renderSelfService() {
         })
     }
 
+    function toggleActiveState(target){
+        var rowId = $(target).attr("data-row-id");
+
+        /** Handelbars template for ANOMALY FUNCTION FORM **/
+        var existingAnomalyFunctionsDataStr = window.sessionStorage.getItem('existingAnomalyFunctions');
+        var existingAnomalyFunctionsData = JSON.parse(existingAnomalyFunctionsDataStr);
+        var anomalyFunctionObj = existingAnomalyFunctionsData[rowId];
+        anomalyFunctionObj.isActive = !anomalyFunctionObj.isActive;
+       //encode filters
+        anomalyFunctionObj.filters = encodeURIComponent(JSON.stringify(anomalyFunctionObj.filters));
+
+        var url = "/dashboard/anomaly-function/update?dataset=" + hash.dataset;
+        for (key in anomalyFunctionObj){
+
+            var value = (anomalyFunctionObj[key] + "" == "null") ? "" : anomalyFunctionObj[key];
+            url += "&" + key + "=" + value;
+        }
+
+
+  //      submitData(url).done(function (id) {
+
+        //decode filters
+        anomalyFunctionObj.filters = JSON.parse(decodeURIComponent(anomalyFunctionObj.filters));
+        existingAnomalyFunctionsData[rowId] = anomalyFunctionObj;
+
+        window.sessionStorage.setItem('existingAnomalyFunctions', JSON.stringify(existingAnomalyFunctionsData));
+
+            //Enable submit btn
+            enableButton($("#confirm-toggle-active-state"));
+            var successMessage = $("#toggle-active-state-success");
+            $("p", successMessage).html("success");
+            successMessage.fadeIn(100);
+ //       })
+
+    }
+
     //Populate modal with data of the selected anomaly function
     function populateUpdateForm(target) {
 
@@ -573,7 +640,7 @@ function renderSelfService() {
         /** Handelbars template for dimensionvalues in filter dropdown **/
         var datasetFilters = window.datasetConfig.datasetFilters;
         var result_filter_dimension_value_template = HandleBarsTemplates.template_filter_dimension_value(datasetFilters)
-        $(".dimension-filter").each(function () {
+        $("#update-function-modal .dimension-filter" ).each(function () {
             $(this).after(result_filter_dimension_value_template)
         });
 

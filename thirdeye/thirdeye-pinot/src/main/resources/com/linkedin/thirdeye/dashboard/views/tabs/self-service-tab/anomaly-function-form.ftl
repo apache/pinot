@@ -248,7 +248,7 @@
         </div>
 
         <div class="uk-form-row">
-            <input id="active-alert" rel="self-service" type="checkbox"  {{#if data/isActive}}checked{{else}}{{/if}}><span> Keep this alert active.</span>
+            <input id="active-alert" rel="self-service" type="checkbox"  {{#if data/isActive}}checked{{else}}{{/if}}><span> Keep monitoring.</span>
         </div>
 
         <div id="manage-anomaly-fn-error" class="uk-alert uk-alert-danger hidden" rel="self-service">

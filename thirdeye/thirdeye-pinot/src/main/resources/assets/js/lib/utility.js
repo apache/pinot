@@ -12,6 +12,7 @@ function getData(url, tab) {
             404: function () {
                 $("#" + tab + "-chart-area-error").empty()
                 var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' })
+                warning.append($('<i class="close-parent uk-icon-close"></i>'))
                 warning.append($('<p></p>', { html: 'No data available. (Error code: 404)' }))
                 $("#" + tab + "-chart-area-error").append(warning)
                 $("#" + tab + "-chart-area-error").fadeIn(100);
@@ -470,6 +471,18 @@ function enableButton(button) {
     $(button).removeAttr("disabled");
 }
 
+function toggleCheckbox($checkbox){
+
+    if ($checkbox.is(':checked')) {
+        $checkbox.removeAttr('checked');
+        $checkbox.prop('checked', false);
+
+    }else{
+        $checkbox.attr('checked', true);
+        $checkbox.prop('checked', true);
+    }
+}
+
 function selectDatasetNGetFormData(target) {
     //Cleanup form: Remove added-item and added-filter, metrics of the previous dataset
     $("#" + hash.view + "-chart-area-error").hide();
@@ -485,7 +498,6 @@ function selectDatasetNGetFormData(target) {
     $(".added-filter").remove();
     $(".filter-panel .value-filter").remove();
     clearCreateForm();
-
 
     //Remove previous dataset's hash values
     delete hash.baselineStart;
