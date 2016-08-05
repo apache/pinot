@@ -12,7 +12,7 @@ public class Row {
   DimensionValues dimensionValues;
   double baselineValue;
   double currentValue;
-  public List<Double> targetRatios = new ArrayList<>(); // for development purpose
+//  public List<Double> targetRatios = new ArrayList<>(); // for development purpose
 
   public Dimensions getDimensions() {
     return dimensions;

@@ -24,7 +24,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class Cube { // the cube (Ca|Cb)
-  private static final int MaxDimensionSize = 5;
+  private static final int DEFAULT_TOP_DIMENSION = 3;
 
   private double topBaselineValue;
   private double topCurrentValue;
@@ -58,24 +58,28 @@ public class Cube { // the cube (Ca|Cb)
     return hierarchicalNodes;
   }
 
-  public void buildFromOALPDataBase(OLAPDataBaseClient olapClient, Dimensions dimensions) {
-    buildFromOALPDataBaseAutoDimensions(olapClient, dimensions, Collections.emptyList());
+  public void buildWithAutoDimensionOrder(OLAPDataBaseClient olapClient, Dimensions dimensions) {
+    buildWithAutoDimensionOrder(olapClient, dimensions, DEFAULT_TOP_DIMENSION, Collections.emptyList());
   }
 
-  public void buildFromOALPDataBaseAutoDimensions(OLAPDataBaseClient olapClient, Dimensions dimensions,
+  public void buildWithAutoDimensionOrder(OLAPDataBaseClient olapClient, Dimensions dimensions, int topDimensions) {
+    buildWithAutoDimensionOrder(olapClient, dimensions, topDimensions, Collections.emptyList());
+  }
+
+  public void buildWithAutoDimensionOrder(OLAPDataBaseClient olapClient, Dimensions dimensions, int topDimension,
       List<List<String>> hierarchy) {
 
     initializeBasicInfo(olapClient);
     if (hierarchy == null) {
       hierarchy = Collections.emptyList();
     }
-    this.dimensions = sortDimensionLevel(olapClient, topRatio, dimensions, hierarchy);
+    this.dimensions = sortDimensionOrder(olapClient, topRatio, dimensions, topDimension, hierarchy);
     System.out.println("Auto decided dimensions: " + this.dimensions);
 
-    buildFromOALPDataBaseManualDimensions(olapClient, this.dimensions);
+    buildWithManualDimensionOrder(olapClient, this.dimensions);
   }
 
-  public void buildFromOALPDataBaseManualDimensions(OLAPDataBaseClient olapClient, Dimensions dimensions) {
+  public void buildWithManualDimensionOrder(OLAPDataBaseClient olapClient, Dimensions dimensions) {
     if (this.dimensions == null) {
       initializeBasicInfo(olapClient);
       this.dimensions = dimensions;
@@ -120,9 +124,9 @@ public class Cube { // the cube (Ca|Cb)
   }
 
   /**
-   * Establish the hierarchy between aggregated and detailed rows
+   * Establish the hierarchy between aggregated and detailed rows.
    */
-  void buildHierarchy() {
+  private void buildHierarchy() {
     for (int level = 0; level <= this.dimensions.size(); ++level) {
       List<HierarchyNode> nodesAtCurrentLevel = new ArrayList<>(hierarchicalRows.get(level).size());
       hierarchicalNodes.add(nodesAtCurrentLevel);
@@ -137,15 +141,15 @@ public class Cube { // the cube (Ca|Cb)
           hierarchicalNodes.get(level).add(node);
 
           // For testing if a node has the correct parent node
-//          boolean haveProblem = false;
-//          for (int i = 0; i < level-1; ++i) {
-//            if (!parentNode.data.dimensionValues.get(i).equals(row.dimensionValues.get(i))) {
-//              haveProblem = true;
-//              break;
-//            }
-//          }
-//          if (haveProblem)
-//            System.out.println(row + " is incorrectly connected to " + parentNode.data);
+          boolean haveProblem = false;
+          for (int i = 0; i < level-1; ++i) {
+            if (parentNode == null || !parentNode.data.dimensionValues.get(i).equals(row.dimensionValues.get(i))) {
+              haveProblem = true;
+              break;
+            }
+          }
+          if (haveProblem)
+            System.out.println(row + " is incorrectly connected to " + parentNode.data);
 
           // If the next data does not have the same prefix of dimension values, then it belongs to a different present.
           if ( (level > 1) && (index != hierarchicalRows.get(level).size()-1) ) {
@@ -162,15 +166,7 @@ public class Cube { // the cube (Ca|Cb)
       } else { // root
         Row row = hierarchicalRows.get(0).get(0);
         HierarchyNode node = new HierarchyNode(0, 0, row, null);
-        node.isRoot = true;
         hierarchicalNodes.get(0).add(node);
-      }
-    }
-
-    {
-      int level = this.dimensions.size() - 1;
-      for (int index = 0; index < hierarchicalRows.get(level).size(); ++index) {
-        hierarchicalNodes.get(level).get(index).isWorker = true;
       }
     }
   }
@@ -181,8 +177,8 @@ public class Cube { // the cube (Ca|Cb)
    * The order among the dimensions that belong to the same hierarchical group will be maintained. An example of
    * a hierarchical group {continent, country}. The cost of a group is the average of member costs.
    */
-  private static Dimensions sortDimensionLevel(OLAPDataBaseClient olapClient, double topRatio, Dimensions dimensions,
-      List<List<String>> hierarchy) {
+  private static Dimensions sortDimensionOrder(OLAPDataBaseClient olapClient, double topRatio, Dimensions dimensions,
+      int topDimension, List<List<String>> hierarchy) {
     List<MutablePair<String, Double>> dimensionCostPairs = new ArrayList<>();
 
     Map<String, DimensionGroup> groupMap = new HashMap<>();
@@ -254,7 +250,7 @@ public class Cube { // the cube (Ca|Cb)
       }
       System.out.println(dimensionCostPair.getRight());
     }
-    return new Dimensions(newDimensions.subList(0, Math.min(MaxDimensionSize, dimensions.size())));
+    return new Dimensions(newDimensions.subList(0, Math.min(topDimension, dimensions.size())));
   }
 
   static class DimensionCostPairSorter implements Comparator<MutablePair<String, Double>> {
@@ -275,7 +271,9 @@ public class Cube { // the cube (Ca|Cb)
   }
 
   public static Cube fromJson(String fileName) throws IOException {
-    return new ObjectMapper().readValue(new File(fileName), Cube.class);
+    Cube cube = new ObjectMapper().readValue(new File(fileName), Cube.class);
+    cube.buildHierarchy();
+    return cube;
   }
 
   @Override

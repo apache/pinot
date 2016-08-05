@@ -7,9 +7,12 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 
 public class Summary {
-  private static final NodeDimensionValuesComparator NODE_COMPARATOR = new NodeDimensionValuesComparator();
+  static final NodeDimensionValuesComparator NODE_COMPARATOR = new NodeDimensionValuesComparator();
   private Cube cube;
   private int maxLevelCount;
   private int levelCount;
@@ -21,15 +24,17 @@ public class Summary {
     this.levelCount = this.maxLevelCount;
   }
 
-  public void computeSummary(int answerSize) {
-    computeSummary(answerSize, this.maxLevelCount);
+  public SummaryResponse computeSummary(int answerSize) {
+    return computeSummary(answerSize, this.maxLevelCount);
   }
 
-  public void computeSummary(int answerSize, int levelCount) {
-    this.levelCount = levelCount;
+  public SummaryResponse computeSummary(int answerSize, int levelCount) {
+    if (answerSize <= 0) answerSize = 1;
     if (levelCount <= 0 || levelCount > this.maxLevelCount) {
-      this.levelCount = this.maxLevelCount;
+      levelCount = this.maxLevelCount;
     }
+    this.levelCount = levelCount;
+
     dpArrays = new ArrayList<>(this.levelCount);
     for (int i = 0; i < this.levelCount; ++i) {
       dpArrays.add(new DPArray(answerSize));
@@ -37,44 +42,29 @@ public class Summary {
     HierarchyNode root = cube.getHierarchicalNodes().get(0).get(0);
     computeChildDPArray(root, 0.);
 
-    // Print summary
-    DPArray dpArray = dpArrays.get(0);
-    List<HierarchyNode> answer = new ArrayList<>();
-    for (HierarchyNode node : dpArray.getAnswer()) {
-      answer.add(node);
-    }
-    answer.sort(NODE_COMPARATOR.reversed()); // Print from root to leaves
-    double baselineValues = root.data.baselineValue;
-    double currentValues = root.data.currentValue;
-    for (HierarchyNode node : answer) {
-      baselineValues -= node.baselineValue;
-      currentValues -= node.currentValue;
-    }
-    System.out.println("ALL: " + baselineValues + " " + currentValues + " " + (currentValues / baselineValues));
-    for (HierarchyNode node : answer) {
-      System.out.println(node);
-    }
 
     // Check correctness of the sum of values
-    List<HierarchyNode> nodeList = new ArrayList<>(dpArray.getAnswer());
-    nodeList.sort(NODE_COMPARATOR); // Process lower level nodes first
-    for (HierarchyNode node : nodeList) {
-      HierarchyNode parent = node;
-      while ((parent = parent.parent) != root) {
-        if (dpArray.getAnswer().contains(parent)) {
-          parent.baselineValue += node.baselineValue;
-          parent.currentValue += node.currentValue;
-          break;
-        }
-      }
-    }
+//    List<HierarchyNode> nodeList = new ArrayList<>(dpArrays.get(0).getAnswer());
+//    nodeList.sort(NODE_COMPARATOR); // Process lower level nodes first
+//    for (HierarchyNode node : nodeList) {
+//      HierarchyNode parent = node;
+//      while ((parent = parent.parent) != null) {
+//        if (dpArrays.get(0).getAnswer().contains(parent)) {
+//          parent.baselineValue += node.baselineValue;
+//          parent.currentValue += node.currentValue;
+//          break;
+//        }
+//      }
+//    }
+//    for (HierarchyNode node : nodeList) {
+//      if (node.baselineValue != node.data.baselineValue || node.currentValue != node.data.currentValue) {
+//        System.err.print("Wrong Wow values:");
+//        System.err.println(node);
+//      }
+//    }
 
-    for (HierarchyNode node : nodeList) {
-      if (node.baselineValue != node.data.baselineValue || node.currentValue != node.data.currentValue) {
-        System.out.print("Wrong Wow values:");
-        System.out.println(node);
-      }
-    }
+    List<HierarchyNode> answer = new ArrayList<>(dpArrays.get(0).getAnswer());
+    return SummaryResponse.buildResponse(answer, levelCount);
   }
 
   static class NodeDimensionValuesComparator implements Comparator<HierarchyNode> {
@@ -134,6 +124,8 @@ public class Summary {
         insertRowToDPArray(dpArray, node, parentTargetRatio);
         dpArray.targetRatio = parentTargetRatio;
       }
+    } else {
+      dpArray.getAnswer().add(node);
     }
   }
 
@@ -155,6 +147,7 @@ public class Summary {
       node.currentValue -= child.currentValue;
     }
     double ratio = node.currentRatio();
+//    if (Double.isInfinite(ratio) || Double.isNaN(ratio)) {
     if (Double.isInfinite(ratio)) {
       return node.aggregatedRatio();
     } else {
@@ -249,6 +242,10 @@ public class Summary {
   private static void insertRowToDPArray(DPArray dp, HierarchyNode node, double targetRatio) {
     double baselineValue = (node.data.baselineValue + node.baselineValue) / 2.;
     double currentValue = (node.data.currentValue + node.currentValue) / 2.;
+//    double baselineValue = node.data.baselineValue;
+//    double currentValue = node.data.currentValue;
+//    double baselineValue = node.baselineValue;
+//    double currentValue = node.currentValue;
     double cost = CostFunction.err4EmptyValues(baselineValue, currentValue, targetRatio);
 //    node.data.targetRatios.add(targetRatio); // for development purpose
 
@@ -268,8 +265,8 @@ public class Summary {
 
   public static void main (String[] argc) {
     String oFileName = "MLCube.json";
-    int maxDimensionSize = 4;
-    int answerSize = 9;
+    int maxDimensionSize = 2;
+    int answerSize = 10;
 
     Cube cube = null;
     try {
@@ -280,8 +277,15 @@ public class Summary {
       e.printStackTrace();
       System.exit(1);
     }
-    cube.buildHierarchy();
     Summary summary = new Summary(cube);
-    summary.computeSummary(answerSize, maxDimensionSize);
+    try {
+      SummaryResponse response = summary.computeSummary(answerSize, maxDimensionSize);
+      System.out.print("JSon String: ");
+      System.out.println(new ObjectMapper().writeValueAsString(response));
+      System.out.println("Object String: ");
+      System.out.println(response.toString());
+    } catch (JsonProcessingException e) {
+      e.printStackTrace();
+    }
   }
 }

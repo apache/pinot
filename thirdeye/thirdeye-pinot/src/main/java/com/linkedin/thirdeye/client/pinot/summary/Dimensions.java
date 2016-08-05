@@ -17,7 +17,7 @@ public class Dimensions {
     names = new ArrayList<String>();
   }
 
-  Dimensions(List<String> names) {
+  public Dimensions(List<String> names) {
     this.names = names;
   }
 
