@@ -8,6 +8,7 @@ import com.linkedin.thirdeye.api.dto.MergedAnomalyResult;
 import com.linkedin.thirdeye.db.dao.AnomalyResultDAO;
 import com.linkedin.thirdeye.db.entity.AnomalyResult;
 import java.util.List;
+import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
@@ -21,10 +22,16 @@ import org.joda.time.DateTime;
 @Produces(MediaType.APPLICATION_JSON)
 public class AnomalySummaryResource {
 
-  AnomalyResultDAO resultDAO;
+  private AnomalyResultDAO resultDAO;
 
   public AnomalySummaryResource(AnomalyResultDAO resultDAO) {
     this.resultDAO = resultDAO;
+  }
+
+  @GET
+  @Path("summary/function/{functionId}")
+  public List<MergedAnomalyResult> getSummaryForFunction(@PathParam("functionId") Long functionId) {
+    return getAnomalySummaryForFunction(functionId, new AnomalyMergeConfig());
   }
 
   @POST

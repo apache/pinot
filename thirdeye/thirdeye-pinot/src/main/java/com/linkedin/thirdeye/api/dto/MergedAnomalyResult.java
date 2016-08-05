@@ -11,6 +11,9 @@ import java.util.Objects;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class MergedAnomalyResult {
+
+  private String metric;
+
   private Long startTime;
 
   private Long endTime;
@@ -34,6 +37,14 @@ public class MergedAnomalyResult {
   private AnomalyMergeStrategy mergeStrategy;
 
   private List<AnomalyResult> anomalyResults = new ArrayList<>();
+
+  public String getMetric() {
+    return metric;
+  }
+
+  public void setMetric(String metric) {
+    this.metric = metric;
+  }
 
   public Long getStartTime() {
     return startTime;

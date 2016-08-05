@@ -9,6 +9,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 
 /**
  * Given list of {@link AnomalyResult} and merge parameters, this utility performs time based merge
@@ -118,15 +119,27 @@ public abstract class AnomalySummaryGenerator {
   private static void populateMergedProperties(MergedAnomalyResult mergedResult) {
     double totalScore = 0.0;
     double totalWeight = 0.0;
-    Map<Integer, Set<String>> mergedDimensions = new HashMap<>();
-
     int n = mergedResult.getAnomalyResults().size();
+
+    List<String> dimensionsList = new ArrayList<>();
+    Set<String> metricList = new TreeSet<>();
+
     for (AnomalyResult anomalyResult : mergedResult.getAnomalyResults()) {
       totalScore += anomalyResult.getScore();
       totalWeight += anomalyResult.getWeight();
+      dimensionsList.add(anomalyResult.getDimensions());
+      metricList.add(anomalyResult.getMetric());
+    }
+    mergedResult.setScore(totalScore / n);
+    mergedResult.setWeight(totalWeight / n);
+    mergedResult.setDimensions(getDimensionsMerged(dimensionsList));
+    mergedResult.setMetric(metricList.toString());
+  }
 
+  private static String getDimensionsMerged(List<String> dimentionList) {
+    Map<Integer, Set<String>> mergedDimensions = new HashMap<>();
+    for (String dimensions : dimentionList) {
       // Merging dimensions
-      String dimensions = anomalyResult.getDimensions();
       if (dimensions != null) {
         String[] dimArr = dimensions.split(",");
         if (dimArr.length > 0) {
@@ -141,8 +154,6 @@ public abstract class AnomalySummaryGenerator {
         }
       }
     }
-    mergedResult.setScore(totalScore / n);
-    mergedResult.setWeight(totalWeight / n);
     StringBuffer dimBuff = new StringBuffer();
     int count = 0;
     for (Map.Entry<Integer, Set<String>> entry : mergedDimensions.entrySet()) {
@@ -155,10 +166,7 @@ public abstract class AnomalySummaryGenerator {
         count++;
       }
     }
-    String dimensions = dimBuff.toString();
-    if (!dimensions.equals("")) {
-      mergedResult.setDimensions(dimensions);
-    }
+    return dimBuff.toString();
   }
 
   private static void populateMergedResult(MergedAnomalyResult mergedAnomaly,
