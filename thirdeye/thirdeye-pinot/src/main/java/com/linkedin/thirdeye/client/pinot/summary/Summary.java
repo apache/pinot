@@ -13,10 +13,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class Summary {
   static final NodeDimensionValuesComparator NODE_COMPARATOR = new NodeDimensionValuesComparator();
+
   private Cube cube;
   private int maxLevelCount;
   private int levelCount;
   private List<DPArray> dpArrays;
+
+  private final RowInserter basicRowInserter = new BasicRowInserter();
+  private RowInserter oneSideErrorRowInserter = basicRowInserter;
+  private RowInserter leafRowInserter = basicRowInserter;
 
   public Summary(Cube cube) {
     this.cube = cube;
@@ -25,10 +30,18 @@ public class Summary {
   }
 
   public SummaryResponse computeSummary(int answerSize) {
-    return computeSummary(answerSize, this.maxLevelCount);
+    return computeSummary(answerSize, false, this.maxLevelCount);
+  }
+
+  public SummaryResponse computeSummary(int answerSize, boolean doOneSideError) {
+    return computeSummary(answerSize, doOneSideError, this.maxLevelCount);
   }
 
   public SummaryResponse computeSummary(int answerSize, int levelCount) {
+    return computeSummary(answerSize, false, this.maxLevelCount);
+  }
+
+  public SummaryResponse computeSummary(int answerSize, boolean doOneSideError, int levelCount) {
     if (answerSize <= 0) answerSize = 1;
     if (levelCount <= 0 || levelCount > this.maxLevelCount) {
       levelCount = this.maxLevelCount;
@@ -40,6 +53,12 @@ public class Summary {
       dpArrays.add(new DPArray(answerSize));
     }
     HierarchyNode root = cube.getHierarchicalNodes().get(0).get(0);
+    if (doOneSideError) {
+      oneSideErrorRowInserter =
+          new OneSideErrorRowInserter(basicRowInserter, Double.compare(1., root.currentRatio()) <= 0);
+      // If this cube contains only one dimension, one side error is calculated starting at leaf level
+      if (levelCount == 2) leafRowInserter = oneSideErrorRowInserter;
+    }
     computeChildDPArray(root);
 
     // Check correctness of the sum of values (The check changes the answer values.)
@@ -88,7 +107,7 @@ public class Summary {
     // Otherwise, merge DPArrays from its children.
     if (node.level == levelCount - 1) {
       for (HierarchyNode child : node.children) {
-        insertRowToDPArray(dpArray, child, node.currentRatio());
+        leafRowInserter.insertRowToDPArray(dpArray, child, node.currentRatio());
         updateWowValues(node, dpArray.getAnswer());
         dpArray.targetRatio = node.currentRatio(); // get updated ratio
       }
@@ -112,7 +131,7 @@ public class Summary {
         updateCost4NewRatio(dpArray, targetRatio);
         dpArray.targetRatio = targetRatio;
         Set<HierarchyNode> removedNode = new HashSet<>(dpArray.getAnswer());
-        insertRowToDPArray(dpArray, node, targetRatio);
+        basicRowInserter.insertRowToDPArray(dpArray, node, targetRatio);
         removedNode.removeAll(dpArray.getAnswer());
         if (removedNode.size() != 0) {
           updateWowValuesDueToRemoval(node, dpArray.getAnswer(), removedNode);
@@ -126,7 +145,7 @@ public class Summary {
         double parentTargetRatio = parent.currentRatio();
         dpArray.reset();
         dpArray.targetRatio = parentTargetRatio;
-        insertRowToDPArray(dpArray, node, parentTargetRatio);
+        basicRowInserter.insertRowToDPArray(dpArray, node, parentTargetRatio);
       }
     } else {
       dpArray.getAnswer().add(node);
@@ -144,7 +163,7 @@ public class Summary {
    * After merging, the baseline and current values of the removed nodes (rows) will be add back to those of their
    * parent node.
    */
-  private static void mergeDPArray(HierarchyNode parentNode, DPArray parentArray, DPArray childArray) {
+  private void mergeDPArray(HierarchyNode parentNode, DPArray parentArray, DPArray childArray) {
     Set<HierarchyNode> removedNodes = new HashSet<>(parentArray.getAnswer());
     removedNodes.addAll(childArray.getAnswer());
     // Compute the merged answer
@@ -198,7 +217,7 @@ public class Summary {
   /**
    * Recompute costs of the nodes in a DPArray using targetRatio for calculating the cost.
    */
-  private static void updateCost4NewRatio(DPArray dp, double targetRatio) {
+  private void updateCost4NewRatio(DPArray dp, double targetRatio) {
     List<HierarchyNode> ans = new ArrayList<>(dp.getAnswer());
     ans.sort(NODE_COMPARATOR);
     dp.reset();
@@ -211,42 +230,75 @@ public class Summary {
    * If the node's parent is also in the DPArray, then it's parent's current ratio is used as the target ratio for
    * calculating the cost of the node; otherwise, targetRatio is used.
    */
-  private static void insertRowToDPArrayWithAdaptiveRatio(DPArray dp, HierarchyNode node, double targetRatio) {
+  private void insertRowToDPArrayWithAdaptiveRatio(DPArray dp, HierarchyNode node, double targetRatio) {
     if (dp.getAnswer().contains(node.parent)) {
-      insertRowToDPArray(dp, node, node.parent.currentRatio());
+      // For one side error if node's parent is included in the solution, then its cost will be calculated normally.
+      basicRowInserter.insertRowToDPArray(dp, node, node.parent.currentRatio());
     } else {
-      insertRowToDPArray(dp, node, targetRatio);
+      oneSideErrorRowInserter.insertRowToDPArray(dp, node, targetRatio);
+    }
+  }
+
+  private static interface RowInserter {
+    public void insertRowToDPArray(DPArray dp, HierarchyNode node, double targetRatio);
+  }
+
+  private static class BasicRowInserter implements RowInserter {
+    @Override
+    public void insertRowToDPArray(DPArray dp, HierarchyNode node, double targetRatio) {
+      double baselineValue = node.baselineValue;
+      double currentValue = node.currentValue;
+      double cost = CostFunction.err4EmptyValues(baselineValue, currentValue, targetRatio);
+
+      for (int n = dp.size(); n > 0; --n) {
+        double val1 = dp.slotAt(n - 1).cost;
+        double val2 = dp.slotAt(n).cost + cost; // fixed r per iteration
+        if (Double.compare(val1, val2) < 0) {
+          dp.slotAt(n).cost = val1;
+          dp.slotAt(n).ans.retainAll(dp.slotAt(n - 1).ans); // dp[n].ans = dp[n-1].ans
+          dp.slotAt(n).ans.add(node);
+        } else {
+          dp.slotAt(n).cost = val2;
+        }
+      }
+      dp.slotAt(0).cost = dp.slotAt(0).cost + cost;
     }
   }
 
   /**
-   * Insert the given node (i.e., the row of data) into the DPArray using the targetRatio for calculating its cost.
+   * A wrapper class over BasicRowInserter. This class provide the calculation for one side error summary.
    */
-  private static void insertRowToDPArray(DPArray dp, HierarchyNode node, double targetRatio) {
-//    double baselineValue = (node.data.baselineValue + node.baselineValue) / 2.;
-//    double currentValue = (node.data.currentValue + node.currentValue) / 2.;
-    double baselineValue = node.baselineValue;
-    double currentValue = node.currentValue;
-    double cost = CostFunction.err4EmptyValues(baselineValue, currentValue, targetRatio);
+  private static class OneSideErrorRowInserter implements RowInserter {
+    final RowInserter basicRowInserter;
+    final boolean side;
 
-    for (int n = dp.size(); n > 0; --n) {
-      double val1 = dp.slotAt(n - 1).cost;
-      double val2 = dp.slotAt(n).cost + cost; // fixed r per iteration
-      if (Double.compare(val1, val2) < 0) {
-        dp.slotAt(n).cost = val1;
-        dp.slotAt(n).ans.retainAll(dp.slotAt(n - 1).ans); // dp[n].ans = dp[n-1].ans
-        dp.slotAt(n).ans.add(node);
+    public OneSideErrorRowInserter(RowInserter basicRowInserter, boolean side) {
+      this.basicRowInserter = basicRowInserter;
+      this.side = side;
+    }
+
+    @Override
+    public void insertRowToDPArray(DPArray dp, HierarchyNode node, double targetRatio)  {
+      boolean mySide = Double.compare(1., node.currentRatio()) <= 0 ? true : false;
+      if ( !(side ^ mySide) ) { // if the row has the same change trend with the top row
+        basicRowInserter.insertRowToDPArray(dp, node, targetRatio);
       } else {
-        dp.slotAt(n).cost = val2;
+        HierarchyNode parents = node;
+        while ((parents = parents.parent) != null) {
+          if (dp.getAnswer().contains(parents)) {
+            basicRowInserter.insertRowToDPArray(dp, node, targetRatio);
+            break;
+          }
+        }
       }
     }
-    dp.slotAt(0).cost = dp.slotAt(0).cost + cost;
   }
 
   public static void main (String[] argc) {
     String oFileName = "MLCube.json";
-    int maxDimensionSize = 3;
     int answerSize = 10;
+    boolean doOneSideError = true;
+    int maxDimensionSize = 3;
 
     Cube cube = null;
     try {
@@ -259,7 +311,7 @@ public class Summary {
     }
     Summary summary = new Summary(cube);
     try {
-      SummaryResponse response = summary.computeSummary(answerSize, maxDimensionSize);
+      SummaryResponse response = summary.computeSummary(answerSize, doOneSideError, maxDimensionSize);
       System.out.print("JSon String: ");
       System.out.println(new ObjectMapper().writeValueAsString(response));
       System.out.println("Object String: ");

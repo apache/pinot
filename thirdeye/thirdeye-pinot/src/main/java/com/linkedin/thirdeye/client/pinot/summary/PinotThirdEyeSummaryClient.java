@@ -292,8 +292,9 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
 
     int maxDimensionSize = 3;
     int answerSize = 5;
+    boolean oneSideErrors = false;
     Summary summary = new Summary(initCube);
-    System.out.println(summary.computeSummary(answerSize, maxDimensionSize));
+    System.out.println(summary.computeSummary(answerSize, oneSideErrors, maxDimensionSize));
 
     try {
       initCube.toJson(oFileName);
@@ -301,7 +302,7 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
       System.out.println("Restored Cube:");
       System.out.println(cube);
       summary = new Summary(cube);
-      System.out.println(summary.computeSummary(answerSize, maxDimensionSize));
+      System.out.println(summary.computeSummary(answerSize, oneSideErrors, maxDimensionSize));
     } catch (IOException e) {
       System.err.println("WARN: Unable to save the cube to the file: " + oFileName);
       e.printStackTrace();
