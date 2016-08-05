@@ -140,7 +140,7 @@ public class ColumnMetadata {
             .getKeyFor(column, V1Constants.MetadataKeys.Column.TOTAL_NUMBER_OF_ENTRIES));
     builder.setTotalNumberOfEntries(totalNumberOfEntries);
 
-    char paddingCharacter = V1Constants.Str.LEGACY_STRING_PAD_CHAR;
+    char paddingCharacter = V1Constants.Str.DEFAULT_STRING_PAD_CHAR;
     if (config
         .containsKey(V1Constants.MetadataKeys.Segment.SEGMENT_PADDING_CHARACTER)) {
       String padding = config.getString(V1Constants.MetadataKeys.Segment.SEGMENT_PADDING_CHARACTER);
