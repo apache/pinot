@@ -679,7 +679,7 @@ body a{
     z-index: 19;
     border-radius: 5px;
     -moz-border-radius: 5px;
-    -webkit-border-radius: 5px"
+    -webkit-border-radius: 5px;
 }
 
 .date-time-selector-box-table{
@@ -897,6 +897,33 @@ body a{
     font-size: 16px;
 }
 
+.anomaly-summary {
+    background-color: lightblue;
+}
+
+.anomaly-detail {
+    background-color: #F5FFFA;
+}
+
+.anomaly2 {
+  font-size: 11px;
+  margin: 10px;
+  padding: 5px;
+  border: 1px #dddddd solid;
+}
+
+.anomaly2 tr {
+  margin: 5px;
+  padding: 5px;
+  border: 1px #dddddd solid;
+}
+
+.anomaly2 td {
+  margin: 2px;
+  padding: 2px;
+  border: 1px #dddddd solid;
+}
+
 /* D3 START*/
 path {
     stroke: steelblue;
@@ -948,7 +975,6 @@ path {
 [class*=baseline]{
   stroke-dasharray: 5,5;
 }
-
 
 /* UIKIT overwrite */
 .uk-button-group.vertical button{

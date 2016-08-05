@@ -47,6 +47,10 @@ function submitData(url, data, tab) {
     console.log("post url:", url)
     return $.ajax({
         url: url,
+        headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+        },
         type: 'post',
         dataType: 'json',
         data: data,
