@@ -10,6 +10,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * Given list of {@link AnomalyResult} and merge parameters, this utility performs time based merge
+ */
 public abstract class AnomalySummaryGenerator {
 
   private AnomalySummaryGenerator() {
@@ -61,29 +64,21 @@ public abstract class AnomalySummaryGenerator {
         populateMergedResult(mergedAnomaly, currentResult);
         mergedAnomaly.setMergeStrategy(mergeConfig.getMergeStrategy());
       } else {
-        // check if Max Duration for merged has passed, if so, create new one
-        if (applyMaxDurationBasedSplit) {
-          if (mergedAnomaly.getEndTime() - mergedAnomaly.getStartTime() >= mergeConfig
-              .getMergeDuration()) {
-            // Split here
-            mergedAnomalies.add(mergedAnomaly);
-            mergedAnomaly = new MergedAnomalyResult();
-            populateMergedResult(mergedAnomaly, currentResult);
-            mergedAnomaly.setMergeStrategy(mergeConfig.getMergeStrategy());
-          }
-        }
-
         // compare current with merged and decide whether to merge the current result or create a new one
         if (applySequentialGapBasedSplit
             && (currentResult.getStartTimeUtc() - mergedAnomaly.getEndTime()) > mergeConfig
             .getSequentialAllowedGap()) {
-          // Split here if not processed already
+
+          // Split here
+          // add previous merged result
           mergedAnomalies.add(mergedAnomaly);
+
+          //set current raw result
           mergedAnomaly = new MergedAnomalyResult();
           populateMergedResult(mergedAnomaly, currentResult);
           mergedAnomaly.setMergeStrategy(mergeConfig.getMergeStrategy());
         } else {
-          // add the current result into mergedResult
+          // add the current raw result into mergedResult
           if (currentResult.getStartTimeUtc() < mergedAnomaly.getStartTime()) {
             mergedAnomaly.setStartTime(currentResult.getStartTimeUtc());
           }
@@ -95,15 +90,28 @@ public abstract class AnomalySummaryGenerator {
           }
         }
       }
-      if (i == (anomalies.size() - 1)) {
-        if (!mergedAnomalies.contains(mergedAnomaly)) {
+
+      // till this point merged result contains current raw result
+      if (applyMaxDurationBasedSplit
+          // check if Max Duration for merged has passed, if so, create new one
+          && mergedAnomaly.getEndTime() - mergedAnomaly.getStartTime() >= mergeConfig
+          .getMergeDuration()) {
+        // check if next anomaly has same start time as current one, that should be merged with current one too
+        if (i < (anomalies.size() - 1) && anomalies.get(i + 1).getStartTimeUtc() < currentResult
+            .getEndTimeUtc()) {
+          // no need to split as we want to include the next raw anomaly into the current one
+        } else {
+          // Split here
           mergedAnomalies.add(mergedAnomaly);
+          mergedAnomaly = null;
         }
       }
+
+      if (i == (anomalies.size() - 1) && mergedAnomaly != null) {
+        mergedAnomalies.add(mergedAnomaly);
+      }
     }
-    for (MergedAnomalyResult mergedAnomalyResult : mergedAnomalies) {
-      populateMergedProperties(mergedAnomalyResult);
-    }
+    mergedAnomalies.forEach(AnomalySummaryGenerator::populateMergedProperties);
     return mergedAnomalies;
   }
 

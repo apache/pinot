@@ -53,7 +53,7 @@ public class AnomalyFunctionResource {
         Method getFunctionProps = clz.getMethod("getPropertyKeys");
         anomalyFunctionMetadata.put(functionName, getFunctionProps.invoke(null));
       } catch (ClassNotFoundException e) {
-        LOG.error("Unknown class for function " + functionName, e);
+        LOG.warn("Unknown class for function : " + functionName);
       } catch (NoSuchMethodException | InvocationTargetException | IllegalAccessException e) {
         LOG.error("Unknown method", e);
       }

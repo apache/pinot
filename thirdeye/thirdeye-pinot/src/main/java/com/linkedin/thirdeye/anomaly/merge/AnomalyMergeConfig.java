@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.anomaly.merge;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
 /**
  * Merge Configuration to hint merge module to fetch anomalies by specific group and apply certain
  * merge rule
@@ -12,10 +14,13 @@ package com.linkedin.thirdeye.anomaly.merge;
  * <p/>
  * mergeDuration : length of the merged anomaly in milli seconds
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class AnomalyMergeConfig {
-  AnomalyMergeStrategy mergeStrategy = AnomalyMergeStrategy.FUNCTION;
-  long sequentialAllowedGap = 30_000; // 30 seconds
-  long mergeDuration = 12 * 60 * 60 * 1000; // 12 hours
+  private AnomalyMergeStrategy mergeStrategy = AnomalyMergeStrategy.FUNCTION;
+  private long sequentialAllowedGap = 30_000; // 30 seconds
+  private long mergeDuration = 12 * 60 * 60 * 1000; // 12 hours
+  private long startTime = 0;
+  private long endTime = System.currentTimeMillis();
 
   public AnomalyMergeStrategy getMergeStrategy() {
     return mergeStrategy;
@@ -39,5 +44,21 @@ public class AnomalyMergeConfig {
 
   public void setMergeDuration(long mergeDuration) {
     this.mergeDuration = mergeDuration;
+  }
+
+  public long getStartTime() {
+    return startTime;
+  }
+
+  public void setStartTime(long startTime) {
+    this.startTime = startTime;
+  }
+
+  public long getEndTime() {
+    return endTime;
+  }
+
+  public void setEndTime(long endTime) {
+    this.endTime = endTime;
   }
 }

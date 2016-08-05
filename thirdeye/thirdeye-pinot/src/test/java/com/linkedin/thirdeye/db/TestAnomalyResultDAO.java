@@ -37,7 +37,8 @@ public class TestAnomalyResultDAO extends AbstractDbTestBase {
 
   @Test(dependsOnMethods = {"testAnomalyResultCRUD"})
   public void testGetCountByFunction() {
-    List<GroupByRow<GroupByKey, Long>> groupByRows = anomalyResultDAO.getCountByFunction();
+    List<GroupByRow<GroupByKey, Long>> groupByRows =
+        anomalyResultDAO.getCountByFunction(0l, System.currentTimeMillis());
     Assert.assertEquals(groupByRows.size(), 1);
     Assert.assertEquals(groupByRows.get(0).getGroupBy().getFunctionId(), spec.getId());
     Assert.assertEquals(groupByRows.get(0).getValue().longValue(), 1);
