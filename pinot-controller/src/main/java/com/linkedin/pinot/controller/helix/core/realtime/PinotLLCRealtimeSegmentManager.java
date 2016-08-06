@@ -61,6 +61,7 @@ public class PinotLLCRealtimeSegmentManager {
       throw new RuntimeException("Instance already created");
     }
     INSTANCE = new PinotLLCRealtimeSegmentManager(helixAdmin, clusterName, helixManager, propertyStore, helixResourceManager);
+    SegmentCompletionManager.create(helixManager, INSTANCE);
   }
 
   private String makeKafkaPartitionPath(String realtimeTableName) {
@@ -328,6 +329,7 @@ public class PinotLLCRealtimeSegmentManager {
     oldSegMetadata.setEndOffset(nextOffset);
     oldSegMetadata.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
     oldSegMetadata.setEndTime(now);
+    // TODO Set download URL? Should these segments be downloaded via vip?
     final ZNRecord oldZnRecord = oldSegMetadata.toZNRecord();
     final String oldZnodePath = PinotRealtimeSegmentManager.getSegmentsPath() + "/" + realtimeTableName + "/" + committingSegmentNameStr;
 
