@@ -44,11 +44,10 @@ public class AnomalySummaryResource {
     if (functionId == null) {
       throw new IllegalArgumentException("Function id can't be null");
     }
-    DateTime startTimeUtc = new DateTime(mergeConfig.getStartTime());
-    DateTime endTimeUtc = new DateTime(mergeConfig.getEndTime());
 
-    List<AnomalyResult> anomalies =
-        resultDAO.findAllByTimeAndFunctionId(startTimeUtc, endTimeUtc, functionId);
+    List<AnomalyResult> anomalies = resultDAO
+        .findAllByTimeAndFunctionId(mergeConfig.getStartTime(), mergeConfig.getEndTime(),
+            functionId);
     return AnomalySummaryGenerator.mergeAnomalies(anomalies, mergeConfig);
   }
 
