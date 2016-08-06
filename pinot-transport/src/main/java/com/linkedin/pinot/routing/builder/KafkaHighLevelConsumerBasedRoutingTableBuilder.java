@@ -15,19 +15,17 @@
  */
 package com.linkedin.pinot.routing.builder;
 
-import com.linkedin.pinot.common.utils.SegmentName;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
-
 import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.SegmentName;
 import com.linkedin.pinot.common.utils.SegmentNameBuilder;
 import com.linkedin.pinot.routing.ServerToSegmentSetMap;
 

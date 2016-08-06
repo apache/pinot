@@ -16,11 +16,8 @@
 package com.linkedin.pinot.broker.broker.helix;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.Callable;
-
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.lang.StringUtils;
@@ -39,7 +36,6 @@ import org.apache.helix.participant.statemachine.StateModelFactory;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import com.linkedin.pinot.broker.broker.BrokerServerBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metrics.BrokerMeter;
@@ -48,8 +44,8 @@ import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
 import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.routing.HelixExternalViewBasedRouting;
-import com.linkedin.pinot.routing.builder.RoutingTableBuilder;
-import com.linkedin.pinot.routing.builder.RoutingTableBuilderFactory;
+import com.linkedin.pinot.routing.RoutingTableSelector;
+import com.linkedin.pinot.routing.RoutingTableSelectorFactory;
 
 
 /**
@@ -58,8 +54,6 @@ import com.linkedin.pinot.routing.builder.RoutingTableBuilderFactory;
  *
  */
 public class HelixBrokerStarter {
-
-  private static final String TABLES_KEY = "tables";
   private static final String PROPERTY_STORE = "PROPERTYSTORE";
 
   private final HelixManager _helixManager;
@@ -74,11 +68,8 @@ public class HelixBrokerStarter {
 
   private static final Logger LOGGER = LoggerFactory.getLogger("HelixBrokerStarter");
 
-  private static final String DEFAULT_OFFLINE_ROUTING_TABLE_BUILDER_KEY =
-      "pinot.broker.routing.table.builder.default.offline";
-  private static final String DEFAULT_REALTIME_ROUTING_TABLE_BUILDER_KEY =
-      "pinot.broker.routing.table.builder.default.realtime";
-  private static final String ROUTING_TABLE_BUILDER_KEY = "pinot.broker.routing.table.builder";
+  private static final String ROUTING_TABLE_SELECTOR_SUBSET_KEY =
+      "pinot.broker.routing.table.selector";
 
   public HelixBrokerStarter(String helixClusterName, String zkServer, Configuration pinotHelixProperties)
       throws Exception {
@@ -96,12 +87,6 @@ public class HelixBrokerStarter {
 
     _pinotHelixProperties.addProperty("pinot.broker.id", brokerId);
     setupHelixSystemProperties();
-    RoutingTableBuilder defaultOfflineRoutingTableBuilder =
-        getRoutingTableBuilder(_pinotHelixProperties.subset(DEFAULT_OFFLINE_ROUTING_TABLE_BUILDER_KEY));
-    RoutingTableBuilder defaultRealtimeRoutingTableBuilder =
-        getRoutingTableBuilder(_pinotHelixProperties.subset(DEFAULT_REALTIME_ROUTING_TABLE_BUILDER_KEY));
-    Map<String, RoutingTableBuilder> tableToRoutingTableBuilderMap =
-        getTableToRoutingTableBuilderMap(_pinotHelixProperties.subset(ROUTING_TABLE_BUILDER_KEY));
 
     // Remove all white-spaces from the list of zkServers (if any).
     String zkServers = zkServer.replaceAll("\\s+", "");
@@ -110,9 +95,9 @@ public class HelixBrokerStarter {
         new ZkClient(getZkAddressForBroker(zkServers, helixClusterName),
             ZkClient.DEFAULT_SESSION_TIMEOUT, ZkClient.DEFAULT_CONNECTION_TIMEOUT, new ZNRecordSerializer());
     _propertyStore = new ZkHelixPropertyStore<ZNRecord>(new ZkBaseDataAccessor<ZNRecord>(_zkClient), "/", null);
-    _helixExternalViewBasedRouting =
-        new HelixExternalViewBasedRouting(defaultOfflineRoutingTableBuilder, defaultRealtimeRoutingTableBuilder,
-            tableToRoutingTableBuilderMap, _propertyStore);
+    RoutingTableSelector selector =
+        RoutingTableSelectorFactory.getRoutingTableSelector(pinotHelixProperties.subset(ROUTING_TABLE_SELECTOR_SUBSET_KEY));
+    _helixExternalViewBasedRouting = new HelixExternalViewBasedRouting(_propertyStore, selector);
 
     // _brokerServerBuilder = startBroker();
     _brokerServerBuilder = startBroker(_pinotHelixProperties);
@@ -167,39 +152,6 @@ public class HelixBrokerStarter {
         _helixAdmin.addInstanceTag(clusterName, instanceName, CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE);
       }
     }
-  }
-
-  private Map<String, RoutingTableBuilder> getTableToRoutingTableBuilderMap(Configuration routingTableBuilderConfig) {
-    if (routingTableBuilderConfig.containsKey(TABLES_KEY)) {
-      String[] tables = routingTableBuilderConfig.getStringArray(TABLES_KEY);
-      if ((tables != null) && (tables.length > 0)) {
-        Map<String, RoutingTableBuilder> routingTableBuilderMap = new HashMap<String, RoutingTableBuilder>();
-        for (String table : tables) {
-          RoutingTableBuilder routingTableBuilder = getRoutingTableBuilder(routingTableBuilderConfig.subset(table));
-          if (routingTableBuilder == null) {
-            LOGGER.error("RoutingTableBuilder is null for table : " + table);
-          } else {
-            routingTableBuilderMap.put(table, routingTableBuilder);
-          }
-        }
-        return routingTableBuilderMap;
-      }
-    }
-    return null;
-  }
-
-  private RoutingTableBuilder getRoutingTableBuilder(Configuration routingTableBuilderConfig) {
-    RoutingTableBuilder routingTableBuilder = null;
-    try {
-      String routingTableBuilderKey = routingTableBuilderConfig.getString("class", null);
-      if (routingTableBuilderKey != null) {
-        routingTableBuilder = RoutingTableBuilderFactory.get(routingTableBuilderKey);
-        routingTableBuilder.init(routingTableBuilderConfig);
-      }
-    } catch (Exception e) {
-      LOGGER.warn("Caught exception while building routing table", e);
-    }
-    return routingTableBuilder;
   }
 
   private BrokerServerBuilder startBroker(Configuration config) throws Exception {
