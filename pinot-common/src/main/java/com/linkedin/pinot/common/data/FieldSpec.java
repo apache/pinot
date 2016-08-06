@@ -15,14 +15,24 @@
  */
 package com.linkedin.pinot.common.data;
 
+import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.utils.EqualityUtils;
 import org.apache.avro.Schema.Type;
-import org.codehaus.jackson.annotate.JsonIgnore;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
-import com.google.common.base.Preconditions;
 
 
+/**
+ * The <code>FieldSpec</code> class contains all specs related to any field (column) in {@link Schema}.
+ * <p>There are 3 types of <code>FieldSpec</code>:
+ * {@link DimensionFieldSpec}, {@link MetricFieldSpec}, {@link TimeFieldSpec}
+ * <p>Specs stored are as followings:
+ * <p>- <code>Name</code>: name of the field.
+ * <p>- <code>DataType</code>: type of the data stored (e.g. INTEGER, LONG, FLOAT, DOUBLE, STRING).
+ * <p>- <code>IsSingleValueField</code>: single-value or multi-value field.
+ * <p>- <code>DefaultNullValue</code>: when no value found for this field, use this value. Stored in string format.
+ */
 public abstract class FieldSpec {
   private static final String DEFAULT_DIM_NULL_VALUE_OF_STRING = "null";
   private static final Integer DEFAULT_DIM_NULL_VALUE_OF_INT = Integer.MIN_VALUE;
@@ -36,45 +46,25 @@ public abstract class FieldSpec {
   private static final Double DEFAULT_METRIC_NULL_VALUE_OF_DOUBLE = 0.0D;
 
   private String _name;
-  private FieldType _fieldType;
   private DataType _dataType;
   private boolean _isSingleValueField = true;
-  private String _delimiter = ",";
-  private Object _defaultNullValue;
+  private String _stringDefaultNullValue;
+  private transient Object _cachedDefaultNullValue;
 
-  // Fields to help make sure we first set data type then default null value.
-  @JsonIgnore
-  protected boolean _isDataTypeSet = false;
-  @JsonIgnore
-  protected boolean _isDefaultNullValueSet = false;
-
+  // Default constructor required by JSON de-serializer. DO NOT REMOVE.
   public FieldSpec() {
   }
 
-  public FieldSpec(String name, FieldType fieldType, DataType dataType, boolean isSingleValueField, String delimiter,
-      Object defaultNullValue) {
+  public FieldSpec(String name, DataType dataType, boolean isSingleValueField) {
     Preconditions.checkNotNull(name);
-    Preconditions.checkNotNull(fieldType);
     Preconditions.checkNotNull(dataType);
 
     _name = name;
-    _fieldType = fieldType;
     _dataType = dataType;
-    _isDataTypeSet = true;
     _isSingleValueField = isSingleValueField;
-    _delimiter = delimiter;
-    if (defaultNullValue != null) {
-      setDefaultNullValue(defaultNullValue);
-    }
   }
 
-  public FieldSpec(String name, FieldType fieldType, DataType dataType, boolean isSingleValueField, String delimiter) {
-    this(name, fieldType, dataType, isSingleValueField, delimiter, null);
-  }
-
-  public FieldSpec(String name, FieldType fieldType, DataType dataType, boolean isSingleValueField) {
-    this(name, fieldType, dataType, isSingleValueField, null, null);
-  }
+  public abstract FieldType getFieldType();
 
   public void setName(String name) {
     Preconditions.checkNotNull(name);
@@ -86,34 +76,11 @@ public abstract class FieldSpec {
     return _name;
   }
 
-  public void setDelimiter(String delimiter) {
-    _delimiter = delimiter;
-  }
-
-  public String getDelimiter() {
-    return _delimiter;
-  }
-
-  public void setFieldType(FieldType fieldType) {
-    Preconditions.checkNotNull(fieldType);
-
-    _fieldType = fieldType;
-  }
-
-  public FieldType getFieldType() {
-    return _fieldType;
-  }
-
   public void setDataType(DataType dataType) {
     Preconditions.checkNotNull(dataType);
 
-    _isDataTypeSet = true;
     _dataType = dataType;
-
-    // Reset default null value if already set.
-    if (_isDefaultNullValueSet) {
-      updateDefaultNullValue();
-    }
+    _cachedDefaultNullValue = null;
   }
 
   public DataType getDataType() {
@@ -131,133 +98,146 @@ public abstract class FieldSpec {
   public void setDefaultNullValue(Object defaultNullValue) {
     Preconditions.checkNotNull(defaultNullValue);
 
-    _isDefaultNullValueSet = true;
-
-    if (_isDataTypeSet) {
-      defaultNullValueFromString(defaultNullValue.toString());
-    } else {
-      // Set default null value as the value passed in, and might reset when setDataType() get called.
-      _defaultNullValue = defaultNullValue;
-    }
+    _stringDefaultNullValue = defaultNullValue.toString();
+    _cachedDefaultNullValue = null;
   }
 
-  /**
-   * Helper function to convert the string format default null value to the correct data type.
-   *
-   * @param value string format of the default null value.
-   */
-  protected void defaultNullValueFromString(String value) {
-    DataType dataType = getDataType();
-    switch (dataType) {
-      case INT:
-        _defaultNullValue = Integer.valueOf(value);
-        return;
-      case LONG:
-        _defaultNullValue = Long.valueOf(value);
-        return;
-      case FLOAT:
-        _defaultNullValue = Float.valueOf(value);
-        return;
-      case DOUBLE:
-        _defaultNullValue = Double.valueOf(value);
-        return;
-      case STRING:
-      case BOOLEAN:
-        _defaultNullValue = value;
-        return;
-      default:
-        throw new UnsupportedOperationException("Unknown data type " + dataType);
-    }
-  }
-
-  /**
-   * Helper function to update default null value according to the data type.
-   */
-  protected void updateDefaultNullValue() {
-    defaultNullValueFromString(_defaultNullValue.toString());
-  }
-
+  // BOOLEAN, BYTE, CHAR, SHORT support is a temporary work around, will remove it after using canonical schema.
   public Object getDefaultNullValue() {
-    if (_defaultNullValue != null) {
-      return _defaultNullValue;
-    }
-    DataType dataType = getDataType();
-    switch (_fieldType) {
-      case METRIC:
-        switch (dataType) {
+    FieldType fieldType = getFieldType();
+    if (_cachedDefaultNullValue == null) {
+      if (_stringDefaultNullValue != null) {
+        switch (_dataType) {
+          case BYTE:
+          case SHORT:
           case INT:
-            return DEFAULT_METRIC_NULL_VALUE_OF_INT;
+            _cachedDefaultNullValue = Integer.valueOf(_stringDefaultNullValue);
+            break;
           case LONG:
-            return DEFAULT_METRIC_NULL_VALUE_OF_LONG;
+            _cachedDefaultNullValue = Long.valueOf(_stringDefaultNullValue);
+            break;
           case FLOAT:
-            return DEFAULT_METRIC_NULL_VALUE_OF_FLOAT;
+            _cachedDefaultNullValue = Float.valueOf(_stringDefaultNullValue);
+            break;
           case DOUBLE:
-            return DEFAULT_METRIC_NULL_VALUE_OF_DOUBLE;
-          default:
-            throw new UnsupportedOperationException("Unknown default null value for metric of data type " + _dataType);
-        }
-      case DIMENSION:
-      case TIME:
-        switch (dataType) {
-          case INT:
-            return DEFAULT_DIM_NULL_VALUE_OF_INT;
-          case LONG:
-            return DEFAULT_DIM_NULL_VALUE_OF_LONG;
-          case FLOAT:
-            return DEFAULT_DIM_NULL_VALUE_OF_FLOAT;
-          case DOUBLE:
-            return DEFAULT_DIM_NULL_VALUE_OF_DOUBLE;
+            _cachedDefaultNullValue = Double.valueOf(_stringDefaultNullValue);
+            break;
+          case BOOLEAN:
+          case CHAR:
           case STRING:
-            return DEFAULT_DIM_NULL_VALUE_OF_STRING;
+            Preconditions.checkState(fieldType != FieldType.METRIC,
+                "For metric field, no support for non-number data type: " + _dataType);
+            _cachedDefaultNullValue = _stringDefaultNullValue;
+            break;
           default:
-            throw new UnsupportedOperationException(
-                "Unknown default null value for dimension/time column of data type " + _dataType);
+            throw new UnsupportedOperationException("Unsupported data type: " + _dataType);
         }
-      default:
-        throw new UnsupportedOperationException("Unknown field type" + _fieldType);
+      } else {
+        switch (fieldType) {
+          case METRIC:
+            switch (_dataType) {
+              case BYTE:
+              case SHORT:
+              case INT:
+                _cachedDefaultNullValue = DEFAULT_METRIC_NULL_VALUE_OF_INT;
+                break;
+              case LONG:
+                _cachedDefaultNullValue = DEFAULT_METRIC_NULL_VALUE_OF_LONG;
+                break;
+              case FLOAT:
+                _cachedDefaultNullValue = DEFAULT_METRIC_NULL_VALUE_OF_FLOAT;
+                break;
+              case DOUBLE:
+                _cachedDefaultNullValue = DEFAULT_METRIC_NULL_VALUE_OF_DOUBLE;
+                break;
+              default:
+                throw new UnsupportedOperationException(
+                    "Unknown default null value for metric field of data type: " + _dataType);
+            }
+            break;
+          case DIMENSION:
+          case TIME:
+            switch (_dataType) {
+              case BYTE:
+              case SHORT:
+              case INT:
+                _cachedDefaultNullValue = DEFAULT_DIM_NULL_VALUE_OF_INT;
+                break;
+              case LONG:
+                _cachedDefaultNullValue = DEFAULT_DIM_NULL_VALUE_OF_LONG;
+                break;
+              case FLOAT:
+                _cachedDefaultNullValue = DEFAULT_DIM_NULL_VALUE_OF_FLOAT;
+                break;
+              case DOUBLE:
+                _cachedDefaultNullValue = DEFAULT_DIM_NULL_VALUE_OF_DOUBLE;
+                break;
+              case BOOLEAN:
+              case CHAR:
+              case STRING:
+                _cachedDefaultNullValue = DEFAULT_DIM_NULL_VALUE_OF_STRING;
+                break;
+              default:
+                throw new UnsupportedOperationException(
+                    "Unknown default null value for dimension/time field of data type: " + _dataType);
+            }
+            break;
+          default:
+            throw new UnsupportedOperationException("Unsupported field type: " + fieldType);
+        }
+      }
     }
+    return _cachedDefaultNullValue;
   }
 
   @Override
   public String toString() {
-    Object defaultNullValue = new String("N/A");
-    try {
-      defaultNullValue = getDefaultNullValue();
-    } catch (UnsupportedOperationException e) {
-      // Ignore the exception
-    }
-    return "< data type: " + getDataType() + " , field type: " + getFieldType()
-        + (isSingleValueField() ? ", single value column" : ", multi value column, delimiter: '" + getDelimiter() + "'")
-        + ", default null value: " + defaultNullValue + " >";
+    return "< field type: " + getFieldType() + ", field name: " + _name + ", data type: " + _dataType
+        + ", is single-value field: " + _isSingleValueField + ", default null value: " + getDefaultNullValue() + " >";
   }
 
   @Override
-  public boolean equals(Object obj) {
-    if (obj instanceof FieldSpec) {
-      return toString().equals(obj.toString());
+  public boolean equals(Object anObject) {
+    if (this == anObject) {
+      return true;
+    }
+    if (anObject instanceof FieldSpec) {
+      FieldSpec anotherFieldSpec = (FieldSpec) anObject;
+
+      return getFieldType().equals(anotherFieldSpec.getFieldType()) && _name.equals(anotherFieldSpec._name)
+          && _dataType.equals(anotherFieldSpec._dataType) && _isSingleValueField == anotherFieldSpec._isSingleValueField
+          && getDefaultNullValue().equals(anotherFieldSpec.getDefaultNullValue());
     }
     return false;
   }
 
   @Override
   public int hashCode() {
-    return toString().hashCode();
+    int result = getFieldType().hashCode();
+    result = EqualityUtils.hashCodeOf(result, _name);
+    result = EqualityUtils.hashCodeOf(result, _dataType);
+    result = EqualityUtils.hashCodeOf(result, _isSingleValueField);
+    result = EqualityUtils.hashCodeOf(result, getDefaultNullValue());
+    return result;
   }
 
   /**
-   * FieldType is used to demonstrate the real world business logic for a column.
-   *
+   * The <code>FieldType</code> enum is used to demonstrate the real world business logic for a column.
+   * <p><code>DIMENSION</code>: columns used to filter records.
+   * <p><code>METRIC</code>: columns used to apply aggregation on. <code>METRIC</code> field only contains numeric data.
+   * <p><code>TIME</code>: time column (at most one per {@link Schema}). <code>TIME</code> field can be used to prune
+   * segments, otherwise treated the same as <code>DIMENSION</code> field.
    */
   public enum FieldType {
-    UNKNOWN,
     DIMENSION,
     METRIC,
     TIME
   }
 
   /**
-   * DataType is used to demonstrate the data type of a column.
-   *
+   * The <code>DataType</code> enum is used to demonstrate the data type of a column.
+   * <p>Array <code>DataType</code> is only used in {@link com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema}.
+   * <p>In {@link Schema}, use non-array <code>DataType</code> only.
    */
   public enum DataType {
     BOOLEAN,
@@ -293,32 +273,30 @@ public abstract class FieldSpec {
       return this.ordinal() < BYTE_ARRAY.ordinal();
     }
 
-    public static DataType valueOf(Type type) {
-      if (type == Type.INT) {
-        return INT;
+    /**
+     * Return the {@link DataType} associate with the {@link Type}
+     */
+    public static DataType valueOf(Type avroType) {
+      switch (avroType) {
+        case INT:
+          return INT;
+        case LONG:
+          return LONG;
+        case FLOAT:
+          return FLOAT;
+        case DOUBLE:
+          return DOUBLE;
+        case BOOLEAN:
+        case STRING:
+        case ENUM:
+          return STRING;
+        default:
+          throw new UnsupportedOperationException("Unsupported Avro type: " + avroType);
       }
-      if (type == Type.LONG) {
-        return LONG;
-      }
-
-      if (type == Type.ENUM || type == Type.STRING || type == Type.BOOLEAN) {
-        return STRING;
-      }
-
-      if (type == Type.FLOAT) {
-        return FLOAT;
-      }
-
-      if (type == Type.DOUBLE) {
-        return DOUBLE;
-      }
-
-      throw new UnsupportedOperationException("Unsupported DataType " + type.toString());
     }
 
     /**
-     * return the number of bytes
-     * @return
+     * Return number of bytes needed for storage.
      */
     public int size() {
       switch (this) {
@@ -335,7 +313,7 @@ public abstract class FieldSpec {
         case DOUBLE:
           return 8;
         default:
-          throw new UnsupportedOperationException("Cant get number of bytes for :" + this);
+          throw new UnsupportedOperationException("Cannot get number of bytes for: " + this);
       }
     }
 

@@ -47,8 +47,8 @@ public class PlainFieldExtractorTest {
     Schema schema = new SchemaBuilder().addSingleValueDimension("svDimensionInt", DataType.INT)
         .addSingleValueDimension("svDimensionDouble", DataType.DOUBLE)
         .addSingleValueDimension("someClassObject", DataType.STRING)
-        .addMultiValueDimension("mvDimension", DataType.STRING, ",")
-        .addMultiValueDimension("mvClassObject", DataType.STRING, ",")
+        .addMultiValueDimension("mvDimension", DataType.STRING)
+        .addMultiValueDimension("mvClassObject", DataType.STRING)
         .addMetric("metric", DataType.INT)
         .addTime("incomingTime", TimeUnit.DAYS, DataType.LONG)
         .build();
@@ -176,7 +176,7 @@ public class PlainFieldExtractorTest {
       throws Exception {
     Schema schema = new SchemaBuilder().addSingleValueDimension("svDimensionInt", DataType.INT)
         .addSingleValueDimension("svDimensionDouble", DataType.DOUBLE)
-        .addMultiValueDimension("mvDimension", DataType.STRING, ",")
+        .addMultiValueDimension("mvDimension", DataType.STRING)
         .addMetric("metric", DataType.INT)
         .build();
     TimeFieldSpec timeSpec = new TimeFieldSpec();
@@ -208,7 +208,7 @@ public class PlainFieldExtractorTest {
       throws Exception {
     Schema schema = new SchemaBuilder().addSingleValueDimension("svDimensionInt", DataType.INT)
         .addSingleValueDimension("svDimensionDouble", DataType.DOUBLE)
-        .addMultiValueDimension("mvDimension", DataType.STRING, ",")
+        .addMultiValueDimension("mvDimension", DataType.STRING)
         .addMetric("metric", DataType.INT)
         .build();
     TimeFieldSpec timeSpec = new TimeFieldSpec();
@@ -242,7 +242,7 @@ public class PlainFieldExtractorTest {
       throws Exception {
     Schema schema = new SchemaBuilder().addSingleValueDimension("svDimensionInt", DataType.INT)
         .addSingleValueDimension("svDimensionDouble", DataType.DOUBLE)
-        .addMultiValueDimension("mvDimension", DataType.STRING, ",")
+        .addMultiValueDimension("mvDimension", DataType.STRING)
         .addMetric("metric", DataType.INT)
         .build();
     TimeFieldSpec timeSpec = new TimeFieldSpec();

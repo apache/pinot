@@ -131,9 +131,8 @@ public class DataGenerator {
           throw new RuntimeException("Invalid Field type.");
     }
 
-    spec.setDataType(dataType);
-    spec.setFieldType(fieldType);
     spec.setName(column);
+    spec.setDataType(dataType);
     spec.setSingleValueField(true);
 
     return spec;

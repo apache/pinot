@@ -15,18 +15,25 @@
  */
 package com.linkedin.pinot.common.data;
 
-public class DimensionFieldSpec extends FieldSpec {
+import org.codehaus.jackson.annotate.JsonIgnore;
+import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 
+
+@JsonIgnoreProperties(ignoreUnknown = true)
+public final class DimensionFieldSpec extends FieldSpec {
+
+  // Default constructor required by JSON de-serializer. DO NOT REMOVE.
   public DimensionFieldSpec() {
     super();
-    setFieldType(FieldType.DIMENSION);
-  }
-
-  public DimensionFieldSpec(String name, DataType dataType, boolean isSingleValueField, String delimiter) {
-    super(name, FieldType.DIMENSION, dataType, isSingleValueField, delimiter);
   }
 
   public DimensionFieldSpec(String name, DataType dataType, boolean isSingleValueField) {
-    super(name, FieldType.DIMENSION, dataType, isSingleValueField);
+    super(name, dataType, isSingleValueField);
+  }
+
+  @JsonIgnore
+  @Override
+  public FieldType getFieldType() {
+    return FieldType.DIMENSION;
   }
 }

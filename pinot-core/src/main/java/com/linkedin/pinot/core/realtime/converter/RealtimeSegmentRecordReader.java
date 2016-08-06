@@ -58,7 +58,7 @@ public class RealtimeSegmentRecordReader extends BaseRecordReader {
   public void init() throws Exception {
     columns.addAll(dataSchema.getDimensionNames());
     columns.addAll(dataSchema.getMetricNames());
-    columns.add(dataSchema.getTimeFieldSpec().getOutGoingTimeColumnName());
+    columns.add(dataSchema.getTimeFieldSpec().getOutgoingTimeColumnName());
   }
 
   @Override

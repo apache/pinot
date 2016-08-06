@@ -15,14 +15,25 @@
  */
 package com.linkedin.pinot.common.data;
 
-public class MetricFieldSpec extends FieldSpec {
+import org.codehaus.jackson.annotate.JsonIgnore;
+import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 
+
+@JsonIgnoreProperties(ignoreUnknown = true)
+public final class MetricFieldSpec extends FieldSpec {
+
+  // Default constructor required by JSON de-serializer. DO NOT REMOVE.
   public MetricFieldSpec() {
     super();
-    setFieldType(FieldType.METRIC);
   }
 
   public MetricFieldSpec(String name, DataType dataType) {
-    super(name, FieldType.METRIC, dataType, true);
+    super(name, dataType, true);
+  }
+
+  @JsonIgnore
+  @Override
+  public FieldType getFieldType() {
+    return FieldType.METRIC;
   }
 }
