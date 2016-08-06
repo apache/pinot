@@ -72,7 +72,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private boolean _hasStarTree;
   private StarTreeMetadata _starTreeMetadata = null;
   private String _creatorName;
-  private char _paddingCharacter = V1Constants.Str.LEGACY_STRING_PAD_CHAR;
+  private char _paddingCharacter = V1Constants.Str.DEFAULT_STRING_PAD_CHAR;
 
   public SegmentMetadataImpl(File indexDir) throws ConfigurationException, IOException {
     LOGGER.debug("SegmentMetadata location: {}", indexDir);

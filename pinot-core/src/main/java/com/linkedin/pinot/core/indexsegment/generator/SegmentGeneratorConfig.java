@@ -71,7 +71,7 @@ public class SegmentGeneratorConfig {
   private String _starTreeIndexSpecFile = null;
   private StarTreeIndexSpec _starTreeIndexSpec = null;
   private String _creatorVersion = null;
-  private char _paddingCharacter = V1Constants.Str.LEGACY_STRING_PAD_CHAR;
+  private char _paddingCharacter = V1Constants.Str.DEFAULT_STRING_PAD_CHAR;
 
   public SegmentGeneratorConfig() {
   }
