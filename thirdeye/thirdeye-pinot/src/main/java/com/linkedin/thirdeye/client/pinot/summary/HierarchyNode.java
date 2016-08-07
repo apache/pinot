@@ -32,11 +32,44 @@ class HierarchyNode {
   }
 
   public double currentRatio() {
-    double ratio = currentValue / baselineValue;
-    if (Double.isInfinite(ratio) || Double.isNaN(ratio)) {
-      return aggregatedRatio();
-    } else {
+    return currentValue / baselineValue;
+  }
+
+  /**
+   * Return the ratio of the node. If the ratio is not a finite number, then it returns the aggragatedRatio.
+   * If the aggregatedRaio is not a finite number, then it bootstraps to the parents until it finds a finite
+   * ratio. If no finite ratio available, then it returns 1.
+   */
+  public double targetRatio() {
+    double ratio = currentRatio();
+    if (Double.isFinite(ratio)) {
       return ratio;
+    } else {
+      ratio = aggregatedRatio();
+      if (Double.isFinite(ratio)) {
+        return ratio;
+      } else {
+        if (parent != null) {
+          return parent.targetRatio();
+        } else {
+          return 1.;
+        }
+      }
+    }
+  }
+
+  /**
+   * Returns the current ratio of this node is increased or decreased, i.e., returns if ratio of the node >= 1.0.
+   * If the current ratio is NAN, then the ratio of the aggregated values is used.
+   *
+   * Precondition: the aggregated baseline and current values cannot both be zero.
+   */
+  public boolean side() {
+    double ratio = currentRatio();
+    if (!Double.isNaN(ratio)) {
+      return Double.compare(1., currentRatio()) <= 0;
+    } else {
+      return Double.compare(1., aggregatedRatio()) <= 0;
     }
   }
 

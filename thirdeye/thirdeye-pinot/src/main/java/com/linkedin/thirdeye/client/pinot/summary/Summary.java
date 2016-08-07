@@ -55,9 +55,10 @@ public class Summary {
     HierarchyNode root = cube.getHierarchicalNodes().get(0).get(0);
     if (doOneSideError) {
       oneSideErrorRowInserter =
-          new OneSideErrorRowInserter(basicRowInserter, Double.compare(1., root.currentRatio()) <= 0);
-      // If this cube contains only one dimension, one side error is calculated starting at leaf level
-      if (levelCount == 2) leafRowInserter = oneSideErrorRowInserter;
+          new OneSideErrorRowInserter(basicRowInserter, Double.compare(1., root.targetRatio()) <= 0);
+      // If this cube contains only one dimension, one side error is calculated starting at leaf (detailed) level;
+      // otherwise, a row at different side is removed through internal nodes.
+      if (levelCount == 1) leafRowInserter = oneSideErrorRowInserter;
     }
     computeChildDPArray(root);
 
@@ -101,7 +102,7 @@ public class Summary {
     HierarchyNode parent = node.parent;
     DPArray dpArray = dpArrays.get(node.level);
     dpArray.reset();
-    dpArray.targetRatio = node.currentRatio();
+    dpArray.targetRatio = node.targetRatio();
 
     // Compute DPArray if the current node is the lowest internal node.
     // Otherwise, merge DPArrays from its children.
@@ -116,20 +117,19 @@ public class Summary {
         computeChildDPArray(child);
         mergeDPArray(node, dpArray, dpArrays.get(node.level + 1));
         updateWowValues(node, dpArray.getAnswer());
-        dpArray.targetRatio = node.currentRatio(); // get updated ratio
+        dpArray.targetRatio = node.targetRatio(); // get updated ratio
       }
     }
 
     // Calculate the cost if the node (aggregated row) is put in the answer.
     // We do not need to do this for the root node.
-    // Moreover, if a node is thinned out by its children, then aggregate all children.
+    // Moreover, if a node is thinned out by its children, it won't be inserted to the answer.
     if (node.level != 0) {
+      updateWowValues(parent, dpArray.getAnswer());
+      double targetRatio = parent.targetRatio();
+      updateCost4NewRatio(dpArray, targetRatio);
+      dpArray.targetRatio = targetRatio;
       if ( !nodeIsThinnedOut(node) ) {
-        updateWowValues(parent, dpArray.getAnswer());
-//        double targetRatio = (dpArray.targetRatio + parent.currentRatio()) / 2.;
-        double targetRatio = parent.currentRatio();
-        updateCost4NewRatio(dpArray, targetRatio);
-        dpArray.targetRatio = targetRatio;
         Set<HierarchyNode> removedNode = new HashSet<>(dpArray.getAnswer());
         basicRowInserter.insertRowToDPArray(dpArray, node, targetRatio);
         removedNode.removeAll(dpArray.getAnswer());
@@ -137,15 +137,6 @@ public class Summary {
           updateWowValuesDueToRemoval(node, dpArray.getAnswer(), removedNode);
           updateWowValues(node, dpArray.getAnswer());
         }
-      } else {
-        node.baselineValue = node.data.baselineValue;
-        node.currentValue = node.data.currentValue;
-        parent.baselineValue -= node.baselineValue;
-        parent.currentValue -= node.currentValue;
-        double parentTargetRatio = parent.currentRatio();
-        dpArray.reset();
-        dpArray.targetRatio = parentTargetRatio;
-        basicRowInserter.insertRowToDPArray(dpArray, node, parentTargetRatio);
       }
     } else {
       dpArray.getAnswer().add(node);
@@ -199,7 +190,8 @@ public class Summary {
    * @param answer The new answer.
    * @param removedNodes The nodes removed from the subtree of node.
    */
-  private static void updateWowValuesDueToRemoval(HierarchyNode root, Set<HierarchyNode> answer, Set<HierarchyNode> removedNodes) {
+  private static void updateWowValuesDueToRemoval(HierarchyNode root, Set<HierarchyNode> answer,
+      Set<HierarchyNode> removedNodes) {
     List<HierarchyNode> removedNodesList = new ArrayList<>(removedNodes);
     removedNodesList.sort(NODE_COMPARATOR); // Process lower level nodes first
     for (HierarchyNode removedNode : removedNodesList) {
@@ -233,7 +225,7 @@ public class Summary {
   private void insertRowToDPArrayWithAdaptiveRatio(DPArray dp, HierarchyNode node, double targetRatio) {
     if (dp.getAnswer().contains(node.parent)) {
       // For one side error if node's parent is included in the solution, then its cost will be calculated normally.
-      basicRowInserter.insertRowToDPArray(dp, node, node.parent.currentRatio());
+      basicRowInserter.insertRowToDPArray(dp, node, node.parent.targetRatio());
     } else {
       oneSideErrorRowInserter.insertRowToDPArray(dp, node, targetRatio);
     }
@@ -279,15 +271,17 @@ public class Summary {
 
     @Override
     public void insertRowToDPArray(DPArray dp, HierarchyNode node, double targetRatio)  {
-      boolean mySide = Double.compare(1., node.currentRatio()) <= 0 ? true : false;
-      if ( !(side ^ mySide) ) { // if the row has the same change trend with the top row
+      // if the row has the same change trend with the top row, then insert the row
+      if ( side == node.side() ) {
         basicRowInserter.insertRowToDPArray(dp, node, targetRatio);
-      } else {
-        HierarchyNode parents = node;
-        while ((parents = parents.parent) != null) {
-          if (dp.getAnswer().contains(parents)) {
-            basicRowInserter.insertRowToDPArray(dp, node, targetRatio);
-            break;
+      } else { // otherwise, it is inserted only there exists an intermediate parent besides root node
+        HierarchyNode parent = node;
+        while ((parent = parent.parent) != null) {
+          if (dp.getAnswer().contains(parent)) {
+            if ( side == parent.side() ) {
+              basicRowInserter.insertRowToDPArray(dp, node, targetRatio);
+              break;
+            }
           }
         }
       }
@@ -295,10 +289,10 @@ public class Summary {
   }
 
   public static void main (String[] argc) {
-    String oFileName = "MLCube.json";
-    int answerSize = 10;
-    boolean doOneSideError = true;
-    int maxDimensionSize = 3;
+    String oFileName = "Cube.json";
+    int answerSize = 20;
+    boolean doOneSideError = false;
+    int maxDimensionSize = 4;
 
     Cube cube = null;
     try {

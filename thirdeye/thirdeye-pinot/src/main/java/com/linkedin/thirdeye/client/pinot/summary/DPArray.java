@@ -13,9 +13,9 @@ public class DPArray {
   double targetRatio;
   List<DPSlot> slots;
 
-  public DPArray(int N) {
-    slots = new ArrayList<>(N);
-    for (int i = 0; i < N; ++i) {
+  public DPArray(int size) {
+    slots = new ArrayList<>(size);
+    for (int i = 0; i < size; ++i) {
       slots.add(new DPSlot());
     }
   }

@@ -233,34 +233,25 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
 
   @SuppressWarnings("deprecation")
   public static void main(String[] argc) throws Exception {
-    String oFileName = "MLCube.json";
-//    String collection = "thirdeyeKbmi";
-//    String metricName = "desktopPageViews";
-//    String[] dimensionNames = { "continent", "environment", "osName", "browserName" };
-
-//    List<List<String>> hierarchy = new ArrayList<>();
-//    hierarchy.add(Lists.newArrayList("continent", "countryCode"));
-
-
-//    DateTime baselineStart = new DateTime(2016, 7, 5, 21, 00);
-//    TimeGranularity timeGranularity = new TimeGranularity(1, TimeUnit.HOURS);
+    String oFileName = "Cube.json";
 
     String collection = "thirdeyeKbmi";
     String metricName = "mobilePageViews";
-//    String[] dimensionNames = { "browserName", "continent", "countryCode", "deviceName", "environment", "locale", "osName", "pageKey", "service", "sourceApp" };
-//    String[] dimensionNames = { "continent", "environment", "osName", "browserName", "countryCode", "contactsOrigin", "deviceName", "locale", "pageKey"};
-    String[] dimensionNames = { "broswerName", "countryCode"};
-    List<List<String>> hierarchy = new ArrayList<>();
-//    hierarchy.add(Lists.newArrayList("continent", "countryCode"));
-//    String[] dimensionNames = { "osName", "browserName", "countryCode", "continent" };
-//    List<List<String>> hierarchy = new ArrayList<>();
-//    hierarchy.add(Lists.newArrayList("continent", "countryCode"));
-//    hierarchy.add(Lists.newArrayList("osName", "browserName"));
-
-//    DateTime baselineStart = new DateTime(2016, 7, 27, 07, 00);
-    DateTime baselineStart = new DateTime(1469628000000L, DateTimeZone.UTC);
-    DateTime currentStart = new DateTime(1470146400000L, DateTimeZone.UTC);
+    DateTime baselineStart = new DateTime(1469628000000L);
+    DateTime currentStart = new DateTime(1470232800000L);
     TimeGranularity timeGranularity = new TimeGranularity(1, TimeUnit.HOURS);
+
+//    String collection = "thirdeyeAbook";
+//    String metricName = "totalFlows";
+//    DateTime baselineStart = new DateTime(2016, 7, 11, 00, 00);
+//    DateTime currentStart = new DateTime(2016, 7, 18, 00, 00);
+//    TimeGranularity timeGranularity = new TimeGranularity(1, TimeUnit.DAYS);
+
+    String[] dimensionNames = { "browserName", "continent", "countryCode",
+                                "deviceName", "environment", "locale", "osName",
+                                "pageKey", "service", "sourceApp" };
+    List<List<String>> hierarchies = new ArrayList<>();
+    hierarchies.add(Lists.newArrayList("continent", "countryCode"));
 
     // Create ThirdEye client
     ThirdEyeConfiguration thirdEyeConfig = new ThirdEyeDashboardConfiguration();
@@ -281,16 +272,17 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
     pinotClient.setMetricName(metricName);
     pinotClient.setGroupByTimeGranularity(timeGranularity);
     pinotClient.setBaselineStartInclusive(baselineStart);
-//    pinotClient.setCurrentStartInclusive(baselineStart.plusDays(7));
     pinotClient.setCurrentStartInclusive(currentStart);
 
+    int maxDimensionSize = 4;
 
     // Build the cube for computing the summary
     Cube initCube = new Cube();
-//    initCube.buildWithAutoDimensionOrder(pinotClient, new Dimensions(Lists.newArrayList(dimensionNames)), 3, hierarchy);
-    initCube.buildWithManualDimensionOrder(pinotClient, new Dimensions(Lists.newArrayList(dimensionNames)));
+    initCube.buildWithAutoDimensionOrder(pinotClient, new Dimensions(Lists.newArrayList(dimensionNames)),
+        maxDimensionSize, hierarchies);
+//    initCube.buildWithManualDimensionOrder(pinotClient, new Dimensions(Lists.newArrayList(dimensionNames)));
 
-    int maxDimensionSize = 3;
+
     int answerSize = 5;
     boolean oneSideErrors = false;
     Summary summary = new Summary(initCube);
