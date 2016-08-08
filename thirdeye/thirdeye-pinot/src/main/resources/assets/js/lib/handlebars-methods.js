@@ -329,9 +329,6 @@ $(document).ready(function () {
     var source_metric_time_series_section = $("#metric-time-series-section-template").html();
     HandleBarsTemplates.template_metric_time_series_section = Handlebars.compile(source_metric_time_series_section);
 
-    /* var source_metric_time_series_section_anomaly = $("#metric-time-series-section-anomaly-template").html();
-     HandleBarsTemplates.template_metric_time_series_section_anomaly = Handlebars.compile(source_metric_time_series_section_anomaly);*/
-
     var source_time_series_template = $("#time-series-template").html();
     HandleBarsTemplates.template_time_series = Handlebars.compile(source_time_series_template);
 
@@ -344,4 +341,18 @@ $(document).ready(function () {
     var source_existing_anomaly_functions_template = $("#self-service-existing-anomaly-functions-template").html();
     HandleBarsTemplates.template_existing_anomaly_functions = Handlebars.compile(source_existing_anomaly_functions_template);
 
+    var source_anomaly_summary_template = $("#anomaly-summary-template").html();
+    HandleBarsTemplates.template_anomaly_summary = Handlebars.compile(source_anomaly_summary_template);
+
+    var source_anomaly_grouping_by_fun_template = $("#anomaly-grouping-by-fun-template").html();
+    HandleBarsTemplates.template_anomaly_grouping_by_fun = Handlebars.compile(source_anomaly_grouping_by_fun_template);
+
+    var source_anomaly_grouping_by_fun_dim_template = $("#anomaly-grouping-by-fun-dim-template").html();
+    HandleBarsTemplates.template_anomaly_grouping_by_fun_dim = Handlebars.compile(source_anomaly_grouping_by_fun_dim_template);
+
+    var source_anomaly_grouping_by_collection_template = $("#anomaly-grouping-by-collection-template").html();
+    HandleBarsTemplates.template_anomaly_grouping_by_collection = Handlebars.compile(source_anomaly_grouping_by_collection_template);
+
+    var source_anomaly_grouping_by_metric_template = $("#anomaly-grouping-by-metric-template").html();
+    HandleBarsTemplates.template_anomaly_grouping_by_metric = Handlebars.compile(source_anomaly_grouping_by_metric_template);
 })

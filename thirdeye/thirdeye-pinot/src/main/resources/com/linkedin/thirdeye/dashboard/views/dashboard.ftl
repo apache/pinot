@@ -5,48 +5,63 @@
 
 <body>
 <div id="main-view">
-	<nav class="tm-navbar uk-navbar uk-navbar-attached">
-		<div class="uk-container uk-container-center">
-            <a class="uk-navbar-brand brand" href="/dashboard">ThirdEye</a>
+  <nav class="tm-navbar uk-navbar uk-navbar-attached">
+    <div class="uk-container uk-container-center">
+      <a class="uk-navbar-brand brand" href="/dashboard">ThirdEye</a>
 
-			<ul class="header-tabs uk-navbar-nav uk-hidden-small" data-uk-switcher="{connect:'#tabs'}">
-				<li id="dashboard-header-tab" class="header-tab" rel="dashboard"><a href="#">Dashboard</a></li>
-				<li id="compare-header-tab" class="header-tab" rel="compare"><a href="#">Time over time comparison</a></li>
-				<li id="timeseries-header-tab" class="header-tab" rel="timeseries"><a href="#">Timeseries</a></li>
-				<li id="anomalies-header-tab" class="header-tab" rel="anomalies"><a href="#">Anomalies</a></li>
-				<li id="anomalies-header-tab" class="header-tab" rel="self-service"><a href="#">Self Service</a></li>
-			</ul>
+      <ul class="header-tabs uk-navbar-nav uk-hidden-small" data-uk-switcher="{connect:'#tabs'}">
+        <li id="dashboard-header-tab" class="header-tab" rel="dashboard"><a href="#">Dashboard</a>
+        </li>
+        <li id="compare-header-tab" class="header-tab" rel="compare"><a href="#">Time over time
+          comparison</a></li>
+        <li id="timeseries-header-tab" class="header-tab" rel="timeseries"><a
+            href="#">Timeseries</a></li>
+        <li id="anomalies-header-tab" class="header-tab" rel="anomalies"><a href="#">Anomalies</a>
+        </li>
+        <li id="anomalies-header-tab" class="header-tab" rel="self-service"><a href="#">Self
+          Service</a></li>
+        <li id="anomalies-header-tab2" class="header-tab" rel="anomalies2" class="uk-hidden">
+          <!--<a href="#">Anomalies2</a>--></li>
+      </ul>
 
 
-            <a id="header-help" class="data-uk-tooltip uk-float-right" title="How to use ThirdEye?" href="https://docs.google.com/document/d/1w4I2fR78pV1fZUqhTm0yILGrQJvXmNZZhBkdU25IWRI/" target="_blank">
-                <i class=" uk-icon-question-circle uk-icon-medium"></i>
-            </a>
-		</div>
-	</nav>
+      <a id="header-help" class="data-uk-tooltip uk-float-right" title="How to use ThirdEye?"
+         href="https://docs.google.com/document/d/1w4I2fR78pV1fZUqhTm0yILGrQJvXmNZZhBkdU25IWRI/"
+         target="_blank">
+        <i class=" uk-icon-question-circle uk-icon-medium"></i>
+      </a>
+    </div>
+  </nav>
 
-	<ul id="tabs" class="uk-switcher">
-		<li id="dashboard"></li>
-		<li id="compare"></li>
-		<li id="timeseries"></li>
-		<li id="anomalies"></li>
-		<li id="self-service"></li>
-	</ul>
+  <ul id="tabs" class="uk-switcher">
+    <li id="dashboard"></li>
+    <li id="compare"></li>
+    <li id="timeseries"></li>
+    <li id="anomalies"></li>
+    <li id="self-service"></li>
+    <li id="anomalies2"></li>
+  </ul>
 </div>
 
-    <#include "tabs/tab.ftl">
-    <#include "tabs/common/form.ftl">
-    <#include "tabs/common/dataset-list.ftl">
-    <#include "tabs/common/metric-list.ftl">
-    <#include "tabs/common/filter-value.ftl">
-    <#include "tabs/compare-tab/metric-timeseries.ftl">
-    <#include "tabs/compare-tab/tabular.ftl">
-    <#include "tabs/compare-tab/heat-map.ftl">
-    <#include "tabs/compare-tab/contributors.ftl">
-    <#include "tabs/timeseries-tab/timeseries.ftl">
-    <#include "tabs/anomalies-tab/anomalies.ftl">
-    <#include "tabs/self-service-tab/self-service.ftl">
-    <#include "tabs/self-service-tab/anomaly-function-form.ftl">
-    <#include "tabs/self-service-tab/self-service-existing-functions.ftl">
+<#include "tabs/tab.ftl">
+<#include "tabs/common/form.ftl">
+<#include "tabs/common/dataset-list.ftl">
+<#include "tabs/common/metric-list.ftl">
+<#include "tabs/common/filter-value.ftl">
+<#include "tabs/compare-tab/metric-timeseries.ftl">
+<#include "tabs/compare-tab/tabular.ftl">
+<#include "tabs/compare-tab/heat-map.ftl">
+<#include "tabs/compare-tab/contributors.ftl">
+<#include "tabs/timeseries-tab/timeseries.ftl">
+<#include "tabs/anomalies-tab/anomalies.ftl">
+<#include "tabs/anomalies-tab/anomaly-grouping-by-fun.ftl">
+<#include "tabs/anomalies-tab/anomaly-grouping-by-dimensions.ftl">
+<#include "tabs/anomalies-tab/anomaly-grouping-by-collection.ftl">
+<#include "tabs/anomalies-tab/anomaly-grouping-by-metric.ftl">
+<#include "tabs/anomalies-tab/anomaly-summary.ftl">
+<#include "tabs/self-service-tab/self-service.ftl">
+<#include "tabs/self-service-tab/anomaly-function-form.ftl">
+<#include "tabs/self-service-tab/self-service-existing-functions.ftl">
 
 </body>
 
