@@ -11,16 +11,11 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 
-import org.jfree.chart.axis.DateTick;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.type.TypeFactory;
-import com.google.common.collect.Lists;
-import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.pinot.summary.Cube;
 import com.linkedin.thirdeye.client.pinot.summary.Dimensions;
@@ -28,6 +23,7 @@ import com.linkedin.thirdeye.client.pinot.summary.OLAPDataBaseClient;
 import com.linkedin.thirdeye.client.pinot.summary.PinotThirdEyeSummaryClient;
 import com.linkedin.thirdeye.client.pinot.summary.Summary;
 import com.linkedin.thirdeye.client.pinot.summary.SummaryResponse;
+import com.linkedin.thirdeye.dashboard.Utils;
 
 
 @Path(value = "/dashboard")
@@ -63,7 +59,7 @@ public class SummaryResource {
       @QueryParam("summarySize") int summarySize,
       @QueryParam("topDimensions") @DefaultValue(DEFAULT_TOP_DIMENSIONS) int topDimensions,
       @QueryParam("hierarchies") @DefaultValue(DEFAULT_HIERARCHIES) String hierarchiesPayload,
-      @QueryParam("oneSideErrors") @DefaultValue(DEFAULT_ONE_SIDE_ERROR) boolean doOneSideError) throws IOException {
+      @QueryParam("oneSideError") @DefaultValue(DEFAULT_ONE_SIDE_ERROR) boolean doOneSideError) throws IOException {
     if (summarySize < 1) summarySize = 1;
 
     OLAPDataBaseClient olapClient = new PinotThirdEyeSummaryClient(CACHE_REGISTRY_INSTANCE.getQueryCache());
@@ -83,6 +79,7 @@ public class SummaryResource {
 
     Summary summary = new Summary(cube);
     SummaryResponse response = summary.computeSummary(summarySize, doOneSideError, topDimensions);
+    summary.testCorrectnessOfWowValues();
     return OBJECT_MAPPER.writeValueAsString(response);
   }
 
@@ -97,7 +94,7 @@ public class SummaryResource {
       @QueryParam("aggTimeGranularity") String aggTimeGranularity,
       @QueryParam("dimensions") String groupByDimensions,
       @QueryParam("summarySize") int summarySize,
-      @QueryParam("oneSideErrors") @DefaultValue(DEFAULT_ONE_SIDE_ERROR) boolean doOneSideError) throws IOException {
+      @QueryParam("oneSideError") @DefaultValue(DEFAULT_ONE_SIDE_ERROR) boolean doOneSideError) throws IOException {
     if (summarySize < 1) summarySize = 1;
 
     OLAPDataBaseClient olapClient = new PinotThirdEyeSummaryClient(CACHE_REGISTRY_INSTANCE.getQueryCache());
@@ -114,6 +111,7 @@ public class SummaryResource {
 
     Summary summary = new Summary(cube);
     SummaryResponse response = summary.computeSummary(summarySize, doOneSideError);
+    summary.testCorrectnessOfWowValues();
     return OBJECT_MAPPER.writeValueAsString(response);
   }
 }

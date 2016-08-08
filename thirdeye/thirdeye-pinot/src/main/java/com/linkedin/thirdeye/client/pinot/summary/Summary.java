@@ -64,7 +64,14 @@ public class Summary {
     List<HierarchyNode> answer = new ArrayList<>(dpArrays.get(0).getAnswer());
     SummaryResponse response = SummaryResponse.buildResponse(answer, levelCount);
 
-    // Check correctness of the sum of values (The check changes the answer values.)
+    return response;
+  }
+
+  /**
+   * Check correctness of the sum of wow values. The check changes the wow values, so it should only be invoked after
+   * SummaryResponse is generated.
+   */
+  public void testCorrectnessOfWowValues() {
     List<HierarchyNode> nodeList = new ArrayList<>(dpArrays.get(0).getAnswer());
     nodeList.sort(NODE_COMPARATOR); // Process lower level nodes first
     for (HierarchyNode node : nodeList) {
@@ -79,12 +86,11 @@ public class Summary {
     }
     for (HierarchyNode node : nodeList) {
       if (node.baselineValue != node.data.baselineValue || node.currentValue != node.data.currentValue) {
-        System.err.print("Wrong Wow values: " + node.data.baselineValue + "," + node.data.currentValue + " ");
-        System.err.println(node);
+        System.err.println("Wrong Wow values at node: " + node.data.dimensionValues + ". Expected: "
+            + node.data.baselineValue + "," + node.data.currentValue + ", actual: " + node.baselineValue + ","
+            + node.currentValue);
       }
     }
-
-    return response;
   }
 
   static class NodeDimensionValuesComparator implements Comparator<HierarchyNode> {
@@ -118,39 +124,26 @@ public class Summary {
       }
     } else {
       List<HierarchyNode> removedNodes = new ArrayList<>();
-      for (HierarchyNode child : node.children) {
-        computeChildDPArray(child);
-        removedNodes.addAll(mergeDPArray(node, dpArray, dpArrays.get(node.level + 1)));
-        updateWowValues(node, dpArray.getAnswer());
-        dpArray.targetRatio = node.targetRatio(); // get updated ratio
-      }
-      // Keeps aggregating current node's answer if it is thinned out due to the user's answer size is too huge.
-      // If the current node is kept being thinned out, it eventually aggregates all its children.
-      while ( nodeIsThinnedOut(node) && dpArray.getAnswer().size() < dpArray.maxSize()) {
-        removedNodes.sort(NODE_COMPARATOR.reversed());
-        for (HierarchyNode removedNode : removedNodes) {
-          HierarchyNode parents = removedNode;
-          while ((parents = parents.parent) != node) {
-            if (dpArray.getAnswer().contains(parents) || removedNodes.contains(parents)) {
-              parents.baselineValue -= removedNode.baselineValue;
-              parents.currentValue -= removedNode.currentValue;
-              break;
-            }
-          }
-        }
-        node.baselineValue = node.data.baselineValue;
-        node.currentValue = node.data.currentValue;
-        dpArray.setShrinkSize(Math.max(1, (dpArray.getAnswer().size()*2)/3));
-        dpArray.reset();
-        dpArray.targetRatio = node.targetRatio();
-        removedNodes.clear();
+      boolean doRollback = false;
+      do {
+        doRollback = false;
         for (HierarchyNode child : node.children) {
           computeChildDPArray(child);
           removedNodes.addAll(mergeDPArray(node, dpArray, dpArrays.get(node.level + 1)));
           updateWowValues(node, dpArray.getAnswer());
           dpArray.targetRatio = node.targetRatio(); // get updated ratio
         }
-      }
+        // Aggregate current node's answer if it is thinned out due to the user's answer size is too huge.
+        // If the current node is kept being thinned out, it eventually aggregates all its children.
+        if ( nodeIsThinnedOut(node) && dpArray.getAnswer().size() < dpArray.maxSize()) {
+          doRollback = true;
+          rollbackInsertions(node, dpArray.getAnswer(), removedNodes);
+          removedNodes.clear();
+          dpArray.setShrinkSize(Math.max(1, (dpArray.getAnswer().size()*2)/3));
+          dpArray.reset();
+          dpArray.targetRatio = node.targetRatio();
+        }
+      } while (doRollback);
     }
 
     // Calculate the cost if the node (aggregated row) is put in the answer.
@@ -159,7 +152,7 @@ public class Summary {
     if (node.level != 0) {
       updateWowValues(parent, dpArray.getAnswer());
       double targetRatio = parent.targetRatio();
-      updateCost4NewRatio(dpArray, targetRatio);
+      aggregateSmallNodes(node, dpArray, targetRatio);
       dpArray.targetRatio = targetRatio;
       if ( !nodeIsThinnedOut(node) ) {
         Set<HierarchyNode> removedNode = new HashSet<>(dpArray.getAnswer());
@@ -181,6 +174,22 @@ public class Summary {
     return Double.compare(0., node.baselineValue) == 0 && Double.compare(0., node.currentValue) == 0;
   }
 
+  private static void rollbackInsertions(HierarchyNode node, Set<HierarchyNode> answer, List<HierarchyNode> removedNodes) {
+    removedNodes.sort(NODE_COMPARATOR.reversed());
+    for (HierarchyNode removedNode : removedNodes) {
+      HierarchyNode parents = removedNode;
+      while ((parents = parents.parent) != node) {
+        if (answer.contains(parents) || removedNodes.contains(parents)) {
+          parents.baselineValue -= removedNode.baselineValue;
+          parents.currentValue -= removedNode.currentValue;
+          break;
+        }
+      }
+    }
+    node.baselineValue = node.data.baselineValue;
+    node.currentValue = node.data.currentValue;
+  }
+
   /**
    * Merge the answers of the two given DPArrays. The merged answer is put in the DPArray at the left hand side.
    * After merging, the baseline and current values of the removed nodes (rows) will be add back to those of their
@@ -191,7 +200,7 @@ public class Summary {
     removedNodes.addAll(childArray.getAnswer());
     // Compute the merged answer
     double targetRatio = (parentArray.targetRatio + childArray.targetRatio) / 2.;
-    updateCost4NewRatio(parentArray, targetRatio);
+    aggregateSmallNodes(parentNode, parentArray, targetRatio);
     List<HierarchyNode> childNodeList = new ArrayList<>(childArray.getAnswer());
     childNodeList.sort(NODE_COMPARATOR);
     for (HierarchyNode childNode : childNodeList) {
@@ -242,12 +251,21 @@ public class Summary {
   /**
    * Recompute costs of the nodes in a DPArray using targetRatio for calculating the cost.
    */
-  private void updateCost4NewRatio(DPArray dp, double targetRatio) {
+  private void aggregateSmallNodes(HierarchyNode parentNode, DPArray dp, double targetRatio) {
+    Set<HierarchyNode> removedNodes = new HashSet<>(dp.getAnswer());
     List<HierarchyNode> ans = new ArrayList<>(dp.getAnswer());
     ans.sort(NODE_COMPARATOR);
     dp.reset();
     for (HierarchyNode node : ans) {
-      insertRowWithAdaptiveRatioNoRemoval(dp, node, targetRatio);
+      insertRowWithAdaptiveRatioNoOneSideError(dp, node, targetRatio);
+    }
+    removedNodes.removeAll(dp.getAnswer());
+    if (removedNodes.size() != 0) {
+      // Temporarily add parentNode to the answer so the values of the removed small node can successfully add back to
+      // parentNode by re-using the method updateWowValuesDueToRemoval.
+      dp.getAnswer().add(parentNode);
+      updateWowValuesDueToRemoval(parentNode.parent, dp.getAnswer(), removedNodes);
+      dp.getAnswer().remove(parentNode);
     }
   }
 
@@ -255,7 +273,7 @@ public class Summary {
    * If the node's parent is also in the DPArray, then it's parent's current ratio is used as the target ratio for
    * calculating the cost of the node; otherwise, targetRatio is used.
    */
-  private void insertRowWithAdaptiveRatioNoRemoval(DPArray dp, HierarchyNode node, double targetRatio) {
+  private void insertRowWithAdaptiveRatioNoOneSideError(DPArray dp, HierarchyNode node, double targetRatio) {
     if (dp.getAnswer().contains(node.parent)) {
       // For one side error if node's parent is included in the solution, then its cost will be calculated normally.
       basicRowInserter.insertRowToDPArray(dp, node, node.parent.targetRatio());
@@ -359,5 +377,6 @@ public class Summary {
     } catch (JsonProcessingException e) {
       e.printStackTrace();
     }
+    summary.testCorrectnessOfWowValues();
   }
 }

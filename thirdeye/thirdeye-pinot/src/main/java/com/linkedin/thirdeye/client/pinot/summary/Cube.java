@@ -14,7 +14,6 @@ import java.util.Set;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import org.apache.commons.lang3.tuple.MutablePair;
-import org.apache.commons.lang3.tuple.Pair;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -94,8 +93,9 @@ public class Cube { // the cube (Ca|Cb)
     //                       / \   \
     //     Level 2          d   e   f
     // The Comparator for generating the order is implemented in the class DimensionValues.
+    List<List<Row>> rowOfLevels = olapClient.getAggregatedValuesOfLevels(dimensions);
     for (int i = 0; i <= dimensions.size(); ++i) {
-      List<Row> rowAtLevelI = olapClient.getAggregatedValuesAtLevel(dimensions, i);
+      List<Row> rowAtLevelI = rowOfLevels.get(i);
       rowAtLevelI.sort(new RowDimensionValuesComparator());
       hierarchicalRows.add(rowAtLevelI);
     }
@@ -107,9 +107,9 @@ public class Cube { // the cube (Ca|Cb)
    * Calculate the change ratio of the top aggregated values.
    */
   private void initializeBasicInfo(OLAPDataBaseClient olapClient) {
-    Pair<Double, Double> topAggValues = olapClient.getTopAggregatedValues();
-    topBaselineValue = topAggValues.getLeft(); // aggregated baseline values
-    topCurrentValue = topAggValues.getRight(); // aggregated current values
+    Row topAggValues = olapClient.getTopAggregatedValues();
+    topBaselineValue = topAggValues.baselineValue; // aggregated baseline values
+    topCurrentValue = topAggValues.currentValue; // aggregated current values
     topRatio = topCurrentValue / topBaselineValue; // change ratio
   }
 
@@ -199,14 +199,15 @@ public class Cube { // the cube (Ca|Cb)
       }
     }
 
+    List<List<Row>> wowValuesOfDimensions = olapClient.getAggregatedValuesOfDimension(dimensions);
     // Calculate cost for each dimension. The costs of the dimensions of the same hierarchical group will be sum up.
     for (int i = 0; i < dimensions.size(); ++i) {
       String dimension = dimensions.get(i);
       double cost = .0;
-      List<Pair<Double, Double>> wowValuesInOneDimension = olapClient.getAggregatedValuesInOneDimension(dimension);
-      for (int j = 0; j < wowValuesInOneDimension.size(); ++j) {
-        Pair<Double, Double> wowValues = wowValuesInOneDimension.get(j);
-        cost += CostFunction.err4EmptyValues(wowValues.getLeft(), wowValues.getRight(), topRatio);
+      List<Row> wowValuesOfOneDimension = wowValuesOfDimensions.get(i);
+      for (int j = 0; j < wowValuesOfOneDimension.size(); ++j) {
+        Row wowValues = wowValuesOfOneDimension.get(j);
+        cost += CostFunction.err4EmptyValues(wowValues.baselineValue, wowValues.currentValue, topRatio);
       }
 
       if (groupMap.containsKey(dimension)) {
