@@ -1,6 +1,6 @@
 package com.linkedin.thirdeye.anomaly.merge;
 
-import com.linkedin.thirdeye.api.dto.MergedAnomalyResult;
+import com.linkedin.thirdeye.db.entity.MergedAnomalyResult;
 import com.linkedin.thirdeye.db.entity.AnomalyResult;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -63,7 +63,6 @@ public abstract class AnomalySummaryGenerator {
       if (mergedAnomaly == null) {
         mergedAnomaly = new MergedAnomalyResult();
         populateMergedResult(mergedAnomaly, currentResult);
-        mergedAnomaly.setMergeStrategy(mergeConfig.getMergeStrategy());
       } else {
         // compare current with merged and decide whether to merge the current result or create a new one
         if (applySequentialGapBasedSplit
@@ -77,7 +76,6 @@ public abstract class AnomalySummaryGenerator {
           //set current raw result
           mergedAnomaly = new MergedAnomalyResult();
           populateMergedResult(mergedAnomaly, currentResult);
-          mergedAnomaly.setMergeStrategy(mergeConfig.getMergeStrategy());
         } else {
           // add the current raw result into mergedResult
           if (currentResult.getStartTimeUtc() < mergedAnomaly.getStartTime()) {
@@ -98,8 +96,8 @@ public abstract class AnomalySummaryGenerator {
           && mergedAnomaly.getEndTime() - mergedAnomaly.getStartTime() >= mergeConfig
           .getMergeDuration()) {
         // check if next anomaly has same start time as current one, that should be merged with current one too
-        if (i < (anomalies.size() - 1) && anomalies.get(i + 1).getStartTimeUtc() < currentResult
-            .getEndTimeUtc()) {
+        if (i < (anomalies.size() - 1) && anomalies.get(i + 1).getStartTimeUtc().equals(currentResult
+            .getStartTimeUtc())) {
           // no need to split as we want to include the next raw anomaly into the current one
         } else {
           // Split here
@@ -171,7 +169,6 @@ public abstract class AnomalySummaryGenerator {
 
   private static void populateMergedResult(MergedAnomalyResult mergedAnomaly,
       AnomalyResult currentResult) {
-    mergedAnomaly.setFunction(currentResult.getFunction());
     if (!mergedAnomaly.getAnomalyResults().contains(currentResult)) {
       mergedAnomaly.getAnomalyResults().add(currentResult);
     }

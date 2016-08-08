@@ -4,6 +4,7 @@ import com.linkedin.thirdeye.api.dto.GroupByKey;
 import com.linkedin.thirdeye.api.dto.GroupByRow;
 import com.linkedin.thirdeye.db.entity.AnomalyResult;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import javax.persistence.TypedQuery;
 import org.joda.time.DateTime;
@@ -49,6 +50,15 @@ public class AnomalyResultDAO extends AbstractJpaDAO<AnomalyResult> {
           + "WHERE d.id = :emailId AND ((r.startTimeUtc >= :startTimeUtc AND r.startTimeUtc <= :endTimeUtc) "
           + "OR (r.endTimeUtc >= :startTimeUtc AND r.endTimeUtc <= :endTimeUtc)) "
           + "AND r.dataMissing=:dataMissing";
+
+  private static final String COUNT_GROUP_BY_COLLECTION_METRIC_DIMENSION =
+      "select count(r.id) as num, r.function.collection, "
+          + "r.function.metric, r.dimensions from AnomalyResult r "
+          + "where r.function.isActive=true "
+          + "and ((r.startTimeUtc >= :startTimeUtc and r.startTimeUtc <= :endTimeUtc) "
+          + "or (r.endTimeUtc >= :startTimeUtc and r.endTimeUtc <= :endTimeUtc)) "
+          + "group by r.function.collection, r.function.metric, r.dimensions "
+          + "order by r.function.collection, num desc";
 
   private static final String COUNT_GROUP_BY_FUNCTION = "select count(r.id) as num, r.function.id,"
       + "r.function.functionName, r.function.collection, r.function.metric from AnomalyResult r "
@@ -97,11 +107,12 @@ public class AnomalyResultDAO extends AbstractJpaDAO<AnomalyResult> {
 
   public List<AnomalyResult> findAllByCollectionTimeMetricAndDimensions(String collection,
       String metric, DateTime startTime, DateTime endTime, String[] dimensions) {
+    List<String> dimList = Arrays.asList(dimensions);
     return getEntityManager().createQuery(FIND_BY_COLLECTION_TIME_METRIC_DIMENSION, entityClass)
         .setParameter("collection", collection)
         .setParameter("startTimeUtc", startTime.toDateTime(DateTimeZone.UTC).getMillis())
         .setParameter("endTimeUtc", endTime.toDateTime(DateTimeZone.UTC).getMillis())
-        .setParameter("metric", metric).setParameter("dimensions", dimensions).getResultList();
+        .setParameter("metric", metric).setParameter("dimensions", dimList).getResultList();
   }
 
   public List<AnomalyResult> findAllByTimeAndFunctionId(long startTime, long endTime,
@@ -135,6 +146,26 @@ public class AnomalyResultDAO extends AbstractJpaDAO<AnomalyResult> {
         .setParameter("startTimeUtc", startTime.toDateTime(DateTimeZone.UTC).getMillis())
         .setParameter("endTimeUtc", endTime.toDateTime(DateTimeZone.UTC).getMillis())
         .setParameter("emailId", emailId).setParameter("dataMissing", false).getResultList();
+  }
+
+  public List<GroupByRow<GroupByKey, Long>> getCountByCollectionMetricDimension(long startTime, long endTime) {
+    List<GroupByRow<GroupByKey, Long>> groupByRecords = new ArrayList<>();
+    TypedQuery<Object[]> q = getEntityManager().createQuery(
+        COUNT_GROUP_BY_COLLECTION_METRIC_DIMENSION, Object[].class)
+        .setParameter("startTimeUtc", startTime).setParameter("endTimeUtc", endTime);
+    List<Object[]> results = q.getResultList();
+    for (int i = 0; i < results.size(); i++) {
+      Long count = (Long) results.get(i)[0];
+      GroupByKey groupByKey = new GroupByKey();
+      groupByKey.setDataset((String) results.get(i)[1]);
+      groupByKey.setMetric((String) results.get(i)[2]);
+      groupByKey.setDimensions((String) results.get(i)[3]);
+      GroupByRow<GroupByKey, Long> row = new GroupByRow<>();
+      row.setGroupBy(groupByKey);
+      row.setValue(count);
+      groupByRecords.add(row);
+    }
+    return groupByRecords;
   }
 
   public List<GroupByRow<GroupByKey, Long>> getCountByFunction(long startTime, long endTime) {

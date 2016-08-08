@@ -1,5 +1,8 @@
 package com.linkedin.thirdeye.anomaly.merge;
 
 public enum AnomalyMergeStrategy {
-  FUNCTION, COLLECTION_METRIC, COLLECTION
+  COLLECTION_METRIC_DIMENSIONS,
+  FUNCTION,
+  COLLECTION_METRIC,
+  COLLECTION
 }

@@ -4,7 +4,7 @@ import com.linkedin.thirdeye.anomaly.merge.AnomalyMergeConfig;
 import com.linkedin.thirdeye.anomaly.merge.AnomalySummaryGenerator;
 import com.linkedin.thirdeye.api.dto.GroupByKey;
 import com.linkedin.thirdeye.api.dto.GroupByRow;
-import com.linkedin.thirdeye.api.dto.MergedAnomalyResult;
+import com.linkedin.thirdeye.db.entity.MergedAnomalyResult;
 import com.linkedin.thirdeye.db.dao.AnomalyResultDAO;
 import com.linkedin.thirdeye.db.entity.AnomalyResult;
 import java.util.List;
@@ -55,7 +55,7 @@ public class AnomalySummaryResource {
   @Path("summary/{collection}")
   public List<MergedAnomalyResult> getAnomalySummaryForCollectionMeric(
       @PathParam("collection") String collection, @QueryParam("metric") String metric,
-      AnomalyMergeConfig mergeConfig) {
+      @QueryParam("dimensions") String dimensions, AnomalyMergeConfig mergeConfig) {
     if (StringUtils.isEmpty(collection)) {
       throw new IllegalArgumentException("Collection can't be empty");
     }
@@ -66,7 +66,11 @@ public class AnomalySummaryResource {
     DateTime endTimeUtc = new DateTime(mergeConfig.getEndTime());
 
     List<AnomalyResult> anomalies;
-    if (!StringUtils.isEmpty(metric)) {
+    if (!StringUtils.isEmpty(metric) && !StringUtils.isEmpty(dimensions)) {
+      anomalies = resultDAO
+          .findAllByCollectionTimeMetricAndDimensions(collection, metric, startTimeUtc, endTimeUtc,
+              new String[] { dimensions });
+    } else if (!StringUtils.isEmpty(metric)) {
       anomalies =
           resultDAO.findAllByCollectionTimeAndMetric(collection, metric, startTimeUtc, endTimeUtc);
     } else {
@@ -83,6 +87,8 @@ public class AnomalySummaryResource {
       mergeConfig = new AnomalyMergeConfig();
     }
     switch (mergeConfig.getMergeStrategy()) {
+    case COLLECTION_METRIC_DIMENSIONS:
+      return resultDAO.getCountByCollectionMetricDimension(mergeConfig.getStartTime(), mergeConfig.getEndTime());
     case FUNCTION:
       return resultDAO.getCountByFunction(mergeConfig.getStartTime(), mergeConfig.getEndTime());
     case COLLECTION_METRIC:
@@ -90,8 +96,7 @@ public class AnomalySummaryResource {
     case COLLECTION:
       return resultDAO.getCountByCollection(mergeConfig.getStartTime(), mergeConfig.getEndTime());
     default:
-      throw new IllegalArgumentException(
-          "Unknown merge strategy : " + mergeConfig.getMergeStrategy());
+      throw new IllegalArgumentException("Unknown merge strategy : " + mergeConfig.getMergeStrategy());
     }
   }
 }
