@@ -98,8 +98,8 @@ public abstract class AnomalySummaryGenerator {
           && mergedAnomaly.getEndTime() - mergedAnomaly.getStartTime() >= mergeConfig
           .getMergeDuration()) {
         // check if next anomaly has same start time as current one, that should be merged with current one too
-        if (i < (anomalies.size() - 1) && anomalies.get(i + 1).getStartTimeUtc() < currentResult
-            .getEndTimeUtc()) {
+        if (i < (anomalies.size() - 1) && anomalies.get(i + 1).getStartTimeUtc().equals(currentResult
+            .getStartTimeUtc())) {
           // no need to split as we want to include the next raw anomaly into the current one
         } else {
           // Split here

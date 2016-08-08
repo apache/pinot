@@ -6,11 +6,14 @@ databaseConfiguration:
     hibernate.dialect: org.hibernate.dialect.HSQLDialect
     hibernate.show_sql: true
     hibernate.hbm2ddl.auto: update
+    hibernate.max_fetch_depth: 3
     hibernate.archive.autodetection: class, hbm
     hibernate.connection.driver_class: org.hsqldb.jdbcDriver
     hibernate.connection.provider_class: org.hibernate.c3p0.internal.C3P0ConnectionProvider
-    hibernate.c3p0.min_size: 1
-    hibernate.c3p0.max_size: 10
-    hibernate.c3p0.timeout: 100
-    hibernate.c3p0.max_statements: 20
-    hibernate.c3p0.idle_test_period: 100
+    hibernate.c3p0.min_size: 5
+    hibernate.c3p0.max_size: 60
+    hibernate.c3p0.max_statements: 60
+    hibernate.c3p0.timeout: 25000
+    hibernate.c3p0.idle_test_period: 12000
+    hibernate.c3p0.preferredTestQuery: SELECT 1;
+    hibernate.c3p0.validate: true

@@ -162,59 +162,59 @@ $(document).ready( function() {
     getDataSetList();
 
     //Add onhashchange event listener to window object to enable back button usage on the browser
-    window.onhashchange = locationHashChanged;
-    function locationHashChanged() {
+    window.onhashchange = routeToTab();
 
-        hash = parseHashParameters(window.location.hash);
+})
 
-        //'rand' parameter's role is to trigger hash change in case of page reload
-        delete hash.rand
+function routeToTab() {
 
-        updateDashboardFormFromHash();
+    hash = parseHashParameters(window.location.hash);
 
+    //'rand' parameter's role is to trigger hash change in case of page reload
+    delete hash.rand
 
-        //close all uikit dropdown
-        closeAllUIKItDropdowns()
+    updateDashboardFormFromHash();
 
-        //If hash has dataset and (dashboard or (view & metric )trigger form submit
-        if( hash.hasOwnProperty("dataset")){
+    //close all uikit dropdown
+    closeAllUIKItDropdowns()
 
-            if( hash.hasOwnProperty("dashboard") || hash.hasOwnProperty("metrics") ){
+    //If hash has dataset and (dashboard or (view & metric )trigger form submit
+    if (hash.hasOwnProperty("dataset")) {
 
-                switch (hash.view) {
-                    case "timeseries":
-                        var tab = "timeseries";
-                        getTimeSeries(tab);
-                        break;
-                    case "compare":
+        if (hash.hasOwnProperty("dashboard") || hash.hasOwnProperty("metrics")) {
 
-                        var tab = "compare";
-                        if (hash.aggTimeGranularity.toLowerCase() == "aggregateall") {
+            switch (hash.view) {
+                case "timeseries":
+                    var tab = "timeseries";
+                    getTimeSeries(tab);
+                    break;
+                case "compare":
 
-                            getHeatmap(tab);
-                            //else aggTimeGranularity == HOURS or DAY
-                        } else if (hash.hasOwnProperty("metrics")) {
+                    var tab = "compare";
+                    if (hash.aggTimeGranularity.toLowerCase() == "aggregateall") {
 
-                            if (hash.hasOwnProperty("dimensions")) {
-                                getContributors(tab);
-                            } else {
-                                getTabular(tab);
-                            }
+                        getHeatmap(tab);
+                        //else aggTimeGranularity == HOURS or DAY
+                    } else if (hash.hasOwnProperty("metrics")) {
+
+                        if (hash.hasOwnProperty("dimensions")) {
+                            getContributors(tab);
+                        } else {
+                            getTabular(tab);
                         }
+                    }
                     break;
-                    case "anomalies":
+                case "anomalies":
 
-                        var tab = "anomalies";
-                      getAnomalies(tab);
+                    var tab = "anomalies";
+                    getAnomalies(tab);
                     break;
-                    default://dashboard tab
+                default://dashboard tab
 
-                        var tab = "dashboard"
-                        getCustomDashboard(tab);
+                    var tab = "dashboard"
+                    getCustomDashboard(tab);
                     break;
-                }
-
             }
         }
     }
-})
+}
