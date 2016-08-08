@@ -15,7 +15,6 @@ import com.linkedin.thirdeye.dashboard.ThirdEyeDashboardConfiguration;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -25,10 +24,8 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.lang3.tuple.ImmutablePair;
-import org.apache.commons.lang3.tuple.MutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.joda.time.DateTime;
-import org.joda.time.DateTimeZone;
 
 
 /**
@@ -39,7 +36,8 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
   private final static TimeGranularity NULL_TIME_GRANULARITY = new TimeGranularity(0, TimeUnit.HOURS);
 
   QueryCache queryCache;
-  ThirdEyeRequest.ThirdEyeRequestBuilder builder = new ThirdEyeRequest.ThirdEyeRequestBuilder();
+  String collection;
+  List<MetricFunction> metricFunctions = new ArrayList<>();
   TimeGranularity timeGranularity = NULL_TIME_GRANULARITY;
   DateTime baselineStartInclusive = NULL_DATETIME;
   DateTime baselineEndExclusive = NULL_DATETIME;
@@ -48,7 +46,6 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
 
   public PinotThirdEyeSummaryClient(QueryCache queryCache) {
     this.queryCache = queryCache;
-    builder.setGroupByTimeGranularity(this.timeGranularity);
   }
 
   public PinotThirdEyeSummaryClient(ThirdEyeClient thirdEyeClient) {
@@ -57,14 +54,13 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
 
   @Override
   public void setCollection(String collection) {
-    builder.setCollection(collection);
+    this.collection = collection;
   }
 
   @Override
   public void setGroupByTimeGranularity(TimeGranularity timeGranularity) {
     if (!this.timeGranularity.equals(timeGranularity)) {
       this.timeGranularity = timeGranularity;
-      builder.setGroupByTimeGranularity(timeGranularity);
       updateBaselineEndExclusive();
       updateCurrentEndExclusive();
     }
@@ -96,85 +92,71 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
 
   @Override
   public void setMetricName(String metricName) {
-    builder.setMetricFunctions(Lists.newArrayList(new MetricFunction(MetricAggFunction.SUM, metricName)));
+    metricFunctions.clear();
+    metricFunctions.add(new MetricFunction(MetricAggFunction.SUM, metricName));
   }
 
   @Override
-  public Pair<Double, Double> getTopAggregatedValues() {
-    Pair<ThirdEyeResponse, ThirdEyeResponse> responses;
-    try {
-      responses = getTimeOnTimeResponse(Collections.<String>emptyList());
-    } catch (Exception e) {
-      e.printStackTrace();
-      return Pair.of(.0, .0);
-    }
+  public Row getTopAggregatedValues() {
+    List<ThirdEyeRequest> bulkRequests = new ArrayList<>();
+    List<String> groupBy = Collections.emptyList();
+    Pair<ThirdEyeRequest, ThirdEyeRequest> timeOnTimeRequests = constructTimeOnTimeRequest(groupBy);
+    bulkRequests.add(timeOnTimeRequests.getLeft());
+    bulkRequests.add(timeOnTimeRequests.getRight());
 
-    return new ImmutablePair<Double, Double>(responses.getLeft().getRow(0).getMetrics().get(0), responses.getRight()
-        .getRow(0).getMetrics().get(0));
+    return constructMultiLevelAggregatedValues(null, bulkRequests).get(0).get(0);
   }
 
   @Override
-  public List<Pair<Double, Double>> getAggregatedValuesInOneDimension(String dimensionName) {
-    Pair<ThirdEyeResponse, ThirdEyeResponse> responses;
-    try {
-      responses = getTimeOnTimeResponse(Arrays.asList(dimensionName));
-    } catch (Exception e) {
-      e.printStackTrace();
-      return Collections.<Pair<Double, Double>>emptyList();
+  public List<List<Row>> getAggregatedValuesOfDimension(Dimensions dimensions) {
+    List<ThirdEyeRequest> bulkRequests = new ArrayList<>();
+    for (int level = 0; level < dimensions.size(); ++level) {
+      List<String> groupBy = Lists.newArrayList(dimensions.get(level));
+      Pair<ThirdEyeRequest, ThirdEyeRequest> timeOnTimeRequests = constructTimeOnTimeRequest(groupBy);
+      bulkRequests.add(timeOnTimeRequests.getLeft());
+      bulkRequests.add(timeOnTimeRequests.getRight());
     }
 
-    List<Pair<Double, Double>> tab = new ArrayList<>();
-    Map<String, Integer> tabTable = new HashMap<>();
-    {
-      ThirdEyeResponse responseTa = responses.getLeft();
-
-      for (int j = 0; j < responseTa.getNumRows(); ++j) {
-        String dimensionValue = responseTa.getRow(j).getDimensions().get(0);
-        double value = responseTa.getRow(j).getMetrics().get(0);
-        if (Double.compare(.0, value) < 0) {
-          tabTable.put(dimensionValue, tab.size());
-          tab.add(new MutablePair<Double, Double>(value, .0));
-        }
-      }
-    }
-
-    {
-      ThirdEyeResponse responseTb = responses.getRight();
-
-      for (int j = 0; j < responseTb.getNumRows(); ++j) {
-        String dimensionValue = responseTb.getRow(j).getDimensions().get(0);
-        double value = responseTb.getRow(j).getMetrics().get(0);
-        if (Double.compare(.0, value) < 0) {
-          if (tabTable.containsKey(dimensionValue)) {
-            ((MutablePair<Double, Double>) tab.get(tabTable.get(dimensionValue))).setRight(value);
-          } else {
-            tab.add(new MutablePair<Double, Double>(.0, value));
-          }
-        }
-      }
-    }
-
-    return tab;
+    return constructMultiLevelAggregatedValues(dimensions, bulkRequests);
   }
 
-  // TODO: (Performance) Multi-threaded this method
-  // TODO: (Design) Merge with getAggregatedValuesInOneDimension() and move to a dedicated parser class
-  public List<Row> getAggregatedValuesAtLevel(Dimensions dimensions, int level) {
-    Pair<ThirdEyeResponse, ThirdEyeResponse> responses;
-    try {
-      List<String> groupBy = dimensions.groupByStringsAtLevel(level);
-      responses = getTimeOnTimeResponse(groupBy);
-    } catch (Exception e) {
-      e.printStackTrace();
-      return Collections.<Row>emptyList();
+  @Override
+  public List<List<Row>> getAggregatedValuesOfLevels(Dimensions dimensions) {
+    List<ThirdEyeRequest> bulkRequests = new ArrayList<>();
+    for (int level = 0; level < dimensions.size() + 1; ++level) {
+      List<String> groupBy = new ArrayList<>(dimensions.groupByStringsAtLevel(level));
+      Pair<ThirdEyeRequest, ThirdEyeRequest> timeOnTimeRequests = constructTimeOnTimeRequest(groupBy);
+      bulkRequests.add(timeOnTimeRequests.getLeft());
+      bulkRequests.add(timeOnTimeRequests.getRight());
     }
 
-    List<Row> rows = new ArrayList<>(responses.getLeft().getNumRows());
+    return constructMultiLevelAggregatedValues(dimensions, bulkRequests);
+  }
+
+  private List<List<Row>> constructMultiLevelAggregatedValues(Dimensions dimensions, List<ThirdEyeRequest> bulkRequests) {
+    List<List<Row>> res = new ArrayList<>();
+
+    try {
+      Map<ThirdEyeRequest, Future<ThirdEyeResponse>> queryResponses = queryCache.getQueryResultsAsync(bulkRequests);
+      for (int i = 0; i < bulkRequests.size(); i += 2) {
+        ThirdEyeResponse responseTa = queryResponses.get(bulkRequests.get(i)).get();
+        ThirdEyeResponse responseTb = queryResponses.get(bulkRequests.get(i+1)).get();
+        List<Row> singleLevelRows = constructSingleLevelAggregatedValues(dimensions, responseTa, responseTb);
+        res.add(singleLevelRows);
+      }
+    } catch (Exception e) {
+      e.printStackTrace();
+      res.clear();
+    }
+
+    return res;
+  }
+
+  private List<Row> constructSingleLevelAggregatedValues(Dimensions dimensions, ThirdEyeResponse responseTa, ThirdEyeResponse responseTb) {
+    List<Row> rows = new ArrayList<>();
     // TODO: (Performance) Replace the key: List<String>
     Map<List<String>, Integer> rowTable = new HashMap<>();
     {
-      ThirdEyeResponse responseTa = responses.getLeft();
-
       for (int j = 0; j < responseTa.getNumRows(); ++j) {
         List<String> dimensionValues = responseTa.getRow(j).getDimensions();
         double value = responseTa.getRow(j).getMetrics().get(0);
@@ -190,8 +172,6 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
     }
 
     {
-      ThirdEyeResponse responseTb = responses.getRight();
-
       for (int j = 0; j < responseTb.getNumRows(); ++j) {
         List<String> dimensionValues = responseTb.getRow(j).getDimensions();
         double value = responseTb.getRow(j).getMetrics().get(0);
@@ -212,8 +192,11 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
     return rows;
   }
 
-  // TODO: (Performance) (Safety) Make this function thread-safe
-  private Pair<ThirdEyeResponse, ThirdEyeResponse> getTimeOnTimeResponse(List<String> groupBy) throws Exception {
+  private Pair<ThirdEyeRequest, ThirdEyeRequest> constructTimeOnTimeRequest(List<String> groupBy) {
+    ThirdEyeRequest.ThirdEyeRequestBuilder builder = new ThirdEyeRequest.ThirdEyeRequestBuilder();
+    builder.setCollection(collection);
+    builder.setMetricFunctions(metricFunctions);
+    builder.setGroupByTimeGranularity(timeGranularity);
     builder.setGroupBy(groupBy);
 
     builder.setStartTimeInclusive(baselineStartInclusive);
@@ -224,11 +207,7 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
     builder.setEndTimeExclusive(currentEndExclusive);
     ThirdEyeRequest currentRequest = builder.build("current");
 
-    Map<ThirdEyeRequest, Future<ThirdEyeResponse>> queryResponses =
-        queryCache.getQueryResultsAsync(Lists.newArrayList(baselineRequest, currentRequest));
-
-    return new ImmutablePair<ThirdEyeResponse, ThirdEyeResponse>(queryResponses.get(baselineRequest).get(),
-        queryResponses.get(currentRequest).get());
+    return new ImmutablePair<ThirdEyeRequest, ThirdEyeRequest>(baselineRequest, currentRequest);
   }
 
   @SuppressWarnings("deprecation")
@@ -265,16 +244,14 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
 
     ThirdEyeCacheRegistry.initializeWebappCaches(thirdEyeConfig, pinotThirdEyeClientConfig);
 
-    ThirdEyeClient thirdEyeClient = ThirdEyeCacheRegistry.getInstance().getQueryCache().getClient();
-
-    OLAPDataBaseClient pinotClient = new PinotThirdEyeSummaryClient(thirdEyeClient);
+    OLAPDataBaseClient pinotClient = new PinotThirdEyeSummaryClient(ThirdEyeCacheRegistry.getInstance().getQueryCache());
     pinotClient.setCollection(collection);
     pinotClient.setMetricName(metricName);
     pinotClient.setGroupByTimeGranularity(timeGranularity);
     pinotClient.setBaselineStartInclusive(baselineStart);
     pinotClient.setCurrentStartInclusive(currentStart);
 
-    int maxDimensionSize = 4;
+    int maxDimensionSize = 2;
 
     // Build the cube for computing the summary
     Cube initCube = new Cube();
@@ -301,7 +278,6 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
     }
 
     // closing
-    thirdEyeClient.close();
     System.exit(0);
   }
 }
