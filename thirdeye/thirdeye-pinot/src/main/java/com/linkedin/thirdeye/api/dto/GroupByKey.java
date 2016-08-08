@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.api.dto;
 
 public class GroupByKey {
   Long functionId;
+  String dimensions;
   String functionName;
   String dataset;
   String metric;
@@ -12,6 +13,14 @@ public class GroupByKey {
 
   public void setFunctionId(long functionId) {
     this.functionId = functionId;
+  }
+
+  public String getDimensions() {
+    return dimensions;
+  }
+
+  public void setDimensions(String dimension) {
+    this.dimensions = dimension;
   }
 
   public String getFunctionName() {

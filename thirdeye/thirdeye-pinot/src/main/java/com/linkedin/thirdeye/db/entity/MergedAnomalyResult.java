@@ -1,24 +1,20 @@
-package com.linkedin.thirdeye.api.dto;
+package com.linkedin.thirdeye.db.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.linkedin.thirdeye.anomaly.merge.AnomalyMergeStrategy;
-import com.linkedin.thirdeye.db.entity.AnomalyFeedback;
-import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
-import com.linkedin.thirdeye.db.entity.AnomalyResult;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class MergedAnomalyResult {
+public class MergedAnomalyResult extends AbstractBaseEntity {
 
   private String metric;
+
+  private String dimensions;
 
   private Long startTime;
 
   private Long endTime;
-
-  private String dimensions;
 
   private double score;
 
@@ -31,10 +27,6 @@ public class MergedAnomalyResult {
   private Long creationTime;
 
   private AnomalyFeedback feedback;
-
-  private AnomalyFunctionSpec function;
-
-  private AnomalyMergeStrategy mergeStrategy;
 
   private List<AnomalyResult> anomalyResults = new ArrayList<>();
 
@@ -118,22 +110,6 @@ public class MergedAnomalyResult {
     this.feedback = feedback;
   }
 
-  public AnomalyFunctionSpec getFunction() {
-    return function;
-  }
-
-  public void setFunction(AnomalyFunctionSpec function) {
-    this.function = function;
-  }
-
-  public AnomalyMergeStrategy getMergeStrategy() {
-    return mergeStrategy;
-  }
-
-  public void setMergeStrategy(AnomalyMergeStrategy mergeStrategy) {
-    this.mergeStrategy = mergeStrategy;
-  }
-
   public List<AnomalyResult> getAnomalyResults() {
     return anomalyResults;
   }
@@ -145,8 +121,7 @@ public class MergedAnomalyResult {
   @Override
   public int hashCode() {
     return Objects
-        .hash(startTime, endTime, dimensions, score, weight, properties, function, dimensions,
-            mergeStrategy);
+        .hash(getId(), startTime, endTime, dimensions, score, weight, properties, dimensions);
   }
 
   @Override
@@ -155,10 +130,9 @@ public class MergedAnomalyResult {
         return false;
       }
     MergedAnomalyResult m = (MergedAnomalyResult) o;
-      return Objects.equals(startTime, m.getStartTime())
+      return Objects.equals(getId(), m.getId())
+          && Objects.equals(startTime, m.getStartTime())
           && Objects.equals(endTime, m.getEndTime())
-          && Objects.equals(function, m.getFunction())
-          && Objects.equals(mergeStrategy, m.getMergeStrategy())
           && Objects.equals(dimensions, m.getDimensions());
   }
 }
