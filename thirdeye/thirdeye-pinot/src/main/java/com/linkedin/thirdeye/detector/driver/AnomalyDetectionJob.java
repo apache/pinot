@@ -302,15 +302,17 @@ public class AnomalyDetectionJob implements Job {
       Transaction transaction = session.beginTransaction();
       try {
         // The ones for this function
-        results.addAll(resultDAO.findAllByCollectionTimeAndFunction(collection, windowStart,
-            windowEnd, anomalyFunction.getSpec().getId()));
+        results.addAll(resultDAO
+            .findAllByTimeAndFunctionId(windowStart.getMillis(), windowEnd.getMillis(),
+                anomalyFunction.getSpec().getId()));
 
         // The ones for any related functions
         List<AnomalyFunctionRelation> relations =
             relationDAO.findByParent(anomalyFunction.getSpec().getId());
         for (AnomalyFunctionRelation relation : relations) {
-          results.addAll(resultDAO.findAllByCollectionTimeAndFunction(collection, windowStart,
-              windowEnd, relation.getChildId()));
+          results.addAll(resultDAO
+              .findAllByTimeAndFunctionId(windowStart.getMillis(), windowEnd.getMillis(),
+                  relation.getChildId()));
         }
 
         transaction.commit();

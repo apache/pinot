@@ -44,12 +44,6 @@ public class AnomalyResultDAO extends AbstractJpaDAO<AnomalyResult> {
           + "AND ((r.startTimeUtc >= :startTimeUtc AND r.startTimeUtc <= :endTimeUtc) "
           + "OR (r.endTimeUtc >= :startTimeUtc AND r.endTimeUtc <= :endTimeUtc))";
 
-  private static final String FIND_BY_COLLECTION_TIME_AND_FUNCTION_ID =
-      "SELECT r FROM AnomalyResult r WHERE r.function.collection = :collection "
-          + "AND r.function.id = :functionId "
-          + "AND ((r.startTimeUtc >= :startTimeUtc AND r.startTimeUtc <= :endTimeUtc) "
-          + "OR (r.endTimeUtc >= :startTimeUtc AND r.endTimeUtc <= :endTimeUtc))";
-
   private static final String FIND_VALID_BY_TIME_EMAIL_ID =
       "SELECT r FROM EmailConfiguration d JOIN d.functions f JOIN f.anomalies r "
           + "WHERE d.id = :emailId AND ((r.startTimeUtc >= :startTimeUtc AND r.startTimeUtc <= :endTimeUtc) "
@@ -110,11 +104,10 @@ public class AnomalyResultDAO extends AbstractJpaDAO<AnomalyResult> {
         .setParameter("metric", metric).setParameter("dimensions", dimensions).getResultList();
   }
 
-  public List<AnomalyResult> findAllByTimeAndFunctionId(DateTime startTime, DateTime endTime,
+  public List<AnomalyResult> findAllByTimeAndFunctionId(long startTime, long endTime,
       long functionId) {
     return getEntityManager().createQuery(FIND_BY_TIME_AND_FUNCTION_ID, entityClass)
-        .setParameter("startTimeUtc", startTime.toDateTime(DateTimeZone.UTC).getMillis())
-        .setParameter("endTimeUtc", endTime.toDateTime(DateTimeZone.UTC).getMillis())
+        .setParameter("startTimeUtc", startTime).setParameter("endTimeUtc", endTime)
         .setParameter("functionId", functionId).getResultList();
   }
 
@@ -142,15 +135,6 @@ public class AnomalyResultDAO extends AbstractJpaDAO<AnomalyResult> {
         .setParameter("startTimeUtc", startTime.toDateTime(DateTimeZone.UTC).getMillis())
         .setParameter("endTimeUtc", endTime.toDateTime(DateTimeZone.UTC).getMillis())
         .setParameter("emailId", emailId).setParameter("dataMissing", false).getResultList();
-  }
-
-  public List<AnomalyResult> findAllByCollectionTimeAndFunction(String collection,
-      DateTime startTime, DateTime endTime, long functionId) {
-    return getEntityManager().createQuery(FIND_BY_COLLECTION_TIME_AND_FUNCTION_ID, entityClass)
-        .setParameter("collection", collection)
-        .setParameter("startTimeUtc", startTime.toDateTime(DateTimeZone.UTC).getMillis())
-        .setParameter("endTimeUtc", endTime.toDateTime(DateTimeZone.UTC).getMillis())
-        .setParameter("functionId", functionId).getResultList();
   }
 
   public List<GroupByRow<GroupByKey, Long>> getCountByFunction(long startTime, long endTime) {

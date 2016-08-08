@@ -128,7 +128,7 @@ public class AnomalyResultResource {
   public List<AnomalyResult> findByFunction(@PathParam("functionId") Long functionId) {
     DateTime endTime = DateTime.now();
     DateTime startTime = endTime.minusDays(7);
-    return dao.findAllByTimeAndFunctionId(startTime, endTime, functionId);
+    return dao.findAllByTimeAndFunctionId(startTime.getMillis(), endTime.getMillis(), functionId);
   }
 
   @GET
@@ -138,7 +138,7 @@ public class AnomalyResultResource {
       @PathParam("startIsoTime") String startIsoTime) {
     DateTime startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startIsoTime);
     DateTime endTime = DateTime.now();
-    return dao.findAllByTimeAndFunctionId(startTime, endTime, functionId);
+    return dao.findAllByTimeAndFunctionId(startTime.getMillis(), endTime.getMillis(), functionId);
   }
 
   @GET
@@ -148,6 +148,6 @@ public class AnomalyResultResource {
       @PathParam("startIsoTime") String startIsoTime, @PathParam("endIsoTime") String endIsoTime) {
     DateTime startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startIsoTime);
     DateTime endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endIsoTime);
-    return dao.findAllByTimeAndFunctionId(startTime, endTime, functionId);
+    return dao.findAllByTimeAndFunctionId(startTime.getMillis(), endTime.getMillis(), functionId);
   }
 }

@@ -49,7 +49,6 @@ public class DetectionTaskRunner implements TaskRunner {
 
   private AnomalyResultDAO resultDAO;
 
-  private String collection;
   private List<String> collectionDimensions;
   private MetricFunction metricFunction;
   private DateTime windowStart;
@@ -84,18 +83,16 @@ public class DetectionTaskRunner implements TaskRunner {
     // TODO put sum into the function config
     metricFunction = new MetricFunction(MetricAggFunction.SUM, anomalyFunctionSpec.getMetric());
 
-    // Collection
-    collection = anomalyFunctionSpec.getCollection();
-
     // Filters
     String filters = anomalyFunctionSpec.getFilters();
 
     LOG.info("Running anomaly detection job with metricFunction: {}, collection: {}",
-        metricFunction, collection);
+        metricFunction, anomalyFunctionSpec.getCollection());
 
     CollectionSchema collectionSchema = null;
     try {
-      collectionSchema = CACHE_REGISTRY_INSTANCE.getCollectionSchemaCache().get(collection);
+      collectionSchema = CACHE_REGISTRY_INSTANCE.getCollectionSchemaCache()
+          .get(anomalyFunctionSpec.getCollection());
     } catch (Exception e) {
       LOG.error("Exception when reading collection schema cache", e);
     }
@@ -106,7 +103,7 @@ public class DetectionTaskRunner implements TaskRunner {
 
     // Seed request with top-level...
     TimeSeriesRequest topLevelRequest = new TimeSeriesRequest();
-    topLevelRequest.setCollectionName(collection);
+    topLevelRequest.setCollectionName(anomalyFunctionSpec.getCollection());
     List<MetricFunction> metricFunctions = Collections.singletonList(metricFunction);
     List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metricFunctions);
     topLevelRequest.setMetricExpressions(metricExpressions);
@@ -183,8 +180,9 @@ public class DetectionTaskRunner implements TaskRunner {
   private List<AnomalyResult> getExistingAnomalies() {
     List<AnomalyResult> results = new ArrayList<>();
     try {
-      results.addAll(resultDAO.findAllByCollectionTimeAndFunction(collection, windowStart,
-          windowEnd, anomalyFunction.getSpec().getId()));
+      results.addAll(resultDAO
+          .findAllByTimeAndFunctionId(windowStart.getMillis(), windowEnd.getMillis(),
+              anomalyFunction.getSpec().getId()));
     } catch (Exception e) {
       LOG.error("Exception in getting existing anomalies", e);
     }
