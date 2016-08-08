@@ -12,24 +12,36 @@ import org.apache.commons.lang3.builder.ToStringStyle;
 public class DPArray {
   double targetRatio;
   List<DPSlot> slots;
+  int size;
+  int shrankSize;
 
   public DPArray(int size) {
     slots = new ArrayList<>(size);
     for (int i = 0; i < size; ++i) {
       slots.add(new DPSlot());
     }
+    this.size = size;
+    this.shrankSize = size;
   }
 
   public DPSlot slotAt(int index) {
     return slots.get(index);
   }
 
+  public int maxSize() {
+    return this.size;
+  }
+
   public int size() {
-    return slots.size()-1;
+    return this.shrankSize;
+  }
+
+  public void setShrinkSize(int size) {
+    this.shrankSize = size;
   }
 
   public Set<HierarchyNode> getAnswer() {
-    return slots.get(slots.size() - 1).ans;
+    return slots.get(this.shrankSize - 1).ans;
   }
 
   public void reset() {
@@ -38,6 +50,11 @@ public class DPArray {
       slot.cost = 0.;
       slot.ans.clear();
     }
+  }
+
+  public void fullReset() {
+    reset();
+    shrankSize = size;
   }
 
   public String toString() {
