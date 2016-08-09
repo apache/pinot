@@ -30,6 +30,7 @@ public class AbstractJpaDAO<E extends AbstractBaseEntity> {
     emf.get().merge(entity);
   }
 
+  @Transactional
   public E findById(Long id) {
     return getEntityManager().find(entityClass, id);
   }
@@ -44,6 +45,7 @@ public class AbstractJpaDAO<E extends AbstractBaseEntity> {
     getEntityManager().remove(findById(id));
   }
 
+  @Transactional
   public List<E> findAll() {
     return getEntityManager().createQuery("from " + entityClass.getSimpleName(), entityClass)
         .getResultList();

@@ -363,13 +363,13 @@ public class AnomalyResource {
     }
     anomalyFunctionSpec.setCron(cron);
 
-    Long responseId = anomalyFunctionDAO.save(anomalyFunctionSpec);
+    anomalyFunctionDAO.update(anomalyFunctionSpec);
 
     if (isActive) {
-      detectionResourceHttpUtils.enableAnomalyFunction(String.valueOf(responseId));
+      detectionResourceHttpUtils.enableAnomalyFunction(String.valueOf(id));
     }
 
-    return Response.ok(responseId).build();
+    return Response.ok(id).build();
   }
 
   // Delete anomaly function

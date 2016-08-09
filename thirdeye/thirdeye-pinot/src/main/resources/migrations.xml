@@ -482,4 +482,22 @@
     </addColumn>
   </changeSet>
 
+  <changeSet id="19" author="npawar">
+  <!-- WebappConfigs -->
+  <createTable tableName="webapp_configs">
+      <column name="id" type="bigint" autoIncrement="true">
+        <constraints primaryKey="true" nullable="false"/>
+      </column>
+      <column name="collection" type="varchar(127)">
+        <constraints nullable="false"/>
+      </column>
+      <column name="config_type" type="varchar(127)">
+        <constraints nullable="false"/>
+      </column>
+      <column name="config" type="text">
+        <constraints nullable="false"/>
+      </column>
+    </createTable>
+  </changeSet>
+
 </databaseChangeLog>

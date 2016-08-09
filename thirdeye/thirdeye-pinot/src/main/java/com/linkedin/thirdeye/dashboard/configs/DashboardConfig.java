@@ -66,7 +66,6 @@ public class DashboardConfig extends AbstractConfig {
 
   @Override
   public String toJSON() throws Exception {
-    System.out.println(this.getClass());
     return OBJECT_MAPPER.writerWithType(DashboardConfig.class).writeValueAsString(this);
 
   }

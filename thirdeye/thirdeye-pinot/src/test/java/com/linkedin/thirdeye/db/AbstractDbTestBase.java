@@ -6,15 +6,16 @@ import com.linkedin.thirdeye.db.dao.AnomalyFunctionDAO;
 import com.linkedin.thirdeye.db.dao.AnomalyJobDAO;
 import com.linkedin.thirdeye.db.dao.AnomalyResultDAO;
 import com.linkedin.thirdeye.db.dao.AnomalyTaskDAO;
-
 import com.linkedin.thirdeye.db.dao.EmailConfigurationDAO;
+import com.linkedin.thirdeye.db.dao.WebappConfigDAO;
 import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
 import com.linkedin.thirdeye.db.entity.EmailConfiguration;
+
 import java.io.File;
 import java.net.URISyntaxException;
 import java.net.URL;
-
 import java.util.concurrent.TimeUnit;
+
 import org.testng.annotations.BeforeClass;
 
 public abstract class AbstractDbTestBase {
@@ -23,6 +24,7 @@ public abstract class AbstractDbTestBase {
   AnomalyJobDAO anomalyJobDAO;
   AnomalyTaskDAO anomalyTaskDAO;
   EmailConfigurationDAO emailConfigurationDAO;
+  WebappConfigDAO webappConfigDAO;
 
   @BeforeClass(alwaysRun = true)
   public void init() throws URISyntaxException {
@@ -34,6 +36,7 @@ public abstract class AbstractDbTestBase {
     anomalyJobDAO = PersistenceUtil.getInstance(AnomalyJobDAO.class);
     anomalyTaskDAO = PersistenceUtil.getInstance(AnomalyTaskDAO.class);
     emailConfigurationDAO = PersistenceUtil.getInstance(EmailConfigurationDAO.class);
+    webappConfigDAO = PersistenceUtil.getInstance(WebappConfigDAO.class);
   }
 
   AnomalyFunctionSpec getTestFunctionSpec(String metricName, String collection) {
