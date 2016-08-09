@@ -46,8 +46,8 @@ public class AnomalyResultDAO extends AbstractJpaDAO<AnomalyResult> {
           + "OR (r.endTimeUtc >= :startTimeUtc AND r.endTimeUtc <= :endTimeUtc))";
 
   private static final String FIND_VALID_BY_TIME_EMAIL_ID =
-      "SELECT r FROM EmailConfiguration d JOIN d.functions f JOIN f.anomalies r "
-          + "WHERE d.id = :emailId AND ((r.startTimeUtc >= :startTimeUtc AND r.startTimeUtc <= :endTimeUtc) "
+      "SELECT r FROM EmailConfiguration d JOIN d.functions f, AnomalyResult r "
+          + "WHERE r.function.id=f.id AND d.id = :emailId AND ((r.startTimeUtc >= :startTimeUtc AND r.startTimeUtc <= :endTimeUtc) "
           + "OR (r.endTimeUtc >= :startTimeUtc AND r.endTimeUtc <= :endTimeUtc)) "
           + "AND r.dataMissing=:dataMissing";
 
