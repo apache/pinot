@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.common.data;
 
+import java.util.concurrent.TimeUnit;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -111,5 +112,27 @@ public class SchemaTest {
     }
 
     */
+  }
+
+  @Test
+  public void testSchemaBuilder() {
+    Schema schema = new Schema.SchemaBuilder()
+        .addSingleValueDimension("svDimension", FieldSpec.DataType.INT)
+        .addMultiValueDimension("mvDimension", FieldSpec.DataType.STRING)
+        .addMetric("metric", FieldSpec.DataType.INT)
+        .addTime("incomingTime", TimeUnit.DAYS, FieldSpec.DataType.LONG)
+        .build();
+
+    Assert.assertEquals(schema.getDimensionSpec("svDimension").isSingleValueField(), true);
+    Assert.assertEquals(schema.getDimensionSpec("svDimension").getDataType(), FieldSpec.DataType.INT);
+
+    Assert.assertEquals(schema.getDimensionSpec("mvDimension").isSingleValueField(), false);
+    Assert.assertEquals(schema.getDimensionSpec("mvDimension").getDataType(), FieldSpec.DataType.STRING);
+
+    Assert.assertEquals(schema.getMetricSpec("metric").isSingleValueField(), true);
+    Assert.assertEquals(schema.getMetricSpec("metric").getDataType(), FieldSpec.DataType.INT);
+
+    Assert.assertEquals(schema.getTimeFieldSpec().isSingleValueField(), true);
+    Assert.assertEquals(schema.getTimeFieldSpec().getDataType(), FieldSpec.DataType.LONG);
   }
 }

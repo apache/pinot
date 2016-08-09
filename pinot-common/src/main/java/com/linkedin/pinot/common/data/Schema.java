@@ -347,14 +347,11 @@ public class Schema {
       return this;
     }
 
-    public SchemaBuilder addMultiValueDimension(String dimensionName, DataType dataType,
-        String delimiter) {
+    public SchemaBuilder addMultiValueDimension(String dimensionName, DataType dataType) {
       FieldSpec spec = new DimensionFieldSpec();
       spec.setSingleValueField(false);
       spec.setDataType(dataType);
       spec.setName(dimensionName);
-      spec.setDelimiter(delimiter);
-
       schema.addField(dimensionName, spec);
       return this;
     }

@@ -124,4 +124,8 @@ public class EqualityUtils {
   public static int hashCodeOf(int previousHashCode, long value) {
     return 37 * previousHashCode + (int) (value ^ (value >>> 32));
   }
+
+  public static int hashCodeOf(int previousHashCode, boolean value) {
+    return 37 * previousHashCode + (value ? 1 : 0);
+  }
 }

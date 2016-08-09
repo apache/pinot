@@ -375,7 +375,7 @@ public class DictionariesTest {
       throws Exception {
     File indexDir = new File("/tmp/dict.test");
     indexDir.deleteOnExit();
-    FieldSpec fieldSpec = new DimensionFieldSpec("test", DataType.STRING, true, "\t");
+    FieldSpec fieldSpec = new DimensionFieldSpec("test", DataType.STRING, true);
 
     String[] inputStrings = new String[2];
     String[] paddedStrings = new String[2];
@@ -426,7 +426,7 @@ public class DictionariesTest {
       throws Exception {
     File indexDir = new File("/tmp/dict.test");
     indexDir.deleteOnExit();
-    FieldSpec fieldSpec = new DimensionFieldSpec("test", DataType.STRING, true, "\t");
+    FieldSpec fieldSpec = new DimensionFieldSpec("test", DataType.STRING, true);
 
     String[] inputStrings = new String[1];
     String[] paddedStrings = new String[1];
@@ -484,7 +484,7 @@ public class DictionariesTest {
       throws Exception {
     File indexDir = new File("/tmp/dict.test");
     indexDir.deleteOnExit();
-    FieldSpec fieldSpec = new DimensionFieldSpec("test", DataType.STRING, true, "\t");
+    FieldSpec fieldSpec = new DimensionFieldSpec("test", DataType.STRING, true);
 
     String[] inputStrings = new String[2];
     String[] paddedStrings = new String[2];
@@ -520,7 +520,7 @@ public class DictionariesTest {
   public void testPaddedNoConflict()
       throws Exception {
     File indexDir = new File("/tmp/dict.test");
-    FieldSpec fieldSpec = new DimensionFieldSpec("test", DataType.STRING, true, "\t");
+    FieldSpec fieldSpec = new DimensionFieldSpec("test", DataType.STRING, true);
 
     String[] inputStrings = new String[2];
     String[] paddedStrings = new String[2];
@@ -567,7 +567,7 @@ public class DictionariesTest {
   public void testSingleNullString()
       throws Exception {
     File indexDir = new File("/tmp/dict.test");
-    FieldSpec fieldSpec = new DimensionFieldSpec("test", DataType.STRING, true, "\t");
+    FieldSpec fieldSpec = new DimensionFieldSpec("test", DataType.STRING, true);
 
     String[] inputStrings = new String[1];
     String[] paddedStrings = new String[1];

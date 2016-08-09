@@ -38,9 +38,9 @@ public class DefaultTimeConverter implements TimeConverter {
     } else {
       duration = Long.parseLong(incomingTimeValue.toString());
     }
-    long outgoingTime = outgoing.getTimeType().convert(duration * incoming.getTimeunitSize(),
+    long outgoingTime = outgoing.getTimeType().convert(duration * incoming.getTimeUnitSize(),
         incoming.getTimeType());
-    return convertToOutgoingDataType(outgoingTime / outgoing.getTimeunitSize());
+    return convertToOutgoingDataType(outgoingTime / outgoing.getTimeUnitSize());
   }
 
   private Object convertToOutgoingDataType(long outgoingTimeValue) {

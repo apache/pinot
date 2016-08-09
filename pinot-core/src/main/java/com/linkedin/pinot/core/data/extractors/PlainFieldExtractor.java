@@ -62,7 +62,7 @@ public class PlainFieldExtractor implements FieldExtractor {
     TimeFieldSpec timeFieldSpec = _schema.getTimeFieldSpec();
     if (timeFieldSpec != null) {
       _incomingTimeColumnName = timeFieldSpec.getIncomingTimeColumnName();
-      _outGoingTimeColumnName = timeFieldSpec.getOutGoingTimeColumnName();
+      _outGoingTimeColumnName = timeFieldSpec.getOutgoingTimeColumnName();
       TimeGranularitySpec incomingGranularitySpec = timeFieldSpec.getIncomingGranularitySpec();
       TimeGranularitySpec outgoingGranularitySpec = timeFieldSpec.getOutgoingGranularitySpec();
       _timeConverter = TimeConverterProvider.getTimeConverter(incomingGranularitySpec,
