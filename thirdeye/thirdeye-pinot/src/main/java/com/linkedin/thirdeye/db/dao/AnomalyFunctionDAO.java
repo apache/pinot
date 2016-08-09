@@ -5,8 +5,6 @@ import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
 
 import java.util.List;
 
-import javax.persistence.NoResultException;
-
 public class AnomalyFunctionDAO extends AbstractJpaDAO<AnomalyFunctionSpec> {
 
   private static final String GET_BY_COLLECTION =
@@ -15,21 +13,13 @@ public class AnomalyFunctionDAO extends AbstractJpaDAO<AnomalyFunctionSpec> {
   private static final String FIND_DISTINCT_METRIC_BY_COLLECTION =
       "SELECT DISTINCT(af.metric) FROM AnomalyFunctionSpec af WHERE af.collection = :collection";
 
-  private static final String FIND_BY_ID =
-      "SELECT af FROM AnomalyFunctionSpec af WHERE af.id = :id";
-
   public AnomalyFunctionDAO() {
     super(AnomalyFunctionSpec.class);
   }
 
   @Transactional
   public AnomalyFunctionSpec findById(Long id) {
-    try {
-      return getEntityManager().createQuery(FIND_BY_ID, AnomalyFunctionSpec.class)
-          .setParameter("id", id).getSingleResult();
-    } catch (NoResultException e) {
-      return null;
-    }
+    return super.findById(id);
   }
 
   @Transactional
