@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.db;
 
+import com.linkedin.thirdeye.db.dao.AbstractDbTestBase;
 import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
 import com.linkedin.thirdeye.db.entity.EmailConfiguration;
 import java.util.ArrayList;

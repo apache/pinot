@@ -4,7 +4,7 @@ import com.linkedin.thirdeye.anomaly.merge.AnomalyMergeConfig;
 import com.linkedin.thirdeye.anomaly.merge.AnomalySummaryGenerator;
 import com.linkedin.thirdeye.api.dto.GroupByKey;
 import com.linkedin.thirdeye.api.dto.GroupByRow;
-import com.linkedin.thirdeye.db.entity.MergedAnomalyResult;
+import com.linkedin.thirdeye.db.entity.AnomalyMergedResult;
 import com.linkedin.thirdeye.db.dao.AnomalyResultDAO;
 import com.linkedin.thirdeye.db.entity.AnomalyResult;
 import java.util.List;
@@ -30,13 +30,13 @@ public class AnomalySummaryResource {
 
   @GET
   @Path("summary/function/{functionId}")
-  public List<MergedAnomalyResult> getSummaryForFunction(@PathParam("functionId") Long functionId) {
+  public List<AnomalyMergedResult> getSummaryForFunction(@PathParam("functionId") Long functionId) {
     return getAnomalySummaryForFunction(functionId, new AnomalyMergeConfig());
   }
 
   @POST
   @Path("summary/function/{functionId}")
-  public List<MergedAnomalyResult> getAnomalySummaryForFunction(
+  public List<AnomalyMergedResult> getAnomalySummaryForFunction(
       @PathParam("functionId") Long functionId, AnomalyMergeConfig mergeConfig) {
     if (mergeConfig == null) {
       mergeConfig = new AnomalyMergeConfig();
@@ -53,7 +53,7 @@ public class AnomalySummaryResource {
 
   @POST
   @Path("summary/{collection}")
-  public List<MergedAnomalyResult> getAnomalySummaryForCollectionMeric(
+  public List<AnomalyMergedResult> getAnomalySummaryForCollectionMeric(
       @PathParam("collection") String collection, @QueryParam("metric") String metric,
       @QueryParam("dimensions") String dimensions, AnomalyMergeConfig mergeConfig) {
     if (StringUtils.isEmpty(collection)) {

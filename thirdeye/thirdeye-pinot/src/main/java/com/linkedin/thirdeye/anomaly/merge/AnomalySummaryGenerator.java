@@ -1,6 +1,6 @@
 package com.linkedin.thirdeye.anomaly.merge;
 
-import com.linkedin.thirdeye.db.entity.MergedAnomalyResult;
+import com.linkedin.thirdeye.db.entity.AnomalyMergedResult;
 import com.linkedin.thirdeye.db.entity.AnomalyResult;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -26,7 +26,7 @@ public abstract class AnomalySummaryGenerator {
    *
    * @return
    */
-  public static List<MergedAnomalyResult> mergeAnomalies(List<AnomalyResult> anomalies,
+  public static List<AnomalyMergedResult> mergeAnomalies(List<AnomalyResult> anomalies,
       AnomalyMergeConfig mergeConfig) {
     return mergeAnomalies(null, anomalies, mergeConfig);
   }
@@ -38,7 +38,7 @@ public abstract class AnomalySummaryGenerator {
    *
    * @return
    */
-  public static List<MergedAnomalyResult> mergeAnomalies(MergedAnomalyResult mergedAnomaly,
+  public static List<AnomalyMergedResult> mergeAnomalies(AnomalyMergedResult mergedAnomaly,
       List<AnomalyResult> anomalies, AnomalyMergeConfig mergeConfig) {
 
     // sort anomalies in natural order of start time
@@ -56,12 +56,12 @@ public abstract class AnomalySummaryGenerator {
       applySequentialGapBasedSplit = true;
     }
 
-    List<MergedAnomalyResult> mergedAnomalies = new ArrayList<>();
+    List<AnomalyMergedResult> mergedAnomalies = new ArrayList<>();
 
     for (int i = 0; i < anomalies.size(); i++) {
       AnomalyResult currentResult = anomalies.get(i);
       if (mergedAnomaly == null) {
-        mergedAnomaly = new MergedAnomalyResult();
+        mergedAnomaly = new AnomalyMergedResult();
         populateMergedResult(mergedAnomaly, currentResult);
       } else {
         // compare current with merged and decide whether to merge the current result or create a new one
@@ -74,7 +74,7 @@ public abstract class AnomalySummaryGenerator {
           mergedAnomalies.add(mergedAnomaly);
 
           //set current raw result
-          mergedAnomaly = new MergedAnomalyResult();
+          mergedAnomaly = new AnomalyMergedResult();
           populateMergedResult(mergedAnomaly, currentResult);
         } else {
           // add the current raw result into mergedResult
@@ -114,7 +114,7 @@ public abstract class AnomalySummaryGenerator {
     return mergedAnomalies;
   }
 
-  private static void populateMergedProperties(MergedAnomalyResult mergedResult) {
+  private static void populateMergedProperties(AnomalyMergedResult mergedResult) {
     double totalScore = 0.0;
     double totalWeight = 0.0;
     int n = mergedResult.getAnomalyResults().size();
@@ -167,16 +167,14 @@ public abstract class AnomalySummaryGenerator {
     return dimBuff.toString();
   }
 
-  private static void populateMergedResult(MergedAnomalyResult mergedAnomaly,
+  private static void populateMergedResult(AnomalyMergedResult mergedAnomaly,
       AnomalyResult currentResult) {
     if (!mergedAnomaly.getAnomalyResults().contains(currentResult)) {
       mergedAnomaly.getAnomalyResults().add(currentResult);
     }
-    mergedAnomaly.setCreationTime(currentResult.getCreationTimeUtc());
+    mergedAnomaly.setCreatedTime(currentResult.getCreationTimeUtc());
     mergedAnomaly.setDimensions(currentResult.getDimensions());
     mergedAnomaly.setStartTime(currentResult.getStartTimeUtc());
     mergedAnomaly.setEndTime(currentResult.getEndTimeUtc());
-    mergedAnomaly.setMessage(currentResult.getMessage());
-    mergedAnomaly.setProperties(currentResult.getProperties());
   }
 }

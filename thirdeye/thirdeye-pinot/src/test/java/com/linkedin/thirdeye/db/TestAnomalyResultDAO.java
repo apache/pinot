@@ -4,6 +4,7 @@ import com.linkedin.thirdeye.api.dto.GroupByKey;
 import com.linkedin.thirdeye.api.dto.GroupByRow;
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
 import com.linkedin.thirdeye.constant.FeedbackStatus;
+import com.linkedin.thirdeye.db.dao.AbstractDbTestBase;
 import com.linkedin.thirdeye.db.entity.AnomalyFeedback;
 import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
 import com.linkedin.thirdeye.db.entity.AnomalyResult;
@@ -28,9 +29,6 @@ public class TestAnomalyResultDAO extends AbstractDbTestBase {
 
     AnomalyResult resultRet = anomalyResultDAO.findById(result.getId());
     Assert.assertEquals(resultRet.getFunction(), spec);
-
-    AnomalyFunctionSpec specRet = anomalyFunctionDAO.findById(spec.getId());
-    Assert.assertEquals(specRet.getAnomalies().size(), 1);
 
     anomalyResultId = result.getId();
   }
@@ -67,14 +65,4 @@ public class TestAnomalyResultDAO extends AbstractDbTestBase {
     anomalyFunctionDAO.delete(functionSpec);
   }
 
-  static AnomalyResult getAnomalyResult() {
-    AnomalyResult anomalyResult = new AnomalyResult();
-    anomalyResult.setScore(1.1);
-    anomalyResult.setStartTimeUtc(System.currentTimeMillis());
-    anomalyResult.setEndTimeUtc(System.currentTimeMillis());
-    anomalyResult.setWeight(10.1);
-    anomalyResult.setDimensions("xyz dimension");
-    anomalyResult.setCreationTimeUtc(System.currentTimeMillis());
-    return anomalyResult;
-  }
 }

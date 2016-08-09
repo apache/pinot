@@ -482,4 +482,40 @@
     </addColumn>
   </changeSet>
 
+  <changeSet id="19" author="pjaiswal">
+    <createTable tableName="anomaly_merged_results">
+      <column name="id" type="bigint" autoIncrement="true">
+        <constraints primaryKey="true" nullable="false"/>
+      </column>
+      <column name="collection" type="varchar(127)">
+        <constraints nullable="false"/>
+      </column>
+      <column name="metric" type="varchar(255)">
+        <constraints nullable="false"/>
+      </column>
+      <column name="dimensions" type="varchar(1023)">
+        <constraints nullable="false"/>
+      </column>
+      <column name="start_time" type="bigint">
+        <constraints nullable="false"/>
+      </column>
+      <column name="end_time" type="bigint">
+        <constraints nullable="false"/>
+      </column>
+      <column name="created_time" type="bigint">
+        <constraints nullable="false"/>
+      </column>
+      <column name="anomaly_feedback_id" type="bigint" defaultValue="null">
+        <constraints nullable="true" foreignKeyName="fk_merged_results_feedback_idx"
+                     referencedTableName="anomaly_feedback" referencedColumnNames="id"/>
+      </column>
+    </createTable>
+    <addColumn tableName="anomaly_results">
+      <column name="merged_result_id" type="bigint" defaultValue="null">
+        <constraints nullable="true" foreignKeyName="fk_anomaly_merged_results_idx"
+                     referencedTableName="anomaly_merged_results" referencedColumnNames="id"/>
+      </column>
+    </addColumn>
+  </changeSet>
+
 </databaseChangeLog>
