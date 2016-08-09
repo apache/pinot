@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.client.pinot.summary;
+package com.linkedin.thirdeye.dashboard.views.diffsummary;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -7,6 +7,8 @@ import java.util.Set;
 
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
+
+import com.linkedin.thirdeye.client.diffsummary.HierarchyNode;
 
 
 public class DPArray {

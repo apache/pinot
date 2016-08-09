@@ -1,6 +1,7 @@
-package com.linkedin.thirdeye.client.pinot.summary;
+package com.linkedin.thirdeye.client.diffsummary;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 
@@ -12,7 +13,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 public class DimensionValues implements Comparable<DimensionValues> {
   @JsonProperty("values")
-  List<String> values;
+  private List<String> values;
 
   public DimensionValues() {
     this.values = new ArrayList<String>();
@@ -24,6 +25,14 @@ public class DimensionValues implements Comparable<DimensionValues> {
 
   public String get(int index) {
     return values.get(index);
+  }
+
+  public List<String> values() {
+    return Collections.<String> unmodifiableList(values);
+  }
+
+  public int size() {
+    return values.size();
   }
 
   /**

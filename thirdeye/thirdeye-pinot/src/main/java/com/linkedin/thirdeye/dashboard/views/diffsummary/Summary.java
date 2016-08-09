@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.client.pinot.summary;
+package com.linkedin.thirdeye.dashboard.views.diffsummary;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -9,6 +9,9 @@ import java.util.Set;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.linkedin.thirdeye.client.diffsummary.CostFunction;
+import com.linkedin.thirdeye.client.diffsummary.Cube;
+import com.linkedin.thirdeye.client.diffsummary.HierarchyNode;
 
 
 public class Summary {
@@ -25,7 +28,7 @@ public class Summary {
 
   public Summary(Cube cube) {
     this.cube = cube;
-    this.maxLevelCount = cube.dimensions.size();
+    this.maxLevelCount = cube.getDimensions().size();
     this.levelCount = this.maxLevelCount;
   }
 
@@ -52,7 +55,7 @@ public class Summary {
     for (int i = 0; i < this.levelCount; ++i) {
       dpArrays.add(new DPArray(answerSize));
     }
-    HierarchyNode root = cube.getHierarchicalNodes().get(0).get(0);
+    HierarchyNode root = cube.getRoot();
     if (doOneSideError) {
       oneSideErrorRowInserter =
           new OneSideErrorRowInserter(basicRowInserter, Double.compare(1., root.targetRatio()) <= 0);
@@ -75,20 +78,15 @@ public class Summary {
     List<HierarchyNode> nodeList = new ArrayList<>(dpArrays.get(0).getAnswer());
     nodeList.sort(NODE_COMPARATOR); // Process lower level nodes first
     for (HierarchyNode node : nodeList) {
-      HierarchyNode parent = node;
-      while ((parent = parent.parent) != null) {
-        if (dpArrays.get(0).getAnswer().contains(parent)) {
-          parent.baselineValue += node.baselineValue;
-          parent.currentValue += node.currentValue;
-          break;
-        }
-      }
+      HierarchyNode parent = findAncestor(node, null, dpArrays.get(0).getAnswer());
+      if (parent != null) parent.addNodeValues(node);
     }
     for (HierarchyNode node : nodeList) {
-      if (node.baselineValue != node.data.baselineValue || node.currentValue != node.data.currentValue) {
-        System.err.println("Wrong Wow values at node: " + node.data.dimensionValues + ". Expected: "
-            + node.data.baselineValue + "," + node.data.currentValue + ", actual: " + node.baselineValue + ","
-            + node.currentValue);
+      if (node.getBaselineValue() != node.getOriginalBaselineValue()
+          || node.getCurrentValue() != node.getOriginalCurrentValue()) {
+        System.err.println("Wrong Wow values at node: " + node.getDimensionValues() + ". Expected: "
+            + node.getOriginalBaselineValue() + "," + node.getOriginalCurrentValue() + ", actual: "
+            + node.getBaselineValue() + "," + node.getCurrentValue());
       }
     }
   }
@@ -96,7 +94,7 @@ public class Summary {
   static class NodeDimensionValuesComparator implements Comparator<HierarchyNode> {
     @Override
     public int compare(HierarchyNode n1, HierarchyNode n2) {
-      return n1.data.dimensionValues.compareTo(n2.data.dimensionValues);
+      return n1.getDimensionValues().compareTo(n2.getDimensionValues());
     }
   }
 
@@ -106,18 +104,18 @@ public class Summary {
    * So, the final answer is located at dpArray[0].
    */
   private void computeChildDPArray(HierarchyNode node) {
-    HierarchyNode parent = node.parent;
-    DPArray dpArray = dpArrays.get(node.level);
+    HierarchyNode parent = node.getParent();
+    DPArray dpArray = dpArrays.get(node.getLevel());
     dpArray.fullReset();
     dpArray.targetRatio = node.targetRatio();
 
     // Compute DPArray if the current node is the lowest internal node.
     // Otherwise, merge DPArrays from its children.
-    if (node.level == levelCount - 1) {
-      if (node.children.size() < dpArray.size()) {
-        dpArray.setShrinkSize(Math.max(1, (node.children.size()+1)/2));
+    if (node.getLevel() == levelCount - 1) {
+      if (node.childrenSize() < dpArray.size()) {
+        dpArray.setShrinkSize(Math.max(1, (node.childrenSize()+1)/2));
       }
-      for (HierarchyNode child : node.children) {
+      for (HierarchyNode child : node.getChildren()) {
         leafRowInserter.insertRowToDPArray(dpArray, child, node.targetRatio());
         updateWowValues(node, dpArray.getAnswer());
         dpArray.targetRatio = node.targetRatio(); // get updated ratio
@@ -127,9 +125,9 @@ public class Summary {
       boolean doRollback = false;
       do {
         doRollback = false;
-        for (HierarchyNode child : node.children) {
+        for (HierarchyNode child : node.getChildren()) {
           computeChildDPArray(child);
-          removedNodes.addAll(mergeDPArray(node, dpArray, dpArrays.get(node.level + 1)));
+          removedNodes.addAll(mergeDPArray(node, dpArray, dpArrays.get(node.getLevel() + 1)));
           updateWowValues(node, dpArray.getAnswer());
           dpArray.targetRatio = node.targetRatio(); // get updated ratio
         }
@@ -149,7 +147,7 @@ public class Summary {
     // Calculate the cost if the node (aggregated row) is put in the answer.
     // We do not need to do this for the root node.
     // Moreover, if a node is thinned out by its children, it won't be inserted to the answer.
-    if (node.level != 0) {
+    if (node.getLevel() != 0) {
       updateWowValues(parent, dpArray.getAnswer());
       double targetRatio = parent.targetRatio();
       aggregateSmallNodes(node, dpArray, targetRatio);
@@ -171,23 +169,18 @@ public class Summary {
   // TODO: Need a better definition for "a node is thinned out by its children."
   // We also need to look into the case where parent node is much smaller than its children.
   private static boolean nodeIsThinnedOut(HierarchyNode node) {
-    return Double.compare(0., node.baselineValue) == 0 && Double.compare(0., node.currentValue) == 0;
+    return Double.compare(0., node.getBaselineValue()) == 0 && Double.compare(0., node.getCurrentValue()) == 0;
   }
 
   private static void rollbackInsertions(HierarchyNode node, Set<HierarchyNode> answer, List<HierarchyNode> removedNodes) {
-    removedNodes.sort(NODE_COMPARATOR.reversed());
+    removedNodes.sort(NODE_COMPARATOR.reversed()); // Rollback from top to bottom nodes
+    Set<HierarchyNode> targetSet = new HashSet<>(answer);
+    targetSet.addAll(removedNodes);
     for (HierarchyNode removedNode : removedNodes) {
-      HierarchyNode parents = removedNode;
-      while ((parents = parents.parent) != node) {
-        if (answer.contains(parents) || removedNodes.contains(parents)) {
-          parents.baselineValue -= removedNode.baselineValue;
-          parents.currentValue -= removedNode.currentValue;
-          break;
-        }
-      }
+      HierarchyNode parents = findAncestor(removedNode, node, targetSet);
+      if (parents != null) parents.removeNodeValues(removedNode);
     }
-    node.baselineValue = node.data.baselineValue;
-    node.currentValue = node.data.currentValue;
+    node.resetValues();
   }
 
   /**
@@ -217,35 +210,40 @@ public class Summary {
    * the answer. Note that the current node may be in the answer.
    */
   private static void updateWowValues(HierarchyNode node, Set<HierarchyNode> answer) {
-    node.baselineValue = node.data.baselineValue;
-    node.currentValue = node.data.currentValue;
+    node.resetValues();
     for (HierarchyNode child : answer) {
       if (child == node) continue;
-      node.baselineValue -= child.baselineValue;
-      node.currentValue -= child.currentValue;
+      node.removeNodeValues(child);
     }
   }
 
   /**
    * Update an internal node's baseline and current values if any of the nodes in its subtree is removed.
-   * @param root The internal node to be updated.
+   * @param node The internal node to be updated.
    * @param answer The new answer.
    * @param removedNodes The nodes removed from the subtree of node.
    */
-  private static void updateWowValuesDueToRemoval(HierarchyNode root, Set<HierarchyNode> answer,
+  private static void updateWowValuesDueToRemoval(HierarchyNode node, Set<HierarchyNode> answer,
       Set<HierarchyNode> removedNodes) {
     List<HierarchyNode> removedNodesList = new ArrayList<>(removedNodes);
     removedNodesList.sort(NODE_COMPARATOR); // Process lower level nodes first
     for (HierarchyNode removedNode : removedNodesList) {
-      HierarchyNode parents = removedNode;
-      while ((parents = parents.parent) != root) {
-        if (answer.contains(parents)) {
-          parents.baselineValue += removedNode.baselineValue;
-          parents.currentValue += removedNode.currentValue;
-          break;
-        }
+      HierarchyNode parents = findAncestor(removedNode, node, answer);
+      if (parents != null) parents.addNodeValues(removedNode);
+    }
+  }
+
+  /**
+   * Find a node's ancestor between the given node and ceiling that is contained in the target set of HierarchyNode.
+   * Returns null if no ancestor exists in the target set.
+   */
+  private static HierarchyNode findAncestor(HierarchyNode node, HierarchyNode ceiling, Set<HierarchyNode> targets) {
+    while ((node = node.getParent()) != ceiling) {
+      if (targets.contains(node)) {
+        return node;
       }
     }
+    return null;
   }
 
   /**
@@ -264,7 +262,7 @@ public class Summary {
       // Temporarily add parentNode to the answer so the values of the removed small node can successfully add back to
       // parentNode by re-using the method updateWowValuesDueToRemoval.
       dp.getAnswer().add(parentNode);
-      updateWowValuesDueToRemoval(parentNode.parent, dp.getAnswer(), removedNodes);
+      updateWowValuesDueToRemoval(parentNode.getParent(), dp.getAnswer(), removedNodes);
       dp.getAnswer().remove(parentNode);
     }
   }
@@ -274,9 +272,9 @@ public class Summary {
    * calculating the cost of the node; otherwise, targetRatio is used.
    */
   private void insertRowWithAdaptiveRatioNoOneSideError(DPArray dp, HierarchyNode node, double targetRatio) {
-    if (dp.getAnswer().contains(node.parent)) {
+    if (dp.getAnswer().contains(node.getParent())) {
       // For one side error if node's parent is included in the solution, then its cost will be calculated normally.
-      basicRowInserter.insertRowToDPArray(dp, node, node.parent.targetRatio());
+      basicRowInserter.insertRowToDPArray(dp, node, node.getParent().targetRatio());
     } else {
       basicRowInserter.insertRowToDPArray(dp, node, targetRatio);
     }
@@ -287,9 +285,9 @@ public class Summary {
    * calculating the cost of the node; otherwise, targetRatio is used.
    */
   private void insertRowWithAdaptiveRatio(DPArray dp, HierarchyNode node, double targetRatio) {
-    if (dp.getAnswer().contains(node.parent)) {
+    if (dp.getAnswer().contains(node.getParent())) {
       // For one side error if node's parent is included in the solution, then its cost will be calculated normally.
-      basicRowInserter.insertRowToDPArray(dp, node, node.parent.targetRatio());
+      basicRowInserter.insertRowToDPArray(dp, node, node.getParent().targetRatio());
     } else {
       oneSideErrorRowInserter.insertRowToDPArray(dp, node, targetRatio);
     }
@@ -302,8 +300,8 @@ public class Summary {
   private static class BasicRowInserter implements RowInserter {
     @Override
     public void insertRowToDPArray(DPArray dp, HierarchyNode node, double targetRatio) {
-      double baselineValue = node.baselineValue;
-      double currentValue = node.currentValue;
+      double baselineValue = node.getBaselineValue();
+      double currentValue = node.getCurrentValue();
       double cost = CostFunction.err4EmptyValues(baselineValue, currentValue, targetRatio);
 
       for (int n = dp.size() - 1; n > 0; --n) {
@@ -335,19 +333,12 @@ public class Summary {
 
     @Override
     public void insertRowToDPArray(DPArray dp, HierarchyNode node, double targetRatio)  {
-      // if the row has the same change trend with the top row, then insert the row
+      // If the row has the same change trend with the top row, then it is inserted.
       if ( side == node.side() ) {
         basicRowInserter.insertRowToDPArray(dp, node, targetRatio);
-      } else { // otherwise, it is inserted only there exists an intermediate parent besides root node
-        HierarchyNode parent = node;
-        while ((parent = parent.parent) != null) {
-          if (dp.getAnswer().contains(parent)) {
-            if ( side == parent.side() ) {
-              basicRowInserter.insertRowToDPArray(dp, node, targetRatio);
-              break;
-            }
-          }
-        }
+      } else { // Otherwise, it is inserted only there exists an intermediate parent besides root node
+        HierarchyNode parent = findAncestor(node, null, dp.getAnswer());
+        if (parent != null && parent.side() == side) basicRowInserter.insertRowToDPArray(dp, node, targetRatio);
       }
     }
   }
@@ -355,7 +346,7 @@ public class Summary {
   public static void main (String[] argc) {
     String oFileName = "Cube.json";
     int answerSize = 20;
-    boolean doOneSideError = false;
+    boolean doOneSideError = true;
     int maxDimensionSize = 4;
 
     Cube cube = null;

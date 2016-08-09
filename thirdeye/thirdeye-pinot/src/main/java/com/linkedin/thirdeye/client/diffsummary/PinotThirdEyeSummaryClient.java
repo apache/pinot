@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.client.pinot.summary;
+package com.linkedin.thirdeye.client.diffsummary;
 
 import com.google.common.collect.Lists;
 import com.linkedin.thirdeye.api.TimeGranularity;
@@ -6,12 +6,14 @@ import com.linkedin.thirdeye.client.MetricFunction;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.client.ThirdEyeRequest;
+import com.linkedin.thirdeye.client.ThirdEyeRequest.ThirdEyeRequestBuilder;
 import com.linkedin.thirdeye.client.ThirdEyeResponse;
 import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClientConfig;
 import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.dashboard.ThirdEyeDashboardConfiguration;
+import com.linkedin.thirdeye.dashboard.views.diffsummary.Summary;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -35,14 +37,14 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
   private final static DateTime NULL_DATETIME = new DateTime();
   private final static TimeGranularity NULL_TIME_GRANULARITY = new TimeGranularity(0, TimeUnit.HOURS);
 
-  QueryCache queryCache;
-  String collection;
-  List<MetricFunction> metricFunctions = new ArrayList<>();
-  TimeGranularity timeGranularity = NULL_TIME_GRANULARITY;
-  DateTime baselineStartInclusive = NULL_DATETIME;
-  DateTime baselineEndExclusive = NULL_DATETIME;
-  DateTime currentStartInclusive = NULL_DATETIME;
-  DateTime currentEndExclusive = NULL_DATETIME;
+  private QueryCache queryCache;
+  private String collection;
+  private List<MetricFunction> metricFunctions = new ArrayList<>();
+  private TimeGranularity timeGranularity = NULL_TIME_GRANULARITY;
+  private DateTime baselineStartInclusive = NULL_DATETIME;
+  private DateTime baselineEndExclusive = NULL_DATETIME;
+  private DateTime currentStartInclusive = NULL_DATETIME;
+  private DateTime currentEndExclusive = NULL_DATETIME;
 
   public PinotThirdEyeSummaryClient(QueryCache queryCache) {
     this.queryCache = queryCache;
@@ -193,7 +195,7 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
   }
 
   private Pair<ThirdEyeRequest, ThirdEyeRequest> constructTimeOnTimeRequest(List<String> groupBy) {
-    ThirdEyeRequest.ThirdEyeRequestBuilder builder = new ThirdEyeRequest.ThirdEyeRequestBuilder();
+    ThirdEyeRequestBuilder builder = ThirdEyeRequest.newBuilder();
     builder.setCollection(collection);
     builder.setMetricFunctions(metricFunctions);
     builder.setGroupByTimeGranularity(timeGranularity);
@@ -251,7 +253,7 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
     pinotClient.setBaselineStartInclusive(baselineStart);
     pinotClient.setCurrentStartInclusive(currentStart);
 
-    int maxDimensionSize = 2;
+    int maxDimensionSize = 4;
 
     // Build the cube for computing the summary
     Cube initCube = new Cube();

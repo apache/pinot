@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.client.pinot.summary;
+package com.linkedin.thirdeye.client.diffsummary;
 
 import java.io.File;
 import java.io.IOException;
@@ -30,7 +30,7 @@ public class Cube { // the cube (Ca|Cb)
   private double topRatio;
 
   @JsonProperty("dimensions")
-  Dimensions dimensions;
+  private Dimensions dimensions;
 
   // The data stored in levels
   @JsonProperty("hierarchicalRows")
@@ -53,8 +53,17 @@ public class Cube { // the cube (Ca|Cb)
     return topRatio;
   }
 
-  public List<List<HierarchyNode>> getHierarchicalNodes() {
-    return hierarchicalNodes;
+  public Dimensions getDimensions() {
+    return dimensions;
+  }
+
+  @JsonIgnore
+  public HierarchyNode getRoot() {
+    if (hierarchicalNodes.size() != 0 && hierarchicalNodes.get(0).size() != 0) {
+      return hierarchicalNodes.get(0).get(0);
+    } else {
+      return null;
+    }
   }
 
   public void buildWithAutoDimensionOrder(OLAPDataBaseClient olapClient, Dimensions dimensions) {
@@ -110,6 +119,8 @@ public class Cube { // the cube (Ca|Cb)
     Row topAggValues = olapClient.getTopAggregatedValues();
     topBaselineValue = topAggValues.baselineValue; // aggregated baseline values
     topCurrentValue = topAggValues.currentValue; // aggregated current values
+    if (topBaselineValue == 0.) topBaselineValue = 1.;
+    if (topCurrentValue == 0.) topCurrentValue = 1.;
     topRatio = topCurrentValue / topBaselineValue; // change ratio
   }
 
@@ -182,7 +193,7 @@ public class Cube { // the cube (Ca|Cb)
     List<MutablePair<String, Double>> dimensionCostPairs = new ArrayList<>();
 
     Map<String, DimensionGroup> groupMap = new HashMap<>();
-    Set<String> dimensionKeySet = new HashSet<>(dimensions.names);
+    Set<String> dimensionKeySet = new HashSet<>(dimensions.allDimensions());
     for (List<String> groupList : hierarchy) {
       if (groupList == null || groupList.size() == 0) continue;
       DimensionGroup group = new DimensionGroup();

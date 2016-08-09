@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.client.pinot.summary;
+package com.linkedin.thirdeye.client.diffsummary;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -9,9 +9,10 @@ import org.apache.commons.lang3.builder.ToStringStyle;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+
 public class Dimensions {
   @JsonProperty("names")
-  List<String> names;
+  private List<String> names;
 
   Dimensions() {
     names = new ArrayList<String>();
@@ -29,16 +30,20 @@ public class Dimensions {
     return names.get(index);
   }
 
+  public List<String> allDimensions() {
+    return Collections.<String> unmodifiableList(names);
+  }
+
   public List<String> groupByStringsAtLevel(int level) {
-    return names.subList(0, level);
+    return Collections.<String> unmodifiableList(names.subList(0, level));
   }
 
   public List<String> groupByStringsAtTop() {
-    return Collections.<String>emptyList();
+    return Collections.<String> emptyList();
   }
 
   public List<String> groupByStringsAtLeaf() {
-    return names;
+    return allDimensions();
   }
 
   @Override
