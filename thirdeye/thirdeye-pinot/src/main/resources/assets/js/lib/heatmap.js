@@ -130,7 +130,7 @@ function renderD3heatmap(data, tab) {
                 var tooltipWidth = tooltipWidthPx.substring(0, tooltipWidthPx.length - 2);
 
 
-                var target = $(this)//$(event.target)
+                var target = $(this);
                 var dimension = target.attr("data-dimension");
                 var metric = target.attr("data-metric");
                 var valueId = target.attr("data-value-id");

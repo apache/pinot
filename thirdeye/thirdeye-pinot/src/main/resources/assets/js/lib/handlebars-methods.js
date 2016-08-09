@@ -76,27 +76,6 @@ $(document).ready(function () {
         }
     });
 
-    //parse anomaly data properties
-    Handlebars.registerHelper('listAnomalyProperties', function (propertiesString) {
-
-        //Remove trailing ";"
-        if(propertiesString.substr(propertiesString.length - 1) == ";"){
-            propertiesString = propertiesString.substring(0, propertiesString.length-1)
-
-        }
-
-        var propertiesAry = propertiesString.split(";");
-        var html = "";
-        for (var i = 0, numProp = propertiesAry.length; i < numProp; i++) {
-            var keyValue = propertiesAry[i];
-            keyValue = keyValue.split("=")
-
-            html += "<span class='prop-key'<b>" + keyValue[0] + " : </b></span><span class='prop-value'>" + keyValue[1] + ",</span><br>"
-
-        }
-        return html
-    });
-
     //parse anomaly data properties value and returns the requested param
     Handlebars.registerHelper('lookupAnomalyProperty', function (propertiesString, param) {
         var propertiesAry = propertiesString.split(";");

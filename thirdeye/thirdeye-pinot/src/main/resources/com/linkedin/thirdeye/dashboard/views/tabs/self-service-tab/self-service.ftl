@@ -29,11 +29,11 @@
                         <div class="uk-modal-header">
                             <a class="uk-modal-close uk-close position-top-right"></a>
                         </div>
-                            <p>Turn
+                            <p><b>Turn
                                 <span id="turn-on-anomaly-function">on
                                 </span>
                                 <span id="turn-off-anomaly-function">off
-                                </span>
+                                </span></b>
                                 monitoring and alerts of
                             <b>
                                 <span class="function-to-toggle">
@@ -42,7 +42,7 @@
                                 function?
                             </p>
                         <div class="uk-modal-footer">
-                            <div id="toggle-active-state-error" class="uk-alert uk-alert-alert hidden" rel="self-service">
+                            <div id="toggle-active-state-error" class="uk-alert uk-alert-danger hidden" rel="self-service">
                                 <p></p>
                             </div>
                             <div id="toggle-active-state-success" class="uk-alert uk-alert-success hidden" rel="self-service">
@@ -61,7 +61,7 @@
 
                         <p>Are you sure about deleting <span id="function-to-delete"></span> function?</p>
                         <div class="uk-modal-footer">
-                            <div id="delete-anomaly-function-error" class="uk-alert uk-alert-alert hidden" rel="self-service">
+                            <div id="delete-anomaly-function-error" class="uk-alert uk-alert-danger hidden" rel="self-service">
                                 <p></p>
                             </div>
                             <div id="delete-anomaly-function-success" class="uk-alert uk-alert-success hidden" rel="self-service">

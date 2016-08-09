@@ -243,7 +243,7 @@
                         <input id="monitoring-schedule-time" class="thin-input" type="text" data-uk-timepicker="{format:'24h'}" placeholder="HH:MM" value="{{#if schedule/scheduleHour}}{{displayScheduleTime schedule/scheduleHour}}:{{else}}00:{{/if}}{{#if schedule/scheduleMinute}}{{displayScheduleTime schedule/scheduleMinute}}{{else}}00{{/if}}">
                         <span id="schedule-timezone">UTC</span>
                     </span>
-           {{#if data.cron}}<span class="form-row">cron: {{data/cron}}</span>{{/if}}
+           {{#if data.cron}}<span class="form-row uk-hidden">cron: {{data/cron}}</span>{{/if}}
 
         </div>
 
