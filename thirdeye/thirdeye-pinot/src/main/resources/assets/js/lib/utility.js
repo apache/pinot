@@ -10,18 +10,22 @@ function getData(url, tab) {
         dataType: 'json',
         statusCode: {
             404: function () {
-                $("#" + tab + "-chart-area-error").empty()
-                var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' })
-                warning.append($('<p></p>', { html: 'No data available. (Error code: 404)' }))
-                $("#" + tab + "-chart-area-error").append(warning)
+                $("#" + tab + "-chart-area-error").empty();
+                var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' });
+                var closeBtn = $('<i></i>', { class: 'close-parent uk-icon-close' });
+                warning.append($('<p></p>', { html: 'No data available. (Error code: 404)' }));
+                $("#" + tab + "-chart-area-error").append(closeBtn);
+                $("#" + tab + "-chart-area-error").append(warning);
                 $("#" + tab + "-chart-area-error").fadeIn(100);
                 return
             },
             500: function () {
                 $("#" + tab + "-chart-area-error").empty()
-                var error = $('<div></div>', { class: 'uk-alert uk-alert-danger' })
-                error.append($('<p></p>', { html: 'Internal server error' }))
-                $("#" + tab + "-chart-area-error").append(error)
+                var error = $('<div></div>', { class: 'uk-alert uk-alert-danger' });
+                var closeBtn = $('<i></i>', { class: 'close-parent uk-icon-close' });
+                error.append($('<p></p>', { html: 'Internal server error' }));
+                $("#" + tab + "-chart-area-error").append(closeBtn);
+                $("#" + tab + "-chart-area-error").append(error);
                 $("#" + tab + "-chart-area-error").fadeIn(100);
                 return
             }
@@ -56,24 +60,23 @@ function submitData(url, data, tab) {
         data: data,
         statusCode: {
             404: function () {
-                $("#" + tab + "-chart-area-error").empty()
-                var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' })
-                warning.append($('<p></p>', { html: 'No data available. (Error code: 404)' }))
-                $("#" + tab + "-chart-area-error").append(warning)
+                $("#" + tab + "-chart-area-error").empty();
+                var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' });
+                var closeBtn = $('<i></i>', { class: 'close-parent uk-icon-close' });
+                warning.append($('<p></p>', { html: 'No data available. (Error code: 404)' }));
+                $("#" + tab + "-chart-area-error").append(closeBtn);
+                $("#" + tab + "-chart-area-error").append(warning);
                 $("#" + tab + "-chart-area-error").fadeIn(100);
                 return
             },
             500: function () {
-                $("#" + tab + "-chart-area-error").empty()
-                var error = $('<div></div>', { class: 'uk-alert uk-alert-danger' })
-                error.append($('<p></p>', { html: 'Internal server error' }))
-                $("#" + tab + "-chart-area-error").append(error)
+                $("#" + tab + "-chart-area-error").empty();
+                var error = $('<div></div>', { class: 'uk-alert uk-alert-danger' });
+                error.append($('<p></p>', { html: 'Internal server error' }));
+                $("#" + tab + "-chart-area-error").append(error);
                 $("#" + tab + "-chart-area-error").fadeIn(100);
                 return
             }
-        },
-        error: function (jqXhr, textStatus, errorThrown) {
-            console.log(errorThrown);
         }
     }).always(function () {
     })
@@ -474,6 +477,18 @@ function enableButton(button) {
     $(button).removeAttr("disabled");
 }
 
+function toggleCheckbox($checkbox){
+
+    if ($checkbox.is(':checked')) {
+        $checkbox.removeAttr('checked');
+        $checkbox.prop('checked', false);
+
+    }else{
+        $checkbox.attr('checked', true);
+        $checkbox.prop('checked', true);
+    }
+}
+
 function selectDatasetNGetFormData(target) {
     //Cleanup form: Remove added-item and added-filter, metrics of the previous dataset
     $("#" + hash.view + "-chart-area-error").hide();
@@ -489,7 +504,6 @@ function selectDatasetNGetFormData(target) {
     $(".added-filter").remove();
     $(".filter-panel .value-filter").remove();
     clearCreateForm();
-
 
     //Remove previous dataset's hash values
     delete hash.baselineStart;
@@ -826,6 +840,26 @@ function clearCreateForm() {
     $("#manage-anomaly-fn-error").hide();
     $("#manage-anomaly-function-success").hide();
     enableButton($("#create-anomaly-function"));
+}
+
+
+/** Takes an object where separators are ";" "=" returns JSON**/
+function parseProperties(properties){
+
+    if(properties && properties.substr(properties.length - 1) == ","){
+        properties = properties.substring(0, properties.length-1);
+        console.log("properties- ,", properties)
+    }
+    var fnProperties = {}
+    var propertiesAry = properties.split(";");
+    for (var i = 0, numProp = propertiesAry.length; i < numProp; i++) {
+        var keyValue = propertiesAry[i];
+        keyValue = keyValue.split("=")
+        var key = ( keyValue[0] == "null") ? "" : keyValue[0];
+        var value = ( keyValue[0] == "null") ? "" : keyValue[1];
+        fnProperties[key] = value;
+    }
+    return fnProperties
 }
 
 

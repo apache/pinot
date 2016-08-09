@@ -764,7 +764,8 @@ body a{
     padding: 5px;
 }
 
-#tooltip {
+#tooltip,
+#existing-fn-table-tooltip {
     position: absolute;
     width: 230px;
     height: auto;
@@ -783,18 +784,21 @@ body a{
     display: none;
 }
 
-#tooltip table {
+#tooltip table,
+#existing-fn-table-tooltip table{
     table-layout:fixed;
     width: 100%;
     max-width: 230px;
     padding: 0;
 }
 
-#tooltip tr {
+#tooltip tr,
+#existing-fn-table-tooltip tr{
     height:20px;
 }
 
-#tooltip td:first-child {
+#tooltip td:first-child,
+#existing-fn-table-tooltip td:first-child{
     white-space: nowrap;
 }
 
@@ -891,6 +895,11 @@ body a{
 
 #existing-anomaly-functions-table td{
     word-break: break-all;
+    vertical-align: top;
+}
+
+#existing-anomaly-functions-table  .properties-cell{
+    border-top: none;
 }
 
 #configure-anomaly-function-form{

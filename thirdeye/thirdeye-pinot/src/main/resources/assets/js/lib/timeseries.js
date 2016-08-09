@@ -78,7 +78,6 @@ function renderTimeSeriesUsingC3(d, tab) {  //time-series-area
     });
     //chart.transform('spline','data1')
 
-
     chart.hide();
 
 
