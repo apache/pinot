@@ -240,7 +240,7 @@
                     <span id="monitoring-schedule" class="{{#if schedule}}{{hide_if_eq schedule/repeatEveryUnit 'HOURS'}}{{else}}uk-hidden{{/if}}">
                         <span> at
                         </span>
-                        <input id="monitoring-schedule-time" class="thin-input" type="text" data-uk-timepicker="{format:'24h'}" placeholder="HH:MM" value="{{#if schedule/scheduleHour}}{{displayScheduleTime schedule/scheduleHour}}:{{else}}00:{{/if}}{{#if schedule/scheduleMinute}}{{displayScheduleTime schedule/scheduleMinute}}{{else}}00{{/if}}">
+                        <input id="monitoring-schedule-time" type="text" placeholder="HH:MM or HH,HH,HH" value="{{#if schedule/scheduleHour}}{{displayScheduleTime schedule/scheduleHour}}{{else}}{{/if}}{{#if schedule/scheduleMinute}}:{{displayScheduleTime schedule/scheduleMinute}}{{else}}{{/if}}">
                         <span id="schedule-timezone">UTC</span>
                     </span>
            {{#if data.cron}}<span class="form-row uk-hidden">cron: {{data/cron}}</span>{{/if}}

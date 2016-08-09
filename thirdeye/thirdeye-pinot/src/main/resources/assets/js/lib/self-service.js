@@ -348,8 +348,13 @@ function renderSelfService() {
         formData.repeatEveryUnit = $("#selected-monitoring-repeat-unit", form).attr("value");
         var monitoringScheduleTime = ( $("#monitoring-schedule-time", form).val() == "" ) ? "" : $("#monitoring-schedule-time", form).val() //Todo: in case of daily data granularity set the default schedule to time when datapoint is created
         if(monitoringScheduleTime){
-            formData.scheduleMinute = monitoringScheduleTime.substring(3, monitoringScheduleTime.length);
-            formData.scheduleHour = monitoringScheduleTime.substring(0, monitoringScheduleTime.length - 3);
+            if(monitoringScheduleTime.indexOf(",") > -1){
+                formData.scheduleMinute = "";
+                formData.scheduleHour = monitoringScheduleTime;
+            }else{
+                formData.scheduleMinute = monitoringScheduleTime.substring(3, monitoringScheduleTime.length);
+                formData.scheduleHour = monitoringScheduleTime.substring(0, monitoringScheduleTime.length - 3);
+            }
         }
 
         if ($("#function-id", form).length > 0) {
@@ -717,7 +722,6 @@ function renderSelfService() {
             var urlParams = urlOfAnomalyFn(formData)
 
             submitData("/dashboard/anomaly-function/update?" + urlParams).done(function () {
-
                 //existingAnomalyFunctionsData[rowId] = {formData}
                 getExistingAnomalyFunctions(formData.dataset);
 

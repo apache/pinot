@@ -898,7 +898,8 @@ body a{
     vertical-align: top;
 }
 
-#existing-anomaly-functions-table  .properties-cell{
+#existing-anomaly-functions-table  .properties-cell,
+#existing-anomaly-functions-table  .existing-anomaly-fn-filters-cell{
     border-top: none;
 }
 
