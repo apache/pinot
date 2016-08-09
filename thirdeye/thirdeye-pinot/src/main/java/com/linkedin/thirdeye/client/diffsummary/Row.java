@@ -1,15 +1,14 @@
-package com.linkedin.thirdeye.client.pinot.summary;
+package com.linkedin.thirdeye.client.diffsummary;
 
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 
 
-public class Row {
+class Row {
   Dimensions dimensions;
   DimensionValues dimensionValues;
   double baselineValue;
   double currentValue;
-//  public List<Double> targetRatios = new ArrayList<>(); // for development purpose
 
   public Dimensions getDimensions() {
     return dimensions;

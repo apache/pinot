@@ -1,17 +1,17 @@
-package com.linkedin.thirdeye.client.pinot.summary;
+package com.linkedin.thirdeye.dashboard.views.diffsummary;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import jersey.repackaged.com.google.common.collect.Lists;
 
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.linkedin.thirdeye.client.diffsummary.DimensionValues;
+import com.linkedin.thirdeye.client.diffsummary.Dimensions;
+import com.linkedin.thirdeye.client.diffsummary.HierarchyNode;
 
 public class SummaryResponse {
   @JsonProperty("dimensions")
@@ -29,9 +29,9 @@ public class SummaryResponse {
     SummaryResponse response = new SummaryResponse();
 
     // Build the header
-    Dimensions dimensions = nodes.get(0).data.dimensions;
+    Dimensions dimensions = nodes.get(0).getDimensions();
     for (int i = 0; i < levelCount; ++i) {
-      response.dimensions.add(dimensions.names.get(i));
+      response.dimensions.add(dimensions.get(i));
     }
 
     // Build the response
@@ -41,15 +41,15 @@ public class SummaryResponse {
     for (HierarchyNode node : nodes) {
       NameTag tag = new NameTag(levelCount);
       nameTags.put(node, tag);
-      tag.copyNames(node.data.dimensionValues);
+      tag.copyNames(node.getDimensionValues());
     }
     for (HierarchyNode node : nodes) {
       HierarchyNode parent = node;
       int levelDiff = 1;
-      while ((parent = parent.parent) != null) {
+      while ((parent = parent.getParent()) != null) {
         NameTag parentNameTag = nameTags.get(parent);
         if (parentNameTag != null) {
-          parentNameTag.setNotAll(node.level-levelDiff);
+          parentNameTag.setNotAll(node.getLevel()-levelDiff);
           break;
         }
         ++levelDiff;
@@ -59,8 +59,8 @@ public class SummaryResponse {
     for (HierarchyNode node : nodes) {
       SummaryResponseRow row = new SummaryResponseRow();
       row.names = nameTags.get(node).names;
-      row.baselineValue = node.baselineValue;
-      row.currentValue = node.currentValue;
+      row.baselineValue = node.getBaselineValue();
+      row.currentValue = node.getCurrentValue();
       row.ratio = node.currentRatio();
       response.responseRows.add(row);
     }
@@ -118,8 +118,8 @@ public class SummaryResponse {
     }
 
     public void copyNames(DimensionValues dimensionValues) {
-      for (int i = 0; i < dimensionValues.values.size(); ++i) {
-        names.set(i, dimensionValues.values.get(i));
+      for (int i = 0; i < dimensionValues.size(); ++i) {
+        names.set(i, dimensionValues.get(i));
       }
     }
 

@@ -17,13 +17,13 @@ import org.joda.time.DateTimeZone;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
-import com.linkedin.thirdeye.client.pinot.summary.Cube;
-import com.linkedin.thirdeye.client.pinot.summary.Dimensions;
-import com.linkedin.thirdeye.client.pinot.summary.OLAPDataBaseClient;
-import com.linkedin.thirdeye.client.pinot.summary.PinotThirdEyeSummaryClient;
-import com.linkedin.thirdeye.client.pinot.summary.Summary;
-import com.linkedin.thirdeye.client.pinot.summary.SummaryResponse;
+import com.linkedin.thirdeye.client.diffsummary.Cube;
+import com.linkedin.thirdeye.client.diffsummary.Dimensions;
+import com.linkedin.thirdeye.client.diffsummary.OLAPDataBaseClient;
+import com.linkedin.thirdeye.client.diffsummary.PinotThirdEyeSummaryClient;
 import com.linkedin.thirdeye.dashboard.Utils;
+import com.linkedin.thirdeye.dashboard.views.diffsummary.Summary;
+import com.linkedin.thirdeye.dashboard.views.diffsummary.SummaryResponse;
 
 
 @Path(value = "/dashboard")

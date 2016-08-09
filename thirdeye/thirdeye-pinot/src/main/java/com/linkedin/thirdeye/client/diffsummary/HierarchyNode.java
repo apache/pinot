@@ -1,13 +1,16 @@
-package com.linkedin.thirdeye.client.pinot.summary;
+package com.linkedin.thirdeye.client.diffsummary;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
-class HierarchyNode {
+
+public class HierarchyNode {
   int level;
   int index;
   double baselineValue;
@@ -25,6 +28,65 @@ class HierarchyNode {
     this.currentValue = data.currentValue;
     this.data = data;
     this.parent = parent;
+  }
+
+  public int getLevel() {
+    return level;
+  }
+
+  public void resetValues() {
+    this.baselineValue = this.data.baselineValue;
+    this.currentValue = this.data.currentValue;
+  }
+
+  public void removeNodeValues(HierarchyNode node) {
+    this.baselineValue -= node.baselineValue;
+    this.currentValue -= node.currentValue;
+  }
+
+  public void addNodeValues(HierarchyNode node) {
+    this.baselineValue += node.baselineValue;
+    this.currentValue += node.currentValue;
+  }
+
+  public double getBaselineValue() {
+    return baselineValue;
+  }
+
+  public double getCurrentValue() {
+    return currentValue;
+  }
+
+  @JsonIgnore
+  public double getOriginalBaselineValue() {
+    return data.baselineValue;
+  }
+
+  @JsonIgnore
+  public double getOriginalCurrentValue() {
+    return data.currentValue;
+  }
+
+  @JsonIgnore
+  public Dimensions getDimensions() {
+    return data.dimensions;
+  }
+
+  @JsonIgnore
+  public DimensionValues getDimensionValues() {
+    return data.dimensionValues;
+  }
+
+  public HierarchyNode getParent() {
+    return parent;
+  }
+
+  public int childrenSize() {
+    return children.size();
+  }
+
+  public List<HierarchyNode> getChildren() {
+    return Collections.unmodifiableList(children);
   }
 
   public double aggregatedRatio() {
@@ -59,7 +121,7 @@ class HierarchyNode {
   }
 
   /**
-   * Returns the current ratio of this node is increased or decreased, i.e., returns if ratio of the node >= 1.0.
+   * Returns the current ratio of this node is increased or decreased, i.e., returns true if ratio of the node >= 1.0.
    * If the current ratio is NAN, then the ratio of the aggregated values is used.
    *
    * Precondition: the aggregated baseline and current values cannot both be zero.
