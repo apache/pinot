@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.db;
 
+import com.linkedin.thirdeye.db.dao.AbstractDbTestBase;
 import java.util.List;
 
 import org.joda.time.DateTime;

@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.db;
 
 import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
+import com.linkedin.thirdeye.db.dao.AbstractDbTestBase;
 import com.linkedin.thirdeye.db.entity.AnomalyJobSpec;
 
 import java.util.List;
