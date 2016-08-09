@@ -8,7 +8,12 @@ import com.linkedin.thirdeye.db.dao.AbstractDbTestBase;
 import com.linkedin.thirdeye.db.entity.AnomalyFeedback;
 import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
 import com.linkedin.thirdeye.db.entity.AnomalyResult;
+import com.linkedin.thirdeye.db.entity.EmailConfiguration;
+
+import java.util.ArrayList;
 import java.util.List;
+
+import org.joda.time.DateTime;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -34,6 +39,23 @@ public class TestAnomalyResultDAO extends AbstractDbTestBase {
   }
 
   @Test(dependsOnMethods = {"testAnomalyResultCRUD"})
+  public void testFindAllByEmailAndTime() {
+    EmailConfiguration emailSpec = getEmailConfiguration();
+    emailConfigurationDAO.save(emailSpec);
+    List<AnomalyFunctionSpec> functionSpecList = new ArrayList<>();
+    functionSpecList.add(spec);
+    emailSpec.setFunctions(functionSpecList);
+    emailConfigurationDAO.save(emailSpec);
+
+    List<AnomalyResult> results = anomalyResultDAO.findValidAllByTimeAndEmailId(new DateTime().minusHours(1),
+        new DateTime(), emailSpec.getId());
+    Assert.assertEquals(results.size(), 1);
+    Assert.assertEquals(results.get(0).isDataMissing(), false);
+    Assert.assertEquals(emailSpec.getFunctions().get(0).getId(), results.get(0).getFunction().getId());
+    emailConfigurationDAO.delete(emailSpec);
+  }
+
+  @Test(dependsOnMethods = {"testFindAllByEmailAndTime"})
   public void testGetCountByFunction() {
     List<GroupByRow<GroupByKey, Long>> groupByRows =
         anomalyResultDAO.getCountByFunction(0l, System.currentTimeMillis());

@@ -1,6 +1,8 @@
 package com.linkedin.thirdeye.db.dao;
 
+import com.google.inject.persist.Transactional;
 import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
+
 import java.util.List;
 
 public class AnomalyFunctionDAO extends AbstractJpaDAO<AnomalyFunctionSpec> {
@@ -15,6 +17,12 @@ public class AnomalyFunctionDAO extends AbstractJpaDAO<AnomalyFunctionSpec> {
     super(AnomalyFunctionSpec.class);
   }
 
+  @Transactional
+  public AnomalyFunctionSpec findById(Long id) {
+    return super.findById(id);
+  }
+
+  @Transactional
   public List<AnomalyFunctionSpec> findAllByCollection(String collection) {
     return getEntityManager().createQuery(GET_BY_COLLECTION, entityClass)
         .setParameter("collection", collection).getResultList();
