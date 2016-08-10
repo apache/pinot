@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.db.dao;
 
+import com.google.inject.persist.Transactional;
 import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
 import com.linkedin.thirdeye.db.entity.AnomalyJobSpec;
 
@@ -25,6 +26,7 @@ public class AnomalyJobDAO extends AbstractJpaDAO<AnomalyJobSpec> {
     return super.findByParams(filterParams);
   }
 
+  @Transactional
   public void updateStatusAndJobEndTime(Long id, JobStatus status, Long jobEndTime) {
     AnomalyJobSpec anomalyJobSpec = findById(id);
     anomalyJobSpec.setStatus(status);
@@ -32,6 +34,7 @@ public class AnomalyJobDAO extends AbstractJpaDAO<AnomalyJobSpec> {
     save(anomalyJobSpec);
   }
 
+  @Transactional
   public int deleteRecordsOlderThanDaysWithStatus(int days, JobStatus status) {
     DateTime expireDate = new DateTime().minusDays(days);
     Timestamp expireTimestamp = new Timestamp(expireDate.getMillis());
@@ -39,7 +42,6 @@ public class AnomalyJobDAO extends AbstractJpaDAO<AnomalyJobSpec> {
         .createQuery(FIND_BY_STATUS_AND_LAST_MODIFIED_TIME_LT_EXPIRE, entityClass)
         .setParameter("expireTimestamp", expireTimestamp)
         .setParameter("status", status).getResultList();
-
     for (AnomalyJobSpec anomalyJobSpec : anomalyJobSpecs) {
       delete(anomalyJobSpec);
     }

@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.db.dao;
 
+import com.google.inject.persist.Transactional;
 import com.linkedin.thirdeye.api.dto.GroupByKey;
 import com.linkedin.thirdeye.api.dto.GroupByRow;
 import com.linkedin.thirdeye.db.entity.AnomalyResult;
@@ -91,6 +92,7 @@ public class AnomalyResultDAO extends AbstractJpaDAO<AnomalyResult> {
     super(AnomalyResult.class);
   }
 
+  @Transactional
   public List<AnomalyResult> findAllByCollectionAndTime(String collection, DateTime startTime,
       DateTime endTime) {
     return getEntityManager().createQuery(FIND_BY_COLLECTION_TIME, entityClass)
@@ -100,6 +102,7 @@ public class AnomalyResultDAO extends AbstractJpaDAO<AnomalyResult> {
         .getResultList();
   }
 
+  @Transactional
   public List<AnomalyResult> findAllByCollectionTimeAndMetric(String collection, String metric,
       DateTime startTime, DateTime endTime) {
     return getEntityManager().createQuery(FIND_BY_COLLECTION_TIME_METRIC, entityClass)
@@ -109,6 +112,7 @@ public class AnomalyResultDAO extends AbstractJpaDAO<AnomalyResult> {
         .setParameter("metric", metric).getResultList();
   }
 
+  @Transactional
   public List<AnomalyResult> findAllByCollectionTimeMetricAndDimensions(String collection,
       String metric, DateTime startTime, DateTime endTime, String[] dimensions) {
     List<String> dimList = Arrays.asList(dimensions);
@@ -119,6 +123,7 @@ public class AnomalyResultDAO extends AbstractJpaDAO<AnomalyResult> {
         .setParameter("metric", metric).setParameter("dimensions", dimList).getResultList();
   }
 
+  @Transactional
   public List<AnomalyResult> findUnmergedByCollectionMetricAndDimensions(String collection,
       String metric, String dimensions) {
     return getEntityManager().createQuery(FIND_UNMERGED_BY_COLLECTION_METRIC_DIMENSION, entityClass)
@@ -126,6 +131,7 @@ public class AnomalyResultDAO extends AbstractJpaDAO<AnomalyResult> {
         .setParameter("dimensions", dimensions).getResultList();
   }
 
+  @Transactional
   public List<AnomalyResult> findAllByTimeAndFunctionId(long startTime, long endTime,
       long functionId) {
     return getEntityManager().createQuery(FIND_BY_TIME_AND_FUNCTION_ID, entityClass)
@@ -133,6 +139,7 @@ public class AnomalyResultDAO extends AbstractJpaDAO<AnomalyResult> {
         .setParameter("functionId", functionId).getResultList();
   }
 
+  @Transactional
   public List<AnomalyResult> findAllByCollectionTimeAndFilters(String collection,
       DateTime startTime, DateTime endTime, String filters) {
     return getEntityManager().createQuery(FIND_BY_COLLECTION_TIME_FILTERS, entityClass)
@@ -142,6 +149,7 @@ public class AnomalyResultDAO extends AbstractJpaDAO<AnomalyResult> {
         .setParameter("filters", filters).getResultList();
   }
 
+  @Transactional
   public List<AnomalyResult> findAllByCollectionTimeMetricAndFilters(String collection,
       String metric, DateTime startTime, DateTime endTime, String filters) {
     return getEntityManager().createQuery(FIND_BY_COLLECTION_TIME_METRIC_FILTERS, entityClass)
@@ -151,6 +159,7 @@ public class AnomalyResultDAO extends AbstractJpaDAO<AnomalyResult> {
         .setParameter("metric", metric).setParameter("filters", filters).getResultList();
   }
 
+  @Transactional
   public List<AnomalyResult> findValidAllByTimeAndEmailId(DateTime startTime, DateTime endTime,
       long emailId) {
     return getEntityManager().createQuery(FIND_VALID_BY_TIME_EMAIL_ID, entityClass)
@@ -159,6 +168,7 @@ public class AnomalyResultDAO extends AbstractJpaDAO<AnomalyResult> {
         .setParameter("emailId", emailId).setParameter("dataMissing", false).getResultList();
   }
 
+  @Transactional
   public List<GroupByRow<GroupByKey, Long>> getCountByCollectionMetricDimension(long startTime, long endTime) {
     List<GroupByRow<GroupByKey, Long>> groupByRecords = new ArrayList<>();
     TypedQuery<Object[]> q = getEntityManager().createQuery(
@@ -179,6 +189,7 @@ public class AnomalyResultDAO extends AbstractJpaDAO<AnomalyResult> {
     return groupByRecords;
   }
 
+  @Transactional
   public List<GroupByRow<GroupByKey, Long>> getCountByFunction(long startTime, long endTime) {
     List<GroupByRow<GroupByKey, Long>> groupByRecords = new ArrayList<>();
     TypedQuery<Object[]> q = getEntityManager().createQuery(COUNT_GROUP_BY_FUNCTION, Object[].class)
@@ -199,6 +210,7 @@ public class AnomalyResultDAO extends AbstractJpaDAO<AnomalyResult> {
     return groupByRecords;
   }
 
+  @Transactional
   public List<GroupByRow<GroupByKey, Long>> getCountByCollection(long startTime, long endTime) {
     List<GroupByRow<GroupByKey, Long>> groupByRecords = new ArrayList<>();
     TypedQuery<Object[]> q =
@@ -217,6 +229,7 @@ public class AnomalyResultDAO extends AbstractJpaDAO<AnomalyResult> {
     return groupByRecords;
   }
 
+  @Transactional
   public List<GroupByRow<GroupByKey, Long>> getCountByCollectionMetric(long startTime,
       long endTime) {
     List<GroupByRow<GroupByKey, Long>> groupByRecords = new ArrayList<>();

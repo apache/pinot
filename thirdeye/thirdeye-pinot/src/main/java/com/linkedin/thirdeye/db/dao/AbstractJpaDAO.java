@@ -18,9 +18,11 @@ public class AbstractJpaDAO<E extends AbstractBaseEntity> {
   private EntityManager em;
 
   final Class<E> entityClass;
+
   AbstractJpaDAO(Class<E> entityClass) {
     this.entityClass = entityClass;
   }
+
   EntityManager getEntityManager() {
     return em;
   }
@@ -36,6 +38,7 @@ public class AbstractJpaDAO<E extends AbstractBaseEntity> {
     getEntityManager().merge(entity);
   }
 
+  @Transactional
   public E findById(Long id) {
     return getEntityManager().find(entityClass, id);
   }
@@ -50,11 +53,13 @@ public class AbstractJpaDAO<E extends AbstractBaseEntity> {
     getEntityManager().remove(findById(id));
   }
 
+  @Transactional
   public List<E> findAll() {
     return getEntityManager().createQuery("from " + entityClass.getSimpleName(), entityClass)
         .getResultList();
   }
 
+  @Transactional
   public List<E> findByParams(Map<String, Object> filters) {
     CriteriaBuilder builder = getEntityManager().getCriteriaBuilder();
     CriteriaQuery<E> query = builder.createQuery(entityClass);
