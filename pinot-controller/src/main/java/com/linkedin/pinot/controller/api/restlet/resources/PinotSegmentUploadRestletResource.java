@@ -20,7 +20,6 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
 import java.net.URLDecoder;
-import java.net.URLEncoder;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
@@ -67,6 +66,7 @@ import com.linkedin.pinot.common.utils.FileUploadUtils.FileUploadType;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.common.utils.time.TimeUtils;
+import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.api.ControllerRestApplication;
 import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
 import com.linkedin.pinot.controller.helix.core.realtime.SegmentCompletionManager;
@@ -103,8 +103,7 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
       tempUntarredPath.mkdirs();
     }
 
-    vip = StringUtil.join("://", _controllerConf.getControllerVipProtocol(),
-        StringUtil.join(":", _controllerConf.getControllerVipHost(), _controllerConf.getControllerPort()));
+    vip = _controllerConf.generateVipUrl();
     segmentCompletionManager = SegmentCompletionManager.getInstance();
     LOGGER.info("controller download url base is : " + vip);
   }
@@ -451,7 +450,7 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
       response = new PinotResourceManagerResponse("Invalid segment start/end time", false);
     } else {
       if (downloadUrl == null) {
-        downloadUrl = constructDownloadUrl(metadata.getTableName(), dataFile.getName());
+        downloadUrl = ControllerConf.constructDownloadUrl(metadata.getTableName(), dataFile.getName(), vip);
       }
       response = _pinotHelixResourceManager.addSegment(metadata, downloadUrl);
     }
@@ -564,15 +563,6 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
       throws JsonProcessingException, JSONException {
 
     return new PinotSegmentRestletResource().toggleSegmentState(tableName, null, "drop", null);
-  }
-
-  public String constructDownloadUrl(String tableName, String segmentName) {
-    try {
-      return StringUtil.join("/", vip, "segments", tableName, URLEncoder.encode(segmentName, "UTF-8"));
-    } catch (UnsupportedEncodingException e) {
-      // Shouldn't happen
-      throw new AssertionError("UTF-8 encoding should always be supported", e);
-    }
   }
 
   /**
