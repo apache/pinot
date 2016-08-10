@@ -124,11 +124,6 @@ public class LLCSegmentCommitTest {
       return createMockApplication();
     }
 
-//    @Override
-//    public Reference getReference() {
-//      return createMockReference();
-//    }
-
     @Override
     boolean uploadSegment(final String instanceId, final String segmentNameStr) {
       _uploadCalled = true;

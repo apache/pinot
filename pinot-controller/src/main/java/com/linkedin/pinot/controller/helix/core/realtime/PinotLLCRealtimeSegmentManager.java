@@ -316,7 +316,6 @@ public class PinotLLCRealtimeSegmentManager {
    * @param nextOffset The offset with which the next segment should start.
    * @return
    */
-  // TODO Change this to be tableName rather than realtimeTableName
   public boolean commitSegment(String rawTableName, final String committingSegmentNameStr, long nextOffset) {
     final long now = System.currentTimeMillis();
     final String realtimeTableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(rawTableName);
@@ -329,7 +328,6 @@ public class PinotLLCRealtimeSegmentManager {
     oldSegMetadata.setEndOffset(nextOffset);
     oldSegMetadata.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
     oldSegMetadata.setEndTime(now);
-    // TODO Set download URL? Should these segments be downloaded via vip?
     final ZNRecord oldZnRecord = oldSegMetadata.toZNRecord();
     final String oldZnodePath = PinotRealtimeSegmentManager.getSegmentsPath() + "/" + realtimeTableName + "/" + committingSegmentNameStr;
 
