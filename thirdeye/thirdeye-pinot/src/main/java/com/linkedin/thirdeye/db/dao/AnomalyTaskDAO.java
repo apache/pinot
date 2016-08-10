@@ -5,8 +5,10 @@ import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
 import com.linkedin.thirdeye.db.entity.AnomalyTaskSpec;
 
 import java.sql.Timestamp;
+import java.util.HashMap;
 import java.util.List;
 
+import java.util.Map;
 import javax.persistence.OptimisticLockException;
 import javax.persistence.RollbackException;
 
@@ -30,10 +32,6 @@ public class AnomalyTaskDAO extends AbstractJpaDAO<AnomalyTaskSpec> {
   private static final String FIND_BY_STATUS_AND_LAST_MODIFIED_TIME_LT_EXPIRE = "SELECT at FROM AnomalyTaskSpec at "
       + "WHERE at.status = :status AND at.lastModified < :expireTimestamp";
 
-  private static final String FIND_BY_STATUS_AND_ID = "SELECT at FROM AnomalyTaskSpec at "
-      + "WHERE status = :status and id = :id";
-
-
   public AnomalyTaskDAO() {
     super(AnomalyTaskSpec.class);
   }
@@ -52,10 +50,10 @@ public class AnomalyTaskDAO extends AbstractJpaDAO<AnomalyTaskSpec> {
   }
 
   public List<AnomalyTaskSpec> findByIdAndStatus(Long id, TaskStatus status) {
-    return getEntityManager().createQuery(FIND_BY_STATUS_AND_ID, entityClass)
-            .setParameter("status", status)
-            .setParameter("id", id)
-            .getResultList();
+    Map<String, Object> filters = new HashMap<>();
+    filters.put("status", status);
+    filters.put("id", id);
+    return super.findByParams(filters);
   }
 
   public boolean updateStatusAndWorkerId(Long workerId, Long id, TaskStatus oldStatus, TaskStatus newStatus) {

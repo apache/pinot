@@ -1,7 +1,7 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
 import com.linkedin.thirdeye.anomaly.merge.AnomalyMergeConfig;
-import com.linkedin.thirdeye.anomaly.merge.AnomalySummaryGenerator;
+import com.linkedin.thirdeye.anomaly.merge.AnomalyMergeGenerator;
 import com.linkedin.thirdeye.api.dto.GroupByKey;
 import com.linkedin.thirdeye.api.dto.GroupByRow;
 import com.linkedin.thirdeye.db.entity.AnomalyMergedResult;
@@ -48,7 +48,7 @@ public class AnomalySummaryResource {
     List<AnomalyResult> anomalies = resultDAO
         .findAllByTimeAndFunctionId(mergeConfig.getStartTime(), mergeConfig.getEndTime(),
             functionId);
-    return AnomalySummaryGenerator.mergeAnomalies(anomalies, mergeConfig);
+    return AnomalyMergeGenerator.mergeAnomalies(anomalies, mergeConfig);
   }
 
   @POST
@@ -76,7 +76,7 @@ public class AnomalySummaryResource {
     } else {
       anomalies = resultDAO.findAllByCollectionAndTime(collection, startTimeUtc, endTimeUtc);
     }
-    return AnomalySummaryGenerator.mergeAnomalies(anomalies, mergeConfig);
+    return AnomalyMergeGenerator.mergeAnomalies(anomalies, mergeConfig);
   }
 
   @POST

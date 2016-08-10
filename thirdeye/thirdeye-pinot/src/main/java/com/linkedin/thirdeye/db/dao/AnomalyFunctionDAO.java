@@ -3,12 +3,11 @@ package com.linkedin.thirdeye.db.dao;
 import com.google.inject.persist.Transactional;
 import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class AnomalyFunctionDAO extends AbstractJpaDAO<AnomalyFunctionSpec> {
-
-  private static final String GET_BY_COLLECTION =
-      "SELECT af FROM AnomalyFunctionSpec af WHERE af.collection = :collection";
 
   private static final String FIND_DISTINCT_METRIC_BY_COLLECTION =
       "SELECT DISTINCT(af.metric) FROM AnomalyFunctionSpec af WHERE af.collection = :collection";
@@ -24,8 +23,9 @@ public class AnomalyFunctionDAO extends AbstractJpaDAO<AnomalyFunctionSpec> {
 
   @Transactional
   public List<AnomalyFunctionSpec> findAllByCollection(String collection) {
-    return getEntityManager().createQuery(GET_BY_COLLECTION, entityClass)
-        .setParameter("collection", collection).getResultList();
+    Map<String, Object> filterParams = new HashMap<>();
+    filterParams.put("collection", collection);
+    return super.findByParams(filterParams);
   }
 
   public List<String> findDistinctMetricsByCollection(String collection) {

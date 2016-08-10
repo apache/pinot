@@ -63,6 +63,9 @@ public class AnomalyResult extends AbstractBaseEntity implements Comparable<Anom
   @JoinColumn(name = "function_id")
   private AnomalyFunctionSpec function;
 
+  @Column(name = "merged_result_id")
+  private Long mergedResultId;
+
   public AnomalyResult() {
     creationTimeUtc = DateTime.now().getMillis();
   }
@@ -172,6 +175,14 @@ public class AnomalyResult extends AbstractBaseEntity implements Comparable<Anom
 
   public void setDataMissing(boolean dataMissing) {
     this.dataMissing = dataMissing;
+  }
+
+  public Long getMergedResultId() {
+    return mergedResultId;
+  }
+
+  public void setMergedResultId(Long mergedResultId) {
+    this.mergedResultId = mergedResultId;
   }
 
   @Override
