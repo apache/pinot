@@ -16,10 +16,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.commons.mail.EmailException;
-import org.hibernate.Session;
 import org.hibernate.SessionFactory;
-import org.hibernate.Transaction;
-import org.hibernate.context.internal.ManagedSessionContext;
 import org.joda.time.DateTime;
 import org.joda.time.format.ISODateTimeFormat;
 import org.quartz.Job;
@@ -296,33 +293,18 @@ public class AnomalyDetectionJob implements Job {
   private List<AnomalyResult> getExistingAnomalies() {
     List<AnomalyResult> results = new ArrayList<>();
 
-    Session session = sessionFactory.openSession();
-    try {
-      ManagedSessionContext.bind(session);
-      Transaction transaction = session.beginTransaction();
-      try {
-        // The ones for this function
-        results.addAll(resultDAO
-            .findAllByTimeAndFunctionId(windowStart.getMillis(), windowEnd.getMillis(),
-                anomalyFunction.getSpec().getId()));
+    // The ones for this function
+    results.addAll(resultDAO
+        .findAllByTimeAndFunctionId(windowStart.getMillis(), windowEnd.getMillis(),
+            anomalyFunction.getSpec().getId()));
 
-        // The ones for any related functions
-        List<AnomalyFunctionRelation> relations =
-            relationDAO.findByParent(anomalyFunction.getSpec().getId());
-        for (AnomalyFunctionRelation relation : relations) {
-          results.addAll(resultDAO
-              .findAllByTimeAndFunctionId(windowStart.getMillis(), windowEnd.getMillis(),
-                  relation.getChildId()));
-        }
-
-        transaction.commit();
-      } catch (Exception e) {
-        transaction.rollback();
-        throw new RuntimeException(e);
-      }
-    } finally {
-      session.close();
-      ManagedSessionContext.unbind(sessionFactory);
+    // The ones for any related functions
+    List<AnomalyFunctionRelation> relations =
+        relationDAO.findByParent(anomalyFunction.getSpec().getId());
+    for (AnomalyFunctionRelation relation : relations) {
+      results.addAll(resultDAO
+          .findAllByTimeAndFunctionId(windowStart.getMillis(), windowEnd.getMillis(),
+              relation.getChildId()));
     }
     return results;
   }
