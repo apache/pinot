@@ -1,25 +1,19 @@
-package com.linkedin.thirdeye.db;
+package com.linkedin.thirdeye.db.dao;
 
 import com.linkedin.thirdeye.api.dto.GroupByKey;
 import com.linkedin.thirdeye.api.dto.GroupByRow;
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
 import com.linkedin.thirdeye.constant.FeedbackStatus;
-import com.linkedin.thirdeye.db.dao.AbstractDbTestBase;
 import com.linkedin.thirdeye.db.entity.AnomalyFeedback;
 import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
 import com.linkedin.thirdeye.db.entity.AnomalyResult;
-import com.linkedin.thirdeye.db.entity.EmailConfiguration;
-
-import java.util.ArrayList;
 import java.util.List;
-
-import org.joda.time.DateTime;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
 public class TestAnomalyResultDAO extends AbstractDbTestBase {
 
-  Long anomalyResultId;
+  AnomalyResult anomalyResult;
   AnomalyFunctionSpec spec = getTestFunctionSpec("metric", "dataset");
 
   @Test
@@ -28,34 +22,16 @@ public class TestAnomalyResultDAO extends AbstractDbTestBase {
     Assert.assertNotNull(spec);
 
     // create anomaly result
-    AnomalyResult result = getAnomalyResult();
-    result.setFunction(spec);
-    anomalyResultDAO.save(result);
+    anomalyResult = getAnomalyResult();
 
-    AnomalyResult resultRet = anomalyResultDAO.findById(result.getId());
+    anomalyResult.setFunction(spec);
+    anomalyResultDAO.save(anomalyResult);
+
+    AnomalyResult resultRet = anomalyResultDAO.findById(anomalyResult.getId());
     Assert.assertEquals(resultRet.getFunction(), spec);
-
-    anomalyResultId = result.getId();
   }
 
   @Test(dependsOnMethods = {"testAnomalyResultCRUD"})
-  public void testFindAllByEmailAndTime() {
-    EmailConfiguration emailSpec = getEmailConfiguration();
-    emailConfigurationDAO.save(emailSpec);
-    List<AnomalyFunctionSpec> functionSpecList = new ArrayList<>();
-    functionSpecList.add(spec);
-    emailSpec.setFunctions(functionSpecList);
-    emailConfigurationDAO.save(emailSpec);
-
-    List<AnomalyResult> results = anomalyResultDAO.findValidAllByTimeAndEmailId(new DateTime().minusHours(1),
-        new DateTime(), emailSpec.getId());
-    Assert.assertEquals(results.size(), 1);
-    Assert.assertEquals(results.get(0).isDataMissing(), false);
-    Assert.assertEquals(emailSpec.getFunctions().get(0).getId(), results.get(0).getFunction().getId());
-    emailConfigurationDAO.delete(emailSpec);
-  }
-
-  @Test(dependsOnMethods = {"testFindAllByEmailAndTime"})
   public void testGetCountByFunction() {
     List<GroupByRow<GroupByKey, Long>> groupByRows =
         anomalyResultDAO.getCountByFunction(0l, System.currentTimeMillis());
@@ -65,8 +41,16 @@ public class TestAnomalyResultDAO extends AbstractDbTestBase {
   }
 
   @Test(dependsOnMethods = {"testGetCountByFunction"})
+  public void testFindUnmergedByCollectionMetricAndDimensions() {
+    List<AnomalyResult> unmergedResults = anomalyResultDAO
+        .findUnmergedByCollectionMetricAndDimensions(spec.getCollection(), spec.getMetric(),
+            anomalyResult.getDimensions() );
+    Assert.assertEquals(unmergedResults.size(), 1);
+  }
+
+  @Test(dependsOnMethods = {"testFindUnmergedByCollectionMetricAndDimensions"})
   public void testResultFeedback() {
-    AnomalyResult result = anomalyResultDAO.findById(anomalyResultId);
+    AnomalyResult result = anomalyResultDAO.findById(anomalyResult.getId());
     Assert.assertNotNull(result);
     Assert.assertNull(result.getFeedback());
 
@@ -77,13 +61,13 @@ public class TestAnomalyResultDAO extends AbstractDbTestBase {
     result.setFeedback(feedback);
     anomalyResultDAO.save(result);
 
-    AnomalyResult resultRet = anomalyResultDAO.findById(anomalyResultId);
+    AnomalyResult resultRet = anomalyResultDAO.findById(anomalyResult.getId());
     Assert.assertEquals(resultRet.getId(), result.getId());
     Assert.assertNotNull(resultRet.getFeedback());
 
     AnomalyFunctionSpec functionSpec = result.getFunction();
 
-    anomalyResultDAO.deleteById(anomalyResultId);
+    anomalyResultDAO.deleteById(anomalyResult.getId());
     anomalyFunctionDAO.delete(functionSpec);
   }
 

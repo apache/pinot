@@ -4,16 +4,15 @@ import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
 import com.linkedin.thirdeye.db.entity.AnomalyJobSpec;
 
 import java.sql.Timestamp;
+import java.util.HashMap;
 import java.util.List;
 
+import java.util.Map;
 import org.joda.time.DateTime;
 
 public class AnomalyJobDAO extends AbstractJpaDAO<AnomalyJobSpec> {
 
-  private static final String FIND_BY_STATUS = "SELECT aj FROM AnomalyJobSpec aj "
-      + "WHERE aj.status = :status";
-
-  private static final String FIND_BY_STATUS_AND_LAST_MODIFIED_TIME_LT_EXPIRE = "SELECT aj FROM AnomalyJobSpec aj "
+  private static final String FIND_BY_STATUS_AND_LAST_MODIFIED_TIME_LT_EXPIRE = "from AnomalyJobSpec aj "
       + "WHERE aj.status = :status AND aj.lastModified < :expireTimestamp";
 
   public AnomalyJobDAO() {
@@ -21,8 +20,9 @@ public class AnomalyJobDAO extends AbstractJpaDAO<AnomalyJobSpec> {
   }
 
   public List<AnomalyJobSpec> findByStatus(JobStatus status) {
-    return getEntityManager().createQuery(FIND_BY_STATUS, entityClass)
-        .setParameter("status", status).getResultList();
+    Map<String, Object> filterParams = new HashMap<>();
+    filterParams.put("status", status);
+    return super.findByParams(filterParams);
   }
 
   public void updateStatusAndJobEndTime(Long id, JobStatus status, Long jobEndTime) {
