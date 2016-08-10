@@ -22,6 +22,8 @@ public class Summary {
   private int levelCount;
   private List<DPArray> dpArrays;
 
+  private double topValue;
+
   private final RowInserter basicRowInserter = new BasicRowInserter();
   private RowInserter oneSideErrorRowInserter = basicRowInserter;
   private RowInserter leafRowInserter = basicRowInserter;
@@ -29,6 +31,7 @@ public class Summary {
   public Summary(Cube cube) {
     this.cube = cube;
     this.maxLevelCount = cube.getDimensions().size();
+    this.topValue = cube.getTopBaselineValue() + cube.getTopCurrentValue();
     this.levelCount = this.maxLevelCount;
   }
 
@@ -44,12 +47,12 @@ public class Summary {
     return computeSummary(answerSize, false, this.maxLevelCount);
   }
 
-  public SummaryResponse computeSummary(int answerSize, boolean doOneSideError, int levelCount) {
+  public SummaryResponse computeSummary(int answerSize, boolean doOneSideError, int userLevelCount) {
     if (answerSize <= 0) answerSize = 1;
-    if (levelCount <= 0 || levelCount > this.maxLevelCount) {
-      levelCount = this.maxLevelCount;
+    if (userLevelCount <= 0 || userLevelCount > this.maxLevelCount) {
+      userLevelCount = this.maxLevelCount;
     }
-    this.levelCount = levelCount;
+    this.levelCount = userLevelCount;
 
     dpArrays = new ArrayList<>(this.levelCount);
     for (int i = 0; i < this.levelCount; ++i) {
@@ -61,11 +64,11 @@ public class Summary {
           new OneSideErrorRowInserter(basicRowInserter, Double.compare(1., root.targetRatio()) <= 0);
       // If this cube contains only one dimension, one side error is calculated starting at leaf (detailed) level;
       // otherwise, a row at different side is removed through internal nodes.
-      if (levelCount == 1) leafRowInserter = oneSideErrorRowInserter;
+      if (userLevelCount == 1) leafRowInserter = oneSideErrorRowInserter;
     }
     computeChildDPArray(root);
     List<HierarchyNode> answer = new ArrayList<>(dpArrays.get(0).getAnswer());
-    SummaryResponse response = SummaryResponse.buildResponse(answer, levelCount);
+    SummaryResponse response = SummaryResponse.buildResponse(answer, userLevelCount);
 
     return response;
   }
@@ -297,12 +300,14 @@ public class Summary {
     public void insertRowToDPArray(DPArray dp, HierarchyNode node, double targetRatio);
   }
 
-  private static class BasicRowInserter implements RowInserter {
+  private class BasicRowInserter implements RowInserter {
     @Override
     public void insertRowToDPArray(DPArray dp, HierarchyNode node, double targetRatio) {
       double baselineValue = node.getBaselineValue();
       double currentValue = node.getCurrentValue();
-      double cost = CostFunction.err4EmptyValues(baselineValue, currentValue, targetRatio);
+      double percentage = (((baselineValue + currentValue) / topValue) * 100);
+      if (Double.compare(percentage, 1.0) < 0) percentage = 1.;
+      double cost = CostFunction.err4EmptyValues(baselineValue, currentValue, targetRatio) * Math.log(percentage);
 
       for (int n = dp.size() - 1; n > 0; --n) {
         double val1 = dp.slotAt(n - 1).cost;
