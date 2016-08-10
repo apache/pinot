@@ -829,6 +829,7 @@ function clearCreateForm() {
         $(element).attr("value", defaultValue);
     }
 
+    $(".anomaly-monitoring-repeat-unit-option[value='HOURS']").click();
     $("#configure-anomaly-function-form .metric-option").show();
     $("monitoring-schedule").hide();
     $("#active-alert").removeAttr("checked");
@@ -1113,7 +1114,7 @@ function encodeCron(repeatEveryUnit, repeatEverySize, scheduleMinute, scheduleHo
     switch(repeatEveryUnit){
         case "DAYS":
                 DAY_OF_MONTH  = (repeatEverySize == 1) ? "*" : "0/" + repeatEverySize;
-                HOUR = ( scheduleHour.indexOf(",") == -1) ? parseInt(scheduleHour) : scheduleHour.replace(",0", ",");
+                HOUR = ( scheduleHour.indexOf(",") == -1) ? parseInt(scheduleHour) : scheduleHour.replace(/^0/, '').replace(",0", ",");
                 MIN  = ( scheduleHour.indexOf(",") == -1) ?  parseInt(scheduleMinute) : 0 ;
 
 
