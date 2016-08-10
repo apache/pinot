@@ -46,7 +46,7 @@ public class AnomalyMergedResult extends AbstractBaseEntity {
   @JoinColumn(name="anomaly_feedback_id")
   private AnomalyFeedback feedback;
 
-  @OneToMany(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+  @OneToMany(fetch = FetchType.EAGER, cascade = CascadeType.ALL)
   private List<AnomalyResult> anomalyResults = new ArrayList<>();
 
   public String getMetric() {

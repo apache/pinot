@@ -28,6 +28,10 @@ public class AnomalyResultDAO extends AbstractJpaDAO<AnomalyResult> {
           + "AND ((r.startTimeUtc >= :startTimeUtc AND r.startTimeUtc <= :endTimeUtc) "
           + "OR (r.endTimeUtc >= :startTimeUtc AND r.endTimeUtc <= :endTimeUtc)) ";
 
+  private static final String FIND_UNMERGED_BY_COLLECTION_METRIC_DIMENSION =
+      "from AnomalyResult r where r.function.collection = :collection and r.function.metric = :metric "
+          + "and r.dimensions=:dimensions and r.mergedResultId is null";
+
   private static final String FIND_BY_COLLECTION_TIME_FILTERS =
       "SELECT r FROM AnomalyResult r WHERE r.function.collection = :collection "
           + "AND ((r.function.filters = :filters) or (r.function.filters is NULL and :filters is NULL)) "
@@ -113,6 +117,13 @@ public class AnomalyResultDAO extends AbstractJpaDAO<AnomalyResult> {
         .setParameter("startTimeUtc", startTime.toDateTime(DateTimeZone.UTC).getMillis())
         .setParameter("endTimeUtc", endTime.toDateTime(DateTimeZone.UTC).getMillis())
         .setParameter("metric", metric).setParameter("dimensions", dimList).getResultList();
+  }
+
+  public List<AnomalyResult> findUnmergedByCollectionMetricAndDimensions(String collection,
+      String metric, String dimensions) {
+    return getEntityManager().createQuery(FIND_UNMERGED_BY_COLLECTION_METRIC_DIMENSION, entityClass)
+        .setParameter("collection", collection).setParameter("metric", metric)
+        .setParameter("dimensions", dimensions).getResultList();
   }
 
   public List<AnomalyResult> findAllByTimeAndFunctionId(long startTime, long endTime,

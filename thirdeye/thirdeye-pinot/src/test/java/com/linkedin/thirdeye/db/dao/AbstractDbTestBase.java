@@ -1,9 +1,11 @@
 package com.linkedin.thirdeye.db.dao;
 
+import com.linkedin.thirdeye.anomaly.job.JobConstants;
 import com.linkedin.thirdeye.common.persistence.PersistenceUtil;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 
 import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
+import com.linkedin.thirdeye.db.entity.AnomalyJobSpec;
 import com.linkedin.thirdeye.db.entity.AnomalyResult;
 import com.linkedin.thirdeye.db.entity.EmailConfiguration;
 import java.io.File;
@@ -18,6 +20,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import javax.persistence.EntityManager;
 import org.hibernate.internal.SessionImpl;
+import org.joda.time.DateTime;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 
@@ -27,7 +30,7 @@ public abstract class AbstractDbTestBase {
   protected AnomalyJobDAO anomalyJobDAO;
   protected AnomalyTaskDAO anomalyTaskDAO;
   protected EmailConfigurationDAO emailConfigurationDAO;
-  protected MergedResultDAO mergedResultDAO;
+  protected AnomalyMergedResultDAO mergedResultDAO;
   private EntityManager entityManager;
 
   @BeforeClass(alwaysRun = true)
@@ -40,7 +43,7 @@ public abstract class AbstractDbTestBase {
     anomalyJobDAO = PersistenceUtil.getInstance(AnomalyJobDAO.class);
     anomalyTaskDAO = PersistenceUtil.getInstance(AnomalyTaskDAO.class);
     emailConfigurationDAO = PersistenceUtil.getInstance(EmailConfigurationDAO.class);
-    mergedResultDAO = PersistenceUtil.getInstance(MergedResultDAO.class);
+    mergedResultDAO = PersistenceUtil.getInstance(AnomalyMergedResultDAO.class);
     entityManager = PersistenceUtil.getInstance(EntityManager.class);
   }
 
@@ -120,5 +123,15 @@ public abstract class AbstractDbTestBase {
     anomalyResult.setDimensions("xyz dimension");
     anomalyResult.setCreationTimeUtc(System.currentTimeMillis());
     return anomalyResult;
+  }
+
+  AnomalyJobSpec getTestJobSpec() {
+    AnomalyJobSpec jobSpec = new AnomalyJobSpec();
+    jobSpec.setJobName("Test_Anomaly_Job");
+    jobSpec.setStatus(JobConstants.JobStatus.SCHEDULED);
+    jobSpec.setScheduleStartTime(System.currentTimeMillis());
+    jobSpec.setWindowStartTime(new DateTime().minusHours(20).getMillis());
+    jobSpec.setWindowEndTime(new DateTime().minusHours(10).getMillis());
+    return jobSpec;
   }
 }

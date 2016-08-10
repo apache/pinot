@@ -7,6 +7,7 @@ databaseConfiguration:
     hibernate.show_sql: true
     hibernate.hbm2ddl.auto: update
     hibernate.max_fetch_depth: 3
+    hibernate.connection.isolation: 2
     hibernate.archive.autodetection: class, hbm
     hibernate.connection.driver_class: org.hsqldb.jdbcDriver
     hibernate.connection.provider_class: org.hibernate.c3p0.internal.C3P0ConnectionProvider

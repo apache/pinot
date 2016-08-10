@@ -1,6 +1,5 @@
-package com.linkedin.thirdeye.db;
+package com.linkedin.thirdeye.db.dao;
 
-import com.linkedin.thirdeye.db.dao.AbstractDbTestBase;
 import java.util.List;
 
 import org.joda.time.DateTime;
@@ -9,12 +8,10 @@ import org.testng.annotations.Test;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
 import com.linkedin.thirdeye.anomaly.monitor.MonitorConstants.MonitorType;
 import com.linkedin.thirdeye.anomaly.monitor.MonitorTaskInfo;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
-import com.linkedin.thirdeye.db.entity.AnomalyJobSpec;
 import com.linkedin.thirdeye.db.entity.AnomalyTaskSpec;
 
 public class TestAnomalyTaskDAO extends AbstractDbTestBase {
@@ -80,7 +77,7 @@ public class TestAnomalyTaskDAO extends AbstractDbTestBase {
     Assert.assertEquals(numRecordsDeleted, 1);
   }
 
-  static AnomalyTaskSpec getTestTaskSpec() throws JsonProcessingException {
+  AnomalyTaskSpec getTestTaskSpec() throws JsonProcessingException {
     AnomalyTaskSpec jobSpec = new AnomalyTaskSpec();
     jobSpec.setJobName("Test_Anomaly_Task");
     jobSpec.setStatus(TaskStatus.WAITING);
@@ -97,15 +94,5 @@ public class TestAnomalyTaskDAO extends AbstractDbTestBase {
     taskInfo.setJobExecutionId(1L);
     taskInfo.setMonitorType(MonitorType.UPDATE);
     return taskInfo;
-  }
-
-  static AnomalyJobSpec getTestJobSpec() {
-    AnomalyJobSpec jobSpec = new AnomalyJobSpec();
-    jobSpec.setJobName("Test_Anomaly_Job");
-    jobSpec.setStatus(JobStatus.SCHEDULED);
-    jobSpec.setScheduleStartTime(System.currentTimeMillis());
-    jobSpec.setWindowStartTime(new DateTime().minusHours(20).getMillis());
-    jobSpec.setWindowEndTime(new DateTime().minusHours(10).getMillis());
-    return jobSpec;
   }
 }

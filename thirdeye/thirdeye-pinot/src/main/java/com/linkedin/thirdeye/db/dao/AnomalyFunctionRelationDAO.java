@@ -1,15 +1,16 @@
 package com.linkedin.thirdeye.db.dao;
 
+import java.util.HashMap;
 import java.util.List;
 
 import com.linkedin.thirdeye.db.entity.AnomalyFunctionRelation;
+import java.util.Map;
 
 public class AnomalyFunctionRelationDAO extends AbstractJpaDAO<AnomalyFunctionRelation> {
   public AnomalyFunctionRelationDAO() {
     super(AnomalyFunctionRelation.class);
   }
 
-  private static final String FIND_BY_PARENT_ID = "SELECT r FROM AnomalyFunctionRelation r WHERE r.parentId = :parentId";
   private static final String DELETE_BY_PARENT_ID = "DELETE FROM AnomalyFunctionRelation r WHERE r.parentId = :parentId";
   private static final String DELETE_BY_PARENT_CHILD = "DELETE FROM AnomalyFunctionRelation r WHERE r.parentId = :parentId and r.childId = :childId";
 
@@ -24,7 +25,8 @@ public class AnomalyFunctionRelationDAO extends AbstractJpaDAO<AnomalyFunctionRe
   }
 
   public List<AnomalyFunctionRelation> findByParent(Long parentId) {
-    return getEntityManager().createQuery(FIND_BY_PARENT_ID, entityClass)
-            .setParameter("parentId", parentId).getResultList();
+    Map<String, Object> params = new HashMap<>();
+    params.put("parentId", parentId);
+    return super.findByParams(params);
   }
 }

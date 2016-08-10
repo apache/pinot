@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.db;
+package com.linkedin.thirdeye.db.dao;
 
 import com.linkedin.thirdeye.db.dao.AbstractDbTestBase;
 import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;

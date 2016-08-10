@@ -1,13 +1,9 @@
-package com.linkedin.thirdeye.db;
+package com.linkedin.thirdeye.db.dao;
 
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.db.dao.AbstractDbTestBase;
 import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
-
 import java.util.List;
-
-import javax.persistence.NoResultException;
-
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -51,7 +47,7 @@ public class TestAnomalyFunctionDAO extends AbstractDbTestBase {
   }
 
   @Test(dependsOnMethods = { "testUpdate" })
-  public void testDelete() throws NoResultException {
+  public void testDelete() {
     anomalyFunctionDAO.deleteById(anomalyFunctionId);
     AnomalyFunctionSpec spec = anomalyFunctionDAO.findById(anomalyFunctionId);
     Assert.assertNull(spec);

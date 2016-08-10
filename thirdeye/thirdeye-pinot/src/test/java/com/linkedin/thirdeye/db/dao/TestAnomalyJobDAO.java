@@ -1,12 +1,10 @@
-package com.linkedin.thirdeye.db;
+package com.linkedin.thirdeye.db.dao;
 
 import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
-import com.linkedin.thirdeye.db.dao.AbstractDbTestBase;
 import com.linkedin.thirdeye.db.entity.AnomalyJobSpec;
 
 import java.util.List;
 
-import org.joda.time.DateTime;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -17,9 +15,9 @@ public class TestAnomalyJobDAO extends AbstractDbTestBase {
 
   @Test
   public void testCreate() {
-    anomalyJobId1 = anomalyJobDAO.save(getTestFunctionSpec());
+    anomalyJobId1 = anomalyJobDAO.save(getTestJobSpec());
     Assert.assertNotNull(anomalyJobId1);
-    anomalyJobId2 = anomalyJobDAO.save(getTestFunctionSpec());
+    anomalyJobId2 = anomalyJobDAO.save(getTestJobSpec());
     Assert.assertNotNull(anomalyJobId2);
   }
 
@@ -54,15 +52,5 @@ public class TestAnomalyJobDAO extends AbstractDbTestBase {
     Assert.assertEquals(numRecordsDeleted, 1);
     List<AnomalyJobSpec> anomalyJobs = anomalyJobDAO.findByStatus(status);
     Assert.assertEquals(anomalyJobs.size(), 0);
-  }
-
-  static AnomalyJobSpec getTestFunctionSpec() {
-    AnomalyJobSpec jobSpec = new AnomalyJobSpec();
-    jobSpec.setJobName("Test_Anomaly_Job");
-    jobSpec.setStatus(JobStatus.SCHEDULED);
-    jobSpec.setScheduleStartTime(System.currentTimeMillis());
-    jobSpec.setWindowStartTime(new DateTime().minusHours(20).getMillis());
-    jobSpec.setWindowEndTime(new DateTime().minusHours(10).getMillis());
-    return jobSpec;
   }
 }
