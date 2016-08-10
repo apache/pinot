@@ -30,7 +30,7 @@ public class AnomalyResultDAO extends AbstractJpaDAO<AnomalyResult> {
 
   private static final String FIND_UNMERGED_BY_COLLECTION_METRIC_DIMENSION =
       "from AnomalyResult r where r.function.collection = :collection and r.function.metric = :metric "
-          + "and r.dimensions=:dimensions and r.mergedResultId is not null";
+          + "and r.dimensions=:dimensions and r.mergedResultId is null";
 
   private static final String FIND_BY_COLLECTION_TIME_FILTERS =
       "SELECT r FROM AnomalyResult r WHERE r.function.collection = :collection "

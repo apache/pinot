@@ -44,13 +44,13 @@ public class TestEmailConfigurationDAO extends AbstractDbTestBase {
   }
 
   @Test(dependsOnMethods = { "testFunctionEmailAssignment" })
-  public void testFndByFunctionId() {
+  public void testFindByFunctionId() {
     List<EmailConfiguration> emailConfigurations =
         emailConfigurationDAO.findByFunctionId(functionId);
     assertEquals(emailConfigurations.size(), 1);
   }
 
-  @Test(dependsOnMethods = { "testFndByFunctionId" })
+  @Test(dependsOnMethods = { "testFindByFunctionId" })
   public void testDelete() {
     emailConfigurationDAO.deleteById(emailConfigId);
     EmailConfiguration emailConfiguration = emailConfigurationDAO.findById(emailConfigId);

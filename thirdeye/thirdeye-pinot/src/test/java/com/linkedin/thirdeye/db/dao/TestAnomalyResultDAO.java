@@ -42,9 +42,10 @@ public class TestAnomalyResultDAO extends AbstractDbTestBase {
 
   @Test(dependsOnMethods = {"testGetCountByFunction"})
   public void testFindUnmergedByCollectionMetricAndDimensions() {
-    anomalyResultDAO
+    List<AnomalyResult> unmergedResults = anomalyResultDAO
         .findUnmergedByCollectionMetricAndDimensions(spec.getCollection(), spec.getMetric(),
             anomalyResult.getDimensions() );
+    Assert.assertEquals(unmergedResults.size(), 1);
   }
 
   @Test(dependsOnMethods = {"testFindUnmergedByCollectionMetricAndDimensions"})
