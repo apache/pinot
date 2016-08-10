@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.common.data;
 
+import com.google.common.base.Preconditions;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 
@@ -35,5 +36,10 @@ public final class MetricFieldSpec extends FieldSpec {
   @Override
   public FieldType getFieldType() {
     return FieldType.METRIC;
+  }
+
+  @Override
+  public void setSingleValueField(boolean isSingleValueField) {
+    Preconditions.checkArgument(isSingleValueField, "Unsupported multi-value for metric field.");
   }
 }
