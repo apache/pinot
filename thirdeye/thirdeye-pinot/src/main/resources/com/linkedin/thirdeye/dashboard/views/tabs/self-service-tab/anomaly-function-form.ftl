@@ -225,7 +225,7 @@
 
             <span class="uk-form-label uk-display-inline-block">Monitor the data every
             </span>
-            <input id="monitoring-repeat-size" type="number" class="thin-input" value="{{#if schedule/repeatEverySize}}{{schedule/repeatEverySize}}{{else}}1{{/if}}">
+            <input id="monitoring-repeat-size" type="number" class="thin-input {{hide_if_eq schedule/repeatEveryUnit 'DAYS'}}" value="{{#if schedule/repeatEverySize}}{{schedule/repeatEverySize}}{{else}}1{{/if}}">
             <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group uk-display-inline-block">
                 <div id="selected-monitoring-repeat-unit" class="uk-button" value="{{#if schedule/repeatEveryUnit}}{{schedule/repeatEveryUnit}}{{else}}HOURS{{/if}}">{{#if schedule/repeatEveryUnit}}{{schedule/repeatEveryUnit}}{{else}}HOUR(S){{/if}}</div>
                 <div class="uk-button uk-button-primary" type="button"><i class="uk-icon-caret-down"></i>
@@ -240,7 +240,7 @@
                     <span id="monitoring-schedule" class="{{#if schedule}}{{hide_if_eq schedule/repeatEveryUnit 'HOURS'}}{{else}}uk-hidden{{/if}}">
                         <span> at
                         </span>
-                        <input id="monitoring-schedule-time" class="thin-input" type="text" data-uk-timepicker="{format:'24h'}" placeholder="HH:MM" value="{{#if schedule/scheduleHour}}{{displayScheduleTime schedule/scheduleHour}}:{{else}}00:{{/if}}{{#if schedule/scheduleMinute}}{{displayScheduleTime schedule/scheduleMinute}}{{else}}00{{/if}}">
+                        <input id="monitoring-schedule-time" type="text" placeholder="HH:MM or HH,HH,HH" value="{{#if schedule/scheduleHour}}{{schedule/scheduleHour}}{{else}}{{/if}}{{#if schedule/scheduleMinute}}:{{schedule/scheduleMinute}}{{else}}{{/if}}">
                         <span id="schedule-timezone">UTC</span>
                     </span>
            {{#if data.cron}}<span class="form-row uk-hidden">cron: {{data/cron}}</span>{{/if}}

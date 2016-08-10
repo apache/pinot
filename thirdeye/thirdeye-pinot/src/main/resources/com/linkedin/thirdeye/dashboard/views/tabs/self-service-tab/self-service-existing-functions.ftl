@@ -26,11 +26,13 @@
                 </td>
 
                 <td>
+                    {{#if anomalyFunction/filters}}
                     <table>
                         {{#each anomalyFunction/filters as |dimensionValue dimension|}}
-                        <tr><td class="">{{dimension}}</td><td><b>{{dimensionValue}}</b></td></tr>
+                        <tr><td class="existing-anomaly-fn-filters-cell">{{dimension}}</td><td class="existing-anomaly-fn-filters-cell"><b>{{dimensionValue}}</b></td></tr>
                         {{/each}}
                     </table>
+                    {{/if}}
                 </td>
                 <td><input class="init-toggle-active-state" type="checkbox" {{#if anomalyFunction/isActive}}checked{{/if}} data-row-id="{{anomalyFunctionIndex}}"  data-function-name="{{anomalyFunction/functionName}}" data-uk-modal="{target:'#toggle-alert-modal'}" data-uk-tooltip="" title="Turn on/off"></span></td>
                 <td><span class="init-update-function-btn uk-button uk-button-large" data-row-id="{{anomalyFunctionIndex}}" data-uk-modal="{target:'#update-function-modal'}" data-uk-tooltip title="Edit"><i class="uk-icon-pencil"></i></span></td>

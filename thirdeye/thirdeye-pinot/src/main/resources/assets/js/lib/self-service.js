@@ -165,6 +165,7 @@ function renderSelfService() {
 
         //Edit button
     $("#self-service-forms-section").on("click", ".init-update-function-btn", function () {
+        $("#self-service-chart-area-error").hide();
         populateUpdateForm(this)
     });
 
@@ -173,6 +174,7 @@ function renderSelfService() {
         var functionId = $(this).attr("data-function-id");
         var functionName = $(this).attr("data-function-name");
         $("#confirm-delete-anomaly-function").attr("data-function-id", functionId);
+        $("#self-service-chart-area-error").hide();
         $("#function-to-delete").text(functionName);
         $("#delete-anomaly-function-success").hide();
         $("#delete-anomaly-function-error").hide();
@@ -184,6 +186,7 @@ function renderSelfService() {
         var functionName = $(this).attr("data-function-name");
         $("#confirm-toggle-active-state").attr("data-row-id", rowId);
         $("#close-toggle-alert-modal").attr("data-row-id", rowId);
+        $("#self-service-chart-area-error").hide();
         $(".function-to-toggle").text(functionName);
         if ($(this).is(':checked')) {
             $("#turn-off-anomaly-function").hide();
@@ -348,8 +351,16 @@ function renderSelfService() {
         formData.repeatEveryUnit = $("#selected-monitoring-repeat-unit", form).attr("value");
         var monitoringScheduleTime = ( $("#monitoring-schedule-time", form).val() == "" ) ? "" : $("#monitoring-schedule-time", form).val() //Todo: in case of daily data granularity set the default schedule to time when datapoint is created
         if(monitoringScheduleTime){
-            formData.scheduleMinute = monitoringScheduleTime.substring(3, monitoringScheduleTime.length);
-            formData.scheduleHour = monitoringScheduleTime.substring(0, monitoringScheduleTime.length - 3);
+            if(monitoringScheduleTime.indexOf(",") > -1){
+                formData.scheduleHour = monitoringScheduleTime;
+                formData.scheduleMinute = "";
+            }else{
+                //schedule time format HH:MM
+                var monitoringScheduleTimeAry = monitoringScheduleTime.split(":")
+
+                formData.scheduleHour = monitoringScheduleTimeAry[0];
+                formData.scheduleMinute = monitoringScheduleTimeAry[1];
+            }
         }
 
         if ($("#function-id", form).length > 0) {
@@ -717,7 +728,6 @@ function renderSelfService() {
             var urlParams = urlOfAnomalyFn(formData)
 
             submitData("/dashboard/anomaly-function/update?" + urlParams).done(function () {
-
                 //existingAnomalyFunctionsData[rowId] = {formData}
                 getExistingAnomalyFunctions(formData.dataset);
 
