@@ -16,10 +16,6 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.commons.mail.EmailException;
-import org.hibernate.Session;
-import org.hibernate.SessionFactory;
-import org.hibernate.Transaction;
-import org.hibernate.context.internal.ManagedSessionContext;
 import org.joda.time.DateTime;
 import org.joda.time.format.ISODateTimeFormat;
 import org.quartz.Job;
@@ -55,7 +51,6 @@ public class AnomalyDetectionJob implements Job {
   public static final String TIME_SERIES_HANDLER = "TIME_SERIES_HANDLER";
   public static final String TIME_SERIES_RESPONSE_CONVERTER = "TIME_SERIES_RESPONSE_CONVERTER";
   public static final String RESULT_DAO = "RESULT_DAO";
-  public static final String SESSION_FACTORY = "SESSION_FACTORY";
   public static final String WINDOW_END = "WINDOW_END";
   public static final String WINDOW_START = "WINDOW_START";
   public static final String METRIC_REGISTRY = "METRIC_REGISTRY";
@@ -66,7 +61,6 @@ public class AnomalyDetectionJob implements Job {
   private TimeSeriesResponseConverter timeSeriesResponseConverter;
   private AnomalyResultDAO resultDAO;
   private AnomalyFunctionRelationDAO relationDAO;
-  private SessionFactory sessionFactory;
   private MetricRegistry metricRegistry;
   private Histogram histogram;
   private String collection;
@@ -119,7 +113,6 @@ public class AnomalyDetectionJob implements Job {
     resultDAO = (AnomalyResultDAO) context.getJobDetail().getJobDataMap().get(RESULT_DAO);
     relationDAO =
         (AnomalyFunctionRelationDAO) context.getJobDetail().getJobDataMap().get(RELATION_DAO);
-    sessionFactory = (SessionFactory) context.getJobDetail().getJobDataMap().get(SESSION_FACTORY);
     metricRegistry = (MetricRegistry) context.getJobDetail().getJobDataMap().get(METRIC_REGISTRY);
     String windowEndProp = context.getJobDetail().getJobDataMap().getString(WINDOW_END);
     String windowStartProp = context.getJobDetail().getJobDataMap().getString(WINDOW_START);
@@ -296,33 +289,18 @@ public class AnomalyDetectionJob implements Job {
   private List<AnomalyResult> getExistingAnomalies() {
     List<AnomalyResult> results = new ArrayList<>();
 
-    Session session = sessionFactory.openSession();
-    try {
-      ManagedSessionContext.bind(session);
-      Transaction transaction = session.beginTransaction();
-      try {
-        // The ones for this function
-        results.addAll(resultDAO
-            .findAllByTimeAndFunctionId(windowStart.getMillis(), windowEnd.getMillis(),
-                anomalyFunction.getSpec().getId()));
+    // The ones for this function
+    results.addAll(resultDAO
+        .findAllByTimeAndFunctionId(windowStart.getMillis(), windowEnd.getMillis(),
+            anomalyFunction.getSpec().getId()));
 
-        // The ones for any related functions
-        List<AnomalyFunctionRelation> relations =
-            relationDAO.findByParent(anomalyFunction.getSpec().getId());
-        for (AnomalyFunctionRelation relation : relations) {
-          results.addAll(resultDAO
-              .findAllByTimeAndFunctionId(windowStart.getMillis(), windowEnd.getMillis(),
-                  relation.getChildId()));
-        }
-
-        transaction.commit();
-      } catch (Exception e) {
-        transaction.rollback();
-        throw new RuntimeException(e);
-      }
-    } finally {
-      session.close();
-      ManagedSessionContext.unbind(sessionFactory);
+    // The ones for any related functions
+    List<AnomalyFunctionRelation> relations =
+        relationDAO.findByParent(anomalyFunction.getSpec().getId());
+    for (AnomalyFunctionRelation relation : relations) {
+      results.addAll(resultDAO
+          .findAllByTimeAndFunctionId(windowStart.getMillis(), windowEnd.getMillis(),
+              relation.getChildId()));
     }
     return results;
   }
