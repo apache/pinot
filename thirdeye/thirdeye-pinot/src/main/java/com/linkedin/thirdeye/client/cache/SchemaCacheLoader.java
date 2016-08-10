@@ -23,6 +23,7 @@ public class SchemaCacheLoader extends CacheLoader<String, Schema> {
 
   private static final String UTF_8 = "UTF-8";
   private static final String SCHEMA_ENDPOINT = "schemas/";
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private final CloseableHttpClient controllerClient;
   private final HttpHost controllerHost;
@@ -43,12 +44,8 @@ public class SchemaCacheLoader extends CacheLoader<String, Schema> {
         LOGGER.error("Schema {} not found, {}", collection, res.getStatusLine().toString());
       }
       InputStream content = res.getEntity().getContent();
-
-      Schema schema = new ObjectMapper().readValue(content, Schema.class);
+      Schema schema = OBJECT_MAPPER.readValue(content, Schema.class);
       return schema;
-    } catch (Exception e) {
-      LOGGER.error("Exception in retrieving schema", e);
-      return null;
     } finally {
       if (res.getEntity() != null) {
         EntityUtils.consume(res.getEntity());
