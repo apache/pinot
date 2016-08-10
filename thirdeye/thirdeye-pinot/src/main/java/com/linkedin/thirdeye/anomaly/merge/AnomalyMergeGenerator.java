@@ -14,9 +14,9 @@ import java.util.TreeSet;
 /**
  * Given list of {@link AnomalyResult} and merge parameters, this utility performs time based merge
  */
-public abstract class AnomalySummaryGenerator {
+public abstract class AnomalyMergeGenerator {
 
-  private AnomalySummaryGenerator() {
+  private AnomalyMergeGenerator() {
 
   }
 
@@ -96,8 +96,8 @@ public abstract class AnomalySummaryGenerator {
           && mergedAnomaly.getEndTime() - mergedAnomaly.getStartTime() >= mergeConfig
           .getMergeDuration()) {
         // check if next anomaly has same start time as current one, that should be merged with current one too
-        if (i < (anomalies.size() - 1) && anomalies.get(i + 1).getStartTimeUtc().equals(currentResult
-            .getStartTimeUtc())) {
+        if (i < (anomalies.size() - 1) && anomalies.get(i + 1).getStartTimeUtc()
+            .equals(currentResult.getStartTimeUtc())) {
           // no need to split as we want to include the next raw anomaly into the current one
         } else {
           // Split here
@@ -110,10 +110,11 @@ public abstract class AnomalySummaryGenerator {
         mergedAnomalies.add(mergedAnomaly);
       }
     }
-    mergedAnomalies.forEach(AnomalySummaryGenerator::populateMergedProperties);
+    mergedAnomalies.forEach(AnomalyMergeGenerator::populateMergedProperties);
     return mergedAnomalies;
   }
 
+  // TODO : // FIXME: 8/9/16 - update score - weighted score of raw and missing time buckets
   private static void populateMergedProperties(AnomalyMergedResult mergedResult) {
     double totalScore = 0.0;
     double totalWeight = 0.0;
@@ -130,8 +131,6 @@ public abstract class AnomalySummaryGenerator {
     }
     mergedResult.setScore(totalScore / n);
     mergedResult.setWeight(totalWeight / n);
-    mergedResult.setDimensions(getDimensionsMerged(dimensionsList));
-    mergedResult.setMetric(metricList.toString());
   }
 
   private static String getDimensionsMerged(List<String> dimentionList) {
@@ -173,6 +172,8 @@ public abstract class AnomalySummaryGenerator {
       mergedAnomaly.getAnomalyResults().add(currentResult);
     }
     mergedAnomaly.setCreatedTime(currentResult.getCreationTimeUtc());
+    mergedAnomaly.setCollection(currentResult.getCollection());
+    mergedAnomaly.setMetric(currentResult.getMetric());
     mergedAnomaly.setDimensions(currentResult.getDimensions());
     mergedAnomaly.setStartTime(currentResult.getStartTimeUtc());
     mergedAnomaly.setEndTime(currentResult.getEndTimeUtc());
