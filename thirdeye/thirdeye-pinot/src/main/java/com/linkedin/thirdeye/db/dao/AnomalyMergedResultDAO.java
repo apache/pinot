@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.db.dao;
 
+import com.google.inject.persist.Transactional;
 import com.linkedin.thirdeye.db.entity.AnomalyMergedResult;
 import java.util.HashMap;
 import java.util.List;
@@ -11,6 +12,7 @@ public class AnomalyMergedResultDAO extends AbstractJpaDAO<AnomalyMergedResult> 
     super(AnomalyMergedResult.class);
   }
 
+  @Transactional
   public List<AnomalyMergedResult> findByCollectionMetricDimensions(String collection,
       String metric, String dimensions) {
     Map<String, Object> filters = new HashMap<>();

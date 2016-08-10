@@ -36,6 +36,7 @@ public class AnomalyTaskDAO extends AbstractJpaDAO<AnomalyTaskSpec> {
     super(AnomalyTaskSpec.class);
   }
 
+  @Transactional
   public List<AnomalyTaskSpec> findByJobIdStatusNotIn(Long jobId, TaskStatus status) {
     return getEntityManager().createQuery(FIND_BY_JOB_ID_STATUS_NOT_IN, entityClass)
         .setParameter("jobId", jobId)
@@ -49,6 +50,7 @@ public class AnomalyTaskDAO extends AbstractJpaDAO<AnomalyTaskSpec> {
             .getResultList();
   }
 
+  @Transactional
   public List<AnomalyTaskSpec> findByIdAndStatus(Long id, TaskStatus status) {
     Map<String, Object> filters = new HashMap<>();
     filters.put("status", status);
@@ -56,6 +58,7 @@ public class AnomalyTaskDAO extends AbstractJpaDAO<AnomalyTaskSpec> {
     return super.findByParams(filters);
   }
 
+  @Transactional
   public boolean updateStatusAndWorkerId(Long workerId, Long id, TaskStatus oldStatus, TaskStatus newStatus) {
     try {
       List<AnomalyTaskSpec> anomalyTaskSpecs = findByIdAndStatus(id, oldStatus);
@@ -76,6 +79,7 @@ public class AnomalyTaskDAO extends AbstractJpaDAO<AnomalyTaskSpec> {
 
   }
 
+  @Transactional
   public void updateStatusAndTaskEndTime(Long id, TaskStatus oldStatus, TaskStatus newStatus, Long taskEndTime) {
     List<AnomalyTaskSpec> anomalyTaskSpecs = findByIdAndStatus(id, oldStatus);
     if (anomalyTaskSpecs.size() == 1) {
@@ -86,6 +90,7 @@ public class AnomalyTaskDAO extends AbstractJpaDAO<AnomalyTaskSpec> {
     }
   }
 
+  @Transactional
   public int deleteRecordsOlderThanDaysWithStatus(int days, TaskStatus status) {
     DateTime expireDate = new DateTime().minusDays(days);
     Timestamp expireTimestamp = new Timestamp(expireDate.getMillis());
