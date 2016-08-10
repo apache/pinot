@@ -9,10 +9,10 @@ import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
+import org.codehaus.jackson.map.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.cache.CacheLoader;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClientConfig;
@@ -43,8 +43,12 @@ public class SchemaCacheLoader extends CacheLoader<String, Schema> {
         LOGGER.error("Schema {} not found, {}", collection, res.getStatusLine().toString());
       }
       InputStream content = res.getEntity().getContent();
+
       Schema schema = new ObjectMapper().readValue(content, Schema.class);
       return schema;
+    } catch (Exception e) {
+      LOGGER.error("Exception in retrieving schema", e);
+      return null;
     } finally {
       if (res.getEntity() != null) {
         EntityUtils.consume(res.getEntity());
