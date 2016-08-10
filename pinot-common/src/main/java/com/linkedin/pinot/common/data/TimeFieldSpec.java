@@ -72,6 +72,13 @@ public final class TimeFieldSpec extends FieldSpec {
     return getName();
   }
 
+  @JsonIgnore
+  @Deprecated
+  // For third-eye backward compatible.
+  public String getOutGoingTimeColumnName() {
+    return getName();
+  }
+
   public void setIncomingGranularitySpec(TimeGranularitySpec incomingGranularitySpec) {
     Preconditions.checkNotNull(incomingGranularitySpec);
 
