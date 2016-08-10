@@ -66,16 +66,17 @@ public class Cube { // the cube (Ca|Cb)
     }
   }
 
-  public void buildWithAutoDimensionOrder(OLAPDataBaseClient olapClient, Dimensions dimensions) {
+  public void buildWithAutoDimensionOrder(OLAPDataBaseClient olapClient, Dimensions dimensions) throws Exception {
     buildWithAutoDimensionOrder(olapClient, dimensions, DEFAULT_TOP_DIMENSION, Collections.emptyList());
   }
 
-  public void buildWithAutoDimensionOrder(OLAPDataBaseClient olapClient, Dimensions dimensions, int topDimensions) {
+  public void buildWithAutoDimensionOrder(OLAPDataBaseClient olapClient, Dimensions dimensions, int topDimensions)
+      throws Exception {
     buildWithAutoDimensionOrder(olapClient, dimensions, topDimensions, Collections.emptyList());
   }
 
   public void buildWithAutoDimensionOrder(OLAPDataBaseClient olapClient, Dimensions dimensions, int topDimension,
-      List<List<String>> hierarchy) {
+      List<List<String>> hierarchy) throws Exception {
 
     initializeBasicInfo(olapClient);
     if (hierarchy == null) {
@@ -87,7 +88,7 @@ public class Cube { // the cube (Ca|Cb)
     buildWithManualDimensionOrder(olapClient, this.dimensions);
   }
 
-  public void buildWithManualDimensionOrder(OLAPDataBaseClient olapClient, Dimensions dimensions) {
+  public void buildWithManualDimensionOrder(OLAPDataBaseClient olapClient, Dimensions dimensions) throws Exception {
     if (this.dimensions == null) {
       initializeBasicInfo(olapClient);
       this.dimensions = dimensions;
@@ -114,8 +115,9 @@ public class Cube { // the cube (Ca|Cb)
 
   /**
    * Calculate the change ratio of the top aggregated values.
+   * @throws Exception An exception is thrown if OLAP database cannot be connected.
    */
-  private void initializeBasicInfo(OLAPDataBaseClient olapClient) {
+  private void initializeBasicInfo(OLAPDataBaseClient olapClient) throws Exception {
     Row topAggValues = olapClient.getTopAggregatedValues();
     topBaselineValue = topAggValues.baselineValue; // aggregated baseline values
     topCurrentValue = topAggValues.currentValue; // aggregated current values
@@ -187,9 +189,10 @@ public class Cube { // the cube (Ca|Cb)
    * Dimensions with larger error is sorted in the front of the list.
    * The order among the dimensions that belong to the same hierarchical group will be maintained. An example of
    * a hierarchical group {continent, country}. The cost of a group is the average of member costs.
+   * @throws Exception An exception is thrown if OLAP database cannot be connected.
    */
   private static Dimensions sortDimensionOrder(OLAPDataBaseClient olapClient, double topRatio, Dimensions dimensions,
-      int topDimension, List<List<String>> hierarchy) {
+      int topDimension, List<List<String>> hierarchy) throws Exception {
     List<MutablePair<String, Double>> dimensionCostPairs = new ArrayList<>();
 
     Map<String, DimensionGroup> groupMap = new HashMap<>();

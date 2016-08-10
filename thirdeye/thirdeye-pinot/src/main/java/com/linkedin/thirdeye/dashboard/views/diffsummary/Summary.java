@@ -352,7 +352,7 @@ public class Summary {
     String oFileName = "Cube.json";
     int answerSize = 20;
     boolean doOneSideError = true;
-    int maxDimensionSize = 4;
+    int maxDimensionSize = 3;
 
     Cube cube = null;
     try {

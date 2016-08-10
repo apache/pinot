@@ -135,10 +135,6 @@ public class HierarchyNode {
     }
   }
 
-  public String toIDString() {
-    return "(" + level + "," + index + ")";
-  }
-
   public String toString() {
     ToStringBuilder tsb = new ToStringBuilder(this, ToStringStyle.SHORT_PREFIX_STYLE);
     tsb.append(data.dimensionValues)//.append(data.baselineValue).append(data.currentValue)
