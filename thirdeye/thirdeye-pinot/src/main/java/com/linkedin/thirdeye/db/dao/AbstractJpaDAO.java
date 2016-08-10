@@ -1,7 +1,6 @@
 package com.linkedin.thirdeye.db.dao;
 
 import com.google.inject.Inject;
-import com.google.inject.Provider;
 import com.google.inject.persist.Transactional;
 import com.linkedin.thirdeye.db.entity.AbstractBaseEntity;
 import java.util.ArrayList;
@@ -14,15 +13,16 @@ import javax.persistence.criteria.Predicate;
 import javax.persistence.criteria.Root;
 
 public class AbstractJpaDAO<E extends AbstractBaseEntity> {
+
   @Inject
-  private Provider<EntityManager> emf;
+  private EntityManager em;
 
   final Class<E> entityClass;
   AbstractJpaDAO(Class<E> entityClass) {
     this.entityClass = entityClass;
   }
   EntityManager getEntityManager() {
-    return emf.get();
+    return em;
   }
 
   @Transactional
@@ -33,7 +33,7 @@ public class AbstractJpaDAO<E extends AbstractBaseEntity> {
 
   @Transactional
   public void update(E entity) {
-    emf.get().merge(entity);
+    getEntityManager().merge(entity);
   }
 
   public E findById(Long id) {
