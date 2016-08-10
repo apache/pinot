@@ -15,23 +15,6 @@
  */
 package com.linkedin.pinot.requestHandler;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
-import org.apache.commons.lang3.tuple.Pair;
-import org.apache.http.annotation.ThreadSafe;
-import org.apache.thrift.protocol.TCompactProtocol;
-import org.json.JSONObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.exception.QueryException;
@@ -69,6 +52,23 @@ import com.linkedin.pinot.transport.scattergather.ScatterGather;
 import com.linkedin.pinot.transport.scattergather.ScatterGatherRequest;
 import com.linkedin.pinot.transport.scattergather.ScatterGatherStats;
 import io.netty.buffer.ByteBuf;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.http.annotation.ThreadSafe;
+import org.apache.thrift.protocol.TCompactProtocol;
+import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -81,7 +81,6 @@ public class BrokerRequestHandler {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerRequestHandler.class);
   private static final Pql2Compiler REQUEST_COMPILER = new Pql2Compiler();
-  private static final String BROKER_RESPONSE_TYPE = "responseType";
   private final RoutingTable _routingTable;
   private final ScatterGather _scatterGatherer;
   private final ReduceServiceRegistry _reduceServiceRegistry;
@@ -89,6 +88,7 @@ public class BrokerRequestHandler {
   private final TimeBoundaryService _timeBoundaryService;
   private final long _brokerTimeOutMs;
   private final BrokerRequestOptimizer _optimizer;
+  private final int _queryResponseLimit;
   private AtomicLong _requestIdGenerator;
 
   //TODO: Currently only using RoundRobin selection. But, this can be allowed to be configured.
@@ -96,7 +96,7 @@ public class BrokerRequestHandler {
 
   public BrokerRequestHandler(RoutingTable table, TimeBoundaryService timeBoundaryService,
       ScatterGather scatterGatherer, ReduceServiceRegistry reduceServiceRegistry, BrokerMetrics brokerMetrics,
-      long brokerTimeOutMs) {
+      long brokerTimeOutMs, int queryResponseLimit) {
     _routingTable = table;
     _timeBoundaryService = timeBoundaryService;
     _reduceServiceRegistry = reduceServiceRegistry;
@@ -106,6 +106,7 @@ public class BrokerRequestHandler {
     _brokerTimeOutMs = brokerTimeOutMs;
     _optimizer = new BrokerRequestOptimizer();
     _requestIdGenerator = new AtomicLong(0);
+    _queryResponseLimit = queryResponseLimit;
   }
 
   public BrokerResponse handleRequest(JSONObject request) throws Exception {
@@ -147,6 +148,16 @@ public class BrokerRequestHandler {
     _brokerMetrics.addPhaseTiming(brokerRequest, BrokerQueryPhase.REQUEST_COMPILATION, requestCompilationTime);
     final ScatterGatherStats scatterGatherStats = new ScatterGatherStats();
 
+    try {
+      validateRequest(brokerRequest);
+    } catch (Exception e) {
+      BrokerResponse brokerResponse = new BrokerResponseNative();
+      brokerResponse.setExceptions(Arrays.asList(QueryException.getException(QueryException.QUERY_VALIDATION_ERROR, e)));
+
+      LOGGER.error("Validation error on query: {}", pql);
+      return brokerResponse;
+    }
+
     final BrokerResponse resp =
         _brokerMetrics.timeQueryPhase(brokerRequest, BrokerQueryPhase.QUERY_EXECUTION, new Callable<BrokerResponse>() {
           @Override
@@ -167,6 +178,33 @@ public class BrokerRequestHandler {
         brokerRequest.getQuerySource().getTableName(), queryProcessingTimeInMillis, resp.getNumDocsScanned(), resp.getTotalDocs(), scatterGatherStats, pql);
 
     return resp;
+  }
+
+  /**
+   * This method validates the broker request. Current validations are:
+   * - Value for 'TOP' for aggregation-group-by query is <= configured value.
+   * - Value for 'LIMIT' for selection query is <= configured value.
+   *
+   * Throws exception if query does not pass validation.
+   *
+   * @param brokerRequest
+   */
+  private void validateRequest(BrokerRequest brokerRequest) {
+    if (brokerRequest.isSetAggregationsInfo()) {
+      if (brokerRequest.isSetGroupBy()) {
+        long topN = brokerRequest.getGroupBy().getTopN();
+        if (topN > _queryResponseLimit) {
+          throw new RuntimeException(
+              "Value for 'TOP' " + topN + " exceeded maximum allowed value of " + _queryResponseLimit);
+        }
+      }
+    } else {
+      int limit = brokerRequest.getSelections().getSize();
+      if (limit > _queryResponseLimit) {
+        throw new RuntimeException(
+            "Value for 'LIMIT' " + limit + " exceeded maximum allowed value of " + _queryResponseLimit);
+      }
+    }
   }
 
   private BucketingSelection getBucketingSelection(BrokerRequest brokerRequest) {

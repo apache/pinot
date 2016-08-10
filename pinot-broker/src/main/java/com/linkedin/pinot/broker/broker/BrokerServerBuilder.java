@@ -72,6 +72,8 @@ public class BrokerServerBuilder {
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerServerBuilder.class);
   private static final long DEFAULT_BROKER_TIME_OUT_MS = 10 * 1000L;
   private static final long DEFAULT_BROKER_DELAY_SHUTDOWN_TIME_MS = 10 * 1000L;
+  private static final int BROKER_QUERY_RESPONSE_LIMIT = 10000;
+  private static final String BROKER_QUERY_RESPONSE_LIMIT_CONFIG = "pinot.broker.query.response.limit";
 
   // Connection Pool Related
   private KeyedPool<ServerInstance, NettyClientConnection> _connPool;
@@ -181,9 +183,10 @@ public class BrokerServerBuilder {
     }
     LOGGER.info("Broker timeout is - " + brokerTimeOutMs + " ms");
 
+    int queryResponseLimit = _config.getInt(BROKER_QUERY_RESPONSE_LIMIT_CONFIG, BROKER_QUERY_RESPONSE_LIMIT);
     ReduceServiceRegistry reduceServiceRegistry = buildReduceServiceRegistry();
     _requestHandler = new BrokerRequestHandler(_routingTable, _timeBoundaryService, _scatterGather,
-        reduceServiceRegistry, _brokerMetrics, brokerTimeOutMs);
+        reduceServiceRegistry, _brokerMetrics, brokerTimeOutMs, queryResponseLimit);
 
     LOGGER.info("Network initialized !!");
   }
