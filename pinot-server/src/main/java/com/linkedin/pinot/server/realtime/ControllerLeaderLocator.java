@@ -49,7 +49,10 @@ public class ControllerLeaderLocator {
    */
   public static void create(HelixManager helixManager) {
     if (_instance != null) {
-      throw new RuntimeException("Cannot create multiple instances");
+      // We create multiple server instances in the hybrid cluster integration tests, so allow the call to create an
+      // instance even if there is already one.
+      LOGGER.warn("Already created");
+      return;
     }
     _instance = new ControllerLeaderLocator(helixManager);
   }
@@ -62,12 +65,13 @@ public class ControllerLeaderLocator {
   }
 
   /**
+   * Locate the controller leader so that we can send LLC segment completion requests to it.
    *
-   * @param refresh
-   * @return
+   * @param forceRefresh : If set to true, then makes a zk call to re-fetch the leadership information.
+   * @return The host:port string of the current controller leader.
    */
-  public String getControllerLeader(boolean refresh) {
-    if (controllerLeaderHostPort == null || refresh) {
+  public String getControllerLeader(boolean forceRefresh) {
+    if (controllerLeaderHostPort == null || forceRefresh) {
       BaseDataAccessor<ZNRecord> dataAccessor = _helixManager.getHelixDataAccessor().getBaseDataAccessor();
       Stat stat = new Stat();
       ZNRecord znRecord = dataAccessor.get("/ValidationCluster/CONTROLLER/LEADER", stat, AccessOption.THROW_EXCEPTION_IFNOTEXIST);
