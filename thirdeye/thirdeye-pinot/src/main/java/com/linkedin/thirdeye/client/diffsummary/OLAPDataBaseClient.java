@@ -18,10 +18,10 @@ public interface OLAPDataBaseClient {
 
   public abstract void setCollection(String collection);
 
-  public abstract Row getTopAggregatedValues();
+  public abstract Row getTopAggregatedValues() throws Exception;
 
-  public abstract List<List<Row>> getAggregatedValuesOfDimension(Dimensions dimensions);
+  public abstract List<List<Row>> getAggregatedValuesOfDimension(Dimensions dimensions) throws Exception;
 
-  public abstract List<List<Row>> getAggregatedValuesOfLevels(Dimensions dimensions);
+  public abstract List<List<Row>> getAggregatedValuesOfLevels(Dimensions dimensions) throws Exception;
 
 }

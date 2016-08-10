@@ -99,7 +99,7 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
   }
 
   @Override
-  public Row getTopAggregatedValues() {
+  public Row getTopAggregatedValues() throws Exception {
     List<ThirdEyeRequest> bulkRequests = new ArrayList<>();
     List<String> groupBy = Collections.emptyList();
     Pair<ThirdEyeRequest, ThirdEyeRequest> timeOnTimeRequests = constructTimeOnTimeRequest(groupBy);
@@ -110,7 +110,7 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
   }
 
   @Override
-  public List<List<Row>> getAggregatedValuesOfDimension(Dimensions dimensions) {
+  public List<List<Row>> getAggregatedValuesOfDimension(Dimensions dimensions) throws Exception {
     List<ThirdEyeRequest> bulkRequests = new ArrayList<>();
     for (int level = 0; level < dimensions.size(); ++level) {
       List<String> groupBy = Lists.newArrayList(dimensions.get(level));
@@ -123,7 +123,7 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
   }
 
   @Override
-  public List<List<Row>> getAggregatedValuesOfLevels(Dimensions dimensions) {
+  public List<List<Row>> getAggregatedValuesOfLevels(Dimensions dimensions) throws Exception {
     List<ThirdEyeRequest> bulkRequests = new ArrayList<>();
     for (int level = 0; level < dimensions.size() + 1; ++level) {
       List<String> groupBy = new ArrayList<>(dimensions.groupByStringsAtLevel(level));
@@ -135,20 +135,16 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
     return constructMultiLevelAggregatedValues(dimensions, bulkRequests);
   }
 
-  private List<List<Row>> constructMultiLevelAggregatedValues(Dimensions dimensions, List<ThirdEyeRequest> bulkRequests) {
+  private List<List<Row>> constructMultiLevelAggregatedValues(Dimensions dimensions, List<ThirdEyeRequest> bulkRequests)
+      throws Exception {
     List<List<Row>> res = new ArrayList<>();
 
-    try {
-      Map<ThirdEyeRequest, Future<ThirdEyeResponse>> queryResponses = queryCache.getQueryResultsAsync(bulkRequests);
-      for (int i = 0; i < bulkRequests.size(); i += 2) {
-        ThirdEyeResponse responseTa = queryResponses.get(bulkRequests.get(i)).get();
-        ThirdEyeResponse responseTb = queryResponses.get(bulkRequests.get(i+1)).get();
-        List<Row> singleLevelRows = constructSingleLevelAggregatedValues(dimensions, responseTa, responseTb);
-        res.add(singleLevelRows);
-      }
-    } catch (Exception e) {
-      e.printStackTrace();
-      res.clear();
+    Map<ThirdEyeRequest, Future<ThirdEyeResponse>> queryResponses = queryCache.getQueryResultsAsync(bulkRequests);
+    for (int i = 0; i < bulkRequests.size(); i += 2) {
+      ThirdEyeResponse responseTa = queryResponses.get(bulkRequests.get(i)).get();
+      ThirdEyeResponse responseTb = queryResponses.get(bulkRequests.get(i+1)).get();
+      List<Row> singleLevelRows = constructSingleLevelAggregatedValues(dimensions, responseTa, responseTb);
+      res.add(singleLevelRows);
     }
 
     return res;
@@ -216,11 +212,19 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
   public static void main(String[] argc) throws Exception {
     String oFileName = "Cube.json";
 
+    // An interesting data set that difficult to tell because too many dark reds and blues
     String collection = "thirdeyeKbmi";
-    String metricName = "mobilePageViews";
-    DateTime baselineStart = new DateTime(1469628000000L);
-    DateTime currentStart = new DateTime(1470232800000L);
-    TimeGranularity timeGranularity = new TimeGranularity(1, TimeUnit.HOURS);
+    String metricName = "pageViews";
+    DateTime baselineStart = new DateTime(1467788400000L);
+    DateTime currentStart = new DateTime(1468393200000L);
+    TimeGranularity timeGranularity = new TimeGranularity(1, TimeUnit.DAYS);
+
+    // An interesting data set that difficult to tell because most cells are light red or blue
+//    String collection = "thirdeyeKbmi";
+//    String metricName = "mobilePageViews";
+//    DateTime baselineStart = new DateTime(1469628000000L);
+//    DateTime currentStart = new DateTime(1470232800000L);
+//    TimeGranularity timeGranularity = new TimeGranularity(1, TimeUnit.HOURS);
 
 //    String collection = "thirdeyeAbook";
 //    String metricName = "totalFlows";
@@ -262,7 +266,7 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
 //    initCube.buildWithManualDimensionOrder(pinotClient, new Dimensions(Lists.newArrayList(dimensionNames)));
 
 
-    int answerSize = 5;
+    int answerSize = 10;
     boolean oneSideErrors = false;
     Summary summary = new Summary(initCube);
     System.out.println(summary.computeSummary(answerSize, oneSideErrors, maxDimensionSize));

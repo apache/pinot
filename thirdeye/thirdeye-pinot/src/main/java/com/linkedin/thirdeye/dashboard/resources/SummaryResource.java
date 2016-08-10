@@ -39,7 +39,7 @@ public class SummaryResource {
   @GET
   @Path(value = "/summary/test")
   @Produces(MediaType.APPLICATION_JSON)
-  public String getSummary() throws IOException {
+  public String getSummary() throws Exception {
     return buildSummary("thirdeyeKbmi", "mobilePageViews", DEFAULT_TIMEZONE_ID, new Long(1469628000000L), new Long(
         1470146400000L), "HOURS",
         "browserName,continent,countryCode,deviceName,environment,locale,osName,pageKey,service,sourceApp", 5, 3, "[]",
@@ -59,7 +59,7 @@ public class SummaryResource {
       @QueryParam("summarySize") int summarySize,
       @QueryParam("topDimensions") @DefaultValue(DEFAULT_TOP_DIMENSIONS) int topDimensions,
       @QueryParam("hierarchies") @DefaultValue(DEFAULT_HIERARCHIES) String hierarchiesPayload,
-      @QueryParam("oneSideError") @DefaultValue(DEFAULT_ONE_SIDE_ERROR) boolean doOneSideError) throws IOException {
+      @QueryParam("oneSideError") @DefaultValue(DEFAULT_ONE_SIDE_ERROR) boolean doOneSideError) throws Exception {
     if (summarySize < 1) summarySize = 1;
 
     OLAPDataBaseClient olapClient = new PinotThirdEyeSummaryClient(CACHE_REGISTRY_INSTANCE.getQueryCache());
@@ -94,7 +94,7 @@ public class SummaryResource {
       @QueryParam("aggTimeGranularity") String aggTimeGranularity,
       @QueryParam("dimensions") String groupByDimensions,
       @QueryParam("summarySize") int summarySize,
-      @QueryParam("oneSideError") @DefaultValue(DEFAULT_ONE_SIDE_ERROR) boolean doOneSideError) throws IOException {
+      @QueryParam("oneSideError") @DefaultValue(DEFAULT_ONE_SIDE_ERROR) boolean doOneSideError) throws Exception {
     if (summarySize < 1) summarySize = 1;
 
     OLAPDataBaseClient olapClient = new PinotThirdEyeSummaryClient(CACHE_REGISTRY_INSTANCE.getQueryCache());
