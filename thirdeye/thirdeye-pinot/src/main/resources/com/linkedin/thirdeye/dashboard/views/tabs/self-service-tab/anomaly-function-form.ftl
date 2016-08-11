@@ -81,7 +81,7 @@
                     <div class="uk-button uk-button-primary" type="button"><i class="uk-icon-caret-down"></i>
                     </div>
                     <div class="uk-dropdown uk-dropdown-small uk-dropdown-bottom" style="top: 30px; left: 0px;">
-                        <ul class="metric-list uk-nav uk-nav-dropdown single-select">
+                        <ul class="metric-list single-metric-list uk-nav uk-nav-dropdown single-select">
                         </ul>
                     </div>
                 </div>
