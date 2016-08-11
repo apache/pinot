@@ -589,7 +589,7 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
     StorageQuotaChecker quotaChecker = new StorageQuotaChecker(offlineTableConfig, tableSizeReader);
     String offlineTableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(metadata.getTableName());
     return quotaChecker.isSegmentStorageWithinQuota(segmentFile, offlineTableName,
-        metadata.getName(), _controllerConf.getServerAdminRequestTimeoutSeconds());
+        metadata.getName(), _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
   }
 
 }
