@@ -22,24 +22,25 @@ public abstract class AnomalyMergeGenerator {
 
   /**
    * @param anomalies   : list of raw anomalies to be merged with last mergedAnomaly
-   * @param mergeConfig : merge configuration params
+   * @param mergeDuration   : length of a merged anomaly
+   * @param sequentialAllowedGap : allowed gap between two raw anomalies in order to merge
    *
    * @return
    */
   public static List<AnomalyMergedResult> mergeAnomalies(List<AnomalyResult> anomalies,
-      AnomalyMergeConfig mergeConfig) {
-    return mergeAnomalies(null, anomalies, mergeConfig);
+      long mergeDuration, long sequentialAllowedGap) {
+    return mergeAnomalies(null, anomalies, mergeDuration, sequentialAllowedGap);
   }
 
   /**
    * @param mergedAnomaly : last merged anomaly
    * @param anomalies     : list of raw anomalies to be merged with last mergedAnomaly
-   * @param mergeConfig   : merge configuration params
-   *
+   * @param mergeDuration   : length of a merged anomaly
+   * @param sequentialAllowedGap : allowed gap between two raw anomalies in order to merge
    * @return
    */
   public static List<AnomalyMergedResult> mergeAnomalies(AnomalyMergedResult mergedAnomaly,
-      List<AnomalyResult> anomalies, AnomalyMergeConfig mergeConfig) {
+      List<AnomalyResult> anomalies, long mergeDuration, long sequentialAllowedGap) {
 
     // sort anomalies in natural order of start time
     Collections
@@ -48,11 +49,11 @@ public abstract class AnomalyMergeGenerator {
     boolean applySequentialGapBasedSplit = false;
     boolean applyMaxDurationBasedSplit = false;
 
-    if (mergeConfig.getMergeDuration() > 0) {
+    if (mergeDuration > 0) {
       applyMaxDurationBasedSplit = true;
     }
 
-    if (mergeConfig.getSequentialAllowedGap() > 0) {
+    if (sequentialAllowedGap > 0) {
       applySequentialGapBasedSplit = true;
     }
 
@@ -66,8 +67,7 @@ public abstract class AnomalyMergeGenerator {
       } else {
         // compare current with merged and decide whether to merge the current result or create a new one
         if (applySequentialGapBasedSplit
-            && (currentResult.getStartTimeUtc() - mergedAnomaly.getEndTime()) > mergeConfig
-            .getSequentialAllowedGap()) {
+            && (currentResult.getStartTimeUtc() - mergedAnomaly.getEndTime()) > sequentialAllowedGap) {
 
           // Split here
           // add previous merged result
@@ -93,8 +93,7 @@ public abstract class AnomalyMergeGenerator {
       // till this point merged result contains current raw result
       if (applyMaxDurationBasedSplit
           // check if Max Duration for merged has passed, if so, create new one
-          && mergedAnomaly.getEndTime() - mergedAnomaly.getStartTime() >= mergeConfig
-          .getMergeDuration()) {
+          && mergedAnomaly.getEndTime() - mergedAnomaly.getStartTime() >= mergeDuration) {
         // check if next anomaly has same start time as current one, that should be merged with current one too
         if (i < (anomalies.size() - 1) && anomalies.get(i + 1).getStartTimeUtc()
             .equals(currentResult.getStartTimeUtc())) {

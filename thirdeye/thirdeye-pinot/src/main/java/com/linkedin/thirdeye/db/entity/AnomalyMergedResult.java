@@ -9,9 +9,11 @@ import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.FetchType;
 import javax.persistence.JoinColumn;
+import javax.persistence.ManyToOne;
 import javax.persistence.OneToMany;
 import javax.persistence.OneToOne;
 import javax.persistence.Table;
+import javax.persistence.Transient;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 @Entity
@@ -46,8 +48,15 @@ public class AnomalyMergedResult extends AbstractBaseEntity {
   @JoinColumn(name="anomaly_feedback_id")
   private AnomalyFeedback feedback;
 
-  @OneToMany(fetch = FetchType.EAGER, cascade = CascadeType.ALL)
+  @OneToMany
   private List<AnomalyResult> anomalyResults = new ArrayList<>();
+
+  @ManyToOne(fetch = FetchType.EAGER)
+  @JoinColumn(name = "function_id")
+  private AnomalyFunctionSpec function;
+
+  @Transient
+  private boolean updated = false;
 
   public String getMetric() {
     return metric;
@@ -127,6 +136,22 @@ public class AnomalyMergedResult extends AbstractBaseEntity {
 
   public void setCollection(String collection) {
     this.collection = collection;
+  }
+
+  public boolean isUpdated() {
+    return updated;
+  }
+
+  public void setUpdated(boolean updated) {
+    this.updated = updated;
+  }
+
+  public AnomalyFunctionSpec getFunction() {
+    return function;
+  }
+
+  public void setFunction(AnomalyFunctionSpec function) {
+    this.function = function;
   }
 
   @Override

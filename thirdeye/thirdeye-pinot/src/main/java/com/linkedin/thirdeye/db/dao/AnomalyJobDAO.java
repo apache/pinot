@@ -1,14 +1,13 @@
 package com.linkedin.thirdeye.db.dao;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.inject.persist.Transactional;
 import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
 import com.linkedin.thirdeye.db.entity.AnomalyJobSpec;
 
 import java.sql.Timestamp;
-import java.util.HashMap;
 import java.util.List;
 
-import java.util.Map;
 import org.joda.time.DateTime;
 
 public class AnomalyJobDAO extends AbstractJpaDAO<AnomalyJobSpec> {
@@ -21,9 +20,7 @@ public class AnomalyJobDAO extends AbstractJpaDAO<AnomalyJobSpec> {
   }
 
   public List<AnomalyJobSpec> findByStatus(JobStatus status) {
-    Map<String, Object> filterParams = new HashMap<>();
-    filterParams.put("status", status);
-    return super.findByParams(filterParams);
+    return super.findByParams(ImmutableMap.of("status", status));
   }
 
   @Transactional
