@@ -60,20 +60,13 @@ public class AnomalyTaskDAO extends AbstractJpaDAO<AnomalyTaskSpec> {
 
   @Transactional
   public boolean updateStatusAndWorkerId(Long workerId, Long id, TaskStatus oldStatus, TaskStatus newStatus) {
-    try {
-      List<AnomalyTaskSpec> anomalyTaskSpecs = findByIdAndStatus(id, oldStatus);
-      if (anomalyTaskSpecs.size() == 1) {
-        AnomalyTaskSpec anomalyTaskSpec = anomalyTaskSpecs.get(0);
-        anomalyTaskSpec.setStatus(newStatus);
-        anomalyTaskSpec.setWorkerId(workerId);
-        save(anomalyTaskSpec);
-        return true;
-      }
-    } catch (OptimisticLockException | RollbackException | StaleObjectStateException e) {
-      LOG.warn("OptimisticLockException while updating workerId {} and status {} for anomalyTaskId {}",
-          workerId, newStatus, id);
-    } catch (Exception e) {
-      LOG.error("Exception in updateStatusAndWorkedId", e);
+    List<AnomalyTaskSpec> anomalyTaskSpecs = findByIdAndStatus(id, oldStatus);
+    if (anomalyTaskSpecs.size() == 1) {
+      AnomalyTaskSpec anomalyTaskSpec = anomalyTaskSpecs.get(0);
+      anomalyTaskSpec.setStatus(newStatus);
+      anomalyTaskSpec.setWorkerId(workerId);
+      save(anomalyTaskSpec);
+      return true;
     }
     return false;
 

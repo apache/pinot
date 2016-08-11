@@ -29,7 +29,7 @@ import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
 
 public class AnomalyTaskSpec extends AbstractBaseEntity {
 
-  @ManyToOne(cascade = CascadeType.ALL, fetch = FetchType.EAGER, optional = true)
+  @ManyToOne(cascade = CascadeType.MERGE, fetch = FetchType.EAGER, optional = true)
   @JoinColumn(name = "job_id")
   private AnomalyJobSpec job;
 

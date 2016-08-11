@@ -609,13 +609,13 @@ public class AnomalyResource {
     }
     emailConfiguration.setFunctions(anomalyFunctionSpecs);
 
-    Long responseId = emailConfigurationDAO.save(emailConfiguration);
+    emailConfigurationDAO.update(emailConfiguration);
 
     // call endpoint to start, if active
     if (isActive) {
       alertResourceHttpUtils.enableEmailConfiguration(String.valueOf(id));
     }
-    return Response.ok(responseId).build();
+    return Response.ok(id).build();
   }
 
 
@@ -695,7 +695,7 @@ public class AnomalyResource {
       feedback.setComment(feedbackRequest.getComment());
       feedback.setFeedbackType(feedbackRequest.getFeedbackType());
 
-      anomalyResultDAO.save(result);
+      anomalyResultDAO.update(result);
     } catch (IOException e) {
       throw new IllegalArgumentException("Invalid payload " + payload, e);
     }
