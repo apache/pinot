@@ -37,10 +37,12 @@ public class ControllerLeaderLocator {
   public static final Logger LOGGER = LoggerFactory.getLogger(ControllerLeaderLocator.class);
 
   private final HelixManager _helixManager;
+  private final String _clusterName;
   private String controllerLeaderHostPort = null;
 
   ControllerLeaderLocator(HelixManager helixManager) {
     _helixManager = helixManager;
+    _clusterName = helixManager.getClusterName();
   }
 
   /**
@@ -74,7 +76,7 @@ public class ControllerLeaderLocator {
     if (controllerLeaderHostPort == null || forceRefresh) {
       BaseDataAccessor<ZNRecord> dataAccessor = _helixManager.getHelixDataAccessor().getBaseDataAccessor();
       Stat stat = new Stat();
-      ZNRecord znRecord = dataAccessor.get("/ValidationCluster/CONTROLLER/LEADER", stat, AccessOption.THROW_EXCEPTION_IFNOTEXIST);
+      ZNRecord znRecord = dataAccessor.get("/" + _clusterName + "/CONTROLLER/LEADER", stat, AccessOption.THROW_EXCEPTION_IFNOTEXIST);
       String leader = znRecord.getId();
       int index = leader.lastIndexOf('_');
       controllerLeaderHostPort = leader.substring(0, index) + ":" + leader.substring(index+1);
