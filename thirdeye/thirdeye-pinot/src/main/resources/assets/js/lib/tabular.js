@@ -76,7 +76,7 @@ function renderTabular(data, tab) {
     });
 }
 var lineChart;
-function drawTimeSeries(ajaxData, tab) {
+function drawTimeSeries(timeSeriesData, tab) {
 
     var currentView = $("#" + tab + "-display-chart-section")
     var lineChartPlaceholder = $("#linechart-placeholder", currentView)[0];
@@ -85,11 +85,13 @@ function drawTimeSeries(ajaxData, tab) {
     var dateTimeFormat = "%I:%M %p";
     if (hash.hasOwnProperty("aggTimeGranularity") && hash.aggTimeGranularity == "DAYS") {
         dateTimeFormat = "%m-%d"
+    }else if(timeSeriesData.summary.baselineEnd - timeSeriesData.summary.baselineStart > 86400000){
+        dateTimeFormat = "%m-%d %I %p"
     }
 
 
     // Metric(s)
-    var metrics = ajaxData["metrics"]
+    var metrics = timeSeriesData["metrics"]
     var lineChartData = {};
     var barChartData = {};
     var xTicksBaseline = [];
@@ -97,8 +99,8 @@ function drawTimeSeries(ajaxData, tab) {
     var colors = {};
     var chartTypes = {};
     var axes = {};
-    for (var t = 0, len = ajaxData["timeBuckets"].length; t < len; t++) {
-        var timeBucket = ajaxData["timeBuckets"][t]["currentStart"]
+    for (var t = 0, len = timeSeriesData["timeBuckets"].length; t < len; t++) {
+        var timeBucket = timeSeriesData["timeBuckets"][t]["currentStart"]
         xTicksBaseline.push(timeBucket)
         xTicksCurrent.push(timeBucket)
     }
@@ -121,10 +123,10 @@ function drawTimeSeries(ajaxData, tab) {
         var metricBaselineData = [];
         var metricCurrentData = [];
         var deltaPercentageData = [];
-        for (var t = 0, len = ajaxData["timeBuckets"].length; t < len; t++) {
-            var baselineValue = ajaxData["data"][metrics[i]]["responseData"][t][0];
-            var currentValue = ajaxData["data"][metrics[i]]["responseData"][t][1];
-            var deltaPercentage = parseInt(ajaxData["data"][metrics[i]]["responseData"][t][2]);
+        for (var t = 0, len = timeSeriesData["timeBuckets"].length; t < len; t++) {
+            var baselineValue = timeSeriesData["data"][metrics[i]]["responseData"][t][0];
+            var currentValue = timeSeriesData["data"][metrics[i]]["responseData"][t][1];
+            var deltaPercentage = parseInt(timeSeriesData["data"][metrics[i]]["responseData"][t][2]);
             metricBaselineData.push(baselineValue);
             metricCurrentData.push(currentValue);
             deltaPercentageData.push(deltaPercentage);

@@ -33,10 +33,12 @@ function getDataSetList() {
 
 //takes the data the message
 function validateFormData(data, message, errorSource) {
+
     var errorMessage = $(".time-input-form-error p");
     var errorAlert = $(".time-input-form-error");
 
     if (!data) {
+
         errorMessage.html(message + " Error: data = " + data);
         errorAlert.fadeIn(100);
         errorAlert.attr("data-error-source", errorSource);
@@ -113,7 +115,8 @@ function getAnomalyMetricList() {
         /* Handelbars template for query form single select metric list on anomaly view */
         var queryFormMetricListData = {data: data};
         var result_query_form_metric_list_template = HandleBarsTemplates.template_metric_list(queryFormMetricListData);
-        $(".single-metric-list").each(function () {
+        var form = $("#anomalies-form");
+        $(".single-metric-list", form ).each(function () {
             $(this).html(result_query_form_metric_list_template)
         });
 
@@ -121,7 +124,6 @@ function getAnomalyMetricList() {
         formComponentPopulated()
     });
 }
-
 
 function getDimensionNValueList() {
 

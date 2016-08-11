@@ -203,11 +203,9 @@ function updateDashboardFormFromHash() {
 
         for (var i = 0, len = metricAry.length; i < len; i++) {
 
-            if (hash.view == "anomalies") {
-                $(".single-metric-option[value='" + metricAry[i] + "']", currentForm).click();
-            } else {
+
                 $(".metric-option[value='" + metricAry[i] + "']", currentForm).click();
-            }
+
         }
     }
 
@@ -624,8 +622,7 @@ function toggleSumDetails(target) {
             .getElementsByClassName("details-cell");
         //Alert
         if (detailsCells.length > 1000) {
-            console.log('details cells to paint:')
-            console.log(detailsCells.length)
+            console.log('details cells to paint:', detailsCells.length)
         }
 
         for (var dIndex = 0, detailsLen = detailsCells.length; dIndex < detailsLen; dIndex++) {
@@ -1114,7 +1111,17 @@ function encodeCron(repeatEveryUnit, repeatEverySize, scheduleMinute, scheduleHo
     switch(repeatEveryUnit){
         case "DAYS":
                 DAY_OF_MONTH  = (repeatEverySize == 1) ? "*" : "0/" + repeatEverySize;
-                HOUR = ( scheduleHour.indexOf(",") == -1) ? parseInt(scheduleHour) : scheduleHour.replace(/^0/, '').replace(",0", ",");
+
+                if( scheduleHour.indexOf(",") == -1){
+                   HOUR = parseInt(scheduleHour);
+                }else{
+                   //remove starting 0-s
+                   var hourList =  scheduleHour.split(',');
+                   for(var i= 0, len = hourList.length; i < len; i++ ){
+                       hourList[i] = parseInt(hourList[i])
+                   }
+                   HOUR = hourList.join(",");
+                }
                 MIN  = ( scheduleHour.indexOf(",") == -1) ?  parseInt(scheduleMinute) : 0 ;
 
 
@@ -1122,13 +1129,13 @@ function encodeCron(repeatEveryUnit, repeatEverySize, scheduleMinute, scheduleHo
         default: //case "HOURS"
                 DAY_OF_MONTH= "*";
                 HOUR = (repeatEverySize == 1) ? "*" : "0/" + repeatEverySize;
-                MIN = 0
+                MIN = 0;
         break
     }
 
     var cronAry = [SEC, MIN, HOUR, DAY_OF_MONTH, DAY_OF_WEEK,YEAR];
 
-    return cronAry.join(" ");
+    return cronAry.join(" ")
 }
 
 

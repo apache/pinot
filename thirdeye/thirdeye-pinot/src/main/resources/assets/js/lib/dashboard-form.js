@@ -124,13 +124,16 @@ function selectMetrics(target) {
         hash["metrics"] = hash["metrics"] + "," + value;
     }
 
-    //Hide alert
+    //Hide earlier error message
     if ($("#" + hash.view + "-time-input-form-error").attr("data-error-source") == "metric-option") {
         $("#" + hash.view + "-time-input-form-error").hide();
     }
 
-    //Update selectors
-    $(target).hide();
+    //Update selectors: hide option if it's in multi metric selector
+    if( !$(target).parent().hasClass("single-metric-list") ){
+        $(target).hide();
+    }
+
     $(".selected-metrics-list[rel='" + hash.view + "']").append("<li class='added-item uk-button remove-selection' rel='" + param + "' value='" + value + "'><a href='#'>" + $(target).text() + "<i class='uk-icon-close'></i></a></li>");
 
     //Enable Go btn
