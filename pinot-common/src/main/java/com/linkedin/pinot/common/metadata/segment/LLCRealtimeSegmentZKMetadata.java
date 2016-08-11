@@ -28,10 +28,13 @@ public class LLCRealtimeSegmentZKMetadata extends RealtimeSegmentZKMetadata {
   private static final String START_OFFSET = "segment.realtime.startOffset";
   private static final String END_OFFSET = "segment.realtime.endOffset";
   private static final String NUM_REPLICAS = "segment.realtime.numReplicas";
+  public static final String DOWNLOAD_URL = "segment.realtime.download.url";
 
   private long _startOffset;
   private long _endOffset;
   private int _numReplicas;
+
+  private String _downloadUrl = null;
 
   public LLCRealtimeSegmentZKMetadata() {
     super();
@@ -42,6 +45,7 @@ public class LLCRealtimeSegmentZKMetadata extends RealtimeSegmentZKMetadata {
     _startOffset = Long.valueOf(znRecord.getSimpleField(START_OFFSET));
     _numReplicas = Integer.valueOf(znRecord.getSimpleField(NUM_REPLICAS));
     _endOffset = Long.valueOf(znRecord.getSimpleField(END_OFFSET));
+    _downloadUrl = znRecord.getSimpleField(DOWNLOAD_URL);
   }
 
   public long getStartOffset() {
@@ -68,12 +72,21 @@ public class LLCRealtimeSegmentZKMetadata extends RealtimeSegmentZKMetadata {
     _numReplicas = numReplicas;
   }
 
+  public String getDownloadUrl() {
+    return _downloadUrl;
+  }
+
+  public void setDownloadUrl(String downloadUrl) {
+    _downloadUrl = downloadUrl;
+  }
+
   @Override
   public ZNRecord toZNRecord() {
     ZNRecord znRecord = super.toZNRecord();
     znRecord.setLongField(START_OFFSET, _startOffset);
     znRecord.setLongField(END_OFFSET, _endOffset);
     znRecord.setIntField(NUM_REPLICAS, _numReplicas);
+    znRecord.setSimpleField(DOWNLOAD_URL, _downloadUrl);
     return znRecord;
   }
 
@@ -87,6 +100,9 @@ public class LLCRealtimeSegmentZKMetadata extends RealtimeSegmentZKMetadata {
     result.append("  " + super.getClass().getName() + " : " + super.toString());
     result.append(newline);
     result.append("  " + START_OFFSET + " : " + _startOffset + ",");
+    result.append(newline);
+    result.append("  " + DOWNLOAD_URL + " : " + _downloadUrl + ",");
+    result.append(newline);
     result.append("  " + END_OFFSET + " : " + _endOffset);
     result.append(newline);
     result.append("}");
@@ -107,6 +123,7 @@ public class LLCRealtimeSegmentZKMetadata extends RealtimeSegmentZKMetadata {
     return super.equals(metadata) &&
         isEqual(_startOffset, metadata._startOffset) &&
         isEqual(_endOffset, metadata._endOffset) &&
+        isEqual(_downloadUrl, metadata._downloadUrl) &&
         isEqual(_numReplicas, metadata._numReplicas);
   }
 
@@ -116,6 +133,7 @@ public class LLCRealtimeSegmentZKMetadata extends RealtimeSegmentZKMetadata {
     result =  hashCodeOf(result, _startOffset);
     result =  hashCodeOf(result, _endOffset);
     result =  hashCodeOf(result, _numReplicas);
+    result = hashCodeOf(result, _downloadUrl);
     return result;
   }
 
@@ -125,6 +143,7 @@ public class LLCRealtimeSegmentZKMetadata extends RealtimeSegmentZKMetadata {
     configMap.put(START_OFFSET, Long.toString(_startOffset));
     configMap.put(END_OFFSET, Long.toString(_endOffset));
     configMap.put(NUM_REPLICAS, Integer.toString(_numReplicas));
+    configMap.put(DOWNLOAD_URL, _downloadUrl);
 
     return configMap;
   }

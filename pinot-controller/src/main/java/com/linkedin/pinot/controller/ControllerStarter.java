@@ -15,19 +15,6 @@
  */
 package com.linkedin.pinot.controller;
 
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import com.linkedin.pinot.common.Utils;
-import com.linkedin.pinot.common.metrics.ControllerMeter;
-import com.linkedin.pinot.common.metrics.ControllerMetrics;
-import com.linkedin.pinot.common.metrics.MetricsHelper;
-import com.linkedin.pinot.common.metrics.ValidationMetrics;
-import com.linkedin.pinot.controller.api.ControllerRestApplication;
-import com.linkedin.pinot.controller.helix.SegmentStatusChecker;
-import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import com.linkedin.pinot.controller.helix.core.realtime.PinotRealtimeSegmentManager;
-import com.linkedin.pinot.controller.helix.core.retention.RetentionManager;
-import com.linkedin.pinot.controller.validation.ValidationManager;
-import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Executor;
@@ -42,6 +29,20 @@ import org.restlet.Context;
 import org.restlet.data.Protocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.linkedin.pinot.common.Utils;
+import com.linkedin.pinot.common.metrics.ControllerMeter;
+import com.linkedin.pinot.common.metrics.ControllerMetrics;
+import com.linkedin.pinot.common.metrics.MetricsHelper;
+import com.linkedin.pinot.common.metrics.ValidationMetrics;
+import com.linkedin.pinot.controller.api.ControllerRestApplication;
+import com.linkedin.pinot.controller.helix.SegmentStatusChecker;
+import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.linkedin.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
+import com.linkedin.pinot.controller.helix.core.realtime.PinotRealtimeSegmentManager;
+import com.linkedin.pinot.controller.helix.core.retention.RetentionManager;
+import com.linkedin.pinot.controller.validation.ValidationManager;
+import com.yammer.metrics.core.MetricsRegistry;
 
 public class ControllerStarter {
   private static final Logger LOGGER = LoggerFactory.getLogger(ControllerStarter.class);
@@ -104,6 +105,8 @@ public class ControllerStarter {
     try {
       LOGGER.info("starting pinot helix resource manager");
       helixResourceManager.start();
+      // Helix resource manager must be started in order to create PinotLLCRealtimeSegmentManager
+      PinotLLCRealtimeSegmentManager.create(helixResourceManager, config);
       LOGGER.info("starting api component");
       component.start();
       LOGGER.info("starting retention manager");

@@ -16,6 +16,8 @@
 package com.linkedin.pinot.controller;
 
 import java.io.File;
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -53,6 +55,15 @@ public class ControllerConf extends PropertiesConfiguration {
 
   public ControllerConf() {
     super();
+  }
+
+  public static String constructDownloadUrl(String tableName, String segmentName, String vip) {
+    try {
+      return StringUtil.join("/", vip, "segments", tableName, URLEncoder.encode(segmentName, "UTF-8"));
+    } catch (UnsupportedEncodingException e) {
+      // Shouldn't happen
+      throw new AssertionError("UTF-8 encoding should always be supported", e);
+    }
   }
 
   public void setQueryConsolePath(String path) {
@@ -119,6 +130,10 @@ public class ControllerConf extends PropertiesConfiguration {
       return Boolean.parseBoolean(getProperty(UPDATE_SEGMENT_STATE_MODEL).toString());
     }
     return false;   // Default is to leave the statemodel untouched.
+  }
+
+  public String generateVipUrl() {
+    return getControllerVipProtocol() + "://" + getControllerVipHost() + ":" + getControllerPort();
   }
 
   public String getZkStr() {
