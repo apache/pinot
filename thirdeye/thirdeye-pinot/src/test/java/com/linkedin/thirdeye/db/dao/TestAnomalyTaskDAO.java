@@ -12,18 +12,22 @@ import com.linkedin.thirdeye.anomaly.monitor.MonitorConstants.MonitorType;
 import com.linkedin.thirdeye.anomaly.monitor.MonitorTaskInfo;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
+import com.linkedin.thirdeye.db.entity.AnomalyJobSpec;
 import com.linkedin.thirdeye.db.entity.AnomalyTaskSpec;
 
 public class TestAnomalyTaskDAO extends AbstractDbTestBase {
 
   private Long anomalyTaskId1;
   private Long anomalyTaskId2;
+  private Long anomalyJobId;
 
   @Test
   public void testCreate() throws JsonProcessingException {
-    anomalyTaskId1 = anomalyTaskDAO.save(getTestTaskSpec());
+    AnomalyJobSpec testAnomalyJobSpec = getTestJobSpec();
+    anomalyJobId = anomalyJobDAO.save(testAnomalyJobSpec);
+    anomalyTaskId1 = anomalyTaskDAO.save(getTestTaskSpec(testAnomalyJobSpec));
     Assert.assertNotNull(anomalyTaskId1);
-    anomalyTaskId2 = anomalyTaskDAO.save(getTestTaskSpec());
+    anomalyTaskId2 = anomalyTaskDAO.save(getTestTaskSpec(testAnomalyJobSpec));
     Assert.assertNotNull(anomalyTaskId2);
   }
 
@@ -66,8 +70,8 @@ public class TestAnomalyTaskDAO extends AbstractDbTestBase {
   @Test(dependsOnMethods = {"testUpdateStatusAndTaskEndTime"})
   public void testFindByJobIdStatusNotIn() {
     TaskStatus status = TaskStatus.COMPLETED;
-    List<AnomalyTaskSpec> anomalyTaskSpecs = anomalyTaskDAO.findByJobIdStatusNotIn(1L, status);
-    Assert.assertEquals(anomalyTaskSpecs.size(), 0);
+    List<AnomalyTaskSpec> anomalyTaskSpecs = anomalyTaskDAO.findByJobIdStatusNotIn(anomalyJobId, status);
+    Assert.assertEquals(anomalyTaskSpecs.size(), 1);
   }
 
   @Test(dependsOnMethods = {"testFindByJobIdStatusNotIn"})
@@ -77,7 +81,7 @@ public class TestAnomalyTaskDAO extends AbstractDbTestBase {
     Assert.assertEquals(numRecordsDeleted, 1);
   }
 
-  AnomalyTaskSpec getTestTaskSpec() throws JsonProcessingException {
+  AnomalyTaskSpec getTestTaskSpec(AnomalyJobSpec anomalyJobSpec) throws JsonProcessingException {
     AnomalyTaskSpec jobSpec = new AnomalyTaskSpec();
     jobSpec.setJobName("Test_Anomaly_Task");
     jobSpec.setStatus(TaskStatus.WAITING);
@@ -85,7 +89,7 @@ public class TestAnomalyTaskDAO extends AbstractDbTestBase {
     jobSpec.setTaskStartTime(new DateTime().minusDays(20).getMillis());
     jobSpec.setTaskEndTime(new DateTime().minusDays(10).getMillis());
     jobSpec.setTaskInfo(new ObjectMapper().writeValueAsString(getTestMonitorTaskInfo()));
-    jobSpec.setJob(getTestJobSpec());
+    jobSpec.setJob(anomalyJobSpec);
     return jobSpec;
   }
 
