@@ -15,25 +15,28 @@
  */
 package com.linkedin.pinot.core.startree;
 
+import com.google.common.collect.HashBiMap;
+import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.FileInputStream;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.OutputStream;
-import java.io.Serializable;
+import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import com.google.common.collect.HashBiMap;
 
-
-public class StarTree implements Serializable{
-
-  /**
-   * 
-   */
+public class StarTree implements StarTreeInterf {
+  private static final Logger LOGGER = LoggerFactory.getLogger(StarTree.class);
   private static final long serialVersionUID = 1L;
+
   StarTreeIndexNode root;
+  int numNodes = 0;
+
   private HashBiMap<String, Integer> dimensionNameToIndexMap;
 
   public StarTree(StarTreeIndexNode root, HashBiMap<String, Integer> dimensionNameToIndexMap) {
@@ -41,36 +44,110 @@ public class StarTree implements Serializable{
     this.dimensionNameToIndexMap = dimensionNameToIndexMap;
   }
 
-  public StarTreeIndexNode getRoot() {
+  /**
+   * {@inheritDoc}
+   * @return
+   */
+  @Override
+  public StarTreeIndexNodeInterf getRoot() {
     return root;
   }
 
+  /**
+   * {@inheritDoc}
+   * @return
+   */
+  @Override
+  public Version getVersion() {
+    return Version.V1;
+  }
+
+  /**
+   * Returns the total number of nodes in the star tree.
+   * For backward compatibility (trees without this info), it computes
+   * the number of nodes on the fly.
+   *
+   * @return
+   */
+  @Override
+  public int getNumNodes() {
+    if (numNodes == 0) {
+      numNodes = getNumNodes(root);
+    }
+    return numNodes;
+  }
+
+  /**
+   * {@inheritDoc}
+   * @return
+   */
+  @Override
   public HashBiMap<String, Integer> getDimensionNameToIndexMap() {
     return dimensionNameToIndexMap;
   }
 
   /**
-   * Returns a Java-serialized StarTree structure of this node and all its sub-trees.
+   * {@inheritDoc}
+   * @param outputFile
+   * @throws IOException
    */
-  public byte[] toBytes() throws IOException {
-    ByteArrayOutputStream baos = new ByteArrayOutputStream();
-    writeTree(baos);
-    baos.close();
-    return baos.toByteArray();
+  @Override
+  public void writeTree(File outputFile)
+      throws IOException {
+    OutputStream outputStream = new BufferedOutputStream(new FileOutputStream(outputFile));
+    ObjectOutputStream oos = new ObjectOutputStream(outputStream);
+
+    try {
+      oos.writeObject(this);
+    } catch (Exception e) {
+      LOGGER.error("Exception caught while writing StarTree file", e);
+    } finally {
+      oos.close();
+    }
   }
 
-  public void writeTree(OutputStream outputStream) throws IOException {
-    ObjectOutputStream oos = new ObjectOutputStream(outputStream);
-    oos.writeObject(this);
+  @Override
+  public void printTree() {
+    printTree(root, 0);
   }
 
   /**
-   * De-serializes a StarTree structure generated with {@link #toBytes}.
+   * Helper method to print the tree.
+   * @param root
+   * @param level
    */
-  public static StarTree fromBytes(InputStream inputStream) throws IOException, ClassNotFoundException {
-    ObjectInputStream ois = new ObjectInputStream(inputStream);
-    StarTree node = (StarTree) ois.readObject();
-    return node;
+  public void printTree(StarTreeIndexNode root, int level) {
+    for (int i = 0; i < level; i++) {
+      System.out.print("  ");
+    }
+    System.out.println(root);
+
+    if (!root.isLeaf()) {
+      for (StarTreeIndexNode child : root.getChildren().values()) {
+        printTree(child, level + 1);
+      }
+    }
   }
 
+  /**
+   * Helper method that computes and returns the number of nodes
+   * in the tree (by performing a dfs on the tree).
+   *
+   * @param root
+   * @return
+   */
+  private static int getNumNodes(StarTreeIndexNode root) {
+    if (root == null) {
+      return 0;
+    }
+
+    int numNodes = 1;
+    Map<Integer, StarTreeIndexNode> children = root.getChildren();
+    if (children != null) {
+      for (StarTreeIndexNode child : children.values()) {
+        numNodes += getNumNodes(child);
+      }
+    }
+    return numNodes;
+  }
 }

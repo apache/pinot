@@ -28,7 +28,8 @@ import com.linkedin.pinot.core.segment.index.converter.SegmentFormatConverter;
 import com.linkedin.pinot.core.segment.index.converter.SegmentFormatConverterFactory;
 import com.linkedin.pinot.core.segment.store.SegmentDirectory;
 import com.linkedin.pinot.core.segment.store.SegmentDirectoryPaths;
-import com.linkedin.pinot.core.startree.StarTree;
+import com.linkedin.pinot.core.startree.StarTreeInterf;
+import com.linkedin.pinot.core.startree.StarTreeSerDe;
 import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
@@ -94,10 +95,10 @@ public class Loaders {
       }
 
       // load star tree index if it exists
-      StarTree starTree = null;
+      StarTreeInterf starTree = null;
       if (segmentReader.hasStarTree()) {
         LOGGER.debug("Loading star tree for segment: {}", segmentDirectory);
-        starTree = StarTree.fromBytes(segmentReader.getStarTreeStream());
+        starTree = StarTreeSerDe.fromBytes(segmentReader.getStarTreeStream());
       }
       return new IndexSegmentImpl(segmentDirectory, metadata, indexContainerMap, starTree);
     }
