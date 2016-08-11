@@ -15,37 +15,9 @@
  */
 package com.linkedin.pinot.controller.api.restlet.resources;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.UnsupportedEncodingException;
-import java.net.InetAddress;
-import java.net.URLDecoder;
-import java.util.Date;
-import java.util.Iterator;
-import java.util.List;
-import org.apache.commons.configuration.ConfigurationException;
-import org.apache.commons.fileupload.FileItem;
-import org.apache.commons.fileupload.disk.DiskFileItemFactory;
-import org.apache.commons.io.FileUtils;
-import org.apache.helix.ZNRecord;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.joda.time.Interval;
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.restlet.data.MediaType;
-import org.restlet.data.Status;
-import org.restlet.ext.fileupload.RestletFileUpload;
-import org.restlet.representation.FileRepresentation;
-import org.restlet.representation.Representation;
-import org.restlet.representation.StringRepresentation;
-import org.restlet.resource.Delete;
-import org.restlet.resource.Post;
-import org.restlet.util.Series;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import com.alibaba.fastjson.JSONObject;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.OfflineTableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
@@ -72,7 +44,35 @@ import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
 import com.linkedin.pinot.controller.helix.core.realtime.SegmentCompletionManager;
 import com.linkedin.pinot.controller.validation.StorageQuotaChecker;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import java.io.File;
+import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.net.InetAddress;
+import java.net.URLDecoder;
+import java.util.Date;
+import java.util.Iterator;
+import java.util.List;
 import javax.annotation.Nonnull;
+import org.apache.commons.configuration.ConfigurationException;
+import org.apache.commons.fileupload.FileItem;
+import org.apache.commons.fileupload.disk.DiskFileItemFactory;
+import org.apache.commons.io.FileUtils;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.joda.time.Interval;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.restlet.data.MediaType;
+import org.restlet.data.Status;
+import org.restlet.ext.fileupload.RestletFileUpload;
+import org.restlet.representation.FileRepresentation;
+import org.restlet.representation.Representation;
+import org.restlet.representation.StringRepresentation;
+import org.restlet.resource.Delete;
+import org.restlet.resource.Post;
+import org.restlet.util.Series;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -428,8 +428,19 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
       throws ConfigurationException, IOException, JSONException {
     final SegmentMetadata metadata = new SegmentMetadataImpl(indexDir);
     final File tableDir = new File(baseDataDir, metadata.getTableName());
+    String tableName = metadata.getTableName();
     File segmentFile = new File(tableDir, dataFile.getName());
-    StorageQuotaChecker.QuotaCheckerResponse quotaResponse = checkStorageQuota(indexDir, metadata);
+    OfflineTableConfig offlineTableConfig = (OfflineTableConfig) ZKMetadataProvider
+        .getOfflineTableConfig(_pinotHelixResourceManager.getPropertyStore(), tableName);
+
+    if (offlineTableConfig == null) {
+      LOGGER.info("Missing configuration for table: {} in helix", metadata.getTableName());
+      setStatus(Status.CLIENT_ERROR_NOT_FOUND);
+      StringRepresentation repr = new StringRepresentation("{\"error\" : \"Missing table: "  +  tableName + "\"}");
+      repr.setMediaType(MediaType.APPLICATION_JSON);
+      return repr;
+    }
+    StorageQuotaChecker.QuotaCheckerResponse quotaResponse = checkStorageQuota(indexDir, metadata, offlineTableConfig);
     if (!quotaResponse.isSegmentWithinQuota) {
       // this is not an "error" hence we don't increment segment upload errors
       LOGGER.info("Rejecting segment upload for table: {}, segment: {}, reason: {}",
@@ -450,8 +461,9 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
       response = new PinotResourceManagerResponse("Invalid segment start/end time", false);
     } else {
       if (downloadUrl == null) {
-        downloadUrl = ControllerConf.constructDownloadUrl(metadata.getTableName(), dataFile.getName(), vip);
+        downloadUrl = ControllerConf.constructDownloadUrl(tableName, dataFile.getName(), vip);
       }
+      // TODO: this will read table configuration again from ZK. We should optimize that
       response = _pinotHelixResourceManager.addSegment(metadata, downloadUrl);
     }
 
@@ -571,14 +583,13 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
    *                    segmentFile must exist on disk and must be a directory
    * @param metadata segment metadata. This should not be null
    */
-  private StorageQuotaChecker.QuotaCheckerResponse checkStorageQuota(@Nonnull File segmentFile, @Nonnull SegmentMetadata metadata) {
+  private StorageQuotaChecker.QuotaCheckerResponse checkStorageQuota(@Nonnull File segmentFile, @Nonnull SegmentMetadata metadata,
+      @Nonnull OfflineTableConfig offlineTableConfig) {
     TableSizeReader tableSizeReader = new TableSizeReader(executor, connectionManager, _pinotHelixResourceManager);
-    AbstractTableConfig offlineTableConfig = ZKMetadataProvider
-        .getOfflineTableConfig(_pinotHelixResourceManager.getPropertyStore(), metadata.getTableName());
     StorageQuotaChecker quotaChecker = new StorageQuotaChecker(offlineTableConfig, tableSizeReader);
     String offlineTableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(metadata.getTableName());
     return quotaChecker.isSegmentStorageWithinQuota(segmentFile, offlineTableName,
-        metadata.getName(), _controllerConf.getServerAdminRequestTimeoutSeconds());
+        metadata.getName(), _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
   }
 
 }
