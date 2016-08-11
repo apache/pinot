@@ -77,6 +77,6 @@ public class AlertJobResource {
       throw new NullArgumentException("Alert config not found");
     }
     alertConfig.setIsActive(state);
-    emailConfigurationDAO.save(alertConfig);
+    emailConfigurationDAO.update(alertConfig);
   }
 }

@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.db;
+package com.linkedin.thirdeye.db.dao;
 
 import com.linkedin.thirdeye.api.dto.GroupByKey;
 import com.linkedin.thirdeye.api.dto.GroupByRow;
@@ -13,7 +13,7 @@ import org.testng.annotations.Test;
 
 public class TestAnomalyResultDAO extends AbstractDbTestBase {
 
-  Long anomalyResultId;
+  AnomalyResult anomalyResult;
   AnomalyFunctionSpec spec = getTestFunctionSpec("metric", "dataset");
 
   @Test
@@ -22,17 +22,13 @@ public class TestAnomalyResultDAO extends AbstractDbTestBase {
     Assert.assertNotNull(spec);
 
     // create anomaly result
-    AnomalyResult result = getAnomalyResult();
-    result.setFunction(spec);
-    anomalyResultDAO.save(result);
+    anomalyResult = getAnomalyResult();
 
-    AnomalyResult resultRet = anomalyResultDAO.findById(result.getId());
+    anomalyResult.setFunction(spec);
+    anomalyResultDAO.save(anomalyResult);
+
+    AnomalyResult resultRet = anomalyResultDAO.findById(anomalyResult.getId());
     Assert.assertEquals(resultRet.getFunction(), spec);
-
-    AnomalyFunctionSpec specRet = anomalyFunctionDAO.findById(spec.getId());
-    Assert.assertEquals(specRet.getAnomalies().size(), 1);
-
-    anomalyResultId = result.getId();
   }
 
   @Test(dependsOnMethods = {"testAnomalyResultCRUD"})
@@ -45,8 +41,16 @@ public class TestAnomalyResultDAO extends AbstractDbTestBase {
   }
 
   @Test(dependsOnMethods = {"testGetCountByFunction"})
+  public void testFindUnmergedByCollectionMetricAndDimensions() {
+    List<AnomalyResult> unmergedResults = anomalyResultDAO
+        .findUnmergedByCollectionMetricAndDimensions(spec.getCollection(), spec.getMetric(),
+            anomalyResult.getDimensions() );
+    Assert.assertEquals(unmergedResults.size(), 1);
+  }
+
+  @Test(dependsOnMethods = {"testFindUnmergedByCollectionMetricAndDimensions"})
   public void testResultFeedback() {
-    AnomalyResult result = anomalyResultDAO.findById(anomalyResultId);
+    AnomalyResult result = anomalyResultDAO.findById(anomalyResult.getId());
     Assert.assertNotNull(result);
     Assert.assertNull(result.getFeedback());
 
@@ -57,24 +61,14 @@ public class TestAnomalyResultDAO extends AbstractDbTestBase {
     result.setFeedback(feedback);
     anomalyResultDAO.save(result);
 
-    AnomalyResult resultRet = anomalyResultDAO.findById(anomalyResultId);
+    AnomalyResult resultRet = anomalyResultDAO.findById(anomalyResult.getId());
     Assert.assertEquals(resultRet.getId(), result.getId());
     Assert.assertNotNull(resultRet.getFeedback());
 
     AnomalyFunctionSpec functionSpec = result.getFunction();
 
-    anomalyResultDAO.deleteById(anomalyResultId);
+    anomalyResultDAO.deleteById(anomalyResult.getId());
     anomalyFunctionDAO.delete(functionSpec);
   }
 
-  static AnomalyResult getAnomalyResult() {
-    AnomalyResult anomalyResult = new AnomalyResult();
-    anomalyResult.setScore(1.1);
-    anomalyResult.setStartTimeUtc(System.currentTimeMillis());
-    anomalyResult.setEndTimeUtc(System.currentTimeMillis());
-    anomalyResult.setWeight(10.1);
-    anomalyResult.setDimensions("xyz dimension");
-    anomalyResult.setCreationTimeUtc(System.currentTimeMillis());
-    return anomalyResult;
-  }
 }

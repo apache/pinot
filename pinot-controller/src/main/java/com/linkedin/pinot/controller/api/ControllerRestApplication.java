@@ -15,13 +15,6 @@
  */
 package com.linkedin.pinot.controller.api;
 
-import com.linkedin.pinot.common.metrics.ControllerMetrics;
-import com.linkedin.pinot.common.restlet.PinotRestletApplication;
-import com.linkedin.pinot.controller.api.restlet.resources.BasePinotControllerRestletResource;
-import com.linkedin.pinot.controller.api.restlet.resources.PinotVersionRestletResource;
-import com.linkedin.pinot.common.restlet.swagger.SwaggerResource;
-
-import com.linkedin.pinot.controller.api.restlet.resources.TableSize;
 import org.restlet.Context;
 import org.restlet.Request;
 import org.restlet.Response;
@@ -34,7 +27,14 @@ import org.restlet.routing.Filter;
 import org.restlet.routing.Redirector;
 import org.restlet.routing.Router;
 import org.restlet.routing.Template;
-
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import com.linkedin.pinot.common.metrics.ControllerMetrics;
+import com.linkedin.pinot.common.restlet.PinotRestletApplication;
+import com.linkedin.pinot.common.restlet.swagger.SwaggerResource;
+import com.linkedin.pinot.controller.api.restlet.resources.BasePinotControllerRestletResource;
+import com.linkedin.pinot.controller.api.restlet.resources.LLCSegmentCommit;
+import com.linkedin.pinot.controller.api.restlet.resources.LLCSegmentConsumed;
 import com.linkedin.pinot.controller.api.restlet.resources.PinotControllerHealthCheck;
 import com.linkedin.pinot.controller.api.restlet.resources.PinotInstanceRestletResource;
 import com.linkedin.pinot.controller.api.restlet.resources.PinotSchemaRestletResource;
@@ -48,10 +48,9 @@ import com.linkedin.pinot.controller.api.restlet.resources.PinotTableSchema;
 import com.linkedin.pinot.controller.api.restlet.resources.PinotTableSegmentConfigs;
 import com.linkedin.pinot.controller.api.restlet.resources.PinotTableTenantConfigs;
 import com.linkedin.pinot.controller.api.restlet.resources.PinotTenantRestletResource;
+import com.linkedin.pinot.controller.api.restlet.resources.PinotVersionRestletResource;
 import com.linkedin.pinot.controller.api.restlet.resources.PqlQueryResource;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.linkedin.pinot.controller.api.restlet.resources.TableSize;
 
 public class ControllerRestApplication extends PinotRestletApplication {
   private static final Logger LOGGER = LoggerFactory.getLogger(ControllerRestApplication.class);
@@ -105,6 +104,11 @@ public class ControllerRestApplication extends PinotRestletApplication {
     attachRoutesForClass(router, PinotSegmentUploadRestletResource.class);
 
     attachRoutesForClass(router, PinotVersionRestletResource.class);
+
+    // SegmentCompletionProtocol implementation on the controller
+    attachRoutesForClass(router, LLCSegmentCommit.class);
+    attachRoutesForClass(router, LLCSegmentConsumed.class);
+
 
     router.attach("/api", SwaggerResource.class);
 

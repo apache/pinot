@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.db;
+package com.linkedin.thirdeye.db.dao;
 
 import java.util.List;
 
@@ -8,7 +8,6 @@ import org.testng.annotations.Test;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
 import com.linkedin.thirdeye.anomaly.monitor.MonitorConstants.MonitorType;
 import com.linkedin.thirdeye.anomaly.monitor.MonitorTaskInfo;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
@@ -20,12 +19,15 @@ public class TestAnomalyTaskDAO extends AbstractDbTestBase {
 
   private Long anomalyTaskId1;
   private Long anomalyTaskId2;
+  private Long anomalyJobId;
 
   @Test
   public void testCreate() throws JsonProcessingException {
-    anomalyTaskId1 = anomalyTaskDAO.save(getTestTaskSpec());
+    AnomalyJobSpec testAnomalyJobSpec = getTestJobSpec();
+    anomalyJobId = anomalyJobDAO.save(testAnomalyJobSpec);
+    anomalyTaskId1 = anomalyTaskDAO.save(getTestTaskSpec(testAnomalyJobSpec));
     Assert.assertNotNull(anomalyTaskId1);
-    anomalyTaskId2 = anomalyTaskDAO.save(getTestTaskSpec());
+    anomalyTaskId2 = anomalyTaskDAO.save(getTestTaskSpec(testAnomalyJobSpec));
     Assert.assertNotNull(anomalyTaskId2);
   }
 
@@ -68,8 +70,8 @@ public class TestAnomalyTaskDAO extends AbstractDbTestBase {
   @Test(dependsOnMethods = {"testUpdateStatusAndTaskEndTime"})
   public void testFindByJobIdStatusNotIn() {
     TaskStatus status = TaskStatus.COMPLETED;
-    List<AnomalyTaskSpec> anomalyTaskSpecs = anomalyTaskDAO.findByJobIdStatusNotIn(1L, status);
-    Assert.assertEquals(anomalyTaskSpecs.size(), 0);
+    List<AnomalyTaskSpec> anomalyTaskSpecs = anomalyTaskDAO.findByJobIdStatusNotIn(anomalyJobId, status);
+    Assert.assertEquals(anomalyTaskSpecs.size(), 1);
   }
 
   @Test(dependsOnMethods = {"testFindByJobIdStatusNotIn"})
@@ -79,7 +81,7 @@ public class TestAnomalyTaskDAO extends AbstractDbTestBase {
     Assert.assertEquals(numRecordsDeleted, 1);
   }
 
-  static AnomalyTaskSpec getTestTaskSpec() throws JsonProcessingException {
+  AnomalyTaskSpec getTestTaskSpec(AnomalyJobSpec anomalyJobSpec) throws JsonProcessingException {
     AnomalyTaskSpec jobSpec = new AnomalyTaskSpec();
     jobSpec.setJobName("Test_Anomaly_Task");
     jobSpec.setStatus(TaskStatus.WAITING);
@@ -87,7 +89,7 @@ public class TestAnomalyTaskDAO extends AbstractDbTestBase {
     jobSpec.setTaskStartTime(new DateTime().minusDays(20).getMillis());
     jobSpec.setTaskEndTime(new DateTime().minusDays(10).getMillis());
     jobSpec.setTaskInfo(new ObjectMapper().writeValueAsString(getTestMonitorTaskInfo()));
-    jobSpec.setJob(getTestJobSpec());
+    jobSpec.setJob(anomalyJobSpec);
     return jobSpec;
   }
 
@@ -96,15 +98,5 @@ public class TestAnomalyTaskDAO extends AbstractDbTestBase {
     taskInfo.setJobExecutionId(1L);
     taskInfo.setMonitorType(MonitorType.UPDATE);
     return taskInfo;
-  }
-
-  static AnomalyJobSpec getTestJobSpec() {
-    AnomalyJobSpec jobSpec = new AnomalyJobSpec();
-    jobSpec.setJobName("Test_Anomaly_Job");
-    jobSpec.setStatus(JobStatus.SCHEDULED);
-    jobSpec.setScheduleStartTime(System.currentTimeMillis());
-    jobSpec.setWindowStartTime(new DateTime().minusHours(20).getMillis());
-    jobSpec.setWindowEndTime(new DateTime().minusHours(10).getMillis());
-    return jobSpec;
   }
 }

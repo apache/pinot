@@ -77,6 +77,6 @@ public class DetectionJobResource {
       throw new NullArgumentException("Function spec not found");
     }
     anomalyFunctionSpec.setIsActive(state);
-    anomalyFunctionSpecDAO.save(anomalyFunctionSpec);
+    anomalyFunctionSpecDAO.update(anomalyFunctionSpec);
   }
 }

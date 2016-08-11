@@ -86,8 +86,8 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
 //      if (!_brokerRoutingTable.containsKey(tableName) && !_llcBrokerRoutingTable.containsKey(tableName)) {
 //        return null;
 //      }
-      if (_brokerRoutingTable.containsKey(tableName)) {
-        if (_llcBrokerRoutingTable.containsKey(tableName)) {
+      if (_brokerRoutingTable.containsKey(tableName) && _brokerRoutingTable.get(tableName).size() != 0) {
+        if (_llcBrokerRoutingTable.containsKey(tableName) && _llcBrokerRoutingTable.get(tableName).size() != 0) {
           // Has both high and low-level segments. Follow what the routing table selector says.
           if (_routingTableSelector.shouldUseLLCRouting(tableName)) {
             serverToSegmentSetMaps = _llcBrokerRoutingTable.get(tableName);

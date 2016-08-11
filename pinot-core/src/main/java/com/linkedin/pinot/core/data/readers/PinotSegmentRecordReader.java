@@ -222,7 +222,6 @@ public class PinotSegmentRecordReader extends BaseRecordReader {
           TimeGranularitySpec incominGranularitySpec = new TimeGranularitySpec(dataType, timeType, columnName);
           fieldSpec = new TimeFieldSpec(incominGranularitySpec);
           break;
-        case UNKNOWN:
         default:
           break;
       }

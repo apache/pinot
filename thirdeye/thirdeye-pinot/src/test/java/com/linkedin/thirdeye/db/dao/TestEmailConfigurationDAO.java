@@ -1,5 +1,6 @@
-package com.linkedin.thirdeye.db;
+package com.linkedin.thirdeye.db.dao;
 
+import com.linkedin.thirdeye.db.dao.AbstractDbTestBase;
 import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
 import com.linkedin.thirdeye.db.entity.EmailConfiguration;
 import java.util.ArrayList;
@@ -43,13 +44,13 @@ public class TestEmailConfigurationDAO extends AbstractDbTestBase {
   }
 
   @Test(dependsOnMethods = { "testFunctionEmailAssignment" })
-  public void testFndByFunctionId() {
+  public void testFindByFunctionId() {
     List<EmailConfiguration> emailConfigurations =
         emailConfigurationDAO.findByFunctionId(functionId);
     assertEquals(emailConfigurations.size(), 1);
   }
 
-  @Test(dependsOnMethods = { "testFndByFunctionId" })
+  @Test(dependsOnMethods = { "testFindByFunctionId" })
   public void testDelete() {
     emailConfigurationDAO.deleteById(emailConfigId);
     EmailConfiguration emailConfiguration = emailConfigurationDAO.findById(emailConfigId);

@@ -5,8 +5,10 @@ import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
 import com.linkedin.thirdeye.db.entity.AnomalyTaskSpec;
 
 import java.sql.Timestamp;
+import java.util.HashMap;
 import java.util.List;
 
+import java.util.Map;
 import javax.persistence.OptimisticLockException;
 import javax.persistence.RollbackException;
 
@@ -30,14 +32,11 @@ public class AnomalyTaskDAO extends AbstractJpaDAO<AnomalyTaskSpec> {
   private static final String FIND_BY_STATUS_AND_LAST_MODIFIED_TIME_LT_EXPIRE = "SELECT at FROM AnomalyTaskSpec at "
       + "WHERE at.status = :status AND at.lastModified < :expireTimestamp";
 
-  private static final String FIND_BY_STATUS_AND_ID = "SELECT at FROM AnomalyTaskSpec at "
-      + "WHERE status = :status and id = :id";
-
-
   public AnomalyTaskDAO() {
     super(AnomalyTaskSpec.class);
   }
 
+  @Transactional
   public List<AnomalyTaskSpec> findByJobIdStatusNotIn(Long jobId, TaskStatus status) {
     return getEntityManager().createQuery(FIND_BY_JOB_ID_STATUS_NOT_IN, entityClass)
         .setParameter("jobId", jobId)
@@ -51,33 +50,29 @@ public class AnomalyTaskDAO extends AbstractJpaDAO<AnomalyTaskSpec> {
             .getResultList();
   }
 
+  @Transactional
   public List<AnomalyTaskSpec> findByIdAndStatus(Long id, TaskStatus status) {
-    return getEntityManager().createQuery(FIND_BY_STATUS_AND_ID, entityClass)
-            .setParameter("status", status)
-            .setParameter("id", id)
-            .getResultList();
+    Map<String, Object> filters = new HashMap<>();
+    filters.put("status", status);
+    filters.put("id", id);
+    return super.findByParams(filters);
   }
 
+  @Transactional
   public boolean updateStatusAndWorkerId(Long workerId, Long id, TaskStatus oldStatus, TaskStatus newStatus) {
-    try {
-      List<AnomalyTaskSpec> anomalyTaskSpecs = findByIdAndStatus(id, oldStatus);
-      if (anomalyTaskSpecs.size() == 1) {
-        AnomalyTaskSpec anomalyTaskSpec = anomalyTaskSpecs.get(0);
-        anomalyTaskSpec.setStatus(newStatus);
-        anomalyTaskSpec.setWorkerId(workerId);
-        save(anomalyTaskSpec);
-        return true;
-      }
-    } catch (OptimisticLockException | RollbackException | StaleObjectStateException e) {
-      LOG.warn("OptimisticLockException while updating workerId {} and status {} for anomalyTaskId {}",
-          workerId, newStatus, id);
-    } catch (Exception e) {
-      LOG.error("Exception in updateStatusAndWorkedId", e);
+    List<AnomalyTaskSpec> anomalyTaskSpecs = findByIdAndStatus(id, oldStatus);
+    if (anomalyTaskSpecs.size() == 1) {
+      AnomalyTaskSpec anomalyTaskSpec = anomalyTaskSpecs.get(0);
+      anomalyTaskSpec.setStatus(newStatus);
+      anomalyTaskSpec.setWorkerId(workerId);
+      save(anomalyTaskSpec);
+      return true;
     }
     return false;
 
   }
 
+  @Transactional
   public void updateStatusAndTaskEndTime(Long id, TaskStatus oldStatus, TaskStatus newStatus, Long taskEndTime) {
     List<AnomalyTaskSpec> anomalyTaskSpecs = findByIdAndStatus(id, oldStatus);
     if (anomalyTaskSpecs.size() == 1) {
@@ -88,6 +83,7 @@ public class AnomalyTaskDAO extends AbstractJpaDAO<AnomalyTaskSpec> {
     }
   }
 
+  @Transactional
   public int deleteRecordsOlderThanDaysWithStatus(int days, TaskStatus status) {
     DateTime expireDate = new DateTime().minusDays(days);
     Timestamp expireTimestamp = new Timestamp(expireDate.getMillis());

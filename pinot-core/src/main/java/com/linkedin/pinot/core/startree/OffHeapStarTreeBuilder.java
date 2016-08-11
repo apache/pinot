@@ -407,7 +407,7 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
   private void splitLeafNodesOnTimeColumn() throws Exception {
     Queue<StarTreeIndexNode> nodes = new LinkedList<>();
     nodes.add(starTreeRootIndexNode);
-    StarTreeDataTableOptimized table = new StarTreeDataTableOptimized(dataFile, dimensionSizeBytes, metricSizeBytes);
+    StarTreeDataSorter dataSorter = new StarTreeDataSorter(dataFile, dimensionSizeBytes, metricSizeBytes);
     while (!nodes.isEmpty()) {
       StarTreeIndexNode node = nodes.remove();
       if (node.isLeaf()) {
@@ -418,10 +418,10 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
 
           int startDocId = node.getStartDocumentId();
           int endDocId = node.getEndDocumentId();
-          table.sort(startDocId, endDocId, newSortOrder);
+          dataSorter.sort(startDocId, endDocId, newSortOrder);
           int timeColIndex = dimensionNameToIndexMap.get(timeColumnName);
           Map<Integer, IntPair> timeColumnRangeMap =
-              table.groupByIntColumnCount(startDocId, endDocId, timeColIndex);
+              dataSorter.groupByIntColumnCount(startDocId, endDocId, timeColIndex);
 
           node.setChildDimensionName(timeColIndex);
           node.setChildren(new HashMap<Integer, StarTreeIndexNode>());
@@ -442,7 +442,7 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
         nodes.addAll(node.getChildren().values());
       }
     }
-    table.close();
+    dataSorter.close();
   }
 
   /**

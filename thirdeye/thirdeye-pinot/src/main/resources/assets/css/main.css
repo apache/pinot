@@ -679,7 +679,7 @@ body a{
     z-index: 19;
     border-radius: 5px;
     -moz-border-radius: 5px;
-    -webkit-border-radius: 5px"
+    -webkit-border-radius: 5px;
 }
 
 .date-time-selector-box-table{
@@ -764,7 +764,8 @@ body a{
     padding: 5px;
 }
 
-#tooltip {
+#tooltip,
+#existing-fn-table-tooltip {
     position: absolute;
     width: 230px;
     height: auto;
@@ -783,18 +784,21 @@ body a{
     display: none;
 }
 
-#tooltip table {
+#tooltip table,
+#existing-fn-table-tooltip table{
     table-layout:fixed;
     width: 100%;
     max-width: 230px;
     padding: 0;
 }
 
-#tooltip tr {
+#tooltip tr,
+#existing-fn-table-tooltip tr{
     height:20px;
 }
 
-#tooltip td:first-child {
+#tooltip td:first-child,
+#existing-fn-table-tooltip td:first-child{
     white-space: nowrap;
 }
 
@@ -891,10 +895,43 @@ body a{
 
 #existing-anomaly-functions-table td{
     word-break: break-all;
+    vertical-align: top;
+}
+
+#existing-anomaly-functions-table  .properties-cell,
+#existing-anomaly-functions-table  .existing-anomaly-fn-filters-cell{
+    border-top: none;
 }
 
 #configure-anomaly-function-form{
     font-size: 16px;
+}
+
+.anomaly-summary {
+    background-color: lightblue;
+}
+
+.anomaly-detail {
+    background-color: #F5FFFA;
+}
+
+.anomaly2 {
+  font-size: 11px;
+  margin: 10px;
+  padding: 5px;
+  border: 1px #dddddd solid;
+}
+
+.anomaly2 tr {
+  margin: 5px;
+  padding: 5px;
+  border: 1px #dddddd solid;
+}
+
+.anomaly2 td {
+  margin: 2px;
+  padding: 2px;
+  border: 1px #dddddd solid;
 }
 
 /* D3 START*/
@@ -948,7 +985,6 @@ path {
 [class*=baseline]{
   stroke-dasharray: 5,5;
 }
-
 
 /* UIKIT overwrite */
 .uk-button-group.vertical button{

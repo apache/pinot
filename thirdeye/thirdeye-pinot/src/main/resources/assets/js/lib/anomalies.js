@@ -248,7 +248,6 @@ function drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab) {
         }
     }
 
-
     function anomalyTimeSelectAllCheckbox(target) {
         //if select all is checked
         if ($(target).is(':checked')) {
@@ -359,33 +358,6 @@ function renderAnomalyTable(data, tab) {
         // update the form area and trigger the ajax call
         window.location.hash = encodeHashParameters(hash);
     }
-
-    function fetchAnomalyFunctions() {
-        $.ajax({
-            url: "/thirdeye/function/metadata",
-            cache: true,
-            dataType: "json",
-            complete: function (data) {
-                console.log("function metadata:");
-                console.log(data);
-            }
-        });
-    }
-
-    function fetchMetricFunctionType() {
-        $.ajax({
-            url: "/thirdeye/function/metric-function",
-            cache: true,
-            dataType: "json",
-            complete: function (data) {
-                console.log("metric function:");
-                console.log(data);
-            }
-        });
-    }
-
-    fetchAnomalyFunctions();
-    fetchMetricFunctionType();
 
     function submitAnomalyFeedback(target) {
         var $target = $(target);

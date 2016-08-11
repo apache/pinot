@@ -16,7 +16,6 @@
 package com.linkedin.pinot.common.data;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.common.data.Schema.SchemaBuilder;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Random;
@@ -27,113 +26,122 @@ import org.testng.annotations.Test;
 
 
 public class FieldSpecTest {
-  private final long _randomSeed = System.currentTimeMillis();
-  private final Random _random = new Random(_randomSeed);
-  private final String _errorMessage = "Random seed is: " + _randomSeed;
-  private final ObjectMapper _mapper = new ObjectMapper();
+  private static final long RANDOM_SEED = System.currentTimeMillis();
+  private static final Random RANDOM = new Random(RANDOM_SEED);
+  private static final String ERROR_MESSAGE = "Random seed is: " + RANDOM_SEED;
+  private static final ObjectMapper MAPPER = new ObjectMapper();
 
   @Test
   public void testFieldSpec() {
-    // Single value dimension field.
-    FieldSpec fieldSpec = new DimensionFieldSpec();
-    fieldSpec.setDataType(DataType.STRING);
-    Assert.assertEquals(fieldSpec.toString(),
-        "< data type: STRING , field type: DIMENSION, single value column, default null value: null >");
-    Assert.assertTrue(fieldSpec.getDefaultNullValue() instanceof String);
+    // Single-value boolean type dimension field with default null value.
+    FieldSpec fieldSpec1 = new DimensionFieldSpec();
+    fieldSpec1.setName("svDimension");
+    fieldSpec1.setDataType(DataType.BOOLEAN);
+    fieldSpec1.setDefaultNullValue(false);
+    FieldSpec fieldSpec2 = new DimensionFieldSpec("svDimension", DataType.BOOLEAN, true);
+    fieldSpec2.setDefaultNullValue(false);
+    Assert.assertEquals(fieldSpec1, fieldSpec2);
+    Assert.assertEquals(fieldSpec1.toString(), fieldSpec2.toString());
+    Assert.assertEquals(fieldSpec1.hashCode(), fieldSpec2.hashCode());
+    Assert.assertTrue(fieldSpec1.getDefaultNullValue() instanceof String);
+    Assert.assertEquals(fieldSpec1.getDefaultNullValue(), "false");
 
-    // Multi value dimension field.
-    fieldSpec = new DimensionFieldSpec();
-    fieldSpec.setDataType(DataType.INT);
-    fieldSpec.setSingleValueField(false);
-    fieldSpec.setDelimiter(";");
-    Assert.assertEquals(fieldSpec.toString(),
-        "< data type: INT , field type: DIMENSION, multi value column, delimiter: ';', default null value: -2147483648 >");
-    Assert.assertTrue(fieldSpec.getDefaultNullValue() instanceof Integer);
+    // Multi-value dimension field.
+    fieldSpec1 = new DimensionFieldSpec();
+    fieldSpec1.setName("mvDimension");
+    fieldSpec1.setDataType(DataType.INT);
+    fieldSpec1.setSingleValueField(false);
+    fieldSpec2 = new DimensionFieldSpec("mvDimension", DataType.INT, false);
+    Assert.assertEquals(fieldSpec1, fieldSpec2);
+    Assert.assertEquals(fieldSpec1.toString(), fieldSpec2.toString());
+    Assert.assertEquals(fieldSpec1.hashCode(), fieldSpec2.hashCode());
+    Assert.assertTrue(fieldSpec1.getDefaultNullValue() instanceof Integer);
+    Assert.assertEquals(fieldSpec1.getDefaultNullValue(), Integer.MIN_VALUE);
 
-    // Multi value dimension field with default null value.
-    fieldSpec = new DimensionFieldSpec();
-    fieldSpec.setDataType(DataType.FLOAT);
-    fieldSpec.setSingleValueField(false);
-    fieldSpec.setDefaultNullValue(-0.1);
-    Assert.assertEquals(fieldSpec.toString(),
-        "< data type: FLOAT , field type: DIMENSION, multi value column, delimiter: ',', default null value: -0.1 >");
-    Assert.assertTrue(fieldSpec.getDefaultNullValue() instanceof Float);
+    // Multi-value dimension field with default null value.
+    fieldSpec1 = new DimensionFieldSpec();
+    fieldSpec1.setName("mvDimension");
+    fieldSpec1.setDataType(DataType.FLOAT);
+    fieldSpec1.setSingleValueField(false);
+    fieldSpec1.setDefaultNullValue(-0.1);
+    fieldSpec2 = new DimensionFieldSpec("mvDimension", DataType.FLOAT, false);
+    fieldSpec2.setDefaultNullValue(-0.1);
+    Assert.assertEquals(fieldSpec1, fieldSpec2);
+    Assert.assertEquals(fieldSpec1.toString(), fieldSpec2.toString());
+    Assert.assertEquals(fieldSpec1.hashCode(), fieldSpec2.hashCode());
+    Assert.assertTrue(fieldSpec1.getDefaultNullValue() instanceof Float);
+    Assert.assertEquals(fieldSpec1.getDefaultNullValue(), -0.1F);
 
-    // Metric field.
-    fieldSpec = new MetricFieldSpec();
-    fieldSpec.setDataType(DataType.DOUBLE);
-    Assert.assertEquals(fieldSpec.toString(),
-        "< data type: DOUBLE , field type: METRIC, single value column, default null value: 0.0 >");
-    Assert.assertTrue(fieldSpec.getDefaultNullValue() instanceof Double);
+    // Short type metric field.
+    fieldSpec1 = new MetricFieldSpec();
+    fieldSpec1.setName("metric");
+    fieldSpec1.setDataType(DataType.SHORT);
+    fieldSpec2 = new MetricFieldSpec("metric", DataType.SHORT);
+    Assert.assertEquals(fieldSpec1, fieldSpec2);
+    Assert.assertEquals(fieldSpec1.toString(), fieldSpec2.toString());
+    Assert.assertEquals(fieldSpec1.hashCode(), fieldSpec2.hashCode());
+    Assert.assertTrue(fieldSpec1.getDefaultNullValue() instanceof Integer);
+    Assert.assertEquals(fieldSpec1.getDefaultNullValue(), 0);
 
     // Metric field with default null value.
-    fieldSpec = new MetricFieldSpec();
-    fieldSpec.setDataType(DataType.LONG);
-    fieldSpec.setDefaultNullValue(0L);
-    Assert.assertEquals(fieldSpec.toString(),
-        "< data type: LONG , field type: METRIC, single value column, default null value: 0 >");
-    Assert.assertTrue(fieldSpec.getDefaultNullValue() instanceof Long);
-  }
-
-  @Test
-  public void testSchemaBuilder() {
-    Schema schema =
-        new SchemaBuilder().addSingleValueDimension("svDimension", DataType.INT)
-            .addMultiValueDimension("mvDimension", DataType.STRING, ",").addMetric("metric", DataType.INT)
-            .addTime("incomingTime", TimeUnit.DAYS, DataType.LONG).build();
-
-    Assert.assertEquals(schema.getFieldSpecFor("svDimension").isSingleValueField(), true);
-    Assert.assertEquals(schema.getFieldSpecFor("svDimension").getDataType(), DataType.INT);
-
-    Assert.assertEquals(schema.getFieldSpecFor("mvDimension").isSingleValueField(), false);
-    Assert.assertEquals(schema.getFieldSpecFor("mvDimension").getDataType(), DataType.STRING);
-    Assert.assertEquals(schema.getFieldSpecFor("mvDimension").getDelimiter(), ",");
-
-    Assert.assertEquals(schema.getFieldSpecFor("metric").isSingleValueField(), true);
-    Assert.assertEquals(schema.getFieldSpecFor("metric").getDataType(), DataType.INT);
-
-    Assert.assertEquals(schema.getFieldSpecFor("incomingTime").isSingleValueField(), true);
-    Assert.assertEquals(schema.getFieldSpecFor("incomingTime").getDataType(), DataType.LONG);
+    fieldSpec1 = new MetricFieldSpec();
+    fieldSpec1.setName("metric");
+    fieldSpec1.setDataType(DataType.LONG);
+    fieldSpec1.setDefaultNullValue(1);
+    fieldSpec2 = new MetricFieldSpec("metric", DataType.LONG);
+    fieldSpec2.setDefaultNullValue(1);
+    Assert.assertEquals(fieldSpec1, fieldSpec2);
+    Assert.assertEquals(fieldSpec1.toString(), fieldSpec2.toString());
+    Assert.assertEquals(fieldSpec1.hashCode(), fieldSpec2.hashCode());
+    Assert.assertTrue(fieldSpec1.getDefaultNullValue() instanceof Long);
+    Assert.assertEquals(fieldSpec1.getDefaultNullValue(), 1L);
   }
 
   @Test
   public void testOrderOfFields() throws Exception {
-    // Metric field with default value.
-    String[] metricFields = {"\"dataType\":\"INT\"", "\"name\":\"metric\"", "\"defaultNullValue\":-1"};
-    MetricFieldSpec metricFieldSpec = _mapper.readValue(getRandomOrderJsonString(metricFields), MetricFieldSpec.class);
-    Assert.assertEquals(metricFieldSpec.toString(),
-        "< data type: INT , field type: METRIC, single value column, default null value: -1 >", _errorMessage);
-    Assert.assertTrue(metricFieldSpec.getDefaultNullValue() instanceof Integer, _errorMessage);
+    // Metric field with default null value.
+    String[] metricFields = {"\"name\":\"metric\"", "\"dataType\":\"INT\"", "\"defaultNullValue\":-1"};
+    MetricFieldSpec metricFieldSpec1 = MAPPER.readValue(getRandomOrderJsonString(metricFields), MetricFieldSpec.class);
+    MetricFieldSpec metricFieldSpec2 = new MetricFieldSpec("metric", DataType.INT);
+    metricFieldSpec2.setDefaultNullValue(-1);
+    Assert.assertEquals(metricFieldSpec1, metricFieldSpec2, ERROR_MESSAGE);
+    Assert.assertTrue(metricFieldSpec1.getDefaultNullValue() instanceof Integer, ERROR_MESSAGE);
+    Assert.assertEquals(metricFieldSpec1.getDefaultNullValue(), -1, ERROR_MESSAGE);
 
-    // Single value dimension field.
-    String[] dimensionFields1 = {"\"dataType\":\"DOUBLE\"","\"name\":\"dimension\""};
+    // Single-value boolean type dimension field with default null value.
+    String[] dimensionFields = {"\"name\":\"dimension\"", "\"dataType\":\"BOOLEAN\"", "\"defaultNullValue\":false"};
     DimensionFieldSpec dimensionFieldSpec1 =
-        _mapper.readValue(getRandomOrderJsonString(dimensionFields1), DimensionFieldSpec.class);
-    Assert.assertEquals(dimensionFieldSpec1.toString(),
-        "< data type: DOUBLE , field type: DIMENSION, single value column, default null value: -Infinity >", _errorMessage);
-    Assert.assertTrue(dimensionFieldSpec1.getDefaultNullValue() instanceof Double, _errorMessage);
+        MAPPER.readValue(getRandomOrderJsonString(dimensionFields), DimensionFieldSpec.class);
+    DimensionFieldSpec dimensionFieldSpec2 = new DimensionFieldSpec("dimension", DataType.BOOLEAN, true);
+    dimensionFieldSpec2.setDefaultNullValue(false);
+    Assert.assertEquals(dimensionFieldSpec1, dimensionFieldSpec2, ERROR_MESSAGE);
+    Assert.assertTrue(dimensionFieldSpec1.getDefaultNullValue() instanceof String, ERROR_MESSAGE);
+    Assert.assertEquals(dimensionFieldSpec1.getDefaultNullValue(), "false", ERROR_MESSAGE);
 
-    // Multi value dimension field with default value.
-    String[] dimensionFields2 =
-        {"\"dataType\":\"STRING\"", "\"name\":\"dimension\"", "\"singleValueField\":false",
-            "\"defaultNullValue\":\"default\""};
-    DimensionFieldSpec dimensionFieldSpec2 =
-        _mapper.readValue(getRandomOrderJsonString(dimensionFields2), DimensionFieldSpec.class);
-    Assert.assertEquals(dimensionFieldSpec2.toString(),
-        "< data type: STRING , field type: DIMENSION, multi value column, delimiter: ',', default null value: default >");
-    Assert.assertTrue(dimensionFieldSpec2.getDefaultNullValue() instanceof String, _errorMessage);
+    // Multi-value dimension field with default null value.
+    dimensionFields = new String[]{
+        "\"name\":\"dimension\"", "\"dataType\":\"STRING\"", "\"singleValueField\":false",
+        "\"defaultNullValue\":\"default\""};
+    dimensionFieldSpec1 = MAPPER.readValue(getRandomOrderJsonString(dimensionFields), DimensionFieldSpec.class);
+    dimensionFieldSpec2 = new DimensionFieldSpec("dimension", DataType.STRING, false);
+    dimensionFieldSpec2.setDefaultNullValue("default");
+    Assert.assertEquals(dimensionFieldSpec1, dimensionFieldSpec2, ERROR_MESSAGE);
+    Assert.assertTrue(dimensionFieldSpec1.getDefaultNullValue() instanceof String, ERROR_MESSAGE);
+    Assert.assertEquals(dimensionFieldSpec1.getDefaultNullValue(), "default", ERROR_MESSAGE);
 
-    // Time field with default value.
-    String[] timeFields =
-        {"\"incomingGranularitySpec\":{\"timeType\":\"MILLISECONDS\",\"dataType\":\"LONG\",\"name\":\"time\"}",
-            "\"outgoingGranularitySpec\":{\"timeType\":\"SECONDS\",\"dataType\":\"INT\",\"name\":\"time\"}",
-            "\"defaultNullValue\":-1"};
-    TimeFieldSpec timeFieldSpec = _mapper.readValue(getRandomOrderJsonString(timeFields), TimeFieldSpec.class);
-    Assert.assertEquals(timeFieldSpec.toString(), "< data type: INT, field type : TIME, "
-        + "incoming granularity spec: < data type: LONG, time type: MILLISECONDS, time unit size: 1, name: time >, "
-        + "outgoing granularity spec: < data type: INT, time type: SECONDS, time unit size: 1, name: time >, "
-        + "default null value: -1 >", _errorMessage);
-    Assert.assertTrue(timeFieldSpec.getDefaultNullValue() instanceof Integer, _errorMessage);
+    // Time field with default null value.
+    String[] timeFields = {
+        "\"incomingGranularitySpec\":{\"timeType\":\"MILLISECONDS\",\"dataType\":\"LONG\",\"name\":\"incomingTime\"}",
+        "\"outgoingGranularitySpec\":{\"timeType\":\"SECONDS\",\"dataType\":\"INT\",\"name\":\"outgoingTime\"}",
+        "\"defaultNullValue\":-1"};
+    TimeFieldSpec timeFieldSpec1 = MAPPER.readValue(getRandomOrderJsonString(timeFields), TimeFieldSpec.class);
+    TimeFieldSpec timeFieldSpec2 =
+        new TimeFieldSpec(new TimeGranularitySpec(DataType.LONG, TimeUnit.MILLISECONDS, "incomingTime"),
+            new TimeGranularitySpec(DataType.INT, TimeUnit.SECONDS, "outgoingTime"));
+    timeFieldSpec2.setDefaultNullValue(-1);
+    Assert.assertEquals(timeFieldSpec1, timeFieldSpec2, ERROR_MESSAGE);
+    Assert.assertTrue(timeFieldSpec1.getDefaultNullValue() instanceof Integer, ERROR_MESSAGE);
+    Assert.assertEquals(timeFieldSpec1.getDefaultNullValue(), -1, ERROR_MESSAGE);
   }
 
   @Test
@@ -141,34 +149,34 @@ public class FieldSpecTest {
     FieldSpec first;
     FieldSpec second;
 
-    // Metric field with default value.
-    String[] metricFields = {"\"dataType\":\"INT\"", "\"name\":\"metric\"", "\"defaultNullValue\":-1"};
-    first = _mapper.readValue(getRandomOrderJsonString(metricFields), MetricFieldSpec.class);
-    second = _mapper.readValue(_mapper.writeValueAsString(first), MetricFieldSpec.class);
-    Assert.assertEquals(first, second, _errorMessage);
+    // Short type Metric field.
+    String[] metricFields = {"\"name\":\"metric\"", "\"dataType\":\"SHORT\""};
+    first = MAPPER.readValue(getRandomOrderJsonString(metricFields), MetricFieldSpec.class);
+    second = MAPPER.readValue(MAPPER.writeValueAsString(first), MetricFieldSpec.class);
+    Assert.assertEquals(first, second, ERROR_MESSAGE);
 
-    // Single value dimension field.
-    String[] dimensionFields1 = {"\"dataType\":\"DOUBLE\"","\"name\":\"dimension\""};
-    first = _mapper.readValue(getRandomOrderJsonString(dimensionFields1), DimensionFieldSpec.class);
-    second = _mapper.readValue(_mapper.writeValueAsString(first), DimensionFieldSpec.class);
-    Assert.assertEquals(first, second, _errorMessage);
+    // Single-value boolean type dimension field with default null value.
+    String[] dimensionFields = {"\"name\":\"dimension\"", "\"dataType\":\"BOOLEAN\"", "\"defaultNullValue\":false"};
+    first = MAPPER.readValue(getRandomOrderJsonString(dimensionFields), DimensionFieldSpec.class);
+    second = MAPPER.readValue(MAPPER.writeValueAsString(first), DimensionFieldSpec.class);
+    Assert.assertEquals(first, second, ERROR_MESSAGE);
 
-    // Multi value dimension field with default value.
-    String[] dimensionFields2 =
-        {"\"dataType\":\"STRING\"", "\"name\":\"dimension\"", "\"singleValueField\":false",
-            "\"defaultNullValue\":\"default\""};
-    first = _mapper.readValue(getRandomOrderJsonString(dimensionFields2), DimensionFieldSpec.class);
-    second = _mapper.readValue(_mapper.writeValueAsString(first), DimensionFieldSpec.class);
-    Assert.assertEquals(first, second, _errorMessage);
+    // Multi-value dimension field with default null value.
+    dimensionFields = new String[]{
+        "\"name\":\"dimension\"", "\"dataType\":\"STRING\"", "\"singleValueField\":false",
+        "\"defaultNullValue\":\"default\""};
+    first = MAPPER.readValue(getRandomOrderJsonString(dimensionFields), DimensionFieldSpec.class);
+    second = MAPPER.readValue(MAPPER.writeValueAsString(first), DimensionFieldSpec.class);
+    Assert.assertEquals(first, second, ERROR_MESSAGE);
 
     // Time field with default value.
-    String[] timeFields =
-        {"\"incomingGranularitySpec\":{\"timeType\":\"MILLISECONDS\",\"dataType\":\"LONG\",\"name\":\"time\"}",
-            "\"outgoingGranularitySpec\":{\"timeType\":\"SECONDS\",\"dataType\":\"INT\",\"name\":\"time\"}",
-            "\"defaultNullValue\":-1"};
-    first = _mapper.readValue(getRandomOrderJsonString(timeFields), TimeFieldSpec.class);
-    second = _mapper.readValue(_mapper.writeValueAsString(first), TimeFieldSpec.class);
-    Assert.assertEquals(first, second, _errorMessage);
+    String[] timeFields = {
+        "\"incomingGranularitySpec\":{\"timeUnitSize\":1, \"timeType\":\"MILLISECONDS\",\"dataType\":\"LONG\",\"name\":\"incomingTime\"}",
+        "\"outgoingGranularitySpec\":{\"timeType\":\"SECONDS\",\"dataType\":\"INT\",\"name\":\"outgoingTime\"}",
+        "\"defaultNullValue\":-1"};
+    first = MAPPER.readValue(getRandomOrderJsonString(timeFields), TimeFieldSpec.class);
+    second = MAPPER.readValue(MAPPER.writeValueAsString(first), TimeFieldSpec.class);
+    Assert.assertEquals(first, second, ERROR_MESSAGE);
   }
 
   /**
@@ -186,7 +194,7 @@ public class FieldSpecTest {
     StringBuilder jsonString = new StringBuilder();
     jsonString.append('{');
     for (int i = length; i > 0; i--) {
-      jsonString.append(fields[indices.remove(_random.nextInt(i))]);
+      jsonString.append(fields[indices.remove(RANDOM.nextInt(i))]);
       if (i != 1) {
         jsonString.append(',');
       }

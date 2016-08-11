@@ -34,19 +34,24 @@ import xerial.larray.mmap.MMapBuffer;
 import xerial.larray.mmap.MMapMode;
 
 
-public class StarTreeDataTableOptimized {
-  Logger LOGGER = LoggerFactory.getLogger(StarTreeDataTableOptimized.class);
+/**
+ * A star tree data table optimized for in-place modifications/sorting
+ * of data. This class allows for the following operations on a fixed size data table:
+ * - Sort all or range of data.
+ * - Group by column count
+ * - Iterate over dimension/metric buffers.
+ */
+public class StarTreeDataSorter {
+  Logger LOGGER = LoggerFactory.getLogger(StarTreeDataSorter.class);
 
-  private File file;
   final MMapBuffer mappedByteBuffer;
 
   private int dimensionSizeInBytes;
   private int metricSizeInBytes;
   private int totalSizeInBytes;
 
-  public StarTreeDataTableOptimized(File file, int dimensionSizeInBytes, int metricSizeInBytes)
+  public StarTreeDataSorter(File file, int dimensionSizeInBytes, int metricSizeInBytes)
       throws IOException {
-    this.file = file;
     this.dimensionSizeInBytes = dimensionSizeInBytes;
     this.metricSizeInBytes = metricSizeInBytes;
     this.totalSizeInBytes = dimensionSizeInBytes + metricSizeInBytes;
@@ -54,6 +59,7 @@ public class StarTreeDataTableOptimized {
   }
 
   /**
+   * Sort from to given start (inclusive) to end (exclusive) as per the provided sort order.
    * @param startRecordId inclusive
    * @param endRecordId exclusive
    * @param sortOrder
@@ -142,6 +148,7 @@ public class StarTreeDataTableOptimized {
   }
 
   /**
+   * Perform group-by based on the 'count' for the given column.
    * @param startDocId inclusive
    * @param endDocId exclusive
    * @param colIndex

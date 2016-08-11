@@ -48,6 +48,7 @@ import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.common.utils.ZkUtils;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentMetadataLoader;
 import com.linkedin.pinot.server.conf.ServerConf;
+import com.linkedin.pinot.server.realtime.ControllerLeaderLocator;
 import com.linkedin.pinot.server.starter.ServerInstance;
 import com.yammer.metrics.core.MetricsRegistry;
 
@@ -124,21 +125,22 @@ public class HelixServerStarter {
         messageHandlerFactory);
 
     _serverInstance.getServerMetrics()
-        .addCallbackGauge("helix.connected",
-            new Callable<Long>() {
+        .addCallbackGauge("helix.connected", new Callable<Long>() {
               @Override
-              public Long call() throws Exception {
+              public Long call()
+                  throws Exception {
                 return _helixManager.isConnected() ? 1L : 0L;
               }
             });
 
-    _helixManager.addPreConnectCallback(
-        new PreConnectCallback() {
+    _helixManager.addPreConnectCallback(new PreConnectCallback() {
           @Override
           public void onPreConnect() {
             _serverInstance.getServerMetrics().addMeteredGlobalValue(ServerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L);
           }
         });
+
+    ControllerLeaderLocator.create(_helixManager);
 
     // Create metrics for mmap stuff
     _serverInstance.getServerMetrics().addCallbackGauge(

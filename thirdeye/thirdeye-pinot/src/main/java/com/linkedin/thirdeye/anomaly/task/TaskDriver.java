@@ -102,27 +102,29 @@ public class TaskDriver {
     taskExecutorService.shutdown();
   }
 
-  private AnomalyTaskSpec selectAndUpdate() throws Exception {
+  private AnomalyTaskSpec selectAndUpdate() {
     LOG.info(Thread.currentThread().getId() + " : Starting selectAndUpdate {}", Thread.currentThread().getId());
     AnomalyTaskSpec acquiredTask = null;
     LOG.info(Thread.currentThread().getId() + " : Trying to find a task to execute");
     do {
 
       List<AnomalyTaskSpec> anomalyTasks = new ArrayList<>();
-      try {
-      anomalyTasks =
-          anomalyTaskDAO.findByStatusOrderByCreateTimeAscending(TaskStatus.WAITING);
-      } catch (OptimisticLockException | RollbackException | StaleObjectStateException e) {
-        LOG.warn("OptimisticLockException while select and update, by workerId {}", workerId);
-      }
+      anomalyTasks = anomalyTaskDAO.findByStatusOrderByCreateTimeAscending(TaskStatus.WAITING);
       if (anomalyTasks.size() > 0)
         LOG.info(Thread.currentThread().getId() + " : Found {} tasks in waiting state", anomalyTasks.size());
 
       for (AnomalyTaskSpec anomalyTaskSpec : anomalyTasks) {
         LOG.info(Thread.currentThread().getId() + " : Trying to acquire task : {}", anomalyTaskSpec.getId());
-        boolean success = anomalyTaskDAO.updateStatusAndWorkerId(workerId, anomalyTaskSpec.getId(),
-            TaskStatus.WAITING, TaskStatus.RUNNING);
-        LOG.info(Thread.currentThread().getId() + " : Task acquired success: {}", success);
+
+        boolean success = false;
+        try {
+          success = anomalyTaskDAO.updateStatusAndWorkerId(workerId, anomalyTaskSpec.getId(),TaskStatus.WAITING,
+              TaskStatus.RUNNING);
+          LOG.info(Thread.currentThread().getId() + " : Task acquired success: {}", success);
+        } catch (OptimisticLockException | RollbackException | StaleObjectStateException e) {
+          LOG.warn("Optimistic lock exception in acquiring task by threadId {} and workerId {}",
+              Thread.currentThread().getId(), workerId);
+        }
         if (success) {
           acquiredTask = anomalyTaskSpec;
           break;

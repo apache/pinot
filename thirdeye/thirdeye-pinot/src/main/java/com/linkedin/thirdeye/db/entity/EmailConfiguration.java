@@ -95,7 +95,7 @@ public class EmailConfiguration extends AbstractBaseEntity {
     return collection;
   }
 
-  @ManyToMany(fetch = FetchType.LAZY)
+  @ManyToMany(fetch = FetchType.EAGER)
   @JoinTable(name = "email_function_dependencies", joinColumns = { @JoinColumn(name = "email_id")},
         inverseJoinColumns = { @JoinColumn(name = "function_id") })
   private List<AnomalyFunctionSpec> functions = new ArrayList<>();

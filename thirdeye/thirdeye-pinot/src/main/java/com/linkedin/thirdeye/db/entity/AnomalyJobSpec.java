@@ -48,9 +48,6 @@ public class AnomalyJobSpec extends AbstractBaseEntity {
       columnDefinition="TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
   private Timestamp lastModified;
 
-  @OneToMany(mappedBy = "job", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
-  private List<AnomalyTaskSpec> anomalyTasks;
-
   public String getJobName() {
     return jobName;
   }
@@ -101,15 +98,6 @@ public class AnomalyJobSpec extends AbstractBaseEntity {
 
   public Timestamp getLastModified() {
     return lastModified;
-  }
-
-
-  public List<AnomalyTaskSpec> getAnomalyTasks() {
-    return anomalyTasks;
-  }
-
-  public void setAnomalyTasks(List<AnomalyTaskSpec> anomalyTasks) {
-    this.anomalyTasks = anomalyTasks;
   }
 
 

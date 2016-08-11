@@ -10,18 +10,22 @@ function getData(url, tab) {
         dataType: 'json',
         statusCode: {
             404: function () {
-                $("#" + tab + "-chart-area-error").empty()
-                var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' })
-                warning.append($('<p></p>', { html: 'No data available. (Error code: 404)' }))
-                $("#" + tab + "-chart-area-error").append(warning)
+                $("#" + tab + "-chart-area-error").empty();
+                var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' });
+                var closeBtn = $('<i></i>', { class: 'close-parent uk-icon-close' });
+                warning.append($('<p></p>', { html: 'No data available. (Error code: 404)' }));
+                $("#" + tab + "-chart-area-error").append(closeBtn);
+                $("#" + tab + "-chart-area-error").append(warning);
                 $("#" + tab + "-chart-area-error").fadeIn(100);
                 return
             },
             500: function () {
                 $("#" + tab + "-chart-area-error").empty()
-                var error = $('<div></div>', { class: 'uk-alert uk-alert-danger' })
-                error.append($('<p></p>', { html: 'Internal server error' }))
-                $("#" + tab + "-chart-area-error").append(error)
+                var error = $('<div></div>', { class: 'uk-alert uk-alert-danger' });
+                var closeBtn = $('<i></i>', { class: 'close-parent uk-icon-close' });
+                error.append($('<p></p>', { html: 'Internal server error' }));
+                $("#" + tab + "-chart-area-error").append(closeBtn);
+                $("#" + tab + "-chart-area-error").append(error);
                 $("#" + tab + "-chart-area-error").fadeIn(100);
                 return
             }
@@ -47,29 +51,32 @@ function submitData(url, data, tab) {
     console.log("post url:", url)
     return $.ajax({
         url: url,
+        headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+        },
         type: 'post',
         dataType: 'json',
         data: data,
         statusCode: {
             404: function () {
-                $("#" + tab + "-chart-area-error").empty()
-                var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' })
-                warning.append($('<p></p>', { html: 'No data available. (Error code: 404)' }))
-                $("#" + tab + "-chart-area-error").append(warning)
+                $("#" + tab + "-chart-area-error").empty();
+                var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' });
+                var closeBtn = $('<i></i>', { class: 'close-parent uk-icon-close' });
+                warning.append($('<p></p>', { html: 'No data available. (Error code: 404)' }));
+                $("#" + tab + "-chart-area-error").append(closeBtn);
+                $("#" + tab + "-chart-area-error").append(warning);
                 $("#" + tab + "-chart-area-error").fadeIn(100);
                 return
             },
             500: function () {
-                $("#" + tab + "-chart-area-error").empty()
-                var error = $('<div></div>', { class: 'uk-alert uk-alert-danger' })
-                error.append($('<p></p>', { html: 'Internal server error' }))
-                $("#" + tab + "-chart-area-error").append(error)
+                $("#" + tab + "-chart-area-error").empty();
+                var error = $('<div></div>', { class: 'uk-alert uk-alert-danger' });
+                error.append($('<p></p>', { html: 'Internal server error' }));
+                $("#" + tab + "-chart-area-error").append(error);
                 $("#" + tab + "-chart-area-error").fadeIn(100);
                 return
             }
-        },
-        error: function (jqXhr, textStatus, errorThrown) {
-            console.log(errorThrown);
         }
     }).always(function () {
     })
@@ -470,6 +477,18 @@ function enableButton(button) {
     $(button).removeAttr("disabled");
 }
 
+function toggleCheckbox($checkbox){
+
+    if ($checkbox.is(':checked')) {
+        $checkbox.removeAttr('checked');
+        $checkbox.prop('checked', false);
+
+    }else{
+        $checkbox.attr('checked', true);
+        $checkbox.prop('checked', true);
+    }
+}
+
 function selectDatasetNGetFormData(target) {
     //Cleanup form: Remove added-item and added-filter, metrics of the previous dataset
     $("#" + hash.view + "-chart-area-error").hide();
@@ -485,7 +504,6 @@ function selectDatasetNGetFormData(target) {
     $(".added-filter").remove();
     $(".filter-panel .value-filter").remove();
     clearCreateForm();
-
 
     //Remove previous dataset's hash values
     delete hash.baselineStart;
@@ -811,6 +829,7 @@ function clearCreateForm() {
         $(element).attr("value", defaultValue);
     }
 
+    $(".anomaly-monitoring-repeat-unit-option[value='HOURS']").click();
     $("#configure-anomaly-function-form .metric-option").show();
     $("monitoring-schedule").hide();
     $("#active-alert").removeAttr("checked");
@@ -822,6 +841,25 @@ function clearCreateForm() {
     $("#manage-anomaly-fn-error").hide();
     $("#manage-anomaly-function-success").hide();
     enableButton($("#create-anomaly-function"));
+}
+
+
+/** Takes an object where separators are ";" "=" returns JSON**/
+function parseProperties(properties){
+
+    if(properties && properties.substr(properties.length - 1) == ","){
+        properties = properties.substring(0, properties.length-1);
+    }
+    var fnProperties = {}
+    var propertiesAry = properties.split(";");
+    for (var i = 0, numProp = propertiesAry.length; i < numProp; i++) {
+        var keyValue = propertiesAry[i];
+        keyValue = keyValue.split("=")
+        var key = ( keyValue[0] == "null") ? "" : keyValue[0];
+        var value = ( keyValue[0] == "null") ? "" : keyValue[1];
+        fnProperties[key] = value;
+    }
+    return fnProperties
 }
 
 
@@ -1008,42 +1046,52 @@ function formatMillisToTZ() {
 
 /** Transforms cron expression into date time schedule for documentation: http://www.quartz-scheduler.org/documentation/quartz-2.x/tutorials/tutorial-lesson-06.html **/
 
-function parseCron(cron){
+function parseCron(cron) {
     var cronAry = cron.split(" ");
 
     var SEC = cronAry[0];
     var MIN = cronAry[1];  //supported values: (integer 0-60) 30 -> scheduleMinute = integer, * -> not supported by backend as of 8/3/2016
-    var HOUR = cronAry[2]; //supported values:  * -> repeatEverySize = 1 & repeatEveryUnit = HOURS;  "0/size" -> repeatEverySize = size repeatEveryUnit = HOURS; (integer 0-23) ie. 10  -> scheduleHour = 10, repeatEveryUnit = DAYS
-    var DAY_OF_MONTH = cronAry[3]; //supported values: * -> repeatEverySize = 1;  0/size -> not supported by backend as of 8/3/2016
+    var HOUR = cronAry[2]; //supported values:  * -> repeatEverySize = 1 & repeatEveryUnit = HOURS;  "0/size" -> repeatEverySize = size repeatEveryUnit = HOURS; (integer 0-23) ie. 10  -> scheduleHour = 10, repeatEveryUnit = DAYS,
+    // 0,4,8 > repeatEverySize = 1, repeatEveryUnit = DAYS, scheduleMinute > 0;
+    var DAY_OF_MONTH = cronAry[3]; //supported values: * ->  unit == "DAYS" ? -> repeatEverySize = 1;  0/size -> not supported by backend as of 8/3/2016
     var DAY_OF_WEEK = cronAry[4];  //supported values: *
-    var YEAR =  cronAry[5];  //supported values: ?
-
+    var YEAR = cronAry[5];  //supported values: ?
     var schedule = {} //repeatEveryUnit: "", repeatEverySize: "", scheduleMinute: "", scheduleHour: ""
 
-    if( parseInt(MIN) ){
-        if(MIN < 10){
-            MIN = "0" + MIN
-        }
-        schedule.scheduleMinute = MIN;
-    }
 
-    if(HOUR == "*"){
+    if (MIN < 10) {
+        MIN = "0" + MIN
+    }
+    schedule.scheduleMinute = MIN;
+
+
+    if (HOUR == "*") {
         schedule.repeatEverySize = 1;
         schedule.repeatEveryUnit = "HOURS";
+
+    }else if( HOUR.indexOf(",") > -1){
+        schedule.scheduleHour = HOUR;
+        schedule.repeatEveryUnit = "DAYS";
+        schedule.repeatEverySize = 1;
+        schedule.scheduleMinute = "";
+
+    }else if(HOUR.substring(0,2) == "0/" ){
+
+        schedule.repeatEverySize = HOUR.substring(2);
+        schedule.repeatEveryUnit = "HOURS";
+        schedule.scheduleMinute = "";
 
     }else if( 0 <=  parseInt(HOUR) < 24 ){
         schedule.scheduleHour = (HOUR.length == 2)? HOUR : "0" + HOUR;
         schedule.repeatEveryUnit = "DAYS";
         schedule.repeatEverySize = 1;
 
-    } else if(HOUR.substring(0,2) == "0/" ){
-        schedule.repeatEverySize = HOUR.substring(2);
-        schedule.repeatEveryUnit = "HOURS";
     }
 
     if(DAY_OF_MONTH == "*"){
-        schedule.repeatEverySize = 1;
-
+        if(schedule.repeatEveryUnit == "DAYS"){
+            schedule.repeatEverySize = 1;
+        }
     }else if(DAY_OF_MONTH.substring(0,2) == "0/"){
         schedule.repeatEverySize = DAY_OF_MONTH.substring(2);
         schedule.repeatEveryUnit = "DAYS";
@@ -1066,8 +1114,10 @@ function encodeCron(repeatEveryUnit, repeatEverySize, scheduleMinute, scheduleHo
     switch(repeatEveryUnit){
         case "DAYS":
                 DAY_OF_MONTH  = (repeatEverySize == 1) ? "*" : "0/" + repeatEverySize;
-                HOUR = parseInt(scheduleHour);
-                MIN  = parseInt(scheduleMinute);
+                HOUR = ( scheduleHour.indexOf(",") == -1) ? parseInt(scheduleHour) : scheduleHour.replace(/^0/, '').replace(",0", ",");
+                MIN  = ( scheduleHour.indexOf(",") == -1) ?  parseInt(scheduleMinute) : 0 ;
+
+
         break;
         default: //case "HOURS"
                 DAY_OF_MONTH= "*";

@@ -1,10 +1,10 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
 import com.linkedin.thirdeye.anomaly.merge.AnomalyMergeConfig;
-import com.linkedin.thirdeye.anomaly.merge.AnomalySummaryGenerator;
+import com.linkedin.thirdeye.anomaly.merge.AnomalyMergeGenerator;
 import com.linkedin.thirdeye.api.dto.GroupByKey;
 import com.linkedin.thirdeye.api.dto.GroupByRow;
-import com.linkedin.thirdeye.api.dto.MergedAnomalyResult;
+import com.linkedin.thirdeye.db.entity.AnomalyMergedResult;
 import com.linkedin.thirdeye.db.dao.AnomalyResultDAO;
 import com.linkedin.thirdeye.db.entity.AnomalyResult;
 import java.util.List;
@@ -30,13 +30,13 @@ public class AnomalySummaryResource {
 
   @GET
   @Path("summary/function/{functionId}")
-  public List<MergedAnomalyResult> getSummaryForFunction(@PathParam("functionId") Long functionId) {
+  public List<AnomalyMergedResult> getSummaryForFunction(@PathParam("functionId") Long functionId) {
     return getAnomalySummaryForFunction(functionId, new AnomalyMergeConfig());
   }
 
   @POST
   @Path("summary/function/{functionId}")
-  public List<MergedAnomalyResult> getAnomalySummaryForFunction(
+  public List<AnomalyMergedResult> getAnomalySummaryForFunction(
       @PathParam("functionId") Long functionId, AnomalyMergeConfig mergeConfig) {
     if (mergeConfig == null) {
       mergeConfig = new AnomalyMergeConfig();
@@ -48,14 +48,14 @@ public class AnomalySummaryResource {
     List<AnomalyResult> anomalies = resultDAO
         .findAllByTimeAndFunctionId(mergeConfig.getStartTime(), mergeConfig.getEndTime(),
             functionId);
-    return AnomalySummaryGenerator.mergeAnomalies(anomalies, mergeConfig);
+    return AnomalyMergeGenerator.mergeAnomalies(anomalies, mergeConfig);
   }
 
   @POST
   @Path("summary/{collection}")
-  public List<MergedAnomalyResult> getAnomalySummaryForCollectionMeric(
+  public List<AnomalyMergedResult> getAnomalySummaryForCollectionMeric(
       @PathParam("collection") String collection, @QueryParam("metric") String metric,
-      AnomalyMergeConfig mergeConfig) {
+      @QueryParam("dimensions") String dimensions, AnomalyMergeConfig mergeConfig) {
     if (StringUtils.isEmpty(collection)) {
       throw new IllegalArgumentException("Collection can't be empty");
     }
@@ -66,13 +66,17 @@ public class AnomalySummaryResource {
     DateTime endTimeUtc = new DateTime(mergeConfig.getEndTime());
 
     List<AnomalyResult> anomalies;
-    if (!StringUtils.isEmpty(metric)) {
+    if (!StringUtils.isEmpty(metric) && !StringUtils.isEmpty(dimensions)) {
+      anomalies = resultDAO
+          .findAllByCollectionTimeMetricAndDimensions(collection, metric, startTimeUtc, endTimeUtc,
+              new String[] { dimensions });
+    } else if (!StringUtils.isEmpty(metric)) {
       anomalies =
           resultDAO.findAllByCollectionTimeAndMetric(collection, metric, startTimeUtc, endTimeUtc);
     } else {
       anomalies = resultDAO.findAllByCollectionAndTime(collection, startTimeUtc, endTimeUtc);
     }
-    return AnomalySummaryGenerator.mergeAnomalies(anomalies, mergeConfig);
+    return AnomalyMergeGenerator.mergeAnomalies(anomalies, mergeConfig);
   }
 
   @POST
@@ -83,6 +87,8 @@ public class AnomalySummaryResource {
       mergeConfig = new AnomalyMergeConfig();
     }
     switch (mergeConfig.getMergeStrategy()) {
+    case COLLECTION_METRIC_DIMENSIONS:
+      return resultDAO.getCountByCollectionMetricDimension(mergeConfig.getStartTime(), mergeConfig.getEndTime());
     case FUNCTION:
       return resultDAO.getCountByFunction(mergeConfig.getStartTime(), mergeConfig.getEndTime());
     case COLLECTION_METRIC:
@@ -90,8 +96,7 @@ public class AnomalySummaryResource {
     case COLLECTION:
       return resultDAO.getCountByCollection(mergeConfig.getStartTime(), mergeConfig.getEndTime());
     default:
-      throw new IllegalArgumentException(
-          "Unknown merge strategy : " + mergeConfig.getMergeStrategy());
+      throw new IllegalArgumentException("Unknown merge strategy : " + mergeConfig.getMergeStrategy());
     }
   }
 }

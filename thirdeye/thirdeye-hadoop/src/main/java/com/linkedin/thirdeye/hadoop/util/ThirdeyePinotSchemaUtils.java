@@ -62,7 +62,6 @@ public class ThirdeyePinotSchemaUtils {
       FieldSpec fieldSpec = new DimensionFieldSpec();
       String dimensionName = dimensionSpec.getName();
       fieldSpec.setName(dimensionName);
-      fieldSpec.setFieldType(FieldType.DIMENSION);
       fieldSpec.setDataType(DataType.STRING);
       fieldSpec.setSingleValueField(true);
       schema.addField(dimensionName, fieldSpec);
@@ -71,7 +70,6 @@ public class ThirdeyePinotSchemaUtils {
         fieldSpec = new DimensionFieldSpec();
         dimensionName = dimensionName + ThirdEyeConstants.RAW_DIMENSION_SUFFIX;
         fieldSpec.setName(dimensionName);
-        fieldSpec.setFieldType(FieldType.DIMENSION);
         fieldSpec.setDataType(DataType.STRING);
         fieldSpec.setSingleValueField(true);
         schema.addField(dimensionName, fieldSpec);
@@ -85,7 +83,6 @@ public class ThirdeyePinotSchemaUtils {
         countIncluded = true;
       }
       fieldSpec.setName(metricName);
-      fieldSpec.setFieldType(FieldType.METRIC);
       fieldSpec.setDataType(DataType.valueOf(metricSpec.getType().toString()));
       fieldSpec.setSingleValueField(true);
       schema.addField(metricName, fieldSpec);
@@ -94,7 +91,6 @@ public class ThirdeyePinotSchemaUtils {
       FieldSpec fieldSpec = new MetricFieldSpec();
       String metricName = ThirdEyeConstants.AUTO_METRIC_COUNT;
       fieldSpec.setName(metricName);
-      fieldSpec.setFieldType(FieldType.METRIC);
       fieldSpec.setDataType(DataType.LONG);
       fieldSpec.setDefaultNullValue(1);
       schema.addField(metricName, fieldSpec);
@@ -110,8 +106,6 @@ public class ThirdeyePinotSchemaUtils {
             thirdeyeConfig.getTime().getTimeGranularity().getUnit(),
             thirdeyeConfig.getTime().getColumnName());
 
-    FieldSpec fieldSpec = new TimeFieldSpec(incoming, outgoing);
-    fieldSpec.setFieldType(FieldType.TIME);
     schema.addField(thirdeyeConfig.getTime().getColumnName(), new TimeFieldSpec(incoming, outgoing));
 
     schema.setSchemaName(thirdeyeConfig.getCollection());

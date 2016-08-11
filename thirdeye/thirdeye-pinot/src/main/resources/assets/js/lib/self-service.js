@@ -20,6 +20,16 @@ function getExistingAnomalyFunctions(dataset) {
             data = {}
         }
 
+        for (var i= 0, len = data.length; i < len; i++){
+            var properties = data[i].properties;
+
+            if(properties.substr(properties.length - 1) == ";"){
+                properties = properties.slice(0, -1);
+            }
+           data[i].properties = parseProperties(properties);
+           data[i].filters = parseProperties(decodeURIComponent(data[i].filters));
+        }
+
         /** Handelbars template for EXISTING ANOMALY FUNCTIONS TABLE **/
         result_existing_anomaly_functions_template = HandleBarsTemplates.template_existing_anomaly_functions(data);
         $("#existing-anomaly-functions-table-placeholder").html(result_existing_anomaly_functions_template);
@@ -28,14 +38,14 @@ function getExistingAnomalyFunctions(dataset) {
         $("#existing-anomaly-functions-table").DataTable({
             "bAutoWidth": false,
             "columnDefs": [
-                { "targets": 0 , "width": "100px" },
-                { "targets": 1 , "width": "100px" },
-                { "targets": 2 , "width": "100px" },
-                { "targets": 3 , "width": "100px" },
+                { "targets": 0  },
+                { "targets": 1  },
+                { "targets": 2  },
+                { "targets": 3  },
 
                 { "targets": 4 , "width": "50px", "orderable": false},
                 { "targets": 5 , "width": "50px", "orderable": false},
-                { "targets": 6 , "width": "50px", "orderable": false},
+                { "targets": 6 , "width": "50px", "orderable": false}
             ]
         });
     }
@@ -66,14 +76,13 @@ function renderSelfService() {
         var form = $(this).closest("form");
         toggleFunctionTypeFields(this,form);
         hideErrorAndSuccess("");
-    })
+    });
 
     // Metric
     $("#self-service-forms-section").on("click", ".metric-option", function () {
         var form = $(this).closest("form");
         hideErrorAndSuccess("metric-option",form);
     });
-
 
     // Monitoring window size
     $("#self-service-forms-section").on("keyup, click", "#monitoring-window-size", function () {
@@ -156,6 +165,7 @@ function renderSelfService() {
 
         //Edit button
     $("#self-service-forms-section").on("click", ".init-update-function-btn", function () {
+        $("#self-service-chart-area-error").hide();
         populateUpdateForm(this)
     });
 
@@ -164,13 +174,56 @@ function renderSelfService() {
         var functionId = $(this).attr("data-function-id");
         var functionName = $(this).attr("data-function-name");
         $("#confirm-delete-anomaly-function").attr("data-function-id", functionId);
+        $("#self-service-chart-area-error").hide();
         $("#function-to-delete").text(functionName);
         $("#delete-anomaly-function-success").hide();
         $("#delete-anomaly-function-error").hide();
         enableButton($("#confirm-delete-anomaly-function"));
     });
 
-    //Confirm delete button
+    $("#self-service-forms-section").on("click", ".init-toggle-active-state", function () {
+        var rowId = $(this).attr("data-row-id");
+        var functionName = $(this).attr("data-function-name");
+        $("#confirm-toggle-active-state").attr("data-row-id", rowId);
+        $("#close-toggle-alert-modal").attr("data-row-id", rowId);
+        $("#self-service-chart-area-error").hide();
+        $(".function-to-toggle").text(functionName);
+        if ($(this).is(':checked')) {
+            $("#turn-off-anomaly-function").hide();
+            $("#turn-on-anomaly-function").show();
+        }else{
+            $("#turn-off-anomaly-function").show();
+            $("#turn-on-anomaly-function").hide();
+        }
+        $("#toggle-active-state-success").hide();
+        $("#toggle-active-state-error").hide();
+        enableButton($("#confirm-toggle-active-state"));
+    });
+
+    //Confirm toggle button
+    $("#self-service-forms-section").on("click", "#close-toggle-alert-modal", function () {
+
+        var rowId = $(this).attr("data-row-id");
+        var existingAnomalyFunctionsDataStr = window.sessionStorage.getItem('existingAnomalyFunctions');
+        var existingAnomalyFunctionsData = JSON.parse(existingAnomalyFunctionsDataStr);
+        var anomalyFunctionObj = existingAnomalyFunctionsData[rowId];
+
+        if(anomalyFunctionObj.isActive ){
+            $(".init-toggle-active-state[data-row-id='" + rowId + "']").attr("checked", true);
+            $(".init-toggle-active-state[data-row-id='" + rowId + "']").prop("checked", true);
+        }else{
+            $(".init-toggle-active-state[data-row-id='" + rowId + "']").removeAttr("checked");
+            $(".init-toggle-active-state[data-row-id='" + rowId + "']").prop("checked", false);
+        }
+    });
+
+
+    //Confirm toggle button
+    $("#self-service-forms-section").on("click", "#confirm-toggle-active-state", function () {
+        toggleActiveState(this)
+    });
+
+    //Confirm delete
     $("#self-service-forms-section").on("click", "#confirm-delete-anomaly-function", function () {
         deleteAnomalyFunction(this)
     });
@@ -178,6 +231,36 @@ function renderSelfService() {
     //Update button
     $("#self-service-forms-section").on("click", "#update-anomaly-function", function () {
         updateAnomalyFunction()
+    });
+
+
+    //Function type
+    $("#self-service-forms-section").on("mousemove", ".tooltip-cell", function () {
+
+        //insert data
+        var propertiesString = $(this).attr("data-properties");
+
+        //Remove trailing ","
+        if(propertiesString.substr(propertiesString.length - 1) == ","){
+            propertiesString = propertiesString.substring(0, propertiesString.length-1);
+        }
+
+        var propertiesAry = propertiesString.split(",");
+        var html = "";
+        for (var i = 0, numProp = propertiesAry.length; i < numProp; i++) {
+            var keyValue = propertiesAry[i];
+            keyValue = keyValue.split(":")
+            html += "<tr><td class='prop-key'>" + keyValue[0] + ": </td><td class='prop-value'>" + keyValue[1] + ",</td></tr>"
+
+        }
+        $("#existing-fn-table-tooltip").html(html);
+        var conainerOffset = $("#self-service-display-chart-area").offset();
+        var mouseOffset = 10;;
+        $("#existing-fn-table-tooltip").css("position", "absolute");
+        $("#existing-fn-table-tooltip").css("top",  event.clientY- conainerOffset.top);
+        $("#existing-fn-table-tooltip").css("left", event.clientX - conainerOffset.left + mouseOffset);
+        $("#existing-fn-table-tooltip").removeClass("hidden");
+
     });
 
     /** Event handlers **/
@@ -268,8 +351,16 @@ function renderSelfService() {
         formData.repeatEveryUnit = $("#selected-monitoring-repeat-unit", form).attr("value");
         var monitoringScheduleTime = ( $("#monitoring-schedule-time", form).val() == "" ) ? "" : $("#monitoring-schedule-time", form).val() //Todo: in case of daily data granularity set the default schedule to time when datapoint is created
         if(monitoringScheduleTime){
-            formData.scheduleMinute = monitoringScheduleTime.substring(3, monitoringScheduleTime.length);
-            formData.scheduleHour = monitoringScheduleTime.substring(0, monitoringScheduleTime.length - 3);
+            if(monitoringScheduleTime.indexOf(",") > -1){
+                formData.scheduleHour = monitoringScheduleTime;
+                formData.scheduleMinute = "";
+            }else{
+                //schedule time format HH:MM
+                var monitoringScheduleTimeAry = monitoringScheduleTime.split(":")
+
+                formData.scheduleHour = monitoringScheduleTimeAry[0];
+                formData.scheduleMinute = monitoringScheduleTimeAry[1];
+            }
         }
 
         if ($("#function-id", form).length > 0) {
@@ -485,6 +576,45 @@ function renderSelfService() {
         })
     }
 
+    function toggleActiveState(target){
+        var rowId = $(target).attr("data-row-id");
+        var existingAnomalyFunctionsDataStr = window.sessionStorage.getItem('existingAnomalyFunctions');
+        var existingAnomalyFunctionsData = JSON.parse(existingAnomalyFunctionsDataStr);
+        var anomalyFunctionObj = existingAnomalyFunctionsData[rowId];
+        anomalyFunctionObj.isActive = !anomalyFunctionObj.isActive;
+        //encode filters
+        anomalyFunctionObj.filters = encodeURIComponent(JSON.stringify(anomalyFunctionObj.filters));
+
+        var url = "/dashboard/anomaly-function/update?dataset=" + hash.dataset;
+        for (key in anomalyFunctionObj){
+
+            var value = (anomalyFunctionObj[key] + "" == "null") ? "" : anomalyFunctionObj[key];
+            url += "&" + key + "=" + value;
+        }
+
+        submitData(url).done(function (id) {
+
+        //decode filters
+        anomalyFunctionObj.filters = JSON.parse(decodeURIComponent(anomalyFunctionObj.filters));
+        existingAnomalyFunctionsData[rowId] = anomalyFunctionObj;
+
+        window.sessionStorage.setItem('existingAnomalyFunctions', JSON.stringify(existingAnomalyFunctionsData));
+
+            //Enable submit btn
+            enableButton($("#confirm-toggle-active-state"));
+            var successMessage = $("#toggle-active-state-success");
+            $("p", successMessage).html("success");
+            successMessage.fadeIn(100);
+            $("#close-toggle-alert-modal").click();
+            $("#self-service-chart-area-error").hide();
+
+        }).fail(function(){
+            var errorMessage = $("#toggle-active-state-error");
+            $("p", errorMessage).html("There was an error completing you request. Please try again.");
+            errorMessage.fadeIn(100);
+        })
+    }
+
     //Populate modal with data of the selected anomaly function
     function populateUpdateForm(target) {
 
@@ -494,7 +624,7 @@ function renderSelfService() {
         var existingAnomalyFunctionsDataStr = window.sessionStorage.getItem('existingAnomalyFunctions');
         var existingAnomalyFunctionsData = JSON.parse(existingAnomalyFunctionsDataStr);
         var anomalyFunctionObj = existingAnomalyFunctionsData[rowId];
-        var fnProperties = parseFnProperties(anomalyFunctionObj.properties);
+        var fnProperties = parseProperties(anomalyFunctionObj.properties);
         var schedule = parseCron(anomalyFunctionObj.cron);
         var filters = anomalyFunctionObj.filters ? anomalyFunctionObj.filters.split(";"): "";
 
@@ -516,7 +646,7 @@ function renderSelfService() {
 
         var templateData = {data: anomalyFunctionObj, fnProperties: fnProperties, schedule :schedule}
 
-        var result_anomaly_function_form_template = HandleBarsTemplates.template_anomaly_function_form(templateData );
+        var result_anomaly_function_form_template = HandleBarsTemplates.template_anomaly_function_form(templateData);
         $("#update-anomaly-functions-form-placeholder").html(result_anomaly_function_form_template);
 
 
@@ -573,7 +703,7 @@ function renderSelfService() {
         /** Handelbars template for dimensionvalues in filter dropdown **/
         var datasetFilters = window.datasetConfig.datasetFilters;
         var result_filter_dimension_value_template = HandleBarsTemplates.template_filter_dimension_value(datasetFilters)
-        $(".dimension-filter").each(function () {
+        $("#update-function-modal .dimension-filter" ).each(function () {
             $(this).after(result_filter_dimension_value_template)
         });
 
@@ -598,17 +728,16 @@ function renderSelfService() {
             var urlParams = urlOfAnomalyFn(formData)
 
             submitData("/dashboard/anomaly-function/update?" + urlParams).done(function () {
-
                 //existingAnomalyFunctionsData[rowId] = {formData}
                 getExistingAnomalyFunctions(formData.dataset);
 
                 //Enable submit btn
                 enableButton($("#update-anomaly-function"));
-                $("#close-update-fn-modal").click();
                 var rowId = $("#update-anomaly-function").attr("data-row-id");
                 var successMessage = $("#manage-anomaly-function-success", form);
                 $("p", successMessage).html("success");
                 successMessage.fadeIn(100);
+                $("#update-function-modal .uk-modal-close.uk-close").click();
             })
         }
     }
@@ -638,15 +767,4 @@ function renderSelfService() {
         return url
     }
 
-    function parseFnProperties(properties){
-        var fnProperties = {}
-        var propertiesAry = properties.split(";");
-        for (var i = 0, numProp = propertiesAry.length; i < numProp; i++) {
-            var keyValue = propertiesAry[i];
-            keyValue = keyValue.split("=")
-            var key = keyValue[0];
-            fnProperties[key] = keyValue[1];
-        }
-        return fnProperties
-    }
 }

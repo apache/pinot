@@ -15,12 +15,14 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import com.google.common.primitives.Longs;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.math.BigDecimal;
+import java.nio.ByteBuffer;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -511,7 +513,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     properties.put("request.required.acks", "1");
 
     ProducerConfig producerConfig = new ProducerConfig(properties);
-    Producer<String, byte[]> producer = new Producer<String, byte[]>(producerConfig);
+    Producer<byte[], byte[]> producer = new Producer<byte[], byte[]>(producerConfig);
     for (File avroFile : avroFiles) {
       try {
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream(65536);
@@ -519,7 +521,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         BinaryEncoder binaryEncoder = new EncoderFactory().directBinaryEncoder(outputStream, null);
         GenericDatumWriter<GenericRecord> datumWriter = new GenericDatumWriter<GenericRecord>(reader.getSchema());
         int recordCount = 0;
-        List<KeyedMessage<String, byte[]>> messagesToWrite = new ArrayList<KeyedMessage<String, byte[]>>(10000);
+        List<KeyedMessage<byte[], byte[]>> messagesToWrite = new ArrayList<KeyedMessage<byte[], byte[]>>(10000);
         int messagesInThisBatch = 0;
         for (GenericRecord genericRecord : reader) {
           outputStream.reset();
@@ -530,7 +532,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
           binaryEncoder.flush();
 
           byte[] bytes = outputStream.toByteArray();
-          KeyedMessage<String, byte[]> data = new KeyedMessage<String, byte[]>(kafkaTopic, bytes);
+          KeyedMessage<byte[], byte[]> data = new KeyedMessage<byte[], byte[]>(kafkaTopic,
+              Longs.toByteArray(System.currentTimeMillis()), bytes);
 
           if (BATCH_KAFKA_MESSAGES) {
             messagesToWrite.add(data);

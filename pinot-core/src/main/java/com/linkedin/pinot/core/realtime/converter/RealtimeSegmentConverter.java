@@ -88,7 +88,7 @@ public class RealtimeSegmentConverter {
         genConfig.createInvertedIndexForColumn(column);
       }
     }
-    genConfig.setTimeColumnName(dataSchema.getTimeFieldSpec().getOutGoingTimeColumnName());
+    genConfig.setTimeColumnName(dataSchema.getTimeFieldSpec().getOutgoingTimeColumnName());
     genConfig.setSegmentTimeUnit(dataSchema.getTimeFieldSpec().getOutgoingGranularitySpec().getTimeType());
     genConfig.setSegmentVersion(segmentVersion);
     genConfig.setTableName(tableName);

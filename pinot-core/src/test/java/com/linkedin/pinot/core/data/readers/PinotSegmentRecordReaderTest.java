@@ -103,7 +103,7 @@ public class PinotSegmentRecordReaderTest {
     FieldSpec spec;
     spec = new DimensionFieldSpec(D_SV_1, DataType.STRING, true);
     testSchema.addField(D_SV_1, spec);
-    spec = new DimensionFieldSpec(D_MV_1, DataType.STRING, false, ",");
+    spec = new DimensionFieldSpec(D_MV_1, DataType.STRING, false);
     testSchema.addField(D_MV_1, spec);
     spec = new MetricFieldSpec(M1, DataType.INT);
     testSchema.addField(M1, spec);

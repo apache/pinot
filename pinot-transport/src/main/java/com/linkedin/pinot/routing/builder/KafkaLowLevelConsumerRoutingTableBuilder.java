@@ -171,8 +171,11 @@ public class KafkaLowLevelConsumerRoutingTableBuilder implements RoutingTableBui
     }
 
     // 3. Sort all the segments to be used during assignment in ascending order of replicas
+
+    // PriorityQueue throws IllegalArgumentException when given a size of zero
+    int segmentCount = Math.max(externalView.getPartitionSet().size(), 1);
     PriorityQueue<Pair<String, Set<String>>> segmentToReplicaSetQueue = new PriorityQueue<Pair<String, Set<String>>>(
-        externalView.getPartitionSet().size(),
+        segmentCount,
         new Comparator<Pair<String, Set<String>>>() {
           @Override
           public int compare(Pair<String, Set<String>> firstPair, Pair<String, Set<String>> secondPair) {

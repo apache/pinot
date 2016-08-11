@@ -16,27 +16,6 @@
 package com.linkedin.pinot.segments.v1.creator;
 
 import com.google.common.base.Preconditions;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
-
-import org.apache.avro.Schema.Field;
-import org.apache.avro.Schema.Type;
-import org.apache.avro.file.DataFileStream;
-import org.apache.avro.generic.GenericData.Array;
-import org.apache.avro.generic.GenericData.Record;
-import org.apache.avro.generic.GenericDatumReader;
-import org.apache.avro.generic.GenericRecord;
-import org.apache.avro.util.Utf8;
-import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.collections.Predicate;
-
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
@@ -48,6 +27,25 @@ import com.linkedin.pinot.common.data.TimeGranularitySpec;
 import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import org.apache.avro.Schema.Field;
+import org.apache.avro.Schema.Type;
+import org.apache.avro.file.DataFileStream;
+import org.apache.avro.generic.GenericData.Array;
+import org.apache.avro.generic.GenericData.Record;
+import org.apache.avro.generic.GenericDatumReader;
+import org.apache.avro.generic.GenericRecord;
+import org.apache.avro.util.Utf8;
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections.Predicate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -135,16 +133,13 @@ public class SegmentTestUtils {
       final FieldSpec fieldSpec;
       if (pinotType != null && "METRIC".equals(pinotType)) {
         fieldSpec = new MetricFieldSpec();
-        fieldSpec.setFieldType(FieldType.METRIC);
       } else {
         fieldSpec = new DimensionFieldSpec();
-        fieldSpec.setFieldType(FieldType.DIMENSION); // default
       }
 
       fieldSpec.setName(columnName);
       fieldSpec.setDataType(getColumnType(dataStream.getSchema().getField(columnName)));
       fieldSpec.setSingleValueField(isSingleValueField(dataStream.getSchema().getField(columnName)));
-      fieldSpec.setDelimiter(",");
       schema.addField(columnName, fieldSpec);
     }
 

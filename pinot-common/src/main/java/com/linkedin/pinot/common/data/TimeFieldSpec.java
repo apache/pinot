@@ -16,58 +16,65 @@
 package com.linkedin.pinot.common.data;
 
 import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.utils.EqualityUtils;
 import java.util.concurrent.TimeUnit;
-
 import org.codehaus.jackson.annotate.JsonIgnore;
+import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 
 
-public class TimeFieldSpec extends FieldSpec {
-
+@JsonIgnoreProperties(ignoreUnknown = true)
+public final class TimeFieldSpec extends FieldSpec {
   private TimeGranularitySpec _incomingGranularitySpec;
   private TimeGranularitySpec _outgoingGranularitySpec;
 
+  // Default constructor required by JSON de-serializer. DO NOT REMOVE.
   public TimeFieldSpec() {
     super();
-    setFieldType(FieldType.TIME);
   }
 
   public TimeFieldSpec(String name, DataType dataType, TimeUnit timeUnit) {
-    super(name, FieldType.TIME, dataType, true);
+    super(name, dataType, true);
     _incomingGranularitySpec = new TimeGranularitySpec(dataType, timeUnit, name);
-    _outgoingGranularitySpec = _incomingGranularitySpec;
-    _isDataTypeSet = true;
   }
 
 
-  public TimeFieldSpec(String name, DataType dataType, int size, TimeUnit timeUnit) {
-    super(name, FieldType.TIME, dataType, true);
-    _incomingGranularitySpec = new TimeGranularitySpec(dataType, size, timeUnit, name);
-    _outgoingGranularitySpec = _incomingGranularitySpec;
-    _isDataTypeSet = true;
+  public TimeFieldSpec(String name, DataType dataType, int timeUnitSize, TimeUnit timeUnit) {
+    super(name, dataType, true);
+    _incomingGranularitySpec = new TimeGranularitySpec(dataType, timeUnitSize, timeUnit, name);
   }
 
   public TimeFieldSpec(TimeGranularitySpec incomingGranularitySpec) {
-    super(incomingGranularitySpec.getName(), FieldType.TIME, incomingGranularitySpec.getDataType(), true);
+    super(incomingGranularitySpec.getName(), incomingGranularitySpec.getDataType(), true);
     _incomingGranularitySpec = incomingGranularitySpec;
-    _outgoingGranularitySpec = _incomingGranularitySpec;
-    _isDataTypeSet = true;
   }
 
   public TimeFieldSpec(TimeGranularitySpec incomingGranularitySpec, TimeGranularitySpec outgoingGranularitySpec) {
-    super(incomingGranularitySpec.getName(), FieldType.TIME, incomingGranularitySpec.getDataType(), true);
+    super(outgoingGranularitySpec.getName(), outgoingGranularitySpec.getDataType(), true);
+    Preconditions.checkNotNull(incomingGranularitySpec);
+
     _incomingGranularitySpec = incomingGranularitySpec;
     _outgoingGranularitySpec = outgoingGranularitySpec;
-    _isDataTypeSet = true;
+  }
+
+  @JsonIgnore
+  @Override
+  public FieldType getFieldType() {
+    return FieldType.TIME;
   }
 
   @Override
-  public String getName() {
-    return getOutgoingGranularitySpec().getName();
+  public void setName(String name) {
+    // Ignore setName for TimeFieldSpec because we pick the name from TimeGranularitySpec.
   }
 
   @Override
-  public DataType getDataType() {
-    return getOutgoingGranularitySpec().getDataType();
+  public void setDataType(DataType dataType) {
+    // Ignore setDataType for TimeFieldSpec because we pick the data type from TimeGranularitySpec.
+  }
+
+  @Override
+  public void setSingleValueField(boolean isSingleValueField) {
+    Preconditions.checkArgument(isSingleValueField, "Unsupported multi-value for time field.");
   }
 
   @JsonIgnore
@@ -76,19 +83,24 @@ public class TimeFieldSpec extends FieldSpec {
   }
 
   @JsonIgnore
+  public String getOutgoingTimeColumnName() {
+    return getName();
+  }
+
+  @JsonIgnore
+  @Deprecated
+  // For third-eye backward compatible.
   public String getOutGoingTimeColumnName() {
-    return getOutgoingGranularitySpec().getName();
+    return getName();
   }
 
   public void setIncomingGranularitySpec(TimeGranularitySpec incomingGranularitySpec) {
     Preconditions.checkNotNull(incomingGranularitySpec);
 
-    _isDataTypeSet = true;
     _incomingGranularitySpec = incomingGranularitySpec;
-
-    // If already set default null value but not outgoing granularity spec, update the default null value.
-    if (_isDefaultNullValueSet) {
-      updateDefaultNullValue();
+    if (_outgoingGranularitySpec == null) {
+      super.setName(incomingGranularitySpec.getName());
+      super.setDataType(incomingGranularitySpec.getDataType());
     }
   }
 
@@ -99,26 +111,45 @@ public class TimeFieldSpec extends FieldSpec {
   public void setOutgoingGranularitySpec(TimeGranularitySpec outgoingGranularitySpec) {
     Preconditions.checkNotNull(outgoingGranularitySpec);
 
-    _isDataTypeSet = true;
     _outgoingGranularitySpec = outgoingGranularitySpec;
-
-    // If already set default null value, update the default null value.
-    if (_isDefaultNullValueSet) {
-      updateDefaultNullValue();
-    }
+    super.setName(outgoingGranularitySpec.getName());
+    super.setDataType(outgoingGranularitySpec.getDataType());
   }
 
   public TimeGranularitySpec getOutgoingGranularitySpec() {
     if (_outgoingGranularitySpec == null) {
-      _outgoingGranularitySpec = _incomingGranularitySpec;
+      return _incomingGranularitySpec;
+    } else {
+      return _outgoingGranularitySpec;
     }
-    return _outgoingGranularitySpec;
   }
 
   @Override
   public String toString() {
-    return "< data type: " + getDataType() + ", field type : " + getFieldType() + ", incoming granularity spec: "
-        + getIncomingGranularitySpec() + ", outgoing granularity spec: " + getOutgoingGranularitySpec()
-        + ", default null value: " + getDefaultNullValue() + " >";
+    return "< field type: TIME, incoming granularity spec: " + _incomingGranularitySpec
+        + ", outgoing granularity spec: " + getOutgoingGranularitySpec() + ", default null value: "
+        + getDefaultNullValue() + " >";
+  }
+
+  @Override
+  public boolean equals(Object anObject) {
+    if (this == anObject) {
+      return true;
+    }
+    if (anObject instanceof TimeFieldSpec) {
+      TimeFieldSpec anotherTimeFieldSpec = (TimeFieldSpec) anObject;
+      return _incomingGranularitySpec.equals(anotherTimeFieldSpec._incomingGranularitySpec)
+          && getOutgoingGranularitySpec().equals(anotherTimeFieldSpec.getOutgoingGranularitySpec())
+          && getDefaultNullValue().equals(anotherTimeFieldSpec.getDefaultNullValue());
+    }
+    return false;
+  }
+
+  @Override
+  public int hashCode() {
+    int result = _incomingGranularitySpec.hashCode();
+    result = EqualityUtils.hashCodeOf(result, getOutgoingGranularitySpec());
+    result = EqualityUtils.hashCodeOf(result, getDefaultNullValue());
+    return result;
   }
 }
