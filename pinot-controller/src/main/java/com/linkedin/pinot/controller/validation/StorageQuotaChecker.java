@@ -16,16 +16,16 @@
 
 package com.linkedin.pinot.controller.validation;
 
+import java.io.File;
+import org.apache.commons.io.FileUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.QuotaConfig;
 import com.linkedin.pinot.controller.api.restlet.resources.TableSizeReader;
-import java.io.File;
 import javax.annotation.Nonnegative;
 import javax.annotation.Nonnull;
-import org.apache.commons.io.FileUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -76,6 +76,7 @@ public class StorageQuotaChecker {
     // 4. is the updated size within quota
     QuotaConfig quotaConfig = tableConfig.getQuotaConfig();
     int numReplicas = tableConfig.getValidationConfig().getReplicationNumber();
+    final String tableName = tableConfig.getTableName();
 
     if (quotaConfig == null) {
       // no quota configuration...so ignore for backwards compatibility
@@ -102,12 +103,12 @@ public class StorageQuotaChecker {
     long estimatedFinalSizeBytes = tableSubtypeSize.estimatedSizeInBytes - existingSegmentSizeBytes + incomingSegmentSizeBytes;
     if (estimatedFinalSizeBytes <= allowedStorageBytes) {
       return new QuotaCheckerResponse(true,
-          String.format("Estimated size: %d bytes is within the configured quota of %d (bytes). Incoming segment size: %d (bytes)",
-          estimatedFinalSizeBytes, allowedStorageBytes, incomingSegmentSizeBytes) );
+          String.format("Estimated size: %d bytes is within the configured quota of %d (bytes) for table %s. Incoming segment size: %d (bytes)",
+          estimatedFinalSizeBytes, allowedStorageBytes, tableName, incomingSegmentSizeBytes) );
     } else {
       return new QuotaCheckerResponse(false,
-          String.format("Estimated size: %d bytes exceeds the configured quota of %d (bytes). Incoming segment size: %d (bytes)",
-          estimatedFinalSizeBytes, allowedStorageBytes, incomingSegmentSizeBytes));
+          String.format("Estimated size: %d bytes exceeds the configured quota of %d (bytes) for table %s. Incoming segment size: %d (bytes)",
+          estimatedFinalSizeBytes, allowedStorageBytes, tableName, incomingSegmentSizeBytes));
     }
   }
 }
