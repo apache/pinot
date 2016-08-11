@@ -122,8 +122,8 @@ public class TaskDriver {
               TaskStatus.RUNNING);
           LOG.info(Thread.currentThread().getId() + " : Task acquired success: {}", success);
         } catch (OptimisticLockException | RollbackException | StaleObjectStateException e) {
-          LOG.warn("Optimistic lock exception in acquiring task by threadId {} and workerId {}", Thread.currentThread(),
-              workerId);
+          LOG.warn("Optimistic lock exception in acquiring task by threadId {} and workerId {}",
+              Thread.currentThread().getId(), workerId);
         }
         if (success) {
           acquiredTask = anomalyTaskSpec;
