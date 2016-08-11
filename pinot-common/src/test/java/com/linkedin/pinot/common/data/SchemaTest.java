@@ -27,28 +27,23 @@ public class SchemaTest {
   public static final Logger LOGGER = LoggerFactory.getLogger(SchemaTest.class);
 
   private static String singleValueDim = "true";
-  private static String singleValueMetric = "true";
   private static String dimType = "\"STRING\"";
   private static String metricType = "\"LONG\"";
 
   private String makeSchema() {
-    return "{" +
-        "\"schemaName\":\"TestSchema\"," +
-        "   \"metricFieldSpecs\":[" +
-        "{\"dataType\":" + metricType + ", \"singleValueField\":" + singleValueMetric + ", \"delimiter\":\",\", \"name\":\"volume\", \"fieldType\":\"METRIC\"}" +
-        "    ], \"dimensionFieldSpecs\":[" +
-        "{\"dataType\":" + dimType + ", \"singleValueField\":" + singleValueDim + ", \"delimiter\":\",\", \"name\":\"page\", \"fieldType\":\"DIMENSION\"}" +
-        "    ], \"timeFieldSpec\":{" +
-        "       \"dataType\":\"LONG\"," +
-        "       \"incomingGranularitySpec\":{" +
-        "          \"dataType\":\"LONG\", \"timeType\":\"MILLISECONDS\", \"name\":\"tick\"" +
-        "        }, \"outgoingGranularitySpec\":{" +
-        "          \"dataType\":\"LONG\", \"timeType\":\"MILLISECONDS\", \"name\":\"tick\"" +
-        "        }," +
-        "        \"singleValueField\":true, \"delimiter\":null, \"name\":\"time\", \"fieldType\":\"TIME\", \"defaultNullValue\":-9223372036854775808"
-        +
-        "    }" +
-        " }";
+    return "{"
+        + "  \"schemaName\":\"TestSchema\","
+        + "  \"metricFieldSpecs\":["
+        + "    {\"dataType\":" + metricType + ",\"singleValueField\":true,\"name\":\"volume\"}"
+        + "  ],"
+        + "  \"dimensionFieldSpecs\":["
+        + "    {\"dataType\":" + dimType + ",\"singleValueField\":" + singleValueDim + ",\"name\":\"page\"}"
+        + "  ],"
+        + "  \"timeFieldSpec\":{"
+        + "    \"incomingGranularitySpec\":{\"dataType\":\"LONG\",\"timeType\":\"MILLISECONDS\",\"name\":\"tick\"},"
+        + "    \"defaultNullValue\":12345"
+        + "  }"
+        + "}";
   }
 
   @Test
@@ -56,7 +51,6 @@ public class SchemaTest {
     ObjectMapper mapper = new ObjectMapper();
     {
       singleValueDim = "true";
-      singleValueMetric = "true";
       dimType = "\"STRING\"";
       metricType = "\"LONG\"";
 
@@ -64,21 +58,8 @@ public class SchemaTest {
       Schema schema = mapper.readValue(validSchema, Schema.class);
       Assert.assertTrue(schema.validate(LOGGER));
     }
-
     {
       singleValueDim = "true";
-      singleValueMetric = "false";
-      dimType = "\"STRING\"";
-      metricType = "\"LONG\"";
-
-      String validSchema = makeSchema();
-      Schema schema = mapper.readValue(validSchema, Schema.class);
-      Assert.assertTrue(schema.validate(LOGGER));
-    }
-
-    {
-      singleValueDim = "true";
-      singleValueMetric = "true";
       dimType = "\"STRING\"";
       metricType = "\"BOOLEAN\"";
 
@@ -86,10 +67,8 @@ public class SchemaTest {
       Schema schema = mapper.readValue(validSchema, Schema.class);
       Assert.assertFalse(schema.validate(LOGGER));
     }
-
     {
-      singleValueDim = "true";
-      singleValueMetric = "true";
+      singleValueDim = "false";
       dimType = "\"STRING\"";
       metricType = "\"STRING\"";
 
@@ -97,12 +76,8 @@ public class SchemaTest {
       Schema schema = mapper.readValue(validSchema, Schema.class);
       Assert.assertFalse(schema.validate(LOGGER));
     }
-
-    /*
-     * Disabled until we fix default value for booleans
     {
-      singleValueDim = "true";
-      singleValueMetric = "true";
+      singleValueDim = "false";
       dimType = "\"BOOLEAN\"";
       metricType = "\"LONG\"";
 
@@ -110,8 +85,6 @@ public class SchemaTest {
       Schema schema = mapper.readValue(validSchema, Schema.class);
       Assert.assertTrue(schema.validate(LOGGER));
     }
-
-    */
   }
 
   @Test

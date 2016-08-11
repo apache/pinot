@@ -62,6 +62,21 @@ public final class TimeFieldSpec extends FieldSpec {
     return FieldType.TIME;
   }
 
+  @Override
+  public void setName(String name) {
+    // Ignore setName for TimeFieldSpec because we pick the name from TimeGranularitySpec.
+  }
+
+  @Override
+  public void setDataType(DataType dataType) {
+    // Ignore setDataType for TimeFieldSpec because we pick the data type from TimeGranularitySpec.
+  }
+
+  @Override
+  public void setSingleValueField(boolean isSingleValueField) {
+    Preconditions.checkArgument(isSingleValueField, "Unsupported multi-value for time field.");
+  }
+
   @JsonIgnore
   public String getIncomingTimeColumnName() {
     return _incomingGranularitySpec.getName();
@@ -84,8 +99,8 @@ public final class TimeFieldSpec extends FieldSpec {
 
     _incomingGranularitySpec = incomingGranularitySpec;
     if (_outgoingGranularitySpec == null) {
-      setName(incomingGranularitySpec.getName());
-      setDataType(incomingGranularitySpec.getDataType());
+      super.setName(incomingGranularitySpec.getName());
+      super.setDataType(incomingGranularitySpec.getDataType());
     }
   }
 
@@ -97,8 +112,8 @@ public final class TimeFieldSpec extends FieldSpec {
     Preconditions.checkNotNull(outgoingGranularitySpec);
 
     _outgoingGranularitySpec = outgoingGranularitySpec;
-    setName(outgoingGranularitySpec.getName());
-    setDataType(outgoingGranularitySpec.getDataType());
+    super.setName(outgoingGranularitySpec.getName());
+    super.setDataType(outgoingGranularitySpec.getDataType());
   }
 
   public TimeGranularitySpec getOutgoingGranularitySpec() {
