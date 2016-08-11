@@ -48,7 +48,8 @@ public class AnomalySummaryResource {
     List<AnomalyResult> anomalies = resultDAO
         .findAllByTimeAndFunctionId(mergeConfig.getStartTime(), mergeConfig.getEndTime(),
             functionId);
-    return AnomalyMergeGenerator.mergeAnomalies(anomalies, mergeConfig);
+    return AnomalyMergeGenerator.mergeAnomalies(anomalies, mergeConfig.getMergeDuration(),
+        mergeConfig.getSequentialAllowedGap());
   }
 
   @POST
@@ -76,7 +77,8 @@ public class AnomalySummaryResource {
     } else {
       anomalies = resultDAO.findAllByCollectionAndTime(collection, startTimeUtc, endTimeUtc);
     }
-    return AnomalyMergeGenerator.mergeAnomalies(anomalies, mergeConfig);
+    return AnomalyMergeGenerator.mergeAnomalies(anomalies, mergeConfig.getMergeDuration(),
+        mergeConfig.getSequentialAllowedGap());
   }
 
   @POST
@@ -88,7 +90,9 @@ public class AnomalySummaryResource {
     }
     switch (mergeConfig.getMergeStrategy()) {
     case COLLECTION_METRIC_DIMENSIONS:
-      return resultDAO.getCountByCollectionMetricDimension(mergeConfig.getStartTime(), mergeConfig.getEndTime());
+      return resultDAO.getCountByCollectionMetricDimension(mergeConfig.getStartTime(), mergeConfig.getEndTime(), true);
+    case FUNCTION_DIMENSIONS:
+      return resultDAO.getCountByFunctionDimensions(mergeConfig.getStartTime(), mergeConfig.getEndTime());
     case FUNCTION:
       return resultDAO.getCountByFunction(mergeConfig.getStartTime(), mergeConfig.getEndTime());
     case COLLECTION_METRIC:

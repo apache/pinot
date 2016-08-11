@@ -518,4 +518,22 @@
     </addColumn>
   </changeSet>
 
+  <changeSet id="20" author="pjaiswal">
+    <addColumn tableName="anomaly_results">
+      <column name="merged" type="boolean" defaultValueBoolean="false">
+        <constraints nullable="false"/>
+      </column>
+    </addColumn>
+    <dropForeignKeyConstraint baseTableName="anomaly_results" constraintName="fk_anomaly_merged_results_idx" />
+    <dropColumn tableName="anomaly_results" columnName="merged_result_id" />
+    <createTable tableName="anomaly_merged_results_anomaly_results">
+      <column name="anomaly_merged_results_id" type="bigint">
+        <constraints nullable="false" foreignKeyName="fk_anomaly_merged_results_idx" referencedTableName="anomaly_merged_results" />
+      </column>
+      <column name="anomaly_results_id" type="bigint">
+        <constraints nullable="false" foreignKeyName="fk_anomaly_results_idx" referencedTableName="anomaly_results" />
+      </column>
+    </createTable>
+  </changeSet>
+
 </databaseChangeLog>
