@@ -57,8 +57,10 @@ function drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab) {
     var currentView = $("#" + tab + "-display-chart-section");
     var aggTimeGranularity = (window.datasetConfig.dataGranularity) ? window.datasetConfig.dataGranularity : "HOURS";
     var dateTimeFormat = "%I:%M %p";
-    if (aggTimeGranularity == "DAYS") {
-        dateTimeFormat = "%m-%d"
+    if (aggTimeGranularity == "DAYS" ) {
+        dateTimeFormat = "%m-%d";
+    }else if(timeSeriesData.summary.baselineEnd - timeSeriesData.summary.baselineStart > 86400000 ){
+        dateTimeFormat = "%m-%d %I %p";
     }
 
     var lineChartPlaceholder = $("#linechart-placeholder", currentView)[0];
@@ -73,18 +75,18 @@ function drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab) {
     var regions = [];
 
     for (var t = 0, len = timeSeriesData["timeBuckets"].length; t < len; t++) {
-        var timeBucket = timeSeriesData["timeBuckets"][t]["currentStart"]
-        var currentEnd = timeSeriesData["timeBuckets"][t]["currentEnd"]
-        xTicksBaseline.push(timeBucket)
-        xTicksCurrent.push(timeBucket)
+        var timeBucket = timeSeriesData["timeBuckets"][t]["currentStart"];
+        var currentEnd = timeSeriesData["timeBuckets"][t]["currentEnd"];
+        xTicksBaseline.push(timeBucket);
+        xTicksCurrent.push(timeBucket);
     }
     for (var i = 0; i < anomalyData.length; i++) {
         var anomaly = anomalyData[i];
 
-        var anomalyStart = anomaly.startTimeUtc
-        var anomalyEnd = anomaly.endTimeUtc
+        var anomalyStart = anomaly.startTimeUtc;
+        var anomalyEnd = anomaly.endTimeUtc;
         var anomayID = "anomaly-id-" + anomaly.id;
-        regions.push({'axis': 'x', 'start': anomalyStart, 'end': anomalyEnd, 'class': 'regionX ' + anomayID })
+        regions.push({'axis': 'x', 'start': anomalyStart, 'end': anomalyEnd, 'class': 'regionX ' + anomayID });
     }
     lineChartData["time"] = xTicksCurrent;
 
