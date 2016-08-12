@@ -153,7 +153,7 @@ public class Summary {
     if (node.getLevel() != 0) {
       updateWowValues(parent, dpArray.getAnswer());
       double targetRatio = parent.targetRatio();
-      aggregateSmallNodes(node, dpArray, targetRatio);
+      RecomputeCostAndRemoveSmallNodes(node, dpArray, targetRatio);
       dpArray.targetRatio = targetRatio;
       if ( !nodeIsThinnedOut(node) ) {
         Set<HierarchyNode> removedNode = new HashSet<>(dpArray.getAnswer());
@@ -196,7 +196,7 @@ public class Summary {
     removedNodes.addAll(childArray.getAnswer());
     // Compute the merged answer
     double targetRatio = (parentArray.targetRatio + childArray.targetRatio) / 2.;
-    aggregateSmallNodes(parentNode, parentArray, targetRatio);
+    RecomputeCostAndRemoveSmallNodes(parentNode, parentArray, targetRatio);
     List<HierarchyNode> childNodeList = new ArrayList<>(childArray.getAnswer());
     childNodeList.sort(NODE_COMPARATOR);
     for (HierarchyNode childNode : childNodeList) {
@@ -252,7 +252,7 @@ public class Summary {
   /**
    * Recompute costs of the nodes in a DPArray using targetRatio for calculating the cost.
    */
-  private void aggregateSmallNodes(HierarchyNode parentNode, DPArray dp, double targetRatio) {
+  private void RecomputeCostAndRemoveSmallNodes(HierarchyNode parentNode, DPArray dp, double targetRatio) {
     Set<HierarchyNode> removedNodes = new HashSet<>(dp.getAnswer());
     List<HierarchyNode> ans = new ArrayList<>(dp.getAnswer());
     ans.sort(NODE_COMPARATOR);
@@ -262,8 +262,8 @@ public class Summary {
     }
     removedNodes.removeAll(dp.getAnswer());
     if (removedNodes.size() != 0) {
-      // Temporarily add parentNode to the answer so the values of the removed small node can successfully add back to
-      // parentNode by re-using the method updateWowValuesDueToRemoval.
+      // Temporarily add parentNode to the answer so the baseline and current values of the removed small node can
+      // successfully add back to parentNode by re-using the method updateWowValuesDueToRemoval.
       dp.getAnswer().add(parentNode);
       updateWowValuesDueToRemoval(parentNode.getParent(), dp.getAnswer(), removedNodes);
       dp.getAnswer().remove(parentNode);
