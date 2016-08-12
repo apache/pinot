@@ -421,6 +421,9 @@ $(document).ready(function () {
     var source_treemap_template = $("#treemap-template").html();
     HandleBarsTemplates.template_treemap = Handlebars.compile(source_treemap_template);
 
+    var source_difference_summary = $("#difference-summary").html();
+    HandleBarsTemplates.template_difference_summary = Handlebars.compile(source_difference_summary);
+
     var source_metric_time_series_section = $("#metric-time-series-section-template").html();
     HandleBarsTemplates.template_metric_time_series_section = Handlebars.compile(source_metric_time_series_section);
 
