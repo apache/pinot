@@ -121,8 +121,6 @@ public class Cube { // the cube (Ca|Cb)
     Row topAggValues = olapClient.getTopAggregatedValues();
     topBaselineValue = topAggValues.baselineValue; // aggregated baseline values
     topCurrentValue = topAggValues.currentValue; // aggregated current values
-    if (topBaselineValue == 0.) topBaselineValue = 1.;
-    if (topCurrentValue == 0.) topCurrentValue = 1.;
     topRatio = topCurrentValue / topBaselineValue; // change ratio
   }
 

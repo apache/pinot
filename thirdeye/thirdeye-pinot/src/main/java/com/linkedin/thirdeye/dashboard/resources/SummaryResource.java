@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 
@@ -13,6 +12,9 @@ import javax.ws.rs.core.MediaType;
 
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -30,6 +32,7 @@ import com.linkedin.thirdeye.dashboard.views.diffsummary.SummaryResponse;
 public class SummaryResource {
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry
       .getInstance();
+  private static final Logger LOG = LoggerFactory.getLogger(SummaryResource.class);
   private static final String DEFAULT_TIMEZONE_ID = "UTC";
   private static final String DEFAULT_TOP_DIMENSIONS = "4";
   private static final String DEFAULT_HIERARCHIES = "[]";
@@ -74,12 +77,17 @@ public class SummaryResource {
         OBJECT_MAPPER.readValue(hierarchiesPayload, new TypeReference<List<List<String>>>() {
         });
 
-    Cube cube = new Cube();
-    cube.buildWithAutoDimensionOrder(olapClient, dimensions, topDimensions, hierarchies);
+    SummaryResponse response = null;
+    try {
+        Cube cube = new Cube();
+        cube.buildWithAutoDimensionOrder(olapClient, dimensions, topDimensions, hierarchies);
 
-    Summary summary = new Summary(cube);
-    SummaryResponse response = summary.computeSummary(summarySize, doOneSideError, topDimensions);
-    summary.testCorrectnessOfWowValues();
+        Summary summary = new Summary(cube);
+        response = summary.computeSummary(summarySize, doOneSideError, topDimensions);
+        summary.testCorrectnessOfWowValues();
+    } catch (Exception e) {
+      LOG.error("Exception while generating difference summary", e);
+    }
     return OBJECT_MAPPER.writeValueAsString(response);
   }
 
@@ -106,12 +114,18 @@ public class SummaryResource {
 
     Dimensions dimensions = new Dimensions(Arrays.asList(groupByDimensions.trim().split(",")));
 
-    Cube cube = new Cube();
-    cube.buildWithManualDimensionOrder(olapClient, dimensions);
+    SummaryResponse response = null;
+    try {
+      Cube cube = new Cube();
+      cube.buildWithManualDimensionOrder(olapClient, dimensions);
 
-    Summary summary = new Summary(cube);
-    SummaryResponse response = summary.computeSummary(summarySize, doOneSideError);
-    summary.testCorrectnessOfWowValues();
+      Summary summary = new Summary(cube);
+      response = summary.computeSummary(summarySize, doOneSideError);
+      summary.testCorrectnessOfWowValues();
+    } catch (Exception e) {
+      LOG.error("Exception while generating difference summary", e);
+    }
+
     return OBJECT_MAPPER.writeValueAsString(response);
   }
 }

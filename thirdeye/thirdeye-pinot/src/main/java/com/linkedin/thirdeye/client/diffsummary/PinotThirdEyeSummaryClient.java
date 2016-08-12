@@ -143,6 +143,12 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
     for (int i = 0; i < bulkRequests.size(); i += 2) {
       ThirdEyeResponse responseTa = queryResponses.get(bulkRequests.get(i)).get();
       ThirdEyeResponse responseTb = queryResponses.get(bulkRequests.get(i+1)).get();
+      if (responseTa.getNumRows() == 0) {
+        throw new Exception("Failed to retrieve results from database with this request: " + bulkRequests.get(i));
+      }
+      if (responseTb.getNumRows() == 0) {
+        throw new Exception("Failed to retrieve results from database with this request: " + bulkRequests.get(i+1));
+      }
       List<Row> singleLevelRows = constructSingleLevelAggregatedValues(dimensions, responseTa, responseTb);
       res.add(singleLevelRows);
     }
