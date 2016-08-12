@@ -42,6 +42,11 @@ public class AbstractJpaDAO<E extends AbstractBaseEntity> {
   }
 
   @Transactional
+  public void updateAll(List<E> entities){
+    entities.forEach(this::update);
+  }
+
+  @Transactional
   public E findById(Long id) {
     return getEntityManager().find(entityClass, id);
   }
@@ -69,7 +74,11 @@ public class AbstractJpaDAO<E extends AbstractBaseEntity> {
     Root<E> entityRoot = query.from(entityClass);
     List<Predicate> predicates = new ArrayList<>();
     for (Map.Entry<String, Object> entry : filters.entrySet()) {
-      predicates.add(builder.equal(entityRoot.get(entry.getKey()), entry.getValue()));
+      if  (entry.getValue() == null ) {
+        predicates.add(builder.isNull(entityRoot.get(entry.getKey())));
+      } else {
+        predicates.add(builder.equal(entityRoot.get(entry.getKey()), entry.getValue()));
+      }
     }
     if (predicates.size() > 0) {
       query.where(predicates.toArray(new Predicate[0]));

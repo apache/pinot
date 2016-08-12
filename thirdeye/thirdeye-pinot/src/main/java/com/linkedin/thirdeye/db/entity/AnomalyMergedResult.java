@@ -9,11 +9,11 @@ import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.FetchType;
 import javax.persistence.JoinColumn;
+import javax.persistence.JoinTable;
 import javax.persistence.ManyToOne;
 import javax.persistence.OneToMany;
 import javax.persistence.OneToOne;
 import javax.persistence.Table;
-import javax.persistence.Transient;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 @Entity
@@ -38,25 +38,21 @@ public class AnomalyMergedResult extends AbstractBaseEntity {
   @Column(name = "score", nullable = false)
   private double score;
 
-  @Column(name = "weight", nullable = false)
-  private double weight;
-
   @Column(name = "created_time", nullable = false)
   private Long createdTime;
 
   @OneToOne(cascade = CascadeType.ALL, fetch = FetchType.EAGER, orphanRemoval = true)
-  @JoinColumn(name="anomaly_feedback_id")
+  @JoinColumn(name = "anomaly_feedback_id")
   private AnomalyFeedback feedback;
 
-  @OneToMany
+  @OneToMany(fetch = FetchType.EAGER)
+  @JoinTable(name = "anomaly_merged_results_mapping", joinColumns = @JoinColumn(name = "anomaly_merged_result_id"),
+      inverseJoinColumns = @JoinColumn(name = "anomaly_result_id"))
   private List<AnomalyResult> anomalyResults = new ArrayList<>();
 
   @ManyToOne(fetch = FetchType.EAGER)
   @JoinColumn(name = "function_id")
   private AnomalyFunctionSpec function;
-
-  @Transient
-  private boolean updated = false;
 
   public String getMetric() {
     return metric;
@@ -98,14 +94,6 @@ public class AnomalyMergedResult extends AbstractBaseEntity {
     this.score = score;
   }
 
-  public double getWeight() {
-    return weight;
-  }
-
-  public void setWeight(double weight) {
-    this.weight = weight;
-  }
-
   public Long getCreatedTime() {
     return createdTime;
   }
@@ -138,14 +126,6 @@ public class AnomalyMergedResult extends AbstractBaseEntity {
     this.collection = collection;
   }
 
-  public boolean isUpdated() {
-    return updated;
-  }
-
-  public void setUpdated(boolean updated) {
-    this.updated = updated;
-  }
-
   public AnomalyFunctionSpec getFunction() {
     return function;
   }
@@ -156,7 +136,7 @@ public class AnomalyMergedResult extends AbstractBaseEntity {
 
   @Override
   public int hashCode() {
-    return Objects.hash(getId(), startTime, endTime, collection, metric, dimensions, score, weight);
+    return Objects.hash(getId(), startTime, endTime, collection, metric, dimensions, score);
   }
 
   @Override

@@ -52,7 +52,7 @@ public class AnomalyResult extends AbstractBaseEntity implements Comparable<Anom
   private Long creationTimeUtc;
 
   @OneToOne(cascade = CascadeType.ALL, fetch = FetchType.EAGER, orphanRemoval = true)
-  @JoinColumn(name="anomaly_feedback_id")
+  @JoinColumn(name = "anomaly_feedback_id")
   private AnomalyFeedback feedback;
 
   @Column(name = "data_missing")
