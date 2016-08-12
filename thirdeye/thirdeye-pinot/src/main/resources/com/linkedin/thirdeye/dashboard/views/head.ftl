@@ -48,6 +48,7 @@
     <script src="../../../assets/js/lib/tabular.js" defer></script>
     <script src="../../../assets/js/lib/contributors.js" defer></script>
     <script src="../../../assets/js/lib/heatmap.js" defer></script>
+
     <script src="../../../assets/js/lib/timeseries.js" defer></script>
     <script src="../../../assets/js/lib/anomalies.js" defer></script>
     <script src="../../../assets/js/lib/self-service.js" defer></script>
@@ -59,6 +60,6 @@
     <script src="../../../assets/js/lib/dashboard-form-time.js" defer></script>
     <script src="../../../assets/js/lib/dashboard-form-submit.js" defer></script>
     <script src="../../../assets/js/lib/dashboard-chart-area.js" defer></script>
-    <script src="../../../assets/js/dashboard.js" defer></script> 
+    <script src="../../../assets/js/dashboard.js" defer></script>
 
 </head>
