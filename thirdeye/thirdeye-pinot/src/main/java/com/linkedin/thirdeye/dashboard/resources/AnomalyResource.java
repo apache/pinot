@@ -393,7 +393,7 @@ public class AnomalyResource {
     }
 
     // delete from db
-    anomalyFunctionDAO.delete(anomalyFunctionSpec);
+    anomalyFunctionDAO.deleteById(id);
 
     return Response.noContent().build();
   }
@@ -636,7 +636,7 @@ public class AnomalyResource {
       alertResourceHttpUtils.disableEmailConfiguration(String.valueOf(id));
     }
     // delete from db
-    emailConfigurationDAO.delete(emailConfiguration);
+    emailConfigurationDAO.deleteById(id);
     return Response.noContent().build();
   }
 
