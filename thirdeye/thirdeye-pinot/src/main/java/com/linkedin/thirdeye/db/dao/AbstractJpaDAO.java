@@ -47,8 +47,14 @@ public class AbstractJpaDAO<E extends AbstractBaseEntity> {
   }
 
   @Transactional
+  public E find(E entity) {
+    return getEntityManager().find(entityClass, entity);
+  }
+
+  @Transactional
   public void delete(E entity) {
-    getEntityManager().remove(entity);
+    E removeEntity = getEntityManager().getReference(entityClass, entity);
+    getEntityManager().remove(removeEntity);
   }
 
   @Transactional

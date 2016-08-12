@@ -14,6 +14,7 @@ import com.linkedin.thirdeye.db.dao.AnomalyResultDAO;
 import com.linkedin.thirdeye.db.dao.AnomalyTaskDAO;
 import com.linkedin.thirdeye.db.dao.EmailConfigurationDAO;
 import com.linkedin.thirdeye.db.dao.AnomalyFunctionRelationDAO;
+import com.linkedin.thirdeye.db.dao.WebappConfigDAO;
 
 import io.dropwizard.Application;
 import io.dropwizard.Configuration;
@@ -31,6 +32,7 @@ public abstract class BaseThirdEyeApplication<T extends Configuration> extends A
   protected AnomalyJobDAO anomalyJobDAO;
   protected AnomalyTaskDAO anomalyTaskDAO;
   protected AnomalyFunctionRelationDAO anomalyFunctionRelationDAO;
+  protected WebappConfigDAO webappConfigDAO;
 
   public void initDAOs() {
     String persistenceConfig = System.getProperty("dw.rootDir") + "/persistence.yml";
@@ -42,6 +44,7 @@ public abstract class BaseThirdEyeApplication<T extends Configuration> extends A
     anomalyFunctionRelationDAO = PersistenceUtil.getInstance(AnomalyFunctionRelationDAO.class);
     anomalyJobDAO = PersistenceUtil.getInstance(AnomalyJobDAO.class);
     anomalyTaskDAO = PersistenceUtil.getInstance(AnomalyTaskDAO.class);
+    webappConfigDAO = PersistenceUtil.getInstance(WebappConfigDAO.class);
   }
 
   // TODO below two methods depend on webapp configs

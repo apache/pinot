@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.db;
+package com.linkedin.thirdeye.db.dao;
 
 import java.util.HashMap;
 import java.util.Map;

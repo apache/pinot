@@ -393,7 +393,7 @@ public class AnomalyResource {
     }
 
     // delete from db
-    anomalyFunctionDAO.delete(anomalyFunctionSpec);
+    anomalyFunctionDAO.deleteById(id);
 
     return Response.noContent().build();
   }

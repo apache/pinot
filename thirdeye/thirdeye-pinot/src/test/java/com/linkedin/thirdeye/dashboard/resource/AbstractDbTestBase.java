@@ -1,36 +1,32 @@
-package com.linkedin.thirdeye.db.dao;
+package com.linkedin.thirdeye.dashboard.resource;
 
 import com.linkedin.thirdeye.anomaly.job.JobConstants;
 import com.linkedin.thirdeye.common.persistence.PersistenceUtil;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
-
+import com.linkedin.thirdeye.db.dao.WebappConfigDAO;
 import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
 import com.linkedin.thirdeye.db.entity.AnomalyJobSpec;
 import com.linkedin.thirdeye.db.entity.AnomalyResult;
 import com.linkedin.thirdeye.db.entity.EmailConfiguration;
+
 import java.io.File;
 import java.net.URISyntaxException;
 import java.net.URL;
-
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+
 import javax.persistence.EntityManager;
+
 import org.hibernate.internal.SessionImpl;
 import org.joda.time.DateTime;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 
 public abstract class AbstractDbTestBase {
-  protected AnomalyFunctionDAO anomalyFunctionDAO;
-  protected AnomalyResultDAO anomalyResultDAO;
-  protected AnomalyJobDAO anomalyJobDAO;
-  protected AnomalyTaskDAO anomalyTaskDAO;
-  protected EmailConfigurationDAO emailConfigurationDAO;
-  protected AnomalyMergedResultDAO mergedResultDAO;
   protected WebappConfigDAO webappConfigDAO;
   private EntityManager entityManager;
 
@@ -39,12 +35,6 @@ public abstract class AbstractDbTestBase {
     URL url = AbstractDbTestBase.class.getResource("/persistence.yml");
     File configFile = new File(url.toURI());
     PersistenceUtil.init(configFile);
-    anomalyFunctionDAO = PersistenceUtil.getInstance(AnomalyFunctionDAO.class);
-    anomalyResultDAO = PersistenceUtil.getInstance(AnomalyResultDAO.class);
-    anomalyJobDAO = PersistenceUtil.getInstance(AnomalyJobDAO.class);
-    anomalyTaskDAO = PersistenceUtil.getInstance(AnomalyTaskDAO.class);
-    emailConfigurationDAO = PersistenceUtil.getInstance(EmailConfigurationDAO.class);
-    mergedResultDAO = PersistenceUtil.getInstance(AnomalyMergedResultDAO.class);
     webappConfigDAO = PersistenceUtil.getInstance(WebappConfigDAO.class);
     entityManager = PersistenceUtil.getInstance(EntityManager.class);
   }

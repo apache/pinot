@@ -29,8 +29,8 @@ public class WebappConfigClassFactory {
     return simpleName;
   }
 
-  public static Class<?> getClassNameFromConfigType(WebappConfigType configType) {
-    Class<?> className = null;
+  public static Class<? extends AbstractConfig> getClassNameFromConfigType(WebappConfigType configType) {
+    Class<? extends AbstractConfig> className = null;
     switch (configType) {
       case CollectionConfig:
         className = CollectionConfig.class;
