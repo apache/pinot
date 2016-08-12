@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.persistence.PersistenceException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -23,7 +24,7 @@ public class AnomalyMergeExecutor {
   final AnomalyFunctionDAO anomalyFunctionDAO;
   final AnomalyMergeConfig mergeConfig;
 
-  final static Logger LOG = LoggerFactory.getLogger(AnomalyMergeExecutor.class);
+  private final static Logger LOG = LoggerFactory.getLogger(AnomalyMergeExecutor.class);
 
   public AnomalyMergeExecutor(AnomalyMergedResultDAO mergedResultDAO,
       AnomalyFunctionDAO anomalyFunctionDAO, AnomalyResultDAO anomalyResultDAO,
@@ -74,21 +75,48 @@ public class AnomalyMergeExecutor {
               "Merge strategy " + mergeConfig.getMergeStrategy() + " not supported");
         }
       }
+      output.forEach(this::updateMergedScoreAndPersist);
     }
   }
 
-  void performMergeBasedOnFunctionId(AnomalyFunctionSpec function,
+  private void updateMergedScoreAndPersist(AnomalyMergedResult mergedResult) {
+    double weightedScoreSum = 0.0;
+    double weightSum = 0.0;
+
+    for (AnomalyResult anomalyResult : mergedResult.getAnomalyResults()) {
+      anomalyResult.setMerged(true);
+      double weight = (anomalyResult.getEndTimeUtc() - anomalyResult.getStartTimeUtc()) / 1000;
+      weightedScoreSum += anomalyResult.getScore() * weight;
+      weightSum += weight;
+    }
+    if (weightSum != 0) {
+      mergedResult.setScore(weightedScoreSum / weightSum);
+    }
+    try {
+      // persist the merged result
+      mergedResultDAO.update(mergedResult);
+      anomalyResultDAO.updateAll(mergedResult.getAnomalyResults());
+    } catch (PersistenceException e) {
+      LOG.error("Could not persist merged result : [" + mergedResult.toString() + "]", e);
+    }
+  }
+
+  private void performMergeBasedOnFunctionId(AnomalyFunctionSpec function,
       List<AnomalyResult> unmergedResults, List<AnomalyMergedResult> output) {
     // Now find last MergedAnomalyResult in same category
     AnomalyMergedResult latestMergedResult =
         mergedResultDAO.findLatestByFunctionIdOnly(function.getId());
     // TODO : get mergeConfig from function
-    output.addAll(AnomalyMergeGenerator
+    List<AnomalyMergedResult> mergedResults = AnomalyTimeBasedSummarizer
         .mergeAnomalies(latestMergedResult, unmergedResults, mergeConfig.getMergeDuration(),
-            mergeConfig.getSequentialAllowedGap()));
+            mergeConfig.getSequentialAllowedGap());
+    for (AnomalyMergedResult mergedResult : mergedResults) {
+      mergedResult.setFunction(function);
+    }
+    output.addAll(mergedResults);
   }
 
-  void performMergeBasedOnFunctionIdAndDimensions(AnomalyFunctionSpec function,
+  private void performMergeBasedOnFunctionIdAndDimensions(AnomalyFunctionSpec function,
       List<AnomalyResult> unmergedResults, List<AnomalyMergedResult> output) {
     Map<String, List<AnomalyResult>> dimensionsResultMap = new HashMap<>();
     for (AnomalyResult anomalyResult : unmergedResults) {
@@ -102,11 +130,16 @@ public class AnomalyMergeExecutor {
       AnomalyMergedResult latestMergedResult =
           mergedResultDAO.findLatestByFunctionIdDimensions(function.getId(), dimensions);
       List<AnomalyResult> unmergedResultsByDimensions = dimensionsResultMap.get(dimensions);
+
       // TODO : get mergeConfig from function
-      output.addAll(AnomalyMergeGenerator
+      List<AnomalyMergedResult> mergedResults = AnomalyTimeBasedSummarizer
           .mergeAnomalies(latestMergedResult, unmergedResultsByDimensions,
-              mergeConfig.getMergeDuration(), mergeConfig.getSequentialAllowedGap()));
+              mergeConfig.getMergeDuration(), mergeConfig.getSequentialAllowedGap());
+      for (AnomalyMergedResult mergedResult : mergedResults) {
+        mergedResult.setFunction(function);
+        mergedResult.setDimensions(dimensions);
+      }
+      output.addAll(mergedResults);
     }
   }
-  // TODO: recompute score for the merged anomalies
 }

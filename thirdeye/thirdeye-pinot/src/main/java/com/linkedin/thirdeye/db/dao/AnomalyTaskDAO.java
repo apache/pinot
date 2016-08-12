@@ -9,12 +9,8 @@ import java.sql.Timestamp;
 import java.util.List;
 
 import org.joda.time.DateTime;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class AnomalyTaskDAO extends AbstractJpaDAO<AnomalyTaskSpec> {
-
-  private static final Logger LOG = LoggerFactory.getLogger(AnomalyTaskDAO.class);
 
   private static final String FIND_BY_JOB_ID_STATUS_NOT_IN = "SELECT at FROM AnomalyTaskSpec at "
       + "WHERE at.job.id = :jobId "

@@ -4,19 +4,14 @@ import com.linkedin.thirdeye.db.entity.AnomalyMergedResult;
 import com.linkedin.thirdeye.db.entity.AnomalyResult;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeSet;
 
 /**
  * Given list of {@link AnomalyResult} and merge parameters, this utility performs time based merge
  */
-public abstract class AnomalyMergeGenerator {
+public abstract class AnomalyTimeBasedSummarizer {
 
-  private AnomalyMergeGenerator() {
+  private AnomalyTimeBasedSummarizer() {
 
   }
 
@@ -86,6 +81,7 @@ public abstract class AnomalyMergeGenerator {
           }
           if (!mergedAnomaly.getAnomalyResults().contains(currentResult)) {
             mergedAnomaly.getAnomalyResults().add(currentResult);
+            currentResult.setMerged(true);
           }
         }
       }
@@ -109,72 +105,21 @@ public abstract class AnomalyMergeGenerator {
         mergedAnomalies.add(mergedAnomaly);
       }
     }
-    mergedAnomalies.forEach(AnomalyMergeGenerator::populateMergedProperties);
     return mergedAnomalies;
   }
 
-  // TODO : // FIXME: 8/9/16 - update score - weighted score of raw and missing time buckets
-  private static void populateMergedProperties(AnomalyMergedResult mergedResult) {
-    double totalScore = 0.0;
-    double totalWeight = 0.0;
-    int n = mergedResult.getAnomalyResults().size();
-
-    List<String> dimensionsList = new ArrayList<>();
-    Set<String> metricList = new TreeSet<>();
-
-    for (AnomalyResult anomalyResult : mergedResult.getAnomalyResults()) {
-      totalScore += anomalyResult.getScore();
-      totalWeight += anomalyResult.getWeight();
-      dimensionsList.add(anomalyResult.getDimensions());
-      metricList.add(anomalyResult.getMetric());
-    }
-    mergedResult.setScore(totalScore / n);
-    mergedResult.setWeight(totalWeight / n);
-  }
-
-  private static String getDimensionsMerged(List<String> dimentionList) {
-    Map<Integer, Set<String>> mergedDimensions = new HashMap<>();
-    for (String dimensions : dimentionList) {
-      // Merging dimensions
-      if (dimensions != null) {
-        String[] dimArr = dimensions.split(",");
-        if (dimArr.length > 0) {
-          for (int i = 0; i < dimArr.length; i++) {
-            if (dimArr[i] != null && !dimArr[i].equals("") && !dimArr[i].equals("*")) {
-              if (!mergedDimensions.containsKey(i)) {
-                mergedDimensions.put(i, new HashSet<>());
-              }
-              mergedDimensions.get(i).add(dimArr[i]);
-            }
-          }
-        }
-      }
-    }
-    StringBuffer dimBuff = new StringBuffer();
-    int count = 0;
-    for (Map.Entry<Integer, Set<String>> entry : mergedDimensions.entrySet()) {
-      // add only non empty dimensions
-      if (entry.getValue().size() > 0) {
-        if (count != 0) {
-          dimBuff.append(',');
-        }
-        dimBuff.append(entry.getValue().toString());
-        count++;
-      }
-    }
-    return dimBuff.toString();
-  }
 
   private static void populateMergedResult(AnomalyMergedResult mergedAnomaly,
       AnomalyResult currentResult) {
     if (!mergedAnomaly.getAnomalyResults().contains(currentResult)) {
       mergedAnomaly.getAnomalyResults().add(currentResult);
+      currentResult.setMerged(true);
     }
-    mergedAnomaly.setCreatedTime(currentResult.getCreationTimeUtc());
+    // only set collection, keep metric, dimensions and function null
     mergedAnomaly.setCollection(currentResult.getCollection());
     mergedAnomaly.setMetric(currentResult.getMetric());
-    mergedAnomaly.setDimensions(currentResult.getDimensions());
     mergedAnomaly.setStartTime(currentResult.getStartTimeUtc());
     mergedAnomaly.setEndTime(currentResult.getEndTimeUtc());
+    mergedAnomaly.setCreatedTime(currentResult.getCreationTimeUtc());
   }
 }

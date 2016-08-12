@@ -493,7 +493,7 @@
       <column name="metric" type="varchar(255)">
         <constraints nullable="false"/>
       </column>
-      <column name="dimensions" type="varchar(1023)">
+      <column name="dimensions" type="varchar(1023)" >
         <constraints nullable="false"/>
       </column>
       <column name="start_time" type="bigint">
@@ -510,6 +510,7 @@
                      referencedTableName="anomaly_feedback" referencedColumnNames="id"/>
       </column>
     </createTable>
+
     <addColumn tableName="anomaly_results">
       <column name="merged_result_id" type="bigint" defaultValue="null">
         <constraints nullable="true" foreignKeyName="fk_anomaly_merged_results_idx"
@@ -524,13 +525,29 @@
         <constraints nullable="false"/>
       </column>
     </addColumn>
+
+    <addColumn tableName="anomaly_merged_results">
+      <column name="score" type="double" defaultValue="0.0">
+        <constraints nullable="false"/>
+      </column>
+    </addColumn>
+    <addColumn tableName="anomaly_merged_results">
+      <column name="function_id" type="bigint">
+        <constraints foreignKeyName="fk_anomaly_merged_result_function_idx" references="anomaly_functions(id)"/>
+      </column>
+    </addColumn>
+    <sql dbms="mysql">
+      ALTER TABLE anomaly_merged_results MODIFY COLUMN dimensions varchar(1023);
+    </sql>
+
     <dropForeignKeyConstraint baseTableName="anomaly_results" constraintName="fk_anomaly_merged_results_idx" />
     <dropColumn tableName="anomaly_results" columnName="merged_result_id" />
-    <createTable tableName="anomaly_merged_results_anomaly_results">
-      <column name="anomaly_merged_results_id" type="bigint">
+
+    <createTable tableName="anomaly_merged_results_mapping">
+      <column name="anomaly_merged_result_id" type="bigint">
         <constraints nullable="false" foreignKeyName="fk_anomaly_merged_results_idx" referencedTableName="anomaly_merged_results" />
       </column>
-      <column name="anomaly_results_id" type="bigint">
+      <column name="anomaly_result_id" type="bigint">
         <constraints nullable="false" foreignKeyName="fk_anomaly_results_idx" referencedTableName="anomaly_results" />
       </column>
     </createTable>
