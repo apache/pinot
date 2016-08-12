@@ -42,6 +42,7 @@
     <#include "tabs/compare-tab/tabular.ftl">
     <#include "tabs/compare-tab/heat-map.ftl">
     <#include "tabs/compare-tab/contributors.ftl">
+    <#include "tabs/compare-tab/difference-summary.ftl">
     <#include "tabs/timeseries-tab/timeseries.ftl">
     <#include "tabs/anomalies-tab/anomalies.ftl">
     <#include "tabs/self-service-tab/self-service.ftl">

@@ -42,14 +42,17 @@
                 </div>
 
                 <div class="uk-button-group dimension-treemap-toggle-buttons" data-uk-button-radio>
-                    <button class="uk-button dimension-treemap-mode" id="treemap_contribution-total-change-percent" mode="0">
+                    <button id="treemap_contribution-total-change-percent" class="uk-button dimension-treemap-mode" mode="0">
                         <i class="uk-icon-eye-slash"></i> Percentage Change
                     </button>
-                    <button class="uk-button dimension-treemap-mode" id="treemap_contribution-total-percent" mode="1">
+                    <button id="treemap_contribution-total-percent" class="uk-button dimension-treemap-mode" mode="1">
                         <i class="uk-icon-eye-slash"></i> Contribution Change (%)
                     </button>
-                    <button class="uk-button dimension-treemap-mode" id="treemap_contribution-change-percent" mode="2">
+                    <button id="treemap_contribution-change-percent" class="uk-button dimension-treemap-mode" mode="2">
                         <i class="uk-icon-eye-slash"></i> Contribution to overall Change (%)
+                    </button>
+                    <button id="treemap_contribution-difference-summary" class="uk-button dimension-treemap-mode" mode="3">
+                        <i class="uk-icon-eye-slash"></i> Difference Summary
                     </button>
                 </div>
 
@@ -78,6 +81,16 @@
                         {{#each @root/dimensions as |dimensionName dimensionIndex|}}
                         <tr style="position: relative; width: 100%;">
                             <td class="treemap-display-tbl-dim"><div style="text-align: left;">{{dimensionName}}</div></td><td id="metric_{{metricName}}_dim_{{dimensionIndex}}_treemap_2" class="dimension-treemap" rel="{{dimensionName}}" style="position: relative; left: 0px; top: 0px; width: 100%;" ></td>
+                        </tr>
+                        {{/each}}
+                    </table>
+                </div>
+
+                <div id="metric_{{metricName}}_treemap_3" class="treemap-container  uk-margin" mode="3">
+                    <table class="treemap-display-tbl" style="position: relative; width: 100%;">
+                        {{#each @root/dimensions as |dimensionName dimensionIndex|}}
+                        <tr style="position: relative; width: 100%;">
+                            <td class="treemap-display-tbl-dim"><div style="text-align: left;">{{dimensionName}}</div></td><td id="difference-summary" class="dimension-treemap" rel="{{dimensionName}}" style="position: relative; left: 0px; top: 0px; width: 100%;" ></td>
                         </tr>
                         {{/each}}
                     </table>
