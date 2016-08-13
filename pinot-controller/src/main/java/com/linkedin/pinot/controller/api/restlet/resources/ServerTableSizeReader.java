@@ -16,15 +16,18 @@
 
 package com.linkedin.pinot.controller.api.restlet.resources;
 
+import com.google.common.base.Throwables;
 import com.google.common.collect.BiMap;
 import com.linkedin.pinot.common.http.MultiGetRequest;
 import com.linkedin.pinot.common.restlet.resources.SegmentSizeInfo;
 import com.linkedin.pinot.common.restlet.resources.TableSizeInfo;
+import java.net.SocketTimeoutException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletionService;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.httpclient.URI;
@@ -59,6 +62,7 @@ public class ServerTableSizeReader {
     }
 
     MultiGetRequest mget = new MultiGetRequest(executor, connectionManager);
+    LOGGER.info("Reading segment sizes from servers for table: {}, timeoutMsec: {}", table, timeoutMsec);
     CompletionService<GetMethod> completionService = mget.execute(serverUrls, timeoutMsec);
 
     Map<String, List<SegmentSizeInfo>> serverSegmentSizes = new HashMap<>(serverEndPoints.size());
@@ -74,10 +78,19 @@ public class ServerTableSizeReader {
         }
         TableSizeInfo tableSizeInfo = new ObjectMapper().readValue(getMethod.getResponseBodyAsString(), TableSizeInfo.class);
         serverSegmentSizes.put(instance, tableSizeInfo.segments);
-      } catch (Exception e) {
-        // ignore for all errors..we let callers manage failures
+      } catch (InterruptedException e) {
+        LOGGER.warn("Interrupted exception while reading segment size for table: {}", table, e);
+      } catch (ExecutionException e) {
+        if (Throwables.getRootCause(e) instanceof SocketTimeoutException) {
+          LOGGER.warn("Server request to read table size was timed out for table: {}", table, e);
+        } else {
+          LOGGER.warn("Execution exception while reading segment sizes for table: {}", table, e);
+        }
+      } catch(Exception e) {
+        LOGGER.warn("Error while reading segment sizes for table: {}", table);
       }
     }
+    LOGGER.info("Finished reading segment sizes for table: {}", table);
     return serverSegmentSizes;
   }
 }
