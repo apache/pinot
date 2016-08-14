@@ -5,14 +5,13 @@ import java.util.List;
 
 import javax.ws.rs.core.Response;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
 import com.linkedin.thirdeye.dashboard.configs.WebappConfigClassFactory.WebappConfigType;
 import com.linkedin.thirdeye.dashboard.resources.WebappConfigResource;
+import com.linkedin.thirdeye.db.dao.AbstractDbTestBase;
 import com.linkedin.thirdeye.db.entity.WebappConfig;
 
 public class TestWebappConfigResource extends AbstractDbTestBase {

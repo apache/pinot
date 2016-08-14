@@ -94,7 +94,7 @@ public class CollectionConfig extends AbstractConfig {
 
   @Override
   public String toJSON() throws Exception {
-    return OBJECT_MAPPER.writeValueAsString(this);
+    return OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(this);
   }
 
   @Override
