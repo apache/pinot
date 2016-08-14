@@ -40,7 +40,7 @@ public class AnomalyJobDAO extends AbstractJpaDAO<AnomalyJobSpec> {
         .setParameter("expireTimestamp", expireTimestamp)
         .setParameter("status", status).getResultList();
     for (AnomalyJobSpec anomalyJobSpec : anomalyJobSpecs) {
-      delete(anomalyJobSpec);
+      deleteById(anomalyJobSpec.getId());
     }
     return anomalyJobSpecs.size();
   }

@@ -80,7 +80,7 @@ public class AnomalyTaskDAO extends AbstractJpaDAO<AnomalyTaskSpec> {
         .setParameter("status", status).getResultList();
 
     for (AnomalyTaskSpec anomalyTaskSpec : anomalyTaskSpecs) {
-      delete(anomalyTaskSpec);
+      deleteById(anomalyTaskSpec.getId());
     }
     return anomalyTaskSpecs.size();
   }
