@@ -571,7 +571,7 @@
         <constraints nullable="false"/>
       </column>
     </createTable>
-    <addUniqueConstraint constraintName="unique_configs_constraint"
+    <addUniqueConstraint constraintName="unique_config_constraint"
     columnNames="config_id,collection,config_type" tableName="webapp_configs"/>
   </changeSet>
 

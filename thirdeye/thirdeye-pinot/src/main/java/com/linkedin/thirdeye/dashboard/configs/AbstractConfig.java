@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.dashboard.configs;
 
+import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.codehaus.jackson.type.TypeReference;
 
@@ -7,6 +8,7 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.linkedin.thirdeye.api.CollectionSchema;
 
 @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, include = JsonTypeInfo.As.PROPERTY, property = "@class")
+@JsonIgnoreProperties(ignoreUnknown = true)
 public abstract class AbstractConfig {
 
   protected String yaml;
@@ -20,6 +22,8 @@ public abstract class AbstractConfig {
   }
 
   public abstract String toJSON() throws Exception;
+
+  public abstract int getConfigId();
 
   public static <T extends AbstractConfig> T fromJSON(String json,
       Class<? extends AbstractConfig> configTypeClass) throws Exception {

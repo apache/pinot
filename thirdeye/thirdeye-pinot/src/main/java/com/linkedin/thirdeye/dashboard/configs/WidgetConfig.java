@@ -13,5 +13,11 @@ public class WidgetConfig extends AbstractConfig {
 
   }
 
+  @Override
+  public int getConfigId() {
+    // TODO Auto-generated method stub
+    return 0;
+  }
+
 
 }

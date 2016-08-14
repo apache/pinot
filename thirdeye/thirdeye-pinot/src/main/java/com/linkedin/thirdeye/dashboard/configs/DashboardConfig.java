@@ -70,4 +70,9 @@ public class DashboardConfig extends AbstractConfig {
 
   }
 
+  @Override
+  public int getConfigId() {
+    return getDashboardId();
+  }
+
 }

@@ -31,6 +31,20 @@ public class TestWebappConfigDAO extends AbstractDbTestBase {
   }
 
   @Test(dependsOnMethods = {"testCreate"})
+  public void testDuplicteCreate() {
+    WebappConfig webappConfig = getWebappConfig();
+    Long duplicateId = null;
+    boolean insertSuccess = false;
+    try {
+      duplicateId = webappConfigDAO.save(webappConfig);
+      insertSuccess = true;
+    } catch (Exception e) {
+      Assert.assertFalse(insertSuccess);
+    }
+    Assert.assertNull(duplicateId);
+  }
+
+  @Test(dependsOnMethods = {"testDuplicteCreate"})
   public void testFind() {
     Assert.assertEquals(webappConfigDAO.findByCollection(collection).size(), 1);
     Assert.assertEquals(webappConfigDAO.findByConfigType(WebappConfigType.CollectionSchema).size(), 0);
@@ -66,6 +80,7 @@ public class TestWebappConfigDAO extends AbstractDbTestBase {
     collectionConfig.setDerivedMetrics(derivedMetrics);
 
     WebappConfig webappConfig = new WebappConfig();
+    webappConfig.setConfigId(collectionConfig.getConfigId());
     webappConfig.setCollection(collection);
     webappConfig.setConfigType(configType);
     try {

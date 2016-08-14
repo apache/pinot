@@ -97,4 +97,10 @@ public class CollectionConfig extends AbstractConfig {
     return OBJECT_MAPPER.writeValueAsString(this);
   }
 
+  @Override
+  public int getConfigId() {
+    return 0;
+  }
+
+
 }

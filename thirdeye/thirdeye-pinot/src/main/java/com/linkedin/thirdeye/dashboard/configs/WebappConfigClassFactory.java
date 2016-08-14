@@ -29,22 +29,22 @@ public class WebappConfigClassFactory {
     return simpleName;
   }
 
-  public static Class<? extends AbstractConfig> getClassNameFromConfigType(WebappConfigType configType) {
-    Class<? extends AbstractConfig> className = null;
+  public static Class<? extends AbstractConfig> getClassFromConfigType(WebappConfigType configType) {
+    Class<? extends AbstractConfig> configClass = null;
     switch (configType) {
       case CollectionConfig:
-        className = CollectionConfig.class;
+        configClass = CollectionConfig.class;
         break;
       case CollectionSchema:
-        className = CollectionSchema.class;
+        configClass = CollectionSchema.class;
         break;
       case DashboardConfig:
-        className = DashboardConfig.class;
+        configClass = DashboardConfig.class;
         break;
       default:
         throw new UnsupportedOperationException("Invalid config type " + configType);
     }
-    return className;
+    return configClass;
   }
 
 }
