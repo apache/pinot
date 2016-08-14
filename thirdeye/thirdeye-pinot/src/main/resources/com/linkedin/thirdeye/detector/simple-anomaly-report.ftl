@@ -76,7 +76,7 @@
 </#if>
     <tr>
         <td>
-<!--Go to <a href="${dashboardHost}/dashboard#view=anomalies&dataset=${collection}&rand=896&compareMode=WoW&aggTimeGranularity=${windowUnit}&currentStart=${startTime?c}&currentEnd=${endTime?c}&metrics=${metric}&filters=${filters}" target="_top">ThirdEye Anomalies Dashboard</a>-->
+Go to <a href="${dashboardHost}/dashboard#view=anomalies&dataset=${collection}&compareMode=WoW&aggTimeGranularity=${windowUnit}&currentStart=${startTime?c}&currentEnd=${endTime?c}&metrics=${metric}&filters=${filters}" target="_top">ThirdEye Anomalies Dashboard</a>
         </td>
     </tr>
 

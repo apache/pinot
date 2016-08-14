@@ -14,7 +14,7 @@
         {{#each this as |groupbyrow rowIndex|}}
         <tr>
           <td>{{groupbyrow/groupBy/functionName}}</td>
-          <td>{{groupbyrow/groupBy/dataset}}</td>
+          <td>{{groupbyrow/groupBy/collection}}</td>
           <td>{{groupbyrow/groupBy/metric}}</td>
           <td>{{groupbyrow/value}}</td>
           <td><span class="show-anomaly-grouping uk-button"

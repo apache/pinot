@@ -120,7 +120,7 @@ public class CollectionSchemaCacheLoader extends CacheLoader<String, CollectionS
     TimeGranularity outputGranularity = new TimeGranularity(GRANULARITY_SIZE,
         timeFieldSpec.getOutgoingGranularitySpec().getTimeType());
     TimeSpec spec =
-        new TimeSpec(timeFieldSpec.getOutGoingTimeColumnName(), outputGranularity, format);
+        new TimeSpec(timeFieldSpec.getOutgoingTimeColumnName(), outputGranularity, format);
     return spec;
   }
 

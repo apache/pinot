@@ -39,6 +39,7 @@ import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.common.utils.SegmentName;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.common.utils.retry.RetryPolicies;
+import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
 
@@ -55,12 +56,22 @@ public class PinotLLCRealtimeSegmentManager {
   private final PinotHelixResourceManager _helixResourceManager;
   private final String _clusterName;
   private boolean _amILeader = false;
+  private final ControllerConf _controllerConf;
 
-  public static synchronized void create(HelixAdmin helixAdmin, String clusterName, HelixManager helixManager, ZkHelixPropertyStore propertyStore, PinotHelixResourceManager helixResourceManager) {
+  public static synchronized void create(PinotHelixResourceManager helixResourceManager, ControllerConf controllerConf) {
+    create(helixResourceManager.getHelixAdmin(), helixResourceManager.getHelixClusterName(),
+        helixResourceManager.getHelixZkManager(), helixResourceManager.getPropertyStore(), helixResourceManager,
+        controllerConf);
+  }
+
+  private static synchronized void create(HelixAdmin helixAdmin, String clusterName, HelixManager helixManager,
+      ZkHelixPropertyStore propertyStore, PinotHelixResourceManager helixResourceManager,
+      ControllerConf controllerConf) {
     if (INSTANCE != null) {
       throw new RuntimeException("Instance already created");
     }
-    INSTANCE = new PinotLLCRealtimeSegmentManager(helixAdmin, clusterName, helixManager, propertyStore, helixResourceManager);
+    INSTANCE = new PinotLLCRealtimeSegmentManager(helixAdmin, clusterName, helixManager, propertyStore,
+        helixResourceManager, controllerConf);
     SegmentCompletionManager.create(helixManager, INSTANCE);
   }
 
@@ -68,12 +79,14 @@ public class PinotLLCRealtimeSegmentManager {
     return KAFKA_PARTITIONS_PATH + "/" + realtimeTableName;
   }
 
-  protected PinotLLCRealtimeSegmentManager(HelixAdmin helixAdmin, String clusterName, HelixManager helixManager, ZkHelixPropertyStore propertyStore, PinotHelixResourceManager helixResourceManager) {
+  protected PinotLLCRealtimeSegmentManager(HelixAdmin helixAdmin, String clusterName, HelixManager helixManager,
+      ZkHelixPropertyStore propertyStore, PinotHelixResourceManager helixResourceManager, ControllerConf controllerConf) {
     _helixAdmin = helixAdmin;
     _helixManager = helixManager;
     _propertyStore = propertyStore;
     _helixResourceManager = helixResourceManager;
     _clusterName = clusterName;
+    _controllerConf = controllerConf;
   }
 
   public static PinotLLCRealtimeSegmentManager getInstance() {
@@ -196,14 +209,14 @@ public class PinotLLCRealtimeSegmentManager {
     for (int i = 0; i < nPartitions; i++) {
       final List instances = partitionMap.get(Integer.toString(i));
       LLCRealtimeSegmentZKMetadata metadata = new LLCRealtimeSegmentZKMetadata();
-      String rawTableName = TableNameBuilder.extractRawTableName(realtimeTableName);
+      final String rawTableName = TableNameBuilder.extractRawTableName(realtimeTableName);
       LLCSegmentName llcSegmentName = new LLCSegmentName(rawTableName, i, seqNum, now);
       final String segName = llcSegmentName.getSegmentName();
 
       metadata.setCreationTime(now);
       metadata.setStartOffset(startOffset);
       metadata.setNumReplicas(instances.size());
-      metadata.setTableName(realtimeTableName);
+      metadata.setTableName(rawTableName);
       metadata.setSegmentName(segName);
       metadata.setStatus(CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
 
@@ -328,6 +341,8 @@ public class PinotLLCRealtimeSegmentManager {
     oldSegMetadata.setEndOffset(nextOffset);
     oldSegMetadata.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
     oldSegMetadata.setEndTime(now);
+    oldSegMetadata.setDownloadUrl(
+        ControllerConf.constructDownloadUrl(rawTableName, committingSegmentNameStr, _controllerConf.generateVipUrl()));
     final ZNRecord oldZnRecord = oldSegMetadata.toZNRecord();
     final String oldZnodePath = PinotRealtimeSegmentManager.getSegmentsPath() + "/" + realtimeTableName + "/" + committingSegmentNameStr;
 
@@ -344,7 +359,7 @@ public class PinotLLCRealtimeSegmentManager {
     newSegMetadata.setCreationTime(System.currentTimeMillis());
     newSegMetadata.setStartOffset(newStartOffset);
     newSegMetadata.setNumReplicas(newInstances.size());
-    newSegMetadata.setTableName(realtimeTableName);
+    newSegMetadata.setTableName(rawTableName);
     newSegMetadata.setSegmentName(newSegmentNameStr);
     newSegMetadata.setStatus(CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
     final ZNRecord newZnRecord = newSegMetadata.toZNRecord();

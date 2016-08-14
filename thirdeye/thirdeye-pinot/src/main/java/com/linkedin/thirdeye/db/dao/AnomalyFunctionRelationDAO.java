@@ -1,11 +1,10 @@
 package com.linkedin.thirdeye.db.dao;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.inject.persist.Transactional;
-import java.util.HashMap;
 import java.util.List;
 
 import com.linkedin.thirdeye.db.entity.AnomalyFunctionRelation;
-import java.util.Map;
 
 public class AnomalyFunctionRelationDAO extends AbstractJpaDAO<AnomalyFunctionRelation> {
   public AnomalyFunctionRelationDAO() {
@@ -29,8 +28,6 @@ public class AnomalyFunctionRelationDAO extends AbstractJpaDAO<AnomalyFunctionRe
 
   @Transactional
   public List<AnomalyFunctionRelation> findByParent(Long parentId) {
-    Map<String, Object> params = new HashMap<>();
-    params.put("parentId", parentId);
-    return super.findByParams(params);
+    return super.findByParams(ImmutableMap.of("parentId", parentId));
   }
 }

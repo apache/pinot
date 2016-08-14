@@ -86,10 +86,11 @@ function getContributors(tab) {
 
 function renderContributionTimeSeries(ajaxData) {
 
-
     var dateTimeFormat = "%I:%M %p";
     if (hash.hasOwnProperty("aggTimeGranularity") && hash.aggTimeGranularity == "DAYS") {
         dateTimeFormat = "%m-%d"
+    }else if( ( ajaxData["timeBuckets"][ ajaxData.timeBuckets.length -1]["baselineEnd"] - ajaxData["timeBuckets"][0]["baselineStart"])  > 86400000 ){
+        dateTimeFormat = "%m-%d %I %p";
     }
 
     var metrics = ajaxData['metrics'];
@@ -97,14 +98,12 @@ function renderContributionTimeSeries(ajaxData) {
     var lineChartMap = {};
     var barChartData = {};
     var barChartMap = {};
-    var dateTimeformat = (hash.hasOwnProperty("aggTimeGranularity") && hash.aggTimeGranularity.toLowerCase().indexOf("days") > -1) ? "MM-DD" : "h a";
-    var xTickFormat = dateTimeformat;
     var xTicksBaseline = [];
     var xTicksCurrent = [];
     for (var t = 0, len = ajaxData["timeBuckets"].length; t < len; t++) {
         var timeBucket = ajaxData["timeBuckets"][t]["currentStart"]
-        xTicksBaseline.push(timeBucket)
-        xTicksCurrent.push(timeBucket)
+        xTicksBaseline.push(timeBucket);
+        xTicksCurrent.push(timeBucket);
     }
     var schema = ajaxData["responseData"]["schema"]["columnsToIndexMapping"]
     for (var metricIndex = 0, metricsLen = metrics.length; metricIndex < metricsLen; metricIndex++) {
@@ -127,7 +126,6 @@ function renderContributionTimeSeries(ajaxData) {
             } else {
                 colorArray = colorScale(dimensionValueArray.length)
             }
-
 
             var colors = {};
             for (var dimensionValIndex = 0; dimensionValIndex < dimensionValueArray.length; dimensionValIndex++) {

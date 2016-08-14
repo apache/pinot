@@ -1,10 +1,13 @@
 package com.linkedin.thirdeye.api.dto;
 
+import com.google.common.base.MoreObjects;
+import com.google.common.base.Objects;
+
 public class GroupByKey {
   Long functionId;
   String dimensions;
   String functionName;
-  String dataset;
+  String collection;
   String metric;
 
   public Long getFunctionId() {
@@ -31,12 +34,12 @@ public class GroupByKey {
     this.functionName = functionName;
   }
 
-  public String getDataset() {
-    return dataset;
+  public String getCollection() {
+    return collection;
   }
 
-  public void setDataset(String dataset) {
-    this.dataset = dataset;
+  public void setCollection(String dataset) {
+    this.collection = dataset;
   }
 
   public String getMetric() {
@@ -45,5 +48,32 @@ public class GroupByKey {
 
   public void setMetric(String metric) {
     this.metric = metric;
+  }
+
+  @Override
+  public String toString() {
+    return MoreObjects.toStringHelper(this).add("dimensions", dimensions)
+        .add("collection", collection).add("metric", metric).toString();
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    GroupByKey that = (GroupByKey) o;
+    return Objects.equal(functionId, that.functionId) &&
+        Objects.equal(dimensions, that.dimensions) &&
+        Objects.equal(functionName, that.functionName) &&
+        Objects.equal(collection, that.collection) &&
+        Objects.equal(metric, that.metric);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hashCode(functionId, dimensions, functionName, collection, metric);
   }
 }

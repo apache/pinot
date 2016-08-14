@@ -1,7 +1,7 @@
 package com.linkedin.thirdeye.db.dao;
 
 import com.linkedin.thirdeye.anomaly.merge.AnomalyMergeConfig;
-import com.linkedin.thirdeye.anomaly.merge.AnomalyMergeGenerator;
+import com.linkedin.thirdeye.anomaly.merge.AnomalyTimeBasedSummarizer;
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
 import com.linkedin.thirdeye.constant.FeedbackStatus;
 import com.linkedin.thirdeye.db.entity.AnomalyFeedback;
@@ -16,20 +16,20 @@ import org.testng.annotations.Test;
 public class TestAnomalyMergedResultDAO extends AbstractDbTestBase {
   AnomalyMergedResult mergedResult = null;
   Long anomalyResultId;
-  AnomalyFunctionSpec spec = getTestFunctionSpec("metric", "dataset");
+  AnomalyFunctionSpec function = getTestFunctionSpec("metric", "dataset");
 
   @Test
   public void testMergedResultCRUD() {
-    anomalyFunctionDAO.save(spec);
-    Assert.assertNotNull(spec.getId());
+    anomalyFunctionDAO.save(function);
+    Assert.assertNotNull(function.getId());
 
     // create anomaly result
     AnomalyResult result = getAnomalyResult();
-    result.setFunction(spec);
+    result.setFunction(function);
     anomalyResultDAO.save(result);
 
     AnomalyResult resultRet = anomalyResultDAO.findById(result.getId());
-    Assert.assertEquals(resultRet.getFunction(), spec);
+    Assert.assertEquals(resultRet.getFunction(), function);
 
     anomalyResultId = result.getId();
 
@@ -39,13 +39,16 @@ public class TestAnomalyMergedResultDAO extends AbstractDbTestBase {
 
     AnomalyMergeConfig mergeConfig = new AnomalyMergeConfig();
 
-    List<AnomalyMergedResult> mergedResults = AnomalyMergeGenerator
-        .mergeAnomalies(rawResults, mergeConfig);
+    List<AnomalyMergedResult> mergedResults = AnomalyTimeBasedSummarizer
+        .mergeAnomalies(rawResults, mergeConfig.getMergeDuration(),
+            mergeConfig.getSequentialAllowedGap());
     Assert.assertEquals(mergedResults.get(0).getStartTime(),result.getStartTimeUtc());
     Assert.assertEquals(mergedResults.get(0).getEndTime(),result.getEndTimeUtc());
     Assert.assertEquals(mergedResults.get(0).getAnomalyResults().get(0), result);
 
-    // Lets persist the merged result
+    // Let's persist the merged result
+    mergedResults.get(0).setDimensions(result.getDimensions());
+
     mergedResultDAO.save(mergedResults.get(0));
     mergedResult = mergedResults.get(0);
     Assert.assertNotNull(mergedResult.getId());
@@ -72,11 +75,19 @@ public class TestAnomalyMergedResultDAO extends AbstractDbTestBase {
     Assert.assertEquals(mergedResult1.getFeedback().getFeedbackType(), AnomalyFeedbackType.ANOMALY);
   }
 
-  @Test(dependsOnMethods = {"testFeedback"})
+  @Test(dependsOnMethods = {"testMergedResultCRUD"})
   public void testFindByCollectionMetricDimensions() {
     List<AnomalyMergedResult> mergedResults = mergedResultDAO
         .findByCollectionMetricDimensions(mergedResult.getCollection(), mergedResult.getMetric(),
             mergedResult.getDimensions());
     Assert.assertEquals(mergedResults.get(0), mergedResult);
+  }
+
+  @Test(dependsOnMethods = {"testMergedResultCRUD"})
+  public void testFindLatestByCollectionMetricDimensions() {
+    AnomalyMergedResult mergedResult1 = mergedResultDAO
+        .findLatestByCollectionMetricDimensions(mergedResult.getCollection(), mergedResult.getMetric(),
+            mergedResult.getDimensions());
+    Assert.assertEquals(mergedResult1, mergedResult);
   }
 }

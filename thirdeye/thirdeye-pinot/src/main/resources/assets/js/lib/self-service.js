@@ -27,7 +27,7 @@ function getExistingAnomalyFunctions(dataset) {
                 properties = properties.slice(0, -1);
             }
            data[i].properties = parseProperties(properties);
-           data[i].filters = parseProperties(decodeURIComponent(data[i].filters));
+           data[i].filters = (data[i].filters) ? parseProperties(decodeURIComponent(data[i].filters)) : "";
         }
 
         /** Handelbars template for EXISTING ANOMALY FUNCTIONS TABLE **/

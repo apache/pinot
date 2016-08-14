@@ -4,42 +4,38 @@ import com.linkedin.thirdeye.db.entity.AnomalyMergedResult;
 import com.linkedin.thirdeye.db.entity.AnomalyResult;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeSet;
 
 /**
  * Given list of {@link AnomalyResult} and merge parameters, this utility performs time based merge
  */
-public abstract class AnomalyMergeGenerator {
+public abstract class AnomalyTimeBasedSummarizer {
 
-  private AnomalyMergeGenerator() {
+  private AnomalyTimeBasedSummarizer() {
 
   }
 
   /**
    * @param anomalies   : list of raw anomalies to be merged with last mergedAnomaly
-   * @param mergeConfig : merge configuration params
+   * @param mergeDuration   : length of a merged anomaly
+   * @param sequentialAllowedGap : allowed gap between two raw anomalies in order to merge
    *
    * @return
    */
   public static List<AnomalyMergedResult> mergeAnomalies(List<AnomalyResult> anomalies,
-      AnomalyMergeConfig mergeConfig) {
-    return mergeAnomalies(null, anomalies, mergeConfig);
+      long mergeDuration, long sequentialAllowedGap) {
+    return mergeAnomalies(null, anomalies, mergeDuration, sequentialAllowedGap);
   }
 
   /**
    * @param mergedAnomaly : last merged anomaly
    * @param anomalies     : list of raw anomalies to be merged with last mergedAnomaly
-   * @param mergeConfig   : merge configuration params
-   *
+   * @param mergeDuration   : length of a merged anomaly
+   * @param sequentialAllowedGap : allowed gap between two raw anomalies in order to merge
    * @return
    */
   public static List<AnomalyMergedResult> mergeAnomalies(AnomalyMergedResult mergedAnomaly,
-      List<AnomalyResult> anomalies, AnomalyMergeConfig mergeConfig) {
+      List<AnomalyResult> anomalies, long mergeDuration, long sequentialAllowedGap) {
 
     // sort anomalies in natural order of start time
     Collections
@@ -48,11 +44,11 @@ public abstract class AnomalyMergeGenerator {
     boolean applySequentialGapBasedSplit = false;
     boolean applyMaxDurationBasedSplit = false;
 
-    if (mergeConfig.getMergeDuration() > 0) {
+    if (mergeDuration > 0) {
       applyMaxDurationBasedSplit = true;
     }
 
-    if (mergeConfig.getSequentialAllowedGap() > 0) {
+    if (sequentialAllowedGap > 0) {
       applySequentialGapBasedSplit = true;
     }
 
@@ -66,8 +62,7 @@ public abstract class AnomalyMergeGenerator {
       } else {
         // compare current with merged and decide whether to merge the current result or create a new one
         if (applySequentialGapBasedSplit
-            && (currentResult.getStartTimeUtc() - mergedAnomaly.getEndTime()) > mergeConfig
-            .getSequentialAllowedGap()) {
+            && (currentResult.getStartTimeUtc() - mergedAnomaly.getEndTime()) > sequentialAllowedGap) {
 
           // Split here
           // add previous merged result
@@ -86,6 +81,7 @@ public abstract class AnomalyMergeGenerator {
           }
           if (!mergedAnomaly.getAnomalyResults().contains(currentResult)) {
             mergedAnomaly.getAnomalyResults().add(currentResult);
+            currentResult.setMerged(true);
           }
         }
       }
@@ -93,8 +89,7 @@ public abstract class AnomalyMergeGenerator {
       // till this point merged result contains current raw result
       if (applyMaxDurationBasedSplit
           // check if Max Duration for merged has passed, if so, create new one
-          && mergedAnomaly.getEndTime() - mergedAnomaly.getStartTime() >= mergeConfig
-          .getMergeDuration()) {
+          && mergedAnomaly.getEndTime() - mergedAnomaly.getStartTime() >= mergeDuration) {
         // check if next anomaly has same start time as current one, that should be merged with current one too
         if (i < (anomalies.size() - 1) && anomalies.get(i + 1).getStartTimeUtc()
             .equals(currentResult.getStartTimeUtc())) {
@@ -110,72 +105,21 @@ public abstract class AnomalyMergeGenerator {
         mergedAnomalies.add(mergedAnomaly);
       }
     }
-    mergedAnomalies.forEach(AnomalyMergeGenerator::populateMergedProperties);
     return mergedAnomalies;
   }
 
-  // TODO : // FIXME: 8/9/16 - update score - weighted score of raw and missing time buckets
-  private static void populateMergedProperties(AnomalyMergedResult mergedResult) {
-    double totalScore = 0.0;
-    double totalWeight = 0.0;
-    int n = mergedResult.getAnomalyResults().size();
-
-    List<String> dimensionsList = new ArrayList<>();
-    Set<String> metricList = new TreeSet<>();
-
-    for (AnomalyResult anomalyResult : mergedResult.getAnomalyResults()) {
-      totalScore += anomalyResult.getScore();
-      totalWeight += anomalyResult.getWeight();
-      dimensionsList.add(anomalyResult.getDimensions());
-      metricList.add(anomalyResult.getMetric());
-    }
-    mergedResult.setScore(totalScore / n);
-    mergedResult.setWeight(totalWeight / n);
-  }
-
-  private static String getDimensionsMerged(List<String> dimentionList) {
-    Map<Integer, Set<String>> mergedDimensions = new HashMap<>();
-    for (String dimensions : dimentionList) {
-      // Merging dimensions
-      if (dimensions != null) {
-        String[] dimArr = dimensions.split(",");
-        if (dimArr.length > 0) {
-          for (int i = 0; i < dimArr.length; i++) {
-            if (dimArr[i] != null && !dimArr[i].equals("") && !dimArr[i].equals("*")) {
-              if (!mergedDimensions.containsKey(i)) {
-                mergedDimensions.put(i, new HashSet<>());
-              }
-              mergedDimensions.get(i).add(dimArr[i]);
-            }
-          }
-        }
-      }
-    }
-    StringBuffer dimBuff = new StringBuffer();
-    int count = 0;
-    for (Map.Entry<Integer, Set<String>> entry : mergedDimensions.entrySet()) {
-      // add only non empty dimensions
-      if (entry.getValue().size() > 0) {
-        if (count != 0) {
-          dimBuff.append(',');
-        }
-        dimBuff.append(entry.getValue().toString());
-        count++;
-      }
-    }
-    return dimBuff.toString();
-  }
 
   private static void populateMergedResult(AnomalyMergedResult mergedAnomaly,
       AnomalyResult currentResult) {
     if (!mergedAnomaly.getAnomalyResults().contains(currentResult)) {
       mergedAnomaly.getAnomalyResults().add(currentResult);
+      currentResult.setMerged(true);
     }
-    mergedAnomaly.setCreatedTime(currentResult.getCreationTimeUtc());
+    // only set collection, keep metric, dimensions and function null
     mergedAnomaly.setCollection(currentResult.getCollection());
     mergedAnomaly.setMetric(currentResult.getMetric());
-    mergedAnomaly.setDimensions(currentResult.getDimensions());
     mergedAnomaly.setStartTime(currentResult.getStartTimeUtc());
     mergedAnomaly.setEndTime(currentResult.getEndTimeUtc());
+    mergedAnomaly.setCreatedTime(currentResult.getCreationTimeUtc());
   }
 }

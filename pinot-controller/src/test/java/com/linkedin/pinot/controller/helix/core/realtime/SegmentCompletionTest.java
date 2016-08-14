@@ -28,6 +28,7 @@ import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
+import com.linkedin.pinot.controller.ControllerConf;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -303,9 +304,10 @@ public class SegmentCompletionTest {
     public static final String clusterName = "someCluster";
     public LLCRealtimeSegmentZKMetadata _segmentMetadata;
     public MockSegmentCompletionManager _segmentCompletionMgr;
+    private static final ControllerConf CONTROLLER_CONF = new ControllerConf();
 
     protected MockPinotLLCRealtimeSegmentManager() {
-      super(null, clusterName, null, null, null);
+      super(null, clusterName, null, null, null, CONTROLLER_CONF);
     }
 
     @Override
@@ -317,6 +319,8 @@ public class SegmentCompletionTest {
     public boolean commitSegment(String rawTableName, String committingSegmentName, long nextOffset) {
       _segmentMetadata.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
       _segmentMetadata.setEndOffset(nextOffset);
+      _segmentMetadata.setDownloadUrl(
+          ControllerConf.constructDownloadUrl(rawTableName, committingSegmentName, CONTROLLER_CONF.generateVipUrl()));
       _segmentMetadata.setEndTime(_segmentCompletionMgr.getCurrentTimeMs());
       return true;
     }

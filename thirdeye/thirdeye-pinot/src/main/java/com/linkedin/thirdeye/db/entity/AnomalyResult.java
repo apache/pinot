@@ -52,19 +52,19 @@ public class AnomalyResult extends AbstractBaseEntity implements Comparable<Anom
   private Long creationTimeUtc;
 
   @OneToOne(cascade = CascadeType.ALL, fetch = FetchType.EAGER, orphanRemoval = true)
-  @JoinColumn(name="anomaly_feedback_id")
+  @JoinColumn(name = "anomaly_feedback_id")
   private AnomalyFeedback feedback;
 
   @Column(name = "data_missing")
   private boolean dataMissing;
 
+  @Column
+  private boolean merged;
+
   @JsonIgnore
   @ManyToOne(fetch = FetchType.EAGER)
   @JoinColumn(name = "function_id")
   private AnomalyFunctionSpec function;
-
-  @Column(name = "merged_result_id")
-  private Long mergedResultId;
 
   public AnomalyResult() {
     creationTimeUtc = DateTime.now().getMillis();
@@ -177,12 +177,12 @@ public class AnomalyResult extends AbstractBaseEntity implements Comparable<Anom
     this.dataMissing = dataMissing;
   }
 
-  public Long getMergedResultId() {
-    return mergedResultId;
+  public boolean isMerged() {
+    return merged;
   }
 
-  public void setMergedResultId(Long mergedResultId) {
-    this.mergedResultId = mergedResultId;
+  public void setMerged(boolean merged) {
+    this.merged = merged;
   }
 
   @Override

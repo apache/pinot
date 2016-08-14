@@ -33,6 +33,7 @@ import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
+import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
 import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
 
@@ -243,6 +244,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     Assert.assertEquals(newSegmentName.getSequenceNumber(), oldSegmentName.getSequenceNumber()+1);
     Assert.assertEquals(oldMetadata.getStatus(), CommonConstants.Segment.Realtime.Status.DONE);
     Assert.assertEquals(newMetadata.getStatus(), CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
+    Assert.assertNotNull(oldMetadata.getDownloadUrl());
   }
 
   @Test
@@ -347,6 +349,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
   static class MockPinotLLCRealtimeSegmentManager extends PinotLLCRealtimeSegmentManager {
 
+    private static final ControllerConf CONTROLLER_CONF = new ControllerConf();
     private final boolean _setupInitialSegments;
     private final List<String> _existingLLCSegments;
 
@@ -368,9 +371,11 @@ public class PinotLLCRealtimeSegmentManagerTest {
     public IdealState _tableIdealState;
 
     protected MockPinotLLCRealtimeSegmentManager(boolean setupInitialSegments, List<String> existingLLCSegments) {
-      super(null, clusterName, null, null, null);
+      super(null, clusterName, null, null, null, CONTROLLER_CONF);
       _setupInitialSegments = setupInitialSegments;
       _existingLLCSegments = existingLLCSegments;
+      CONTROLLER_CONF.setControllerVipHost("vip");
+      CONTROLLER_CONF.setControllerPort("9000");
     }
 
     @Override

@@ -636,7 +636,7 @@ public class AnomalyResource {
       alertResourceHttpUtils.disableEmailConfiguration(String.valueOf(id));
     }
     // delete from db
-    emailConfigurationDAO.delete(emailConfiguration);
+    emailConfigurationDAO.deleteById(id);
     return Response.noContent().build();
   }
 

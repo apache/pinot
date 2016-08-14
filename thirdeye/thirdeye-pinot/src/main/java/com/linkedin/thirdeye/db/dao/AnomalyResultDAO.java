@@ -29,10 +29,6 @@ public class AnomalyResultDAO extends AbstractJpaDAO<AnomalyResult> {
           + "AND ((r.startTimeUtc >= :startTimeUtc AND r.startTimeUtc <= :endTimeUtc) "
           + "OR (r.endTimeUtc >= :startTimeUtc AND r.endTimeUtc <= :endTimeUtc)) ";
 
-  private static final String FIND_UNMERGED_BY_COLLECTION_METRIC_DIMENSION =
-      "from AnomalyResult r where r.function.collection = :collection and r.function.metric = :metric "
-          + "and r.dimensions=:dimensions and r.mergedResultId is null";
-
   private static final String FIND_BY_COLLECTION_TIME_FILTERS =
       "SELECT r FROM AnomalyResult r WHERE r.function.collection = :collection "
           + "AND ((r.function.filters = :filters) or (r.function.filters is NULL and :filters is NULL)) "
@@ -65,12 +61,29 @@ public class AnomalyResultDAO extends AbstractJpaDAO<AnomalyResult> {
           + "group by r.function.collection, r.function.metric, r.dimensions "
           + "order by r.function.collection, num desc";
 
+  private static final String COUNT_UNMERGED_BY_COLLECTION_METRIC_DIMENSION =
+      "select count(r.id) as num, r.function.collection, "
+          + "r.function.metric, r.dimensions from AnomalyResult r "
+          + "where r.function.isActive=true and r.mergedResultId is null "
+          + "and ((r.startTimeUtc >= :startTimeUtc and r.startTimeUtc <= :endTimeUtc) "
+          + "or (r.endTimeUtc >= :startTimeUtc and r.endTimeUtc <= :endTimeUtc)) "
+          + "group by r.function.collection, r.function.metric, r.dimensions "
+          + "order by r.function.collection, num desc";
+
   private static final String COUNT_GROUP_BY_FUNCTION = "select count(r.id) as num, r.function.id,"
       + "r.function.functionName, r.function.collection, r.function.metric from AnomalyResult r "
       + "where r.function.isActive=true "
       + "and ((r.startTimeUtc >= :startTimeUtc and r.startTimeUtc <= :endTimeUtc) "
       + "or (r.endTimeUtc >= :startTimeUtc and r.endTimeUtc <= :endTimeUtc))"
       + "group by r.function.id, r.function.functionName, r.function.collection, r.function.metric "
+      + "order by r.function.collection, num desc";
+
+  private static final String COUNT_GROUP_BY_FUNCTION_DIMENSIONS = "select count(r.id) as num, r.function.id,"
+      + "r.function.functionName, r.function.collection, r.function.metric, r.dimensions from AnomalyResult r "
+      + "where r.function.isActive=true "
+      + "and ((r.startTimeUtc >= :startTimeUtc and r.startTimeUtc <= :endTimeUtc) "
+      + "or (r.endTimeUtc >= :startTimeUtc and r.endTimeUtc <= :endTimeUtc))"
+      + "group by r.function.id, r.function.functionName, r.function.collection, r.function.metric, r.dimensions "
       + "order by r.function.collection, num desc";
 
   private static final String COUNT_GROUP_BY_COLLECTION_METRIC = "select count(r.id) as num, "
@@ -87,6 +100,14 @@ public class AnomalyResultDAO extends AbstractJpaDAO<AnomalyResult> {
           + "and ((r.startTimeUtc >= :startTimeUtc and r.startTimeUtc <= :endTimeUtc) "
           + "or (r.endTimeUtc >= :startTimeUtc and r.endTimeUtc <= :endTimeUtc))"
           + "group by r.function.collection order by r.function.collection, num desc";
+
+  private static final String FIND_UNMERGED_BY_COLLECTION_METRIC_DIMENSION =
+      "from AnomalyResult r where r.function.collection = :collection and r.function.metric = :metric "
+          + "and r.dimensions=:dimensions and r.merged=false and r.dataMissing=:dataMissing";
+
+  private static final String FIND_UNMERGED_BY_FUNCTION =
+      "select r from AnomalyResult r where r.function.id = :functionId and r.merged=false "
+          + "and r.dataMissing=:dataMissing";
 
   public AnomalyResultDAO() {
     super(AnomalyResult.class);
@@ -121,14 +142,6 @@ public class AnomalyResultDAO extends AbstractJpaDAO<AnomalyResult> {
         .setParameter("startTimeUtc", startTime.toDateTime(DateTimeZone.UTC).getMillis())
         .setParameter("endTimeUtc", endTime.toDateTime(DateTimeZone.UTC).getMillis())
         .setParameter("metric", metric).setParameter("dimensions", dimList).getResultList();
-  }
-
-  @Transactional
-  public List<AnomalyResult> findUnmergedByCollectionMetricAndDimensions(String collection,
-      String metric, String dimensions) {
-    return getEntityManager().createQuery(FIND_UNMERGED_BY_COLLECTION_METRIC_DIMENSION, entityClass)
-        .setParameter("collection", collection).setParameter("metric", metric)
-        .setParameter("dimensions", dimensions).getResultList();
   }
 
   @Transactional
@@ -169,16 +182,20 @@ public class AnomalyResultDAO extends AbstractJpaDAO<AnomalyResult> {
   }
 
   @Transactional
-  public List<GroupByRow<GroupByKey, Long>> getCountByCollectionMetricDimension(long startTime, long endTime) {
+  public List<GroupByRow<GroupByKey, Long>> getCountByCollectionMetricDimension(long startTime,
+      long endTime, boolean includeMerged) {
+    String query = COUNT_UNMERGED_BY_COLLECTION_METRIC_DIMENSION;
+    if (includeMerged) {
+      query = COUNT_GROUP_BY_COLLECTION_METRIC_DIMENSION;
+    }
     List<GroupByRow<GroupByKey, Long>> groupByRecords = new ArrayList<>();
-    TypedQuery<Object[]> q = getEntityManager().createQuery(
-        COUNT_GROUP_BY_COLLECTION_METRIC_DIMENSION, Object[].class)
+    TypedQuery<Object[]> q = getEntityManager().createQuery(query, Object[].class)
         .setParameter("startTimeUtc", startTime).setParameter("endTimeUtc", endTime);
     List<Object[]> results = q.getResultList();
     for (int i = 0; i < results.size(); i++) {
       Long count = (Long) results.get(i)[0];
       GroupByKey groupByKey = new GroupByKey();
-      groupByKey.setDataset((String) results.get(i)[1]);
+      groupByKey.setCollection((String) results.get(i)[1]);
       groupByKey.setMetric((String) results.get(i)[2]);
       groupByKey.setDimensions((String) results.get(i)[3]);
       GroupByRow<GroupByKey, Long> row = new GroupByRow<>();
@@ -200,8 +217,30 @@ public class AnomalyResultDAO extends AbstractJpaDAO<AnomalyResult> {
       GroupByKey functionKey = new GroupByKey();
       functionKey.setFunctionId((Long) results.get(i)[1]);
       functionKey.setFunctionName((String) results.get(i)[2]);
-      functionKey.setDataset((String) results.get(i)[3]);
+      functionKey.setCollection((String) results.get(i)[3]);
       functionKey.setMetric((String) results.get(i)[4]);
+      GroupByRow<GroupByKey, Long> row = new GroupByRow<>();
+      row.setGroupBy(functionKey);
+      row.setValue(count);
+      groupByRecords.add(row);
+    }
+    return groupByRecords;
+  }
+
+  @Transactional
+  public List<GroupByRow<GroupByKey, Long>> getCountByFunctionDimensions(long startTime, long endTime) {
+    List<GroupByRow<GroupByKey, Long>> groupByRecords = new ArrayList<>();
+    TypedQuery<Object[]> q = getEntityManager().createQuery(COUNT_GROUP_BY_FUNCTION, Object[].class)
+        .setParameter("startTimeUtc", startTime).setParameter("endTimeUtc", endTime);
+    List<Object[]> results = q.getResultList();
+    for (int i = 0; i < results.size(); i++) {
+      Long count = (Long) results.get(i)[0];
+      GroupByKey functionKey = new GroupByKey();
+      functionKey.setFunctionId((Long) results.get(i)[1]);
+      functionKey.setFunctionName((String) results.get(i)[2]);
+      functionKey.setCollection((String) results.get(i)[3]);
+      functionKey.setMetric((String) results.get(i)[4]);
+      functionKey.setMetric((String)results.get(i)[5]);
       GroupByRow<GroupByKey, Long> row = new GroupByRow<>();
       row.setGroupBy(functionKey);
       row.setValue(count);
@@ -220,7 +259,7 @@ public class AnomalyResultDAO extends AbstractJpaDAO<AnomalyResult> {
     for (int i = 0; i < results.size(); i++) {
       Long count = (Long) results.get(i)[0];
       GroupByKey groupByKey = new GroupByKey();
-      groupByKey.setDataset((String) results.get(i)[1]);
+      groupByKey.setCollection((String) results.get(i)[1]);
       GroupByRow<GroupByKey, Long> row = new GroupByRow<>();
       row.setGroupBy(groupByKey);
       row.setValue(count);
@@ -240,7 +279,7 @@ public class AnomalyResultDAO extends AbstractJpaDAO<AnomalyResult> {
     for (int i = 0; i < results.size(); i++) {
       Long count = (Long) results.get(i)[0];
       GroupByKey groupByKey = new GroupByKey();
-      groupByKey.setDataset((String) results.get(i)[1]);
+      groupByKey.setCollection((String) results.get(i)[1]);
       groupByKey.setMetric((String) results.get(i)[2]);
       GroupByRow<GroupByKey, Long> row = new GroupByRow<>();
       row.setGroupBy(groupByKey);
@@ -248,5 +287,19 @@ public class AnomalyResultDAO extends AbstractJpaDAO<AnomalyResult> {
       groupByRecords.add(row);
     }
     return groupByRecords;
+  }
+
+  @Transactional
+  public List<AnomalyResult> findUnmergedByFunctionId(Long functionId) {
+    return getEntityManager().createQuery(FIND_UNMERGED_BY_FUNCTION, entityClass)
+        .setParameter("functionId", functionId).setParameter("dataMissing", false).getResultList();
+  }
+
+  @Transactional
+  public List<AnomalyResult> findUnmergedByCollectionMetricAndDimensions(String collection,
+      String metric, String dimensions) {
+    return getEntityManager().createQuery(FIND_UNMERGED_BY_COLLECTION_METRIC_DIMENSION, entityClass)
+        .setParameter("collection", collection).setParameter("metric", metric)
+        .setParameter("dimensions", dimensions).setParameter("dataMissing", false).getResultList();
   }
 }

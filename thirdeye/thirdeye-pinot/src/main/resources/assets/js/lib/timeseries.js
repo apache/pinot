@@ -23,10 +23,11 @@ function getTimeSeries(tab) {
 
 function renderTimeSeriesUsingC3(d, tab) {  //time-series-area
 
-
     var dateTimeFormat = "%I:%M %p";
     if (hash.hasOwnProperty("aggTimeGranularity") && hash.aggTimeGranularity == "DAYS") {
         dateTimeFormat = "%m-%d"
+    }else if(d.summary.currentEnd - d.summary.currentStart > 86400000 ){
+        dateTimeFormat = "%m-%d %I %p";
     }
 
     var colors = {};

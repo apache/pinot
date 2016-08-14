@@ -1,25 +1,16 @@
 package com.linkedin.thirdeye.db.dao;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.inject.persist.Transactional;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
 import com.linkedin.thirdeye.db.entity.AnomalyTaskSpec;
 
 import java.sql.Timestamp;
-import java.util.HashMap;
 import java.util.List;
 
-import java.util.Map;
-import javax.persistence.OptimisticLockException;
-import javax.persistence.RollbackException;
-
-import org.hibernate.StaleObjectStateException;
 import org.joda.time.DateTime;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class AnomalyTaskDAO extends AbstractJpaDAO<AnomalyTaskSpec> {
-
-  private static final Logger LOG = LoggerFactory.getLogger(AnomalyTaskDAO.class);
 
   private static final String FIND_BY_JOB_ID_STATUS_NOT_IN = "SELECT at FROM AnomalyTaskSpec at "
       + "WHERE at.job.id = :jobId "
@@ -52,10 +43,7 @@ public class AnomalyTaskDAO extends AbstractJpaDAO<AnomalyTaskSpec> {
 
   @Transactional
   public List<AnomalyTaskSpec> findByIdAndStatus(Long id, TaskStatus status) {
-    Map<String, Object> filters = new HashMap<>();
-    filters.put("status", status);
-    filters.put("id", id);
-    return super.findByParams(filters);
+    return super.findByParams(ImmutableMap.of("status", status, "id", id));
   }
 
   @Transactional
@@ -69,7 +57,6 @@ public class AnomalyTaskDAO extends AbstractJpaDAO<AnomalyTaskSpec> {
       return true;
     }
     return false;
-
   }
 
   @Transactional

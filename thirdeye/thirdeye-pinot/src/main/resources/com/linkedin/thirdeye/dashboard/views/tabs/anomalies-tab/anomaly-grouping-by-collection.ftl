@@ -11,10 +11,10 @@
         <tbody>
         {{#each this as |groupbyrow rowIndex|}}
         <tr>
-          <td>{{groupbyrow/groupBy/dataset}}</td>
+          <td>{{groupbyrow/groupBy/collection}}</td>
           <td>{{groupbyrow/value}}</td>
           <td><span class="show-anomaly-grouping uk-button"
-                    onclick="renderAnomalySummaryByCollection('{{groupbyrow/groupBy/dataset}}')"
+                    onclick="renderAnomalySummaryByCollection('{{groupbyrow/groupBy/collection}}')"
                     data-uk-tooltip
                     title="Show Anomalies"><i class="uk-icon-list"></i></span></td>
         </tr>
