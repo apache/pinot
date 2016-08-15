@@ -20,5 +20,5 @@ package com.linkedin.pinot.core.segment.creator;
  */
 
 public enum InvertedIndexType {
-  P4_DELTA, ROARING_BITMAPS
+  P4_DELTA, ROARING_BITMAPS, SORTED_INDEX
 }

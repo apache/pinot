@@ -165,7 +165,6 @@ $(document).ready( function() {
     window.onhashchange = routeToTab;
 
     // Load anomalies 2
-    console.log(hash);
     if (hash.view === 'anomalies2') {
         $("#anomalies2").append("<h2>Analyze anomalies</h2>" + "<div id='merge-strategy'>"
             + "<table class='anomaly2'><tr><td>Anomaly Group </td><td><select id='anomaly-group-select' onchange='renderAnomalyGroups()'>"
@@ -190,6 +189,14 @@ $(document).ready( function() {
             + "</table>" + "</div>" + "<div id='mergeConfig'></div>" + "<div id='group-by'></div>"
             + "<div id='anomaly-merged-summary'></div>");
         renderAnomalyGroups(this);
+        routeToTab();
+    }
+
+    // Load anomalies 3
+    if (hash.view === 'anomalies3') {
+        $("#anomalies3").append(
+            "<h2>View merged anomalies</h2>" + "<div id='anomaly-merged-summary'></div>");
+        renderMergedAnomalies();
         routeToTab();
     }
 

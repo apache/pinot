@@ -37,7 +37,6 @@ import com.linkedin.pinot.common.data.TimeFieldSpec;
 import com.linkedin.pinot.common.data.TimeGranularitySpec;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.data.readers.BaseRecordReader;
 import com.linkedin.pinot.core.io.reader.SingleColumnMultiValueReader;
 import com.linkedin.pinot.core.io.reader.SingleColumnSingleValueReader;
 import com.linkedin.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
@@ -218,9 +217,9 @@ public class PinotSegmentRecordReader extends BaseRecordReader {
           fieldSpec = new MetricFieldSpec(columnName, dataType);
           break;
         case TIME:
-          TimeUnit timeType = columnMetadata.getTimeunit();
-          TimeGranularitySpec incominGranularitySpec = new TimeGranularitySpec(dataType, timeType, columnName);
-          fieldSpec = new TimeFieldSpec(incominGranularitySpec);
+          TimeUnit timeType = columnMetadata.getTimeUnit();
+          TimeGranularitySpec incomingGranularitySpec = new TimeGranularitySpec(dataType, timeType, columnName);
+          fieldSpec = new TimeFieldSpec(incomingGranularitySpec);
           break;
         default:
           break;

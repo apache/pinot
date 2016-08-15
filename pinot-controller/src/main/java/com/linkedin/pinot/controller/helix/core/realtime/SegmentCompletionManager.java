@@ -23,6 +23,7 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
 import com.linkedin.pinot.common.utils.CommonConstants;
@@ -93,8 +94,9 @@ public class SegmentCompletionManager {
       ZNRecord segment;
       try {
         // TODO if we keep a list of last few committed segments, we don't need to go to zk for this.
+        final String realtimeTableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(segmentName.getTableName());
         LLCRealtimeSegmentZKMetadata segmentMetadata = _segmentManager.getRealtimeSegmentZKMetadata(
-            segmentName.getTableName(), segmentName.getSegmentName());
+            realtimeTableName, segmentName.getSegmentName());
         if (segmentMetadata.getStatus().equals(CommonConstants.Segment.Realtime.Status.DONE)) {
           // Best to go through the state machine for this case as well, so that all code regarding state handling is in one place
           // Also good for synchronization, because it is possible that multiple threads take this path, and we don't want

@@ -16,16 +16,20 @@
 package com.linkedin.pinot.server.starter.helix;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.codehaus.jackson.JsonParseException;
+import org.codehaus.jackson.map.JsonMappingException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.data.DataManager;
+import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
@@ -33,6 +37,7 @@ import com.linkedin.pinot.common.segment.SegmentMetadataLoader;
 import com.linkedin.pinot.common.segment.fetcher.SegmentFetcherFactory;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
+import com.linkedin.pinot.common.utils.helix.PinotHelixPropertyStoreZnRecordProvider;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 
 public class SegmentFetcherAndLoader {
@@ -80,6 +85,15 @@ public class SegmentFetcherAndLoader {
     OfflineSegmentZKMetadata offlineSegmentZKMetadata =
         ZKMetadataProvider.getOfflineSegmentZKMetadata(_propertyStore, tableName, segmentId);
 
+    // Try to load table schema from Helix property store.
+    // This schema is used for adding default values for newly added columns.
+    Schema schema = null;
+    try {
+      schema = getSchema(tableName);
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while trying to load schema for table: {}", tableName, e);
+    }
+
     LOGGER.info("Adding or replacing segment {} for table {}, metadata {}", segmentId, tableName, offlineSegmentZKMetadata);
     try {
       SegmentMetadata segmentMetadataForCheck = new SegmentMetadataImpl(offlineSegmentZKMetadata);
@@ -107,7 +121,7 @@ public class SegmentFetcherAndLoader {
               LOGGER.info("Segment metadata same as before, loading {} of table {} (crc {}) from disk", segmentId,
                   tableName, localSegmentMetadata.getCrc());
               AbstractTableConfig tableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, tableName);
-              _dataManager.addSegment(localSegmentMetadata, tableConfig);
+              _dataManager.addSegment(localSegmentMetadata, tableConfig, schema);
               // TODO Update zk metadata with CRC for this instance
               return;
             }
@@ -147,7 +161,7 @@ public class SegmentFetcherAndLoader {
             final String localSegmentDir = downloadSegmentToLocal(uri, tableName, segmentId);
             final SegmentMetadata segmentMetadata =
                 _metadataLoader.loadIndexSegmentMetadataFromDir(localSegmentDir);
-            _dataManager.addSegment(segmentMetadata, tableConfig);
+            _dataManager.addSegment(segmentMetadata, tableConfig, schema);
             LOGGER.info("Downloaded segment {} of table {} crc {} from controller", segmentId, tableName, segmentMetadata.getCrc());
 
             // Successfully loaded the segment, break out of the retry loop
@@ -192,6 +206,19 @@ public class SegmentFetcherAndLoader {
       LOGGER.error("Cannot load segment : " + segmentId + " for table " + tableName, e);
       Utils.rethrowException(e);
       throw new AssertionError("Should not reach this");
+    }
+  }
+
+  private Schema getSchema(String schemaName)
+      throws IOException {
+    PinotHelixPropertyStoreZnRecordProvider propertyStoreHelper =
+        PinotHelixPropertyStoreZnRecordProvider.forSchema(_propertyStore);
+    ZNRecord record = propertyStoreHelper.get(schemaName);
+    if (record != null) {
+      LOGGER.info("Found schema: {}", schemaName);
+      return Schema.fromZNRecord(record);
+    } else {
+      return null;
     }
   }
 

@@ -54,8 +54,8 @@ import com.linkedin.pinot.core.realtime.impl.kafka.KafkaHighLevelStreamProviderC
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
 
 
-public class RealtimeSegmentDataManager extends SegmentDataManager {
-  private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeSegmentDataManager.class);
+public class HLRealtimeSegmentDataManager extends SegmentDataManager {
+  private static final Logger LOGGER = LoggerFactory.getLogger(HLRealtimeSegmentDataManager.class);
   private final static long ONE_MINUTE_IN_MILLSEC = 1000 * 60;
 
   private final String tableName;
@@ -91,7 +91,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   // An instance of this class exists only for the duration of the realtime segment that is currently being consumed.
   // Once the segment is committed, the segment is handled by OfflineSegmentDataManager
-  public RealtimeSegmentDataManager(final RealtimeSegmentZKMetadata segmentMetadata,
+  public HLRealtimeSegmentDataManager(final RealtimeSegmentZKMetadata segmentMetadata,
       final AbstractTableConfig tableConfig, InstanceZKMetadata instanceMetadata,
       RealtimeTableDataManager realtimeResourceManager, final String resourceDataDir, final ReadMode mode,
       final Schema schema, final ServerMetrics serverMetrics) throws Exception {
@@ -130,7 +130,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     // TODO : ideally resourceMetatda should create and give back a streamProviderConfig
     this.kafkaStreamProviderConfig = new KafkaHighLevelStreamProviderConfig();
     this.kafkaStreamProviderConfig.init(tableConfig, instanceMetadata, schema);
-    segmentLogger = LoggerFactory.getLogger(RealtimeSegmentDataManager.class.getName() +
+    segmentLogger = LoggerFactory.getLogger(HLRealtimeSegmentDataManager.class.getName() +
             "_" + segmentName +
             "_" + kafkaStreamProviderConfig.getStreamName()
     );

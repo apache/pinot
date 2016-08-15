@@ -15,13 +15,6 @@
  */
 package com.linkedin.pinot.core.data.manager.realtime;
 
-import java.io.File;
-import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import org.apache.helix.ZNRecord;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.IndexingConfig;
 import com.linkedin.pinot.common.data.FieldSpec;
@@ -33,12 +26,20 @@ import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
 import com.linkedin.pinot.common.utils.NamedThreadFactory;
+import com.linkedin.pinot.common.utils.SegmentName;
 import com.linkedin.pinot.common.utils.helix.PinotHelixPropertyStoreZnRecordProvider;
 import com.linkedin.pinot.core.data.manager.offline.AbstractTableDataManager;
 import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaConsumerManager;
+import java.io.File;
+import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.slf4j.LoggerFactory;
 
 
 // TODO Use the refcnt object inside SegmentDataManager
@@ -128,10 +129,14 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
         LOGGER.error("Not adding segment {}", segmentId);
         throw new RuntimeException("Mismatching schema/table config for " + _tableName);
       }
-      SegmentDataManager manager =
-          new RealtimeSegmentDataManager(segmentZKMetadata, tableConfig,
-              instanceZKMetadata, this, _indexDir.getAbsolutePath(), _readMode, Schema.fromZNRecord(record),
-              _serverMetrics);
+      SegmentDataManager manager;
+      if (SegmentName.isHighLevelConsumerSegmentName(segmentId)) {
+        manager = new HLRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, instanceZKMetadata, this, _indexDir.getAbsolutePath(), _readMode, Schema.fromZNRecord(record),
+            _serverMetrics);
+      } else {
+        manager = new LLRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, instanceZKMetadata, this, _indexDir.getAbsolutePath(), _readMode, Schema.fromZNRecord(record),
+            _serverMetrics);
+      }
       LOGGER.info("Initialize RealtimeSegmentDataManager - " + segmentId);
       try {
         _rwLock.writeLock().lock();
@@ -154,7 +159,7 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
    * 2. Validate the schema itself
    *
    * We allow the user to specify multiple sorted columns, but only consider the first one for now.
-   * (secondary sort is not yet implemnented).
+   * (secondary sort is not yet implemented).
    *
    * If we add more validations, it may make sense to split this method into multiple validation methods.
    * But then, we are trying to figure out all the invalid cases before we return from this method...
@@ -187,9 +192,11 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
   }
 
   @Override
-  public void addSegment(SegmentMetadata segmentMetaToAdd) throws Exception {
-    throw new UnsupportedOperationException("Not supported addSegment(SegmentMetadata) in RealtimeTableDataManager"
-      + segmentMetaToAdd.getName() + "," + segmentMetaToAdd.getTableName());
+  public void addSegment(SegmentMetadata segmentMetaToAdd, Schema schema)
+      throws Exception {
+    throw new UnsupportedOperationException(
+        "Unsupported addSegment(SegmentMetadata, Schema) in RealtimeTableDataManager for table: "
+            + segmentMetaToAdd.getTableName() + " segment: " + segmentMetaToAdd.getName());
   }
 
   private void markSegmentAsLoaded(String segmentId) {

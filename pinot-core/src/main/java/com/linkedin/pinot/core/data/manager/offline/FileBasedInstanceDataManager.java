@@ -15,26 +15,25 @@
  */
 package com.linkedin.pinot.core.data.manager.offline;
 
-import java.io.File;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
-
-import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.ConfigurationException;
-import org.apache.helix.ZNRecord;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadataLoader;
 import com.linkedin.pinot.core.data.manager.config.FileBasedInstanceDataManagerConfig;
 import com.linkedin.pinot.core.data.manager.config.TableDataManagerConfig;
+import java.io.File;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
+import org.apache.commons.configuration.Configuration;
+import org.apache.commons.configuration.ConfigurationException;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -125,7 +124,7 @@ public class FileBasedInstanceDataManager implements InstanceDataManager {
       File bootstrapSegmentDir = new File(_instanceDataManagerConfig.getInstanceBootstrapSegmentDir());
       if (bootstrapSegmentDir.exists()) {
         for (File segment : bootstrapSegmentDir.listFiles()) {
-          addSegment(_segmentMetadataLoader.load(segment), null);
+          addSegment(_segmentMetadataLoader.load(segment), null, null);
           LOGGER.info("Bootstrapped segment from directory : " + segment.getAbsolutePath());
         }
       } else {
@@ -171,11 +170,12 @@ public class FileBasedInstanceDataManager implements InstanceDataManager {
   }
 
   @Override
-  public synchronized void addSegment(SegmentMetadata segmentMetadata, AbstractTableConfig tableConfig) throws Exception {
+  public synchronized void addSegment(SegmentMetadata segmentMetadata, AbstractTableConfig tableConfig, Schema schema)
+      throws Exception {
     String tableName = segmentMetadata.getTableName();
     LOGGER.info("Trying to add segment : " + segmentMetadata.getName());
     if (_tableDataManagerMap.containsKey(tableName)) {
-      _tableDataManagerMap.get(tableName).addSegment(segmentMetadata);
+      _tableDataManagerMap.get(tableName).addSegment(segmentMetadata, schema);
       LOGGER.info("Added a segment : " + segmentMetadata.getName() + " to table : " + tableName);
     } else {
       LOGGER.error("InstanceDataManager doesn't contain the assigned table for segment : "

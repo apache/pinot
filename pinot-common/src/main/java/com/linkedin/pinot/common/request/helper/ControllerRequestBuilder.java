@@ -104,13 +104,13 @@ public class ControllerRequestBuilder {
     List<String> invertedIndexColumns = Collections.emptyList();
     return buildCreateRealtimeTableJSON(tableName, serverTenant, brokerTenant, timeColumnName, timeType, retentionTimeUnit,
         retentionTimeValue, numReplicas, segmentAssignmentStrategy, streamConfigs, schemaName, sortedColumn,
-        invertedIndexColumns, null);
+        invertedIndexColumns, null, true);
   }
 
   public static JSONObject buildCreateRealtimeTableJSON(String tableName, String serverTenant, String brokerTenant,
       String timeColumnName, String timeType, String retentionTimeUnit, String retentionTimeValue, int numReplicas,
       String segmentAssignmentStrategy, JSONObject streamConfigs, String schemaName, String sortedColumn,
-      List<String> invertedIndexColumns, String loadMode)
+      List<String> invertedIndexColumns, String loadMode, boolean isHighLevel)
           throws JSONException {
     JSONObject creationRequest = new JSONObject();
     creationRequest.put("tableName", tableName);
@@ -121,6 +121,9 @@ public class ControllerRequestBuilder {
     segmentsConfig.put("segmentPushFrequency", "daily");
     segmentsConfig.put("segmentPushType", "APPEND");
     segmentsConfig.put("replication", numReplicas);
+    if (!isHighLevel) {
+      segmentsConfig.put("replicasPerPartition", numReplicas);
+    }
     segmentsConfig.put("schemaName", schemaName);
     segmentsConfig.put("timeColumnName", timeColumnName);
     segmentsConfig.put("timeType", timeType);

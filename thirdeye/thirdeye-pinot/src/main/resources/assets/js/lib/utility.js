@@ -467,7 +467,7 @@ function closeClosestDropDown(target) {
 
 function disableButton(button) {
     $(button).prop("disabled", true);
-    $(button).attr("disabled", true);
+    $(button).attr("disabled", "disabled");
 }
 
 function enableButton(button) {

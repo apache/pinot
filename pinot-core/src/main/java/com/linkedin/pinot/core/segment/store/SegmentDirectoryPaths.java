@@ -16,7 +16,6 @@
 package com.linkedin.pinot.core.segment.store;
 
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import java.io.File;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,5 +37,9 @@ public class SegmentDirectoryPaths {
         throw new UnsupportedOperationException("Segment path for version: " + version +
             " and segmentIndexDirectory: " + segmentIndexDirectory + " can not be determined ");
     }
+  }
+
+  public static boolean isV3Directory(File path) {
+    return path.toString().endsWith(V3_SUBDIRECTORY_NAME);
   }
 }

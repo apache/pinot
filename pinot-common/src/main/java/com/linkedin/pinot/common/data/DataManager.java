@@ -26,7 +26,7 @@ public interface DataManager {
 
   void start();
 
-  void addSegment(SegmentMetadata segmentMetadata, AbstractTableConfig tableConfig) throws Exception;
+  void addSegment(SegmentMetadata segmentMetadata, AbstractTableConfig tableConfig, Schema schema) throws Exception;
 
   void removeSegment(String segmentName);
 
