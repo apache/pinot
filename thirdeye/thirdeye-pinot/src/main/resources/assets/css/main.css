@@ -920,6 +920,7 @@ body a{
   margin: 10px;
   padding: 5px;
   border: 1px #dddddd solid;
+  table-layout: fixed;
 }
 
 .anomaly2 tr {

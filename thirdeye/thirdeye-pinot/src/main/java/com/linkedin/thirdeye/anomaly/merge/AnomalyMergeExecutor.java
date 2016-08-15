@@ -56,8 +56,12 @@ public class AnomalyMergeExecutor {
 
     // for each anomaly function, find raw unmerged results and perform merge
     for (AnomalyFunctionSpec function : activeFunctions) {
+
       List<AnomalyResult> unmergedResults =
           anomalyResultDAO.findUnmergedByFunctionId(function.getId());
+
+      LOG.info("Running merge for function id : [{}], found [{}] raw anomalies", function.getId(),
+          unmergedResults.size());
 
       // TODO : move merge config within the AnomalyFunction; Every function should have its own merge config.
       List<AnomalyMergedResult> output = new ArrayList<>();
@@ -113,6 +117,8 @@ public class AnomalyMergeExecutor {
     for (AnomalyMergedResult mergedResult : mergedResults) {
       mergedResult.setFunction(function);
     }
+    LOG.info("Merging [{}] raw anomalies into [{}] merged anomalies for function id : [{}]",
+        unmergedResults.size(), mergedResults.size(), function.getId());
     output.addAll(mergedResults);
   }
 
@@ -139,6 +145,8 @@ public class AnomalyMergeExecutor {
         mergedResult.setFunction(function);
         mergedResult.setDimensions(dimensions);
       }
+      LOG.info("Merging [{}] raw anomalies into [{}] merged anomalies for function id : [{}] and dimensions : [{}]",
+          unmergedResults.size(), mergedResults.size(), function.getId(), dimensions);
       output.addAll(mergedResults);
     }
   }

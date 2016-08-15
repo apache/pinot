@@ -4,9 +4,11 @@ import com.linkedin.thirdeye.anomaly.merge.AnomalyMergeConfig;
 import com.linkedin.thirdeye.anomaly.merge.AnomalyTimeBasedSummarizer;
 import com.linkedin.thirdeye.api.dto.GroupByKey;
 import com.linkedin.thirdeye.api.dto.GroupByRow;
+import com.linkedin.thirdeye.db.dao.AnomalyMergedResultDAO;
 import com.linkedin.thirdeye.db.entity.AnomalyMergedResult;
 import com.linkedin.thirdeye.db.dao.AnomalyResultDAO;
 import com.linkedin.thirdeye.db.entity.AnomalyResult;
+import java.util.Collections;
 import java.util.List;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -23,9 +25,20 @@ import org.joda.time.DateTime;
 public class AnomalySummaryResource {
 
   private AnomalyResultDAO resultDAO;
+  private AnomalyMergedResultDAO mergedResultDAO;
 
-  public AnomalySummaryResource(AnomalyResultDAO resultDAO) {
+  public AnomalySummaryResource(AnomalyResultDAO resultDAO,
+      AnomalyMergedResultDAO mergedResultDAO) {
     this.resultDAO = resultDAO;
+    this.mergedResultDAO = mergedResultDAO;
+  }
+
+  @GET
+  @Path("merged")
+  public List<AnomalyMergedResult> getMergedResults() {
+    List<AnomalyMergedResult> mergedResults = mergedResultDAO.findAll();
+    Collections.reverse(mergedResults);
+    return mergedResults;
   }
 
   @GET

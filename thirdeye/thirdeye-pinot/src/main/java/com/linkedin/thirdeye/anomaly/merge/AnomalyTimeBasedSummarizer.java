@@ -5,11 +5,14 @@ import com.linkedin.thirdeye.db.entity.AnomalyResult;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Given list of {@link AnomalyResult} and merge parameters, this utility performs time based merge
  */
 public abstract class AnomalyTimeBasedSummarizer {
+  private final static Logger LOG = LoggerFactory.getLogger(AnomalyTimeBasedSummarizer.class);
 
   private AnomalyTimeBasedSummarizer() {
 
@@ -105,6 +108,7 @@ public abstract class AnomalyTimeBasedSummarizer {
         mergedAnomalies.add(mergedAnomaly);
       }
     }
+    LOG.info("merging [{}] raw anomalies", anomalies.size());
     return mergedAnomalies;
   }
 
