@@ -10,7 +10,7 @@ import javax.persistence.Table;
 import javax.persistence.UniqueConstraint;
 
 import com.google.common.base.MoreObjects;
-import com.linkedin.thirdeye.dashboard.configs.WebappConfigClassFactory.WebappConfigType;
+import com.linkedin.thirdeye.dashboard.configs.WebappConfigFactory.WebappConfigType;
 
 /**
  * Entity class for webapp configs. config_id, collection, config_type conbination should be unique

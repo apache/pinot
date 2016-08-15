@@ -17,18 +17,16 @@ import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.dashboard.configs.AbstractConfig;
-import com.linkedin.thirdeye.dashboard.configs.WebappConfigClassFactory;
-import com.linkedin.thirdeye.dashboard.configs.WebappConfigClassFactory.WebappConfigType;
+import com.linkedin.thirdeye.dashboard.configs.WebappConfigFactory;
+import com.linkedin.thirdeye.dashboard.configs.WebappConfigFactory.WebappConfigType;
 import com.linkedin.thirdeye.db.dao.WebappConfigDAO;
 import com.linkedin.thirdeye.db.entity.WebappConfig;
 
-@Path(value = "/dashboard")
+@Path(value = "/webapp-config")
 @Produces(MediaType.APPLICATION_JSON)
 public class WebappConfigResource {
 
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static final Logger LOG = LoggerFactory.getLogger(WebappConfigResource.class);
   private WebappConfigDAO webappConfigDAO;
 
@@ -45,14 +43,14 @@ public class WebappConfigResource {
    *                     { "collectionName" : "test_collection", "collectionAlias" : "test_alias" }"
    */
   @POST
-  @Path(value = "webapp-config/create/{collection}/{configType}")
+  @Path(value = "create/{collection}/{configType}")
   public Response createConfig(@PathParam("collection") String collection,
       @PathParam("configType") WebappConfigType configType,
       String payload) {
 
     try {
-      AbstractConfig abstractConfig = AbstractConfig.fromJSON(payload,
-          WebappConfigClassFactory.getClassFromConfigType(configType));
+      AbstractConfig abstractConfig = WebappConfigFactory.getConfigFromConfigTypeAndJson(configType, payload);
+
       int configId = abstractConfig.getConfigId();
       String config = abstractConfig.toJSON();
 
@@ -65,13 +63,14 @@ public class WebappConfigResource {
       LOG.info("Created webappConfig {} with id {}", webappConfig, id);
       return Response.ok(id).build();
     } catch (Exception e) {
-      LOG.error("Invalid payload {} for configType {}", payload, configType, e);
+      LOG.error("Exception in creating webapp config with collection {} configType {} and payload {}",
+          collection, configType, payload, e);
       return Response.ok(e).build();
     }
   }
 
   @GET
-  @Path(value = "webapp-config/view")
+  @Path(value = "view")
   public List<WebappConfig> viewConfigs(@QueryParam("id") Long id, @QueryParam("collection") String collection,
       @QueryParam("configType") WebappConfigType configType) {
     List<WebappConfig> webappConfigs = new ArrayList<>();
@@ -92,12 +91,12 @@ public class WebappConfigResource {
   }
 
   @POST
-  @Path(value = "webapp-config/update/{id}/{collection}/{configType}")
+  @Path(value = "update/{id}/{collection}/{configType}")
   public Response updateConfig(@PathParam("id") Long id, @PathParam("collection") String collection,
       @PathParam("configType") WebappConfigType configType, String payload) {
     try {
-      AbstractConfig abstractConfig = AbstractConfig.fromJSON(payload,
-          WebappConfigClassFactory.getClassFromConfigType(configType));
+      AbstractConfig abstractConfig = WebappConfigFactory.getConfigFromConfigTypeAndJson(configType, payload);
+
       int configId = abstractConfig.getConfigId();
       String config = abstractConfig.toJSON();
 
@@ -109,13 +108,14 @@ public class WebappConfigResource {
       webappConfigDAO.update(webappConfig);
       return Response.ok(id).build();
     } catch (Exception e) {
-      LOG.error("Invalid payload {} for configType {}", payload, configType, e);
+      LOG.error("Exception in updating webapp config with id {} collection {} configType {} and payload {}",
+          id, collection, configType, payload, e);
       return Response.ok(e).build();
     }
   }
 
   @DELETE
-  @Path(value = "webapp-config/delete")
+  @Path(value = "delete")
   public Response deleteConfig(@QueryParam("id") Long id, @QueryParam("collection") String collection,
       @QueryParam("configType") WebappConfigType configType) {
     try {

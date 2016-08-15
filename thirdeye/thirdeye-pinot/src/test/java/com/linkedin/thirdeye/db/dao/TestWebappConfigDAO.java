@@ -10,7 +10,7 @@ import org.testng.annotations.Test;
 
 import com.linkedin.thirdeye.dashboard.configs.AbstractConfig;
 import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
-import com.linkedin.thirdeye.dashboard.configs.WebappConfigClassFactory.WebappConfigType;
+import com.linkedin.thirdeye.dashboard.configs.WebappConfigFactory.WebappConfigType;
 import com.linkedin.thirdeye.db.entity.WebappConfig;
 
 public class TestWebappConfigDAO extends AbstractDbTestBase {
@@ -18,7 +18,7 @@ public class TestWebappConfigDAO extends AbstractDbTestBase {
   private static final Logger LOG = LoggerFactory.getLogger(TestWebappConfigDAO.class);
 
   private static final String collection = "testCollection";
-  private static final WebappConfigType configType = WebappConfigType.CollectionConfig;
+  private static final WebappConfigType configType = WebappConfigType.COLLECTION_CONFIG;
   private Long webappConfigId;
 
 
@@ -47,7 +47,7 @@ public class TestWebappConfigDAO extends AbstractDbTestBase {
   @Test(dependsOnMethods = {"testDuplicteCreate"})
   public void testFind() {
     Assert.assertEquals(webappConfigDAO.findByCollection(collection).size(), 1);
-    Assert.assertEquals(webappConfigDAO.findByConfigType(WebappConfigType.CollectionSchema).size(), 0);
+    Assert.assertEquals(webappConfigDAO.findByConfigType(WebappConfigType.COLLECTION_SCHEMA).size(), 0);
     Assert.assertEquals(webappConfigDAO.findByConfigType(configType).size(), 1);
     Assert.assertEquals(webappConfigDAO.findByCollectionAndConfigType(collection, configType).size(), 1);
   }

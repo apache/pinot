@@ -9,7 +9,7 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
-import com.linkedin.thirdeye.dashboard.configs.WebappConfigClassFactory.WebappConfigType;
+import com.linkedin.thirdeye.dashboard.configs.WebappConfigFactory.WebappConfigType;
 import com.linkedin.thirdeye.dashboard.resources.WebappConfigResource;
 import com.linkedin.thirdeye.db.dao.AbstractDbTestBase;
 import com.linkedin.thirdeye.db.entity.WebappConfig;
@@ -17,7 +17,7 @@ import com.linkedin.thirdeye.db.entity.WebappConfig;
 public class TestWebappConfigResource extends AbstractDbTestBase {
 
   private String collection = "test_collection";
-  private WebappConfigType configType = WebappConfigType.CollectionConfig;
+  private WebappConfigType configType = WebappConfigType.COLLECTION_CONFIG;
   private String payload = "{ \"collectionName\" : \"test_collection\", \"collectionAlias\" : \"test_alias\" }";
   private Long id;
 
@@ -50,7 +50,7 @@ public class TestWebappConfigResource extends AbstractDbTestBase {
     Assert.assertEquals(webappConfigs.size(), 1);
     webappConfigs = webappConfigResource.viewConfigs(null, null, configType);
     Assert.assertEquals(webappConfigs.size(), 1);
-    webappConfigs = webappConfigResource.viewConfigs(null, null, WebappConfigType.CollectionSchema);
+    webappConfigs = webappConfigResource.viewConfigs(null, null, WebappConfigType.COLLECTION_SCHEMA);
     Assert.assertEquals(webappConfigs.size(), 0);
 
   }
@@ -76,7 +76,7 @@ public class TestWebappConfigResource extends AbstractDbTestBase {
     webappConfigResource.createConfig(collection, configType, payload);
     Assert.assertEquals(webappConfigDAO.findAll().size(), 1);
 
-    webappConfigResource.deleteConfig(null, collection, WebappConfigType.CollectionSchema);
+    webappConfigResource.deleteConfig(null, collection, WebappConfigType.COLLECTION_SCHEMA);
     Assert.assertEquals(webappConfigDAO.findAll().size(), 1);
 
     webappConfigResource.deleteConfig(null, collection, null);
