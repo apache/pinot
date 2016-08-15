@@ -75,7 +75,34 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
 
   @Override
   public long getDiskSizeBytes() {
-    return FileUtils.sizeOfDirectory(segmentDirectory.toPath().toFile());
+    // [PINOT-3479] For newly added refresh segments, the new segment will
+    // replace the old segment on disk before the new segment is loaded.
+    // That means, the new segment may be in the pre-processing state.
+    // So, the segment format may not have been converted, and inverted indexes
+    // or default columns will not exist.
+
+    // check that v3 subdirectory exists since the format may not have been converted
+    if (segmentDirectory.exists()) {
+      try {
+        return FileUtils.sizeOfDirectory(segmentDirectory.toPath().toFile());
+      } catch (IllegalArgumentException e) {
+        LOGGER.error("Failed to read disk size for direcotry: ", segmentDirectory.getAbsolutePath());
+        return -1;
+      }
+    } else {
+      if (! SegmentDirectoryPaths.isV3Directory(segmentDirectory)) {
+        LOGGER.error("Segment directory: {} not found on disk and is not v3 format", segmentDirectory.getAbsolutePath());
+        return -1;
+      }
+      File[] files = segmentDirectory.getParentFile().listFiles();
+      long size = 0L;
+      for (File file : files) {
+        if (file.isFile()) {
+          size += file.length();
+        }
+      }
+      return size;
+    }
   }
 
   public Reader createReader()

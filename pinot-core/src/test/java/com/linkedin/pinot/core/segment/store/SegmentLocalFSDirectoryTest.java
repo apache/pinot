@@ -143,4 +143,40 @@ public class SegmentLocalFSDirectoryTest {
     }
   }
 
+  @Test
+  public void testDirectorySize()
+      throws IOException {
+    // this test verifies that the segment size is returned correctly even if v3/ subdir
+    // does not exist. We have not good way to test all the conditions since the
+    // format converters are higher level modules that can not be used in this package
+    // So, we do what we can do best....HACK HACK HACK
+    File sizeTestDirectory = null;
+    try {
+       sizeTestDirectory = new File(SegmentLocalFSDirectoryTest.class.getName() + "-size_test");
+      if (sizeTestDirectory.exists()) {
+        FileUtils.deleteQuietly(sizeTestDirectory);
+      }
+      FileUtils.copyDirectoryToDirectory(segmentDirectory.getPath().toFile(), sizeTestDirectory);
+      SegmentDirectory sizeSegment = SegmentLocalFSDirectory.createFromLocalFS(sizeTestDirectory, metadata, ReadMode.mmap);
+      Assert.assertEquals(sizeSegment.getDiskSizeBytes(), segmentDirectory.getDiskSizeBytes());
+
+      Assert.assertFalse(SegmentDirectoryPaths.segmentDirectoryFor(sizeTestDirectory, SegmentVersion.v3).exists());
+      File v3SizeDir = new File(sizeTestDirectory, SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
+      // the destination is not exactly v3 but does not matter
+      FileUtils.copyDirectoryToDirectory(segmentDirectory.getPath().toFile(), v3SizeDir);
+      SegmentDirectory sizeV3Segment = SegmentDirectory.createFromLocalFS(v3SizeDir, metadata, ReadMode.mmap);
+      Assert.assertEquals(sizeSegment.getDiskSizeBytes(), sizeV3Segment.getDiskSizeBytes());
+
+      // now drop v3
+      FileUtils.deleteQuietly(v3SizeDir);
+      v3SizeDir.mkdirs();
+      // sizes still match because we get the size from the parent...
+      Assert.assertEquals(sizeSegment.getDiskSizeBytes(), sizeV3Segment.getDiskSizeBytes());
+    } finally {
+      if (sizeTestDirectory != null) {
+        FileUtils.deleteQuietly(sizeTestDirectory);
+      }
+    }
+  }
+
 }
