@@ -69,6 +69,7 @@ function renderSelfService() {
         var form = $(this).closest("form");
         hideErrorAndSuccess("name",form);
         enableButton($("#create-anomaly-function"));
+        enableButton($("#create-run-anomaly-function"));
     });
 
     //Function type
@@ -159,6 +160,14 @@ function renderSelfService() {
     //Create anomaly function
     $("#self-service-forms-section").on("click", "#create-anomaly-function", function () {
         createAnomalyFunction()
+    });
+
+    //Create anomaly function
+    $("#self-service-forms-section").on("click", "#create-run-anomaly-function", function () {
+
+        var callback = runAdhocAnomalyFunction;
+        createAnomalyFunction(callback);
+
     });
 
     /** Manage anomaly tab related listeners **/
@@ -323,7 +332,7 @@ function renderSelfService() {
     };
 
     //Takes the css selector of the placeholder of the form
-    function collectAnomalyFnFormValues(form) {
+    function collectAnomalyFnData(form) {
         var formData = {};
 
         //Close uikit dropdowns
@@ -525,27 +534,65 @@ function renderSelfService() {
 
 
     //SUBMIT CREATED ANOMALY FUNCTION
-    function createAnomalyFunction() {
+    function createAnomalyFunction(callback) {
+
         var form = $("#create-anomaly-functions-tab");
-        var formData = collectAnomalyFnFormValues(form);
+        var formData = collectAnomalyFnData(form);
         var valid = validateAnomalyFnFormData(formData, form);
 
         if (valid) {
 
             //Disable submit btn
             disableButton($("#create-anomaly-function"));
+            disableButton($("#create-run-anomaly-function"));
 
-
+            //Submit data
             var urlParams = urlOfAnomalyFn(formData);
-            submitData("/dashboard/anomaly-function/create?" + urlParams).done(function(){
+            submitData("/dashboard/anomaly-function/create?" + urlParams).done(function(id){
                //Enable submit btn
                enableButton($("#create-anomaly-function"))
+               enableButton($("#create-run-anomaly-function"))
 
                 var successMessage = $("#manage-anomaly-function-success");
                 $("p", successMessage).html("success");
                 successMessage.fadeIn(100);
+
+                    if(callback){
+                        callback(id);
+                    }
+
             })
         }
+    }
+
+    function runAdhocAnomalyFunction(id){
+        // Change the view to anomalies
+        hash.view = "anomalies";
+
+        var form = $("#create-anomaly-functions-tab");
+        var formData = collectAnomalyFnData(form);
+        hash.metrics = formData.metric;
+        hash.dataset = formData.dataset;
+
+        var maxMillis = window.datasetConfig.maxMillis ? window.datasetConfig.maxMillis : moment();
+        hash.currentEnd = maxMillis;
+        hash.currentStart = moment(maxMillis).add(-1, 'days')._i;
+        hash.anomalyFunctionId = id;
+
+
+
+        var currentStartISO = moment(parseInt(hash.currentStart)).toISOString();
+        var currentEndISO = moment(parseInt(hash.currentEnd)).toISOString();
+        var urlParams = "dataset=" + hash.dataset + "&startTimeIso=" + currentStartISO + "&endTimeIso=" + currentEndISO + "&metric=" + hash.metrics + "&id=" + hash.anomalyFunctionId;
+        urlParams +=  hash.filter ? "&filters=" + hash.filters : "";
+
+        var url = "/dashboard/anomaly-function/adhoc?" + urlParams;
+
+        submitData(url).done(function(){
+            //update hash will trigger window.onhashchange event:
+            //update the form area and trigger the ajax call
+            window.location.hash = encodeHashParameters(hash);
+        })
     }
 
     //DELETE ANOMALY FUNCTION
@@ -718,7 +765,7 @@ function renderSelfService() {
     function updateAnomalyFunction() {
 
         var form = $("#update-function-modal");
-        var formData = collectAnomalyFnFormValues(form);
+        var formData = collectAnomalyFnData(form);
         var valid = validateAnomalyFnFormData(formData, form);
 
         if (valid) {
