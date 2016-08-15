@@ -16,21 +16,26 @@ function getAnomalies(tab) {
 
     var currentStartISO = moment(parseInt(currentStart)).toISOString();
     var currentEndISO = moment(parseInt(currentEnd)).toISOString();
-    var anomaliesUrl = "/dashboard/anomalies/view?dataset=" + hash.dataset + "&startTimeIso=" + currentStartISO + "&endTimeIso=" + currentEndISO + "&metric=" + hash.metrics + "&filters=" + hash.filters;
+
+    var urlParams = "dataset=" + hash.dataset + "&startTimeIso=" + currentStartISO + "&endTimeIso=" + currentEndISO + "&metric=" + hash.metrics;
+        urlParams += hash.filter ? "&filters=" + hash.filters : "";
+        urlParams += hash.hasOwnProperty("anomalyFunctionId")  ?   "&id=" + hash.anomalyFunctionId : "";
+
+    var anomaliesUrl = "/dashboard/anomalies/view?" + urlParams;
 
     getData(anomaliesUrl).done(function (anomalyData) {
         getData(timeSeriesUrl).done(function (timeSeriesData) {
 
             //Error handling when data is falsy (empty, undefined or null)
             if (!timeSeriesData) {
-                $("#" + tab + "-chart-area-error").empty()
-                var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' })
-                warning.append($('<p></p>', { html: 'Something went wrong. Please try and reload the page. Error: metric timeseries data =' + timeSeriesData  }))
-                $("#" + tab + "-chart-area-error").append(warning)
-                $("#" + tab + "-chart-area-error").show()
+                $("#" + tab + "-chart-area-error").empty();
+                var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' });
+                warning.append($('<p></p>', { html: 'Something went wrong. Please try and reload the page. Error: metric timeseries data =' + timeSeriesData  }));
+                $("#" + tab + "-chart-area-error").append(warning);
+                $("#" + tab + "-chart-area-error").show();
                 return
             } else {
-                $("#" + tab + "-chart-area-error").hide()
+                $("#" + tab + "-chart-area-error").hide();
             }
             renderAnomalyLineChart(timeSeriesData, anomalyData, tab);
             renderAnomalyTable(anomalyData, tab);
