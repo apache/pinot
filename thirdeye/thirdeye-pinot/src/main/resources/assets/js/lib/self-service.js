@@ -575,12 +575,14 @@ function renderSelfService() {
         hash.dataset = formData.dataset;
 
         var maxMillis = window.datasetConfig.maxMillis ? window.datasetConfig.maxMillis : moment();
-        hash.currentEndMillis = maxMillis;
-        hash.currentStartMillis = moment(maxMillis).add(-1, 'days')._i;
+        hash.currentEnd = maxMillis;
+        hash.currentStart = moment(maxMillis).add(-1, 'days')._i;
         hash.anomalyFunctionId = id;
 
-        var currentStartISO = moment(parseInt(hash.currentStartMillis)).toISOString();
-        var currentEndISO = moment(parseInt(hash.currentEndMillis)).toISOString();
+
+
+        var currentStartISO = moment(parseInt(hash.currentStart)).toISOString();
+        var currentEndISO = moment(parseInt(hash.currentEnd)).toISOString();
         var urlParams = "dataset=" + hash.dataset + "&startTimeIso=" + currentStartISO + "&endTimeIso=" + currentEndISO + "&metric=" + hash.metrics + "&id=" + hash.anomalyFunctionId;
         urlParams +=  hash.filter ? "&filters=" + hash.filters : "";
 
@@ -591,8 +593,6 @@ function renderSelfService() {
             //update the form area and trigger the ajax call
             window.location.hash = encodeHashParameters(hash);
         })
-
-
     }
 
     //DELETE ANOMALY FUNCTION
