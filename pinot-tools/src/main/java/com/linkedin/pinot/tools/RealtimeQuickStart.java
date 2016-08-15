@@ -15,21 +15,17 @@
  */
 package com.linkedin.pinot.tools;
 
-import static com.linkedin.pinot.tools.Quickstart.prettyprintResponse;
-import static com.linkedin.pinot.tools.Quickstart.printStatus;
-
 import java.io.File;
-
 import org.apache.commons.io.FileUtils;
 import org.json.JSONException;
-
 import com.google.common.collect.Lists;
 import com.linkedin.pinot.common.utils.KafkaStarterUtils;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.tools.Quickstart.color;
 import com.linkedin.pinot.tools.admin.command.QuickstartRunner;
 import com.linkedin.pinot.tools.streams.MeetupRsvpStream;
-
+import static com.linkedin.pinot.tools.Quickstart.prettyprintResponse;
+import static com.linkedin.pinot.tools.Quickstart.printStatus;
 import kafka.server.KafkaServerStartable;
 
 
@@ -63,7 +59,7 @@ public class RealtimeQuickStart {
         KafkaStarterUtils.startServer(KafkaStarterUtils.DEFAULT_KAFKA_PORT, KafkaStarterUtils.DEFAULT_BROKER_ID,
             KafkaStarterUtils.DEFAULT_ZK_STR, KafkaStarterUtils.getDefaultKafkaConfiguration());
 
-    KafkaStarterUtils.createTopic("meetupRSVPEvents", KafkaStarterUtils.DEFAULT_ZK_STR);
+    KafkaStarterUtils.createTopic("meetupRSVPEvents", KafkaStarterUtils.DEFAULT_ZK_STR, 10);
 
     File tempDir = new File("/tmp/" + String.valueOf(System.currentTimeMillis()));
 

@@ -15,6 +15,17 @@
  */
 package com.linkedin.pinot.core.data.manager.offline;
 
+import java.io.File;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
@@ -25,18 +36,7 @@ import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.NamedThreadFactory;
 import com.linkedin.pinot.core.data.manager.config.TableDataManagerConfig;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import java.io.File;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 import javax.annotation.Nonnull;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 public abstract  class AbstractTableDataManager implements TableDataManager {
@@ -59,6 +59,7 @@ public abstract  class AbstractTableDataManager implements TableDataManager {
   protected int _numberOfTableQueryExecutorThreads;
   protected IndexLoadingConfigMetadata _indexLoadingConfigMetadata;
   protected ServerMetrics _serverMetrics;
+  protected String _serverInstance;
 
 
   protected AbstractTableDataManager() {
@@ -66,7 +67,8 @@ public abstract  class AbstractTableDataManager implements TableDataManager {
   }
 
   @Override
-  public void init(TableDataManagerConfig tableDataManagerConfig, ServerMetrics serverMetrics) {
+  public void init(TableDataManagerConfig tableDataManagerConfig, ServerMetrics serverMetrics, String serverInstance) {
+    _serverInstance = serverInstance;
     _tableDataManagerConfig = tableDataManagerConfig;
     _serverMetrics = serverMetrics;
 

@@ -28,7 +28,6 @@ import org.restlet.representation.Representation;
 import org.restlet.representation.StringRepresentation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
 import com.linkedin.pinot.common.restlet.swagger.Description;
 import com.linkedin.pinot.common.restlet.swagger.HttpVerb;
@@ -132,8 +131,7 @@ public class LLCSegmentCommit extends PinotSegmentUploadRestletResource {
       // table
       LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
       final String rawTableName = segmentName.getTableName();
-      final String realtimeTableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(rawTableName);
-      final File tableDir = new File(baseDataDir, realtimeTableName);
+      final File tableDir = new File(baseDataDir, rawTableName);
       final File segmentFile = new File(tableDir, segmentNameStr);
 
       synchronized (_pinotHelixResourceManager) {

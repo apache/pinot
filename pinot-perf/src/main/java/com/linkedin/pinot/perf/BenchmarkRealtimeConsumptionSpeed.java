@@ -19,11 +19,9 @@ import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.common.TestUtils;
 import com.linkedin.pinot.common.utils.KafkaStarterUtils;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
-import com.linkedin.pinot.integration.tests.BaseClusterIntegrationTest;
 import com.linkedin.pinot.integration.tests.OfflineClusterIntegrationTest;
 import com.linkedin.pinot.integration.tests.RealtimeClusterIntegrationTest;
 import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -63,7 +61,7 @@ public class BenchmarkRealtimeConsumptionSpeed extends RealtimeClusterIntegratio
             KafkaStarterUtils.DEFAULT_ZK_STR, KafkaStarterUtils.getDefaultKafkaConfiguration());
 
     // Create Kafka topic
-    KafkaStarterUtils.createTopic(KAFKA_TOPIC, KafkaStarterUtils.DEFAULT_ZK_STR);
+    KafkaStarterUtils.createTopic(KAFKA_TOPIC, KafkaStarterUtils.DEFAULT_ZK_STR, 10);
 
     // Unpack data (needed to get the Avro schema)
     TarGzCompressionUtils.unTar(

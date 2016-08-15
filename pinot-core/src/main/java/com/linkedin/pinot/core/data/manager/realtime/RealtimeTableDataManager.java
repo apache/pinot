@@ -15,38 +15,38 @@
  */
 package com.linkedin.pinot.core.data.manager.realtime;
 
+import java.io.File;
+import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import org.apache.commons.io.FileUtils;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.IndexingConfig;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
+import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.common.segment.fetcher.SegmentFetcherFactory;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
 import com.linkedin.pinot.common.utils.NamedThreadFactory;
 import com.linkedin.pinot.common.utils.SegmentName;
+import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.common.utils.helix.PinotHelixPropertyStoreZnRecordProvider;
 import com.linkedin.pinot.core.data.manager.offline.AbstractTableDataManager;
 import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaConsumerManager;
-import java.io.File;
-import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import org.apache.helix.ZNRecord;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.slf4j.LoggerFactory;
-
 
 // TODO Use the refcnt object inside SegmentDataManager
 public class RealtimeTableDataManager extends AbstractTableDataManager {
-
-//  private final Object _globalLock = new Object();
-//  private boolean _isStarted = false;
 
   private final ExecutorService _segmentAsyncExecutorService = Executors
       .newSingleThreadExecutor(new NamedThreadFactory("SegmentAsyncExecutorService"));
@@ -77,12 +77,18 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
 
   /*
    * This call comes in one of two ways:
+   * For HL Segments:
    * - We are being directed by helix to own up all the segments that we committed and are still in retention. In this case
    *   we treat it exactly like how OfflineTableDataManager would -- wrap it into an OfflineSegmentDataManager, and put it
    *   in the map.
    * - We are being asked to own up a new realtime segment. In this case, we wrap the segment with a RealTimeSegmentDataManager
    *   (that kicks off Kafka consumption). When the segment is committed we get notified via the notifySegmentCommitted call, at
    *   which time we replace the segment with the OfflineSegmentDataManager
+   * For LL Segments:
+   * - We are being asked to start consuming from a kafka partition.
+   * - We did not know about the segment and are being asked to download and own the segment (re-balancing, or
+   *   replacing a realtime server with a fresh one, maybe). We need to look at segment metadata and decide whether
+   *   to start consuming or download the segment.
    */
   @Override
   public void addSegment(ZkHelixPropertyStore<ZNRecord> propertyStore, AbstractTableConfig tableConfig,
@@ -134,6 +140,20 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
         manager = new HLRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, instanceZKMetadata, this, _indexDir.getAbsolutePath(), _readMode, Schema.fromZNRecord(record),
             _serverMetrics);
       } else {
+        LLCRealtimeSegmentZKMetadata llcSegmentMetadata = (LLCRealtimeSegmentZKMetadata) segmentZKMetadata;
+        if (segmentZKMetadata.getStatus().equals(Status.DONE)) {
+          // TODO Remove code duplication here and in LLRealtimeSegmentDataManager
+          final String uri = llcSegmentMetadata.getDownloadUrl();
+          File tempSegmentFolder = new File(_indexDir, "tmp-" + String.valueOf(System.currentTimeMillis()));
+          File tempFile = new File(_indexDir, segmentId + ".tar.gz");
+          SegmentFetcherFactory.getSegmentFetcherBasedOnURI(uri).fetchSegmentToLocal(uri, tempFile);
+          LOGGER.info("Downloaded file from {} to {}; Length of downloaded file: {}", uri, tempFile, tempFile.length());
+          TarGzCompressionUtils.unTar(tempFile, tempSegmentFolder);
+          FileUtils.deleteQuietly(tempFile);
+          FileUtils.moveDirectory(tempSegmentFolder, new File(_indexDir, segmentId));
+          replaceLLSegment(segmentId);
+          return;
+        }
         manager = new LLRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, instanceZKMetadata, this, _indexDir.getAbsolutePath(), _readMode, Schema.fromZNRecord(record),
             _serverMetrics);
       }
@@ -146,6 +166,20 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
       }
       _loadingSegments.add(segmentId);
     }
+  }
+
+  // Replace a committed segment.
+  public void replaceLLSegment(String segmentId) {
+    try {
+      IndexSegment segment = ColumnarSegmentLoader.load(new File(_indexDir, segmentId), _readMode, _indexLoadingConfigMetadata);
+      addSegment(segment);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  public String getServerInstance() {
+    return _serverInstance;
   }
 
   /**

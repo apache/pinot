@@ -26,14 +26,14 @@ import com.linkedin.pinot.controller.ControllerStarter;
  *
  */
 public class ControllerTestUtils {
-  public static final String DEFAULT_CONTROLLER_INSTANCE_NAME = "localhost_11984";
+  private static final String DEFAULT_CONTROLLER_HOST_NAME = "localhost";
   public static final String DEFAULT_DATA_DIR = FileUtils.getTempDirectoryPath() + File.separator + "test-controller-" + System.currentTimeMillis();
   public static final String DEFAULT_CONTROLLER_API_PORT = "8998";
   public static final String DEFAULT_CONTROLLER_HOST = "localhost";
 
   public static ControllerConf getDefaultControllerConfiguration() {
     final ControllerConf conf = new ControllerConf();
-    conf.setControllerHost(DEFAULT_CONTROLLER_INSTANCE_NAME);
+    conf.setControllerHost(DEFAULT_CONTROLLER_HOST_NAME);
     conf.setControllerPort(DEFAULT_CONTROLLER_API_PORT);
     conf.setDataDir(DEFAULT_DATA_DIR);
     conf.setControllerVipHost("localhost");

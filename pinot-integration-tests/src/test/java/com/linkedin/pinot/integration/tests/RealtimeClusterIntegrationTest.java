@@ -23,18 +23,15 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-
-import kafka.server.KafkaServerStartable;
-
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.utils.KafkaStarterUtils;
+import kafka.server.KafkaServerStartable;
 
 
 /**
@@ -68,7 +65,7 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
             KafkaStarterUtils.DEFAULT_ZK_STR, KafkaStarterUtils.getDefaultKafkaConfiguration());
 
     // Create Kafka topic
-    KafkaStarterUtils.createTopic(KAFKA_TOPIC, KafkaStarterUtils.DEFAULT_ZK_STR);
+    createKafkaTopic(KAFKA_TOPIC, KafkaStarterUtils.DEFAULT_ZK_STR);
 
     // Start the Pinot cluster
     startController();
@@ -108,6 +105,10 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
     rs.close();
 
     waitForRecordCountToStabilizeToExpectedCount(h2RecordCount, timeInFiveMinutes);
+  }
+
+  protected void createKafkaTopic(String kafkaTopic, String zkStr) {
+    KafkaStarterUtils.createTopic(kafkaTopic, zkStr, 10);
   }
 
   @Override

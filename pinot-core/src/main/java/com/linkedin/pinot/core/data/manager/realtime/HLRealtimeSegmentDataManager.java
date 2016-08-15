@@ -88,14 +88,16 @@ public class HLRealtimeSegmentDataManager extends SegmentDataManager {
   private final List<String> invertedIndexColumns;
   private Logger segmentLogger = LOGGER;
   private final SegmentVersion _segmentVersion;
+  private final RealtimeTableDataManager _realtimeTableDataManager;
 
   // An instance of this class exists only for the duration of the realtime segment that is currently being consumed.
   // Once the segment is committed, the segment is handled by OfflineSegmentDataManager
   public HLRealtimeSegmentDataManager(final RealtimeSegmentZKMetadata segmentMetadata,
       final AbstractTableConfig tableConfig, InstanceZKMetadata instanceMetadata,
-      RealtimeTableDataManager realtimeResourceManager, final String resourceDataDir, final ReadMode mode,
+      RealtimeTableDataManager realtimeTableDataManager, final String resourceDataDir, final ReadMode mode,
       final Schema schema, final ServerMetrics serverMetrics) throws Exception {
     super();
+    _realtimeTableDataManager = realtimeTableDataManager;
     final String segmentVersionStr = tableConfig.getIndexingConfig().getSegmentFormatVersion();
     _segmentVersion = SegmentVersion.fromStringOrDefault(segmentVersionStr);
     this.schema = schema;
@@ -156,7 +158,7 @@ public class HLRealtimeSegmentDataManager extends SegmentDataManager {
     realtimeSegment = new RealtimeSegmentImpl(schema, kafkaStreamProviderConfig.getSizeThresholdToFlushSegment(), tableName,
         segmentMetadata.getSegmentName(), kafkaStreamProviderConfig.getStreamName(), serverMetrics);
     realtimeSegment.setSegmentMetadata(segmentMetadata, this.schema);
-    notifier = realtimeResourceManager;
+    notifier = realtimeTableDataManager;
 
     segmentStatusTask = new TimerTask() {
       @Override

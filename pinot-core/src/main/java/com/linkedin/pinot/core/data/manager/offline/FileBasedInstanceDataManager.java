@@ -64,7 +64,7 @@ public class FileBasedInstanceDataManager implements InstanceDataManager {
     for (String tableName : _instanceDataManagerConfig.getTableNames()) {
       TableDataManagerConfig tableDataManagerConfig =
           _instanceDataManagerConfig.getTableDataManagerConfig(tableName);
-      TableDataManager tableDataManager = TableDataManagerProvider.getTableDataManager(tableDataManagerConfig);
+      TableDataManager tableDataManager = TableDataManagerProvider.getTableDataManager(tableDataManagerConfig, null);
       _tableDataManagerMap.put(tableName, tableDataManager);
     }
     _segmentMetadataLoader = getSegmentMetadataLoader(_instanceDataManagerConfig.getSegmentMetadataLoaderClass());
@@ -82,7 +82,7 @@ public class FileBasedInstanceDataManager implements InstanceDataManager {
     for (String tableName : _instanceDataManagerConfig.getTableNames()) {
       TableDataManagerConfig tableDataManagerConfig =
           _instanceDataManagerConfig.getTableDataManagerConfig(tableName);
-      TableDataManager tableDataManager = TableDataManagerProvider.getTableDataManager(tableDataManagerConfig);
+      TableDataManager tableDataManager = TableDataManagerProvider.getTableDataManager(tableDataManagerConfig, null);
       _tableDataManagerMap.put(tableName, tableDataManager);
     }
     try {
@@ -220,7 +220,7 @@ public class FileBasedInstanceDataManager implements InstanceDataManager {
 
   @Override
   public void addSegment(ZkHelixPropertyStore<ZNRecord> propertyStore, AbstractTableConfig tableConfig,
-      InstanceZKMetadata instanceZKMetadata, SegmentZKMetadata segmentZKMetadata) throws Exception {
+      InstanceZKMetadata instanceZKMetadata, SegmentZKMetadata segmentZKMetadata, String serverInstance) throws Exception {
     throw new UnsupportedOperationException("Not support addSegment(...) in FileBasedInstanceDataManager yet!");
   }
 

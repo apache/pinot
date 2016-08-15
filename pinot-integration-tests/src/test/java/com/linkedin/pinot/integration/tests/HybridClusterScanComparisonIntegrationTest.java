@@ -468,7 +468,7 @@ public abstract class HybridClusterScanComparisonIntegrationTest extends HybridC
     // Drop and recreate the Kafka topic
     KafkaStarterUtils.deleteTopic(KAFKA_TOPIC, KafkaStarterUtils.DEFAULT_ZK_STR);
     Uninterruptibles.sleepUninterruptibly(5, TimeUnit.SECONDS);
-    KafkaStarterUtils.createTopic(KAFKA_TOPIC, KafkaStarterUtils.DEFAULT_ZK_STR);
+    KafkaStarterUtils.createTopic(KAFKA_TOPIC, KafkaStarterUtils.DEFAULT_ZK_STR, 10);
 
     // Recreate the realtime table
     addRealtimeTable("mytable", "DaysSinceEpoch", "daysSinceEpoch", 900, "Days", KafkaStarterUtils.DEFAULT_ZK_STR,

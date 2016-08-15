@@ -61,7 +61,7 @@ public class RealtimeStressTest extends RealtimeClusterIntegrationTest {
             KafkaStarterUtils.DEFAULT_ZK_STR, KafkaStarterUtils.getDefaultKafkaConfiguration());
 
     // Create Kafka topic
-    KafkaStarterUtils.createTopic(KAFKA_TOPIC, KafkaStarterUtils.DEFAULT_ZK_STR);
+    KafkaStarterUtils.createTopic(KAFKA_TOPIC, KafkaStarterUtils.DEFAULT_ZK_STR, 10);
 
     // Unpack data (needed to get the Avro schema)
     TarGzCompressionUtils.unTar(

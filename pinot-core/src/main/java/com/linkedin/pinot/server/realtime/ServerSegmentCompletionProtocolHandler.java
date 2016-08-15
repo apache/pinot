@@ -32,8 +32,6 @@ import org.apache.commons.httpclient.methods.multipart.MultipartRequestEntity;
 import org.apache.commons.httpclient.methods.multipart.Part;
 import org.apache.commons.httpclient.methods.multipart.PartSource;
 import org.apache.commons.httpclient.params.HttpMethodParams;
-import org.apache.helix.InstanceType;
-import org.apache.helix.manager.zk.ZKHelixManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
@@ -52,11 +50,11 @@ public class ServerSegmentCompletionProtocolHandler {
     _instance = instance;
   }
 
-  public SegmentCompletionProtocol.Response segmentCommit(long offset, final File segmentTarFile) throws FileNotFoundException {
-    SegmentCompletionProtocol.SegmentCommitRequest request = new SegmentCompletionProtocol.SegmentCommitRequest(segmentTarFile.getName(), offset, _instance);
+  public SegmentCompletionProtocol.Response segmentCommit(long offset, final String segmentName, final File segmentTarFile) throws FileNotFoundException {
+    SegmentCompletionProtocol.SegmentCommitRequest request = new SegmentCompletionProtocol.SegmentCommitRequest(segmentName, offset, _instance);
     final InputStream inputStream = new FileInputStream(segmentTarFile);
     Part[] parts = {
-        new FilePart(segmentTarFile.getName(), new PartSource() {
+        new FilePart(segmentName, new PartSource() {
           @Override
           public long getLength() {
             return segmentTarFile.length();
