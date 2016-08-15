@@ -24,7 +24,6 @@ import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.io.reader.SingleColumnMultiValueReader;
-import com.linkedin.pinot.core.io.reader.impl.v1.FixedBitMultiValueReader;
 import com.linkedin.pinot.core.operator.docvalsets.MultiValueSet;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
@@ -53,7 +52,7 @@ public class MultiValueBlock implements Block {
   }
 
   public boolean hasInvertedIndex() {
-    return columnMetadata.isHasInvertedIndex();
+    return columnMetadata.hasInvertedIndex();
   }
 
   public boolean isSingleValued() {

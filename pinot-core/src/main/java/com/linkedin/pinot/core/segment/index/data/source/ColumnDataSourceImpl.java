@@ -121,8 +121,7 @@ public class ColumnDataSourceImpl extends DataSource {
         if (indexContainer.getColumnMetadata().isSorted()) {
           return true;
         }
-        return indexContainer.getColumnMetadata().isHasInvertedIndex()
-            && indexContainer.getInvertedIndex() != null;
+        return indexContainer.getColumnMetadata().hasInvertedIndex() && indexContainer.getInvertedIndex() != null;
       }
 
       @Override

@@ -13,12 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.segment.creator;
+package com.linkedin.pinot.core.segment.index.loader.defaultcolumn;
 
-/**
- * Nov 9, 2014
- */
+public interface DefaultColumnHandler {
 
-public enum InvertedIndexType {
-  P4_DELTA, ROARING_BITMAPS, SORTED_INDEX
+  /**
+   * Update the auto-generated default columns.
+   * <p>Supported default column actions include: <code>ADD/UPDATE/REMOVE DIMENSION/METRIC</code>
+   *
+   * @throws Exception
+   */
+  void updateDefaultColumns()
+      throws Exception;
 }

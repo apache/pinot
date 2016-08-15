@@ -15,18 +15,9 @@
  */
 package com.linkedin.pinot.server.starter.helix;
 
-import java.io.File;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
-import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.ConfigurationException;
-import org.apache.helix.ZNRecord;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
@@ -38,6 +29,16 @@ import com.linkedin.pinot.core.data.manager.offline.InstanceDataManager;
 import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
 import com.linkedin.pinot.core.data.manager.offline.TableDataManager;
 import com.linkedin.pinot.core.data.manager.offline.TableDataManagerProvider;
+import java.io.File;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
+import org.apache.commons.configuration.Configuration;
+import org.apache.commons.configuration.ConfigurationException;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -145,11 +146,12 @@ public class HelixInstanceDataManager implements InstanceDataManager {
 
   // Called for offline segments only
   @Override
-  public synchronized void addSegment(SegmentMetadata segmentMetadata, AbstractTableConfig tableConfig) throws Exception {
+  public synchronized void addSegment(SegmentMetadata segmentMetadata, AbstractTableConfig tableConfig, Schema schema)
+      throws Exception {
     if (segmentMetadata == null || segmentMetadata.getTableName() == null) {
       throw new RuntimeException("Error: adding invalid SegmentMetadata!");
     }
-    LOGGER.info("Trying to add segment {} of table {}",segmentMetadata.getName(), segmentMetadata.getTableName());
+    LOGGER.info("Trying to add segment {} of table {}", segmentMetadata.getName(), segmentMetadata.getTableName());
     if (LOGGER.isDebugEnabled()) {
       LOGGER.debug("Trying to add segment with Metadata: " + segmentMetadata.toString());
     }
@@ -167,7 +169,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         }
       }
     }
-    _tableDataManagerMap.get(tableName).addSegment(segmentMetadata);
+    _tableDataManagerMap.get(tableName).addSegment(segmentMetadata, schema);
     LOGGER.info("Successfully added a segment {} of table {}", segmentMetadata.getName(), segmentMetadata.getTableName());
   }
 
