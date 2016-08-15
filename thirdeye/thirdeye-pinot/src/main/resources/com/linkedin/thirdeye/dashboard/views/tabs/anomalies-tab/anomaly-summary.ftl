@@ -1,11 +1,13 @@
 <section id="anomaly-summary-template-section">
   <script id="anomaly-summary-template" type="text/x-handlebars-template">
-    <table id="anomaly-summary-table" class="anomaly2">
+    <table id="anomaly-summary-table" class="anomaly2" style="table-layout:fixed;">
       <thead>
       <tr>
         <td>id</td>
-        <td>startTime</td>
-        <td>endTime</td>
+        <td style="width:15%;white-space:no-wrap;">startTime</td>
+        <td style="width:15%;white-space:no-wrap;">endTime</td>
+        <td>function id</td>
+        <td>collection</td>
         <td>metric</td>
         <td>score</td>
         <td>weight</td>
@@ -15,9 +17,11 @@
       <tbody>
       {{#each this as |summary summaryIndex|}}
       <tr class="anomaly-summary">
-        <td>{{summaryIndex}}</td>
-        <td>{{millisToDate summary/startTime}}</td>
-        <td>{{millisToDate summary/endTime}}</td>
+        <td>{{summary/id}}</td>
+        <td style="width:15%;white-space:no-wrap;">{{millisToDate summary/startTime}}</td>
+        <td style="width:15%;white-space:no-wrap;">{{millisToDate summary/endTime}}</td>
+        <td>{{summary/function/id}}</td>
+        <td>{{summary/collection}}</td>
         <td>{{summary/metric}}</td>
         <td>{{summary/score}}</td>
         <td>{{summary/weight}}</td>
@@ -29,6 +33,8 @@
         <td>{{anomalyResult/id}}</td>
         <td>{{millisToDate anomalyResult/startTimeUtc}}</td>
         <td>{{millisToDate anomalyResult/endTimeUtc}}</td>
+        <td>{{anomalyResult/function/id}}</td>
+        <td>{{anomalyResult/collection}}</td>
         <td>{{anomalyResult/metric}}</td>
         <td>{{anomalyResult/score}}</td>
         <td>{{anomalyResult/weight}}</td>

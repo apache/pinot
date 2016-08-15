@@ -8,11 +8,12 @@ import com.linkedin.thirdeye.db.dao.AnomalyFunctionDAO;
 import com.linkedin.thirdeye.db.dao.AnomalyMergedResultDAO;
 import com.linkedin.thirdeye.db.dao.AnomalyResultDAO;
 import java.io.File;
+import java.io.IOException;
 
 public class AnomalyMergeTester {
 
-  private static final String dbConfig = "/opt/Code/thirdeye-configs/local-configs/persistence.yml";
-  public static void main(String[] args) {
+  private static final String dbConfig = "/opt/Code/thirdeye-configs/sandbox-configs/persistence.yml";
+  public static void main(String[] args) throws IOException, InterruptedException {
     PersistenceUtil.init(new File(dbConfig));
     AnomalyMergeConfig config = new AnomalyMergeConfig();
     config.setMergeStrategy(AnomalyMergeStrategy.FUNCTION_DIMENSIONS);
@@ -23,7 +24,10 @@ public class AnomalyMergeTester {
     AnomalyMergedResultDAO mergedResultDAO = PersistenceUtil.getInstance(AnomalyMergedResultDAO.class);
     AnomalyFunctionDAO functionDAO = PersistenceUtil.getInstance(AnomalyFunctionDAO.class);
     AnomalyMergeExecutor executor = new AnomalyMergeExecutor(mergedResultDAO, functionDAO, resultDAO, config);
-
-    executor.updateMergedResults();
+    while (true) {
+      executor.updateMergedResults();
+      System.out.println("Sleeping for 1 min");
+      Thread.sleep(60_000);
+    }
   }
 }

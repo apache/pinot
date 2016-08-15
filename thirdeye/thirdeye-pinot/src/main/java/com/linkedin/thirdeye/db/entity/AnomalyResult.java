@@ -1,5 +1,4 @@
 package com.linkedin.thirdeye.db.entity;
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.base.Joiner;
 import java.util.ArrayList;
 import java.util.List;
@@ -61,7 +60,6 @@ public class AnomalyResult extends AbstractBaseEntity implements Comparable<Anom
   @Column
   private boolean merged;
 
-  @JsonIgnore
   @ManyToOne(fetch = FetchType.EAGER)
   @JoinColumn(name = "function_id")
   private AnomalyFunctionSpec function;

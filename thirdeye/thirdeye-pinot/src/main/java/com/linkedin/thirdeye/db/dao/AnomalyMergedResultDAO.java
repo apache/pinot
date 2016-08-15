@@ -9,20 +9,31 @@ import javax.persistence.NoResultException;
 
 public class AnomalyMergedResultDAO extends AbstractJpaDAO<AnomalyMergedResult> {
 
+
+  private static final String GET_ALL_BY_FUNCTION_ID =
+      "from AnomalyMergedResult amr where amr.function.id=:functionId order by amr.endTime desc";
+
+
   private static final String FIND_BY_COLLECTION_METRIC_DIMENSIONS_ORDER_BY_END_TIME =
       "from AnomalyMergedResult amr where amr.collection=:collection and amr.metric=:metric "
           + "and amr.dimensions=:dimensions order by amr.endTime desc";
 
-  private static final String FIND_BY_FUNCTION_DIMENSIONS =
+  private static final String FIND_BY_FUNCTION_AND_DIMENSIONS =
       "from AnomalyMergedResult amr where amr.function.id=:functionId "
           + "and amr.dimensions=:dimensions order by amr.endTime desc";
 
-  private static final String FIND_BY_FUNCTION_ONLY =
+  private static final String FIND_BY_FUNCTION_AND_NULL_DIMENSION =
       "from AnomalyMergedResult amr where amr.function.id=:functionId "
           + "and amr.dimensions is null order by amr.endTime desc";
 
   public AnomalyMergedResultDAO() {
     super(AnomalyMergedResult.class);
+  }
+
+  @Transactional
+  public List<AnomalyMergedResult> getAllByFunctionId(Long functionId) {
+    return getEntityManager().createQuery(GET_ALL_BY_FUNCTION_ID, entityClass)
+        .setParameter("functionId", functionId).getResultList();
   }
 
   @Transactional
@@ -51,7 +62,7 @@ public class AnomalyMergedResultDAO extends AbstractJpaDAO<AnomalyMergedResult> 
   @Transactional
   public AnomalyMergedResult findLatestByFunctionIdDimensions(Long functionId, String dimensions) {
     try {
-      return getEntityManager().createQuery(FIND_BY_FUNCTION_DIMENSIONS, entityClass)
+      return getEntityManager().createQuery(FIND_BY_FUNCTION_AND_DIMENSIONS, entityClass)
           .setParameter("functionId", functionId).setParameter("dimensions", dimensions)
           .setMaxResults(1).getSingleResult();
     } catch (NoResultException e) {
@@ -62,7 +73,7 @@ public class AnomalyMergedResultDAO extends AbstractJpaDAO<AnomalyMergedResult> 
   @Transactional
   public AnomalyMergedResult findLatestByFunctionIdOnly(Long functionId) {
     try {
-      return getEntityManager().createQuery(FIND_BY_FUNCTION_ONLY, entityClass)
+      return getEntityManager().createQuery(FIND_BY_FUNCTION_AND_NULL_DIMENSION, entityClass)
           .setParameter("functionId", functionId).setMaxResults(1).getSingleResult();
     } catch (NoResultException e) {
       return null;

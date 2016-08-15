@@ -43,7 +43,7 @@ public class ThirdEyeDashboardApplication
       LOG.error("Exception while loading caches", e);
     }
     env.jersey().register(new AnomalyFunctionResource(config));
-    env.jersey().register(new AnomalySummaryResource(anomalyResultDAO));
+    env.jersey().register(new AnomalySummaryResource(anomalyResultDAO, anomalyMergedResultDAO));
     env.jersey().register(new DashboardResource(BaseThirdEyeApplication.getDashboardConfigDAO(config)));
     env.jersey().register(new CacheResource());
     env.jersey().register(

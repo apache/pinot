@@ -20,8 +20,8 @@
         </li>
         <li id="anomalies-header-tab" class="header-tab" rel="self-service"><a href="#">Self
           Service</a></li>
-        <li id="anomalies-header-tab2" class="header-tab" rel="anomalies2" class="uk-hidden">
-          <!--<a href="#">Anomalies2</a>--></li>
+        <li id="anomalies-header-tab2" class="header-tab" rel="anomalies2" class="uk-hidden"></li>
+        <li id="anomalies-header-tab2" class="header-tab" rel="anomalies3" class="uk-hidden"></li>
       </ul>
 
 
@@ -40,6 +40,7 @@
     <li id="anomalies"></li>
     <li id="self-service"></li>
     <li id="anomalies2"></li>
+    <li id="anomalies3"></li>
   </ul>
 </div>
 

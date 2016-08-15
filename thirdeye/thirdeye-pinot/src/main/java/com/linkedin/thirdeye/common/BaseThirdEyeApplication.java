@@ -10,6 +10,7 @@ import com.linkedin.thirdeye.dashboard.configs.FileBasedConfigDAOFactory;
 import com.linkedin.thirdeye.dashboard.configs.WidgetConfig;
 import com.linkedin.thirdeye.db.dao.AnomalyFunctionDAO;
 import com.linkedin.thirdeye.db.dao.AnomalyJobDAO;
+import com.linkedin.thirdeye.db.dao.AnomalyMergedResultDAO;
 import com.linkedin.thirdeye.db.dao.AnomalyResultDAO;
 import com.linkedin.thirdeye.db.dao.AnomalyTaskDAO;
 import com.linkedin.thirdeye.db.dao.EmailConfigurationDAO;
@@ -31,7 +32,7 @@ public abstract class BaseThirdEyeApplication<T extends Configuration> extends A
   protected AnomalyJobDAO anomalyJobDAO;
   protected AnomalyTaskDAO anomalyTaskDAO;
   protected AnomalyFunctionRelationDAO anomalyFunctionRelationDAO;
-
+  protected AnomalyMergedResultDAO anomalyMergedResultDAO;
   public void initDAOs() {
     String persistenceConfig = System.getProperty("dw.rootDir") + "/persistence.yml";
     LOG.info("Loading persistence config from [{}]", persistenceConfig);
@@ -42,6 +43,7 @@ public abstract class BaseThirdEyeApplication<T extends Configuration> extends A
     anomalyFunctionRelationDAO = PersistenceUtil.getInstance(AnomalyFunctionRelationDAO.class);
     anomalyJobDAO = PersistenceUtil.getInstance(AnomalyJobDAO.class);
     anomalyTaskDAO = PersistenceUtil.getInstance(AnomalyTaskDAO.class);
+    anomalyMergedResultDAO = PersistenceUtil.getInstance(AnomalyMergedResultDAO.class);
   }
 
   // TODO below two methods depend on webapp configs
