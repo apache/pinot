@@ -103,6 +103,9 @@ public class MultiGetRequest {
           HttpClient client = new HttpClient(connectionManager);
           GetMethod getMethod = new GetMethod(url);
           getMethod.getParams().setSoTimeout(timeoutMs);
+          // if all connections in the connection manager are busy this will wait to retrieve a connection
+          // set time to wait to retrieve a connection from connection manager
+          client.getParams().setConnectionManagerTimeout(timeoutMs);
           client.executeMethod(getMethod);
           return getMethod;
         }

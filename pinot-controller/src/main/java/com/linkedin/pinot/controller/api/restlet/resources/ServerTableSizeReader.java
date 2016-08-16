@@ -29,6 +29,8 @@ import java.util.Map;
 import java.util.concurrent.CompletionService;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
+import org.apache.commons.httpclient.ConnectTimeoutException;
+import org.apache.commons.httpclient.ConnectionPoolTimeoutException;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.httpclient.URI;
 import org.apache.commons.httpclient.methods.GetMethod;
@@ -83,6 +85,10 @@ public class ServerTableSizeReader {
       } catch (ExecutionException e) {
         if (Throwables.getRootCause(e) instanceof SocketTimeoutException) {
           LOGGER.warn("Server request to read table size was timed out for table: {}", table, e);
+        } else if (Throwables.getRootCause(e) instanceof ConnectTimeoutException) {
+          LOGGER.warn("Server request to read table size timed out waiting for connection. table: {}", table, e);
+        } else if (Throwables.getRootCause(e) instanceof ConnectionPoolTimeoutException) {
+          LOGGER.warn("Server request to read table size timed out on getting a connection from pool, table: {}", table, e);
         } else {
           LOGGER.warn("Execution exception while reading segment sizes for table: {}", table, e);
         }

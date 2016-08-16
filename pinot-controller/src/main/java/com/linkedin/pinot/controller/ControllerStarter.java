@@ -91,7 +91,9 @@ public class ControllerStarter {
     LOGGER.info("injecting conf and resource manager to the api context");
     applicationContext.getAttributes().put(ControllerConf.class.toString(), config);
     applicationContext.getAttributes().put(PinotHelixResourceManager.class.toString(), helixResourceManager);
-    applicationContext.getAttributes().put(HttpConnectionManager.class.toString(), new MultiThreadedHttpConnectionManager());
+    MultiThreadedHttpConnectionManager connectionManager = new MultiThreadedHttpConnectionManager();
+    connectionManager.getParams().setConnectionTimeout(config.getServerAdminRequestTimeoutSeconds());
+    applicationContext.getAttributes().put(HttpConnectionManager.class.toString(), connectionManager);
     applicationContext.getAttributes().put(Executor.class.toString(), executorService);
 
     controllerRestApp.setContext(applicationContext);
