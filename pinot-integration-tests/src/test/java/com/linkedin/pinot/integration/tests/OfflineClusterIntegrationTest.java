@@ -309,36 +309,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
     }
   }
 
-  /**
-   * Test for query validation:
-   * - Issues a query with larger than allowed 'limit'/'top' values and ensures
-   *   the response has the expected error code.
-   *
-   * @throws Exception
-   */
-  @Test
-  public void testQueryValidation()
-      throws Exception {
-    JSONObject response = postQuery("select * from myTable limit 99999");
-    JSONArray exceptions = response.getJSONArray("exceptions");
-    Assert.assertTrue(exceptions.length() > 0, "Expected exceptions in query response.");
-
-    JSONObject exception = exceptions.getJSONObject(0);
-    int errorCode = exception.getInt("errorCode");
-
-    Assert.assertEquals(errorCode, QueryException.QUERY_VALIDATION_ERROR_CODE, "Mis-match in error code.");
-
-    response = postQuery("select count(*) from myTable group by DaysSinceEpoch TOP 99999");
-    exceptions = response.getJSONArray("exceptions");
-    Assert.assertTrue(exceptions.length() > 0, "Expected exceptions in query response.");
-
-    exception = exceptions.getJSONObject(0);
-    errorCode = exception.getInt("errorCode");
-
-    Assert.assertEquals(errorCode, QueryException.QUERY_VALIDATION_ERROR_CODE, "Mis-match in error code.");
-
-  }
-
   @AfterClass
   public void tearDown() throws Exception {
     stopBroker();
