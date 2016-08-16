@@ -110,9 +110,9 @@ public class AnomalyMergeExecutor implements Runnable {
       totalBucketSize += bucketSizeSeconds;
     }
     if (totalBucketSize != 0) {
-      mergedResult.setScore((weightedScoreSum * normalizationFactor) / totalBucketSize);
-      // TODO: recompute weight by quering Pinot
-      mergedResult.setWeight((weightedWeightSum * normalizationFactor) / totalBucketSize);
+      mergedResult.setScore((weightedScoreSum / totalBucketSize) * normalizationFactor);
+      // TODO: recompute weight by querying Pinot
+      mergedResult.setWeight((weightedWeightSum / totalBucketSize) * normalizationFactor);
     }
     try {
       // persist the merged result
