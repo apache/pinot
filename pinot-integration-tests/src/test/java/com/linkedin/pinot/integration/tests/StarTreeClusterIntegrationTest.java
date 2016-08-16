@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.utils.FileUploadUtils;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.controller.helix.ControllerTestUtils;
@@ -27,6 +29,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.IOException;
+import java.net.URL;
 import java.sql.Timestamp;
 import java.util.List;
 import java.util.Map;
@@ -60,6 +63,7 @@ import org.testng.annotations.Test;
 public class StarTreeClusterIntegrationTest extends ClusterTest {
   private static final Logger LOGGER =
       LoggerFactory.getLogger(StarTreeClusterIntegrationTest.class);
+
 
   private static final int NUM_GENERATED_QUERIES = 100;
 
@@ -108,6 +112,21 @@ public class StarTreeClusterIntegrationTest extends ClusterTest {
   }
 
   /**
+   * Get schema with all single-value columns.
+   *
+   * @return Schema with all single-value columns.
+   * @throws IOException
+   */
+  private Schema getSingleValueColumnsSchema()
+      throws IOException {
+    URL resourceUrl = OfflineClusterIntegrationTest.class.getClassLoader()
+        .getResource("On_Time_On_Time_Performance_2014_100k_subset_nonulls_single_value_columns.schema");
+    Preconditions.checkNotNull(resourceUrl);
+    File schemaFile = new File(resourceUrl.getFile());
+    return Schema.fromFile(schemaFile);
+  }
+
+  /**
    * Generate the reference and star tree indexes and upload to corresponding tables.
    * @param avroFiles
    * @param tableName
@@ -123,7 +142,7 @@ public class StarTreeClusterIntegrationTest extends ClusterTest {
 
     ExecutorService executor = Executors.newCachedThreadPool();
     BaseClusterIntegrationTest.buildSegmentsFromAvro(avroFiles, executor, 0, _segmentsDir,
-        _tarredSegmentsDir, tableName, starTree, null);
+        _tarredSegmentsDir, tableName, starTree, getSingleValueColumnsSchema());
 
     executor.shutdown();
     executor.awaitTermination(TIMEOUT_IN_SECONDS, TimeUnit.SECONDS);

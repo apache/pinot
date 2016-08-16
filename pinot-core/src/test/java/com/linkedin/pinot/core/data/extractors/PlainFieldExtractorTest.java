@@ -17,8 +17,6 @@ package com.linkedin.pinot.core.data.extractors;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.data.TimeFieldSpec;
-import com.linkedin.pinot.common.data.TimeGranularitySpec;
 import com.linkedin.pinot.core.data.GenericRow;
 import java.util.HashMap;
 import java.util.Map;
@@ -29,10 +27,10 @@ import org.testng.annotations.Test;
 
 public class PlainFieldExtractorTest {
   private static final DataType[] ALL_TYPES =
-      {DataType.BOOLEAN, DataType.BYTE, DataType.CHAR, DataType.SHORT, DataType.INT, DataType.LONG, DataType.FLOAT,
-          DataType.DOUBLE, DataType.STRING};
-  // All types have single/multi-value except BOOLEAN.
-  private static final int NUMBER_OF_TYPES = 2 * ALL_TYPES.length - 1;
+      {DataType.INT, DataType.LONG, DataType.FLOAT, DataType.DOUBLE, DataType.STRING};
+  // All types have single/multi-value version.
+  private static final int NUMBER_OF_TYPES = 2 * ALL_TYPES.length;
+  private static final int INDEX_OF_STRING_TYPE = NUMBER_OF_TYPES - 2;
   private static final String TEST_COLUMN = "testColumn";
   private static final Schema[] ALL_TYPE_SCHEMAS = new Schema[NUMBER_OF_TYPES];
 
@@ -42,11 +40,9 @@ public class PlainFieldExtractorTest {
       ALL_TYPE_SCHEMAS[i++] = new Schema.SchemaBuilder().setSchemaName("testSchema")
           .addSingleValueDimension(TEST_COLUMN, dataType)
           .build();
-      if (dataType != DataType.BOOLEAN) {
-        ALL_TYPE_SCHEMAS[i++] = new Schema.SchemaBuilder().setSchemaName("testSchema")
-            .addMultiValueDimension(TEST_COLUMN, dataType)
-            .build();
-      }
+      ALL_TYPE_SCHEMAS[i++] = new Schema.SchemaBuilder().setSchemaName("testSchema")
+          .addMultiValueDimension(TEST_COLUMN, dataType)
+          .build();
     }
   }
 
@@ -131,8 +127,8 @@ public class PlainFieldExtractorTest {
       row.init(fieldMap);
       plainFieldExtractor.transform(row);
 
-      if (i > 14) {
-        // AnyClassWithToString only works with String (array).
+      // AnyClassWithToString only works with String (array).
+      if (i >= INDEX_OF_STRING_TYPE) {
         Assert.assertEquals(plainFieldExtractor.getTotalErrors(), 0);
         Assert.assertEquals(plainFieldExtractor.getTotalNulls(), 0);
         Assert.assertEquals(plainFieldExtractor.getTotalConversions(), 2);
@@ -146,29 +142,36 @@ public class PlainFieldExtractorTest {
 
   @Test
   public void automatedTest() {
-    Object[] objectArray = new Object[NUMBER_OF_TYPES];
-    objectArray[0] = true;
-    objectArray[1] = (byte) 65;
-    objectArray[2] = new Object[]{(byte) 65};
-    objectArray[3] = 'a';
-    objectArray[4] = new Object[]{'a'};
-    objectArray[5] = (short) 500;
-    objectArray[6] = new Object[]{(short) 500};
-    objectArray[7] = 500;
-    objectArray[8] = new Object[]{500};
-    objectArray[9] = 500L;
-    objectArray[10] = new Object[]{500L};
-    objectArray[11] = 500.5F;
-    objectArray[12] = new Object[]{500.5F};
-    objectArray[13] = 500.5;
-    objectArray[14] = new Object[]{500.5};
-    objectArray[15] = "true";
-    objectArray[16] = new Object[]{"true"};
+    int numTypes = 19;
+    Object[] objectArray = new Object[numTypes];
+
+    // Pinot data types.
+    objectArray[0] = 500;                                       // Integer
+    objectArray[1] = new Object[]{500};                         // Integer array
+    objectArray[2] = 500L;                                      // Long
+    objectArray[3] = new Object[]{500L};                        // Long array
+    objectArray[4] = 500.5F;                                    // Float
+    objectArray[5] = new Object[]{500.5F};                      // Float array
+    objectArray[6] = 500.5;                                     // Double
+    objectArray[7] = new Object[]{500.5};                       // Double array
+    objectArray[8] = "500";                                     // String
+    objectArray[9] = new Object[]{"500"};                       // String array
+
+    // Non-Pinot data types.
+    objectArray[10] = true;                                     // Boolean
+    objectArray[11] = (byte) 65;                                // Byte
+    objectArray[12] = new Object[]{(byte) 65};                  // Byte array
+    objectArray[13] = 'a';                                      // Character
+    objectArray[14] = new Object[]{'a'};                        // Character array
+    objectArray[15] = (short) 500;                              // Short
+    objectArray[16] = new Object[]{(short) 500};                // Short array
+    objectArray[17] = new AnyClassWithToString();               // Object
+    objectArray[18] = new Object[]{new AnyClassWithToString()}; // Object array
 
     GenericRow row = new GenericRow();
     Map<String, Object> fieldMap = new HashMap<>();
     for (int i = 0; i < NUMBER_OF_TYPES; i++) {
-      for (int j = 0; j < NUMBER_OF_TYPES; j++) {
+      for (int j = 0; j < numTypes; j++) {
         PlainFieldExtractor plainFieldExtractor = new PlainFieldExtractor(ALL_TYPE_SCHEMAS[i]);
         fieldMap.put(TEST_COLUMN, objectArray[j]);
         row.init(fieldMap);
@@ -182,15 +185,15 @@ public class PlainFieldExtractorTest {
           continue;
         }
 
-        // Check conversions to or from Boolean.
-        if (i == 0 || j == 0) {
-          if (i > 14 || j > 14) {
-            // Conversion between Boolean and String (array). (Allowed for String value "true")
+        // Check conversions from Object (array).
+        if (j == 10 || j >= 17/* Index of AnyClassWithToString */) {
+          if (i >= INDEX_OF_STRING_TYPE) {
+            // Conversions from Boolean or Object (array) to String (array). (Allowed)
             Assert.assertEquals(plainFieldExtractor.getTotalErrors(), 0);
             Assert.assertEquals(plainFieldExtractor.getTotalNulls(), 0);
             Assert.assertEquals(plainFieldExtractor.getTotalConversions(), 1);
           } else {
-            // Conversion between Boolean and non-String (array). (Not allowed)
+            // Conversions from Boolean or Object (array) to non-String (array). (Not allowed)
             Assert.assertEquals(plainFieldExtractor.getTotalErrors(), 1);
             Assert.assertEquals(plainFieldExtractor.getTotalNulls(), 0);
             Assert.assertEquals(plainFieldExtractor.getTotalConversions(), 0);
@@ -198,23 +201,7 @@ public class PlainFieldExtractorTest {
           continue;
         }
 
-        // Check conversions from String or String array.
-        if (j > 14) {
-          if (i == 3 || i == 4 || i > 14) {
-            // Conversion from String (array) to Character (array) or String (array). (Allowed)
-            Assert.assertEquals(plainFieldExtractor.getTotalErrors(), 0);
-            Assert.assertEquals(plainFieldExtractor.getTotalNulls(), 0);
-            Assert.assertEquals(plainFieldExtractor.getTotalConversions(), 1);
-          } else {
-            // Conversion from String (array) to non-Character (array). (Not allowed for String value "true")
-            Assert.assertEquals(plainFieldExtractor.getTotalErrors(), 1);
-            Assert.assertEquals(plainFieldExtractor.getTotalNulls(), 0);
-            Assert.assertEquals(plainFieldExtractor.getTotalConversions(), 0);
-          }
-          continue;
-        }
-
-        // Check other conversions.
+        // Check other conversions. (Because string value is "500", it can convert to any type)
         Assert.assertEquals(plainFieldExtractor.getTotalErrors(), 0);
         Assert.assertEquals(plainFieldExtractor.getTotalNulls(), 0);
         Assert.assertEquals(plainFieldExtractor.getTotalConversions(), 1);
@@ -224,9 +211,9 @@ public class PlainFieldExtractorTest {
 
   @Test
   public void timeSpecStringTest() {
-    Schema schema = new Schema();
-    schema.setSchemaName("testSchema");
-    schema.setTimeFieldSpec(new TimeFieldSpec("timeString", DataType.STRING, TimeUnit.DAYS));
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testSchema")
+        .addTime("timeString", TimeUnit.DAYS, DataType.STRING)
+        .build();
     PlainFieldExtractor plainFieldExtractor = new PlainFieldExtractor(schema);
     GenericRow row = new GenericRow();
     Map<String, Object> fieldMap = new HashMap<>();
@@ -240,11 +227,9 @@ public class PlainFieldExtractorTest {
 
   @Test
   public void differentIncomingOutgoingTimeSpecTest() {
-    Schema schema = new Schema();
-    schema.setSchemaName("testSchema");
-    TimeGranularitySpec incoming = new TimeGranularitySpec(DataType.INT, TimeUnit.DAYS, "incoming");
-    TimeGranularitySpec outgoing = new TimeGranularitySpec(DataType.LONG, TimeUnit.HOURS, "outgoing");
-    schema.setTimeFieldSpec(new TimeFieldSpec(incoming, outgoing));
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testSchema")
+        .addTime("incoming", TimeUnit.DAYS, DataType.INT, "outgoing", TimeUnit.HOURS, DataType.LONG)
+        .build();
     PlainFieldExtractor plainFieldExtractor = new PlainFieldExtractor(schema);
     GenericRow row = new GenericRow();
     Map<String, Object> fieldMap = new HashMap<>();

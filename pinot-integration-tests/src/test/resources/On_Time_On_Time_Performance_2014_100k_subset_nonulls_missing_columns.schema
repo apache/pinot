@@ -1,83 +1,67 @@
 {
-  "metricFieldSpecs" : [
+  "metricFieldSpecs": [
     {
       "dataType": "INT",
-      "name": "ActualElapsedTime",
-      "singleValueField": true
+      "name": "ActualElapsedTime"
     },
     {
       "dataType": "INT",
-      "name": "AirTime",
-      "singleValueField": true
+      "name": "AirTime"
     },
     {
       "dataType": "FLOAT",
-      "name": "ArrDelay",
-      "singleValueField": true
+      "name": "ArrDelay"
     },
     {
       "dataType": "INT",
-      "name": "ArrivalDelayGroups",
-      "singleValueField": true
+      "name": "ArrivalDelayGroups"
     },
     {
       "dataType": "DOUBLE",
-      "name": "ArrDelayMinutes",
-      "singleValueField": true
+      "name": "ArrDelayMinutes"
     },
     {
       "dataType": "INT",
-      "name": "Cancelled",
-      "singleValueField": true
+      "name": "Cancelled"
     },
     {
       "dataType": "INT",
-      "name": "CarrierDelay",
-      "singleValueField": true
+      "name": "CarrierDelay"
     },
     {
       "dataType": "INT",
-      "name": "DepDel15",
-      "singleValueField": true
+      "name": "DepDel15"
     },
     {
       "dataType": "DOUBLE",
-      "name": "DepDelay",
-      "singleValueField": true
+      "name": "DepDelay"
     },
     {
       "dataType": "FLOAT",
-      "name": "DepDelayMinutes",
-      "singleValueField": true
+      "name": "DepDelayMinutes"
     },
     {
       "dataType": "INT",
-      "name": "DepartureDelayGroups",
-      "singleValueField": true
+      "name": "DepartureDelayGroups"
     },
     {
       "dataType": "INT",
-      "name": "LateAircraftDelay",
-      "singleValueField": true
+      "name": "LateAircraftDelay"
     },
     {
       "dataType": "INT",
-      "name": "NASDelay",
-      "singleValueField": true
+      "name": "NASDelay"
     },
     {
       "dataType": "INT",
-      "name": "SecurityDelay",
-      "singleValueField": true
+      "name": "SecurityDelay"
     },
     {
       "dataType": "INT",
-      "name": "WeatherDelay",
-      "singleValueField": true
+      "name": "WeatherDelay"
     }
-
   ],
-  "dimensionFieldSpecs" : [
+  "dimensionFieldSpecs": [
     {
       "dataType": "LONG",
       "name": "AirlineID",
@@ -389,17 +373,17 @@
       "singleValueField": true
     }
   ],
-  "timeFieldSpec" : {
-    "incomingGranularitySpec" : {
+  "timeFieldSpec": {
+    "incomingGranularitySpec": {
       "dataType": "INT",
       "timeType": "DAYS",
       "name": "DaysSinceEpoch"
     },
-    "outgoingGranularitySpec" : {
+    "outgoingGranularitySpec": {
       "dataType": "INT",
       "timeType": "DAYS",
       "name": "DaysSinceEpoch"
     }
   },
-  "schemaName" : "fightDataSchema"
+  "schemaName": "fightDataSchema"
 }

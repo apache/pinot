@@ -48,7 +48,7 @@ public class TestOffheapStarTreeBuilder {
     for (int i = 0; i < numDimensions; i++) {
       String dimName = "d" + (i + 1);
       DimensionFieldSpec dimensionFieldSpec = new DimensionFieldSpec(dimName, DataType.STRING, true);
-      schema.addField(dimName, dimensionFieldSpec);
+      schema.addField(dimensionFieldSpec);
 
       if (i < (numDimensions - numSkipMaterializationDimensions)) {
         builderConfig.dimensionsSplitOrder.add(dimName);
@@ -61,7 +61,7 @@ public class TestOffheapStarTreeBuilder {
     for (int i = 0; i < numMetrics; i++) {
       String metricName = "m" + (i + 1);
       MetricFieldSpec metricFieldSpec = new MetricFieldSpec(metricName, DataType.INT);
-      schema.addField(metricName, metricFieldSpec);
+      schema.addField(metricFieldSpec);
     }
     builderConfig.maxLeafRecords = 10;
     builderConfig.schema = schema;
@@ -135,14 +135,14 @@ public class TestOffheapStarTreeBuilder {
     for (int i = 0; i < numDimensions; i++) {
       String dimName = "d" + (i + 1);
       DimensionFieldSpec dimensionFieldSpec = new DimensionFieldSpec(dimName, DataType.INT, true);
-      schema.addField(dimName, dimensionFieldSpec);
+      schema.addField(dimensionFieldSpec);
       builderConfig.dimensionsSplitOrder.add(dimName);
     }
     schema.setTimeFieldSpec(new TimeFieldSpec("daysSinceEpoch", DataType.INT, TimeUnit.DAYS));
     for (int i = 0; i < numMetrics; i++) {
       String metricName = "n" + (i + 1);
       MetricFieldSpec metricFieldSpec = new MetricFieldSpec(metricName, DataType.INT);
-      schema.addField(metricName, metricFieldSpec);
+      schema.addField(metricFieldSpec);
     }
     builderConfig.maxLeafRecords = 10;
     builderConfig.schema = schema;

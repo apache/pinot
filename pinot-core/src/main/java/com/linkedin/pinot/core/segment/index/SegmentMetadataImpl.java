@@ -177,7 +177,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
   private void setSchema(Schema schema) {
     for (String columnName : schema.getColumnNames()) {
-      _schema.addField(columnName, schema.getFieldSpecFor(columnName));
+      _schema.addField(schema.getFieldSpecFor(columnName));
     }
   }
 
@@ -281,7 +281,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     }
 
     for (final String column : _columnMetadataMap.keySet()) {
-      _schema.addField(column, _columnMetadataMap.get(column).toFieldSpec());
+      _schema.addField(_columnMetadataMap.get(column).toFieldSpec());
     }
   }
 

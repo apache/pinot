@@ -83,11 +83,11 @@ public class DataFetcherTest {
 
     // Create an index segment with the random dimension and metric values.
     final Schema schema = new Schema();
-    schema.addField(DIMENSION_NAME, new DimensionFieldSpec(DIMENSION_NAME, FieldSpec.DataType.STRING, true));
-    schema.addField(INT_METRIC_NAME, new MetricFieldSpec(INT_METRIC_NAME, FieldSpec.DataType.INT));
-    schema.addField(LONG_METRIC_NAME, new MetricFieldSpec(LONG_METRIC_NAME, FieldSpec.DataType.LONG));
-    schema.addField(FLOAT_METRIC_NAME, new MetricFieldSpec(FLOAT_METRIC_NAME, FieldSpec.DataType.FLOAT));
-    schema.addField(DOUBLE_METRIC_NAME, new MetricFieldSpec(DOUBLE_METRIC_NAME, FieldSpec.DataType.DOUBLE));
+    schema.addField(new DimensionFieldSpec(DIMENSION_NAME, FieldSpec.DataType.STRING, true));
+    schema.addField(new MetricFieldSpec(INT_METRIC_NAME, FieldSpec.DataType.INT));
+    schema.addField(new MetricFieldSpec(LONG_METRIC_NAME, FieldSpec.DataType.LONG));
+    schema.addField(new MetricFieldSpec(FLOAT_METRIC_NAME, FieldSpec.DataType.FLOAT));
+    schema.addField(new MetricFieldSpec(DOUBLE_METRIC_NAME, FieldSpec.DataType.DOUBLE));
 
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
     FileUtils.deleteQuietly(new File(INDEX_DIR_PATH));

@@ -15,6 +15,13 @@
  */
 package com.linkedin.pinot.core.indexsegment.utils;
 
+import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.data.DimensionFieldSpec;
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.data.MetricFieldSpec;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.data.TimeFieldSpec;
+import com.linkedin.pinot.core.data.readers.AvroRecordReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -31,12 +38,6 @@ import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.linkedin.pinot.common.data.DimensionFieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.MetricFieldSpec;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.data.TimeFieldSpec;
-import com.linkedin.pinot.core.data.readers.AvroRecordReader;
 
 
 /**
@@ -60,13 +61,10 @@ public class AvroUtils {
    * @throws IOException
    */
   public static Schema extractSchemaFromAvro(File avroFile) throws IOException {
-
-    final Schema schema = new Schema();
-    final DataFileStream<GenericRecord> dataStreamReader = getAvroReader(avroFile);
-    final org.apache.avro.Schema avroSchema = dataStreamReader.getSchema();
-    dataStreamReader.close();
-
-    return getPinotSchemaFromAvroSchema(avroSchema, getDefaultFieldTypes(avroSchema), TimeUnit.DAYS);
+    try (DataFileStream<GenericRecord> dataStreamReader = getAvroReader(avroFile)) {
+      org.apache.avro.Schema avroSchema = dataStreamReader.getSchema();
+      return getPinotSchemaFromAvroSchema(avroSchema, getDefaultFieldTypes(avroSchema), TimeUnit.DAYS);
+    }
   }
 
 
@@ -107,37 +105,40 @@ public class AvroUtils {
    * @return Return the equivalent pinot schema for the given avro schema.
    */
   private static Schema getPinotSchemaFromAvroSchema(org.apache.avro.Schema avroSchema,
-                                                     Map<String, FieldSpec.FieldType> fieldTypes,
-                                                     TimeUnit timeUnit) {
+      Map<String, FieldSpec.FieldType> fieldTypes, TimeUnit timeUnit) {
     Schema pinotSchema = new Schema();
 
     for (final Field field : avroSchema.getFields()) {
-      FieldSpec spec;
-      FieldSpec.DataType columnType;
+      String fieldName = field.name();
+      FieldSpec.DataType dataType;
 
       try {
-        columnType = AvroRecordReader.getColumnType(field);
+        dataType = AvroRecordReader.getColumnType(field);
       } catch (UnsupportedOperationException e) {
-        LOGGER.warn("Unsupported field type for field {} schema {}, using String instead.", field.name(), field.schema());
-        columnType = FieldSpec.DataType.STRING;
+        LOGGER.warn("Unsupported field type for field {} schema {}, using String instead.", fieldName, field.schema());
+        dataType = FieldSpec.DataType.STRING;
       }
 
-      FieldSpec.FieldType fieldType = fieldTypes.get(field.name());
-      if (fieldType == FieldSpec.FieldType.METRIC) {
-        spec = new MetricFieldSpec();
-        spec.setDataType(columnType);
-      } else if (fieldType == FieldSpec.FieldType.TIME) {
-        spec = new TimeFieldSpec(field.name(), columnType, timeUnit);
-      } else {
-        spec = new DimensionFieldSpec();
-        spec.setDataType(columnType);
+      FieldSpec.FieldType fieldType = fieldTypes.get(fieldName);
+      boolean isSingleValueField = AvroRecordReader.isSingleValueField(field);
+
+      switch (fieldType) {
+        case DIMENSION:
+          pinotSchema.addField(new DimensionFieldSpec(fieldName, dataType, isSingleValueField));
+          break;
+        case METRIC:
+          Preconditions.checkState(isSingleValueField, "Unsupported multi-value for metric field.");
+          pinotSchema.addField(new MetricFieldSpec(fieldName, dataType));
+          break;
+        case TIME:
+          Preconditions.checkState(isSingleValueField, "Unsupported multi-value for time field.");
+          pinotSchema.addField(new TimeFieldSpec(field.name(), dataType, timeUnit));
+          break;
+        default:
+          throw new UnsupportedOperationException("Unsupported field type: " + fieldType + " for field: " + fieldName);
       }
-
-      spec.setName(field.name());
-      spec.setSingleValueField(AvroRecordReader.isSingleValueField(field));
-
-      pinotSchema.addField(spec.getName(), spec);
     }
+
     return pinotSchema;
   }
 

@@ -172,14 +172,14 @@ public class BaseStarTreeIndexTest {
     for (int i = 0; i < NUM_DIMENSIONS; i++) {
       String dimName = "d" + (i + 1);
       DimensionFieldSpec dimensionFieldSpec = new DimensionFieldSpec(dimName, FieldSpec.DataType.STRING, true);
-      schema.addField(dimName, dimensionFieldSpec);
+      schema.addField(dimensionFieldSpec);
     }
 
     schema.setTimeFieldSpec(new TimeFieldSpec(TIME_COLUMN_NAME, FieldSpec.DataType.INT, TimeUnit.DAYS));
     for (int i = 0; i < NUM_METRICS; i++) {
       String metricName = "m" + (i + 1);
       MetricFieldSpec metricFieldSpec = new MetricFieldSpec(metricName, FieldSpec.DataType.INT);
-      schema.addField(metricName, metricFieldSpec);
+      schema.addField(metricFieldSpec);
     }
 
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);

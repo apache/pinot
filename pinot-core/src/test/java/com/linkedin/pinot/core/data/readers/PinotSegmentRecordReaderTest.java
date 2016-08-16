@@ -102,15 +102,15 @@ public class PinotSegmentRecordReaderTest {
     testSchema.setSchemaName("schema");
     FieldSpec spec;
     spec = new DimensionFieldSpec(D_SV_1, DataType.STRING, true);
-    testSchema.addField(D_SV_1, spec);
+    testSchema.addField(spec);
     spec = new DimensionFieldSpec(D_MV_1, DataType.STRING, false);
-    testSchema.addField(D_MV_1, spec);
+    testSchema.addField(spec);
     spec = new MetricFieldSpec(M1, DataType.INT);
-    testSchema.addField(M1, spec);
+    testSchema.addField(spec);
     spec = new MetricFieldSpec(M2, DataType.FLOAT);
-    testSchema.addField(M2, spec);
+    testSchema.addField(spec);
     spec = new TimeFieldSpec(new TimeGranularitySpec(DataType.LONG, TimeUnit.HOURS, TIME));
-    testSchema.addField(TIME, spec);
+    testSchema.addField(spec);
     return testSchema;
   }
 

@@ -426,11 +426,6 @@
       "dataType": "INT",
       "timeType": "DAYS",
       "name": "DaysSinceEpoch"
-    },
-    "outgoingGranularitySpec": {
-      "dataType": "INT",
-      "timeType": "DAYS",
-      "name": "DaysSinceEpoch"
     }
   },
   "schemaName": "mytable_OFFLINE"

@@ -22,7 +22,6 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.math.BigDecimal;
-import java.nio.ByteBuffer;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -110,7 +109,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   private static final int MAX_MESSAGES_PER_BATCH = 10000;
   private static final int MAX_MULTIVALUE_CARDINALITY = 5;
   protected static final boolean GATHER_FAILED_QUERIES = false;
-  protected static final String PINOT_SCHEMA_FILE = "OnTimeSchema.json";
+
   private int failedQueryCount = 0;
   private int queryCount = 0;
 
@@ -725,13 +724,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
             final SegmentGeneratorConfig genConfig = SegmentTestUtils
                 .getSegmentGenSpecWithSchemAndProjectedColumns(inputAvroFile, outputDir, TimeUnit.DAYS, tableName, inputPinotSchema);
 
-            if (createStarTreeIndex) {
-              final File pinotSchemaFile = new File(TestUtils.getFileFromResourceUrl(
-                  BaseClusterIntegrationTest.class.getClassLoader().getResource(PINOT_SCHEMA_FILE)));
-              com.linkedin.pinot.common.data.Schema pinotSchema =
-                  com.linkedin.pinot.common.data.Schema.fromFile(pinotSchemaFile);
-              genConfig.setSchema(pinotSchema);
-            } else if (inputPinotSchema != null) {
+            if (inputPinotSchema != null) {
               genConfig.setSchema(inputPinotSchema);
             }
 

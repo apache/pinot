@@ -95,11 +95,11 @@ public class DefaultGroupKeyGeneratorTest {
     Schema schema = new Schema();
     for (String singleValueColumn : SINGLE_VALUE_COLUMNS) {
       DimensionFieldSpec dimensionFieldSpec = new DimensionFieldSpec(singleValueColumn, FieldSpec.DataType.INT, true);
-      schema.addField(singleValueColumn, dimensionFieldSpec);
+      schema.addField(dimensionFieldSpec);
     }
     for (String multiValueColumn : MULTI_VALUE_COLUMNS) {
       DimensionFieldSpec dimensionFieldSpec = new DimensionFieldSpec(multiValueColumn, FieldSpec.DataType.INT, false);
-      schema.addField(multiValueColumn, dimensionFieldSpec);
+      schema.addField(dimensionFieldSpec);
     }
 
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);

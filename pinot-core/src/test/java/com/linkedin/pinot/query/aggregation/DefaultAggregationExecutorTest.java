@@ -206,7 +206,7 @@ public class DefaultAggregationExecutorTest {
     for (int i = 0; i < NUM_METRIC_COLUMNS; i++) {
       String metricName = METRIC_PREFIX + i;
       MetricFieldSpec metricFieldSpec = new MetricFieldSpec(metricName, FieldSpec.DataType.DOUBLE);
-      schema.addField(metricName, metricFieldSpec);
+      schema.addField(metricFieldSpec);
       _columns[i] = metricName;
     }
     return schema;

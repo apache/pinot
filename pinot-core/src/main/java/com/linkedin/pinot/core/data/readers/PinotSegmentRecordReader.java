@@ -208,7 +208,7 @@ public class PinotSegmentRecordReader extends BaseRecordReader {
       FieldType fieldType = columnMetadata.getFieldType();
       FieldSpec fieldSpec = null;
 
-      switch(fieldType) {
+      switch (fieldType) {
         case DIMENSION:
           boolean isSingleValue = columnMetadata.isSingleValue();
           fieldSpec = new DimensionFieldSpec(columnName, dataType, isSingleValue);
@@ -224,7 +224,7 @@ public class PinotSegmentRecordReader extends BaseRecordReader {
         default:
           break;
       }
-      schema.addField(columnName, fieldSpec);
+      schema.addField(fieldSpec);
     }
     return schema;
   }

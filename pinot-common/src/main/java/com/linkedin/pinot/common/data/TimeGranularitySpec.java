@@ -51,7 +51,7 @@ public class TimeGranularitySpec {
     Preconditions.checkNotNull(timeType);
     Preconditions.checkNotNull(name);
 
-    _dataType = dataType;
+    _dataType = dataType.getStoredType();
     _timeType = timeType;
     _name = name;
   }
@@ -61,7 +61,7 @@ public class TimeGranularitySpec {
     Preconditions.checkNotNull(timeType);
     Preconditions.checkNotNull(name);
 
-    _dataType = dataType;
+    _dataType = dataType.getStoredType();
     _timeType = timeType;
     _timeUnitSize = timeUnitSize;
     _name = name;
@@ -70,7 +70,7 @@ public class TimeGranularitySpec {
   public void setDataType(DataType dataType) {
     Preconditions.checkNotNull(dataType);
 
-    _dataType = dataType;
+    _dataType = dataType.getStoredType();
   }
 
   public DataType getDataType() {
@@ -92,7 +92,7 @@ public class TimeGranularitySpec {
     _timeUnitSize = timeUnitSize;
   }
 
-  // Required by JSON de-serializer (For backward compatible). DO NOT REMOVE.
+  // Required by JSON de-serializer (for backward compatible). DO NOT REMOVE.
   public void setTimeunitSize(int timeUnitSize) {
     _timeUnitSize = timeUnitSize;
   }

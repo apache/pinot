@@ -15,76 +15,62 @@
  */
 package com.linkedin.pinot.common.data;
 
+import com.google.common.base.Preconditions;
+import java.io.File;
+import java.io.IOException;
+import java.net.URL;
 import java.util.concurrent.TimeUnit;
-import org.codehaus.jackson.map.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
 public class SchemaTest {
   public static final Logger LOGGER = LoggerFactory.getLogger(SchemaTest.class);
 
-  private static String singleValueDim = "true";
-  private static String dimType = "\"STRING\"";
-  private static String metricType = "\"LONG\"";
+  private Schema schema;
 
-  private String makeSchema() {
-    return "{"
-        + "  \"schemaName\":\"TestSchema\","
-        + "  \"metricFieldSpecs\":["
-        + "    {\"dataType\":" + metricType + ",\"singleValueField\":true,\"name\":\"volume\"}"
-        + "  ],"
-        + "  \"dimensionFieldSpecs\":["
-        + "    {\"dataType\":" + dimType + ",\"singleValueField\":" + singleValueDim + ",\"name\":\"page\"}"
-        + "  ],"
-        + "  \"timeFieldSpec\":{"
-        + "    \"incomingGranularitySpec\":{\"dataType\":\"LONG\",\"timeType\":\"MILLISECONDS\",\"name\":\"tick\"},"
-        + "    \"defaultNullValue\":12345"
-        + "  }"
-        + "}";
+  @BeforeClass
+  public void setUp()
+      throws IOException {
+    URL resourceUrl = getClass().getClassLoader().getResource("schemaTest.schema");
+    Preconditions.checkNotNull(resourceUrl);
+    schema = Schema.fromFile(new File(resourceUrl.getFile()));
   }
 
   @Test
   public void testValidation() throws Exception {
-    ObjectMapper mapper = new ObjectMapper();
-    {
-      singleValueDim = "true";
-      dimType = "\"STRING\"";
-      metricType = "\"LONG\"";
+    Schema schemaToValidate;
 
-      String validSchema = makeSchema();
-      Schema schema = mapper.readValue(validSchema, Schema.class);
-      Assert.assertTrue(schema.validate(LOGGER));
-    }
-    {
-      singleValueDim = "true";
-      dimType = "\"STRING\"";
-      metricType = "\"BOOLEAN\"";
+    schemaToValidate = Schema.fromString(makeSchema(FieldSpec.DataType.LONG, FieldSpec.DataType.STRING, true));
+    Assert.assertTrue(schemaToValidate.validate(LOGGER));
 
-      String validSchema = makeSchema();
-      Schema schema = mapper.readValue(validSchema, Schema.class);
-      Assert.assertFalse(schema.validate(LOGGER));
-    }
-    {
-      singleValueDim = "false";
-      dimType = "\"STRING\"";
-      metricType = "\"STRING\"";
+    schemaToValidate = Schema.fromString(makeSchema(FieldSpec.DataType.BOOLEAN, FieldSpec.DataType.STRING, true));
+    Assert.assertFalse(schemaToValidate.validate(LOGGER));
 
-      String validSchema = makeSchema();
-      Schema schema = mapper.readValue(validSchema, Schema.class);
-      Assert.assertTrue(schema.validate(LOGGER)); // True since we have String metric like hll field
-    }
-    {
-      singleValueDim = "false";
-      dimType = "\"BOOLEAN\"";
-      metricType = "\"LONG\"";
+    schemaToValidate = Schema.fromString(makeSchema(FieldSpec.DataType.STRING, FieldSpec.DataType.STRING, false));
+    Assert.assertFalse(schemaToValidate.validate(LOGGER));
 
-      String validSchema = makeSchema();
-      Schema schema = mapper.readValue(validSchema, Schema.class);
-      Assert.assertTrue(schema.validate(LOGGER));
-    }
+    schemaToValidate = Schema.fromString(makeSchema(FieldSpec.DataType.LONG, FieldSpec.DataType.BOOLEAN, false));
+    Assert.assertTrue(schemaToValidate.validate(LOGGER));
+  }
+
+  private String makeSchema(FieldSpec.DataType metricType, FieldSpec.DataType dimensionType, boolean isSingleValue) {
+    return "{"
+        + "  \"schemaName\":\"SchemaTest\","
+        + "  \"metricFieldSpecs\":["
+        + "    {\"name\":\"m\",\"dataType\":\"" + metricType + "\"}"
+        + "  ],"
+        + "  \"dimensionFieldSpecs\":["
+        + "    {\"name\":\"d\",\"dataType\":\"" + dimensionType + "\",\"singleValueField\":" + isSingleValue + "}"
+        + "  ],"
+        + "  \"timeFieldSpec\":{"
+        + "    \"incomingGranularitySpec\":{\"dataType\":\"LONG\",\"timeType\":\"MILLISECONDS\",\"name\":\"time\"},"
+        + "    \"defaultNullValue\":12345"
+        + "  }"
+        + "}";
   }
 
   @Test
@@ -93,19 +79,48 @@ public class SchemaTest {
         .addSingleValueDimension("svDimension", FieldSpec.DataType.INT)
         .addMultiValueDimension("mvDimension", FieldSpec.DataType.STRING)
         .addMetric("metric", FieldSpec.DataType.INT)
-        .addTime("incomingTime", TimeUnit.DAYS, FieldSpec.DataType.LONG)
+        .addMetric("derivedMetric", FieldSpec.DataType.STRING, 10, MetricFieldSpec.DerivedMetricType.HLL)
+        .addTime("time", TimeUnit.DAYS, FieldSpec.DataType.LONG)
         .build();
 
-    Assert.assertEquals(schema.getDimensionSpec("svDimension").isSingleValueField(), true);
-    Assert.assertEquals(schema.getDimensionSpec("svDimension").getDataType(), FieldSpec.DataType.INT);
+    FieldSpec fieldSpec;
+    fieldSpec = schema.getDimensionSpec("svDimension");
+    Assert.assertNotNull(fieldSpec);
+    Assert.assertEquals(fieldSpec.isSingleValueField(), true);
+    Assert.assertEquals(fieldSpec.getDataType(), FieldSpec.DataType.INT);
 
-    Assert.assertEquals(schema.getDimensionSpec("mvDimension").isSingleValueField(), false);
-    Assert.assertEquals(schema.getDimensionSpec("mvDimension").getDataType(), FieldSpec.DataType.STRING);
+    fieldSpec = schema.getDimensionSpec("mvDimension");
+    Assert.assertNotNull(fieldSpec);
+    Assert.assertEquals(fieldSpec.isSingleValueField(), false);
+    Assert.assertEquals(fieldSpec.getDataType(), FieldSpec.DataType.STRING);
 
-    Assert.assertEquals(schema.getMetricSpec("metric").isSingleValueField(), true);
-    Assert.assertEquals(schema.getMetricSpec("metric").getDataType(), FieldSpec.DataType.INT);
+    fieldSpec = schema.getMetricSpec("metric");
+    Assert.assertNotNull(fieldSpec);
+    Assert.assertEquals(fieldSpec.isSingleValueField(), true);
+    Assert.assertEquals(fieldSpec.getDataType(), FieldSpec.DataType.INT);
 
-    Assert.assertEquals(schema.getTimeFieldSpec().isSingleValueField(), true);
-    Assert.assertEquals(schema.getTimeFieldSpec().getDataType(), FieldSpec.DataType.LONG);
+    fieldSpec = schema.getMetricSpec("derivedMetric");
+    Assert.assertNotNull(fieldSpec);
+    Assert.assertEquals(fieldSpec.isSingleValueField(), true);
+    Assert.assertEquals(fieldSpec.getDataType(), FieldSpec.DataType.STRING);
+
+    fieldSpec = schema.getTimeFieldSpec();
+    Assert.assertNotNull(fieldSpec);
+    Assert.assertEquals(fieldSpec.isSingleValueField(), true);
+    Assert.assertEquals(fieldSpec.getDataType(), FieldSpec.DataType.LONG);
+  }
+
+  @Test
+  public void testSerializeDeserialize()
+      throws IOException, IllegalAccessException {
+    Schema newSchema;
+
+    newSchema = Schema.fromString(schema.getJSONSchema());
+    Assert.assertEquals(newSchema, schema);
+    Assert.assertEquals(newSchema.hashCode(), schema.hashCode());
+
+    newSchema = Schema.fromZNRecord(Schema.toZNRecord(schema));
+    Assert.assertEquals(newSchema, schema);
+    Assert.assertEquals(newSchema.hashCode(), schema.hashCode());
   }
 }

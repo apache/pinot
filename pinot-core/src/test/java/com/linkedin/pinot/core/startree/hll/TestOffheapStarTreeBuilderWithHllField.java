@@ -53,12 +53,12 @@ public class TestOffheapStarTreeBuilderWithHllField {
       // add member id dimension spec
       String dimName = memberIdFieldName;
       DimensionFieldSpec dimensionFieldSpec = new DimensionFieldSpec(dimName, DataType.INT, true);
-      schema.addField(dimName, dimensionFieldSpec);
+      schema.addField(dimensionFieldSpec);
       // add other dimension specs
       for (int i = 1; i < numDimensions; i++) {
         dimName = "d" + (i + 1);
         dimensionFieldSpec = new DimensionFieldSpec(dimName, DataType.STRING, true);
-        schema.addField(dimName, dimensionFieldSpec);
+        schema.addField(dimensionFieldSpec);
 
         if (i < (numDimensions - numSkipMaterializationDimensions)) {
           builderConfig.dimensionsSplitOrder.add(dimName);
@@ -72,13 +72,13 @@ public class TestOffheapStarTreeBuilderWithHllField {
       for (int i = 0; i < numMetrics - 1; i++) {
         String metricName = "m" + (i + 1);
         MetricFieldSpec metricFieldSpec = new MetricFieldSpec(metricName, DataType.INT);
-        schema.addField(metricName, metricFieldSpec);
+        schema.addField(metricFieldSpec);
       }
       // add hll metric
       String hllMetricName = memberIdFieldName + hllDeriveFieldSuffix;
       MetricFieldSpec hllDerivedFieldSpec = new MetricFieldSpec(hllMetricName, FieldSpec.DataType.STRING,
           HllUtil.getHllFieldSizeFromLog2m(log2m), MetricFieldSpec.DerivedMetricType.HLL);
-      schema.addField(hllMetricName, hllDerivedFieldSpec);
+      schema.addField(hllDerivedFieldSpec);
       //
       builderConfig.maxLeafRecords = 10;
       builderConfig.schema = schema;
