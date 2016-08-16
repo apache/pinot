@@ -68,7 +68,7 @@ public class TestAnomalyResultDAO extends AbstractDbTestBase {
     AnomalyFunctionSpec functionSpec = result.getFunction();
 
     anomalyResultDAO.deleteById(anomalyResult.getId());
-    anomalyFunctionDAO.delete(functionSpec);
+    anomalyFunctionDAO.deleteById(functionSpec.getId());
   }
 
 }

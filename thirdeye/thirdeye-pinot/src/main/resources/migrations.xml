@@ -481,7 +481,6 @@
       </column>
     </addColumn>
   </changeSet>
-
   <changeSet id="19" author="pjaiswal">
     <createTable tableName="anomaly_merged_results">
       <column name="id" type="bigint" autoIncrement="true">
@@ -506,15 +505,15 @@
         <constraints nullable="false"/>
       </column>
       <column name="anomaly_feedback_id" type="bigint" defaultValue="null">
-        <constraints nullable="true" foreignKeyName="fk_merged_results_feedback_idx"
-                     referencedTableName="anomaly_feedback" referencedColumnNames="id"/>
+        <constraints nullable="true" foreignKeyName="fk_merged_results_feedback_idx" referencedTableName="anomaly_feedback"
+          referencedColumnNames="id"/>
       </column>
     </createTable>
 
     <addColumn tableName="anomaly_results">
       <column name="merged_result_id" type="bigint" defaultValue="null">
-        <constraints nullable="true" foreignKeyName="fk_anomaly_merged_results_idx"
-                     referencedTableName="anomaly_merged_results" referencedColumnNames="id"/>
+        <constraints nullable="true" foreignKeyName="fk_anomaly_merged_results_idx" referencedTableName="anomaly_merged_results"
+          referencedColumnNames="id"/>
       </column>
     </addColumn>
   </changeSet>
@@ -551,6 +550,29 @@
         <constraints nullable="false" foreignKeyName="fk_anomaly_results_idx" referencedTableName="anomaly_results" />
       </column>
     </createTable>
+  </changeSet>
+
+   <changeSet id="21" author="npawar">
+  <!-- WebappConfigs -->
+    <createTable tableName="webapp_configs">
+      <column name="id" type="bigint" autoIncrement="true">
+        <constraints primaryKey="true" nullable="false"/>
+      </column>
+      <column name="config_id" type="bigint">
+        <constraints nullable="false"/>
+      </column>
+      <column name="collection" type="varchar(127)">
+        <constraints nullable="false"/>
+      </column>
+      <column name="config_type" type="varchar(127)">
+        <constraints nullable="false"/>
+      </column>
+      <column name="config" type="text">
+        <constraints nullable="false"/>
+      </column>
+    </createTable>
+    <addUniqueConstraint constraintName="unique_config_constraint"
+    columnNames="config_id,collection,config_type" tableName="webapp_configs"/>
   </changeSet>
 
 </databaseChangeLog>

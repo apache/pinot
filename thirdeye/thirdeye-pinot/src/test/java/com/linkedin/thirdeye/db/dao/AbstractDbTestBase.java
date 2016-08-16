@@ -31,6 +31,7 @@ public abstract class AbstractDbTestBase {
   protected AnomalyTaskDAO anomalyTaskDAO;
   protected EmailConfigurationDAO emailConfigurationDAO;
   protected AnomalyMergedResultDAO mergedResultDAO;
+  protected WebappConfigDAO webappConfigDAO;
   private EntityManager entityManager;
 
   @BeforeClass(alwaysRun = true)
@@ -44,6 +45,7 @@ public abstract class AbstractDbTestBase {
     anomalyTaskDAO = PersistenceUtil.getInstance(AnomalyTaskDAO.class);
     emailConfigurationDAO = PersistenceUtil.getInstance(EmailConfigurationDAO.class);
     mergedResultDAO = PersistenceUtil.getInstance(AnomalyMergedResultDAO.class);
+    webappConfigDAO = PersistenceUtil.getInstance(WebappConfigDAO.class);
     entityManager = PersistenceUtil.getInstance(EntityManager.class);
   }
 

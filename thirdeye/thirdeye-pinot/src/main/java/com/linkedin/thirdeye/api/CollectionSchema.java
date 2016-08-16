@@ -8,8 +8,6 @@ import java.util.List;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.linkedin.thirdeye.dashboard.configs.AbstractConfig;
 
 @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, include = JsonTypeInfo.As.PROPERTY, property = "@class")
@@ -136,6 +134,11 @@ public final class CollectionSchema extends AbstractConfig{
   @Override
   public String toJSON() throws Exception {
     return OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(this);
+  }
+
+  @Override
+  public int getConfigId() {
+    return 0;
   }
 
 }

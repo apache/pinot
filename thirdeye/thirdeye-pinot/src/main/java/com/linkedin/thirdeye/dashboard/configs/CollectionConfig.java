@@ -97,4 +97,10 @@ public class CollectionConfig extends AbstractConfig {
     return OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(this);
   }
 
+  @Override
+  public int getConfigId() {
+    return 0;
+  }
+
+
 }
