@@ -1,7 +1,7 @@
 function getHeatmap(tab) {
 
     var url = "/dashboard/data/heatmap?" + window.location.hash.substring(1);
-    getData(url, tab).done(function (data) {
+    getData(url, tab).done(function (heatMapData) {
 
         var templatePlaceHolder;
         switch(tab){
@@ -12,15 +12,37 @@ function getHeatmap(tab) {
                 templatePlaceHolder = $("#" + tab + "-display-chart-section")
         }
 
-        renderD3heatmap(data, tab, templatePlaceHolder);
+        renderD3heatmap(heatMapData, tab, templatePlaceHolder);
 
         heatMapEventListeners(tab);
 
+        //AJAX
+        var url = "/dashboard/summary/autoDimensionOrder?" +
+            "dataset="   + hash.dataset + //"thirdeyeKbmi" +
+            "&metrics=" + hash.metrics + //"desktopPageViews" +
+            "&baselineStart="+ hash.baselineStart + //"1470553200000" +
+            "&currentStart="+ hash.currentStart + //"1471158000000" +
+            "&aggTimeGranularity=" + "DAYS" +// hash.aggTimeGranularity +
+            "&dimensions="+ hash.dimensions + // "browserName,continent,countryCode,deviceName,environment,locale,osName,pageKey,service,sourceApp" +
+            "&topDimensions=3" +
+            "&oneSideError=true" +
+            "&summarySize=15"
+
+        getData(url).done(function(summaryData){
+
+            console.log("summaryData")
+            console.log(summaryData)
+
+
+            renderD3heatmap(heatMapData, summaryData, tab);
+
+            heatMapEventListeners(tab);
+
+        })
     });
 };
 
 function renderD3heatmap(data, tab, templatePlaceHolder) {
-
     //Error handling when data is falsy (empty, undefined or null)
     if (!data) {
         $("#" + tab + "-chart-area-error").empty()
@@ -33,9 +55,11 @@ function renderD3heatmap(data, tab, templatePlaceHolder) {
         $("#" + tab + "-chart-area-error").hide()
     }
 
-    /* Handelbars template for treemap table */
+    //var summaryData = {"dimensions":["continent","countryCode","pageKey"],"responseRows":[{"names":["(ALL)-","(ALL)","(ALL)"],"baselineValue":290076771,"currentValue":290989633,"ratio":1.0031469669110458},{"names":["unknown","(ALL)-","(ALL)"],"baselineValue":49637728,"currentValue":42080059,"ratio":0.8477434543337681},{"names":["unknown","other","p_flagship3_feed_updates"],"baselineValue":12438174,"currentValue":8903781,"ratio":0.7158430972263292},{"names":["Oceania","au","(ALL)"],"baselineValue":17854104,"currentValue":15000436,"ratio":0.8401673923261564},{"names":["North America","us","(ALL)-"],"baselineValue":120970350,"currentValue":105194842,"ratio":0.8695919454643225},{"names":["North America","us","p_flagship3_people_pymk"],"baselineValue":11642301,"currentValue":8071474,"ratio":0.693288551807757},{"names":["North America","us","p_flagship3_feed_updates"],"baselineValue":24534044,"currentValue":17338875,"ratio":0.7067271502407023},{"names":["North America","ca","(ALL)"],"baselineValue":21769165,"currentValue":18074492,"ratio":0.8302795261095224},{"names":["Latin America","br","(ALL)"],"baselineValue":22534261,"currentValue":17793288,"ratio":0.7896104513922156},{"names":["Europe","fr","(ALL)"],"baselineValue":20051472,"currentValue":16703293,"ratio":0.8330207877007733}]};
 
-    var result_treemap_template = HandleBarsTemplates.template_treemap(data)
+    /* Handelbars template for treemap table */
+    var combinedData = {heatMapData : heatMapData, summaryData : summaryData}
+    var result_treemap_template = HandleBarsTemplates.template_treemap(combinedData)
     templatePlaceHolder.html(result_treemap_template);
 
     //var invertColorMetrics
@@ -130,7 +154,6 @@ function renderD3heatmap(data, tab, templatePlaceHolder) {
             var placeholder_0 = '#metric_' + metric + '_dim_' + d + '_treemap_0'
             var placeholder_1 = '#metric_' + metric + '_dim_' + d + '_treemap_1'
             var placeholder_2 = '#metric_' + metric + '_dim_' + d + '_treemap_2'
-
 
             var mousemove = function (d) {
 
@@ -263,6 +286,15 @@ function renderD3heatmap(data, tab, templatePlaceHolder) {
             drawTreemap(root_2, placeholder_2)
 
         }
+
+
+        //Create dataTable instance of summary table
+        $(".difference-summary").each(function(){
+            var metricName = $(this).attr("data-metric");
+            console.log("#heat-map-" + metric +"-difference-summary-table")
+            $("#heat-map-" + metric +"-difference-summary-table").DataTable();
+        })
+
     }
 }
 
@@ -324,30 +356,5 @@ function heatMapEventListeners(tab) {
             window.location.hash = encodeHashParameters(hash);
         }
     })
-
-    $("#treemap_contribution-difference-summary").click(function(){
-
-      //AJAX
-      var url = '/dashboard/summary/autoDimensionOrder?dataset=thirdeyeKbmi&metrics='
-        + 'desktopPageViews&baselineStart=1470326400000&currentStart=1470931200000&aggTimeGranularity=HOURS&dimensions=browserName,continent,countryCode,deviceName,environment,locale,osName,pageKey,service,sourceApp&'
-        //+hierarchies=[["continent","countryCode"]]
-        + '&topDimensions=3&oneSideError=false&summarySize=10'
-      getData(url).done(function(){
-
-           var data = {"dimensions":["continent","countryCode","pageKey"],"responseRows":[{"names":["(ALL)-","(ALL)","(ALL)"],"baselineValue":290076771,"currentValue":290989633,"ratio":1.0031469669110458},{"names":["unknown","(ALL)-","(ALL)"],"baselineValue":49637728,"currentValue":42080059,"ratio":0.8477434543337681},{"names":["unknown","other","p_flagship3_feed_updates"],"baselineValue":12438174,"currentValue":8903781,"ratio":0.7158430972263292},{"names":["Oceania","au","(ALL)"],"baselineValue":17854104,"currentValue":15000436,"ratio":0.8401673923261564},{"names":["North America","us","(ALL)-"],"baselineValue":120970350,"currentValue":105194842,"ratio":0.8695919454643225},{"names":["North America","us","p_flagship3_people_pymk"],"baselineValue":11642301,"currentValue":8071474,"ratio":0.693288551807757},{"names":["North America","us","p_flagship3_feed_updates"],"baselineValue":24534044,"currentValue":17338875,"ratio":0.7067271502407023},{"names":["North America","ca","(ALL)"],"baselineValue":21769165,"currentValue":18074492,"ratio":0.8302795261095224},{"names":["Latin America","br","(ALL)"],"baselineValue":22534261,"currentValue":17793288,"ratio":0.7896104513922156},{"names":["Europe","fr","(ALL)"],"baselineValue":20051472,"currentValue":16703293,"ratio":0.8330207877007733}]};
-          // $(".dimension-heat-map-treemap-section").each(function(){
-          //    $(this).append("<div class='difference-summary-section'></div>")
-          //})
-
-
-        //Handelbars compile difference summary template
-        var result_difference_summary_template = HandleBarsTemplates.template_difference_summary(data)
-        $(".treemap-container:last-child").each(function(){
-              console.log(result_difference_summary_template);
-              $(this).append(result_difference_summary_template);
-        })
-      })
-
-    });
 
 }
