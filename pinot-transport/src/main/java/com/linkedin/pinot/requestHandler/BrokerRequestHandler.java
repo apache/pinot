@@ -189,7 +189,7 @@ public class BrokerRequestHandler {
    *
    * @param brokerRequest
    */
-  private void validateRequest(BrokerRequest brokerRequest) {
+  public void validateRequest(BrokerRequest brokerRequest) {
     if (brokerRequest.isSetAggregationsInfo()) {
       if (brokerRequest.isSetGroupBy()) {
         long topN = brokerRequest.getGroupBy().getTopN();
