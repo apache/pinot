@@ -11,6 +11,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import javax.persistence.PersistenceException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,6 +33,10 @@ public class AnomalyMergeExecutor implements Runnable {
     this.anomalyResultDAO = anomalyResultDAO;
     this.anomalyFunctionDAO = anomalyFunctionDAO;
     this.executorService = executorService;
+  }
+
+  public void start() {
+    executorService.scheduleWithFixedDelay(this, 1, 2, TimeUnit.MINUTES);
   }
 
   public void stop() {

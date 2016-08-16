@@ -21,7 +21,6 @@ import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 
 public class ThirdEyeAnomalyApplication
     extends BaseThirdEyeApplication<ThirdEyeAnomalyConfiguration> {
@@ -94,7 +93,7 @@ public class ThirdEyeAnomalyApplication
           anomalyMergeExecutor =
               new AnomalyMergeExecutor(anomalyMergedResultDAO, anomalyFunctionDAO, anomalyResultDAO,
                   executorService);
-          executorService.scheduleWithFixedDelay(anomalyMergeExecutor, 1, 2, TimeUnit.MINUTES);
+          anomalyMergeExecutor.start();
         }
       }
 
