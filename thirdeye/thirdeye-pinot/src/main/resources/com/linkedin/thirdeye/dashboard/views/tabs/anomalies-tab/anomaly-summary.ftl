@@ -1,11 +1,11 @@
 <section id="anomaly-summary-template-section">
   <script id="anomaly-summary-template" type="text/x-handlebars-template">
-    <table id="anomaly-summary-table" class="anomaly2" style="table-layout:fixed;">
+    <table id="anomaly-summary-table" class="anomaly2">
       <thead>
       <tr>
         <td>id</td>
-        <td style="width:15%;white-space:no-wrap;">startTime</td>
-        <td style="width:15%;white-space:no-wrap;">endTime</td>
+        <td>startTime</td>
+        <td>endTime</td>
         <td>function id</td>
         <td>collection</td>
         <td>metric</td>
@@ -18,8 +18,8 @@
       {{#each this as |summary summaryIndex|}}
       <tr class="anomaly-summary">
         <td>{{summary/id}}</td>
-        <td style="width:15%;white-space:no-wrap;">{{millisToDate summary/startTime}}</td>
-        <td style="width:15%;white-space:no-wrap;">{{millisToDate summary/endTime}}</td>
+        <td>{{millisToDate summary/startTime}}</td>
+        <td>{{millisToDate summary/endTime}}</td>
         <td>{{summary/function/id}}</td>
         <td>{{summary/collection}}</td>
         <td>{{summary/metric}}</td>

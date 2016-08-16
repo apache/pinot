@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.anomaly;
 
+import com.linkedin.thirdeye.anomaly.merge.AnomalyMergeExecutor;
 import io.dropwizard.assets.AssetsBundle;
 import io.dropwizard.lifecycle.Managed;
 import io.dropwizard.setup.Bootstrap;
@@ -18,6 +19,8 @@ import com.linkedin.thirdeye.anomaly.task.TaskDriver;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 
 public class ThirdEyeAnomalyApplication
     extends BaseThirdEyeApplication<ThirdEyeAnomalyConfiguration> {
@@ -27,6 +30,7 @@ public class ThirdEyeAnomalyApplication
   private MonitorJobScheduler monitorJobScheduler = null;
   private AlertJobScheduler alertJobScheduler = null;
   private AnomalyFunctionFactory anomalyFunctionFactory = null;
+  private AnomalyMergeExecutor anomalyMergeExecutor = null;
 
   public static void main(final String[] args) throws Exception {
     List<String> argList = new ArrayList<String>(Arrays.asList(args));
@@ -84,6 +88,13 @@ public class ThirdEyeAnomalyApplication
           environment.jersey()
           .register(new AlertJobResource(alertJobScheduler, emailConfigurationDAO));
         }
+        if (config.isMerger()) {
+          ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
+          anomalyMergeExecutor =
+              new AnomalyMergeExecutor(anomalyMergedResultDAO, anomalyFunctionDAO, anomalyResultDAO,
+                  executorService);
+          anomalyMergeExecutor.start();
+        }
       }
 
       @Override
@@ -99,6 +110,9 @@ public class ThirdEyeAnomalyApplication
         }
         if (config.isAlert()) {
           alertJobScheduler.stop();
+        }
+        if (config.isMerger()) {
+          anomalyMergeExecutor.stop();
         }
       }
     });

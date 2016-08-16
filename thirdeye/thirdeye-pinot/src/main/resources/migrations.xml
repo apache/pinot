@@ -575,4 +575,11 @@
     columnNames="config_id,collection,config_type" tableName="webapp_configs"/>
   </changeSet>
 
+  <changeSet id="22" author="pjaiswal">
+    <addColumn tableName="anomaly_merged_results">
+      <column name="weight" type="double" defaultValue="0.0">
+        <constraints nullable="false"/>
+      </column>
+    </addColumn>
+  </changeSet>
 </databaseChangeLog>

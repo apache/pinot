@@ -9,6 +9,9 @@ import com.linkedin.thirdeye.db.dao.AnomalyMergedResultDAO;
 import com.linkedin.thirdeye.db.dao.AnomalyResultDAO;
 import java.io.File;
 import java.io.IOException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class AnomalyMergeTester {
 
@@ -23,11 +26,18 @@ public class AnomalyMergeTester {
     AnomalyResultDAO resultDAO = PersistenceUtil.getInstance(AnomalyResultDAO.class);
     AnomalyMergedResultDAO mergedResultDAO = PersistenceUtil.getInstance(AnomalyMergedResultDAO.class);
     AnomalyFunctionDAO functionDAO = PersistenceUtil.getInstance(AnomalyFunctionDAO.class);
-    AnomalyMergeExecutor executor = new AnomalyMergeExecutor(mergedResultDAO, functionDAO, resultDAO, config);
-    while (true) {
-      executor.updateMergedResults();
-      System.out.println("Sleeping for 1 min");
-      Thread.sleep(60_000);
+    ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
+    AnomalyMergeExecutor anomalyMergeExecutor = new AnomalyMergeExecutor(mergedResultDAO, functionDAO, resultDAO, executorService);
+    System.out.println("Starting in 1 minute");
+    executorService.scheduleWithFixedDelay(anomalyMergeExecutor, 1, 2, TimeUnit.MINUTES);
+    int ch = '0';
+    while(ch != 'q') {
+      System.out.println("press q to quit");
+      ch = System.in.read();
+      if(ch == 'q') {
+        executorService.shutdown();
+        break;
+      }
     }
   }
 }

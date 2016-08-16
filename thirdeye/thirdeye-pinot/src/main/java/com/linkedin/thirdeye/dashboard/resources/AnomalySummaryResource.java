@@ -8,7 +8,6 @@ import com.linkedin.thirdeye.db.dao.AnomalyMergedResultDAO;
 import com.linkedin.thirdeye.db.entity.AnomalyMergedResult;
 import com.linkedin.thirdeye.db.dao.AnomalyResultDAO;
 import com.linkedin.thirdeye.db.entity.AnomalyResult;
-import java.util.Collections;
 import java.util.List;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -35,9 +34,15 @@ public class AnomalySummaryResource {
 
   @GET
   @Path("merged")
-  public List<AnomalyMergedResult> getMergedResults() {
-    List<AnomalyMergedResult> mergedResults = mergedResultDAO.findAll();
-    Collections.reverse(mergedResults);
+  public List<AnomalyMergedResult> getMergedResults(@QueryParam("startTime") Long startTime,
+      @QueryParam("endTime") Long endTime) {
+    if(startTime == null) {
+      startTime = 0l;
+    }
+    if(endTime == null) {
+      endTime = System.currentTimeMillis();
+    }
+    List<AnomalyMergedResult> mergedResults = mergedResultDAO.getAllByTime(startTime, endTime);
     return mergedResults;
   }
 

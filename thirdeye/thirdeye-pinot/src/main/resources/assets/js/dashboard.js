@@ -195,7 +195,12 @@ $(document).ready( function() {
     // Load anomalies 3
     if (hash.view === 'anomalies3') {
         $("#anomalies3").append(
-            "<h2>View merged anomalies</h2>" + "<div id='anomaly-merged-summary'></div>");
+            "<h2>View merged anomalies</h2>"
+            + "Select Time Range <select id='time-range' onchange='renderMergedAnomalies()'>"
+            + "<option value='6' >Last 6 hours</option>" + "<option value='24' >Last 1 day</option>"
+            + "<option value='168' selected='selected'>Last 1 week</option>"
+            + "<option value='336'>Last 2 weeks</option>" + "<option value='720'>Last 1 Month</option>"
+            + "<option value='0' >All Time</option></select><div id='anomaly-merged-summary'></div>");
         renderMergedAnomalies();
         routeToTab();
     }

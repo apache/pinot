@@ -8,6 +8,8 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
   private boolean worker = false;
   private boolean monitor = false;
   private boolean alert = false;
+  private boolean merger = false;
+
   private long id;
   private String dashboardHost;
   private SmtpConfiguration smtpConfiguration;
@@ -73,6 +75,14 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
 
   public SmtpConfiguration getSmtpConfiguration() {
     return smtpConfiguration;
+  }
+
+  public boolean isMerger() {
+    return merger;
+  }
+
+  public void setMerger(boolean merger) {
+    this.merger = merger;
   }
 
   public void setSmtpConfiguration(SmtpConfiguration smtpConfiguration) {

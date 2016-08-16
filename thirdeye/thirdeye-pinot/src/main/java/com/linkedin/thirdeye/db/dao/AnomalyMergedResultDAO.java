@@ -9,11 +9,6 @@ import javax.persistence.NoResultException;
 
 public class AnomalyMergedResultDAO extends AbstractJpaDAO<AnomalyMergedResult> {
 
-
-  private static final String GET_ALL_BY_FUNCTION_ID =
-      "from AnomalyMergedResult amr where amr.function.id=:functionId order by amr.endTime desc";
-
-
   private static final String FIND_BY_COLLECTION_METRIC_DIMENSIONS_ORDER_BY_END_TIME =
       "from AnomalyMergedResult amr where amr.collection=:collection and amr.metric=:metric "
           + "and amr.dimensions=:dimensions order by amr.endTime desc";
@@ -26,14 +21,18 @@ public class AnomalyMergedResultDAO extends AbstractJpaDAO<AnomalyMergedResult> 
       "from AnomalyMergedResult amr where amr.function.id=:functionId "
           + "and amr.dimensions is null order by amr.endTime desc";
 
+  private static final String FIND_BY_TIME =
+      "SELECT r FROM AnomalyMergedResult r WHERE ((r.startTime >= :startTime AND r.startTime <= :endTime) "
+          + "OR (r.endTime >= :startTime AND r.endTime <= :endTime)) order by r.endTime desc ";
+
   public AnomalyMergedResultDAO() {
     super(AnomalyMergedResult.class);
   }
 
   @Transactional
-  public List<AnomalyMergedResult> getAllByFunctionId(Long functionId) {
-    return getEntityManager().createQuery(GET_ALL_BY_FUNCTION_ID, entityClass)
-        .setParameter("functionId", functionId).getResultList();
+  public List<AnomalyMergedResult> getAllByTime(long startTime, long endTime) {
+    return getEntityManager().createQuery(FIND_BY_TIME, entityClass)
+        .setParameter("startTime", startTime).setParameter("endTime", endTime).getResultList();
   }
 
   @Transactional
