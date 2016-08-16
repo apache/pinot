@@ -125,7 +125,9 @@ public class HLRealtimeSegmentDataManager extends SegmentDataManager {
     }
     //inverted index columns
     invertedIndexColumns = indexingConfig.getInvertedIndexColumns();
-
+    if (sortedColumn != null && !invertedIndexColumns.contains(sortedColumn)) {
+      invertedIndexColumns.add(sortedColumn);
+    }
     this.segmentMetatdaZk = segmentMetadata;
 
     // create and init stream provider config
@@ -156,7 +158,7 @@ public class HLRealtimeSegmentDataManager extends SegmentDataManager {
     // lets create a new realtime segment
     segmentLogger.info("Started kafka stream provider");
     realtimeSegment = new RealtimeSegmentImpl(schema, kafkaStreamProviderConfig.getSizeThresholdToFlushSegment(), tableName,
-        segmentMetadata.getSegmentName(), kafkaStreamProviderConfig.getStreamName(), serverMetrics);
+        segmentMetadata.getSegmentName(), kafkaStreamProviderConfig.getStreamName(), serverMetrics, invertedIndexColumns);
     realtimeSegment.setSegmentMetadata(segmentMetadata, this.schema);
     notifier = realtimeTableDataManager;
 

@@ -19,7 +19,6 @@ package com.linkedin.pinot.core.data.manager.realtime;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -566,9 +565,11 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     _tableStreamName = _tableName + "_" + kafkaStreamProviderConfig.getStreamName();
 
 
+    List<String> invertedIndexColumns = indexingConfig.getInvertedIndexColumns();
+    invertedIndexColumns.add(indexingConfig.getSortedColumn().get(0));
     // Start new realtime segment
     _realtimeSegment = new RealtimeSegmentImpl(schema, _segmentMaxRowCount, tableConfig.getTableName(),
-        segmentZKMetadata.getSegmentName(), _kafkaTopic, _serverMetrics);
+        segmentZKMetadata.getSegmentName(), _kafkaTopic, _serverMetrics, invertedIndexColumns);
     _realtimeSegment.setSegmentMetadata(segmentZKMetadata, schema);
 
     // Create message decoder

@@ -95,7 +95,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
   private final String tableAndStreamName;
 
   public RealtimeSegmentImpl(Schema schema, int capacity, String tableName, String segmentName, String streamName,
-      ServerMetrics serverMetrics) throws IOException {
+      ServerMetrics serverMetrics, List<String> invertedIndexColumns) throws IOException {
     // initial variable setup
     this.segmentName = segmentName;
     this.serverMetrics = serverMetrics;
@@ -132,7 +132,9 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     invertedIndexMap = new HashMap<String, RealtimeInvertedIndex>();
 
     for (String dimension : schema.getDimensionNames()) {
-      invertedIndexMap.put(dimension, new DimensionInvertertedIndex(dimension));
+      if (invertedIndexColumns.contains(dimension)) {
+        invertedIndexMap.put(dimension, new DimensionInvertertedIndex(dimension));
+      }
       if (schema.getFieldSpecFor(dimension).isSingleValueField()) {
         columnIndexReaderWriterMap.put(dimension, new FixedByteSingleColumnSingleValueReaderWriter(capacity,
             V1Constants.Dict.INT_DICTIONARY_COL_SIZE));
@@ -143,16 +145,25 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     }
 
     for (String metric : schema.getMetricNames()) {
-      invertedIndexMap.put(metric, new MetricInvertedIndex(metric));
+      if (invertedIndexColumns.contains(metric)) {
+        invertedIndexMap.put(metric, new MetricInvertedIndex(metric));
+      }
       columnIndexReaderWriterMap.put(metric, new FixedByteSingleColumnSingleValueReaderWriter(capacity,
           V1Constants.Dict.INT_DICTIONARY_COL_SIZE));
     }
 
-    invertedIndexMap.put(outgoingTimeColumnName, new TimeInvertedIndex(outgoingTimeColumnName));
+    if (invertedIndexColumns.contains(outgoingTimeColumnName)) {
+      invertedIndexMap.put(outgoingTimeColumnName, new TimeInvertedIndex(outgoingTimeColumnName));
+    }
     columnIndexReaderWriterMap.put(outgoingTimeColumnName, new FixedByteSingleColumnSingleValueReaderWriter(capacity,
         V1Constants.Dict.INT_DICTIONARY_COL_SIZE));
 
     tableAndStreamName = tableName + "-" + streamName;
+  }
+
+  public RealtimeSegmentImpl(Schema schema, int sizeThresholdToFlushSegment, String tableName, String segmentName, String streamName,
+      ServerMetrics serverMetrics) throws IOException {
+    this(schema, sizeThresholdToFlushSegment, tableName, segmentName, streamName, serverMetrics, new ArrayList<String>());
   }
 
   @Override
@@ -294,23 +305,28 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     // lets update the inverted index now
     // metrics
     for (String metric : dataSchema.getMetricNames()) {
-      invertedIndexMap.get(metric).add(rawRowToDicIdMap.get(metric), docId);
+      if (invertedIndexMap.containsKey(metric)) {
+        invertedIndexMap.get(metric).add(rawRowToDicIdMap.get(metric), docId);
+      }
     }
 
     // dimension
     for (String dimension : dataSchema.getDimensionNames()) {
-      if (dataSchema.getFieldSpecFor(dimension).isSingleValueField()) {
-        invertedIndexMap.get(dimension).add(rawRowToDicIdMap.get(dimension), docId);
-      } else {
-        int[] dicIds = (int[]) rawRowToDicIdMap.get(dimension);
-        for (int dicId : dicIds) {
-          invertedIndexMap.get(dimension).add(dicId, docId);
+      if (invertedIndexMap.containsKey(dimension)) {
+        if (dataSchema.getFieldSpecFor(dimension).isSingleValueField()) {
+          invertedIndexMap.get(dimension).add(rawRowToDicIdMap.get(dimension), docId);
+        } else {
+          int[] dicIds = (int[]) rawRowToDicIdMap.get(dimension);
+          for (int dicId : dicIds) {
+            invertedIndexMap.get(dimension).add(dicId, docId);
+          }
         }
       }
     }
     // time
-    invertedIndexMap.get(outgoingTimeColumnName).add(rawRowToDicIdMap.get(outgoingTimeColumnName), docId);
-
+    if (invertedIndexMap.containsKey(outgoingTimeColumnName)) {
+      invertedIndexMap.get(outgoingTimeColumnName).add(rawRowToDicIdMap.get(outgoingTimeColumnName), docId);
+    }
     docIdSearchableOffset = docId;
     numDocsIndexed += 1;
     numSuccessIndexed += 1;
