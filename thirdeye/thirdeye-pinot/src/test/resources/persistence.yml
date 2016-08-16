@@ -10,10 +10,12 @@ databaseConfiguration:
     hibernate.connection.isolation: 2
     hibernate.archive.autodetection: class, hbm
     hibernate.connection.driver_class: org.hsqldb.jdbcDriver
-    hibernate.connection.provider_class: org.hibernate.c3p0.internal.C3P0ConnectionProvider
-    hibernate.c3p0.min_size: 0
-    hibernate.c3p0.max_size: 60
-    hibernate.c3p0.timeout: 25000
-    hibernate.c3p0.idle_test_period: 12000
-    hibernate.c3p0.preferredTestQuery: SELECT 1;
-    hibernate.c3p0.validate: true
+    hibernate.connection.provider_class: com.zaxxer.hikari.hibernate.HikariConnectionProvider
+    hibernate.hikari.minimumIdle: 0
+    hibernate.hikari.maximumPoolSize: 200
+    hibernate.hikari.idleTimeout: 300000
+    hibernate.hikari.maxLifetime: 28700000
+    hibernate.hikari.dataSource.cachePrepStmts: true
+    hibernate.hikari.dataSource.prepStmtCacheSize: 250
+    hibernate.hikari.dataSource.prepStmtCacheSqlLimit: 2048
+    hibernate.hikari.connectionTimeout: 300000
