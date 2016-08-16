@@ -31,9 +31,11 @@ public class IndexLoadingConfigMetadata {
 
   public static final String KEY_OF_LOADING_INVERTED_INDEX = "metadata.loading.inverted.index.columns";
   public static final String KEY_OF_SEGMENT_FORMAT_VERSION = "segment.format.version";
+  public static final String KEY_OF_ENABLE_DEFAULT_COLUMNS = "enable.default.columns";
   private final Set<String> _loadingInvertedIndexColumnSet = new HashSet<String>();
   private final String DEFAULT_SEGMENT_FORMAT = "v1";
   private String segmentVersionToLoad;
+  private boolean enableDefaultColumns;
 
   public IndexLoadingConfigMetadata(Configuration tableDataManagerConfig) {
     List<String> valueOfLoadingInvertedIndexConfig = tableDataManagerConfig.getList(KEY_OF_LOADING_INVERTED_INDEX, null);
@@ -42,6 +44,7 @@ public class IndexLoadingConfigMetadata {
     }
 
     segmentVersionToLoad = tableDataManagerConfig.getString(KEY_OF_SEGMENT_FORMAT_VERSION, DEFAULT_SEGMENT_FORMAT);
+    enableDefaultColumns = tableDataManagerConfig.getBoolean(KEY_OF_ENABLE_DEFAULT_COLUMNS, false);
   }
 
   public void initLoadingInvertedIndexColumnSet(String[] columnCollections) {
@@ -62,5 +65,13 @@ public class IndexLoadingConfigMetadata {
 
   public static String getKeyOfLoadingInvertedIndex() {
     return KEY_OF_LOADING_INVERTED_INDEX;
+  }
+
+  public void setEnableDefaultColumns(boolean enableDefaultColumns) {
+    this.enableDefaultColumns = enableDefaultColumns;
+  }
+
+  public boolean isEnableDefaultColumns() {
+    return enableDefaultColumns;
   }
 }

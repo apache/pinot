@@ -73,7 +73,6 @@ public class Loaders {
             indexDir.getName(), metadataVersion, configuredVersionToLoad);
       }
 
-
       // add or removes indexes based on indexLoadingConfigurationMetadata
       // add or replace new columns with default value
       // NOTE: this step may modify the segment metadata.

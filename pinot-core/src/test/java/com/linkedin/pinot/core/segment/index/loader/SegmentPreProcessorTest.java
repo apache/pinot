@@ -106,6 +106,7 @@ public class SegmentPreProcessorTest {
     indexLoadingConfigMetadata = new IndexLoadingConfigMetadata(new PropertiesConfiguration());
     indexLoadingConfigMetadata.initLoadingInvertedIndexColumnSet(
         new String[]{COLUMN1_NAME, COLUMN7_NAME, COLUMN13_NAME, NO_SUCH_COLUMN_NAME});
+    indexLoadingConfigMetadata.setEnableDefaultColumns(true);
 
     ObjectMapper objectMapper = new ObjectMapper();
     File newColumnsSchemaFile1 = new File(
@@ -269,7 +270,8 @@ public class SegmentPreProcessorTest {
     // Try to use the third schema and update default value again.
     // For the third schema, we changed the default value for column 'newStringMVDimension' to 'notSameLength', which
     // is not the same length as before. This should be fine for segment format v1.
-    SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectoryFile, null, newColumnsSchema3);
+    SegmentPreProcessor processor =
+        new SegmentPreProcessor(segmentDirectoryFile, indexLoadingConfigMetadata, newColumnsSchema3);
     processor.process();
   }
 
@@ -287,7 +289,8 @@ public class SegmentPreProcessorTest {
     // For the third schema, we changed the default value for column 'newStringMVDimension' to 'notSameLength', which
     // is not the same length as before. This should throw exception for segment format v3.
     try {
-      SegmentPreProcessor processor = new SegmentPreProcessor(v3SegmentDirectoryFile, null, newColumnsSchema3);
+      SegmentPreProcessor processor =
+          new SegmentPreProcessor(v3SegmentDirectoryFile, indexLoadingConfigMetadata, newColumnsSchema3);
       processor.process();
       Assert.fail("For segment format v3, should throw exception when trying to update with different length index");
     } catch (Exception e) {
@@ -298,7 +301,8 @@ public class SegmentPreProcessorTest {
   private void checkUpdateDefaultColumns(File segmentDirectoryFile)
       throws Exception {
     // Update default value.
-    SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectoryFile, null, newColumnsSchema1);
+    SegmentPreProcessor processor =
+        new SegmentPreProcessor(segmentDirectoryFile, indexLoadingConfigMetadata, newColumnsSchema1);
     processor.process();
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(segmentDirectoryFile);
 
@@ -379,7 +383,7 @@ public class SegmentPreProcessorTest {
     // Use the second schema and update default value again.
     // For the second schema, we changed the default value for column 'newIntMetric' to 2, and added default value
     // 'abcd' (keep the same length as 'null') to column 'newStringMVDimension'.
-    processor = new SegmentPreProcessor(segmentDirectoryFile, null, newColumnsSchema2);
+    processor = new SegmentPreProcessor(segmentDirectoryFile, indexLoadingConfigMetadata, newColumnsSchema2);
     processor.process();
     segmentMetadata = new SegmentMetadataImpl(segmentDirectoryFile);
 
