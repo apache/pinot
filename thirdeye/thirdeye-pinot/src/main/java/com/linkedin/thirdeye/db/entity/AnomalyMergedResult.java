@@ -38,6 +38,9 @@ public class AnomalyMergedResult extends AbstractBaseEntity {
   @Column(name = "score", nullable = false)
   private double score;
 
+  @Column(name = "weight", nullable = false)
+  private double weight;
+
   @Column(name = "created_time", nullable = false)
   private Long createdTime;
 
@@ -45,7 +48,7 @@ public class AnomalyMergedResult extends AbstractBaseEntity {
   @JoinColumn(name = "anomaly_feedback_id")
   private AnomalyFeedback feedback;
 
-  @OneToMany(fetch = FetchType.EAGER)
+  @OneToMany(fetch = FetchType.EAGER, cascade = CascadeType.ALL)
   @JoinTable(name = "anomaly_merged_results_mapping", joinColumns = @JoinColumn(name = "anomaly_merged_result_id"),
       inverseJoinColumns = @JoinColumn(name = "anomaly_result_id"))
   private List<AnomalyResult> anomalyResults = new ArrayList<>();
@@ -132,6 +135,14 @@ public class AnomalyMergedResult extends AbstractBaseEntity {
 
   public void setFunction(AnomalyFunctionSpec function) {
     this.function = function;
+  }
+
+  public double getWeight() {
+    return weight;
+  }
+
+  public void setWeight(double weight) {
+    this.weight = weight;
   }
 
   @Override
