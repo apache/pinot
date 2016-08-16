@@ -153,7 +153,7 @@ public class Summary {
     if (node.getLevel() != 0) {
       updateWowValues(parent, dpArray.getAnswer());
       double targetRatio = parent.targetRatio();
-      RecomputeCostAndRemoveSmallNodes(node, dpArray, targetRatio);
+      recomputeCostAndRemoveSmallNodes(node, dpArray, targetRatio);
       dpArray.targetRatio = targetRatio;
       if ( !nodeIsThinnedOut(node) ) {
         Set<HierarchyNode> removedNode = new HashSet<>(dpArray.getAnswer());
@@ -196,7 +196,7 @@ public class Summary {
     removedNodes.addAll(childArray.getAnswer());
     // Compute the merged answer
     double targetRatio = (parentArray.targetRatio + childArray.targetRatio) / 2.;
-    RecomputeCostAndRemoveSmallNodes(parentNode, parentArray, targetRatio);
+    recomputeCostAndRemoveSmallNodes(parentNode, parentArray, targetRatio);
     List<HierarchyNode> childNodeList = new ArrayList<>(childArray.getAnswer());
     childNodeList.sort(NODE_COMPARATOR);
     for (HierarchyNode childNode : childNodeList) {
@@ -252,7 +252,7 @@ public class Summary {
   /**
    * Recompute costs of the nodes in a DPArray using targetRatio for calculating the cost.
    */
-  private void RecomputeCostAndRemoveSmallNodes(HierarchyNode parentNode, DPArray dp, double targetRatio) {
+  private void recomputeCostAndRemoveSmallNodes(HierarchyNode parentNode, DPArray dp, double targetRatio) {
     Set<HierarchyNode> removedNodes = new HashSet<>(dp.getAnswer());
     List<HierarchyNode> ans = new ArrayList<>(dp.getAnswer());
     ans.sort(NODE_COMPARATOR);
@@ -306,7 +306,7 @@ public class Summary {
       double baselineValue = node.getBaselineValue();
       double currentValue = node.getCurrentValue();
       double percentage = (((baselineValue + currentValue) / topValue) * 100);
-      if (Double.compare(percentage, 1.0) < 0) percentage = 1.;
+      if (Double.compare(percentage, Math.E) < 0) percentage = Math.E;
       double cost = CostFunction.err4EmptyValues(baselineValue, currentValue, targetRatio) * Math.log(percentage);
 
       for (int n = dp.size() - 1; n > 0; --n) {
@@ -350,7 +350,7 @@ public class Summary {
 
   public static void main (String[] argc) {
     String oFileName = "Cube.json";
-    int answerSize = 20;
+    int answerSize = 15;
     boolean doOneSideError = true;
     int maxDimensionSize = 3;
 

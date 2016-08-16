@@ -222,23 +222,18 @@ public class Cube { // the cube (Ca|Cb)
         cost += CostFunction.err4EmptyValues(wowValues.baselineValue, wowValues.currentValue, topRatio);
       }
 
+      // The max cost of children will be the cost of a group
       if (groupMap.containsKey(dimension)) {
         DimensionGroup dimensionGroup = groupMap.get(dimension);
         MutablePair<String, Double> costOfDimensionPair = dimensionCostPairs.get(dimensionGroup.index);
-        costOfDimensionPair.right += cost;
+        costOfDimensionPair.right = Math.max(cost, costOfDimensionPair.right);
       } else {
         MutablePair<String, Double> costOfDimensionPair = new MutablePair<>(dimension, cost);
         dimensionCostPairs.add(costOfDimensionPair);
       }
     }
 
-    // Calculate average cost for each hierarchical group
-    for (MutablePair<String, Double> costOfDimensionPair : dimensionCostPairs) {
-      if (groupMap.containsKey(costOfDimensionPair.getLeft())) {
-        DimensionGroup group = groupMap.get(costOfDimensionPair.getLeft());
-        costOfDimensionPair.right /= group.count;
-      }
-    }
+    // Sort dimensions according to their costs
     dimensionCostPairs.sort((new DimensionCostPairSorter()).reversed());
 
     // Create a new Dimension instance whose dimensions follow the calculated order

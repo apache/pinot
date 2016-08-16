@@ -219,11 +219,17 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
     String oFileName = "Cube.json";
 
     // An interesting data set that difficult to tell because too many dark reds and blues
+//    String collection = "thirdeyeKbmi";
+//    String metricName = "pageViews";
+//    DateTime baselineStart = new DateTime(1467788400000L);
+//    DateTime currentStart = new DateTime(1468393200000L);
+//    TimeGranularity timeGranularity = new TimeGranularity(1, TimeUnit.DAYS);
+
     String collection = "thirdeyeKbmi";
-    String metricName = "pageViews";
-    DateTime baselineStart = new DateTime(1467788400000L);
-    DateTime currentStart = new DateTime(1468393200000L);
-    TimeGranularity timeGranularity = new TimeGranularity(1, TimeUnit.DAYS);
+    String metricName = "desktopPageViews";
+    DateTime baselineStart = new DateTime(1470628800000L);
+    DateTime currentStart = new DateTime(1471233600000L);
+    TimeGranularity timeGranularity = new TimeGranularity(1, TimeUnit.HOURS);
 
     // An interesting data set that difficult to tell because most cells are light red or blue
 //    String collection = "thirdeyeKbmi";
@@ -263,7 +269,7 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
     pinotClient.setBaselineStartInclusive(baselineStart);
     pinotClient.setCurrentStartInclusive(currentStart);
 
-    int maxDimensionSize = 4;
+    int maxDimensionSize = 3;
 
     // Build the cube for computing the summary
     Cube initCube = new Cube();
