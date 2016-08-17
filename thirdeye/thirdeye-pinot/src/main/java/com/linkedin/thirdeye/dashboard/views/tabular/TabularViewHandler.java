@@ -9,11 +9,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.SortedSet;
 import java.util.TreeSet;
+import java.util.concurrent.TimeUnit;
 
+import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
 
 import com.google.common.collect.Multimap;
+import com.linkedin.thirdeye.api.CollectionSchema;
 import com.linkedin.thirdeye.client.MetricExpression;
+import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.client.comparison.Row;
 import com.linkedin.thirdeye.client.comparison.Row.Metric;
@@ -27,6 +31,7 @@ import com.linkedin.thirdeye.dashboard.views.ViewHandler;
 import com.linkedin.thirdeye.dashboard.views.heatmap.HeatMapCell;
 
 public class TabularViewHandler implements ViewHandler<TabularViewRequest, TabularViewResponse> {
+  private static ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
 
   private final Comparator<Row> rowComparator = new Comparator<Row>() {
     @Override
@@ -53,7 +58,12 @@ public class TabularViewHandler implements ViewHandler<TabularViewRequest, Tabul
     DateTime baselineEnd = request.getBaselineEnd();
     DateTime currentStart = request.getCurrentStart();
     DateTime currentEnd = request.getCurrentEnd();
-    comparisonRequest.setEndDateInclusive(true);
+
+    CollectionSchema collectionSchema = CACHE_REGISTRY_INSTANCE.getCollectionSchemaCache().get(collection);
+    if (!request.getTimeGranularity().getUnit().equals(TimeUnit.DAYS) ||
+        !StringUtils.isBlank(collectionSchema.getTime().getFormat())) {
+      comparisonRequest.setEndDateInclusive(true);
+    }
 
     Multimap<String, String> filters = request.getFilters();
 

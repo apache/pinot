@@ -12,6 +12,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.TreeSet;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
@@ -492,7 +493,7 @@ public class DashboardResource {
     request.setCollectionName(collection);
     request.setStart(new DateTime(start, DateTimeZone.forID(timeZone)));
     request.setEnd(new DateTime(end, DateTimeZone.forID(timeZone)));
-    request.setEndDateInclusive(true);
+
     if (groupByDimensions != null && !groupByDimensions.isEmpty()) {
       request.setGroupByDimensions(Arrays.asList(groupByDimensions.trim().split(",")));
     }
@@ -504,6 +505,11 @@ public class DashboardResource {
         Utils.convertToMetricExpressions(metricsJson, collection);
     request.setMetricExpressions(metricExpressions);
     request.setAggregationTimeGranularity(Utils.getAggregationTimeGranularity(aggTimeGranularity));
+    CollectionSchema collectionSchema = CACHE_REGISTRY_INSTANCE.getCollectionSchemaCache().get(collection);
+    if (!request.getAggregationTimeGranularity().getUnit().equals(TimeUnit.DAYS) ||
+        !StringUtils.isBlank(collectionSchema.getTime().getFormat())) {
+      request.setEndDateInclusive(true);
+    }
 
     TimeSeriesHandler handler = new TimeSeriesHandler(queryCache);
     String jsonResponse = "";

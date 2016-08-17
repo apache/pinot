@@ -44,19 +44,23 @@ public class TimeOnTimeComparisonHandler {
     // baseline time ranges
     DateTime baselineStart = comparisonRequest.getBaselineStart();
     DateTime baselineEnd = comparisonRequest.getBaselineEnd();
-    baselineTimeranges =
-        TimeRangeUtils.computeTimeRanges(aggregationTimeGranularity, baselineStart, baselineEnd);
     // current time ranges
     DateTime currentStart = comparisonRequest.getCurrentStart();
     DateTime currentEnd = comparisonRequest.getCurrentEnd();
+
     if (comparisonRequest.isEndDateInclusive()) {
       // ThirdEyeRequest is exclusive endpoint, so increment by one bucket
       long aggTimeBucketMillis = aggregationTimeGranularity.toMillis();
+      currentStart = currentStart.plus(aggTimeBucketMillis);
+      baselineStart = baselineStart.plus(aggTimeBucketMillis);
       currentEnd = currentEnd.plus(aggTimeBucketMillis);
       baselineEnd = baselineEnd.plus(aggTimeBucketMillis);
     }
+    baselineTimeranges =
+        TimeRangeUtils.computeTimeRanges(aggregationTimeGranularity, baselineStart, baselineEnd);
     currentTimeranges =
         TimeRangeUtils.computeTimeRanges(aggregationTimeGranularity, currentStart, currentEnd);
+
     // create baseline request
     ThirdEyeRequest baselineRequest =
         createThirdEyeRequest(BASELINE, comparisonRequest, baselineStart, baselineEnd);

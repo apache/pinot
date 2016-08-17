@@ -11,12 +11,16 @@ import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.concurrent.TimeUnit;
 
+import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
+import com.linkedin.thirdeye.api.CollectionSchema;
 import com.linkedin.thirdeye.client.MetricExpression;
+import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.client.comparison.Row;
 import com.linkedin.thirdeye.client.comparison.Row.Metric;
@@ -32,6 +36,8 @@ import com.linkedin.thirdeye.dashboard.views.ViewHandler;
 
 public class ContributorViewHandler implements
     ViewHandler<ContributorViewRequest, ContributorViewResponse> {
+  private static ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
+
   private final Comparator<DateTime> dateTimeComparator = new Comparator<DateTime>() {
     @Override
     public int compare(DateTime dateTime1, DateTime dateTime2) {
@@ -67,7 +73,11 @@ public class ContributorViewHandler implements
     DateTime baselineEnd = request.getBaselineEnd();
     DateTime currentStart = request.getCurrentStart();
     DateTime currentEnd = request.getCurrentEnd();
-    comparisonRequest.setEndDateInclusive(true);
+    CollectionSchema collectionSchema = CACHE_REGISTRY_INSTANCE.getCollectionSchemaCache().get(collection);
+    if (!request.getTimeGranularity().getUnit().equals(TimeUnit.DAYS) ||
+        !StringUtils.isBlank(collectionSchema.getTime().getFormat())) {
+      comparisonRequest.setEndDateInclusive(true);
+    }
 
     Multimap<String, String> filters = request.getFilters();
     List<String> dimensionsToGroupBy = request.getGroupByDimensions();
