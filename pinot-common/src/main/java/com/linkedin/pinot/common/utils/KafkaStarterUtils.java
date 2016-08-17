@@ -17,6 +17,8 @@ package com.linkedin.pinot.common.utils;
 
 import java.io.File;
 import java.security.Permission;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Properties;
 import org.I0Itec.zkclient.ZkClient;
 import org.apache.commons.io.FileUtils;
@@ -45,6 +47,17 @@ public class KafkaStarterUtils {
     configureHostName(configuration, "localhost");
 
     return configuration;
+  }
+
+  public static List<KafkaServerStartable> startServers(final int brokerCount, final int port, final String zkStr,
+      final Properties configuration) {
+    List<KafkaServerStartable> startables = new ArrayList<>(brokerCount);
+
+    for (int i = 0; i < brokerCount; i++) {
+      startables.add(startServer(port + i, i, zkStr, "/tmp/kafka-" + Double.toHexString(Math.random()), configuration));
+    }
+
+    return startables;
   }
 
   public static KafkaServerStartable startServer(final int port, final int brokerId, final String zkStr,

@@ -29,6 +29,7 @@ import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import kafka.api.FetchRequestBuilder;
+import kafka.cluster.Broker;
 import kafka.javaapi.FetchResponse;
 import kafka.javaapi.TopicMetadata;
 import kafka.javaapi.TopicMetadataRequest;
@@ -68,6 +69,7 @@ public class SimpleConsumerWrapper implements Closeable {
   private int[] _bootstrapPorts;
   private SimpleConsumer _simpleConsumer;
   private final Random _random = new Random();
+  private Broker _leader;
 
   private SimpleConsumerWrapper(KafkaSimpleConsumerFactory simpleConsumerFactory, String bootstrapNodes,
       String clientId) {
@@ -142,7 +144,8 @@ public class SimpleConsumerWrapper implements Closeable {
     void handleConsumerException(Exception e) {
       // By default, just log the exception and switch back to CONNECTING_TO_BOOTSTRAP_NODE (which will take care of
       // closing the connection if it exists)
-      LOGGER.warn("Caught Kafka consumer exception, disconnecting and trying again", e);
+      LOGGER.warn("Caught Kafka consumer exception while in state {}, disconnecting and trying again",
+          _currentState.getStateValue(), e);
 
       setCurrentState(new ConnectingToBootstrapNode());
     }
@@ -217,8 +220,30 @@ public class SimpleConsumerWrapper implements Closeable {
     @Override
     void process() {
       // Fetch leader information
-      // TODO Implement, for now, since it's a test, we're connected to the leader by definition
-      setCurrentState(new ConnectingToPartitionLeader());
+      try {
+        TopicMetadataResponse response = _simpleConsumer.send(new TopicMetadataRequest(Collections.singletonList(_topic)));
+        try {
+          _leader = response.topicsMetadata().get(0).partitionsMetadata().get(_partition).leader();
+
+          // If we've located a broker
+          if (_leader != null) {
+            LOGGER.info("Located leader broker {}, connecting to it.", _leader);
+            setCurrentState(new ConnectingToPartitionLeader());
+          } else {
+            // Failed to get the leader broker. There could be a leader election at the moment, so retry after a little
+            // bit.
+            LOGGER.warn("Leader broker is null, retrying leader fetch in 100ms");
+            Uninterruptibles.sleepUninterruptibly(100, TimeUnit.MILLISECONDS);
+          }
+        } catch (Exception e) {
+          // Failed to get the leader broker. There could be a leader election at the moment, so retry after a little
+          // bit.
+          LOGGER.warn("Failed to get the leader broker due to exception, retrying in 100ms", e);
+          Uninterruptibles.sleepUninterruptibly(100, TimeUnit.MILLISECONDS);
+        }
+      } catch (Exception e) {
+        handleConsumerException(e);
+      }
     }
 
     @Override
@@ -234,9 +259,26 @@ public class SimpleConsumerWrapper implements Closeable {
 
     @Override
     void process() {
+      // Disconnect from current broker
+      if(_simpleConsumer != null) {
+        try {
+          _simpleConsumer.close();
+          _simpleConsumer = null;
+        } catch (Exception e) {
+          handleConsumerException(e);
+          return;
+        }
+      }
+
       // Connect to the partition leader
-      // TODO Implement, for now, since it's a test, we're connected to the leader by definition
-      setCurrentState(new ConnectedToPartitionLeader());
+      try {
+        _simpleConsumer =
+            new SimpleConsumer(_leader.host(), _leader.port(), SOCKET_TIMEOUT_MILLIS, SOCKET_BUFFER_SIZE, _clientId);
+
+        setCurrentState(new ConnectedToPartitionLeader());
+      } catch (Exception e) {
+        handleConsumerException(e);
+      }
     }
 
     @Override

@@ -27,6 +27,7 @@ import com.linkedin.pinot.common.utils.KafkaStarterUtils;
  */
 public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegrationTest {
   private static int KAFKA_PARTITION_COUNT = 2;
+
   protected void setUpTable(String tableName, String timeColumnName, String timeColumnType, String kafkaZkUrl,
       String kafkaTopic, File schemaFile, File avroFile) throws Exception {
     Schema schema = Schema.fromFile(schemaFile);
@@ -37,5 +38,10 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
 
   protected void createKafkaTopic(String kafkaTopic, String zkStr) {
     KafkaStarterUtils.createTopic(kafkaTopic, zkStr, KAFKA_PARTITION_COUNT);
+  }
+
+  @Override
+  protected int getKafkaBrokerCount() {
+    return 2;
   }
 }

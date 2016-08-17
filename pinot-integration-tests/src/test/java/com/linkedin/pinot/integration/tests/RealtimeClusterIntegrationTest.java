@@ -46,7 +46,7 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
   private static final int SEGMENT_COUNT = 12;
   public static final int QUERY_COUNT = 1000;
   protected static final int ROW_COUNT_FOR_REALTIME_SEGMENT_FLUSH = 20000;
-  private KafkaServerStartable kafkaStarter;
+  private List<KafkaServerStartable> kafkaStarters;
 
   protected void setUpTable(String tableName, String timeColumnName, String timeColumnType, String kafkaZkUrl,
       String kafkaTopic, File schemaFile, File avroFile) throws Exception {
@@ -60,8 +60,8 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
   public void setUp() throws Exception {
     // Start ZK and Kafka
     startZk();
-    kafkaStarter =
-        KafkaStarterUtils.startServer(KafkaStarterUtils.DEFAULT_KAFKA_PORT, KafkaStarterUtils.DEFAULT_BROKER_ID,
+    kafkaStarters =
+        KafkaStarterUtils.startServers(getKafkaBrokerCount(), KafkaStarterUtils.DEFAULT_KAFKA_PORT,
             KafkaStarterUtils.DEFAULT_ZK_STR, KafkaStarterUtils.getDefaultKafkaConfiguration());
 
     // Create Kafka topic
@@ -107,6 +107,10 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
     waitForRecordCountToStabilizeToExpectedCount(h2RecordCount, timeInFiveMinutes);
   }
 
+  protected int getKafkaBrokerCount() {
+    return 1;
+  }
+
   protected void createKafkaTopic(String kafkaTopic, String zkStr) {
     KafkaStarterUtils.createTopic(kafkaTopic, zkStr, 10);
   }
@@ -148,7 +152,9 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
     stopBroker();
     stopController();
     stopServer();
-    KafkaStarterUtils.stopServer(kafkaStarter);
+    for (KafkaServerStartable kafkaStarter : kafkaStarters) {
+      KafkaStarterUtils.stopServer(kafkaStarter);
+    }
     try {
       stopZk();
     } catch (Exception e) {
