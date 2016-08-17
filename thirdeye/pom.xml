@@ -50,7 +50,6 @@
     <hibernate-jpa-2.1-api.version>1.0.0.Final</hibernate-jpa-2.1-api.version>
     <hibernate-entirymanager.version>4.3.10.Final</hibernate-entirymanager.version>
     <hibernate-c3p0.version>4.3.10.Final</hibernate-c3p0.version>
-    <HikariCP.version>2.4.7</HikariCP.version>
   </properties>
 
   <build>
@@ -280,11 +279,6 @@
         <groupId>org.hibernate</groupId>
         <artifactId>hibernate-c3p0</artifactId>
         <version>${hibernate-c3p0.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.zaxxer</groupId>
-        <artifactId>HikariCP</artifactId>
-        <version>${HikariCP.version}</version>
       </dependency>
 
       <!-- test dependencies -->
