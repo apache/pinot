@@ -177,7 +177,7 @@ function renderContributionTimeSeries(ajaxData) {
                     y: {
                         tick: {
                             //format integers with comma-grouping for thousands
-                            format: d3.format(',.0f')
+                            format: d3.format(",.1 ")
                         }
                     }
                 },

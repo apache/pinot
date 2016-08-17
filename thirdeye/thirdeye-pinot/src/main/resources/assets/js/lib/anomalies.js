@@ -39,6 +39,11 @@ function getAnomalies(tab) {
             }
             renderAnomalyLineChart(timeSeriesData, anomalyData, tab);
             renderAnomalyTable(anomalyData, tab);
+
+            //anomalyFunctionId is only present in hash when anomaly
+            // function run adhoc was requested on self service tab
+            //needs to be removed to be able to view other functions in later queries on the anomalies view
+            delete hash.anomalyFunctionId
         });
     });
 };
@@ -148,7 +153,7 @@ function drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab) {
             y: {
                 tick: {
                     //format integers with comma-grouping for thousands
-                    format: d3.format(',.0f')
+                    format: d3.format(",.1 ")
                 }
             }
         },
