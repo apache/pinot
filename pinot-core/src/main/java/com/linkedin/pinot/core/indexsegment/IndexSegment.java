@@ -17,7 +17,7 @@ package com.linkedin.pinot.core.indexsegment;
 
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.common.DataSource;
-import com.linkedin.pinot.core.startree.StarTree;
+import com.linkedin.pinot.core.startree.StarTreeInterf;
 
 
 /**
@@ -66,7 +66,7 @@ public interface IndexSegment {
   public void destroy();
 
   /** Returns the StarTree index structure, or null if it does not exist */
-  StarTree getStarTree();
+  StarTreeInterf getStarTree();
 
   /**
    * Get the total size of the segment in bytes

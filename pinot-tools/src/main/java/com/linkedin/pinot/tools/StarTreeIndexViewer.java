@@ -15,6 +15,9 @@
  */
 package com.linkedin.pinot.tools;
 
+import com.linkedin.pinot.core.startree.StarTreeIndexNodeInterf;
+import com.linkedin.pinot.core.startree.StarTreeInterf;
+import com.linkedin.pinot.core.startree.StarTreeSerDe;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -25,7 +28,6 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
 
 import org.apache.commons.lang3.tuple.ImmutablePair;
@@ -58,8 +60,6 @@ import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
-import com.linkedin.pinot.core.startree.StarTree;
-import com.linkedin.pinot.core.startree.StarTreeIndexNode;
 
 public class StarTreeIndexViewer {
   private static final Logger LOGGER = LoggerFactory.getLogger(StarTreeIndexViewer.class);
@@ -89,7 +89,7 @@ public class StarTreeIndexViewer {
       dictionaries.put(columnName, dataSource.getDictionary());
     }
     File starTreeFile = new File(segmentDir, V1Constants.STAR_TREE_INDEX_FILE);
-    StarTree tree = StarTree.fromBytes(new FileInputStream(starTreeFile));
+    StarTreeInterf tree = StarTreeSerDe.fromBytes(new FileInputStream(starTreeFile));
     dimensionNameToIndexMap = tree.getDimensionNameToIndexMap();
     StarTreeJsonNode jsonRoot = new StarTreeJsonNode("ROOT");
     build(tree.getRoot(), jsonRoot);
@@ -101,15 +101,15 @@ public class StarTreeIndexViewer {
     startServer(segmentDir, writeValueAsString);
   }
 
-  private int build(StarTreeIndexNode indexNode, StarTreeJsonNode json) {
-    Map<Integer, StarTreeIndexNode> children = indexNode.getChildren();
-    if (children == null) {
+  private int build(StarTreeIndexNodeInterf indexNode, StarTreeJsonNode json) {
+    Iterator<? extends StarTreeIndexNodeInterf> childrenIterator = indexNode.getChildrenIterator();
+    if (!childrenIterator.hasNext()) {
       return 0;
     }
     int childDimensionId = indexNode.getChildDimensionName();
     String childDimensionName = dimensionNameToIndexMap.inverse().get(childDimensionId);
     Dictionary dictionary = dictionaries.get(childDimensionName);
-    int totalChildNodes = children.size();
+    int totalChildNodes = indexNode.getNumChildren();
 
     Comparator<Pair<String, Integer>> comparator = new Comparator<Pair<String, Integer>>() {
 
@@ -121,16 +121,17 @@ public class StarTreeIndexViewer {
     MinMaxPriorityQueue<Pair<String, Integer>> queue =
         MinMaxPriorityQueue.orderedBy(comparator).maximumSize(MAX_CHILDREN).create();
     StarTreeJsonNode allNode = null;
-    for (Entry<Integer, StarTreeIndexNode> entry : children.entrySet()) {
-      int childDimensionValueId = entry.getKey();
-      StarTreeIndexNode childIndexNode = entry.getValue();
+
+    while (childrenIterator.hasNext()) {
+      StarTreeIndexNodeInterf childIndexNode = childrenIterator.next();
+      int childDimensionValueId = childIndexNode.getDimensionValue();
       String childDimensionValue = "ALL";
-      if (childDimensionValueId != StarTreeIndexNode.all()) {
+      if (childDimensionValueId != StarTreeIndexNodeInterf.ALL) {
         childDimensionValue = dictionary.get(childDimensionValueId).toString();
       }
       StarTreeJsonNode childJson = new StarTreeJsonNode(childDimensionValue);
       totalChildNodes += build(childIndexNode, childJson);
-      if (childDimensionValueId != StarTreeIndexNode.all()) {
+      if (childDimensionValueId != StarTreeIndexNodeInterf.ALL) {
         json.addChild(childJson);
         queue.add(ImmutablePair.of(childDimensionValue, totalChildNodes));
       } else {
@@ -141,7 +142,7 @@ public class StarTreeIndexViewer {
     if (allNode != null) {
       json.addChild(allNode);
     }
-    if (children.size() > MAX_CHILDREN) {
+    if (totalChildNodes > MAX_CHILDREN) {
       Iterator<Pair<String, Integer>> qIterator = queue.iterator();
       Set<String> topKDimensions = new HashSet<>();
       topKDimensions.add("ALL");

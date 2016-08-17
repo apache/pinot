@@ -15,6 +15,21 @@
  */
 package com.linkedin.pinot.core.segment.creator.impl;
 
+import com.linkedin.pinot.core.startree.StarTreeIndexNodeInterf;
+import java.io.DataOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang.mutable.MutableLong;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.google.common.collect.HashBiMap;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
@@ -42,21 +57,6 @@ import com.linkedin.pinot.core.startree.StarTreeBuilder;
 import com.linkedin.pinot.core.startree.StarTreeBuilderConfig;
 import com.linkedin.pinot.core.startree.StarTreeIndexNode;
 import com.linkedin.pinot.core.util.CrcUtils;
-import java.io.DataOutputStream;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang.mutable.MutableLong;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -229,9 +229,9 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     Map<String, HashBiMap<Object, Integer>> dictionaryMap = starTreeBuilder.getDictionaryMap();
     StarTree tree = starTreeBuilder.getTree();
     HashBiMap<String, Integer> dimensionNameToIndexMap = starTreeBuilder.getDimensionNameToIndexMap();
-    StarTreeIndexNode node = tree.getRoot();
+    StarTreeIndexNode node = (StarTreeIndexNode) tree.getRoot();
     updateTree(node, dictionaryMap, dimensionNameToIndexMap);
-    tree.writeTree(new FileOutputStream(new File(tempIndexDir, V1Constants.STAR_TREE_INDEX_FILE)));
+    tree.writeTree(new File(tempIndexDir, V1Constants.STAR_TREE_INDEX_FILE));
   }
 
   /**
@@ -244,10 +244,10 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   private void updateTree(StarTreeIndexNode node, Map<String, HashBiMap<Object, Integer>> dictionaryMap,
       HashBiMap<String, Integer> dimensionNameToIndexMap) {
     //current node needs to update only if its not star
-    if (node.getDimensionName() != StarTreeIndexNode.all()) {
+    if (node.getDimensionName() != StarTreeIndexNodeInterf.ALL) {
       String dimName = dimensionNameToIndexMap.inverse().get(node.getDimensionName());
       int dimensionValue = node.getDimensionValue();
-      if (dimensionValue != StarTreeIndexNode.all()) {
+      if (dimensionValue != StarTreeIndexNodeInterf.ALL) {
         Object sortedValuesForDim = indexCreationInfoMap.get(dimName).getSortedUniqueElementsArray();
         int indexForDimValue =
             searchValueInArray(sortedValuesForDim, dictionaryMap.get(dimName).inverse().get(dimensionValue));
@@ -255,20 +255,22 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       }
     }
     //update children map
-    Map<Integer, StarTreeIndexNode> children = node.getChildren();
-    Map<Integer, StarTreeIndexNode> newChildren = new HashMap<>();
-    if (children != null && !children.isEmpty()) {
+    Iterator<StarTreeIndexNode> childrenIterator = node.getChildrenIterator();
+    if (childrenIterator.hasNext()) {
+      Map<Integer, StarTreeIndexNode> newChildren = new HashMap<>();
       String childDimName = dimensionNameToIndexMap.inverse().get(node.getChildDimensionName());
       Object sortedValuesForDim = indexCreationInfoMap.get(childDimName).getSortedUniqueElementsArray();
-      for (Entry<Integer, StarTreeIndexNode> entry : children.entrySet()) {
-        int childDimValue = entry.getKey();
-        int childMappedDimValue = StarTreeIndexNode.all();
-        if (childDimValue != StarTreeIndexNode.all()) {
+
+      while (childrenIterator.hasNext()) {
+        StarTreeIndexNode child = childrenIterator.next();
+        int childDimValue = child.getDimensionValue();
+        int childMappedDimValue = StarTreeIndexNodeInterf.ALL;
+        if (childDimValue != StarTreeIndexNodeInterf.ALL) {
           childMappedDimValue = searchValueInArray(sortedValuesForDim,
               dictionaryMap.get(childDimName).inverse().get(childDimValue));
         }
-        newChildren.put(childMappedDimValue, entry.getValue());
-        updateTree(entry.getValue(), dictionaryMap, dimensionNameToIndexMap);
+        newChildren.put(childMappedDimValue, child);
+        updateTree(child, dictionaryMap, dimensionNameToIndexMap);
       }
       node.setChildren(newChildren);
     }
