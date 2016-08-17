@@ -15,6 +15,10 @@
  */
 package com.linkedin.pinot.core.data.manager.offline;
 
+import java.util.List;
+import java.util.concurrent.ExecutorService;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import com.google.common.collect.ImmutableList;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.data.Schema;
@@ -24,11 +28,7 @@ import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.data.manager.config.TableDataManagerConfig;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import java.util.List;
-import java.util.concurrent.ExecutorService;
 import javax.annotation.Nonnull;
-import org.apache.helix.ZNRecord;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
 
 
 /**
@@ -42,8 +42,9 @@ public interface TableDataManager {
    * Initialize TableDataManager based on given config.
    *
    * @param tableDataManagerConfig
+   * @param serverInstance
    */
-  void init(TableDataManagerConfig tableDataManagerConfig, ServerMetrics serverMetrics);
+  void init(TableDataManagerConfig tableDataManagerConfig, ServerMetrics serverMetrics, String serverInstance);
 
   void start();
 

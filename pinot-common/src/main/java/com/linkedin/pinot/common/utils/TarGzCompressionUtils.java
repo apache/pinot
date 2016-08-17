@@ -47,7 +47,7 @@ import org.slf4j.LoggerFactory;
  */
 public class TarGzCompressionUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(TarGzCompressionUtils.class);
-  private static final String TAR_GZ_FILE_EXTENTION = ".tar.gz";
+  public static final String TAR_GZ_FILE_EXTENTION = ".tar.gz";
 
   /**
    * Creates a tar.gz file at the specified path with the contents of the

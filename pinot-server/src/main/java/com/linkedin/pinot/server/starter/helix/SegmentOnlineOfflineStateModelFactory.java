@@ -34,8 +34,10 @@ import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.data.DataManager;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
+import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
+import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.common.utils.SegmentName;
 import com.linkedin.pinot.core.data.manager.offline.InstanceDataManager;
 import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
@@ -104,17 +106,28 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
 
     @Transition(from = "CONSUMING", to = "ONLINE")
     public void onBecomeOnlineFromConsuming(Message message, NotificationContext context) {
+      final String realtimeTableName = message.getResourceName();
       final TableDataManager tableDataManager =
-          ((InstanceDataManager) INSTANCE_DATA_MANAGER).getTableDataManager(message.getResourceName());
-      SegmentDataManager acquiredSegment = tableDataManager.acquireSegment(message.getPartitionName());
+          ((InstanceDataManager) INSTANCE_DATA_MANAGER).getTableDataManager(realtimeTableName);
+      final String segmentNameStr = message.getPartitionName();
+      LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
+      SegmentDataManager acquiredSegment = tableDataManager.acquireSegment(segmentNameStr);
+      // For this transition to be correct in helix, we should already have a segment that is consuming
+      if (acquiredSegment == null) {
+        throw new RuntimeException("Segment " + segmentNameStr + " + not present ");
+      }
+      LLRealtimeSegmentDataManager segmentDataManager = (LLRealtimeSegmentDataManager)acquiredSegment;
 
       try {
-        if (acquiredSegment != null && acquiredSegment instanceof LLRealtimeSegmentDataManager) {
-          ((LLRealtimeSegmentDataManager) acquiredSegment).goOnlineFromConsuming();
-        }
+        RealtimeSegmentZKMetadata metadata = ZKMetadataProvider.getRealtimeSegmentZKMetadata(propertyStore,
+            segmentName.getTableName(), segmentNameStr);
+        segmentDataManager.goOnlineFromConsuming(metadata);
+      } catch (InterruptedException e) {
+        LOGGER.warn("State transition interrupted", e);
+        throw new RuntimeException(e);
       } finally {
         if (acquiredSegment != null) {
-          tableDataManager.releaseSegment(acquiredSegment);
+          tableDataManager.releaseSegment(segmentDataManager);
         }
       }
     }
@@ -182,7 +195,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
       AbstractTableConfig tableConfig =
           ZKMetadataProvider.getRealtimeTableConfig(propertyStore, tableName);
       ((InstanceDataManager) INSTANCE_DATA_MANAGER).addSegment(propertyStore, tableConfig,
-          instanceZKMetadata, realtimeSegmentZKMetadata);
+          instanceZKMetadata, realtimeSegmentZKMetadata, _instanceId);
     }
 
     private void onBecomeOnlineFromOfflineForOfflineSegment(Message message, NotificationContext context) {

@@ -165,7 +165,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       LOGGER.info("Trying to add TableDataManager for table name: " + tableName);
       synchronized (_globalLock) {
         if (!_tableDataManagerMap.containsKey(tableName)) {
-          addTableIfNeed(tableConfig, tableName);
+          addTableIfNeed(tableConfig, tableName, null);
         }
       }
     }
@@ -176,7 +176,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   // Called for real-time segments only
   @Override
   public synchronized void addSegment(ZkHelixPropertyStore<ZNRecord> propertyStore, AbstractTableConfig tableConfig,
-      InstanceZKMetadata instanceZKMetadata, SegmentZKMetadata segmentZKMetadata) throws Exception {
+      InstanceZKMetadata instanceZKMetadata, SegmentZKMetadata segmentZKMetadata, String serverInstance) throws Exception {
     if (segmentZKMetadata == null || segmentZKMetadata.getTableName() == null) {
       throw new RuntimeException("Error: adding invalid SegmentMetadata!");
     }
@@ -192,7 +192,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       LOGGER.info("Trying to add TableDataManager for table name: " + tableName);
       synchronized (_globalLock) {
         if (!_tableDataManagerMap.containsKey(tableName)) {
-          addTableIfNeed(tableConfig, tableName);
+          addTableIfNeed(tableConfig, tableName, serverInstance);
         }
       }
     }
@@ -202,13 +202,13 @@ public class HelixInstanceDataManager implements InstanceDataManager {
 
   }
 
-  public synchronized void addTableIfNeed(AbstractTableConfig tableConfig, String tableName)
+  public synchronized void addTableIfNeed(AbstractTableConfig tableConfig, String tableName, String serverInstance)
       throws ConfigurationException {
     TableDataManagerConfig tableDataManagerConfig = getDefaultHelixTableDataManagerConfig(tableName);
     if (tableConfig != null) {
       tableDataManagerConfig.overrideConfigs(tableName, tableConfig);
     }
-    TableDataManager tableDataManager = TableDataManagerProvider.getTableDataManager(tableDataManagerConfig);
+    TableDataManager tableDataManager = TableDataManagerProvider.getTableDataManager(tableDataManagerConfig, serverInstance);
     tableDataManager.start();
     addTableDataManager(tableName, tableDataManager);
   }

@@ -18,13 +18,11 @@ package com.linkedin.pinot.common.utils;
 import java.io.File;
 import java.security.Permission;
 import java.util.Properties;
-
+import org.I0Itec.zkclient.ZkClient;
+import org.apache.commons.io.FileUtils;
 import kafka.admin.TopicCommand;
 import kafka.server.KafkaConfig;
 import kafka.server.KafkaServerStartable;
-
-import org.I0Itec.zkclient.ZkClient;
-import org.apache.commons.io.FileUtils;
 
 
 /**
@@ -119,9 +117,10 @@ public class KafkaStarterUtils {
     FileUtils.deleteQuietly(new File(serverStartable.serverConfig().logDirs().apply(0)));
   }
 
-  public static void createTopic(String kafkaTopic, String zkStr) {
+  public static void createTopic(String kafkaTopic, String zkStr, int partitionCount) {
     invokeTopicCommand(
-        new String[]{"--create", "--zookeeper", zkStr, "--replication-factor", "1", "--partitions", "10", "--topic",
+        new String[]{"--create", "--zookeeper", zkStr, "--replication-factor", "1", "--partitions", Integer.toString(
+            partitionCount), "--topic",
             kafkaTopic});
   }
 

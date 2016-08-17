@@ -28,6 +28,6 @@ public interface InstanceDataManager extends DataManager {
   TableDataManager getTableDataManager(String tableName);
 
   void addSegment(ZkHelixPropertyStore<ZNRecord> propertyStore, AbstractTableConfig tableConfig,
-      InstanceZKMetadata instanceZKMetadata, SegmentZKMetadata segmentZKMetadata) throws Exception;
+      InstanceZKMetadata instanceZKMetadata, SegmentZKMetadata segmentZKMetadata, String serverInstance) throws Exception;
 
 }

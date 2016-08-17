@@ -15,10 +15,10 @@
  */
 package com.linkedin.pinot.integration.tests;
 
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.utils.KafkaStarterUtils;
 import java.io.File;
 import java.util.Collections;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.utils.KafkaStarterUtils;
 
 
 /**
@@ -26,11 +26,16 @@ import java.util.Collections;
  *
  */
 public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegrationTest {
+  private static int KAFKA_PARTITION_COUNT = 2;
   protected void setUpTable(String tableName, String timeColumnName, String timeColumnType, String kafkaZkUrl,
       String kafkaTopic, File schemaFile, File avroFile) throws Exception {
     Schema schema = Schema.fromFile(schemaFile);
     addSchema(schemaFile, schema.getSchemaName());
     addLLCRealtimeTable(tableName, timeColumnName, timeColumnType, -1, "", KafkaStarterUtils.DEFAULT_KAFKA_BROKER, kafkaTopic, schema.getSchemaName(),
         null, null, avroFile, ROW_COUNT_FOR_REALTIME_SEGMENT_FLUSH, "Carrier", Collections.<String>emptyList(), "mmap");
+  }
+
+  protected void createKafkaTopic(String kafkaTopic, String zkStr) {
+    KafkaStarterUtils.createTopic(kafkaTopic, zkStr, KAFKA_PARTITION_COUNT);
   }
 }

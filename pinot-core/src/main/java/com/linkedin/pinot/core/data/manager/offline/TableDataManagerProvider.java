@@ -15,11 +15,10 @@
  */
 package com.linkedin.pinot.core.data.manager.offline;
 
-import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.metrics.ServerMetrics;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-
+import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.core.data.manager.config.TableDataManagerConfig;
 import com.linkedin.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 
@@ -39,7 +38,8 @@ public class TableDataManagerProvider {
     keyToFunction.put("realtime", RealtimeTableDataManager.class);
   }
 
-  public static TableDataManager getTableDataManager(TableDataManagerConfig tableDataManagerConfig) {
+  public static TableDataManager getTableDataManager(TableDataManagerConfig tableDataManagerConfig,
+      String serverInstance) {
     Preconditions.checkNotNull(SERVER_METRICS);
 
     try {
@@ -47,7 +47,7 @@ public class TableDataManagerProvider {
           keyToFunction.get(tableDataManagerConfig.getTableDataManagerType().toLowerCase());
       if (cls != null) {
         TableDataManager tableDataManager = cls.newInstance();
-        tableDataManager.init(tableDataManagerConfig, SERVER_METRICS);
+        tableDataManager.init(tableDataManagerConfig, SERVER_METRICS, serverInstance);
         return tableDataManager;
       } else {
         throw new UnsupportedOperationException("No tableDataManager type found.");

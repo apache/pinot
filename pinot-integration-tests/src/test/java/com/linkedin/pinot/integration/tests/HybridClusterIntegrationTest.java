@@ -288,7 +288,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
             KafkaStarterUtils.DEFAULT_ZK_STR, KafkaStarterUtils.getDefaultKafkaConfiguration());
 
     // Create Kafka topic
-    KafkaStarterUtils.createTopic(KAFKA_TOPIC, KafkaStarterUtils.DEFAULT_ZK_STR);
+    KafkaStarterUtils.createTopic(KAFKA_TOPIC, KafkaStarterUtils.DEFAULT_ZK_STR, 10);
 
     // Start the Pinot cluster
     startController(true);
