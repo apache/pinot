@@ -58,15 +58,17 @@ function selectAggregate(target) {
         $("#" + hash.view + "-form-tip").hide();
     }
 
-    //Display message to user if daily granularity selected and only 1 day set the timerange to last 7 days with 12am time
+    //Display message to user if daily granularity selected and only 1 day set the timerange to last 7 days with the latest available data
     if (unit == "DAYS") {
 
-
+        var maxMillis = window.datasetConfig.maxMillis;
+        console.log("maxMillis", maxMillis);
+        var hh = maxMillis ? moment(maxMillis).format("HH") : "00";
         //Set the time selectors to midnight
-        $("#" + currentView + "-current-end-time-input").val("00:00");
-        $("#" + currentView + "-current-start-time-input").val("00:00");
-        $("#" + currentView + "-baseline-start-time-input").val("00:00");
-        $("#" + currentView + "-baseline-end-time-input").val("00:00");
+        $("#" + currentView + "-current-end-time-input").val(hh + ":00");
+        $("#" + currentView + "-current-start-time-input").val(hh + ":00");
+        $("#" + currentView + "-baseline-start-time-input").val(hh + ":00");
+        $("#" + currentView + "-baseline-end-time-input").val(hh + ":00");
         $(".time-input-apply-btn[rel='" + currentView + "']").click();
 
         //close uikit dropdown
@@ -122,15 +124,8 @@ function selectCurrentDateRange(target) {
                 $(".current-end-date-input[rel='" + currentTab + "']").val(today);
             }
 
-
             $(".current-start-time-input[rel='" + currentTab + "']").val("00:00");
             $(".current-end-time-input[rel='" + currentTab + "']").val(hh + ":00");
-
-            //Disable inputfield edit
-            // $(".current-start-date-input[rel='"+ currentTab +"']").attr("disabled", true);
-            // $(".current-end-date-input[rel='"+ currentTab +"']").attr("disabled", true);
-            //$(".current-start-time-input[rel='"+ currentTab +"']").attr("disabled", true);
-            //$(".current-end-time-input[rel='"+ currentTab +"']").attr("disabled", true);
 
             break;
 
@@ -145,12 +140,6 @@ function selectCurrentDateRange(target) {
             $(".current-end-time-input[rel='" + currentTab + "']").val("00:00");
             $(".current-start-date-input[rel='" + currentTab + "']").val(yesterday);
             $(".current-start-time-input[rel='" + currentTab + "']").val("00:00");
-
-            //disable the inputfields
-            //$(".current-start-date-input[rel='"+ currentTab +"']").attr("disabled", true);
-            //$(".current-end-date-input[rel='"+ currentTab +"']").attr("disabled", true);
-            //$(".current-start-time-input[rel='"+ currentTab +"']").attr("disabled", true);
-            //$(".current-end-time-input[rel='"+ currentTab +"']").attr("disabled", true);
 
             break;
         case "7": //last7days not full days
@@ -174,10 +163,6 @@ function selectCurrentDateRange(target) {
             $(".current-end-time-input[rel='" + currentTab + "']").val(currentEndTimeString);
             $(".current-start-date-input[rel='" + currentTab + "']").attr("readonly");
             $(".current-end-date-input[rel='" + currentTab + "']").attr("readonly");
-            //$(".current-start-date-input[rel='"+ currentTab +"']").attr("disabled", true);
-            //$(".current-end-date-input[rel='"+ currentTab +"']").attr("disabled", true);
-            //$(".current-start-time-input[rel='"+ currentTab +"']").attr("disabled", true);
-            //$(".current-end-time-input[rel='"+ currentTab +"']").attr("disabled", true);
 
             break;
         case "24": //last24hours not full days
@@ -204,19 +189,12 @@ function selectCurrentDateRange(target) {
             $(".current-end-time-input[rel='" + currentTab + "']").val(currentEndTimeString);
             $(".current-start-date-input[rel='" + currentTab + "']").attr("readonly");
             $(".current-end-date-input[rel='" + currentTab + "']").attr("readonly");
-            //$(".current-start-date-input[rel='"+ currentTab +"']").attr("disabled", true);
-            //$(".current-end-date-input[rel='"+ currentTab +"']").attr("disabled", true);
-            //$(".current-start-time-input[rel='"+ currentTab +"']").attr("disabled", true);
-            //$(".current-end-time-input[rel='"+ currentTab +"']").attr("disabled", true);
-
             break;
-        case "custom":
+        default: //case "custom"
+        break;
 
-        //Enable inputfield edit
-        //$(".current-start-date-input[rel='"+ currentTab +"']").attr("disabled", false);
-        //$(".current-end-date-input[rel='"+ currentTab +"']").attr("disabled", false);
-        //$(".current-start-time-input[rel='"+ currentTab +"']").attr("disabled", false);
-        //$(".current-end-time-input[rel='"+ currentTab +"']").attr("disabled", false);
+
+
     }
 
     //If the comparison is enabled the comparison inputfileds will be updated every time the current date input is updated
