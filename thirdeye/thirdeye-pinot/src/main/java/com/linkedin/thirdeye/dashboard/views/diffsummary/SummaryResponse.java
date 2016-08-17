@@ -15,11 +15,10 @@ import com.linkedin.thirdeye.client.diffsummary.HierarchyNode;
 
 public class SummaryResponse {
   @JsonProperty("dimensions")
-  List<String> dimensions = new ArrayList<>();;
+  List<String> dimensions = new ArrayList<>();
 
   @JsonProperty("responseRows")
-  private
-  List<SummaryResponseRow> responseRows = new ArrayList<>();
+  private List<SummaryResponseRow> responseRows = new ArrayList<>();
 
   public List<SummaryResponseRow> getResponseRows() {
     return responseRows;
@@ -35,7 +34,8 @@ public class SummaryResponse {
     }
 
     // Build the response
-    nodes.sort(Summary.NODE_COMPARATOR.reversed());
+//    nodes.sort(Summary.NODE_COMPARATOR.reversed()); // pre-order traversal
+    nodes = SummaryResponseTree.sortResponseTree(nodes, levelCount);
     //   Build name tag for each row of responses
     Map<HierarchyNode, NameTag> nameTags = new HashMap<>();
     for (HierarchyNode node : nodes) {
@@ -43,6 +43,7 @@ public class SummaryResponse {
       nameTags.put(node, tag);
       tag.copyNames(node.getDimensionValues());
     }
+    //   pre-condition: parent node is processed before its children nodes
     for (HierarchyNode node : nodes) {
       HierarchyNode parent = node;
       int levelDiff = 1;

@@ -44,7 +44,7 @@ public class Summary {
   }
 
   public SummaryResponse computeSummary(int answerSize, int levelCount) {
-    return computeSummary(answerSize, false, this.maxLevelCount);
+    return computeSummary(answerSize, false, levelCount);
   }
 
   public SummaryResponse computeSummary(int answerSize, boolean doOneSideError, int userLevelCount) {
@@ -64,11 +64,11 @@ public class Summary {
           new OneSideErrorRowInserter(basicRowInserter, Double.compare(1., root.targetRatio()) <= 0);
       // If this cube contains only one dimension, one side error is calculated starting at leaf (detailed) level;
       // otherwise, a row at different side is removed through internal nodes.
-      if (userLevelCount == 1) leafRowInserter = oneSideErrorRowInserter;
+      if (this.levelCount == 1) leafRowInserter = oneSideErrorRowInserter;
     }
     computeChildDPArray(root);
     List<HierarchyNode> answer = new ArrayList<>(dpArrays.get(0).getAnswer());
-    SummaryResponse response = SummaryResponse.buildResponse(answer, userLevelCount);
+    SummaryResponse response = SummaryResponse.buildResponse(answer, this.levelCount);
 
     return response;
   }
@@ -308,6 +308,7 @@ public class Summary {
       double percentage = (((baselineValue + currentValue) / topValue) * 100);
       if (Double.compare(percentage, Math.E) < 0) percentage = Math.E;
       double cost = CostFunction.err4EmptyValues(baselineValue, currentValue, targetRatio) * Math.log(percentage);
+//      double cost = CostFunction.err4EmptyValues(baselineValue, currentValue, targetRatio);
 
       for (int n = dp.size() - 1; n > 0; --n) {
         double val1 = dp.slotAt(n - 1).cost;
@@ -373,6 +374,7 @@ public class Summary {
     } catch (JsonProcessingException e) {
       e.printStackTrace();
     }
+
     summary.testCorrectnessOfWowValues();
   }
 }
