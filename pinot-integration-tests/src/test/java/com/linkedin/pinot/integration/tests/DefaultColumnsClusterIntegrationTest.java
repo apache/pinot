@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.FileUploadUtils;
 import java.io.File;
 import java.io.FileInputStream;
@@ -25,6 +26,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.configuration.Configuration;
 import org.apache.commons.io.FileUtils;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -48,7 +50,7 @@ import org.testng.annotations.Test;
  * <p>- "newAddedIntDimension", DIMENSION, INT, single-value, default (Integer.MIN_VALUE)
  * <p>- "newAddedLongDimension", DIMENSION, LONG, single-value, default (Long.MIN_VALUE)
  * <p>- "newAddedFloatDimension", DIMENSION, FLOAT, single-value, default (Float.NEGATIVE_INFINITY)
- * <p> "newAddedDoubleDimension", DIMENSION, DOUBLE, single-value, default (Double.NEGATIVE_INFINITY)
+ * <p>- "newAddedDoubleDimension", DIMENSION, DOUBLE, single-value, default (Double.NEGATIVE_INFINITY)
  * <p>- "newAddedStringDimension", DIMENSION, STRING, multi-value, "newAdded"
  */
 public class DefaultColumnsClusterIntegrationTest extends BaseClusterIntegrationTest {
@@ -119,6 +121,11 @@ public class DefaultColumnsClusterIntegrationTest extends BaseClusterIntegration
     // Wait for all segments to be ONLINE.
     latch.await();
     waitForSegmentsOnline();
+  }
+
+  @Override
+  protected void overrideOfflineServerConf(Configuration configuration) {
+    configuration.addProperty(CommonConstants.Server.CONFIG_OF_ENABLE_DEFAULT_COLUMNS, true);
   }
 
   protected void sendSchema()

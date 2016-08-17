@@ -32,6 +32,7 @@ import org.slf4j.LoggerFactory;
  */
 public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixInstanceDataManagerConfig.class);
+
   private static final String INSTANCE_SEGMENT_METADATA_LOADER_CLASS = "segment.metadata.loader.class";
   // Key of instance id
   public static final String INSTANCE_ID = "id";
@@ -45,10 +46,12 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   public static final String kEY_OF_TABLE_DATA_DIRECTORY = "directory";
   // Key of table data directory
   public static final String kEY_OF_TABLE_NAME = "name";
-  // Key of instance level segment read mode.
+  // Key of instance level segment read mode
   public static final String READ_MODE = "readMode";
-  // key of the segment format this server can read
+  // Key of the segment format this server can read
   public static final String SEGMENT_FORMAT_VERSION = "segment.format.version";
+  // Key of whether to enable default columns
+  private static final String ENABLE_DEFAULT_COLUMNS = "enable.default.columns";
 
   private final static String[] REQUIRED_KEYS = { INSTANCE_ID, INSTANCE_DATA_DIR, READ_MODE };
   private Configuration _instanceDataManagerConfiguration = null;
@@ -110,6 +113,11 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   @Override
   public String getSegmentFormatVersion() {
     return _instanceDataManagerConfiguration.getString(SEGMENT_FORMAT_VERSION);
+  }
+
+  @Override
+  public boolean isEnableDefaultColumns() {
+    return _instanceDataManagerConfiguration.getBoolean(ENABLE_DEFAULT_COLUMNS, false);
   }
 
   @Override

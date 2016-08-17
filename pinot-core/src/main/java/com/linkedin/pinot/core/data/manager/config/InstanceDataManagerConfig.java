@@ -35,4 +35,6 @@ public interface InstanceDataManagerConfig {
   ReadMode getReadMode();
 
   String getSegmentFormatVersion();
+
+  boolean isEnableDefaultColumns();
 }

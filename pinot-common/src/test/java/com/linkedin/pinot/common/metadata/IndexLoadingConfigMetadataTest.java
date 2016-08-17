@@ -15,20 +15,18 @@
  */
 package com.linkedin.pinot.common.metadata;
 
+import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
 import java.util.Arrays;
 import java.util.Set;
-
 import junit.framework.Assert;
-
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
-
 
 public class IndexLoadingConfigMetadataTest {
   private final static String KEY_OF_LOADING_INVERTED_INDEX = "metadata.loading.inverted.index.columns";
+  private final static String KEY_OF_ENABLE_DEFAULT_COLUMNS = "enable.default.columns";
 
   @Test
   public void testInvertedIndexConfig() {
@@ -48,6 +46,13 @@ public class IndexLoadingConfigMetadataTest {
     }
   }
 
+  @Test
+  public void testEnableDefaultColumnsConfig() {
+    Configuration resourceMetadata = getTestResourceMetadata();
+    IndexLoadingConfigMetadata indexLoadingConfigMetadata = new IndexLoadingConfigMetadata(resourceMetadata);
+    Assert.assertTrue(indexLoadingConfigMetadata.isEnableDefaultColumns());
+  }
+
   private Configuration getTestResourceMetadata() {
     Configuration resourceMetadata = new PropertiesConfiguration();
     String columnNames = null;
@@ -59,6 +64,7 @@ public class IndexLoadingConfigMetadataTest {
       }
     }
     resourceMetadata.addProperty(KEY_OF_LOADING_INVERTED_INDEX, columnNames);
+    resourceMetadata.addProperty(KEY_OF_ENABLE_DEFAULT_COLUMNS, true);
     return resourceMetadata;
   }
 }

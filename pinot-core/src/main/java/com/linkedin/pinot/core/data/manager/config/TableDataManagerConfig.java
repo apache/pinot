@@ -88,6 +88,9 @@ public class TableDataManagerConfig {
       defaultConfig.addProperty(IndexLoadingConfigMetadata.KEY_OF_SEGMENT_FORMAT_VERSION,
           _instanceDataManagerConfig.getSegmentFormatVersion());
     }
+    if (_instanceDataManagerConfig.isEnableDefaultColumns()) {
+      defaultConfig.addProperty(IndexLoadingConfigMetadata.KEY_OF_ENABLE_DEFAULT_COLUMNS, true);
+    }
     defaultConfig.addProperty(TABLE_DATA_MANAGER_NUM_QUERY_EXECUTOR_THREADS, 20);
     TableDataManagerConfig tableDataManagerConfig = new TableDataManagerConfig(defaultConfig);
 

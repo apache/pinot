@@ -42,16 +42,18 @@ public class FileBasedInstanceDataManagerConfig implements InstanceDataManagerCo
   private static final String INSTANCE_SEGMENT_TAR_DIR = "segmentTarDir";
   // Key of segment directory
   private static final String INSTANCE_BOOTSTRAP_SEGMENT_DIR = "bootstrap.segment.dir";
-  // Key of table names that will be holding from initialization.
+  // Key of table names that will be holding from initialization
   private static final String INSTANCE_TABLE_NAME = "tableName";
   // Key of table data directory
   private static final String KEY_OF_TABLE_DATA_DIRECTORY = "directory";
   // Key of table data directory
   private static final String KEY_OF_TABLE_NAME = "name";
-  // Key of instance level segment read mode.
+  // Key of instance level segment read mode
   private static final String READ_MODE = "readMode";
-  // key of the segment format this server can read
-  public static final String SEGMENT_FORMAT_VERSION = "segment.format.version";
+  // Key of the segment format this server can read
+  private static final String SEGMENT_FORMAT_VERSION = "segment.format.version";
+  // Key of whether to enable default columns
+  private static final String ENABLE_DEFAULT_COLUMNS = "enable.default.columns";
 
   private static String[] REQUIRED_KEYS = { INSTANCE_ID, INSTANCE_DATA_DIR, INSTANCE_TABLE_NAME };
   private Configuration _instanceDataManagerConfiguration = null;
@@ -133,6 +135,11 @@ public class FileBasedInstanceDataManagerConfig implements InstanceDataManagerCo
   @Override
   public String getSegmentFormatVersion() {
     return _instanceDataManagerConfiguration.getString(SEGMENT_FORMAT_VERSION);
+  }
+
+  @Override
+  public boolean isEnableDefaultColumns() {
+    return _instanceDataManagerConfiguration.getBoolean(ENABLE_DEFAULT_COLUMNS, false);
   }
 
   @Override

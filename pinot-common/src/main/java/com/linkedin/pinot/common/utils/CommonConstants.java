@@ -181,6 +181,7 @@ public class CommonConstants {
     public static final String CONFIG_OF_SEGMENT_LOAD_MIN_RETRY_DELAY_MILLIS =
         "pinot.server.segment.minRetryDelayMillis";
     public static final String CONFIG_OF_SEGMENT_FORMAT_VERSION = "pinot.server.instance.segment.format.version";
+    public static final String CONFIG_OF_ENABLE_DEFAULT_COLUMNS = "pinot.server.instance.enable.default.columns";
     public static final String CONFIG_OF_HELIX_FLAPPING_TIMEWINDOW_MS = "pinot.server.flapping.timeWindowMs";
 
     public static final String DEFAULT_ADMIN_API_PORT = "8097";

@@ -38,6 +38,7 @@ public class SegmentPreProcessor implements AutoCloseable {
   private final SegmentMetadataImpl segmentMetadata;
   private final IndexLoadingConfigMetadata indexConfig;
   private final Schema schema;
+  private final boolean enableDefaultColumns;
   private final SegmentDirectory segmentDirectory;
 
   SegmentPreProcessor(File indexDir, IndexLoadingConfigMetadata indexConfig, Schema schema)
@@ -50,6 +51,11 @@ public class SegmentPreProcessor implements AutoCloseable {
     segmentMetadata = new SegmentMetadataImpl(indexDir);
     this.indexConfig = indexConfig;
     this.schema = schema;
+    if (schema != null && indexConfig != null && indexConfig.isEnableDefaultColumns()) {
+      enableDefaultColumns = true;
+    } else {
+      enableDefaultColumns = false;
+    }
     // Always use mmap to load the segment because it is safest and performs well without impact from -Xmx params.
     // This is not the final load of the segment.
     segmentDirectory = SegmentDirectory.createFromLocalFS(indexDir, segmentMetadata, ReadMode.mmap);
@@ -66,11 +72,13 @@ public class SegmentPreProcessor implements AutoCloseable {
           new InvertedIndexHandler(indexDir, segmentMetadata, indexConfig, segmentWriter);
       invertedIndexHandler.createInvertedIndices();
 
-      // Update default columns according to the schema.
-      // NOTE: This step may modify the segment metadata. When adding new steps after this, reload the segment metadata.
-      DefaultColumnHandler defaultColumnHandler =
-          DefaultColumnHandlerFactory.getDefaultColumnHandler(indexDir, schema, segmentMetadata, segmentWriter);
-      defaultColumnHandler.updateDefaultColumns();
+      if (enableDefaultColumns) {
+        // Update default columns according to the schema.
+        // NOTE: This step may modify the segment metadata. When adding new steps after this, reload the metadata.
+        DefaultColumnHandler defaultColumnHandler =
+            DefaultColumnHandlerFactory.getDefaultColumnHandler(indexDir, schema, segmentMetadata, segmentWriter);
+        defaultColumnHandler.updateDefaultColumns();
+      }
     } finally {
       if (segmentWriter != null) {
         segmentWriter.saveAndClose();
