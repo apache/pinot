@@ -119,17 +119,16 @@ public class StarTreeIndexNode implements StarTreeIndexNodeInterf, Serializable 
   }
 
   @Override
-  public void addChild(StarTreeIndexNodeInterf child, int dimensionValue) {
-    children.put(dimensionValue, (StarTreeIndexNode) child);
-  }
-
-  @Override
   public StarTreeIndexNodeInterf getChildForDimensionValue(int dimensionValue) {
     if (children != null && children.containsKey(dimensionValue)) {
       return children.get(dimensionValue);
     } else {
       return null;
     }
+  }
+
+  public void addChild(StarTreeIndexNodeInterf child, int dimensionValue) {
+    children.put(dimensionValue, (StarTreeIndexNode) child);
   }
 
   public void setChildren(Map<Integer, StarTreeIndexNode> children) {

@@ -104,13 +104,6 @@ public interface StarTreeIndexNodeInterf {
   boolean isLeaf();
 
   /**
-   * Adds the provided node as a child of this node, for the given dimension value.
-   * @param child
-   * @param dimensionValue
-   */
-  void addChild(StarTreeIndexNodeInterf child, int dimensionValue);
-
-  /**
    * Returns a child corresponding to the dimension value (dictionary id) for this node.
    * If no such child exists, returns null.
    * @param dimensionValue

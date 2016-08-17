@@ -37,6 +37,7 @@ public class StarTreeBuilderConfig {
   private Set<String> _skipMaterializationFroDimensions;
   private int _skipMaterializationCardinalityThreshold =
       StarTreeIndexSpec.DEFAULT_SKIP_MATERIALIZATION_CARDINALITY_THRESHOLD;
+  private boolean enableOffHealpFormat;
 
   public StarTreeBuilderConfig() {
   }
@@ -106,5 +107,21 @@ public class StarTreeBuilderConfig {
    */
   public void setSkipMaterializationForDimensions(Set<String> skipMaterializationForDimensions) {
     _skipMaterializationFroDimensions = skipMaterializationForDimensions;
+  }
+
+  /**
+   * Returns True if StarTreeV2 is enabled, false otherwise.
+   * @return
+   */
+  public boolean isEnableOffHealpFormat() {
+    return enableOffHealpFormat;
+  }
+
+  /**
+   * Enable/Disable StarTreeV2
+   * @param enableOffHealpFormat
+   */
+  public void setEnableOffHealpFormat(boolean enableOffHealpFormat) {
+    this.enableOffHealpFormat = enableOffHealpFormat;
   }
 }

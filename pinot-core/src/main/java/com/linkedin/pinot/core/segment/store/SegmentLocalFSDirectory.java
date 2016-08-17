@@ -231,6 +231,11 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
     }
 
     @Override
+    public File getStarTreeFile() {
+      return SegmentLocalFSDirectory.this.starTreeIndexFile();
+    }
+
+    @Override
     public boolean hasStarTree() {
       return SegmentLocalFSDirectory.this.hasStarTree();
     }
@@ -286,6 +291,11 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
     @Override
     public InputStream getStarTreeStream() {
       return SegmentLocalFSDirectory.this.getStarTreeStream();
+    }
+
+    @Override
+    public File getStarTreeFile() {
+      return SegmentLocalFSDirectory.this.starTreeIndexFile();
     }
 
     @Override

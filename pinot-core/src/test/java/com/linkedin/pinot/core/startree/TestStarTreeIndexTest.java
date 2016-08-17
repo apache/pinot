@@ -40,7 +40,7 @@ public class TestStarTreeIndexTest extends BaseStarTreeIndexTest {
   @BeforeSuite
   void setup()
       throws Exception {
-    _schema = buildSegment(SEGMENT_DIR_NAME, SEGMENT_NAME);
+    _schema = buildSegment(SEGMENT_DIR_NAME, SEGMENT_NAME, false);
     _segment = loadSegment(SEGMENT_DIR_NAME, SEGMENT_NAME);
   }
 

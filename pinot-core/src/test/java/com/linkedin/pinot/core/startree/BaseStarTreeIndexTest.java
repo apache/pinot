@@ -19,6 +19,7 @@ import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.data.StarTreeIndexSpec;
 import com.linkedin.pinot.common.data.TimeFieldSpec;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.segment.ReadMode;
@@ -163,7 +164,7 @@ public class BaseStarTreeIndexTest {
    * @param segmentName
    * @throws Exception
    */
-  Schema buildSegment(String segmentDirName, String segmentName)
+  Schema buildSegment(String segmentDirName, String segmentName, boolean enableOffHeapFormat)
       throws Exception {
     int ROWS = (int) MathUtils.factorial(NUM_DIMENSIONS);
     Schema schema = new Schema();
@@ -186,6 +187,7 @@ public class BaseStarTreeIndexTest {
     config.setOutDir(segmentDirName);
     config.setFormat(FileFormat.AVRO);
     config.setSegmentName(segmentName);
+    config.setStarTreeIndexSpec(buildStarTreeIndexSpec(enableOffHeapFormat));
 
     final List<GenericRow> data = new ArrayList<>();
     for (int row = 0; row < ROWS; row++) {
@@ -216,6 +218,19 @@ public class BaseStarTreeIndexTest {
 
     LOGGER.info("Built segment {} at {}", segmentName, segmentDirName);
     return schema;
+  }
+
+  /**
+   * Builds a star tree index spec for the test.
+   * - Use MaxLeafRecords as 1 to stress test.
+   * @return
+   * @param enableOffHeapFormat
+   */
+  private StarTreeIndexSpec buildStarTreeIndexSpec(boolean enableOffHeapFormat) {
+    StarTreeIndexSpec spec = new StarTreeIndexSpec();
+    spec.setMaxLeafRecords(1);
+    spec.setEnableOffHeapFormat(enableOffHeapFormat);
+    return spec;
   }
 
   /**

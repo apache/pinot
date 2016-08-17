@@ -36,6 +36,8 @@ public class StarTreeIndexSpec {
   private Set<String> _skipMaterializationForDimensions;
   private int skipMaterializationCardinalityThreshold = DEFAULT_SKIP_MATERIALIZATION_CARDINALITY_THRESHOLD;
 
+  private boolean enableOffHeapFormat = false;
+
   public StarTreeIndexSpec() {}
 
   public Integer getMaxLeafRecords() {
@@ -99,5 +101,21 @@ public class StarTreeIndexSpec {
         .add("maxLeafRecords", maxLeafRecords)
         .add("dimensionsSplitOrder", dimensionsSplitOrder)
         .toString();
+  }
+
+  /**
+   * Returns True if StarTreeV2 is enabled, False otherwise.
+   * @return
+   */
+  public boolean isEnableOffHeapFormat() {
+    return enableOffHeapFormat;
+  }
+
+  /**
+   * Enable/Disable StarTreeV2.
+   * @param enableOffHeapFormat
+   */
+  public void setEnableOffHeapFormat(boolean enableOffHeapFormat) {
+    this.enableOffHeapFormat = enableOffHeapFormat;
   }
 }
