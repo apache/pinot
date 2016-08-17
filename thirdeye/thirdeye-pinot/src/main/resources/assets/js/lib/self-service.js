@@ -713,23 +713,6 @@ function renderSelfService() {
             $(".anomaly-condition-min-max-option[value='MAX']").click()
         }
 
-        /** Handelbars template for dataset dropdown **/
-        var datasetList = JSON.parse(window.sessionStorage.getItem('datasetList'));
-        var queryFormDatasetData = {data: datasetList};
-        var result_datasets_template = HandleBarsTemplates.template_datasets(queryFormDatasetData);
-        $("#update-function-modal .landing-dataset").each(function () {
-            $(this).html(result_datasets_template)
-        });
-
-
-        /** Handelbars template for query form multi select metric list **/
-        var metricList = window.datasetConfig.datasetMetrics;
-        var queryFormMetricListData = {data: metricList};
-        var result_query_form_metric_list_template = HandleBarsTemplates.template_metric_list(queryFormMetricListData);
-        $("#update-function-modal .metric-list").each(function () {
-            $(this).html(result_query_form_metric_list_template)
-        });
-
 
         /** Populate dimension list **/
         var dimnsionList = window.datasetConfig.datasetDimensions;
