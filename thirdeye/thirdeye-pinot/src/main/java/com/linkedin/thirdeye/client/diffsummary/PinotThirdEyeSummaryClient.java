@@ -1,7 +1,19 @@
 package com.linkedin.thirdeye.client.diffsummary;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
+import org.joda.time.DateTime;
+
 import com.google.common.collect.Lists;
-import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.client.MetricFunction;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
@@ -15,32 +27,16 @@ import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.dashboard.ThirdEyeDashboardConfiguration;
 import com.linkedin.thirdeye.dashboard.views.diffsummary.Summary;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-
-import org.apache.commons.lang3.tuple.ImmutablePair;
-import org.apache.commons.lang3.tuple.Pair;
-import org.joda.time.DateTime;
-
 
 /**
  * Provide low-level operation of query to Pinot.
  */
 public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
   private final static DateTime NULL_DATETIME = new DateTime();
-  private final static TimeGranularity NULL_TIME_GRANULARITY = new TimeGranularity(0, TimeUnit.HOURS);
 
   private QueryCache queryCache;
   private String collection;
   private List<MetricFunction> metricFunctions = new ArrayList<>();
-  private TimeGranularity timeGranularity = NULL_TIME_GRANULARITY;
   private DateTime baselineStartInclusive = NULL_DATETIME;
   private DateTime baselineEndExclusive = NULL_DATETIME;
   private DateTime currentStartInclusive = NULL_DATETIME;
@@ -60,42 +56,29 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
   }
 
   @Override
-  public void setGroupByTimeGranularity(TimeGranularity timeGranularity) {
-    if (!this.timeGranularity.equals(timeGranularity)) {
-      this.timeGranularity = timeGranularity;
-      updateBaselineEndExclusive();
-      updateCurrentEndExclusive();
-    }
+  public void setMetricName(String metricName) {
+    metricFunctions.clear();
+    metricFunctions.add(new MetricFunction(MetricAggFunction.SUM, metricName));
   }
 
   @Override
   public void setBaselineStartInclusive(DateTime dateTime) {
-    if (!this.baselineStartInclusive.equals(dateTime)) {
-      baselineStartInclusive = dateTime;
-      updateBaselineEndExclusive();
-    }
+    baselineStartInclusive = dateTime;
+  }
+
+  @Override
+  public void setBaselineEndExclusive(DateTime dateTime) {
+    baselineEndExclusive = dateTime;
   }
 
   @Override
   public void setCurrentStartInclusive(DateTime dateTime) {
-    if (!this.currentStartInclusive.equals(dateTime)) {
-      currentStartInclusive = dateTime;
-      updateCurrentEndExclusive();
-    }
-  }
-
-  private void updateBaselineEndExclusive() {
-    baselineEndExclusive = baselineStartInclusive.plus(timeGranularity.toMillis());
-  }
-
-  private void updateCurrentEndExclusive() {
-    currentEndExclusive = currentStartInclusive.plus(timeGranularity.toMillis());
+    currentStartInclusive = dateTime;
   }
 
   @Override
-  public void setMetricName(String metricName) {
-    metricFunctions.clear();
-    metricFunctions.add(new MetricFunction(MetricAggFunction.SUM, metricName));
+  public void setCurrentEndExclusive(DateTime dateTime) {
+    currentEndExclusive = dateTime;
   }
 
   @Override
@@ -200,7 +183,6 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
     ThirdEyeRequestBuilder builder = ThirdEyeRequest.newBuilder();
     builder.setCollection(collection);
     builder.setMetricFunctions(metricFunctions);
-    builder.setGroupByTimeGranularity(timeGranularity);
     builder.setGroupBy(groupBy);
 
     builder.setStartTimeInclusive(baselineStartInclusive);
@@ -218,31 +200,43 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
   public static void main(String[] argc) throws Exception {
     String oFileName = "Cube.json";
 
-    // An interesting data set that difficult to tell because too many dark reds and blues
+    // An interesting data set that difficult to tell because too many dark reds and blues (Granularity: DAYS)
 //    String collection = "thirdeyeKbmi";
 //    String metricName = "pageViews";
 //    DateTime baselineStart = new DateTime(1467788400000L);
-//    DateTime currentStart = new DateTime(1468393200000L);
-//    TimeGranularity timeGranularity = new TimeGranularity(1, TimeUnit.DAYS);
+//    DateTime baselineEnd =   new DateTime(1469862000000L);
+//    DateTime currentStart =  new DateTime(1468393200000L);
+//    DateTime currentEnd =    new DateTime(1470466800000L);
 
-    String collection = "thirdeyeKbmi";
-    String metricName = "desktopPageViews";
-    DateTime baselineStart = new DateTime(1470628800000L);
-    DateTime currentStart = new DateTime(1471233600000L);
-    TimeGranularity timeGranularity = new TimeGranularity(1, TimeUnit.HOURS);
-
-    // An interesting data set that difficult to tell because most cells are light red or blue
+    // An interesting data set that difficult to tell because most cells are light red or blue (Granularity: HOURS)
 //    String collection = "thirdeyeKbmi";
 //    String metricName = "mobilePageViews";
 //    DateTime baselineStart = new DateTime(1469628000000L);
-//    DateTime currentStart = new DateTime(1470232800000L);
-//    TimeGranularity timeGranularity = new TimeGranularity(1, TimeUnit.HOURS);
+//    DateTime baselineEnd =   new DateTime(1469714400000L);
+//    DateTime currentStart =  new DateTime(1470232800000L);
+//    DateTime currentEnd =    new DateTime(1470319200000L);
 
+    // A migration of Asia connections from other data center to lsg data center (Granularity: DAYS)
+    // Most contributors: India and China
 //    String collection = "thirdeyeAbook";
 //    String metricName = "totalFlows";
 //    DateTime baselineStart = new DateTime(2016, 7, 11, 00, 00);
-//    DateTime currentStart = new DateTime(2016, 7, 18, 00, 00);
-//    TimeGranularity timeGranularity = new TimeGranularity(1, TimeUnit.DAYS);
+//    DateTime baselineEnd =   new DateTime(2016, 7, 12, 00, 00);
+//    DateTime currentStart =  new DateTime(2016, 7, 18, 00, 00);
+//    DateTime currentEnd =    new DateTime(2016, 7, 19, 00, 00);
+
+    // National Holidays in India and several countries in Europe and Latin America. (Granularity: DAYS)
+    String collection = "thirdeyeKbmi";
+    String metricName = "desktopPageViews";
+//    DateTime baselineStart = new DateTime(1471244400000L);
+//    DateTime baselineEnd =   new DateTime(1471330800000L);
+//    DateTime currentStart =  new DateTime(1470639600000L);
+//    DateTime currentEnd =    new DateTime(1470726000000L);
+
+    DateTime baselineStart = new DateTime(1470769200000L);
+    DateTime baselineEnd =   new DateTime(1470855600000L);
+    DateTime currentStart =  new DateTime(1471374000000L);
+    DateTime currentEnd =    new DateTime(1471460400000L);
 
     String[] dimensionNames = { "browserName", "continent", "countryCode",
                                 "deviceName", "environment", "locale", "osName",
@@ -265,9 +259,11 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
     OLAPDataBaseClient pinotClient = new PinotThirdEyeSummaryClient(ThirdEyeCacheRegistry.getInstance().getQueryCache());
     pinotClient.setCollection(collection);
     pinotClient.setMetricName(metricName);
-    pinotClient.setGroupByTimeGranularity(timeGranularity);
-    pinotClient.setBaselineStartInclusive(baselineStart);
     pinotClient.setCurrentStartInclusive(currentStart);
+    pinotClient.setCurrentEndExclusive(currentEnd);
+    pinotClient.setBaselineStartInclusive(baselineStart);
+    pinotClient.setBaselineEndExclusive(baselineEnd);
+
 
     int maxDimensionSize = 3;
 

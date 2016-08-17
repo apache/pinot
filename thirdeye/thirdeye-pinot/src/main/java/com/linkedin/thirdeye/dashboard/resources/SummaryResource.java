@@ -35,42 +35,34 @@ public class SummaryResource {
   private static final Logger LOG = LoggerFactory.getLogger(SummaryResource.class);
   private static final String DEFAULT_TIMEZONE_ID = "UTC";
   private static final String DEFAULT_TOP_DIMENSIONS = "4";
-  private static final String DEFAULT_HIERARCHIES = "[]";
+  private static final String DEFAULT_HIERARCHIES = "[[\"continent\",\"countryCode\"]]";
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static final String DEFAULT_ONE_SIDE_ERROR = "false";
-
-  @GET
-  @Path(value = "/summary/test")
-  @Produces(MediaType.APPLICATION_JSON)
-  public String getSummary() throws Exception {
-    return buildSummary("thirdeyeKbmi", "mobilePageViews", DEFAULT_TIMEZONE_ID, new Long(1469628000000L), new Long(
-        1470146400000L), "HOURS",
-        "browserName,continent,countryCode,deviceName,environment,locale,osName,pageKey,service,sourceApp", 5, 3, "[]",
-        false);
-  }
 
   @GET
   @Path(value = "/summary/autoDimensionOrder")
   @Produces(MediaType.APPLICATION_JSON)
   public String buildSummary(@QueryParam("dataset") String collection,
-      @QueryParam("metrics") String metric,
-      @QueryParam("timeZone") @DefaultValue(DEFAULT_TIMEZONE_ID) String timeZone,
-      @QueryParam("baselineStart") Long baselineStart,
-      @QueryParam("currentStart") Long currentStart,
-      @QueryParam("aggTimeGranularity") String aggTimeGranularity,
+      @QueryParam("metric") String metric,
+      @QueryParam("currentStart") Long currentStartInclusive,
+      @QueryParam("currentEnd") Long currentEndExclusive,
+      @QueryParam("baselineStart") Long baselineStartInclusive,
+      @QueryParam("baselineEnd") Long baselineEndExclusive,
       @QueryParam("dimensions") String groupByDimensions,
       @QueryParam("summarySize") int summarySize,
       @QueryParam("topDimensions") @DefaultValue(DEFAULT_TOP_DIMENSIONS) int topDimensions,
       @QueryParam("hierarchies") @DefaultValue(DEFAULT_HIERARCHIES) String hierarchiesPayload,
-      @QueryParam("oneSideError") @DefaultValue(DEFAULT_ONE_SIDE_ERROR) boolean doOneSideError) throws Exception {
+      @QueryParam("oneSideError") @DefaultValue(DEFAULT_ONE_SIDE_ERROR) boolean doOneSideError,
+      @QueryParam("timeZone") @DefaultValue(DEFAULT_TIMEZONE_ID) String timeZone) throws Exception {
     if (summarySize < 1) summarySize = 1;
 
     OLAPDataBaseClient olapClient = new PinotThirdEyeSummaryClient(CACHE_REGISTRY_INSTANCE.getQueryCache());
     olapClient.setCollection(collection);
     olapClient.setMetricName(metric);
-    olapClient.setGroupByTimeGranularity(Utils.getAggregationTimeGranularity(aggTimeGranularity));
-    olapClient.setBaselineStartInclusive(new DateTime(baselineStart, DateTimeZone.forID(timeZone)));
-    olapClient.setCurrentStartInclusive(new DateTime(currentStart, DateTimeZone.forID(timeZone)));
+    olapClient.setCurrentStartInclusive(new DateTime(currentStartInclusive, DateTimeZone.forID(timeZone)));
+    olapClient.setCurrentEndExclusive(new DateTime(currentEndExclusive, DateTimeZone.forID(timeZone)));
+    olapClient.setBaselineStartInclusive(new DateTime(baselineStartInclusive, DateTimeZone.forID(timeZone)));
+    olapClient.setBaselineEndExclusive(new DateTime(baselineEndExclusive, DateTimeZone.forID(timeZone)));
 
     Dimensions dimensions = new Dimensions(Arrays.asList(groupByDimensions.trim().split(",")));
     List<List<String>> hierarchies =
@@ -95,22 +87,24 @@ public class SummaryResource {
   @Path(value = "/summary/manualDimensionOrder")
   @Produces(MediaType.APPLICATION_JSON)
   public String buildSummaryManualDimensionOrder(@QueryParam("dataset") String collection,
-      @QueryParam("metrics") String metric,
-      @QueryParam("timeZone") @DefaultValue(DEFAULT_TIMEZONE_ID) String timeZone,
-      @QueryParam("baselineStart") Long baselineStart,
-      @QueryParam("currentStart") Long currentStart,
-      @QueryParam("aggTimeGranularity") String aggTimeGranularity,
+      @QueryParam("metric") String metric,
+      @QueryParam("currentStart") Long currentStartInclusive,
+      @QueryParam("currentEnd") Long currentEndExclusive,
+      @QueryParam("baselineStart") Long baselineStartInclusive,
+      @QueryParam("baselineEnd") Long baselineEndExclusive,
       @QueryParam("dimensions") String groupByDimensions,
       @QueryParam("summarySize") int summarySize,
-      @QueryParam("oneSideError") @DefaultValue(DEFAULT_ONE_SIDE_ERROR) boolean doOneSideError) throws Exception {
+      @QueryParam("oneSideError") @DefaultValue(DEFAULT_ONE_SIDE_ERROR) boolean doOneSideError,
+      @QueryParam("timeZone") @DefaultValue(DEFAULT_TIMEZONE_ID) String timeZone) throws Exception {
     if (summarySize < 1) summarySize = 1;
 
     OLAPDataBaseClient olapClient = new PinotThirdEyeSummaryClient(CACHE_REGISTRY_INSTANCE.getQueryCache());
     olapClient.setCollection(collection);
     olapClient.setMetricName(metric);
-    olapClient.setGroupByTimeGranularity(Utils.getAggregationTimeGranularity(aggTimeGranularity));
-    olapClient.setBaselineStartInclusive(new DateTime(baselineStart, DateTimeZone.forID(timeZone)));
-    olapClient.setCurrentStartInclusive(new DateTime(currentStart, DateTimeZone.forID(timeZone)));
+    olapClient.setCurrentStartInclusive(new DateTime(currentStartInclusive, DateTimeZone.forID(timeZone)));
+    olapClient.setCurrentEndExclusive(new DateTime(currentEndExclusive, DateTimeZone.forID(timeZone)));
+    olapClient.setBaselineStartInclusive(new DateTime(baselineStartInclusive, DateTimeZone.forID(timeZone)));
+    olapClient.setBaselineEndExclusive(new DateTime(baselineEndExclusive, DateTimeZone.forID(timeZone)));
 
     Dimensions dimensions = new Dimensions(Arrays.asList(groupByDimensions.trim().split(",")));
 

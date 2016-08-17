@@ -18,26 +18,25 @@ function getHeatmap(tab) {
 
         //AJAX
         var url = "/dashboard/summary/autoDimensionOrder?" +
-            "dataset="   + hash.dataset + //"thirdeyeKbmi" +
-            "&metrics=" + hash.metrics + //"desktopPageViews" +
-            "&baselineStart="+ hash.baselineStart + //"1470553200000" +
-            "&currentStart="+ hash.currentStart + //"1471158000000" +
-            "&aggTimeGranularity=" + "DAYS" +// hash.aggTimeGranularity +
-            "&dimensions="+ hash.dimensions + // "browserName,continent,countryCode,deviceName,environment,locale,osName,pageKey,service,sourceApp" +
+            "dataset=" + hash.dataset +
+            "&metric=" + hash.metrics +
+            "&baselineStart=" + hash.baselineStart +
+            "&baselineEnd=" + hash.baselineEnd +
+            "&currentStart=" + hash.currentStart +
+            "&currentEnd=" + hash.currentEnd +
+            "&dimensions=" + hash.dimensions +
             "&topDimensions=3" +
-            "&oneSideError=true" +
-            "&summarySize=15"
+            "&oneSideError=false" +
+            "&summarySize=10"
 
         getData(url).done(function(summaryData){
 
             console.log("summaryData")
             console.log(summaryData)
 
-
             renderD3heatmap(heatMapData, summaryData, tab);
 
             heatMapEventListeners(tab);
-
         })
     });
 };

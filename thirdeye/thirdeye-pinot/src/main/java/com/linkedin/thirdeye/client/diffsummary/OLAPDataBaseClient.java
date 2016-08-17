@@ -8,20 +8,21 @@ import com.linkedin.thirdeye.api.TimeGranularity;
 
 public interface OLAPDataBaseClient {
 
-  public abstract void setBaselineStartInclusive(DateTime dateTime);
+  public void setCollection(String collection);
 
-  public abstract void setCurrentStartInclusive(DateTime dateTime);
+  public void setMetricName(String metricName);
 
-  public abstract void setMetricName(String metricName);
+  public void setBaselineStartInclusive(DateTime dateTime);
 
-  public abstract void setGroupByTimeGranularity(TimeGranularity timeGranularity);
+  public void setBaselineEndExclusive(DateTime dateTime);
 
-  public abstract void setCollection(String collection);
+  public void setCurrentStartInclusive(DateTime dateTime);
 
-  public abstract Row getTopAggregatedValues() throws Exception;
+  public void setCurrentEndExclusive(DateTime dateTime);
 
-  public abstract List<List<Row>> getAggregatedValuesOfDimension(Dimensions dimensions) throws Exception;
+  public Row getTopAggregatedValues() throws Exception;
 
-  public abstract List<List<Row>> getAggregatedValuesOfLevels(Dimensions dimensions) throws Exception;
+  public List<List<Row>> getAggregatedValuesOfDimension(Dimensions dimensions) throws Exception;
 
+  public List<List<Row>> getAggregatedValuesOfLevels(Dimensions dimensions) throws Exception;
 }
