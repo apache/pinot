@@ -70,6 +70,8 @@ public class SimpleConsumerWrapper implements Closeable {
   private SimpleConsumer _simpleConsumer;
   private final Random _random = new Random();
   private Broker _leader;
+  private String _currentHost;
+  private int _currentPort;
 
   private SimpleConsumerWrapper(KafkaSimpleConsumerFactory simpleConsumerFactory, String bootstrapNodes,
       String clientId) {
@@ -172,11 +174,11 @@ public class SimpleConsumerWrapper implements Closeable {
       }
 
       int randomHostIndex = _random.nextInt(_bootstrapHosts.length);
-      String host = _bootstrapHosts[randomHostIndex];
-      int port = _bootstrapPorts[randomHostIndex];
+      _currentHost = _bootstrapHosts[randomHostIndex];
+      _currentPort = _bootstrapPorts[randomHostIndex];
 
       try {
-        _simpleConsumer = _simpleConsumerFactory.buildSimpleConsumer(host, port, SOCKET_TIMEOUT_MILLIS,
+        _simpleConsumer = _simpleConsumerFactory.buildSimpleConsumer(_currentHost, _currentPort, SOCKET_TIMEOUT_MILLIS,
             SOCKET_BUFFER_SIZE, _clientId);
         setCurrentState(new ConnectedToBootstrapNode());
       } catch (Exception e) {
@@ -259,6 +261,12 @@ public class SimpleConsumerWrapper implements Closeable {
 
     @Override
     void process() {
+      // If we're already connected to the leader broker, don't disconnect and reconnect
+      if (_leader.host().equals(_currentHost) && _leader.port() == _currentPort) {
+        setCurrentState(new ConnectedToPartitionLeader());
+        return;
+      }
+
       // Disconnect from current broker
       if(_simpleConsumer != null) {
         try {
