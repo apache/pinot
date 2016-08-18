@@ -596,7 +596,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
       _serverMetrics.addMeteredTableValue(_tableStreamName,
           ServerMeter.ROWS_WITH_ERRORS, (long) numErrors);
     }
-    Map<String, Integer> errorCount = _fieldExtractor.getError_count();
+    Map<String, Integer> errorCount = _fieldExtractor.getErrorCount();
     for (String column : errorCount.keySet()) {
       if ((numErrors = errorCount.get(column)) > 0) {
         segmentLogger.warn("Column {} had {} rows with errors", column, numErrors);
