@@ -28,12 +28,12 @@ $("#main-view").on("change", ".compare-mode-selector", function () {
     selectBaselineDateRange(this)
 });
 
-$("#main-view").on("change", ".current-start-date-input, .current-start-time-input, .current-end-date-input, .current-end-time-input", function () {
+$("#main-view").on("change, keyup", ".current-start-date-input, .current-start-time-input, .current-end-date-input, .current-end-time-input", function () {
     selectBaselineDateRange(this)
     enableButton($(".time-input-apply-btn[rel='" + hash.view + "']"));
 });
 
-$("#main-view").on("change", ".baseline-start-date-input, .baseline-start-time-input, .baseline-end-date-input, .baseline-end-time-input", function () {
+$("#main-view").on("change, keyup", ".baseline-start-date-input, .baseline-start-time-input, .baseline-end-date-input, .baseline-end-time-input", function () {
     enableButton($(".time-input-apply-btn[rel='" + hash.view + "']"))
 });
 
