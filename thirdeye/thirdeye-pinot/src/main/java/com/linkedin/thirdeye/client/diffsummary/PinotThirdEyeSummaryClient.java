@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
@@ -33,6 +34,8 @@ import com.linkedin.thirdeye.dashboard.views.diffsummary.Summary;
  */
 public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
   private final static DateTime NULL_DATETIME = new DateTime();
+  private final static int TIME_OUT_VALUE = 60;
+  private final static TimeUnit TIME_OUT_UNIT = TimeUnit.MINUTES;
 
   private QueryCache queryCache;
   private String collection;
@@ -124,8 +127,8 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
 
     Map<ThirdEyeRequest, Future<ThirdEyeResponse>> queryResponses = queryCache.getQueryResultsAsync(bulkRequests);
     for (int i = 0; i < bulkRequests.size(); i += 2) {
-      ThirdEyeResponse responseTa = queryResponses.get(bulkRequests.get(i)).get();
-      ThirdEyeResponse responseTb = queryResponses.get(bulkRequests.get(i+1)).get();
+      ThirdEyeResponse responseTa = queryResponses.get(bulkRequests.get(i)).get(TIME_OUT_VALUE, TIME_OUT_UNIT);
+      ThirdEyeResponse responseTb = queryResponses.get(bulkRequests.get(i+1)).get(TIME_OUT_VALUE, TIME_OUT_UNIT);
       if (responseTa.getNumRows() == 0) {
         throw new Exception("Failed to retrieve results from database with this request: " + bulkRequests.get(i));
       }

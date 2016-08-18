@@ -14,6 +14,8 @@ import java.util.Set;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import org.apache.commons.lang3.tuple.MutablePair;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -23,6 +25,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class Cube { // the cube (Ca|Cb)
+  private static final Logger LOG = LoggerFactory.getLogger(Cube.class);
   private static final int DEFAULT_TOP_DIMENSION = 3;
 
   private double topBaselineValue;
@@ -79,16 +82,22 @@ public class Cube { // the cube (Ca|Cb)
       List<List<String>> hierarchy) throws Exception {
 
     initializeBasicInfo(olapClient);
+    if (dimensions == null || dimensions.size() == 0) {
+      throw new IllegalArgumentException("Dimensions cannot be empty.");
+    }
     if (hierarchy == null) {
       hierarchy = Collections.emptyList();
     }
     this.dimensions = sortDimensionOrder(olapClient, topRatio, dimensions, topDimension, hierarchy);
-    System.out.println("Auto decided dimensions: " + this.dimensions);
+    LOG.info("Auto decided dimensions: " + this.dimensions);
 
     buildWithManualDimensionOrder(olapClient, this.dimensions);
   }
 
   public void buildWithManualDimensionOrder(OLAPDataBaseClient olapClient, Dimensions dimensions) throws Exception {
+    if (dimensions == null || dimensions.size() == 0) {
+      throw new IllegalArgumentException("Dimensions cannot be empty.");
+    }
     if (this.dimensions == null) {
       initializeBasicInfo(olapClient);
       this.dimensions = dimensions;
@@ -160,7 +169,7 @@ public class Cube { // the cube (Ca|Cb)
             }
           }
           if (haveProblem)
-            System.out.println(row + " is incorrectly connected to " + parentNode.data);
+            LOG.info(row + " is incorrectly connected to " + parentNode.data);
 
           // If the next data does not have the same prefix of dimension values, then it belongs to a different present.
           if ( (level > 1) && (index != hierarchicalRows.get(level).size()-1) ) {
@@ -239,6 +248,7 @@ public class Cube { // the cube (Ca|Cb)
     // Create a new Dimension instance whose dimensions follow the calculated order
     ArrayList<String> newDimensions = new ArrayList<>();
     for (MutablePair<String, Double> dimensionCostPair : dimensionCostPairs) {
+      StringBuilder sb = new StringBuilder("  Dimension: ");
       if (groupMap.containsKey(dimensionCostPair.getLeft())) {
         DimensionGroup dimensionGroup = groupMap.get(dimensionCostPair.getLeft());
         if (dimensionGroup.count == dimensionGroup.hierarchy.size()) {
@@ -251,12 +261,14 @@ public class Cube { // the cube (Ca|Cb)
           }
         }
 
-        System.out.print("  Dimension: " + dimensionGroup.hierarchy + ", Cost: ");
+        sb.append(dimensionGroup.hierarchy);
       } else {
         newDimensions.add(dimensionCostPair.getLeft());
-        System.out.print("  Dimension: " + dimensionCostPair.getLeft() + ", Cost: ");
+        sb.append(dimensionCostPair.getLeft());
       }
-      System.out.println(dimensionCostPair.getRight());
+      sb.append(", Cost: ");
+      sb.append(dimensionCostPair.getRight());
+      LOG.info(sb.toString());
     }
     return new Dimensions(newDimensions.subList(0, Math.min(topDimension, dimensions.size())));
   }
@@ -293,5 +305,7 @@ public class Cube { // the cube (Ca|Cb)
        .append("#Detailed Rows", hierarchicalRows.get(hierarchicalRows.size()-1).size());
     return tsb.toString();
   }
+
+
 }
 

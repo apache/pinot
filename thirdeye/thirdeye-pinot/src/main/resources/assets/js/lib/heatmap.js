@@ -26,7 +26,7 @@ function getHeatmap(tab) {
             "&currentEnd=" + hash.currentEnd +
             "&dimensions=" + hash.dimensions +
             "&topDimensions=3" +
-            "&oneSideError=false" +
+            "&oneSideError=true" +
             "&summarySize=10"
 
         getData(url).done(function(summaryData){

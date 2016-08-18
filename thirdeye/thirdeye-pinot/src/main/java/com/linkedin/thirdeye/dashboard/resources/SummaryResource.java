@@ -12,7 +12,6 @@ import javax.ws.rs.core.MediaType;
 
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -24,17 +23,19 @@ import com.linkedin.thirdeye.client.diffsummary.Dimensions;
 import com.linkedin.thirdeye.client.diffsummary.OLAPDataBaseClient;
 import com.linkedin.thirdeye.client.diffsummary.PinotThirdEyeSummaryClient;
 import com.linkedin.thirdeye.dashboard.Utils;
+import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
 import com.linkedin.thirdeye.dashboard.views.diffsummary.Summary;
 import com.linkedin.thirdeye.dashboard.views.diffsummary.SummaryResponse;
+import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 
 @Path(value = "/dashboard")
 public class SummaryResource {
-  private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry
-      .getInstance();
+  private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
+
   private static final Logger LOG = LoggerFactory.getLogger(SummaryResource.class);
   private static final String DEFAULT_TIMEZONE_ID = "UTC";
-  private static final String DEFAULT_TOP_DIMENSIONS = "4";
+  private static final String DEFAULT_TOP_DIMENSIONS = "3";
   private static final String DEFAULT_HIERARCHIES = "[[\"continent\",\"countryCode\"]]";
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static final String DEFAULT_ONE_SIDE_ERROR = "false";
@@ -56,6 +57,13 @@ public class SummaryResource {
       @QueryParam("timeZone") @DefaultValue(DEFAULT_TIMEZONE_ID) String timeZone) throws Exception {
     if (summarySize < 1) summarySize = 1;
 
+    collection = ThirdEyeUtils.getCollectionFromAlias(collection);
+    CollectionConfig collectionConfig = CACHE_REGISTRY_INSTANCE.getCollectionConfigCache().get(collection);
+    if (collectionConfig != null && collectionConfig.getDerivedMetrics() != null
+        && collectionConfig.getDerivedMetrics().containsKey(metric)) {
+      metric = collectionConfig.getDerivedMetrics().get(metric);
+    }
+
     OLAPDataBaseClient olapClient = new PinotThirdEyeSummaryClient(CACHE_REGISTRY_INSTANCE.getQueryCache());
     olapClient.setCollection(collection);
     olapClient.setMetricName(metric);
@@ -64,7 +72,13 @@ public class SummaryResource {
     olapClient.setBaselineStartInclusive(new DateTime(baselineStartInclusive, DateTimeZone.forID(timeZone)));
     olapClient.setBaselineEndExclusive(new DateTime(baselineEndExclusive, DateTimeZone.forID(timeZone)));
 
-    Dimensions dimensions = new Dimensions(Arrays.asList(groupByDimensions.trim().split(",")));
+    Dimensions dimensions;
+    if (groupByDimensions == null || groupByDimensions.length() == 0 || groupByDimensions.equals("undefined")) {
+      dimensions = new Dimensions(Utils.getDimensions(CACHE_REGISTRY_INSTANCE.getQueryCache(), collection));
+    } else {
+      dimensions = new Dimensions(Arrays.asList(groupByDimensions.trim().split(",")));
+    }
+
     List<List<String>> hierarchies =
         OBJECT_MAPPER.readValue(hierarchiesPayload, new TypeReference<List<List<String>>>() {
         });
@@ -98,6 +112,13 @@ public class SummaryResource {
       @QueryParam("timeZone") @DefaultValue(DEFAULT_TIMEZONE_ID) String timeZone) throws Exception {
     if (summarySize < 1) summarySize = 1;
 
+    collection = ThirdEyeUtils.getCollectionFromAlias(collection);
+    CollectionConfig collectionConfig = CACHE_REGISTRY_INSTANCE.getCollectionConfigCache().get(collection);
+    if (collectionConfig != null && collectionConfig.getDerivedMetrics() != null
+        && collectionConfig.getDerivedMetrics().containsKey(metric)) {
+      metric = collectionConfig.getDerivedMetrics().get(metric);
+    }
+
     OLAPDataBaseClient olapClient = new PinotThirdEyeSummaryClient(CACHE_REGISTRY_INSTANCE.getQueryCache());
     olapClient.setCollection(collection);
     olapClient.setMetricName(metric);
@@ -106,7 +127,16 @@ public class SummaryResource {
     olapClient.setBaselineStartInclusive(new DateTime(baselineStartInclusive, DateTimeZone.forID(timeZone)));
     olapClient.setBaselineEndExclusive(new DateTime(baselineEndExclusive, DateTimeZone.forID(timeZone)));
 
-    Dimensions dimensions = new Dimensions(Arrays.asList(groupByDimensions.trim().split(",")));
+    List<String> allDimensions;
+    if (groupByDimensions == null || groupByDimensions.length() == 0 || groupByDimensions.equals("undefined")) {
+      allDimensions = Utils.getDimensions(CACHE_REGISTRY_INSTANCE.getQueryCache(), collection);
+    } else {
+      allDimensions = Arrays.asList(groupByDimensions.trim().split(","));
+    }
+    if (allDimensions.size() > Integer.parseInt(DEFAULT_TOP_DIMENSIONS)) {
+      allDimensions = allDimensions.subList(0, Integer.parseInt(DEFAULT_TOP_DIMENSIONS));
+    }
+    Dimensions dimensions = new Dimensions(allDimensions);
 
     SummaryResponse response = null;
     try {
