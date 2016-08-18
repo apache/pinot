@@ -17,51 +17,29 @@ import org.apache.http.util.EntityUtils;
 /**
  * Utility classes for calling detector endpoints to execute/schedule jobs
  */
-public class DetectionResourceHttpUtils {
-
-  private HttpHost detectionResourceHttpHost;
+public class DetectionResourceHttpUtils extends AbstractResourceHttpUtils {
 
   private static String DETECTION_JOB_ENDPOINT = "/api/detection-job/";
   private static String ADHOC = "/ad-hoc";
 
   public DetectionResourceHttpUtils(String detectionHost, int detectionPort) {
-    this.detectionResourceHttpHost = new HttpHost(detectionHost, detectionPort);
+    super(new HttpHost(detectionHost, detectionPort));
   }
 
   public String enableAnomalyFunction(String id) throws ClientProtocolException, IOException {
     HttpPost req = new HttpPost(DETECTION_JOB_ENDPOINT + id);
-    return callDetectionJobEndpoint(req);
+    return callJobEndpoint(req);
   }
 
   public String disableAnomalyFunction(String id) throws ClientProtocolException, IOException {
     HttpDelete req = new HttpDelete(DETECTION_JOB_ENDPOINT + id);
-    return callDetectionJobEndpoint(req);
+    return callJobEndpoint(req);
   }
 
   public String runAdhocAnomalyFunction(String id, String startTimeIso, String endTimeIso)
       throws ClientProtocolException, IOException {
-    HttpPost req = new HttpPost(DETECTION_JOB_ENDPOINT + id + ADHOC + "?start=" + startTimeIso + "&end=" + endTimeIso);
-    return callDetectionJobEndpoint(req);
+    HttpPost req = new HttpPost(
+        DETECTION_JOB_ENDPOINT + id + ADHOC + "?start=" + startTimeIso + "&end=" + endTimeIso);
+    return callJobEndpoint(req);
   }
-
-
-  private String callDetectionJobEndpoint(HttpRequest req) throws IOException {
-    HttpClient controllerClient = new DefaultHttpClient();
-    HttpResponse res = controllerClient.execute(detectionResourceHttpHost, req);
-    String response = null;
-    try {
-      if (res.getStatusLine().getStatusCode() != 200) {
-        throw new IllegalStateException(res.getStatusLine().toString());
-      }
-      InputStream content = res.getEntity().getContent();
-      response = IOUtils.toString(content);
-
-    } finally {
-      if (res.getEntity() != null) {
-        EntityUtils.consume(res.getEntity());
-      }
-    }
-    return response;
-  }
-
 }

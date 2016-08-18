@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.dashboard;
 
+import com.linkedin.thirdeye.anomaly.utils.AbstractResourceHttpUtils;
 import java.io.IOException;
 import java.io.InputStream;
 
@@ -17,67 +18,45 @@ import org.apache.http.util.EntityUtils;
 /**
  * Utility classes for calling detector endpoints to execute/schedule jobs
  */
-public class DetectorHttpUtils {
-
-  private HttpHost detectorHttpHost;
+public class DetectorHttpUtils extends AbstractResourceHttpUtils {
 
   private static String ANOMALY_JOBS_ENDPOINT = "/api/anomaly-jobs/";
   private static String EMAIL_JOBS_ENDPOINT = "/api/email-jobs/";
   private static String ADHOC = "/ad-hoc";
 
   public DetectorHttpUtils(String detectorHost, int detectorPort) {
-    this.detectorHttpHost = new HttpHost(detectorHost, detectorPort);
+    super(new HttpHost(detectorHost, detectorPort));
   }
 
   public String enableAnomalyFunction(String id) throws ClientProtocolException, IOException {
     HttpPost req = new HttpPost(ANOMALY_JOBS_ENDPOINT + id);
-    return callDetectorEndpoint(req);
+    return callJobEndpoint(req);
   }
 
   public String disableAnomalyFunction(String id) throws ClientProtocolException, IOException {
     HttpDelete req = new HttpDelete(ANOMALY_JOBS_ENDPOINT + id);
-    return callDetectorEndpoint(req);
+    return callJobEndpoint(req);
   }
 
   public String runAdhocAnomalyFunction(String id, String start, String end)
       throws ClientProtocolException, IOException {
     HttpPost req = new HttpPost(ANOMALY_JOBS_ENDPOINT + id + ADHOC + "?start=" + start + "&end=" + end);
-    return callDetectorEndpoint(req);
+    return callJobEndpoint(req);
   }
 
   public String enableEmailConfiguration(String id) throws ClientProtocolException, IOException {
     HttpPost req = new HttpPost(EMAIL_JOBS_ENDPOINT + id);
-    return callDetectorEndpoint(req);
+    return callJobEndpoint(req);
   }
 
   public String disableEmailConfiguration(String id) throws ClientProtocolException, IOException {
     HttpDelete req = new HttpDelete(EMAIL_JOBS_ENDPOINT + id);
-    return callDetectorEndpoint(req);
+    return callJobEndpoint(req);
   }
 
   public String runAdhocEmailConfiguration(String id)
       throws ClientProtocolException, IOException {
     HttpPost req = new HttpPost(EMAIL_JOBS_ENDPOINT + id + ADHOC);
-    return callDetectorEndpoint(req);
+    return callJobEndpoint(req);
   }
-
-  private String callDetectorEndpoint(HttpRequest req) throws IOException {
-    HttpClient controllerClient = new DefaultHttpClient();
-    HttpResponse res = controllerClient.execute(detectorHttpHost, req);
-    String response = null;
-    try {
-      if (res.getStatusLine().getStatusCode() != 200) {
-        throw new IllegalStateException(res.getStatusLine().toString());
-      }
-      InputStream content = res.getEntity().getContent();
-      response = IOUtils.toString(content);
-
-    } finally {
-      if (res.getEntity() != null) {
-        EntityUtils.consume(res.getEntity());
-      }
-    }
-    return response;
-  }
-
 }
