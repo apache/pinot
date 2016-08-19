@@ -572,8 +572,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     _realtimeSegment.setSegmentMetadata(segmentZKMetadata, schema);
 
     // Create message decoder
-    _messageDecoder = (KafkaMessageDecoder) Class.forName(_decoderClassName).newInstance();
-    _messageDecoder.init(new HashMap<String, String>(), _schema, _kafkaTopic);
+    _messageDecoder = kafkaStreamProviderConfig.getDecoder();
     _clientId = _kafkaPartitionId + "-" + NetUtil.getHostnameOrAddress();
 
     // Create field extractor
