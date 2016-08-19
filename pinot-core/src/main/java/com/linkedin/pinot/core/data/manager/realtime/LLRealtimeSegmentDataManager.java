@@ -566,7 +566,9 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
 
 
     List<String> invertedIndexColumns = indexingConfig.getInvertedIndexColumns();
-    invertedIndexColumns.add(indexingConfig.getSortedColumn().get(0));
+    if (!indexingConfig.getSortedColumn().isEmpty()) {
+      invertedIndexColumns.add(indexingConfig.getSortedColumn().get(0));
+    }
     // Start new realtime segment
     _realtimeSegment = new RealtimeSegmentImpl(schema, _segmentMaxRowCount, tableConfig.getTableName(),
         segmentZKMetadata.getSegmentName(), _kafkaTopic, _serverMetrics, invertedIndexColumns);
