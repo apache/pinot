@@ -66,7 +66,7 @@ public class MinMaxThresholdFunction extends BaseAnomalyFunction {
 
     long numBuckets = (windowEnd.getMillis() - windowStart.getMillis()) / bucketMillis;
 
-    // weight of this time series
+    // avg value of this time series
     averageValue /= numBuckets;
 
     for (Long timeBucket : timeSeries.getTimeWindowSet()) {
@@ -79,8 +79,8 @@ public class MinMaxThresholdFunction extends BaseAnomalyFunction {
         anomalyResult.setStartTimeUtc(timeBucket);
         anomalyResult.setEndTimeUtc(timeBucket + bucketMillis); // point-in-time
         anomalyResult.setDimensions(CSV.join(dimensionKey.getDimensionValues()));
-        anomalyResult.setScore(Math.abs(deviationFromThreshold)); // higher change, higher the score
-        anomalyResult.setWeight(averageValue);
+        anomalyResult.setScore(averageValue);
+        anomalyResult.setWeight(Math.abs(deviationFromThreshold)); // higher change, higher the severity
         String message =
             String.format(DEFAULT_MESSAGE_TEMPLATE, min, max, value, deviationFromThreshold);
         anomalyResult.setMessage(message);

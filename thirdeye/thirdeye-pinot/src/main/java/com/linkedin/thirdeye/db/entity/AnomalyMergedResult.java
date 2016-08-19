@@ -35,9 +35,11 @@ public class AnomalyMergedResult extends AbstractBaseEntity {
   @Column(name = "end_time", nullable = false)
   private Long endTime;
 
+  // significance level
   @Column(name = "score", nullable = false)
   private double score;
 
+  // severity
   @Column(name = "weight", nullable = false)
   private double weight;
 

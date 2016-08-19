@@ -35,9 +35,11 @@ public class AnomalyResult extends AbstractBaseEntity implements Comparable<Anom
   @Column(name = "dimensions", nullable = false)
   private String dimensions;
 
+  // significance level
   @Column(name = "score", nullable = false)
   private double score;
 
+  // severity
   @Column(name = "weight", nullable = false)
   private double weight;
 
