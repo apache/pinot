@@ -194,7 +194,21 @@ public class PinotTableIdealStateBuilder {
       create = true;
     }
     LOGGER.info("Assigning partitions to instances for simple consumer for table {}", realtimeTableName);
-    final int nReplicas = Integer.valueOf(realtimeTableConfig.getValidationConfig().getReplicasPerPartition());
+
+    final String replicasPerPartition = realtimeTableConfig.getValidationConfig().getReplicasPerPartition();
+
+    if (replicasPerPartition == null || replicasPerPartition.isEmpty()) {
+      throw new RuntimeException("Invalid value for replicasPerPartition, expected a number: " + replicasPerPartition);
+    }
+
+    final int nReplicas;
+
+    try {
+      nReplicas = Integer.valueOf(replicasPerPartition);
+    } catch (NumberFormatException e) {
+      throw new RuntimeException("Invalid value for replicasPerPartition, expected a number: " + replicasPerPartition);
+    }
+
     final KafkaStreamMetadata kafkaMetadata = new KafkaStreamMetadata(realtimeTableConfig.getIndexingConfig().getStreamConfigs());
     final String topicName = kafkaMetadata.getKafkaTopicName();
     final PinotLLCRealtimeSegmentManager segmentManager = PinotLLCRealtimeSegmentManager.getInstance();
