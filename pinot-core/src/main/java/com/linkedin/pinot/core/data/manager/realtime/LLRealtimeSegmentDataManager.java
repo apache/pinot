@@ -139,7 +139,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
   // Segment end criteria
   private long _consumeEndTime = 0;
   private volatile long _finalOffset = -1;
-  private boolean _receivedStop = false;
+  private volatile boolean _receivedStop = false;
 
   // It takes 30s to locate controller leader, and more if there are multiple controller failures.
   // For now, we let 31s pass for this state transition.
