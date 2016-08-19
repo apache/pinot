@@ -16,6 +16,7 @@
 
 package com.linkedin.pinot.core.realtime.impl.kafka;
 
+import com.google.common.base.Preconditions;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -32,8 +33,12 @@ import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.Uninterruptibles;
 import javax.annotation.Nullable;
 import kafka.api.FetchRequestBuilder;
+import kafka.api.PartitionOffsetRequestInfo;
 import kafka.cluster.Broker;
+import kafka.common.TopicAndPartition;
 import kafka.javaapi.FetchResponse;
+import kafka.javaapi.OffsetRequest;
+import kafka.javaapi.OffsetResponse;
 import kafka.javaapi.TopicMetadata;
 import kafka.javaapi.TopicMetadataRequest;
 import kafka.javaapi.TopicMetadataResponse;
@@ -333,6 +338,7 @@ public class SimpleConsumerWrapper implements Closeable {
       }
 
       // Send the metadata request to Kafka
+
       TopicMetadataResponse topicMetadataResponse = null;
       try {
         topicMetadataResponse = _simpleConsumer.send(new TopicMetadataRequest(Collections.singletonList(topic)));
@@ -385,7 +391,78 @@ public class SimpleConsumerWrapper implements Closeable {
         .addFetch(_topic, _partition, startOffset, 500000)
         .build());
 
-    return buildOffsetFilteringIterable(fetchResponse.messageSet(_topic, _partition), startOffset, endOffset);
+    if (!fetchResponse.hasError()) {
+      return buildOffsetFilteringIterable(fetchResponse.messageSet(_topic, _partition), startOffset, endOffset);
+    } else {
+      throw Errors.forCode(fetchResponse.errorCode(_topic, _partition)).exception();
+    }
+  }
+
+  /**
+   * Fetches the numeric Kafka offset for this partition for a symbolic name ("largest" or "smallest").
+   *
+   * @param requestedOffset Either "largest" or "smallest"
+   * @param timeoutMillis Timeout in milliseconds
+   * @return An offset
+   */
+  public synchronized long fetchPartitionOffset(String requestedOffset, int timeoutMillis) {
+    Preconditions.checkNotNull(requestedOffset);
+
+    final long offsetRequestTime;
+    if (requestedOffset.equalsIgnoreCase("largest")) {
+      offsetRequestTime = kafka.api.OffsetRequest.LatestTime();
+    } else if (requestedOffset.equalsIgnoreCase("smallest")) {
+      offsetRequestTime = kafka.api.OffsetRequest.EarliestTime();
+    } else if (requestedOffset.equalsIgnoreCase("testDummy")) {
+      return -1L;
+    } else {
+      throw new IllegalArgumentException("Unknown initial offset value " + requestedOffset);
+    }
+
+    int kafkaErrorCount = 0;
+    final int MAX_KAFKA_ERROR_COUNT = 10;
+
+    while(true) {
+      // Try to get into a state where we're connected to Kafka
+      // TODO This needs a time limit
+      while (_currentState.getStateValue() != ConsumerState.CONNECTED_TO_PARTITION_LEADER) {
+        _currentState.process();
+      }
+
+      // Send the offset request to Kafka
+      OffsetRequest request = new OffsetRequest(Collections.singletonMap(new TopicAndPartition(_topic, _partition),
+          new PartitionOffsetRequestInfo(offsetRequestTime, 1)), kafka.api.OffsetRequest.CurrentVersion(), _clientId);
+      OffsetResponse offsetResponse;
+      try {
+        offsetResponse = _simpleConsumer.getOffsetsBefore(request);
+      } catch (Exception e) {
+        _currentState.handleConsumerException(e);
+        continue;
+      }
+
+      final short errorCode = offsetResponse.errorCode(_topic, _partition);
+
+      if (errorCode == Errors.NONE.code()) {
+        long offset = offsetResponse.offsets(_topic, _partition)[0];
+        if (offset == 0L) {
+          LOGGER.warn("Fetched offset of 0 for topic {} and partition {}, is this a newly created topic?", _topic,
+              _partition);
+        }
+        return offset;
+      } else if (errorCode == Errors.LEADER_NOT_AVAILABLE.code()) {
+        // If there is no leader, it'll take some time for a new leader to be elected, wait 100 ms before retrying
+        Uninterruptibles.sleepUninterruptibly(100, TimeUnit.MILLISECONDS);
+      } else {
+        // Retry after a short delay
+        kafkaErrorCount++;
+
+        if (MAX_KAFKA_ERROR_COUNT < kafkaErrorCount) {
+          throw Errors.forCode(errorCode).exception();
+        }
+
+        Uninterruptibles.sleepUninterruptibly(100, TimeUnit.MILLISECONDS);
+      }
+    }
   }
 
   private Iterable<MessageAndOffset> buildOffsetFilteringIterable(final ByteBufferMessageSet messageAndOffsets, final long startOffset, final long endOffset) {

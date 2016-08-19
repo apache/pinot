@@ -209,9 +209,9 @@ public class PinotTableIdealStateBuilder {
     final String topicName = kafkaMetadata.getKafkaTopicName();
     final PinotLLCRealtimeSegmentManager segmentManager = PinotLLCRealtimeSegmentManager.getInstance();
     final int nPartitions = getPartitionsCount(kafkaMetadata);
-    // TODO Get/Infer the initial offset from table Config?
-    final long startOffset = 0L;
-    segmentManager.setupHelixEntries(topicName, realtimeTableName, nPartitions, realtimeInstances, nReplicas, 0L,
+
+    segmentManager.setupHelixEntries(topicName, realtimeTableName, nPartitions, realtimeInstances, nReplicas,
+        kafkaMetadata.getKafkaConsumerProperties().get("auto.offset.reset"), kafkaMetadata.getBootstrapHosts(),
         idealState, create);
   }
 

@@ -196,6 +196,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
   }
 
   private void consumeLoop() {
+    segmentLogger.info("Starting consumption loop start offset {}, end offset {}", _currentOffset, _endOffset);
     while(!_receivedStop && !endCriteriaReached()) {
       // Consume for the next _kafkaReadTime ms, or we get to final offset, whichever happens earlier,
       // Update _currentOffset upon return from this method

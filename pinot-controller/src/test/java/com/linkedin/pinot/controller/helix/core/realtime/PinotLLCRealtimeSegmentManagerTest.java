@@ -40,6 +40,8 @@ import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
 
 public class PinotLLCRealtimeSegmentManagerTest {
   private static final String clusterName = "testCluster";
+  private static final String DUMMY_HOST = "dummyHost:1234";
+  private static final String KAFKA_OFFSET = "testDummy";
   private String[] serverNames;
 
   private List<String> getInstanceList(final int nServers) {
@@ -72,7 +74,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     final String rtTableName = "table_REALTIME";
     List<String> instances = getInstanceList(nInstances);
 //    String[] instances = {server1, server2, server3, server4};
-    final long startOffset = 7L;
+    final String startOffset = KAFKA_OFFSET;
 
     // Populate 'partitionSet' with all kafka partitions,
     // As we find partitions in the assigment, we will remove the partition from this set.
@@ -81,7 +83,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
       partitionSet.add(i);
     }
 
-    segmentManager.setupHelixEntries(topic, rtTableName, nPartitions, instances, nReplicas, startOffset, null, true);
+    segmentManager.setupHelixEntries(topic, rtTableName, nPartitions, instances, nReplicas, startOffset,
+        DUMMY_HOST, null, true);
 
     Map<String, List<String>> assignmentMap = segmentManager._partitionAssignment.getListFields();
     Assert.assertEquals(assignmentMap.size(), nPartitions);
@@ -125,11 +128,11 @@ public class PinotLLCRealtimeSegmentManagerTest {
     final String topic = "someTopic";
     final String rtTableName = "table_REALTIME";
     List<String> instances = getInstanceList(nInstances);
-    final long startOffset = 81L;
+    final String startOffset = KAFKA_OFFSET;
 
     IdealState  idealState = PinotTableIdealStateBuilder.buildEmptyKafkaConsumerRealtimeIdealStateFor(rtTableName, nReplicas);
-    segmentManager.setupHelixEntries(topic, rtTableName, nPartitions, instances, nReplicas, startOffset, idealState,
-        !existingIS);
+    segmentManager.setupHelixEntries(topic, rtTableName, nPartitions, instances, nReplicas, startOffset,
+        DUMMY_HOST, idealState, !existingIS);
 
     final String actualRtTableName = segmentManager._realtimeTableName;
     final Map<String, List<String>> idealStateEntries = segmentManager._idealStateEntries;
@@ -169,7 +172,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
       Assert.assertEquals(metadata, metadataCopy);
       final String path = segmentPathsMap.get(partition);
       final String segmentName = metadata.getSegmentName();
-      Assert.assertEquals(metadata.getStartOffset(), startOffset);
+      Assert.assertEquals(metadata.getStartOffset(), -1L);
       Assert.assertEquals(path, "/SEGMENTS/" + rtTableName + "/" + segmentName);
       LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
       Assert.assertEquals(llcSegmentName.getPartitionId(), partition);
@@ -187,18 +190,18 @@ public class PinotLLCRealtimeSegmentManagerTest {
     final String topic = "someTopic";
     final String rtTableName = "table_REALTIME";
     List<String> instances = getInstanceList(3);
-    final long startOffset = 81L;
+    final String startOffset = KAFKA_OFFSET;
 
     IdealState  idealState = PinotTableIdealStateBuilder.buildEmptyKafkaConsumerRealtimeIdealStateFor(rtTableName, 10);
     try {
-      segmentManager.setupHelixEntries(topic, rtTableName, 8, instances, 3, startOffset, idealState, false);
+      segmentManager.setupHelixEntries(topic, rtTableName, 8, instances, 3, startOffset, DUMMY_HOST, idealState, false);
       Assert.fail("Did not get expected exception when setting up helix with existing segments in propertystore");
     } catch (RuntimeException e) {
       // Expected
     }
 
     try {
-      segmentManager.setupHelixEntries(topic, rtTableName, 8, instances, 3, startOffset, idealState, true);
+      segmentManager.setupHelixEntries(topic, rtTableName, 8, instances, 3, startOffset, DUMMY_HOST, idealState, true);
       Assert.fail("Did not get expected exception when setting up helix with existing segments in propertystore");
     } catch (RuntimeException e) {
       // Expected
@@ -217,10 +220,10 @@ public class PinotLLCRealtimeSegmentManagerTest {
     final int nReplicas = 3;
     final boolean existingIS = false;
     List<String> instances = getInstanceList(nInstances);
-    final long startOffset = 81L;
+    final String startOffset = KAFKA_OFFSET;
 
     IdealState  idealState = PinotTableIdealStateBuilder.buildEmptyKafkaConsumerRealtimeIdealStateFor(rtTableName, nReplicas);
-    segmentManager.setupHelixEntries(topic, rtTableName, nPartitions, instances, nReplicas, startOffset, idealState,
+    segmentManager.setupHelixEntries(topic, rtTableName, nPartitions, instances, nReplicas, startOffset, DUMMY_HOST, idealState,
         !existingIS);
     // Now commit the first segment of partition 6.
     final int committingPartition = 6;
@@ -296,10 +299,10 @@ public class PinotLLCRealtimeSegmentManagerTest {
       final int nInstances = 5;
       final int nReplicas = 3;
       List<String> instances = getInstanceList(nInstances);
-      final long startOffset = 0L;
+      final String startOffset = KAFKA_OFFSET;
 
       MockPinotLLCRealtimeSegmentManager segmentManager = new MockPinotLLCRealtimeSegmentManager(false, null);
-      segmentManager.setupHelixEntries(topic, realtimeTableName, nPartitions, instances, nReplicas, startOffset, idealState, false);
+      segmentManager.setupHelixEntries(topic, realtimeTableName, nPartitions, instances, nReplicas, startOffset, DUMMY_HOST, idealState, false);
       ZNRecord partitionAssignment = segmentManager.getKafkaPartitionAssignment(realtimeTableName);
 
       for (int p = 0; p < nPartitions; p++) {
@@ -362,7 +365,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     public List<String> _paths;
     public List<ZNRecord> _records;
     public ZNRecord _partitionAssignment;
-    public long _startOffset;
+    public String _startOffset;
     public boolean _createNew;
     public int _nReplicas;
 
@@ -390,13 +393,13 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
 
     @Override
-    protected void setupInitialSegments(String realtimeTableName, ZNRecord partitionAssignment, long startOffset,
+    protected void setupInitialSegments(String realtimeTableName, ZNRecord partitionAssignment, String topicName, String startOffset, String bootstrapHostList,
         IdealState idealState, boolean create, int nReplicas) {
       _realtimeTableName = realtimeTableName;
       _partitionAssignment = partitionAssignment;
       _startOffset = startOffset;
       if (_setupInitialSegments) {
-        super.setupInitialSegments(realtimeTableName, partitionAssignment, startOffset, idealState, create, nReplicas);
+        super.setupInitialSegments(realtimeTableName, partitionAssignment, topicName, startOffset, bootstrapHostList, idealState, create, nReplicas);
       }
     }
 
