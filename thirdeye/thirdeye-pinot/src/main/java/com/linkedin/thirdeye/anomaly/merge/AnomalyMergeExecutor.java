@@ -165,6 +165,8 @@ public class AnomalyMergeExecutor implements Runnable {
 
   private void updateMergedSeverity(AnomalyMergedResult anomalyMergedResult) throws Exception {
     AnomalyFunctionSpec anomalyFunctionSpec = anomalyMergedResult.getFunction();
+
+    // create time series request
     TimeSeriesRequest timeSeriesRequest = new TimeSeriesRequest();
     timeSeriesRequest.setCollectionName(anomalyFunctionSpec.getCollection());
     MetricFunction metricFunction = new MetricFunction(anomalyFunctionSpec.getMetricFunction(),
@@ -176,9 +178,6 @@ public class AnomalyMergeExecutor implements Runnable {
         anomalyFunctionSpec.getBucketUnit());
     timeSeriesRequest.setAggregationTimeGranularity(timeBucket);
 
-    timeSeriesRequest.setStart(new DateTime(anomalyMergedResult.getStartTime()));
-    timeSeriesRequest.setEnd(new DateTime(anomalyMergedResult.getEndTime()));
-
     timeSeriesRequest.setEndDateInclusive(false);
     if (StringUtils.isNotBlank(anomalyFunctionSpec.getFilters())) {
       timeSeriesRequest.setFilterSet(ThirdEyeUtils.getFilterSet(anomalyFunctionSpec.getFilters()));
@@ -189,8 +188,9 @@ public class AnomalyMergeExecutor implements Runnable {
     }
 
     // Fetch current time series data
+    timeSeriesRequest.setStart(new DateTime(anomalyMergedResult.getStartTime()));
+    timeSeriesRequest.setEnd(new DateTime(anomalyMergedResult.getEndTime()));
     TimeSeriesResponse responseCurrent = timeSeriesHandler.handle(timeSeriesRequest);
-    LOG.info("number of rows : " + responseCurrent.getNumRows());
 
     // Fetch baseline time series data
     long baselineOffset = AnomalyFunctionUtils.getBaselineOffset(anomalyFunctionSpec);
