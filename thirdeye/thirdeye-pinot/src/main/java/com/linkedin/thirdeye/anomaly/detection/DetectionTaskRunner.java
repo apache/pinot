@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.anomaly.detection;
 
-import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.db.dao.AnomalyResultDAO;
 
 import java.util.ArrayList;
@@ -80,8 +79,9 @@ public class DetectionTaskRunner implements TaskRunner {
     // Compute metric function
     TimeGranularity timeGranularity = new TimeGranularity(anomalyFunctionSpec.getBucketSize(),
         anomalyFunctionSpec.getBucketUnit());
-    // TODO put sum into the function config
-    metricFunction = new MetricFunction(MetricAggFunction.SUM, anomalyFunctionSpec.getMetric());
+
+    metricFunction = new MetricFunction(anomalyFunctionSpec.getMetricFunction(),
+        anomalyFunctionSpec.getMetric());
 
     // Filters
     String filters = anomalyFunctionSpec.getFilters();
@@ -194,7 +194,6 @@ public class DetectionTaskRunner implements TaskRunner {
       try {
         // Properties that always come from the function spec
         AnomalyFunctionSpec spec = anomalyFunction.getSpec();
-
         // make sure score and weight are valid numbers
         result.setScore(normalize(result.getScore()));
         result.setWeight(normalize(result.getWeight()));

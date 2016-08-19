@@ -41,8 +41,7 @@ public class AbstractJpaDAO<E extends AbstractBaseEntity> {
     getEntityManager().merge(entity);
   }
 
-  @Transactional
-  public void updateAll(List<E> entities){
+  public void updateAll(List<E> entities) {
     entities.forEach(this::update);
   }
 

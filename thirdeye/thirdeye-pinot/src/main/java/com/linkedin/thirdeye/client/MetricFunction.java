@@ -9,7 +9,7 @@ public class MetricFunction implements Comparable<MetricFunction> {
   private MetricAggFunction functionName;
   private String metricName;
 
-  public MetricFunction(){
+  public MetricFunction() {
 
   }
 

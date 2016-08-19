@@ -1,18 +1,33 @@
 package com.linkedin.thirdeye.anomaly.merge;
 
+import com.linkedin.thirdeye.api.TimeGranularity;
+import com.linkedin.thirdeye.client.MetricExpression;
+import com.linkedin.thirdeye.client.MetricFunction;
+import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
+import com.linkedin.thirdeye.client.cache.QueryCache;
+import com.linkedin.thirdeye.client.timeseries.TimeSeriesHandler;
+import com.linkedin.thirdeye.client.timeseries.TimeSeriesRequest;
+import com.linkedin.thirdeye.client.timeseries.TimeSeriesResponse;
+import com.linkedin.thirdeye.client.timeseries.TimeSeriesRow;
+import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.db.dao.AnomalyFunctionDAO;
 import com.linkedin.thirdeye.db.dao.AnomalyMergedResultDAO;
 import com.linkedin.thirdeye.db.dao.AnomalyResultDAO;
 import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
 import com.linkedin.thirdeye.db.entity.AnomalyMergedResult;
 import com.linkedin.thirdeye.db.entity.AnomalyResult;
+import com.linkedin.thirdeye.detector.function.AnomalyFunctionUtils;
+import com.linkedin.thirdeye.util.ThirdEyeUtils;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import javax.persistence.PersistenceException;
+import org.apache.commons.lang3.StringUtils;
+import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -25,14 +40,24 @@ public class AnomalyMergeExecutor implements Runnable {
   private final AnomalyResultDAO anomalyResultDAO;
   private final AnomalyFunctionDAO anomalyFunctionDAO;
   private final ScheduledExecutorService executorService;
+
+  private final QueryCache queryCache;
+  private final TimeSeriesHandler timeSeriesHandler;
+
+  private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE =
+      ThirdEyeCacheRegistry.getInstance();
+
   private final static Logger LOG = LoggerFactory.getLogger(AnomalyMergeExecutor.class);
 
   public AnomalyMergeExecutor(AnomalyMergedResultDAO mergedResultDAO,
-      AnomalyFunctionDAO anomalyFunctionDAO, AnomalyResultDAO anomalyResultDAO,ScheduledExecutorService executorService) {
+      AnomalyFunctionDAO anomalyFunctionDAO, AnomalyResultDAO anomalyResultDAO,
+      ScheduledExecutorService executorService) {
     this.mergedResultDAO = mergedResultDAO;
     this.anomalyResultDAO = anomalyResultDAO;
     this.anomalyFunctionDAO = anomalyFunctionDAO;
     this.executorService = executorService;
+    this.queryCache = CACHE_REGISTRY_INSTANCE.getQueryCache();
+    this.timeSeriesHandler = new TimeSeriesHandler(queryCache);
   }
 
   public void start() {
@@ -109,7 +134,8 @@ public class AnomalyMergeExecutor implements Runnable {
 
     for (AnomalyResult anomalyResult : mergedResult.getAnomalyResults()) {
       anomalyResult.setMerged(true);
-      double bucketSizeSeconds = (anomalyResult.getEndTimeUtc() - anomalyResult.getStartTimeUtc()) / 1000;
+      double bucketSizeSeconds =
+          (anomalyResult.getEndTimeUtc() - anomalyResult.getStartTimeUtc()) / 1000;
       weightedScoreSum += (anomalyResult.getScore() / normalizationFactor) * bucketSizeSeconds;
       weightedWeightSum += (anomalyResult.getWeight() / normalizationFactor) * bucketSizeSeconds;
       totalBucketSize += bucketSizeSeconds;
@@ -119,6 +145,15 @@ public class AnomalyMergeExecutor implements Runnable {
       // TODO: recompute weight by querying Pinot
       mergedResult.setWeight((weightedWeightSum / totalBucketSize) * normalizationFactor);
     }
+
+    if (mergedResult.getAnomalyResults().size() > 1) {
+      try {
+        updateMergedSeverity(mergedResult);
+      } catch (Exception e) {
+        LOG.error("Could not recompute severity", e);
+      }
+    }
+
     try {
       // persist the merged result
       mergedResultDAO.update(mergedResult);
@@ -128,8 +163,65 @@ public class AnomalyMergeExecutor implements Runnable {
     }
   }
 
-  private void performMergeBasedOnFunctionId(AnomalyFunctionSpec function, AnomalyMergeConfig mergeConfig,
-      List<AnomalyResult> unmergedResults, List<AnomalyMergedResult> output) {
+  private void updateMergedSeverity(AnomalyMergedResult anomalyMergedResult) throws Exception {
+    AnomalyFunctionSpec anomalyFunctionSpec = anomalyMergedResult.getFunction();
+
+    // create time series request
+    TimeSeriesRequest timeSeriesRequest = new TimeSeriesRequest();
+    timeSeriesRequest.setCollectionName(anomalyFunctionSpec.getCollection());
+    MetricFunction metricFunction = new MetricFunction(anomalyFunctionSpec.getMetricFunction(),
+        anomalyFunctionSpec.getMetric());
+    List<MetricFunction> metricFunctions = Collections.singletonList(metricFunction);
+    List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metricFunctions);
+    timeSeriesRequest.setMetricExpressions(metricExpressions);
+    TimeGranularity timeBucket = new TimeGranularity(anomalyFunctionSpec.getBucketSize(),
+        anomalyFunctionSpec.getBucketUnit());
+    timeSeriesRequest.setAggregationTimeGranularity(timeBucket);
+
+    timeSeriesRequest.setEndDateInclusive(false);
+    if (StringUtils.isNotBlank(anomalyFunctionSpec.getFilters())) {
+      timeSeriesRequest.setFilterSet(ThirdEyeUtils.getFilterSet(anomalyFunctionSpec.getFilters()));
+    }
+    String exploreDimension = anomalyFunctionSpec.getExploreDimensions();
+    if (StringUtils.isNotBlank(exploreDimension)) {
+      timeSeriesRequest.setGroupByDimensions(Collections.singletonList(exploreDimension));
+    }
+
+    // Fetch current time series data
+    timeSeriesRequest.setStart(new DateTime(anomalyMergedResult.getStartTime()));
+    timeSeriesRequest.setEnd(new DateTime(anomalyMergedResult.getEndTime()));
+    TimeSeriesResponse responseCurrent = timeSeriesHandler.handle(timeSeriesRequest);
+
+    // Fetch baseline time series data
+    long baselineOffset = AnomalyFunctionUtils.getBaselineOffset(anomalyFunctionSpec);
+    timeSeriesRequest.setStart(new DateTime(anomalyMergedResult.getStartTime() - baselineOffset));
+    timeSeriesRequest.setEnd(new DateTime(anomalyMergedResult.getEndTime() - baselineOffset));
+    TimeSeriesResponse responseBaseline = timeSeriesHandler.handle(timeSeriesRequest);
+
+    Double currentValue = getMetricValueSum(responseCurrent, anomalyFunctionSpec.getMetric());
+    Double baselineValue = getMetricValueSum(responseBaseline, anomalyFunctionSpec.getMetric());
+    Double severity = anomalyMergedResult.getWeight();
+    if (baselineValue != 0) {
+      severity = (currentValue - baselineValue) / baselineValue;
+    }
+    anomalyMergedResult.setWeight(severity);
+  }
+
+  private Double getMetricValueSum(TimeSeriesResponse response, String metricName) {
+    Double totalVal = 0.0;
+    for (int i = 0; i < response.getNumRows(); i++) {
+      for (TimeSeriesRow.TimeSeriesMetric metricData : response.getRow(i).getMetrics()) {
+        if (metricName.equals(metricData.getMetricName())) {
+          totalVal += metricData.getValue();
+        }
+      }
+    }
+    return totalVal;
+  }
+
+  private void performMergeBasedOnFunctionId(AnomalyFunctionSpec function,
+      AnomalyMergeConfig mergeConfig, List<AnomalyResult> unmergedResults,
+      List<AnomalyMergedResult> output) {
     // Now find last MergedAnomalyResult in same category
     AnomalyMergedResult latestMergedResult =
         mergedResultDAO.findLatestByFunctionIdOnly(function.getId());
@@ -145,8 +237,9 @@ public class AnomalyMergeExecutor implements Runnable {
     output.addAll(mergedResults);
   }
 
-  private void performMergeBasedOnFunctionIdAndDimensions(AnomalyFunctionSpec function, AnomalyMergeConfig mergeConfig,
-      List<AnomalyResult> unmergedResults, List<AnomalyMergedResult> output) {
+  private void performMergeBasedOnFunctionIdAndDimensions(AnomalyFunctionSpec function,
+      AnomalyMergeConfig mergeConfig, List<AnomalyResult> unmergedResults,
+      List<AnomalyMergedResult> output) {
     Map<String, List<AnomalyResult>> dimensionsResultMap = new HashMap<>();
     for (AnomalyResult anomalyResult : unmergedResults) {
       String dimensions = anomalyResult.getDimensions();
@@ -168,7 +261,8 @@ public class AnomalyMergeExecutor implements Runnable {
         mergedResult.setFunction(function);
         mergedResult.setDimensions(dimensions);
       }
-      LOG.info("Merging [{}] raw anomalies into [{}] merged anomalies for function id : [{}] and dimensions : [{}]",
+      LOG.info(
+          "Merging [{}] raw anomalies into [{}] merged anomalies for function id : [{}] and dimensions : [{}]",
           unmergedResults.size(), mergedResults.size(), function.getId(), dimensions);
       output.addAll(mergedResults);
     }

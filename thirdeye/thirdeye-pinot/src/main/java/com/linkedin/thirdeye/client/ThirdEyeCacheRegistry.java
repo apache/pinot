@@ -76,7 +76,6 @@ public class ThirdEyeCacheRegistry {
     } catch (Exception e) {
      LOGGER.info("Caught exception while initializing caches", e);
     }
-
   }
 
   private static void init(ThirdEyeConfiguration config, PinotThirdEyeClientConfig pinotThirdEyeClientConfig) {
@@ -334,5 +333,4 @@ public class ThirdEyeCacheRegistry {
   public void registerQueryCache(QueryCache queryCache) {
     this.queryCache = queryCache;
   }
-
 }
