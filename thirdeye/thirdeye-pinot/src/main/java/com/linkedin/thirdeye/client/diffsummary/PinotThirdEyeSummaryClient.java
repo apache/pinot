@@ -13,6 +13,9 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.joda.time.DateTime;
+import org.slf4j.LoggerFactory;
+
+import ch.qos.logback.classic.Level;
 
 import com.google.common.collect.Lists;
 import com.linkedin.thirdeye.client.MetricFunction;
@@ -26,7 +29,10 @@ import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClientConfig;
 import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.dashboard.ThirdEyeDashboardConfiguration;
+import com.linkedin.thirdeye.dashboard.Utils;
+import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
 import com.linkedin.thirdeye.dashboard.views.diffsummary.Summary;
+import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 
 /**
@@ -34,8 +40,8 @@ import com.linkedin.thirdeye.dashboard.views.diffsummary.Summary;
  */
 public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
   private final static DateTime NULL_DATETIME = new DateTime();
-  private final static int TIME_OUT_VALUE = 60;
-  private final static TimeUnit TIME_OUT_UNIT = TimeUnit.MINUTES;
+  private final static int TIME_OUT_VALUE = 120;
+  private final static TimeUnit TIME_OUT_UNIT = TimeUnit.SECONDS;
 
   private QueryCache queryCache;
   private String collection;
@@ -229,23 +235,19 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
 //    DateTime currentEnd =    new DateTime(2016, 7, 19, 00, 00);
 
     // National Holidays in India and several countries in Europe and Latin America. (Granularity: DAYS)
-    String collection = "thirdeyeKbmi";
-    String metricName = "desktopPageViews";
+//    String collection = "thirdeyeKbmi";
+//    String metricName = "desktopPageViews";
 //    DateTime baselineStart = new DateTime(1471244400000L);
 //    DateTime baselineEnd =   new DateTime(1471330800000L);
 //    DateTime currentStart =  new DateTime(1470639600000L);
 //    DateTime currentEnd =    new DateTime(1470726000000L);
 
-    DateTime baselineStart = new DateTime(1470769200000L);
-    DateTime baselineEnd =   new DateTime(1470855600000L);
-    DateTime currentStart =  new DateTime(1471374000000L);
-    DateTime currentEnd =    new DateTime(1471460400000L);
-
-    String[] dimensionNames = { "browserName", "continent", "countryCode",
-                                "deviceName", "environment", "locale", "osName",
-                                "pageKey", "service", "sourceApp" };
-    List<List<String>> hierarchies = new ArrayList<>();
-    hierarchies.add(Lists.newArrayList("continent", "countryCode"));
+    String collection = "login_desktop";
+    String metricName = "challengeShown";
+    DateTime baselineStart = new DateTime(1470261600000L);
+    DateTime baselineEnd =   new DateTime(1470265200000L);
+    DateTime currentStart =  new DateTime(1470866400000L);
+    DateTime currentEnd =    new DateTime(1470870000000L);
 
     // Create ThirdEye client
     ThirdEyeConfiguration thirdEyeConfig = new ThirdEyeDashboardConfiguration();
@@ -258,8 +260,9 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
     pinotThirdEyeClientConfig.setClusterName("mpSprintDemoCluster");
 
     ThirdEyeCacheRegistry.initializeWebappCaches(thirdEyeConfig, pinotThirdEyeClientConfig);
+    ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
 
-    OLAPDataBaseClient pinotClient = new PinotThirdEyeSummaryClient(ThirdEyeCacheRegistry.getInstance().getQueryCache());
+    OLAPDataBaseClient pinotClient = new PinotThirdEyeSummaryClient(CACHE_REGISTRY_INSTANCE.getQueryCache());
     pinotClient.setCollection(collection);
     pinotClient.setMetricName(metricName);
     pinotClient.setCurrentStartInclusive(currentStart);
@@ -267,18 +270,32 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
     pinotClient.setBaselineStartInclusive(baselineStart);
     pinotClient.setBaselineEndExclusive(baselineEnd);
 
+    collection = ThirdEyeUtils.getCollectionFromAlias(collection);
+    CollectionConfig collectionConfig = CACHE_REGISTRY_INSTANCE.getCollectionConfigCache().getIfPresent(collection);
+    if (collectionConfig != null && collectionConfig.getDerivedMetrics() != null
+        && collectionConfig.getDerivedMetrics().containsKey(metricName)) {
+      metricName = collectionConfig.getDerivedMetrics().get(metricName);
+    }
+
+//    String[] dimensionNames =
+//        { "browserName", "continent", "countryCode", "deviceName", "environment", "locale", "osName", "pageKey", "service", "sourceApp" };
+    List<List<String>> hierarchies = new ArrayList<>();
+    hierarchies.add(Lists.newArrayList("continent", "countryCode"));
+    hierarchies.add(Lists.newArrayList("browser_name", "browser_version"));
+
+//    Dimensions dimensions = new Dimensions(Lists.newArrayList(dimensionNames));
+    Dimensions dimensions = new Dimensions(Utils.getDimensions(CACHE_REGISTRY_INSTANCE.getQueryCache(), collection));
 
     int maxDimensionSize = 3;
 
     // Build the cube for computing the summary
     Cube initCube = new Cube();
-    initCube.buildWithAutoDimensionOrder(pinotClient, new Dimensions(Lists.newArrayList(dimensionNames)),
-        maxDimensionSize, hierarchies);
-//    initCube.buildWithManualDimensionOrder(pinotClient, new Dimensions(Lists.newArrayList(dimensionNames)));
+    initCube.buildWithAutoDimensionOrder(pinotClient, dimensions, maxDimensionSize, hierarchies);
+//    initCube.buildWithManualDimensionOrder(pinotClient, dimensions);
 
 
     int answerSize = 10;
-    boolean oneSideErrors = false;
+    boolean oneSideErrors = true;
     Summary summary = new Summary(initCube);
     System.out.println(summary.computeSummary(answerSize, oneSideErrors, maxDimensionSize));
 

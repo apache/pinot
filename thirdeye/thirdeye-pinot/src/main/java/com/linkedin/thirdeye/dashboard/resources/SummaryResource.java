@@ -36,7 +36,7 @@ public class SummaryResource {
   private static final Logger LOG = LoggerFactory.getLogger(SummaryResource.class);
   private static final String DEFAULT_TIMEZONE_ID = "UTC";
   private static final String DEFAULT_TOP_DIMENSIONS = "3";
-  private static final String DEFAULT_HIERARCHIES = "[[\"continent\",\"countryCode\"]]";
+  private static final String DEFAULT_HIERARCHIES = "[]";
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static final String DEFAULT_ONE_SIDE_ERROR = "false";
 
@@ -58,7 +58,7 @@ public class SummaryResource {
     if (summarySize < 1) summarySize = 1;
 
     collection = ThirdEyeUtils.getCollectionFromAlias(collection);
-    CollectionConfig collectionConfig = CACHE_REGISTRY_INSTANCE.getCollectionConfigCache().get(collection);
+    CollectionConfig collectionConfig = CACHE_REGISTRY_INSTANCE.getCollectionConfigCache().getIfPresent(collection);
     if (collectionConfig != null && collectionConfig.getDerivedMetrics() != null
         && collectionConfig.getDerivedMetrics().containsKey(metric)) {
       metric = collectionConfig.getDerivedMetrics().get(metric);
@@ -113,7 +113,7 @@ public class SummaryResource {
     if (summarySize < 1) summarySize = 1;
 
     collection = ThirdEyeUtils.getCollectionFromAlias(collection);
-    CollectionConfig collectionConfig = CACHE_REGISTRY_INSTANCE.getCollectionConfigCache().get(collection);
+    CollectionConfig collectionConfig = CACHE_REGISTRY_INSTANCE.getCollectionConfigCache().getIfPresent(collection);
     if (collectionConfig != null && collectionConfig.getDerivedMetrics() != null
         && collectionConfig.getDerivedMetrics().containsKey(metric)) {
       metric = collectionConfig.getDerivedMetrics().get(metric);

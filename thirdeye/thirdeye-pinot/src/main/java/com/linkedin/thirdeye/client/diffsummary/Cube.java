@@ -103,6 +103,7 @@ public class Cube { // the cube (Ca|Cb)
       this.dimensions = dimensions;
     }
 
+    int size = 0;
     // Get the rows at each level and sort them in the post-order of their hierarchical relationship,
     // in which a parent row aggregates the details rows under it. For instance, in the following
     // hierarchy row b aggregates rows d and e, and row a aggregates rows b and c.
@@ -117,7 +118,9 @@ public class Cube { // the cube (Ca|Cb)
       List<Row> rowAtLevelI = rowOfLevels.get(i);
       rowAtLevelI.sort(new RowDimensionValuesComparator());
       hierarchicalRows.add(rowAtLevelI);
+      size += rowAtLevelI.size();
     }
+    LOG.info("Size of the cube for generating summary: " + size);
 
     buildHierarchy();
   }
@@ -202,26 +205,35 @@ public class Cube { // the cube (Ca|Cb)
       int topDimension, List<List<String>> hierarchy) throws Exception {
     List<MutablePair<String, Double>> dimensionCostPairs = new ArrayList<>();
 
-    Map<String, DimensionGroup> groupMap = new HashMap<>();
-    Set<String> dimensionKeySet = new HashSet<>(dimensions.allDimensions());
-    for (List<String> groupList : hierarchy) {
-      if (groupList == null || groupList.size() == 0) continue;
-      DimensionGroup group = new DimensionGroup();
-      group.hierarchy = groupList;
-      for (String name : groupList) {
-        if (dimensionKeySet.contains(name)) {
-          groupMap.put(name, group);
-          ++group.count;
+    // Given one dimension name D, returns the hierarchical dimension to which D belong.
+    Map<String, HierarchicalDimension> hierarchicalDimensionMap = new HashMap<>();
+    Set<String> availableDimensionKeySet = new HashSet<>(dimensions.allDimensions());
+    // Process the suggested hierarchy list and filter out only the hierarchies that can be applied to the available
+    // dimensions of the dataset.
+    for (List<String> suggestedHierarchyList : hierarchy) {
+      if (suggestedHierarchyList == null || suggestedHierarchyList.size() < 2) continue;
+
+      List<String> actualHierarchy = new ArrayList<>();
+      for (String dimension : suggestedHierarchyList) {
+        if (availableDimensionKeySet.contains(dimension)) {
+          actualHierarchy.add(dimension);
         }
       }
-      if (group.count > 0) {
-        group.index = dimensionCostPairs.size();
-        dimensionCostPairs.add(new MutablePair<>(groupList.get(0), .0));
+
+      if (actualHierarchy.size() > 1) {
+        HierarchicalDimension hierarchicalDimension = new HierarchicalDimension();
+        hierarchicalDimension.hierarchy = actualHierarchy;
+        for (String dimension : actualHierarchy) {
+          hierarchicalDimensionMap.put(dimension, hierarchicalDimension);
+        }
+        hierarchicalDimension.index = dimensionCostPairs.size();
+        dimensionCostPairs.add(new MutablePair<>(actualHierarchy.get(0), .0));
       }
     }
 
     List<List<Row>> wowValuesOfDimensions = olapClient.getAggregatedValuesOfDimension(dimensions);
-    // Calculate cost for each dimension. The costs of the dimensions of the same hierarchical group will be sum up.
+    // Calculate cost for each dimension. The costs of the dimensions of the same hierarchical group will be the max
+    // cost among all the children in that hierarchy.
     for (int i = 0; i < dimensions.size(); ++i) {
       String dimension = dimensions.get(i);
       double cost = .0;
@@ -231,12 +243,12 @@ public class Cube { // the cube (Ca|Cb)
         cost += CostFunction.err4EmptyValues(wowValues.baselineValue, wowValues.currentValue, topRatio);
       }
 
-      // The max cost of children will be the cost of a group
-      if (groupMap.containsKey(dimension)) {
-        DimensionGroup dimensionGroup = groupMap.get(dimension);
-        MutablePair<String, Double> costOfDimensionPair = dimensionCostPairs.get(dimensionGroup.index);
+      if (hierarchicalDimensionMap.containsKey(dimension)) {
+        HierarchicalDimension hierarchicalDimension = hierarchicalDimensionMap.get(dimension);
+        MutablePair<String, Double> costOfDimensionPair = dimensionCostPairs.get(hierarchicalDimension.index);
+        // The max cost of children will be the cost of a group
         costOfDimensionPair.right = Math.max(cost, costOfDimensionPair.right);
-      } else {
+      } else { // The dimension does not belong to any hierarchy
         MutablePair<String, Double> costOfDimensionPair = new MutablePair<>(dimension, cost);
         dimensionCostPairs.add(costOfDimensionPair);
       }
@@ -249,20 +261,11 @@ public class Cube { // the cube (Ca|Cb)
     ArrayList<String> newDimensions = new ArrayList<>();
     for (MutablePair<String, Double> dimensionCostPair : dimensionCostPairs) {
       StringBuilder sb = new StringBuilder("  Dimension: ");
-      if (groupMap.containsKey(dimensionCostPair.getLeft())) {
-        DimensionGroup dimensionGroup = groupMap.get(dimensionCostPair.getLeft());
-        if (dimensionGroup.count == dimensionGroup.hierarchy.size()) {
-          newDimensions.addAll(dimensionGroup.hierarchy);
-        } else {
-          for (String subdimension : dimensionGroup.hierarchy) {
-            if (groupMap.containsKey(subdimension)) {
-              newDimensions.add(subdimension);
-            }
-          }
-        }
-
-        sb.append(dimensionGroup.hierarchy);
-      } else {
+      if (hierarchicalDimensionMap.containsKey(dimensionCostPair.getLeft())) {
+        HierarchicalDimension hierarchicalDimension = hierarchicalDimensionMap.get(dimensionCostPair.getLeft());
+        newDimensions.addAll(hierarchicalDimension.hierarchy);
+        sb.append(hierarchicalDimension.hierarchy);
+      } else { // The dimension does not belong to any hierarchy
         newDimensions.add(dimensionCostPair.getLeft());
         sb.append(dimensionCostPair.getLeft());
       }
@@ -280,9 +283,8 @@ public class Cube { // the cube (Ca|Cb)
     }
   }
 
-  static class DimensionGroup {
+  static class HierarchicalDimension {
     int index = -1;
-    int count = 0;
     List<String> hierarchy;
   }
 

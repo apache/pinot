@@ -52,9 +52,6 @@
                     <button id="treemap_contribution-change-percent" class="uk-button dimension-treemap-mode" mode="2">
                         <i class="uk-icon-eye-slash"></i> Contribution to overall Change (%)
                     </button>
-                    <button id="treemap_contribution-difference-summary" class="uk-button dimension-treemap-mode" mode="3">
-                        <i class="uk-icon-eye-slash"></i> Difference Summary
-                    </button>
                 </div>
 
                 <div id="metric_{{metricName}}_treemap_0" class="treemap-container  uk-margin" mode="0">

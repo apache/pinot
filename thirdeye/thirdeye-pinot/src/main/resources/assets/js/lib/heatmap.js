@@ -27,7 +27,8 @@ function getHeatmap(tab) {
             "&dimensions=" + hash.dimensions +
             "&topDimensions=3" +
             "&oneSideError=true" +
-            "&summarySize=10"
+            "&summarySize=10" +
+            "&hierarchies=[[\"browser_name\", \"browser_version\"],[\"continent\",\"countryCode\"]]"
 
         getData(url).done(function(summaryData){
 
