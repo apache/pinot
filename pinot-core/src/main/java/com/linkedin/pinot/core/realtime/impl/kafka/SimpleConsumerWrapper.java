@@ -16,17 +16,20 @@
 
 package com.linkedin.pinot.core.realtime.impl.kafka;
 
-import com.google.common.base.Predicate;
-import com.google.common.base.Splitter;
-import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
-import com.google.common.util.concurrent.Uninterruptibles;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
+import org.apache.kafka.common.protocol.Errors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import com.google.common.base.Predicate;
+import com.google.common.base.Splitter;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
+import com.google.common.util.concurrent.Uninterruptibles;
 import javax.annotation.Nullable;
 import kafka.api.FetchRequestBuilder;
 import kafka.cluster.Broker;
@@ -37,9 +40,6 @@ import kafka.javaapi.TopicMetadataResponse;
 import kafka.javaapi.consumer.SimpleConsumer;
 import kafka.javaapi.message.ByteBufferMessageSet;
 import kafka.message.MessageAndOffset;
-import org.apache.kafka.common.protocol.Errors;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -319,7 +319,7 @@ public class SimpleConsumerWrapper implements Closeable {
     _currentState = newState;
   }
 
-  public synchronized int getPartitionCount(String topic) {
+  public synchronized int getPartitionCount(String topic, long maxWaitTimeMs) {
     int unknownTopicReplyCount = 0;
     final int MAX_UNKNOWN_TOPIC_REPLY_COUNT = 10;
     int kafkaErrorCount = 0;
@@ -327,7 +327,7 @@ public class SimpleConsumerWrapper implements Closeable {
 
     while(true) {
       // Try to get into a state where we're connected to Kafka
-      // TODO This needs a time limit
+      // TODO This needs a time limit, and perhaps a back-off before we query kafka again.
       while (!_currentState.isConnectedToKafkaBroker()) {
         _currentState.process();
       }
