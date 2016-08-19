@@ -116,9 +116,8 @@ public class FilterPlanNode implements PlanNode {
       int startDocId = 0;
       int endDocId = _segment.getSegmentMetadata().getTotalRawDocs() - 1; //end is inclusive
       if (dataSourceMetadata.hasInvertedIndex()) {
-        // jfim: ScanBasedFilterOperator is broken for realtime segments for now
         // range evaluation based on inv index is inefficient, so do this only if is NOT range.
-        if (!filterType.equals(FilterOperator.RANGE) || _segment instanceof RealtimeSegment) {
+        if (!filterType.equals(FilterOperator.RANGE)) {
           if (dataSourceMetadata.isSingleValue() && dataSourceMetadata.isSorted()) {
             // if the column is sorted use sorted inverted index based implementation
             baseFilterOperator = new SortedInvertedIndexBasedFilterOperator(ds, startDocId, endDocId);

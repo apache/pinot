@@ -69,6 +69,7 @@ public class RangeRealtimeDictionaryPredicateEvaluator implements PredicateEvalu
     dictIdSet = new IntOpenHashSet(ids.size());
     for (int i = 0; i < matchingIds.length; i++) {
       matchingIds[i] = ids.get(i);
+      dictIdSet.add(ids.get(i));
     }
   }
 
