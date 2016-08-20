@@ -1114,8 +1114,10 @@ public class PinotHelixResourceManager {
     // Remove groupId/PartitionId mapping for realtime table type.
     for (String instance : getAllInstancesForTable(realtimeTableName)) {
       InstanceZKMetadata instanceZKMetadata = ZKMetadataProvider.getInstanceZKMetadata(getPropertyStore(), instance);
-      instanceZKMetadata.removeResource(realtimeTableName);
-      ZKMetadataProvider.setInstanceZKMetadata(getPropertyStore(), instanceZKMetadata);
+      if (instanceZKMetadata != null) {
+        instanceZKMetadata.removeResource(realtimeTableName);
+        ZKMetadataProvider.setInstanceZKMetadata(getPropertyStore(), instanceZKMetadata);
+      }
     }
 
     // dropping table
