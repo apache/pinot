@@ -17,6 +17,7 @@ import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.linkedin.thirdeye.client.MetricExpression;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.diffsummary.Cube;
 import com.linkedin.thirdeye.client.diffsummary.Dimensions;
@@ -63,10 +64,11 @@ public class SummaryResource {
         && collectionConfig.getDerivedMetrics().containsKey(metric)) {
       metric = collectionConfig.getDerivedMetrics().get(metric);
     }
+    List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metric, collection);
 
     OLAPDataBaseClient olapClient = new PinotThirdEyeSummaryClient(CACHE_REGISTRY_INSTANCE.getQueryCache());
     olapClient.setCollection(collection);
-    olapClient.setMetricName(metric);
+    olapClient.setMetricExpression(metricExpressions.get(0));
     olapClient.setCurrentStartInclusive(new DateTime(currentStartInclusive, DateTimeZone.forID(timeZone)));
     olapClient.setCurrentEndExclusive(new DateTime(currentEndExclusive, DateTimeZone.forID(timeZone)));
     olapClient.setBaselineStartInclusive(new DateTime(baselineStartInclusive, DateTimeZone.forID(timeZone)));
@@ -118,10 +120,11 @@ public class SummaryResource {
         && collectionConfig.getDerivedMetrics().containsKey(metric)) {
       metric = collectionConfig.getDerivedMetrics().get(metric);
     }
+    List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metric, collection);
 
     OLAPDataBaseClient olapClient = new PinotThirdEyeSummaryClient(CACHE_REGISTRY_INSTANCE.getQueryCache());
     olapClient.setCollection(collection);
-    olapClient.setMetricName(metric);
+    olapClient.setMetricExpression(metricExpressions.get(0));
     olapClient.setCurrentStartInclusive(new DateTime(currentStartInclusive, DateTimeZone.forID(timeZone)));
     olapClient.setCurrentEndExclusive(new DateTime(currentEndExclusive, DateTimeZone.forID(timeZone)));
     olapClient.setBaselineStartInclusive(new DateTime(baselineStartInclusive, DateTimeZone.forID(timeZone)));

@@ -5,12 +5,13 @@ import java.util.List;
 import org.joda.time.DateTime;
 
 import com.linkedin.thirdeye.api.TimeGranularity;
+import com.linkedin.thirdeye.client.MetricExpression;
 
 public interface OLAPDataBaseClient {
 
   public void setCollection(String collection);
 
-  public void setMetricName(String metricName);
+  public void setMetricExpression(MetricExpression metricExpressions);
 
   public void setBaselineStartInclusive(DateTime dateTime);
 
