@@ -81,7 +81,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
       partitionSet.add(i);
     }
 
-    segmentManager.setupHelixEntries(topic, rtTableName, nPartitions, instances, nReplicas, startOffset, null, false);
+    segmentManager.setupHelixEntries(topic, rtTableName, nPartitions, instances, nReplicas, startOffset, null, true);
 
     Map<String, List<String>> assignmentMap = segmentManager._partitionAssignment.getListFields();
     Assert.assertEquals(assignmentMap.size(), nPartitions);
@@ -127,12 +127,13 @@ public class PinotLLCRealtimeSegmentManagerTest {
     List<String> instances = getInstanceList(nInstances);
     final long startOffset = 81L;
 
-    IdealState  idealState = PinotTableIdealStateBuilder.buildEmptyKafkaConsumerRealtimeIdealStateFor(rtTableName);
+    IdealState  idealState = PinotTableIdealStateBuilder.buildEmptyKafkaConsumerRealtimeIdealStateFor(rtTableName, nReplicas);
     segmentManager.setupHelixEntries(topic, rtTableName, nPartitions, instances, nReplicas, startOffset, idealState,
         !existingIS);
 
     final String actualRtTableName = segmentManager._realtimeTableName;
     final Map<String, List<String>> idealStateEntries = segmentManager._idealStateEntries;
+    final int idealStateNReplicas = segmentManager._nReplicas;
     final List<String> propStorePaths = segmentManager._paths;
     final List<ZNRecord> propStoreEntries = segmentManager._records;
     final boolean createNew = segmentManager._createNew;
@@ -142,6 +143,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     Assert.assertEquals(idealStateEntries.size(), nPartitions);
     Assert.assertEquals(actualRtTableName, rtTableName);
     Assert.assertEquals(createNew, !existingIS);
+    Assert.assertEquals(idealStateNReplicas, nReplicas);
 
     Map<Integer, ZNRecord> segmentPropStoreMap = new HashMap<>(propStorePaths.size());
     Map<Integer, String> segmentPathsMap = new HashMap<>(propStorePaths.size());
@@ -187,7 +189,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     List<String> instances = getInstanceList(3);
     final long startOffset = 81L;
 
-    IdealState  idealState = PinotTableIdealStateBuilder.buildEmptyKafkaConsumerRealtimeIdealStateFor(rtTableName);
+    IdealState  idealState = PinotTableIdealStateBuilder.buildEmptyKafkaConsumerRealtimeIdealStateFor(rtTableName, 10);
     try {
       segmentManager.setupHelixEntries(topic, rtTableName, 8, instances, 3, startOffset, idealState, false);
       Assert.fail("Did not get expected exception when setting up helix with existing segments in propertystore");
@@ -217,7 +219,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     List<String> instances = getInstanceList(nInstances);
     final long startOffset = 81L;
 
-    IdealState  idealState = PinotTableIdealStateBuilder.buildEmptyKafkaConsumerRealtimeIdealStateFor(rtTableName);
+    IdealState  idealState = PinotTableIdealStateBuilder.buildEmptyKafkaConsumerRealtimeIdealStateFor(rtTableName, nReplicas);
     segmentManager.setupHelixEntries(topic, rtTableName, nPartitions, instances, nReplicas, startOffset, idealState,
         !existingIS);
     // Now commit the first segment of partition 6.
@@ -249,7 +251,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
   @Test
   public void testUpdateHelixForSegmentClosing() throws Exception {
-    final IdealState  idealState = PinotTableIdealStateBuilder.buildEmptyKafkaConsumerRealtimeIdealStateFor("someTable_REALTIME");
+    final IdealState  idealState = PinotTableIdealStateBuilder.buildEmptyKafkaConsumerRealtimeIdealStateFor("someTable_REALTIME",
+        17);
     final String s1 = "S1";
     final String s2 = "S2";
     final String s3 = "S3";
@@ -286,7 +289,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
       final long now = System.currentTimeMillis();
       final String tableName = "table";
       final String realtimeTableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName);
-      final IdealState idealState = PinotTableIdealStateBuilder.buildEmptyKafkaConsumerRealtimeIdealStateFor(realtimeTableName);
+      final IdealState idealState = PinotTableIdealStateBuilder.buildEmptyKafkaConsumerRealtimeIdealStateFor(realtimeTableName,
+          19);
       int nIncompleteCommits = 0;
       final String topic = "someTopic";
       final int nInstances = 5;
@@ -295,7 +299,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
       final long startOffset = 0L;
 
       MockPinotLLCRealtimeSegmentManager segmentManager = new MockPinotLLCRealtimeSegmentManager(false, null);
-      segmentManager.setupHelixEntries(topic, realtimeTableName, nPartitions, instances, nReplicas, startOffset, null, false);
+      segmentManager.setupHelixEntries(topic, realtimeTableName, nPartitions, instances, nReplicas, startOffset, idealState, false);
       ZNRecord partitionAssignment = segmentManager.getKafkaPartitionAssignment(realtimeTableName);
 
       for (int p = 0; p < nPartitions; p++) {
@@ -360,6 +364,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     public ZNRecord _partitionAssignment;
     public long _startOffset;
     public boolean _createNew;
+    public int _nReplicas;
 
     public List<String> _newInstances;
     public String _oldSegmentNameStr;
@@ -386,12 +391,12 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     @Override
     protected void setupInitialSegments(String realtimeTableName, ZNRecord partitionAssignment, long startOffset,
-        IdealState idealState, boolean create) {
+        IdealState idealState, boolean create, int nReplicas) {
       _realtimeTableName = realtimeTableName;
       _partitionAssignment = partitionAssignment;
       _startOffset = startOffset;
       if (_setupInitialSegments) {
-        super.setupInitialSegments(realtimeTableName, partitionAssignment, startOffset, idealState, create);
+        super.setupInitialSegments(realtimeTableName, partitionAssignment, startOffset, idealState, create, nReplicas);
       }
     }
 
@@ -402,9 +407,10 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     @Override
     protected void updateHelixIdealState(IdealState idealState, String realtimeTableName, Map<String, List<String>> idealStateEntries,
-        boolean create) {
+        boolean create, int nReplicas) {
       _realtimeTableName = realtimeTableName;
       _idealStateEntries = idealStateEntries;
+      _nReplicas = nReplicas;
       _createNew = create;
     }
 

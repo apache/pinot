@@ -15,8 +15,6 @@
  */
 package com.linkedin.pinot.controller.helix.core;
 
-import com.linkedin.pinot.core.realtime.impl.kafka.KafkaSimpleConsumerFactoryImpl;
-import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -37,6 +35,8 @@ import com.linkedin.pinot.common.utils.CommonConstants.Helix;
 import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
+import com.linkedin.pinot.core.realtime.impl.kafka.KafkaSimpleConsumerFactoryImpl;
+import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
 
 
 /**
@@ -172,12 +172,13 @@ public class PinotTableIdealStateBuilder {
         ControllerTenantNameBuilder.getRealtimeTenantNameForTenant(realtimeTableConfig.getTenantConfig().getServer());
     final List<String> realtimeInstances = helixAdmin.getInstancesInClusterWithTag(helixClusterName,
         realtimeServerTenant);
-    IdealState idealState = buildEmptyKafkaConsumerRealtimeIdealStateFor(realtimeTableName);
+    IdealState idealState = buildEmptyKafkaConsumerRealtimeIdealStateFor(realtimeTableName, 1);
     if (realtimeInstances.size() % Integer.parseInt(realtimeTableConfig.getValidationConfig().getReplication()) != 0) {
       throw new RuntimeException(
           "Number of instance in current tenant should be an integer multiples of the number of replications");
     }
-    setupInstanceConfigForKafkaHighLevelConsumer(realtimeTableName, realtimeInstances.size(), Integer.parseInt(realtimeTableConfig.getValidationConfig().getReplication()),
+    setupInstanceConfigForKafkaHighLevelConsumer(realtimeTableName, realtimeInstances.size(),
+        Integer.parseInt(realtimeTableConfig.getValidationConfig().getReplication()),
         realtimeTableConfig.getIndexingConfig().getStreamConfigs(), zkHelixPropertyStore, realtimeInstances);
     return idealState;
   }
@@ -189,12 +190,21 @@ public class PinotTableIdealStateBuilder {
     final List<String> realtimeInstances = helixAdmin.getInstancesInClusterWithTag(helixClusterName,
         realtimeServerTenant);
     boolean create = false;
+    final String replicasPerPartitionStr = realtimeTableConfig.getValidationConfig().getReplicasPerPartition();
+    if (replicasPerPartitionStr == null || replicasPerPartitionStr.isEmpty()) {
+      throw new RuntimeException("Null or empty value for replicasPerPartition, expected a number");
+    }
+    final int nReplicas;
+    try {
+      nReplicas = Integer.valueOf(replicasPerPartitionStr);
+    } catch (NumberFormatException e) {
+      throw new RuntimeException("Invalid value for replicasPerPartition, expected a number: " + replicasPerPartitionStr, e);
+    }
     if (idealState == null) {
-      idealState = buildEmptyKafkaConsumerRealtimeIdealStateFor(realtimeTableName);
+      idealState = buildEmptyKafkaConsumerRealtimeIdealStateFor(realtimeTableName, nReplicas);
       create = true;
     }
     LOGGER.info("Assigning partitions to instances for simple consumer for table {}", realtimeTableName);
-    final int nReplicas = Integer.valueOf(realtimeTableConfig.getValidationConfig().getReplicasPerPartition());
     final KafkaStreamMetadata kafkaMetadata = new KafkaStreamMetadata(realtimeTableConfig.getIndexingConfig().getStreamConfigs());
     final String topicName = kafkaMetadata.getKafkaTopicName();
     final PinotLLCRealtimeSegmentManager segmentManager = PinotLLCRealtimeSegmentManager.getInstance();
@@ -206,22 +216,26 @@ public class PinotTableIdealStateBuilder {
   }
 
   private static int getPartitionsCount(KafkaStreamMetadata kafkaMetadata) {
+    String bootstrapHosts = kafkaMetadata.getBootstrapHosts();
+    if (bootstrapHosts == null || bootstrapHosts.isEmpty()) {
+      throw new RuntimeException("Invalid value for " + Helix.DataSource.Realtime.Kafka.KAFKA_BROKER_LIST);
+    }
     SimpleConsumerWrapper consumerWrapper = SimpleConsumerWrapper.forMetadataConsumption(
         new KafkaSimpleConsumerFactoryImpl(), kafkaMetadata.getBootstrapHosts(),
         PinotTableIdealStateBuilder.class.getSimpleName() + "-" + kafkaMetadata.getKafkaTopicName());
 
     try {
-      return consumerWrapper.getPartitionCount(kafkaMetadata.getKafkaTopicName());
+      return consumerWrapper.getPartitionCount(kafkaMetadata.getKafkaTopicName(), /*maxWaitTimeMs=*/5000L);
     } finally {
       IOUtils.closeQuietly(consumerWrapper);
     }
   }
 
-  public static IdealState buildEmptyKafkaConsumerRealtimeIdealStateFor(String realtimeTableName) {
+  public static IdealState buildEmptyKafkaConsumerRealtimeIdealStateFor(String realtimeTableName, int replicaCount) {
     final CustomModeISBuilder customModeIdealStateBuilder = new CustomModeISBuilder(realtimeTableName);
     customModeIdealStateBuilder
         .setStateModel(PinotHelixSegmentOnlineOfflineStateModelGenerator.PINOT_SEGMENT_ONLINE_OFFLINE_STATE_MODEL)
-        .setNumPartitions(0).setNumReplica(1).setMaxPartitionsPerNode(1);
+        .setNumPartitions(0).setNumReplica(replicaCount).setMaxPartitionsPerNode(1);
     final IdealState idealState = customModeIdealStateBuilder.build();
     idealState.setInstanceGroupTag(realtimeTableName);
 

@@ -169,7 +169,7 @@ public class PinotLLCRealtimeSegmentManager {
       znRecord.setListField(Integer.toString(p), instances);
     }
     writeKafkaPartitionAssignemnt(realtimeTableName, znRecord);
-    setupInitialSegments(realtimeTableName, znRecord, startOffset, idealState, create);
+    setupInitialSegments(realtimeTableName, znRecord, startOffset, idealState, create, nReplicas);
   }
 
   protected void writeKafkaPartitionAssignemnt(final String realtimeTableName, ZNRecord znRecord) {
@@ -183,7 +183,7 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   protected void setupInitialSegments(String realtimeTableName, ZNRecord partitionAssignment, long startOffset,
-      IdealState idealState, boolean create) {
+      IdealState idealState, boolean create, int nReplicas) {
     List<String> currentSegments = getExistingSegments(realtimeTableName);
     // Make sure that there are no low-level segments existing.
     if (currentSegments != null) {
@@ -230,12 +230,12 @@ public class PinotLLCRealtimeSegmentManager {
     writeSegmentsToPropertyStore(paths, records);
     LOGGER.info("Added {} segments to propertyStore for table {}", paths.size(), realtimeTableName);
 
-    updateHelixIdealState(idealState, realtimeTableName, idealStateEntries, create);
+    updateHelixIdealState(idealState, realtimeTableName, idealStateEntries, create, nReplicas);
   }
 
   // Update the helix idealstate when a new table is added.
   protected void updateHelixIdealState(final IdealState idealState, String realtimeTableName, final Map<String, List<String>> idealStateEntries,
-      boolean create) {
+      boolean create, final int nReplicas) {
     if (create) {
       addLLCRealtimeSegmentsInIdealState(idealState, idealStateEntries);
       _helixAdmin.addResource(_clusterName, realtimeTableName, idealState);
@@ -243,6 +243,7 @@ public class PinotLLCRealtimeSegmentManager {
       HelixHelper.updateIdealState(_helixManager, realtimeTableName, new Function<IdealState, IdealState>() {
         @Override
         public IdealState apply(IdealState idealState) {
+          idealState.setReplicas(Integer.toString(nReplicas));
           return addLLCRealtimeSegmentsInIdealState(idealState, idealStateEntries);
         }
       }, RetryPolicies.exponentialBackoffRetryPolicy(5, 500L, 2.0f));
