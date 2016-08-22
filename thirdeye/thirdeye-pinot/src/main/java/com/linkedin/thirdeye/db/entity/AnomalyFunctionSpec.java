@@ -48,18 +48,21 @@ public class AnomalyFunctionSpec extends AbstractBaseEntity {
   private Integer bucketSize;
 
   @Column(name = "bucket_unit", nullable = false)
+  @Enumerated(EnumType.STRING)
   private TimeUnit bucketUnit;
 
   @Column(name = "window_size", nullable = false)
   private Integer windowSize;
 
   @Column(name = "window_unit", nullable = false)
+  @Enumerated(EnumType.STRING)
   private TimeUnit windowUnit;
 
   @Column(name = "window_delay", nullable = false)
   private Integer windowDelay;
 
   @Column(name = "window_delay_unit", nullable = false)
+  @Enumerated(EnumType.STRING)
   private TimeUnit windowDelayUnit;
 
   @Column(name = "explore_dimensions", nullable = true)

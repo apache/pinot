@@ -582,4 +582,38 @@
       </column>
     </addColumn>
   </changeSet>
+
+  <changeSet id="23" author="pjaiswal">
+    <createTable tableName="merge_config">
+      <column name="id" type="bigint" autoIncrement="true">
+        <constraints primaryKey="true" nullable="false"/>
+      </column>
+      <column name="strategy" type="VARCHAR(200)">
+        <constraints nullable="false"/>
+      </column>
+      <column name="allowed_sequential_gap" type="bigint">
+        <constraints nullable="false"/>
+      </column>
+      <column name="merge_duration" type="bigint">
+        <constraints nullable="false"/>
+      </column>
+      <column name="function_id" type="bigint">
+        <constraints foreignKeyName="fk_merge_config_function_idx"
+                     references="anomaly_functions(id)" nullable="false"/>
+      </column>
+    </createTable>
+    <sql>
+      update anomaly_functions set bucket_unit = 'DAYS' where bucket_unit='6';
+      update anomaly_functions set bucket_unit = 'HOURS' where bucket_unit='5';
+      update anomaly_functions set bucket_unit = 'MINUTES' where bucket_unit='4';
+
+      update anomaly_functions set window_unit = 'DAYS' where window_unit='6';
+      update anomaly_functions set window_unit = 'HOURS' where window_unit='5';
+      update anomaly_functions set window_unit = 'MINUTES' where window_unit='4';
+
+      update anomaly_functions set window_delay_unit = 'DAYS' where window_delay_unit='6';
+      update anomaly_functions set window_delay_unit = 'HOURS' where window_delay_unit='5';
+      update anomaly_functions set window_delay_unit = 'MINUTES' where window_delay_unit='4';
+    </sql>
+  </changeSet>
 </databaseChangeLog>
