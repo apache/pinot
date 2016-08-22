@@ -67,6 +67,10 @@ body a{
     background: #f2fae3;
 }
 
+.red-background{
+    background: #fff1f0;
+}
+
 .position-top-right{
     position: absolute;
     top: 10px;
