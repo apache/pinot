@@ -51,7 +51,7 @@ public abstract class AbstractDbTestBase {
 
   @AfterClass(alwaysRun = true)
   public void cleanUp() throws Exception {
-    if(entityManager.getTransaction().isActive()) {
+    if (entityManager.getTransaction().isActive()) {
       entityManager.getTransaction().rollback();
     }
     clearDatabase();
