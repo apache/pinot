@@ -13,7 +13,9 @@ import java.util.Map.Entry;
 import java.util.Properties;
 
 import javax.validation.Validation;
-
+import org.apache.tomcat.jdbc.pool.DataSource;
+import org.hibernate.cfg.Environment;
+import org.hibernate.engine.jdbc.connections.internal.DatasourceConnectionProviderImpl;
 
 public abstract class PersistenceUtil {
 
@@ -27,8 +29,20 @@ public abstract class PersistenceUtil {
   public static void init(File localConfigFile) {
     PersistenceConfig configuration = createConfiguration(localConfigFile);
     Properties properties = createDbPropertiesFromConfiguration(configuration);
-    JpaPersistModule jpaPersistModule = new JpaPersistModule(JPA_UNIT);
-    jpaPersistModule.properties(properties);
+
+    DataSource ds = new DataSource();
+    ds.setUrl(configuration.getDatabaseConfiguration().getUrl());
+    ds.setPassword(configuration.getDatabaseConfiguration().getPassword());
+    ds.setUsername(configuration.getDatabaseConfiguration().getUser());
+    ds.setDriverClassName(configuration.getDatabaseConfiguration().getProperties().get("hibernate.connection.driver_class"));
+    ds.setMaxActive(200);
+    ds.setInitialSize(10);
+    ds.setDefaultAutoCommit(true);
+
+    properties.put(Environment.CONNECTION_PROVIDER, DatasourceConnectionProviderImpl.class.getName());
+    properties.put(Environment.DATASOURCE, ds);
+
+    JpaPersistModule jpaPersistModule = new JpaPersistModule(JPA_UNIT).properties(properties);
     injector = Guice.createInjector(jpaPersistModule, new PersistenceModule());
     injector.getInstance(PersistService.class).start();
   }
@@ -48,14 +62,8 @@ public abstract class PersistenceUtil {
   }
 
   public static Properties createDbPropertiesFromConfiguration(PersistenceConfig localConfiguration) {
-    PersistenceConfig.DatabaseConfiguration databaseConfiguration =
-        localConfiguration.getDatabaseConfiguration();
-
+    PersistenceConfig.DatabaseConfiguration databaseConfiguration = localConfiguration.getDatabaseConfiguration();
     Properties properties = new Properties();
-    properties.setProperty("javax.persistence.jdbc.url", databaseConfiguration.getUrl());
-    properties.setProperty("javax.persistence.jdbc.user", databaseConfiguration.getUser());
-    properties.setProperty("javax.persistence.jdbc.password", databaseConfiguration.getPassword());
-
     for (Entry<String, String> entry : databaseConfiguration.getProperties().entrySet()) {
       properties.setProperty(entry.getKey(), entry.getValue());
     }
