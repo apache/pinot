@@ -316,7 +316,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     if ((numErrors = extractor.getTotalErrors()) > 0) {
       LOGGER.warn("Index creator for schema {} had {} rows with errors", dataSchema.getSchemaName(), numErrors);
     }
-    Map<String, Integer> errorCount = extractor.getError_count();
+    Map<String, Integer> errorCount = extractor.getErrorCount();
     for (String column : errorCount.keySet()) {
       if ((numErrors = errorCount.get(column)) > 0) {
         LOGGER.info("Column {} had {} rows with errors", column, numErrors);

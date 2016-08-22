@@ -15,261 +15,246 @@
  */
 package com.linkedin.pinot.core.data.extractors;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.testng.Assert;
-import org.testng.annotations.Test;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.data.Schema.SchemaBuilder;
 import com.linkedin.pinot.common.data.TimeFieldSpec;
 import com.linkedin.pinot.common.data.TimeGranularitySpec;
 import com.linkedin.pinot.core.data.GenericRow;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import org.testng.Assert;
+import org.testng.annotations.Test;
+
 
 public class PlainFieldExtractorTest {
-  private class AnyClassWithToString {
-    private final int _n;
-    public AnyClassWithToString(int n) {
-      _n = n;
+  private static final DataType[] ALL_TYPES =
+      {DataType.BOOLEAN, DataType.BYTE, DataType.CHAR, DataType.SHORT, DataType.INT, DataType.LONG, DataType.FLOAT,
+          DataType.DOUBLE, DataType.STRING};
+  // All types have single/multi-value except BOOLEAN.
+  private static final int NUMBER_OF_TYPES = 2 * ALL_TYPES.length - 1;
+  private static final String TEST_COLUMN = "testColumn";
+  private static final Schema[] ALL_TYPE_SCHEMAS = new Schema[NUMBER_OF_TYPES];
+
+  static {
+    int i = 0;
+    for (DataType dataType : ALL_TYPES) {
+      ALL_TYPE_SCHEMAS[i++] = new Schema.SchemaBuilder().setSchemaName("testSchema")
+          .addSingleValueDimension(TEST_COLUMN, dataType)
+          .build();
+      if (dataType != DataType.BOOLEAN) {
+        ALL_TYPE_SCHEMAS[i++] = new Schema.SchemaBuilder().setSchemaName("testSchema")
+            .addMultiValueDimension(TEST_COLUMN, dataType)
+            .build();
+      }
     }
+  }
+
+  private class AnyClassWithToString {
     @Override
     public String toString() {
-      return Integer.toString(_n);
+      return "AnyClass";
     }
   }
 
   @Test
-  public void simpleTest()
-      throws Exception {
-    Schema schema = new SchemaBuilder().addSingleValueDimension("svDimensionInt", DataType.INT)
+  public void simpleTest() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testSchema")
+        .addSingleValueDimension("svDimensionInt", DataType.INT)
         .addSingleValueDimension("svDimensionDouble", DataType.DOUBLE)
-        .addSingleValueDimension("someClassObject", DataType.STRING)
-        .addMultiValueDimension("mvDimension", DataType.STRING)
+        .addSingleValueDimension("svClassObject", DataType.STRING)
+        .addMultiValueDimension("mvDimensionLong", DataType.LONG)
         .addMultiValueDimension("mvClassObject", DataType.STRING)
-        .addMetric("metric", DataType.INT)
-        .addTime("incomingTime", TimeUnit.DAYS, DataType.LONG)
+        .addMetric("metricInt", DataType.INT)
+        .addTime("timeInt", TimeUnit.DAYS, DataType.INT)
         .build();
-    PlainFieldExtractor extractor = (PlainFieldExtractor) FieldExtractorFactory.getPlainFieldExtractor(schema);
+    PlainFieldExtractor plainFieldExtractor = new PlainFieldExtractor(schema);
     GenericRow row = new GenericRow();
-    Map<String, Object> fieldMap = new HashMap<String, Object>();
-    Short shortObj = new Short((short) 5);
-    fieldMap.put("svDimensionInt", shortObj);
-    Float floatObj = new Float((float) 3.2);
-    fieldMap.put("svDimensionDouble", floatObj);
-    Double doubleObj = new Double((double) 34.5);
-    fieldMap.put("metric", doubleObj);
+    Map<String, Object> fieldMap = new HashMap<>();
+    fieldMap.put("svDimensionInt", (short) 5);
+    fieldMap.put("svDimensionDouble", 3.2F);
+    fieldMap.put("svClassObject", new AnyClassWithToString());
+    fieldMap.put("mvDimensionLong", 13);
+    fieldMap.put("mvClassObject", new Object[]{new AnyClassWithToString(), new AnyClassWithToString()});
+    fieldMap.put("metricInt", 34.5);
     long currentDaysSinceEpoch = System.currentTimeMillis() / 1000 / 60 / 60 / 24;
-    fieldMap.put("incomingTime", currentDaysSinceEpoch);
-
-    final int value = 89;
-    {
-      AnyClassWithToString obj = new AnyClassWithToString(value);
-      fieldMap.put("someClassObject", value);
-    }
-    {
-      Object[] obj = new Object[2];
-      obj[0] = new AnyClassWithToString(value);
-      obj[1] = new AnyClassWithToString(value+1);
-      fieldMap.put("mvClassObject", obj);
-    }
+    fieldMap.put("timeInt", currentDaysSinceEpoch);
 
     row.init(fieldMap);
-    extractor.transform(row);
+    plainFieldExtractor.transform(row);
+
     Assert.assertTrue(row.getValue("svDimensionInt") instanceof Integer);
+    Assert.assertEquals(row.getValue("svDimensionInt"), 5);
     Assert.assertTrue(row.getValue("svDimensionDouble") instanceof Double);
-    Assert.assertTrue(row.getValue("mvDimension") != null);
-    Assert.assertTrue(row.getValue("metric") instanceof Integer);
-    Assert.assertTrue((Integer) row.getValue("metric") == 34);
-    Assert.assertTrue((Long) row.getValue("incomingTime") == currentDaysSinceEpoch);
-    Assert.assertTrue(Integer.toString(value).equals(row.getValue("someClassObject")));
-    Assert.assertTrue(row.getValue("mvClassObject") instanceof  String[]);
-    String[] strings = (String[])row.getValue("mvClassObject");
-    Assert.assertEquals(strings.length, 2);
-    Assert.assertEquals(Integer.toString(value), strings[0]);
-    Assert.assertEquals(Integer.toString(value+1), strings[1]);
+    Assert.assertEquals((double) row.getValue("svDimensionDouble"), 3.2, 0.1);
+    Assert.assertTrue(row.getValue("svClassObject") instanceof String);
+    Assert.assertEquals(row.getValue("svClassObject"), "AnyClass");
+    Assert.assertTrue(row.getValue("mvDimensionLong") instanceof Object[]);
+    Assert.assertTrue(((Object[]) row.getValue("mvDimensionLong"))[0] instanceof Long);
+    Assert.assertEquals(((Object[]) row.getValue("mvDimensionLong"))[0], 13L);
+    Assert.assertTrue(row.getValue("mvClassObject") instanceof Object[]);
+    Assert.assertTrue(((Object[]) row.getValue("mvClassObject"))[0] instanceof String);
+    Assert.assertTrue(((Object[]) row.getValue("mvClassObject"))[1] instanceof String);
+    Assert.assertEquals(((Object[]) row.getValue("mvClassObject"))[0], "AnyClass");
+    Assert.assertEquals(((Object[]) row.getValue("mvClassObject"))[1], "AnyClass");
+    Assert.assertTrue(row.getValue("metricInt") instanceof Integer);
+    Assert.assertEquals(row.getValue("metricInt"), 34);
+    Assert.assertTrue(row.getValue("timeInt") instanceof Integer);
+    Assert.assertEquals(row.getValue("timeInt"), (int) currentDaysSinceEpoch);
   }
 
   @Test
-  public void automatedTest()
-      throws Exception {
-    final Logger LOGGER = LoggerFactory.getLogger(PlainFieldExtractorTest.class);
-    final int numberOfTypes = 18;
-    final String columnName = "testColumn";
-    Schema[] schemaArray = new Schema[numberOfTypes];
-    Object[] objectArray = new Object[numberOfTypes];
-    int i = 0;
-    for (DataType dataType : DataType.values()) {
-      schemaArray[i] = new SchemaBuilder().setSchemaName("automatedTestSchema").addSingleValueDimension(columnName, dataType).build();
-      i++;
+  public void nullValueTest() {
+    GenericRow row = new GenericRow();
+    Map<String, Object> fieldMap = new HashMap<>();
+    for (int i = 0; i < NUMBER_OF_TYPES; i++) {
+      PlainFieldExtractor plainFieldExtractor = new PlainFieldExtractor(ALL_TYPE_SCHEMAS[i]);
+      row.init(fieldMap);
+      plainFieldExtractor.transform(row);
+
+      Assert.assertEquals(plainFieldExtractor.getTotalErrors(), 0);
+      Assert.assertEquals(plainFieldExtractor.getTotalNulls(), 1);
+      Assert.assertEquals(plainFieldExtractor.getTotalConversions(), 0);
     }
+  }
 
-    objectArray[0] = new Boolean(true);
-    objectArray[1] = new Byte((byte) 65);
-    objectArray[2] = new Character('a');
-    objectArray[3] = new Short((short) 500);
-    objectArray[4] = new Integer(500);
-    objectArray[5] = new Long(500);
-    objectArray[6] = new Float(500.50);
-    objectArray[7] = new Double(500.50);
-    objectArray[8] = "Pinot Rules";
-    objectArray[9] = null;
-    objectArray[10] = new Byte[1];
-    ((Byte[]) objectArray[10])[0] = new Byte((byte) 65);
-    objectArray[11] = new Character[1];
-    ((Character[]) objectArray[11])[0] = new Character('a');
-    objectArray[12] = new Short[1];
-    ((Short[]) objectArray[12])[0] = new Short((short) 500);
-    objectArray[13] = new Integer[1];
-    ((Integer[]) objectArray[13])[0] = new Integer(500);
-    objectArray[14] = new Long[1];
-    ((Long[]) objectArray[14])[0] = new Long(500);
-    objectArray[15] = new Float[1];
-    ((Float[]) objectArray[15])[0] = new Float(500.50);
-    objectArray[16] = new Double[1];
-    ((Double[]) objectArray[16])[0] = new Double(500.50);
-    objectArray[17] = new String[1];
-    ((String[]) objectArray[17])[0] = new String("Pinot Rules");
+  @Test
+  public void classWithToStringTest() {
+    GenericRow row = new GenericRow();
+    Map<String, Object> fieldMap = new HashMap<>();
+    for (int i = 0; i < NUMBER_OF_TYPES; i++) {
+      PlainFieldExtractor plainFieldExtractor = new PlainFieldExtractor(ALL_TYPE_SCHEMAS[i]);
+      fieldMap.put(TEST_COLUMN, new AnyClassWithToString());
+      row.init(fieldMap);
+      plainFieldExtractor.transform(row);
+      fieldMap.put(TEST_COLUMN, new Object[]{new AnyClassWithToString(), new AnyClassWithToString()});
+      row.init(fieldMap);
+      plainFieldExtractor.transform(row);
 
-    for (i = 0; i < numberOfTypes; i++) {
-      for (int j = 0; j < numberOfTypes; j++) {
-        PlainFieldExtractor extractor =
-            (PlainFieldExtractor) FieldExtractorFactory.getPlainFieldExtractor(schemaArray[i]);
-        GenericRow row = new GenericRow();
-        Map<String, Object> fieldMap = new HashMap<String, Object>();
-        fieldMap.put(columnName, objectArray[j]);
-        row.init(fieldMap);
-        extractor.transform(row);
-        if (j == 9) {
-          // Checking operations on null
-          Assert.assertEquals(extractor.getTotalNulls(), 1);
-        } else if ((i == 0) && (j != 0)) {
-          // Checking non-Boolean to Boolean conversions
-          if (j == 8) {
-            // String to Boolean conversion
-            Assert.assertEquals(extractor.getTotalErrors(), 0);
-            Assert.assertEquals(extractor.getTotalConversions(), 1);
-          } else {
-            Assert.assertEquals(extractor.getTotalErrors(), 1);
-            Assert.assertEquals(extractor.getTotalConversions(), 1);
-          }
-        }
-        if ((i == 8) && (j == 0)) {
-          // Boolean to String conversion
-          Assert.assertEquals(extractor.getTotalErrors(), 0);
-          Assert.assertEquals(extractor.getTotalConversions(), 1);
-        }
-        LOGGER.debug("Number of Error {}", extractor.getTotalErrors());
-        LOGGER.debug("Number of rows with Null columns {}", extractor.getTotalNulls());
-        LOGGER.debug("Number of rows with columns requiring conversion {}", extractor.getTotalConversions());
-        LOGGER.debug("Column with conversion {}, number of conversions {}", columnName,
-            extractor.getError_count().get(columnName));
-        LOGGER.debug("Old value {}, new value {}", objectArray[j], row.getValue(columnName));
+      if (i > 14) {
+        // AnyClassWithToString only works with String (array).
+        Assert.assertEquals(plainFieldExtractor.getTotalErrors(), 0);
+        Assert.assertEquals(plainFieldExtractor.getTotalNulls(), 0);
+        Assert.assertEquals(plainFieldExtractor.getTotalConversions(), 2);
+      } else {
+        Assert.assertEquals(plainFieldExtractor.getTotalErrors(), 2);
+        Assert.assertEquals(plainFieldExtractor.getTotalNulls(), 0);
+        Assert.assertEquals(plainFieldExtractor.getTotalConversions(), 0);
       }
     }
   }
 
   @Test
-  public void timeSpecTest()
-      throws Exception {
-    Schema schema = new SchemaBuilder().addSingleValueDimension("svDimensionInt", DataType.INT)
-        .addSingleValueDimension("svDimensionDouble", DataType.DOUBLE)
-        .addMultiValueDimension("mvDimension", DataType.STRING)
-        .addMetric("metric", DataType.INT)
-        .build();
-    TimeFieldSpec timeSpec = new TimeFieldSpec();
-    TimeGranularitySpec timeGranularitySpec = new TimeGranularitySpec(DataType.LONG, TimeUnit.DAYS, "incoming");
-    timeSpec.setIncomingGranularitySpec(timeGranularitySpec);
-    timeSpec.setOutgoingGranularitySpec(timeGranularitySpec);
-    schema.setTimeFieldSpec(timeSpec);
-    PlainFieldExtractor extractor = (PlainFieldExtractor) FieldExtractorFactory.getPlainFieldExtractor(schema);
+  public void automatedTest() {
+    Object[] objectArray = new Object[NUMBER_OF_TYPES];
+    objectArray[0] = true;
+    objectArray[1] = (byte) 65;
+    objectArray[2] = new Object[]{(byte) 65};
+    objectArray[3] = 'a';
+    objectArray[4] = new Object[]{'a'};
+    objectArray[5] = (short) 500;
+    objectArray[6] = new Object[]{(short) 500};
+    objectArray[7] = 500;
+    objectArray[8] = new Object[]{500};
+    objectArray[9] = 500L;
+    objectArray[10] = new Object[]{500L};
+    objectArray[11] = 500.5F;
+    objectArray[12] = new Object[]{500.5F};
+    objectArray[13] = 500.5;
+    objectArray[14] = new Object[]{500.5};
+    objectArray[15] = "true";
+    objectArray[16] = new Object[]{"true"};
+
     GenericRow row = new GenericRow();
-    Map<String, Object> fieldMap = new HashMap<String, Object>();
-    Short shortObj = new Short((short) 5);
-    fieldMap.put("svDimensionInt", shortObj);
-    Float floatObj = new Float((float) 3.2);
-    fieldMap.put("svDimensionDouble", floatObj);
-    Double doubleObj = new Double((double) 34.5);
-    fieldMap.put("metric", doubleObj);
-    row.init(fieldMap);
-    extractor.transform(row);
-    Assert.assertTrue(row.getValue("svDimensionInt") instanceof Integer);
-    Assert.assertTrue(row.getValue("svDimensionDouble") instanceof Double);
-    Assert.assertTrue(row.getValue("mvDimension") != null);
-    Assert.assertTrue(row.getValue("metric") instanceof Integer);
-    Assert.assertTrue((Integer) row.getValue("metric") == 34);
-    Assert.assertTrue(row.getValue("incoming") != null);
+    Map<String, Object> fieldMap = new HashMap<>();
+    for (int i = 0; i < NUMBER_OF_TYPES; i++) {
+      for (int j = 0; j < NUMBER_OF_TYPES; j++) {
+        PlainFieldExtractor plainFieldExtractor = new PlainFieldExtractor(ALL_TYPE_SCHEMAS[i]);
+        fieldMap.put(TEST_COLUMN, objectArray[j]);
+        row.init(fieldMap);
+        plainFieldExtractor.transform(row);
+
+        // Check when schema and field match.
+        if (i == j) {
+          Assert.assertEquals(plainFieldExtractor.getTotalErrors(), 0);
+          Assert.assertEquals(plainFieldExtractor.getTotalNulls(), 0);
+          Assert.assertEquals(plainFieldExtractor.getTotalConversions(), 0);
+          continue;
+        }
+
+        // Check conversions to or from Boolean.
+        if (i == 0 || j == 0) {
+          if (i > 14 || j > 14) {
+            // Conversion between Boolean and String (array). (Allowed for String value "true")
+            Assert.assertEquals(plainFieldExtractor.getTotalErrors(), 0);
+            Assert.assertEquals(plainFieldExtractor.getTotalNulls(), 0);
+            Assert.assertEquals(plainFieldExtractor.getTotalConversions(), 1);
+          } else {
+            // Conversion between Boolean and non-String (array). (Not allowed)
+            Assert.assertEquals(plainFieldExtractor.getTotalErrors(), 1);
+            Assert.assertEquals(plainFieldExtractor.getTotalNulls(), 0);
+            Assert.assertEquals(plainFieldExtractor.getTotalConversions(), 0);
+          }
+          continue;
+        }
+
+        // Check conversions from String or String array.
+        if (j > 14) {
+          if (i == 3 || i == 4 || i > 14) {
+            // Conversion from String (array) to Character (array) or String (array). (Allowed)
+            Assert.assertEquals(plainFieldExtractor.getTotalErrors(), 0);
+            Assert.assertEquals(plainFieldExtractor.getTotalNulls(), 0);
+            Assert.assertEquals(plainFieldExtractor.getTotalConversions(), 1);
+          } else {
+            // Conversion from String (array) to non-Character (array). (Not allowed for String value "true")
+            Assert.assertEquals(plainFieldExtractor.getTotalErrors(), 1);
+            Assert.assertEquals(plainFieldExtractor.getTotalNulls(), 0);
+            Assert.assertEquals(plainFieldExtractor.getTotalConversions(), 0);
+          }
+          continue;
+        }
+
+        // Check other conversions.
+        Assert.assertEquals(plainFieldExtractor.getTotalErrors(), 0);
+        Assert.assertEquals(plainFieldExtractor.getTotalNulls(), 0);
+        Assert.assertEquals(plainFieldExtractor.getTotalConversions(), 1);
+      }
+    }
   }
 
   @Test
-  public void timeSpecStringTest()
-      throws Exception {
-    Schema schema = new SchemaBuilder().addSingleValueDimension("svDimensionInt", DataType.INT)
-        .addSingleValueDimension("svDimensionDouble", DataType.DOUBLE)
-        .addMultiValueDimension("mvDimension", DataType.STRING)
-        .addMetric("metric", DataType.INT)
-        .build();
-    TimeFieldSpec timeSpec = new TimeFieldSpec();
-    TimeGranularitySpec timeGranularitySpec = new TimeGranularitySpec(DataType.STRING, TimeUnit.DAYS, "incoming");
-    timeSpec.setIncomingGranularitySpec(timeGranularitySpec);
-    timeSpec.setOutgoingGranularitySpec(timeGranularitySpec);
-    schema.setTimeFieldSpec(timeSpec);
-    PlainFieldExtractor extractor = (PlainFieldExtractor) FieldExtractorFactory.getPlainFieldExtractor(schema);
+  public void timeSpecStringTest() {
+    Schema schema = new Schema();
+    schema.setSchemaName("testSchema");
+    schema.setTimeFieldSpec(new TimeFieldSpec("timeString", DataType.STRING, TimeUnit.DAYS));
+    PlainFieldExtractor plainFieldExtractor = new PlainFieldExtractor(schema);
     GenericRow row = new GenericRow();
-    Map<String, Object> fieldMap = new HashMap<String, Object>();
-    Short shortObj = new Short((short) 5);
-    fieldMap.put("svDimensionInt", shortObj);
-    Float floatObj = new Float((float) 3.2);
-    fieldMap.put("svDimensionDouble", floatObj);
-    Double doubleObj = new Double((double) 34.5);
-    fieldMap.put("metric", doubleObj);
-    String myDate = "2016-01-17";
-    fieldMap.put("incoming", myDate);
+    Map<String, Object> fieldMap = new HashMap<>();
+    fieldMap.put("timeString", "2016-01-01");
     row.init(fieldMap);
-    extractor.transform(row);
-    Assert.assertTrue(row.getValue("svDimensionInt") instanceof Integer);
-    Assert.assertTrue(row.getValue("svDimensionDouble") instanceof Double);
-    Assert.assertTrue(row.getValue("mvDimension") != null);
-    Assert.assertTrue(row.getValue("metric") instanceof Integer);
-    Assert.assertTrue((Integer) row.getValue("metric") == 34);
-    Assert.assertTrue(row.getValue("incoming") == "2016-01-17");
+    plainFieldExtractor.transform(row);
+
+    Assert.assertTrue(row.getValue("timeString") instanceof String);
+    Assert.assertEquals(row.getValue("timeString"), "2016-01-01");
   }
 
   @Test
-  public void inNoutTimeSpecTest()
-      throws Exception {
-    Schema schema = new SchemaBuilder().addSingleValueDimension("svDimensionInt", DataType.INT)
-        .addSingleValueDimension("svDimensionDouble", DataType.DOUBLE)
-        .addMultiValueDimension("mvDimension", DataType.STRING)
-        .addMetric("metric", DataType.INT)
-        .build();
-    TimeFieldSpec timeSpec = new TimeFieldSpec();
-    TimeGranularitySpec incomingTimeGranularitySpec = new TimeGranularitySpec(DataType.LONG, TimeUnit.DAYS, "incoming");
-    TimeGranularitySpec outgoingTimeGranularitySpec = new TimeGranularitySpec(DataType.LONG, TimeUnit.HOURS, "outgoing");
-    timeSpec.setIncomingGranularitySpec(incomingTimeGranularitySpec);
-    timeSpec.setOutgoingGranularitySpec(outgoingTimeGranularitySpec);
-    schema.setTimeFieldSpec(timeSpec);
-    PlainFieldExtractor extractor = (PlainFieldExtractor) FieldExtractorFactory.getPlainFieldExtractor(schema);
+  public void differentIncomingOutgoingTimeSpecTest() {
+    Schema schema = new Schema();
+    schema.setSchemaName("testSchema");
+    TimeGranularitySpec incoming = new TimeGranularitySpec(DataType.INT, TimeUnit.DAYS, "incoming");
+    TimeGranularitySpec outgoing = new TimeGranularitySpec(DataType.LONG, TimeUnit.HOURS, "outgoing");
+    schema.setTimeFieldSpec(new TimeFieldSpec(incoming, outgoing));
+    PlainFieldExtractor plainFieldExtractor = new PlainFieldExtractor(schema);
     GenericRow row = new GenericRow();
-    Map<String, Object> fieldMap = new HashMap<String, Object>();
-    Short shortObj = new Short((short) 5);
-    fieldMap.put("svDimensionInt", shortObj);
-    Float floatObj = new Float((float) 3.2);
-    fieldMap.put("svDimensionDouble", floatObj);
-    Double doubleObj = new Double((double) 34.5);
-    fieldMap.put("metric", doubleObj);
+    Map<String, Object> fieldMap = new HashMap<>();
     long currentDaysSinceEpoch = System.currentTimeMillis() / 1000 / 60 / 60 / 24;
     fieldMap.put("incoming", currentDaysSinceEpoch);
     row.init(fieldMap);
-    extractor.transform(row);
-    Assert.assertTrue(row.getValue("svDimensionInt") instanceof Integer);
-    Assert.assertTrue(row.getValue("svDimensionDouble") instanceof Double);
-    Assert.assertTrue(row.getValue("mvDimension") != null);
-    Assert.assertTrue(row.getValue("metric") instanceof Integer);
-    Assert.assertTrue((Integer) row.getValue("metric") == 34);
-    Assert.assertTrue(row.getValue("incoming") == null);
-    Assert.assertEquals(((Long) row.getValue("outgoing")).longValue(), currentDaysSinceEpoch * 24);
+    plainFieldExtractor.transform(row);
+
+    Assert.assertNull(row.getValue("incoming"));
+    Assert.assertTrue(row.getValue("outgoing") instanceof Long);
+    Assert.assertEquals(row.getValue("outgoing"), currentDaysSinceEpoch * 24);
   }
 }

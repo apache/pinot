@@ -211,7 +211,7 @@ public class HLRealtimeSegmentDataManager extends SegmentDataManager {
             serverMetrics.addMeteredTableValue(tableStreamName,
                 ServerMeter.ROWS_WITH_ERRORS, (long) numErrors);
           }
-          Map<String, Integer> errorCount = extractor.getError_count();
+          Map<String, Integer> errorCount = extractor.getErrorCount();
           for (String column : errorCount.keySet()) {
             if ((numErrors = errorCount.get(column)) > 0) {
               segmentLogger.warn("Column {} had {} rows with errors", column, numErrors);
