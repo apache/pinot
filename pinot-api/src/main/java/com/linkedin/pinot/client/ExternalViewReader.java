@@ -17,9 +17,12 @@ package com.linkedin.pinot.client;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
 
 import org.I0Itec.zkclient.ZkClient;
 import org.json.JSONObject;
@@ -72,7 +75,7 @@ public class ExternalViewReader {
 
   @SuppressWarnings("unchecked")
   public Map<String, List<String>> getTableToBrokersMap() {
-    Map<String, List<String>> brokerUrlsMap = new HashMap<String, List<String>>();
+    Map<String, Set<String>> brokerUrlsMap = new HashMap<>();
     try {
       byte[] brokerResourceNodeData = zkClient.readData("/EXTERNALVIEW/brokerResource", true);
       JSONObject jsonObject = new JSONObject(new String(brokerResourceNodeData));
@@ -81,9 +84,13 @@ public class ExternalViewReader {
       Iterator<String> resourceNames = brokerResourceNode.keys();
       while (resourceNames.hasNext()) {
         String resourceName = resourceNames.next();
+        String resourceNameCommon = resourceName = resourceName.replace("_OFFLINE", "").replace("_REALTIME", "");
+        Set<String> brokerUrls = brokerUrlsMap.get(resourceNameCommon);
+        if (brokerUrls == null) {
+          brokerUrls = new HashSet<>();
+          brokerUrlsMap.put(resourceNameCommon, brokerUrls);
+        }
         JSONObject resource = brokerResourceNode.getJSONObject(resourceName);
-        List<String> brokerUrls = new ArrayList<String>();
-        brokerUrlsMap.put(resourceName, brokerUrls);
         Iterator<String> brokerNames = resource.keys();
         while (brokerNames.hasNext()) {
           String brokerName = brokerNames.next();
@@ -98,7 +105,11 @@ public class ExternalViewReader {
       LOGGER.warn("Exception while reading External view from zookeeper", e);
       // ignore
     }
-    return brokerUrlsMap;
+    Map<String, List<String>> tableToBrokersMap = new HashMap<>();
+    for (Entry<String, Set<String>> entry : brokerUrlsMap.entrySet()) {
+      tableToBrokersMap.put(entry.getKey(), new ArrayList<>(entry.getValue()));
+    }
+    return tableToBrokersMap;
   }
 
 }
