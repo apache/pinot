@@ -50,4 +50,9 @@ public class GroupByResult {
   public void setGroup(List<String> group) {
     _group = group;
   }
+
+  @Override
+  public String toString() {
+    return _group + ": " + _value.toString();
+  }
 }

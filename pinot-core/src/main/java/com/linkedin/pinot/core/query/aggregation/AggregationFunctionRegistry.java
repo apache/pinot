@@ -16,6 +16,7 @@
 package com.linkedin.pinot.core.query.aggregation;
 
 import com.linkedin.pinot.common.Utils;
+import com.linkedin.pinot.core.query.aggregation.function.FastHllAggregationFunction;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -60,6 +61,7 @@ public class AggregationFunctionRegistry {
     keyToFunctionWithDictionary.put("minmaxrange", MinMaxRangeAggregationFunction.class);
     keyToFunctionWithDictionary.put("distinctcount", DistinctCountAggregationFunction.class);
     keyToFunctionWithDictionary.put("distinctcounthll", DistinctCountHLLAggregationFunction.class);
+    keyToFunctionWithDictionary.put("fasthll", FastHllAggregationFunction.class);
     // quantiles
     keyToFunctionWithDictionary.put("percentileest50", Percentileest50.class);
     keyToFunctionWithDictionary.put("percentileest90", Percentileest90.class);

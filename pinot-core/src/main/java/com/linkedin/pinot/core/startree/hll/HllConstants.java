@@ -16,6 +16,6 @@
 package com.linkedin.pinot.core.startree.hll;
 
 public class HllConstants {
-    public static final int DEFAULT_LOG2M = 5;
+    public static final int DEFAULT_LOG2M = 8;
     public static final String DEFAULT_HLL_DERIVE_COLUMN_SUFFIX = "_hll";
 }

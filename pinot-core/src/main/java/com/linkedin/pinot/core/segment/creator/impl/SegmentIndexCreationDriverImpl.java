@@ -105,12 +105,13 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     recordReader = reader;
     recordReader.init();
     dataSchema = recordReader.getSchema();
-    enableHllIndex = (config.getHllConfig() != null) && (config.getHllConfig().isEnableHllIndex());
+    enableHllIndex = config.getHllConfig().isEnableHllIndex();
 
     if (enableHllIndex && !createStarTree) {
       LOGGER.warn("Hll configuration works only with star tree. " +
           "Star Tree generation is not specified. " +
           "This will not add derived hll fields.");
+      config.getHllConfig().setEnableHllIndex(false);
       enableHllIndex = false;
     }
 
@@ -145,7 +146,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     if (enableHllIndex) {
       Collection<String> columnNames = dataSchema.getColumnNames();
       HllConfig hllConfig = config.getHllConfig();
-      for (String derivedFieldName : hllConfig.getDerivedHllFieldsMap().values()) {
+      for (String derivedFieldName : hllConfig.getDerivedHllFieldToOriginMap().keySet()) {
         if (columnNames.contains(derivedFieldName)) {
           throw new IllegalArgumentException(
               "Cannot add derived field: " + derivedFieldName + " since it already exists in schema.");
@@ -163,9 +164,9 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     //add default hll value in each row
     if (enableHllIndex) {
       HllConfig hllConfig = config.getHllConfig();
-      for (Entry<String, String> entry : hllConfig.getDerivedHllFieldsMap().entrySet()) {
-        String originFieldName = entry.getKey();
-        String derivedFieldName = entry.getValue();
+      for (Entry<String, String> entry : hllConfig.getDerivedHllFieldToOriginMap().entrySet()) {
+        String derivedFieldName = entry.getKey();
+        String originFieldName = entry.getValue();
         row.putField(derivedFieldName,
             HllUtil.singleValueHllAsString(hllConfig.getHllLog2m(), row.getValue(originFieldName)));
       }
@@ -216,7 +217,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     starTreeBuilder.init(starTreeBuilderConfig);
     //build star tree along with collecting stats
     recordReader.rewind();
-    LOGGER.info("Start building star tree!");
+    LOGGER.info("Start append raw data to star tree builder!");
     totalDocs = 0;
     while (recordReader.hasNext()) {
       //PlainFieldExtractor conducts necessary type conversions

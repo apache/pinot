@@ -17,16 +17,23 @@ package com.linkedin.pinot.core.startree.hll;
 
 import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
 import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.core.common.DataFetcher;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
+import com.linkedin.pinot.core.operator.aggregation.SingleValueBlockCache;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.converter.SegmentV1V2ToV3FormatConverter;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import com.linkedin.pinot.core.segment.store.SegmentDirectoryPaths;
+import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.attribute.FileTime;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.slf4j.Logger;
@@ -36,18 +43,11 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import java.io.File;
-import java.nio.file.Files;
-import java.nio.file.attribute.FileTime;
-import java.util.Arrays;
-import java.util.List;
-import java.util.concurrent.TimeUnit;
-
 /**
  * Dictionary Index Size for Hll Field is roughly 10 times of the corresponding index for Long field.
  */
-public class TestHllIndexSize {
-  private static final Logger LOGGER = LoggerFactory.getLogger(TestHllIndexSize.class);
+public class TestHllIndexCreation {
+  private static final Logger LOGGER = LoggerFactory.getLogger(TestHllIndexCreation.class);
   private static final String hllDeriveColumnSuffix = HllConstants.DEFAULT_HLL_DERIVE_COLUMN_SUFFIX;
 
   // change this to change the columns that need to create hll index on
@@ -59,7 +59,7 @@ public class TestHllIndexSize {
   private static final String timeColumnName = "daysSinceEpoch";
   private static final TimeUnit timeUnit = TimeUnit.DAYS;
 
-  private static final int hllLog2m = 5;
+  private static final int hllLog2m = HllConstants.DEFAULT_LOG2M;
 
   private IndexLoadingConfigMetadata v1LoadingConfig;
   private IndexLoadingConfigMetadata v3LoadingConfig;
@@ -107,9 +107,10 @@ public class TestHllIndexSize {
   }
 
   @Test
-  public void testColumnStatsWithStarTree() {
+  public void testColumnStatsWithStarTree() throws Exception {
     SegmentWithHllIndexCreateHelper helper = null;
     boolean hasException = false;
+    int maxDocLength = 10000;
     try {
       LOGGER.debug("================ With StarTree ================");
       helper = new SegmentWithHllIndexCreateHelper(
@@ -119,6 +120,21 @@ public class TestHllIndexSize {
       for (String name : helper.getSchema().getColumnNames()) {
         LOGGER.debug("* " + name + ": " + driver.getColumnStatisticsCollector(name).getCardinality());
       }
+      LOGGER.info("Loading ...");
+      IndexSegment indexSegment = Loaders.IndexSegment.load(helper.getSegmentDirectory(), ReadMode.mmap);
+
+      int[] docIdSet = new int[maxDocLength];
+      for (int i = 0; i < maxDocLength; i++) {
+        docIdSet[i] = i;
+      }
+      SingleValueBlockCache blockCache = new SingleValueBlockCache(new DataFetcher(indexSegment));
+      blockCache.initNewBlock(docIdSet, 0, maxDocLength);
+
+      String[] strings = blockCache.getStringValueArrayForColumn("column1_hll");
+      Assert.assertEquals(strings.length, maxDocLength);
+
+      double[] ints = blockCache.getDoubleValueArrayForColumn("column1");
+      Assert.assertEquals(ints.length, maxDocLength);
     } catch (Exception e) {
       hasException = true;
       LOGGER.error(e.getMessage());

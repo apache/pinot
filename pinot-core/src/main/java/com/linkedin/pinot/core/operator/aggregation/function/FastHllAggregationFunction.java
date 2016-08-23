@@ -17,23 +17,29 @@ package com.linkedin.pinot.core.operator.aggregation.function;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.core.operator.aggregation.AggregationResultHolder;
 import com.linkedin.pinot.core.operator.aggregation.groupby.GroupByResultHolder;
-import com.linkedin.pinot.core.startree.hll.HllConstants;
+import com.linkedin.pinot.core.startree.hll.HllUtil;
 import java.util.List;
 
 
 /**
- * Class to implement the 'distinctcounthll' aggregation function.
+ * Class to implement the new 'fasthll' aggregation function,
+ * fasthll takes advantage of pre-aggregated results for fast distinct count estimation.
  */
-public class DistinctCountHLLAggregationFunction implements AggregationFunction {
-  private static final String FUNCTION_NAME = AggregationFunctionFactory.DISTINCTCOUNTHLL_AGGREGATION_FUNCTION;
-  private static final ResultDataType RESULT_DATA_TYPE = ResultDataType.DISTINCTCOUNTHLL_HYPERLOGLOG;
+public class FastHllAggregationFunction implements AggregationFunction {
+  private static final String FUNCTION_NAME = AggregationFunctionFactory.FASTHLL_AGGREGATION_FUNCTION;
+  // TODO: change or not?
+  private static final ResultDataType RESULT_DATA_TYPE = ResultDataType.HLL_PREAGGREGATED;
+  private final int hllLog2m;
 
-  private static final int log2m = HllConstants.DEFAULT_LOG2M;
+  public FastHllAggregationFunction(int hllLog2m) {
+    this.hllLog2m = hllLog2m;
+  }
 
   /**
-   * Performs 'distinctcounthll' aggregation on the input array.
+   * Performs 'fasthll' aggregation on the input array.
    *
    * {@inheritDoc}
    *
@@ -44,18 +50,23 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction 
   @Override
   public void aggregate(int length, AggregationResultHolder resultHolder, Object... valueArray) {
     Preconditions.checkArgument(valueArray.length == 1);
-    Preconditions.checkArgument(valueArray[0] instanceof double[]);
-    final double[] values = (double[]) valueArray[0];
+    Preconditions.checkArgument(valueArray[0] instanceof String[]);
+    final String[] values = (String[]) valueArray[0];
     Preconditions.checkState(length <= values.length);
 
     HyperLogLog hll = resultHolder.getResult();
     if (hll == null) {
-      hll = new HyperLogLog(log2m);
+      hll = new HyperLogLog(hllLog2m);
       resultHolder.setValue(hll);
     }
 
     for (int i = 0; i < length; i++) {
-      hll.offer((int) values[i]);
+      try {
+        HyperLogLog value = HllUtil.convertStringToHll(values[i]);
+        hll.addAll(value);
+      } catch (Exception e) {
+        Utils.rethrowException(e);
+      }
     }
   }
 
@@ -73,18 +84,23 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeys, GroupByResultHolder resultHolder, Object... valueArray) {
     Preconditions.checkArgument(valueArray.length == 1);
-    Preconditions.checkArgument(valueArray[0] instanceof double[]);
-    final double[] values = (double[]) valueArray[0];
+    Preconditions.checkArgument(valueArray[0] instanceof String[]);
+    final String[] values = (String[]) valueArray[0];
     Preconditions.checkState(length <= values.length);
 
     for (int i = 0; i < length; i++) {
       int groupKey = groupKeys[i];
       HyperLogLog hll = resultHolder.getResult(groupKey);
       if (hll == null) {
-        hll = new HyperLogLog(log2m);
+        hll = new HyperLogLog(hllLog2m);
         resultHolder.setValueForKey(groupKey, hll);
       }
-      hll.offer((int) values[i]);
+      try {
+        HyperLogLog value = HllUtil.convertStringToHll(values[i]);
+        hll.addAll(value);
+      } catch (Exception e) {
+        Utils.rethrowException(e);
+      }
     }
   }
 
@@ -100,19 +116,23 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction 
   public void aggregateGroupByMV(int length, int[][] docIdToGroupKeys, GroupByResultHolder resultHolder,
       Object... valueArray) {
     Preconditions.checkArgument(valueArray.length == 1);
-    Preconditions.checkArgument(valueArray[0] instanceof double[]);
-    final double[] values = (double[]) valueArray[0];
+    Preconditions.checkArgument(valueArray[0] instanceof String[]);
+    final String[] values = (String[]) valueArray[0];
     Preconditions.checkState(length <= values.length);
 
     for (int i = 0; i < length; i++) {
-      int value = (int) values[i];
       for (int groupKey : docIdToGroupKeys[i]) {
         HyperLogLog hll = resultHolder.getResult(groupKey);
         if (hll == null) {
-          hll = new HyperLogLog(log2m);
+          hll = new HyperLogLog(hllLog2m);
           resultHolder.setValueForKey(groupKey, hll);
         }
-        hll.offer(value);
+        try {
+          HyperLogLog value = HllUtil.convertStringToHll(values[i]);
+          hll.addAll(value);
+        } catch (Exception e) {
+          Utils.rethrowException(e);
+        }
       }
     }
   }

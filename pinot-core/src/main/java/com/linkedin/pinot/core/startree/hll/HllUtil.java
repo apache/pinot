@@ -19,11 +19,13 @@ import com.clearspring.analytics.stream.cardinality.CardinalityMergeException;
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableBiMap;
+import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.core.data.GenericRow;
 
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.util.Arrays;
+import java.util.List;
 
 
 /**
@@ -120,10 +122,28 @@ public class HllUtil {
   }
 
   /**
+   * Merge all HLLs in list to the first HLL in the list, the list must contain at least one element
+   * @param resultList
+   * @return
+   */
+  public static HyperLogLog mergeHLLResultsToFirstInList(List<HyperLogLog> resultList) {
+    HyperLogLog hllResult = resultList.get(0);
+    for (int i = 1; i < resultList.size(); ++i) {
+      try {
+        hllResult.addAll(resultList.get(i));
+      } catch (CardinalityMergeException e) {
+        Utils.rethrowException(e);
+      }
+    }
+    return hllResult;
+  }
+
+  /**
    * Convert between byte array and char array, one byte is mapped to one char and vice versa.
    * This is due to UTF-8 encoding for String type serialization used all over the system.
    */
   public static class SerializationConverter {
+    private static final int BYTE_TO_CHAR_OFFSET = 129; // we choose 129 since normally we leave \0 for padding.
 
     public static char[] byteArrayToChars(byte[] byteArray) {
       char[] charArrayBuffer = new char[byteArray.length];
@@ -142,11 +162,11 @@ public class HllUtil {
     }
 
     public static char byteToChar(byte b) {
-      return (char) b;
+      return (char)(((int)b) + BYTE_TO_CHAR_OFFSET);
     }
 
     public static byte charToByte(char c) {
-      return (byte) c; // same as: (byte)((c & 0x000000FF))
+      return (byte)(((int)c) - BYTE_TO_CHAR_OFFSET);
     }
   }
 }

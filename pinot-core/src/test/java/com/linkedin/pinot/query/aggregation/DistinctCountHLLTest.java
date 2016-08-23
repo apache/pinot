@@ -21,6 +21,7 @@ import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.CombineLevel;
 import com.linkedin.pinot.core.query.aggregation.function.DistinctCountAggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.function.DistinctCountHLLAggregationFunction;
+import com.linkedin.pinot.core.startree.hll.HllConstants;
 import com.linkedin.pinot.util.TestUtils;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import java.io.ByteArrayOutputStream;
@@ -210,7 +211,7 @@ public class DistinctCountHLLTest {
         setAggregationFunction.init(_paramsInfo);
 
         final int numOfItemsPerList = 100;
-        final int numOfListCombined = 100000;
+        final int numOfListCombined = 10000;
         println("#list_combined, HLL_time(nano), IntOpenHashSet(nano), time_ratio, estimate, precise, error");
         // Test combine
         StringBuilder sb1 = new StringBuilder();
@@ -243,7 +244,7 @@ public class DistinctCountHLLTest {
 
     @Test
     public void testInsertionTime() {
-        int numOfItems = 10000000;
+        int numOfItems = 1000000;
 
         println("#items_inserted, HLL_time(nano), IntOpenHashSet(nano), time_ratio, estimate, precise, error");
         for (int i = 0; i < numOfItems; i+=numOfItems/17) {
@@ -251,7 +252,7 @@ public class DistinctCountHLLTest {
                 continue;
             }
             RandomNumberArray arr = new RandomNumberArray(i, DUPLICATION_PER_ITEM);
-            HyperLogLog hllResult = new HyperLogLog(DistinctCountHLLAggregationFunction.DEFAULT_BIT_SIZE);
+            HyperLogLog hllResult = new HyperLogLog(HllConstants.DEFAULT_LOG2M);
             IntOpenHashSet set = new IntOpenHashSet(); //HashSet<Integer> set = new HashSet<Integer>();
             long t1 = System.nanoTime();
             arr.offerAllNumberTo(hllResult);
@@ -267,7 +268,7 @@ public class DistinctCountHLLTest {
 
     @Test
     public void testMemoryConsumption() {
-        int numOfItems = 10000000;
+        int numOfItems = 1000000;
 
         println("#items_inserted, HLL_ser_size, openHashSet_ser_size, ser_size_ratio, estimate, precise, error");
         for (int i = 0; i < numOfItems; i+=numOfItems/17) {
@@ -275,7 +276,7 @@ public class DistinctCountHLLTest {
                 continue;
             }
             RandomNumberArray arr = new RandomNumberArray(i, DUPLICATION_PER_ITEM);
-            HyperLogLog hllResult = new HyperLogLog(DistinctCountHLLAggregationFunction.DEFAULT_BIT_SIZE);
+            HyperLogLog hllResult = new HyperLogLog(HllConstants.DEFAULT_LOG2M);
             IntOpenHashSet set = new IntOpenHashSet();
             arr.offerAllNumberTo(hllResult);
             arr.offerAllNumberTo(set);
@@ -319,7 +320,7 @@ public class DistinctCountHLLTest {
     private static List<Serializable> getHLLResultValues(int numberOfElements) {
         List<Serializable> hllResultList = new ArrayList<Serializable>();
         for (int i = 0; i < numberOfElements; ++i) {
-            HyperLogLog hllResult = new HyperLogLog(DistinctCountHLLAggregationFunction.DEFAULT_BIT_SIZE);
+            HyperLogLog hllResult = new HyperLogLog(HllConstants.DEFAULT_LOG2M);
             hllResult.offer(i);
             hllResultList.add(hllResult);
         }
@@ -329,7 +330,7 @@ public class DistinctCountHLLTest {
     private static List<Serializable> getHLLRandomResultValues(RandomNumberArray arr, int numOfListCombined, int numOfItemsPerList) {
         List<Serializable> hllResultList = new ArrayList<Serializable>();
         for (int i = 0; i < numOfListCombined; ++i) {
-            HyperLogLog hllResult = new HyperLogLog(DistinctCountHLLAggregationFunction.DEFAULT_BIT_SIZE);
+            HyperLogLog hllResult = new HyperLogLog(HllConstants.DEFAULT_LOG2M);
             arr.offerNumberInRangeTo(hllResult, i*numOfItemsPerList, (i+1)*numOfItemsPerList);
             hllResultList.add(hllResult);
         }

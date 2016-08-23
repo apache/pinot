@@ -18,17 +18,18 @@ package com.linkedin.pinot.core.operator.aggregation;
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.request.AggregationInfo;
+import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.primitive.MutableLongValue;
 import com.linkedin.pinot.core.common.DataFetcher;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunction;
 import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunctionFactory;
-import com.linkedin.pinot.core.operator.aggregation.function.DistinctCountHLLAggregationFunction;
 import com.linkedin.pinot.core.operator.aggregation.function.PercentileestAggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.function.AvgAggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.function.MinMaxRangeAggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.function.quantile.digest.QuantileDigest;
 import com.linkedin.pinot.core.query.utils.Pair;
+import com.linkedin.pinot.core.startree.hll.HllConstants;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import java.io.Serializable;
@@ -47,6 +48,7 @@ public class DefaultAggregationExecutor implements AggregationExecutor {
 
   // Array of result holders, one for each aggregation.
   private final AggregationResultHolder[] _resultHolderArray;
+  private final SegmentMetadata _segmentMetadata;
 
   boolean _inited = false;
   boolean _finished = false;
@@ -59,10 +61,12 @@ public class DefaultAggregationExecutor implements AggregationExecutor {
     _singleValueBlockCache = new SingleValueBlockCache(new DataFetcher(indexSegment));
     _numAggrFunc = aggregationInfoList.size();
     _aggrFuncContextArray = new AggregationFunctionContext[_numAggrFunc];
+    _segmentMetadata = indexSegment.getSegmentMetadata();
     for (int i = 0; i < _numAggrFunc; i++) {
       AggregationInfo aggregationInfo = aggregationInfoList.get(i);
       String[] columns = aggregationInfo.getAggregationParams().get("column").trim().split(",");
-      _aggrFuncContextArray[i] = new AggregationFunctionContext(aggregationInfo.getAggregationType(), columns);
+      _aggrFuncContextArray[i] = new AggregationFunctionContext(
+          aggregationInfo.getAggregationType(), columns, _segmentMetadata);
     }
     _resultHolderArray = new AggregationResultHolder[_numAggrFunc];
   }
@@ -129,12 +133,18 @@ public class DefaultAggregationExecutor implements AggregationExecutor {
       case AggregationFunctionFactory.DISTINCTCOUNT_AGGREGATION_FUNCTION:
       case AggregationFunctionFactory.DISTINCTCOUNTHLL_AGGREGATION_FUNCTION:
         aggregationFunction.aggregate(length, resultHolder,
-            _singleValueBlockCache.getHashCodeArrayForColumn(aggrColumn));
+            (Object) _singleValueBlockCache.getHashCodeArrayForColumn(aggrColumn));
+        break;
+
+      case AggregationFunctionFactory.FASTHLL_AGGREGATION_FUNCTION:
+        String derivedColumn = _segmentMetadata.getStarTreeMetadata().getDerivedHllColumnFromOrigin(aggrColumn);
+        aggregationFunction.aggregate(length, resultHolder,
+            (Object) _singleValueBlockCache.getStringValueArrayForColumn(derivedColumn));
         break;
 
       default:
         aggregationFunction.aggregate(length, resultHolder,
-            _singleValueBlockCache.getDoubleValueArrayForColumn(aggrColumn));
+            (Object) _singleValueBlockCache.getDoubleValueArrayForColumn(aggrColumn));
         break;
     }
   }
@@ -218,9 +228,17 @@ public class DefaultAggregationExecutor implements AggregationExecutor {
       case DISTINCTCOUNTHLL_HYPERLOGLOG:
         HyperLogLog hyperLogLog = resultHolder.getResult();
         if (hyperLogLog == null) {
-          return new HyperLogLog(DistinctCountHLLAggregationFunction.DEFAULT_BIT_SIZE);
+          return new HyperLogLog(HllConstants.DEFAULT_LOG2M);
         } else {
           return hyperLogLog;
+        }
+
+      case HLL_PREAGGREGATED:
+        HyperLogLog hllPreaggregated = resultHolder.getResult();
+        if (hllPreaggregated == null) {
+          return new HyperLogLog(_segmentMetadata.getStarTreeMetadata().getHllLog2m());
+        } else {
+          return hllPreaggregated;
         }
 
       case PERCENTILE_LIST:

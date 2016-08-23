@@ -15,11 +15,16 @@
  */
 package com.linkedin.pinot.util;
 
+import com.linkedin.pinot.common.response.broker.GroupByResult;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 import java.util.HashMap;
 
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nonnull;
 import org.apache.commons.io.FileUtils;
 import org.json.JSONArray;
@@ -38,6 +43,9 @@ import static org.testng.Assert.assertEquals;
 public class TestUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(TestUtils.class);
   private static final int testThreshold = 1000;
+
+  public static final double hllEstimationThreshold = 0.5;
+  public static final double digestEstimationThreshold = 0.1;
 
   public static String getFileFromResourceUrl(@Nonnull URL resourceUrl) {
     // For maven cross package use case, we need to extract the resource from jar to a temporary directory.
@@ -82,10 +90,35 @@ public class TestUtils {
     }
   }
 
-  /*
-  public static void assertQuantileApproximation(double estimate, double actual, double precision, byte quantile) {
-    assertApproximation(estimate, (actual+0.0)*(quantile+0.0)/100, precision);
-  }*/
+  public static void assertGroupByResultsApproximation(
+      List<GroupByResult> estimateValues, List<GroupByResult> actualValues, double precision) {
+    LOGGER.info("====== assertGroupByResultsApproximation ======");
+    // estimation should not affect number of groups formed
+    Assert.assertEquals(estimateValues.size(), actualValues.size());
+
+    Map<List<String>, Double> mapEstimate = new HashMap<>();
+    Map<List<String>, Double> mapActual = new HashMap<>();
+    for (GroupByResult gby: estimateValues) {
+      mapEstimate.put(gby.getGroup(), Double.parseDouble(gby.getValue().toString()));
+    }
+    for (GroupByResult gby: actualValues) {
+      mapActual.put(gby.getGroup(), Double.parseDouble(gby.getValue().toString()));
+    }
+
+    LOGGER.info("estimate: " + mapEstimate.keySet());
+    LOGGER.info("actual: " + mapActual.keySet());
+
+    int cnt = 0;
+    for (List<String> key: mapEstimate.keySet()) {
+      // Not strictly enforced, since in quantile, top 100 groups from accurate maybe not be top 100 from estimate
+      // Assert.assertEquals(mapActual.keySet().contains(key), true);
+      if (mapActual.keySet().contains(key)) {
+        assertApproximation(mapEstimate.get(key), mapActual.get(key), precision);
+        cnt += 1;
+      }
+    }
+    LOGGER.info("group overlap rate: " + (cnt+0.0)/mapEstimate.keySet().size());
+  }
 
   public static void assertJSONArrayApproximation(JSONArray jsonArrayEstimate, JSONArray jsonArrayActual, double precision) {
     LOGGER.info("====== assertJSONArrayApproximation ======");
@@ -116,7 +149,7 @@ public class TestUtils {
     HashMap<String, Double> map = new HashMap<String, Double>();
     for (int i = 0; i < array.length(); ++i) {
       map.put(array.getJSONObject(i).getJSONArray("group").getString(0),
-              array.getJSONObject(i).getDouble("value"));
+          array.getJSONObject(i).getDouble("value"));
     }
     return map;
   }

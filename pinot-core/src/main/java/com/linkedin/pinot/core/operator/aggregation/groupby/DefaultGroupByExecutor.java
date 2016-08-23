@@ -18,6 +18,7 @@ package com.linkedin.pinot.core.operator.aggregation.groupby;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.GroupBy;
+import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.common.DataFetcher;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.aggregation.AggregationFunctionContext;
@@ -43,6 +44,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
   private final int _numAggrFunc;
   private final AggregationFunctionContext[] _aggrFuncContextArray;
   private final GroupByResultHolder[] _resultHolderArray;
+  private final SegmentMetadata _segmentMetadata;
 
   private int[] _docIdToSVGroupKey;
   private int[][] _docIdToMVGroupKey;
@@ -75,14 +77,14 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     _numAggrFunc = aggregationInfoList.size();
     _aggrFuncContextArray = new AggregationFunctionContext[_numAggrFunc];
     _resultHolderArray = new GroupByResultHolder[_numAggrFunc];
+    _segmentMetadata = indexSegment.getSegmentMetadata();
     for (int i = 0; i < _numAggrFunc; i++) {
       AggregationInfo aggregationInfo = aggregationInfoList.get(i);
       String[] columns = aggregationInfo.getAggregationParams().get("column").trim().split(",");
-      AggregationFunctionContext aggregationFunctionContext =
-          new AggregationFunctionContext(aggregationInfo.getAggregationType(), columns);
-      _aggrFuncContextArray[i] = aggregationFunctionContext;
-      AggregationFunction aggregationFunction = aggregationFunctionContext.getAggregationFunction();
-      _resultHolderArray[i] = ResultHolderFactory.getGroupByResultHolder(aggregationFunction, maxNumResults);
+      _aggrFuncContextArray[i] = new AggregationFunctionContext(
+          aggregationInfo.getAggregationType(), columns, _segmentMetadata);
+      _resultHolderArray[i] = ResultHolderFactory.getGroupByResultHolder(
+          _aggrFuncContextArray[i].getAggregationFunction(), maxNumResults);
     }
   }
 
@@ -161,18 +163,28 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
       case AggregationFunctionFactory.DISTINCTCOUNTHLL_AGGREGATION_FUNCTION:
         double[] hashCodeArray = _singleValueBlockCache.getHashCodeArrayForColumn(aggrColumn);
         if (_hasMultiValuedColumns) {
-          aggregationFunction.aggregateGroupByMV(length, _docIdToMVGroupKey, resultHolder, hashCodeArray);
+          aggregationFunction.aggregateGroupByMV(length, _docIdToMVGroupKey, resultHolder, (Object) hashCodeArray);
         } else {
-          aggregationFunction.aggregateGroupBySV(length, _docIdToSVGroupKey, resultHolder, hashCodeArray);
+          aggregationFunction.aggregateGroupBySV(length, _docIdToSVGroupKey, resultHolder, (Object) hashCodeArray);
+        }
+        break;
+
+      case AggregationFunctionFactory.FASTHLL_AGGREGATION_FUNCTION:
+        String derivedColumn = _segmentMetadata.getStarTreeMetadata().getDerivedHllColumnFromOrigin(aggrColumn);
+        String[] stringArray = _singleValueBlockCache.getStringValueArrayForColumn(derivedColumn);
+        if (_hasMultiValuedColumns) {
+          aggregationFunction.aggregateGroupByMV(length, _docIdToMVGroupKey, resultHolder, (Object) stringArray);
+        } else {
+          aggregationFunction.aggregateGroupBySV(length, _docIdToSVGroupKey, resultHolder, (Object) stringArray);
         }
         break;
 
       default:
         double[] valueArray = _singleValueBlockCache.getDoubleValueArrayForColumn(aggrColumn);
         if (_hasMultiValuedColumns) {
-          aggregationFunction.aggregateGroupByMV(length, _docIdToMVGroupKey, resultHolder, valueArray);
+          aggregationFunction.aggregateGroupByMV(length, _docIdToMVGroupKey, resultHolder, (Object) valueArray);
         } else {
-          aggregationFunction.aggregateGroupBySV(length, _docIdToSVGroupKey, resultHolder, valueArray);
+          aggregationFunction.aggregateGroupBySV(length, _docIdToSVGroupKey, resultHolder, (Object) valueArray);
         }
         break;
     }

@@ -97,6 +97,7 @@ public class AggregationGroupByResult {
         return (IntOpenHashSet) _resultHolder[index].getResult(groupId);
 
       case DISTINCTCOUNTHLL_HYPERLOGLOG:
+      case HLL_PREAGGREGATED:
         return (HyperLogLog) _resultHolder[index].getResult(groupId);
 
       case PERCENTILE_LIST:

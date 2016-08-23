@@ -139,7 +139,7 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
     if (outDir == null) {
       outDir = new File(System.getProperty("java.io.tmpdir"), V1Constants.STAR_TREE_INDEX_DIR + "_" + DateTime.now());
     }
-    LOG.debug("Index output directory:{}", outDir);
+    LOG.info("Index output directory:{}", outDir);
 
     dimensionTypes = new ArrayList<>();
     dimensionNames = new ArrayList<>();
@@ -194,7 +194,7 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
     numMetrics = metricNames.size();
     builderConfig.getOutDir().mkdirs();
     dataFile = new File(outDir, "star-tree.buf");
-    LOG.debug("StarTree output data file: {}", dataFile.getAbsolutePath());
+    LOG.info("StarTree output data file: {}", dataFile.getAbsolutePath());
     dataBuffer = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(dataFile)));
 
     // INITIALIZE THE ROOT NODE
@@ -202,8 +202,8 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
     this.starTreeRootIndexNode.setDimensionName(StarTreeIndexNodeInterf.ALL);
     this.starTreeRootIndexNode.setDimensionValue(StarTreeIndexNodeInterf.ALL);
     this.starTreeRootIndexNode.setLevel(0);
-    LOG.debug("dimensionNames:{}", dimensionNames);
-    LOG.debug("metricNames:{}", metricNames);
+    LOG.info("dimensionNames:{}", dimensionNames);
+    LOG.info("metricNames:{}", metricNames);
   }
 
   private Object getAllStarValue(FieldSpec spec) throws Exception {
@@ -319,8 +319,8 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
       skipMaterializationForDimensions.removeAll(dimensionsSplitOrder);
     }
 
-    LOG.debug("Split order: {}", dimensionsSplitOrder);
-    LOG.debug("Skip Materilazitaion For Dimensions: {}", skipMaterializationForDimensions);
+    LOG.info("Split order: {}", dimensionsSplitOrder);
+    LOG.info("Skip Materilazitaion For Dimensions: {}", skipMaterializationForDimensions);
 
     long start = System.currentTimeMillis();
     dataBuffer.flush();
@@ -339,21 +339,21 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
     // Create aggregate rows for all nodes in the tree
     createAggDocForAllNodes(starTreeRootIndexNode);
     long end = System.currentTimeMillis();
-    LOG.debug("Took {} ms to build star tree index. Original records:{} Materialized record:{}",
+    LOG.info("Took {} ms to build star tree index. Original records:{} Materialized record:{}",
         (end - start), rawRecordCount, aggRecordCount);
     starTree = new StarTree(starTreeRootIndexNode, dimensionNameToIndexMap);
     File treeBinary = new File(outDir, "star-tree.bin");
 
     if (enableOffHeapFormat) {
-      LOG.debug("Saving tree in off-heap binary format at: {} ", treeBinary);
+      LOG.info("Saving tree in off-heap binary format at: {} ", treeBinary);
       StarTreeSerDe.writeTreeOffHeapFormat(starTree, treeBinary);
     } else {
-      LOG.debug("Saving tree in on-heap binary at: {} ", treeBinary);
+      LOG.info("Saving tree in on-heap binary at: {} ", treeBinary);
       StarTreeSerDe.writeTreeOnHeapFormat(starTree, treeBinary);
     }
 
     printTree(starTreeRootIndexNode, 0);
-    LOG.debug("Finished build tree. out dir: {} ", outDir);
+    LOG.info("Finished build tree. out dir: {} ", outDir);
     dataBuffer.close();
   }
 

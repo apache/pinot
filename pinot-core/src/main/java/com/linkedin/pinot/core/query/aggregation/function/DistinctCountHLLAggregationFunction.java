@@ -29,6 +29,8 @@ import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.CombineLevel;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import com.linkedin.pinot.core.startree.hll.HllConstants;
+import com.linkedin.pinot.core.startree.hll.HllUtil;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.slf4j.Logger;
@@ -57,7 +59,7 @@ import com.clearspring.analytics.stream.cardinality.HyperLogLog;
  * of 65%, 95% and 99% respectively.
  *
  * Warning:
- * 1. _bitSize, i.e. log of bucket size m (m=2^_bitSize), significantly affect the merge speed, size between 8 to 13 is common choice.
+ * 1. log2m, i.e. log of bucket size m (m=2^log2m), significantly affect the merge speed, size between 8 to 13 is common choice.
  *    see {@link RegisterSet#merge(RegisterSet)}  }
  * 2. This implementation uses HyperLogLog provided hash function, i.e. {@link MurmurHash}, other hash functions may not work.
  *    see {@link HyperLogLog#offer(Object)}
@@ -66,18 +68,9 @@ import com.clearspring.analytics.stream.cardinality.HyperLogLog;
  */
 public class DistinctCountHLLAggregationFunction implements AggregationFunction<HyperLogLog, Long> {
   private static final Logger LOGGER = LoggerFactory.getLogger(DistinctCountHLLAggregationFunction.class);
-  public static final int DEFAULT_BIT_SIZE = 10;
+  private static final int log2m = HllConstants.DEFAULT_LOG2M;
 
   private String _distinctCountHLLColumnName;
-  private int _bitSize;
-
-  public DistinctCountHLLAggregationFunction() {
-    _bitSize = DEFAULT_BIT_SIZE;
-  }
-
-  public DistinctCountHLLAggregationFunction(int bitSize) {
-    _bitSize = bitSize;
-  }
 
   @Override
   public void init(AggregationInfo aggregationInfo) {
@@ -120,7 +113,7 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
   public HyperLogLog aggregate(Block docIdSetBlock, Block[] block) {
     BlockDocIdIterator docIdIterator = docIdSetBlock.getBlockDocIdSet().iterator();
 
-    HyperLogLog ret = new HyperLogLog(_bitSize);
+    HyperLogLog ret = new HyperLogLog(log2m);
     int docId = 0;
     while ((docId = docIdIterator.next()) != Constants.EOF) {
       offerValueToHyperLogLog(docId, block, ret);
@@ -132,7 +125,7 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
   @Override
   public HyperLogLog aggregate(HyperLogLog mergedResult, int docId, Block[] block) {
     if (mergedResult == null) {
-      mergedResult = new HyperLogLog(_bitSize);
+      mergedResult = new HyperLogLog(log2m);
     }
 
     offerValueToHyperLogLog(docId, block, mergedResult);
@@ -144,17 +137,9 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
     if ((aggregationResultList == null) || aggregationResultList.isEmpty()) {
       return null;
     }
-    HyperLogLog hllResult = aggregationResultList.get(0);
-    for (int i = 1; i < aggregationResultList.size(); ++i) {
-      try {
-        hllResult.addAll(aggregationResultList.get(i));
-      } catch (CardinalityMergeException e) {
-        LOGGER.error("Caught exception while merging Cardinality using HyperLogLog", e);
-        Utils.rethrowException(e);
-      }
-    }
+    HyperLogLog merged = HllUtil.mergeHLLResultsToFirstInList(aggregationResultList);
     aggregationResultList.clear();
-    aggregationResultList.add(hllResult);
+    aggregationResultList.add(merged);
     return aggregationResultList;
   }
 
@@ -180,15 +165,7 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
     if ((combinedResultList == null) || combinedResultList.isEmpty()) {
       return 0L;
     }
-    HyperLogLog reducedResult = combinedResultList.get(0);
-    for (int i = 1; i < combinedResultList.size(); ++i) {
-      try {
-        reducedResult.addAll(combinedResultList.get(i));
-      } catch (CardinalityMergeException e) {
-        LOGGER.error("Caught exception while merging Cardinality using HyperLogLog", e);
-        Utils.rethrowException(e);
-      }
-    }
+    HyperLogLog reducedResult = HllUtil.mergeHLLResultsToFirstInList(combinedResultList);
     return reducedResult.cardinality();
   }
 
@@ -215,6 +192,6 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
 
   @Override
   public Serializable getDefaultValue() {
-    return new HyperLogLog(DEFAULT_BIT_SIZE);
+    return new HyperLogLog(HllConstants.DEFAULT_LOG2M);
   }
 }

@@ -111,58 +111,6 @@ public class QueriesSentinelTest {
     FileUtils.deleteQuietly(INDEX_DIR);
   }
 
-  private void runApproximationQueries(List<? extends AvroQueryGenerator.TestAggreationQuery> queries, double precision)
-          throws Exception {
-    boolean isAccurate = true;
-    Object accurateValue = null;
-
-    int counter = 0;
-    final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
-    for (final AvroQueryGenerator.TestAggreationQuery query : queries) {
-      LOGGER.info("**************************");
-      LOGGER.info("running " + counter + " : " + query.getPql());
-      final BrokerRequest brokerRequest = REQUEST_COMPILER.compileToBrokerRequest(query.getPql());
-      InstanceRequest instanceRequest = new InstanceRequest(counter++, brokerRequest);
-      instanceRequest.setSearchSegments(new ArrayList<String>());
-      instanceRequest.getSearchSegments().add(segmentName);
-      QueryRequest queryRequest = new QueryRequest(instanceRequest);
-      final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(queryRequest);
-      instanceResponseMap.clear();
-      instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
-      final BrokerResponseNative brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
-      LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
-
-      // compute value
-      Object val;
-      if (query instanceof AvroQueryGenerator.TestSimpleAggreationQuery) {
-        val = Double.parseDouble(brokerResponse.getAggregationResults().get(0).getValue().toString());
-      } else {
-        val = brokerResponse.getAggregationResults().get(0).getGroupByResult();
-      }
-
-      if (isAccurate) {
-        // store accurate value
-        accurateValue = val;
-        isAccurate = false;
-      } else {
-        // compare value with accurate value
-        // it's estimation so we need to test its result within error bound
-        if (query instanceof AvroQueryGenerator.TestSimpleAggreationQuery) {
-          TestUtils.assertApproximation((Double) val, (Double) accurateValue, precision);
-        } else {
-          List<GroupByResult> expectedValues = (List<GroupByResult>) accurateValue;
-          List<GroupByResult> groupByResults = (List<GroupByResult>) val;
-          for (int i = 0; i < groupByResults.size(); i++) {
-            double expected = Double.parseDouble(groupByResults.get(i).getValue().toString());
-            double actual = Double.parseDouble(expectedValues.get(i).getValue().toString());
-            TestUtils.assertApproximation(actual, expected, precision);
-          }
-        }
-        isAccurate = true;
-      }
-    }
-  }
-
   /**
    * Console output of the last statement may not appear, maybe a result of intellij idea test console redirection.
    * To avoid this, always add assert clauses, and do not rely on the console output.
@@ -178,7 +126,7 @@ public class QueriesSentinelTest {
       aggCalls.add(new TestSimpleAggreationQuery("select distinctcounthll(column" + i + ") from testTable limit 0", 0.0));
     }
 
-    runApproximationQueries(aggCalls, 0.1);
+    ApproximateQueryTestUtil.runApproximationQueries(QUERY_EXECUTOR, segmentName, aggCalls, TestUtils.hllEstimationThreshold);
   }
 
   @Test
@@ -192,7 +140,7 @@ public class QueriesSentinelTest {
       groupByCalls.add(new TestGroupByAggreationQuery("select distinctcounthll(column2) from testTable group by column" + i + " limit 0", null));
     }
 
-    runApproximationQueries(groupByCalls, 0.1);
+    ApproximateQueryTestUtil.runApproximationQueries(QUERY_EXECUTOR, segmentName, groupByCalls, TestUtils.hllEstimationThreshold);
   }
 
   @Test
@@ -205,7 +153,7 @@ public class QueriesSentinelTest {
       aggCalls.add(new TestSimpleAggreationQuery("select percentileest50(column" + i + ") from testTable limit 0", 0.0));
     }
 
-    runApproximationQueries(aggCalls, 0.1);
+    ApproximateQueryTestUtil.runApproximationQueries(QUERY_EXECUTOR, segmentName, aggCalls, TestUtils.digestEstimationThreshold);
   }
 
   @Test
@@ -220,7 +168,7 @@ public class QueriesSentinelTest {
       groupByCalls.add(new TestGroupByAggreationQuery("select percentileest50(column1) from testTable group by column" + i + " top " + top + " limit 0", null));
     }
 
-    runApproximationQueries(groupByCalls, 0.1);
+    ApproximateQueryTestUtil.runApproximationQueries(QUERY_EXECUTOR, segmentName, groupByCalls, TestUtils.digestEstimationThreshold);
   }
 
   @Test
