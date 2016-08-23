@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.common.utils.request;
 
+import com.google.common.collect.ImmutableSet;
 import com.linkedin.pinot.common.request.GroupBy;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.StarTreeMetadata;
@@ -102,11 +103,13 @@ public class RequestUtils {
     return q2;
   }
 
+  public static final Set<String> ALLOWED_AGGREGATION_FUNCTIONS = ImmutableSet.of("sum", "fasthll");
+
   /**
    * Returns true for the following, false otherwise:
    * - Query is not aggregation/group-by
    * - Segment does not contain star tree
-   * - The only aggregation function in the query is 'sum'
+   * - The only aggregation function in the query should be in {@link #ALLOWED_AGGREGATION_FUNCTIONS}
    * - All group by columns and predicate columns are materialized
    * - Predicates do not contain any metric columns
    * - Query consists only of simple predicates, conjoined by AND.
@@ -147,9 +150,10 @@ public class RequestUtils {
       }
     }
 
-    // We currently support only sum
+    // We currently support only limited aggregations
     for (AggregationInfo aggregationInfo : aggregationsInfo) {
-      if (!aggregationInfo.getAggregationType().equalsIgnoreCase("sum")) {
+      String aggregationFunctionName = aggregationInfo.getAggregationType().toLowerCase();
+      if (!ALLOWED_AGGREGATION_FUNCTIONS.contains(aggregationFunctionName)) {
         return false;
       }
     }

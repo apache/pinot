@@ -29,7 +29,7 @@ import org.testng.annotations.Test;
  * aggregation results computed using star-tree index operator are the same as
  * aggregation results computed by scanning raw docs.
  */
-public class TestStarTreeIndexTest extends BaseStarTreeIndexTest {
+public class TestSumStarTreeIndexTest extends BaseSumStarTreeIndexTest {
 
   private static final String SEGMENT_NAME = "starTreeSegment";
   private static final String SEGMENT_DIR_NAME = "/tmp/star-tree-index";
@@ -40,8 +40,8 @@ public class TestStarTreeIndexTest extends BaseStarTreeIndexTest {
   @BeforeSuite
   void setup()
       throws Exception {
-    _schema = buildSegment(SEGMENT_DIR_NAME, SEGMENT_NAME, false);
-    _segment = loadSegment(SEGMENT_DIR_NAME, SEGMENT_NAME);
+    _schema = StarTreeIndexTestSegmentHelper.buildSegment(SEGMENT_DIR_NAME, SEGMENT_NAME, false);
+    _segment = StarTreeIndexTestSegmentHelper.loadSegment(SEGMENT_DIR_NAME, SEGMENT_NAME);
   }
 
   @AfterSuite
