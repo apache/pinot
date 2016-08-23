@@ -19,6 +19,7 @@ import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.client.MetricFunction;
 import com.linkedin.thirdeye.client.ThirdEyeRequest;
+import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
 
 /**
  * Util class for generated PQL queries (pinot).
@@ -41,14 +42,59 @@ public class PqlUtils {
         request.getGroupBy(), request.getGroupByTimeGranularity(), dataTimeSpec);
   }
 
-  static String getPql(String collection, List<MetricFunction> metricFunctions, DateTime startTime,
+  /**
+   * Returns pqls to handle tables where metric names are a single dimension column,
+   * and the metric values are all in a single value column
+   * @param request
+   * @param dataTimeSpec
+   * @param collectionConfig
+   * @return
+   */
+  public static List<String> getMetricAsDimensionPqls(ThirdEyeRequest request, TimeSpec dataTimeSpec, CollectionConfig collectionConfig) {
+
+    // select sum(metric_values_column) from collection
+    // where time_clause and metric_names_column=function.getMetricName
+
+    String metricValuesColumn = collectionConfig.getMetricValuesColumn();
+    String metricNamesColumn = collectionConfig.getMetricNamesColumn();
+
+    List<String> metricAsDimensionPqls = getMetricAsDimensionPqls(request.getCollection(), request.getMetricFunctions(),
+        request.getStartTimeInclusive(), request.getEndTimeExclusive(), request.getFilterSet(),
+        request.getGroupBy(), request.getGroupByTimeGranularity(), dataTimeSpec,
+        metricValuesColumn, metricNamesColumn);
+
+    return metricAsDimensionPqls;
+  }
+
+  static List<String> getMetricAsDimensionPqls(String collection, List<MetricFunction> metricFunctions, DateTime startTime,
       DateTime endTimeExclusive, Multimap<String, String> filterSet, List<String> groupBy,
-      TimeGranularity timeGranularity, TimeSpec dataTimeSpec) {
+      TimeGranularity timeGranularity, TimeSpec dataTimeSpec, String metricValuesColumn,
+      String metricNamesColumn) {
+
+    List<String> metricAsDimensionPqls = new ArrayList<>();
+    for (MetricFunction metricFunction : metricFunctions) {
+      String metricAsDimensionPql = getMetricAsDimensionPql(collection, metricFunction, startTime, endTimeExclusive, filterSet, groupBy, timeGranularity,
+          dataTimeSpec, metricValuesColumn, metricNamesColumn);
+      metricAsDimensionPqls.add(metricAsDimensionPql);
+    }
+    return metricAsDimensionPqls;
+  }
+
+  static String getMetricAsDimensionPql(String collection, MetricFunction metricFunction, DateTime startTime,
+      DateTime endTimeExclusive, Multimap<String, String> filterSet, List<String> groupBy,
+      TimeGranularity timeGranularity, TimeSpec dataTimeSpec, String metricValuesColumn,
+      String metricNamesColumn) {
+
     StringBuilder sb = new StringBuilder();
-    String selectionClause = getSelectionClause(metricFunctions);
+    String selectionClause = getMetricAsDimensionSelectionClause(metricFunction, metricValuesColumn);
+
     sb.append("SELECT ").append(selectionClause).append(" FROM ").append(collection);
     String betweenClause = getBetweenClause(startTime, endTimeExclusive, dataTimeSpec);
     sb.append(" WHERE ").append(betweenClause);
+
+    String metricWhereClause = getMetricWhereClause(metricFunction, metricNamesColumn);
+    sb.append(metricWhereClause);
+
     String dimensionWhereClause = getDimensionWhereClause(filterSet);
     if (StringUtils.isNotBlank(dimensionWhereClause)) {
       sb.append(" AND ").append(dimensionWhereClause);
@@ -64,6 +110,41 @@ public class PqlUtils {
     return sb.toString();
   }
 
+  static String getPql(String collection, List<MetricFunction> metricFunctions, DateTime startTime,
+      DateTime endTimeExclusive, Multimap<String, String> filterSet, List<String> groupBy,
+      TimeGranularity timeGranularity, TimeSpec dataTimeSpec) {
+
+    StringBuilder sb = new StringBuilder();
+    String selectionClause = getSelectionClause(metricFunctions);
+
+    sb.append("SELECT ").append(selectionClause).append(" FROM ").append(collection);
+    String betweenClause = getBetweenClause(startTime, endTimeExclusive, dataTimeSpec);
+    sb.append(" WHERE ").append(betweenClause);
+
+    String dimensionWhereClause = getDimensionWhereClause(filterSet);
+    if (StringUtils.isNotBlank(dimensionWhereClause)) {
+      sb.append(" AND ").append(dimensionWhereClause);
+    }
+    String groupByClause = getDimensionGroupByClause(groupBy, timeGranularity, dataTimeSpec);
+    if (StringUtils.isNotBlank(groupByClause)) {
+      sb.append(" ").append(groupByClause);
+      int bucketCount = Integer.MAX_VALUE;
+      sb.append(" TOP ").append(bucketCount);
+
+    }
+
+    return sb.toString();
+  }
+
+  static String getMetricWhereClause(MetricFunction metricFunction, String metricNameColumn) {
+    StringBuilder builder = new StringBuilder();
+    if (!metricFunction.getMetricName().equals("*")) {
+      builder.append(" AND ");
+      builder.append(String.format("%s='%s'", metricNameColumn, metricFunction.getMetricName()));
+    }
+    return builder.toString();
+  }
+
   /**
    * SUM each metric over the current time bucket.
    */
@@ -76,6 +157,16 @@ public class PqlUtils {
           .append(")");
       delim = ", ";
     }
+    return builder.toString();
+  }
+
+  static String getMetricAsDimensionSelectionClause(MetricFunction metricFunction, String metricValueColumn) {
+    StringBuilder builder = new StringBuilder();
+    String metricName = metricValueColumn;
+    if (metricFunction.getMetricName().equals("*")) {
+      metricName = "*";
+    }
+    builder.append(metricFunction.getFunctionName()).append("(").append(metricName).append(")");
     return builder.toString();
   }
 
