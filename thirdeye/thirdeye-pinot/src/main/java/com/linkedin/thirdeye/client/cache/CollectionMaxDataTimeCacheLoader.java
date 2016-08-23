@@ -47,11 +47,12 @@ public class CollectionMaxDataTimeCacheLoader extends CacheLoader<String, Long> 
 
     LOGGER.info("Loading maxDataTime cache {}", collection);
     long maxTime = 0;
-    if (propertyStore != null) {
+    int options = AccessOption.PERSISTENT;
+    String offlineTablePropertyStorePath = "/SEGMENTS/" + collection + "_OFFLINE";
+    if ((propertyStore != null) && (propertyStore.exists(offlineTablePropertyStorePath, options))) {
       List<Stat> stats = new ArrayList<>();
-      int options = AccessOption.PERSISTENT;
       List<ZNRecord> zkSegmentDataList =
-          propertyStore.getChildren("/SEGMENTS/" + collection + "_OFFLINE", stats, options);
+          propertyStore.getChildren(offlineTablePropertyStorePath, stats, options);
       for (ZNRecord record : zkSegmentDataList) {
         try {
           long endTime = Long.parseLong(record.getSimpleField("segment.end.time"));
