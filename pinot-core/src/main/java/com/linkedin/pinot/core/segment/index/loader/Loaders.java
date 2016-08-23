@@ -98,7 +98,7 @@ public class Loaders {
       StarTreeInterf starTree = null;
       if (segmentReader.hasStarTree()) {
         LOGGER.debug("Loading star tree for segment: {}", segmentDirectory);
-        starTree = StarTreeSerDe.fromBytes(segmentReader.getStarTreeStream());
+        starTree = StarTreeSerDe.fromFile(segmentReader.getStarTreeFile(), readMode);
       }
       return new IndexSegmentImpl(segmentDirectory, metadata, indexContainerMap, starTree);
     }

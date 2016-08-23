@@ -104,7 +104,7 @@ public class SegmentDumpTool {
     if (dumpStarTree) {
       System.out.println();
       File starTreeFile = new File(segmentDir, V1Constants.STAR_TREE_INDEX_FILE);
-      StarTreeInterf tree = StarTreeSerDe.fromBytes(new FileInputStream(starTreeFile));
+      StarTreeInterf tree = StarTreeSerDe.fromFile(starTreeFile, ReadMode.mmap);
       tree.printTree();
     }
   }

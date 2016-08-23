@@ -89,7 +89,7 @@ public class StarTreeIndexViewer {
       dictionaries.put(columnName, dataSource.getDictionary());
     }
     File starTreeFile = new File(segmentDir, V1Constants.STAR_TREE_INDEX_FILE);
-    StarTreeInterf tree = StarTreeSerDe.fromBytes(new FileInputStream(starTreeFile));
+    StarTreeInterf tree = StarTreeSerDe.fromFile(starTreeFile, ReadMode.mmap);
     dimensionNameToIndexMap = tree.getDimensionNameToIndexMap();
     StarTreeJsonNode jsonRoot = new StarTreeJsonNode("ROOT");
     build(tree.getRoot(), jsonRoot);

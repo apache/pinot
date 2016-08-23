@@ -16,6 +16,7 @@
 package com.linkedin.pinot.core.segment.creator.impl;
 
 import com.linkedin.pinot.core.startree.StarTreeIndexNodeInterf;
+import com.linkedin.pinot.core.startree.StarTreeSerDe;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -159,6 +160,10 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     starTreeBuilderConfig.setSkipMaterializationForDimensions(skipMaterializationForDimensions);
     starTreeBuilderConfig.setSkipMaterializationCardinalityThreshold(starTreeIndexSpec.getskipMaterializationCardinalityThreshold());
     starTreeBuilderConfig.setOutDir(starTreeTempDir);
+
+    boolean enableOffHeapFormat = starTreeIndexSpec.isEnableOffHeapFormat();
+    starTreeBuilderConfig.setEnableOffHealpFormat(enableOffHeapFormat);
+
     //initialize star tree builder
     StarTreeBuilder starTreeBuilder = new OffHeapStarTreeBuilder();
     starTreeBuilder.init(starTreeBuilderConfig);
@@ -214,7 +219,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       starTreeIndexSpec.setSkipMaterializationForDimensions(starTreeBuilder.getSkipMaterializationForDimensions());
     }
 
-    serializeTree(starTreeBuilder);
+    serializeTree(starTreeBuilder, enableOffHeapFormat);
     //post creation
     handlePostCreation();
     starTreeBuilder.cleanup();
@@ -224,14 +229,20 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
         end - statCollectionFinishTime);
   }
 
-  private void serializeTree(StarTreeBuilder starTreeBuilder) throws Exception {
+  private void serializeTree(StarTreeBuilder starTreeBuilder, boolean enableOffHeapFormat) throws Exception {
     //star tree was built using its own dictionary, we need to re-map dimension value id
     Map<String, HashBiMap<Object, Integer>> dictionaryMap = starTreeBuilder.getDictionaryMap();
     StarTree tree = starTreeBuilder.getTree();
     HashBiMap<String, Integer> dimensionNameToIndexMap = starTreeBuilder.getDimensionNameToIndexMap();
     StarTreeIndexNode node = (StarTreeIndexNode) tree.getRoot();
     updateTree(node, dictionaryMap, dimensionNameToIndexMap);
-    tree.writeTree(new File(tempIndexDir, V1Constants.STAR_TREE_INDEX_FILE));
+
+    File starTreeFile = new File(tempIndexDir, V1Constants.STAR_TREE_INDEX_FILE);
+    if (enableOffHeapFormat) {
+      StarTreeSerDe.writeTreeV2(tree, starTreeFile);
+    } else {
+      StarTreeSerDe.writeTreeV1(tree, starTreeFile);
+    }
   }
 
   /**

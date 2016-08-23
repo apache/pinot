@@ -121,6 +121,7 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
   boolean debugMode = false;
   private int[] sortOrder;
   private int skipMaterializationCardinalityThreshold;
+  private boolean enableOffHeapFormat;
 
   public void init(StarTreeBuilderConfig builderConfig) throws Exception {
     Schema schema = builderConfig.schema;
@@ -129,6 +130,7 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
     skipStarNodeCreationForDimensions = builderConfig.getSkipStarNodeCreationForDimensions();
     skipMaterializationForDimensions = builderConfig.getSkipMaterializationForDimensions();
     skipMaterializationCardinalityThreshold = builderConfig.getSkipMaterializationCardinalityThreshold();
+    enableOffHeapFormat = builderConfig.isEnableOffHealpFormat();
 
     this.maxLeafRecords = builderConfig.maxLeafRecords;
     this.outDir = builderConfig.getOutDir();
@@ -340,8 +342,15 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
         (end - start), rawRecordCount, aggRecordCount);
     starTree = new StarTree(starTreeRootIndexNode, dimensionNameToIndexMap);
     File treeBinary = new File(outDir, "star-tree.bin");
-    LOG.debug("Saving tree binary at: {} ", treeBinary);
-    starTree.writeTree(treeBinary);
+
+    if (enableOffHeapFormat) {
+      LOG.debug("Saving tree binary V2 at: {} ", treeBinary);
+      StarTreeSerDe.writeTreeV2(starTree, treeBinary);
+    } else {
+      LOG.debug("Saving tree binary V1 at: {} ", treeBinary);
+      StarTreeSerDe.writeTreeV1(starTree, treeBinary);
+    }
+
     printTree(starTreeRootIndexNode, 0);
     LOG.debug("Finished build tree. out dir: {} ", outDir);
     dataBuffer.close();

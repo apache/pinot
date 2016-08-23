@@ -137,6 +137,13 @@ public abstract class SegmentDirectory implements AutoCloseable {
     public abstract InputStream getStarTreeStream();
 
     /**
+     * Get the StarTree index file.
+     *
+     * @return File for StarTree index.
+     */
+    public abstract File getStarTreeFile();
+
+    /**
      * Check if the segment has star tree
      */
     public abstract boolean hasStarTree();
