@@ -109,18 +109,46 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
     TimeSpec dataTimeSpec = collectionSchema.getTime();
     List<MetricFunction> metricFunctions = request.getMetricFunctions();
     List<String> dimensionNames = collectionSchema.getDimensionNames();
-    String sql = PqlUtils.getPql(request, dataTimeSpec);
-    LOG.debug("Executing: {}", sql);
-    ResultSetGroup result =
-        CACHE_INSTANCE.getResultSetGroupCache().get(
-            new PinotQuery(sql, request.getCollection() + "_OFFLINE"));
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Result for: {} {}", sql, format(result));
+    CollectionConfig collectionConfig = null;
+    List<ResultSetGroup> resultSetGroups = new ArrayList<>();
+
+    try {
+      collectionConfig = CACHE_INSTANCE.getCollectionConfigCache().get(request.getCollection());
+    } catch (Exception e) {
+      LOG.debug("Collection config for collection {} does not exist", request.getCollection());
     }
-    List<String[]> resultRows =
-        parseResultSetGroup(request, result, metricFunctions, collectionSchema, dimensionNames);
+    if (collectionConfig != null && collectionConfig.isMetricAsDimension()) {
+       List<String> pqls = PqlUtils.getMetricAsDimensionPqls(request, dataTimeSpec, collectionConfig);
+       for (String pql : pqls) {
+         ResultSetGroup result = CACHE_INSTANCE.getResultSetGroupCache()
+             .get(new PinotQuery(pql, request.getCollection() + "_OFFLINE"));
+         resultSetGroups.add(result);
+       }
+    } else {
+      String sql = PqlUtils.getPql(request, dataTimeSpec);
+      LOG.debug("Executing: {}", sql);
+      ResultSetGroup result = CACHE_INSTANCE.getResultSetGroupCache()
+          .get(new PinotQuery(sql, request.getCollection() + "_OFFLINE"));
+      resultSetGroups.add(result);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Result for: {} {}", sql, format(result));
+      }
+    }
+    List<ResultSet> resultSets = getResultSets(resultSetGroups);
+    List<String[]> resultRows = parseResultSets(request, resultSets, metricFunctions, collectionSchema, dimensionNames);
     PinotThirdEyeResponse resp = new PinotThirdEyeResponse(request, resultRows, dataTimeSpec);
     return resp;
+
+  }
+
+  private static List<ResultSet> getResultSets(List<ResultSetGroup> resultSetGroups) {
+    List<ResultSet> resultSets = new ArrayList<>();
+    for (ResultSetGroup resultSetGroup : resultSetGroups) {
+      for (int i = 0; i < resultSetGroup.getResultSetCount(); i++) {
+        resultSets.add(resultSetGroup.getResultSet(i));
+      }
+    }
+    return resultSets;
   }
 
   private static String format(ResultSetGroup resultSetGroup) {
@@ -132,9 +160,10 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
     return sb.toString();
   }
 
-  private List<String[]> parseResultSetGroup(ThirdEyeRequest request, ResultSetGroup result,
+  private List<String[]> parseResultSets(ThirdEyeRequest request, List<ResultSet> resultSets,
       List<MetricFunction> metricFunctions, CollectionSchema collectionSchema,
       List<String> dimensionNames) {
+
     int numGroupByKeys = 0;
     boolean hasGroupBy = false;
     if (request.getGroupByTimeGranularity() != null) {
@@ -165,8 +194,8 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
       interval = request.getGroupByTimeGranularity().toMillis();
     }
     LinkedHashMap<String, String[]> dataMap = new LinkedHashMap<>();
-    for (int i = 0; i < result.getResultSetCount(); i++) {
-      ResultSet resultSet = result.getResultSet(i);
+    for (int i = 0; i < resultSets.size(); i++) {
+      ResultSet resultSet = resultSets.get(i);
       int numRows = resultSet.getRowCount();
       for (int r = 0; r < numRows; r++) {
         boolean skipRowDueToError = false;

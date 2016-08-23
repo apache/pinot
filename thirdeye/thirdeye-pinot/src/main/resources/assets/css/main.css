@@ -244,6 +244,8 @@ body a{
 
 .added-item{
     margin: 5px 0 5px 5px;
+    max-width: 100%;
+    overflow-wrap: break-word;
 }
 
 .remove-selection,

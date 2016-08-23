@@ -16,6 +16,9 @@ public class CollectionConfig extends AbstractConfig {
 
   boolean isActive = true;
   boolean enableCount = false; // Default __COUNT metric
+  boolean metricAsDimension = false;
+  String metricNamesColumn = null;
+  String metricValuesColumn = null;
 
   Map<String, String> derivedMetrics;
 
@@ -65,6 +68,30 @@ public class CollectionConfig extends AbstractConfig {
 
   public void setEnableCount(boolean enableCount) {
     this.enableCount = enableCount;
+  }
+
+  public boolean isMetricAsDimension() {
+    return metricAsDimension;
+  }
+
+  public void setMetricAsDimension(boolean metricAsDimension) {
+    this.metricAsDimension = metricAsDimension;
+  }
+
+  public String getMetricValuesColumn() {
+    return metricValuesColumn;
+  }
+
+  public void setMetricValuesColumn(String metricValuesColumn) {
+    this.metricValuesColumn = metricValuesColumn;
+  }
+
+  public String getMetricNamesColumn() {
+    return metricNamesColumn;
+  }
+
+  public void setMetricNamesColumn(String metricNamesColumn) {
+    this.metricNamesColumn = metricNamesColumn;
   }
 
   public Map<String, String> getDerivedMetrics() {

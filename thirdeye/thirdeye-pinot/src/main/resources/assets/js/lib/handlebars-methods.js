@@ -212,6 +212,7 @@ $(document).ready(function () {
         return obj[prop];
     });
 
+
     /* Add details-cell or heatmap-cell class to cells */
     Handlebars.registerHelper('classify', function (index) {
         if ((index + 1) % 3 == 0) {
@@ -246,9 +247,14 @@ $(document).ready(function () {
     //takes an object and a key as option param and returns an object as a scope
     Handlebars.registerHelper('lookupInMapByKey', function (mapObj, key) {
         var val = mapObj[key];
-        if (typeof val !== "undefined") {
+        if ((typeof val == "undefined") || (val == key)) {
+          val = "";
+        } else {
             val = "(" + val + ")";
         }
+        console.log("val", val);
+        console.log("key",key);
+
         return val;
     });
 
