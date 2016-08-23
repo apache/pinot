@@ -337,8 +337,17 @@ function renderAnomalyTable(data, tab) {
     });
 
     //Clicking the feedback option will trigger the ajax - post
-    $("#anomalies-table").on("click", ".anomaly-feedback-option", function () {
-        submitAnomalyFeedback(this)
+    $("#anomalies-table").on("click", ".feedback-list", function () {
+        $(this).next("textarea").show();;
+    });
+
+
+    $('.feedback-dropdown[data-uk-dropdown]').on('hide.uk.dropdown', function(){
+
+        console.log("hidden element:")
+        console.log(this)
+
+        submitAnomalyFeedback(this);
     });
 
     /** Compare/Tabular view and dashboard view heat-map-cell click switches the view to compare/heat-map
@@ -373,16 +382,26 @@ function renderAnomalyTable(data, tab) {
 
     function submitAnomalyFeedback(target) {
         var $target = $(target);
-        var feedbackType = $target.attr("value");
-        var selector = $target.closest(".feedback-selector");
+        var selector = $(".selected-feedback", $target);
+        var feedbackType = selector.attr("value");
         var anomalyId = selector.attr("data-anomaly-id");
-        var data = '{ "feedbackType": "' + feedbackType + '"}';
-        var url = "/dashboard/anomaly-result/feedback/" + anomalyId;
-        //post anomaly feedback
-        submitData(url, data).done(function () {
-            // selector resized
-            $(".selected-feedback", selector).addClass("green-background");
-        })
+        var comment = $(".feedback-comment", $target).val();
+
+        //Remove control characters
+        comment = comment.replace(/[\x00-\x1F\x7F-\x9F]/g, "")
+        if(feedbackType){
+
+            var data = '{ "feedbackType": "' + feedbackType + '","comment": "'+ comment +'"}';
+            var url = "/dashboard/anomaly-result/feedback/" + anomalyId;
+
+            //post anomaly feedback
+            submitData(url, data).done(function () {
+
+                $(selector).addClass("green-background");
+            }).fail(function(){
+                $(selector).addClass("red-background");
+            })
+        }
     }
 }
 

@@ -39,34 +39,20 @@
                     </a>
                 </td>
                 <td>
-                   <div class="feedback-selector" data-anomaly-id="{{anomalyData/id}}" data-dataset="{{anomalyData/collection}}">
-                        <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group">
-                            <div class="selected-feedback uk-button"  value="{{#if anomalyData/feedback/feedbackType}}{{anomalyData/feedback/feedbackType}}{{/if}}">{{#if anomalyData/feedback/feedbackType}}{{anomalyData/feedback/feedbackType}}{{else}}Provide Feedback{{/if}}</div>
-                            <button class="add-single-metric-btn uk-button uk-button-primary" type="button"><i class="uk-icon-caret-down"></i></button>
+                   <div class="feedback-selector">
+                        <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="feedback-dropdown uk-button-group">
+                            <div class="selected-feedback uk-button"  data-anomaly-id="{{anomalyData/id}}" value="{{#if anomalyData/feedback/feedbackType}}{{anomalyData/feedback/feedbackType}}{{/if}}">{{#if anomalyData/feedback/feedbackType}}{{anomalyData/feedback/feedbackType}}{{else}}Provide Feedback{{/if}}</div>
+                            <button class="uk-button uk-button-primary" type="button"><i class="uk-icon-caret-down"></i></button>
                             <div class="uk-dropdown uk-dropdown-small">
                                 <ul class="feedback-list uk-nav uk-nav-dropdown single-select">
-                                    <li class="anomaly-feedback-option" value="NOT_ANOMALY"><a class="uk-dropdown-close">NOT_ANOMALY</a></li>
-                                    <li class="anomaly-feedback-option" value="ANOMALY"><a class="uk-dropdown-close">ANOMALY</a></li>
-                                    <li class="anomaly-feedback-option" value="ANOMALY_NO_ACTION"><a class="uk-dropdown-close">ANOMALY_NO_ACTION</a></li>
+                                    <li class="anomaly-feedback-option" value="NOT_ANOMALY"><a>NOT_ANOMALY</a></li>
+                                    <li class="anomaly-feedback-option" value="ANOMALY"><a>ANOMALY</a></li>
+                                    <li class="anomaly-feedback-option" value="ANOMALY_NO_ACTION"><a>ANOMALY_NO_ACTION</a></li>
                                 </ul>
+                                <textarea class="feedback-comment {{#if anomalyData/feedback/comment}}{{else}}hidden{{/if}}">{{#if anomalyData/feedback/comment}}{{anomalyData/feedback/comment}}{{/if}}</textarea>
                             </div>
                         </div>
                    </div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
                </td>
             </tr>
             {{/each}}
