@@ -43,7 +43,7 @@ public interface AggregationFunction {
    * @param resultHolder
    * @param valueArray
    */
-  void aggregate(int length, AggregationResultHolder resultHolder, double[]... valueArray);
+  void aggregate(int length, AggregationResultHolder resultHolder, Object... valueArray);
 
   /**
    * Perform a group-by aggregation on the given set of values, and the group key to which
@@ -55,7 +55,7 @@ public interface AggregationFunction {
    * @param resultHolder
    * @param valueArray
    */
-  void aggregateGroupBySV(int length, int[] docIdToGroupKey, GroupByResultHolder resultHolder, double[]... valueArray);
+  void aggregateGroupBySV(int length, int[] docIdToGroupKey, GroupByResultHolder resultHolder, Object... valueArray);
 
   /**
    * Perform a group-by aggregation on the given set of values, and the group key to which
@@ -68,8 +68,7 @@ public interface AggregationFunction {
    * @param resultHolder
    * @param valueArray
    */
-  void aggregateGroupByMV(int length, int[][] docIdToGroupKeys, GroupByResultHolder resultHolder,
-      double[]... valueArray);
+  void aggregateGroupByMV(int length, int[][] docIdToGroupKeys, GroupByResultHolder resultHolder, Object... valueArray);
 
   /**
    * Reduce the aggregation. For example, in case of avg/range being performed
