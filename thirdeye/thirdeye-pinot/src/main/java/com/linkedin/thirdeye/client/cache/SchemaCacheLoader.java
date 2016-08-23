@@ -22,7 +22,8 @@ public class SchemaCacheLoader extends CacheLoader<String, Schema> {
   private static final Logger LOGGER = LoggerFactory.getLogger(SchemaCacheLoader.class);
 
   private static final String UTF_8 = "UTF-8";
-  private static final String SCHEMA_ENDPOINT = "schemas/";
+  private static final String SCHEMA_ENDPOINT_TEMPLATE = "tables/%s/schema";
+
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private final CloseableHttpClient controllerClient;
@@ -36,7 +37,7 @@ public class SchemaCacheLoader extends CacheLoader<String, Schema> {
 
   @Override
   public Schema load(String collection) throws Exception {
-    HttpGet req = new HttpGet(SCHEMA_ENDPOINT + URLEncoder.encode(collection, UTF_8));
+    HttpGet req = new HttpGet(String.format(SCHEMA_ENDPOINT_TEMPLATE, URLEncoder.encode(collection, UTF_8)));
     LOGGER.info("Retrieving schema: {}", req);
     CloseableHttpResponse res = controllerClient.execute(controllerHost, req);
     try {
