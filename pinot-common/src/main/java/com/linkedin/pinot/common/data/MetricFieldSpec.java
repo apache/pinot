@@ -23,6 +23,9 @@ import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class MetricFieldSpec extends FieldSpec {
 
+  private int fieldSize = -1;
+  private DerivedMetricType derivedMetricType = null;
+
   // Default constructor required by JSON de-serializer. DO NOT REMOVE.
   public MetricFieldSpec() {
     super();
@@ -30,6 +33,30 @@ public final class MetricFieldSpec extends FieldSpec {
 
   public MetricFieldSpec(String name, DataType dataType) {
     super(name, dataType, true);
+  }
+
+  /**
+   * For Derived Fields
+   * @param name
+   * @param dataType
+   * @param derivedMetricType
+   */
+  public MetricFieldSpec(String name, DataType dataType, int fieldSize, DerivedMetricType derivedMetricType) {
+    super(name, dataType, true);
+    this.fieldSize = fieldSize;
+    this.derivedMetricType = derivedMetricType;
+  }
+
+  public int getFieldSize() {
+    if (fieldSize == -1) {
+      return getDataType().size();
+    } else {
+      return fieldSize;
+    }
+  }
+
+  public void setFieldSize(int fieldSize) {
+    this.fieldSize = fieldSize;
   }
 
   @JsonIgnore
@@ -41,5 +68,32 @@ public final class MetricFieldSpec extends FieldSpec {
   @Override
   public void setSingleValueField(boolean isSingleValueField) {
     Preconditions.checkArgument(isSingleValueField, "Unsupported multi-value for metric field.");
+  }
+
+  @JsonIgnore
+  public boolean isDerivedMetric() {
+    return derivedMetricType != null;
+  }
+
+  public DerivedMetricType getDerivedMetricType() {
+    return derivedMetricType;
+  }
+
+  public void setDerivedMetricType(DerivedMetricType derivedMetricType) {
+    this.derivedMetricType = derivedMetricType;
+  }
+
+  /**
+   * DerivedMetricType is assigned for all metric fields to allow derived metric field a customized type not in DataType.
+   * Since we cannot add a new type directly to DataType since Pinot currently has no support for a custom types.
+   *
+   * It is currently used for derived field recognition in MetricBuffer, may have other use cases in system later.
+   *
+   * Generally, a customized type value should be converted to a standard Pinot type value (like String)
+   * for serialization, and converted back after deserialization when in use.
+   */
+  public enum DerivedMetricType {
+    // customized types start from here
+    HLL
   }
 }

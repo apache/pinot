@@ -17,6 +17,7 @@ package com.linkedin.pinot.core.data.extractors;
 
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.TimeFieldSpec;
 import com.linkedin.pinot.common.data.TimeGranularitySpec;
@@ -121,6 +122,12 @@ public class PlainFieldExtractor implements FieldExtractor {
     boolean hasConversion = false;
 
     for (String column : _schema.getColumnNames()) {
+      FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
+      // Ignore transform of DerivedMetric
+      if (fieldSpec instanceof MetricFieldSpec && ((MetricFieldSpec) fieldSpec).isDerivedMetric()) {
+        continue;
+      }
+
       Object value;
 
       // Fetch value for this column.
@@ -191,7 +198,6 @@ public class PlainFieldExtractor implements FieldExtractor {
 
       // Assign default value for null value.
       if (value == null) {
-        FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
         if (fieldSpec.isSingleValueField()) {
           // Single-value field.
           value = fieldSpec.getDefaultNullValue();

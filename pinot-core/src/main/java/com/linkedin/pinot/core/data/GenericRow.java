@@ -15,18 +15,16 @@
  */
 package com.linkedin.pinot.core.data;
 
+import com.linkedin.pinot.common.data.RowEvent;
+import org.codehaus.jackson.map.ObjectMapper;
+import org.codehaus.jackson.type.TypeReference;
+
 import java.io.IOException;
 import java.io.StringWriter;
 import java.nio.charset.Charset;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Objects;
-
-import org.codehaus.jackson.map.ObjectMapper;
-import org.codehaus.jackson.type.TypeReference;
-
-import com.linkedin.pinot.common.data.RowEvent;
 
 
 /**
@@ -53,18 +51,24 @@ public class GenericRow implements RowEvent {
     return _fieldMap.get(fieldName);
   }
 
+  public void putField(String key, Object value) {
+    _fieldMap.put(key, value);
+  }
+
   @Override
   public String toString() {
     StringBuilder b = new StringBuilder();
     for (String key : _fieldMap.keySet()) {
-      if (_fieldMap.get(key) instanceof Object[]) {
-        b.append(key + " : " + Arrays.toString((Object[]) _fieldMap.get(key)) + ", ");
+      Object value = _fieldMap.get(key);
+      b.append(key);
+      b.append(" : ");
+      if (value instanceof Object[]) {
+        b.append(Arrays.toString((Object[]) value));
       } else {
-        b.append(key + " : " + _fieldMap.get(key) + ", ");
+        b.append(value);
       }
-
+      b.append(", ");
     }
-
     return b.toString();
   }
 
@@ -82,8 +86,8 @@ public class GenericRow implements RowEvent {
     return _fieldMap.equals(r._fieldMap);
   }
 
-static TypeReference typeReference = new TypeReference<Map<String, Object>>() {
-};
+  static TypeReference typeReference = new TypeReference<Map<String, Object>>() {};
+
   public static GenericRow fromBytes(byte[] buffer) throws IOException {
     Map<String, Object> fieldMap = (Map<String, Object>) OBJECT_MAPPER.readValue(buffer, typeReference);
     GenericRow genericRow = new GenericRow();

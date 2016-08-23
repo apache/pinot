@@ -34,8 +34,8 @@ public class StarTreeBuilderConfig {
   File outDir;
 
   private Set<String> skipStarNodeCreationForDimensions;
-  private Set<String> _skipMaterializationFroDimensions;
-  private int _skipMaterializationCardinalityThreshold =
+  private Set<String> skipMaterializationForDimensions;
+  private int skipMaterializationCardinalityThreshold =
       StarTreeIndexSpec.DEFAULT_SKIP_MATERIALIZATION_CARDINALITY_THRESHOLD;
   private boolean enableOffHealpFormat;
 
@@ -79,11 +79,11 @@ public class StarTreeBuilderConfig {
   }
 
   public int getSkipMaterializationCardinalityThreshold() {
-    return _skipMaterializationCardinalityThreshold;
+    return skipMaterializationCardinalityThreshold;
   }
 
   public void setSkipMaterializationCardinalityThreshold(int skipMaterializationCardinalityThreshold) {
-    _skipMaterializationCardinalityThreshold = skipMaterializationCardinalityThreshold;
+    this.skipMaterializationCardinalityThreshold = skipMaterializationCardinalityThreshold;
   }
 
   /**
@@ -98,7 +98,7 @@ public class StarTreeBuilderConfig {
    * @return
    */
   public Set<String> getSkipMaterializationForDimensions() {
-    return _skipMaterializationFroDimensions;
+    return skipMaterializationForDimensions;
   }
 
   /**
@@ -106,7 +106,7 @@ public class StarTreeBuilderConfig {
    * @param skipMaterializationForDimensions
    */
   public void setSkipMaterializationForDimensions(Set<String> skipMaterializationForDimensions) {
-    _skipMaterializationFroDimensions = skipMaterializationForDimensions;
+    this.skipMaterializationForDimensions = skipMaterializationForDimensions;
   }
 
   /**

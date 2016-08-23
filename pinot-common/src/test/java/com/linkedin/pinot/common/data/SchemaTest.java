@@ -74,7 +74,7 @@ public class SchemaTest {
 
       String validSchema = makeSchema();
       Schema schema = mapper.readValue(validSchema, Schema.class);
-      Assert.assertFalse(schema.validate(LOGGER));
+      Assert.assertTrue(schema.validate(LOGGER)); // True since we have String metric like hll field
     }
     {
       singleValueDim = "false";
