@@ -51,7 +51,7 @@ public class CollectionMaxDataTimeCacheLoader extends CacheLoader<String, Long> 
     String offlineTablePropertyStorePath = "/SEGMENTS/" + collection + "_OFFLINE";
     String realtimeTablePropertyStorePath = "/SEGMENTS/" + collection + "_REALTIME";
 
-    long maxTime = 0;//System.currentTimeMillis();
+    long maxTime = 0;
     List<Stat> stats = new ArrayList<>();
     List<ZNRecord> zkSegmentDataList = new ArrayList<>();;
     if (propertyStore != null) {
