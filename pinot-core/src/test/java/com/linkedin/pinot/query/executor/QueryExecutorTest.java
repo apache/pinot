@@ -145,16 +145,10 @@ public class QueryExecutorTest {
       instanceRequest.getSearchSegments().add(segment.getSegmentName());
     }
 
-    try {
-      DataTable instanceResponse = _queryExecutor.processQuery(instanceRequest);
-      LOGGER.info("InstanceResponse is " + instanceResponse.getLong(0, 0));
-      Assert.assertEquals(instanceResponse.getLong(0, 0), 400002L);
-      LOGGER.info("Time used for instanceResponse is " + instanceResponse.getMetadata().get("timeUsedMs"));
-    } catch (Exception e) {
-      e.printStackTrace();
-      // Should never happen
-      Assert.assertEquals(true, false);
-    }
+    DataTable instanceResponse = _queryExecutor.processQuery(instanceRequest);
+    LOGGER.info("InstanceResponse is " + instanceResponse.getLong(0, 0));
+    Assert.assertEquals(instanceResponse.getLong(0, 0), 400002L);
+    LOGGER.info("Time used for instanceResponse is " + instanceResponse.getMetadata().get("timeUsedMs"));
   }
 
   @Test
@@ -169,17 +163,11 @@ public class QueryExecutorTest {
     for (IndexSegment segment : _indexSegmentList) {
       instanceRequest.getSearchSegments().add(segment.getSegmentName());
     }
-    try {
-      DataTable instanceResponse = _queryExecutor.processQuery(instanceRequest);
-      LOGGER.info("InstanceResponse is " + instanceResponse.getDouble(0, 0));
-      Assert.assertEquals(instanceResponse.getDouble(0, 0), 40000200000.0);
-      LOGGER.info("Time used for instanceResponse is " + instanceResponse.getMetadata().get("timeUsedMs"));
-    } catch (Exception e) {
-      e.printStackTrace();
-      // Should never happen
-      Assert.assertEquals(true, false);
-    }
 
+    DataTable instanceResponse = _queryExecutor.processQuery(instanceRequest);
+    LOGGER.info("InstanceResponse is " + instanceResponse.getDouble(0, 0));
+    Assert.assertEquals(instanceResponse.getDouble(0, 0), 40000200000.0);
+    LOGGER.info("Time used for instanceResponse is " + instanceResponse.getMetadata().get("timeUsedMs"));
   }
 
   @Test
@@ -195,18 +183,11 @@ public class QueryExecutorTest {
     for (IndexSegment segment : _indexSegmentList) {
       instanceRequest.getSearchSegments().add(segment.getSegmentName());
     }
-    try {
-      DataTable instanceResponse = _queryExecutor.processQuery(instanceRequest);
-      LOGGER.info("InstanceResponse is " + instanceResponse.getDouble(0, 0));
-      Assert.assertEquals(instanceResponse.getDouble(0, 0), 200000.0);
 
-      LOGGER.info("Time used for instanceResponse is " + instanceResponse.getMetadata().get("timeUsedMs"));
-    } catch (Exception e) {
-      e.printStackTrace();
-      // Should never happen
-      Assert.assertEquals(true, false);
-    }
-
+    DataTable instanceResponse = _queryExecutor.processQuery(instanceRequest);
+    LOGGER.info("InstanceResponse is " + instanceResponse.getDouble(0, 0));
+    Assert.assertEquals(instanceResponse.getDouble(0, 0), 200000.0);
+    LOGGER.info("Time used for instanceResponse is " + instanceResponse.getMetadata().get("timeUsedMs"));
   }
 
   @Test
@@ -221,17 +202,11 @@ public class QueryExecutorTest {
     for (IndexSegment segment : _indexSegmentList) {
       instanceRequest.getSearchSegments().add(segment.getSegmentName());
     }
-    try {
-      DataTable instanceResponse = _queryExecutor.processQuery(instanceRequest);
-      LOGGER.info("InstanceResponse is " + instanceResponse.getDouble(0, 0));
-      Assert.assertEquals(instanceResponse.getDouble(0, 0), 0.0);
-      LOGGER.info("Time used for instanceResponse is " + instanceResponse.getMetadata().get("timeUsedMs"));
-    } catch (Exception e) {
-      e.printStackTrace();
-      // Should never happen
-      Assert.assertEquals(true, false);
-    }
 
+    DataTable instanceResponse = _queryExecutor.processQuery(instanceRequest);
+    LOGGER.info("InstanceResponse is " + instanceResponse.getDouble(0, 0));
+    Assert.assertEquals(instanceResponse.getDouble(0, 0), 0.0);
+    LOGGER.info("Time used for instanceResponse is " + instanceResponse.getMetadata().get("timeUsedMs"));
   }
 
   private BrokerRequest getCountQuery() {

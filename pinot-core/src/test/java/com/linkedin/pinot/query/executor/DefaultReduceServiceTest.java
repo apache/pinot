@@ -149,23 +149,16 @@ public class DefaultReduceServiceTest {
       instanceRequest.addToSearchSegments(segment.getSegmentName());
     }
 
-    Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
-    try {
-      DataTable instanceResponse1 = _queryExecutor.processQuery(instanceRequest);
-      instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse1);
-      DataTable instanceResponse2 = _queryExecutor.processQuery(instanceRequest);
-      instanceResponseMap.put(new ServerInstance("localhost:1111"), instanceResponse2);
-      BrokerResponseJSON brokerResponse = _reduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
-      LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
-      JsonAssert.assertEqualsIgnoreOrder(brokerResponse.getAggregationResults().get(0).toString(),
-          "{\"value\":\"800004\",\"function\":\"count_star\"}");
-      LOGGER.info("Time used for BrokerResponse is " + brokerResponse.getTimeUsedMs());
-    } catch (Exception e) {
-      e.printStackTrace();
-      // Should never happen
-      throw new RuntimeException(e.toString(), e);
-      //Assert.assertEquals(true, false);
-    }
+    Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<>();
+    DataTable instanceResponse1 = _queryExecutor.processQuery(instanceRequest);
+    instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse1);
+    DataTable instanceResponse2 = _queryExecutor.processQuery(instanceRequest);
+    instanceResponseMap.put(new ServerInstance("localhost:1111"), instanceResponse2);
+    BrokerResponseJSON brokerResponse = _reduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
+    LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
+    JsonAssert.assertEqualsIgnoreOrder(brokerResponse.getAggregationResults().get(0).toString(),
+        "{\"value\":\"800004\",\"function\":\"count_star\"}");
+    LOGGER.info("Time used for BrokerResponse is " + brokerResponse.getTimeUsedMs());
   }
 
   @Test

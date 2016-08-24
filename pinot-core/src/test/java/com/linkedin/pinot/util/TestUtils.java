@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.net.URL;
 import java.util.HashMap;
 
+import javax.annotation.Nonnull;
 import org.apache.commons.io.FileUtils;
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -38,23 +39,21 @@ public class TestUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(TestUtils.class);
   private static final int testThreshold = 1000;
 
-  public static String getFileFromResourceUrl(URL resourceUrl) {
-    System.out.println(resourceUrl);
-    // Check if we need to extract the resource to a temporary directory
+  public static String getFileFromResourceUrl(@Nonnull URL resourceUrl) {
+    // For maven cross package use case, we need to extract the resource from jar to a temporary directory.
     String resourceUrlStr = resourceUrl.toString();
     if (resourceUrlStr.contains("jar!")) {
       try {
         String extension = resourceUrlStr.substring(resourceUrlStr.lastIndexOf('.'));
         File tempFile = File.createTempFile("pinot-test-temp", extension);
-        LOGGER.info("Extractng from " + resourceUrlStr + " to " + tempFile.getAbsolutePath());
-        System.out.println("Extractng from " + resourceUrlStr + " to " + tempFile.getAbsolutePath());
+        String tempFilePath = tempFile.getAbsolutePath();
+        LOGGER.info("Extracting from " + resourceUrlStr + " to " + tempFilePath);
         FileUtils.copyURLToFile(resourceUrl, tempFile);
-        return tempFile.getAbsolutePath();
+        return tempFilePath;
       } catch (IOException e) {
         throw new RuntimeException(e);
       }
     } else {
-      System.out.println("Not extracting plain file " + resourceUrl);
       return resourceUrl.getFile();
     }
   }

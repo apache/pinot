@@ -18,9 +18,9 @@ package com.linkedin.pinot.common.metadata;
 import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
 import java.util.Arrays;
 import java.util.Set;
-import junit.framework.Assert;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
+import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
@@ -38,11 +38,11 @@ public class IndexLoadingConfigMetadataTest {
     Assert.assertEquals(10, loadingInvertedIndexColumns.size());
     for (int j = 0; j < 10; ++j) {
       String columnName = "col" + j;
-      Assert.assertEquals(true, indexLoadingConfigMetadata.isLoadingInvertedIndexForColumn(columnName));
+      Assert.assertTrue(indexLoadingConfigMetadata.isLoadingInvertedIndexForColumn(columnName));
     }
     for (int j = 10; j < 20; ++j) {
       String columnName = "col" + j;
-      Assert.assertEquals(false, indexLoadingConfigMetadata.isLoadingInvertedIndexForColumn(columnName));
+      Assert.assertFalse(indexLoadingConfigMetadata.isLoadingInvertedIndexForColumn(columnName));
     }
   }
 

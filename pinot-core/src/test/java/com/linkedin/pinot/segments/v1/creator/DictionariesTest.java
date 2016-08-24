@@ -147,24 +147,24 @@ public class DictionariesTest {
       switch (((SegmentMetadataImpl) mmapSegment.getSegmentMetadata()).getColumnMetadataMap().get(column).getDataType()) {
         case BOOLEAN:
         case STRING:
-          Assert.assertEquals(true, heapDictionary instanceof StringDictionary);
-          Assert.assertEquals(true, mmapDictionary instanceof StringDictionary);
+          Assert.assertTrue(heapDictionary instanceof StringDictionary);
+          Assert.assertTrue(mmapDictionary instanceof StringDictionary);
           break;
         case DOUBLE:
-          Assert.assertEquals(true, heapDictionary instanceof DoubleDictionary);
-          Assert.assertEquals(true, mmapDictionary instanceof DoubleDictionary);
+          Assert.assertTrue(heapDictionary instanceof DoubleDictionary);
+          Assert.assertTrue(mmapDictionary instanceof DoubleDictionary);
           break;
         case FLOAT:
-          Assert.assertEquals(true, heapDictionary instanceof FloatDictionary);
-          Assert.assertEquals(true, mmapDictionary instanceof FloatDictionary);
+          Assert.assertTrue(heapDictionary instanceof FloatDictionary);
+          Assert.assertTrue(mmapDictionary instanceof FloatDictionary);
           break;
         case LONG:
-          Assert.assertEquals(true, heapDictionary instanceof LongDictionary);
-          Assert.assertEquals(true, mmapDictionary instanceof LongDictionary);
+          Assert.assertTrue(heapDictionary instanceof LongDictionary);
+          Assert.assertTrue(mmapDictionary instanceof LongDictionary);
           break;
         case INT:
-          Assert.assertEquals(true, heapDictionary instanceof IntDictionary);
-          Assert.assertEquals(true, mmapDictionary instanceof IntDictionary);
+          Assert.assertTrue(heapDictionary instanceof IntDictionary);
+          Assert.assertTrue(mmapDictionary instanceof IntDictionary);
           break;
       }
 
@@ -191,8 +191,8 @@ public class DictionariesTest {
       for (final Object entry : list) {
         Assert.assertEquals(mmapDictionary.indexOf(entry), heapDictionary.indexOf(entry));
         if (!column.equals("pageKey")) {
-          Assert.assertEquals(false, heapDictionary.indexOf(entry) < 0);
-          Assert.assertEquals(false, mmapDictionary.indexOf(entry) < 0);
+          Assert.assertFalse(heapDictionary.indexOf(entry) < 0);
+          Assert.assertFalse(mmapDictionary.indexOf(entry) < 0);
         }
       }
     }
