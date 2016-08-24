@@ -121,14 +121,14 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
        List<String> pqls = PqlUtils.getMetricAsDimensionPqls(request, dataTimeSpec, collectionConfig);
        for (String pql : pqls) {
          ResultSetGroup result = CACHE_INSTANCE.getResultSetGroupCache()
-             .get(new PinotQuery(pql, request.getCollection() + "_OFFLINE"));
+             .get(new PinotQuery(pql, request.getCollection()));
          resultSetGroups.add(result);
        }
     } else {
       String sql = PqlUtils.getPql(request, dataTimeSpec);
       LOG.debug("Executing: {}", sql);
       ResultSetGroup result = CACHE_INSTANCE.getResultSetGroupCache()
-          .get(new PinotQuery(sql, request.getCollection() + "_OFFLINE"));
+          .get(new PinotQuery(sql, request.getCollection()));
       resultSetGroups.add(result);
       if (LOG.isDebugEnabled()) {
         LOG.debug("Result for: {} {}", sql, format(result));
@@ -208,7 +208,7 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
               int timeBucket;
               long millis;
               if (!isISOFormat) {
-                millis = dataTimeUnit.toMillis(Long.parseLong(groupKeyVal));
+                millis = dataTimeUnit.toMillis(Double.valueOf(groupKeyVal).longValue());
               } else {
                 millis = DateTime.parse(groupKeyVal, dateTimeFormatter).getMillis();
               }

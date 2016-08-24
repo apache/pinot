@@ -46,26 +46,37 @@ public class CollectionMaxDataTimeCacheLoader extends CacheLoader<String, Long> 
   public Long load(String collection) throws Exception {
 
     LOGGER.info("Loading maxDataTime cache {}", collection);
-    long maxTime = 0;
+
     int options = AccessOption.PERSISTENT;
     String offlineTablePropertyStorePath = "/SEGMENTS/" + collection + "_OFFLINE";
-    if ((propertyStore != null) && (propertyStore.exists(offlineTablePropertyStorePath, options))) {
-      List<Stat> stats = new ArrayList<>();
-      List<ZNRecord> zkSegmentDataList =
-          propertyStore.getChildren(offlineTablePropertyStorePath, stats, options);
-      for (ZNRecord record : zkSegmentDataList) {
-        try {
-          long endTime = Long.parseLong(record.getSimpleField("segment.end.time"));
-          TimeUnit timeUnit = TimeUnit.valueOf(record.getSimpleField("segment.time.unit"));
-          long endTimeMillis = timeUnit.toMillis(endTime);
-          if (endTimeMillis > maxTime) {
-            maxTime = endTimeMillis;
+    String realtimeTablePropertyStorePath = "/SEGMENTS/" + collection + "_REALTIME";
+
+    long maxTime = 0;
+    List<Stat> stats = new ArrayList<>();
+    List<ZNRecord> zkSegmentDataList = new ArrayList<>();;
+    if (propertyStore != null) {
+      if (propertyStore.exists(realtimeTablePropertyStorePath, options)) {
+        zkSegmentDataList.addAll(propertyStore.getChildren(realtimeTablePropertyStorePath, stats, options));
+      }
+      if (propertyStore.exists(offlineTablePropertyStorePath, options)) {
+        zkSegmentDataList.addAll(propertyStore.getChildren(offlineTablePropertyStorePath, stats, options));
+      }
+      if (zkSegmentDataList != null && !zkSegmentDataList.isEmpty()) {
+        for (ZNRecord record : zkSegmentDataList) {
+          try {
+            long endTime = Long.parseLong(record.getSimpleField("segment.end.time"));
+            TimeUnit timeUnit = TimeUnit.valueOf(record.getSimpleField("segment.time.unit"));
+            long endTimeMillis = timeUnit.toMillis(endTime);
+            if (endTimeMillis > maxTime) {
+              maxTime = endTimeMillis;
+            }
+          } catch (Exception e) {
+            LOGGER.warn("Exception parsing metadata:{}", record, e);
           }
-        } catch (Exception e) {
-          LOGGER.warn("Exception parsing metadata:{}", record, e);
         }
       }
-    } else {
+    }
+    if (maxTime == 0) {
       maxTime = System.currentTimeMillis();
     }
     return maxTime;
