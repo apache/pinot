@@ -401,7 +401,7 @@ public class SegmentGeneratorConfig {
 
     Schema schema;
     if (_schemaFile != null) {
-      schema = objectMapper.readValue(new File(_schemaFile), Schema.class);
+      schema = Schema.fromFile(new File(_schemaFile));
       setSchema(schema);
     } else if (_format == FileFormat.AVRO) {
       schema = AvroUtils.extractSchemaFromAvro(new File(_inputFilePath));

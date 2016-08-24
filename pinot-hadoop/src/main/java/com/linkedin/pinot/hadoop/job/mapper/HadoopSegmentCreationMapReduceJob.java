@@ -120,7 +120,7 @@ public class HadoopSegmentCreationMapReduceJob {
         throw new RuntimeException("Input to the mapper is malformed, please contact the pinot team");
       }
       _inputFilePath = lineSplits[1].trim();
-      Schema schema = new ObjectMapper().readValue(context.getConfiguration().get("data.schema"), Schema.class);
+      Schema schema = Schema.fromString(context.getConfiguration().get("data.schema"));
 
       LOGGER.info("*********************************************************************");
       LOGGER.info("input data file path : {}", _inputFilePath);

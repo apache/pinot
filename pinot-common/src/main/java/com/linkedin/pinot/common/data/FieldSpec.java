@@ -40,7 +40,6 @@ public abstract class FieldSpec {
   private static final Float DEFAULT_DIM_NULL_VALUE_OF_FLOAT = Float.NEGATIVE_INFINITY;
   private static final Double DEFAULT_DIM_NULL_VALUE_OF_DOUBLE = Double.NEGATIVE_INFINITY;
 
-  private static final String DEFAULT_METRIC_NULL_VALUE_OF_STRING = "null";
   private static final Integer DEFAULT_METRIC_NULL_VALUE_OF_INT = 0;
   private static final Long DEFAULT_METRIC_NULL_VALUE_OF_LONG = 0L;
   private static final Float DEFAULT_METRIC_NULL_VALUE_OF_FLOAT = 0.0F;
@@ -50,7 +49,7 @@ public abstract class FieldSpec {
   private DataType _dataType;
   private boolean _isSingleValueField = true;
   private String _stringDefaultNullValue;
-  private transient Object _cachedDefaultNullValue;
+  private Object _cachedDefaultNullValue;
 
   // Default constructor required by JSON de-serializer. DO NOT REMOVE.
   public FieldSpec() {
@@ -61,7 +60,7 @@ public abstract class FieldSpec {
     Preconditions.checkNotNull(dataType);
 
     _name = name;
-    _dataType = dataType;
+    _dataType = dataType.getStoredType();
     _isSingleValueField = isSingleValueField;
   }
 
@@ -80,7 +79,7 @@ public abstract class FieldSpec {
   public void setDataType(DataType dataType) {
     Preconditions.checkNotNull(dataType);
 
-    _dataType = dataType;
+    _dataType = dataType.getStoredType();
     _cachedDefaultNullValue = null;
   }
 
@@ -103,14 +102,11 @@ public abstract class FieldSpec {
     _cachedDefaultNullValue = null;
   }
 
-  // BOOLEAN, BYTE, CHAR, SHORT support is a temporary work around, will remove it after using canonical schema.
   public Object getDefaultNullValue() {
     FieldType fieldType = getFieldType();
     if (_cachedDefaultNullValue == null) {
       if (_stringDefaultNullValue != null) {
         switch (_dataType) {
-          case BYTE:
-          case SHORT:
           case INT:
             _cachedDefaultNullValue = Integer.valueOf(_stringDefaultNullValue);
             break;
@@ -123,8 +119,6 @@ public abstract class FieldSpec {
           case DOUBLE:
             _cachedDefaultNullValue = Double.valueOf(_stringDefaultNullValue);
             break;
-          case BOOLEAN:
-          case CHAR:
           case STRING:
             Preconditions.checkState(fieldType != FieldType.METRIC,
                 "For metric field, no support for non-number data type: " + _dataType);
@@ -137,8 +131,6 @@ public abstract class FieldSpec {
         switch (fieldType) {
           case METRIC:
             switch (_dataType) {
-              case BYTE:
-              case SHORT:
               case INT:
                 _cachedDefaultNullValue = DEFAULT_METRIC_NULL_VALUE_OF_INT;
                 break;
@@ -151,9 +143,6 @@ public abstract class FieldSpec {
               case DOUBLE:
                 _cachedDefaultNullValue = DEFAULT_METRIC_NULL_VALUE_OF_DOUBLE;
                 break;
-              case STRING:
-                _cachedDefaultNullValue = DEFAULT_METRIC_NULL_VALUE_OF_STRING;
-                break;
               default:
                 throw new UnsupportedOperationException(
                     "Unknown default null value for metric field of data type: " + _dataType);
@@ -162,8 +151,6 @@ public abstract class FieldSpec {
           case DIMENSION:
           case TIME:
             switch (_dataType) {
-              case BYTE:
-              case SHORT:
               case INT:
                 _cachedDefaultNullValue = DEFAULT_DIM_NULL_VALUE_OF_INT;
                 break;
@@ -176,8 +163,6 @@ public abstract class FieldSpec {
               case DOUBLE:
                 _cachedDefaultNullValue = DEFAULT_DIM_NULL_VALUE_OF_DOUBLE;
                 break;
-              case BOOLEAN:
-              case CHAR:
               case STRING:
                 _cachedDefaultNullValue = DEFAULT_DIM_NULL_VALUE_OF_STRING;
                 break;
@@ -192,37 +177,6 @@ public abstract class FieldSpec {
       }
     }
     return _cachedDefaultNullValue;
-  }
-
-  @Override
-  public String toString() {
-    return "< field type: " + getFieldType() + ", field name: " + _name + ", data type: " + _dataType
-        + ", is single-value field: " + _isSingleValueField + ", default null value: " + getDefaultNullValue() + " >";
-  }
-
-  @Override
-  public boolean equals(Object anObject) {
-    if (this == anObject) {
-      return true;
-    }
-    if (anObject instanceof FieldSpec) {
-      FieldSpec anotherFieldSpec = (FieldSpec) anObject;
-
-      return getFieldType().equals(anotherFieldSpec.getFieldType()) && _name.equals(anotherFieldSpec._name)
-          && _dataType.equals(anotherFieldSpec._dataType) && _isSingleValueField == anotherFieldSpec._isSingleValueField
-          && getDefaultNullValue().equals(anotherFieldSpec.getDefaultNullValue());
-    }
-    return false;
-  }
-
-  @Override
-  public int hashCode() {
-    int result = getFieldType().hashCode();
-    result = EqualityUtils.hashCodeOf(result, _name);
-    result = EqualityUtils.hashCodeOf(result, _dataType);
-    result = EqualityUtils.hashCodeOf(result, _isSingleValueField);
-    result = EqualityUtils.hashCodeOf(result, getDefaultNullValue());
-    return result;
   }
 
   /**
@@ -242,22 +196,24 @@ public abstract class FieldSpec {
    * The <code>DataType</code> enum is used to demonstrate the data type of a column.
    * <p>Array <code>DataType</code> is only used in {@link com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema}.
    * <p>In {@link Schema}, use non-array <code>DataType</code> only.
+   * <p>In pinot, we store data using 5 <code>DataType</code>s: INT, LONG, FLOAT, DOUBLE, STRING. All other
+   * <code>DataType</code>s will be converted to one of them.
    */
   public enum DataType {
-    BOOLEAN,
-    BYTE,
-    CHAR,
-    SHORT,
+    BOOLEAN,      // Stored as STRING.
+    BYTE,         // Stored as INT.
+    CHAR,         // Stored as STRING.
+    SHORT,        // Stored as INT.
     INT,
     LONG,
     FLOAT,
     DOUBLE,
     STRING,
-    OBJECT,
+    OBJECT,       // Used in dataTable to transfer data structure.
     //EVERYTHING AFTER THIS MUST BE ARRAY TYPE
-    BYTE_ARRAY,
-    CHAR_ARRAY,
-    SHORT_ARRAY,
+    BYTE_ARRAY,   // Unused.
+    CHAR_ARRAY,   // Unused.
+    SHORT_ARRAY,  // Unused.
     INT_ARRAY,
     LONG_ARRAY,
     FLOAT_ARRAY,
@@ -265,16 +221,57 @@ public abstract class FieldSpec {
     STRING_ARRAY;
 
     public boolean isNumber() {
-      return (this == BYTE) || (this == SHORT) || (this == INT) || (this == LONG) || (this == FLOAT)
-          || (this == DOUBLE);
+      switch (this) {
+        case BYTE:
+        case SHORT:
+        case INT:
+        case LONG:
+        case FLOAT:
+        case DOUBLE:
+          return true;
+        default:
+          return false;
+      }
     }
 
     public boolean isInteger() {
-      return (this == BYTE) || (this == SHORT) || (this == INT) || (this == LONG);
+      switch (this) {
+        case BYTE:
+        case SHORT:
+        case INT:
+        case LONG:
+          return true;
+        default:
+          return false;
+      }
     }
 
     public boolean isSingleValue() {
       return this.ordinal() < BYTE_ARRAY.ordinal();
+    }
+
+    /**
+     * Return the {@link DataType} stored in pinot.
+     */
+    public DataType getStoredType() {
+      switch (this) {
+        case BYTE:
+        case SHORT:
+        case INT:
+          return INT;
+        case LONG:
+          return LONG;
+        case FLOAT:
+          return FLOAT;
+        case DOUBLE:
+          return DOUBLE;
+        case BOOLEAN:
+        case CHAR:
+        case STRING:
+          return STRING;
+        default:
+          throw new UnsupportedOperationException("Unsupported data type: " + this);
+      }
     }
 
     /**
@@ -304,10 +301,6 @@ public abstract class FieldSpec {
      */
     public int size() {
       switch (this) {
-        case BYTE:
-          return 1;
-        case SHORT:
-          return 2;
         case INT:
           return 4;
         case LONG:
@@ -355,12 +348,6 @@ public abstract class FieldSpec {
           stringType.put("null");
           stringType.put("string");
           ret.put("type", stringType);
-          return ret;
-        case BOOLEAN:
-          final JSONArray booleanType = new JSONArray();
-          booleanType.put("null");
-          booleanType.put("boolean");
-          ret.put("type", booleanType);
           return ret;
         default:
           return null;

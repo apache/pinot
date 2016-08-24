@@ -145,14 +145,12 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     if (enableHllIndex) {
       Collection<String> columnNames = dataSchema.getColumnNames();
       HllConfig hllConfig = config.getHllConfig();
-      for (Entry<String, String> entry : hllConfig.getDerivedHllFieldsMap().entrySet()) {
-        String originFieldName = entry.getKey();
-        String derivedFieldName = entry.getValue();
+      for (String derivedFieldName : hllConfig.getDerivedHllFieldsMap().values()) {
         if (columnNames.contains(derivedFieldName)) {
-          throw new IllegalArgumentException("Can not add derivedField " + derivedFieldName
-              + " since it already exists in schema.");
+          throw new IllegalArgumentException(
+              "Cannot add derived field: " + derivedFieldName + " since it already exists in schema.");
         } else {
-          dataSchema.addField(derivedFieldName,
+          dataSchema.addField(
               new MetricFieldSpec(derivedFieldName, FieldSpec.DataType.STRING, hllConfig.getHllFieldSize(),
                   MetricFieldSpec.DerivedMetricType.HLL));
         }
@@ -160,17 +158,16 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     }
   }
 
-  private void populateDefaultDerivedColumnValues(GenericRow row) throws IOException {
+  private void populateDefaultDerivedColumnValues(GenericRow row)
+      throws IOException {
     //add default hll value in each row
     if (enableHllIndex) {
       HllConfig hllConfig = config.getHllConfig();
       for (Entry<String, String> entry : hllConfig.getDerivedHllFieldsMap().entrySet()) {
         String originFieldName = entry.getKey();
         String derivedFieldName = entry.getValue();
-        row.putField(
-            derivedFieldName,
-            HllUtil.singleValueHllAsString(hllConfig.getHllLog2m(), row.getValue(originFieldName))
-        );
+        row.putField(derivedFieldName,
+            HllUtil.singleValueHllAsString(hllConfig.getHllLog2m(), row.getValue(originFieldName)));
       }
     }
   }

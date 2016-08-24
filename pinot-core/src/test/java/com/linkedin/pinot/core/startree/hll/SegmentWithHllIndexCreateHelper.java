@@ -39,7 +39,6 @@ import java.nio.file.Files;
 import java.util.concurrent.TimeUnit;
 
 public class SegmentWithHllIndexCreateHelper {
-
     private static final Logger LOGGER = LoggerFactory.getLogger(SegmentWithHllIndexCreateHelper.class);
 
     private File INDEX_DIR;
@@ -97,20 +96,6 @@ public class SegmentWithHllIndexCreateHelper {
         LOGGER.info("Time column: {}", schema.getTimeColumnName());
     }
 
-    private void addTimeColumnToSchema(SegmentGeneratorConfig segmentGenConfig) throws Exception {
-        // set time column in schema
-        DataFileStream<GenericRecord> dataStream =
-                new DataFileStream<>(new FileInputStream(inputAvro), new GenericDatumReader<GenericRecord>());
-        final TimeGranularitySpec gSpec = new TimeGranularitySpec(
-                 /* time column data type*/
-                SegmentTestUtils.getColumnType(dataStream.getSchema().getField(timeColumnName)),
-                timeUnit,
-                timeColumnName);
-        final TimeFieldSpec fSpec = new TimeFieldSpec(gSpec);
-        segmentGenConfig.getSchema().addField(timeColumnName, fSpec);
-        dataStream.close();
-    }
-
     private void setupStarTreeConfig(SegmentGeneratorConfig segmentGenConfig) {
         // StarTree related
         segmentGenConfig.setEnableStarTreeIndex(true);
@@ -124,8 +109,6 @@ public class SegmentWithHllIndexCreateHelper {
     public SegmentIndexCreationDriver build(boolean enableStarTree, HllConfig hllConfig) throws Exception {
         final SegmentGeneratorConfig segmentGenConfig = new SegmentGeneratorConfig(
                 SegmentTestUtils.extractSchemaFromAvroWithoutTime(inputAvro));
-
-        addTimeColumnToSchema(segmentGenConfig);
 
         // set other fields in segmentGenConfig
         segmentGenConfig.setInputFilePath(inputAvro.getAbsolutePath());

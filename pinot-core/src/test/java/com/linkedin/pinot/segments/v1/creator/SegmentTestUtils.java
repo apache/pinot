@@ -94,16 +94,16 @@ public class SegmentTestUtils {
         case TIME:
           final TimeGranularitySpec gSpec = new TimeGranularitySpec(getColumnType(field), granularity, columnName);
           final TimeFieldSpec fSpec = new TimeFieldSpec(gSpec);
-          schema.addField(columnName, fSpec);
+          schema.addField(fSpec);
           continue;
         case DIMENSION:
           final FieldSpec dimensionFieldSpec =
               new DimensionFieldSpec(columnName, getColumnType(field), isSingleValueField(field));
-          schema.addField(columnName, dimensionFieldSpec);
+          schema.addField(dimensionFieldSpec);
           continue;
         case METRIC:
           final FieldSpec metricFieldSpec = new MetricFieldSpec(columnName, getColumnType(field));
-          schema.addField(columnName, metricFieldSpec);
+          schema.addField(metricFieldSpec);
           continue;
         default:
           throw new UnsupportedOperationException("Unsupported field type: " + fieldType);
@@ -140,7 +140,7 @@ public class SegmentTestUtils {
       fieldSpec.setName(columnName);
       fieldSpec.setDataType(getColumnType(dataStream.getSchema().getField(columnName)));
       fieldSpec.setSingleValueField(isSingleValueField(dataStream.getSchema().getField(columnName)));
-      schema.addField(columnName, fieldSpec);
+      schema.addField(fieldSpec);
     }
 
     dataStream.close();

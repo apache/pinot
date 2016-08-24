@@ -132,15 +132,15 @@ public final class TimeFieldSpec extends FieldSpec {
   }
 
   @Override
-  public boolean equals(Object anObject) {
-    if (this == anObject) {
+  public boolean equals(Object object) {
+    if (this == object) {
       return true;
     }
-    if (anObject instanceof TimeFieldSpec) {
-      TimeFieldSpec anotherTimeFieldSpec = (TimeFieldSpec) anObject;
-      return _incomingGranularitySpec.equals(anotherTimeFieldSpec._incomingGranularitySpec)
-          && getOutgoingGranularitySpec().equals(anotherTimeFieldSpec.getOutgoingGranularitySpec())
-          && getDefaultNullValue().equals(anotherTimeFieldSpec.getDefaultNullValue());
+    if (object instanceof TimeFieldSpec) {
+      TimeFieldSpec that = (TimeFieldSpec) object;
+      return _incomingGranularitySpec.equals(that._incomingGranularitySpec)
+          && getOutgoingGranularitySpec().equals(that.getOutgoingGranularitySpec())
+          && getDefaultNullValue().equals(that.getDefaultNullValue());
     }
     return false;
   }

@@ -16,13 +16,23 @@
 package com.linkedin.pinot.common.data;
 
 import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.utils.EqualityUtils;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 
 
+/**
+ * The <code>MetricFieldSpec</code> class contains all specs related to any metric field (column) in {@link Schema}.
+ * <p>Different with {@link DimensionFieldSpec}, inside <code>MetricFieldSpec</code> we allow user defined
+ * {@link DerivedMetricType} and <code>fieldSize</code>.
+ * <p>{@link DerivedMetricType} is used when the metric field is derived from some other fields (e.g. HLL).
+ * <p><code>fieldSize</code> is used to mark the size of the value when the size is not constant (e.g. STRING).
+ */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class MetricFieldSpec extends FieldSpec {
+  private static final String DEFAULT_DERIVED_METRIC_NULL_VALUE_OF_STRING = "null";
 
+  // These two fields are for derived metric fields.
   private int fieldSize = -1;
   private DerivedMetricType derivedMetricType = null;
 
@@ -35,12 +45,7 @@ public final class MetricFieldSpec extends FieldSpec {
     super(name, dataType, true);
   }
 
-  /**
-   * For Derived Fields
-   * @param name
-   * @param dataType
-   * @param derivedMetricType
-   */
+  // For derived metric fields.
   public MetricFieldSpec(String name, DataType dataType, int fieldSize, DerivedMetricType derivedMetricType) {
     super(name, dataType, true);
     this.fieldSize = fieldSize;
@@ -59,6 +64,14 @@ public final class MetricFieldSpec extends FieldSpec {
     this.fieldSize = fieldSize;
   }
 
+  public DerivedMetricType getDerivedMetricType() {
+    return derivedMetricType;
+  }
+
+  public void setDerivedMetricType(DerivedMetricType derivedMetricType) {
+    this.derivedMetricType = derivedMetricType;
+  }
+
   @JsonIgnore
   @Override
   public FieldType getFieldType() {
@@ -70,30 +83,62 @@ public final class MetricFieldSpec extends FieldSpec {
     Preconditions.checkArgument(isSingleValueField, "Unsupported multi-value for metric field.");
   }
 
+  @Override
+  public Object getDefaultNullValue() {
+    if (derivedMetricType != null && getDataType() == DataType.STRING) {
+      return DEFAULT_DERIVED_METRIC_NULL_VALUE_OF_STRING;
+    } else {
+      return super.getDefaultNullValue();
+    }
+  }
+
   @JsonIgnore
   public boolean isDerivedMetric() {
     return derivedMetricType != null;
   }
 
-  public DerivedMetricType getDerivedMetricType() {
-    return derivedMetricType;
-  }
-
-  public void setDerivedMetricType(DerivedMetricType derivedMetricType) {
-    this.derivedMetricType = derivedMetricType;
-  }
-
   /**
-   * DerivedMetricType is assigned for all metric fields to allow derived metric field a customized type not in DataType.
-   * Since we cannot add a new type directly to DataType since Pinot currently has no support for a custom types.
-   *
-   * It is currently used for derived field recognition in MetricBuffer, may have other use cases in system later.
-   *
-   * Generally, a customized type value should be converted to a standard Pinot type value (like String)
-   * for serialization, and converted back after deserialization when in use.
+   * The <code>DerivedMetricType</code> enum is assigned for all metric fields to allow derived metric field, a
+   * customized type which is not included in DataType.
+   * <p>It is currently used for derived field recognition in star tree <code>MetricBuffer</code>, may have other use
+   * cases later.
+   * <p>Generally, a customized type value should be converted to a standard
+   * {@link com.linkedin.pinot.common.data.FieldSpec.DataType} for storage, and converted back when needed.
    */
   public enum DerivedMetricType {
-    // customized types start from here
     HLL
+  }
+
+  @Override
+  public String toString() {
+    return "< field type: METRIC, field name: " + getName() + ", data type: " + getDataType() + ", default null value: "
+        + getDefaultNullValue() + ", field size: " + fieldSize + ", derived metric type: " + derivedMetricType + " >";
+  }
+
+  @Override
+  public boolean equals(Object object) {
+    if (this == object) {
+      return true;
+    }
+    if (object instanceof MetricFieldSpec) {
+      MetricFieldSpec that = (MetricFieldSpec) object;
+
+      return getName().equals(that.getName())
+          && getDataType() == that.getDataType()
+          && getDefaultNullValue().equals(that.getDefaultNullValue())
+          && getFieldSize() == that.getFieldSize()
+          && derivedMetricType == that.derivedMetricType;
+    }
+    return false;
+  }
+
+  @Override
+  public int hashCode() {
+    int result = getName().hashCode();
+    result = EqualityUtils.hashCodeOf(result, getDataType());
+    result = EqualityUtils.hashCodeOf(result, getDefaultNullValue());
+    result = EqualityUtils.hashCodeOf(result, getFieldSize());
+    result = EqualityUtils.hashCodeOf(result, derivedMetricType);
+    return result;
   }
 }

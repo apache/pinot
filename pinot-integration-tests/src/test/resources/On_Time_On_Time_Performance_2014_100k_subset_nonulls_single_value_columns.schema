@@ -188,23 +188,8 @@
     },
     {
       "dataType": "INT",
-      "name": "DivAirportIDs",
-      "singleValueField": false
-    },
-    {
-      "dataType": "INT",
       "name": "DivAirportLandings",
       "singleValueField": true
-    },
-    {
-      "dataType": "INT",
-      "name": "DivAirportSeqIDs",
-      "singleValueField": false
-    },
-    {
-      "dataType": "STRING",
-      "name": "DivAirports",
-      "singleValueField": false
     },
     {
       "dataType": "INT",
@@ -217,34 +202,9 @@
       "singleValueField": true
     },
     {
-      "dataType": "FLOAT",
-      "name": "DivLongestGTimes",
-      "singleValueField": false
-    },
-    {
       "dataType": "INT",
       "name": "DivReachedDest",
       "singleValueField": true
-    },
-    {
-      "dataType": "STRING",
-      "name": "DivTailNums",
-      "singleValueField": false
-    },
-    {
-      "dataType": "LONG",
-      "name": "DivTotalGTimes",
-      "singleValueField": false
-    },
-    {
-      "dataType": "INT",
-      "name": "DivWheelsOffs",
-      "singleValueField": false
-    },
-    {
-      "dataType": "INT",
-      "name": "DivWheelsOns",
-      "singleValueField": false
     },
     {
       "dataType": "INT",
@@ -330,11 +290,6 @@
       "dataType": "INT",
       "name": "Quarter",
       "singleValueField": true
-    },
-    {
-      "dataType": "STRING",
-      "name": "RandomAirports",
-      "singleValueField": false
     },
     {
       "dataType": "STRING",

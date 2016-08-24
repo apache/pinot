@@ -1,0 +1,102 @@
+{
+  "metricFieldSpecs": [
+    {
+      "name": "byteMetric",
+      "dataType": "BYTE",
+      "defaultNullValue": "-1"
+    },
+    {
+      "name": "shortMetric",
+      "dataType": "SHORT",
+      "singleValueField": true
+    },
+    {
+      "name": "intMetric",
+      "dataType": "INT",
+      "defaultNullValue": -2
+    },
+    {
+      "name": "longMetric",
+      "dataType": "LONG",
+      "singleValueField": true
+    },
+    {
+      "name": "floatMetric",
+      "dataType": "FLOAT",
+      "defaultNullValue": -3
+    },
+    {
+      "name": "doubleMetric",
+      "dataType": "DOUBLE",
+      "singleValueField": true
+    }
+  ],
+  "dimensionFieldSpecs": [
+    {
+      "name": "booleanDimension",
+      "dataType": "BOOLEAN",
+      "defaultNullValue": false
+    },
+    {
+      "name": "byteDimension",
+      "dataType": "BYTE",
+      "singleValueField": true,
+      "delimiter": null
+    },
+    {
+      "name": "charDimension",
+      "dataType": "CHAR",
+      "singleValueField": false,
+      "defaultNullValue": "%"
+    },
+    {
+      "name": "shortDimension",
+      "dataType": "SHORT",
+      "delimiter": null
+    },
+    {
+      "name": "intDimension",
+      "dataType": "INT",
+      "singleValueField": true,
+      "defaultNullValue": -1
+    },
+    {
+      "name": "longDimension",
+      "dataType": "LONG",
+      "singleValueField": false,
+      "delimiter": null
+    },
+    {
+      "name": "floatDimension",
+      "dataType": "FLOAT",
+      "defaultNullValue": -2
+    },
+    {
+      "name": "doubleDimension",
+      "dataType": "DOUBLE",
+      "singleValueField": true,
+      "delimiter": null
+    },
+    {
+      "name": "stringDimension",
+      "dataType": "STRING",
+      "singleValueField": false,
+      "defaultNullValue": "default"
+    }
+  ],
+  "timeFieldSpec": {
+    "incomingGranularitySpec": {
+      "dataType": "LONG",
+      "timeType": "SECONDS",
+      "timeUnitSize": 10,
+      "name": "incoming"
+    },
+    "outgoingGranularitySpec": {
+      "dataType": "INT",
+      "timeType": "DAYS",
+      "name": "outgoing"
+    },
+    "defaultNullValue": 10000
+  },
+  "schemaName": "schemaTest"
+}

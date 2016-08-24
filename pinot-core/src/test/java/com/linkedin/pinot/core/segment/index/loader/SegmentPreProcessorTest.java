@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.segment.index.loader;
 
+import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
@@ -32,16 +33,16 @@ import com.linkedin.pinot.core.segment.store.SegmentDirectory;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
+import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.attribute.FileTime;
 import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
-import org.codehaus.jackson.map.ObjectMapper;
 import org.testng.Assert;
-import org.testng.annotations.AfterMethod;
-import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
@@ -74,23 +75,42 @@ public class SegmentPreProcessorTest {
   private Schema newColumnsSchema2;
   private Schema newColumnsSchema3;
 
-  @BeforeMethod
+  @BeforeClass
   public void setUp()
       throws Exception {
-    FileUtils.deleteQuietly(INDEX_DIR);
-
-    File avroFile =
-        new File(TestUtils.getFileFromResourceUrl(SegmentPreProcessor.class.getClassLoader().getResource(AVRO_DATA)));
-
-    // NOTE:
-    // We create inverted index for 'column7' when constructing the segment.
-    //
     // For indexLoadingConfigMetadata, we specify two columns without inverted index ('column1', 'column13'), one
     // non-existing column ('noSuchColumn') and one column with existed inverted index ('column7').
-    //
+    indexLoadingConfigMetadata = new IndexLoadingConfigMetadata(new PropertiesConfiguration());
+    indexLoadingConfigMetadata.initLoadingInvertedIndexColumnSet(
+        new String[]{COLUMN1_NAME, COLUMN7_NAME, COLUMN13_NAME, NO_SUCH_COLUMN_NAME});
+    indexLoadingConfigMetadata.setEnableDefaultColumns(true);
+
     // For newColumnsSchema, we add 4 different data type metric columns with one user-defined default null value, and
     // 3 different data type dimension columns with one user-defined default null value and one multi-value column.
+    ClassLoader classLoader = getClass().getClassLoader();
+    URL resourceUrl = classLoader.getResource(NEW_COLUMNS_SCHEMA1);
+    Preconditions.checkNotNull(resourceUrl);
+    newColumnsSchema1 = Schema.fromFile(new File(resourceUrl.getFile()));
+    resourceUrl = classLoader.getResource(NEW_COLUMNS_SCHEMA2);
+    Preconditions.checkNotNull(resourceUrl);
+    newColumnsSchema2 = Schema.fromFile(new File(resourceUrl.getFile()));
+    resourceUrl = classLoader.getResource(NEW_COLUMNS_SCHEMA3);
+    Preconditions.checkNotNull(resourceUrl);
+    newColumnsSchema3 = Schema.fromFile(new File(resourceUrl.getFile()));
+  }
 
+  @AfterClass
+  public void tearDown()
+      throws Exception {
+    FileUtils.deleteQuietly(INDEX_DIR);
+  }
+
+  private void constructSegment()
+      throws Exception {
+    FileUtils.deleteQuietly(INDEX_DIR);
+    File avroFile = new File(TestUtils.getFileFromResourceUrl(getClass().getClassLoader().getResource(AVRO_DATA)));
+
+    // NOTE: We create inverted index for 'column7' when constructing the segment.
     // Intentionally changed this to TimeUnit.Hours to make it non-default for testing.
     SegmentGeneratorConfig config =
         SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(avroFile, INDEX_DIR, "daysSinceEpoch",
@@ -103,32 +123,13 @@ public class SegmentPreProcessorTest {
     driver.build();
 
     segmentDirectoryFile = new File(INDEX_DIR, driver.getSegmentName());
-    indexLoadingConfigMetadata = new IndexLoadingConfigMetadata(new PropertiesConfiguration());
-    indexLoadingConfigMetadata.initLoadingInvertedIndexColumnSet(
-        new String[]{COLUMN1_NAME, COLUMN7_NAME, COLUMN13_NAME, NO_SUCH_COLUMN_NAME});
-    indexLoadingConfigMetadata.setEnableDefaultColumns(true);
-
-    ObjectMapper objectMapper = new ObjectMapper();
-    File newColumnsSchemaFile1 = new File(
-        TestUtils.getFileFromResourceUrl(SegmentPreProcessor.class.getClassLoader().getResource(NEW_COLUMNS_SCHEMA1)));
-    newColumnsSchema1 = objectMapper.readValue(newColumnsSchemaFile1, Schema.class);
-    File newColumnsSchemaFile2 = new File(
-        TestUtils.getFileFromResourceUrl(SegmentPreProcessor.class.getClassLoader().getResource(NEW_COLUMNS_SCHEMA2)));
-    newColumnsSchema2 = objectMapper.readValue(newColumnsSchemaFile2, Schema.class);
-    File newColumnsSchemaFile3 = new File(
-        TestUtils.getFileFromResourceUrl(SegmentPreProcessor.class.getClassLoader().getResource(NEW_COLUMNS_SCHEMA3)));
-    newColumnsSchema3 = objectMapper.readValue(newColumnsSchemaFile3, Schema.class);
-  }
-
-  @AfterMethod
-  public void tearDown()
-      throws Exception {
-    FileUtils.deleteQuietly(INDEX_DIR);
   }
 
   @Test
   public void testV1CreateInvertedIndices()
       throws Exception {
+    constructSegment();
+
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(segmentDirectoryFile);
     String segmentVersion = segmentMetadata.getVersion();
     Assert.assertEquals(SegmentVersion.valueOf(segmentVersion), SegmentVersion.v1);
@@ -179,6 +180,8 @@ public class SegmentPreProcessorTest {
   @Test
   public void testV3CreateInvertedIndices()
       throws Exception {
+    constructSegment();
+
     // Convert segment format to v3.
     SegmentV1V2ToV3FormatConverter converter = new SegmentV1V2ToV3FormatConverter();
     converter.convert(segmentDirectoryFile);
@@ -265,6 +268,8 @@ public class SegmentPreProcessorTest {
   @Test
   public void testV1UpdateDefaultColumns()
       throws Exception {
+    constructSegment();
+
     checkUpdateDefaultColumns(segmentDirectoryFile);
 
     // Try to use the third schema and update default value again.
@@ -278,6 +283,8 @@ public class SegmentPreProcessorTest {
   @Test
   public void testV3UpdateDefaultColumns()
       throws Exception {
+    constructSegment();
+
     // Convert segment format to v3.
     SegmentV1V2ToV3FormatConverter converter = new SegmentV1V2ToV3FormatConverter();
     converter.convert(segmentDirectoryFile);
@@ -340,7 +347,7 @@ public class SegmentPreProcessorTest {
     Assert.assertEquals(columnMetadata.getDefaultNullValueString(), "0.0");
 
     columnMetadata = segmentMetadata.getColumnMetadataFor(NEW_BOOLEAN_SV_DIMENSION_COLUMN_NAME);
-    Assert.assertEquals(columnMetadata.getDataType(), FieldSpec.DataType.BOOLEAN);
+    Assert.assertEquals(columnMetadata.getDataType(), FieldSpec.DataType.STRING);
     Assert.assertEquals(columnMetadata.getStringColumnMaxLength(), 5);
     Assert.assertEquals(columnMetadata.getFieldType(), FieldSpec.FieldType.DIMENSION);
     Assert.assertEquals(columnMetadata.getDefaultNullValueString(), "false");
@@ -398,6 +405,8 @@ public class SegmentPreProcessorTest {
   @Test
   public void testNullIndexLoadingConfigAndNullSchema()
       throws Exception {
+    constructSegment();
+
     SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectoryFile, null, null);
     processor.process();
     // No exception is the validation that we handle null value for indexLoadingConfigMetadata and newColumnsSchema

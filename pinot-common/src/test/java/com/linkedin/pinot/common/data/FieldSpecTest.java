@@ -16,6 +16,7 @@
 package com.linkedin.pinot.common.data;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import java.io.IOException;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Random;
@@ -25,12 +26,18 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
+/**
+ * Tests for {@link FieldSpec}.
+ */
 public class FieldSpecTest {
   private static final long RANDOM_SEED = System.currentTimeMillis();
   private static final Random RANDOM = new Random(RANDOM_SEED);
   private static final String ERROR_MESSAGE = "Random seed is: " + RANDOM_SEED;
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
+  /**
+   * Test all {@link FieldSpec.FieldType} with different {@link DataType}.
+   */
   @Test
   public void testFieldSpec() {
     // Single-value boolean type dimension field with default null value.
@@ -97,6 +104,28 @@ public class FieldSpecTest {
     Assert.assertEquals(fieldSpec1.getDefaultNullValue(), 1L);
   }
 
+  /**
+   * Test derived {@link MetricFieldSpec}.
+   */
+  @Test
+  public void testDerivedMetricFieldSpec()
+      throws IOException {
+    MetricFieldSpec derivedMetricField =
+        new MetricFieldSpec("derivedMetric", DataType.STRING, 10, MetricFieldSpec.DerivedMetricType.HLL);
+    Assert.assertEquals(derivedMetricField.getFieldSize(), 10);
+    Assert.assertTrue(derivedMetricField.isDerivedMetric());
+    Assert.assertEquals(derivedMetricField.getDerivedMetricType(), MetricFieldSpec.DerivedMetricType.HLL);
+    Assert.assertEquals(derivedMetricField.getDefaultNullValue(), "null");
+
+    // Test serialize deserialize.
+    MetricFieldSpec derivedMetricField2 =
+        MAPPER.readValue(MAPPER.writeValueAsString(derivedMetricField), MetricFieldSpec.class);
+    Assert.assertEquals(derivedMetricField2, derivedMetricField);
+  }
+
+  /**
+   * Test different order of fields in serialized JSON string to deserialize {@link FieldSpec}.
+   */
   @Test
   public void testOrderOfFields() throws Exception {
     // Metric field with default null value.
@@ -144,6 +173,9 @@ public class FieldSpecTest {
     Assert.assertEquals(timeFieldSpec1.getDefaultNullValue(), -1, ERROR_MESSAGE);
   }
 
+  /**
+   * Test {@link FieldSpec} serialize deserialize.
+   */
   @Test
   public void testSerializeDeserialize() throws Exception {
     FieldSpec first;
@@ -180,10 +212,7 @@ public class FieldSpecTest {
   }
 
   /**
-   * Helper function to generate json string with random order of fields passed in.
-   *
-   * @param fields string array of fields.
-   * @return generated json string.
+   * Helper function to generate JSON string with random order of fields passed in.
    */
   private String getRandomOrderJsonString(String[] fields) {
     int length = fields.length;

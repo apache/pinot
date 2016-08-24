@@ -116,8 +116,7 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
       throw new RuntimeException("Cannot generate negative number of records/files.");
     }
 
-    File schemaFile = new File(_schemaFile);
-    Schema schema = new ObjectMapper().readValue(schemaFile, Schema.class);
+    Schema schema = Schema.fromFile(new File(_schemaFile));
 
     List<String> columns = new LinkedList<String>();
     final HashMap<String, DataType> dataTypes = new HashMap<String, DataType>();

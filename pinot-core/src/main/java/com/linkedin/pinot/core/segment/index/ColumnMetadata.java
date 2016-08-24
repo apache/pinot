@@ -139,7 +139,7 @@ public class ColumnMetadata {
     }
 
     public Builder setDataType(DataType dataType) {
-      this.dataType = dataType;
+      this.dataType = dataType.getStoredType();
       return this;
     }
 
