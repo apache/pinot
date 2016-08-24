@@ -142,7 +142,6 @@ public class AnomalyMergeExecutor implements Runnable {
     }
     if (totalBucketSize != 0) {
       mergedResult.setScore((weightedScoreSum / totalBucketSize) * normalizationFactor);
-      // TODO: recompute weight by querying Pinot
       mergedResult.setWeight((weightedWeightSum / totalBucketSize) * normalizationFactor);
     }
 
@@ -153,6 +152,11 @@ public class AnomalyMergeExecutor implements Runnable {
         LOG.error("Could not recompute severity", e);
       }
     }
+
+    // update the anomaly reason message in merged anomaly
+    mergedResult.setMessage(
+        mergedResult.getAnomalyResults().get(mergedResult.getAnomalyResults().size() - 1)
+            .getMessage());
 
     try {
       // persist the merged result

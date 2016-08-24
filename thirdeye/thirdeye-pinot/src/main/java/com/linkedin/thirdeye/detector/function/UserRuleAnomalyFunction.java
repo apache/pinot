@@ -2,7 +2,6 @@ package com.linkedin.thirdeye.detector.function;
 
 import java.text.NumberFormat;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
@@ -144,8 +143,6 @@ public class UserRuleAnomalyFunction extends BaseAnomalyFunction {
     Set<Long> filteredBaselineTimes =
         filterTimeWindowSet(timeSeries.getTimeWindowSet(), windowStart.getMillis(), windowEnd
             .minus(baselineMillis).getMillis());
-    Long min = Collections.min(timeSeries.getTimeWindowSet());
-    Long max = Collections.max(timeSeries.getTimeWindowSet());
     List<Double> currentValues = new ArrayList<>();
     List<Double> baselineValues = new ArrayList<>();
     for (Long baselineKey : filteredBaselineTimes) {
@@ -180,7 +177,6 @@ public class UserRuleAnomalyFunction extends BaseAnomalyFunction {
 
     return getFilteredAndMergedAnomalyResults(anomalyResults, minConsecutiveSize, bucketMillis,
         baselineValues, currentValues, changeThreshold, baselineProp);
-
   }
 
   /**
@@ -259,9 +255,7 @@ public class UserRuleAnomalyFunction extends BaseAnomalyFunction {
           }
         }
       }
-
       return anomalyResultsAggregated;
-
     } else {
       return anomalyResults;
     }

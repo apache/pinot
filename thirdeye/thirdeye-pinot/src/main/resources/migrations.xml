@@ -616,4 +616,12 @@
       update anomaly_functions set window_delay_unit = 'MINUTES' where window_delay_unit='4';
     </sql>
   </changeSet>
+
+  <changeSet id="24" author="pjaiswal">
+    <addColumn tableName="anomaly_merged_results">
+      <column name="message" type="varchar(1023)">
+        <constraints nullable="true"/>
+      </column>
+    </addColumn>
+  </changeSet>
 </databaseChangeLog>

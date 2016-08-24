@@ -1,11 +1,6 @@
 package com.linkedin.thirdeye.db.entity;
-import com.google.common.base.Joiner;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 
-import java.util.Properties;
 import javax.persistence.CascadeType;
 import javax.persistence.Column;
 import javax.persistence.Entity;
@@ -23,8 +18,6 @@ import com.google.common.base.MoreObjects;
 @Entity
 @Table(name = "anomaly_results")
 public class AnomalyResult extends AbstractBaseEntity implements Comparable<AnomalyResult> {
-  private static Joiner SEMICOLON = Joiner.on(";");
-  private static Joiner EQUALS = Joiner.on("=");
 
   @Column(name = "start_time_utc", nullable = false)
   private Long startTimeUtc;
@@ -236,13 +229,5 @@ public class AnomalyResult extends AbstractBaseEntity implements Comparable<Anom
       return diff;
     }
     return ObjectUtils.compare(getId(), o.getId());
-  }
-
-  public static String encodeCompactedProperties(Properties props) {
-    List<String> parts = new ArrayList<>();
-    for (Map.Entry<Object, Object> entry : props.entrySet()) {
-      parts.add(EQUALS.join(entry.getKey(), entry.getValue()));
-    }
-    return SEMICOLON.join(parts);
   }
 }
