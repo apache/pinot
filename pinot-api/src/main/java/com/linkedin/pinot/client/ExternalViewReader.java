@@ -84,7 +84,7 @@ public class ExternalViewReader {
       Iterator<String> resourceNames = brokerResourceNode.keys();
       while (resourceNames.hasNext()) {
         String resourceName = resourceNames.next();
-        String resourceNameCommon = resourceName = resourceName.replace("_OFFLINE", "").replace("_REALTIME", "");
+        String resourceNameCommon = resourceName.replace("_OFFLINE", "").replace("_REALTIME", "");
         Set<String> brokerUrls = brokerUrlsMap.get(resourceNameCommon);
         if (brokerUrls == null) {
           brokerUrls = new HashSet<>();
