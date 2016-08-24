@@ -1,16 +1,5 @@
 language: java
 
-env:
-  - PINOT_MODULE="pinot-integration-tests"
-  - PINOT_MODULE="pinot-core"
-  - PINOT_MODULE="pinot-controller"
-  - PINOT_MODULE="pinot-api"
-  - PINOT_MODULE="pinot-common"
-  - PINOT_MODULE="pinot-transport"
-  - PINOT_MODULE="pinot-broker"
-  - PINOT_MODULE="pinot-server"
-  - PINOT_MODULE="pinot-perf"
-
 jdk:
   - oraclejdk7
   - openjdk7
@@ -21,9 +10,6 @@ install:
 
 script:
   - ./.travis_test.sh
-
-after_success:
-  - bash <(cat .codecov_bash)
 
 branches:
   only:
