@@ -14,11 +14,12 @@ import javax.persistence.ManyToOne;
 import javax.persistence.OneToMany;
 import javax.persistence.OneToOne;
 import javax.persistence.Table;
+import org.apache.commons.lang.ObjectUtils;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 @Entity
 @Table(name = "anomaly_merged_results")
-public class AnomalyMergedResult extends AbstractBaseEntity {
+public class AnomalyMergedResult extends AbstractBaseEntity implements Comparable<AnomalyMergedResult> {
 
   @Column(name = "collection")
   private String collection;
@@ -45,6 +46,9 @@ public class AnomalyMergedResult extends AbstractBaseEntity {
 
   @Column(name = "created_time", nullable = false)
   private Long createdTime;
+
+  @Column(name = "message")
+  private String message;
 
   @OneToOne(cascade = CascadeType.ALL, fetch = FetchType.EAGER, orphanRemoval = true)
   @JoinColumn(name = "anomaly_feedback_id")
@@ -147,6 +151,14 @@ public class AnomalyMergedResult extends AbstractBaseEntity {
     this.weight = weight;
   }
 
+  public String getMessage() {
+    return message;
+  }
+
+  public void setMessage(String message) {
+    this.message = message;
+  }
+
   @Override
   public int hashCode() {
     return Objects.hash(getId(), startTime, endTime, collection, metric, dimensions, score);
@@ -161,5 +173,24 @@ public class AnomalyMergedResult extends AbstractBaseEntity {
     return Objects.equals(getId(), m.getId()) && Objects.equals(startTime, m.getStartTime())
         && Objects.equals(endTime, m.getEndTime()) && Objects.equals(collection, m.getCollection())
         && Objects.equals(metric, m.getMetric()) && Objects.equals(dimensions, m.getDimensions());
+  }
+
+  @Override
+  public int compareTo(AnomalyMergedResult o) {
+    // compare by dimension, -startTime, functionId, id
+    int diff = ObjectUtils.compare(getDimensions(), o.getDimensions());
+    if (diff != 0) {
+      return diff;
+    }
+    diff = -ObjectUtils.compare(startTime, o.getStartTime()); // inverted to sort by
+    // decreasing time
+    if (diff != 0) {
+      return diff;
+    }
+    diff = ObjectUtils.compare(getFunction().getId(), o.getFunction().getId());
+    if (diff != 0) {
+      return diff;
+    }
+    return ObjectUtils.compare(getId(), o.getId());
   }
 }

@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.anomaly.task;
 
 import com.linkedin.thirdeye.db.dao.AnomalyJobDAO;
+import com.linkedin.thirdeye.db.dao.AnomalyMergedResultDAO;
 import com.linkedin.thirdeye.db.dao.AnomalyResultDAO;
 import com.linkedin.thirdeye.db.dao.AnomalyTaskDAO;
 
@@ -29,9 +30,9 @@ public class TaskDriver {
 
   private ExecutorService taskExecutorService;
 
-  private AnomalyJobDAO anomalyJobDAO;
-  private AnomalyTaskDAO anomalyTaskDAO;
-  private AnomalyResultDAO anomalyResultDAO;
+  private final AnomalyTaskDAO anomalyTaskDAO;
+  private final AnomalyResultDAO anomalyResultDAO;
+  private final AnomalyMergedResultDAO mergedResultDAO;
   private AnomalyFunctionFactory anomalyFunctionFactory;
   private TaskContext taskContext;
   private ThirdEyeAnomalyConfiguration thirdEyeAnomalyConfiguration;
@@ -41,10 +42,12 @@ public class TaskDriver {
   private static int MAX_PARALLEL_TASK = 3;
 
   public TaskDriver(ThirdEyeAnomalyConfiguration thirdEyeAnomalyConfiguration, AnomalyJobDAO anomalyJobDAO,
-      AnomalyTaskDAO anomalyTaskDAO, AnomalyResultDAO anomalyResultDAO, AnomalyFunctionFactory anomalyFunctionFactory) {
+      AnomalyTaskDAO anomalyTaskDAO, AnomalyResultDAO anomalyResultDAO, AnomalyMergedResultDAO mergedResultDAO,
+      AnomalyFunctionFactory anomalyFunctionFactory) {
     this.workerId = thirdEyeAnomalyConfiguration.getId();
     this.anomalyTaskDAO = anomalyTaskDAO;
     this.anomalyResultDAO = anomalyResultDAO;
+    this.mergedResultDAO = mergedResultDAO;
     this.anomalyFunctionFactory = anomalyFunctionFactory;
     taskExecutorService = Executors.newFixedThreadPool(MAX_PARALLEL_TASK);
 
@@ -82,7 +85,7 @@ public class TaskDriver {
               LOG.info(Thread.currentThread().getId() + " : DONE Executing task: {}", anomalyTaskSpec.getId());
 
               // update status to COMPLETED
-              updateStatusAndTaskEndime(anomalyTaskSpec.getId(), TaskStatus.RUNNING, TaskStatus.COMPLETED);
+              updateStatusAndTaskEndTime(anomalyTaskSpec.getId(), TaskStatus.RUNNING, TaskStatus.COMPLETED);
             } catch (Exception e) {
               LOG.error("Exception in electing and executing task", e);
             }
@@ -136,12 +139,12 @@ public class TaskDriver {
     return acquiredTask;
   }
 
-  private void updateStatusAndTaskEndime(long taskId, TaskStatus oldStatus, TaskStatus newStatus) throws Exception {
-    LOG.info(Thread.currentThread().getId() + " : Starting updateStatus {}", Thread.currentThread().getId());
+  private void updateStatusAndTaskEndTime(long taskId, TaskStatus oldStatus, TaskStatus newStatus) throws Exception {
+    LOG.info("{} : Starting updateStatus {}", Thread.currentThread().getId(), Thread.currentThread().getId());
 
     try {
       anomalyTaskDAO.updateStatusAndTaskEndTime(taskId, oldStatus, newStatus, System.currentTimeMillis());
-      LOG.info(Thread.currentThread().getId() + " : updated status {}", newStatus);
+      LOG.info("{} : updated status {}", Thread.currentThread().getId(), newStatus);
     } catch (Exception e) {
       LOG.error("Exception in updating status and task end time", e);
     }

@@ -1,7 +1,8 @@
 package com.linkedin.thirdeye.anomaly.alert;
 
-import com.linkedin.thirdeye.db.dao.AnomalyResultDAO;
+import com.linkedin.thirdeye.db.dao.AnomalyMergedResultDAO;
 
+import com.linkedin.thirdeye.db.entity.AnomalyMergedResult;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.OutputStreamWriter;
@@ -17,14 +18,11 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
 import java.util.TreeMap;
-import java.util.concurrent.TimeUnit;
 
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.commons.mail.EmailException;
 import org.apache.commons.mail.HtmlEmail;
-import org.jfree.chart.JFreeChart;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.quartz.JobExecutionException;
@@ -36,18 +34,12 @@ import com.linkedin.thirdeye.anomaly.task.TaskContext;
 import com.linkedin.thirdeye.anomaly.task.TaskInfo;
 import com.linkedin.thirdeye.anomaly.task.TaskResult;
 import com.linkedin.thirdeye.anomaly.task.TaskRunner;
-import com.linkedin.thirdeye.api.TimeGranularity;
-import com.linkedin.thirdeye.client.MetricExpression;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.client.comparison.TimeOnTimeComparisonHandler;
-import com.linkedin.thirdeye.client.comparison.TimeOnTimeComparisonRequest;
-import com.linkedin.thirdeye.client.comparison.TimeOnTimeComparisonResponse;
 import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
-import com.linkedin.thirdeye.db.entity.AnomalyResult;
 import com.linkedin.thirdeye.db.entity.EmailConfiguration;
-import com.linkedin.thirdeye.detector.email.AnomalyGraphGenerator;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 import freemarker.template.Configuration;
@@ -60,19 +52,11 @@ import freemarker.template.TemplateScalarModel;
 
 public class AlertTaskRunner implements TaskRunner {
 
-  private static final String PNG = ".png";
-
-  private static final String EMAIL_REPORT_CHART_PREFIX = "email_report_chart_";
-
-  private static final long WEEK_MILLIS = TimeUnit.DAYS.toMillis(7); // TODO make w/w configurable.
-  private static final int MINIMUM_GRAPH_WINDOW_HOURS = 24;
-  private static final int MINIMUM_GRAPH_WINDOW_DAYS = 7;
-
   private static final Logger LOG = LoggerFactory.getLogger(AlertTaskRunner.class);
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE =
       ThirdEyeCacheRegistry.getInstance();
 
-  private AnomalyResultDAO anomalyResultDAO;
+  private AnomalyMergedResultDAO anomalyMergedResultDAO;
   private EmailConfiguration alertConfig;
   private DateTime windowStart;
   private DateTime windowEnd;
@@ -94,7 +78,7 @@ public class AlertTaskRunner implements TaskRunner {
   public List<TaskResult> execute(TaskInfo taskInfo, TaskContext taskContext) throws Exception {
     AlertTaskInfo alertTaskInfo = (AlertTaskInfo) taskInfo;
     List<TaskResult> taskResult = new ArrayList<>();
-    anomalyResultDAO = taskContext.getResultDAO();
+    anomalyMergedResultDAO = taskContext.getMergedResultDAO();
     alertConfig = alertTaskInfo.getAlertConfig();
     windowStart = alertTaskInfo.getWindowStartTime();
     windowEnd = alertTaskInfo.getWindowEndTime();
@@ -120,7 +104,7 @@ public class AlertTaskRunner implements TaskRunner {
     final String collectionAlias = ThirdEyeUtils.getAliasFromCollection(collection);
 
     // Get the anomalies in that range
-    final List<AnomalyResult> results = getAnomalyResults(windowStart, windowEnd);
+    final List<AnomalyMergedResult> results = anomalyMergedResultDAO.getAllByTimeEmailId(windowStart.getMillis(), windowEnd.getMillis(), alertConfig.getId());
 
     if (results.isEmpty() && !alertConfig.getSendZeroAnomalyEmail()) {
       LOG.info("Zero anomalies found, skipping sending email");
@@ -128,28 +112,28 @@ public class AlertTaskRunner implements TaskRunner {
     }
 
     // Group by dimension key, then sort according to anomaly result compareTo method.
-    Map<String, List<AnomalyResult>> groupedResults = new TreeMap<>();
-    for (AnomalyResult result : results) {
+    Map<String, List<AnomalyMergedResult>> groupedResults = new TreeMap<>();
+    for (AnomalyMergedResult result : results) {
       String dimensions = result.getDimensions();
       if (!groupedResults.containsKey(dimensions)) {
-        groupedResults.put(dimensions, new ArrayList<AnomalyResult>());
+        groupedResults.put(dimensions, new ArrayList<>());
       }
       groupedResults.get(dimensions).add(result);
     }
     // sort each list of anomaly results afterwards and keep track of sequence number in a new list
-    Map<AnomalyResult, String> anomaliesWithLabels = new LinkedHashMap<AnomalyResult, String>();
+    Map<AnomalyMergedResult, String> anomaliesWithLabels = new LinkedHashMap<>();
     int counter = 1;
-    for (List<AnomalyResult> resultsByDimensionKey : groupedResults.values()) {
+    for (List<AnomalyMergedResult> resultsByDimensionKey : groupedResults.values()) {
       Collections.sort(resultsByDimensionKey);
-      for (AnomalyResult result : resultsByDimensionKey) {
+      for (AnomalyMergedResult result : resultsByDimensionKey) {
         anomaliesWithLabels.put(result, String.valueOf(counter));
         counter++;
       }
     }
-
-    String chartFilePath =
-        writeTimeSeriesChart(alertConfig, timeOnTimeComparisonHandler, windowStart, windowEnd, collection,
-            anomaliesWithLabels);
+    // TODO : clean up charts from email
+    //    String chartFilePath =
+    //        EmailHelper.writeTimeSeriesChart(alertConfig, timeOnTimeComparisonHandler, windowStart, windowEnd,
+    //            collection, anomaliesWithLabels);
 
     // get dimensions for rendering
     List<String> dimensionNames;
@@ -158,6 +142,13 @@ public class AlertTaskRunner implements TaskRunner {
     } catch (Exception e) {
       throw new JobExecutionException(e);
     }
+
+    sendAlertForAnomalies(collectionAlias, results, groupedResults, dimensionNames);
+  }
+
+  private void sendAlertForAnomalies(String collectionAlias, List<AnomalyMergedResult> results,
+      Map<String, List<AnomalyMergedResult>> groupedResults, List<String> dimensionNames)
+      throws JobExecutionException {
 
     DateTimeZone timeZone = DateTimeZone.forTimeZone(DEFAULT_TIME_ZONE);
     DateFormatMethod dateFormatMethod = new DateFormatMethod(timeZone);
@@ -191,7 +182,7 @@ public class AlertTaskRunner implements TaskRunner {
       templateData.put("dateFormat", dateFormatMethod);
       templateData.put("timeZone", timeZone);
       // http://stackoverflow.com/questions/13339445/feemarker-writing-images-to-html
-      chartFile = new File(chartFilePath);
+      //      chartFile = new File(chartFilePath);
       templateData.put("embeddedChart", email.embed(chartFile));
       templateData.put("collection", collectionAlias);
       templateData.put("metric", metric);
@@ -200,9 +191,8 @@ public class AlertTaskRunner implements TaskRunner {
       templateData.put("dashboardHost", thirdeyeConfig.getDashboardHost());
       templateData.put("functionTypes", functionTypes.toString());
 
-      Template template = freemarkerConfig.getTemplate("simple-anomaly-report.ftl");
+      Template template = freemarkerConfig.getTemplate("merged-anomaly-report.ftl");
       template.process(templateData, out);
-
     } catch (Exception e) {
       throw new JobExecutionException(e);
     }
@@ -212,119 +202,13 @@ public class AlertTaskRunner implements TaskRunner {
       String alertEmailSubject = String.format("Anomaly Alert!: %d anomalies detected for %s:%s",
           results.size(), collectionAlias, alertConfig.getMetric());
       String alertEmailHtml = new String(baos.toByteArray(), CHARSET);
-      AlertJobUtils.sendEmailWithHtml(email, thirdeyeConfig.getSmtpConfiguration(), alertEmailSubject, alertEmailHtml,
+      AlertJobUtils
+          .sendEmailWithHtml(email, thirdeyeConfig.getSmtpConfiguration(), alertEmailSubject, alertEmailHtml,
           alertConfig.getFromAddress(), alertConfig.getToAddresses());
-
     } catch (Exception e) {
       throw new JobExecutionException(e);
-    } finally {
-      if (!FileUtils.deleteQuietly(chartFile)) {
-        LOG.error("Unable to delete chart {}", chartFilePath);
-      }
     }
-
     LOG.info("Sent email with {} anomalies! {}", results.size(), alertConfig);
-  }
-
-  private String writeTimeSeriesChart(final EmailConfiguration config,
-      TimeOnTimeComparisonHandler timeOnTimeComparisonHandler, final DateTime now,
-      final DateTime then, final String collection,
-      final Map<AnomalyResult, String> anomaliesWithLabels) throws JobExecutionException {
-    try {
-      int windowSize = config.getWindowSize();
-      TimeUnit windowUnit = config.getWindowUnit();
-      long windowMillis = windowUnit.toMillis(windowSize);
-
-      ThirdEyeClient client = timeOnTimeComparisonHandler.getClient();
-      // TODO provide a way for email reports to specify desired graph granularity.
-      TimeGranularity dataGranularity =
-          client.getCollectionSchema(collection).getTime().getDataGranularity();
-
-      TimeOnTimeComparisonResponse chartData =
-          getData(timeOnTimeComparisonHandler, config, then, now, WEEK_MILLIS, dataGranularity);
-      AnomalyGraphGenerator anomalyGraphGenerator = AnomalyGraphGenerator.getInstance();
-      JFreeChart chart =
-          anomalyGraphGenerator.createChart(chartData, dataGranularity, windowMillis,
-              anomaliesWithLabels);
-      String chartFilePath = EMAIL_REPORT_CHART_PREFIX + config.getId() + PNG;
-      LOG.info("Writing chart to {}", chartFilePath);
-      anomalyGraphGenerator.writeChartToFile(chart, chartFilePath);
-      return chartFilePath;
-    } catch (Exception e) {
-      throw new JobExecutionException(e);
-    }
-  }
-
-  private List<AnomalyResult> getAnomalyResults(DateTime start, DateTime end) throws JobExecutionException {
-    final List<AnomalyResult> results;
-    try {
-      results = anomalyResultDAO.findValidAllByTimeAndEmailId(start, end, alertConfig.getId());
-
-    } catch (Exception e) {
-      throw new JobExecutionException(e);
-    }
-    return results;
-  }
-
-  /**
-   * Generate and send request to retrieve chart data. If the request window is too small, the graph
-   * data retrieved has default window sizes based on time granularity and ending at the defined
-   * endpoint: <br/>
-   * <ul>
-   * <li>DAYS: 7</li>
-   * <li>HOURS: 24</li>
-   * </ul>
-   * @param bucketGranularity
-   * @throws JobExecutionException
-   */
-  private TimeOnTimeComparisonResponse getData(
-      TimeOnTimeComparisonHandler timeOnTimeComparisonHandler, EmailConfiguration config,
-      DateTime start, final DateTime end, long baselinePeriodMillis,
-      TimeGranularity bucketGranularity) throws JobExecutionException {
-    start = calculateGraphDataStart(start, end, bucketGranularity);
-    try {
-      TimeOnTimeComparisonRequest comparisonRequest = new TimeOnTimeComparisonRequest();
-      comparisonRequest.setCollectionName(config.getCollection());
-      comparisonRequest.setBaselineStart(start.minus(baselinePeriodMillis));
-      comparisonRequest.setBaselineEnd(end.minus(baselinePeriodMillis));
-      comparisonRequest.setCurrentStart(start);
-      comparisonRequest.setCurrentEnd(end);
-      comparisonRequest.setEndDateInclusive(true);
-
-      List<MetricExpression> metricExpressions = new ArrayList<>();
-      MetricExpression expression = new MetricExpression(config.getMetric());
-      metricExpressions.add(expression);
-      comparisonRequest.setMetricExpressions(metricExpressions);
-      comparisonRequest.setAggregationTimeGranularity(bucketGranularity);
-      LOG.debug("Starting...");
-      TimeOnTimeComparisonResponse response = timeOnTimeComparisonHandler.handle(comparisonRequest);
-      LOG.debug("Done!");
-      return response;
-    } catch (Exception e) {
-      throw new JobExecutionException(e);
-    }
-  }
-
-  private DateTime calculateGraphDataStart(DateTime start, DateTime end,
-      TimeGranularity bucketGranularity) {
-    TimeUnit unit = bucketGranularity.getUnit();
-    long minUnits;
-    if (TimeUnit.DAYS.equals(unit)) {
-      minUnits = MINIMUM_GRAPH_WINDOW_DAYS;
-    } else if (TimeUnit.HOURS.equals(unit)) {
-      minUnits = MINIMUM_GRAPH_WINDOW_HOURS;
-    } else {
-      // no need to do calculation, return input start;
-      return start;
-    }
-    long currentUnits = unit.convert(end.getMillis() - start.getMillis(), TimeUnit.MILLISECONDS);
-    if (currentUnits < minUnits) {
-      LOG.info("Overriding config window size {} {} with minimum default of {}", currentUnits,
-          unit, minUnits);
-      start = end.minus(unit.toMillis(minUnits));
-    }
-    return start;
-
   }
 
   private class AssignedDimensionsMethod implements TemplateMethodModelEx {
@@ -406,5 +290,4 @@ public class AlertTaskRunner implements TaskRunner {
       throw new JobExecutionException(e);
     }
   }
-
 }

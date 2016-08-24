@@ -78,14 +78,6 @@ public class AnomalyResultDAO extends AbstractJpaDAO<AnomalyResult> {
       + "group by r.function.id, r.function.functionName, r.function.collection, r.function.metric "
       + "order by r.function.collection, num desc";
 
-  private static final String COUNT_GROUP_BY_FUNCTION_DIMENSIONS = "select count(r.id) as num, r.function.id,"
-      + "r.function.functionName, r.function.collection, r.function.metric, r.dimensions from AnomalyResult r "
-      + "where r.function.isActive=true "
-      + "and ((r.startTimeUtc >= :startTimeUtc and r.startTimeUtc <= :endTimeUtc) "
-      + "or (r.endTimeUtc >= :startTimeUtc and r.endTimeUtc <= :endTimeUtc))"
-      + "group by r.function.id, r.function.functionName, r.function.collection, r.function.metric, r.dimensions "
-      + "order by r.function.collection, num desc";
-
   private static final String COUNT_GROUP_BY_COLLECTION_METRIC = "select count(r.id) as num, "
       + "r.function.collection, r.function.metric from AnomalyResult r "
       + "where r.function.isActive=true "

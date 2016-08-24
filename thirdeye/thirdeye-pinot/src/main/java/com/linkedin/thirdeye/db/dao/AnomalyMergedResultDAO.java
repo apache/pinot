@@ -22,7 +22,13 @@ public class AnomalyMergedResultDAO extends AbstractJpaDAO<AnomalyMergedResult> 
           + "and amr.dimensions is null order by amr.endTime desc";
 
   private static final String FIND_BY_TIME =
-      "SELECT r FROM AnomalyMergedResult r WHERE ((r.startTime >= :startTime AND r.startTime <= :endTime) "
+      "from AnomalyMergedResult r WHERE ((r.startTime >= :startTime AND r.startTime <= :endTime) "
+          + "OR (r.endTime >= :startTime AND r.endTime <= :endTime)) order by r.endTime desc ";
+
+  private static final String FIND_BY_TIME_EMAIL =
+      "SELECT r FROM EmailConfiguration d JOIN d.functions f, AnomalyMergedResult r "
+          + "WHERE r.function.id=f.id AND d.id = :emailId "
+          + "AND ((r.startTime >= :startTime AND r.startTime <= :endTime) "
           + "OR (r.endTime >= :startTime AND r.endTime <= :endTime)) order by r.endTime desc ";
 
   public AnomalyMergedResultDAO() {
@@ -33,6 +39,13 @@ public class AnomalyMergedResultDAO extends AbstractJpaDAO<AnomalyMergedResult> 
   public List<AnomalyMergedResult> getAllByTime(long startTime, long endTime) {
     return getEntityManager().createQuery(FIND_BY_TIME, entityClass)
         .setParameter("startTime", startTime).setParameter("endTime", endTime).getResultList();
+  }
+
+  @Transactional
+  public List<AnomalyMergedResult> getAllByTimeEmailId(long startTime, long endTime, long emailId) {
+    return getEntityManager().createQuery(FIND_BY_TIME_EMAIL, entityClass)
+        .setParameter("emailId", emailId).setParameter("startTime", startTime)
+        .setParameter("endTime", endTime).getResultList();
   }
 
   @Transactional
