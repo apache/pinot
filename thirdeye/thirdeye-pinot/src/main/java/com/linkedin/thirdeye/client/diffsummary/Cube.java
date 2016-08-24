@@ -254,7 +254,7 @@ public class Cube { // the cube (Ca|Cb)
       }
     }
 
-    // Sort dimensions according to their costs
+    // Sort dimensions according to their costs in a descending order
     dimensionCostPairs.sort((new DimensionCostPairSorter()).reversed());
 
     // Create a new Dimension instance whose dimensions follow the calculated order

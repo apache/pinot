@@ -14,6 +14,7 @@ import org.jfree.util.Log;
 import org.joda.time.DateTime;
 
 import com.google.common.collect.Lists;
+import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.client.MetricExpression;
 import com.linkedin.thirdeye.client.MetricFunction;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
@@ -148,7 +149,11 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
     builder.setMetricFunctions(metricFunctions);
     builder.setGroupBy(groupBy);
     builder.setStartTimeInclusive(baselineStartInclusive);
-    builder.setEndTimeExclusive(baselineEndExclusive);
+    if (baselineEndExclusive.minusHours(1).equals(baselineStartInclusive)) {
+      builder.setEndTimeExclusive(baselineStartInclusive);
+    } else {
+      builder.setEndTimeExclusive(baselineEndExclusive);
+    }
     ThirdEyeRequest baselineRequest = builder.build("baseline");
     requests.add(baselineRequest);
 
@@ -158,13 +163,21 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
     builder.setMetricFunctions(metricFunctions);
     builder.setGroupBy(groupBy);
     builder.setStartTimeInclusive(currentStartInclusive);
-    builder.setEndTimeExclusive(currentEndExclusive);
+    if (currentEndExclusive.minusHours(1).equals(currentStartInclusive)) {
+      builder.setEndTimeExclusive(currentStartInclusive);
+    } else {
+      builder.setEndTimeExclusive(currentEndExclusive);
+    }
     ThirdEyeRequest currentRequest = builder.build("current");
     requests.add(currentRequest);
 
     return requests;
   }
 
+  /**
+   * @throws Exception Throws exceptions when no useful data is retrieved, i.e., time out, failed to connect
+   * to the backend database, no non-zero data returned from the database, etc.
+   */
   private List<List<Row>> constructAggregatedValues(Dimensions dimensions, List<ThirdEyeRequest> bulkRequests)
       throws Exception {
     Map<ThirdEyeRequest, Future<ThirdEyeResponse>> queryResponses = queryCache.getQueryResultsAsync(bulkRequests);
@@ -176,13 +189,17 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
       ThirdEyeResponse baselineResponses = queryResponses.get(baselineRequest).get(TIME_OUT_VALUE, TIME_OUT_UNIT);
       ThirdEyeResponse currentResponses = queryResponses.get(currentRequest).get(TIME_OUT_VALUE, TIME_OUT_UNIT);
       if (baselineResponses.getNumRows() == 0 || currentResponses.getNumRows() == 0) {
-        throw new Exception("Failed to retrieve results from database with this request: "
+        throw new Exception("Failed to retrieve results with this request: "
             + (baselineResponses.getNumRows() == 0 ? baselineRequest : currentRequest));
       }
 
       Map<List<String>, Row> rowTable = new HashMap<>();
       buildMetricFunctionOrExpressionsRows(dimensions, baselineResponses, rowTable, true);
       buildMetricFunctionOrExpressionsRows(dimensions, currentResponses, rowTable, false);
+      if (rowTable.size() == 0) {
+        throw new Exception("Failed to retrieve non-zero results with these requests: "
+            + baselineRequest + ", " + currentRequest);
+      }
       List<Row> rows = new ArrayList<>(rowTable.size());
       for (Map.Entry<List<String>, Row> entry : rowTable.entrySet()) {
         rows.add(entry.getValue());

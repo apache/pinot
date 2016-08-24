@@ -7,6 +7,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.jfree.util.Log;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.client.diffsummary.CostFunction;
@@ -85,9 +87,9 @@ public class Summary {
       if (parent != null) parent.addNodeValues(node);
     }
     for (HierarchyNode node : nodeList) {
-      if (node.getBaselineValue() != node.getOriginalBaselineValue()
-          || node.getCurrentValue() != node.getOriginalCurrentValue()) {
-        System.err.println("Wrong Wow values at node: " + node.getDimensionValues() + ". Expected: "
+      if (Double.compare(node.getBaselineValue(), node.getOriginalBaselineValue()) != 0
+          || Double.compare(node.getCurrentValue(), node.getOriginalCurrentValue()) != 0) {
+        Log.warn("Wrong Wow values at node: " + node.getDimensionValues() + ". Expected: "
             + node.getOriginalBaselineValue() + "," + node.getOriginalCurrentValue() + ", actual: "
             + node.getBaselineValue() + "," + node.getCurrentValue());
       }
