@@ -27,6 +27,9 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.I0Itec.zkclient.IZkDataListener;
 import org.I0Itec.zkclient.ZkClient;
 import org.I0Itec.zkclient.serialize.BytesPushThroughSerializer;
+import static com.linkedin.pinot.client.ExternalViewReader.OFFLINE_SUFFIX;
+import static com.linkedin.pinot.client.ExternalViewReader.REALTIME_SUFFIX;
+
 
 /**
  * Maintains a mapping between table name and list of brokers
@@ -63,7 +66,8 @@ public class DynamicBrokerSelector implements BrokerSelector, IZkDataListener {
       List<String> list = allBrokerListRef.get();
       return list.get(_random.nextInt(list.size()));
     }
-    List<String> list = tableToBrokerListMapRef.get().get(table);
+    String tableName = table.replace(OFFLINE_SUFFIX, "").replace(REALTIME_SUFFIX, "");
+    List<String> list = tableToBrokerListMapRef.get().get(tableName);
     if (list != null && !list.isEmpty()) {
       return list.get(_random.nextInt(list.size()));
     }

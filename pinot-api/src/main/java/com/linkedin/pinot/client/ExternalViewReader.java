@@ -38,6 +38,8 @@ public class ExternalViewReader {
   private ZkClient zkClient;
 
   public static String BROKER_EXTERNAL_VIEW_PATH = "/EXTERNALVIEW/brokerResource";
+  public static String REALTIME_SUFFIX = "_REALTIME";
+  public static String OFFLINE_SUFFIX = "_OFFLINE";
 
   public ExternalViewReader(ZkClient zkClient) {
     this.zkClient = zkClient;
@@ -84,11 +86,11 @@ public class ExternalViewReader {
       Iterator<String> resourceNames = brokerResourceNode.keys();
       while (resourceNames.hasNext()) {
         String resourceName = resourceNames.next();
-        String resourceNameCommon = resourceName.replace("_OFFLINE", "").replace("_REALTIME", "");
-        Set<String> brokerUrls = brokerUrlsMap.get(resourceNameCommon);
+        String tableName = resourceName.replace(OFFLINE_SUFFIX, "").replace(REALTIME_SUFFIX, "");
+        Set<String> brokerUrls = brokerUrlsMap.get(tableName);
         if (brokerUrls == null) {
           brokerUrls = new HashSet<>();
-          brokerUrlsMap.put(resourceNameCommon, brokerUrls);
+          brokerUrlsMap.put(tableName, brokerUrls);
         }
         JSONObject resource = brokerResourceNode.getJSONObject(resourceName);
         Iterator<String> brokerNames = resource.keys();

@@ -208,7 +208,7 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
               int timeBucket;
               long millis;
               if (!isISOFormat) {
-                millis = dataTimeUnit.toMillis(Long.parseLong(groupKeyVal));
+                millis = dataTimeUnit.toMillis(Double.valueOf(groupKeyVal).longValue());
               } else {
                 millis = DateTime.parse(groupKeyVal, dateTimeFormatter).getMillis();
               }
