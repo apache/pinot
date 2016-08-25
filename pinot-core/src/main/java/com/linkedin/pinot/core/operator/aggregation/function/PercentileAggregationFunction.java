@@ -60,9 +60,11 @@ public class PercentileAggregationFunction implements AggregationFunction {
    * @param valueArray
    */
   @Override
-  public void aggregate(int length, AggregationResultHolder resultHolder, double[]... valueArray) {
+  public void aggregate(int length, AggregationResultHolder resultHolder, Object... valueArray) {
     Preconditions.checkArgument(valueArray.length == 1);
-    Preconditions.checkState(length <= valueArray[0].length);
+    Preconditions.checkArgument(valueArray[0] instanceof double[]);
+    final double[] values = (double[]) valueArray[0];
+    Preconditions.checkState(length <= values.length);
 
     DoubleArrayList valueList = resultHolder.getResult();
     if (valueList == null) {
@@ -71,7 +73,7 @@ public class PercentileAggregationFunction implements AggregationFunction {
     }
 
     for (int i = 0; i < length; i++) {
-      valueList.add(valueArray[0][i]);
+      valueList.add(values[i]);
     }
   }
 
@@ -87,10 +89,11 @@ public class PercentileAggregationFunction implements AggregationFunction {
    * @param valueArray
    */
   @Override
-  public void aggregateGroupBySV(int length, int[] groupKeys, GroupByResultHolder resultHolder,
-      double[]... valueArray) {
+  public void aggregateGroupBySV(int length, int[] groupKeys, GroupByResultHolder resultHolder, Object... valueArray) {
     Preconditions.checkArgument(valueArray.length == 1);
-    Preconditions.checkState(length <= valueArray[0].length);
+    Preconditions.checkArgument(valueArray[0] instanceof double[]);
+    final double[] values = (double[]) valueArray[0];
+    Preconditions.checkState(length <= values.length);
 
     for (int i = 0; i < length; i++) {
       int groupKey = groupKeys[i];
@@ -99,7 +102,7 @@ public class PercentileAggregationFunction implements AggregationFunction {
         valueList = new DoubleArrayList();
         resultHolder.setValueForKey(groupKey, valueList);
       }
-      valueList.add(valueArray[0][i]);
+      valueList.add(values[i]);
     }
   }
 
@@ -113,12 +116,14 @@ public class PercentileAggregationFunction implements AggregationFunction {
    */
   @Override
   public void aggregateGroupByMV(int length, int[][] docIdToGroupKeys, GroupByResultHolder resultHolder,
-      double[]... valueArray) {
+      Object... valueArray) {
     Preconditions.checkArgument(valueArray.length == 1);
-    Preconditions.checkState(length <= valueArray[0].length);
+    Preconditions.checkArgument(valueArray[0] instanceof double[]);
+    final double[] values = (double[]) valueArray[0];
+    Preconditions.checkState(length <= values.length);
 
     for (int i = 0; i < length; ++i) {
-      double value = valueArray[0][i];
+      double value = values[i];
       for (int groupKey : docIdToGroupKeys[i]) {
         DoubleArrayList valueList = resultHolder.getResult(groupKey);
         if (valueList == null) {

@@ -61,9 +61,11 @@ public class PercentileestAggregationFunction implements AggregationFunction {
    * @param valueArray
    */
   @Override
-  public void aggregate(int length, AggregationResultHolder resultHolder, double[]... valueArray) {
+  public void aggregate(int length, AggregationResultHolder resultHolder, Object... valueArray) {
     Preconditions.checkArgument(valueArray.length == 1);
-    Preconditions.checkState(length <= valueArray[0].length);
+    Preconditions.checkArgument(valueArray[0] instanceof double[]);
+    final double[] values = (double[]) valueArray[0];
+    Preconditions.checkState(length <= values.length);
 
     QuantileDigest digest = resultHolder.getResult();
     if (digest == null) {
@@ -72,7 +74,7 @@ public class PercentileestAggregationFunction implements AggregationFunction {
     }
 
     for (int i = 0; i < length; i++) {
-      digest.add((long) valueArray[0][i]);
+      digest.add((long) values[i]);
     }
   }
 
@@ -88,10 +90,11 @@ public class PercentileestAggregationFunction implements AggregationFunction {
    * @param valueArray
    */
   @Override
-  public void aggregateGroupBySV(int length, int[] groupKeys, GroupByResultHolder resultHolder,
-      double[]... valueArray) {
+  public void aggregateGroupBySV(int length, int[] groupKeys, GroupByResultHolder resultHolder, Object... valueArray) {
     Preconditions.checkArgument(valueArray.length == 1);
-    Preconditions.checkState(length <= valueArray[0].length);
+    Preconditions.checkArgument(valueArray[0] instanceof double[]);
+    final double[] values = (double[]) valueArray[0];
+    Preconditions.checkState(length <= values.length);
 
     for (int i = 0; i < length; i++) {
       int groupKey = groupKeys[i];
@@ -100,7 +103,7 @@ public class PercentileestAggregationFunction implements AggregationFunction {
         digest = new QuantileDigest(DEFAULT_MAX_ERROR);
         resultHolder.setValueForKey(groupKey, digest);
       }
-      digest.add((long) valueArray[0][i]);
+      digest.add((long) values[i]);
     }
   }
 
@@ -114,12 +117,14 @@ public class PercentileestAggregationFunction implements AggregationFunction {
    */
   @Override
   public void aggregateGroupByMV(int length, int[][] docIdToGroupKeys, GroupByResultHolder resultHolder,
-      double[]... valueArray) {
+      Object... valueArray) {
     Preconditions.checkArgument(valueArray.length == 1);
-    Preconditions.checkState(length <= valueArray[0].length);
+    Preconditions.checkArgument(valueArray[0] instanceof double[]);
+    final double[] values = (double[]) valueArray[0];
+    Preconditions.checkState(length <= values.length);
 
     for (int i = 0; i < length; i++) {
-      long value = (long) valueArray[0][i];
+      long value = (long) values[i];
       for (int groupKey : docIdToGroupKeys[i]) {
         QuantileDigest digest = resultHolder.getResult(groupKey);
         if (digest == null) {

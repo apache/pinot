@@ -42,13 +42,15 @@ public class SumAggregationFunction implements AggregationFunction {
    * @param valueArray
    */
   @Override
-  public void aggregate(int length, AggregationResultHolder resultHolder, double[]... valueArray) {
+  public void aggregate(int length, AggregationResultHolder resultHolder, Object... valueArray) {
     Preconditions.checkArgument(valueArray.length == 1);
-    Preconditions.checkState(length <= valueArray[0].length);
+    Preconditions.checkArgument(valueArray[0] instanceof double[]);
+    final double[] values = (double[]) valueArray[0];
+    Preconditions.checkState(length <= values.length);
 
     double sum = 0.0;
     for (int i = 0; i < length; i++) {
-      sum += valueArray[0][i];
+      sum += values[i];
     }
     resultHolder.setValue(resultHolder.getDoubleResult() + sum);
   }
@@ -65,15 +67,16 @@ public class SumAggregationFunction implements AggregationFunction {
    * @param valueArray
    */
   @Override
-  public void aggregateGroupBySV(int length, int[] groupKeys, GroupByResultHolder resultHolder,
-      double[]... valueArray) {
+  public void aggregateGroupBySV(int length, int[] groupKeys, GroupByResultHolder resultHolder, Object... valueArray) {
     Preconditions.checkArgument(valueArray.length == 1);
-    Preconditions.checkState(length <= valueArray[0].length);
+    Preconditions.checkArgument(valueArray[0] instanceof double[]);
+    final double[] values = (double[]) valueArray[0];
+    Preconditions.checkState(length <= values.length);
 
     for (int i = 0; i < length; i++) {
       int groupKey = groupKeys[i];
       double oldValue = resultHolder.getDoubleResult(groupKey);
-      resultHolder.setValueForKey(groupKey, (oldValue + valueArray[0][i]));
+      resultHolder.setValueForKey(groupKey, (oldValue + values[i]));
     }
   }
 
@@ -87,14 +90,16 @@ public class SumAggregationFunction implements AggregationFunction {
    */
   @Override
   public void aggregateGroupByMV(int length, int[][] docIdToGroupKey, GroupByResultHolder resultHolder,
-      double[]... valueArray) {
+      Object... valueArray) {
     Preconditions.checkArgument(valueArray.length == 1);
-    Preconditions.checkState(length <= valueArray[0].length);
+    Preconditions.checkArgument(valueArray[0] instanceof double[]);
+    final double[] values = (double[]) valueArray[0];
+    Preconditions.checkState(length <= values.length);
 
     for (int i = 0; i < length; ++i) {
       for (int groupKey : docIdToGroupKey[i]) {
         double oldValue = resultHolder.getDoubleResult(groupKey);
-        double newValue = oldValue + valueArray[0][i];
+        double newValue = oldValue + values[i];
         resultHolder.setValueForKey(groupKey, newValue);
       }
     }

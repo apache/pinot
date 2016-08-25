@@ -40,7 +40,7 @@ public class CountAggregationFunction implements AggregationFunction {
    * @param valueArray
    */
   @Override
-  public void aggregate(int length, AggregationResultHolder resultHolder, double[]... valueArray) {
+  public void aggregate(int length, AggregationResultHolder resultHolder, Object... valueArray) {
     // Should never call count with a valueArray.
     Preconditions.checkArgument(valueArray.length == 0);
 
@@ -59,8 +59,7 @@ public class CountAggregationFunction implements AggregationFunction {
    * @param valueArray
    */
   @Override
-  public void aggregateGroupBySV(int length, int[] groupKeys, GroupByResultHolder resultHolder,
-      double[]... valueArray) {
+  public void aggregateGroupBySV(int length, int[] groupKeys, GroupByResultHolder resultHolder, Object... valueArray) {
     Preconditions.checkArgument(valueArray.length == 0);
 
     for (int i = 0; i < length; i++) {
@@ -80,7 +79,7 @@ public class CountAggregationFunction implements AggregationFunction {
    */
   @Override
   public void aggregateGroupByMV(int length, int[][] docIdToGroupKey, GroupByResultHolder resultHolder,
-      double[]... valueArray) {
+      Object... valueArray) {
     Preconditions.checkArgument(valueArray.length == 0);
     for (int i = 0; i < length; ++i) {
       for (int groupKey : docIdToGroupKey[i]) {

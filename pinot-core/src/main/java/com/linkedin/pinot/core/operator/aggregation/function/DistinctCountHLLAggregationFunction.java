@@ -40,9 +40,11 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction 
    * @param valueArray
    */
   @Override
-  public void aggregate(int length, AggregationResultHolder resultHolder, double[]... valueArray) {
+  public void aggregate(int length, AggregationResultHolder resultHolder, Object... valueArray) {
     Preconditions.checkArgument(valueArray.length == 1);
-    Preconditions.checkState(length <= valueArray[0].length);
+    Preconditions.checkArgument(valueArray[0] instanceof double[]);
+    final double[] values = (double[]) valueArray[0];
+    Preconditions.checkState(length <= values.length);
 
     HyperLogLog hll = resultHolder.getResult();
     if (hll == null) {
@@ -51,7 +53,7 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction 
     }
 
     for (int i = 0; i < length; i++) {
-      hll.offer((int) valueArray[0][i]);
+      hll.offer((int) values[i]);
     }
   }
 
@@ -67,10 +69,11 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction 
    * @param valueArray
    */
   @Override
-  public void aggregateGroupBySV(int length, int[] groupKeys, GroupByResultHolder resultHolder,
-      double[]... valueArray) {
+  public void aggregateGroupBySV(int length, int[] groupKeys, GroupByResultHolder resultHolder, Object... valueArray) {
     Preconditions.checkArgument(valueArray.length == 1);
-    Preconditions.checkState(length <= valueArray[0].length);
+    Preconditions.checkArgument(valueArray[0] instanceof double[]);
+    final double[] values = (double[]) valueArray[0];
+    Preconditions.checkState(length <= values.length);
 
     for (int i = 0; i < length; i++) {
       int groupKey = groupKeys[i];
@@ -79,7 +82,7 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction 
         hll = new HyperLogLog(DEFAULT_BIT_SIZE);
         resultHolder.setValueForKey(groupKey, hll);
       }
-      hll.offer((int) valueArray[0][i]);
+      hll.offer((int) values[i]);
     }
   }
 
@@ -93,12 +96,14 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction 
    */
   @Override
   public void aggregateGroupByMV(int length, int[][] docIdToGroupKeys, GroupByResultHolder resultHolder,
-      double[]... valueArray) {
+      Object... valueArray) {
     Preconditions.checkArgument(valueArray.length == 1);
-    Preconditions.checkState(length <= valueArray[0].length);
+    Preconditions.checkArgument(valueArray[0] instanceof double[]);
+    final double[] values = (double[]) valueArray[0];
+    Preconditions.checkState(length <= values.length);
 
     for (int i = 0; i < length; i++) {
-      int value = (int) valueArray[0][i];
+      int value = (int) values[i];
       for (int groupKey : docIdToGroupKeys[i]) {
         HyperLogLog hll = resultHolder.getResult(groupKey);
         if (hll == null) {

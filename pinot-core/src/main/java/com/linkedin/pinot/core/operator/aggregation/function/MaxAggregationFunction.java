@@ -44,14 +44,16 @@ public class MaxAggregationFunction implements AggregationFunction {
    * @param valueArray
    */
   @Override
-  public void aggregate(int length, AggregationResultHolder resultHolder, double[]... valueArray) {
+  public void aggregate(int length, AggregationResultHolder resultHolder, Object... valueArray) {
     Preconditions.checkArgument(valueArray.length == 1);
-    Preconditions.checkState(length <= valueArray[0].length);
+    Preconditions.checkArgument(valueArray[0] instanceof double[]);
+    final double[] values = (double[]) valueArray[0];
+    Preconditions.checkState(length <= values.length);
 
     double max = DEFAULT_VALUE;
     for (int i = 0; i < length; i++) {
-      if (valueArray[0][i] > max) {
-        max = valueArray[0][i];
+      if (values[i] > max) {
+        max = values[i];
       }
     }
 
@@ -73,16 +75,17 @@ public class MaxAggregationFunction implements AggregationFunction {
    * @param valueArray
    */
   @Override
-  public void aggregateGroupBySV(int length, int[] groupKeys, GroupByResultHolder resultHolder,
-      double[]... valueArray) {
+  public void aggregateGroupBySV(int length, int[] groupKeys, GroupByResultHolder resultHolder, Object... valueArray) {
     Preconditions.checkArgument(valueArray.length == 1);
-    Preconditions.checkState(length <= valueArray[0].length);
+    Preconditions.checkArgument(valueArray[0] instanceof double[]);
+    final double[] values = (double[]) valueArray[0];
+    Preconditions.checkState(length <= values.length);
 
     for (int i = 0; i < length; i++) {
       int groupKey = groupKeys[i];
       double oldValue = resultHolder.getDoubleResult(groupKey);
-      if (valueArray[0][i] > oldValue) {
-        resultHolder.setValueForKey(groupKey, valueArray[0][i]);
+      if (values[i] > oldValue) {
+        resultHolder.setValueForKey(groupKey, values[i]);
       }
     }
   }
@@ -97,15 +100,17 @@ public class MaxAggregationFunction implements AggregationFunction {
    */
   @Override
   public void aggregateGroupByMV(int length, int[][] docIdToGroupKey, GroupByResultHolder resultHolder,
-      double[]... valueArray) {
+      Object... valueArray) {
     Preconditions.checkArgument(valueArray.length == 1);
-    Preconditions.checkState(length <= valueArray[0].length);
+    Preconditions.checkArgument(valueArray[0] instanceof double[]);
+    final double[] values = (double[]) valueArray[0];
+    Preconditions.checkState(length <= values.length);
 
     for (int i = 0; i < length; ++i) {
       for (int groupKey : docIdToGroupKey[i]) {
         double oldValue = resultHolder.getDoubleResult(groupKey);
-        if (valueArray[0][i] > oldValue) {
-          resultHolder.setValueForKey(groupKey, valueArray[0][i]);
+        if (values[i] > oldValue) {
+          resultHolder.setValueForKey(groupKey, values[i]);
         }
       }
     }
