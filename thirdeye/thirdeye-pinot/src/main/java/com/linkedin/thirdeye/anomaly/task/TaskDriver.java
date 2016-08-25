@@ -56,6 +56,7 @@ public class TaskDriver {
     taskContext.setAnomalyTaskDAO(anomalyTaskDAO);
     taskContext.setResultDAO(anomalyResultDAO);
     taskContext.setAnomalyFunctionFactory(anomalyFunctionFactory);
+    taskContext.setMergedResultDAO(mergedResultDAO);
     taskContext.setThirdEyeAnomalyConfiguration(thirdEyeAnomalyConfiguration);
   }
 
