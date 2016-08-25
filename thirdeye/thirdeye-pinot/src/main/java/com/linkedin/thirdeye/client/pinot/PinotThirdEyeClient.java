@@ -48,7 +48,7 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
     this.controllerHost = new HttpHost(controllerHostName, controllerPort);
     // TODO currently no way to configure the CloseableHttpClient
     this.controllerClient = HttpClients.createDefault();
-    LOG.info("Created PinotThirdEyeClient to {} with controller {}", controllerHost);
+    LOG.info("Created PinotThirdEyeClient with controller {}", controllerHost);
   }
 
   /* Static builder methods to mirror Pinot Java API (ConnectionFactory) */
