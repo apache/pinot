@@ -76,30 +76,20 @@ $(document).ready(function () {
         }
     });
 
-    //parse anomaly data properties value and returns the requested param
-    Handlebars.registerHelper('lookupAnomalyProperty', function (propertiesString, param) {
-        var propertiesAry = propertiesString.split(";");
-        for (var i = 0, numProp = propertiesAry.length; i < numProp; i++) {
-            var keyValue = propertiesAry[i];
-            keyValue = keyValue.split("=")
-
-            var key = keyValue[0];
-            if (key == param) {
-                var value = keyValue[1]
-                return value
-            }
+    //Takes 2 parameters and a className variable, className to element if the 2 params are equal
+    Handlebars.registerHelper('add_string_if_eq', function (param1, param2, options) {
+        var className = options.hash.stringToAdd;
+        if (param1 == param2) {
+            return className
         }
     });
 
     //Helper for anomaly function form, here we can set the desired display of any function property
-    Handlebars.registerHelper('populateAnomalyFunctionProp', function (param , value) {
+    Handlebars.registerHelper('displayAnomalyFunctionProp', function (param , value) {
 
         switch(param){
             case "changeThreshold":
                 value = Math.abs(parseFloat(value)) * 100;
-            break;
-            case "":
-
             break;
             default:
             break;
@@ -202,7 +192,6 @@ $(document).ready(function () {
             dateTimeFormat = "MM-DD h a"
         }
 
-
         return moment(millis).tz(tz).format(dateTimeFormat);
     });
 
@@ -235,7 +224,6 @@ $(document).ready(function () {
         if (schemaItem == "percentageChange") {
             indexFordisplayRatioHelper = 2;
         }
-
         return Handlebars.helpers.displayRatio(responseData[rowId][schema[schemaItem]], indexFordisplayRatioHelper)
     })
 
@@ -244,18 +232,24 @@ $(document).ready(function () {
         //Without the options.fn()  the raw object would be returned to be the html content
         return options.fn(obj[options.hash.dimName])
     });
-    //takes an object and a key as option param and returns an object as a scope
-    Handlebars.registerHelper('lookupInMapByKey', function (mapObj, key) {
-        var val = mapObj[key];
-        if ((typeof val == "undefined") || (val == key)) {
-          val = "";
-        } else {
-            val = "(" + val + ")";
-        }
-        console.log("val", val);
-        console.log("key",key);
 
+    //takes an object and a key and returns the value in ()-s
+    Handlebars.registerHelper('lookupInMapByKey', function (mapObj, options) {
+        var key = options.hash.key;
+        var val = mapObj[key];
+        if (typeof val !== "undefined") {
+
+            if(options.hash.display=="()"){
+                val = "(" + val + ")";
+            }
+        }
         return val;
+    });
+
+    //takes an object and 2 strings that will create one key to look up, returns object[key] as a scope ie. summary["metricName|dimensionName"]
+    Handlebars.registerHelper('lookupComplexScope', function (obj, options) {
+        //Without the options.fn()  the raw object would be returned to be the html content
+        return options.fn(obj[options.hash.primary + options.hash.separator + options.hash.secondary ])
     });
 
     //takes an object and a key as option param and returns an object as a scope
@@ -266,11 +260,11 @@ $(document).ready(function () {
 
 
     //if param 1 == param 2
-    Handlebars.registerHelper('if_eq', function (a, b, opts) {
+    Handlebars.registerHelper('if_eq', function (a, b, options) {
         if (a == b) { // Or === depending on your needs
-            return opts.fn(this);
+            return options.hash.value
         }
-        return opts.inverse(this);
+
     });
 
     HandleBarsTemplates = {

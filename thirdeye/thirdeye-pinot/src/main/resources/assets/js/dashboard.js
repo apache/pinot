@@ -1,8 +1,7 @@
 $(document).ready( function() {
 
-
     /** Handelbars template for tabs **/
-    //DASHBOARD
+    //DASHBOARD TAB
     var dasboard_tab_options = {
         tabName: "dashboard",
         showChartSection: true,
@@ -11,7 +10,7 @@ $(document).ready( function() {
     var result_tab_template = HandleBarsTemplates.template_tab(dasboard_tab_options)
     $("#dashboard").append(result_tab_template);
 
-    //COMPARE
+    //COMPARE TAB
     var compare_tab_options = {
         tabName: "compare",
         showChartSection: true,
@@ -20,7 +19,7 @@ $(document).ready( function() {
     var result_tab_template = HandleBarsTemplates.template_tab(compare_tab_options)
     $("#compare").append(result_tab_template);
 
-    //TIMESERIES
+    //TIMESERIES TAB
     var timseries_tab_options = {
         tabName: "timeseries",
         showChartSection: true,
@@ -29,7 +28,7 @@ $(document).ready( function() {
     var result_tab_template = HandleBarsTemplates.template_tab(timseries_tab_options)
     $("#timeseries").append(result_tab_template);
 
-    //ANOMALIES
+    //ANOMALIES TAB
     var anomalies_tab_options = {
         tabName: "anomalies",
         showChartSection: true,
@@ -39,8 +38,7 @@ $(document).ready( function() {
     $("#anomalies").append(result_tab_template);
 
 
-    //SELF SERVICE
-    //ANOMALIES
+    //SELF SERVICE TAB
     var self_service_tab_options = {
         tabName: "self-service",
         showChartSection: false,
@@ -52,7 +50,7 @@ $(document).ready( function() {
 
 
     /** Handelbars template for forms on tabs* */
-    //DASHBOARD
+    //DASHBOARD TAB/FORM
     var dasboard_section_options = {
         tabName: "dashboard",
         needQueryForm: true,
@@ -69,7 +67,7 @@ $(document).ready( function() {
     var result_form_template = HandleBarsTemplates.template_form(dasboard_section_options)
     $("#dashboard-section #form-area").append(result_form_template);
 
-    //COMPARE
+    //COMPARE TAB/FORM
     var compare_section_options = {
         tabName: "compare",
         needQueryForm: true,
@@ -86,7 +84,7 @@ $(document).ready( function() {
     var result_form_template = HandleBarsTemplates.template_form(compare_section_options)
     $("#compare-section #form-area").append(result_form_template);
 
-    //TIMESERIES
+    //TIMESERIES TAB/FORM
     var timseries_section_options = {
         tabName: "timeseries",
         needQueryForm: true,
@@ -104,7 +102,7 @@ $(document).ready( function() {
     var result_form_template = HandleBarsTemplates.template_form(timseries_section_options)
     $("#timeseries-section #form-area").append(result_form_template);
 
-    //ANOMALIES
+    //ANOMALIES TAB/FORM
     var anomalies_section_options = {
         tabName: "anomalies",
         needQueryForm: true,
@@ -122,7 +120,7 @@ $(document).ready( function() {
     var result_form_template = HandleBarsTemplates.template_form(anomalies_section_options)
     $("#anomalies-section #form-area").append(result_form_template);
 
-    //SELF SERVICE
+    //SELF SERVICE TAB/FORM
     var self_service_section_options = {
         tabName: "self-service",
         needQueryForm: false,
@@ -143,8 +141,68 @@ $(document).ready( function() {
 
     /** Handelbars template for main content
      /** Handelbars template for SELF SERVICE tab ANOMALY FUNCTION FORM **/
-    var result_anomaly_function_form_template = HandleBarsTemplates.template_anomaly_function_form("");
+    var metaDataUrl = "/thirdeye/function/metadata"
+    getData(metaDataUrl, "self-service").done(function (anomalyFunctionTypeMetaData) {
+
+        var propertyDefs = {
+            "schema": {
+                 "defaultValue": 0,
+                 "validType": 1,
+                 "description": 2
+            },
+            "propertyDef": {
+                "KALMAN_FILTER|knob": [10000, "double"],
+                "KALMAN_FILTER|order": [1, "int"],
+                "KALMAN_FILTER|pValueThreshold": [0.05, "double"],
+                "KALMAN_FILTER|seasonal": [0, "int"],
+                "MIN_MAX_THRESHOLD|max": [],
+                "MIN_MAX_THRESHOLD|min": [],
+                "SCAN_STATISTICS|bootstrap": [true, "boolean"],
+                "SCAN_STATISTICS|complementaryLevel": ["", "double"],
+                "SCAN_STATISTICS|complementaryPattern": ["", "Pattern"],
+                "SCAN_STATISTICS|enableOfflineTrain": [false, "boolean"],
+                "SCAN_STATISTICS|enableSTL": [false, "boolean"],
+                "SCAN_STATISTICS|filterOnSeverity": ["NaN", "string"],
+                "SCAN_STATISTICS|maxWindowLength": ["", "int"],
+                "SCAN_STATISTICS|minIncrement": [1, "int"],
+                "SCAN_STATISTICS|minWindowLength": [1, "int"],
+                "SCAN_STATISTICS|notEqualEpsilon": [0.1, "double"],
+                "SCAN_STATISTICS|numOfOfflineAnomalies": [1, "int"],
+                "SCAN_STATISTICS|numSimulations": [1000, "int"],
+                "SCAN_STATISTICS|pValueThreshold": [0.05, "double"],
+                "SCAN_STATISTICS|periodic": [true, "boolean"],
+                "SCAN_STATISTICS|proportionAnomalyInTraining": [0.5, "double"],
+                "SCAN_STATISTICS|robust": [true, "boolean"],
+                "SCAN_STATISTICS|seasonal": [168, "int"],
+                "SCAN_STATISTICS|targetLevel": ["", "double"],
+                "SCAN_STATISTICS|targetPattern": ["", "Pattern"],
+                "SIGN_TEST|autoTuneThreshold": [0.05, "double"],
+                "SIGN_TEST|baselineLift": [1.05, "String"],
+                "SIGN_TEST|baselineSeasonalPeriod": [4, "int"],
+                "SIGN_TEST|baselineShift": ["0.0", "String"],
+                "SIGN_TEST|enableAutoTune": [false, "boolean"],
+                "SIGN_TEST|pValueThreshold": [0.01, "double"],
+                "SIGN_TEST|pattern": ["", "Pattern"],
+                "SIGN_TEST|seasonalSize": [7, "int"],
+                "SIGN_TEST|seasonalUnit": ["DAYS", "TimeUnit"],
+                "SIGN_TEST|signTestSize": [2, "int"],
+                "SIGN_TEST|signTestUnit": ["HOURS", "TimeUnit"],
+                "USER_RULE|averageVolumeThreshold": [],
+                "USER_RULE|baseline": [],
+                "USER_RULE|changeThreshold": []
+            }
+        }
+
+        var functionInfo = {propertyDefs : propertyDefs, fnTypeMetaData : anomalyFunctionTypeMetaData}
+
+         console.log('functionInfo')
+         console.log(functionInfo)
+        //cache the data
+        window.sessionStorage.setItem('anomalyFunctionTypeMetaData', JSON.stringify(functionInfo));
+
+    var result_anomaly_function_form_template = HandleBarsTemplates.template_anomaly_function_form(functionInfo);
     $("#create-anomaly-functions-tab").html(result_anomaly_function_form_template);
+    })
 
     //Global object where the dataset params will be cached
     window.datasetConfig = {};

@@ -859,6 +859,14 @@ function parseProperties(properties){
     return fnProperties
 }
 
+function stringifyProperties(properties){
+    var str = ""
+    for (key in properties){
+        str += key + "=" + properties[key] + ";"
+    }
+    return str
+}
+
 
 /** DATE, TIME RELATED METHODS **/
 

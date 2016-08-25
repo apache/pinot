@@ -26,7 +26,6 @@ function switchHeaderTab(target) {
         } else {
             getExistingAnomalyFunctions();
         }
-        renderSelfService();
-
+        addSelfServiceListeners()
     }
 }

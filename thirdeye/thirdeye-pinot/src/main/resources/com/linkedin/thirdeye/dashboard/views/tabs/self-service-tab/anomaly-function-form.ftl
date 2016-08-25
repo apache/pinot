@@ -58,8 +58,15 @@
                         <div class="uk-button uk-button-primary" type="button"><i class="uk-icon-caret-down"></i></div>
                         <div class="uk-dropdown uk-dropdown-small uk-dropdown-bottom" style="top: 30px; left: 0px;">
                             <ul class="uk-nav uk-nav-dropdown single-select">
-                                <li id="user-rule" class="function-type-option" value="USER_RULE"><a class="uk-dropdown-close">USER_RULE</a></li>
-                                <li id="min-max-threshold" class="function-type-option" value="MIN_MAX_THRESHOLD"><a class="uk-dropdown-close">MIN_MAX_THRESHOLD</a></li>
+                                {{#if @root/fnTypeMetaData}}
+                                {{#with @root/fnTypeMetaData}}
+                                {{#each this as |functionProperties functionType|}}
+                                <li id="{{functionType}}" class="function-type-option" value="{{functionType}}">
+                                    <a class="uk-dropdown-close">{{functionType}}</a>
+                                </li>
+                                {{/each}}
+                                {{/with}}
+                                {{/if}}
                             </ul>
                         </div>
                     </div>
@@ -88,8 +95,8 @@
                 </div>
             </div>
 
-            <!-- ** USER_RULE PROPERTIES part 2/1 ** -->
-            <div class="user-rule-fields function-type-fields uk-display-inline-block {{#if data/functionype}}uk-hidden{{/if}}">
+            <!-- ** USER_RULE PROPERTIES ** -->
+            <div class="USER_RULE-fields function-type-fields uk-display-inline-block {{#if data/functionype}}uk-hidden{{/if}}">
                 <div id="anomaly-condition-selector" class="uk-form-row uk-form-row uk-display-inline-block" rel="self-service">
                     <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group uk-display-inline-block">
                         <div id="selected-anomaly-condition" class="uk-button" value={{#if fnProperties}}"{{discribeDelta fnProperties/changeThreshold 'description'}}"{{/if}}>
@@ -111,7 +118,7 @@
                 </div>
                 <span>by</span>
                 <div class="uk-display-inline-block">
-                    <input id="anomaly-threshold" type="text" placeholder="threshold" value="{{#if fnProperties}}{{populateAnomalyFunctionProp 'changeThreshold' fnProperties/changeThreshold}}{{/if}}"><span>%</span>
+                    <input id="anomaly-threshold" type="text" placeholder="threshold" value="{{#if fnProperties}}{{displayAnomalyFunctionProp 'changeThreshold' fnProperties/changeThreshold}}{{/if}}"><span>%</span>
                 </div>
                 <div id="anomaly-compare-mode-selector" class="uk-form-row uk-display-inline-block" rel="self-service">
                     <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group uk-display-inline-block">
@@ -128,10 +135,10 @@
                     </div>
                 </div>
             </div>
-            <!-- ** END OF USER_RULE PROPERTIES 2/1 **
+            <!-- ** END OF USER_RULE PROPERTIES **
 
             <!-- ** MIN_MAX_THRESHOLD PROPERTIES ** -->
-            <div class="min-max-threshold-fields function-type-fields uk-display-inline-block uk-hidden">
+            <div class="MIN_MAX_THRESHOLD-fields function-type-fields uk-display-inline-block uk-hidden">
                 <div id="anomaly-condition-selector-min-max" class="uk-display-inline-block">
                     <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group uk-display-inline-block">
                         <div id="selected-anomaly-condition-min-max" class="uk-button" value="{{#if fnProperties}}{{else}}MIN{{/if}}">
@@ -158,24 +165,6 @@
                 </div>
             </div>
             <!-- ** END OF MIN_MAX_THRESHOLD PROPERTIES ** -->
-
-            <!-- ** COMMON ANOMALY FUNCTION PARAMS part 3/2** -->
-            <span>for</span>
-            <input id="monitoring-window-size" class="thin-input" type="number" value="{{#if data/windowSize}}{{data/windowSize}}{{else}}1{{/if}}">
-            <span>consecutive</span>
-            <div id="monitoring-window-unit-selector uk-display-inline-block" class="uk-form-row uk-form-row uk-display-inline-block" rel="self-service">
-                <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group uk-display-inline-block">
-                    <div id="selected-monitoring-window-unit" class="uk-button" value="{{#if data/windowUnit}}{{data/windowUnit}}{{else}}HOURS{{/if}}">{{#if data/windowUnit}}{{data/windowUnit}}{{else}}HOUR(S){{/if}}</div>
-                    <div class="uk-button uk-button-primary" type="button"><i class="uk-icon-caret-down"></i></div>
-                    <div class="uk-dropdown uk-dropdown-small uk-dropdown-bottom" style="top: 30px; left: 0px;">
-                        <ul class="uk-nav uk-nav-dropdown single-select">
-                            <li class="monitoring-window-unit-option" value="HOURS"><a href="#" class="uk-dropdown-close">HOUR(S)</a></li>
-                            <li class="monitoring-window-unit-option" value="DAYS"><a href="#" class="uk-dropdown-close" >DAY(S)</a></li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-            <!-- END OF COMMON ANOMALY FUNCTION PARAMS part 3/2 ** -->
         </div>
         <div class="uk-form-row uk-margin-top">
 
@@ -214,16 +203,70 @@
             <!-- ** USER_RULE & MIN_MAX_THRESHOLD PROPERTIES ** -->
         </div>
 
+        <!-- ** FUNCTION TYPE PROPERTIES ** -->
 
+        {{#with @root/fnTypeMetaData}}
+        {{#each this as |functionProperties functionType|}}
+        <div class="{{functionType}}-fields function-type-fields uk-hidden" style="padding-left:50px;">
+            <span>... exceeds the following:</span>
+            <table class="uk-margin">
+            {{#each this as |property propertyIndex|}}
+            <tr>
+                <td>{{property}}</td>
+                <td class="" style="padding:5px;">
+                    <input id="{{property}}" class="fn-type-property"
+                           type="text"
+                           data-property="{{property}}"
+
+                    {{#if @root/fnProperties}}
+                         value="{{lookupInMapByKey  @root/fnProperties key=property}}"
+                    {{else}}
+                         {{#lookupComplexScope  @root/propertyDefs/propertyDef primary=functionType secondary=property separator='|'}}
+                             value="{{this.[0]}}"
+                         {{/lookupComplexScope}}
+                    {{/if}}
+
+                    {{#lookupComplexScope  @root/propertyDefs/propertyDef primary=functionType secondary=property separator='|'}}
+                          placeholder="{{add_string_if_eq this.[1] 'Pattern' stringToAdd='UP,DOWN'}}{{add_string_if_eq this.[1] 'TimeUnit' stringToAdd='HOURS,DAYS'}}"
+                          data-expected="{{this.[1]}}"
+                    >
+                    <i class="uk-icon-question-circle"  data-uk-tooltip="{delay: 0}" title="expected data type: {{this.[1]}}"></i>
+                    {{/lookupComplexScope}}
+                </td>
+            </tr>
+            {{/each}}
+            </table>
+        </div>
+        {{/each}}
+        {{/with}}
+        <!-- ** END OF FUNCTION PROPERTIES** -->
 
         <!-- EMAIL ADDRESS CONFIG currently 7/26/2016 not supported by the back end
         <div class="uk-form-row">
             <input class="" rel="self-service" type="checkbox" checked><span>Send me an email when this alert triggers. Email address: </span><input type="email" autocomplete="on">
         </div>-->
 
+           <!-- ** COMMON ANOMALY FUNCTION PARAMS part 3/2** -->
+           <div class="uk-form-row uk-margin-top">
+               <span>for</span>
+               <input id="monitoring-window-size" class="thin-input" type="number" value="{{#if data/windowSize}}{{data/windowSize}}{{else}}1{{/if}}">
+               <span>consecutive</span>
+               <div id="monitoring-window-unit-selector uk-display-inline-block" class="uk-form-row uk-form-row uk-display-inline-block" rel="self-service">
+                   <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group uk-display-inline-block">
+                       <div id="selected-monitoring-window-unit" class="uk-button" value="{{#if data/windowUnit}}{{data/windowUnit}}{{else}}HOURS{{/if}}">{{#if data/windowUnit}}{{data/windowUnit}}{{else}}HOUR(S){{/if}}</div>
+                       <div class="uk-button uk-button-primary" type="button"><i class="uk-icon-caret-down"></i></div>
+                       <div class="uk-dropdown uk-dropdown-small uk-dropdown-bottom" style="top: 30px; left: 0px;">
+                           <ul class="uk-nav uk-nav-dropdown single-select">
+                               <li class="monitoring-window-unit-option" value="HOURS"><a href="#" class="uk-dropdown-close">HOUR(S)</a></li>
+                               <li class="monitoring-window-unit-option" value="DAYS"><a href="#" class="uk-dropdown-close" >DAY(S)</a></li>
+                           </ul>
+                       </div>
+                   </div>
+               </div>
+           </div>
+           <!-- END OF COMMON ANOMALY FUNCTION PARAMS part 3/2 ** -->
+
         <div class="uk-form-row">
-
-
             <span class="uk-form-label uk-display-inline-block">Monitor the data every
             </span>
             <input id="monitoring-repeat-size" type="number" class="thin-input {{hide_if_eq schedule/repeatEveryUnit 'DAYS'}}" value="{{#if schedule/repeatEverySize}}{{schedule/repeatEverySize}}{{else}}1{{/if}}">
@@ -244,7 +287,7 @@
                         <input id="monitoring-schedule-time" type="text" placeholder="HH:MM or HH,HH,HH" value="{{#if schedule/scheduleHour}}{{schedule/scheduleHour}}{{else}}{{/if}}{{#if schedule/scheduleMinute}}:{{schedule/scheduleMinute}}{{else}}{{/if}}">
                         <span id="schedule-timezone">UTC</span>
                     </span>
-           {{#if data.cron}}<span class="form-row uk-hidden">cron: {{data/cron}}</span>{{/if}}
+           {{#if data/cron}}<span class="form-row uk-hidden">cron: {{data/cron}}</span>{{/if}}
 
         </div>
 

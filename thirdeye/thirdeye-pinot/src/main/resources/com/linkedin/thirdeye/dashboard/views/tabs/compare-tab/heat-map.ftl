@@ -31,7 +31,7 @@
                             <th> Delta (%):</th>
                         </tr>
                         <tr>
-                            <td class="title-stat">{{metricName}}  {{lookupInMapByKey @root/metricExpression  metricName}} </td>
+                            <td class="title-stat">{{metricName}}  {{lookupInMapByKey @root/metricExpression  key=metricName display="()"}} </td>
                             <td class="title-stat baseline-total">{{@root/summary/simpleFields/baselineTotal}}</td>
                             <td class="title-stat current-total">{{@root/summary/simpleFields/currentTotal}}</td>
                             <td class="title-stat delta-value">{{@root/summary/simpleFields/deltaChange}} </td>
