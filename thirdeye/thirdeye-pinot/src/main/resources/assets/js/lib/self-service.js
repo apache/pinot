@@ -292,7 +292,9 @@ function addSelfServiceListeners() {
 
         //Hide autoPopulated UASER_RULE and MIN_MAX_THRESHOLD to populate only the hard coded customized fields
         $(".USER_RULE-fields>table").addClass("uk-hidden");
+        $(".USER_RULE-fields>.exceed-txt").addClass("uk-hidden");
         $(".MIN_MAX_THRESHOLD-fields>table").addClass("uk-hidden");
+        $(".MIN_MAX_THRESHOLD-fields>.exceed-txt").addClass("uk-hidden");
     }
 
     function toggleMinMaxInput(target, form) {

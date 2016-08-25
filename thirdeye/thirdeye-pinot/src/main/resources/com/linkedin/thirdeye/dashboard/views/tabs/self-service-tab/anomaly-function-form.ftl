@@ -208,7 +208,7 @@
         {{#with @root/fnTypeMetaData}}
         {{#each this as |functionProperties functionType|}}
         <div class="{{functionType}}-fields function-type-fields uk-hidden" style="padding-left:50px;">
-            <span>... exceeds the following:</span>
+            <span class="exceed-txt">... exceeds the following:</span>
             <table class="uk-margin">
             {{#each this as |property propertyIndex|}}
             <tr>
