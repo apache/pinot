@@ -172,7 +172,7 @@ function addSelfServiceListeners() {
         createAnomalyFunction()
     });
 
-    //Create anomaly function
+    //Create than run anomaly function
     $("#self-service-forms-section").on("click", "#create-run-anomaly-function", function () {
 
         var callback = runAdhocAnomalyFunction;
@@ -364,8 +364,8 @@ function addSelfServiceListeners() {
         formData.functionName = $("#name", form).val();
         formData.metric = $("#selected-metric-manage-anomaly-fn", form).attr("value");
         formData.functionType = $("#selected-function-type", form).attr("value");
-        formData.metricFunction = "SUM";  //dblcheck if this is true for all
-        formData.windowDelay = "1";  //dblcheck if this is true for all fnTypes  Todo:consider max time ?
+        formData.metricFunction = "SUM";
+        formData.windowDelay = "1";
         formData.windowSize = $("#monitoring-window-size", form).val(); //
         formData.windowUnit = $("#selected-monitoring-window-unit", form).attr("value");
         formData.repeatEverySize = $("#monitoring-repeat-size", form).val() ? $("#monitoring-repeat-size", form).val() : 1;
@@ -378,7 +378,6 @@ function addSelfServiceListeners() {
             }else{
                 //schedule time format HH:MM
                 var monitoringScheduleTimeAry = monitoringScheduleTime.split(":")
-
                 formData.scheduleHour = monitoringScheduleTimeAry[0];
                 formData.scheduleMinute = monitoringScheduleTimeAry[1];
             }

@@ -144,6 +144,8 @@ $(document).ready( function() {
     var metaDataUrl = "/thirdeye/function/metadata"
     getData(metaDataUrl, "self-service").done(function (anomalyFunctionTypeMetaData) {
 
+        //Adding property defaults and datatypes from: https://gitli.corp.linkedin.com/ars-projects/anomaly-detection/source/bdafe93d4b4e57a439b16a8ca82c5b4119218ddd:anomaly-detection/src/main/java/com/linkedin/anomaly/api
+        //Todo: get the property defaults from the backend once an endpoint is ready
         var propertyDefs = {
             "schema": {
                  "defaultValue": 0,
