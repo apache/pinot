@@ -53,6 +53,10 @@ function getExistingAnomalyFunctions(dataset) {
 
 
 function renderSelfService() {
+    //Unbind previously added eventlisteners
+    $("#self-service-forms-section").off("click")
+    $("#self-service-forms-section").off("keyup")
+
 
     // The elements of the self-service tab are created on the anomaly-function-form template
 
