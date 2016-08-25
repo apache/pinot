@@ -196,7 +196,7 @@ public class ThirdEyeCacheRegistry {
 
     // CollectionMaxDataTime Cache
     LoadingCache<String, Long> collectionMaxDataTimeCache = CacheBuilder.newBuilder()
-        .build(new CollectionMaxDataTimeCacheLoader(pinotThirdeyeClientConfig));
+        .build(new CollectionMaxDataTimeCacheLoader(pinotThirdeyeClientConfig, collectionSchemaCache, resultSetGroupCache));
     cacheRegistry.registerCollectionMaxDataTimeCache(collectionMaxDataTimeCache);
 
     // CollectionConfig Cache
