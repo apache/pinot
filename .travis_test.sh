@@ -28,5 +28,9 @@ if [ $TRAVIS_JDK_VERSION != 'oraclejdk7' ]; then
   exit 0
 fi
 
-cd $PINOT_MODULE
 mvn test -P travis
+if [ $? -ne 0 ]; then
+  exit 1
+fi
+
+bash <(cat .codecov_bash)
