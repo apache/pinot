@@ -156,7 +156,7 @@ public class AlertTaskRunner implements TaskRunner {
     // Render template - create email first so we can get embedded image string
     HtmlEmail email = new HtmlEmail();
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
-    File chartFile = null;
+//    File chartFile = null;
     try (Writer out = new OutputStreamWriter(baos, CHARSET)) {
       Configuration freemarkerConfig = new Configuration(Configuration.VERSION_2_3_21);
       freemarkerConfig.setClassForTemplateLoading(getClass(), "/com/linkedin/thirdeye/detector/");
@@ -183,7 +183,7 @@ public class AlertTaskRunner implements TaskRunner {
       templateData.put("timeZone", timeZone);
       // http://stackoverflow.com/questions/13339445/feemarker-writing-images-to-html
       //      chartFile = new File(chartFilePath);
-      templateData.put("embeddedChart", email.embed(chartFile));
+      //      templateData.put("embeddedChart", email.embed(chartFile));
       templateData.put("collection", collectionAlias);
       templateData.put("metric", metric);
       templateData.put("filters", filtersJsonEncoded);
