@@ -665,17 +665,17 @@ public class AnomalyResource {
   }
 
   /**
-   * @param anomalyResultId : anomaly result id
+   * @param anomalyResultId : anomaly merged result id
    * @param payload         : Json payload containing feedback @see com.linkedin.thirdeye.constant.AnomalyFeedbackType
    *                        eg. payload
    *                        <p/>
    *                        { "feedbackType": "NOT_ANOMALY", "comment": "this is not an anomaly" }
    */
   @POST
-  @Path(value = "anomaly-result/feedback/{anomaly_result_id}")
-  public void updateAnomalyResultFeedback(@PathParam("anomaly_result_id") long anomalyResultId, String payload) {
+  @Path(value = "anomaly-result/feedback/{anomaly_merged_result_id}")
+  public void updateAnomalyResultFeedback(@PathParam("anomaly_merged_result_id") long anomalyResultId, String payload) {
     try {
-      AnomalyResult result = anomalyResultDAO.findById(anomalyResultId);
+      AnomalyMergedResult result = anomalyMergedResultDAO.findById(anomalyResultId);
       if (result == null) {
         throw new IllegalArgumentException("AnomalyResult not found with id " + anomalyResultId);
       }
@@ -694,7 +694,7 @@ public class AnomalyResource {
       feedback.setComment(feedbackRequest.getComment());
       feedback.setFeedbackType(feedbackRequest.getFeedbackType());
 
-      anomalyResultDAO.update(result);
+      anomalyMergedResultDAO.update(result);
     } catch (IOException e) {
       throw new IllegalArgumentException("Invalid payload " + payload, e);
     }

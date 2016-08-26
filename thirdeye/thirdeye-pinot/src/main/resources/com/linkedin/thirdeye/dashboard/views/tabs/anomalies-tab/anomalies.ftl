@@ -28,13 +28,13 @@
                 </div> {{anomalyData/id}}</label>
                 </td>
                 <td>
-                    <p>{{millisToDate anomalyData/startTimeUtc showTimeZone=false}} </p>
-                    <p> {{millisToDate anomalyData/endTimeUtc showTimeZone=false}}</p>
+                    <p>{{millisToDate anomalyData/startTime showTimeZone=false}} </p>
+                    <p> {{millisToDate anomalyData/endTime showTimeZone=false}}</p>
                 </td>
                 <td>{{anomalyData/message}}</td>
                 <td>{{anomalyData/dimensions}}</td>
                 <td>
-                    <a class="heatmap-link" href="#" data-start-utc-millis="{{anomalyData/startTimeUtc}}" data-end-utc-millis="{{anomalyData/endTimeUtc}}"  data-metric="{{anomalyData/metric}}">
+                    <a class="heatmap-link" href="#" data-start-utc-millis="{{anomalyData/startTime}}" data-end-utc-millis="{{anomalyData/endTime}}"  data-metric="{{anomalyData/metric}}">
                         <span class="uk-button" data-uk-tooltip title="See heatmap of this timerange"><i class="uk-icon-eye"></i></span>
                     </a>
                 </td>

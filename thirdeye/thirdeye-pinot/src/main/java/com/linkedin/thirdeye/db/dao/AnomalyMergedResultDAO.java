@@ -3,9 +3,7 @@ package com.linkedin.thirdeye.db.dao;
 import com.google.inject.persist.Transactional;
 import com.linkedin.thirdeye.db.entity.AnomalyMergedResult;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import javax.persistence.NoResultException;
 
 public class AnomalyMergedResultDAO extends AbstractJpaDAO<AnomalyMergedResult> {
@@ -14,20 +12,22 @@ public class AnomalyMergedResultDAO extends AbstractJpaDAO<AnomalyMergedResult> 
       "from AnomalyMergedResult amr where amr.collection=:collection and amr.metric=:metric "
           + "and amr.dimensions=:dimensions order by amr.endTime desc";
 
+  // find a conflicting window
   private static final String FIND_BY_COLLECTION_METRIC_DIMENSIONS_TIME =
       "from AnomalyMergedResult r where r.collection=:collection and r.metric=:metric "
-          + "and r.dimensions in :dimensions and ((r.startTime >= :startTime and r.startTime <= :endTime) "
-          + "or (r.endTime >= :startTime and r.endTime <= :endTime)) order by r.endTime desc";
+          + "and r.dimensions in :dimensions "
+          + "and (r.startTime < :endTime and r.endTime > :startTime) "
+          + "order by r.endTime desc";
 
+  // find a conflicting window
   private static final String FIND_BY_COLLECTION_METRIC_TIME =
       "from AnomalyMergedResult r where r.collection=:collection and r.metric=:metric "
-          + "and ((r.startTime >= :startTime and r.startTime <= :endTime) "
-          + "or (r.endTime >= :startTime and r.endTime <= :endTime)) order by r.endTime desc";
+          + "and (r.startTime < :endTime and r.endTime > :startTime) order by r.endTime desc";
 
+  // find a conflicting window
   private static final String FIND_BY_COLLECTION_TIME =
       "from AnomalyMergedResult r where r.collection=:collection "
-          + "and ((r.startTime >= :startTime and r.startTime <= :endTime) "
-          + "or (r.endTime >= :startTime and r.endTime <= :endTime)) order by r.endTime desc";
+          + "and (r.startTime < :endTime and r.endTime > :startTime) order by r.endTime desc";
 
   private static final String FIND_BY_FUNCTION_AND_DIMENSIONS =
       "from AnomalyMergedResult amr where amr.function.id=:functionId "
