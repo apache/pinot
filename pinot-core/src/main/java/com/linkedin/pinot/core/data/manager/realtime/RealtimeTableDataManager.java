@@ -106,6 +106,7 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
       return;
     }
     RealtimeSegmentZKMetadata segmentZKMetadata = (RealtimeSegmentZKMetadata) inputSegmentZKMetadata;
+    LOGGER.info("Attempting to add realtime segment {} for table {}", segmentId, tableName);
 
     if (new File(_indexDir, segmentId).exists() && (segmentZKMetadata).getStatus() == Status.DONE) {
       // segment already exists on file, and we have committed the realtime segment in ZK. Treat it like an offline segment
@@ -129,7 +130,7 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
       }
       PinotHelixPropertyStoreZnRecordProvider propertyStoreHelper = PinotHelixPropertyStoreZnRecordProvider.forSchema(propertyStore);
       ZNRecord record = propertyStoreHelper.get(tableConfig.getValidationConfig().getSchemaName());
-      LOGGER.info("found schema {} ", tableConfig.getValidationConfig().getSchemaName());
+      LOGGER.info("Found schema {} ", tableConfig.getValidationConfig().getSchemaName());
       Schema schema = Schema.fromZNRecord(record);
       if (!isValid(schema, tableConfig.getIndexingConfig())) {
         LOGGER.error("Not adding segment {}", segmentId);
@@ -151,6 +152,7 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
           TarGzCompressionUtils.unTar(tempFile, tempSegmentFolder);
           FileUtils.deleteQuietly(tempFile);
           FileUtils.moveDirectory(tempSegmentFolder, new File(_indexDir, segmentId));
+          LOGGER.info("Replacing LLC Segment {}", segmentId);
           replaceLLSegment(segmentId);
           return;
         }
