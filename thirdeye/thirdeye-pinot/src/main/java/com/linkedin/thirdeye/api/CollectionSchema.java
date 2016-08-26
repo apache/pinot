@@ -137,8 +137,8 @@ public final class CollectionSchema extends AbstractConfig{
   }
 
   @Override
-  public int getConfigId() {
-    return 0;
+  public String getConfigName() {
+    return collection;
   }
 
 }

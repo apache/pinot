@@ -17,7 +17,9 @@ import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.thirdeye.api.CollectionSchema;
 import com.linkedin.thirdeye.dashboard.configs.AbstractConfig;
+import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
 import com.linkedin.thirdeye.dashboard.configs.WebappConfigFactory;
 import com.linkedin.thirdeye.dashboard.configs.WebappConfigFactory.WebappConfigType;
 import com.linkedin.thirdeye.db.dao.WebappConfigDAO;
@@ -43,28 +45,28 @@ public class WebappConfigResource {
    *                     { "collectionName" : "test_collection", "collectionAlias" : "test_alias" }"
    */
   @POST
-  @Path(value = "create/{collection}/{configType}")
+  @Path(value = "create/{collection}/{type}")
   public Response createConfig(@PathParam("collection") String collection,
-      @PathParam("configType") WebappConfigType configType,
+      @PathParam("type") WebappConfigType type,
       String payload) {
 
     try {
-      AbstractConfig abstractConfig = WebappConfigFactory.getConfigFromConfigTypeAndJson(configType, payload);
+      AbstractConfig abstractConfig = WebappConfigFactory.getConfigFromConfigTypeAndJson(type, payload);
 
-      int configId = abstractConfig.getConfigId();
+      String configName = abstractConfig.getConfigName();
       String config = abstractConfig.toJSON();
 
       WebappConfig webappConfig = new WebappConfig();
-      webappConfig.setConfigId(configId);
+      webappConfig.setName(configName);
       webappConfig.setCollection(collection);
-      webappConfig.setConfigType(configType);
+      webappConfig.setType(type);
       webappConfig.setConfig(config);
       Long id = webappConfigDAO.save(webappConfig);
       LOG.info("Created webappConfig {} with id {}", webappConfig, id);
       return Response.ok(id).build();
     } catch (Exception e) {
       LOG.error("Exception in creating webapp config with collection {} configType {} and payload {}",
-          collection, configType, payload, e);
+          collection, type, payload, e);
       return Response.ok(e).build();
     }
   }
@@ -72,18 +74,18 @@ public class WebappConfigResource {
   @GET
   @Path(value = "view")
   public List<WebappConfig> viewConfigs(@QueryParam("id") Long id, @QueryParam("collection") String collection,
-      @QueryParam("configType") WebappConfigType configType) {
+      @QueryParam("type") WebappConfigType type) {
     List<WebappConfig> webappConfigs = new ArrayList<>();
     if (id != null) {
       webappConfigs.add(webappConfigDAO.findById(id));
     } else if (!StringUtils.isBlank(collection)) {
-      if (configType != null) {
-        webappConfigs.addAll(webappConfigDAO.findByCollectionAndConfigType(collection, configType));
+      if (type != null) {
+        webappConfigs.addAll(webappConfigDAO.findByCollectionAndType(collection, type));
       } else {
         webappConfigs.addAll(webappConfigDAO.findByCollection(collection));
       }
-    } else if (configType != null) {
-      webappConfigs.addAll(webappConfigDAO.findByConfigType(configType));
+    } else if (type != null) {
+      webappConfigs.addAll(webappConfigDAO.findByType(type));
     } else {
       webappConfigs.addAll(webappConfigDAO.findAll());
     }
@@ -93,23 +95,23 @@ public class WebappConfigResource {
   @POST
   @Path(value = "update/{id}/{collection}/{configType}")
   public Response updateConfig(@PathParam("id") Long id, @PathParam("collection") String collection,
-      @PathParam("configType") WebappConfigType configType, String payload) {
+      @PathParam("type") WebappConfigType type, String payload) {
     try {
-      AbstractConfig abstractConfig = WebappConfigFactory.getConfigFromConfigTypeAndJson(configType, payload);
+      AbstractConfig abstractConfig = WebappConfigFactory.getConfigFromConfigTypeAndJson(type, payload);
 
-      int configId = abstractConfig.getConfigId();
+      String configName = abstractConfig.getConfigName();
       String config = abstractConfig.toJSON();
 
       WebappConfig webappConfig = webappConfigDAO.findById(id);
-      webappConfig.setConfigId(configId);
+      webappConfig.setName(configName);
       webappConfig.setCollection(collection);
-      webappConfig.setConfigType(configType);
+      webappConfig.setType(type);
       webappConfig.setConfig(config);
       webappConfigDAO.update(webappConfig);
       return Response.ok(id).build();
     } catch (Exception e) {
       LOG.error("Exception in updating webapp config with id {} collection {} configType {} and payload {}",
-          id, collection, configType, payload, e);
+          id, collection, type, payload, e);
       return Response.ok(e).build();
     }
   }
@@ -117,7 +119,7 @@ public class WebappConfigResource {
   @DELETE
   @Path(value = "delete")
   public Response deleteConfig(@QueryParam("id") Long id, @QueryParam("collection") String collection,
-      @QueryParam("configType") WebappConfigType configType) {
+      @QueryParam("type") WebappConfigType type) {
     try {
       if (id == null && StringUtils.isBlank(collection)) {
         throw new IllegalStateException("must specify id or collection");
@@ -126,10 +128,10 @@ public class WebappConfigResource {
       if (id != null) {
         webappConfigs = new ArrayList<>();
         webappConfigs.add(webappConfigDAO.findById(id));
-      } else if (configType == null) {
+      } else if (type == null) {
         webappConfigs = webappConfigDAO.findByCollection(collection);
       } else {
-        webappConfigs = webappConfigDAO.findByCollectionAndConfigType(collection, configType);
+        webappConfigs = webappConfigDAO.findByCollectionAndType(collection, type);
       }
       for (WebappConfig webappConfig : webappConfigs) {
         webappConfigDAO.deleteById(webappConfig.getId());

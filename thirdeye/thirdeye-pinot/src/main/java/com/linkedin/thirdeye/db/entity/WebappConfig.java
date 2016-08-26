@@ -13,32 +13,32 @@ import com.google.common.base.MoreObjects;
 import com.linkedin.thirdeye.dashboard.configs.WebappConfigFactory.WebappConfigType;
 
 /**
- * Entity class for webapp configs. config_id, collection, config_type conbination should be unique
+ * Entity class for webapp configs. name, collection, type conbination should be unique
  */
 @Entity
-@Table(name = "webapp_configs",
-  uniqueConstraints = {@UniqueConstraint(columnNames={"config_id", "collection", "config_type"})})
+@Table(name = "webapp_config",
+  uniqueConstraints = {@UniqueConstraint(columnNames={"name", "collection", "type"})})
 public class WebappConfig  extends AbstractBaseEntity {
 
-  @Column(name = "config_id", nullable = false)
-  private Integer configId;
+  @Column(name = "name", nullable = false)
+  private String name;
 
   @Column(name = "collection", nullable = false)
   private String collection;
 
   @Enumerated(EnumType.STRING)
-  @Column(name = "config_type", nullable = false)
-  private WebappConfigType configType;
+  @Column(name = "type", nullable = false)
+  private WebappConfigType type;
 
   @Column(name = "config", nullable = false, length = 10000)
   private String config;
 
-  public Integer getConfigId() {
-    return configId;
+  public String getName() {
+    return name;
   }
 
-  public void setConfigId(Integer configId) {
-    this.configId = configId;
+  public void setName(String name) {
+    this.name = name;
   }
 
   public String getCollection() {
@@ -49,12 +49,12 @@ public class WebappConfig  extends AbstractBaseEntity {
     this.collection = collection;
   }
 
-  public WebappConfigType getConfigType() {
-    return configType;
+  public WebappConfigType getType() {
+    return type;
   }
 
-  public void setConfigType(WebappConfigType configType) {
-    this.configType = configType;
+  public void setType(WebappConfigType type) {
+    this.type = type;
   }
 
   public String getConfig() {
@@ -72,24 +72,24 @@ public class WebappConfig  extends AbstractBaseEntity {
     }
     WebappConfig wc = (WebappConfig) o;
     return Objects.equals(getId(), wc.getId())
-        && Objects.equals(configId, wc.getConfigId())
+        && Objects.equals(name, wc.getName())
         && Objects.equals(collection, wc.getCollection())
-        && Objects.equals(configType, wc.getConfigType())
+        && Objects.equals(type, wc.getType())
         && Objects.equals(config, wc.getConfig());
   }
 
   @Override public int hashCode() {
-    return Objects.hash(getId(), configId, collection, configType, config);
+    return Objects.hash(getId(), name, collection, type, config);
   }
 
   @Override
   public String toString() {
     return MoreObjects.toStringHelper(this)
         .add("id", getId())
-        .add("configId", configId)
+        .add("name", getName())
         .add("collection", getCollection())
-        .add("configType", getConfigType())
-        .add("config", getConfigType()).toString();
+        .add("type", getType())
+        .add("config", getConfig()).toString();
   }
 
 }

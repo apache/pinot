@@ -104,7 +104,6 @@ public class PqlUtils {
     if (StringUtils.isNotBlank(groupByClause)) {
       sb.append(" ").append(groupByClause);
       sb.append(" TOP ").append(DEFAULT_TOP);
-
     }
 
     return sb.toString();
@@ -129,7 +128,6 @@ public class PqlUtils {
     if (StringUtils.isNotBlank(groupByClause)) {
       sb.append(" ").append(groupByClause);
       sb.append(" TOP ").append(DEFAULT_TOP);
-
     }
 
     return sb.toString();

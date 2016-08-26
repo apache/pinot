@@ -27,12 +27,10 @@ import com.linkedin.thirdeye.client.cache.SchemaCacheLoader;
 import com.linkedin.thirdeye.client.pinot.PinotQuery;
 import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClient;
 import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClientConfig;
-import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
 import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
-import com.linkedin.thirdeye.dashboard.configs.AbstractConfigDAO;
 import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
-import com.linkedin.thirdeye.dashboard.configs.DashboardConfig;
 import com.linkedin.thirdeye.dashboard.resources.CacheResource;
+import com.linkedin.thirdeye.db.dao.WebappConfigDAO;
 
 public class ThirdEyeCacheRegistry {
 
@@ -47,9 +45,7 @@ public class ThirdEyeCacheRegistry {
   private CollectionsCache collectionsCache;
   private QueryCache queryCache;
 
-  private static AbstractConfigDAO<CollectionSchema> collectionSchemaDAO;
-  private static AbstractConfigDAO<CollectionConfig> collectionConfigDAO;
-  private static AbstractConfigDAO<DashboardConfig> dashboardConfigDAO;
+  private static WebappConfigDAO webappConfigDAO;
   private static PinotThirdEyeClientConfig pinotThirdeyeClientConfig;
   private static ThirdEyeClient thirdEyeClient;
 
@@ -63,80 +59,44 @@ public class ThirdEyeCacheRegistry {
     return Holder.INSTANCE;
   }
 
-  private static void init(ThirdEyeConfiguration config) {
+  private static void init(ThirdEyeConfiguration config, WebappConfigDAO configDAO) {
     try {
 
       pinotThirdeyeClientConfig = PinotThirdEyeClientConfig.createThirdEyeClientConfig(config);
       thirdEyeClient = PinotThirdEyeClient.fromClientConfig(pinotThirdeyeClientConfig);
-
-      dashboardConfigDAO = BaseThirdEyeApplication.getDashboardConfigDAO(config);
-      collectionSchemaDAO = BaseThirdEyeApplication.getCollectionSchemaDAO(config);
-      collectionConfigDAO = BaseThirdEyeApplication.getCollectionConfigDAO(config);
+      webappConfigDAO = configDAO;
 
     } catch (Exception e) {
      LOGGER.info("Caught exception while initializing caches", e);
     }
   }
 
-  private static void init(ThirdEyeConfiguration config, PinotThirdEyeClientConfig pinotThirdEyeClientConfig) {
+  private static void init(ThirdEyeConfiguration config, PinotThirdEyeClientConfig pinotThirdEyeClientConfig,
+      WebappConfigDAO configDAO) {
     try {
 
       pinotThirdeyeClientConfig = pinotThirdEyeClientConfig;
       thirdEyeClient = PinotThirdEyeClient.fromClientConfig(pinotThirdeyeClientConfig);
-
-      dashboardConfigDAO = BaseThirdEyeApplication.getDashboardConfigDAO(config);
-      collectionSchemaDAO = BaseThirdEyeApplication.getCollectionSchemaDAO(config);
-      collectionConfigDAO = BaseThirdEyeApplication.getCollectionConfigDAO(config);
-
+      webappConfigDAO = configDAO;
     } catch (Exception e) {
      LOGGER.info("Caught exception while initializing caches", e);
     }
-
   }
 
-  /**
-   * Initializes detector caches
-   * @param config
-   */
-  public static void initializeDetectorCaches(ThirdEyeConfiguration config) {
-    init(config);
-    initCommonCacheLoaders();
-  }
 
   /**
    * Initializes webapp caches
    * @param config
    */
-  public static void initializeWebappCaches(ThirdEyeConfiguration config) {
+  public static void initializeCaches(ThirdEyeConfiguration config, WebappConfigDAO configDAO) {
 
-    init(config);
-    initCommonCacheLoaders();
+    init(config, configDAO);
 
-    ThirdEyeCacheRegistry cacheRegistry = ThirdEyeCacheRegistry.getInstance();
-
-    LoadingCache<String, String> dimensionFiltersCache = CacheBuilder.newBuilder()
-        .build(new DimensionFiltersCacheLoader(cacheRegistry.getQueryCache()));
-    cacheRegistry.registerDimensionFiltersCache(dimensionFiltersCache);
-
-    LoadingCache<String, String> dashboardsCache = CacheBuilder.newBuilder()
-        .build(new DashboardsCacheLoader(dashboardConfigDAO));
-    cacheRegistry.registerDashboardsCache(dashboardsCache);
-
-    CollectionsCache collectionsCache = new CollectionsCache(pinotThirdeyeClientConfig, config);
-    cacheRegistry.registerCollectionsCache(collectionsCache);
+    initCaches(config, pinotThirdeyeClientConfig);
 
     initPeriodicCacheRefresh();
   }
 
-  /**
-   * Initializes detector caches with custom PinotThirdEyeClientConfig : ONLY FOR TESTING
-   * @param config
-   */
-  @Deprecated
-  public static void initializeDetectorCaches(ThirdEyeConfiguration config, PinotThirdEyeClientConfig pinotThirdEyeClientConfig) {
-    init(config, pinotThirdEyeClientConfig);
-    initCommonCacheLoaders();
-  }
 
   /**
    * Initialize web app caches with custom PinotThirdEyeClientConfig: ONLY FOR TESTING
@@ -144,30 +104,18 @@ public class ThirdEyeCacheRegistry {
    * @param pinotThirdeyeClientConfig
    */
   @Deprecated
-  public static void initializeWebappCaches(ThirdEyeConfiguration config, PinotThirdEyeClientConfig pinotThirdeyeClientConfig) {
+  public static void initializeCaches(ThirdEyeConfiguration config, PinotThirdEyeClientConfig pinotThirdeyeClientConfig,
+      WebappConfigDAO configDAO) {
 
-    init(config, pinotThirdeyeClientConfig);
-    initCommonCacheLoaders();
+    init(config, pinotThirdeyeClientConfig, configDAO);
 
-    ThirdEyeCacheRegistry cacheRegistry = ThirdEyeCacheRegistry.getInstance();
-
-    LoadingCache<String, String> dimensionFiltersCache = CacheBuilder.newBuilder()
-        .build(new DimensionFiltersCacheLoader(cacheRegistry.getQueryCache()));
-    cacheRegistry.registerDimensionFiltersCache(dimensionFiltersCache);
-
-    LoadingCache<String, String> dashboardsCache = CacheBuilder.newBuilder()
-        .build(new DashboardsCacheLoader(dashboardConfigDAO));
-    cacheRegistry.registerDashboardsCache(dashboardsCache);
-
-    CollectionsCache collectionsCache = new CollectionsCache(pinotThirdeyeClientConfig, config);
-    cacheRegistry.registerCollectionsCache(collectionsCache);
+    initCaches(config, pinotThirdeyeClientConfig);
 
     initPeriodicCacheRefresh();
   }
 
 
-  private static void initCommonCacheLoaders() {
-
+  private static void initCaches(ThirdEyeConfiguration config, PinotThirdEyeClientConfig pinotThirdEyeClientConfig) {
     ThirdEyeCacheRegistry cacheRegistry = ThirdEyeCacheRegistry.getInstance();
 
     RemovalListener<PinotQuery, ResultSetGroup> listener = new RemovalListener<PinotQuery, ResultSetGroup>() {
@@ -191,7 +139,7 @@ public class ThirdEyeCacheRegistry {
 
     // Collection Schema Cache
     LoadingCache<String, CollectionSchema> collectionSchemaCache = CacheBuilder.newBuilder()
-        .build(new CollectionSchemaCacheLoader(pinotThirdeyeClientConfig, collectionSchemaDAO));
+        .build(new CollectionSchemaCacheLoader(pinotThirdeyeClientConfig, webappConfigDAO));
     cacheRegistry.registerCollectionSchemaCache(collectionSchemaCache);
 
     // CollectionMaxDataTime Cache
@@ -201,18 +149,28 @@ public class ThirdEyeCacheRegistry {
 
     // CollectionConfig Cache
     LoadingCache<String, CollectionConfig> collectionConfigCache = CacheBuilder.newBuilder()
-        .build(new CollectionConfigCacheLoader(collectionConfigDAO));
+        .build(new CollectionConfigCacheLoader(webappConfigDAO));
     cacheRegistry.registerCollectionConfigCache(collectionConfigCache);
 
     // Collection Alias cache
     LoadingCache<String, String> collectionAliasCache = CacheBuilder.newBuilder()
-        .build(new CollectionAliasCacheLoader(collectionConfigDAO));
+        .build(new CollectionAliasCacheLoader(webappConfigDAO));
     cacheRegistry.registerCollectionAliasCache(collectionAliasCache);
 
     // Query Cache
     QueryCache queryCache = new QueryCache(thirdEyeClient, Executors.newFixedThreadPool(10));
     cacheRegistry.registerQueryCache(queryCache);
 
+    LoadingCache<String, String> dimensionFiltersCache = CacheBuilder.newBuilder()
+        .build(new DimensionFiltersCacheLoader(cacheRegistry.getQueryCache()));
+    cacheRegistry.registerDimensionFiltersCache(dimensionFiltersCache);
+
+    LoadingCache<String, String> dashboardsCache = CacheBuilder.newBuilder()
+        .build(new DashboardsCacheLoader(webappConfigDAO));
+    cacheRegistry.registerDashboardsCache(dashboardsCache);
+
+    CollectionsCache collectionsCache = new CollectionsCache(pinotThirdeyeClientConfig, config);
+    cacheRegistry.registerCollectionsCache(collectionsCache);
   }
 
   private static void initPeriodicCacheRefresh() {

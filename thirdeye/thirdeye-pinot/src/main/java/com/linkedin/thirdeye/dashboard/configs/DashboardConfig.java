@@ -66,13 +66,12 @@ public class DashboardConfig extends AbstractConfig {
 
   @Override
   public String toJSON() throws Exception {
-    return OBJECT_MAPPER.writerWithType(DashboardConfig.class).writeValueAsString(this);
-
+    return OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(this);
   }
 
   @Override
-  public int getConfigId() {
-    return getDashboardId();
+  public String getConfigName() {
+    return getDashboardName();
   }
 
 }
