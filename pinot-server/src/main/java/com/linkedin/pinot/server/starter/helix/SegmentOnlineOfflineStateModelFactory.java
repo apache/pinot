@@ -116,7 +116,6 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
       if (acquiredSegment == null) {
         throw new RuntimeException("Segment " + segmentNameStr + " + not present ");
       }
-      // TODO change
 
       try {
         if (!(acquiredSegment instanceof LLRealtimeSegmentDataManager)) {
