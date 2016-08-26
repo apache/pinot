@@ -117,7 +117,7 @@ public class AnomalyResource {
     if (StringUtils.isNotEmpty(endTimeIso)) {
       endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso);
     }
-    DateTime startTime = endTime.minusDays(21);
+    DateTime startTime = endTime.minusDays(7);
     if (StringUtils.isNotEmpty(startTimeIso)) {
       startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso);
     }
