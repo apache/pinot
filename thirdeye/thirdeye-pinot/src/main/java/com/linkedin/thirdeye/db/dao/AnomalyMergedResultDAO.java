@@ -38,14 +38,12 @@ public class AnomalyMergedResultDAO extends AbstractJpaDAO<AnomalyMergedResult> 
           + "and amr.dimensions is null order by amr.endTime desc";
 
   private static final String FIND_BY_TIME =
-      "from AnomalyMergedResult r WHERE ((r.startTime >= :startTime AND r.startTime <= :endTime) "
-          + "OR (r.endTime >= :startTime AND r.endTime <= :endTime)) order by r.endTime desc ";
+      "from AnomalyMergedResult r WHERE (r.startTime < :endTime and r.endTime > :startTime) order by r.endTime desc ";
 
   private static final String FIND_BY_TIME_EMAIL =
       "SELECT r FROM EmailConfiguration d JOIN d.functions f, AnomalyMergedResult r "
           + "WHERE r.function.id=f.id AND d.id = :emailId "
-          + "AND ((r.startTime >= :startTime AND r.startTime <= :endTime) "
-          + "OR (r.endTime >= :startTime AND r.endTime <= :endTime)) order by r.endTime desc ";
+          + "and (r.startTime < :endTime and r.endTime > :startTime) order by r.endTime desc ";
 
   public AnomalyMergedResultDAO() {
     super(AnomalyMergedResult.class);
