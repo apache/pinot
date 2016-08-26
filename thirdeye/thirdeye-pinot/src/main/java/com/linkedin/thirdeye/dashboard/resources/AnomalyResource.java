@@ -5,10 +5,12 @@ import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
 import com.linkedin.thirdeye.constant.FeedbackStatus;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.db.dao.AnomalyFunctionDAO;
+import com.linkedin.thirdeye.db.dao.AnomalyMergedResultDAO;
 import com.linkedin.thirdeye.db.dao.AnomalyResultDAO;
 import com.linkedin.thirdeye.db.dao.EmailConfigurationDAO;
 import com.linkedin.thirdeye.db.entity.AnomalyFeedback;
 
+import com.linkedin.thirdeye.db.entity.AnomalyMergedResult;
 import java.io.IOException;
 import java.net.URLDecoder;
 import java.util.ArrayList;
@@ -65,6 +67,7 @@ public class AnomalyResource {
   private static final String DEFAULT_FUNCTION_TYPE = "USER_RULE";
 
   private AnomalyFunctionDAO anomalyFunctionDAO;
+  private AnomalyMergedResultDAO anomalyMergedResultDAO;
   private AnomalyResultDAO anomalyResultDAO;
   private EmailConfigurationDAO emailConfigurationDAO;
 
@@ -72,7 +75,9 @@ public class AnomalyResource {
   private AlertResourceHttpUtils alertResourceHttpUtils;
   private ThirdEyeDashboardConfiguration dashboardConfiguration;
 
-  public AnomalyResource(ThirdEyeDashboardConfiguration dashboardConfiguration, AnomalyFunctionDAO anomalyFunctionDAO, AnomalyResultDAO anomalyResultDAO, EmailConfigurationDAO emailConfigurationDAO) {
+  public AnomalyResource(ThirdEyeDashboardConfiguration dashboardConfiguration,
+      AnomalyFunctionDAO anomalyFunctionDAO, AnomalyResultDAO anomalyResultDAO,
+      EmailConfigurationDAO emailConfigurationDAO, AnomalyMergedResultDAO anomalyMergedResultDAO) {
     this.dashboardConfiguration = dashboardConfiguration;
     this.detectionResourceHttpUtils = new DetectionResourceHttpUtils(dashboardConfiguration.getDetectorHost(),
         dashboardConfiguration.getDetectorPort());
@@ -80,6 +85,7 @@ public class AnomalyResource {
         dashboardConfiguration.getAlertPort());
     this.anomalyFunctionDAO = anomalyFunctionDAO;
     this.anomalyResultDAO = anomalyResultDAO;
+    this.anomalyMergedResultDAO = anomalyMergedResultDAO;
     this.emailConfigurationDAO = emailConfigurationDAO;
   }
 
@@ -94,10 +100,10 @@ public class AnomalyResource {
     return metrics;
   }
 
-  // View anomalies for collection
+  // View merged anomalies for collection
   @GET
   @Path("/anomalies/view")
-  public List<AnomalyResult> viewAnomaliesInRange(@NotNull @QueryParam("dataset") String dataset,
+  public List<AnomalyMergedResult> viewAnomaliesInRange(@NotNull @QueryParam("dataset") String dataset,
       @QueryParam("startTimeIso") String startTimeIso,
       @QueryParam("endTimeIso") String endTimeIso,
       @QueryParam("metric") String metric,
@@ -107,37 +113,31 @@ public class AnomalyResource {
       throw new IllegalArgumentException("dataset is a required query param");
     }
 
-    List<AnomalyResult> anomalyResults = new ArrayList<>();
+    DateTime endTime = DateTime.now();
+    if (StringUtils.isNotEmpty(endTimeIso)) {
+      endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso);
+    }
+    DateTime startTime = endTime.minusDays(7);
+    if (StringUtils.isNotEmpty(startTimeIso)) {
+      startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso);
+    }
+    List<AnomalyMergedResult> anomalyResults = new ArrayList<>();
     try {
-      DateTime endTime = DateTime.now();
-      if (StringUtils.isNotEmpty(endTimeIso)) {
-        endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso);
-      }
-      DateTime startTime = endTime.minusDays(7);
-      if (StringUtils.isNotEmpty(startTimeIso)) {
-        startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso);
-      }
-
       String[] dimensionPatterns = null;
       if (StringUtils.isNotBlank(dimensions)) {
-
         // get dimension names and index position
-        List<String> dimensionNames = CACHE_REGISTRY_INSTANCE.getCollectionSchemaCache()
-            .get(dataset).getDimensionNames();
+        List<String> dimensionNames = CACHE_REGISTRY_INSTANCE.getCollectionSchemaCache().get(dataset).getDimensionNames();
         Map<String, Integer> dimensionNameToIndexMap = new HashMap<>();
         for (int i = 0; i < dimensionNames.size(); i ++) {
           dimensionNameToIndexMap.put(dimensionNames.get(i), i);
         }
-
         // get dimensions map from request
         dimensions = URLDecoder.decode(dimensions, UTF8 );
         Multimap<String, String> dimensionsMap = ThirdEyeUtils.convertToMultiMap(dimensions);
-
         // create dimension patterns
         String[] dimensionsArray = new String[dimensionNames.size()];
         Arrays.fill(dimensionsArray, STAR_DIMENSION);
         List<String> dimensionPatternsList = new ArrayList<>();
-
         for (String dimensionName : dimensionsMap.keySet()) {
           List<String> dimensionValues = Lists.newArrayList(dimensionsMap.get(dimensionName));
           int dimensionIndex = dimensionNameToIndexMap.get(dimensionName);
@@ -153,16 +153,15 @@ public class AnomalyResource {
         dimensionPatterns = dimensionPatternsList.toArray(dimensionPatterns);
       }
 
+
       if (StringUtils.isNotBlank(metric)) {
         if (StringUtils.isNotBlank(dimensions)) {
-          anomalyResults = anomalyResultDAO.findAllByCollectionTimeMetricAndDimensions(dataset, metric,
-              startTime, endTime, dimensionPatterns);
+          anomalyResults = anomalyMergedResultDAO.findByCollectionMetricDimensionsTime(dataset, metric, dimensionPatterns, startTime.getMillis(), endTime.getMillis());
         } else {
-          anomalyResults = anomalyResultDAO.findAllByCollectionTimeAndMetric(dataset, metric,
-              startTime, endTime);
+          anomalyResults = anomalyMergedResultDAO.findByCollectionMetricTime(dataset, metric, startTime.getMillis(), endTime.getMillis());
         }
       } else {
-        anomalyResults = anomalyResultDAO.findAllByCollectionAndTime(dataset, startTime, endTime);
+        anomalyResults = anomalyMergedResultDAO.findByCollectionTime(dataset, startTime.getMillis(), endTime.getMillis());
       }
 
     } catch (Exception e) {
@@ -666,17 +665,17 @@ public class AnomalyResource {
   }
 
   /**
-   * @param anomalyResultId : anomaly result id
+   * @param anomalyResultId : anomaly merged result id
    * @param payload         : Json payload containing feedback @see com.linkedin.thirdeye.constant.AnomalyFeedbackType
    *                        eg. payload
    *                        <p/>
    *                        { "feedbackType": "NOT_ANOMALY", "comment": "this is not an anomaly" }
    */
   @POST
-  @Path(value = "anomaly-result/feedback/{anomaly_result_id}")
-  public void updateAnomalyResultFeedback(@PathParam("anomaly_result_id") long anomalyResultId, String payload) {
+  @Path(value = "anomaly-result/feedback/{anomaly_merged_result_id}")
+  public void updateAnomalyResultFeedback(@PathParam("anomaly_merged_result_id") long anomalyResultId, String payload) {
     try {
-      AnomalyResult result = anomalyResultDAO.findById(anomalyResultId);
+      AnomalyMergedResult result = anomalyMergedResultDAO.findById(anomalyResultId);
       if (result == null) {
         throw new IllegalArgumentException("AnomalyResult not found with id " + anomalyResultId);
       }
@@ -695,7 +694,7 @@ public class AnomalyResource {
       feedback.setComment(feedbackRequest.getComment());
       feedback.setFeedbackType(feedbackRequest.getFeedbackType());
 
-      anomalyResultDAO.update(result);
+      anomalyMergedResultDAO.update(result);
     } catch (IOException e) {
       throw new IllegalArgumentException("Invalid payload " + payload, e);
     }
