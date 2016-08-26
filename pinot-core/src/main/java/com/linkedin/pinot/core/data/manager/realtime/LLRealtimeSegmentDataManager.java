@@ -163,6 +163,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
   private final ServerSegmentCompletionProtocolHandler _protocolHandler;
 
 
+  // TODO each time this method is called, we print reason for stop. Good to print only once.
   private boolean endCriteriaReached() {
     Preconditions.checkState(_state.shouldConsume(), "Incorrect state %s", _state);
     if (_state.equals(State.INITIAL_CONSUMING)) {
@@ -331,7 +332,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
    */
   private boolean buildSegment(boolean buildTgz) {
     // Build a segment from in-memory rows.If buildTgz is true, then build the tar.gz file as well
-    // TODO Use an auto-closeable objec to delete temp resources.
+    // TODO Use an auto-closeable object to delete temp resources.
     File tempSegmentFolder = new File(_resourceTmpDir, "tmp-" + _segmentNameStr + "-" + String.valueOf(now()));
 
     // lets convert the segment now
@@ -497,7 +498,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
 
   public void start() {
     _state = State.INITIAL_CONSUMING;
-    _consumerThread = new Thread(new PartitionConsumer(), "consumer_" + _kafkaTopic + "_" + _kafkaPartitionId + "_" + _startOffset);
+    _consumerThread = new Thread(_segmentNameStr);
     segmentLogger.info("Created new consumer thread {} for {}", _consumerThread, this.toString());
     _consumerThread.start();
   }

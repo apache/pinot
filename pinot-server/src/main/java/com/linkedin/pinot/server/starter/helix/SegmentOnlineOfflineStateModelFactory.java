@@ -116,9 +116,15 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
       if (acquiredSegment == null) {
         throw new RuntimeException("Segment " + segmentNameStr + " + not present ");
       }
-      LLRealtimeSegmentDataManager segmentDataManager = (LLRealtimeSegmentDataManager)acquiredSegment;
 
       try {
+        if (!(acquiredSegment instanceof LLRealtimeSegmentDataManager)) {
+          // We found a LLC segment that is not consuming right now, must be that we already swapped it with a
+          // segment that has been built. Nothing to do for this state transition.
+          LOGGER.info("Segment {} not an instance of LLRealtimeSegmentDataManager. Reporting success for the transition", acquiredSegment.getSegmentName());
+          return;
+        }
+        LLRealtimeSegmentDataManager segmentDataManager = (LLRealtimeSegmentDataManager)acquiredSegment;
         RealtimeSegmentZKMetadata metadata = ZKMetadataProvider.getRealtimeSegmentZKMetadata(propertyStore,
             segmentName.getTableName(), segmentNameStr);
         segmentDataManager.goOnlineFromConsuming(metadata);
@@ -126,9 +132,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
         LOGGER.warn("State transition interrupted", e);
         throw new RuntimeException(e);
       } finally {
-        if (acquiredSegment != null) {
-          tableDataManager.releaseSegment(segmentDataManager);
-        }
+        tableDataManager.releaseSegment(acquiredSegment);
       }
     }
 
