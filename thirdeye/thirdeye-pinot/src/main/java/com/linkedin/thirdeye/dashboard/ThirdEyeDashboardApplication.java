@@ -48,7 +48,7 @@ public class ThirdEyeDashboardApplication
     env.jersey().register(new DashboardResource(BaseThirdEyeApplication.getDashboardConfigDAO(config)));
     env.jersey().register(new CacheResource());
     env.jersey().register(
-        new AnomalyResource(config, anomalyFunctionDAO, anomalyResultDAO, emailConfigurationDAO));
+        new AnomalyResource(config, anomalyFunctionDAO, anomalyResultDAO, emailConfigurationDAO, anomalyMergedResultDAO));
     env.jersey().register(new WebappConfigResource(webappConfigDAO));
   }
 
