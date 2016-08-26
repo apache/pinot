@@ -198,7 +198,8 @@ public class PqlUtils {
       long startInConvertedUnits = dataGranularity.convertToUnit(start.getMillis());
       long endInConvertedUnits = dataGranularity.convertToUnit(endExclusive.getMillis());
       startQueryTime = String.valueOf(startInConvertedUnits);
-      endQueryTimeExclusive = String.valueOf(endInConvertedUnits);
+      endQueryTimeExclusive = (endInConvertedUnits == startInConvertedUnits + 1) ?
+          startQueryTime : String.valueOf(endInConvertedUnits);
     } else {
       DateTimeFormatter dateTimeFormatter = DateTimeFormat.forPattern(timeFormat).withZoneUTC();
       startQueryTime = dateTimeFormatter.print(start);
