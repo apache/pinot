@@ -9,7 +9,7 @@ function getExistingAnomalyFunctions(dataset) {
             if (data) {
                 window.sessionStorage.setItem('existingAnomalyFunctions', JSON.stringify(data));
             }
-            compileAnomalyFnTable(data)
+                compileAnomalyFnTable(data);
         });
     } else {
         compileAnomalyFnTable()
@@ -49,10 +49,11 @@ function getExistingAnomalyFunctions(dataset) {
             ]
         });
     }
+
 }
 
+function addSelfServiceListeners() {
 
-function renderSelfService() {
     //Unbind previously added eventlisteners
     $("#self-service-forms-section").off("click")
     $("#self-service-forms-section").off("keyup")
@@ -78,6 +79,7 @@ function renderSelfService() {
 
     //Function type
     $("#self-service-forms-section").on("click", ".function-type-option", function () {
+
         var form = $(this).closest("form");
         toggleFunctionTypeFields(this,form);
         hideErrorAndSuccess("");
@@ -153,6 +155,10 @@ function renderSelfService() {
         hideErrorAndSuccess("anomaly-threshold", form);
     });
 
+    $("#self-service-forms-section").on("keyup", ".fn-type-property", function () {
+        var form = $(this).closest("form");
+        hideErrorAndSuccess("data-type", form);
+    });
 
     //COMMON LISTENERS
 
@@ -166,7 +172,7 @@ function renderSelfService() {
         createAnomalyFunction()
     });
 
-    //Create anomaly function
+    //Create than run anomaly function
     $("#self-service-forms-section").on("click", "#create-run-anomaly-function", function () {
 
         var callback = runAdhocAnomalyFunction;
@@ -279,9 +285,16 @@ function renderSelfService() {
     /** Event handlers **/
 
     function toggleFunctionTypeFields(target) {
+
         var functionType = $(target).attr("id");
         $(".function-type-fields").addClass("uk-hidden");
         $("." + functionType + "-fields").removeClass("uk-hidden");
+
+        //Hide autoPopulated UASER_RULE and MIN_MAX_THRESHOLD to populate only the hard coded customized fields
+        $(".USER_RULE-fields>table").addClass("uk-hidden");
+        $(".USER_RULE-fields>.exceed-txt").addClass("uk-hidden");
+        $(".MIN_MAX_THRESHOLD-fields>table").addClass("uk-hidden");
+        $(".MIN_MAX_THRESHOLD-fields>.exceed-txt").addClass("uk-hidden");
     }
 
     function toggleMinMaxInput(target, form) {
@@ -338,6 +351,8 @@ function renderSelfService() {
     //Takes the css selector of the placeholder of the form
     function collectAnomalyFnData(form) {
         var formData = {};
+        formData.properties = {};
+        formData.properties_meta = {};
 
         //Close uikit dropdowns
         $("[data-uk-dropdown]").removeClass("uk-open");
@@ -345,21 +360,14 @@ function renderSelfService() {
         $(".uk-dropdown").addClass("hidden");
 
         /** Collect the form values **/
-
-            //Currently only supporting 'user rule' type alert configuration on the front end-
-            // KALMAN and SCAN Statistics are set up by the backend
         formData.dataset = $(".selected-dataset", form).attr("value");
         formData.functionName = $("#name", form).val();
         formData.metric = $("#selected-metric-manage-anomaly-fn", form).attr("value");
         formData.functionType = $("#selected-function-type", form).attr("value");
         formData.metricFunction = "SUM";
-        formData.windowDelay = "1";  //Todo:consider max time ?
-        formData.windowSize = $("#monitoring-window-size", form).val();
+        formData.windowDelay = "1";
+        formData.windowSize = $("#monitoring-window-size", form).val(); //
         formData.windowUnit = $("#selected-monitoring-window-unit", form).attr("value");
-
-        //Todo add monitoring schedule time to update form when it's available
-
-
         formData.repeatEverySize = $("#monitoring-repeat-size", form).val() ? $("#monitoring-repeat-size", form).val() : 1;
         formData.repeatEveryUnit = $("#selected-monitoring-repeat-unit", form).attr("value");
         var monitoringScheduleTime = ( $("#monitoring-schedule-time", form).val() == "" ) ? "" : $("#monitoring-schedule-time", form).val() //Todo: in case of daily data granularity set the default schedule to time when datapoint is created
@@ -370,12 +378,10 @@ function renderSelfService() {
             }else{
                 //schedule time format HH:MM
                 var monitoringScheduleTimeAry = monitoringScheduleTime.split(":")
-
                 formData.scheduleHour = monitoringScheduleTimeAry[0];
                 formData.scheduleMinute = monitoringScheduleTimeAry[1];
             }
         }
-
         if ($("#function-id", form).length > 0) {
             formData.functionId = $("#function-id", form).text();
         }
@@ -393,19 +399,48 @@ function renderSelfService() {
         formData.filters = encodeURIComponent(JSON.stringify(filters));
         formData.exploreDimension = $("#self-service-view-single-dimension-selector #selected-dimension", form).attr("value");
 
+
+        //Function type params
         //USER_RULE Params
-        if (formData.functionType == "USER_RULE") {
+        switch(formData.functionType){
+            case "USER_RULE":
+                formData.condition = ( $("#selected-anomaly-condition", form).attr("value") == "DROPS" ) ? "-" : ( $("#selected-anomaly-condition", form).attr("value") == "INCREASES" ) ? "" : null;
+                formData.baseline = $("#selected-anomaly-compare-mode", form).attr("value");
+                formData.changeThreshold = parseFloat($("#anomaly-threshold", form).val() / 100);
+                //USER_RULE & MIN_MAX_THRESHOLD
+                var filters = readFiltersAppliedInCurrentView("self-service", {form: form});
 
-            formData.condition = ( $("#selected-anomaly-condition", form).attr("value") == "DROPS" ) ? "-" : ( $("#selected-anomaly-condition", form).attr("value") == "INCREASES" ) ? "" : null;
-            formData.baseline = $("#selected-anomaly-compare-mode", form).attr("value");
-            formData.changeThreshold = parseFloat($("#anomaly-threshold", form).val() / 100);
+                //Transform filters Todo: clarify if filters object should be consistent on FE and BE
+                formData.filters = encodeURIComponent(JSON.stringify(filters));
+                formData.exploreDimension = $("#self-service-view-single-dimension-selector #selected-dimension", form).attr("value");
+            break;
+            case "MIN_MAX_THRESHOLD":
+                formData.min = $("#anomaly-threshold-min", form).val();
+                formData.max = $("#anomaly-threshold-max", form).val();
+                //USER_RULE & MIN_MAX_THRESHOLD
+                var filters = readFiltersAppliedInCurrentView("self-service", {form: form});
 
-            //MIN_MAX_THRESHOLD PARAMS
-        } else if (formData.functionType == "MIN_MAX_THRESHOLD") {
+                //Transform filters Todo: clarify if filters object should be consistent on FE and BE
+                formData.filters = encodeURIComponent(JSON.stringify(filters));
+                formData.exploreDimension = $("#self-service-view-single-dimension-selector #selected-dimension", form).attr("value");
+            break;
+            default:
+                var context = $("." + formData.functionType + "-fields", form)[0];
+                var fields = $("input", context);
 
-            formData.min = $("#anomaly-threshold-min", form).val();
-            formData.max = $("#anomaly-threshold-max", form).val();
+                for (var i=0, len =fields.length; i<len; i++) {
+
+                    var $inputField = $(fields[i]);
+                    var expectedDataType = $inputField.attr("data-expected");
+                    var selector = $inputField.attr("data-property");
+                    var value = $inputField.val();
+                    formData["properties"][selector] = value;
+                    formData["properties_meta"][selector] = expectedDataType;
+                }
+            break;
+
         }
+
         return formData;
     }
 
@@ -426,21 +461,6 @@ function renderSelfService() {
             errorAlert.fadeIn(100);
             return
         }
-
-        //Check if rule name contains only alphanumeric and "_" characters
-        function isAlphaNumeric(str) {
-
-            str = str.replace(/_/g, '');
-            for (var i = 0, len = str.length; i < len; i++) {
-                var code = str.charCodeAt(i);
-                if (!(code > 47 && code < 58) && // numeric (0-9)
-                    !(code > 64 && code < 91) && // upper alpha (A-Z)
-                    !(code > 96 && code < 123)) { // lower alpha (a-z)
-                    return false;
-                }
-            }
-            return true;
-        };
 
         if (!isAlphaNumeric(formData.functionName)) {
             errorMessage.html("Please only use alphanumeric (0-9, A-Z, a-z) and '_' characters in 'Name' field. No space, no '-' is accepted.");
@@ -465,55 +485,12 @@ function renderSelfService() {
             return
         }
 
-        if( formData.functionType == "USER_RULE"){
-
-            //Check if condition is selected
-            if ( formData.condition == null) {
-                errorMessage.html("Please select a condition ie. DROP, INCREASE.");
-                errorAlert.attr("data-error-source", "anomaly-condition");
-                errorAlert.fadeIn(100);
-                return
-            }
-
-            //Check if threshold < 0 or the value of the input is not a number
-            if (!formData.changeThreshold || formData.changeThreshold < 0.01) {
-                errorMessage.html("Please provide a threshold percentage using positive numbers greater than 1. Example: write 5 for a 5% threshold. <br> The ratio will be calculated as: (current value - baseline value) / baseline value");
-                errorAlert.attr("data-error-source", "anomaly-threshold");
-                errorAlert.fadeIn(100);
-                return
-            }
-        }
-
-        if(formData.functionType == "MIN_MAX_THRESHOLD"){
-
-            if( parseFloat(formData.min)  >= parseFloat(formData.max)){
-                errorMessage.html("Minimum threshold should be less than maximum threshold.");
-                errorAlert.attr("data-error-source", "anomaly-threshold");
-                errorAlert.fadeIn(100);
-                return
-            }
-
-            if ( !formData.min && !formData.max) {
-                errorMessage.html("Please provide a threshold value.");
-                errorAlert.attr("data-error-source", "anomaly-threshold");
-                errorAlert.fadeIn(100);
-                return
-            }
-
-        }
-
         //Check if windowSize has value
         if (!formData.windowSize || formData.windowSize < 0) {
             errorMessage.html("Please fill in how many consecutive hours/days/weeks/months should fail the threshold to trigger an alert.");
             errorAlert.attr("data-error-source", "monitoring-window-size");
             errorAlert.fadeIn(100);
             return
-        }
-
-
-        //Check if repeatEverySize is positive integer
-        function isPositiveInteger(str) {
-            return /^\+?[1-9][\d]*$/.test(str);
         }
 
         //Todo:Remove this condition if the repeatEverySize and repeatEveryUnit are available on all forms all
@@ -532,6 +509,135 @@ function renderSelfService() {
             errorAlert.fadeIn(100);
             return
         }
+
+        //Fields related to FUNCTION_TYPE PROPERTIES
+        switch(formData.functionType){
+            case "USER_RULE":
+                //Check if condition is selected
+                if ( formData.condition == null) {
+                    errorMessage.html("Please select a condition ie. DROP, INCREASE.");
+                    errorAlert.attr("data-error-source", "anomaly-condition");
+                    errorAlert.fadeIn(100);
+                    return
+                }
+
+                //Check if threshold < 0 or the value of the input is not a number
+                if (!formData.changeThreshold || formData.changeThreshold < 0.01) {
+                    errorMessage.html("Please provide a threshold percentage using positive numbers greater than 1. Example: write 5 for a 5% threshold. <br> The ratio will be calculated as: (current value - baseline value) / baseline value");
+                    errorAlert.attr("data-error-source", "anomaly-threshold");
+                    errorAlert.fadeIn(100);
+                    return
+                }
+
+                break;
+            case "MIN_MAX_THRESHOLD":
+                if( parseFloat(formData.min)  >= parseFloat(formData.max)){
+                    errorMessage.html("Minimum threshold should be less than maximum threshold.");
+                    errorAlert.attr("data-error-source", "anomaly-threshold");
+                    errorAlert.fadeIn(100);
+                    return
+                }
+
+                if ( !formData.min && !formData.max) {
+                    errorMessage.html("Please provide a threshold value.");
+                    errorAlert.attr("data-error-source", "anomaly-threshold");
+                    errorAlert.fadeIn(100);
+                    return
+                }
+                break;
+            case "SIGN_TEST":
+            case "KALMAN_FILTER":
+            case "SCAN_STATISTICS":
+            default:
+
+
+                for (key in formData["properties"]){
+
+                    //var $inputField = $(fields[i]);
+                    var expectedDataType = formData["properties_meta"][key];
+
+                    var value = formData["properties"][key];
+
+                    switch (expectedDataType.toLowerCase()) {
+                        case "double":
+                            if(value != ""){
+                                if(!isFloat(value)){
+                                    errorMessage.html("In '" + key + "' field <b>" + expectedDataType + "</b> data type is expected.");
+                                    errorAlert.attr("data-error-source", "data-type");
+                                    errorAlert.fadeIn(100);
+                                    return
+                                };
+                            };
+                            break;
+                        case "int":
+                            if(value != "") {
+                                if (!isInt(value)) {
+                                    errorMessage.html("In <b>" + key + "</b> field <b>integer</b> data type is expected.");
+                                    errorAlert.attr("data-error-source", "data-type");
+                                    errorAlert.fadeIn(100);
+                                    return
+                                };
+                            };
+                            break;
+                        case "boolean":
+                            if(value != "") {
+                                if (!isBoolean(value)) {
+                                    errorMessage.html("In <b>" + key + "</b> field <b>" + expectedDataType + "</b> data type is expected.");
+                                    errorAlert.attr("data-error-source", "data-type");
+                                    errorAlert.fadeIn(100);
+                                    return
+                                };
+                            };
+                            break;
+                        case "pattern":
+                            //Todo: clarify: is pattern always UP, DOWN
+                            break;
+                        case "string":
+                            break;
+                        default:
+                            break
+                    }
+
+                }
+        }
+
+
+        //Check if repeatEverySize is positive integer
+        function isPositiveInteger(str) {
+            return /^\+?[1-9][\d]*$/.test(str);
+        }
+
+        //Check if rule name contains only alphanumeric and "_" characters
+        function isAlphaNumeric(str) {
+
+            str = str.replace(/_/g, '');
+            for (var i = 0, len = str.length; i < len; i++) {
+                var code = str.charCodeAt(i);
+                if (!(code > 47 && code < 58) && // numeric (0-9)
+                    !(code > 64 && code < 91) && // upper alpha (A-Z)
+                    !(code > 96 && code < 123)) { // lower alpha (a-z)
+                    return false;
+                }
+            }
+            return true;
+        };
+
+
+        function isFloat(str){
+          return !!parseFloat(str)
+        }
+
+        function isBoolean(str){
+            isBool = typeof(str) === "boolean" || ( str + "" == "true" || str + "" == "false" );
+            return typeof(str) === "boolean" || ( str + "" == "true" || str + "" == "false" );
+        }
+
+        function isInt(str){
+            var strNum = Number(str);
+            var isInteger = (typeof strNum === "number" && isFinite(strNum) &&  Math.floor(strNum) === strNum);
+            return typeof strNum === "number" && isFinite(strNum) &&  Math.floor(strNum) === strNum;
+        }
+
 
         return valid
     }
@@ -695,8 +801,10 @@ function renderSelfService() {
             }
         }
 
-        var templateData = {data: anomalyFunctionObj, fnProperties: fnProperties, schedule :schedule}
 
+        var anomalyFunctionTypeMetaDataStr = window.sessionStorage.getItem('anomalyFunctionTypeMetaData');
+        var anomalyFunctionTypeMetaData = JSON.parse(anomalyFunctionTypeMetaDataStr);
+        var templateData = {data: anomalyFunctionObj, fnProperties: fnProperties, schedule :schedule, propertyDefs: anomalyFunctionTypeMetaData.propertyDefs, fnTypeMetaData : anomalyFunctionTypeMetaData.fnTypeMetaData };
         var result_anomaly_function_form_template = HandleBarsTemplates.template_anomaly_function_form(templateData);
         $("#update-anomaly-functions-form-placeholder").html(result_anomaly_function_form_template);
 
@@ -777,12 +885,11 @@ function renderSelfService() {
     }
 
     function urlOfAnomalyFn(formData){
+
         //Todo: remove the condition once the create and update form both has the inputfields for cron
         if(formData.repeatEveryUnit){
             var cron = encodeCron(formData.repeatEveryUnit, formData.repeatEverySize, formData.scheduleMinute, formData.scheduleHour )
         }
-
-
         /* Submit form */
         var url = "dataset=" + formData.dataset + "&metric=" + formData.metric + "&type=" + formData.functionType + "&metricFunction=" + formData.metricFunction + "&functionName=" + formData.functionName
             + "&windowSize=" + formData.windowSize + "&windowUnit=" + formData.windowUnit + "&windowDelay=" + formData.windowDelay
@@ -790,7 +897,7 @@ function renderSelfService() {
             + "&isActive=" + formData.isActive + "&properties="
         url += (formData.functionType == "USER_RULE") ? "baseline=" + formData.baseline + ";changeThreshold=" + formData.condition + formData.changeThreshold : "";
         url += (formData.functionType == "MIN_MAX_THRESHOLD" && formData.min ) ? "min=" + formData.min + ";" : "";
-        url += (formData.functionType == "MIN_MAX_THRESHOLD" && formData.max ) ? "max=" + formData.max : "";
+        url += (formData.functionType != "MIN_MAX_THRESHOLD" && formData.functionType != "USER_RULE" ) ? stringifyProperties(formData.properties) : "";
         url += (formData.repeatEveryUnit) ? "&cron=" + cron : "";
         url += (formData.repeatEveryUnit) ? "&repeatEvery=" + formData.repeatEveryUnit : "";
         url += (formData.repeatEveryUnit == "DAYS") ?  "&scheduleMinute=" + formData.scheduleMinute + "&scheduleHour=" + formData.scheduleHour : "";
