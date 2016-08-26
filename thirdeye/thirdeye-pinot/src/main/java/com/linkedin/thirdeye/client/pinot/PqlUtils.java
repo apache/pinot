@@ -29,6 +29,7 @@ public class PqlUtils {
   private static final Joiner COMMA = Joiner.on(",");
   private static final Joiner EQUALS = Joiner.on(" = ");
   private static final Logger LOGGER = LoggerFactory.getLogger(PqlUtils.class);
+  private static final int DEFAULT_TOP = 300000;
 
   /**
    * Returns sql to calculate the sum of all raw metrics required for <tt>request</tt>, grouped by
@@ -102,8 +103,7 @@ public class PqlUtils {
     String groupByClause = getDimensionGroupByClause(groupBy, timeGranularity, dataTimeSpec);
     if (StringUtils.isNotBlank(groupByClause)) {
       sb.append(" ").append(groupByClause);
-      int bucketCount = Integer.MAX_VALUE;
-      sb.append(" TOP ").append(bucketCount);
+      sb.append(" TOP ").append(DEFAULT_TOP);
 
     }
 
@@ -128,8 +128,7 @@ public class PqlUtils {
     String groupByClause = getDimensionGroupByClause(groupBy, timeGranularity, dataTimeSpec);
     if (StringUtils.isNotBlank(groupByClause)) {
       sb.append(" ").append(groupByClause);
-      int bucketCount = Integer.MAX_VALUE;
-      sb.append(" TOP ").append(bucketCount);
+      sb.append(" TOP ").append(DEFAULT_TOP);
 
     }
 
