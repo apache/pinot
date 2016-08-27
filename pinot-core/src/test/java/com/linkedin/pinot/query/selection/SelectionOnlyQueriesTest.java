@@ -15,6 +15,9 @@
  */
 package com.linkedin.pinot.query.selection;
 
+import com.linkedin.pinot.common.response.broker.BrokerResponseNative;
+import com.linkedin.pinot.common.response.broker.SelectionResults;
+import com.linkedin.pinot.core.query.reduce.BrokerReduceService;
 import java.io.File;
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -26,6 +29,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
+import org.codehaus.jackson.map.ObjectMapper;
 import org.json.JSONObject;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -34,7 +38,6 @@ import org.testng.annotations.Test;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.request.Selection;
-import com.linkedin.pinot.common.response.BrokerResponseJSON;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.DataTable;
@@ -59,7 +62,6 @@ import com.linkedin.pinot.core.plan.Plan;
 import com.linkedin.pinot.core.plan.PlanNode;
 import com.linkedin.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import com.linkedin.pinot.core.plan.maker.PlanMaker;
-import com.linkedin.pinot.core.query.reduce.DefaultReduceService;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorUtils;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
@@ -261,16 +263,21 @@ public class SelectionOnlyQueriesTest {
     System.out.println("Test: InterSegmentSelectionPlanMakerAndRun");
     System.out.println("instanceResponse : " + instanceResponse);
 
-    final DefaultReduceService defaultReduceService = new DefaultReduceService();
+    final BrokerReduceService reduceService = new BrokerReduceService();
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
-    final BrokerResponseJSON brokerResponse = defaultReduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
-    System.out.println("Selection Result : " + brokerResponse.getSelectionResults());
+    final BrokerResponseNative
+        brokerResponse = reduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
+    SelectionResults selectionResults = brokerResponse.getSelectionResults();
+
+    ObjectMapper mapper = new ObjectMapper();
+    String actualResults = mapper.writeValueAsString(selectionResults);
+
+    System.out.println("Selection Result : " + actualResults);
     System.out.println("Time used : " + brokerResponse.getTimeUsedMs());
-    System.out.println("Result: " + brokerResponse.getSelectionResults());
+
     JsonAssert
-        .assertEqualsIgnoreOrder(
-            brokerResponse.getSelectionResults().toString(),
+        .assertEqualsIgnoreOrder(actualResults,
             "{\"columns\":[\"column11\",\"column12\",\"met_impressionCount\"],\"results\":[[\"i\",\"jgn\",\"4955241829510629137\"],[\"i\",\"lVH\",\"6240989492723764727\"],[\"i\",\"kWZ\",\"4955241829510629137\"],[\"i\",\"pm\",\"6240989492723764727\"],[\"i\",\"GF\",\"8637957270245933828\"],[\"i\",\"kB\",\"8637957270245933828\"],[\"i\",\"BQ\",\"8310347835142446717\"],[\"i\",\"YO\",\"4955241829510629137\"],[\"i\",\"RI\",\"8310347835142446717\"],[\"i\",\"RI\",\"6240989492723764727\"]]}");
   }
 

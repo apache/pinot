@@ -37,7 +37,6 @@ import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.request.Selection;
 import com.linkedin.pinot.common.request.SelectionSort;
-import com.linkedin.pinot.common.response.BrokerResponseJSON;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.response.broker.BrokerResponseNative;
 import com.linkedin.pinot.common.response.broker.SelectionResults;
@@ -64,7 +63,6 @@ import com.linkedin.pinot.core.plan.PlanNode;
 import com.linkedin.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import com.linkedin.pinot.core.plan.maker.PlanMaker;
 import com.linkedin.pinot.core.query.reduce.BrokerReduceService;
-import com.linkedin.pinot.core.query.reduce.DefaultReduceService;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorService;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorUtils;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
@@ -264,22 +262,20 @@ public class SelectionQueriesTest {
 
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
-    final DefaultReduceService defaultReduceService = new DefaultReduceService();
-    final BrokerResponseJSON brokerResponse = defaultReduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
-    System.out.println("Selection Result : " + brokerResponse.getSelectionResults());
-    System.out.println("Time used : " + brokerResponse.getTimeUsedMs());
+    final BrokerReduceService reduceService = new BrokerReduceService();
+    final BrokerResponseNative brokerResponse = reduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
 
-    JSONObject jsonResult = brokerResponse.getSelectionResults();
-    JSONArray columnJsonArray = jsonResult.getJSONArray("columns");
-    Assert.assertEquals(columnJsonArray.getString(0), "column12");
-    Assert.assertEquals(columnJsonArray.getString(1), "met_impressionCount");
-    Assert.assertEquals(columnJsonArray.getString(2), "column11");
+    SelectionResults selectionResults = brokerResponse.getSelectionResults();
+    List<String> columns = selectionResults.getColumns();
+    Assert.assertEquals(columns.get(0), "column12");
+    Assert.assertEquals(columns.get(1), "met_impressionCount");
+    Assert.assertEquals(columns.get(2), "column11");
 
-    JSONArray resultsJsonArray = jsonResult.getJSONArray("results");
-    for (int i = 0; i < resultsJsonArray.length(); ++i) {
-      JSONArray rowJsonArray = resultsJsonArray.getJSONArray(i);
-      Assert.assertEquals(rowJsonArray.length(), 3);
-      Assert.assertEquals(rowJsonArray.getString(2), "i");
+    List<Serializable[]> rows = selectionResults.getRows();
+    for (int i = 0; i < rows.size(); ++i) {
+      Serializable[] row = rows.get(i);
+      Assert.assertEquals(row.length, 3);
+      Assert.assertEquals(row[2], "i");
     }
 
     final BrokerReduceService brokerReduceService = new BrokerReduceService();
@@ -287,7 +283,7 @@ public class SelectionQueriesTest {
     System.out.println("Selection Result : " + brokerResponseNative.getSelectionResults().toString());
     System.out.println("Time used : " + brokerResponseNative.getTimeUsedMs());
 
-    SelectionResults selectionResults = brokerResponseNative.getSelectionResults();
+    selectionResults = brokerResponseNative.getSelectionResults();
     List<String> columnArray = selectionResults.getColumns();
     Assert.assertEquals(columnArray.size(), 3);
     Assert.assertEquals(columnArray.get(0), "column12");
@@ -299,10 +295,10 @@ public class SelectionQueriesTest {
     for (int i = 0; i < resultRows.size(); ++i) {
       Serializable[] resultRow = resultRows.get(i);
       Assert.assertEquals(resultRow.length, 3);
-      JSONArray rowJsonArray = resultsJsonArray.getJSONArray(i);
-      Assert.assertEquals(resultRow[0], rowJsonArray.getString(0));
-      Assert.assertEquals(resultRow[1], rowJsonArray.getString(1));
-      Assert.assertEquals(resultRow[2], rowJsonArray.getString(2));
+      Serializable[] expectedValues = rows.get(i);
+      Assert.assertEquals(resultRow[0], expectedValues[0]);
+      Assert.assertEquals(resultRow[1], expectedValues[1]);
+      Assert.assertEquals(resultRow[2], expectedValues[2]);
     }
   }
 
@@ -323,24 +319,24 @@ public class SelectionQueriesTest {
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
 
-    final DefaultReduceService defaultReduceService = new DefaultReduceService();
-    final BrokerResponseJSON brokerResponse = defaultReduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
+    final BrokerReduceService reduceService = new BrokerReduceService();
+    final BrokerResponseNative brokerResponse = reduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
     System.out.println("Selection Result : " + brokerResponse.getSelectionResults());
     System.out.println("Time used : " + brokerResponse.getTimeUsedMs());
 
-    JSONObject jsonResult = brokerResponse.getSelectionResults();
-    JSONArray columnJsonArray = jsonResult.getJSONArray("columns");
-    Assert.assertEquals(columnJsonArray.getString(0), "column11");
-    Assert.assertEquals(columnJsonArray.getString(1), "column12");
-    Assert.assertEquals(columnJsonArray.getString(2), "met_impressionCount");
+    SelectionResults selectionResults = brokerResponse.getSelectionResults();
+    List<String> columns = selectionResults.getColumns();
+    Assert.assertEquals(columns.get(0), "column11");
+    Assert.assertEquals(columns.get(1), "column12");
+    Assert.assertEquals(columns.get(2), "met_impressionCount");
 
-    JSONArray resultsJsonArray = jsonResult.getJSONArray("results");
-    for (int i = 0; i < resultsJsonArray.length(); ++i) {
-      JSONArray rowJsonArray = resultsJsonArray.getJSONArray(i);
-      Assert.assertEquals(rowJsonArray.length(), 3);
-      Assert.assertEquals(rowJsonArray.getString(0), "U");
-      Assert.assertEquals(rowJsonArray.getString(1), "db");
-      Assert.assertEquals(rowJsonArray.getString(2), "6240989492723764727");
+    List<Serializable[]> rows = selectionResults.getRows();
+    for (int i = 0; i < rows.size(); ++i) {
+      Serializable[] row = rows.get(i);
+      Assert.assertEquals(row.length, 3);
+      Assert.assertEquals(row[0], "U");
+      Assert.assertEquals(row[1], "db");
+      Assert.assertEquals(row[2], "6240989492723764727");
     }
 
     final BrokerReduceService brokerReduceService = new BrokerReduceService();
@@ -348,7 +344,7 @@ public class SelectionQueriesTest {
     System.out.println("Selection Result : " + brokerResponseNative.getSelectionResults());
     System.out.println("Time used : " + brokerResponseNative.getTimeUsedMs());
 
-    SelectionResults selectionResults = brokerResponseNative.getSelectionResults();
+    selectionResults = brokerResponseNative.getSelectionResults();
     List<String> columnArray = selectionResults.getColumns();
     Assert.assertEquals(columnArray.size(), 3);
     Assert.assertEquals(columnArray.get(0), "column11");
@@ -358,12 +354,12 @@ public class SelectionQueriesTest {
     List<Serializable[]> resultRows = selectionResults.getRows();
     Assert.assertEquals(resultRows.size(), 10);
     for (int i = 0; i < resultRows.size(); ++i) {
-      Serializable[] resultRow = resultRows.get(i);
-      Assert.assertEquals(resultRow.length, 3);
-      JSONArray rowJsonArray = resultsJsonArray.getJSONArray(i);
-      Assert.assertEquals(resultRow[0], rowJsonArray.getString(0));
-      Assert.assertEquals(resultRow[1], rowJsonArray.getString(1));
-      Assert.assertEquals(resultRow[2], rowJsonArray.getString(2));
+      Serializable[] actualRow = resultRows.get(i);
+      Assert.assertEquals(actualRow.length, 3);
+      Serializable[] expectedRow = rows.get(i);
+      Assert.assertEquals(actualRow[0], expectedRow[0]);
+      Assert.assertEquals(actualRow[1], expectedRow[1]);
+      Assert.assertEquals(actualRow[2], expectedRow[2]);
     }
   }
 

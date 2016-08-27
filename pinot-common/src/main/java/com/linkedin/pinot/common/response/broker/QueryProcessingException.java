@@ -28,6 +28,10 @@ public class QueryProcessingException {
   public QueryProcessingException() {
   }
 
+  public QueryProcessingException(int errorCode) {
+    _errorCode = errorCode;
+  }
+
   @JsonProperty("errorCode")
   public int getErrorCode() {
     return _errorCode;

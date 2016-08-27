@@ -23,8 +23,9 @@ import com.linkedin.pinot.common.query.gen.AvroQueryGenerator.TestGroupByAggreat
 import com.linkedin.pinot.common.query.gen.AvroQueryGenerator.TestSimpleAggreationQuery;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.InstanceRequest;
-import com.linkedin.pinot.common.response.BrokerResponseJSON;
 import com.linkedin.pinot.common.response.ServerInstance;
+import com.linkedin.pinot.common.response.broker.BrokerResponseNative;
+import com.linkedin.pinot.common.response.broker.GroupByResult;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.core.data.manager.config.FileBasedInstanceDataManagerConfig;
@@ -34,7 +35,7 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.query.executor.ServerQueryExecutorV1Impl;
-import com.linkedin.pinot.core.query.reduce.DefaultReduceService;
+import com.linkedin.pinot.core.query.reduce.BrokerReduceService;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import com.linkedin.pinot.pql.parsers.Pql2Compiler;
@@ -52,8 +53,6 @@ import java.util.concurrent.TimeUnit;
 import org.antlr.runtime.RecognitionException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
-import org.json.JSONArray;
-import org.json.JSONException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -68,7 +67,7 @@ import org.testng.annotations.Test;
 
 public class QueriesSentinelTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueriesSentinelTest.class);
-  private static ReduceService<BrokerResponseJSON> REDUCE_SERVICE = new DefaultReduceService();
+  private static ReduceService<BrokerResponseNative> REDUCE_SERVICE = new BrokerReduceService();
 
   private static final Pql2Compiler REQUEST_COMPILER = new Pql2Compiler();
   private final String AVRO_DATA = "data/test_data-mv.avro";
@@ -128,15 +127,15 @@ public class QueriesSentinelTest {
       final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(instanceRequest);
       instanceResponseMap.clear();
       instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
-      final BrokerResponseJSON brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
+      final BrokerResponseNative brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
       LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
 
       // compute value
       Object val;
       if (query instanceof AvroQueryGenerator.TestSimpleAggreationQuery) {
-        val = Double.parseDouble(brokerResponse.getAggregationResults().get(0).getString("value"));
+        val = Double.parseDouble(brokerResponse.getAggregationResults().get(0).getValue().toString());
       } else {
-        val = brokerResponse.getAggregationResults().get(0).getJSONArray("groupByResult");
+        val = brokerResponse.getAggregationResults().get(0).getGroupByResult();
       }
 
       if (isAccurate) {
@@ -149,7 +148,13 @@ public class QueriesSentinelTest {
         if (query instanceof AvroQueryGenerator.TestSimpleAggreationQuery) {
           TestUtils.assertApproximation((Double) val, (Double) accurateValue, precision);
         } else {
-          TestUtils.assertJSONArrayApproximation((JSONArray) val, (JSONArray) accurateValue, precision);
+          List<GroupByResult> expectedValues = (List<GroupByResult>) accurateValue;
+          List<GroupByResult> groupByResults = (List<GroupByResult>) val;
+          for (int i = 0; i < groupByResults.size(); i++) {
+            double expected = Double.parseDouble(groupByResults.get(i).getValue().toString());
+            double actual = Double.parseDouble(expectedValues.get(i).getValue().toString());
+            TestUtils.assertApproximation(actual, expected, precision);
+          }
         }
         isAccurate = true;
       }
@@ -230,19 +235,11 @@ public class QueriesSentinelTest {
       final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(instanceRequest);
       instanceResponseMap.clear();
       instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
-      final BrokerResponseJSON brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
+      final BrokerResponseNative brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
       LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
       LOGGER.info("Result from avro is : " + aggCall.result);
-      try {
-        Assert.assertEquals(Double.parseDouble(brokerResponse.getAggregationResults().get(0).getString("value")),
-                aggCall.result);
-      } catch (AssertionError e) {
-        System.out.println(aggCall.pql);
-        System.out.println("from broker : "
-            + Double.parseDouble(brokerResponse.getAggregationResults().get(0).getString("value")));
-        System.out.println("from precomp : " + aggCall.result);
-        throw new AssertionError(e);
-      }
+      Assert.assertEquals(Double.parseDouble(brokerResponse.getAggregationResults().get(0).getValue().toString()),
+          aggCall.result);
     }
   }
 
@@ -260,33 +257,25 @@ public class QueriesSentinelTest {
       final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(instanceRequest);
       instanceResponseMap.clear();
       instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
-      final BrokerResponseJSON brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
+      final BrokerResponseNative brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
       LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
       LOGGER.info("Result from avro is : " + groupBy.groupResults);
 
-      try {
-        assertGroupByResults(brokerResponse.getAggregationResults().get(0).getJSONArray("groupByResult"),
-                groupBy.groupResults);
-      } catch (AssertionError e) {
-        System.out.println(groupBy.pql);
-        System.out.println("from broker : "
-            + brokerResponse.getAggregationResults().get(0).getJSONArray("groupByResult").toString());
-        System.out.println("from precomp : " + groupBy.groupResults);
-        throw new AssertionError(e);
-      }
+      assertGroupByResults(brokerResponse.getAggregationResults().get(0).getGroupByResult(),
+          groupBy.groupResults);
     }
   }
 
-  private void assertGroupByResults(JSONArray jsonArray, Map<Object, Double> groupResultsFromAvro) throws JSONException {
+  private void assertGroupByResults(List<GroupByResult> groupByResults, Map<Object, Double> groupResultsFromAvro) {
     final Map<String, Double> groupResultsFromQuery = new HashMap<String, Double>();
     if (groupResultsFromAvro.size() > 10) {
-      Assert.assertEquals(jsonArray.length(), 10);
+      Assert.assertEquals(groupByResults.size(), 10);
     } else {
-      Assert.assertTrue(jsonArray.length() >= groupResultsFromAvro.size());
+      Assert.assertTrue(groupByResults.size() >= groupResultsFromAvro.size());
     }
-    for (int i = 0; i < jsonArray.length(); ++i) {
-      groupResultsFromQuery.put(jsonArray.getJSONObject(i).getJSONArray("group").getString(0),
-          jsonArray.getJSONObject(i).getDouble("value"));
+    for (int i = 0; i < groupByResults.size(); ++i) {
+      groupResultsFromQuery.put(groupByResults.get(i).getGroup().toString(),
+          Double.parseDouble(groupByResults.get(i).getValue().toString()));
     }
 
     for (final Object key : groupResultsFromAvro.keySet()) {
@@ -373,7 +362,7 @@ public class QueriesSentinelTest {
     final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(instanceRequest);
     instanceResponseMap.clear();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
-    final BrokerResponseJSON brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
+    final BrokerResponseNative brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
     LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
   }
 
@@ -389,13 +378,13 @@ public class QueriesSentinelTest {
     final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(instanceRequest);
     instanceResponseMap.clear();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
-    final BrokerResponseJSON brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
+    final BrokerResponseNative brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
     LOGGER.info("BrokerResponse is " + brokerResponse);
     LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
     LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(1));
 
-    Assert.assertEquals(brokerResponse.getAggregationResults().get(0).getInt("value"), 100000);
-    Assert.assertEquals(brokerResponse.getAggregationResults().get(1).getDouble("value"), 8.90662862E13);
+    Assert.assertEquals(Double.parseDouble(brokerResponse.getAggregationResults().get(0).getValue().toString()), 100000.0);
+    Assert.assertEquals(Double.parseDouble(brokerResponse.getAggregationResults().get(1).getValue().toString()), 8.90662862E13);
     Assert.assertEquals(brokerResponse.getNumDocsScanned(), 100000);
   }
 
@@ -411,9 +400,9 @@ public class QueriesSentinelTest {
     final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(instanceRequest);
     instanceResponseMap.clear();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
-    final BrokerResponseJSON brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
+    final BrokerResponseNative brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
     LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
-    Assert.assertEquals(brokerResponse.getAggregationResults().get(0).getInt("value"), 14);
+    Assert.assertEquals(Double.parseDouble(brokerResponse.getAggregationResults().get(0).getValue().toString()), 14.0);
     Assert.assertEquals(brokerResponse.getNumDocsScanned(), 14);
   }
 
@@ -431,7 +420,7 @@ public class QueriesSentinelTest {
     final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(instanceRequest);
     instanceResponseMap.clear();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
-    final BrokerResponseJSON brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
+    final BrokerResponseNative brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
     LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
     LOGGER.info("TraceInfo is " + brokerResponse.getTraceInfo()); //
   }

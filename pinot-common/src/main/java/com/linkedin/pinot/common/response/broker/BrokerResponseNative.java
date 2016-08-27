@@ -174,13 +174,13 @@ public class BrokerResponseNative implements BrokerResponse {
     return new JSONObject(toJsonString());
   }
 
-  public BrokerResponseNative fromJsonString(String jsonString)
+  public static BrokerResponseNative fromJsonString(String jsonString)
       throws IOException {
     return OBJECT_MAPPER.readValue(jsonString, new TypeReference<BrokerResponseNative>() {
     });
   }
 
-  public BrokerResponseNative fromJsonObject(JSONObject jsonObject)
+  public static BrokerResponseNative fromJsonObject(JSONObject jsonObject)
       throws IOException {
     return fromJsonString(jsonObject.toString());
   }
@@ -198,13 +198,11 @@ public class BrokerResponseNative implements BrokerResponse {
 
   @JsonIgnore
   @Override
-  public BrokerResponseFactory.ResponseType getResponseType() {
-    return BrokerResponseFactory.ResponseType.BROKER_RESPONSE_TYPE_NATIVE;
-  }
-
-  @JsonIgnore
-  @Override
   public int getExceptionsSize() {
     return _processingExceptions.size();
+  }
+
+  public void addToExceptions(QueryProcessingException processingException) {
+    _processingExceptions.add(processingException);
   }
 }
