@@ -61,7 +61,8 @@ public class AnomalyMergeExecutor implements Runnable {
   }
 
   public void start() {
-    executorService.scheduleWithFixedDelay(this, 1, 2, TimeUnit.MINUTES);
+    // running every 15 mins
+    executorService.scheduleWithFixedDelay(this, 1, 15, TimeUnit.MINUTES);
   }
 
   public void stop() {

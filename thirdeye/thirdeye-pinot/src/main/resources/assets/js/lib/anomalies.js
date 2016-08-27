@@ -255,8 +255,6 @@ function drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab) {
                     $("." + anomalyId).hide();
                 }
             })
-
-
         }
     }
 
@@ -392,11 +390,10 @@ function renderAnomalyTable(data, tab) {
         if(feedbackType){
 
             var data = '{ "feedbackType": "' + feedbackType + '","comment": "'+ comment +'"}';
-            var url = "/dashboard/anomaly-result/feedback/" + anomalyId;
+            var url = "/dashboard/anomaly-merged-result/feedback/" + anomalyId;
 
             //post anomaly feedback
             submitData(url, data).done(function () {
-
                 $(selector).addClass("green-background");
             }).fail(function(){
                 $(selector).addClass("red-background");

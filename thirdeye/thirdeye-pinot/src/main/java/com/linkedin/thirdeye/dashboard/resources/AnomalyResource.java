@@ -672,8 +672,8 @@ public class AnomalyResource {
    *                        { "feedbackType": "NOT_ANOMALY", "comment": "this is not an anomaly" }
    */
   @POST
-  @Path(value = "anomaly-result/feedback/{anomaly_merged_result_id}")
-  public void updateAnomalyResultFeedback(@PathParam("anomaly_merged_result_id") long anomalyResultId, String payload) {
+  @Path(value = "anomaly-merged-result/feedback/{anomaly_merged_result_id}")
+  public void updateAnomalyMergedResultFeedback(@PathParam("anomaly_merged_result_id") long anomalyResultId, String payload) {
     try {
       AnomalyMergedResult result = anomalyMergedResultDAO.findById(anomalyResultId);
       if (result == null) {
@@ -695,6 +695,35 @@ public class AnomalyResource {
       feedback.setFeedbackType(feedbackRequest.getFeedbackType());
 
       anomalyMergedResultDAO.update(result);
+    } catch (IOException e) {
+      throw new IllegalArgumentException("Invalid payload " + payload, e);
+    }
+  }
+
+  @POST
+  @Path(value = "anomaly-result/feedback/{anomaly_result_id}")
+  public void updateAnomalyResultFeedback(@PathParam("anomaly_result_id") long anomalyResultId, String payload) {
+    try {
+      AnomalyResult result = anomalyResultDAO.findById(anomalyResultId);
+      if (result == null) {
+        throw new IllegalArgumentException("AnomalyResult not found with id " + anomalyResultId);
+      }
+      ObjectMapper mapper = new ObjectMapper();
+      AnomalyFeedback feedbackRequest = mapper.readValue(payload, AnomalyFeedback.class);
+      AnomalyFeedback feedback = result.getFeedback();
+      if (feedback == null) {
+        feedback = new AnomalyFeedback();
+        result.setFeedback(feedback);
+      }
+      if (feedbackRequest.getStatus() == null) {
+        feedback.setStatus(FeedbackStatus.NEW);
+      } else {
+        feedback.setStatus(feedbackRequest.getStatus());
+      }
+      feedback.setComment(feedbackRequest.getComment());
+      feedback.setFeedbackType(feedbackRequest.getFeedbackType());
+
+      anomalyResultDAO.update(result);
     } catch (IOException e) {
       throw new IllegalArgumentException("Invalid payload " + payload, e);
     }
