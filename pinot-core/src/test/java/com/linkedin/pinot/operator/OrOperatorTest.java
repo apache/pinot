@@ -15,16 +15,6 @@
  */
 package com.linkedin.pinot.operator;
 
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.TreeSet;
-
-import junit.framework.Assert;
-
-import org.apache.commons.lang3.ArrayUtils;
-import org.testng.annotations.Test;
-
 import com.google.common.collect.Lists;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
@@ -34,9 +24,15 @@ import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.operator.blocks.ArrayBasedFilterBlock;
 import com.linkedin.pinot.core.operator.blocks.BaseFilterBlock;
-import com.linkedin.pinot.core.operator.docidsets.FilterBlockDocIdSet;
 import com.linkedin.pinot.core.operator.filter.BaseFilterOperator;
 import com.linkedin.pinot.core.operator.filter.OrOperator;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.TreeSet;
+import org.apache.commons.lang3.ArrayUtils;
+import org.testng.Assert;
+import org.testng.annotations.Test;
 
 
 public class OrOperatorTest {

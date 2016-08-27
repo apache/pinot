@@ -62,14 +62,14 @@ public class BitmapInvertedIndexTest {
         }
         final int dicId = heapSegment.getDictionaryFor(column).indexOf(entry);
         // make sure that docId for dicId exist in the inverted index
-        Assert.assertEquals(true, heapSegment.getInvertedIndexFor(column).getImmutable(dicId).contains(docId));
+        Assert.assertTrue(heapSegment.getInvertedIndexFor(column).getImmutable(dicId).contains(docId));
         final int size = heapSegment.getDictionaryFor(column).length();
         for (int i = 0; i < size; ++i) { // remove this for-loop for quick test
           if (i == dicId) {
             continue;
           }
           // make sure that docId for dicId does not exist in the inverted index
-          Assert.assertEquals(false, heapSegment.getInvertedIndexFor(column).getImmutable(i).contains(docId));
+          Assert.assertFalse(heapSegment.getInvertedIndexFor(column).getImmutable(i).contains(docId));
         }
       }
       ++docId;
@@ -94,14 +94,14 @@ public class BitmapInvertedIndexTest {
         }
         final int dicId = mmapSegment.getDictionaryFor(column).indexOf(entry);
         // make sure that docId for dicId exist in the inverted index
-        Assert.assertEquals(true, mmapSegment.getInvertedIndexFor(column).getImmutable(dicId).contains(docId));
+        Assert.assertTrue(mmapSegment.getInvertedIndexFor(column).getImmutable(dicId).contains(docId));
         final int size = mmapSegment.getDictionaryFor(column).length();
         for (int i = 0; i < size; ++i) { // remove this for-loop for quick test
           if (i == dicId) {
             continue;
           }
           // make sure that docId for dicId does not exist in the inverted index
-          Assert.assertEquals(false, mmapSegment.getInvertedIndexFor(column).getImmutable(i).contains(docId));
+          Assert.assertFalse(mmapSegment.getInvertedIndexFor(column).getImmutable(i).contains(docId));
         }
       }
       ++docId;

@@ -15,27 +15,30 @@
  */
 package com.linkedin.pinot.query.aggregation;
 
-import static org.testng.Assert.assertEquals;
-
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
-import com.linkedin.pinot.core.query.aggregation.function.*;
-
+import com.linkedin.pinot.common.request.AggregationInfo;
+import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
+import com.linkedin.pinot.core.query.aggregation.CombineLevel;
+import com.linkedin.pinot.core.query.aggregation.function.DistinctCountAggregationFunction;
+import com.linkedin.pinot.core.query.aggregation.function.DistinctCountHLLAggregationFunction;
+import com.linkedin.pinot.util.TestUtils;
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
-import java.util.*;
-
-import com.linkedin.pinot.util.TestUtils;
-import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-
-import com.linkedin.pinot.common.request.AggregationInfo;
-import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
-import com.linkedin.pinot.core.query.aggregation.CombineLevel;
 
 /**
  *
@@ -157,7 +160,7 @@ public class DistinctCountHLLTest {
             sb1.append(estimate + ", ");
             sb2.append(i + ", ");
         }
-        // assertEquals(sb1.toString(), sb2.toString());  // assert actual equals (nearly impossible!)
+        // Assert.assertEquals(sb1.toString(), sb2.toString());  // assert actual equals (nearly impossible!)
 
         // Test reduce
         for (int i = 1; i <= _sizeOfCombineList; ++i) {
@@ -234,7 +237,7 @@ public class DistinctCountHLLTest {
             println(i + ", " + (t2 - t1) + ", " + (t4 - t3) + ", " + (t2 - t1 + 0.0) / (t4 - t3 + 0.0) + ", "
                     + estimate + ", " + precise + ", " + getErrorString(precise, estimate));
             TestUtils.assertApproximation(estimate, precise, 0.15);
-            assertEquals(((IntOpenHashSet) (setCombinedResult.get(0))).size(), precise);
+            Assert.assertEquals(((IntOpenHashSet) (setCombinedResult.get(0))).size(), precise);
         }
     }
 
@@ -260,7 +263,6 @@ public class DistinctCountHLLTest {
             println(i + ", " + "" + (t2 - t1) + ", " + (t3 - t2) + ", " + (t2 - t1 + 0.0) / (t3 - t2 + 0.0) + ", "
                     + estimate + ", " + precise + ", " + getErrorString(precise, estimate));
         }
-        assertEquals(true, true);
     }
 
     @Test
@@ -284,7 +286,6 @@ public class DistinctCountHLLTest {
             println(i + ", " + hllSize + ", " + setSize + ", " + (hllSize + 0.0) / (setSize + 0.0) + ", "
                     + estimate + ", " + precise + ", " + getErrorString(precise, estimate));
         }
-        assertEquals(true, true);
     }
 
     // ------------ helper functions ------------

@@ -16,11 +16,11 @@
 package com.linkedin.pinot.perf;
 
 import com.google.common.util.concurrent.Uninterruptibles;
-import com.linkedin.pinot.common.TestUtils;
 import com.linkedin.pinot.common.utils.KafkaStarterUtils;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.integration.tests.OfflineClusterIntegrationTest;
 import com.linkedin.pinot.integration.tests.RealtimeClusterIntegrationTest;
+import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;

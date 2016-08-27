@@ -18,20 +18,32 @@ package com.linkedin.pinot.query.aggregation;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.CombineLevel;
-import com.linkedin.pinot.core.query.aggregation.function.quantile.*;
+import com.linkedin.pinot.core.query.aggregation.function.quantile.PercentileAggregationFunction;
+import com.linkedin.pinot.core.query.aggregation.function.quantile.PercentileUtil;
+import com.linkedin.pinot.core.query.aggregation.function.quantile.Percentileest50;
+import com.linkedin.pinot.core.query.aggregation.function.quantile.Percentileest90;
+import com.linkedin.pinot.core.query.aggregation.function.quantile.Percentileest95;
 import com.linkedin.pinot.core.query.aggregation.function.quantile.digest.DigestAggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.function.quantile.digest.QuantileDigest;
 import com.linkedin.pinot.util.TestUtils;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-
-import java.io.*;
-import java.util.*;
-
-import static org.testng.Assert.assertEquals;
 
 /**
  *
@@ -290,8 +302,6 @@ public class DigestTest {
                         + estimate + ", " + actual + ", " + getErrorString(actual, estimate));
             }
         }
-
-        assertEquals(true, true);
     }
 
     @Test
@@ -320,8 +330,6 @@ public class DigestTest {
                         + estimate + ", " + actual + ", " + getErrorString(actual, estimate));
             }
         }
-
-        assertEquals(true, true);
     }
 
     @Test
@@ -351,8 +359,6 @@ public class DigestTest {
                 println("[After Serialization Estimate]: " + estimate2);
             }
         }
-
-        assertEquals(true, true);
     }
 
     // ------------ helper functions ------------

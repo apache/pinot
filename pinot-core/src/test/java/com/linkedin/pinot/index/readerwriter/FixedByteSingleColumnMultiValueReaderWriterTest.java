@@ -15,22 +15,19 @@
  */
 package com.linkedin.pinot.index.readerwriter;
 
+import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnMultiValueReaderWriter;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Random;
-
-import junit.framework.Assert;
-
+import org.testng.Assert;
 import org.testng.annotations.Test;
-
-import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnMultiValueReaderWriter;
-import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnSingleValueReaderWriter;
 
 
 public class FixedByteSingleColumnMultiValueReaderWriterTest {
-  
+
   @Test
-  public void testIntArray() throws IOException {
+  public void testIntArray()
+      throws IOException {
     FixedByteSingleColumnMultiValueReaderWriter readerWriter;
     int rows = 1000;
     int columnSizeInBytes = Integer.SIZE / 8;
@@ -53,10 +50,7 @@ public class FixedByteSingleColumnMultiValueReaderWriterTest {
       int length = readerWriter.getIntArray(i, ret);
       Assert.assertEquals(data[i].length, length);
       Assert.assertTrue(Arrays.equals(data[i], Arrays.copyOf(ret, length)));
-
     }
     readerWriter.close();
   }
-  
- 
 }
