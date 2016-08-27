@@ -96,6 +96,10 @@ public class QueryRunner {
           LOGGER.info(
               "Processed {} Queries, Total Server Time: {}ms, Total Broker Time: {}ms, Total Client Time : {}ms.",
               numQueries, totalServerTime, totalBrokerTime, totalClientTime);
+
+          if (numQueries % 10000 == 0) {
+            printStats(stats);
+          }
         }
       }
 
@@ -107,10 +111,13 @@ public class QueryRunner {
 
   private static void printStats(DescriptiveStatistics stats) {
     LOGGER.info(stats.toString());
+    LOGGER.info("10th percentile: {}ms", stats.getPercentile(10.0));
+    LOGGER.info("25th percentile: {}ms", stats.getPercentile(25.0));
     LOGGER.info("50th percentile: {}ms", stats.getPercentile(50.0));
     LOGGER.info("90th percentile: {}ms", stats.getPercentile(90.0));
     LOGGER.info("95th percentile: {}ms", stats.getPercentile(95.0));
     LOGGER.info("99th percentile: {}ms", stats.getPercentile(99.0));
+    LOGGER.info("99.9th percentile: {}ms", stats.getPercentile(99.9));
   }
 
   /**
@@ -173,6 +180,7 @@ public class QueryRunner {
 
     executorService.shutdown();
 
+    int iter = 0;
     long startTime = System.currentTimeMillis();
     while (latch.getCount() > 0) {
       Thread.sleep(reportIntervalMillis);
@@ -181,6 +189,11 @@ public class QueryRunner {
       double avgResponseTime = ((double) totalResponseTime.get()) / count;
       LOGGER.info("Time Passed: {}s, Query Executed: {}, QPS: {}, Avg Response Time: {}ms", timePassedSeconds, count,
           count / timePassedSeconds, avgResponseTime);
+
+      iter++;
+      if (iter % 10 == 0) {
+        printStats(stats);
+      }
     }
 
     printStats(stats);
