@@ -104,11 +104,11 @@ public class HierarchyNode {
    */
   public double targetRatio() {
     double ratio = currentRatio();
-    if (Double.isFinite(ratio)) {
+    if (Double.isFinite(ratio) && Double.compare(ratio, 0d) != 0) {
       return ratio;
     } else {
       ratio = aggregatedRatio();
-      if (Double.isFinite(ratio)) {
+      if (Double.isFinite(ratio) && Double.compare(ratio, 0d) != 0) {
         return ratio;
       } else {
         if (parent != null) {

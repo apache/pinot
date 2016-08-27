@@ -117,6 +117,7 @@ public class Summary {
     // Compute DPArray if the current node is the lowest internal node.
     // Otherwise, merge DPArrays from its children.
     if (node.getLevel() == levelCount - 1) {
+      // Shrink answer size for getting a higher level view, which gives larger picture of the dataset
       if (node.childrenSize() < dpArray.size()) {
         dpArray.setShrinkSize(Math.max(1, (node.childrenSize()+1)/2));
       }
@@ -158,6 +159,9 @@ public class Summary {
       recomputeCostAndRemoveSmallNodes(node, dpArray, targetRatio);
       dpArray.targetRatio = targetRatio;
       if ( !nodeIsThinnedOut(node) ) {
+        // dpArray actually takes (dpArray.size-1) nodes as the answer, so we set its size to 2
+        // in order to insert the aggregated node to the answer.
+        if (dpArray.size() == 1) dpArray.setShrinkSize(2);
         Set<HierarchyNode> removedNode = new HashSet<>(dpArray.getAnswer());
         basicRowInserter.insertRowToDPArray(dpArray, node, targetRatio);
         removedNode.removeAll(dpArray.getAnswer());
@@ -343,6 +347,10 @@ public class Summary {
     public void insertRowToDPArray(DPArray dp, HierarchyNode node, double targetRatio)  {
       // If the row has the same change trend with the top row, then it is inserted.
       if ( side == node.side() ) {
+        // When do oneSide, we try to make the root's ratio close to 1 in order to see the major root causes.
+        if ( (side && Double.compare(targetRatio, 1d) > 0) || (!side && Double.compare(targetRatio, 1d) < 0)) {
+          targetRatio = 1d;
+        }
         basicRowInserter.insertRowToDPArray(dp, node, targetRatio);
       } else { // Otherwise, it is inserted only there exists an intermediate parent besides root node
         HierarchyNode parent = findAncestor(node, null, dp.getAnswer());
@@ -353,7 +361,7 @@ public class Summary {
 
   public static void main (String[] argc) {
     String oFileName = "Cube.json";
-    int answerSize = 15;
+    int answerSize = 10;
     boolean doOneSideError = true;
     int maxDimensionSize = 3;
 

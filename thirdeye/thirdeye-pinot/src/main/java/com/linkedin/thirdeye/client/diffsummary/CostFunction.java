@@ -11,23 +11,23 @@ public class CostFunction {
    * If v1 and v2 both are zero or parentRatio is not finite, this function returns 0.
    */
   public static double err4EmptyValues(double v1, double v2, double parentRatio) {
-    return err4EmptyValues(v1, v2, parentRatio, parentRatio);
-  }
-
-  public static double err4EmptyValues(double v1, double v2, double parentRatio, double F) {
-    if (!Double.isFinite(parentRatio)) { return 0.; }
     if (Double.compare(0., v1) != 0 && Double.compare(0., v2) != 0) {
       return CostFunction.err(v1, v2, parentRatio);
-    } else {
-      if (Double.compare(0., v1) == 0 && Double.compare(0., v2) == 0) {
-        return 0.;
+    } else if (Double.compare(v1, 0d) == 0 || Double.compare(v2, 0d) == 0) {
+      double filledInRatio = Math.abs(v1 - v2);
+      if (Double.compare(filledInRatio, Math.E) < 0) {
+        filledInRatio = 1d;
       } else {
-        if (Double.compare(0., v1) == 0) {
-          return CostFunction.err(v2 / Math.max(F, parentRatio + (1/F)), v2, parentRatio);
-        } else {
-          return CostFunction.err(v1, v1 * Math.min(1/F, parentRatio), parentRatio);
-        }
+        filledInRatio = Math.log(filledInRatio);
       }
+      if (Double.compare(0., v1) == 0) {
+        return CostFunction.err(v2 / Math.max(filledInRatio, parentRatio + (1/filledInRatio)), v2, parentRatio);
+      } else {
+        filledInRatio = 1d / filledInRatio; // because Double.compare(v1, v2) > 0
+        return CostFunction.err(v1, v1 * Math.min(1/filledInRatio, parentRatio + filledInRatio), parentRatio);
+      }
+    } else { // v1 and v2 are zeros. Set cost to zero so the node will be naturally aggregated to its parent.
+      return 0.;
     }
   }
 }

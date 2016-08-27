@@ -149,11 +149,7 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
     builder.setMetricFunctions(metricFunctions);
     builder.setGroupBy(groupBy);
     builder.setStartTimeInclusive(baselineStartInclusive);
-    if (baselineEndExclusive.minusHours(1).equals(baselineStartInclusive)) {
-      builder.setEndTimeExclusive(baselineStartInclusive);
-    } else {
-      builder.setEndTimeExclusive(baselineEndExclusive);
-    }
+    builder.setEndTimeExclusive(baselineEndExclusive);
     ThirdEyeRequest baselineRequest = builder.build("baseline");
     requests.add(baselineRequest);
 
@@ -163,11 +159,7 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
     builder.setMetricFunctions(metricFunctions);
     builder.setGroupBy(groupBy);
     builder.setStartTimeInclusive(currentStartInclusive);
-    if (currentEndExclusive.minusHours(1).equals(currentStartInclusive)) {
-      builder.setEndTimeExclusive(currentStartInclusive);
-    } else {
-      builder.setEndTimeExclusive(currentEndExclusive);
-    }
+    builder.setEndTimeExclusive(currentEndExclusive);
     ThirdEyeRequest currentRequest = builder.build("current");
     requests.add(currentRequest);
 
@@ -200,10 +192,7 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
         throw new Exception("Failed to retrieve non-zero results with these requests: "
             + baselineRequest + ", " + currentRequest);
       }
-      List<Row> rows = new ArrayList<>(rowTable.size());
-      for (Map.Entry<List<String>, Row> entry : rowTable.entrySet()) {
-        rows.add(entry.getValue());
-      }
+      List<Row> rows = new ArrayList<>(rowTable.values());
       res.add(rows);
     }
 
