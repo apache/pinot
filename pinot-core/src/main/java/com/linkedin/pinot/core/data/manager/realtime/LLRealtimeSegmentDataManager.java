@@ -498,7 +498,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
 
   public void start() {
     _state = State.INITIAL_CONSUMING;
-    _consumerThread = new Thread(_segmentNameStr);
+    _consumerThread = new Thread(new PartitionConsumer(), _segmentNameStr);
     segmentLogger.info("Created new consumer thread {} for {}", _consumerThread, this.toString());
     _consumerThread.start();
   }
