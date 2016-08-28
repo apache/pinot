@@ -30,14 +30,22 @@ public abstract class PersistenceUtil {
     PersistenceConfig configuration = createConfiguration(localConfigFile);
     Properties properties = createDbPropertiesFromConfiguration(configuration);
 
+    /**
+     * https://tomcat.apache.org/tomcat-7.0-doc/jdbc-pool.html
+     */
     DataSource ds = new DataSource();
     ds.setUrl(configuration.getDatabaseConfiguration().getUrl());
     ds.setPassword(configuration.getDatabaseConfiguration().getPassword());
     ds.setUsername(configuration.getDatabaseConfiguration().getUser());
     ds.setDriverClassName(configuration.getDatabaseConfiguration().getProperties().get("hibernate.connection.driver_class"));
-    ds.setMaxActive(200);
+    ds.setMaxActive(100);
     ds.setInitialSize(10);
+    ds.setValidationQuery("select 1 as dbcp_connection_test");
+    ds.setTestWhileIdle(true);
+    ds.setTestOnReturn(true);
+    ds.setTestOnBorrow(true);
     ds.setDefaultAutoCommit(true);
+    ds.setRemoveAbandoned(true);
 
     properties.put(Environment.CONNECTION_PROVIDER, DatasourceConnectionProviderImpl.class.getName());
     properties.put(Environment.DATASOURCE, ds);

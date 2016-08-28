@@ -124,6 +124,6 @@ public abstract class AnomalyTimeBasedSummarizer {
     mergedAnomaly.setMetric(currentResult.getMetric());
     mergedAnomaly.setStartTime(currentResult.getStartTimeUtc());
     mergedAnomaly.setEndTime(currentResult.getEndTimeUtc());
-    mergedAnomaly.setCreatedTime(currentResult.getCreationTimeUtc());
+    mergedAnomaly.setCreatedTime(System.currentTimeMillis());
   }
 }
