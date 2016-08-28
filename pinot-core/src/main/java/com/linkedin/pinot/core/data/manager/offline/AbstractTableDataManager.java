@@ -141,7 +141,7 @@ public abstract  class AbstractTableDataManager implements TableDataManager {
   // Add or a segment (or, replace it if it exists with the same name).
   public void addSegment(final IndexSegment indexSegmentToAdd) {
     final String segmentName = indexSegmentToAdd.getSegmentName();
-    LOGGER.info("Trying to add a new segment {} of table {}", segmentName, _tableName);
+    LOGGER.info("Trying to add a new segment {} of table {} with OfflineSegmentDataManager", segmentName, _tableName);
     OfflineSegmentDataManager newSegmentManager = new OfflineSegmentDataManager(indexSegmentToAdd);
     final int newNumDocs = indexSegmentToAdd.getSegmentMetadata().getTotalRawDocs();
     SegmentDataManager oldSegmentManager;

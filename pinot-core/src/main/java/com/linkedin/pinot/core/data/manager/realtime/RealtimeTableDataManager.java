@@ -151,7 +151,8 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
           LOGGER.info("Downloaded file from {} to {}; Length of downloaded file: {}", uri, tempFile, tempFile.length());
           TarGzCompressionUtils.unTar(tempFile, tempSegmentFolder);
           FileUtils.deleteQuietly(tempFile);
-          FileUtils.moveDirectory(tempSegmentFolder, new File(_indexDir, segmentId));
+          FileUtils.moveDirectory(tempSegmentFolder.listFiles()[0], new File(_indexDir, segmentId));
+          FileUtils.deleteQuietly(tempSegmentFolder);
           LOGGER.info("Replacing LLC Segment {}", segmentId);
           replaceLLSegment(segmentId);
           return;

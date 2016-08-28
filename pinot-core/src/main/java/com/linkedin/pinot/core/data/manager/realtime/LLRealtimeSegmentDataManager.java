@@ -375,6 +375,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     final String segTarFileName = destSeg.getAbsolutePath() + TarGzCompressionUtils.TAR_GZ_FILE_EXTENTION;
     try {
       _protocolHandler.segmentCommit(_currentOffset, _segmentNameStr, new File(segTarFileName));
+      FileUtils.deleteQuietly(new File(segTarFileName));
     } catch (FileNotFoundException e) {
       segmentLogger.error("Tar file {} not found", segTarFileName, e);
       return false;
