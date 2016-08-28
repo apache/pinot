@@ -319,10 +319,4 @@ $(document).ready(function () {
 
     var source_anomaly_grouping_by_fun_dim_template = $("#anomaly-grouping-by-fun-dim-template").html();
     HandleBarsTemplates.template_anomaly_grouping_by_fun_dim = Handlebars.compile(source_anomaly_grouping_by_fun_dim_template);
-
-    var source_anomaly_grouping_by_collection_template = $("#anomaly-grouping-by-collection-template").html();
-    HandleBarsTemplates.template_anomaly_grouping_by_collection = Handlebars.compile(source_anomaly_grouping_by_collection_template);
-
-    var source_anomaly_grouping_by_metric_template = $("#anomaly-grouping-by-metric-template").html();
-    HandleBarsTemplates.template_anomaly_grouping_by_metric = Handlebars.compile(source_anomaly_grouping_by_metric_template);
 })

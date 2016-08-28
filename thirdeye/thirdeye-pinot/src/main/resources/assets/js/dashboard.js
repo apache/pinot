@@ -228,10 +228,9 @@ $(document).ready( function() {
     if (hash.view === 'anomalies2') {
         $("#anomalies2").append("<h2>Analyze anomalies</h2>" + "<div id='merge-strategy'>"
             + "<table class='anomaly2'><tr><td>Anomaly Group </td><td><select id='anomaly-group-select' onchange='renderAnomalyGroups()'>"
-            + "<option value='COLLECTION_METRIC_DIMENSIONS' selected='selected'>Collection, Metric & Dimensions</option>"
-            + "<option value='FUNCTION'>Function & Metric</option>"
-            + "<option value='COLLECTION_METRIC'>Collection & Metric</option>"
-            + "<option value='COLLECTION'>Collection</option></select></td></tr>"
+            + "<option value='FUNCTION_DIMENSIONS' selected='selected'>Function & Dimension</option>"
+            + "<option value='FUNCTION'>Function</option>"
+            + "</select></td></tr>"
             + "<tr><td>Select Time Range </td><td><select id='time-range' onchange='renderAnomalyGroups()'>"
             + "<option value='6' >Last 6 hours</option>" + "<option value='24' >Last 1 day</option>"
             + "<option value='168' selected='selected'>Last 1 week</option>"
@@ -249,19 +248,6 @@ $(document).ready( function() {
             + "</table>" + "</div>" + "<div id='mergeConfig'></div>" + "<div id='group-by'></div>"
             + "<div id='anomaly-merged-summary'></div>");
         renderAnomalyGroups(this);
-        routeToTab();
-    }
-
-    // Load anomalies 3
-    if (hash.view === 'anomalies3') {
-        $("#anomalies3").append(
-            "<h2>View merged anomalies</h2>"
-            + "Select Time Range <select id='time-range' onchange='renderMergedAnomalies()'>"
-            + "<option value='6' >Last 6 hours</option>" + "<option value='24' >Last 1 day</option>"
-            + "<option value='168' selected='selected'>Last 1 week</option>"
-            + "<option value='336'>Last 2 weeks</option>" + "<option value='720'>Last 1 Month</option>"
-            + "<option value='0' >All Time</option></select><div id='anomaly-merged-summary'></div>");
-        renderMergedAnomalies();
         routeToTab();
     }
 

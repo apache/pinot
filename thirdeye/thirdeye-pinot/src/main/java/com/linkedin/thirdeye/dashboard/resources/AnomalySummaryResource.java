@@ -17,7 +17,6 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import org.apache.commons.lang3.StringUtils;
-import org.joda.time.DateTime;
 
 @Path("thirdeye/anomaly")
 @Produces(MediaType.APPLICATION_JSON)
@@ -48,14 +47,16 @@ public class AnomalySummaryResource {
 
   @GET
   @Path("summary/function/{functionId}")
-  public List<AnomalyMergedResult> getSummaryForFunction(@PathParam("functionId") Long functionId) {
-    return getAnomalySummaryForFunction(functionId, new AnomalyMergeConfig());
+  public List<AnomalyMergedResult> getSummaryForFunction(@PathParam("functionId") Long functionId,
+      @QueryParam("dimensions") String dimensions) {
+    return getAnomalySummaryForFunction(functionId, dimensions, new AnomalyMergeConfig());
   }
 
   @POST
   @Path("summary/function/{functionId}")
   public List<AnomalyMergedResult> getAnomalySummaryForFunction(
-      @PathParam("functionId") Long functionId, AnomalyMergeConfig mergeConfig) {
+      @PathParam("functionId") Long functionId, @QueryParam("dimensions") String dimensions,
+      AnomalyMergeConfig mergeConfig) {
     if (mergeConfig == null) {
       mergeConfig = new AnomalyMergeConfig();
     }
@@ -63,37 +64,14 @@ public class AnomalySummaryResource {
       throw new IllegalArgumentException("Function id can't be null");
     }
 
-    List<AnomalyResult> anomalies = resultDAO
-        .findAllByTimeAndFunctionId(mergeConfig.getStartTime(), mergeConfig.getEndTime(),
-            functionId);
-    return AnomalyTimeBasedSummarizer.mergeAnomalies(anomalies, mergeConfig.getMergeDuration(),
-        mergeConfig.getSequentialAllowedGap());
-  }
-
-  @POST
-  @Path("summary/{collection}")
-  public List<AnomalyMergedResult> getAnomalySummaryForCollectionMeric(
-      @PathParam("collection") String collection, @QueryParam("metric") String metric,
-      @QueryParam("dimensions") String dimensions, AnomalyMergeConfig mergeConfig) {
-    if (StringUtils.isEmpty(collection)) {
-      throw new IllegalArgumentException("Collection can't be empty");
-    }
-    if (mergeConfig == null) {
-      mergeConfig = new AnomalyMergeConfig();
-    }
-    DateTime startTimeUtc = new DateTime(mergeConfig.getStartTime());
-    DateTime endTimeUtc = new DateTime(mergeConfig.getEndTime());
-
     List<AnomalyResult> anomalies;
-    if (!StringUtils.isEmpty(metric) && !StringUtils.isEmpty(dimensions)) {
-      anomalies = resultDAO
-          .findAllByCollectionTimeMetricAndDimensions(collection, metric, startTimeUtc, endTimeUtc,
-              new String[] { dimensions });
-    } else if (!StringUtils.isEmpty(metric)) {
-      anomalies =
-          resultDAO.findAllByCollectionTimeAndMetric(collection, metric, startTimeUtc, endTimeUtc);
+    if (!StringUtils.isEmpty(dimensions)) {
+      anomalies = resultDAO.findAllByTimeFunctionIdAndDimensions(mergeConfig.getStartTime(),
+          mergeConfig.getEndTime(), functionId, dimensions);
     } else {
-      anomalies = resultDAO.findAllByCollectionAndTime(collection, startTimeUtc, endTimeUtc);
+      anomalies = resultDAO
+          .findAllByTimeAndFunctionId(mergeConfig.getStartTime(), mergeConfig.getEndTime(),
+              functionId);
     }
     return AnomalyTimeBasedSummarizer.mergeAnomalies(anomalies, mergeConfig.getMergeDuration(),
         mergeConfig.getSequentialAllowedGap());
@@ -107,16 +85,10 @@ public class AnomalySummaryResource {
       mergeConfig = new AnomalyMergeConfig();
     }
     switch (mergeConfig.getMergeStrategy()) {
-    case COLLECTION_METRIC_DIMENSIONS:
-      return resultDAO.getCountByCollectionMetricDimension(mergeConfig.getStartTime(), mergeConfig.getEndTime(), true);
     case FUNCTION_DIMENSIONS:
       return resultDAO.getCountByFunctionDimensions(mergeConfig.getStartTime(), mergeConfig.getEndTime());
     case FUNCTION:
       return resultDAO.getCountByFunction(mergeConfig.getStartTime(), mergeConfig.getEndTime());
-    case COLLECTION_METRIC:
-      return resultDAO.getCountByCollectionMetric(mergeConfig.getStartTime(), mergeConfig.getEndTime());
-    case COLLECTION:
-      return resultDAO.getCountByCollection(mergeConfig.getStartTime(), mergeConfig.getEndTime());
     default:
       throw new IllegalArgumentException("Unknown merge strategy : " + mergeConfig.getMergeStrategy());
     }

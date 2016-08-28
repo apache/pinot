@@ -61,5 +61,4 @@
     <script src="../../../assets/js/lib/dashboard-chart-area.js" defer></script>
     <script src="../../../assets/js/dashboard.js" defer></script>
     <script src="../../../assets/js/lib/anomalies2.js" defer></script>
-    <script src="../../../assets/js/lib/anomalies3.js" defer></script>
 </head>

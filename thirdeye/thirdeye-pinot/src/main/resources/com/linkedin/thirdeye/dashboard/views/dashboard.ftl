@@ -21,7 +21,6 @@
         <li id="anomalies-header-tab" class="header-tab" rel="self-service"><a href="#">Self
           Service</a></li>
         <li id="anomalies-header-tab2" class="header-tab" rel="anomalies2" class="uk-hidden"></li>
-        <li id="anomalies-header-tab2" class="header-tab" rel="anomalies3" class="uk-hidden"></li>
       </ul>
 
 
@@ -40,7 +39,6 @@
     <li id="anomalies"></li>
     <li id="self-service"></li>
     <li id="anomalies2"></li>
-    <li id="anomalies3"></li>
   </ul>
 </div>
 
@@ -57,8 +55,6 @@
 <#include "tabs/anomalies-tab/anomalies.ftl">
 <#include "tabs/anomalies-tab/anomaly-grouping-by-fun.ftl">
 <#include "tabs/anomalies-tab/anomaly-grouping-by-dimensions.ftl">
-<#include "tabs/anomalies-tab/anomaly-grouping-by-collection.ftl">
-<#include "tabs/anomalies-tab/anomaly-grouping-by-metric.ftl">
 <#include "tabs/anomalies-tab/anomaly-summary.ftl">
 <#include "tabs/self-service-tab/self-service.ftl">
 <#include "tabs/self-service-tab/anomaly-function-form.ftl">
