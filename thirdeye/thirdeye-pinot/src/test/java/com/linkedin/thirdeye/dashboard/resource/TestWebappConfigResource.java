@@ -52,7 +52,6 @@ public class TestWebappConfigResource extends AbstractDbTestBase {
     Assert.assertEquals(webappConfigs.size(), 1);
     webappConfigs = webappConfigResource.viewConfigs(null, null, WebappConfigType.COLLECTION_SCHEMA);
     Assert.assertEquals(webappConfigs.size(), 0);
-
   }
 
   @Test(dependsOnMethods = {"testViewConfigs"})
