@@ -28,7 +28,15 @@ $("#main-view").on("change", ".compare-mode-selector", function () {
     selectBaselineDateRange(this)
 });
 
-$("#main-view").on("change, keyup", ".current-start-date-input, .current-start-time-input, .current-end-date-input, .current-end-time-input", function () {
+
+$("#main-view").on("hide.uk.datepicker",
+    ".time-range-selector-dropdown .current-start-date-input[data-uk-datepicker], " +
+    ".time-range-selector-dropdown .current-end-date-input[data-uk-datepicker]", function () {
+    selectBaselineDateRange(this)
+    enableButton($(".time-input-apply-btn[rel='" + hash.view + "']"));
+});
+
+$("#main-view").on("change, keyup, focus, blur, input, paste", ".current-start-date-input, .current-start-time-input, .current-end-date-input, .current-end-time-input", function () {
     selectBaselineDateRange(this)
     enableButton($(".time-input-apply-btn[rel='" + hash.view + "']"));
 });
@@ -62,7 +70,6 @@ function selectAggregate(target) {
     if (unit == "DAYS") {
 
         var maxMillis = window.datasetConfig.maxMillis;
-        console.log("maxMillis", maxMillis);
         var hh = maxMillis ? moment(maxMillis).format("HH") : "00";
         //Set the time selectors to midnight
         $("#" + currentView + "-current-end-time-input").val(hh + ":00");
@@ -220,7 +227,6 @@ function selectBaselineDateRange(target) {
     var currentStartDateString = $(".current-start-date-input[rel='" + currentTab + "']").val();
     var currentEndDateString = $(".current-end-date-input[rel='" + currentTab + "']").val();
 
-
     var currentStartDate = moment.tz(currentStartDateString, tz);
     var currentEndDate = moment.tz(currentEndDateString, tz);
 
@@ -240,6 +246,7 @@ function selectBaselineDateRange(target) {
             var baselineEndDate = baselineEndDateUTCMillis.clone().tz(tz);
 
             var baselineStartDateString = baselineStartDate.format("YYYY-MM-DD");
+
             var baselineEndDateString = baselineEndDate.format("YYYY-MM-DD");
 
             $(".baseline-start-date-input[rel='" + currentTab + "']").val(baselineStartDateString);
@@ -252,8 +259,9 @@ function selectBaselineDateRange(target) {
             $(".baseline-end-time-input[rel='" + currentTab + "']").attr("disabled", true);
 
             break;
-
+        case "custom":
         case "1":
+
             //var yesterday = moment().add(-1, 'days').format("YYYY-MM-DD");
             //$(".baseline-start-date-input[rel='"+ currentTab +"']").val(yesterday);
             //$(".baseline-end-date-input[rel='"+ currentTab +"']").val(yesterday);
