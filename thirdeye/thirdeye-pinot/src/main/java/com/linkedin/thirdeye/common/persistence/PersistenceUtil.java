@@ -44,7 +44,6 @@ public abstract class PersistenceUtil {
     ds.setTestWhileIdle(true);
     ds.setTestOnReturn(true);
     ds.setTestOnBorrow(true);
-    ds.setDefaultAutoCommit(true);
     ds.setRemoveAbandoned(true);
 
     properties.put(Environment.CONNECTION_PROVIDER, DatasourceConnectionProviderImpl.class.getName());
