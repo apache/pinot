@@ -1,11 +1,14 @@
 package com.linkedin.thirdeye.client.diffsummary;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -14,7 +17,6 @@ import org.jfree.util.Log;
 import org.joda.time.DateTime;
 
 import com.google.common.collect.Lists;
-import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.client.MetricExpression;
 import com.linkedin.thirdeye.client.MetricFunction;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
@@ -23,12 +25,13 @@ import com.linkedin.thirdeye.client.ThirdEyeRequest;
 import com.linkedin.thirdeye.client.ThirdEyeRequest.ThirdEyeRequestBuilder;
 import com.linkedin.thirdeye.client.ThirdEyeResponse;
 import com.linkedin.thirdeye.client.cache.QueryCache;
-import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClientConfig;
 import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
+import com.linkedin.thirdeye.common.persistence.PersistenceUtil;
 import com.linkedin.thirdeye.dashboard.ThirdEyeDashboardConfiguration;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
 import com.linkedin.thirdeye.dashboard.views.diffsummary.Summary;
+import com.linkedin.thirdeye.db.dao.WebappConfigDAO;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 
@@ -264,8 +267,7 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
     }
   }
 
-  @SuppressWarnings("deprecation")
-  public static void main(String[] argc) throws Exception {
+  public static void main(String[] args) throws Exception {
     String oFileName = "Cube.json";
 
     // An interesting data set that difficult to tell because too many dark reds and blues (Granularity: DAYS)
@@ -309,18 +311,32 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
 //    DateTime currentEnd =    new DateTime(1471629600000L);
 
     // Create ThirdEye client
+    List<String> argList = new ArrayList<String>(Arrays.asList(args));
+    if (argList.size() == 1) {
+      argList.add(0, "server");
+    }
+    int lastIndex = argList.size() - 1;
+    String thirdEyeConfigDir = argList.get(lastIndex);
+    String persistenceConfig = thirdEyeConfigDir + "/persistence.yml";
+    File configFile = new File(persistenceConfig);
+    PersistenceUtil.init(configFile);
+    WebappConfigDAO webappConfigDAO = PersistenceUtil.getInstance(WebappConfigDAO.class);
+
     ThirdEyeConfiguration thirdEyeConfig = new ThirdEyeDashboardConfiguration();
     thirdEyeConfig.setWhitelistCollections(collection);
+    thirdEyeConfig.setRootDir(thirdEyeConfigDir);
 
-    PinotThirdEyeClientConfig pinotThirdEyeClientConfig = new PinotThirdEyeClientConfig();
-    pinotThirdEyeClientConfig.setControllerHost("lva1-app0086.corp.linkedin.com");
-    pinotThirdEyeClientConfig.setControllerPort(11984);
-    pinotThirdEyeClientConfig.setZookeeperUrl("zk-lva1-pinot.corp.linkedin.com:12913/pinot-cluster");
-    pinotThirdEyeClientConfig.setClusterName("mpSprintDemoCluster");
-
-    ThirdEyeCacheRegistry.initializeWebappCaches(thirdEyeConfig, pinotThirdEyeClientConfig);
+    ThirdEyeCacheRegistry.initializeCaches(thirdEyeConfig, webappConfigDAO);
     ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
-    collection = ThirdEyeUtils.getCollectionFromAlias(collection);
+
+    // Get alias collection name and metric name if there exists any
+    try {
+      String aliasCollection = ThirdEyeUtils.getCollectionFromAlias(collection);
+      collection = aliasCollection;
+    } catch (ExecutionException e1) {
+      System.out.println("Failed to get alias collection name for " + collection
+          + ". The original colleciotn name is used.");
+    }
     CollectionConfig collectionConfig = CACHE_REGISTRY_INSTANCE.getCollectionConfigCache().getIfPresent(collection);
     if (collectionConfig != null && collectionConfig.getDerivedMetrics() != null
         && collectionConfig.getDerivedMetrics().containsKey(metricName)) {
@@ -337,14 +353,20 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
     pinotClient.setBaselineStartInclusive(baselineStart);
     pinotClient.setBaselineEndExclusive(baselineEnd);
 
-//    String[] dimensionNames =
-//        { "browserName", "continent", "countryCode", "deviceName", "environment", "locale", "osName", "pageKey", "service", "sourceApp" };
     List<List<String>> hierarchies = new ArrayList<>();
     hierarchies.add(Lists.newArrayList("continent", "countryCode"));
     hierarchies.add(Lists.newArrayList("browser_name", "browser_version"));
 
-//    Dimensions dimensions = new Dimensions(Lists.newArrayList(dimensionNames));
-    Dimensions dimensions = new Dimensions(Utils.getDimensions(CACHE_REGISTRY_INSTANCE.getQueryCache(), collection));
+    Dimensions dimensions;
+    try {
+      dimensions = new Dimensions(Utils.getDimensions(CACHE_REGISTRY_INSTANCE.getQueryCache(), collection));
+    } catch (Exception e1) {
+      System.out.println("Failed to get dimensions names of the collection: " + collection);
+      String[] dimensionNames =
+          { "browserName", "continent", "countryCode", "deviceName", "environment", "locale", "osName", "pageKey", "service", "sourceApp" };
+      System.out.println("Default dimension names are used:" + dimensionNames);
+      dimensions = new Dimensions(Lists.newArrayList(dimensionNames));
+    }
 
     int maxDimensionSize = 3;
 
