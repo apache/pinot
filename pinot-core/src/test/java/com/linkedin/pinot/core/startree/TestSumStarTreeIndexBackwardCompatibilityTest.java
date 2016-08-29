@@ -27,7 +27,7 @@ import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
 
-public class TestStarTreeIndexBackwardCompatibilityTest extends BaseStarTreeIndexTest {
+public class TestSumStarTreeIndexBackwardCompatibilityTest extends BaseSumStarTreeIndexTest {
   private static final String _tmpDirName = "/tmp/starTreeIndexDir";
   private File _tmpDir;
   private IndexSegment _segment;
@@ -36,7 +36,7 @@ public class TestStarTreeIndexBackwardCompatibilityTest extends BaseStarTreeInde
   void setup()
       throws Exception {
     String compressedIndex = TestUtils.getFileFromResourceUrl(
-        TestStarTreeIndexBackwardCompatibilityTest.class.getClassLoader().getResource("data/starTreeSegment.tar.gz"));
+        TestSumStarTreeIndexBackwardCompatibilityTest.class.getClassLoader().getResource("data/starTreeSegment.tar.gz"));
 
     _tmpDir = new File(_tmpDirName);
     if (_tmpDir.exists()) {

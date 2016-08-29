@@ -33,7 +33,7 @@ import org.testng.annotations.Test;
 /**
  * Tests for StarTreeV2 class.
  */
-public class TestStarTreeV2 extends BaseStarTreeIndexTest {
+public class TestStarTreeV2 extends BaseSumStarTreeIndexTest {
 
   private static final String SEGMENT_NAME = "starTreeSegment";
   private static final String SEGMENT_V2_NAME = "starTreeV2Segment";
@@ -54,16 +54,16 @@ public class TestStarTreeV2 extends BaseStarTreeIndexTest {
   @BeforeSuite
   void setup()
       throws Exception {
-    buildSegment(SEGMENT_DIR_NAME, SEGMENT_NAME, false);
-    _segment = loadSegment(SEGMENT_DIR_NAME, SEGMENT_NAME);
+    StarTreeIndexTestSegmentHelper.buildSegment(SEGMENT_DIR_NAME, SEGMENT_NAME, false);
+    _segment = StarTreeIndexTestSegmentHelper.loadSegment(SEGMENT_DIR_NAME, SEGMENT_NAME);
     _starTreeV1 = _segment.getStarTree();
 
     _starTreeV2File = new File(SEGMENT_DIR_NAME, STAR_TREE_V2_FILE_NAME);
     StarTreeSerDe.writeTreeV2(_starTreeV1, _starTreeV2File);
 
     // Build the StarTreeV2 segment
-    _schema = buildSegment(SEGMENT_V2_DIR_NAME, SEGMENT_V2_NAME, true);
-    _segmentV2 = loadSegment(SEGMENT_V2_DIR_NAME, SEGMENT_V2_NAME);
+    _schema = StarTreeIndexTestSegmentHelper.buildSegment(SEGMENT_V2_DIR_NAME, SEGMENT_V2_NAME, true);
+    _segmentV2 = StarTreeIndexTestSegmentHelper.loadSegment(SEGMENT_V2_DIR_NAME, SEGMENT_V2_NAME);
   }
 
   /**
