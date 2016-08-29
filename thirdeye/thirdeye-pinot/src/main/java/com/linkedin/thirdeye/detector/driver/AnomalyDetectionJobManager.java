@@ -29,7 +29,6 @@ import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesHandler;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesResponseConverter;
 import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
-import com.linkedin.thirdeye.db.dao.AnomalyFunctionRelationDAO;
 import com.linkedin.thirdeye.detector.function.AnomalyFunction;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 
@@ -41,7 +40,6 @@ public class AnomalyDetectionJobManager {
   private final TimeSeriesHandler timeSeriesHandler;
   private final TimeSeriesResponseConverter timeSeriesResponseConverter;
   private final AnomalyFunctionDAO specDAO;
-  private final AnomalyFunctionRelationDAO relationDAO;
   private final AnomalyResultDAO resultDAO;
   private final Object sync;
   private final Map<Long, String> scheduledJobKeys;
@@ -53,9 +51,8 @@ public class AnomalyDetectionJobManager {
   private static final ObjectMapper reader = new ObjectMapper(new YAMLFactory());
 
   public AnomalyDetectionJobManager(Scheduler quartzScheduler, AnomalyFunctionDAO specDAO,
-      AnomalyFunctionRelationDAO relationDAO, AnomalyResultDAO resultDAO,
-      MetricRegistry metricRegistry, AnomalyFunctionFactory anomalyFunctionFactory,
-      FailureEmailConfiguration failureEmailConfig) {
+      AnomalyResultDAO resultDAO, MetricRegistry metricRegistry,
+      AnomalyFunctionFactory anomalyFunctionFactory, FailureEmailConfiguration failureEmailConfig) {
 
     this.queryCache = CACHE_REGISTRY_INSTANCE.getQueryCache();
 
@@ -64,7 +61,6 @@ public class AnomalyDetectionJobManager {
 
     this.quartzScheduler = quartzScheduler;
     this.specDAO = specDAO;
-    this.relationDAO = relationDAO;
     this.resultDAO = resultDAO;
     this.metricRegistry = metricRegistry;
     this.sync = new Object();
@@ -121,7 +117,6 @@ public class AnomalyDetectionJobManager {
     job.getJobDataMap().put(AnomalyDetectionJob.WINDOW_END, windowEndIsoString);
     job.getJobDataMap().put(AnomalyDetectionJob.RESULT_DAO, resultDAO);
     job.getJobDataMap().put(AnomalyDetectionJob.METRIC_REGISTRY, metricRegistry);
-    job.getJobDataMap().put(AnomalyDetectionJob.RELATION_DAO, relationDAO);
 
     job.getJobDataMap().put(FailureEmailConfiguration.FAILURE_EMAIL_CONFIG_KEY, failureEmailConfig);
 

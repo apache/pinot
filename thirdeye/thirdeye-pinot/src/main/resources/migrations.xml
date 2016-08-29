@@ -650,4 +650,12 @@
     columnNames="name,collection,type" tableName="webapp_config"/>
   </changeSet>
 
+  <changeSet id="26" author="pjaiswal">
+    <addColumn tableName="anomaly_merged_results">
+      <column name="notified"  type="boolean" defaultValueBoolean="false">
+        <constraints nullable="false"/>
+      </column>
+    </addColumn>
+    <dropTable tableName="anomaly_function_relations" />
+  </changeSet>
 </databaseChangeLog>

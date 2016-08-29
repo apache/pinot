@@ -36,7 +36,6 @@ import com.linkedin.thirdeye.detector.email.EmailReportJobManager;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import com.linkedin.thirdeye.detector.lib.util.JobUtils;
 import com.linkedin.thirdeye.detector.resources.AnomalyDetectionJobResource;
-import com.linkedin.thirdeye.detector.resources.AnomalyFunctionRelationResource;
 import com.linkedin.thirdeye.detector.resources.AnomalyFunctionSpecResource;
 import com.linkedin.thirdeye.detector.resources.AnomalyResultResource;
 import com.linkedin.thirdeye.detector.resources.EmailFunctionDependencyResource;
@@ -112,9 +111,9 @@ public class ThirdEyeDetectorApplication
         new AnomalyFunctionFactory(config.getFunctionConfigPath());
 
     // ThirdEye driver
-    final AnomalyDetectionJobManager anomalyDetectionJobManager = new AnomalyDetectionJobManager(quartzScheduler,
-        anomalyFunctionDAO, anomalyFunctionRelationDAO, anomalyResultDAO,
-        environment.metrics(), anomalyFunctionFactory, config.getFailureEmailConfig());
+    final AnomalyDetectionJobManager anomalyDetectionJobManager =
+        new AnomalyDetectionJobManager(quartzScheduler, anomalyFunctionDAO, anomalyResultDAO,
+            environment.metrics(), anomalyFunctionFactory, config.getFailureEmailConfig());
 
     // Start all active jobs on startup
     environment.lifecycle().manage(new Managed() {
@@ -216,7 +215,6 @@ public class ThirdEyeDetectorApplication
 
     // Jersey resources
     environment.jersey().register(new AnomalyFunctionSpecResource(anomalyFunctionDAO));
-    environment.jersey().register(new AnomalyFunctionRelationResource(anomalyFunctionRelationDAO));
     environment.jersey().register(new AnomalyResultResource(anomalyResultDAO));
     environment.jersey().register(new MetricsGraphicsTimeSeriesResource(anomalyResultDAO));
     environment.jersey().register(new AnomalyDetectionJobResource(anomalyDetectionJobManager, anomalyFunctionDAO));

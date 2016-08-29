@@ -4,7 +4,6 @@ import com.linkedin.thirdeye.db.dao.AnomalyMergedResultDAO;
 
 import com.linkedin.thirdeye.db.entity.AnomalyMergedResult;
 import java.io.ByteArrayOutputStream;
-import java.io.File;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.net.URLEncoder;
@@ -104,7 +103,7 @@ public class AlertTaskRunner implements TaskRunner {
     final String collectionAlias = ThirdEyeUtils.getAliasFromCollection(collection);
 
     // Get the anomalies in that range
-    final List<AnomalyMergedResult> results = anomalyMergedResultDAO.getAllByTimeEmailId(windowStart.getMillis(), windowEnd.getMillis(), alertConfig.getId());
+    final List<AnomalyMergedResult> results = anomalyMergedResultDAO.getAllByTimeEmailIdAndNotifiedFalse(windowStart.getMillis(), windowEnd.getMillis(), alertConfig.getId());
 
     if (results.isEmpty() && !alertConfig.getSendZeroAnomalyEmail()) {
       LOG.info("Zero anomalies found, skipping sending email");
@@ -144,6 +143,7 @@ public class AlertTaskRunner implements TaskRunner {
     }
 
     sendAlertForAnomalies(collectionAlias, results, groupedResults, dimensionNames);
+    updateNotifiedStatus(results);
   }
 
   private void sendAlertForAnomalies(String collectionAlias, List<AnomalyMergedResult> results,
@@ -156,7 +156,7 @@ public class AlertTaskRunner implements TaskRunner {
     // Render template - create email first so we can get embedded image string
     HtmlEmail email = new HtmlEmail();
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
-//    File chartFile = null;
+    //    File chartFile = null;
     try (Writer out = new OutputStreamWriter(baos, CHARSET)) {
       Configuration freemarkerConfig = new Configuration(Configuration.VERSION_2_3_21);
       freemarkerConfig.setClassForTemplateLoading(getClass(), "/com/linkedin/thirdeye/detector/");
@@ -209,6 +209,13 @@ public class AlertTaskRunner implements TaskRunner {
       throw new JobExecutionException(e);
     }
     LOG.info("Sent email with {} anomalies! {}", results.size(), alertConfig);
+  }
+
+  private void updateNotifiedStatus(List<AnomalyMergedResult> mergedResults) {
+    for (AnomalyMergedResult mergedResult : mergedResults) {
+      mergedResult.setNotified(true);
+      anomalyMergedResultDAO.update(mergedResult);
+    }
   }
 
   private class AssignedDimensionsMethod implements TemplateMethodModelEx {

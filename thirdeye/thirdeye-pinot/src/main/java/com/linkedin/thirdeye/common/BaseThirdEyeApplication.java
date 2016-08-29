@@ -7,7 +7,6 @@ import com.linkedin.thirdeye.db.dao.AnomalyMergedResultDAO;
 import com.linkedin.thirdeye.db.dao.AnomalyResultDAO;
 import com.linkedin.thirdeye.db.dao.AnomalyTaskDAO;
 import com.linkedin.thirdeye.db.dao.EmailConfigurationDAO;
-import com.linkedin.thirdeye.db.dao.AnomalyFunctionRelationDAO;
 import com.linkedin.thirdeye.db.dao.WebappConfigDAO;
 
 import io.dropwizard.Application;
@@ -25,7 +24,6 @@ public abstract class BaseThirdEyeApplication<T extends Configuration> extends A
   protected EmailConfigurationDAO emailConfigurationDAO;
   protected AnomalyJobDAO anomalyJobDAO;
   protected AnomalyTaskDAO anomalyTaskDAO;
-  protected AnomalyFunctionRelationDAO anomalyFunctionRelationDAO;
   protected WebappConfigDAO webappConfigDAO;
   protected AnomalyMergedResultDAO anomalyMergedResultDAO;
 
@@ -36,7 +34,6 @@ public abstract class BaseThirdEyeApplication<T extends Configuration> extends A
     anomalyFunctionDAO = PersistenceUtil.getInstance(AnomalyFunctionDAO.class);
     anomalyResultDAO = PersistenceUtil.getInstance(AnomalyResultDAO.class);
     emailConfigurationDAO = PersistenceUtil.getInstance(EmailConfigurationDAO.class);
-    anomalyFunctionRelationDAO = PersistenceUtil.getInstance(AnomalyFunctionRelationDAO.class);
     anomalyJobDAO = PersistenceUtil.getInstance(AnomalyJobDAO.class);
     anomalyTaskDAO = PersistenceUtil.getInstance(AnomalyTaskDAO.class);
     webappConfigDAO = PersistenceUtil.getInstance(WebappConfigDAO.class);
