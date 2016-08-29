@@ -10,4 +10,3 @@ databaseConfiguration:
     hibernate.connection.isolation: 2
     hibernate.archive.autodetection: class, hbm
     hibernate.connection.driver_class: org.hsqldb.jdbcDriver
-    hibernate.connection.autocommit: true

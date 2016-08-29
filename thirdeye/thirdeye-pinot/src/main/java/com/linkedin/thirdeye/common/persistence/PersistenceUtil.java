@@ -54,8 +54,6 @@ public abstract class PersistenceUtil {
     ds.setRemoveAbandonedTimeout(15 * 60);
     ds.setRemoveAbandoned(true);
 
-    ds.setDefaultAutoCommit(true);
-
     properties.put(Environment.CONNECTION_PROVIDER, DatasourceConnectionProviderImpl.class.getName());
     properties.put(Environment.DATASOURCE, ds);
 
