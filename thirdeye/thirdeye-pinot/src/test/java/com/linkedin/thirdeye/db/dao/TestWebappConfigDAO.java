@@ -18,7 +18,7 @@ public class TestWebappConfigDAO extends AbstractDbTestBase {
   private static final Logger LOG = LoggerFactory.getLogger(TestWebappConfigDAO.class);
 
   private static final String collection = "testCollection";
-  private static final WebappConfigType configType = WebappConfigType.COLLECTION_CONFIG;
+  private static final WebappConfigType type = WebappConfigType.COLLECTION_CONFIG;
   private Long webappConfigId;
 
 
@@ -47,9 +47,9 @@ public class TestWebappConfigDAO extends AbstractDbTestBase {
   @Test(dependsOnMethods = {"testDuplicteCreate"})
   public void testFind() {
     Assert.assertEquals(webappConfigDAO.findByCollection(collection).size(), 1);
-    Assert.assertEquals(webappConfigDAO.findByConfigType(WebappConfigType.COLLECTION_SCHEMA).size(), 0);
-    Assert.assertEquals(webappConfigDAO.findByConfigType(configType).size(), 1);
-    Assert.assertEquals(webappConfigDAO.findByCollectionAndConfigType(collection, configType).size(), 1);
+    Assert.assertEquals(webappConfigDAO.findByType(WebappConfigType.COLLECTION_SCHEMA).size(), 0);
+    Assert.assertEquals(webappConfigDAO.findByType(type).size(), 1);
+    Assert.assertEquals(webappConfigDAO.findByCollectionAndType(collection, type).size(), 1);
   }
 
   @Test(dependsOnMethods = {"testFind"})
@@ -80,9 +80,9 @@ public class TestWebappConfigDAO extends AbstractDbTestBase {
     collectionConfig.setDerivedMetrics(derivedMetrics);
 
     WebappConfig webappConfig = new WebappConfig();
-    webappConfig.setConfigId(collectionConfig.getConfigId());
+    webappConfig.setName(collectionConfig.getConfigName());
     webappConfig.setCollection(collection);
-    webappConfig.setConfigType(configType);
+    webappConfig.setType(type);
     try {
       webappConfig.setConfig(collectionConfig.toJSON());
     } catch (Exception e) {

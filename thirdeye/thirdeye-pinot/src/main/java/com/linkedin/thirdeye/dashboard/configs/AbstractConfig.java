@@ -23,7 +23,7 @@ public abstract class AbstractConfig {
 
   public abstract String toJSON() throws Exception;
 
-  public abstract int getConfigId();
+  public abstract String getConfigName();
 
   public static <T extends AbstractConfig> T fromJSON(String json,
       Class<? extends AbstractConfig> configTypeClass) throws Exception {

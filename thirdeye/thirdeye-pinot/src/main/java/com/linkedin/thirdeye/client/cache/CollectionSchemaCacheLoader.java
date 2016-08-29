@@ -20,7 +20,10 @@ import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClientConfig;
-import com.linkedin.thirdeye.dashboard.configs.AbstractConfigDAO;
+import com.linkedin.thirdeye.dashboard.configs.AbstractConfig;
+import com.linkedin.thirdeye.dashboard.configs.WebappConfigFactory.WebappConfigType;
+import com.linkedin.thirdeye.db.dao.WebappConfigDAO;
+import com.linkedin.thirdeye.db.entity.WebappConfig;
 
 public class CollectionSchemaCacheLoader extends CacheLoader<String, CollectionSchema> {
 
@@ -28,11 +31,11 @@ public class CollectionSchemaCacheLoader extends CacheLoader<String, CollectionS
 
   private static final int GRANULARITY_SIZE = 1;
 
-  private AbstractConfigDAO<CollectionSchema> collectionSchemaDAO;
+  private WebappConfigDAO webappConfigDAO;
 
   public CollectionSchemaCacheLoader(PinotThirdEyeClientConfig pinotThirdeyeClientConfig,
-      AbstractConfigDAO<CollectionSchema> collectionSchemaDAO) {
-    this.collectionSchemaDAO = collectionSchemaDAO;
+      WebappConfigDAO webappConfigDAO) {
+    this.webappConfigDAO = webappConfigDAO;
   }
 
   @Override
@@ -43,8 +46,10 @@ public class CollectionSchemaCacheLoader extends CacheLoader<String, CollectionS
 
   public CollectionSchema getCollectionSchema(String collection) throws Exception {
     CollectionSchema collectionSchema = null;
-    collectionSchema = collectionSchemaDAO.findById(collection);
-    if (collectionSchema == null) {
+    List<WebappConfig> webappConfigs = webappConfigDAO
+        .findByCollectionAndType(collection, WebappConfigType.COLLECTION_SCHEMA);
+
+    if (webappConfigs.isEmpty()) {
       // get from schema endpoint
       Schema schema = ThirdEyeCacheRegistry.getInstance().getSchemaCache().get(collection);
       List<DimensionSpec> dimSpecs = fromDimensionFieldSpecs(schema.getDimensionFieldSpecs());
@@ -53,6 +58,8 @@ public class CollectionSchemaCacheLoader extends CacheLoader<String, CollectionS
       CollectionSchema config = new CollectionSchema.Builder().setCollection(collection)
           .setDimensions(dimSpecs).setMetrics(metricSpecs).setTime(timeSpec).build();
       return config;
+    } else {
+      collectionSchema = AbstractConfig.fromJSON(webappConfigs.get(0).getConfig(), CollectionSchema.class);
     }
 
     return collectionSchema;

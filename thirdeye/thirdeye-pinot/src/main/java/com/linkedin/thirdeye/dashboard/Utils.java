@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.dashboard;
 
 import com.linkedin.thirdeye.constant.MetricAggFunction;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -31,9 +32,12 @@ import com.linkedin.thirdeye.client.ThirdEyeRequest;
 import com.linkedin.thirdeye.client.ThirdEyeRequest.ThirdEyeRequestBuilder;
 import com.linkedin.thirdeye.client.ThirdEyeResponse;
 import com.linkedin.thirdeye.client.cache.QueryCache;
-import com.linkedin.thirdeye.dashboard.configs.AbstractConfigDAO;
+import com.linkedin.thirdeye.dashboard.configs.AbstractConfig;
 import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
 import com.linkedin.thirdeye.dashboard.configs.DashboardConfig;
+import com.linkedin.thirdeye.dashboard.configs.WebappConfigFactory.WebappConfigType;
+import com.linkedin.thirdeye.db.dao.WebappConfigDAO;
+import com.linkedin.thirdeye.db.entity.WebappConfig;
 
 public class Utils {
   private static final Logger LOG = LoggerFactory.getLogger(Utils.class);
@@ -127,29 +131,20 @@ public class Utils {
     return dimensionsToGroupBy;
   }
 
-  public static List<String> getDashboards(AbstractConfigDAO<DashboardConfig> configDAO,
-      String collection) {
-    List<DashboardConfig> dashboardConfigs = configDAO.findAll();
+  public static List<String> getDashboards(WebappConfigDAO webappConfigDAO, String collection) throws Exception {
+    List<WebappConfig> webappConfigs = webappConfigDAO
+        .findByCollectionAndType(collection, WebappConfigType.DASHBOARD_CONFIG);
 
     List<String> dashboards = new ArrayList<>();
-    for (DashboardConfig dashboardConfig : dashboardConfigs) {
-      if (dashboardConfig == null
-          || !collection.equalsIgnoreCase(dashboardConfig.getCollectionName())) {
-        continue;
-      } else {
-        dashboards.add(dashboardConfig.getDashboardName());
-      }
+    for (WebappConfig webappConfig : webappConfigs) {
+      DashboardConfig dashboardConfig = AbstractConfig.fromJSON(webappConfig.getConfig(), DashboardConfig.class);
+      dashboards.add(dashboardConfig.getDashboardName());
     }
+
     dashboards.add(DEFAULT_DASHBOARD);
     return dashboards;
   }
 
-  public static List<MetricExpression> getMetricExpressions(
-      AbstractConfigDAO<DashboardConfig> configDAO, String collection, String dashboardId) {
-
-    DashboardConfig dashboardConfig = configDAO.findById(collection + "_" + dashboardId);
-    return dashboardConfig.getMetricExpressions();
-  }
 
   public static List<MetricExpression> convertToMetricExpressions(String metricsJson,
       String collection) {

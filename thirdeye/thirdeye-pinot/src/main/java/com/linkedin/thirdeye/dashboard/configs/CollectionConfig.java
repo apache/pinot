@@ -125,8 +125,8 @@ public class CollectionConfig extends AbstractConfig {
   }
 
   @Override
-  public int getConfigId() {
-    return 0;
+  public String getConfigName() {
+    return collectionName;
   }
 
 

@@ -61,7 +61,7 @@ public class ThirdEyeAnomalyApplication
       throws Exception {
     LOG.info("Starting ThirdeyeAnomalyApplication : Scheduler {} Worker {}", config.isScheduler(), config.isWorker());
     super.initDAOs();
-    ThirdEyeCacheRegistry.initializeDetectorCaches(config);
+    ThirdEyeCacheRegistry.initializeCaches(config, webappConfigDAO);
 
     environment.lifecycle().manage(new Managed() {
       @Override

@@ -624,4 +624,30 @@
       </column>
     </addColumn>
   </changeSet>
+
+  <changeSet id="25" author="npawar">
+    <dropTable tableName="webapp_configs"/>
+
+    <!-- WebappConfigs -->
+    <createTable tableName="webapp_config">
+      <column name="id" type="bigint" autoIncrement="true">
+        <constraints primaryKey="true" nullable="false"/>
+      </column>
+      <column name="name" type="varchar(127)">
+        <constraints nullable="false"/>
+      </column>
+      <column name="collection" type="varchar(127)">
+        <constraints nullable="false"/>
+      </column>
+      <column name="type" type="varchar(127)">
+        <constraints nullable="false"/>
+      </column>
+      <column name="config" type="text">
+        <constraints nullable="false"/>
+      </column>
+    </createTable>
+    <addUniqueConstraint constraintName="unique_config_constraint"
+    columnNames="name,collection,type" tableName="webapp_config"/>
+  </changeSet>
+
 </databaseChangeLog>

@@ -20,16 +20,16 @@ public class WebappConfigDAO  extends AbstractJpaDAO<WebappConfig> {
     return super.findByParams(filterParams);
   }
 
-  public List<WebappConfig> findByConfigType(WebappConfigType configType) {
+  public List<WebappConfig> findByType(WebappConfigType type) {
     Map<String, Object> filterParams = new HashMap<>();
-    filterParams.put("configType", configType);
+    filterParams.put("type", type);
     return super.findByParams(filterParams);
   }
 
-  public List<WebappConfig> findByCollectionAndConfigType(String collection, WebappConfigType configType) {
+  public List<WebappConfig> findByCollectionAndType(String collection, WebappConfigType type) {
     Map<String, Object> filterParams = new HashMap<>();
     filterParams.put("collection", collection);
-    filterParams.put("configType", configType);
+    filterParams.put("type", type);
     return super.findByParams(filterParams);
   }
 

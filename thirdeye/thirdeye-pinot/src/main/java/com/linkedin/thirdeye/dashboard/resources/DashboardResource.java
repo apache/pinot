@@ -49,9 +49,10 @@ import com.linkedin.thirdeye.client.timeseries.TimeSeriesResponse;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesRow;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesRow.TimeSeriesMetric;
 import com.linkedin.thirdeye.dashboard.Utils;
-import com.linkedin.thirdeye.dashboard.configs.AbstractConfigDAO;
+import com.linkedin.thirdeye.dashboard.configs.AbstractConfig;
 import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
 import com.linkedin.thirdeye.dashboard.configs.DashboardConfig;
+import com.linkedin.thirdeye.dashboard.configs.WebappConfigFactory.WebappConfigType;
 import com.linkedin.thirdeye.dashboard.views.DashboardView;
 import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewHandler;
 import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewRequest;
@@ -62,6 +63,8 @@ import com.linkedin.thirdeye.dashboard.views.heatmap.HeatMapViewResponse;
 import com.linkedin.thirdeye.dashboard.views.tabular.TabularViewHandler;
 import com.linkedin.thirdeye.dashboard.views.tabular.TabularViewRequest;
 import com.linkedin.thirdeye.dashboard.views.tabular.TabularViewResponse;
+import com.linkedin.thirdeye.db.dao.WebappConfigDAO;
+import com.linkedin.thirdeye.db.entity.WebappConfig;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 @Path(value = "/dashboard")
@@ -82,9 +85,9 @@ public class DashboardResource {
   private LoadingCache<String, Long> collectionMaxDataTimeCache;
   private LoadingCache<String,String> dashboardsCache;
   private LoadingCache<String, String> dimensionFiltersCache;
-  private AbstractConfigDAO<DashboardConfig> dashboardConfigDAO;
+  private WebappConfigDAO webappConfigDAO;
 
-  public DashboardResource(AbstractConfigDAO<DashboardConfig> dashboardConfigDAO) {
+  public DashboardResource(WebappConfigDAO webappConfigDAO) {
     this.queryCache = CACHE_REGISTRY_INSTANCE.getQueryCache();
     this.collectionsCache = CACHE_REGISTRY_INSTANCE.getCollectionsCache();
     this.collectionSchemaCache = CACHE_REGISTRY_INSTANCE.getCollectionSchemaCache();
@@ -92,7 +95,7 @@ public class DashboardResource {
     this.collectionMaxDataTimeCache = CACHE_REGISTRY_INSTANCE.getCollectionMaxDataTimeCache();
     this.dashboardsCache = CACHE_REGISTRY_INSTANCE.getDashboardsCache();
     this.dimensionFiltersCache = CACHE_REGISTRY_INSTANCE.getDimensionFiltersCache();
-    this.dashboardConfigDAO = dashboardConfigDAO;
+    this.webappConfigDAO = webappConfigDAO;
   }
 
   @GET
@@ -262,7 +265,6 @@ public class DashboardResource {
 
       TabularViewRequest request = new TabularViewRequest();
       request.setCollection(collection);
-      DashboardConfig dashboardConfig;
       List<MetricExpression> metricExpressions;
       if (dashboardName == null || DEFAULT_DASHBOARD.equals(dashboardName)) {
         CollectionConfig collectionConfig = null;
@@ -283,7 +285,15 @@ public class DashboardResource {
           metricExpressions.add(new MetricExpression(metric));
         }
       } else {
-        dashboardConfig = dashboardConfigDAO.findById(collection + "_" + dashboardName);
+        List<WebappConfig> webappConfigs = webappConfigDAO
+            .findByCollectionAndType(collection, WebappConfigType.DASHBOARD_CONFIG);
+        DashboardConfig dashboardConfig = null;
+        for (WebappConfig webappConfig : webappConfigs) {
+          if (webappConfig.getName().equals(dashboardName)) {
+            dashboardConfig = AbstractConfig.fromJSON(webappConfig.getConfig(), DashboardConfig.class);
+            break;
+          }
+        }
         metricExpressions = dashboardConfig.getMetricExpressions();
       }
       request.setMetricExpressions(metricExpressions);

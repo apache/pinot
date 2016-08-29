@@ -1,12 +1,6 @@
 package com.linkedin.thirdeye.common;
 
 import io.dropwizard.Configuration;
-import io.dropwizard.db.DataSourceFactory;
-
-import javax.validation.Valid;
-import javax.validation.constraints.NotNull;
-
-import com.fasterxml.jackson.annotation.JsonProperty;
 
 public abstract class ThirdEyeConfiguration extends Configuration {
   /**

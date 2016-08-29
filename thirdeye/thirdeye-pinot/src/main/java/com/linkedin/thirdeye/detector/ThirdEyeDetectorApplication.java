@@ -85,7 +85,7 @@ public class ThirdEyeDetectorApplication
       throws Exception {
     super.initDAOs();
     try {
-      ThirdEyeCacheRegistry.initializeDetectorCaches(config);
+      ThirdEyeCacheRegistry.initializeCaches(config, webappConfigDAO);
     } catch (Exception e) {
       LOG.error("Exception while loading caches", e);
     }
