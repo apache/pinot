@@ -15,6 +15,9 @@
  */
 package com.linkedin.pinot.query.selection;
 
+import com.linkedin.pinot.common.response.broker.BrokerResponseNative;
+import com.linkedin.pinot.common.response.broker.SelectionResults;
+import com.linkedin.pinot.core.query.reduce.BrokerReduceService;
 import java.io.File;
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -40,7 +43,6 @@ import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.request.Selection;
 import com.linkedin.pinot.common.request.SelectionSort;
-import com.linkedin.pinot.common.response.BrokerResponseJSON;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.DataTable;
@@ -65,7 +67,6 @@ import com.linkedin.pinot.core.plan.Plan;
 import com.linkedin.pinot.core.plan.PlanNode;
 import com.linkedin.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import com.linkedin.pinot.core.plan.maker.PlanMaker;
-import com.linkedin.pinot.core.query.reduce.DefaultReduceService;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorService;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorUtils;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
@@ -303,28 +304,24 @@ public class SelectionQueriesForMultiValueColumnTest {
     final DataTable instanceResponse = globalPlan.getInstanceResponse();
     System.out.println("instanceResponse : " + instanceResponse);
 
-    final DefaultReduceService defaultReduceService = new DefaultReduceService();
+    final BrokerReduceService reduceService = new BrokerReduceService();
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
-    final BrokerResponseJSON brokerResponse = defaultReduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
-    System.out.println("Selection Result : " + brokerResponse.getSelectionResults());
-    System.out.println("Time used : " + brokerResponse.getTimeUsedMs());
-    System.out.println("Broker Response : " + brokerResponse);
+    final BrokerResponseNative brokerResponse = reduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
 
-    JSONObject jsonResult = brokerResponse.getSelectionResults();
-    JSONArray columnJsonArray = jsonResult.getJSONArray("columns");
-    System.out.println(columnJsonArray);
-    Assert.assertEquals(columnJsonArray.getString(0), "column2");
-    Assert.assertEquals(columnJsonArray.getString(1), "column1");
-    Assert.assertEquals(columnJsonArray.getString(2), "column5");
-    Assert.assertEquals(columnJsonArray.getString(3), "column6");
-    Assert.assertEquals(columnJsonArray.getString(4), "column7");
-    Assert.assertEquals(columnJsonArray.getString(5), "count");
+    SelectionResults selectionResults = brokerResponse.getSelectionResults();
+    List<String> columns = selectionResults.getColumns();
+    Assert.assertEquals(columns.get(0), "column2");
+    Assert.assertEquals(columns.get(1), "column1");
+    Assert.assertEquals(columns.get(2), "column5");
+    Assert.assertEquals(columns.get(3), "column6");
+    Assert.assertEquals(columns.get(4), "column7");
+    Assert.assertEquals(columns.get(5), "count");
 
-    JSONArray resultsJsonArray = jsonResult.getJSONArray("results");
-    for (int i = 0; i < resultsJsonArray.length(); ++i) {
-      JSONArray rowJsonArray = resultsJsonArray.getJSONArray(i);
-      Assert.assertEquals(rowJsonArray.getString(0), "2147434110");
+    List<Serializable[]> rows = selectionResults.getRows();
+    for (int i = 0; i < rows.size(); ++i) {
+      Serializable[] row = rows.get(i);
+      Assert.assertEquals(row[0], "2147434110");
     }
   }
 

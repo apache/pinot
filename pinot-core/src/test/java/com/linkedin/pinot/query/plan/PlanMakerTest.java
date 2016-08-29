@@ -15,9 +15,10 @@
  */
 package com.linkedin.pinot.query.plan;
 
+import com.linkedin.pinot.common.response.broker.BrokerResponseNative;
+import com.linkedin.pinot.common.response.broker.SelectionResults;
+import com.linkedin.pinot.core.query.reduce.BrokerReduceService;
 import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.PrintWriter;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -33,6 +34,7 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -42,7 +44,6 @@ import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.request.GroupBy;
 import com.linkedin.pinot.common.request.Selection;
 import com.linkedin.pinot.common.request.SelectionSort;
-import com.linkedin.pinot.common.response.BrokerResponseJSON;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.DataTable;
@@ -61,7 +62,6 @@ import com.linkedin.pinot.core.plan.PlanNode;
 import com.linkedin.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import com.linkedin.pinot.core.plan.maker.PlanMaker;
 import com.linkedin.pinot.core.query.aggregation.groupby.AggregationGroupByOperatorService;
-import com.linkedin.pinot.core.query.reduce.DefaultReduceService;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
@@ -411,10 +411,10 @@ public class PlanMakerTest {
     assertEquals(100000.0, Double.parseDouble(instanceResponse.getObject(0, 4).toString()));
     assertEquals(10, ((IntOpenHashSet) instanceResponse.getObject(0, 5)).size());
     assertEquals(100, ((IntOpenHashSet) instanceResponse.getObject(0, 6)).size());
-    DefaultReduceService reduceService = new DefaultReduceService();
+    BrokerReduceService reduceService = new BrokerReduceService();
     Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     instanceResponseMap.put(new ServerInstance("localhost:1111"), instanceResponse);
-    BrokerResponseJSON brokerResponse = reduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
+    BrokerResponseNative brokerResponse = reduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
     LOGGER.debug(brokerResponse.getAggregationResults().toString());
   }
 
@@ -528,10 +528,10 @@ public class PlanMakerTest {
       assertEquals(expectedAvgValue, ((IntOpenHashSet) resultList).size());
     }
 
-    DefaultReduceService defaultReduceService = new DefaultReduceService();
+    BrokerReduceService reduceService = new BrokerReduceService();
     Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
-    BrokerResponseJSON brokerResponse = defaultReduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
+    BrokerResponseNative brokerResponse = reduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
     LOGGER.debug(new JSONArray(brokerResponse.getAggregationResults()).toString());
     LOGGER.debug("Time used: {}", brokerResponse.getTimeUsedMs());
   }
@@ -559,21 +559,21 @@ public class PlanMakerTest {
     globalPlan.execute();
     DataTable instanceResponse = globalPlan.getInstanceResponse();
 
-    DefaultReduceService defaultReduceService = new DefaultReduceService();
+    BrokerReduceService reduceService = new BrokerReduceService();
     Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
     instanceResponseMap.put(new ServerInstance("localhost:1111"), instanceResponse);
 
-    BrokerResponseJSON brokerResponse = defaultReduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
+    BrokerResponseNative brokerResponse = reduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
     LOGGER.debug(brokerResponse.getSelectionResults().toString());
     LOGGER.debug("Time used: {}", brokerResponse.getTimeUsedMs());
     LOGGER.debug(brokerResponse.toString());
-    JSONArray selectionResultsArray = brokerResponse.getSelectionResults().getJSONArray("results");
-    for (int j = 0; j < selectionResultsArray.length(); ++j) {
-      LOGGER.debug(selectionResultsArray.getJSONArray(j).toString());
-      assertEquals(selectionResultsArray.getJSONArray(j).getInt(0), 1);
-      assertEquals(selectionResultsArray.getJSONArray(j).getInt(1), 91);
-      assertEquals(selectionResultsArray.getJSONArray(j).getInt(2) % 100, 91);
+    List<Serializable[]> rows = brokerResponse.getSelectionResults().getRows();
+    for (int i = 0; i < rows.size(); i++) {
+      Serializable[] actualValues = rows.get(i);
+      assertEquals(Double.parseDouble(actualValues[0].toString()), 1.0);
+      assertEquals(Double.parseDouble(actualValues[1].toString()), 91.0);
+      assertEquals(Double.parseDouble(actualValues[2].toString()) % 100, 91.0);
     }
   }
 
@@ -600,19 +600,19 @@ public class PlanMakerTest {
     globalPlan.execute();
     DataTable instanceResponse = globalPlan.getInstanceResponse();
 
-    DefaultReduceService defaultReduceService = new DefaultReduceService();
+    BrokerReduceService defaultReduceService = new BrokerReduceService();
     Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
     instanceResponseMap.put(new ServerInstance("localhost:1111"), instanceResponse);
 
-    BrokerResponseJSON brokerResponse = defaultReduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
+    BrokerResponseNative brokerResponse = defaultReduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
     LOGGER.debug(brokerResponse.getSelectionResults().toString());
     LOGGER.debug("TimeUsedMs: {}", brokerResponse.getTimeUsedMs());
     LOGGER.debug(brokerResponse.toString());
 
-    JSONArray selectionResultsArray = brokerResponse.getSelectionResults().getJSONArray("results");
-    for (int j = 0; j < selectionResultsArray.length(); ++j) {
-      assertEquals(selectionResultsArray.getJSONArray(j).getInt(0), 1);
+    List<Serializable[]> rows = brokerResponse.getSelectionResults().getRows();
+    for (Serializable[] row : rows) {
+      Assert.assertEquals(Double.parseDouble(row[0].toString()), 1.0);
     }
   }
 
@@ -816,16 +816,5 @@ public class PlanMakerTest {
     groupBy.setColumns(columns);
     groupBy.setTopN(15);
     return groupBy;
-  }
-
-  public static void main(String[] args) throws FileNotFoundException {
-    PrintWriter jsonFilePW = new PrintWriter("/tmp/simpleData200001.json");
-    for (int i = 0; i < 200001; ++i) {
-      String s = "{\"dim0\":" + (i % 10) + ",";
-      s += "\"dim1\":" + (i % 100) + ",";
-      s += "\"met\":" + i + "}";
-      jsonFilePW.println(s);
-    }
-    jsonFilePW.close();
   }
 }

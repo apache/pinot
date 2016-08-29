@@ -15,8 +15,9 @@
  */
 package com.linkedin.pinot.queries;
 
-import com.linkedin.pinot.common.response.BrokerResponseJSON;
+import com.linkedin.pinot.common.response.broker.BrokerResponseNative;
 import com.linkedin.pinot.core.data.manager.offline.TableDataManagerProvider;
+import com.linkedin.pinot.core.query.reduce.BrokerReduceService;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -57,7 +58,6 @@ import com.linkedin.pinot.core.data.manager.offline.FileBasedInstanceDataManager
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.utils.AvroUtils;
 import com.linkedin.pinot.core.query.executor.ServerQueryExecutorV1Impl;
-import com.linkedin.pinot.core.query.reduce.DefaultReduceService;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
 import com.linkedin.pinot.core.realtime.impl.kafka.AvroRecordToPinotRowGenerator;
 import com.linkedin.pinot.pql.parsers.Pql2Compiler;
@@ -68,7 +68,7 @@ import com.yammer.metrics.core.MetricsRegistry;
 
 public class RealtimeQueriesSentinelTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeQueriesSentinelTest.class);
-  private static ReduceService<BrokerResponseJSON> REDUCE_SERVICE = new DefaultReduceService();
+  private static ReduceService<BrokerResponseNative> REDUCE_SERVICE = new BrokerReduceService();
 
   private static final Pql2Compiler REQUEST_COMPILER = new Pql2Compiler();
 
@@ -122,10 +122,10 @@ public class RealtimeQueriesSentinelTest {
       DataTable instanceResponse = QUERY_EXECUTOR.processQuery(instanceRequest);
       instanceResponseMap.clear();
       instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
-      final BrokerResponseJSON brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
+      final BrokerResponseNative brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
       LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
       LOGGER.info("Result from avro is : " + aggCall.result);
-      Double actual = Double.parseDouble(brokerResponse.getAggregationResults().get(0).getString("value"));
+      Double actual = Double.parseDouble(brokerResponse.getAggregationResults().get(0).getValue().toString());
       Double expected = aggCall.result;
       try {
         Assert.assertEquals(actual, expected);
@@ -158,10 +158,9 @@ public class RealtimeQueriesSentinelTest {
     DataTable instanceResponse = QUERY_EXECUTOR.processQuery(instanceRequest);
     instanceResponseMap.clear();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
-    BrokerResponseJSON brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
-    JSONArray actual = brokerResponse.getAggregationResults().get(0).getJSONArray("groupByResult");
-    LOGGER.info("actual : {}", brokerResponse.getAggregationResults().get(0).toString(1));
-    LOGGER.info("expected : {}", fromAvro);
+    BrokerResponseNative brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
+    JSONArray actual =
+        brokerResponse.toJson().getJSONArray("aggregationResults").getJSONObject(0).getJSONArray("groupByResult");
     assertGroupByResults(actual, fromAvro);
   }
 
@@ -181,9 +180,9 @@ public class RealtimeQueriesSentinelTest {
       instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
       Map<Object, Double> expected = groupBy.groupResults;
       LOGGER.info("Result from avro is : " + expected);
-      BrokerResponseJSON brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
-      LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
-      JSONArray actual = brokerResponse.getAggregationResults().get(0).getJSONArray("groupByResult");
+      BrokerResponseNative brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
+      JSONArray actual =
+          brokerResponse.toJson().getJSONArray("aggregationResults").getJSONObject(0).getJSONArray("groupByResult");
       try {
         assertGroupByResults(actual, expected);
       } catch (AssertionError e) {

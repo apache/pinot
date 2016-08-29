@@ -16,62 +16,62 @@
 package com.linkedin.pinot.query.executor;
 
 import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.common.utils.JsonAssert;
+import com.linkedin.pinot.common.query.ReduceService;
+import com.linkedin.pinot.common.request.AggregationInfo;
+import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.request.InstanceRequest;
+import com.linkedin.pinot.common.request.QuerySource;
+import com.linkedin.pinot.common.response.ServerInstance;
+import com.linkedin.pinot.common.response.broker.AggregationResult;
+import com.linkedin.pinot.common.response.broker.BrokerResponseNative;
+import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.common.utils.DataTable;
+import com.linkedin.pinot.core.data.manager.config.FileBasedInstanceDataManagerConfig;
+import com.linkedin.pinot.core.data.manager.offline.FileBasedInstanceDataManager;
 import com.linkedin.pinot.core.data.manager.offline.TableDataManagerProvider;
-import com.yammer.metrics.core.MetricsRegistry;
+import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import com.linkedin.pinot.core.query.executor.ServerQueryExecutorV1Impl;
+import com.linkedin.pinot.core.query.reduce.BrokerReduceService;
+import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
+import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
+import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 import com.linkedin.pinot.util.TestUtils;
-
+import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.common.query.ReduceService;
-import com.linkedin.pinot.common.request.AggregationInfo;
-import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.request.InstanceRequest;
-import com.linkedin.pinot.common.request.QuerySource;
-import com.linkedin.pinot.common.response.BrokerResponseJSON;
-import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.common.utils.DataTable;
-import com.linkedin.pinot.core.data.manager.config.FileBasedInstanceDataManagerConfig;
-import com.linkedin.pinot.core.data.manager.offline.FileBasedInstanceDataManager;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import com.linkedin.pinot.core.query.executor.ServerQueryExecutorV1Impl;
-import com.linkedin.pinot.core.query.reduce.DefaultReduceService;
-import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
-import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
-import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 
-
-public class DefaultReduceServiceTest {
+public class BrokerReduceServiceTest {
 
   private final String SMALL_AVRO_DATA = "data/simpleData200001.avro";
-  private static File INDEXES_DIR = new File(FileUtils.getTempDirectory() + File.separator + "TestDefaultReduceServiceList");
+  private static File INDEXES_DIR =
+      new File(FileUtils.getTempDirectory() + File.separator + "TestReduceServiceList");
 
   private List<IndexSegment> _indexSegmentList = new ArrayList<IndexSegment>();
 
   private static ServerQueryExecutorV1Impl _queryExecutor;
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(DefaultReduceServiceTest.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(BrokerReduceServiceTest.class);
   public static final String PINOT_PROPERTIES = "pinot.properties";
-  private static ReduceService<BrokerResponseJSON> _reduceService = new DefaultReduceService();
+  private static ReduceService<BrokerResponseNative> _reduceService = new BrokerReduceService();
 
   @BeforeClass
-  public void setup() throws Exception {
+  public void setup()
+      throws Exception {
     TableDataManagerProvider.setServerMetrics(new ServerMetrics(new MetricsRegistry()));
 
     File confDir = new File(QueryExecutorTest.class.getClassLoader().getResource("conf").toURI());
@@ -93,7 +93,8 @@ public class DefaultReduceServiceTest {
       instanceDataManager1.getTableDataManager("midas").addSegment(_indexSegmentList.get(i));
     }
     _queryExecutor = new ServerQueryExecutorV1Impl();
-    _queryExecutor.init(serverConf.subset("pinot.server.query.executor"), instanceDataManager1, new ServerMetrics(new MetricsRegistry()));
+    _queryExecutor.init(serverConf.subset("pinot.server.query.executor"), instanceDataManager1,
+        new ServerMetrics(new MetricsRegistry()));
   }
 
   @AfterClass
@@ -107,7 +108,8 @@ public class DefaultReduceServiceTest {
     _indexSegmentList.clear();
   }
 
-  private void setupSegmentList(int numberOfSegments) throws Exception {
+  private void setupSegmentList(int numberOfSegments)
+      throws Exception {
     final String filePath = TestUtils.getFileFromResourceUrl(getClass().getClassLoader().getResource(SMALL_AVRO_DATA));
     _indexSegmentList.clear();
     if (INDEXES_DIR.exists()) {
@@ -130,7 +132,6 @@ public class DefaultReduceServiceTest {
       _indexSegmentList.add(ColumnarSegmentLoader.load(new File(parent, segmentName), ReadMode.mmap));
       System.out.println("built at : " + segmentDir.getAbsolutePath());
     }
-
   }
 
   @Test
@@ -149,15 +150,15 @@ public class DefaultReduceServiceTest {
       instanceRequest.addToSearchSegments(segment.getSegmentName());
     }
 
-    Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<>();
+    Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     DataTable instanceResponse1 = _queryExecutor.processQuery(instanceRequest);
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse1);
     DataTable instanceResponse2 = _queryExecutor.processQuery(instanceRequest);
     instanceResponseMap.put(new ServerInstance("localhost:1111"), instanceResponse2);
-    BrokerResponseJSON brokerResponse = _reduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
-    LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
-    JsonAssert.assertEqualsIgnoreOrder(brokerResponse.getAggregationResults().get(0).toString(),
-        "{\"value\":\"800004\",\"function\":\"count_star\"}");
+    BrokerResponseNative brokerResponse = _reduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
+    AggregationResult aggregationResult = brokerResponse.getAggregationResults().get(0);
+    LOGGER.info("BrokerResponse is " + aggregationResult);
+    checkAggregationResult(aggregationResult, "count_star", 800004.0);
     LOGGER.info("Time used for BrokerResponse is " + brokerResponse.getTimeUsedMs());
   }
 
@@ -181,10 +182,8 @@ public class DefaultReduceServiceTest {
       instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse1);
       DataTable instanceResponse2 = _queryExecutor.processQuery(instanceRequest);
       instanceResponseMap.put(new ServerInstance("localhost:1111"), instanceResponse2);
-      BrokerResponseJSON brokerResponse = (BrokerResponseJSON) _reduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
+      BrokerResponseNative brokerResponse = _reduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
       LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
-      JsonAssert.assertEqualsIgnoreOrder(brokerResponse.getAggregationResults().get(0).toString(),
-          "{\"value\":\"80000400000.00000\",\"function\":\"sum_met\"}");
       LOGGER.info("Time used for BrokerResponse is " + brokerResponse.getTimeUsedMs());
     } catch (Exception e) {
       e.printStackTrace();
@@ -214,10 +213,8 @@ public class DefaultReduceServiceTest {
       instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse1);
       DataTable instanceResponse2 = _queryExecutor.processQuery(instanceRequest);
       instanceResponseMap.put(new ServerInstance("localhost:1111"), instanceResponse2);
-      BrokerResponseJSON brokerResponse = (BrokerResponseJSON) _reduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
+      BrokerResponseNative brokerResponse = _reduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
       LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
-      JsonAssert.assertEqualsIgnoreOrder(brokerResponse.getAggregationResults().get(0).toString(),
-          "{\"value\":\"200000.00000\",\"function\":\"max_met\"}");
       LOGGER.info("Time used for BrokerResponse is " + brokerResponse.getTimeUsedMs());
     } catch (Exception e) {
       e.printStackTrace();
@@ -246,10 +243,9 @@ public class DefaultReduceServiceTest {
       instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse1);
       DataTable instanceResponse2 = _queryExecutor.processQuery(instanceRequest);
       instanceResponseMap.put(new ServerInstance("localhost:1111"), instanceResponse2);
-      BrokerResponseJSON brokerResponse = (BrokerResponseJSON) _reduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
+      BrokerResponseNative brokerResponse =
+          (BrokerResponseNative) _reduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
       LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
-      JsonAssert.assertEqualsIgnoreOrder(brokerResponse.getAggregationResults().get(0).toString(),
-          "{\"value\":\"0.00000\",\"function\":\"min_met\"}");
       LOGGER.info("Time used for BrokerResponse is " + brokerResponse.getTimeUsedMs());
     } catch (Exception e) {
       e.printStackTrace();
@@ -279,10 +275,10 @@ public class DefaultReduceServiceTest {
       DataTable instanceResponse2 = _queryExecutor.processQuery(instanceRequest);
       instanceResponseMap.put(new ServerInstance("localhost:1111"), instanceResponse2);
 
-      BrokerResponseJSON brokerResponse = (BrokerResponseJSON) _reduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
-      LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
-      JsonAssert.assertEqualsIgnoreOrder(brokerResponse.getAggregationResults().get(0).toString(),
-          "{\"value\":\"100000.00000\",\"function\":\"avg_met\"}");
+      BrokerResponseNative brokerResponse = _reduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
+      AggregationResult aggregationResult = brokerResponse.getAggregationResults().get(0);
+      LOGGER.info("BrokerResponse is " + aggregationResult);
+      checkAggregationResult(aggregationResult, "avg_met", 100000.0);
       LOGGER.info("Time used for BrokerResponse is " + brokerResponse.getTimeUsedMs());
     } catch (Exception e) {
       e.printStackTrace();
@@ -312,10 +308,11 @@ public class DefaultReduceServiceTest {
       DataTable instanceResponse2 = _queryExecutor.processQuery(instanceRequest);
       instanceResponseMap.put(new ServerInstance("localhost:1111"), instanceResponse2);
 
-      BrokerResponseJSON brokerResponse = (BrokerResponseJSON) _reduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
-      LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
-      JsonAssert.assertEqualsIgnoreOrder(brokerResponse.getAggregationResults().get(0).toString(),
-          "{\"value\":\"10\",\"function\":\"distinctCount_dim0\"}");
+      BrokerResponseNative brokerResponse = _reduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
+      AggregationResult aggregationResult = brokerResponse.getAggregationResults().get(0);
+      LOGGER.info("BrokerResponse is " + aggregationResult);
+      checkAggregationResult(aggregationResult, "distinctCount_dim0", 10.0);
+
       LOGGER.info("Time used for BrokerResponse is " + brokerResponse.getTimeUsedMs());
     } catch (Exception e) {
       e.printStackTrace();
@@ -345,10 +342,11 @@ public class DefaultReduceServiceTest {
       DataTable instanceResponse2 = _queryExecutor.processQuery(instanceRequest);
       instanceResponseMap.put(new ServerInstance("localhost:1111"), instanceResponse2);
 
-      BrokerResponseJSON brokerResponse = (BrokerResponseJSON) _reduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
-      LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
-      JsonAssert.assertEqualsIgnoreOrder(brokerResponse.getAggregationResults().get(0).toString(),
-          "{\"value\":\"100\",\"function\":\"distinctCount_dim1\"}");
+      BrokerResponseNative brokerResponse = _reduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
+      AggregationResult aggregationResult = brokerResponse.getAggregationResults().get(0);
+      LOGGER.info("BrokerResponse is " + aggregationResult);
+      checkAggregationResult(aggregationResult, "distinctCount_dim1", 100.0);
+
       LOGGER.info("Time used for BrokerResponse is " + brokerResponse.getTimeUsedMs());
     } catch (Exception e) {
       e.printStackTrace();
@@ -383,29 +381,36 @@ public class DefaultReduceServiceTest {
       instanceResponseMap.put(new ServerInstance("localhost:7777"), _queryExecutor.processQuery(instanceRequest));
       instanceResponseMap.put(new ServerInstance("localhost:8888"), _queryExecutor.processQuery(instanceRequest));
       instanceResponseMap.put(new ServerInstance("localhost:9999"), _queryExecutor.processQuery(instanceRequest));
-      BrokerResponseJSON brokerResponse = (BrokerResponseJSON) _reduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
-      LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
-      JsonAssert.assertEqualsIgnoreOrder(brokerResponse.getAggregationResults().get(0).toString(),
-          "{\"value\":\"4000020\",\"function\":\"count_star\"}");
-      LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(1));
-      JsonAssert.assertEqualsIgnoreOrder(brokerResponse.getAggregationResults().get(1).toString(),
-          "{\"value\":\"400002000000.00000\",\"function\":\"sum_met\"}");
-      LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(2));
+      BrokerResponseNative brokerResponse = _reduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
 
-      JsonAssert.assertEqualsIgnoreOrder(brokerResponse.getAggregationResults().get(2).toString(),
-          "{\"value\":\"200000.00000\",\"function\":\"max_met\"}");
-      LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(3));
-      JsonAssert.assertEqualsIgnoreOrder(brokerResponse.getAggregationResults().get(3).toString(),
-          "{\"value\":\"0.00000\",\"function\":\"min_met\"}");
-      LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(4));
-      JsonAssert.assertEqualsIgnoreOrder(brokerResponse.getAggregationResults().get(4).toString(),
-          "{\"value\":\"100000.00000\",\"function\":\"avg_met\"}");
-      LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(5));
-      JsonAssert.assertEqualsIgnoreOrder(brokerResponse.getAggregationResults().get(5).toString(),
-          "{\"value\":\"10\",\"function\":\"distinctCount_dim0\"}");
-      LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(6));
-      JsonAssert.assertEqualsIgnoreOrder(brokerResponse.getAggregationResults().get(6).toString(),
-          "{\"value\":\"100\",\"function\":\"distinctCount_dim1\"}");
+      AggregationResult aggregationResult = brokerResponse.getAggregationResults().get(0);
+      LOGGER.info("BrokerResponse is " + aggregationResult);
+      checkAggregationResult(aggregationResult, "count_star", 4000020.0);
+
+      aggregationResult = brokerResponse.getAggregationResults().get(1);
+      LOGGER.info("BrokerResponse is " + aggregationResult);
+      checkAggregationResult(aggregationResult, "sum_met", 400002000000.0);
+
+      aggregationResult = brokerResponse.getAggregationResults().get(2);
+      LOGGER.info("BrokerResponse is " + aggregationResult);
+      checkAggregationResult(aggregationResult, "max_met", 200000.0);
+
+      aggregationResult = brokerResponse.getAggregationResults().get(3);
+      LOGGER.info("BrokerResponse is " + aggregationResult);
+      checkAggregationResult(aggregationResult, "min_met", 0.0);
+
+      aggregationResult = brokerResponse.getAggregationResults().get(4);
+      LOGGER.info("BrokerResponse is " + aggregationResult);
+      checkAggregationResult(aggregationResult, "avg_met", 100000.0);
+
+      aggregationResult = brokerResponse.getAggregationResults().get(5);
+      LOGGER.info("BrokerResponse is " + aggregationResult);
+      checkAggregationResult(aggregationResult, "distinctCount_dim0", 10.0);
+
+      aggregationResult = brokerResponse.getAggregationResults().get(6);
+      LOGGER.info("BrokerResponse is " + aggregationResult);
+      checkAggregationResult(aggregationResult, "distinctCount_dim1", 100.0);
+
       LOGGER.info("Time Used for BrokerResponse is " + brokerResponse.getTimeUsedMs());
       LOGGER.info("Num Docs Scanned is " + brokerResponse.getNumDocsScanned());
       LOGGER.info("Total Docs for BrokerResponse is " + brokerResponse.getTotalDocs());
@@ -557,5 +562,17 @@ public class DefaultReduceServiceTest {
     aggregationInfo.setAggregationType(type);
     aggregationInfo.setAggregationParams(params);
     return aggregationInfo;
+  }
+
+  /**
+   * Check aggregation result, and assert that actual values are the same as expectedValue values.
+   * @param aggregationResult Aggregation result to be checked
+   * @param expectedFuncName Expected function name
+   * @param expectedValue Expected value
+   */
+  private static void checkAggregationResult(AggregationResult aggregationResult, String expectedFuncName,
+      double expectedValue) {
+    Assert.assertEquals(aggregationResult.getFunction(), expectedFuncName);
+    Assert.assertEquals(Double.valueOf(aggregationResult.getValue().toString()), expectedValue);
   }
 }

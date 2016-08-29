@@ -19,8 +19,9 @@ import com.linkedin.pinot.common.query.ReduceService;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.FilterOperator;
-import com.linkedin.pinot.common.response.BrokerResponseJSON;
 import com.linkedin.pinot.common.response.ServerInstance;
+import com.linkedin.pinot.common.response.broker.AggregationResult;
+import com.linkedin.pinot.common.response.broker.BrokerResponseNative;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.common.utils.NamedThreadFactory;
@@ -45,7 +46,7 @@ import com.linkedin.pinot.core.plan.PlanNode;
 import com.linkedin.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import com.linkedin.pinot.core.plan.maker.PlanMaker;
 import com.linkedin.pinot.core.query.aggregation.CombineService;
-import com.linkedin.pinot.core.query.reduce.DefaultReduceService;
+import com.linkedin.pinot.core.query.reduce.BrokerReduceService;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
@@ -62,7 +63,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
-import org.json.JSONArray;
 import org.json.JSONException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -246,7 +246,7 @@ public class AggregationQueriesTest {
 
   private void logReducedResults(IntermediateResultsBlock resultBlock)
       throws Exception {
-    final ReduceService reduceService = new DefaultReduceService();
+    final ReduceService reduceService = new BrokerReduceService();
 
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), resultBlock.getAggregationResultDataTable());
@@ -259,8 +259,8 @@ public class AggregationQueriesTest {
     instanceResponseMap.put(new ServerInstance("localhost:7777"), resultBlock.getAggregationResultDataTable());
     instanceResponseMap.put(new ServerInstance("localhost:8888"), resultBlock.getAggregationResultDataTable());
     instanceResponseMap.put(new ServerInstance("localhost:9999"), resultBlock.getAggregationResultDataTable());
-    final BrokerResponseJSON reducedResults =
-        (BrokerResponseJSON) reduceService.reduceOnDataTable(getAggregationNoFilterBrokerRequest(), instanceResponseMap);
+    final BrokerResponseNative reducedResults =
+        (BrokerResponseNative) reduceService.reduceOnDataTable(getAggregationNoFilterBrokerRequest(), instanceResponseMap);
 
     LOGGER.debug("Reduced Result : {}", reducedResults);
   }
@@ -295,52 +295,50 @@ public class AggregationQueriesTest {
     final DataTable instanceResponse = globalPlan.getInstanceResponse();
     LOGGER.debug("Instance Response : {}", instanceResponse);
 
-    final DefaultReduceService defaultReduceService = new DefaultReduceService();
+    final BrokerReduceService reduceService = new BrokerReduceService();
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
-    final BrokerResponseJSON brokerResponse = defaultReduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
-    LOGGER.debug("Result : {}", new JSONArray(brokerResponse.getAggregationResults()));
-    LOGGER.debug("Time used : {}", brokerResponse.getTimeUsedMs());
+    final BrokerResponseNative brokerResponse = reduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
     assertBrokerResponse(numSegments, brokerResponse);
   }
 
-  private void assertBrokerResponse(int numSegments, BrokerResponseJSON brokerResponse) throws JSONException {
+  private void assertBrokerResponse(int numSegments, BrokerResponseNative brokerResponse) throws JSONException {
     Assert.assertEquals(10001 * numSegments, brokerResponse.getNumDocsScanned());
     Assert.assertEquals(_numAggregations, brokerResponse.getAggregationResults().size());
 
     // Assertion on Count
-    Assert.assertEquals("count_star", brokerResponse.getAggregationResults().get(0).getString("function").toString());
-    Assert.assertEquals(10001 * numSegments,
-        Integer.parseInt(brokerResponse.getAggregationResults().get(0).getString("value")));
+    AggregationResult aggregationResult = brokerResponse.getAggregationResults().get(0);
+    Assert.assertEquals(aggregationResult.getFunction(), "count_star");
+    Assert.assertEquals(Integer.parseInt(aggregationResult.getValue().toString()), 10001 * numSegments);
 
-    Assert.assertEquals("sum_met_impressionCount", brokerResponse.getAggregationResults().get(1).getString("function")
-        .toString());
+    aggregationResult = brokerResponse.getAggregationResults().get(1);
+    Assert.assertEquals(aggregationResult.getFunction(), "sum_met_impressionCount");
 
-    Assert.assertEquals(0, DoubleComparisonUtil.defaultDoubleCompare(1343930646015719300000000.00000,
-        Double.parseDouble(brokerResponse.getAggregationResults().get(1).getString("value"))));
+    Assert.assertEquals(DoubleComparisonUtil.defaultDoubleCompare(1343930646015719300000000.00000,
+        Double.parseDouble(aggregationResult.getValue().toString())), 0);
 
-    Assert.assertEquals("max_met_impressionCount", brokerResponse.getAggregationResults().get(2).getString("function")
-        .toString());
-    Assert.assertEquals(0, DoubleComparisonUtil.defaultDoubleCompare(8637957270245934100.0,
-        Double.parseDouble(brokerResponse.getAggregationResults().get(2).getString("value"))));
+    aggregationResult = brokerResponse.getAggregationResults().get(2);
+    Assert.assertEquals(aggregationResult.getFunction(), "max_met_impressionCount");
+    Assert.assertEquals(DoubleComparisonUtil.defaultDoubleCompare(8637957270245934100.0,
+        Double.parseDouble(aggregationResult.getValue().toString())), 0);
 
-    Assert.assertEquals("min_met_impressionCount", brokerResponse.getAggregationResults().get(3).getString("function")
-        .toString());
-    Assert.assertEquals(0, DoubleComparisonUtil.defaultDoubleCompare(614819680033322500.0,
-        Double.parseDouble(brokerResponse.getAggregationResults().get(3).getString("value"))));
+    aggregationResult = brokerResponse.getAggregationResults().get(3);
+    Assert.assertEquals(aggregationResult.getFunction(), "min_met_impressionCount");
+    Assert.assertEquals(DoubleComparisonUtil.defaultDoubleCompare(614819680033322500.0,
+        Double.parseDouble(aggregationResult.getValue().toString())), 0);
 
-    Assert.assertEquals("avg_met_impressionCount", brokerResponse.getAggregationResults().get(4).getString("function")
-        .toString());
-    Assert.assertEquals(0, DoubleComparisonUtil.defaultDoubleCompare(6718981331945402400.0,
-        Double.parseDouble(brokerResponse.getAggregationResults().get(4).getString("value"))));
+    aggregationResult = brokerResponse.getAggregationResults().get(4);
+    Assert.assertEquals(aggregationResult.getFunction(), "avg_met_impressionCount");
+    Assert.assertEquals(DoubleComparisonUtil.defaultDoubleCompare(6718981331945402400.0,
+        Double.parseDouble(aggregationResult.getValue().toString())), 0);
 
-    Assert.assertEquals("distinctCount_column12",
-        brokerResponse.getAggregationResults().get(5).getString("function").toString());
-    Assert.assertEquals(146, Integer.parseInt(brokerResponse.getAggregationResults().get(5).getString("value")));
+    aggregationResult = brokerResponse.getAggregationResults().get(5);
+    Assert.assertEquals(aggregationResult.getFunction(), "distinctCount_column12");
+    Assert.assertEquals(Integer.parseInt(aggregationResult.getValue().toString()), 146);
 
-    Assert.assertEquals("distinctCount_met_impressionCount",
-        brokerResponse.getAggregationResults().get(6).getString("function").toString());
-    Assert.assertEquals(21, Integer.parseInt(brokerResponse.getAggregationResults().get(6).getString("value")));
+    aggregationResult = brokerResponse.getAggregationResults().get(6);
+    Assert.assertEquals(aggregationResult. getFunction(), "distinctCount_met_impressionCount");
+    Assert.assertEquals(Integer.parseInt(aggregationResult.getValue().toString()), 21);
 
   }
 

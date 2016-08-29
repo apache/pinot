@@ -53,12 +53,6 @@ public interface BrokerResponse {
       throws Exception;
 
   /**
-   * Return the responseType to indicate the implementation class.
-   * @return
-   */
-  BrokerResponseFactory.ResponseType getResponseType();
-
-  /**
    * Return the number of documents scanned when processing the query.
    * @return
    */

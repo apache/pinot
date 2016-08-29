@@ -29,7 +29,6 @@ public class BrokerResponseFactory {
    * Enum for broker response types.
    */
   public enum ResponseType {
-    BROKER_RESPONSE_TYPE_JSON,
     BROKER_RESPONSE_TYPE_NATIVE
   }
 
@@ -45,9 +44,7 @@ public class BrokerResponseFactory {
    * @return
    */
   public static BrokerResponse get(ResponseType brokerResponseType) {
-    if (brokerResponseType.equals(ResponseType.BROKER_RESPONSE_TYPE_JSON)) {
-      return new BrokerResponseJSON();
-    } else if (brokerResponseType.equals(ResponseType.BROKER_RESPONSE_TYPE_NATIVE)) {
+    if (brokerResponseType.equals(ResponseType.BROKER_RESPONSE_TYPE_NATIVE)) {
       return new BrokerResponseNative();
     } else {
       throw new IllegalArgumentException(ILLEGAL_RESPONSE_TYPE);
@@ -56,7 +53,7 @@ public class BrokerResponseFactory {
 
   /**
    * Given a brokerRequest JSONObject, return the requested enum ResponseType
-   * - If request does not have responseType property, return the default value of ResponseType.BROKER_RESPONSE_JSON
+   * - If request does not have responseType property, return the default value of ResponseType.BROKER_RESPONSE_NATIVE
    * - If requested responseType property does not match enum values, throws IllegalArgumentException.
    * - If JSONObject cannot be parsed, throws JSONException.
    *
@@ -67,7 +64,7 @@ public class BrokerResponseFactory {
   public static ResponseType getResponseType(JSONObject brokerRequest)
       throws JSONException {
     if (!brokerRequest.has((BROKER_RESPONSE_TYPE_KEY))) {
-      return ResponseType.BROKER_RESPONSE_TYPE_JSON;
+      return ResponseType.BROKER_RESPONSE_TYPE_NATIVE;
     }
 
     return ResponseType.valueOf(brokerRequest.get(BROKER_RESPONSE_TYPE_KEY).toString());
@@ -75,16 +72,14 @@ public class BrokerResponseFactory {
 
   /**
    * Given a responseType string, return the appropriate enum ResponseType.
-   * If the input string is null, return the default BROKER_RESPONSE_TYPE_JSON.
+   * If the input string is null, return the default BROKER_RESPONSE_TYPE_NATIVE.
    * If input string cannot be mapped to enum field, throws an IllegalArgumentException
    *
    * @param responseType
    * @return
    */
   public static ResponseType getResponseType(String responseType) {
-    if (responseType == null || responseType.equalsIgnoreCase(ResponseType.BROKER_RESPONSE_TYPE_JSON.name())) {
-      return ResponseType.BROKER_RESPONSE_TYPE_JSON;
-    } else if (responseType.equalsIgnoreCase(ResponseType.BROKER_RESPONSE_TYPE_NATIVE.name())) {
+    if (responseType == null || (responseType.equalsIgnoreCase(ResponseType.BROKER_RESPONSE_TYPE_NATIVE.name()))) {
       return ResponseType.BROKER_RESPONSE_TYPE_NATIVE;
     } else {
       throw new IllegalArgumentException("Illegal response type string " + responseType);
@@ -100,8 +95,6 @@ public class BrokerResponseFactory {
   public static BrokerResponse getNoTableHitBrokerResponse(ResponseType brokerResponseType) {
     if (brokerResponseType.equals(ResponseType.BROKER_RESPONSE_TYPE_NATIVE)) {
       return BrokerResponseNative.NO_TABLE_RESULT;
-    } else if (brokerResponseType.equals(ResponseType.BROKER_RESPONSE_TYPE_JSON)) {
-      return BrokerResponseJSON.NO_TABLE_RESULT;
     } else {
       throw new RuntimeException(ILLEGAL_RESPONSE_TYPE);
     }
@@ -115,8 +108,6 @@ public class BrokerResponseFactory {
   public static BrokerResponse getEmptyBrokerResponse(ResponseType brokerResponseType) {
     if (brokerResponseType.equals(ResponseType.BROKER_RESPONSE_TYPE_NATIVE)) {
       return BrokerResponseNative.EMPTY_RESULT;
-    } else if (brokerResponseType.equals(ResponseType.BROKER_RESPONSE_TYPE_JSON)) {
-      return BrokerResponseJSON.EMPTY_RESULT;
     } else {
       throw new RuntimeException(ILLEGAL_RESPONSE_TYPE);
     }

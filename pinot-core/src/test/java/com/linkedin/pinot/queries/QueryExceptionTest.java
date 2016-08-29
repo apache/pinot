@@ -15,8 +15,9 @@
  */
 package com.linkedin.pinot.queries;
 
-import com.linkedin.pinot.common.response.BrokerResponseJSON;
+import com.linkedin.pinot.common.response.broker.BrokerResponseNative;
 import com.linkedin.pinot.core.data.manager.offline.TableDataManagerProvider;
+import com.linkedin.pinot.core.query.reduce.BrokerReduceService;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -47,7 +48,6 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.query.executor.ServerQueryExecutorV1Impl;
-import com.linkedin.pinot.core.query.reduce.DefaultReduceService;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import com.linkedin.pinot.pql.parsers.Pql2Compiler;
@@ -58,7 +58,7 @@ import com.yammer.metrics.core.MetricsRegistry;
 
 public class QueryExceptionTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueriesSentinelTest.class);
-  private static ReduceService<BrokerResponseJSON> REDUCE_SERVICE = new DefaultReduceService();
+  private static ReduceService<BrokerResponseNative> REDUCE_SERVICE = new BrokerReduceService();
 
   private static final Pql2Compiler REQUEST_COMPILER = new Pql2Compiler();
   private final String AVRO_DATA = "data/test_data-mv.avro";
@@ -131,7 +131,7 @@ public class QueryExceptionTest {
     final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(instanceRequest);
     instanceResponseMap.clear();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
-    final BrokerResponseJSON brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
+    final BrokerResponseNative brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
     LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
   }
 
@@ -147,7 +147,7 @@ public class QueryExceptionTest {
     final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(instanceRequest);
     instanceResponseMap.clear();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
-    final BrokerResponseJSON brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
+    final BrokerResponseNative brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
     LOGGER.info("BrokerResponse is {}", brokerResponse);
     Assert.assertTrue(brokerResponse.getExceptionsSize() > 0);
   }
@@ -164,7 +164,7 @@ public class QueryExceptionTest {
     final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(instanceRequest);
     instanceResponseMap.clear();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
-    final BrokerResponseJSON brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
+    final BrokerResponseNative brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
     LOGGER.info("BrokerResponse is {}", brokerResponse);
     Assert.assertTrue(brokerResponse.getExceptionsSize() > 0);
   }
@@ -181,7 +181,7 @@ public class QueryExceptionTest {
     final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(instanceRequest);
     instanceResponseMap.clear();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
-    final BrokerResponseJSON brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
+    final BrokerResponseNative brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
     LOGGER.info("BrokerResponse is {}", brokerResponse);
     Assert.assertEquals(brokerResponse.getExceptionsSize(), 1);
   }

@@ -15,6 +15,10 @@
  */
 package com.linkedin.pinot.query.aggregation;
 
+import com.linkedin.pinot.common.response.broker.AggregationResult;
+import com.linkedin.pinot.common.response.broker.BrokerResponseNative;
+import com.linkedin.pinot.common.response.broker.GroupByResult;
+import com.linkedin.pinot.core.query.reduce.BrokerReduceService;
 import java.io.File;
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -38,7 +42,6 @@ import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.request.GroupBy;
-import com.linkedin.pinot.common.response.BrokerResponseJSON;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.DataTable;
@@ -66,7 +69,6 @@ import com.linkedin.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import com.linkedin.pinot.core.plan.maker.PlanMaker;
 import com.linkedin.pinot.core.query.aggregation.CombineService;
 import com.linkedin.pinot.core.query.aggregation.groupby.AggregationGroupByOperatorService;
-import com.linkedin.pinot.core.query.reduce.DefaultReduceService;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
@@ -379,13 +381,10 @@ public class AggregationGroupByWithDictionaryOperatorForMultiValueTest {
     LOGGER.debug("instanceResponse: {}", instanceResponse);
     LOGGER.debug("timeUsedMs : {}", instanceResponse.getMetadata().get("timeUsedMs"));
 
-    final DefaultReduceService defaultReduceService = new DefaultReduceService();
+    final BrokerReduceService reduceService = new BrokerReduceService();
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
-    final BrokerResponseJSON brokerResponse = defaultReduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
-    LOGGER.debug("Aggregation Results : {}", new JSONArray(brokerResponse.getAggregationResults()));
-    LOGGER.debug("Time used : {}", brokerResponse.getTimeUsedMs());
-
+    final BrokerResponseNative brokerResponse = reduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
     assertBrokerResponse(numSegments, brokerResponse);
   }
 
@@ -403,67 +402,68 @@ public class AggregationGroupByWithDictionaryOperatorForMultiValueTest {
     final DataTable instanceResponse = globalPlan.getInstanceResponse();
     LOGGER.debug("instanceResponse: {}", instanceResponse);
 
-    final DefaultReduceService defaultReduceService = new DefaultReduceService();
+    final BrokerReduceService reduceService = new BrokerReduceService();
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
-    final BrokerResponseJSON brokerResponse = defaultReduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
-    LOGGER.debug("Aggregation Results : {}", new JSONArray(brokerResponse.getAggregationResults()));
-    LOGGER.debug("Time used : {}", brokerResponse.getTimeUsedMs());
+    final BrokerResponseNative brokerResponse = reduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
     assertEmptyBrokerResponse(brokerResponse);
   }
 
-  private void assertBrokerResponse(int numSegments, BrokerResponseJSON brokerResponse) throws JSONException {
+  private void assertBrokerResponse(int numSegments, BrokerResponseNative brokerResponse) throws JSONException {
     Assert.assertEquals(100000 * numSegments, brokerResponse.getNumDocsScanned());
     final int groupSize = 15;
     verifyResponse(brokerResponse, groupSize);
 
     // Assertion on Aggregation Results
-    final List<double[]> aggregationResult = getAggregationResult(numSegments);
-    final List<String[]> groupByResult = getGroupResult();
+    final List<double[]> expectedAggregationResults = getAggregationResult(numSegments);
+    final List<String[]> expectedGroupByResults = getGroupResult();
     for (int j = 0; j < _numAggregations; ++j) {
       LOGGER.debug("For aggregation function: {}", _aggregationInfos.get(j));
-      final double[] aggResult = aggregationResult.get(j);
-      final String[] groupResult = groupByResult.get(j);
+      final double[] expectedAggregationResult = expectedAggregationResults.get(j);
+      final String[] expectedGroupByResult = expectedGroupByResults.get(j);
       for (int i = 0; i < 15; ++i) {
         LOGGER.debug("Comparing group: {}", i);
-        Assert.assertEquals(0, DoubleComparisonUtil.defaultDoubleCompare(aggResult[i],
-            brokerResponse.getAggregationResults().get(j).getJSONArray("groupByResult").getJSONObject(i).getDouble("value")));
-        if (groupResult.length < 2) {
+        AggregationResult actualAggregationResult = brokerResponse.getAggregationResults().get(j);
+        GroupByResult actualGroupByResult = actualAggregationResult.getGroupByResult().get(i);
+        Assert.assertEquals(0, DoubleComparisonUtil.defaultDoubleCompare(expectedAggregationResult[i],
+            Double.valueOf(actualGroupByResult.getValue().toString())));
+        if (expectedGroupByResult.length < 2) {
           continue;
         }
-        if ((i < 14 && aggResult[i] == aggResult[i + 1]) || (i > 0 && aggResult[i] == aggResult[i - 1])) {
+        if ((i < 14 && expectedAggregationResult[i] == expectedAggregationResult[i + 1]) || (i > 0
+            && expectedAggregationResult[i] == expectedAggregationResult[i - 1])) {
           //do nothing, as we have multiple groups within same value.
         } else {
-          Assert.assertEquals(
-              groupResult[i],
-              brokerResponse.getAggregationResults().get(j).getJSONArray("groupByResult").getJSONObject(i)
-                  .getString("group"));
+          JSONArray actualGroup = new JSONArray(actualGroupByResult.getGroup());
+          Assert.assertEquals(actualGroup.toString(), expectedGroupByResult[i]);
         }
       }
     }
 
   }
 
-  private void verifyResponse(BrokerResponseJSON brokerResponse, int groupSize)
+  private void verifyResponse(BrokerResponseNative brokerResponse, int groupSize)
       throws JSONException {
     Assert.assertEquals(_numAggregations, brokerResponse.getAggregationResults().size());
     for (int i = 0; i < _numAggregations; ++i) {
-      Assert.assertEquals("[\"column7\",\"column6\"]", brokerResponse.getAggregationResults().get(i)
-          .getJSONArray("groupByColumns").toString());
-      Assert.assertEquals(groupSize, brokerResponse.getAggregationResults().get(i).getJSONArray("groupByResult").length());
+      AggregationResult aggregationResult = brokerResponse.getAggregationResults().get(i);
+      List<String> groupByColumns = aggregationResult.getGroupByColumns();
+      Assert.assertEquals(groupByColumns.size(), 2);
+      Assert.assertTrue(groupByColumns.contains("column6"));
+      Assert.assertTrue(groupByColumns.contains("column7"));
+      Assert.assertEquals(aggregationResult.getGroupByResult().size(), groupSize);
     }
 
-    // Assertion on Count
-    Assert.assertEquals("count_star", brokerResponse.getAggregationResults().get(0).getString("function").toString());
-    Assert.assertEquals("sum_count", brokerResponse.getAggregationResults().get(1).getString("function").toString());
-    Assert.assertEquals("max_count", brokerResponse.getAggregationResults().get(2).getString("function").toString());
-    Assert.assertEquals("min_count", brokerResponse.getAggregationResults().get(3).getString("function").toString());
-    Assert.assertEquals("avg_count", brokerResponse.getAggregationResults().get(4).getString("function").toString());
-    Assert.assertEquals("distinctCount_column2", brokerResponse.getAggregationResults().get(5).getString("function")
-        .toString());
+    // Assertion on function names
+    Assert.assertEquals(brokerResponse.getAggregationResults().get(0).getFunction(), "count_star");
+    Assert.assertEquals(brokerResponse.getAggregationResults().get(1).getFunction(), "sum_count");
+    Assert.assertEquals(brokerResponse.getAggregationResults().get(2).getFunction(), "max_count");
+    Assert.assertEquals(brokerResponse.getAggregationResults().get(3).getFunction(), "min_count");
+    Assert.assertEquals(brokerResponse.getAggregationResults().get(4).getFunction(), "avg_count");
+    Assert.assertEquals(brokerResponse.getAggregationResults().get(5).getFunction(), "distinctCount_column2");
   }
 
-  private void assertEmptyBrokerResponse(BrokerResponseJSON brokerResponse) throws JSONException {
+  private void assertEmptyBrokerResponse(BrokerResponseNative brokerResponse) throws JSONException {
     Assert.assertEquals(0, brokerResponse.getNumDocsScanned());
     final int groupSize = 0;
     verifyResponse(brokerResponse, groupSize);

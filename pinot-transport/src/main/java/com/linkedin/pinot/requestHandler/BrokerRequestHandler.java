@@ -234,7 +234,7 @@ public class BrokerRequestHandler {
 
     if (request.getQuerySource() == null || request.getQuerySource().getTableName() == null) {
       LOGGER.info("Query contains null table.");
-      return BrokerResponseFactory.getNoTableHitBrokerResponse(responseType);
+      return new BrokerResponseNative();
     }
 
     List<String> matchedTables = getMatchedTables(request);

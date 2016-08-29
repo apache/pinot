@@ -27,7 +27,6 @@ import com.linkedin.pinot.common.query.ReduceServiceRegistry;
 import com.linkedin.pinot.common.response.BrokerResponseFactory;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.core.query.reduce.BrokerReduceService;
-import com.linkedin.pinot.core.query.reduce.DefaultReduceService;
 import com.linkedin.pinot.requestHandler.BrokerRequestHandler;
 import com.linkedin.pinot.routing.CfgBasedRouting;
 import com.linkedin.pinot.routing.HelixExternalViewBasedRouting;
@@ -196,14 +195,11 @@ public class BrokerServerBuilder {
    */
   private ReduceServiceRegistry buildReduceServiceRegistry() {
     ReduceServiceRegistry reduceServiceRegistry = new ReduceServiceRegistry();
-
-    DefaultReduceService defaultReduceService = new DefaultReduceService();
-    reduceServiceRegistry.register(BrokerResponseFactory.ResponseType.BROKER_RESPONSE_TYPE_JSON,
-        new DefaultReduceService());
+    BrokerReduceService reduceService = new BrokerReduceService();
     reduceServiceRegistry.register(BrokerResponseFactory.ResponseType.BROKER_RESPONSE_TYPE_NATIVE,
-        new BrokerReduceService());
+        reduceService);
 
-    reduceServiceRegistry.registerDefault(defaultReduceService);
+    reduceServiceRegistry.registerDefault(reduceService);
     return reduceServiceRegistry;
   }
 
