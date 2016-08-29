@@ -38,10 +38,8 @@ import com.linkedin.thirdeye.client.timeseries.TimeSeriesRequest;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesResponse;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesResponseConverter;
 import com.linkedin.thirdeye.dashboard.Utils;
-import com.linkedin.thirdeye.db.entity.AnomalyFunctionRelation;
 import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
 import com.linkedin.thirdeye.db.entity.AnomalyResult;
-import com.linkedin.thirdeye.db.dao.AnomalyFunctionRelationDAO;
 import com.linkedin.thirdeye.detector.function.AnomalyFunction;
 import com.linkedin.thirdeye.detector.lib.util.JobUtils;
 
@@ -54,13 +52,11 @@ public class AnomalyDetectionJob implements Job {
   public static final String WINDOW_END = "WINDOW_END";
   public static final String WINDOW_START = "WINDOW_START";
   public static final String METRIC_REGISTRY = "METRIC_REGISTRY";
-  public static final String RELATION_DAO = "RELATION_DAO";
 
   private AnomalyFunction anomalyFunction;
   private TimeSeriesHandler timeSeriesHandler;
   private TimeSeriesResponseConverter timeSeriesResponseConverter;
   private AnomalyResultDAO resultDAO;
-  private AnomalyFunctionRelationDAO relationDAO;
   private MetricRegistry metricRegistry;
   private Histogram histogram;
   private String collection;
@@ -111,8 +107,6 @@ public class AnomalyDetectionJob implements Job {
         (TimeSeriesResponseConverter) context.getJobDetail().getJobDataMap()
             .get(TIME_SERIES_RESPONSE_CONVERTER);
     resultDAO = (AnomalyResultDAO) context.getJobDetail().getJobDataMap().get(RESULT_DAO);
-    relationDAO =
-        (AnomalyFunctionRelationDAO) context.getJobDetail().getJobDataMap().get(RELATION_DAO);
     metricRegistry = (MetricRegistry) context.getJobDetail().getJobDataMap().get(METRIC_REGISTRY);
     String windowEndProp = context.getJobDetail().getJobDataMap().getString(WINDOW_END);
     String windowStartProp = context.getJobDetail().getJobDataMap().getString(WINDOW_START);
@@ -293,15 +287,6 @@ public class AnomalyDetectionJob implements Job {
     results.addAll(resultDAO
         .findAllByTimeAndFunctionId(windowStart.getMillis(), windowEnd.getMillis(),
             anomalyFunction.getSpec().getId()));
-
-    // The ones for any related functions
-    List<AnomalyFunctionRelation> relations =
-        relationDAO.findByParent(anomalyFunction.getSpec().getId());
-    for (AnomalyFunctionRelation relation : relations) {
-      results.addAll(resultDAO
-          .findAllByTimeAndFunctionId(windowStart.getMillis(), windowEnd.getMillis(),
-              relation.getChildId()));
-    }
     return results;
   }
 

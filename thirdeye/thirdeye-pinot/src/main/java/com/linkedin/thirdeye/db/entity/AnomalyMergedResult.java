@@ -50,6 +50,9 @@ public class AnomalyMergedResult extends AbstractBaseEntity implements Comparabl
   @Column(name = "message")
   private String message;
 
+  @Column(name = "notified")
+  private boolean notified;
+
   @OneToOne(cascade = CascadeType.ALL, fetch = FetchType.EAGER, orphanRemoval = true)
   @JoinColumn(name = "anomaly_feedback_id")
   private AnomalyFeedback feedback;
@@ -125,6 +128,14 @@ public class AnomalyMergedResult extends AbstractBaseEntity implements Comparabl
 
   public void setAnomalyResults(List<AnomalyResult> anomalyResults) {
     this.anomalyResults = anomalyResults;
+  }
+
+  public boolean isNotified() {
+    return notified;
+  }
+
+  public void setNotified(boolean notified) {
+    this.notified = notified;
   }
 
   public String getCollection() {

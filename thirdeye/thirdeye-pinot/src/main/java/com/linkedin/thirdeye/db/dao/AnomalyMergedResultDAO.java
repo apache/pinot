@@ -40,9 +40,9 @@ public class AnomalyMergedResultDAO extends AbstractJpaDAO<AnomalyMergedResult> 
   private static final String FIND_BY_TIME =
       "from AnomalyMergedResult r WHERE (r.startTime < :endTime and r.endTime > :startTime) order by r.endTime desc ";
 
-  private static final String FIND_BY_TIME_EMAIL =
+  private static final String FIND_BY_TIME_EMAIL_NOTIFIED_FALSE =
       "SELECT r FROM EmailConfiguration d JOIN d.functions f, AnomalyMergedResult r "
-          + "WHERE r.function.id=f.id AND d.id = :emailId "
+          + "WHERE r.function.id=f.id AND d.id = :emailId and r.notified=false "
           + "and (r.startTime < :endTime and r.endTime > :startTime) order by r.endTime desc ";
 
   public AnomalyMergedResultDAO() {
@@ -56,8 +56,8 @@ public class AnomalyMergedResultDAO extends AbstractJpaDAO<AnomalyMergedResult> 
   }
 
   @Transactional
-  public List<AnomalyMergedResult> getAllByTimeEmailId(long startTime, long endTime, long emailId) {
-    return getEntityManager().createQuery(FIND_BY_TIME_EMAIL, entityClass)
+  public List<AnomalyMergedResult> getAllByTimeEmailIdAndNotifiedFalse(long startTime, long endTime, long emailId) {
+    return getEntityManager().createQuery(FIND_BY_TIME_EMAIL_NOTIFIED_FALSE, entityClass)
         .setParameter("emailId", emailId).setParameter("startTime", startTime)
         .setParameter("endTime", endTime).getResultList();
   }
