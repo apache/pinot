@@ -148,7 +148,7 @@ function drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab) {
                 type: 'timeseries',
                 tick: {
                     count:11,
-                    width:40,
+                    width:80,
                     multiline: true,
                     format: dateTimeFormat
                 }
