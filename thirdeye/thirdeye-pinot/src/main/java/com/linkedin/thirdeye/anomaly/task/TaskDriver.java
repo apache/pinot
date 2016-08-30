@@ -7,6 +7,7 @@ import com.linkedin.thirdeye.db.dao.AnomalyTaskDAO;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -38,7 +39,8 @@ public class TaskDriver {
   private static final int MAX_PARALLEL_TASK = 3;
   private static final int NO_TASK_IDLE_DELAY_MILLIS = 15_000; // 15 seconds
   private static final int TASK_FAILURE_DELAY_MILLIS = 5 * 60_000; // 5 minutes
-  public static final int TASK_FETCH_SIZE = 10;
+  private static final int TASK_FETCH_SIZE = 10;
+  private static final Random RANDOM = new Random();
 
   public TaskDriver(ThirdEyeAnomalyConfiguration thirdEyeAnomalyConfiguration, AnomalyJobDAO anomalyJobDAO,
       AnomalyTaskDAO anomalyTaskDAO, AnomalyResultDAO anomalyResultDAO, AnomalyMergedResultDAO mergedResultDAO,
@@ -106,7 +108,7 @@ public class TaskDriver {
       try {
         anomalyTasks = anomalyTaskDAO.findByStatusOrderByCreateTimeAsc(TaskStatus.WAITING, TASK_FETCH_SIZE);
       } catch (Exception e) {
-        LOG.error("Exception found in fetching new tasks, sleeping for 15 seconds", e);
+        LOG.error("Exception found in fetching new tasks, sleeping for few seconds", e);
         // TODO : Add better wait / clear call
         Thread.sleep(TASK_FAILURE_DELAY_MILLIS);
       }
@@ -114,8 +116,9 @@ public class TaskDriver {
         LOG.info(Thread.currentThread().getId() + " : Found {} tasks in waiting state", anomalyTasks.size());
       } else {
         // sleep for few seconds if not tasks found - avoid cpu thrashing
+        // also add some extra random number of milli seconds to allow threads to start at different times
         // TODO : Add better wait / clear call
-        LOG.debug("No tasks found to execute, sleeping for {} MS", NO_TASK_IDLE_DELAY_MILLIS);
+        LOG.debug("No tasks found to execute, sleeping for {} MS", NO_TASK_IDLE_DELAY_MILLIS + RANDOM.nextInt(1000));
         Thread.sleep(NO_TASK_IDLE_DELAY_MILLIS);
       }
 
