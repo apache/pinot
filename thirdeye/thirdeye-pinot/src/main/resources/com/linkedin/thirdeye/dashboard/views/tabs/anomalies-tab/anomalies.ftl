@@ -8,7 +8,7 @@
         {{/if}}
         {{/each}}
         </div>
-        <table id="anomalies-table" class="uk-table display">
+        <table id="anomalies-table" class="uk-table display" data-page-length='100'>
             <thead>
             <tr>
                 <th class="select_all_cell"><input class="select-all-checkbox hidden" value="1" type="checkbox" rel="anomalies" checked>ID</th>
