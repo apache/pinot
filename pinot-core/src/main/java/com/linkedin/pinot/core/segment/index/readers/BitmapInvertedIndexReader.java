@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.core.segment.index.readers;
 
-import com.linkedin.pinot.common.utils.Pairs.IntPair;
+import com.linkedin.pinot.common.utils.DocIdRange;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.File;
 import java.io.IOException;
@@ -122,7 +122,7 @@ public class BitmapInvertedIndexReader implements InvertedIndexReader {
   }
 
   @Override
-  public IntPair getMinMaxRangeFor(int dicId) {
+  public DocIdRange getMinMaxRangeFor(int dicId) {
     throw new UnsupportedOperationException("not supported in inverted index type bitmap");
   }
 }

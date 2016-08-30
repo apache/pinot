@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.operator.docidsets;
 
+import com.linkedin.pinot.common.utils.DocIdRange;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
@@ -25,7 +26,6 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.BlockDocIdSet;
-import com.linkedin.pinot.common.utils.Pairs;
 import com.linkedin.pinot.core.operator.dociditerators.BitmapDocIdIterator;
 import com.linkedin.pinot.core.operator.dociditerators.OrDocIdIterator;
 
@@ -82,9 +82,9 @@ public final class OrBlockDocIdSet implements FilterBlockDocIdSet {
         if (docIdSet instanceof SortedDocIdSet) {
           MutableRoaringBitmap bitmap = new MutableRoaringBitmap();
           SortedDocIdSet sortedDocIdSet = (SortedDocIdSet) docIdSet;
-          List<Pairs.IntPair> pairs = sortedDocIdSet.getRaw();
-          for (Pairs.IntPair pair : pairs) {
-            bitmap.add(pair.getLeft(), pair.getRight() + 1); //add takes [start, end) i.e inclusive start, exclusive end.
+          List<DocIdRange> docIdRanges = sortedDocIdSet.getRaw();
+          for (DocIdRange docIdRange : docIdRanges) {
+            bitmap.add(docIdRange.getStart(), docIdRange.getEnd() + 1); //add takes [start, end) i.e inclusive start, exclusive end.
           }
           allBitmaps.add(bitmap);
         } else if (docIdSet instanceof BitmapDocIdSet) {

@@ -17,55 +17,52 @@ package com.linkedin.pinot.core.operator.dociditerators;
 
 import java.util.List;
 
-import org.apache.commons.lang3.tuple.Pair;
-
-import com.linkedin.pinot.common.utils.Pairs.IntPair;
-import com.linkedin.pinot.core.common.BlockDocIdIterator;
+import com.linkedin.pinot.common.utils.DocIdRange;
 import com.linkedin.pinot.core.common.Constants;
-import com.linkedin.pinot.core.operator.docidsets.SortedDocIdSet;
+
 
 public final class SortedDocIdIterator implements IndexBasedDocIdIterator {
   /**
    * 
    */
-  private List<IntPair> pairs;
+  private List<DocIdRange> docIdRanges;
   private String datasourceName;
 
   /**
    * @param sortedDocIdSet
    */
-  public SortedDocIdIterator(String datasourceName, List<IntPair> pairs) {
+  public SortedDocIdIterator(String datasourceName, List<DocIdRange> docIdRanges) {
     this.datasourceName = datasourceName;
-    this.pairs = pairs;
+    this.docIdRanges = docIdRanges;
   }
 
-  int pairPointer = 0;
+  int rangeIndex = 0;
   int currentDocId = -1;
 
   @Override
   public int advance(int targetDocId) {
-    if (pairPointer == this.pairs.size() || targetDocId > pairs.get(pairs.size() - 1).getRight()) {
-      pairPointer = pairs.size();
+    if (rangeIndex == this.docIdRanges.size() || targetDocId > docIdRanges.get(docIdRanges.size() - 1).getEnd()) {
+      rangeIndex = docIdRanges.size();
       return (currentDocId = Constants.EOF);
     }
     if (currentDocId >= targetDocId) {
       return currentDocId;
     }
     // couter < targetDocId
-    while (pairPointer < pairs.size()) {
-      if (pairs.get(pairPointer).getLeft() > targetDocId) {
+    while (rangeIndex < docIdRanges.size()) {
+      if (docIdRanges.get(rangeIndex).getStart() > targetDocId) {
         // targetDocId in the gap between two valid pairs.
-        currentDocId = pairs.get(pairPointer).getLeft();
+        currentDocId = docIdRanges.get(rangeIndex).getStart();
         break;
-      } else if (targetDocId >= pairs.get(pairPointer).getLeft()
-          && targetDocId <= pairs.get(pairPointer).getRight()) {
+      } else if (targetDocId >= docIdRanges.get(rangeIndex).getStart()
+          && targetDocId <= docIdRanges.get(rangeIndex).getEnd()) {
         // targetDocId in the future valid pair.
         currentDocId = targetDocId;
         break;
       }
-      pairPointer++;
+      rangeIndex++;
     }
-    if (pairPointer == pairs.size()) {
+    if (rangeIndex == docIdRanges.size()) {
       currentDocId = Constants.EOF;
     }
     return currentDocId;
@@ -73,20 +70,20 @@ public final class SortedDocIdIterator implements IndexBasedDocIdIterator {
 
   @Override
   public int next() {
-    if (pairPointer == pairs.size() || currentDocId > pairs.get(pairs.size() - 1).getRight()) {
-      pairPointer = pairs.size();
+    if (rangeIndex == docIdRanges.size() || currentDocId > docIdRanges.get(docIdRanges.size() - 1).getEnd()) {
+      rangeIndex = docIdRanges.size();
       return (currentDocId = Constants.EOF);
     }
     currentDocId = currentDocId + 1;
-    if (pairPointer < pairs.size() && currentDocId > pairs.get(pairPointer).getRight()) {
-      pairPointer++;
-      if (pairPointer == pairs.size()) {
+    if (rangeIndex < docIdRanges.size() && currentDocId > docIdRanges.get(rangeIndex).getEnd()) {
+      rangeIndex++;
+      if (rangeIndex == docIdRanges.size()) {
         currentDocId = Constants.EOF;
       } else {
-        currentDocId = pairs.get(pairPointer).getLeft();
+        currentDocId = docIdRanges.get(rangeIndex).getStart();
       }
-    } else if (currentDocId < pairs.get(pairPointer).getLeft()) {
-      currentDocId = pairs.get(pairPointer).getLeft();
+    } else if (currentDocId < docIdRanges.get(rangeIndex).getStart()) {
+      currentDocId = docIdRanges.get(rangeIndex).getStart();
     }
     return currentDocId;
   }

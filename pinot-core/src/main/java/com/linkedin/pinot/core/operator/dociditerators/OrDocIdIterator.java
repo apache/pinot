@@ -19,21 +19,20 @@ import java.util.Iterator;
 import java.util.PriorityQueue;
 import java.util.concurrent.atomic.AtomicLong;
 
-import com.linkedin.pinot.common.utils.Pairs;
-import com.linkedin.pinot.common.utils.Pairs.IntPair;
+import com.linkedin.pinot.common.utils.DocIdRange;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.Constants;
 
 public final class OrDocIdIterator implements BlockDocIdIterator {
   private BlockDocIdIterator[] docIdIterators;
 
-  final PriorityQueue<IntPair> queue;
+  final PriorityQueue<DocIdRange> queue;
   final boolean[] iteratorIsInQueue;
   int currentDocId = -1;
   private int minDocId;
   private int maxDocId;
   private AtomicLong timeMeasure = new AtomicLong(0);
-  IntPair[] pointers;
+  DocIdRange[] docIdRanges;
 
   /**
    * @param docIdIterators
@@ -41,11 +40,11 @@ public final class OrDocIdIterator implements BlockDocIdIterator {
   public OrDocIdIterator(BlockDocIdIterator[] docIdIterators) {
     this.docIdIterators = docIdIterators;
     queue =
-        new PriorityQueue<IntPair>(docIdIterators.length, new Pairs.AscendingIntPairComparator());
+        new PriorityQueue<DocIdRange>(docIdIterators.length, DocIdRange.buildAscendingDocIdRangeComparator());
     iteratorIsInQueue = new boolean[docIdIterators.length];
-    pointers= new IntPair[docIdIterators.length];
+    docIdRanges = new DocIdRange[docIdIterators.length];
     for (int i = 0; i < docIdIterators.length; i++) {
-      pointers[i] = new IntPair(0, i);
+      docIdRanges[i] = new DocIdRange(0, i);
     }
   }
 
@@ -63,12 +62,12 @@ public final class OrDocIdIterator implements BlockDocIdIterator {
     long start = System.nanoTime();
 
     // Remove iterators that are before the target document id from the queue
-    Iterator<IntPair> iterator = queue.iterator();
+    Iterator<DocIdRange> iterator = queue.iterator();
     while (iterator.hasNext()) {
-      IntPair pair = iterator.next();
-      if (pair.getLeft() < targetDocId) {
+      DocIdRange range = iterator.next();
+      if (range.getStart() < targetDocId) {
         iterator.remove();
-        iteratorIsInQueue[pair.getRight()] = false;
+        iteratorIsInQueue[range.getEnd()] = false;
       }
     }
 
@@ -77,8 +76,8 @@ public final class OrDocIdIterator implements BlockDocIdIterator {
       if (!iteratorIsInQueue[i]) {
         int nextDocId = docIdIterators[i].advance(targetDocId);
         if (nextDocId != Constants.EOF) {
-          pointers[i].setLeft(nextDocId);
-          queue.add(pointers[i]);
+          docIdRanges[i].setStart(nextDocId);
+          queue.add(docIdRanges[i]);
         }
         iteratorIsInQueue[i] = true;
       }
@@ -86,7 +85,7 @@ public final class OrDocIdIterator implements BlockDocIdIterator {
 
     // Return the first element
     if (queue.size() > 0) {
-      currentDocId = queue.peek().getLeft();
+      currentDocId = queue.peek().getStart();
     } else {
       currentDocId = Constants.EOF;
     }
@@ -103,9 +102,9 @@ public final class OrDocIdIterator implements BlockDocIdIterator {
     if (currentDocId == Constants.EOF) {
       return currentDocId;
     }
-    while (queue.size() > 0 && queue.peek().getLeft() <= currentDocId) {
-      IntPair pair = queue.remove();
-      iteratorIsInQueue[pair.getRight()] = false;
+    while (queue.size() > 0 && queue.peek().getStart() <= currentDocId) {
+      DocIdRange range = queue.remove();
+      iteratorIsInQueue[range.getEnd()] = false;
     }
     currentDocId++;
     // Grab the next value from each iterator, if it's not in the queue
@@ -117,14 +116,14 @@ public final class OrDocIdIterator implements BlockDocIdIterator {
             throw new RuntimeException("next Doc : " + nextDocId
                 + " should never crossing the range : [ " + minDocId + ", " + maxDocId + " ]");
           }
-          queue.add(new IntPair(nextDocId, i));
+          queue.add(new DocIdRange(nextDocId, i));
         }
         iteratorIsInQueue[i] = true;
       }
     }
 
     if (queue.size() > 0) {
-      currentDocId = queue.peek().getLeft();
+      currentDocId = queue.peek().getStart();
     } else {
       currentDocId = Constants.EOF;
     }

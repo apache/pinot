@@ -18,9 +18,7 @@ package com.linkedin.pinot.core.operator.docidsets;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.apache.commons.lang3.tuple.Pair;
-
-import com.linkedin.pinot.common.utils.Pairs.IntPair;
+import com.linkedin.pinot.common.utils.DocIdRange;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.operator.blocks.BlockFactory;
 import com.linkedin.pinot.core.operator.dociditerators.SortedDocIdIterator;
@@ -28,21 +26,21 @@ import com.linkedin.pinot.core.operator.dociditerators.SortedDocIdIterator;
 
 public class SortedDocIdSet implements FilterBlockDocIdSet {
 
-  public final List<IntPair> pairs;
+  public final List<DocIdRange> docIdRanges;
   public final AtomicLong timeMeasure = new AtomicLong(0);
   int startDocId;
   int endDocId;
   private String datasourceName;
 
-  public SortedDocIdSet(String datasourceName,List<IntPair> pairs) {
+  public SortedDocIdSet(String datasourceName,List<DocIdRange> docIdRanges) {
     this.datasourceName = datasourceName;
-    this.pairs = pairs;
+    this.docIdRanges = docIdRanges;
   }
 
   @Override
   public int getMinDocId() {
-    if (pairs.size() > 0) {
-      return pairs.get(0).getLeft();
+    if (docIdRanges.size() > 0) {
+      return docIdRanges.get(0).getStart();
     } else {
       return 0;
     }
@@ -50,8 +48,8 @@ public class SortedDocIdSet implements FilterBlockDocIdSet {
 
   @Override
   public int getMaxDocId() {
-    if (pairs.size() > 0) {
-      return pairs.get(pairs.size() - 1).getRight();
+    if (docIdRanges.size() > 0) {
+      return docIdRanges.get(docIdRanges.size() - 1).getEnd();
     } else {
       return 0;
     }
@@ -77,20 +75,20 @@ public class SortedDocIdSet implements FilterBlockDocIdSet {
 
   @Override
   public BlockDocIdIterator iterator() {
-    if (pairs == null || pairs.isEmpty()) {
+    if (docIdRanges == null || docIdRanges.isEmpty()) {
       return BlockFactory.emptyBlockDocIdSetIterator();
     }
-    return new SortedDocIdIterator(datasourceName, pairs);
+    return new SortedDocIdIterator(datasourceName, docIdRanges);
   }
 
   @SuppressWarnings("unchecked")
   @Override
   public <T> T getRaw() {
-    return (T) pairs;
+    return (T) docIdRanges;
   }
 
   @Override
   public String toString() {
-    return pairs.toString();
+    return docIdRanges.toString();
   }
 }

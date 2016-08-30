@@ -20,15 +20,14 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
-import com.linkedin.pinot.common.utils.Pairs;
-import com.linkedin.pinot.common.utils.Pairs.IntPair;
+import com.linkedin.pinot.common.utils.DocIdRange;
 
 /**
  * Utility to perform intersection of sorted ranges
  */
 public class SortedRangeIntersection {
 
-  public static List<IntPair> intersectSortedRangeSets(List<List<IntPair>> sortedRangeSetList) {
+  public static List<DocIdRange> intersectSortedRangeSets(List<List<DocIdRange>> sortedRangeSetList) {
     if (sortedRangeSetList == null || sortedRangeSetList.size() == 0) {
       return Collections.emptyList();
     }
@@ -36,7 +35,7 @@ public class SortedRangeIntersection {
       return sortedRangeSetList.get(0);
     }
     // if any list is empty return empty
-    for (List<IntPair> rangeSet : sortedRangeSetList) {
+    for (List<DocIdRange> rangeSet : sortedRangeSetList) {
       if (rangeSet.size() == 0) {
         return Collections.emptyList();
       }
@@ -46,11 +45,11 @@ public class SortedRangeIntersection {
     int maxHead = -1;
     int maxHeadIndex = -1;
     boolean reachedEnd = false;
-    List<IntPair> result = new ArrayList<IntPair>();
+    List<DocIdRange> result = new ArrayList<DocIdRange>();
     while (!reachedEnd) {
       // find max Head in the current pointers
       for (int i = 0; i < sortedRangeSetList.size(); i++) {
-        int head = sortedRangeSetList.get(i).get(currentRangeSetIndex[i]).getLeft();
+        int head = sortedRangeSetList.get(i).get(currentRangeSetIndex[i]).getStart();
         if (head > maxHead) {
           maxHead = head;
           maxHeadIndex = i;
@@ -63,13 +62,13 @@ public class SortedRangeIntersection {
         }
         boolean found = false;
         while (!found && currentRangeSetIndex[i] < sortedRangeSetList.get(i).size()) {
-          IntPair range = sortedRangeSetList.get(i).get(currentRangeSetIndex[i]);
-          if (maxHead >= range.getLeft() && maxHead <= range.getRight()) {
+          DocIdRange range = sortedRangeSetList.get(i).get(currentRangeSetIndex[i]);
+          if (maxHead >= range.getStart() && maxHead <= range.getEnd()) {
             found = true;
             break;
           }
-          if (range.getLeft() > maxHead) {
-            maxHead = range.getLeft();
+          if (range.getStart() > maxHead) {
+            maxHead = range.getStart();
             maxHeadIndex = i;
             i = -1;
             break;
@@ -90,20 +89,20 @@ public class SortedRangeIntersection {
         break;
       }
       // there is definitely some intersection possible here
-      IntPair intPair = sortedRangeSetList.get(0).get(currentRangeSetIndex[0]);
-      IntPair intersection = Pairs.intPair(intPair.getLeft(), intPair.getRight());
+      DocIdRange docIdRange = sortedRangeSetList.get(0).get(currentRangeSetIndex[0]);
+      DocIdRange intersection = new DocIdRange(docIdRange.getStart(), docIdRange.getEnd());
       for (int i = 1; i < sortedRangeSetList.size(); i++) {
-        IntPair pair = sortedRangeSetList.get(i).get(currentRangeSetIndex[i]);
-        int start = Math.max(intersection.getLeft(), pair.getLeft());
-        int end = Math.min(intersection.getRight(), pair.getRight());
-        intersection.setLeft(start);
-        intersection.setRight(end);
+        DocIdRange pair = sortedRangeSetList.get(i).get(currentRangeSetIndex[i]);
+        int start = Math.max(intersection.getStart(), pair.getStart());
+        int end = Math.min(intersection.getEnd(), pair.getEnd());
+        intersection.setStart(start);
+        intersection.setEnd(end);
       }
       if (result.size() > 0) {
         // if new range is contiguous merge it
-        IntPair prevIntersection = result.get(result.size() - 1);
-        if (intersection.getLeft() == prevIntersection.getRight() + 1) {
-          prevIntersection.setRight(intersection.getRight());
+        DocIdRange prevIntersection = result.get(result.size() - 1);
+        if (intersection.getStart() == prevIntersection.getEnd() + 1) {
+          prevIntersection.setEnd(intersection.getEnd());
         } else {
           result.add(intersection);
         }
@@ -112,8 +111,8 @@ public class SortedRangeIntersection {
       }
       // move the pointers forward for rangesets where the currenttail == intersection.tail
       for (int i = 0; i < sortedRangeSetList.size(); i++) {
-        IntPair pair = sortedRangeSetList.get(i).get(currentRangeSetIndex[i]);
-        if (pair.getRight() == intersection.getRight()) {
+        DocIdRange pair = sortedRangeSetList.get(i).get(currentRangeSetIndex[i]);
+        if (pair.getEnd() == intersection.getEnd()) {
           currentRangeSetIndex[i] = currentRangeSetIndex[i] + 1;
           if (currentRangeSetIndex[i] == sortedRangeSetList.get(i).size()) {
             reachedEnd = true;

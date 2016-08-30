@@ -23,13 +23,11 @@ import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
-import com.linkedin.pinot.common.data.MetricFieldSpec.DerivedMetricType;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.TimeFieldSpec;
-import com.linkedin.pinot.common.utils.Pairs.IntPair;
+import com.linkedin.pinot.common.utils.DocIdRange;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
-import com.linkedin.pinot.core.startree.hll.HllConfig;
 import java.io.BufferedOutputStream;
 import java.io.DataOutputStream;
 import java.io.File;
@@ -433,21 +431,21 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
           int endDocId = node.getEndDocumentId();
           dataSorter.sort(startDocId, endDocId, newSortOrder);
           int timeColIndex = dimensionNameToIndexMap.get(timeColumnName);
-          Map<Integer, IntPair> timeColumnRangeMap =
+          Map<Integer, DocIdRange> timeColumnRangeMap =
               dataSorter.groupByIntColumnCount(startDocId, endDocId, timeColIndex);
 
           node.setChildDimensionName(timeColIndex);
           node.setChildren(new HashMap<Integer, StarTreeIndexNode>());
 
           for (int timeValue : timeColumnRangeMap.keySet()) {
-            IntPair range = timeColumnRangeMap.get(timeValue);
+            DocIdRange range = timeColumnRangeMap.get(timeValue);
             StarTreeIndexNode child = new StarTreeIndexNode();
             child.setDimensionName(timeColIndex);
             child.setDimensionValue(timeValue);
             child.setParent(node);
             child.setLevel(node.getLevel() + 1);
-            child.setStartDocumentId(range.getLeft());
-            child.setEndDocumentId(range.getRight());
+            child.setStartDocumentId(range.getStart());
+            child.setEndDocumentId(range.getEnd());
             node.addChild(child, timeValue);
           }
         }
@@ -630,7 +628,7 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
     LOG.debug(
         "Building tree at level:{} using file:{} from startDoc:{} endDocId:{} splitting on dimension:{}",
         level, file.getName(), startDocId, endDocId, splitDimensionName);
-    Map<Integer, IntPair> sortGroupBy = groupBy(startDocId, endDocId, splitDimensionId, file);
+    Map<Integer, DocIdRange> sortGroupBy = groupBy(startDocId, endDocId, splitDimensionId, file);
     LOG.debug("Group stats:{}", sortGroupBy);
     node.setChildDimensionName(splitDimensionId);
     node.setChildren(new HashMap<Integer, StarTreeIndexNode>());
@@ -647,16 +645,16 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
       node.addChild(child, childDimensionValue);
 
       int childDocs = 0;
-      IntPair range = sortGroupBy.get(childDimensionValue);
-      if (range.getRight() - range.getLeft() > maxLeafRecords) {
-        childDocs = constructStarTree(child, range.getLeft(), range.getRight(), level + 1, file);
+      DocIdRange range = sortGroupBy.get(childDimensionValue);
+      if (range.getEnd() - range.getStart() > maxLeafRecords) {
+        childDocs = constructStarTree(child, range.getStart(), range.getEnd(), level + 1, file);
         docsAdded += childDocs;
       }
 
       // Either range <= maxLeafRecords, or we did not split further (last level).
       if (childDocs == 0) {
-        child.setStartDocumentId(range.getLeft());
-        child.setEndDocumentId(range.getRight());
+        child.setStartDocumentId(range.getStart());
+        child.setEndDocumentId(range.getEnd());
       }
     }
 
@@ -809,7 +807,7 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
    * @param file
    * @return
    */
-  private Map<Integer, IntPair> groupBy(int startDocId, int endDocId, Integer dimension,
+  private Map<Integer, DocIdRange> groupBy(int startDocId, int endDocId, Integer dimension,
       File file) {
     StarTreeDataTable dataSorter =
         new StarTreeDataTable(file, dimensionSizeBytes, metricSizeBytes, getSortOrder());

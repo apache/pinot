@@ -28,8 +28,7 @@ import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.common.utils.Pairs;
-import com.linkedin.pinot.common.utils.Pairs.IntPair;
+import com.linkedin.pinot.common.utils.DocIdRange;
 
 
 /**
@@ -44,14 +43,14 @@ public class SortedRangeIntersectionTest {
 
   @Test
   public void testSimple() {
-    List<IntPair> rangeSet1 = Arrays.asList(Pairs.intPair(0, 4), Pairs.intPair(6, 10));
-    List<IntPair> rangeSet2 = Arrays.asList(Pairs.intPair(4, 7), Pairs.intPair(8, 14));
-    List<List<IntPair>> newArrayList = Arrays.asList(rangeSet1, rangeSet2);
-    List<IntPair> intersectionPairs = SortedRangeIntersection.intersectSortedRangeSets(newArrayList);
+    List<DocIdRange> rangeSet1 = Arrays.asList(new DocIdRange(0, 4), new DocIdRange(6, 10));
+    List<DocIdRange> rangeSet2 = Arrays.asList(new DocIdRange(4, 7), new DocIdRange(8, 14));
+    List<List<DocIdRange>> newArrayList = Arrays.asList(rangeSet1, rangeSet2);
+    List<DocIdRange> intersectionPairs = SortedRangeIntersection.intersectSortedRangeSets(newArrayList);
     // expected (4,4) (6,10)
     Assert.assertEquals(intersectionPairs.size(), 2);
-    Assert.assertEquals(intersectionPairs.get(0), Pairs.intPair(4, 4));
-    Assert.assertEquals(intersectionPairs.get(1), Pairs.intPair(6, 10));
+    Assert.assertEquals(intersectionPairs.get(0), new DocIdRange(4, 4));
+    Assert.assertEquals(intersectionPairs.get(1), new DocIdRange(6, 10));
   }
 
   @Test
@@ -118,25 +117,25 @@ public class SortedRangeIntersectionTest {
         + "[893193,895091], [911058,914564], [927183,927762], [939548,942122], [953197,956096], [969266,970314], "
         + "[984965,989441]]";
 
-    List<List<IntPair>> sortedRangeSetList =
+    List<List<DocIdRange>> sortedRangeSetList =
         Arrays.asList(constructRangeSet(rangeSet1), constructRangeSet(rangeSet2), constructRangeSet(rangeSet3));
-    List<IntPair> expected = constructRangeSet(expectedOutputRangeSet);
-    List<IntPair> actual = SortedRangeIntersection.intersectSortedRangeSets(sortedRangeSetList);
+    List<DocIdRange> expected = constructRangeSet(expectedOutputRangeSet);
+    List<DocIdRange> actual = SortedRangeIntersection.intersectSortedRangeSets(sortedRangeSetList);
     Assert.assertEquals(actual, expected);
   }
 
-  List<IntPair> constructRangeSet(String formattedString) {
+  List<DocIdRange> constructRangeSet(String formattedString) {
     formattedString = formattedString.replace('[', ' ');
     formattedString = formattedString.replace(']', ' ');
     String[] splits = formattedString.split(",");
     int length = splits.length;
     Preconditions.checkState(length % 2 == 0);
 
-    List<IntPair> pairs = new ArrayList<>();
+    List<DocIdRange> pairs = new ArrayList<>();
     for (int i = 0; i < length; i += 2) {
       int start = Integer.parseInt(splits[i].trim());
       int end = Integer.parseInt(splits[i + 1].trim());
-      pairs.add(Pairs.intPair(start, end));
+      pairs.add(new DocIdRange(start, end));
     }
     return pairs;
   }
@@ -149,17 +148,17 @@ public class SortedRangeIntersectionTest {
     long randomSeed = System.currentTimeMillis();
     Random r = new Random(randomSeed);
     int numLists = 3;
-    List<List<IntPair>> sortedRangePairsList = new ArrayList<>();
+    List<List<DocIdRange>> sortedRangePairsList = new ArrayList<>();
     List<Set<Integer>> rawIdSetList = new ArrayList<>();
     for (int i = 0; i < numLists; i++) {
-      List<IntPair> pairs = new ArrayList<>();
+      List<DocIdRange> pairs = new ArrayList<>();
       Set<Integer> rawIdSet = new HashSet<>();
       int docId = 0;
       while (docId < totalDocs) {
         int start = docId + r.nextInt(maxRange);
         int end = start + Math.max(minRange, r.nextInt(maxRange));
         if (end < totalDocs) {
-          pairs.add(Pairs.intPair(start, end));
+          pairs.add(new DocIdRange(start, end));
           for (int id = start; id <= end; id++) {
             rawIdSet.add(id);
           }
@@ -170,7 +169,7 @@ public class SortedRangeIntersectionTest {
       rawIdSetList.add(rawIdSet);
     }
     // expected intersection
-    List<IntPair> expected = new ArrayList<>();
+    List<DocIdRange> expected = new ArrayList<>();
     int tempStart = -1;
     for (int id = 0; id < totalDocs; id++) {
       boolean foundInAll = true;
@@ -186,12 +185,12 @@ public class SortedRangeIntersectionTest {
         }
       } else {
         if (tempStart != -1) {
-          expected.add(Pairs.intPair(tempStart, id - 1));
+          expected.add(new DocIdRange(tempStart, id - 1));
           tempStart = -1;
         }
       }
     }
-    List<IntPair> actual = SortedRangeIntersection.intersectSortedRangeSets(sortedRangePairsList);
+    List<DocIdRange> actual = SortedRangeIntersection.intersectSortedRangeSets(sortedRangePairsList);
 
     if (!actual.equals(expected)) {
       LOGGER.error("Actual pairs not equal to expected pairs.");

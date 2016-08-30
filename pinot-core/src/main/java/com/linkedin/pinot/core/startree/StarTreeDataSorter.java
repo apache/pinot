@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.core.startree;
 
-import com.linkedin.pinot.common.utils.Pairs.IntPair;
+import com.linkedin.pinot.common.utils.DocIdRange;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -154,9 +154,9 @@ public class StarTreeDataSorter {
    * @param colIndex
    * @return start, end for each value. inclusive start, exclusive end
    */
-  public Map<Integer, IntPair> groupByIntColumnCount(int startDocId, int endDocId, Integer colIndex) {
+  public Map<Integer, DocIdRange> groupByIntColumnCount(int startDocId, int endDocId, Integer colIndex) {
     int length = endDocId - startDocId;
-    Map<Integer, IntPair> rangeMap = new LinkedHashMap<>();
+    Map<Integer, DocIdRange> rangeMap = new LinkedHashMap<>();
     final int startOffset = startDocId * totalSizeInBytes;
 
     int prevValue = -1;
@@ -167,13 +167,13 @@ public class StarTreeDataSorter {
       mappedByteBuffer.copyTo(startOffset + (i * totalSizeInBytes), dimBuff, 0, dimensionSizeInBytes);
       int value = ByteBuffer.wrap(dimBuff).asIntBuffer().get(colIndex);
       if (prevValue != -1 && prevValue != value) {
-        rangeMap.put(prevValue, new IntPair(startDocId + prevStart, startDocId + i));
+        rangeMap.put(prevValue, new DocIdRange(startDocId + prevStart, startDocId + i));
         prevStart = i;
       }
       prevValue = value;
     }
 
-    rangeMap.put(prevValue, new IntPair(startDocId + prevStart, endDocId));
+    rangeMap.put(prevValue, new DocIdRange(startDocId + prevStart, endDocId));
     return rangeMap;
   }
 

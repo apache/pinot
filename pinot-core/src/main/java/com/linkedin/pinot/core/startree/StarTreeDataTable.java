@@ -17,11 +17,8 @@ package com.linkedin.pinot.core.startree;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
-import java.nio.MappedByteBuffer;
-import java.nio.channels.FileChannel.MapMode;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -30,10 +27,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.tuple.Pair;
 
-import com.linkedin.pinot.common.utils.Pairs.IntPair;
+import com.linkedin.pinot.common.utils.DocIdRange;
 
 import xerial.larray.mmap.MMapBuffer;
 import xerial.larray.mmap.MMapMode;
@@ -154,11 +150,11 @@ public class StarTreeDataTable {
    * @param colIndex
    * @return start,end for each value. inclusive start, exclusive end
    */
-  public Map<Integer, IntPair> groupByIntColumnCount(int startDocId, int endDocId, Integer colIndex) {
+  public Map<Integer, DocIdRange> groupByIntColumnCount(int startDocId, int endDocId, Integer colIndex) {
     MMapBuffer mappedByteBuffer = null;
     try {
       int length = endDocId - startDocId;
-      Map<Integer, IntPair> rangeMap = new LinkedHashMap<>();
+      Map<Integer, DocIdRange> rangeMap = new LinkedHashMap<>();
       final int startOffset = startDocId * totalSizeInBytes;
       mappedByteBuffer = new MMapBuffer(file, startOffset, length * totalSizeInBytes, MMapMode.READ_WRITE);
       int prevValue = -1;
@@ -168,12 +164,12 @@ public class StarTreeDataTable {
         mappedByteBuffer.copyTo(i * totalSizeInBytes, dimBuff, 0, dimensionSizeInBytes);
         int value = ByteBuffer.wrap(dimBuff).asIntBuffer().get(colIndex);
         if (prevValue != -1 && prevValue != value) {
-          rangeMap.put(prevValue, new IntPair(startDocId + prevStart, startDocId + i));
+          rangeMap.put(prevValue, new DocIdRange(startDocId + prevStart, startDocId + i));
           prevStart = i;
         }
         prevValue = value;
       }
-      rangeMap.put(prevValue, new IntPair(startDocId + prevStart, endDocId));
+      rangeMap.put(prevValue, new DocIdRange(startDocId + prevStart, endDocId));
       return rangeMap;
     } catch (IOException e) {
       e.printStackTrace();

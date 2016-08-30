@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.core.segment.index.readers;
 
-import com.linkedin.pinot.common.utils.Pairs.IntPair;
+import com.linkedin.pinot.common.utils.DocIdRange;
 import com.linkedin.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
 import java.io.IOException;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
@@ -24,7 +24,7 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 public class SortedInvertedIndexReader implements InvertedIndexReader {
   private final int cardinality;
   private final FixedByteSingleValueMultiColReader indexReader;
-  private final static IntPair EMPTY_PAIR = new IntPair(0, 0);
+  private final static DocIdRange EMPTY_PAIR = new DocIdRange(0, 0);
 
   /*
   public SortedInvertedIndexReader(File file, int cardinality, boolean isMmap) throws IOException {
@@ -60,11 +60,11 @@ public class SortedInvertedIndexReader implements InvertedIndexReader {
   }
 
   @Override
-  public IntPair getMinMaxRangeFor(int dictId) {
+  public DocIdRange getMinMaxRangeFor(int dictId) {
     if (dictId >= cardinality) {
       return EMPTY_PAIR;
     }
-    return new IntPair(indexReader.getInt(dictId, 0), indexReader.getInt(dictId, 1));
+    return new DocIdRange(indexReader.getInt(dictId, 0), indexReader.getInt(dictId, 1));
   }
 
   @Override

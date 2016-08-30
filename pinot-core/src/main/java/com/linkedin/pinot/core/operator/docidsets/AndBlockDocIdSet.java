@@ -23,7 +23,7 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.linkedin.pinot.common.utils.Pairs.IntPair;
+import com.linkedin.pinot.common.utils.DocIdRange;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.Constants;
@@ -102,10 +102,11 @@ public final class AndBlockDocIdSet implements FilterBlockDocIdSet {
         if (docIdSet instanceof SortedDocIdSet) {
           MutableRoaringBitmap bitmap = new MutableRoaringBitmap();
           SortedDocIdSet sortedDocIdSet = (SortedDocIdSet) docIdSet;
-          List<IntPair> pairs = sortedDocIdSet.getRaw();
-          for (IntPair pair : pairs) {
-            bitmap.add(pair.getLeft(), pair.getRight() + 1); // add takes [start, end) i.e inclusive
-                                                             // start, exclusive end.
+          List<DocIdRange> docIdRanges = sortedDocIdSet.getRaw();
+          for (DocIdRange docIdRange : docIdRanges) {
+            bitmap.add(docIdRange.getStart(), docIdRange.getEnd() + 1); // add takes [start, end) i.e inclusive
+                                                                        // start, exclusive end, while docIdRange is
+                                                                        // inclusive on both ends
           }
           allBitmaps.add(bitmap);
         } else if (docIdSet instanceof BitmapDocIdSet) {
@@ -145,7 +146,7 @@ public final class AndBlockDocIdSet implements FilterBlockDocIdSet {
 
   public BlockDocIdIterator fastIterator() {
     long start = System.currentTimeMillis();
-    List<List<IntPair>> sortedRangeSets = new ArrayList<>();
+    List<List<DocIdRange>> sortedRangeSets = new ArrayList<>();
     List<ImmutableRoaringBitmap> childBitmaps = new ArrayList<ImmutableRoaringBitmap>();
     List<FilterBlockDocIdSet> scanBasedDocIdSets = new ArrayList<>();
     List<BlockDocIdIterator> remainingIterators = new ArrayList<>();
@@ -153,8 +154,8 @@ public final class AndBlockDocIdSet implements FilterBlockDocIdSet {
     for (BlockDocIdSet docIdSet : blockDocIdSets) {
       if (docIdSet instanceof SortedDocIdSet) {
         SortedDocIdSet sortedDocIdSet = (SortedDocIdSet) docIdSet;
-        List<IntPair> pairs = sortedDocIdSet.getRaw();
-        sortedRangeSets.add(pairs);
+        List<DocIdRange> docIdRanges = sortedDocIdSet.getRaw();
+        sortedRangeSets.add(docIdRanges);
       } else if (docIdSet instanceof BitmapDocIdSet) {
         BitmapDocIdSet bitmapDocIdSet = (BitmapDocIdSet) docIdSet;
         ImmutableRoaringBitmap childBitmap = bitmapDocIdSet.getRaw();
@@ -180,12 +181,12 @@ public final class AndBlockDocIdSet implements FilterBlockDocIdSet {
       // handle sorted ranges
       // TODO: will be nice to re-order sorted and bitmap index based on size
       if (sortedRangeSets.size() > 0) {
-        List<IntPair> pairList;
-        pairList = SortedRangeIntersection.intersectSortedRangeSets(sortedRangeSets);
+        List<DocIdRange> docIdRanges;
+        docIdRanges = SortedRangeIntersection.intersectSortedRangeSets(sortedRangeSets);
         answer = new MutableRoaringBitmap();
-        for (IntPair pair : pairList) {
+        for (DocIdRange pair : docIdRanges) {
           // end is exclusive
-          answer.add(pair.getLeft(), pair.getRight() + 1);
+          answer.add(pair.getStart(), pair.getEnd() + 1);
         }
       }
       // handle bitmaps

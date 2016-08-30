@@ -22,7 +22,7 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.common.utils.Pairs.IntPair;
+import com.linkedin.pinot.common.utils.DocIdRange;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.BlockMetadata;
@@ -72,7 +72,7 @@ public class SortedInvertedIndexBasedFilterOperator extends BaseFilterOperator {
     Predicate predicate = getPredicate();
     final SortedInvertedIndexReader invertedIndex = (SortedInvertedIndexReader) dataSource.getInvertedIndex();
     Dictionary dictionary = dataSource.getDictionary();
-    List<IntPair> pairs = new ArrayList<IntPair>();
+    List<DocIdRange> docIdRanges = new ArrayList<DocIdRange>();
     PredicateEvaluator evaluator = PredicateEvaluatorProvider.getPredicateFunctionFor(predicate, dictionary);
 
     // At this point, we need to create a list of matching docId ranges. There are two kinds of operators:
@@ -109,39 +109,41 @@ public class SortedInvertedIndexBasedFilterOperator extends BaseFilterOperator {
         throw new RuntimeException("Unimplemented!");
     }
 
+    DocIdRange minMaxDocIdRange = new DocIdRange(startDocId, endDocId);
+
     if (0 < dictionaryIds.length) {
       // Sort the dictionaryIds in ascending order, so that their respective ranges are adjacent if their
       // dictionaryIds are adjacent
       Arrays.sort(dictionaryIds);
 
-      IntPair lastPair = invertedIndex.getMinMaxRangeFor(dictionaryIds[0]);
-      IntRanges.clip(lastPair, startDocId, endDocId);
+      DocIdRange previousDocIdRange = invertedIndex.getMinMaxRangeFor(dictionaryIds[0]);
+      previousDocIdRange.clip(minMaxDocIdRange);
 
       for (int i = 1; i < dictionaryIds.length; i++) {
-        IntPair currentPair = invertedIndex.getMinMaxRangeFor(dictionaryIds[i]);
-        IntRanges.clip(currentPair, startDocId, endDocId);
+        DocIdRange currentDocIdRange = invertedIndex.getMinMaxRangeFor(dictionaryIds[i]);
+        currentDocIdRange.clip(minMaxDocIdRange);
 
-        // If the previous range is degenerate, just keep the current one
-        if (IntRanges.isInvalid(lastPair)) {
-          lastPair = currentPair;
+        // If the previous range is invalid, just keep the current one
+        if (previousDocIdRange.isInvalid()) {
+          previousDocIdRange = currentDocIdRange;
           continue;
         }
 
         // If the current range is adjacent or overlaps with the previous range, merge it into the previous range,
         // otherwise add the previous range and keep the current one to be added
-        if (IntRanges.rangesAreMergeable(lastPair, currentPair)) {
-          IntRanges.mergeIntoFirst(lastPair, currentPair);
+        if (previousDocIdRange.rangeIsMergeable(currentDocIdRange)) {
+          previousDocIdRange.mergeWithRange(currentDocIdRange);
         } else {
-          if (!IntRanges.isInvalid(lastPair)) {
-            pairs.add(lastPair);
+          if (!previousDocIdRange.isInvalid()) {
+            docIdRanges.add(previousDocIdRange);
           }
-          lastPair = currentPair;
+          previousDocIdRange = currentDocIdRange;
         }
       }
 
       // Add the last range if it's valid
-      if (!IntRanges.isInvalid(lastPair)) {
-        pairs.add(lastPair);
+      if (!previousDocIdRange.isInvalid()) {
+        docIdRanges.add(previousDocIdRange);
       }
     }
 
@@ -152,43 +154,43 @@ public class SortedInvertedIndexBasedFilterOperator extends BaseFilterOperator {
       // - No holes, in which case the final range is [startDocId; endDocId]
       // - One or more hole, in which case the final ranges are [startDocId; firstHoleStartDocId - 1] and
       //   [lastHoleEndDocId + 1; endDocId] and ranges in between other holes
-      List<IntPair> newPairs = new ArrayList<>();
-      if (pairs.isEmpty()) {
-        newPairs.add(new IntPair(startDocId, endDocId));
+      List<DocIdRange> invertedDocIdRanges = new ArrayList<>();
+      if (docIdRanges.isEmpty()) {
+        invertedDocIdRanges.add(new DocIdRange(startDocId, endDocId));
       } else {
         // Add the first filled area (between startDocId and the first hole)
-        IntPair firstHole = pairs.get(0);
-        IntPair firstRange = new IntPair(startDocId, firstHole.getLeft() - 1);
+        DocIdRange firstHole = docIdRanges.get(0);
+        DocIdRange firstRange = new DocIdRange(startDocId, firstHole.getStart() - 1);
 
-        if (!IntRanges.isInvalid(firstRange)) {
-          newPairs.add(firstRange);
+        if (!firstRange.isInvalid()) {
+          invertedDocIdRanges.add(firstRange);
         }
 
         // Add the filled areas between contiguous holes
-        int pairCount = pairs.size();
+        int pairCount = docIdRanges.size();
         for (int i = 1; i < pairCount; i++) {
-          IntPair previousHole = pairs.get(i - 1);
-          IntPair currentHole = pairs.get(i);
-          IntPair range = new IntPair(previousHole.getRight() + 1, currentHole.getLeft() - 1);
-          if (!IntRanges.isInvalid(range)) {
-            newPairs.add(range);
+          DocIdRange previousHole = docIdRanges.get(i - 1);
+          DocIdRange currentHole = docIdRanges.get(i);
+          DocIdRange range = new DocIdRange(previousHole.getEnd() + 1, currentHole.getStart() - 1);
+          if (!range.isInvalid()) {
+            invertedDocIdRanges.add(range);
           }
         }
 
         // Add the last filled area (between the last hole and endDocId)
-        IntPair lastHole = pairs.get(pairs.size() - 1);
-        IntPair lastRange = new IntPair(lastHole.getRight() + 1, endDocId);
+        DocIdRange lastHole = docIdRanges.get(docIdRanges.size() - 1);
+        DocIdRange lastRange = new DocIdRange(lastHole.getEnd() + 1, endDocId);
 
-        if (!IntRanges.isInvalid(lastRange)) {
-          newPairs.add(lastRange);
+        if (!lastRange.isInvalid()) {
+          invertedDocIdRanges.add(lastRange);
         }
       }
 
-      pairs = newPairs;
+      docIdRanges = invertedDocIdRanges;
     }
 
-    LOGGER.debug("Creating a Sorted Block with pairs: {}", pairs);
-    sortedBlock = new SortedBlock(dataSource.getOperatorName(), pairs);
+    LOGGER.debug("Creating a Sorted Block with docIdRanges: {}", docIdRanges);
+    sortedBlock = new SortedBlock(dataSource.getOperatorName(), docIdRanges);
     return sortedBlock;
   }
 
@@ -199,11 +201,11 @@ public class SortedInvertedIndexBasedFilterOperator extends BaseFilterOperator {
 
   public static class SortedBlock extends BaseFilterBlock {
 
-    private List<IntPair> pairs;
+    private List<DocIdRange> pairs;
     private SortedDocIdSet sortedDocIdSet;
     private String datasourceName;
 
-    public SortedBlock(String datasourceName, List<IntPair> pairs) {
+    public SortedBlock(String datasourceName, List<DocIdRange> pairs) {
       this.datasourceName = datasourceName;
       this.pairs = pairs;
     }

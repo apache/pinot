@@ -18,69 +18,6 @@ package com.linkedin.pinot.common.utils;
 import java.util.Comparator;
 
 public class Pairs {
-
-  public static IntPair intPair(int a, int b) {
-    return new IntPair(a, b);
-  }
-
-  public static Comparator<IntPair> intPairComparator() {
-    return new AscendingIntPairComparator();
-  }
-
-  public static class IntPair {
-    int a;
-
-    int b;
-
-    public IntPair(int a, int b) {
-      this.a = a;
-      this.b = b;
-    }
-    
-    public int getLeft() {
-      return a;
-    }
-
-    public int getRight() {
-      return b;
-    }
-
-    public void setLeft(int a) {
-      this.a = a;
-    }
-
-    public void setRight(int b) {
-      this.b = b;
-    }
-
-    @Override
-    public String toString() {
-      return "[" + a + "," + b + "]";
-    }
-
-    @Override
-    public int hashCode() {
-      return toString().hashCode();
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-      if (obj instanceof IntPair) {
-        IntPair that = (IntPair) obj;
-        return obj != null && a == (that.a) && b == that.b;
-      }
-      return false;
-    }
-  }
-
-  public static class AscendingIntPairComparator implements Comparator<IntPair> {
-
-    @Override
-    public int compare(IntPair o1, IntPair o2) {
-      return Integer.compare(o1.a, o2.a);
-    }
-  }
-
   public static Comparator<Number2ObjectPair> getAscendingnumber2ObjectPairComparator() {
     return new AscendingNumber2ObjectPairComparator();
   }
