@@ -58,43 +58,43 @@ public class SummaryResource {
       @QueryParam("timeZone") @DefaultValue(DEFAULT_TIMEZONE_ID) String timeZone) throws Exception {
     if (summarySize < 1) summarySize = 1;
 
-    collection = ThirdEyeUtils.getCollectionFromAlias(collection);
-    CollectionConfig collectionConfig = CACHE_REGISTRY_INSTANCE.getCollectionConfigCache().getIfPresent(collection);
-    if (collectionConfig != null && collectionConfig.getDerivedMetrics() != null
-        && collectionConfig.getDerivedMetrics().containsKey(metric)) {
-      metric = collectionConfig.getDerivedMetrics().get(metric);
-    }
-    List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metric, collection);
-
-    OLAPDataBaseClient olapClient = new PinotThirdEyeSummaryClient(CACHE_REGISTRY_INSTANCE.getQueryCache());
-    olapClient.setCollection(collection);
-    olapClient.setMetricExpression(metricExpressions.get(0));
-    olapClient.setCurrentStartInclusive(new DateTime(currentStartInclusive, DateTimeZone.forID(timeZone)));
-    olapClient.setCurrentEndExclusive(new DateTime(currentEndExclusive, DateTimeZone.forID(timeZone)));
-    olapClient.setBaselineStartInclusive(new DateTime(baselineStartInclusive, DateTimeZone.forID(timeZone)));
-    olapClient.setBaselineEndExclusive(new DateTime(baselineEndExclusive, DateTimeZone.forID(timeZone)));
-
-    Dimensions dimensions;
-    if (groupByDimensions == null || groupByDimensions.length() == 0 || groupByDimensions.equals("undefined")) {
-      dimensions = new Dimensions(Utils.getDimensions(CACHE_REGISTRY_INSTANCE.getQueryCache(), collection));
-    } else {
-      dimensions = new Dimensions(Arrays.asList(groupByDimensions.trim().split(",")));
-    }
-
-    List<List<String>> hierarchies =
-        OBJECT_MAPPER.readValue(hierarchiesPayload, new TypeReference<List<List<String>>>() {
-        });
-
     SummaryResponse response = null;
     try {
-        Cube cube = new Cube();
-        cube.buildWithAutoDimensionOrder(olapClient, dimensions, topDimensions, hierarchies);
+      collection = ThirdEyeUtils.getCollectionFromAlias(collection);
+      CollectionConfig collectionConfig = CACHE_REGISTRY_INSTANCE.getCollectionConfigCache().getIfPresent(collection);
+      if (collectionConfig != null && collectionConfig.getDerivedMetrics() != null
+          && collectionConfig.getDerivedMetrics().containsKey(metric)) {
+        metric = collectionConfig.getDerivedMetrics().get(metric);
+      }
+      List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metric, collection);
 
-        Summary summary = new Summary(cube);
-        response = summary.computeSummary(summarySize, doOneSideError, topDimensions);
-        summary.testCorrectnessOfWowValues();
+      OLAPDataBaseClient olapClient = new PinotThirdEyeSummaryClient(CACHE_REGISTRY_INSTANCE.getQueryCache());
+      olapClient.setCollection(collection);
+      olapClient.setMetricExpression(metricExpressions.get(0));
+      olapClient.setCurrentStartInclusive(new DateTime(currentStartInclusive, DateTimeZone.forID(timeZone)));
+      olapClient.setCurrentEndExclusive(new DateTime(currentEndExclusive, DateTimeZone.forID(timeZone)));
+      olapClient.setBaselineStartInclusive(new DateTime(baselineStartInclusive, DateTimeZone.forID(timeZone)));
+      olapClient.setBaselineEndExclusive(new DateTime(baselineEndExclusive, DateTimeZone.forID(timeZone)));
+
+      Dimensions dimensions;
+      if (groupByDimensions == null || groupByDimensions.length() == 0 || groupByDimensions.equals("undefined")) {
+        dimensions = new Dimensions(Utils.getDimensions(CACHE_REGISTRY_INSTANCE.getQueryCache(), collection));
+      } else {
+        dimensions = new Dimensions(Arrays.asList(groupByDimensions.trim().split(",")));
+      }
+
+      List<List<String>> hierarchies =
+          OBJECT_MAPPER.readValue(hierarchiesPayload, new TypeReference<List<List<String>>>() {
+          });
+
+      Cube cube = new Cube();
+      cube.buildWithAutoDimensionOrder(olapClient, dimensions, topDimensions, hierarchies);
+
+      Summary summary = new Summary(cube);
+      response = summary.computeSummary(summarySize, doOneSideError, topDimensions);
     } catch (Exception e) {
       LOG.error("Exception while generating difference summary", e);
+      response = SummaryResponse.buildDummyResponse();
     }
     return OBJECT_MAPPER.writeValueAsString(response);
   }
@@ -114,45 +114,45 @@ public class SummaryResource {
       @QueryParam("timeZone") @DefaultValue(DEFAULT_TIMEZONE_ID) String timeZone) throws Exception {
     if (summarySize < 1) summarySize = 1;
 
-    collection = ThirdEyeUtils.getCollectionFromAlias(collection);
-    CollectionConfig collectionConfig = CACHE_REGISTRY_INSTANCE.getCollectionConfigCache().getIfPresent(collection);
-    if (collectionConfig != null && collectionConfig.getDerivedMetrics() != null
-        && collectionConfig.getDerivedMetrics().containsKey(metric)) {
-      metric = collectionConfig.getDerivedMetrics().get(metric);
-    }
-    List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metric, collection);
-
-    OLAPDataBaseClient olapClient = new PinotThirdEyeSummaryClient(CACHE_REGISTRY_INSTANCE.getQueryCache());
-    olapClient.setCollection(collection);
-    olapClient.setMetricExpression(metricExpressions.get(0));
-    olapClient.setCurrentStartInclusive(new DateTime(currentStartInclusive, DateTimeZone.forID(timeZone)));
-    olapClient.setCurrentEndExclusive(new DateTime(currentEndExclusive, DateTimeZone.forID(timeZone)));
-    olapClient.setBaselineStartInclusive(new DateTime(baselineStartInclusive, DateTimeZone.forID(timeZone)));
-    olapClient.setBaselineEndExclusive(new DateTime(baselineEndExclusive, DateTimeZone.forID(timeZone)));
-
-    List<String> allDimensions;
-    if (groupByDimensions == null || groupByDimensions.length() == 0 || groupByDimensions.equals("undefined")) {
-      allDimensions = Utils.getDimensions(CACHE_REGISTRY_INSTANCE.getQueryCache(), collection);
-    } else {
-      allDimensions = Arrays.asList(groupByDimensions.trim().split(","));
-    }
-    if (allDimensions.size() > Integer.parseInt(DEFAULT_TOP_DIMENSIONS)) {
-      allDimensions = allDimensions.subList(0, Integer.parseInt(DEFAULT_TOP_DIMENSIONS));
-    }
-    Dimensions dimensions = new Dimensions(allDimensions);
-
     SummaryResponse response = null;
     try {
+      collection = ThirdEyeUtils.getCollectionFromAlias(collection);
+      CollectionConfig collectionConfig = CACHE_REGISTRY_INSTANCE.getCollectionConfigCache().getIfPresent(collection);
+      if (collectionConfig != null && collectionConfig.getDerivedMetrics() != null
+          && collectionConfig.getDerivedMetrics().containsKey(metric)) {
+        metric = collectionConfig.getDerivedMetrics().get(metric);
+      }
+      List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metric, collection);
+
+      OLAPDataBaseClient olapClient = new PinotThirdEyeSummaryClient(CACHE_REGISTRY_INSTANCE.getQueryCache());
+      olapClient.setCollection(collection);
+      olapClient.setMetricExpression(metricExpressions.get(0));
+      olapClient.setCurrentStartInclusive(new DateTime(currentStartInclusive, DateTimeZone.forID(timeZone)));
+      olapClient.setCurrentEndExclusive(new DateTime(currentEndExclusive, DateTimeZone.forID(timeZone)));
+      olapClient.setBaselineStartInclusive(new DateTime(baselineStartInclusive, DateTimeZone.forID(timeZone)));
+      olapClient.setBaselineEndExclusive(new DateTime(baselineEndExclusive, DateTimeZone.forID(timeZone)));
+
+      List<String> allDimensions;
+      if (groupByDimensions == null || groupByDimensions.length() == 0 || groupByDimensions.equals("undefined")) {
+        allDimensions = Utils.getDimensions(CACHE_REGISTRY_INSTANCE.getQueryCache(), collection);
+      } else {
+        allDimensions = Arrays.asList(groupByDimensions.trim().split(","));
+      }
+      if (allDimensions.size() > Integer.parseInt(DEFAULT_TOP_DIMENSIONS)) {
+        allDimensions = allDimensions.subList(0, Integer.parseInt(DEFAULT_TOP_DIMENSIONS));
+      }
+      Dimensions dimensions = new Dimensions(allDimensions);
+
+
       Cube cube = new Cube();
       cube.buildWithManualDimensionOrder(olapClient, dimensions);
 
       Summary summary = new Summary(cube);
       response = summary.computeSummary(summarySize, doOneSideError);
-      summary.testCorrectnessOfWowValues();
     } catch (Exception e) {
       LOG.error("Exception while generating difference summary", e);
+      response = SummaryResponse.buildDummyResponse();
     }
-
     return OBJECT_MAPPER.writeValueAsString(response);
   }
 }

@@ -24,6 +24,16 @@ public class SummaryResponse {
     return responseRows;
   }
 
+  public static SummaryResponse buildDummyResponse() {
+    SummaryResponse response = new SummaryResponse();
+    response.dimensions.add("-na-");
+    SummaryResponseRow row = new SummaryResponseRow();
+    row.names = new ArrayList<String>();
+    row.names.add("-na-");
+    response.responseRows.add(row);
+    return response;
+  }
+
   public static SummaryResponse buildResponse(List<HierarchyNode> nodes, int levelCount) {
     SummaryResponse response = new SummaryResponse();
 
