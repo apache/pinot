@@ -52,7 +52,8 @@ public class TestAnomalyTaskDAO extends AbstractDbTestBase {
 
   @Test(dependsOnMethods = {"testUpdateStatusAndWorkerId"})
   public void testFindByStatusOrderByCreationTimeAsc() {
-    List<AnomalyTaskSpec> anomalyTasks = anomalyTaskDAO.findByStatusOrderByCreateTimeAscending(TaskStatus.WAITING);
+    List<AnomalyTaskSpec> anomalyTasks =
+        anomalyTaskDAO.findByStatusOrderByCreateTimeAsc(TaskStatus.WAITING, Integer.MAX_VALUE);
     Assert.assertEquals(anomalyTasks.size(), 1);
   }
 

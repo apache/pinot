@@ -33,7 +33,7 @@ public class ThirdEyeAnomalyApplication
   private AnomalyMergeExecutor anomalyMergeExecutor = null;
 
   public static void main(final String[] args) throws Exception {
-    List<String> argList = new ArrayList<String>(Arrays.asList(args));
+    List<String> argList = new ArrayList<>(Arrays.asList(args));
     if (argList.size() == 1) {
       argList.add(0, "server");
     }
@@ -62,7 +62,6 @@ public class ThirdEyeAnomalyApplication
     LOG.info("Starting ThirdeyeAnomalyApplication : Scheduler {} Worker {}", config.isScheduler(), config.isWorker());
     super.initDAOs();
     ThirdEyeCacheRegistry.initializeCaches(config, webappConfigDAO);
-
     environment.lifecycle().manage(new Managed() {
       @Override
       public void start() throws Exception {

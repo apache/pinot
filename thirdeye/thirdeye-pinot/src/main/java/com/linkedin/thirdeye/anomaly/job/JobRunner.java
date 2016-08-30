@@ -7,6 +7,6 @@ import java.util.List;
  */
 public interface JobRunner extends Runnable {
 
-  long createJob();
+  Long createJob();
   List<Long> createTasks();
 }

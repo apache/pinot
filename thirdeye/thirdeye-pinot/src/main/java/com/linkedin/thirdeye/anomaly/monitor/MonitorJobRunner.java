@@ -45,16 +45,17 @@ public class MonitorJobRunner implements JobRunner {
       List<AnomalyJobSpec> anomalyJobSpecs = findAnomalyJobsWithStatusScheduled();
       monitorJobContext.setJobName(TaskType.MONITOR.toString());
       monitorJobContext.setAnomalyJobSpecs(anomalyJobSpecs);
-      long jobExecutionId = createJob();
-      monitorJobContext.setJobExecutionId(jobExecutionId);
-      List<Long> taskIds = createTasks();
-
+      Long jobExecutionId = createJob();
+      if (jobExecutionId != null) {
+        monitorJobContext.setJobExecutionId(jobExecutionId);
+        List<Long> taskIds = createTasks();
+      }
     } catch (Exception e) {
       LOG.error("Exception in monitor job runner", e);
     }
   }
 
-  public long createJob() {
+  public Long createJob() {
     Long jobExecutionId = null;
     try {
 

@@ -91,12 +91,11 @@ public class DetectionTaskRunner implements TaskRunner {
 
     CollectionSchema collectionSchema = null;
     try {
-      collectionSchema = CACHE_REGISTRY_INSTANCE.getCollectionSchemaCache()
-          .get(anomalyFunctionSpec.getCollection());
+      collectionSchema = CACHE_REGISTRY_INSTANCE.getCollectionSchemaCache().get(anomalyFunctionSpec.getCollection());
+      collectionDimensions = collectionSchema.getDimensionNames();
     } catch (Exception e) {
       LOG.error("Exception when reading collection schema cache", e);
     }
-    collectionDimensions = collectionSchema.getDimensionNames();
 
     // Get existing anomalies for this time range
     knownAnomalies = getExistingAnomalies();
