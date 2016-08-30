@@ -889,7 +889,7 @@ body a{
     height: 10px;
 }
 
-#anomalies-table .radio-cell label{
+#anomalies-table .checkbox-cell label{
     padding: 6px;
 }
 
