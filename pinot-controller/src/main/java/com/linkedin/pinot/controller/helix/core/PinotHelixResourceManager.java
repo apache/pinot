@@ -1111,6 +1111,7 @@ public class PinotHelixResourceManager {
     // remove from property store
     ZKMetadataProvider.removeResourceSegmentsFromPropertyStore(getPropertyStore(), realtimeTableName);
     ZKMetadataProvider.removeResourceConfigFromPropertyStore(getPropertyStore(), realtimeTableName);
+    ZKMetadataProvider.removeKafkaPartitionAssignmentFromPropertyStore(getPropertyStore(), realtimeTableName);
     // Remove groupId/PartitionId mapping for realtime table type.
     for (String instance : getAllInstancesForTable(realtimeTableName)) {
       InstanceZKMetadata instanceZKMetadata = ZKMetadataProvider.getInstanceZKMetadata(getPropertyStore(), instance);
