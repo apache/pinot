@@ -16,7 +16,7 @@
 #
 
 # Ignore changes not related to pinot code
-git diff --name-only $TRAVIS_COMMIT_RANGE | egrep '^(pinot-|pom.xml|.travis)'
+git diff --name-only $TRAVIS_COMMIT_RANGE | egrep '^(pinot-|pom.xml|.travis|.codecov)'
 if [ $? -ne 0 ]; then
   echo 'No changes related to the pinot code, skip the test.'
   exit 0

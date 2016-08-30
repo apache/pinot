@@ -22,7 +22,7 @@ if [ $? -ne 0 ]; then
   echo 'Commit range is invalid.'
   exit 1
 fi
-git diff --name-only $TRAVIS_COMMIT_RANGE | egrep '^(pinot-|pom.xml|.travis)'
+git diff --name-only $TRAVIS_COMMIT_RANGE | egrep '^(pinot-|pom.xml|.travis|.codecov)'
 if [ $? -ne 0 ]; then
   echo 'No changes related to the pinot code, skip the install.'
   exit 0
