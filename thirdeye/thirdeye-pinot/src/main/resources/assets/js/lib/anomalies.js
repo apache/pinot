@@ -342,9 +342,6 @@ function renderAnomalyTable(data, tab) {
 
     $('.feedback-dropdown[data-uk-dropdown]').on('hide.uk.dropdown', function(){
 
-        console.log("hidden element:")
-        console.log(this)
-
         submitAnomalyFeedback(this);
     });
 

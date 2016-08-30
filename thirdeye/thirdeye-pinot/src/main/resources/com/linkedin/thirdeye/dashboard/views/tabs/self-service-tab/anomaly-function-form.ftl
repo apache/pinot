@@ -169,7 +169,7 @@
         <div class="uk-form-row uk-margin-top">
 
             <!-- ** USER_RULE & MIN_MAX_THRESHOLD PROPERTIES ** -->
-            <div class="user-rule-fields min-max-threshold-fields function-type-fields">
+            <div class="USER_RULE-fields MIN_MAX_THRESHOLD-fields function-type-fields">
                 <div id="self-service-view-single-dimension-selector" class="view-single-dimension-selector uk-display-inline-block" rel="self-service">
                     <label class="uk-form-label">in dimension</label>
                     <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group">
