@@ -845,8 +845,7 @@ body a{
 #linechart-placeholder {
     display: inline-block;
     width: 83%;
-    height: 300px;
-
+    height: 310px;
 }
 
 #anomalies-display-chart-section #barchart-placeholder {
@@ -890,7 +889,7 @@ body a{
     height: 10px;
 }
 
-#anomalies-table .checkbox-cell label{
+#anomalies-table .radio-cell label{
     padding: 6px;
 }
 
