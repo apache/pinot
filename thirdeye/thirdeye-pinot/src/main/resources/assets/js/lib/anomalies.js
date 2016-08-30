@@ -93,8 +93,8 @@ function drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab) {
     for (var i = 0; i < anomalyData.length; i++) {
         var anomaly = anomalyData[i];
 
-        var anomalyStart = anomaly.startTimeUtc;
-        var anomalyEnd = anomaly.endTimeUtc;
+        var anomalyStart = anomaly.startTime;
+        var anomalyEnd = anomaly.endTime;
         var anomayID = "anomaly-id-" + anomaly.id;
         regions.push({'axis': 'x', 'start': anomalyStart, 'end': anomalyEnd, 'class': 'regionX ' + anomayID });
     }
