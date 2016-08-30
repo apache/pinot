@@ -40,12 +40,15 @@ import com.linkedin.thirdeye.hadoop.backfill.BackfillPhaseJob;
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConstants;
 import com.linkedin.thirdeye.hadoop.derivedcolumn.transformation.DerivedColumnTransformationPhaseConstants;
 import com.linkedin.thirdeye.hadoop.derivedcolumn.transformation.DerivedColumnTransformationPhaseJob;
+import com.linkedin.thirdeye.hadoop.join.JoinPhaseJob;
 import com.linkedin.thirdeye.hadoop.push.SegmentPushPhase;
 import com.linkedin.thirdeye.hadoop.push.SegmentPushPhaseConstants;
 import com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants;
 import com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseJob;
 import com.linkedin.thirdeye.hadoop.topk.TopKPhaseConstants;
 import com.linkedin.thirdeye.hadoop.topk.TopKPhaseJob;
+import com.linkedin.thirdeye.hadoop.transform.TransformPhaseJob;
+import com.linkedin.thirdeye.hadoop.wait.WaitPhaseJob;
 
 /**
  * Wrapper to manage segment create and segment push jobs for thirdeye
@@ -102,6 +105,58 @@ public class ThirdEyeJob {
         config.setProperty(BackfillPhaseConstants.BACKFILL_PHASE_TABLE_NAME.toString(), collection);
 
         return config;
+      }
+    },
+    WAIT {
+      @Override
+      Class<?> getKlazz() {
+        return null;
+      }
+
+      @Override
+      String getDescription() {
+        return "Polls a pre-determined amount of time for the existence of input paths";
+      }
+
+      @Override
+      Properties getJobProperties(Properties inputConfig, String root, String collection,
+          DateTime minTime, DateTime maxTime, String inputPaths)
+              throws Exception {
+        return null;
+      }
+    },
+    JOIN {
+      @Override
+      Class<?> getKlazz() {
+        return JoinPhaseJob.class;
+      }
+
+      @Override
+      String getDescription() {
+        return "Joins multiple data sets based on join key";
+      }
+
+      @Override
+      Properties getJobProperties(Properties inputConfig, String root, String collection,
+          DateTime minTime, DateTime maxTime, String inputPaths) {
+        return inputConfig;
+      }
+    },
+    TRANSFORM {
+      @Override
+      Class<?> getKlazz() {
+        return TransformPhaseJob.class;
+      }
+
+      @Override
+      String getDescription() {
+        return "Transforms avro record";
+      }
+
+      @Override
+      Properties getJobProperties(Properties inputConfig, String root, String collection,
+          DateTime minTime, DateTime maxTime, String inputPaths) {
+        return inputConfig;
       }
     },
     AGGREGATION {
@@ -324,6 +379,21 @@ public class ThirdEyeJob {
     } catch (Exception e) {
       usage();
       throw e;
+    }
+
+    if (PhaseSpec.TRANSFORM.equals(phaseSpec)) {
+      TransformPhaseJob job = new TransformPhaseJob("Transform Job", inputConfig);
+      job.run();
+      return;
+
+    } else if (PhaseSpec.JOIN.equals(phaseSpec)) {
+      JoinPhaseJob job = new JoinPhaseJob("Join Job", inputConfig);
+      job.run();
+      return;
+
+    } else if (PhaseSpec.WAIT.equals(phaseSpec)) {
+      WaitPhaseJob job = new WaitPhaseJob("Wait for inputs", inputConfig);
+      job.run();
     }
 
     // Get root, collection, input paths
