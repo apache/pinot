@@ -3,6 +3,10 @@ package com.linkedin.thirdeye.client.cache;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.apache.commons.lang3.StringUtils;
+import org.joda.time.DateTime;
+import org.joda.time.format.DateTimeFormat;
+import org.joda.time.format.DateTimeFormatter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,8 +52,14 @@ public class CollectionMaxDataTimeCacheLoader extends CacheLoader<String, Long> 
       } else {
         long endTime = new Double(resultSetGroup.getResultSet(0).getDouble(0)).longValue();
         this.collectionToPrevMaxDataTimeMap.put(collection, endTime);
-        // entTime + 1 to make sure we cover the time range of that time value.
-        maxTime = timeSpec.getDataGranularity().toMillis(endTime + 1) - 1;
+        // endTime + 1 to make sure we cover the time range of that time value.
+        String timeFormat = timeSpec.getFormat();
+        if (StringUtils.isBlank(timeFormat) || TimeSpec.SINCE_EPOCH_FORMAT.equals(timeFormat)) {
+          maxTime = timeSpec.getDataGranularity().toMillis(endTime + 1) - 1;
+        } else {
+          DateTimeFormatter dateTimeFormatter = DateTimeFormat.forPattern(timeFormat).withZoneUTC();
+          maxTime = DateTime.parse(String.valueOf(endTime), dateTimeFormatter).getMillis();
+        }
       }
     } catch (Exception e) {
       LOGGER.warn("Exception getting maxTime from collection: {}", collection, e);
