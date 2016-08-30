@@ -336,14 +336,11 @@ function renderAnomalyTable(data, tab) {
 
     //Clicking the feedback option will trigger the ajax - post
     $("#anomalies-table").on("click", ".feedback-list", function () {
-        $(this).next("textarea").show();;
+        $(this).next("textarea").show();
     });
 
 
     $('.feedback-dropdown[data-uk-dropdown]').on('hide.uk.dropdown', function(){
-
-        console.log("hidden element:")
-        console.log(this)
 
         submitAnomalyFeedback(this);
     });
@@ -400,6 +397,10 @@ function renderAnomalyTable(data, tab) {
             })
         }
     }
+
+    //Set initial view:
+    $(".select-all-checkbox").click();
+    $($(".anomaly-table-checkbox")[0]).click();
 }
 
 

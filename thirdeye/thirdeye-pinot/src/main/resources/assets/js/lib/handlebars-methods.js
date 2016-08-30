@@ -77,9 +77,9 @@ $(document).ready(function () {
 
     //Takes 2 parameters and a className variable, className to element if the 2 params are equal
     Handlebars.registerHelper('add_string_if_eq', function (param1, param2, options) {
-        var className = options.hash.stringToAdd;
+        var stringToAdd = options.hash.stringToAdd;
         if (param1 == param2) {
-            return className
+            return stringToAdd
         }
     });
 

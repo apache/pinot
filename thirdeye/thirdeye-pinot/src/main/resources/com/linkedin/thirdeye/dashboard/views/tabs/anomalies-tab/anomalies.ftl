@@ -11,7 +11,7 @@
         <table id="anomalies-table" class="uk-table display">
             <thead>
             <tr>
-                <th class="select_all_cell"><input class="select-all-checkbox" value="1" type="checkbox" rel="anomalies" checked>ID</th>
+                <th class="select_all_cell"><input class="select-all-checkbox hidden" value="1" type="checkbox" rel="anomalies" checked>ID</th>
                 <th>Start / End ({{returnUserTimeZone}})</th>
                 <th>Alert reason</th>
                 <th>Dimension</th>
