@@ -40,18 +40,21 @@ public abstract class PersistenceUtil {
     ds.setDriverClassName(configuration.getDatabaseConfiguration().getProperties().get("hibernate.connection.driver_class"));
 
     // pool size configurations
-    ds.setMaxActive(100);
+    ds.setMaxActive(200);
     ds.setMinIdle(10);
     ds.setInitialSize(10);
 
     // validate connection
     ds.setValidationQuery("select 1 as dbcp_connection_test");
     ds.setTestWhileIdle(true);
-    ds.setTestOnReturn(true);
     ds.setTestOnBorrow(true);
 
+    // when returning connection to pool
+    ds.setTestOnReturn(true);
+    ds.setRollbackOnReturn(true);
+
     // Timeout in seconds before an abandoned(in use) connection can be removed.
-    ds.setRemoveAbandonedTimeout(15 * 60);
+    ds.setRemoveAbandonedTimeout(600);
     ds.setRemoveAbandoned(true);
 
     properties.put(Environment.CONNECTION_PROVIDER, DatasourceConnectionProviderImpl.class.getName());

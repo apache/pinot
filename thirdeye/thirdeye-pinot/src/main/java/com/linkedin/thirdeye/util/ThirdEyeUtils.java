@@ -21,7 +21,6 @@ import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
-import com.linkedin.thirdeye.dashboard.resources.AnomalyResource;
 
 public class ThirdEyeUtils {
   private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeUtils.class);
@@ -97,7 +96,6 @@ public class ThirdEyeUtils {
         sb.append(FILTER_CLAUSE_SEPARATOR);
       }
     }
-
     return StringUtils.chop(sb.toString());
   }
 
@@ -108,7 +106,6 @@ public class ThirdEyeUtils {
     if (StringUtils.isBlank(sortedFilters)) {
       return null;
     }
-
     return sortedFilters;
   }
 
@@ -119,7 +116,6 @@ public class ThirdEyeUtils {
     if (StringUtils.isBlank(sortedFilters)) {
       return null;
     }
-
     return sortedFilters;
   }
 
@@ -151,7 +147,6 @@ public class ThirdEyeUtils {
   }
 
   public static String constructCron(String scheduleMinute, String scheduleHour, TimeUnit repeatEvery) {
-
     if (StringUtils.isNotBlank(scheduleMinute)
         && (Integer.valueOf(scheduleMinute) < 0 || Integer.valueOf(scheduleMinute) > 59)) {
       throw new IllegalArgumentException("scheduleMinute " + scheduleMinute + " must be between [0,60)");
@@ -162,7 +157,6 @@ public class ThirdEyeUtils {
     }
     String minute = "0";
     String hour = "0";
-    String cron = AnomalyResource.DEFAULT_CRON;
     if (repeatEvery.equals(TimeUnit.DAYS)) {
       minute = StringUtils.isEmpty(scheduleMinute) ? minute : scheduleMinute;
       hour = StringUtils.isEmpty(scheduleHour) ? hour : scheduleHour;
@@ -170,9 +164,6 @@ public class ThirdEyeUtils {
       minute = StringUtils.isEmpty(scheduleMinute) ? minute : scheduleMinute;
       hour = "*";
     }
-    cron = String.format("0 %s %s * * ?", minute, hour);
-    return cron;
+    return String.format("0 %s %s * * ?", minute, hour);
   }
-
-
 }

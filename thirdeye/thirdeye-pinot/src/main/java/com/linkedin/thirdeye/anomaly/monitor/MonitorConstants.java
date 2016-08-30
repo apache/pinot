@@ -6,7 +6,7 @@ public class MonitorConstants {
     EXPIRE
   }
 
-  public static int DEFAULT_EXPIRE_DAYS_AGO = 7;
+  public static int DEFAULT_EXPIRE_DAYS_AGO = 3;
   public static int DEFAULT_MONITOR_FREQUENCY_HOURS = 1;
 
 }

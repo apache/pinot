@@ -326,7 +326,6 @@ public class DashboardResource {
       LOG.error("Exception while processing /data/tabular call", e);
       return "{\"ERROR\": + " + e.getMessage() + "}";
     }
-
   }
 
   @GET

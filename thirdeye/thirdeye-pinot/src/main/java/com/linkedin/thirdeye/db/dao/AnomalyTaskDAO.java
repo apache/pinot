@@ -17,8 +17,7 @@ public class AnomalyTaskDAO extends AbstractJpaDAO<AnomalyTaskSpec> {
       + "AND at.status != :status";
 
   private static final String FIND_BY_STATUS_ORDER_BY_CREATE_TIME_ASC = "SELECT at FROM AnomalyTaskSpec at "
-      + "WHERE at.status = :status "
-      + "order by at.taskStartTime asc";
+      + "WHERE at.status = :status order by at.taskStartTime asc";
 
   private static final String FIND_BY_STATUS_AND_LAST_MODIFIED_TIME_LT_EXPIRE = "SELECT at FROM AnomalyTaskSpec at "
       + "WHERE at.status = :status AND at.lastModified < :expireTimestamp";
@@ -35,10 +34,9 @@ public class AnomalyTaskDAO extends AbstractJpaDAO<AnomalyTaskSpec> {
   }
 
   @Transactional
-  public List<AnomalyTaskSpec> findByStatusOrderByCreateTimeAscending(TaskStatus status) {
+  public List<AnomalyTaskSpec> findByStatusOrderByCreateTimeAsc(TaskStatus status, int fetchSize) {
     return getEntityManager().createQuery(FIND_BY_STATUS_ORDER_BY_CREATE_TIME_ASC, entityClass)
-            .setParameter("status", status)
-            .getResultList();
+        .setMaxResults(fetchSize).setParameter("status", status).getResultList();
   }
 
   @Transactional
