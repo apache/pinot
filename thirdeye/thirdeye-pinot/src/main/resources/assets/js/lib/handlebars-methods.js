@@ -19,7 +19,6 @@ $(document).ready(function () {
         } else {
             return  Handlebars.helpers.assignColorByID(numIds, id)
         }
-
     });
 
     Handlebars.registerHelper('colorByIdContributors', function (id, dimensionValuesMap, options) {
@@ -78,11 +77,23 @@ $(document).ready(function () {
 
     //Takes 2 parameters and a className variable, className to element if the 2 params are equal
     Handlebars.registerHelper('add_string_if_eq', function (param1, param2, options) {
-        var className = options.hash.stringToAdd;
+        var stringToAdd = options.hash.stringToAdd;
         if (param1 == param2) {
-            return className
+            return stringToAdd
         }
     });
+
+
+    //Helper for anomaly function form, here we can set the desired display of any function property
+    Handlebars.registerHelper('displayAnomalyResultDimensionValue', function (value) {
+
+        var displayValue = value.replace(/[,*\s]/g, "");
+        if(displayValue.length == 0){
+            displayValue = "ALL";
+        }
+        return displayValue
+    });
+
 
     //Helper for anomaly function form, here we can set the desired display of any function property
     Handlebars.registerHelper('displayAnomalyFunctionProp', function (param , value) {

@@ -11,7 +11,7 @@
         <table id="anomalies-table" class="uk-table display">
             <thead>
             <tr>
-                <th class="select_all_cell"><input class="select-all-checkbox" value="1" type="checkbox" rel="anomalies" checked>ID</th>
+                <th class="select_all_cell"><input class="select-all-checkbox hidden" value="1" type="checkbox" rel="anomalies" checked>ID</th>
                 <th>Start / End ({{returnUserTimeZone}})</th>
                 <th>Alert reason</th>
                 <th>Dimension</th>
@@ -24,7 +24,8 @@
             <tbody class="">
             {{#each this as |anomalyData anomalyIndex|}}
             <tr>
-                <td class="checkbox-cell"><label class="anomaly-table-checkbox"><input type="checkbox" data-value="{{anomalyData/metric}}" id="{{anomalyData/id}}" checked><div class="color-box uk-display-inline-block" style="background:{{colorById anomalyIndex @root.length}}">
+                <td class="checkbox-cell"><label class="anomaly-table-checkbox">
+                    <input type="checkbox" data-value="{{anomalyData/metric}}" id="{{anomalyData/id}}" checked><div class="color-box uk-display-inline-block" style="background:{{colorById anomalyIndex @root.length}}">
                 </div> {{anomalyData/id}}</label>
                 </td>
                 <td>
@@ -32,7 +33,7 @@
                     <p> {{millisToDate anomalyData/endTime showTimeZone=false}}</p>
                 </td>
                 <td>{{anomalyData/message}}</td>
-                <td>{{anomalyData/dimensions}}</td>
+                <td>{{#if anomalyData/function/exploreDimensions}}{{anomalyData/function/exploreDimensions}}:{{/if}} {{displayAnomalyResultDimensionValue anomalyData/dimensions}}</td>
                 <td>
                     <a class="heatmap-link" href="#" data-start-utc-millis="{{anomalyData/startTime}}" data-end-utc-millis="{{anomalyData/endTime}}"  data-metric="{{anomalyData/metric}}">
                         <span class="uk-button" data-uk-tooltip title="See heatmap of this timerange"><i class="uk-icon-eye"></i></span>
