@@ -197,8 +197,6 @@ $(document).ready( function() {
 
         var functionInfo = {propertyDefs : propertyDefs, fnTypeMetaData : anomalyFunctionTypeMetaData}
 
-         console.log('functionInfo')
-         console.log(functionInfo)
         //cache the data
         window.sessionStorage.setItem('anomalyFunctionTypeMetaData', JSON.stringify(functionInfo));
 

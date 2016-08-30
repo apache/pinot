@@ -20,15 +20,37 @@ function getExistingAnomalyFunctions(dataset) {
             data = {}
         }
 
-        for (var i= 0, len = data.length; i < len; i++){
-            var properties = data[i].properties;
+        for (var i = 0, len = data.length; i < len; i++) {
+            if(data[i]){
+                var properties = data[i].properties;
 
-            if(properties.substr(properties.length - 1) == ";"){
-                properties = properties.slice(0, -1);
+                if (properties.substr(properties.length - 1) == ";") {
+                    properties = properties.slice(0, -1);
+                }
+
+                data[i].properties = parseProperties(properties);
+
+                if (data[i].filters) {
+
+                    var filtersAry = data[i].filters.split(";");
+
+                    var filterParams = {}
+                    for (var f = 0, len = filtersAry.length; f < len; f++) {
+                        var keyValue = filtersAry[f].split("=");
+                        var key = keyValue[0]
+                        var value = keyValue[1]
+
+                        if (filterParams[key]) {
+                            filterParams[key] += "," + value;
+                        } else {
+                            filterParams[key] = value
+                        }
+                    }
+                    data[i].filters = filterParams;
+                }
             }
-           data[i].properties = parseProperties(properties);
-           data[i].filters = (data[i].filters) ? parseProperties(decodeURIComponent(data[i].filters)) : "";
         }
+
 
         /** Handelbars template for EXISTING ANOMALY FUNCTIONS TABLE **/
         result_existing_anomaly_functions_template = HandleBarsTemplates.template_existing_anomaly_functions(data);
@@ -49,7 +71,6 @@ function getExistingAnomalyFunctions(dataset) {
             ]
         });
     }
-
 }
 
 function addSelfServiceListeners() {
@@ -800,7 +821,6 @@ function addSelfServiceListeners() {
                 filterParams[dimension].push(value)
             }
         }
-
 
         var anomalyFunctionTypeMetaDataStr = window.sessionStorage.getItem('anomalyFunctionTypeMetaData');
         var anomalyFunctionTypeMetaData = JSON.parse(anomalyFunctionTypeMetaDataStr);
