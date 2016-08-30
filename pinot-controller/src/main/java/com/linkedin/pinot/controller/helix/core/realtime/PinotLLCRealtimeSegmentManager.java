@@ -46,7 +46,6 @@ import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineSt
 
 public class PinotLLCRealtimeSegmentManager {
   public static final Logger LOGGER = LoggerFactory.getLogger(PinotLLCRealtimeSegmentManager.class);
-  private static final String KAFKA_PARTITIONS_PATH = "/KAFKA_PARTITIONS";
 
   private static PinotLLCRealtimeSegmentManager INSTANCE = null;
 
@@ -73,10 +72,6 @@ public class PinotLLCRealtimeSegmentManager {
     INSTANCE = new PinotLLCRealtimeSegmentManager(helixAdmin, clusterName, helixManager, propertyStore,
         helixResourceManager, controllerConf);
     SegmentCompletionManager.create(helixManager, INSTANCE);
-  }
-
-  private String makeKafkaPartitionPath(String realtimeTableName) {
-    return KAFKA_PARTITIONS_PATH + "/" + realtimeTableName;
   }
 
   protected PinotLLCRealtimeSegmentManager(HelixAdmin helixAdmin, String clusterName, HelixManager helixManager,
@@ -173,12 +168,12 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   protected void writeKafkaPartitionAssignemnt(final String realtimeTableName, ZNRecord znRecord) {
-    final String path = makeKafkaPartitionPath(realtimeTableName);
+    final String path = ZKMetadataProvider.constructPropertyStorePathForKafkaPartitions(realtimeTableName);
     _propertyStore.set(path, znRecord, AccessOption.PERSISTENT);
   }
 
   protected ZNRecord getKafkaPartitionAssignment(final String realtimeTableName) {
-    final String path = makeKafkaPartitionPath(realtimeTableName);
+    final String path = ZKMetadataProvider.constructPropertyStorePathForKafkaPartitions(realtimeTableName);
     return _propertyStore.get(path, null, AccessOption.PERSISTENT);
   }
 
