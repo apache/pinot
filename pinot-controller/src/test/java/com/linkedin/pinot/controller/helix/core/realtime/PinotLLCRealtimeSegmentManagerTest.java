@@ -26,6 +26,7 @@ import java.util.Random;
 import java.util.Set;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.IdealState;
+import org.joda.time.Interval;
 import org.testng.Assert;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
@@ -36,6 +37,13 @@ import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
 import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
+import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.when;
 
 
 public class PinotLLCRealtimeSegmentManagerTest {
@@ -68,7 +76,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
   }
 
   public void testKafkaAssignment(final int nPartitions, final int nInstances, final int nReplicas) {
-    MockPinotLLCRealtimeSegmentManager segmentManager = new MockPinotLLCRealtimeSegmentManager(false, null);
+    FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager(false, null);
 
     final String topic = "someTopic";
     final String rtTableName = "table_REALTIME";
@@ -123,7 +131,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
   private void testInitialSegmentAssignments(final int nPartitions, final int nInstances, final int nReplicas,
       boolean existingIS) {
-    MockPinotLLCRealtimeSegmentManager segmentManager = new MockPinotLLCRealtimeSegmentManager(true, null);
+    FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager(true, null);
 
     final String topic = "someTopic";
     final String rtTableName = "table_REALTIME";
@@ -185,7 +193,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
   public void testPreExistingSegments() throws Exception {
     LLCSegmentName existingSegmentName = new LLCSegmentName("someTable", 1, 31, 12355L);
     String[] existingSegs = {existingSegmentName.getSegmentName()};
-    MockPinotLLCRealtimeSegmentManager segmentManager = new MockPinotLLCRealtimeSegmentManager(true, Arrays.asList(existingSegs));
+    FakePinotLLCRealtimeSegmentManager
+        segmentManager = new FakePinotLLCRealtimeSegmentManager(true, Arrays.asList(existingSegs));
 
     final String topic = "someTopic";
     final String rtTableName = "table_REALTIME";
@@ -210,7 +219,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
   @Test
   public void testCommittingSegment() throws Exception {
-    MockPinotLLCRealtimeSegmentManager segmentManager = new MockPinotLLCRealtimeSegmentManager(true, null);
+    FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager(true, null);
 
     final String topic = "someTopic";
     final String rtTableName = "table_REALTIME";
@@ -230,6 +239,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     final long nextOffset = 3425666L;
     LLCRealtimeSegmentZKMetadata committingSegmentMetadata =  new LLCRealtimeSegmentZKMetadata(segmentManager._records.get(committingPartition));
     boolean status = segmentManager.commitSegment(rawTableName, committingSegmentMetadata.getSegmentName(), nextOffset);
+    segmentManager.verifyMetadataInteractions();
     Assert.assertTrue(status);
 
     // Get the old and new segment metadata and make sure that they are correct.
@@ -250,6 +260,11 @@ public class PinotLLCRealtimeSegmentManagerTest {
     Assert.assertEquals(oldMetadata.getStatus(), CommonConstants.Segment.Realtime.Status.DONE);
     Assert.assertEquals(newMetadata.getStatus(), CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
     Assert.assertNotNull(oldMetadata.getDownloadUrl());
+    Assert.assertEquals(Long.valueOf(oldMetadata.getCrc()), Long.valueOf(FakePinotLLCRealtimeSegmentManager.CRC));
+    Assert.assertEquals(oldMetadata.getStartTime(), FakePinotLLCRealtimeSegmentManager.INTERVAL.getStartMillis());
+    Assert.assertEquals(oldMetadata.getEndTime(), FakePinotLLCRealtimeSegmentManager.INTERVAL.getEndMillis());
+    Assert.assertEquals(oldMetadata.getTotalRawDocs(), FakePinotLLCRealtimeSegmentManager.NUM_DOCS);
+    Assert.assertEquals(oldMetadata.getIndexVersion(), FakePinotLLCRealtimeSegmentManager.SEGMENT_VERSION);
   }
 
   @Test
@@ -301,7 +316,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
       List<String> instances = getInstanceList(nInstances);
       final String startOffset = KAFKA_OFFSET;
 
-      MockPinotLLCRealtimeSegmentManager segmentManager = new MockPinotLLCRealtimeSegmentManager(false, null);
+      FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager(false, null);
       segmentManager.setupHelixEntries(topic, realtimeTableName, nPartitions, instances, nReplicas, startOffset, DUMMY_HOST, idealState, false);
       ZNRecord partitionAssignment = segmentManager.getKafkaPartitionAssignment(realtimeTableName);
 
@@ -354,7 +369,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
   }
 
-  static class MockPinotLLCRealtimeSegmentManager extends PinotLLCRealtimeSegmentManager {
+  static class FakePinotLLCRealtimeSegmentManager extends PinotLLCRealtimeSegmentManager {
 
     private static final ControllerConf CONTROLLER_CONF = new ControllerConf();
     private final boolean _setupInitialSegments;
@@ -378,7 +393,14 @@ public class PinotLLCRealtimeSegmentManagerTest {
     public int _nCallsToUpdateHelix = 0;
     public IdealState _tableIdealState;
 
-    protected MockPinotLLCRealtimeSegmentManager(boolean setupInitialSegments, List<String> existingLLCSegments) {
+    public static final String CRC = "5680988776500";
+    public static final Interval INTERVAL = new Interval(3000, 4000);
+    public static final String SEGMENT_VERSION = SegmentVersion.v1.toString();
+    public static final int NUM_DOCS = 5099775;
+
+    private SegmentMetadataImpl segmentMetadata;
+
+    protected FakePinotLLCRealtimeSegmentManager(boolean setupInitialSegments, List<String> existingLLCSegments) {
       super(null, clusterName, null, null, null, CONTROLLER_CONF);
       _setupInitialSegments = setupInitialSegments;
       _existingLLCSegments = existingLLCSegments;
@@ -438,6 +460,24 @@ public class PinotLLCRealtimeSegmentManagerTest {
       LLCRealtimeSegmentZKMetadata metadata = new LLCRealtimeSegmentZKMetadata();
       metadata.setSegmentName(segmentName);
       return metadata;
+    }
+
+    @Override
+    protected SegmentMetadataImpl extractSegmentMetadata(final String rawTableName, final String segmentNameStr) {
+      segmentMetadata = mock(SegmentMetadataImpl.class);
+      when(segmentMetadata.getCrc()).thenReturn(CRC);
+      when(segmentMetadata.getTimeInterval()).thenReturn(INTERVAL);
+      when(segmentMetadata.getVersion()).thenReturn(SEGMENT_VERSION);
+      when(segmentMetadata.getTotalRawDocs()).thenReturn(NUM_DOCS);
+      return segmentMetadata;
+    }
+
+    public void verifyMetadataInteractions() {
+      verify(segmentMetadata, times(1)).getCrc();
+      verify(segmentMetadata, times(2)).getTimeInterval();
+      verify(segmentMetadata, times(1)).getVersion();
+      verify(segmentMetadata, times(1)).getTotalRawDocs();
+      verifyNoMoreInteractions(segmentMetadata);
     }
 
     @Override

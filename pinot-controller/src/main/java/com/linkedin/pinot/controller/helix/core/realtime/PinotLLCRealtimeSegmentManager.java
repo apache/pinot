@@ -243,7 +243,7 @@ public class PinotLLCRealtimeSegmentManager {
         metadata.setStatus(CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
 
         ZNRecord record = metadata.toZNRecord();
-        final String znodePath = PinotRealtimeSegmentManager.getSegmentsPath() + "/" + realtimeTableName + "/" + segName;
+        final String znodePath = ZKMetadataProvider.constructPropertyStorePathForSegment(realtimeTableName, segName);
         paths.add(znodePath);
         records.add(record);
         idealStateEntries.put(segName, instances);
@@ -325,11 +325,13 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   protected List<String> getExistingSegments(String realtimeTableName) {
-    return  _propertyStore.getChildNames(PinotRealtimeSegmentManager.getSegmentsPath() + "/" + realtimeTableName, AccessOption.PERSISTENT);
+    String propStorePath = ZKMetadataProvider.constructPropertyStorePathForResource(realtimeTableName);
+    return  _propertyStore.getChildNames(propStorePath, AccessOption.PERSISTENT);
   }
 
   protected List<ZNRecord> getExistingSegmentMetadata(String realtimeTableName) {
-    return _propertyStore.getChildren(PinotRealtimeSegmentManager.getSegmentsPath() + "/" + realtimeTableName, null, 0);
+    String propStorePath = ZKMetadataProvider.constructPropertyStorePathForResource(realtimeTableName);
+    return _propertyStore.getChildren(propStorePath, null, 0);
 
   }
 
@@ -366,29 +368,10 @@ public class PinotLLCRealtimeSegmentManager {
     final int oldSeqNum = oldSegmentName.getSequenceNumber();
     oldSegMetadata.setEndOffset(nextOffset);
     oldSegMetadata.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
-    oldSegMetadata.setEndTime(now);
     oldSegMetadata.setDownloadUrl(
         ControllerConf.constructDownloadUrl(rawTableName, committingSegmentNameStr, _controllerConf.generateVipUrl()));
     // Pull segment metadata from incoming segment and set it in zk segment metadata
-    final String baseDir = StringUtil.join("/", _controllerConf.getDataDir(), rawTableName);
-    final String segFileName = StringUtil.join("/", baseDir, committingSegmentNameStr);
-    final File segFile = new File(segFileName);
-    // File must exist since this method is called only after the file is downloaded.
-    SegmentMetadataImpl segmentMetadata;
-    Path metadataPath = null;
-    try {
-      InputStream is = TarGzCompressionUtils
-          .unTarOneFile(new FileInputStream(segFile), V1Constants.MetadataKeys.METADATA_FILE_NAME);
-      metadataPath = FileSystems.getDefault().getPath(baseDir, committingSegmentNameStr + ".metadata");
-      Files.copy(is, metadataPath);
-      segmentMetadata = new SegmentMetadataImpl(new File(metadataPath.toString()));
-    } catch (Exception e) {
-      throw new RuntimeException("Exception extacting and reading segment metadata for " + committingSegmentNameStr, e);
-    } finally {
-      if (metadataPath != null) {
-        FileUtils.deleteQuietly(new File(metadataPath.toString()));
-      }
-    }
+    SegmentMetadataImpl segmentMetadata = extractSegmentMetadata(rawTableName, committingSegmentNameStr);
     oldSegMetadata.setCrc(Long.valueOf(segmentMetadata.getCrc()));
     oldSegMetadata.setStartTime(segmentMetadata.getTimeInterval().getStartMillis());
     oldSegMetadata.setEndTime(segmentMetadata.getTimeInterval().getEndMillis());
@@ -396,7 +379,7 @@ public class PinotLLCRealtimeSegmentManager {
     oldSegMetadata.setTotalRawDocs(segmentMetadata.getTotalRawDocs());
 
     final ZNRecord oldZnRecord = oldSegMetadata.toZNRecord();
-    final String oldZnodePath = PinotRealtimeSegmentManager.getSegmentsPath() + "/" + realtimeTableName + "/" + committingSegmentNameStr;
+    final String oldZnodePath = ZKMetadataProvider.constructPropertyStorePathForSegment(realtimeTableName, committingSegmentNameStr);
 
     final ZNRecord partitionAssignment = getKafkaPartitionAssignment(realtimeTableName);
     List<String> newInstances = partitionAssignment.getListField(Integer.toString(partitionId));
@@ -415,7 +398,7 @@ public class PinotLLCRealtimeSegmentManager {
     newSegMetadata.setSegmentName(newSegmentNameStr);
     newSegMetadata.setStatus(CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
     final ZNRecord newZnRecord = newSegMetadata.toZNRecord();
-    final String newZnodePath = PinotRealtimeSegmentManager.getSegmentsPath() + "/" + realtimeTableName + "/" + newSegmentNameStr;
+    final String newZnodePath = ZKMetadataProvider.constructPropertyStorePathForSegment(realtimeTableName, newSegmentNameStr);
 
     idealStateEntries.put(newSegmentNameStr, newInstances);
 
@@ -445,6 +428,37 @@ public class PinotLLCRealtimeSegmentManager {
 
     updateHelixIdealState(realtimeTableName, newInstances, committingSegmentNameStr, newSegmentNameStr);
     return true;
+  }
+
+  /**
+   * Extract the segment metadata file from the tar-zipped segment file that is expected to be in the
+   * directory for the table.
+   * Segment tar-zipped file path: DATADIR/rawTableName/segmentName
+   * We extract the metadata into a file into a file in the same level,as in: DATADIR/rawTableName/segmentName.metadata
+   * @param rawTableName Name of the table (not including the REALTIME extension)
+   * @param segmentNameStr Name of the segment
+   * @return SegmentMetadataImpl if it is able to extract the metadata file from the tar-zipped segment file.
+   */
+  protected SegmentMetadataImpl extractSegmentMetadata(final String rawTableName, final String segmentNameStr) {
+    final String baseDir = StringUtil.join("/", _controllerConf.getDataDir(), rawTableName);
+    final String segFileName = StringUtil.join("/", baseDir, segmentNameStr);
+    final File segFile = new File(segFileName);
+    SegmentMetadataImpl segmentMetadata;
+    Path metadataPath = null;
+    try {
+      InputStream is = TarGzCompressionUtils
+          .unTarOneFile(new FileInputStream(segFile), V1Constants.MetadataKeys.METADATA_FILE_NAME);
+      metadataPath = FileSystems.getDefault().getPath(baseDir, segmentNameStr + ".metadata");
+      Files.copy(is, metadataPath);
+      segmentMetadata = new SegmentMetadataImpl(new File(metadataPath.toString()));
+    } catch (Exception e) {
+      throw new RuntimeException("Exception extacting and reading segment metadata for " + segmentNameStr, e);
+    } finally {
+      if (metadataPath != null) {
+        FileUtils.deleteQuietly(new File(metadataPath.toString()));
+      }
+    }
+    return segmentMetadata;
   }
 
   public LLCRealtimeSegmentZKMetadata getRealtimeSegmentZKMetadata(String realtimeTableName, String segmentName) {
