@@ -55,13 +55,17 @@ function getAnomalies(tab) {
 // TODO: requires refactoring !!
 
 function updateChartForSingleAnomaly(dimension, value, start, end) {
-    var baselineStart = moment(start).add(-7, 'days')
-    var baselineEnd = moment(end).add(-7, 'days')
+    // var baselineStart = moment(start).add(-7, 'days')
+    // var baselineEnd = moment(end).add(-7, 'days')
+
+    var baselineStart = moment(parseInt(hash.currentStart)).add(-7, 'days')
+    var baselineEnd = moment(parseInt(hash.currentEnd)).add(-7, 'days')
+
     var aggTimeGranularity = (window.datasetConfig.dataGranularity) ? window.datasetConfig.dataGranularity : "HOURS";
     var dataset = hash.dataset;
     var compareMode = "WoW";
-    var currentStart = start;
-    var currentEnd = end;
+    var currentStart = hash.currentStart;
+    var currentEnd = hash.currentEnd;
     var metrics = hash.metrics;
 
     var filter = "{}";
