@@ -8,6 +8,8 @@ import com.linkedin.thirdeye.db.entity.AnomalyTaskSpec;
 import java.sql.Timestamp;
 import java.util.List;
 
+import javax.persistence.EntityManager;
+import javax.persistence.EntityTransaction;
 import org.joda.time.DateTime;
 
 public class AnomalyTaskDAO extends AbstractJpaDAO<AnomalyTaskSpec> {
@@ -26,25 +28,37 @@ public class AnomalyTaskDAO extends AbstractJpaDAO<AnomalyTaskSpec> {
     super(AnomalyTaskSpec.class);
   }
 
-  @Transactional
+  @Transactional(rollbackOn = Exception.class)
   public List<AnomalyTaskSpec> findByJobIdStatusNotIn(Long jobId, TaskStatus status) {
     return getEntityManager().createQuery(FIND_BY_JOB_ID_STATUS_NOT_IN, entityClass)
         .setParameter("jobId", jobId)
         .setParameter("status", status).getResultList();
   }
 
-  @Transactional
   public List<AnomalyTaskSpec> findByStatusOrderByCreateTimeAsc(TaskStatus status, int fetchSize) {
-    return getEntityManager().createQuery(FIND_BY_STATUS_ORDER_BY_CREATE_TIME_ASC, entityClass)
-        .setMaxResults(fetchSize).setParameter("status", status).getResultList();
+    EntityManager em = getEntityManager();
+    EntityTransaction txn = em.getTransaction();
+    try {
+      txn.begin();
+      List<AnomalyTaskSpec> tasks =
+          getEntityManager().createQuery(FIND_BY_STATUS_ORDER_BY_CREATE_TIME_ASC, entityClass)
+              .setMaxResults(fetchSize).setParameter("status", status).getResultList();
+      txn.commit();
+      return tasks;
+    } catch (Exception e) {
+      if (txn.isActive()) {
+        txn.rollback();
+      }
+      throw e;
+    }
   }
 
-  @Transactional
+  @Transactional(rollbackOn = Exception.class)
   public List<AnomalyTaskSpec> findByIdAndStatus(Long id, TaskStatus status) {
     return super.findByParams(ImmutableMap.of("status", status, "id", id));
   }
 
-  @Transactional
+  @Transactional(rollbackOn = Exception.class)
   public boolean updateStatusAndWorkerId(Long workerId, Long id, TaskStatus oldStatus, TaskStatus newStatus) {
     List<AnomalyTaskSpec> anomalyTaskSpecs = findByIdAndStatus(id, oldStatus);
     if (anomalyTaskSpecs.size() == 1) {
@@ -57,7 +71,7 @@ public class AnomalyTaskDAO extends AbstractJpaDAO<AnomalyTaskSpec> {
     return false;
   }
 
-  @Transactional
+  @Transactional(rollbackOn = Exception.class)
   public void updateStatusAndTaskEndTime(Long id, TaskStatus oldStatus, TaskStatus newStatus, Long taskEndTime) {
     List<AnomalyTaskSpec> anomalyTaskSpecs = findByIdAndStatus(id, oldStatus);
     if (anomalyTaskSpecs.size() == 1) {

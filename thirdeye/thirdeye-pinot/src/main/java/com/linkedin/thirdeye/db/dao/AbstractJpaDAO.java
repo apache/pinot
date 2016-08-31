@@ -30,13 +30,13 @@ public class AbstractJpaDAO<E extends AbstractBaseEntity> {
     return emf.get();
   }
 
-  @Transactional
+  @Transactional(rollbackOn = Exception.class)
   public Long save(E entity) {
     getEntityManager().persist(entity);
     return entity.getId();
   }
 
-  @Transactional
+  @Transactional(rollbackOn = Exception.class)
   public void update(E entity) {
     getEntityManager().merge(entity);
   }

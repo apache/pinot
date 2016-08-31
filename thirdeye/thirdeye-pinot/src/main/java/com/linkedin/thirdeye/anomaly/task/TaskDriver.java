@@ -118,8 +118,9 @@ public class TaskDriver {
         // sleep for few seconds if not tasks found - avoid cpu thrashing
         // also add some extra random number of milli seconds to allow threads to start at different times
         // TODO : Add better wait / clear call
-        LOG.debug("No tasks found to execute, sleeping for {} MS", NO_TASK_IDLE_DELAY_MILLIS + RANDOM.nextInt(1000));
-        Thread.sleep(NO_TASK_IDLE_DELAY_MILLIS);
+        int delay = NO_TASK_IDLE_DELAY_MILLIS + RANDOM.nextInt(NO_TASK_IDLE_DELAY_MILLIS);
+        LOG.debug("No tasks found to execute, sleeping for {} MS", delay);
+        Thread.sleep(delay);
       }
 
       for (AnomalyTaskSpec anomalyTaskSpec : anomalyTasks) {
