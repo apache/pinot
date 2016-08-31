@@ -32,7 +32,10 @@
                     <p>{{millisToDate anomalyData/startTime showTimeZone=false}} </p>
                     <p> {{millisToDate anomalyData/endTime showTimeZone=false}}</p>
                 </td>
-                <td>{{anomalyData/message}}</td>
+                <td>{{anomalyData/message}}
+                  <br/>
+                  <a onclick="updateChartForSingleAnomaly('{{anomalyData/function/exploreDimensions}}', '{{displayAnomalyResultDimensionValue anomalyData/dimensions}}', {{anomalyData/startTime}}, {{anomalyData/endTime}})" >update chart</a>
+                </td>
                 <td>{{#if anomalyData/function/exploreDimensions}}{{anomalyData/function/exploreDimensions}}:{{/if}} {{displayAnomalyResultDimensionValue anomalyData/dimensions}}</td>
                 <td>
                     <a class="heatmap-link" href="#" data-start-utc-millis="{{anomalyData/startTime}}" data-end-utc-millis="{{anomalyData/endTime}}"  data-metric="{{anomalyData/metric}}">

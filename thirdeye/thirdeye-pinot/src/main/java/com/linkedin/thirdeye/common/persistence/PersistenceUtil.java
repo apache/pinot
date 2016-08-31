@@ -53,8 +53,8 @@ public abstract class PersistenceUtil {
     ds.setTestOnReturn(true);
     ds.setRollbackOnReturn(true);
 
-    // Timeout in seconds before an abandoned(in use) connection can be removed.
-    ds.setRemoveAbandonedTimeout(600);
+    // Timeout before an abandoned(in use) connection can be removed.
+    ds.setRemoveAbandonedTimeout(600_000);
     ds.setRemoveAbandoned(true);
 
     properties.put(Environment.CONNECTION_PROVIDER, DatasourceConnectionProviderImpl.class.getName());

@@ -6,8 +6,11 @@ import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
 import com.linkedin.thirdeye.db.entity.AnomalyTaskSpec;
 
 import java.sql.Timestamp;
+import java.util.ArrayList;
 import java.util.List;
 
+import javax.persistence.EntityManager;
+import javax.persistence.EntityTransaction;
 import org.joda.time.DateTime;
 
 public class AnomalyTaskDAO extends AbstractJpaDAO<AnomalyTaskSpec> {
@@ -26,45 +29,58 @@ public class AnomalyTaskDAO extends AbstractJpaDAO<AnomalyTaskSpec> {
     super(AnomalyTaskSpec.class);
   }
 
-  @Transactional
+  @Transactional(rollbackOn = Exception.class)
   public List<AnomalyTaskSpec> findByJobIdStatusNotIn(Long jobId, TaskStatus status) {
     return getEntityManager().createQuery(FIND_BY_JOB_ID_STATUS_NOT_IN, entityClass)
         .setParameter("jobId", jobId)
         .setParameter("status", status).getResultList();
   }
 
-  @Transactional
   public List<AnomalyTaskSpec> findByStatusOrderByCreateTimeAsc(TaskStatus status, int fetchSize) {
-    return getEntityManager().createQuery(FIND_BY_STATUS_ORDER_BY_CREATE_TIME_ASC, entityClass)
-        .setMaxResults(fetchSize).setParameter("status", status).getResultList();
+    EntityManager em = getEntityManager();
+    EntityTransaction txn = em.getTransaction();
+    List<AnomalyTaskSpec> tasks = new ArrayList<>();
+    try {
+      txn.begin();
+      tasks = em.createQuery(FIND_BY_STATUS_ORDER_BY_CREATE_TIME_ASC, entityClass)
+          .setMaxResults(fetchSize).setParameter("status", status).getResultList();
+      txn.commit();
+      return tasks;
+    } catch (Exception e) {
+      if (txn.isActive()) {
+        txn.rollback();
+      }
+    }
+    return tasks;
   }
 
-  @Transactional
+  @Transactional(rollbackOn = Exception.class)
   public List<AnomalyTaskSpec> findByIdAndStatus(Long id, TaskStatus status) {
     return super.findByParams(ImmutableMap.of("status", status, "id", id));
   }
 
-  @Transactional
-  public boolean updateStatusAndWorkerId(Long workerId, Long id, TaskStatus oldStatus, TaskStatus newStatus) {
-    List<AnomalyTaskSpec> anomalyTaskSpecs = findByIdAndStatus(id, oldStatus);
-    if (anomalyTaskSpecs.size() == 1) {
-      AnomalyTaskSpec anomalyTaskSpec = anomalyTaskSpecs.get(0);
-      anomalyTaskSpec.setStatus(newStatus);
-      anomalyTaskSpec.setWorkerId(workerId);
-      save(anomalyTaskSpec);
+  @Transactional(rollbackOn = Exception.class)
+  public boolean updateStatusAndWorkerId(Long workerId,
+      Long id, TaskStatus oldStatus, TaskStatus newStatus) {
+    AnomalyTaskSpec task = findById(id);
+    if (task.getStatus().equals(oldStatus)) {
+      task.setStatus(newStatus);
+      task.setWorkerId(workerId);
+      save(task);
       return true;
+    } else {
+      return false;
     }
-    return false;
   }
 
-  @Transactional
-  public void updateStatusAndTaskEndTime(Long id, TaskStatus oldStatus, TaskStatus newStatus, Long taskEndTime) {
-    List<AnomalyTaskSpec> anomalyTaskSpecs = findByIdAndStatus(id, oldStatus);
-    if (anomalyTaskSpecs.size() == 1) {
-      AnomalyTaskSpec anomalyTaskSpec = anomalyTaskSpecs.get(0);
-      anomalyTaskSpec.setStatus(newStatus);
-      anomalyTaskSpec.setTaskEndTime(taskEndTime);
-      save(anomalyTaskSpec);
+  @Transactional(rollbackOn = Exception.class)
+  public void updateStatusAndTaskEndTime(Long id,
+      TaskStatus oldStatus, TaskStatus newStatus, Long taskEndTime) {
+    AnomalyTaskSpec task = findById(id);
+    if (task.getStatus().equals(oldStatus)) {
+      task.setStatus(newStatus);
+      task.setTaskEndTime(taskEndTime);
+      save(task);
     }
   }
 

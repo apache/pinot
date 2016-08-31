@@ -1,3 +1,6 @@
+var anomaliesDisplayData = "";
+var timeseriesDisplayData = "";
+
 function getAnomalies(tab) {
 
     var baselineStart = moment(parseInt(hash.currentStart)).add(-7, 'days')
@@ -24,8 +27,9 @@ function getAnomalies(tab) {
     var anomaliesUrl = "/dashboard/anomalies/view?" + urlParams;
 
     getData(anomaliesUrl).done(function (anomalyData) {
+        anomaliesDisplayData = anomalyData;
         getData(timeSeriesUrl).done(function (timeSeriesData) {
-
+            timeseriesDisplayData = timeSeriesData;
             //Error handling when data is falsy (empty, undefined or null)
             if (!timeSeriesData) {
                 $("#" + tab + "-chart-area-error").empty();
@@ -46,20 +50,61 @@ function getAnomalies(tab) {
             delete hash.anomalyFunctionId
         });
     });
-};
+}
+
+// TODO: requires refactoring !!
+
+function updateChartForSingleAnomaly(dimension, value, start, end) {
+    // var baselineStart = moment(start).add(-7, 'days')
+    // var baselineEnd = moment(end).add(-7, 'days')
+
+    var baselineStart = moment(parseInt(hash.currentStart)).add(-7, 'days')
+    var baselineEnd = moment(parseInt(hash.currentEnd)).add(-7, 'days')
+
+    var aggTimeGranularity = (window.datasetConfig.dataGranularity) ? window.datasetConfig.dataGranularity : "HOURS";
+    var dataset = hash.dataset;
+    var compareMode = "WoW";
+    var currentStart = hash.currentStart;
+    var currentEnd = hash.currentEnd;
+    var metrics = hash.metrics;
+
+    var filter = "{}";
+    if(dimension && value && value != 'ALL') {
+        filter = '{"'+dimension+'":["'+value+'"]}';
+    }
+    console.log(filter);
+
+    var timeSeriesUrl = "/dashboard/data/tabular?dataset=" + dataset + "&compareMode=" + compareMode //
+        + "&currentStart=" + currentStart + "&currentEnd=" + currentEnd  //
+        + "&baselineStart=" + baselineStart + "&baselineEnd=" + baselineEnd   //
+        + "&aggTimeGranularity=" + aggTimeGranularity + "&metrics=" + metrics+ "&filters=" + filter;
+
+
+    var tab = "anomalies";
+
+    getData(timeSeriesUrl).done(function (timeSeriesData) {
+        //Error handling when data is falsy (empty, undefined or null)
+        if (!timeSeriesData) {
+            // do nothing
+            return
+        } else {
+            $("#" + tab + "-chart-area-error").hide();
+        }
+        renderAnomalyLineChart(timeSeriesData, anomaliesDisplayData, tab);
+        renderAnomalyTable(anomaliesDisplayData, tab);
+    });
+}
 
 function renderAnomalyLineChart(timeSeriesData, anomalyData, tab) {
-
+    console.log(timeseriesDisplayData);
+    console.log(anomaliesDisplayData);
 
     $("#" + tab + "-display-chart-section").empty();
-
     /* Handelbars template for time series legend */
     var result_metric_time_series_section = HandleBarsTemplates.template_metric_time_series_section(timeSeriesData);
     $("#" + tab + "-display-chart-section").append(result_metric_time_series_section);
-
     drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab);
 }
-
 
 var lineChart;
 function drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab) {
