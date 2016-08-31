@@ -120,7 +120,6 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
   private final LLCRealtimeSegmentZKMetadata _segmentZKMetadata;
   private final AbstractTableConfig _tableConfig;
   private final RealtimeTableDataManager _realtimeTableDataManager;
-  private final String _decoderClassName;
   private final KafkaMessageDecoder _messageDecoder;
   private final int _segmentMaxRowCount;
   private final String _resourceDataDir;
@@ -131,7 +130,6 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
   private long _currentOffset;
   private volatile State _state;
   private int _numRowsConsumed = 0;
-  private long _startOffset = 0;
   private long _startTimeMs = 0;
   private final String _segmentNameStr;
   private final SegmentVersion _segmentVersion;
@@ -233,6 +231,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
       }
       if (batchSize != 0) {
         segmentLogger.debug("Indexed {} messages current offset {}", batchSize, _currentOffset);
+        updateCurrentDocumentCountMetrics();
       } else {
         // If there were no messages to be fetched from Kafka, wait for a little bit as to avoid hammering the
         // Kafka broker
@@ -539,8 +538,6 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     _segmentNameStr = _segmentZKMetadata.getSegmentName();
     _segmentName = new LLCSegmentName(_segmentNameStr);
     _kafkaPartitionId = _segmentName.getPartitionId();
-    _decoderClassName = indexingConfig.getStreamConfigs()
-        .get(CommonConstants.Helix.DataSource.STREAM_PREFIX + "." + CommonConstants.Helix.DataSource.Realtime.Kafka.DECODER_CLASS);
     _segmentMaxRowCount = Integer.parseInt(_tableConfig.getIndexingConfig().getStreamConfigs().get(
         CommonConstants.Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_SIZE));
     _tableName = _tableConfig.getTableName();

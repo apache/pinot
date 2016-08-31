@@ -16,14 +16,19 @@
 
 package com.linkedin.pinot.controller.helix.core.realtime;
 
-import com.linkedin.pinot.core.realtime.impl.kafka.KafkaSimpleConsumerFactoryImpl;
-import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.InputStream;
+import java.nio.file.FileSystems;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixAdmin;
@@ -40,11 +45,17 @@ import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.common.utils.SegmentName;
+import com.linkedin.pinot.common.utils.StringUtil;
+import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.common.utils.retry.RetryPolicies;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
+import com.linkedin.pinot.core.realtime.impl.kafka.KafkaSimpleConsumerFactoryImpl;
+import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
+import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 
 
 public class PinotLLCRealtimeSegmentManager {
@@ -358,6 +369,32 @@ public class PinotLLCRealtimeSegmentManager {
     oldSegMetadata.setEndTime(now);
     oldSegMetadata.setDownloadUrl(
         ControllerConf.constructDownloadUrl(rawTableName, committingSegmentNameStr, _controllerConf.generateVipUrl()));
+    // Pull segment metadata from incoming segment and set it in zk segment metadata
+    final String baseDir = StringUtil.join("/", _controllerConf.getDataDir(), rawTableName);
+    final String segFileName = StringUtil.join("/", baseDir, committingSegmentNameStr);
+    final File segFile = new File(segFileName);
+    // File must exist since this method is called only after the file is downloaded.
+    SegmentMetadataImpl segmentMetadata;
+    Path metadataPath = null;
+    try {
+      InputStream is = TarGzCompressionUtils
+          .unTarOneFile(new FileInputStream(segFile), V1Constants.MetadataKeys.METADATA_FILE_NAME);
+      metadataPath = FileSystems.getDefault().getPath(baseDir, committingSegmentNameStr + ".metadata");
+      Files.copy(is, metadataPath);
+      segmentMetadata = new SegmentMetadataImpl(new File(metadataPath.toString()));
+    } catch (Exception e) {
+      throw new RuntimeException("Exception extacting and reading segment metadata for " + committingSegmentNameStr, e);
+    } finally {
+      if (metadataPath != null) {
+        FileUtils.deleteQuietly(new File(metadataPath.toString()));
+      }
+    }
+    oldSegMetadata.setCrc(Long.valueOf(segmentMetadata.getCrc()));
+    oldSegMetadata.setStartTime(segmentMetadata.getTimeInterval().getStartMillis());
+    oldSegMetadata.setEndTime(segmentMetadata.getTimeInterval().getEndMillis());
+    oldSegMetadata.setIndexVersion(segmentMetadata.getVersion());
+    oldSegMetadata.setTotalRawDocs(segmentMetadata.getTotalRawDocs());
+
     final ZNRecord oldZnRecord = oldSegMetadata.toZNRecord();
     final String oldZnodePath = PinotRealtimeSegmentManager.getSegmentsPath() + "/" + realtimeTableName + "/" + committingSegmentNameStr;
 
