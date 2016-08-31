@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.common.persistence;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.Maps;
 import io.dropwizard.Configuration;
@@ -22,10 +23,12 @@ public class PersistenceConfig extends Configuration {
     this.databaseConfiguration = databaseConfiguration;
   }
 
+  @JsonIgnoreProperties(ignoreUnknown = true)
   public static class DatabaseConfiguration {
     private String user;
     private String password;
     private String url;
+    private String driver;
     private Map<String, String> properties = Maps.newLinkedHashMap();
 
     public String getUser() {
@@ -58,6 +61,14 @@ public class PersistenceConfig extends Configuration {
 
     public void setUrl(String url) {
       this.url = url;
+    }
+
+    public String getDriver() {
+      return driver;
+    }
+
+    public void setDriver(String driver) {
+      this.driver = driver;
     }
   }
 }

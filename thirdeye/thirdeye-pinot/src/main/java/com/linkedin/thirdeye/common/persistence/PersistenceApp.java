@@ -63,4 +63,12 @@ public class PersistenceApp extends Application<PersistenceConfig> {
     argList.set(lastIndex, dbConfigFile);
     new PersistenceApp().run(argList.toArray(new String[argList.size()]));
   }
+
+  public static void testWithPersistenceFile(final String[] args) throws Exception {
+    List<String> argList = new ArrayList<>(Arrays.asList(args));
+    int lastIndex = argList.size() - 1;
+    String thirdEyeConfigFile = argList.get(lastIndex);
+    argList.set(lastIndex, thirdEyeConfigFile);
+    new PersistenceApp().run(argList.toArray(new String[argList.size()]));
+  }
 }

@@ -117,7 +117,22 @@
      <groupId>org.hibernate</groupId>
      <artifactId>hibernate-c3p0</artifactId>
    </dependency>
-
+    <!-- TODO: restructure this -->
+    <dependency>
+      <groupId>org.jdbi</groupId>
+      <artifactId>jdbi</artifactId>
+      <version>2.75</version>
+    </dependency>
+    <dependency>
+      <groupId>org.modelmapper</groupId>
+      <artifactId>modelmapper</artifactId>
+      <version>0.7.6</version>
+    </dependency>
+    <dependency>
+      <groupId>com.h2database</groupId>
+      <artifactId>h2</artifactId>
+      <version>1.4.192</version>
+    </dependency>
     <!--UI dependencies -->
     <dependency>
       <groupId>com.github.jknack</groupId>
