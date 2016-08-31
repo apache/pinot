@@ -141,8 +141,26 @@ $(document).ready( function() {
 
     /** Handelbars template for main content
      /** Handelbars template for SELF SERVICE tab ANOMALY FUNCTION FORM **/
-    var metaDataUrl = "/thirdeye/function/metadata"
-    getData(metaDataUrl, "self-service").done(function (anomalyFunctionTypeMetaData) {
+
+    //Harcoding the function type metadata till backend endpoint is updated/available: "/thirdeye/function/metadata"
+    //Todo: get the function-type metadata from the backend once endpoint is updated
+    var anomalyFunctionTypeMetaData = {
+        KALMAN_FILTER: [
+            "order","knob","seasonal","pValueThreshold"
+        ],
+        MIN_MAX_THRESHOLD: ["min","max"
+        ],
+        USER_RULE: [
+            "baseline","changeThreshold","averageVolumeThreshold"
+        ],
+        SIGN_TEST: [
+            "pattern","signTestSize","signTestUnit","seasonalSize","seasonalUnit","baselineSeasonalPeriod","pValueThreshold","baselineShift","baselineLift","enableAutoTune","autoTuneThreshold"
+        ],
+        SCAN_STATISTICS: [
+            "pValueThreshold","complementaryPattern","complementaryLevel","seasonal","minIncrement","minWindowLength","maxWindowLength","bootstrap","numSimulations",
+            "notEqualEpsilon","proportionAnomalyInTraining","enableSTL","robust","periodic","enableOfflineTrain","numOfOfflineAnomalies","filterOnSeverity","targetPattern","targetLevel"
+        ]
+    }
 
         //Adding property defaults and datatypes from: https://gitli.corp.linkedin.com/ars-projects/anomaly-detection/source/bdafe93d4b4e57a439b16a8ca82c5b4119218ddd:anomaly-detection/src/main/java/com/linkedin/anomaly/api
         //Todo: get the property defaults from the backend once an endpoint is ready
@@ -202,7 +220,7 @@ $(document).ready( function() {
 
     var result_anomaly_function_form_template = HandleBarsTemplates.template_anomaly_function_form(functionInfo);
     $("#create-anomaly-functions-tab").html(result_anomaly_function_form_template);
-    })
+
 
     //Global object where the dataset params will be cached
     window.datasetConfig = {};

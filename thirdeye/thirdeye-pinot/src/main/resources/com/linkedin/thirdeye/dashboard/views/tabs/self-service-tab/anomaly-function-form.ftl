@@ -160,7 +160,7 @@
                 </div>
                 <div class="uk-form-row uk-form-row uk-display-inline-block" rel="self-service">
                     <input id="anomaly-threshold-min" type="text" placeholder="min threshold" {{#if fnProperties}}value="{{fnProperties/min}}"{{else}}{{/if}}>
-                    <span id="and">and</span>
+                    <span id="and" class="uk-hidden">and</span>
                     <input id="anomaly-threshold-max" class="uk-hidden" type="text" placeholder="max threshold" {{#if fnProperties}}value="{{fnProperties/max}}"{{else}} class="uk-hidden"{{/if}}>
                 </div>
             </div>
