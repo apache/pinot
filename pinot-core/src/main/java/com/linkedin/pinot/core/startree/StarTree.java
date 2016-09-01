@@ -17,12 +17,9 @@ package com.linkedin.pinot.core.startree;
 
 import com.google.common.collect.HashBiMap;
 import java.io.BufferedOutputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.OutputStream;
 import java.util.Map;
@@ -58,8 +55,8 @@ public class StarTree implements StarTreeInterf {
    * @return
    */
   @Override
-  public Version getVersion() {
-    return Version.V1;
+  public StarTreeFormatVersion getVersion() {
+    return StarTreeFormatVersion.V1;
   }
 
   /**

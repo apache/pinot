@@ -35,6 +35,7 @@ public class IndexingConfig {
   private String lazyLoad;
   private Map<String, String> streamConfigs = new HashMap<String, String>();
   private String segmentFormatVersion;
+  private String starTreeFormat;
 
   public IndexingConfig() {
 
@@ -120,5 +121,11 @@ public class IndexingConfig {
     return result.toString();
   }
 
+  public String getStarTreeFormat() {
+    return starTreeFormat;
+  }
 
+  public void setStarTreeFormat(String starTreeFormat) {
+    this.starTreeFormat = starTreeFormat;
+  }
 }

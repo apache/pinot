@@ -192,8 +192,8 @@ public class StarTreeV2 implements StarTreeInterf {
    * {@inheritDoc}
    * @return
    */
-  public Version getVersion() {
-    return Version.V2;
+  public StarTreeFormatVersion getVersion() {
+    return StarTreeFormatVersion.V2;
   }
 
   @Override

@@ -16,6 +16,7 @@
 package com.linkedin.pinot.integration.tests;
 
 import com.google.common.primitives.Longs;
+import com.linkedin.pinot.common.data.StarTreeIndexSpec;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileWriter;
@@ -732,7 +733,14 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
             // in their filename don't work properly
             genConfig.setSegmentNamePostfix(Integer.toString(segmentNumber) + " %");
             genConfig.setEnableStarTreeIndex(createStarTreeIndex);
-            genConfig.setStarTreeIndexSpec(null);
+
+            // Enable off heap star tree format in the integration test.
+            StarTreeIndexSpec starTreeIndexSpec = null;
+            if (createStarTreeIndex) {
+              starTreeIndexSpec = new StarTreeIndexSpec();
+              starTreeIndexSpec.setEnableOffHeapFormat(true);
+            }
+            genConfig.setStarTreeIndexSpec(starTreeIndexSpec);
 
             final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
             driver.init(genConfig);

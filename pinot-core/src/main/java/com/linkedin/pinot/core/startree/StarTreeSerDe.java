@@ -33,6 +33,9 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
+import org.apache.commons.io.FileUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import xerial.larray.buffer.LBuffer;
 import xerial.larray.buffer.LBufferAPI;
 import xerial.larray.mmap.MMapBuffer;
@@ -44,6 +47,8 @@ import xerial.larray.mmap.MMapMode;
  * data structure.
  */
 public class StarTreeSerDe {
+  private static final Logger LOGGER = LoggerFactory.getLogger(StarTreeSerDe.class);
+
   public static final long MAGIC_MARKER = 0xBADDA55B00DAD00DL;
   public static final int MAGIC_MARKER_SIZE_IN_BYTES = 8;
 
@@ -57,7 +62,7 @@ public class StarTreeSerDe {
       throws IOException, ClassNotFoundException {
 
     BufferedInputStream bufferedInputStream = new BufferedInputStream(inputStream);
-    StarTreeInterf.Version version = getStarTreeVersion(bufferedInputStream);
+    StarTreeFormatVersion version = getStarTreeVersion(bufferedInputStream);
 
     switch (version) {
       case V1:
@@ -79,7 +84,7 @@ public class StarTreeSerDe {
    */
   public static void writeTreeV1(StarTreeInterf starTree, File outputFile)
       throws IOException {
-    Preconditions.checkArgument(starTree.getVersion() == StarTreeInterf.Version.V1,
+    Preconditions.checkArgument(starTree.getVersion() == StarTreeFormatVersion.V1,
         "Cannot write V1 version of star tree from another version");
     starTree.writeTree(outputFile);
   }
@@ -92,7 +97,7 @@ public class StarTreeSerDe {
    */
   public static void writeTreeV2(StarTreeInterf starTree, File outputFile)
       throws IOException {
-    if (starTree.getVersion() == StarTreeInterf.Version.V1) {
+    if (starTree.getVersion() == StarTreeFormatVersion.V1) {
       writeTreeV2FromV1((StarTree) starTree, outputFile);
     } else {
       starTree.writeTree(outputFile);
@@ -108,7 +113,7 @@ public class StarTreeSerDe {
    * @return
    * @throws IOException
    */
-  public static StarTreeInterf.Version getStarTreeVersion(BufferedInputStream bufferedInputStream)
+  public static StarTreeFormatVersion getStarTreeVersion(BufferedInputStream bufferedInputStream)
       throws IOException {
     byte[] magicBytes = new byte[MAGIC_MARKER_SIZE_IN_BYTES];
 
@@ -121,10 +126,27 @@ public class StarTreeSerDe {
     long magicMarker = lBuffer.getLong(0);
 
     if (magicMarker == MAGIC_MARKER) {
-      return StarTreeInterf.Version.V2;
+      return StarTreeFormatVersion.V2;
     } else {
-      return StarTreeInterf.Version.V1;
+      return StarTreeFormatVersion.V1;
     }
+  }
+
+  /**
+   * Given a star tree file, return its version (v1 or v2).
+   * Assumes that the file is a valid star tree file.
+   *
+   * @param starTreeFile
+   * @return
+   * @throws IOException
+   */
+  public static StarTreeFormatVersion getStarTreeVersion(File starTreeFile)
+      throws IOException {
+    InputStream inputStream = new FileInputStream(starTreeFile);
+    BufferedInputStream bufferedInputStream = new BufferedInputStream(inputStream);
+    StarTreeFormatVersion version = getStarTreeVersion(bufferedInputStream);
+    bufferedInputStream.close();
+    return version;
   }
 
   /**
@@ -380,14 +402,76 @@ public class StarTreeSerDe {
 
     InputStream inputStream = new FileInputStream(starTreeFile);
     BufferedInputStream bufferedInputStream = new BufferedInputStream(inputStream);
-    StarTreeInterf.Version starTreeVersion = getStarTreeVersion(bufferedInputStream);
+    StarTreeFormatVersion starTreeVersion = getStarTreeVersion(bufferedInputStream);
 
-    if (starTreeVersion.equals(StarTreeInterf.Version.V1)) {
+    if (starTreeVersion.equals(StarTreeFormatVersion.V1)) {
       return fromBytesV1(bufferedInputStream);
-    } else if (starTreeVersion.equals(StarTreeInterf.Version.V2)) {
+    } else if (starTreeVersion.equals(StarTreeFormatVersion.V2)) {
       return new StarTreeV2(starTreeFile, readMode);
     } else {
       throw new RuntimeException("Unrecognized version for Star Tree " + starTreeVersion);
+    }
+  }
+
+  /**
+   * Utility method to convert star tree from v1 to v2 format:
+   * <p>- If star tree does not exist, or if actual version is the same as
+   *   expected version, then no action is taken. </p>
+   *
+   * <p>- If actual version is v1 and expected version is v2, then conversion from
+   *   v1 to v2 is performed. Both v1 and v2 formats are also backed up.</p>
+   *
+   * <p>- If actual version is v2 and expected version is v1, then v1 is restored from
+   *   backup version, if available, no-op otherwise. Note, there is no v2 to v1
+   *   conversion as of now.</p>
+   *
+   * @param indexDir
+   * @param starTreeVersionToLoad
+   * @throws IOException
+   * @throws ClassNotFoundException
+   */
+  public static void convertStarTreeFormatIfNeeded(File indexDir, StarTreeFormatVersion starTreeVersionToLoad)
+      throws IOException, ClassNotFoundException {
+    File starTreeFile = new File(indexDir, V1Constants.STAR_TREE_INDEX_FILE);
+
+    // If the star-tree file does not exist, this is not a star tree index, nothing to do here.
+    if (!starTreeFile.exists()) {
+      LOGGER.info("Skipping Star Tree format conversion, as no star tree file exists for {}",
+          starTreeFile.getAbsoluteFile());
+      return;
+    }
+
+    StarTreeFormatVersion actualVersion = getStarTreeVersion(starTreeFile);
+    if (actualVersion == StarTreeFormatVersion.V1 && starTreeVersionToLoad == StarTreeFormatVersion.V2) {
+      LOGGER.info("Converting Star Tree from V1 to V2 format for {}", starTreeFile.getAbsolutePath());
+      File starTreeV2File = new File(indexDir, V1Constants.STAR_TREE_V2_INDEX_FILE);
+      if (starTreeV2File.exists()) {
+        LOGGER.info("Replacing star tree v1 format with v2 format for {}", starTreeFile.getAbsolutePath());
+        FileUtils.copyFile(starTreeV2File, starTreeFile);
+      } else {
+        StarTreeInterf starTreeV1 = fromFile(starTreeFile, ReadMode.heap); // V1 only supports HEAP mode.
+
+        try {
+          writeTreeV2(starTreeV1, starTreeV2File);
+          FileUtils.copyFile(starTreeFile, new File(indexDir, V1Constants.STAR_TREE_V1_INDEX_FILE));
+          FileUtils.copyFile(starTreeV2File, starTreeFile);
+        } catch (Exception e) {
+          LOGGER.warn("Exception caught while convert star tree v1 to v2 for {}", starTreeFile.getAbsolutePath(), e);
+        }
+      }
+    } else if (actualVersion == StarTreeFormatVersion.V2 && starTreeVersionToLoad == StarTreeFormatVersion.V1) {
+      File starTreeV1File = new File(indexDir, V1Constants.STAR_TREE_V1_INDEX_FILE);
+      if (starTreeV1File.exists()) {
+        try {
+          FileUtils.copyFile(starTreeFile, new File(indexDir, V1Constants.STAR_TREE_V2_INDEX_FILE));
+          FileUtils.copyFile(starTreeV1File, starTreeFile);
+        } catch (Exception e) {
+          LOGGER.warn("Exception caught while converting star tree v2 to v1 for {}", starTreeFile.getAbsolutePath(), e);
+        }
+      } else {
+        LOGGER.info("Could not replace star tree format v2 to v1 as {} does not exist, will load v2 format",
+            starTreeV1File.getAbsolutePath());
+      }
     }
   }
 }

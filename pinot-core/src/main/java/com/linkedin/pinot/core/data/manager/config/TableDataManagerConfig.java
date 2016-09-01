@@ -16,6 +16,7 @@
 package com.linkedin.pinot.core.data.manager.config;
 
 import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.IndexingConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
 import com.linkedin.pinot.common.segment.ReadMode;
@@ -109,10 +110,13 @@ public class TableDataManagerConfig {
   }
 
   public void overrideConfigs(String tableName, AbstractTableConfig tableConfig) {
-    _tableDataManagerConfig.setProperty(READ_MODE, tableConfig.getIndexingConfig().getLoadMode().toLowerCase());
+    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+    _tableDataManagerConfig.setProperty(READ_MODE, indexingConfig.getLoadMode().toLowerCase());
     _tableDataManagerConfig.setProperty(TABLE_DATA_MANAGER_NAME, tableConfig.getTableName());
     _tableDataManagerConfig.setProperty(IndexLoadingConfigMetadata.getKeyOfLoadingInvertedIndex(),
-        tableConfig.getIndexingConfig().getInvertedIndexColumns());
+        indexingConfig.getInvertedIndexColumns());
+    _tableDataManagerConfig.setProperty(IndexLoadingConfigMetadata.KEY_OF_STAR_TREE_FORMAT_VERSION,
+        indexingConfig.getStarTreeFormat());
     String segmentVersionKey = IndexLoadingConfigMetadata.KEY_OF_SEGMENT_FORMAT_VERSION;
     // Server configuration is always to DEFAULT or configured value
     // Apply table configuration only if the server configuration is set with table config
@@ -122,7 +126,7 @@ public class TableDataManagerConfig {
     // security from inadvertent changes as both config will need to be enabled for the
     // change to take effect
     SegmentVersion tableConfigVersion =
-        SegmentVersion.fromStringOrDefault(tableConfig.getIndexingConfig().getSegmentFormatVersion());
+        SegmentVersion.fromStringOrDefault(indexingConfig.getSegmentFormatVersion());
     SegmentVersion serverConfigVersion =
         SegmentVersion.fromStringOrDefault(_tableDataManagerConfig.getString(
             IndexLoadingConfigMetadata.KEY_OF_SEGMENT_FORMAT_VERSION));
@@ -131,7 +135,7 @@ public class TableDataManagerConfig {
     if (SegmentVersion.compare(tableConfigVersion, serverConfigVersion) < 0) {
       LOGGER.info("Overriding server segment format version: {} with table version: {} for table: {}",
           serverConfigVersion, tableConfigVersion, tableName);
-      _tableDataManagerConfig.setProperty(segmentVersionKey, tableConfig.getIndexingConfig().getSegmentFormatVersion());
+      _tableDataManagerConfig.setProperty(segmentVersionKey, indexingConfig.getSegmentFormatVersion());
     } else {
       LOGGER.info("Loading table: {} with server configured segment format version: {}", tableName, serverConfigVersion);
     }
