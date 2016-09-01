@@ -25,20 +25,3 @@ server:
 #   adminConnectors:
 #     - type: http
 #       port: 11120
-database:
-  driverClass: com.mysql.jdbc.Driver
-  user: thirdeye
-  password: <change_me_password>
-  url: 'jdbc:mysql://<change_me_host_name>:3306/thirdeye_anomaly'
-  properties:
-    charSet: UTF-8
-  maxWaitForConnection: 1s
-  validationQuery: "/* ThirdEyeDetectorApplication Health Check */ SELECT 1"
-  validationQueryTimeout: 3s
-  minSize: 8
-  maxSize: 32
-  checkConnectionWhileIdle: true
-  checkConnectionOnReturn: true
-  checkConnectionOnBorrow: true
-  evictionInterval: 10s
-  minIdleTime: 1 minute

@@ -65,7 +65,6 @@ public class MetricTimeSeries {
     case DOUBLE:
       buffer.putDouble(value.doubleValue());
       break;
-
     }
   }
 

@@ -22,12 +22,15 @@ import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
 
-public class ThirdEyeUtils {
+public abstract class ThirdEyeUtils {
   private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeUtils.class);
-
   private static final String FILTER_VALUE_ASSIGNMENT_SEPARATOR = "=";
   private static final String FILTER_CLAUSE_SEPARATOR = ";";
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
+  private ThirdEyeUtils () {
+
+  }
 
   private static ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry
       .getInstance();
