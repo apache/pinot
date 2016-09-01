@@ -3,8 +3,9 @@ package com.linkedin.thirdeye.dbi.dao;
 import com.linkedin.thirdeye.common.persistence.PersistenceApp;
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
 import com.linkedin.thirdeye.constant.FeedbackStatus;
-import com.linkedin.thirdeye.dbi.DaoProviderUtil;
-import com.linkedin.thirdeye.dbi.entity.data.AnomalyFeedback;
+import com.linkedin.thirdeye.datalayer.entity.AnomalyFeedback;
+import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
+
 import java.io.File;
 import java.net.URL;
 import java.sql.Connection;
