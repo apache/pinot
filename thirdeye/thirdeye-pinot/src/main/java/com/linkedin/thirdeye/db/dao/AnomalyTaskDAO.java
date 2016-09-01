@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.db.dao;
 
-import com.google.common.collect.ImmutableMap;
 import com.google.inject.persist.Transactional;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
 import com.linkedin.thirdeye.db.entity.AnomalyTaskSpec;
@@ -52,11 +51,6 @@ public class AnomalyTaskDAO extends AbstractJpaDAO<AnomalyTaskSpec> {
       }
     }
     return tasks;
-  }
-
-  @Transactional(rollbackOn = Exception.class)
-  public List<AnomalyTaskSpec> findByIdAndStatus(Long id, TaskStatus status) {
-    return super.findByParams(ImmutableMap.of("status", status, "id", id));
   }
 
   @Transactional(rollbackOn = Exception.class)
