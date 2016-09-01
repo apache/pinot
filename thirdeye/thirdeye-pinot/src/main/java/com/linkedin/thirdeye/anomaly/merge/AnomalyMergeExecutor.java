@@ -153,12 +153,7 @@ public class AnomalyMergeExecutor implements Runnable {
         LOG.error("Could not recompute severity", e);
       }
     }
-
-    // update the anomaly reason message in merged anomaly
-    mergedResult.setMessage(
-        mergedResult.getAnomalyResults().get(mergedResult.getAnomalyResults().size() - 1)
-            .getMessage());
-
+    mergedResult.setMessage(createMessage(mergedResult.getWeight()));
     try {
       // persist the merged result
       mergedResultDAO.update(mergedResult);
@@ -271,5 +266,9 @@ public class AnomalyMergeExecutor implements Runnable {
           unmergedResults.size(), mergedResults.size(), function.getId(), dimensions);
       output.addAll(mergedResults);
     }
+  }
+
+  public String createMessage(double severity) {
+    return String.format("percentage change : %.2f", severity * 100);
   }
 }

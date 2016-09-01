@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+import javax.persistence.CascadeType;
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.FetchType;
@@ -95,7 +96,7 @@ public class EmailConfiguration extends AbstractBaseEntity {
     return collection;
   }
 
-  @ManyToMany(fetch = FetchType.EAGER)
+  @ManyToMany(fetch = FetchType.EAGER, cascade = CascadeType.MERGE)
   @JoinTable(name = "email_function_dependencies", joinColumns = { @JoinColumn(name = "email_id")},
         inverseJoinColumns = { @JoinColumn(name = "function_id") })
   private List<AnomalyFunctionSpec> functions = new ArrayList<>();

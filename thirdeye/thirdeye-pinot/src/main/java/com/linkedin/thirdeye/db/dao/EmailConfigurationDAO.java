@@ -6,8 +6,7 @@ import java.util.List;
 
 public class EmailConfigurationDAO extends AbstractJpaDAO<EmailConfiguration> {
   private static final String FIND_BY_FUNCTION_ID =
-      "select ec from EmailConfiguration ec, AnomalyFunctionSpec fn where fn.id=:id "
-          + "and fn in elements(ec.functions)";
+      "select ec from EmailConfiguration ec JOIN ec.functions fn where fn.id=:id";
 
   public EmailConfigurationDAO() {
     super(EmailConfiguration.class);
