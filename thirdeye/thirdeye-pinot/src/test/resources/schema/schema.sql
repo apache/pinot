@@ -26,7 +26,7 @@ create table if not exists anomaly_merge_config (
     json_val JSON
 ) ENGINE=InnoDB;
 
-create table if not exists anomaly_function_merge_config(
+create table if not exists anomaly_function_merge_config_mapping(
     anomaly_function_id bigint(20),
     anomaly_merge_config_id bigint(20),
     foreign key (anomaly_function_id) references anomaly_function(id),
