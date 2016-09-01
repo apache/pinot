@@ -27,7 +27,8 @@ public enum ThirdEyeJobProperties {
   THIRDEYE_PINOT_CONTROLLER_HOSTS("thirdeye.pinot.controller.hosts"),
   THIRDEYE_PINOT_CONTROLLER_PORT("thirdeye.pinot.controller.port"),
   THIRDEYE_BACKFILL_START_TIME("thirdeye.backfill.start.time"),
-  THIRDEYE_BACKFILL_END_TIME("thirdeye.backfill.end.time");
+  THIRDEYE_BACKFILL_END_TIME("thirdeye.backfill.end.time"),
+  THIRDEYE_NUM_REDUCERS("thirdeye.num.reducers");
 
   private final String propertyName;
 

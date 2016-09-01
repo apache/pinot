@@ -29,6 +29,7 @@ import org.apache.avro.mapred.AvroKey;
 import org.apache.avro.mapreduce.AvroJob;
 import org.apache.avro.mapreduce.AvroKeyInputFormat;
 import org.apache.avro.mapreduce.AvroKeyOutputFormat;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileSystem;
@@ -45,6 +46,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.linkedin.thirdeye.hadoop.ThirdEyeJobProperties;
 import com.linkedin.thirdeye.hadoop.config.MetricType;
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfig;
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfigProperties;
@@ -291,6 +293,10 @@ public class AggregationPhaseJob extends Configured {
     job.setOutputValueClass(NullWritable.class);
     AvroJob.setOutputKeySchema(job, avroSchema);
     job.setOutputFormatClass(AvroKeyOutputFormat.class);
+    String numReducers = props.getProperty(ThirdEyeJobProperties.THIRDEYE_NUM_REDUCERS.toString());
+    if (StringUtils.isNotBlank(numReducers)) {
+      job.setNumReduceTasks(Integer.valueOf(numReducers));
+    }
 
     job.waitForCompletion(true);
 
