@@ -16,26 +16,7 @@
 package com.linkedin.pinot.query.executor;
 
 import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.core.data.manager.offline.TableDataManagerProvider;
-import com.yammer.metrics.core.MetricsRegistry;
-import com.linkedin.pinot.util.TestUtils;
-
-import java.io.File;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
-
-import org.apache.commons.configuration.PropertiesConfiguration;
-import org.apache.commons.io.FileUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.testng.Assert;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
-import org.testng.annotations.Test;
-
+import com.linkedin.pinot.common.query.QueryRequest;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.FilterQuery;
@@ -45,6 +26,7 @@ import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.core.data.manager.config.FileBasedInstanceDataManagerConfig;
 import com.linkedin.pinot.core.data.manager.offline.FileBasedInstanceDataManager;
+import com.linkedin.pinot.core.data.manager.offline.TableDataManagerProvider;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
@@ -52,6 +34,22 @@ import com.linkedin.pinot.core.query.executor.ServerQueryExecutorV1Impl;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
+import com.linkedin.pinot.util.TestUtils;
+import com.yammer.metrics.core.MetricsRegistry;
+import java.io.File;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.commons.io.FileUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.testng.Assert;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
+import org.testng.annotations.Test;
 
 
 public class QueryExecutorTest {
@@ -144,8 +142,8 @@ public class QueryExecutorTest {
     for (IndexSegment segment : _indexSegmentList) {
       instanceRequest.getSearchSegments().add(segment.getSegmentName());
     }
-
-    DataTable instanceResponse = _queryExecutor.processQuery(instanceRequest);
+    QueryRequest queryRequest = new QueryRequest(instanceRequest);
+    DataTable instanceResponse = _queryExecutor.processQuery(queryRequest);
     LOGGER.info("InstanceResponse is " + instanceResponse.getLong(0, 0));
     Assert.assertEquals(instanceResponse.getLong(0, 0), 400002L);
     LOGGER.info("Time used for instanceResponse is " + instanceResponse.getMetadata().get("timeUsedMs"));
@@ -163,8 +161,8 @@ public class QueryExecutorTest {
     for (IndexSegment segment : _indexSegmentList) {
       instanceRequest.getSearchSegments().add(segment.getSegmentName());
     }
-
-    DataTable instanceResponse = _queryExecutor.processQuery(instanceRequest);
+    QueryRequest queryRequest = new QueryRequest(instanceRequest);
+    DataTable instanceResponse = _queryExecutor.processQuery(queryRequest);
     LOGGER.info("InstanceResponse is " + instanceResponse.getDouble(0, 0));
     Assert.assertEquals(instanceResponse.getDouble(0, 0), 40000200000.0);
     LOGGER.info("Time used for instanceResponse is " + instanceResponse.getMetadata().get("timeUsedMs"));
@@ -183,8 +181,8 @@ public class QueryExecutorTest {
     for (IndexSegment segment : _indexSegmentList) {
       instanceRequest.getSearchSegments().add(segment.getSegmentName());
     }
-
-    DataTable instanceResponse = _queryExecutor.processQuery(instanceRequest);
+    QueryRequest queryRequest = new QueryRequest(instanceRequest);
+    DataTable instanceResponse = _queryExecutor.processQuery(queryRequest);
     LOGGER.info("InstanceResponse is " + instanceResponse.getDouble(0, 0));
     Assert.assertEquals(instanceResponse.getDouble(0, 0), 200000.0);
     LOGGER.info("Time used for instanceResponse is " + instanceResponse.getMetadata().get("timeUsedMs"));
@@ -202,8 +200,8 @@ public class QueryExecutorTest {
     for (IndexSegment segment : _indexSegmentList) {
       instanceRequest.getSearchSegments().add(segment.getSegmentName());
     }
-
-    DataTable instanceResponse = _queryExecutor.processQuery(instanceRequest);
+    QueryRequest queryRequest = new QueryRequest(instanceRequest);
+    DataTable instanceResponse = _queryExecutor.processQuery(queryRequest);
     LOGGER.info("InstanceResponse is " + instanceResponse.getDouble(0, 0));
     Assert.assertEquals(instanceResponse.getDouble(0, 0), 0.0);
     LOGGER.info("Time used for instanceResponse is " + instanceResponse.getMetadata().get("timeUsedMs"));

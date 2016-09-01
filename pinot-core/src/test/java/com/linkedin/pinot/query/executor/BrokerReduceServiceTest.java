@@ -16,6 +16,7 @@
 package com.linkedin.pinot.query.executor;
 
 import com.linkedin.pinot.common.metrics.ServerMetrics;
+import com.linkedin.pinot.common.query.QueryRequest;
 import com.linkedin.pinot.common.query.ReduceService;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
@@ -151,9 +152,10 @@ public class BrokerReduceServiceTest {
     }
 
     Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
-    DataTable instanceResponse1 = _queryExecutor.processQuery(instanceRequest);
+    QueryRequest queryRequest = new QueryRequest(instanceRequest);
+    DataTable instanceResponse1 = _queryExecutor.processQuery(queryRequest);
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse1);
-    DataTable instanceResponse2 = _queryExecutor.processQuery(instanceRequest);
+    DataTable instanceResponse2 = _queryExecutor.processQuery(queryRequest);
     instanceResponseMap.put(new ServerInstance("localhost:1111"), instanceResponse2);
     BrokerResponseNative brokerResponse = _reduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
     AggregationResult aggregationResult = brokerResponse.getAggregationResults().get(0);
@@ -178,9 +180,10 @@ public class BrokerReduceServiceTest {
 
     Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     try {
-      DataTable instanceResponse1 = _queryExecutor.processQuery(instanceRequest);
+      QueryRequest queryRequest = new QueryRequest(instanceRequest);
+      DataTable instanceResponse1 = _queryExecutor.processQuery(queryRequest);
       instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse1);
-      DataTable instanceResponse2 = _queryExecutor.processQuery(instanceRequest);
+      DataTable instanceResponse2 = _queryExecutor.processQuery(queryRequest);
       instanceResponseMap.put(new ServerInstance("localhost:1111"), instanceResponse2);
       BrokerResponseNative brokerResponse = _reduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
       LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
@@ -209,9 +212,10 @@ public class BrokerReduceServiceTest {
 
     Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     try {
-      DataTable instanceResponse1 = _queryExecutor.processQuery(instanceRequest);
+      QueryRequest queryRequest = new QueryRequest(instanceRequest);
+      DataTable instanceResponse1 = _queryExecutor.processQuery(queryRequest);
       instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse1);
-      DataTable instanceResponse2 = _queryExecutor.processQuery(instanceRequest);
+      DataTable instanceResponse2 = _queryExecutor.processQuery(queryRequest);
       instanceResponseMap.put(new ServerInstance("localhost:1111"), instanceResponse2);
       BrokerResponseNative brokerResponse = _reduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
       LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
@@ -239,9 +243,10 @@ public class BrokerReduceServiceTest {
 
     Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     try {
-      DataTable instanceResponse1 = _queryExecutor.processQuery(instanceRequest);
+      QueryRequest queryRequest = new QueryRequest(instanceRequest);
+      DataTable instanceResponse1 = _queryExecutor.processQuery(queryRequest);
       instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse1);
-      DataTable instanceResponse2 = _queryExecutor.processQuery(instanceRequest);
+      DataTable instanceResponse2 = _queryExecutor.processQuery(queryRequest);
       instanceResponseMap.put(new ServerInstance("localhost:1111"), instanceResponse2);
       BrokerResponseNative brokerResponse =
           (BrokerResponseNative) _reduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
@@ -270,9 +275,10 @@ public class BrokerReduceServiceTest {
 
     Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     try {
-      DataTable instanceResponse1 = _queryExecutor.processQuery(instanceRequest);
+      QueryRequest queryRequest = new QueryRequest(instanceRequest);
+      DataTable instanceResponse1 = _queryExecutor.processQuery(queryRequest);
       instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse1);
-      DataTable instanceResponse2 = _queryExecutor.processQuery(instanceRequest);
+      DataTable instanceResponse2 = _queryExecutor.processQuery(queryRequest);
       instanceResponseMap.put(new ServerInstance("localhost:1111"), instanceResponse2);
 
       BrokerResponseNative brokerResponse = _reduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
@@ -303,9 +309,10 @@ public class BrokerReduceServiceTest {
 
     Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     try {
-      DataTable instanceResponse1 = _queryExecutor.processQuery(instanceRequest);
+      QueryRequest queryRequest = new QueryRequest(instanceRequest);
+      DataTable instanceResponse1 = _queryExecutor.processQuery(queryRequest);
       instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse1);
-      DataTable instanceResponse2 = _queryExecutor.processQuery(instanceRequest);
+      DataTable instanceResponse2 = _queryExecutor.processQuery(queryRequest);
       instanceResponseMap.put(new ServerInstance("localhost:1111"), instanceResponse2);
 
       BrokerResponseNative brokerResponse = _reduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
@@ -337,9 +344,10 @@ public class BrokerReduceServiceTest {
 
     Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     try {
-      DataTable instanceResponse1 = _queryExecutor.processQuery(instanceRequest);
+      QueryRequest queryRequest = new QueryRequest(instanceRequest);
+      DataTable instanceResponse1 = _queryExecutor.processQuery(queryRequest);
       instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse1);
-      DataTable instanceResponse2 = _queryExecutor.processQuery(instanceRequest);
+      DataTable instanceResponse2 = _queryExecutor.processQuery(queryRequest);
       instanceResponseMap.put(new ServerInstance("localhost:1111"), instanceResponse2);
 
       BrokerResponseNative brokerResponse = _reduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
@@ -371,16 +379,17 @@ public class BrokerReduceServiceTest {
 
     Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     try {
-      instanceResponseMap.put(new ServerInstance("localhost:0000"), _queryExecutor.processQuery(instanceRequest));
-      instanceResponseMap.put(new ServerInstance("localhost:1111"), _queryExecutor.processQuery(instanceRequest));
-      instanceResponseMap.put(new ServerInstance("localhost:2222"), _queryExecutor.processQuery(instanceRequest));
-      instanceResponseMap.put(new ServerInstance("localhost:3333"), _queryExecutor.processQuery(instanceRequest));
-      instanceResponseMap.put(new ServerInstance("localhost:4444"), _queryExecutor.processQuery(instanceRequest));
-      instanceResponseMap.put(new ServerInstance("localhost:5555"), _queryExecutor.processQuery(instanceRequest));
-      instanceResponseMap.put(new ServerInstance("localhost:6666"), _queryExecutor.processQuery(instanceRequest));
-      instanceResponseMap.put(new ServerInstance("localhost:7777"), _queryExecutor.processQuery(instanceRequest));
-      instanceResponseMap.put(new ServerInstance("localhost:8888"), _queryExecutor.processQuery(instanceRequest));
-      instanceResponseMap.put(new ServerInstance("localhost:9999"), _queryExecutor.processQuery(instanceRequest));
+      QueryRequest queryRequest = new QueryRequest(instanceRequest);
+      instanceResponseMap.put(new ServerInstance("localhost:0000"), _queryExecutor.processQuery(queryRequest));
+      instanceResponseMap.put(new ServerInstance("localhost:1111"), _queryExecutor.processQuery(queryRequest));
+      instanceResponseMap.put(new ServerInstance("localhost:2222"), _queryExecutor.processQuery(queryRequest));
+      instanceResponseMap.put(new ServerInstance("localhost:3333"), _queryExecutor.processQuery(queryRequest));
+      instanceResponseMap.put(new ServerInstance("localhost:4444"), _queryExecutor.processQuery(queryRequest));
+      instanceResponseMap.put(new ServerInstance("localhost:5555"), _queryExecutor.processQuery(queryRequest));
+      instanceResponseMap.put(new ServerInstance("localhost:6666"), _queryExecutor.processQuery(queryRequest));
+      instanceResponseMap.put(new ServerInstance("localhost:7777"), _queryExecutor.processQuery(queryRequest));
+      instanceResponseMap.put(new ServerInstance("localhost:8888"), _queryExecutor.processQuery(queryRequest));
+      instanceResponseMap.put(new ServerInstance("localhost:9999"), _queryExecutor.processQuery(queryRequest));
       BrokerResponseNative brokerResponse = _reduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
 
       AggregationResult aggregationResult = brokerResponse.getAggregationResults().get(0);

@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.server.integration;
 
+import com.linkedin.pinot.common.query.QueryRequest;
 import java.io.File;
 import java.net.URL;
 import java.util.ArrayList;
@@ -142,7 +143,8 @@ public class IntegrationTest {
     searchSegments.add("testTable_0_9_");
     instanceRequest.setSearchSegments(searchSegments);
     try {
-      DataTable instanceResponse = _queryExecutor.processQuery(instanceRequest);
+      QueryRequest queryRequest = new QueryRequest(instanceRequest);
+      DataTable instanceResponse = _queryExecutor.processQuery(queryRequest);
       System.out.println(instanceResponse.getLong(0, 0));
       System.out.println(instanceResponse.getMetadata().get("timeUsedMs"));
     } catch (Exception e) {
@@ -162,7 +164,8 @@ public class IntegrationTest {
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
     addTestTableSearchSegmentsToInstanceRequest(instanceRequest);
     try {
-      DataTable instanceResponse = _queryExecutor.processQuery(instanceRequest);
+      QueryRequest queryRequest = new QueryRequest(instanceRequest);
+      DataTable instanceResponse = _queryExecutor.processQuery(queryRequest);
       System.out.println(instanceResponse.getLong(0, 0));
       System.out.println(instanceResponse.getMetadata().get("timeUsedMs"));
     } catch (Exception e) {
@@ -186,7 +189,8 @@ public class IntegrationTest {
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
     addTestTableSearchSegmentsToInstanceRequest(instanceRequest);
     try {
-      DataTable instanceResponse = _queryExecutor.processQuery(instanceRequest);
+      QueryRequest queryRequest = new QueryRequest(instanceRequest);
+      DataTable instanceResponse = _queryExecutor.processQuery(queryRequest);
       System.out.println(instanceResponse.getDouble(0, 0));
       System.out.println(instanceResponse.getMetadata().get("timeUsedMs"));
     } catch (Exception e) {
@@ -207,7 +211,8 @@ public class IntegrationTest {
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
     addTestTableSearchSegmentsToInstanceRequest(instanceRequest);
     try {
-      DataTable instanceResponse = _queryExecutor.processQuery(instanceRequest);
+      QueryRequest queryRequest = new QueryRequest(instanceRequest);
+      DataTable instanceResponse = _queryExecutor.processQuery(queryRequest);
       System.out.println(instanceResponse.getDouble(0, 0));
       System.out.println(instanceResponse.getMetadata().get("timeUsedMs"));
     } catch (Exception e) {
@@ -226,7 +231,8 @@ public class IntegrationTest {
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
     addTestTableSearchSegmentsToInstanceRequest(instanceRequest);
     try {
-      DataTable instanceResponse = _queryExecutor.processQuery(instanceRequest);
+      QueryRequest queryRequest = new QueryRequest(instanceRequest);
+      DataTable instanceResponse = _queryExecutor.processQuery(queryRequest);
       System.out.println(instanceResponse.getDouble(0, 0));
       System.out.println(instanceResponse.getMetadata().get("timeUsedMs"));
     } catch (Exception e) {

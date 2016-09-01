@@ -17,6 +17,7 @@ package com.linkedin.pinot.queries;
 
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.query.QueryExecutor;
+import com.linkedin.pinot.common.query.QueryRequest;
 import com.linkedin.pinot.common.query.ReduceService;
 import com.linkedin.pinot.common.query.gen.AvroQueryGenerator;
 import com.linkedin.pinot.common.query.gen.AvroQueryGenerator.TestGroupByAggreationQuery;
@@ -124,7 +125,8 @@ public class QueriesSentinelTest {
       InstanceRequest instanceRequest = new InstanceRequest(counter++, brokerRequest);
       instanceRequest.setSearchSegments(new ArrayList<String>());
       instanceRequest.getSearchSegments().add(segmentName);
-      final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(instanceRequest);
+      QueryRequest queryRequest = new QueryRequest(instanceRequest);
+      final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(queryRequest);
       instanceResponseMap.clear();
       instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
       final BrokerResponseNative brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
@@ -232,7 +234,8 @@ public class QueriesSentinelTest {
       InstanceRequest instanceRequest = new InstanceRequest(counter++, brokerRequest);
       instanceRequest.setSearchSegments(new ArrayList<String>());
       instanceRequest.getSearchSegments().add(segmentName);
-      final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(instanceRequest);
+      QueryRequest queryRequest = new QueryRequest(instanceRequest);
+      final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(queryRequest);
       instanceResponseMap.clear();
       instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
       final BrokerResponseNative brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
@@ -254,7 +257,8 @@ public class QueriesSentinelTest {
       InstanceRequest instanceRequest = new InstanceRequest(counter++, brokerRequest);
       instanceRequest.setSearchSegments(new ArrayList<String>());
       instanceRequest.getSearchSegments().add(segmentName);
-      final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(instanceRequest);
+      QueryRequest queryRequest = new QueryRequest(instanceRequest);
+      final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(queryRequest);
       instanceResponseMap.clear();
       instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
       final BrokerResponseNative brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
@@ -359,7 +363,8 @@ public class QueriesSentinelTest {
     InstanceRequest instanceRequest = new InstanceRequest(1, brokerRequest);
     instanceRequest.setSearchSegments(new ArrayList<String>());
     instanceRequest.getSearchSegments().add(segmentName);
-    final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(instanceRequest);
+    QueryRequest queryRequest = new QueryRequest(instanceRequest);
+    final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(queryRequest);
     instanceResponseMap.clear();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
     final BrokerResponseNative brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
@@ -375,7 +380,8 @@ public class QueriesSentinelTest {
     InstanceRequest instanceRequest = new InstanceRequest(1, brokerRequest);
     instanceRequest.setSearchSegments(new ArrayList<String>());
     instanceRequest.getSearchSegments().add(segmentName);
-    final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(instanceRequest);
+    QueryRequest queryRequest = new QueryRequest(instanceRequest);
+    final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(queryRequest);
     instanceResponseMap.clear();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
     final BrokerResponseNative brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
@@ -397,7 +403,8 @@ public class QueriesSentinelTest {
     InstanceRequest instanceRequest = new InstanceRequest(1, brokerRequest);
     instanceRequest.setSearchSegments(new ArrayList<String>());
     instanceRequest.getSearchSegments().add(segmentName);
-    final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(instanceRequest);
+    QueryRequest queryRequest = new QueryRequest(instanceRequest);
+    final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(queryRequest);
     instanceResponseMap.clear();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
     final BrokerResponseNative brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
@@ -417,7 +424,8 @@ public class QueriesSentinelTest {
     instanceRequest.setEnableTrace(true); // TODO: add trace settings consistency
     instanceRequest.setSearchSegments(new ArrayList<String>());
     instanceRequest.getSearchSegments().add(segmentName);
-    final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(instanceRequest);
+    QueryRequest queryRequest = new QueryRequest(instanceRequest);
+    final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(queryRequest);
     instanceResponseMap.clear();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
     final BrokerResponseNative brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);

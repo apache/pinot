@@ -95,7 +95,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    * Logs the timing for a table
    *
    * @param tableName The table associated with this timer
-   * @param timerName The name of timer
+   * @param timer The name of timer
    * @param duration The log time duration time value
    * @param timeUnit The log time duration time unit
    */

@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.transport.netty;
 
+import io.netty.channel.ChannelHandlerContext;
 import java.lang.reflect.Field;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -520,7 +521,7 @@ public class NettySingleConnectionIntegrationTest {
     }
 
     @Override
-    public byte[] processRequest(ByteBuf request) {
+    public byte[] processRequest(ChannelHandlerContext channelHandlerContext, ByteBuf request) {
       byte[] b = new byte[request.readableBytes()];
       request.readBytes(b);
       if (null != _responseHandlingLatch) {

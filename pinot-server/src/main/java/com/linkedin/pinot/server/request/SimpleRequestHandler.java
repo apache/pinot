@@ -15,11 +15,6 @@
  */
 package com.linkedin.pinot.server.request;
 
-import java.util.ArrayList;
-import java.util.List;
-import org.apache.thrift.protocol.TCompactProtocol;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.metrics.ServerMeter;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
@@ -30,9 +25,17 @@ import com.linkedin.pinot.common.request.InstanceRequest;
 import com.linkedin.pinot.common.response.ProcessingException;
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.common.utils.DataTableBuilder;
+import com.linkedin.pinot.common.query.QueryRequest;
 import com.linkedin.pinot.serde.SerDe;
 import com.linkedin.pinot.transport.netty.NettyServer.RequestHandler;
 import io.netty.buffer.ByteBuf;
+import io.netty.channel.ChannelHandlerContext;
+import java.net.InetSocketAddress;
+import java.util.ArrayList;
+import java.util.List;
+import org.apache.thrift.protocol.TCompactProtocol;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -53,7 +56,7 @@ public class SimpleRequestHandler implements RequestHandler {
   }
 
   @Override
-  public byte[] processRequest(ByteBuf request) {
+  public byte[] processRequest(ChannelHandlerContext channelHandlerContext, ByteBuf request) {
 
     long queryStartTime = System.nanoTime();
     _serverMetrics.addMeteredGlobalValue(ServerMeter.QUERIES, 1);
@@ -73,9 +76,15 @@ public class SimpleRequestHandler implements RequestHandler {
       _serverMetrics.addPhaseTiming(brokerRequest, ServerQueryPhase.REQUEST_DESERIALIZATION, deserRequestTime - queryStartTime);
       LOGGER.debug("Processing requestId:{},request={}", queryRequest.getRequestId(), queryRequest);
       brokerRequest = queryRequest.getQuery();
+      QueryRequest queryRequestContext = new QueryRequest(queryRequest);
+      InetSocketAddress address = (InetSocketAddress) channelHandlerContext.channel().remoteAddress();
+      String remoteAddress = address.getAddress().getHostAddress();
+      // we will set the ip address as client id. This is good enough for start.
+      // Ideally, broker should send it's identity as part of the request
+      queryRequestContext.setClientId(remoteAddress);
 
       long startTime = System.nanoTime();
-      instanceResponse = _queryExecutor.processQuery(queryRequest);
+      instanceResponse = _queryExecutor.processQuery(queryRequestContext);
       long totalNanos = System.nanoTime() - startTime;
       _serverMetrics.addPhaseTiming(brokerRequest, ServerQueryPhase.QUERY_PROCESSING, totalNanos);
     } catch (Exception e) {
