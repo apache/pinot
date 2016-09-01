@@ -25,7 +25,7 @@ public class AnomalyFunctionResource {
 
   private static final Logger LOG = LoggerFactory.getLogger(AnomalyFunctionResource.class);
 
-  private final Map<String, Object> anomalyFunctionMetadata = new HashMap<>();;
+  private final Map<String, Object> anomalyFunctionMetadata = new HashMap<>();
 
   public AnomalyFunctionResource() {
   }
