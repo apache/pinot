@@ -68,9 +68,12 @@ function getDataCustomCallback(url, tab, callback) {
                 $("#" + tab + "-chart-area-error").append(error);
                 $("#" + tab + "-chart-area-error").fadeIn(100);
                 return
-            }
+            },
+            beforeSend: showLoader(tab)
         }
-    })
+    }).always(function () {
+        hideLoader(tab);
+    });
 };
 
 function submitData(url, data, tab) {

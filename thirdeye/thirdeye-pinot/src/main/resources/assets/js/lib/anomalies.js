@@ -100,8 +100,6 @@ function drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab, placeholder) {
         xTicksCurrent.push(timeBucket);
     }
 
-    console.log("anomalyData");
-    console.log(anomalyData);
     for (var i = 0; i < anomalyData.length; i++) {
         var anomaly = anomalyData[i];
 
@@ -215,7 +213,6 @@ function drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab, placeholder) {
             .style("fill", regionColors[i])
     }
 
-
     attach_TimeSeries_EventListeners(currentView)
 
 } //end of drawAnomalyTimeSeries
@@ -242,7 +239,6 @@ function renderAnomalyTable(data, tab) {
 
 }
 
-
  function attach_TimeSeries_EventListeners(currentView){
 
      //Unbind previously attached eventlisteners
@@ -260,15 +256,8 @@ function renderAnomalyTable(data, tab) {
          anomalyTimeSelectAllCheckbox(this);
      });
 
-
-     //licking a checkbox in the table toggles the region of that timerange on the timeseries chart
-     currentView.on("change", ".anomaly-table-checkbox input", function () {
-         toggleAnomalyTimeRange(this);
-     });
-
      //Preselect first metric on load
      $($(".time-series-metric-checkbox", currentView)[0]).click();
-
 
      function anomalyTimeSeriesCheckbox(target) {
          var checkbox = target;
@@ -279,35 +268,11 @@ function renderAnomalyTable(data, tab) {
              anomalyLineChart.show(metricName + "-current");
              anomalyLineChart.show(metricName + "-baseline");
 
-             //show related ranges on timeserie and related rows in the tabular display
-    //            $(".anomaly-table-checkbox input").each(function () {
-    //
-    //                if ($(this).attr("data-value") == metricName) {
-    //                    var tableRow = $(this).closest("tr");
-    //                    tableRow.show()
-    //                    //check the related input boxes
-    //                    $("input", tableRow).attr('checked', 'checked');
-    //                    $("input", tableRow).prop('checked', true);
-    //                    //show the related timeranges
-    //                    var anomalyId = "anomaly-id-" + $(this).attr("id");
-    //                    $("." + anomalyId).show();
-    //                }
-    //            })
-
          } else {
              //Hide metric's lines on timeseries
              anomalyLineChart.hide(metricName + "-current");
              anomalyLineChart.hide(metricName + "-baseline");
 
-             //hide related ranges on timeserie and related rows in the tabular display
-    //            $(".anomaly-table-checkbox input").each(function () {
-    //
-    //                if ($(this).attr("data-value") == metricName) {
-    //                    $(this).closest("tr").hide();
-    //                    var anomalyId = "anomaly-id-" + $(this).attr("id");
-    //                    $("." + anomalyId).hide();
-    //                }
-    //            })
          }
      }
 
@@ -330,15 +295,6 @@ function renderAnomalyTable(data, tab) {
          }
      }
 
-     function toggleAnomalyTimeRange(target) {
-         var anomalyId = ".anomaly-id-" + $(target).attr("id");
-         if ($(target).is(':checked')) {
-             $(anomalyId).show();
-         } else {
-             $(anomalyId).hide();
-         }
-     }
-
      //Show the first line on the timeseries
      var firstLegendLabel = $($(".time-series-metric-checkbox")[0])
      if( !firstLegendLabel.is(':checked')) {
@@ -352,26 +308,8 @@ function renderAnomalyTable(data, tab) {
      $("#anomalies-table").off("click");
      $("#anomalies-table").off("hide.uk.dropdown");
 
-
-     //Select all checkbox selects the checkboxes in all rows
-     $("#anomalies-table").on("click", ".select-all-checkbox", function () {
-
-         var currentTable = $(this).closest("table");
-
-         if ($(this).is(':checked')) {
-             $("input[type='checkbox']", currentTable).attr('checked', 'checked');
-             $("input[type='checkbox']", currentTable).prop('checked', true);
-             $("input[type='checkbox']", currentTable).change();
-
-         } else {
-             $("input[type='checkbox']", currentTable).removeAttr('checked');
-             $("input[type='checkbox']", currentTable).prop('checked', false);
-             $("input[type='checkbox']", currentTable).change();
-
-         }
-     })
-
-     $("#anomalies-table").on("click", ".view-chart-link", function () {
+     //Clicking a checkbox in the table toggles the region of that timerange on the timeseries chart
+     $("#anomalies-table").on("change", ".anomaly-table-radio-label input", function () {
          updateChartForSingleAnomaly(this);
      });
 
@@ -444,8 +382,6 @@ function renderAnomalyTable(data, tab) {
          }
      }
 
-     // TODO: requires refactoring !!
-
      function updateChartForSingleAnomaly(target) {
 
 
@@ -488,18 +424,12 @@ function renderAnomalyTable(data, tab) {
              }
              var placeholder = "linechart-placeholder";
              var anomalyRegionData = [];
-             console.log('color')
-             console.log(colorHEX)
+
              anomalyRegionData.push({startTime: parseInt(startTime), endTime: parseInt(endTime), id: anomalyId, regionColor: colorHEX});
              drawAnomalyTimeSeries(timeSeriesData, anomalyRegionData, tab, placeholder);
 
          });
      }
-
-     //Set initial view:
-     $(".select-all-checkbox").click();
-     $($(".anomaly-table-checkbox")[0]).click();
-
  }
 
 
