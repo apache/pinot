@@ -39,6 +39,43 @@ function getData(url, tab) {
     })
 }
 
+
+function getDataCustomCallback(url, tab, callback) {
+    console.log("request url:", url)
+
+    tab = tab ? tab : hash.view;
+    return $.ajax({
+        url: url,
+        type: 'get',
+        dataType: 'json',
+        statusCode: {
+            404: function () {
+                $("#" + tab + "-chart-area-error").empty();
+                var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' });
+                var closeBtn = $('<i></i>', { class: 'close-parent uk-icon-close' });
+                warning.append($('<p></p>', { html: 'No data available. (Error code: 404)' }));
+                $("#" + tab + "-chart-area-error").append(closeBtn);
+                $("#" + tab + "-chart-area-error").append(warning);
+                $("#" + tab + "-chart-area-error").fadeIn(100);
+                return
+            },
+            500: function () {
+                $("#" + tab + "-chart-area-error").empty()
+                var error = $('<div></div>', { class: 'uk-alert uk-alert-danger' });
+                var closeBtn = $('<i></i>', { class: 'close-parent uk-icon-close' });
+                error.append($('<p></p>', { html: 'Internal server error' }));
+                $("#" + tab + "-chart-area-error").append(closeBtn);
+                $("#" + tab + "-chart-area-error").append(error);
+                $("#" + tab + "-chart-area-error").fadeIn(100);
+                return
+            },
+            beforeSend: showLoader(tab)
+        }
+    }).always(function () {
+        hideLoader(tab);
+    });
+};
+
 function submitData(url, data, tab) {
 
     if (data === undefined) {
@@ -433,7 +470,7 @@ function formComponentPopulated() {
     }
 }
 
-/* Event listeners used in multiple instances in FORM area and chart area*/
+/** Event listeners used in multiple instances in FORM area and chart area **/
 
 /* takes a clicked anchor tag and applies active class to it's prent (li, button) */
 function radioOptions(target) {
@@ -585,6 +622,20 @@ function colorScale(len) {
 
     return colorAry
 
+}
+
+function componentToHex(c) {
+    var hex = c.toString(16);
+    return hex.length == 1 ? "0" + hex : hex;
+}
+
+function rgbToHex(rgb) {
+    var parts = rgb.substring(rgb.indexOf("(")).split(","),
+        r = parseInt($.trim(parts[0].substring(1)), 10),
+        g = parseInt($.trim(parts[1]), 10),
+        b = parseInt($.trim(parts[2]), 10)
+
+    return "#" + componentToHex(r) + componentToHex(g) + componentToHex(b);
 }
 
 function toggleCumulative() {

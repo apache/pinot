@@ -1,8 +1,9 @@
-var anomaliesDisplayData = "";
-var timeseriesDisplayData = "";
+ anomaliesDisplayData = "";
+ timeseriesDisplayData = "";
 
 function getAnomalies(tab) {
 
+    //Creating request url
     var baselineStart = moment(parseInt(hash.currentStart)).add(-7, 'days')
     var baselineEnd = moment(parseInt(hash.currentEnd)).add(-7, 'days')
     var aggTimeGranularity = (window.datasetConfig.dataGranularity) ? window.datasetConfig.dataGranularity : "HOURS";
@@ -26,6 +27,7 @@ function getAnomalies(tab) {
 
     var anomaliesUrl = "/dashboard/anomalies/view?" + urlParams;
 
+    //AJAX for data
     getData(anomaliesUrl).done(function (anomalyData) {
         anomaliesDisplayData = anomalyData;
         getData(timeSeriesUrl).done(function (timeSeriesData) {
@@ -40,8 +42,10 @@ function getAnomalies(tab) {
                 return
             } else {
                 $("#" + tab + "-chart-area-error").hide();
+                $("#" + tab + "-display-chart-section").empty();
             }
-            renderAnomalyLineChart(timeSeriesData, anomalyData, tab);
+            var placeholder= "linechart-placeholder"
+            renderAnomalyLineChart(timeSeriesData, anomalyData, tab, placeholder);
             renderAnomalyTable(anomalyData, tab);
 
             //anomalyFunctionId is only present in hash when anomaly
@@ -52,64 +56,24 @@ function getAnomalies(tab) {
     });
 }
 
-// TODO: requires refactoring !!
+function renderAnomalyLineChart(timeSeriesData, anomalyData, tab, placeholder) {
 
-function updateChartForSingleAnomaly(dimension, value, start, end) {
-    // var baselineStart = moment(start).add(-7, 'days')
-    // var baselineEnd = moment(end).add(-7, 'days')
-
-    var baselineStart = moment(parseInt(hash.currentStart)).add(-7, 'days')
-    var baselineEnd = moment(parseInt(hash.currentEnd)).add(-7, 'days')
-
-    var aggTimeGranularity = (window.datasetConfig.dataGranularity) ? window.datasetConfig.dataGranularity : "HOURS";
-    var dataset = hash.dataset;
-    var compareMode = "WoW";
-    var currentStart = hash.currentStart;
-    var currentEnd = hash.currentEnd;
-    var metrics = hash.metrics;
-
-    var filter = "{}";
-    if(dimension && value && value != 'ALL') {
-        filter = '{"'+dimension+'":["'+value+'"]}';
-    }
-    console.log(filter);
-
-    var timeSeriesUrl = "/dashboard/data/tabular?dataset=" + dataset + "&compareMode=" + compareMode //
-        + "&currentStart=" + currentStart + "&currentEnd=" + currentEnd  //
-        + "&baselineStart=" + baselineStart + "&baselineEnd=" + baselineEnd   //
-        + "&aggTimeGranularity=" + aggTimeGranularity + "&metrics=" + metrics+ "&filters=" + filter;
-
-
-    var tab = "anomalies";
-
-    getData(timeSeriesUrl).done(function (timeSeriesData) {
-        //Error handling when data is falsy (empty, undefined or null)
-        if (!timeSeriesData) {
-            // do nothing
-            return
-        } else {
-            $("#" + tab + "-chart-area-error").hide();
-        }
-        renderAnomalyLineChart(timeSeriesData, anomaliesDisplayData, tab);
-        renderAnomalyTable(anomaliesDisplayData, tab);
-    });
-}
-
-function renderAnomalyLineChart(timeSeriesData, anomalyData, tab) {
-    console.log(timeseriesDisplayData);
-    console.log(anomaliesDisplayData);
-
-    $("#" + tab + "-display-chart-section").empty();
+    //$("#" + tab + "-display-chart-section").empty();
     /* Handelbars template for time series legend */
     var result_metric_time_series_section = HandleBarsTemplates.template_metric_time_series_section(timeSeriesData);
     $("#" + tab + "-display-chart-section").append(result_metric_time_series_section);
-    drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab);
+    drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab, placeholder);
 }
 
-var lineChart;
-function drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab) {
+var anomalyLineChart;
+function drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab, placeholder) {
 
     var currentView = $("#" + tab + "-display-chart-section");
+
+    //Unbind previous eventListeners
+    currentView.off("click")
+    currentView.off("change")
+
     var aggTimeGranularity = (window.datasetConfig.dataGranularity) ? window.datasetConfig.dataGranularity : "HOURS";
     var dateTimeFormat = "%I:%M %p";
     if (aggTimeGranularity == "DAYS" ) {
@@ -118,7 +82,7 @@ function drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab) {
         dateTimeFormat = "%m-%d %I %p";
     }
 
-    var lineChartPlaceholder = $("#linechart-placeholder", currentView)[0];
+    var lineChartPlaceholder = $("#"+ placeholder, currentView)[0];
     // Metric(s)
     var metrics = timeSeriesData["metrics"];
     var lineChartData = {};
@@ -135,6 +99,7 @@ function drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab) {
         xTicksBaseline.push(timeBucket);
         xTicksCurrent.push(timeBucket);
     }
+
     for (var i = 0; i < anomalyData.length; i++) {
         var anomaly = anomalyData[i];
 
@@ -174,7 +139,7 @@ function drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab) {
 
     }
 
-    lineChart = c3.generate({
+    anomalyLineChart = c3.generate({
         bindto: lineChartPlaceholder,
         padding: {
             top: 0,
@@ -193,7 +158,7 @@ function drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab) {
                 type: 'timeseries',
                 tick: {
                     count:11,
-                    width:80,
+                    width:84,
                     multiline: true,
                     format: dateTimeFormat
                 }
@@ -222,10 +187,16 @@ function drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab) {
         }
     });
 
-    lineChart.hide();
+    anomalyLineChart.hide();
     var numAnomalies = anomalyData.length
     var regionColors;
-    if (parseInt(numAnomalies) < 10) {
+
+    if (anomalyData.length > 0 && anomalyData[0]["regionColor"]) {
+
+        regionColors = [];
+        regionColors.push( anomalyData[0]["regionColor"] )
+
+    } else if(parseInt(numAnomalies) < 10) {
         regionColors = d3.scale.category10().range();
 
     } else if (numAnomalies < 20) {
@@ -242,98 +213,7 @@ function drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab) {
             .style("fill", regionColors[i])
     }
 
-    //EventListeners
-
-    // Clicking the checkbox of the timeseries legend will redraw the timeseries
-    // with the selected elements
-    currentView.on("click", '.time-series-metric-checkbox', function () {
-        anomalyTimeSeriesCheckbox(this);
-    });
-
-    //Select all / deselect all metrics option
-    currentView.on("click", ".time-series-metric-select-all-checkbox", function () {
-        anomalyTimeSelectAllCheckbox(this);
-    });
-
-
-    //licking a checkbox in the table toggles the region of that timerange on the timeseries chart
-    currentView.on("change", ".anomaly-table-checkbox input", function () {
-        toggleAnomalyTimeRange(this);
-    });
-
-    //Preselect first metric on load
-    $($(".time-series-metric-checkbox", currentView)[0]).click();
-
-
-    function anomalyTimeSeriesCheckbox(target) {
-        var checkbox = target;
-        var checkboxObj = $(checkbox);
-        metricName = checkboxObj.val();
-        if (checkboxObj.is(':checked')) {
-            //Show metric's lines on timeseries
-            lineChart.show(metricName + "-current");
-            lineChart.show(metricName + "-baseline");
-
-            //show related ranges on timeserie and related rows in the tabular display
-            $(".anomaly-table-checkbox input").each(function () {
-
-                if ($(this).attr("data-value") == metricName) {
-                    var tableRow = $(this).closest("tr");
-                    tableRow.show()
-                    //check the related input boxes
-                    $("input", tableRow).attr('checked', 'checked');
-                    $("input", tableRow).prop('checked', true);
-                    //show the related timeranges
-                    var anomalyId = "anomaly-id-" + $(this).attr("id");
-                    $("." + anomalyId).show();
-                }
-            })
-
-        } else {
-            //Hide metric's lines on timeseries
-            lineChart.hide(metricName + "-current");
-            lineChart.hide(metricName + "-baseline");
-
-            //hide related ranges on timeserie and related rows in the tabular display
-            $(".anomaly-table-checkbox input").each(function () {
-
-                if ($(this).attr("data-value") == metricName) {
-                    $(this).closest("tr").hide();
-                    var anomalyId = "anomaly-id-" + $(this).attr("id");
-                    $("." + anomalyId).hide();
-                }
-            })
-        }
-    }
-
-    function anomalyTimeSelectAllCheckbox(target) {
-        //if select all is checked
-        if ($(target).is(':checked')) {
-            //trigger click on each unchecked checkbox
-            $(".time-series-metric-checkbox", currentView).each(function (index, checkbox) {
-                if (!$(checkbox).is(':checked')) {
-                    $(checkbox).click();
-                }
-            })
-        } else {
-            //trigger click on each checked checkbox
-            $(".time-series-metric-checkbox", currentView).each(function (index, checkbox) {
-                if ($(checkbox).is(':checked')) {
-                    $(checkbox).click();
-                }
-            })
-        }
-    }
-
-
-    function toggleAnomalyTimeRange(target) {
-        var anomalyId = ".anomaly-id-" + $(target).attr("id");
-        if ($(target).is(':checked')) {
-            $(anomalyId).show();
-        } else {
-            $(anomalyId).hide();
-        }
-    }
+    attach_TimeSeries_EventListeners(currentView)
 
 } //end of drawAnomalyTimeSeries
 
@@ -355,101 +235,222 @@ function renderAnomalyTable(data, tab) {
     /** Create Datatables instance of the anomalies table **/
     $("#anomalies-table").DataTable();
 
+    attach_AnomalyTable_EventListeners()
 
-    //Eventlisteners of anomalies table
-
-    //Select all checkbox selects the checkboxes in all rows
-    $("#anomalies-table").on("click", ".select-all-checkbox", function () {
-
-        var currentTable = $(this).closest("table");
-
-        if ($(this).is(':checked')) {
-            $("input[type='checkbox']", currentTable).attr('checked', 'checked');
-            $("input[type='checkbox']", currentTable).prop('checked', true);
-            $("input[type='checkbox']", currentTable).change();
-
-        } else {
-            $("input[type='checkbox']", currentTable).removeAttr('checked');
-            $("input[type='checkbox']", currentTable).prop('checked', false);
-            $("input[type='checkbox']", currentTable).change();
-
-        }
-    })
-
-
-    //Clicking a checkbox in the table takes user to related heatmap chart
-    $("#anomalies-table").on("click", ".heatmap-link", function () {
-        showHeatMapOfAnomaly(this);
-    });
-
-    //Clicking the feedback option will trigger the ajax - post
-    $("#anomalies-table").on("click", ".feedback-list", function () {
-        $(this).next("textarea").show();
-    });
-
-
-    $('.feedback-dropdown[data-uk-dropdown]').on('hide.uk.dropdown', function(){
-
-        submitAnomalyFeedback(this);
-    });
-
-    /** Compare/Tabular view and dashboard view heat-map-cell click switches the view to compare/heat-map
-     * focusing on the timerange of the cell or in case of cumulative values it query the cumulative timerange **/
-    function showHeatMapOfAnomaly(target) {
-
-        var $target = $(target);
-        hash.view = "compare";
-        hash.aggTimeGranularity = "aggregateAll";
-
-        var currentStartUTC = $target.attr("data-start-utc-millis");
-        var currentEndUTC = $target.attr("data-end-utc-millis");
-
-        //Using WoW for anomaly baseline
-        var baselineStartUTC = moment(parseInt(currentStartUTC)).add(-7, 'days').valueOf();
-        var baselineEndUTC = moment(parseInt(currentEndUTC)).add(-7, 'days').valueOf();
-
-        hash.baselineStart = baselineStartUTC;
-        hash.baselineEnd = baselineEndUTC;
-        hash.currentStart = currentStartUTC;
-        hash.currentEnd = currentEndUTC;
-        delete hash.dashboard;
-        metrics = [];
-        var metricName = $target.attr("data-metric");
-        metrics.push(metricName);
-        hash.metrics = metrics.toString();
-
-        //update hash will trigger window.onhashchange event:
-        // update the form area and trigger the ajax call
-        window.location.hash = encodeHashParameters(hash);
-    }
-
-    function submitAnomalyFeedback(target) {
-        var $target = $(target);
-        var selector = $(".selected-feedback", $target);
-        var feedbackType = selector.attr("value");
-        var anomalyId = selector.attr("data-anomaly-id");
-        var comment = $(".feedback-comment", $target).val();
-
-        //Remove control characters
-        comment = comment.replace(/[\x00-\x1F\x7F-\x9F]/g, "")
-        if(feedbackType){
-
-            var data = '{ "feedbackType": "' + feedbackType + '","comment": "'+ comment +'"}';
-            var url = "/dashboard/anomaly-merged-result/feedback/" + anomalyId;
-
-            //post anomaly feedback
-            submitData(url, data).done(function () {
-                $(selector).addClass("green-background");
-            }).fail(function(){
-                $(selector).addClass("red-background");
-            })
-        }
-    }
-
-    //Set initial view:
-    $(".select-all-checkbox").click();
-    $($(".anomaly-table-checkbox")[0]).click();
 }
+
+ function attach_TimeSeries_EventListeners(currentView){
+
+     //Unbind previously attached eventlisteners
+     currentView.off("click");
+     currentView.off("change");
+
+     // Clicking the checkbox of the timeseries legend will redraw the timeseries
+     // with the selected elements
+     currentView.on("click", '.time-series-metric-checkbox', function () {
+         anomalyTimeSeriesCheckbox(this);
+     });
+
+     //Select all / deselect all metrics option
+     currentView.on("click", ".time-series-metric-select-all-checkbox", function () {
+         anomalyTimeSelectAllCheckbox(this);
+     });
+
+     //Preselect first metric on load
+     $($(".time-series-metric-checkbox", currentView)[0]).click();
+
+     function anomalyTimeSeriesCheckbox(target) {
+         var checkbox = target;
+         var checkboxObj = $(checkbox);
+         metricName = checkboxObj.val();
+         if (checkboxObj.is(':checked')) {
+             //Show metric's lines on timeseries
+             anomalyLineChart.show(metricName + "-current");
+             anomalyLineChart.show(metricName + "-baseline");
+
+         } else {
+             //Hide metric's lines on timeseries
+             anomalyLineChart.hide(metricName + "-current");
+             anomalyLineChart.hide(metricName + "-baseline");
+
+         }
+     }
+
+     function anomalyTimeSelectAllCheckbox(target) {
+         //if select all is checked
+         if ($(target).is(':checked')) {
+             //trigger click on each unchecked checkbox
+             $(".time-series-metric-checkbox", currentView).each(function (index, checkbox) {
+                 if (!$(checkbox).is(':checked')) {
+                     $(checkbox).click();
+                 }
+             })
+         } else {
+             //trigger click on each checked checkbox
+             $(".time-series-metric-checkbox", currentView).each(function (index, checkbox) {
+                 if ($(checkbox).is(':checked')) {
+                     $(checkbox).click();
+                 }
+             })
+         }
+     }
+
+     //Show the first line on the timeseries
+     var firstLegendLabel = $($(".time-series-metric-checkbox")[0])
+     if( !firstLegendLabel.is(':checked')) {
+         firstLegendLabel.click();
+     }
+ }
+
+ function attach_AnomalyTable_EventListeners(){
+
+     //Unbind previously attached eventlisteners
+     $("#anomalies-table").off("click");
+     $("#anomalies-table").off("hide.uk.dropdown");
+
+     //Clicking a checkbox in the table toggles the region of that timerange on the timeseries chart
+     $("#anomalies-table").on("change", ".anomaly-table-radio-label input", function () {
+         updateChartForSingleAnomaly(this);
+     });
+
+     //Clicking a checkbox in the table takes user to related heatmap chart
+     $("#anomalies-table").on("click", ".heatmap-link", function () {
+         showHeatMapOfAnomaly(this);
+     });
+
+     //Clicking the feedback option will trigger the ajax - post
+     $("#anomalies-table").on("click", ".feedback-list", function () {
+         $(this).next("textarea").show();
+     });
+
+
+     $('.feedback-dropdown[data-uk-dropdown]').on('hide.uk.dropdown', function(){
+
+         submitAnomalyFeedback(this);
+     });
+
+     /** Compare/Tabular view and dashboard view heat-map-cell click switches the view to compare/heat-map
+      * focusing on the timerange of the cell or in case of cumulative values it query the cumulative timerange **/
+     function showHeatMapOfAnomaly(target) {
+
+         var $target = $(target);
+         hash.view = "compare";
+         hash.aggTimeGranularity = "aggregateAll";
+
+         var currentStartUTC = $target.attr("data-start-utc-millis");
+         var currentEndUTC = $target.attr("data-end-utc-millis");
+
+         //Using WoW for anomaly baseline
+         var baselineStartUTC = moment(parseInt(currentStartUTC)).add(-7, 'days').valueOf();
+         var baselineEndUTC = moment(parseInt(currentEndUTC)).add(-7, 'days').valueOf();
+
+         hash.baselineStart = baselineStartUTC;
+         hash.baselineEnd = baselineEndUTC;
+         hash.currentStart = currentStartUTC;
+         hash.currentEnd = currentEndUTC;
+         delete hash.dashboard;
+         metrics = [];
+         var metricName = $target.attr("data-metric");
+         metrics.push(metricName);
+         hash.metrics = metrics.toString();
+
+         //update hash will trigger window.onhashchange event:
+         // update the form area and trigger the ajax call
+         window.location.hash = encodeHashParameters(hash);
+     }
+
+     function submitAnomalyFeedback(target) {
+         var $target = $(target);
+         var selector = $(".selected-feedback", $target);
+         var feedbackType = selector.attr("value");
+         var anomalyId = selector.attr("data-anomaly-id");
+         var comment = $(".feedback-comment", $target).val();
+
+         //Remove control characters
+         comment = comment.replace(/[\x00-\x1F\x7F-\x9F]/g, "")
+         if(feedbackType){
+
+             var data = '{ "feedbackType": "' + feedbackType + '","comment": "'+ comment +'"}';
+             var url = "/dashboard/anomaly-merged-result/feedback/" + anomalyId;
+
+             //post anomaly feedback
+             submitData(url, data).done(function () {
+                 $(selector).addClass("green-background");
+             }).fail(function(){
+                 $(selector).addClass("red-background");
+             })
+         }
+     }
+
+     function updateChartForSingleAnomaly(target) {
+
+
+         var button = $(target);
+         var dimension = button.attr("data-explore-dimensions");
+         var value = button.attr("data-dimension-value");
+         var startTime = button.attr("data-start-time");
+         var endTime = button.attr("data-end-time");
+         var anomalyId = button.attr("data-anomaly-id");
+         var row = button.closest('tr')
+         var colorRGB = $(".color-box", row).css("background-color");
+         var colorHEX = rgbToHex(colorRGB);
+         var baselineStart = moment(parseInt(hash.currentStart)).add(-7, 'days')
+         var baselineEnd = moment(parseInt(hash.currentEnd)).add(-7, 'days')
+         var aggTimeGranularity = (window.datasetConfig.dataGranularity) ? window.datasetConfig.dataGranularity : "HOURS";
+         var dataset = hash.dataset;
+         var compareMode = "WoW";
+         var currentStart = hash.currentStart;
+         var currentEnd = hash.currentEnd;
+         var metrics = hash.metrics;
+
+         var filter = "{}";
+         if(dimension && value && value != 'ALL') {
+             filter = '{"'+dimension+'":["'+value+'"]}';
+         }
+
+         var timeSeriesUrl = "/dashboard/data/tabular?dataset=" + dataset + "&compareMode=" + compareMode //
+             + "&currentStart=" + currentStart + "&currentEnd=" + currentEnd  //
+             + "&baselineStart=" + baselineStart + "&baselineEnd=" + baselineEnd   //
+             + "&aggTimeGranularity=" + aggTimeGranularity + "&metrics=" + metrics+ "&filters=" + filter;
+         var tab = hash.view;
+
+         getDataCustomCallback(timeSeriesUrl,tab ).done(function (timeSeriesData) {
+             //Error handling when data is falsy (empty, undefined or null)
+             if (!timeSeriesData) {
+                 // do nothing
+                 return
+             } else {
+                 $("#" + tab + "-chart-area-error").hide();
+             }
+             var placeholder = "linechart-placeholder";
+             var anomalyRegionData = [];
+
+             anomalyRegionData.push({startTime: parseInt(startTime), endTime: parseInt(endTime), id: anomalyId, regionColor: colorHEX});
+             drawAnomalyTimeSeries(timeSeriesData, anomalyRegionData, tab, placeholder);
+
+         });
+     }
+ }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

@@ -24,8 +24,9 @@
             <tbody class="">
             {{#each this as |anomalyData anomalyIndex|}}
             <tr>
-                <td class="checkbox-cell"><label class="anomaly-table-checkbox">
-                    <input type="checkbox" data-value="{{anomalyData/metric}}" id="{{anomalyData/id}}" checked><div class="color-box uk-display-inline-block" style="background:{{colorById anomalyIndex @root.length}}">
+                <td class="radio-btn-cell"><label class="anomaly-table-radio-label">
+                    <input type="radio" name="anomaly-result-row" data-value="{{anomalyData/metric}}" id="{{anomalyData/id}}" data-explore-dimensions="{{anomalyData/function/exploreDimensions}}" data-dimension-value="{{displayAnomalyResultDimensionValue anomalyData/dimensions}}"
+                    data-start-time="{{anomalyData/startTime}}" data-end-time="{{anomalyData/endTime}}" data-anomaly-id="{{anomalyData/id}}"><div class="color-box uk-display-inline-block" style="background:{{colorById anomalyIndex @root.length}}">
                 </div> {{anomalyData/id}}</label>
                 </td>
                 <td>
@@ -34,7 +35,6 @@
                 </td>
                 <td>{{anomalyData/message}}
                   <br/>
-                  <a onclick="updateChartForSingleAnomaly('{{anomalyData/function/exploreDimensions}}', '{{displayAnomalyResultDimensionValue anomalyData/dimensions}}', {{anomalyData/startTime}}, {{anomalyData/endTime}})" >update chart</a>
                 </td>
                 <td>{{#if anomalyData/function/exploreDimensions}}{{anomalyData/function/exploreDimensions}}:{{/if}} {{displayAnomalyResultDimensionValue anomalyData/dimensions}}</td>
                 <td>
