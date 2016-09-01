@@ -34,7 +34,8 @@
                 </td>
                 <td>{{anomalyData/message}}
                   <br/>
-                  <a onclick="updateChartForSingleAnomaly('{{anomalyData/function/exploreDimensions}}', '{{displayAnomalyResultDimensionValue anomalyData/dimensions}}', {{anomalyData/startTime}}, {{anomalyData/endTime}})" >update chart</a>
+                  <a class="view-chart-link" data-explore-dimensions="{{anomalyData/function/exploreDimensions}}" data-dimension-value="{{displayAnomalyResultDimensionValue anomalyData/dimensions}}"
+                     data-start-time="{{anomalyData/startTime}}" data-end-time="{{anomalyData/endTime}}" data-anomaly-id="{{anomalyData/id}}">update chart</a>
                 </td>
                 <td>{{#if anomalyData/function/exploreDimensions}}{{anomalyData/function/exploreDimensions}}:{{/if}} {{displayAnomalyResultDimensionValue anomalyData/dimensions}}</td>
                 <td>
