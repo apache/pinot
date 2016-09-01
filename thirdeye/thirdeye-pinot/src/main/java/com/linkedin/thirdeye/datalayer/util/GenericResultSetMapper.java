@@ -1,7 +1,7 @@
 package com.linkedin.thirdeye.datalayer.util;
 
 import com.google.common.collect.BiMap;
-import com.linkedin.thirdeye.db.entity.AbstractBaseEntity;
+import com.linkedin.thirdeye.datalayer.entity.AbstractJsonEntity;
 import com.linkedin.thirdeye.db.entity.AnomalyTaskSpec;
 import java.io.File;
 import java.io.FileInputStream;
@@ -42,33 +42,33 @@ public class GenericResultSetMapper {
     this.entityMappingHolder = entityMappingHolder;
   }
 
-  public AbstractBaseEntity mapSingle(ResultSet rs, Class<? extends AbstractBaseEntity> entityClass)
+  public AbstractJsonEntity mapSingle(ResultSet rs, Class<? extends AbstractJsonEntity> entityClass)
       throws Exception {
-    List<AbstractBaseEntity> resultMapList = toEntityList(rs, entityClass);
+    List<AbstractJsonEntity> resultMapList = toEntityList(rs, entityClass);
     if (resultMapList.size() > 0) {
       return resultMapList.get(0);
     }
     return null;
   }
 
-  public List<AbstractBaseEntity> mapAll(ResultSet rs,
-      Class<? extends AbstractBaseEntity> entityClass) throws Exception {
+  public List<AbstractJsonEntity> mapAll(ResultSet rs,
+      Class<? extends AbstractJsonEntity> entityClass) throws Exception {
     return toEntityList(rs, entityClass);
   }
 
 
 
-  private List<AbstractBaseEntity> toEntityList(ResultSet rs,
-      Class<? extends AbstractBaseEntity> entityClass) throws Exception {
+  private List<AbstractJsonEntity> toEntityList(ResultSet rs,
+      Class<? extends AbstractJsonEntity> entityClass) throws Exception {
     String tableName =
         entityMappingHolder.tableToEntityNameMap.inverse().get(entityClass.getSimpleName());
     LinkedHashMap<String, ColumnInfo> columnInfoMap =
         entityMappingHolder.columnInfoPerTable.get(tableName);
-    List<AbstractBaseEntity> entityList = new ArrayList<>();
+    List<AbstractJsonEntity> entityList = new ArrayList<>();
 
     ObjectMapper mapper = new ObjectMapper();
     while (rs.next()) {
-      AbstractBaseEntity entityObj = entityClass.newInstance();
+      AbstractJsonEntity entityObj = entityClass.newInstance();
       ResultSetMetaData resultSetMetaData = rs.getMetaData();
       int numColumns = resultSetMetaData.getColumnCount();
       ObjectNode objectNode = mapper.createObjectNode();
@@ -110,8 +110,8 @@ public class GenericResultSetMapper {
 
   }
 
-  public AbstractBaseEntity mapSingleOLD(ResultSet rs,
-      Class<? extends AbstractBaseEntity> entityClass) throws Exception {
+  public AbstractJsonEntity mapSingleOLD(ResultSet rs,
+      Class<? extends AbstractJsonEntity> entityClass) throws Exception {
     List<Map<String, Object>> resultMapList = toResultMapList(rs, entityClass);
     if (resultMapList.size() > 0) {
       Map<String, Object> map = resultMapList.get(0);
@@ -122,20 +122,20 @@ public class GenericResultSetMapper {
         oos.close();
         System.out.println(map);
       }
-      AbstractBaseEntity entity = modelMapper.map(map, entityClass);
+      AbstractJsonEntity entity = modelMapper.map(map, entityClass);
       System.out.println(entity);
       return entity;
     }
     return null;
   }
 
-  public List<AbstractBaseEntity> mapAllOLD(ResultSet rs,
-      Class<? extends AbstractBaseEntity> entityClass) throws Exception {
+  public List<AbstractJsonEntity> mapAllOLD(ResultSet rs,
+      Class<? extends AbstractJsonEntity> entityClass) throws Exception {
     List<Map<String, Object>> resultMapList = toResultMapList(rs, entityClass);
-    List<AbstractBaseEntity> resultEntityList = new ArrayList<>();
+    List<AbstractJsonEntity> resultEntityList = new ArrayList<>();
     if (resultMapList.size() > 0) {
       for (Map<String, Object> map : resultMapList) {
-        AbstractBaseEntity entity = modelMapper.map(map, entityClass);
+        AbstractJsonEntity entity = modelMapper.map(map, entityClass);
         resultEntityList.add(entity);
       }
     }
@@ -143,7 +143,7 @@ public class GenericResultSetMapper {
   }
 
   List<Map<String, Object>> toResultMapList(ResultSet rs,
-      Class<? extends AbstractBaseEntity> entityClass) throws Exception {
+      Class<? extends AbstractJsonEntity> entityClass) throws Exception {
     List<Map<String, Object>> resultMapList = new ArrayList<>();
     String tableName =
         entityMappingHolder.tableToEntityNameMap.inverse().get(entityClass.getSimpleName());

@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.datalayer.dao;
 
 import com.google.inject.Inject;
+import com.linkedin.thirdeye.datalayer.entity.AbstractJsonEntity;
 import com.linkedin.thirdeye.datalayer.util.GenericResultSetMapper;
 import com.linkedin.thirdeye.datalayer.util.Predicate;
 import com.linkedin.thirdeye.datalayer.util.SqlQueryBuilder;
@@ -17,7 +18,7 @@ import java.util.Map;
 import java.util.Set;
 import javax.sql.DataSource;
 
-public class AbstractBaseDAO<E extends AbstractBaseEntity> {
+public class AbstractBaseDAO<E extends AbstractJsonEntity> {
 
   final Class<E> entityClass;
 
@@ -49,7 +50,7 @@ public class AbstractBaseDAO<E extends AbstractBaseEntity> {
       throw new RuntimeException(
           "id must be null when inserting new record. If you are trying to update call update");
     }
-    return runTask(new Task<Long>() {
+    return runTask(new QueryTask<Long>() {
       @Override
       public Long handle(Connection connection) throws Exception {
         PreparedStatement insertStatement =
@@ -69,7 +70,7 @@ public class AbstractBaseDAO<E extends AbstractBaseEntity> {
 
   @SuppressWarnings("unchecked")
   public E findById(Long id) {
-    return runTask(new Task<E>() {
+    return runTask(new QueryTask<E>() {
       @Override
       public E handle(Connection connection) throws Exception {
         PreparedStatement selectStatement =
@@ -82,7 +83,7 @@ public class AbstractBaseDAO<E extends AbstractBaseEntity> {
 
   @SuppressWarnings("unchecked")
   public List<E> findAll() {
-    return runTask(new Task<List<E>>() {
+    return runTask(new QueryTask<List<E>>() {
       @Override
       public List<E> handle(Connection connection) throws Exception {
         PreparedStatement selectStatement =
@@ -94,7 +95,7 @@ public class AbstractBaseDAO<E extends AbstractBaseEntity> {
   }
 
   public int deleteById(Long id) {
-    return runTask(new Task<Integer>() {
+    return runTask(new QueryTask<Integer>() {
       @Override
       public Integer handle(Connection connection) throws Exception {
         Map<String, Object> filters = new HashMap<>();
@@ -107,7 +108,7 @@ public class AbstractBaseDAO<E extends AbstractBaseEntity> {
   }
 
   public int deleteByParams(Map<String, Object> filters) {
-    return runTask(new Task<Integer>() {
+    return runTask(new QueryTask<Integer>() {
       @Override
       public Integer handle(Connection connection) throws Exception {
         PreparedStatement deleteStatement =
@@ -120,7 +121,7 @@ public class AbstractBaseDAO<E extends AbstractBaseEntity> {
   @SuppressWarnings("unchecked")
   public List<E> executeParameterizedSQL(String parameterizedSQL,
       Map<String, Object> parameterMap) {
-    return runTask(new Task<List<E>>() {
+    return runTask(new QueryTask<List<E>>() {
       @Override
       public List<E> handle(Connection connection) throws Exception {
         PreparedStatement selectStatement = sqlQueryBuilder.createStatementFromSQL(connection,
@@ -134,7 +135,7 @@ public class AbstractBaseDAO<E extends AbstractBaseEntity> {
 
   @SuppressWarnings("unchecked")
   public List<E> findByParams(Map<String, Object> filters) {
-    return runTask(new Task<List<E>>() {
+    return runTask(new QueryTask<List<E>>() {
       @Override
       public List<E> handle(Connection connection) throws Exception {
         PreparedStatement selectStatement =
@@ -147,7 +148,7 @@ public class AbstractBaseDAO<E extends AbstractBaseEntity> {
 
   @SuppressWarnings("unchecked")
   public List<E> findByParams(Predicate predicate) {
-    return runTask(new Task<List<E>>() {
+    return runTask(new QueryTask<List<E>>() {
       @Override
       public List<E> handle(Connection connection) throws Exception {
         PreparedStatement selectStatement =
@@ -159,7 +160,7 @@ public class AbstractBaseDAO<E extends AbstractBaseEntity> {
   }
 
   public int update(E entity) {
-    return runTask(new Task<Integer>() {
+    return runTask(new QueryTask<Integer>() {
       @Override
       public Integer handle(Connection connection) throws Exception {
         PreparedStatement updateStatement;
@@ -170,7 +171,7 @@ public class AbstractBaseDAO<E extends AbstractBaseEntity> {
   }
 
   public Integer update(E entity, Set<String> fieldsToUpdate) {
-    return runTask(new Task<Integer>() {
+    return runTask(new QueryTask<Integer>() {
       @Override
       public Integer handle(Connection connection) throws Exception {
         try (PreparedStatement updateStatement =
@@ -181,11 +182,11 @@ public class AbstractBaseDAO<E extends AbstractBaseEntity> {
     }, 0);
   }
 
-  interface Task<T> {
+  interface QueryTask<T> {
     T handle(Connection connection) throws Exception;
   }
 
-  <T> T runTask(Task<T> task, T defaultReturnValue) {
+  <T> T runTask(QueryTask<T> task, T defaultReturnValue) {
     try (Connection connection = getConnection()) {
       return task.handle(connection);
     } catch (Exception e) {
