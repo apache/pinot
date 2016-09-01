@@ -270,9 +270,13 @@ public class ThirdEyeJob {
 
         Path derivedOutputPath = new Path(getIndexDir(root, collection, minTime, maxTime) + File.separator +
             DERIVED_COLUMN_TRANSFORMATION.getName());
+        Path aggregationOutputPath = new Path(getIndexDir(root, collection, minTime, maxTime) + File.separator +
+            AGGREGATION.getName());
         FileSystem fs = FileSystem.get(new Configuration());
         if (fs.exists(derivedOutputPath)) {
           inputPaths = derivedOutputPath.toString();
+        } else if (fs.exists(aggregationOutputPath)) {
+          inputPaths = aggregationOutputPath.toString();
         }
 
         config.setProperty(SegmentCreationPhaseConstants.SEGMENT_CREATION_INPUT_PATH.toString(), inputPaths);
@@ -394,6 +398,7 @@ public class ThirdEyeJob {
     } else if (PhaseSpec.WAIT.equals(phaseSpec)) {
       WaitPhaseJob job = new WaitPhaseJob("Wait for inputs", inputConfig);
       job.run();
+      return;
     }
 
     // Get root, collection, input paths
