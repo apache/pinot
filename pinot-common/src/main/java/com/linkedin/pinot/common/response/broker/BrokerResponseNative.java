@@ -15,10 +15,6 @@
  */
 package com.linkedin.pinot.common.response.broker;
 
-import com.linkedin.pinot.common.exception.QueryException;
-import com.linkedin.pinot.common.response.BrokerResponse;
-import com.linkedin.pinot.common.response.BrokerResponseFactory;
-import com.linkedin.pinot.common.response.ProcessingException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -32,6 +28,9 @@ import org.codehaus.jackson.map.annotate.JsonSerialize;
 import org.codehaus.jackson.type.TypeReference;
 import org.json.JSONException;
 import org.json.JSONObject;
+import com.linkedin.pinot.common.exception.QueryException;
+import com.linkedin.pinot.common.response.BrokerResponse;
+import com.linkedin.pinot.common.response.ProcessingException;
 
 
 /**
@@ -148,7 +147,7 @@ public class BrokerResponseNative implements BrokerResponse {
     return _processingExceptions;
   }
 
-  @JsonProperty("exception")
+  @JsonProperty("exceptions")
   public void setProcessingExceptions(List<QueryProcessingException> processingExceptions) {
     _processingExceptions = processingExceptions;
   }
