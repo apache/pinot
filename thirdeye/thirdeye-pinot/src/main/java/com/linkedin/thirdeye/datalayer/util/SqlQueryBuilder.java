@@ -2,7 +2,7 @@ package com.linkedin.thirdeye.datalayer.util;
 
 import com.google.common.collect.BiMap;
 import com.google.common.collect.Sets;
-import com.linkedin.thirdeye.db.entity.AbstractBaseEntity;
+import com.linkedin.thirdeye.datalayer.entity.AbstractJsonEntity;
 import com.mysql.jdbc.Statement;
 import java.sql.Clob;
 import java.sql.Connection;
@@ -64,7 +64,7 @@ public class SqlQueryBuilder {
     return sb.toString();
   }
 
-  public PreparedStatement createInsertStatement(Connection conn, AbstractBaseEntity entity)
+  public PreparedStatement createInsertStatement(Connection conn, AbstractJsonEntity entity)
       throws Exception {
     String tableName =
         entityMappingHolder.tableToEntityNameMap.inverse().get(entity.getClass().getSimpleName());
@@ -72,7 +72,7 @@ public class SqlQueryBuilder {
   }
 
   public PreparedStatement createInsertStatement(Connection conn, String tableName,
-      AbstractBaseEntity entity) throws Exception {
+      AbstractJsonEntity entity) throws Exception {
     if (!insertSqlMap.containsKey(tableName)) {
       String insertSql =
           generateInsertSql(tableName, entityMappingHolder.columnInfoPerTable.get(tableName));
@@ -109,7 +109,7 @@ public class SqlQueryBuilder {
 
 
   public PreparedStatement createFindByIdStatement(Connection connection,
-      Class<? extends AbstractBaseEntity> entityClass, Long id) throws Exception {
+      Class<? extends AbstractJsonEntity> entityClass, Long id) throws Exception {
     String tableName =
         entityMappingHolder.tableToEntityNameMap.inverse().get(entityClass.getSimpleName());
     String sql = "Select * from " + tableName + " where id=?";
@@ -119,7 +119,7 @@ public class SqlQueryBuilder {
   }
 
   public PreparedStatement createFindByParamsStatement(Connection connection,
-      Class<? extends AbstractBaseEntity> entityClass, Map<String, Object> filters)
+      Class<? extends AbstractJsonEntity> entityClass, Map<String, Object> filters)
           throws Exception {
     String tableName =
         entityMappingHolder.tableToEntityNameMap.inverse().get(entityClass.getSimpleName());
@@ -151,7 +151,7 @@ public class SqlQueryBuilder {
     return prepareStatement;
   }
 
-  public PreparedStatement createUpdateStatement(Connection connection, AbstractBaseEntity entity,
+  public PreparedStatement createUpdateStatement(Connection connection, AbstractJsonEntity entity,
       Set<String> fieldsToUpdate) throws Exception {
     String tableName =
         entityMappingHolder.tableToEntityNameMap.inverse().get(entity.getClass().getSimpleName());
@@ -195,7 +195,7 @@ public class SqlQueryBuilder {
   }
 
   public PreparedStatement createDeleteByIdStatement(Connection connection,
-      Class<? extends AbstractBaseEntity> entityClass, Map<String, Object> filters)
+      Class<? extends AbstractJsonEntity> entityClass, Map<String, Object> filters)
           throws Exception {
     String tableName =
         entityMappingHolder.tableToEntityNameMap.inverse().get(entityClass.getSimpleName());
@@ -225,7 +225,7 @@ public class SqlQueryBuilder {
 
 
   public PreparedStatement createFindAllStatement(Connection connection,
-      Class<? extends AbstractBaseEntity> entityClass) throws Exception {
+      Class<? extends AbstractJsonEntity> entityClass) throws Exception {
     String tableName =
         entityMappingHolder.tableToEntityNameMap.inverse().get(entityClass.getSimpleName());
     String sql = "Select * from " + tableName;
@@ -234,7 +234,7 @@ public class SqlQueryBuilder {
   }
 
   public PreparedStatement createFindByParamsStatement(Connection connection,
-      Class<? extends AbstractBaseEntity> entityClass, Predicate predicate) throws Exception {
+      Class<? extends AbstractJsonEntity> entityClass, Predicate predicate) throws Exception {
     String tableName =
         entityMappingHolder.tableToEntityNameMap.inverse().get(entityClass.getSimpleName());
     BiMap<String, String> entityNameToDBNameMapping =
@@ -286,7 +286,7 @@ public class SqlQueryBuilder {
   }
 
   public PreparedStatement createStatementFromSQL(Connection connection, String parameterizedSQL,
-      Map<String, Object> parameterMap, Class<? extends AbstractBaseEntity> entityClass)
+      Map<String, Object> parameterMap, Class<? extends AbstractJsonEntity> entityClass)
           throws Exception {
     String tableName =
         entityMappingHolder.tableToEntityNameMap.inverse().get(entityClass.getSimpleName());
