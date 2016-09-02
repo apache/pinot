@@ -218,9 +218,9 @@ public class TopkPhaseTest {
     Assert.assertTrue("Topk file failed to generate!", topKFile.exists());
     TopKDimensionValues topk = OBJECT_MAPPER.readValue(new FileInputStream(topKFile), TopKDimensionValues.class);
     Map<String, Set<String>> topkMap = topk.getTopKDimensions();
-    Assert.assertEquals("Incorrect topk object", topkMap.size(), 2);
+    Assert.assertEquals("Incorrect topk object", topkMap.size(), 1);
     Assert.assertEquals("Incorrect topk values in topk object", Sets.newHashSet("pqr1"), topkMap.get("d2"));
-    Assert.assertEquals("Incorrect whitelist values in topk object", Sets.newHashSet("xyz2"), topkMap.get("d3"));
+    Assert.assertEquals("Incorrect whitelist values in topk object", null, topkMap.get("d3"));
   }
 
 

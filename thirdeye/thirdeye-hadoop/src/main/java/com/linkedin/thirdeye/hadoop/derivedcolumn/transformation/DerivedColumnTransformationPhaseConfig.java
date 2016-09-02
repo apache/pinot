@@ -19,9 +19,16 @@ import com.linkedin.thirdeye.hadoop.config.DimensionSpec;
 import com.linkedin.thirdeye.hadoop.config.MetricSpec;
 import com.linkedin.thirdeye.hadoop.config.MetricType;
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfig;
+import com.linkedin.thirdeye.hadoop.config.TopkWhitelistSpec;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
 
 /**
  * This class contains the config needed by TopKColumnTransformation
@@ -32,6 +39,9 @@ public class DerivedColumnTransformationPhaseConfig {
   private List<String> metricNames;
   private List<MetricType> metricTypes;
   private String timeColumnName;
+  private Map<String, Set<String>> whitelist;
+
+  private static final String FIELD_SEPARATOR = ",";
 
   public DerivedColumnTransformationPhaseConfig() {
 
@@ -41,14 +51,17 @@ public class DerivedColumnTransformationPhaseConfig {
    * @param dimensionNames
    * @param metricNames
    * @param metricTypes
+   * @param timeColumnName
+   * @param whitelist
    */
   public DerivedColumnTransformationPhaseConfig(List<String> dimensionNames, List<String> metricNames,
-      List<MetricType> metricTypes, String timeColumnName) {
+      List<MetricType> metricTypes, String timeColumnName, Map<String, Set<String>> whitelist) {
     super();
     this.dimensionNames = dimensionNames;
     this.metricNames = metricNames;
     this.metricTypes = metricTypes;
     this.timeColumnName = timeColumnName;
+    this.whitelist = whitelist;
   }
 
   public List<String> getDimensionNames() {
@@ -65,6 +78,10 @@ public class DerivedColumnTransformationPhaseConfig {
 
   public String getTimeColumnName() {
     return timeColumnName;
+  }
+
+  public Map<String, Set<String>> getWhitelist() {
+    return whitelist;
   }
 
   public static DerivedColumnTransformationPhaseConfig fromThirdEyeConfig(ThirdEyeConfig config) {
@@ -86,7 +103,19 @@ public class DerivedColumnTransformationPhaseConfig {
     // time
     String timeColumnName = config.getTime().getColumnName();
 
-    return new DerivedColumnTransformationPhaseConfig(dimensionNames, metricNames, metricTypes, timeColumnName);
+    TopkWhitelistSpec topKWhitelist = config.getTopKWhitelist();
+    Map<String, Set<String>> whitelist = new HashMap<>();
+
+    // topkwhitelist
+    if (topKWhitelist != null && topKWhitelist.getWhitelist() != null) {
+      for (Entry<String, String> entry : topKWhitelist.getWhitelist().entrySet()) {
+        String[] whitelistValues = entry.getValue().split(FIELD_SEPARATOR);
+        whitelist.put(entry.getKey(), new HashSet<String>(Arrays.asList(whitelistValues)));
+      }
+    }
+
+    return new DerivedColumnTransformationPhaseConfig(dimensionNames, metricNames, metricTypes,
+        timeColumnName, whitelist);
   }
 
 }

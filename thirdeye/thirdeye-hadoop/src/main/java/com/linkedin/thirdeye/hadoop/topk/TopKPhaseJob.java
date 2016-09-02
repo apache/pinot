@@ -373,17 +373,8 @@ public class TopKPhaseJob extends Configured {
             for (DimensionValueMetricPair pair : topKQueue) {
               topkDimensionValues.addValue(dimension, pair.getDimensionValue());
             }
-
           }
         }
-
-        // Get whitelist
-        Set<String> whitelistValues = whitelist.get(dimension);
-        if (whitelistValues != null) {
-          LOGGER.info("Adding whitelist values for {} : {}", dimension, whitelistValues);
-          topkDimensionValues.addAllValues(dimension, whitelistValues);
-        }
-
       }
 
       if (topkDimensionValues.getTopKDimensions().size() > 0) {

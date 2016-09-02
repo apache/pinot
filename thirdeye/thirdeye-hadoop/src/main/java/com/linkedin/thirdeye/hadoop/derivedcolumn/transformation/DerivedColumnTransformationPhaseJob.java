@@ -52,6 +52,7 @@ import org.apache.avro.mapreduce.AvroJob;
 import org.apache.avro.mapreduce.AvroKeyInputFormat;
 import org.apache.avro.mapreduce.AvroKeyOutputFormat;
 import org.apache.avro.mapreduce.AvroMultipleOutputs;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -70,9 +71,9 @@ import org.slf4j.LoggerFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
- * This phase will add a new column for every column that has topk/whitelist config
- * The new column added will be called column_raw (containing all values) and
- * column will contain only topk+whitelist values
+ * This phase will add a new column for every column that has topk config
+ * The new column added will be called "column_topk" (containing only topk values plus any whitelist)
+ * and "column" will contain all values with whitelist applied
  */
 public class DerivedColumnTransformationPhaseJob extends Configured {
   private static final Logger LOGGER = LoggerFactory.getLogger(DerivedColumnTransformationPhaseJob.class);
@@ -103,6 +104,7 @@ public class DerivedColumnTransformationPhaseJob extends Configured {
     private List<MetricType> metricTypes;
     private TopKDimensionValues topKDimensionValues;
     private Map<String, Set<String>> topKDimensionsMap;
+    private Map<String, Set<String>> whitelist;
     private String timeColumnName;
 
     private AvroMultipleOutputs avroMultipleOutputs;
@@ -125,6 +127,7 @@ public class DerivedColumnTransformationPhaseJob extends Configured {
       metricNames = config.getMetricNames();
       metricTypes = config.getMetricTypes();
       timeColumnName = config.getTimeColumnName();
+      whitelist = config.getWhitelist();
 
       outputSchema = new Schema.Parser().parse(configuration.get(DERIVED_COLUMN_TRANSFORMATION_PHASE_OUTPUT_SCHEMA.toString()));
 
@@ -156,17 +159,36 @@ public class DerivedColumnTransformationPhaseJob extends Configured {
       for (String dimension : dimensionsNames) {
         String dimensionName = dimension;
         String dimensionValue = ThirdeyeAvroUtils.getDimensionFromRecord(inputRecord, dimension);
-        // add column for topk + whitelist
+
+        // add original dimension value with whitelist applied
+        String whitelistDimensionValue = dimensionValue;
+        if (whitelist != null) {
+          Set<String> whitelistDimensions = whitelist.get(dimensionName);
+          if (CollectionUtils.isNotEmpty(whitelistDimensions)) {
+            // whitelist config exists for this dimension but value not present in whitelist
+            if (!whitelistDimensions.contains(dimensionValue)) {
+              whitelistDimensionValue = ThirdEyeConstants.OTHER;
+            }
+          }
+        }
+        outputRecord.put(dimensionName, whitelistDimensionValue);
+
+        // add column for topk, if topk config exists for that column, plus any whitelist values
         if (topKDimensionsMap.containsKey(dimensionName)) {
           Set<String> topKDimensionValues = topKDimensionsMap.get(dimensionName);
-          if (topKDimensionValues != null && topKDimensionValues.contains(dimensionValue)) {
-            outputRecord.put(dimensionName, dimensionValue);
-          } else {
-            outputRecord.put(dimensionName, ThirdEyeConstants.OTHER);
+          // if topk config exists for that dimension
+          if (CollectionUtils.isNotEmpty(topKDimensionValues)) {
+            String topkDimensionName = dimensionName + ThirdEyeConstants.TOPK_DIMENSION_SUFFIX;
+            String topkDimensionValue = dimensionValue;
+            // topk config exists for this dimension, but value not present in topk or whitelist
+            if (!topKDimensionValues.contains(dimensionValue) &&
+                (whitelist == null || whitelist.get(dimensionName) == null
+                || !whitelist.get(dimensionName).contains(dimensionValue))) {
+              topkDimensionValue = ThirdEyeConstants.OTHER;
+            }
+            outputRecord.put(topkDimensionName, topkDimensionValue);
           }
-          dimensionName = dimension + ThirdEyeConstants.RAW_DIMENSION_SUFFIX;
         }
-        outputRecord.put(dimensionName, dimensionValue);
       }
 
       // metrics
@@ -257,30 +279,26 @@ public class DerivedColumnTransformationPhaseJob extends Configured {
   public Schema newSchema(ThirdEyeConfig thirdeyeConfig) {
     Schema outputSchema = null;
 
-    Set<String> transformDimensionSet = new HashSet<>();
+    Set<String> topKTransformDimensionSet = new HashSet<>();
     TopkWhitelistSpec topkWhitelist = thirdeyeConfig.getTopKWhitelist();
 
-    // gather topk + whitelist columns
+    // gather topk columns
     if (topkWhitelist != null) {
       List<TopKDimensionToMetricsSpec> topKDimensionToMetricsSpecs = topkWhitelist.getTopKDimensionToMetricsSpec();
       if (topKDimensionToMetricsSpecs != null) {
         for (TopKDimensionToMetricsSpec topKDimensionToMetricsSpec : topKDimensionToMetricsSpecs) {
-          transformDimensionSet.add(topKDimensionToMetricsSpec.getDimensionName());
+          topKTransformDimensionSet.add(topKDimensionToMetricsSpec.getDimensionName());
         }
-      }
-      Map<String, String> whitelist = topkWhitelist.getWhitelist();
-      if (whitelist != null) {
-        transformDimensionSet.addAll(whitelist.keySet());
       }
     }
     RecordBuilder<Schema> recordBuilder = SchemaBuilder.record(thirdeyeConfig.getCollection());
     FieldAssembler<Schema> fieldAssembler = recordBuilder.fields();
 
-    // add new column for topk + whitelist columns
+    // add new column for topk columns
     for (String dimension : thirdeyeConfig.getDimensionNames()) {
       fieldAssembler = fieldAssembler.name(dimension).type().nullable().stringType().noDefault();
-      if (transformDimensionSet.contains(dimension)) {
-        fieldAssembler = fieldAssembler.name(dimension + ThirdEyeConstants.RAW_DIMENSION_SUFFIX).type().nullable().stringType().noDefault();
+      if (topKTransformDimensionSet.contains(dimension)) {
+        fieldAssembler = fieldAssembler.name(dimension + ThirdEyeConstants.TOPK_DIMENSION_SUFFIX).type().nullable().stringType().noDefault();
       }
     }
 

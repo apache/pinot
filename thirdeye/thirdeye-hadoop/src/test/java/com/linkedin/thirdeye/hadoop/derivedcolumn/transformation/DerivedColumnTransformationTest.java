@@ -33,6 +33,7 @@ import org.apache.avro.generic.GenericData.Record;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.hadoop.io.AvroSerialization;
 import org.apache.avro.mapred.AvroKey;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -195,10 +196,10 @@ public class DerivedColumnTransformationTest {
     for (Pair<AvroKey<GenericRecord>, NullWritable> pair : result) {
       GenericRecord datum = pair.getFirst().datum();
       Assert.assertEquals("TopKTransformationJob did not add new column for topk column",
-          datum.getSchema().getField("d2_raw") != null, true);
+          datum.getSchema().getField("d2_topk") != null, true);
       String d2 = (String) datum.get("d2");
-      String d2_raw = (String) datum.get("d2_raw");
-      Assert.assertEquals("Incorrect topk column transformation", (d2_raw.equals("pqr1") && d2.equals("other")) || (d2_raw.equals("pqr2") && d2.equals("pqr2")), true);
+      String d2_topk = (String) datum.get("d2_topk");
+      Assert.assertEquals("Incorrect topk column transformation", (d2_topk.equals("other") && d2.equals("pqr1")) || (d2_topk.equals("pqr2") && d2.equals("pqr2")), true);
     }
   }
 
@@ -220,6 +221,7 @@ public class DerivedColumnTransformationTest {
     private TopKDimensionValues topKDimensionValues;
     private Map<String, Set<String>> topKDimensionsMap;
     private String timeColumnName;
+    private Map<String, Set<String>> whitelist;
 
     @Override
     public void setup(Context context) throws IOException, InterruptedException {
@@ -231,6 +233,7 @@ public class DerivedColumnTransformationTest {
       dimensionsNames = config.getDimensionNames();
       metricNames = config.getMetricNames();
       timeColumnName = config.getTimeColumnName();
+      whitelist = config.getWhitelist();
 
       outputSchema = new Schema.Parser().parse(configuration.get(DerivedColumnTransformationPhaseConstants.DERIVED_COLUMN_TRANSFORMATION_PHASE_OUTPUT_SCHEMA.toString()));
 
@@ -260,18 +263,37 @@ public class DerivedColumnTransformationTest {
       for (String dimension : dimensionsNames) {
         String dimensionName = dimension;
         String dimensionValue = ThirdeyeAvroUtils.getDimensionFromRecord(inputRecord, dimension);
-        // add column for topk + whitelist
+
+        // add original dimension value with whitelist applied
+        String whitelistDimensionValue = dimensionValue;
+        if (whitelist != null) {
+          Set<String> whitelistDimensions = whitelist.get(dimensionName);
+          if (CollectionUtils.isNotEmpty(whitelistDimensions)) {
+            // whitelist config exists for this dimension but value not present in whitelist
+            if (!whitelistDimensions.contains(dimensionValue)) {
+              whitelistDimensionValue = ThirdEyeConstants.OTHER;
+            }
+          }
+        }
+        outputRecord.put(dimensionName, whitelistDimensionValue);
+
+        // add column for topk, if topk config exists for that column
         if (topKDimensionsMap.containsKey(dimensionName)) {
           Set<String> topKDimensionValues = topKDimensionsMap.get(dimensionName);
-          if (topKDimensionValues != null && topKDimensionValues.contains(dimensionValue)) {
-            outputRecord.put(dimensionName, dimensionValue);
-          } else {
-            outputRecord.put(dimensionName, ThirdEyeConstants.OTHER);
+          // if topk config exists for that dimension
+          if (CollectionUtils.isNotEmpty(topKDimensionValues)) {
+            String topkDimensionName = dimensionName + ThirdEyeConstants.TOPK_DIMENSION_SUFFIX;
+            String topkDimensionValue = dimensionValue;
+            // topk config exists for this dimension, but value not present in topk
+            if (!topKDimensionValues.contains(dimensionValue) &&
+                (whitelist == null || whitelist.get(dimensionName) == null || !whitelist.get(dimensionName).contains(dimensionValue))) {
+              topkDimensionValue = ThirdEyeConstants.OTHER;
+            }
+            outputRecord.put(topkDimensionName, topkDimensionValue);
           }
-          dimensionName = dimension + ThirdEyeConstants.RAW_DIMENSION_SUFFIX;
         }
-        outputRecord.put(dimensionName, dimensionValue);
       }
+
 
       // metrics
       for (String metric : metricNames) {
