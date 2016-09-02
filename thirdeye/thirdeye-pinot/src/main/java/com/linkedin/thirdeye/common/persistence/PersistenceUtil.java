@@ -25,7 +25,6 @@ public abstract class PersistenceUtil {
   private PersistenceUtil() {
   }
 
-  // Used for unit testing, provides injector
   public static void init(File localConfigFile) {
     PersistenceConfig configuration = createConfiguration(localConfigFile);
     Properties properties = createDbPropertiesFromConfiguration(configuration);
@@ -60,7 +59,11 @@ public abstract class PersistenceUtil {
     properties.put(Environment.CONNECTION_PROVIDER, DatasourceConnectionProviderImpl.class.getName());
     properties.put(Environment.DATASOURCE, ds);
 
-    JpaPersistModule jpaPersistModule = new JpaPersistModule(JPA_UNIT).properties(properties);
+    init(properties);
+  }
+
+  public static void init(Properties dsProps) {
+    JpaPersistModule jpaPersistModule = new JpaPersistModule(JPA_UNIT).properties(dsProps);
     injector = Guice.createInjector(jpaPersistModule, new PersistenceModule());
     injector.getInstance(PersistService.class).start();
   }

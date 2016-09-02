@@ -62,7 +62,7 @@ public class AnomalyMergedResult extends AbstractBaseEntity implements Comparabl
       inverseJoinColumns = @JoinColumn(name = "anomaly_result_id"))
   private List<AnomalyResult> anomalyResults = new ArrayList<>();
 
-  @ManyToOne(fetch = FetchType.EAGER)
+  @ManyToOne(fetch = FetchType.EAGER, cascade = CascadeType.DETACH)
   @JoinColumn(name = "function_id")
   private AnomalyFunctionSpec function;
 

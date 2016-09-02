@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.db.dao;
 
 import com.linkedin.thirdeye.anomaly.job.JobConstants;
+import com.linkedin.thirdeye.common.persistence.PersistenceConfig;
 import com.linkedin.thirdeye.common.persistence.PersistenceUtil;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 
@@ -16,9 +17,13 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.HashSet;
+import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import javax.persistence.EntityManager;
+import org.apache.tomcat.jdbc.pool.DataSource;
+import org.hibernate.cfg.Environment;
+import org.hibernate.engine.jdbc.connections.internal.DatasourceConnectionProviderImpl;
 import org.hibernate.internal.SessionImpl;
 import org.joda.time.DateTime;
 import org.testng.annotations.AfterClass;
@@ -38,7 +43,41 @@ public abstract class AbstractDbTestBase {
   public void init() throws URISyntaxException {
     URL url = AbstractDbTestBase.class.getResource("/persistence.yml");
     File configFile = new File(url.toURI());
-    PersistenceUtil.init(configFile);
+
+    PersistenceConfig configuration = PersistenceUtil.createConfiguration(configFile);
+    Properties properties = PersistenceUtil.createDbPropertiesFromConfiguration(configuration);
+
+    long dbId = System.currentTimeMillis();
+
+    DataSource ds = new DataSource();
+    ds.setUrl(configuration.getDatabaseConfiguration().getUrl() + dbId);
+    ds.setPassword(configuration.getDatabaseConfiguration().getPassword());
+    ds.setUsername(configuration.getDatabaseConfiguration().getUser());
+    ds.setDriverClassName(configuration.getDatabaseConfiguration().getProperties().get("hibernate.connection.driver_class"));
+
+    // pool size configurations
+    ds.setMaxActive(200);
+    ds.setMinIdle(10);
+    ds.setInitialSize(10);
+
+    // validate connection
+    ds.setValidationQuery("select 1 as dbcp_connection_test");
+    ds.setTestWhileIdle(true);
+    ds.setTestOnBorrow(true);
+
+    // when returning connection to pool
+    ds.setTestOnReturn(true);
+    ds.setRollbackOnReturn(true);
+
+    // Timeout before an abandoned(in use) connection can be removed.
+    ds.setRemoveAbandonedTimeout(600_000);
+    ds.setRemoveAbandoned(true);
+
+    properties.put(Environment.CONNECTION_PROVIDER, DatasourceConnectionProviderImpl.class.getName());
+    properties.put(Environment.DATASOURCE, ds);
+
+    PersistenceUtil.init(properties);
+
     anomalyFunctionDAO = PersistenceUtil.getInstance(AnomalyFunctionDAO.class);
     anomalyResultDAO = PersistenceUtil.getInstance(AnomalyResultDAO.class);
     anomalyJobDAO = PersistenceUtil.getInstance(AnomalyJobDAO.class);

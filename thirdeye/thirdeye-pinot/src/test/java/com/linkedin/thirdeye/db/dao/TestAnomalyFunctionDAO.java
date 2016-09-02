@@ -1,7 +1,6 @@
 package com.linkedin.thirdeye.db.dao;
 
 import com.linkedin.thirdeye.constant.MetricAggFunction;
-import com.linkedin.thirdeye.db.dao.AbstractDbTestBase;
 import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
 import java.util.List;
 import org.testng.Assert;

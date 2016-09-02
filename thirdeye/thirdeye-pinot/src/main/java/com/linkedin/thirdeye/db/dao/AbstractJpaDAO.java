@@ -55,7 +55,6 @@ public class AbstractJpaDAO<E extends AbstractBaseEntity> {
     getEntityManager().remove(entity);
   }
 
-  @Transactional
   public void deleteById(Long id) {
     getEntityManager().remove(findById(id));
   }
