@@ -518,6 +518,11 @@
         <artifactId>antlr4-annotations</artifactId>
         <version>4.3</version>
       </dependency>
+      <dependency>
+        <groupId>com.jcabi</groupId>
+        <artifactId>jcabi-log</artifactId>
+        <version>0.17.1</version>
+      </dependency>
     </dependencies>
   </dependencyManagement>
   <build>

@@ -110,6 +110,10 @@
       <artifactId>helix-core</artifactId>
     </dependency>
     <dependency>
+      <groupId>com.jcabi</groupId>
+      <artifactId>jcabi-log</artifactId>
+    </dependency>
+    <dependency>
       <groupId>com.linkedin.pinot</groupId>
       <artifactId>pinot-common</artifactId>
       <version>${project.version}</version>

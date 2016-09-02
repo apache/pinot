@@ -77,6 +77,7 @@ public class HelixServerStarter {
 
   public HelixServerStarter(String helixClusterName, String zkServer, Configuration pinotHelixProperties)
       throws Exception {
+    LOGGER.info("Starting Pinot server");
     _helixClusterName = helixClusterName;
     _pinotHelixProperties = pinotHelixProperties;
     String hostname = pinotHelixProperties.getString(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST,
@@ -93,6 +94,7 @@ public class HelixServerStarter {
     pinotHelixProperties.addProperty("pinot.server.instance.id", _instanceId);
     startServerInstance(pinotHelixProperties);
 
+    LOGGER.info("Connecting Helix components");
     // Replace all white-spaces from list of zkServers.
     String zkServers = zkServer.replaceAll("\\s+", "");
     _helixManager =
@@ -141,6 +143,8 @@ public class HelixServerStarter {
         });
 
     ControllerLeaderLocator.create(_helixManager);
+
+    LOGGER.info("Pinot server ready");
 
     // Create metrics for mmap stuff
     _serverInstance.getServerMetrics().addCallbackGauge(
@@ -213,12 +217,10 @@ public class HelixServerStarter {
     setupHelixSystemProperties(moreConfigurations);
 
     if (_serverInstance == null) {
-      LOGGER.info("Trying to create a new ServerInstance!");
       _serverInstance = new ServerInstance();
-      LOGGER.info("Trying to initial ServerInstance!");
       _serverInstance.init(_serverConf, new MetricsRegistry());
-      LOGGER.info("Trying to start ServerInstance!");
       _serverInstance.start();
+      LOGGER.info("Started server instance");
     }
   }
 

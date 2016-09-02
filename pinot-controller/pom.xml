@@ -121,6 +121,10 @@
     <scope>test</scope>
   </dependency>
     <!-- End Helix Related Depedency -->
+    <dependency>
+      <groupId>com.jcabi</groupId>
+      <artifactId>jcabi-log</artifactId>
+    </dependency>
 
   </dependencies>
   <build>

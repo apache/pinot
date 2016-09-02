@@ -79,6 +79,8 @@ public class ControllerStarter {
   }
 
   public void start() {
+    LOGGER.info("Starting Pinot controller");
+
     Utils.logVersions();
 
     component.getServers().add(Protocol.HTTP, Integer.parseInt(config.getControllerPort()));
@@ -87,7 +89,7 @@ public class ControllerStarter {
 
     final Context applicationContext = component.getContext().createChildContext();
 
-    LOGGER.info("injecting conf and resource manager to the api context");
+    LOGGER.info("Injecting configuration and resource manager to the API context");
     applicationContext.getAttributes().put(ControllerConf.class.toString(), config);
     applicationContext.getAttributes().put(PinotHelixResourceManager.class.toString(), helixResourceManager);
     MultiThreadedHttpConnectionManager connectionManager = new MultiThreadedHttpConnectionManager();
@@ -104,20 +106,23 @@ public class ControllerStarter {
     final ControllerMetrics controllerMetrics = new ControllerMetrics(_metricsRegistry);
 
     try {
-      LOGGER.info("starting pinot helix resource manager");
+      LOGGER.info("Starting Pinot Helix resource manager and connecting to Zookeeper");
       helixResourceManager.start();
       // Helix resource manager must be started in order to create PinotLLCRealtimeSegmentManager
       PinotLLCRealtimeSegmentManager.create(helixResourceManager, config);
-      LOGGER.info("starting api component");
+      LOGGER.info("Starting Pinot REST API component");
       component.start();
-      LOGGER.info("starting retention manager");
+      LOGGER.info("Starting retention manager");
       retentionManager.start();
-      LOGGER.info("starting validation manager");
+      LOGGER.info("Starting validation manager");
       validationManager.start();
-      LOGGER.info("starting realtime segments manager");
+      LOGGER.info("Starting realtime segment manager");
       realtimeSegmentsManager.start(controllerMetrics);
-      LOGGER.info("starting segments status manager");
+      LOGGER.info("Starting segment status manager");
       segmentStatusChecker.start(controllerMetrics);
+      LOGGER.info("Pinot controller ready and listening on port {} for API requests", config.getControllerPort());
+      LOGGER.info("Controller services available at http://{}:{}/", config.getControllerHost(),
+          config.getControllerPort());
     } catch (final Exception e) {
       LOGGER.error("Caught exception while starting controller", e);
       Utils.rethrowException(e);
@@ -153,27 +158,27 @@ public class ControllerStarter {
 
   public void stop() {
     try {
-      LOGGER.info("stopping validation manager");
+      LOGGER.info("Stopping validation manager");
       validationManager.stop();
 
-      LOGGER.info("stopping retention manager");
+      LOGGER.info("Stopping retention manager");
       retentionManager.stop();
 
-      LOGGER.info("stopping api component");
+      LOGGER.info("Stopping API component");
       component.stop();
 
-      LOGGER.info("stopping realtime segments manager");
+      LOGGER.info("Stopping realtime segment manager");
       realtimeSegmentsManager.stop();
 
-      LOGGER.info("stopping resource manager");
+      LOGGER.info("Stopping resource manager");
       helixResourceManager.stop();
 
-      LOGGER.info("stopping segments status manager");
+      LOGGER.info("Stopping segment status manager");
       segmentStatusChecker.stop();
 
       executorService.shutdownNow();
     } catch (final Exception e) {
-      LOGGER.error("Caught exception", e);
+      LOGGER.error("Caught exception while shutting down", e);
     }
   }
 

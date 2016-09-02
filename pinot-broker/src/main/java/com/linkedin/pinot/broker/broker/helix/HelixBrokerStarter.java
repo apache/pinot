@@ -66,13 +66,15 @@ public class HelixBrokerStarter {
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private final LiveInstancesChangeListenerImpl _liveInstancesListener;
 
-  private static final Logger LOGGER = LoggerFactory.getLogger("HelixBrokerStarter");
+  private static final Logger LOGGER = LoggerFactory.getLogger(HelixBrokerStarter.class);
 
   private static final String ROUTING_TABLE_SELECTOR_SUBSET_KEY =
       "pinot.broker.routing.table.selector";
 
   public HelixBrokerStarter(String helixClusterName, String zkServer, Configuration pinotHelixProperties)
       throws Exception {
+    LOGGER.info("Starting Pinot broker");
+
     _liveInstancesListener = new LiveInstancesChangeListenerImpl(helixClusterName);
 
     _pinotHelixProperties = DefaultHelixBrokerConfig.getDefaultBrokerConf(pinotHelixProperties);
@@ -91,6 +93,7 @@ public class HelixBrokerStarter {
     // Remove all white-spaces from the list of zkServers (if any).
     String zkServers = zkServer.replaceAll("\\s+", "");
 
+    LOGGER.info("Starting Zookeeper client");
     _zkClient =
         new ZkClient(getZkAddressForBroker(zkServers, helixClusterName),
             ZkClient.DEFAULT_SESSION_TIMEOUT, ZkClient.DEFAULT_CONNECTION_TIMEOUT, new ZNRecordSerializer());
@@ -99,6 +102,7 @@ public class HelixBrokerStarter {
         RoutingTableSelectorFactory.getRoutingTableSelector(pinotHelixProperties.subset(ROUTING_TABLE_SELECTOR_SUBSET_KEY));
     _helixExternalViewBasedRouting = new HelixExternalViewBasedRouting(_propertyStore, selector);
 
+    LOGGER.info("Connecting Helix components");
     // _brokerServerBuilder = startBroker();
     _brokerServerBuilder = startBroker(_pinotHelixProperties);
     _helixManager =
@@ -165,6 +169,9 @@ public class HelixBrokerStarter {
     brokerServerBuilder.buildHTTP();
     brokerServerBuilder.start();
 
+    LOGGER.info("Pinot broker ready and listening on port {} for API requests",
+        config.getProperty("pinot.broker.client.queryPort"));
+
     Runtime.getRuntime().addShutdownHook(new Thread() {
       @Override
       public void run() {
@@ -211,12 +218,12 @@ public class HelixBrokerStarter {
     LOGGER.info("Shutting down");
 
     if (_helixManager != null) {
-      LOGGER.info("Disconnecting Helix Manager");
+      LOGGER.info("Disconnecting Helix manager");
       _helixManager.disconnect();
     }
 
     if (_zkClient != null) {
-      LOGGER.info("Closing ZK Client");
+      LOGGER.info("Closing Zookeeper client");
       _zkClient.close();
     }
   }
