@@ -159,11 +159,8 @@
               </jvmSettings>
             </program>
             <program>
-              <mainClass>com.linkedin.pinot.tools.admin.PinotAdministrator</mainClass>
+              <mainClass>com.linkedin.pinot.tools.admin.PinotController</mainClass>
               <name>start-controller</name>
-              <commandLineArguments>
-                <commandLineArgument>StartController</commandLineArgument>
-              </commandLineArguments>
               <jvmSettings>
                 <initialMemorySize>1G</initialMemorySize>
                 <maxMemorySize>1G</maxMemorySize>
@@ -173,11 +170,8 @@
               </jvmSettings>
             </program>
             <program>
-              <mainClass>com.linkedin.pinot.tools.admin.PinotAdministrator</mainClass>
+              <mainClass>com.linkedin.pinot.tools.admin.PinotBroker</mainClass>
               <name>start-broker</name>
-              <commandLineArguments>
-                <commandLineArgument>StartBroker</commandLineArgument>
-              </commandLineArguments>
               <jvmSettings>
                 <initialMemorySize>1G</initialMemorySize>
                 <maxMemorySize>1G</maxMemorySize>
@@ -187,11 +181,8 @@
               </jvmSettings>
             </program>
             <program>
-              <mainClass>com.linkedin.pinot.tools.admin.PinotAdministrator</mainClass>
+              <mainClass>com.linkedin.pinot.tools.admin.PinotServer</mainClass>
               <name>start-server</name>
-              <commandLineArguments>
-                <commandLineArgument>StartServer</commandLineArgument>
-              </commandLineArguments>
               <jvmSettings>
                 <initialMemorySize>1G</initialMemorySize>
                 <maxMemorySize>1G</maxMemorySize>
