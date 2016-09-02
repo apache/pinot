@@ -128,7 +128,7 @@ public class Loaders {
     private static StarTreeFormatVersion getStarTreeVersionToLoad(
         IndexLoadingConfigMetadata indexLoadingConfigMetadata) {
       if (indexLoadingConfigMetadata == null) {
-        return StarTreeFormatVersion.V1;
+        return StarTreeFormatVersion.ON_HEAP;
       } else {
         return StarTreeFormatVersion.valueOf(indexLoadingConfigMetadata.getStarTreeVersionToLoad().toUpperCase());
       }

@@ -30,10 +30,10 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * This class implements the Star Tree V1 to V2 converter.
+ * This class implements the Star Tree ON_HEAP to OFF_HEAP converter.
  */
-public class StarTreeV1ToV2Converter extends AbstractBaseAdminCommand implements Command {
-  private static final Logger LOGGER = LoggerFactory.getLogger(StarTreeV1ToV2Converter.class);
+public class StarTreeOnHeapToOffHeapConverter extends AbstractBaseAdminCommand implements Command {
+  private static final Logger LOGGER = LoggerFactory.getLogger(StarTreeOnHeapToOffHeapConverter.class);
 
   @Option(name = "-segmentDir", required = true, metaVar = "<String>", usage = "path to untarred input segment.")
   private String _segmentDir;
@@ -58,22 +58,22 @@ public class StarTreeV1ToV2Converter extends AbstractBaseAdminCommand implements
     LOGGER.info("Loaded segment {} in {} ms ", indexDir.getName(), (end - start));
 
     start = end;
-    StarTreeInterf starTreeV1 = segment.getStarTree();
-    File starTreeV2File = new File(TMP_DIR, (V1Constants.STAR_TREE_INDEX_FILE + System.currentTimeMillis()));
+    StarTreeInterf starTreeOnHeap = segment.getStarTree();
+    File starTreeOffHeapFile = new File(TMP_DIR, (V1Constants.STAR_TREE_INDEX_FILE + System.currentTimeMillis()));
 
-    // Convert the star tree v1 to v2
-    StarTreeSerDe.writeTreeV2(starTreeV1, starTreeV2File);
+    // Convert the star tree on-heap to off-heap format.
+    StarTreeSerDe.writeTreeOffHeapFormat(starTreeOnHeap, starTreeOffHeapFile);
 
     // Copy all the indexes into output directory.
     File outputDir = new File(_outputDir);
     FileUtils.deleteQuietly(outputDir);
     FileUtils.copyDirectory(indexDir, outputDir);
 
-    // Delete the existing star tree v1 file from the output directory.
+    // Delete the existing star tree on-heap file from the output directory.
     FileUtils.deleteQuietly(new File(_outputDir, V1Constants.STAR_TREE_INDEX_FILE));
 
-    // Move the temp star tree v2 file into the output directory.
-    FileUtils.moveFile(starTreeV2File, new File(_outputDir, V1Constants.STAR_TREE_INDEX_FILE));
+    // Move the temp star tree off-heap file into the output directory.
+    FileUtils.moveFile(starTreeOffHeapFile, new File(_outputDir, V1Constants.STAR_TREE_INDEX_FILE));
     end = System.currentTimeMillis();
 
     LOGGER.info("Converted segment: {} ms", (end - start));
@@ -82,7 +82,7 @@ public class StarTreeV1ToV2Converter extends AbstractBaseAdminCommand implements
 
   @Override
   public String description() {
-    return "Convert Pinto Segment with Star Tree V1 format into Pinot Segment with Star Tree V2 format";
+    return "Convert Pinto Segment with Star Tree ON_HEAP format into Pinot Segment with Star Tree OFF_HEAP format";
   }
 
   @Override
@@ -92,14 +92,14 @@ public class StarTreeV1ToV2Converter extends AbstractBaseAdminCommand implements
 
   @Override
   public String toString() {
-    return "StarTreeV1ToV2Converter -segmentDir " + _segmentDir + " -outputDir " + _outputDir;
+    return "StarTreeOnHeapToOffHeapConverter -segmentDir " + _segmentDir + " -outputDir " + _outputDir;
   }
 
   public String getSegmentDir() {
     return _segmentDir;
   }
 
-  public StarTreeV1ToV2Converter setSegmentDir(String segmentDir) {
+  public StarTreeOnHeapToOffHeapConverter setSegmentDir(String segmentDir) {
     _segmentDir = segmentDir;
     return this;
   }
@@ -108,7 +108,7 @@ public class StarTreeV1ToV2Converter extends AbstractBaseAdminCommand implements
     return _outputDir;
   }
 
-  public StarTreeV1ToV2Converter setOutputDir(String outputDir) {
+  public StarTreeOnHeapToOffHeapConverter setOutputDir(String outputDir) {
     _outputDir = outputDir;
     return this;
   }

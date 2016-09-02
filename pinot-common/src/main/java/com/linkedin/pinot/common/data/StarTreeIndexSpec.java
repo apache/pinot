@@ -104,7 +104,7 @@ public class StarTreeIndexSpec {
   }
 
   /**
-   * Returns True if StarTreeV2 is enabled, False otherwise.
+   * Returns True if StarTreeOffHeap is enabled, False otherwise.
    * @return
    */
   public boolean isEnableOffHeapFormat() {
@@ -112,7 +112,7 @@ public class StarTreeIndexSpec {
   }
 
   /**
-   * Enable/Disable StarTreeV2.
+   * Enable/Disable StarTreeOffHeapFormat.
    * @param enableOffHeapFormat
    */
   public void setEnableOffHeapFormat(boolean enableOffHeapFormat) {
