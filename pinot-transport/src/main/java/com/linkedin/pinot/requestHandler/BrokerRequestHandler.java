@@ -52,6 +52,8 @@ import com.linkedin.pinot.transport.scattergather.ScatterGather;
 import com.linkedin.pinot.transport.scattergather.ScatterGatherRequest;
 import com.linkedin.pinot.transport.scattergather.ScatterGatherStats;
 import io.netty.buffer.ByteBuf;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -63,6 +65,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import org.apache.commons.configuration.Configuration;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.http.annotation.ThreadSafe;
 import org.apache.thrift.protocol.TCompactProtocol;
@@ -90,23 +93,45 @@ public class BrokerRequestHandler {
   private final BrokerRequestOptimizer _optimizer;
   private final int _queryResponseLimit;
   private AtomicLong _requestIdGenerator;
-
+  private Configuration _config;
+  private final String _brokerId;
+  private static final String DEFAULT_BROKER_ID;
+  static {
+    String defaultBrokerId = "";
+    try {
+      defaultBrokerId = InetAddress.getLocalHost().getHostName();
+    } catch (UnknownHostException e) {
+      LOGGER.error("Failed to read default broker id", e);
+    }
+    DEFAULT_BROKER_ID = defaultBrokerId;
+  }
   //TODO: Currently only using RoundRobin selection. But, this can be allowed to be configured.
   private RoundRobinReplicaSelection _replicaSelection;
 
+  private static final int DEFAULT_BROKER_QUERY_RESPONSE_LIMIT = Integer.MAX_VALUE;
+  private static final String BROKER_QUERY_RESPONSE_LIMIT_CONFIG = "pinot.broker.query.response.limit";
+  public  static final long DEFAULT_BROKER_TIME_OUT_MS = 10 * 1000L;
+  private static final String BROKER_TIME_OUT_CONFIG = "pinot.broker.timeoutMs";
+  public static final String BROKER_ID_CONFIG_KEY = "pinot.broker.id";
+
   public BrokerRequestHandler(RoutingTable table, TimeBoundaryService timeBoundaryService,
       ScatterGather scatterGatherer, ReduceServiceRegistry reduceServiceRegistry, BrokerMetrics brokerMetrics,
-      long brokerTimeOutMs, int queryResponseLimit) {
+      Configuration config) {
     _routingTable = table;
     _timeBoundaryService = timeBoundaryService;
     _reduceServiceRegistry = reduceServiceRegistry;
     _scatterGatherer = scatterGatherer;
     _replicaSelection = new RoundRobinReplicaSelection();
     _brokerMetrics = brokerMetrics;
-    _brokerTimeOutMs = brokerTimeOutMs;
+    _config = config;
     _optimizer = new BrokerRequestOptimizer();
     _requestIdGenerator = new AtomicLong(0);
-    _queryResponseLimit = queryResponseLimit;
+    _queryResponseLimit = _config.getInt(BROKER_QUERY_RESPONSE_LIMIT_CONFIG, DEFAULT_BROKER_QUERY_RESPONSE_LIMIT);
+    _brokerTimeOutMs = _config.getLong(BROKER_TIME_OUT_CONFIG, DEFAULT_BROKER_TIME_OUT_MS);
+    _brokerId = _config.getString(BROKER_ID_CONFIG_KEY, DEFAULT_BROKER_ID);
+    LOGGER.info("Broker response limit is: " + _queryResponseLimit);
+    LOGGER.info("Broker timeout is - " + _brokerTimeOutMs + " ms");
+    LOGGER.info("Broker id: " + _brokerId);
   }
 
   public BrokerResponse handleRequest(JSONObject request) throws Exception {
@@ -382,7 +407,7 @@ public class BrokerRequestHandler {
     ScatterGatherRequestImpl scatterRequest = new ScatterGatherRequestImpl(request, segmentServices, _replicaSelection,
         ReplicaSelectionGranularity.SEGMENT_ID_SET, request.getBucketHashKey(), 0,
         //TODO: Speculative Requests not yet supported
-        overriddenSelection, requestId, _brokerTimeOutMs);
+        overriddenSelection, requestId, _brokerTimeOutMs, _brokerId);
     CompositeFuture<ServerInstance, ByteBuf> response =
         _scatterGatherer.scatterGather(scatterRequest, scatterGatherStats, _brokerMetrics);
 
@@ -483,7 +508,7 @@ public class BrokerRequestHandler {
           new ScatterGatherRequestImpl(request, segmentServices, _replicaSelection,
               ReplicaSelectionGranularity.SEGMENT_ID_SET, request.getBucketHashKey(), 0,
               //TODO: Speculative Requests not yet supported
-              overriddenSelection, requestId, _brokerTimeOutMs);
+              overriddenSelection, requestId, _brokerTimeOutMs, _brokerId);
       responseFuturesList.put(request,
           Pair.of(_scatterGatherer.scatterGather(scatterRequest, scatterGatherStats, _brokerMetrics), respStats));
     }
@@ -583,10 +608,12 @@ public class BrokerRequestHandler {
     private final BucketingSelection _bucketingSelection;
     private final long _requestId;
     private final long _requestTimeoutMs;
+    private final String _brokerId;
 
     public ScatterGatherRequestImpl(BrokerRequest request, Map<ServerInstance, SegmentIdSet> segmentServices,
         ReplicaSelection replicaSelection, ReplicaSelectionGranularity replicaSelectionGranularity, Object hashKey,
-        int numSpeculativeRequests, BucketingSelection bucketingSelection, long requestId, long requestTimeoutMs) {
+        int numSpeculativeRequests, BucketingSelection bucketingSelection, long requestId, long requestTimeoutMs,
+        String brokerId) {
       _brokerRequest = request;
       _segmentServices = segmentServices;
       _replicaSelection = replicaSelection;
@@ -596,6 +623,7 @@ public class BrokerRequestHandler {
       _bucketingSelection = bucketingSelection;
       _requestId = requestId;
       _requestTimeoutMs = requestTimeoutMs;
+      _brokerId = brokerId;
     }
 
     @Override
@@ -610,7 +638,7 @@ public class BrokerRequestHandler {
       r.setEnableTrace(_brokerRequest.isEnableTrace());
       r.setQuery(_brokerRequest);
       r.setSearchSegments(querySegments.getSegmentsNameList());
-
+      r.setBrokerId(_brokerId);
       // _serde is not threadsafe.
       return getSerde().serialize(r);
       //      return _serde.serialize(r);

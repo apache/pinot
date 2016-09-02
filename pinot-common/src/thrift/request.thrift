@@ -17,7 +17,7 @@ namespace java com.linkedin.pinot.common.request
 
 /**
  * AUTO GENERATED: DO NOT EDIT
- * Filter Operator 
+ * Filter Operator
  **/
 enum FilterOperator {
   AND,
@@ -136,4 +136,5 @@ struct InstanceRequest {
   2: required BrokerRequest query;
   3: optional list<string> searchSegments;
   4: optional bool enableTrace;
+  5: optional string brokerId;
 }
