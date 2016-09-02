@@ -7,6 +7,7 @@ import com.linkedin.thirdeye.dashboard.resources.AnomalyResource;
 import com.linkedin.thirdeye.dashboard.resources.AnomalySummaryResource;
 import com.linkedin.thirdeye.dashboard.resources.CacheResource;
 import com.linkedin.thirdeye.dashboard.resources.DashboardResource;
+import com.linkedin.thirdeye.dashboard.resources.EmailResource;
 import com.linkedin.thirdeye.dashboard.resources.WebappConfigResource;
 
 import io.dropwizard.assets.AssetsBundle;
@@ -16,7 +17,6 @@ import io.dropwizard.views.ViewBundle;
 
 public class ThirdEyeDashboardApplication
     extends BaseThirdEyeApplication<ThirdEyeDashboardConfiguration> {
-  public static final String WEBAPP_CONFIG = "/webapp-config";
 
   @Override
   public String getName() {
@@ -50,6 +50,7 @@ public class ThirdEyeDashboardApplication
     env.jersey().register(
         new AnomalyResource(config, anomalyFunctionDAO, anomalyResultDAO, emailConfigurationDAO, anomalyMergedResultDAO));
     env.jersey().register(new WebappConfigResource(webappConfigDAO));
+    env.jersey().register(new EmailResource(anomalyFunctionDAO, emailConfigurationDAO));
   }
 
   public static void main(String[] args) throws Exception {
@@ -59,9 +60,7 @@ public class ThirdEyeDashboardApplication
     String thirdEyeConfigDir = args[0];
     System.setProperty("dw.rootDir", thirdEyeConfigDir);
     String dashboardApplicationConfigFile = thirdEyeConfigDir + "/" + "dashboard.yml";
-    new ThirdEyeDashboardApplication().run(new String[] {
-        "server", dashboardApplicationConfigFile
-    });
+    new ThirdEyeDashboardApplication().run("server", dashboardApplicationConfigFile);
   }
 
 }
