@@ -32,10 +32,14 @@ public class IndexLoadingConfigMetadata {
   public static final String KEY_OF_LOADING_INVERTED_INDEX = "metadata.loading.inverted.index.columns";
   public static final String KEY_OF_SEGMENT_FORMAT_VERSION = "segment.format.version";
   public static final String KEY_OF_ENABLE_DEFAULT_COLUMNS = "enable.default.columns";
+  public static final String KEY_OF_STAR_TREE_FORMAT_VERSION = "startree.format.version";
+
   private final Set<String> _loadingInvertedIndexColumnSet = new HashSet<String>();
   private final String DEFAULT_SEGMENT_FORMAT = "v1";
+  private static final String DEFAULT_STAR_TREE_FORMAT = "V1";
   private String segmentVersionToLoad;
   private boolean enableDefaultColumns;
+  private final String starTreeVersionToLoad;
 
   public IndexLoadingConfigMetadata(Configuration tableDataManagerConfig) {
     List<String> valueOfLoadingInvertedIndexConfig = tableDataManagerConfig.getList(KEY_OF_LOADING_INVERTED_INDEX, null);
@@ -45,6 +49,7 @@ public class IndexLoadingConfigMetadata {
 
     segmentVersionToLoad = tableDataManagerConfig.getString(KEY_OF_SEGMENT_FORMAT_VERSION, DEFAULT_SEGMENT_FORMAT);
     enableDefaultColumns = tableDataManagerConfig.getBoolean(KEY_OF_ENABLE_DEFAULT_COLUMNS, false);
+    starTreeVersionToLoad = tableDataManagerConfig.getString(KEY_OF_STAR_TREE_FORMAT_VERSION, DEFAULT_STAR_TREE_FORMAT);
   }
 
   public void initLoadingInvertedIndexColumnSet(String[] columnCollections) {
@@ -73,5 +78,9 @@ public class IndexLoadingConfigMetadata {
 
   public boolean isEnableDefaultColumns() {
     return enableDefaultColumns;
+  }
+
+  public String getStarTreeVersionToLoad() {
+    return starTreeVersionToLoad;
   }
 }

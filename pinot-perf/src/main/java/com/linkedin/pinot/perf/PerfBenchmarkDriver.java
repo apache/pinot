@@ -17,6 +17,7 @@ package com.linkedin.pinot.perf;
 
 import com.linkedin.pinot.broker.broker.helix.HelixBrokerStarter;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.IndexingConfig;
 import com.linkedin.pinot.common.config.Tenant;
 import com.linkedin.pinot.common.config.Tenant.TenantBuilder;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
@@ -284,8 +285,9 @@ public class PerfBenchmarkDriver {
     AbstractTableConfig offlineTableConfig = AbstractTableConfig.init(jsonString);
     offlineTableConfig.getValidationConfig().setRetentionTimeUnit("DAYS");
     offlineTableConfig.getValidationConfig().setRetentionTimeValue("");
+    IndexingConfig indexingConfig = offlineTableConfig.getIndexingConfig();
     if (invertedIndexColumns != null && !invertedIndexColumns.isEmpty()) {
-      offlineTableConfig.getIndexingConfig().setInvertedIndexColumns(invertedIndexColumns);
+      indexingConfig.setInvertedIndexColumns(invertedIndexColumns);
     }
     helixResourceManager.addTable(offlineTableConfig);
   }

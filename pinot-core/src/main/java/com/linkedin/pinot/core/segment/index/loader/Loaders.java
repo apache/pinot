@@ -28,6 +28,7 @@ import com.linkedin.pinot.core.segment.index.converter.SegmentFormatConverter;
 import com.linkedin.pinot.core.segment.index.converter.SegmentFormatConverterFactory;
 import com.linkedin.pinot.core.segment.store.SegmentDirectory;
 import com.linkedin.pinot.core.segment.store.SegmentDirectoryPaths;
+import com.linkedin.pinot.core.startree.StarTreeFormatVersion;
 import com.linkedin.pinot.core.startree.StarTreeInterf;
 import com.linkedin.pinot.core.startree.StarTreeSerDe;
 import java.io.File;
@@ -62,10 +63,15 @@ public class Loaders {
       SegmentMetadataImpl metadata = new SegmentMetadataImpl(indexDir);
       SegmentVersion configuredVersionToLoad = getSegmentVersionToLoad(indexLoadingConfigMetadata);
       SegmentVersion metadataVersion = metadata.getSegmentVersion();
-      if (shouldConvertFormat(metadataVersion, configuredVersionToLoad)
-          && !targetFormatAlreadyExists(indexDir, configuredVersionToLoad)) {
-        LOGGER.info("segment:{} needs to be converted from :{} to {} version.", indexDir.getName(),
-            metadataVersion, configuredVersionToLoad);
+      if (indexLoadingConfigMetadata != null) {
+        StarTreeFormatVersion starTreeVersionToLoad = getStarTreeVersionToLoad(indexLoadingConfigMetadata);
+        StarTreeSerDe.convertStarTreeFormatIfNeeded(indexDir, starTreeVersionToLoad);
+      }
+
+      if (shouldConvertFormat(metadataVersion, configuredVersionToLoad) && !targetFormatAlreadyExists(indexDir,
+          configuredVersionToLoad)) {
+        LOGGER.info("segment:{} needs to be converted from :{} to {} version.", indexDir.getName(), metadataVersion,
+            configuredVersionToLoad);
         SegmentFormatConverter converter =
             SegmentFormatConverterFactory.getConverter(metadataVersion, configuredVersionToLoad);
         LOGGER.info("Using converter:{} to up-convert the format", converter.getClass().getName());
@@ -117,6 +123,15 @@ public class Loaders {
       }
       String versionName = indexLoadingConfigMetadata.segmentVersionToLoad();
       return SegmentVersion.fromStringOrDefault(versionName);
+    }
+
+    private static StarTreeFormatVersion getStarTreeVersionToLoad(
+        IndexLoadingConfigMetadata indexLoadingConfigMetadata) {
+      if (indexLoadingConfigMetadata == null) {
+        return StarTreeFormatVersion.V1;
+      } else {
+        return StarTreeFormatVersion.valueOf(indexLoadingConfigMetadata.getStarTreeVersionToLoad().toUpperCase());
+      }
     }
   }
 }

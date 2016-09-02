@@ -26,11 +26,6 @@ import java.io.Serializable;
  */
 public interface StarTreeInterf extends Serializable {
 
-  enum Version {
-    V1,
-    V2
-  }
-
   /**
    * Returns the root of the StarTree.
    * @return
@@ -41,7 +36,7 @@ public interface StarTreeInterf extends Serializable {
    * Returns the version of star tree.
    * @return
    */
-  Version getVersion();
+  StarTreeFormatVersion getVersion();
 
   /**
    * Returns the total number of nodes in the star tree.
