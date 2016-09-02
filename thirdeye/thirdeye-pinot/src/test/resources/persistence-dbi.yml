@@ -1,5 +1,0 @@
-databaseConfiguration:
-  url: jdbc:h2:~/test
-  user: sa
-  password: sa
-  driver: org.h2.Driver

@@ -3,10 +3,10 @@ package com.linkedin.thirdeye.datalayer.util;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.Sets;
 import com.linkedin.thirdeye.datalayer.entity.AbstractJsonEntity;
-import com.mysql.jdbc.Statement;
 import java.sql.Clob;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.Statement;
 import java.sql.Types;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -106,7 +106,6 @@ public class SqlQueryBuilder {
     }
     return preparedStatement;
   }
-
 
   public PreparedStatement createFindByIdStatement(Connection connection,
       Class<? extends AbstractJsonEntity> entityClass, Long id) throws Exception {
