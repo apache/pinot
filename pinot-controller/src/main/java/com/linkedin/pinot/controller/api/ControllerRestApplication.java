@@ -142,17 +142,38 @@ public class ControllerRestApplication extends PinotRestletApplication {
       }
     };
 
-    final Directory webdir = new Directory(getContext(), CONSOLE_WEBAPP_ROOT_PATH);
-    webdir.setDeeplyAccessible(true);
-    webdir.setIndexName("index.html");
-    router.attach("/query", webdir);
+    try {
+      final Directory webdir = new Directory(getContext(), CONSOLE_WEBAPP_ROOT_PATH);
+      webdir.setDeeplyAccessible(true);
+      webdir.setIndexName("index.html");
+      router.attach("/query", webdir);
+    } catch (Exception e) {
+      LOGGER.warn("Failed to initialize route for /query", e);
+    }
 
+    try {
     final Directory swaggerUiDir = new Directory(getContext(), getClass().getClassLoader().getResource("META-INF/resources/webjars/swagger-ui/2.1.4").toString());
     swaggerUiDir.setDeeplyAccessible(true);
     router.attach("/swagger-ui", swaggerUiDir);
+  } catch (Exception e) {
+    LOGGER.warn("Failed to initialize route for /swagger-ui", e);
+  }
 
-    final Redirector redirector = new Redirector(getContext(), "/swagger-ui/index.html?url=/api", Redirector.MODE_CLIENT_TEMPORARY);
-    router.attach("/help", redirector);
+    try {
+      final Redirector redirector = new Redirector(getContext(), "/swagger-ui/index.html?url=/api", Redirector.MODE_CLIENT_TEMPORARY);
+      router.attach("/help", redirector);
+    } catch (Exception e) {
+      LOGGER.warn("Failed to initialize route for /help", e);
+    }
+
+    try {
+      final Directory landing = new Directory(getContext(), getClass().getClassLoader().getResource("landing").toString());
+      landing.setDeeplyAccessible(false);
+      landing.setIndexName("index.html");
+      router.attach("/", landing);
+    } catch (Exception e) {
+      LOGGER.warn("Failed to initialize route for /", e);
+    }
   }
 
   @Override
