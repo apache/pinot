@@ -68,7 +68,7 @@ public class AlertJobScheduler implements JobScheduler {
     quartzScheduler.start();
 
     // start all active alert functions
-    List<EmailConfiguration> alertConfigs = readAlertConfigurations();
+    List<EmailConfiguration> alertConfigs = emailConfigurationDAO.findAll();
     for (EmailConfiguration alertConfig : alertConfigs) {
       if (alertConfig.getIsActive()) {
         AlertJobContext alertJobContext = new AlertJobContext();
@@ -78,7 +78,6 @@ public class AlertJobScheduler implements JobScheduler {
         alertJobContext.setAlertConfigId(alertConfig.getId());
         String jobKey = getJobKey(alertConfig.getId());
         alertJobContext.setJobName(jobKey);
-
         scheduleJob(alertJobContext, alertConfig);
       }
     }
@@ -172,10 +171,6 @@ public class AlertJobScheduler implements JobScheduler {
     }
 
     LOG.info("Started {}: {}", jobKey, alertConfig);
-  }
-
-  private List<EmailConfiguration> readAlertConfigurations() {
-    return emailConfigurationDAO.findAll();
   }
 
   private String getJobKey(Long id) {

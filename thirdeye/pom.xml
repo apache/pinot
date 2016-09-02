@@ -21,7 +21,7 @@
     <jdk.version>1.8</jdk.version>
     <dropwizard.version>0.8.4</dropwizard.version>
     <jackson.version>2.5.1</jackson.version>
-    <mysql.connector.version>5.1.36</mysql.connector.version>
+    <mysql.connector.version>5.1.39</mysql.connector.version>
     <quartz.version>2.2.1</quartz.version>
     <httpclient.version>4.3.6</httpclient.version>
     <commons.email.version>1.4</commons.email.version>

@@ -1,0 +1,16 @@
+SET FOREIGN_KEY_CHECKS = 0;
+drop table if EXISTS metric;
+DROP TABLE if EXISTS email_configuration_anomaly_function_mapping;
+DROP TABLE if EXISTS anomaly_function_anomaly_merge_config_mapping;
+DROP TABLE if EXISTS anomaly_merge_config;
+drop TABLE if EXISTS anomaly_function;
+DROP TABLE if EXISTS email_configuration;
+DROP TABLE if EXISTS task;
+DROP TABLE if EXISTS job;
+DROP TABLE if EXISTS anomaly_raw_result_anomaly_merged_result_mapping;
+drop TABLE if EXISTS anomaly_raw_result;
+DROP TABLE if EXISTS anomaly_merged_result;
+DROP table if EXISTS anomaly_feedback;
+DROP TABLE if EXISTS ingraph_metric_config;
+DROP TABLE if EXISTS webapp_config;
+SET FOREIGN_KEY_CHECKS = 1;

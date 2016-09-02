@@ -1,4 +1,4 @@
--- drop database thirdeye; create database thirdeye; use thirdeye;
+-- drop database thirdeye_test; create database thirdeye_test; use thirdeye_test;
 
 create table if not exists metric (
     id bigint(20) primary key auto_increment,
@@ -26,7 +26,7 @@ create table if not exists anomaly_merge_config (
     json_val JSON
 ) ENGINE=InnoDB;
 
-create table if not exists anomaly_function_merge_config_mapping(
+create table if not exists anomaly_function_anomaly_merge_config_mapping(
     anomaly_function_id bigint(20),
     anomaly_merge_config_id bigint(20),
     foreign key (anomaly_function_id) references anomaly_function(id),
@@ -40,7 +40,7 @@ create table if not exists email_configuration (
     json_val JSON
 ) ENGINE=InnoDB;
 
-create table if not exists email_function_mapping (
+create table if not exists email_configuration_anomaly_function_mapping (
     email_configuration_id bigint(20),
     anomaly_function_id bigint(20),
     foreign key (email_configuration_id) references email_configuration(id),
@@ -109,7 +109,7 @@ create table if not exists anomaly_merged_result (
     foreign key (metric_id) references metric(id)
 ) ENGINE=InnoDB;
 
-create table if not exists anomaly_raw_merged_result_mapping (
+create table if not exists anomaly_raw_result_anomaly_merged_result_mapping (
     anomaly_raw_result_id bigint(20),
     anomaly_merged_result_id bigint(20),
     foreign key (anomaly_raw_result_id) references anomaly_raw_result(id),

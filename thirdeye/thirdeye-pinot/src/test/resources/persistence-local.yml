@@ -1,0 +1,5 @@
+databaseConfiguration:
+  url: jdbc:mysql://localhost:3306/thirdeye_test
+  user: root
+  password: root
+  driver: com.mysql.jdbc.Driver

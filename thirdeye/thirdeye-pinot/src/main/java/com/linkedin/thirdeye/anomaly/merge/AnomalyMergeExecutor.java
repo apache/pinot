@@ -146,12 +146,11 @@ public class AnomalyMergeExecutor implements Runnable {
       mergedResult.setWeight((weightedWeightSum / totalBucketSize) * normalizationFactor);
     }
 
-    if (mergedResult.getAnomalyResults().size() > 1) {
-      try {
-        updateMergedSeverity(mergedResult);
-      } catch (Exception e) {
-        LOG.error("Could not recompute severity", e);
-      }
+    // recompute severity
+    try {
+      updateMergedSeverity(mergedResult);
+    } catch (Exception e) {
+      LOG.error("Could not recompute severity", e);
     }
     mergedResult.setMessage(createMessage(mergedResult.getWeight()));
     try {
@@ -200,9 +199,11 @@ public class AnomalyMergeExecutor implements Runnable {
 
     Double currentValue = getMetricValueSum(responseCurrent, anomalyFunctionSpec.getMetric());
     Double baselineValue = getMetricValueSum(responseBaseline, anomalyFunctionSpec.getMetric());
-    Double severity = anomalyMergedResult.getWeight();
+    Double severity;
     if (baselineValue != 0) {
       severity = (currentValue - baselineValue) / baselineValue;
+    } else {
+      severity = 1.0;
     }
     anomalyMergedResult.setWeight(severity);
   }

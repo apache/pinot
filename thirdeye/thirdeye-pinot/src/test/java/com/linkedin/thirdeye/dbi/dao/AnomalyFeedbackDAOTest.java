@@ -20,7 +20,7 @@ public class AnomalyFeedbackDAOTest {
   public static void main(String[] args) throws Exception {
     // TODO: 8/31/16 use test/resources/schema/database.sql to create db schema
 
-  /*  URL url = AnomalyFeedbackDAOTest.class.getResource("/persistence-dbi.yml");
+  /*  URL url = AnomalyFeedbackDAOTest.class.getResource("/persistence.yml");
     PersistenceApp.testWithPersistenceFile(new String[]{"db" ,"migrate", url.getFile()});
     File configFile = new File(url.toURI());
     DaoProviderUtil.init(configFile);
