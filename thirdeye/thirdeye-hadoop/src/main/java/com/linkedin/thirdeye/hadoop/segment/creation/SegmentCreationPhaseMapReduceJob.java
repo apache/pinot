@@ -212,11 +212,26 @@ public class SegmentCreationPhaseMapReduceJob {
       // Set star tree config
       StarTreeIndexSpec starTreeIndexSpec = new StarTreeIndexSpec();
 
+      // _raw dimensions should not be in star tree split order
+      // if a dimension has a _topk column, we will include only
+      // the column with topk, and skip _raw column for materialization in star tree
+      Set<String> skipMaterializationForDimensions = new HashSet<>();
+      Set<String> transformDimensionsSet = thirdeyeConfig.getTransformDimensions();
+      LOGGER.info("Dimensions with _topk column {}", transformDimensionsSet);
+      for (String topkTransformDimension : transformDimensionsSet) {
+        skipMaterializationForDimensions.add(topkTransformDimension);
+        LOGGER.info("Adding {} to skipMaterialization set", topkTransformDimension);
+      }
+      starTreeIndexSpec.setSkipMaterializationForDimensions(skipMaterializationForDimensions);
+      LOGGER.info("Setting skipMaterializationForDimensions {}", skipMaterializationForDimensions);
+
       if (thirdeyeConfig.getSplit() != null) {
         starTreeIndexSpec.setMaxLeafRecords(thirdeyeConfig.getSplit().getThreshold());
         LOGGER.info("Setting split threshold to {}", starTreeIndexSpec.getMaxLeafRecords());
         List<String> splitOrder = thirdeyeConfig.getSplit().getOrder();
         if (splitOrder != null) {
+          LOGGER.info("Removing from splitOrder, any dimensions which are also in skipMaterializationForDimensions");
+          splitOrder.removeAll(skipMaterializationForDimensions);
           starTreeIndexSpec.setDimensionsSplitOrder(splitOrder);
         }
         LOGGER.info("Setting splitOrder {}", splitOrder);
