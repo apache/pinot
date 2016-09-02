@@ -43,7 +43,6 @@ public class AdminApiService {
     adminApiComponent.getServers().add(Protocol.HTTP, httpPort);
     adminApiComponent.getClients().add(Protocol.FILE);
     adminApiComponent.getClients().add(Protocol.JAR);
-    adminApiComponent.getClients().add(Protocol.WAR);
 
     PinotAdminEndpointApplication adminEndpointApplication = new PinotAdminEndpointApplication();
     final Context applicationContext = adminApiComponent.getContext().createChildContext();
