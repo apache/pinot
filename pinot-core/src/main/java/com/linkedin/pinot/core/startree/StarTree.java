@@ -56,7 +56,7 @@ public class StarTree implements StarTreeInterf {
    */
   @Override
   public StarTreeFormatVersion getVersion() {
-    return StarTreeFormatVersion.V1;
+    return StarTreeFormatVersion.ON_HEAP;
   }
 
   /**

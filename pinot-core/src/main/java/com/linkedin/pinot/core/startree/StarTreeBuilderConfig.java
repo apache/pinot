@@ -110,7 +110,7 @@ public class StarTreeBuilderConfig {
   }
 
   /**
-   * Returns True if StarTreeV2 is enabled, false otherwise.
+   * Returns True if StarTreeOffHeap is enabled, false otherwise.
    * @return
    */
   public boolean isEnableOffHealpFormat() {
@@ -118,7 +118,7 @@ public class StarTreeBuilderConfig {
   }
 
   /**
-   * Enable/Disable StarTreeV2
+   * Enable/Disable StarTreeOffHeap
    * @param enableOffHealpFormat
    */
   public void setEnableOffHealpFormat(boolean enableOffHealpFormat) {

@@ -23,13 +23,11 @@ import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
-import com.linkedin.pinot.common.data.MetricFieldSpec.DerivedMetricType;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.TimeFieldSpec;
 import com.linkedin.pinot.common.utils.Pairs.IntPair;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
-import com.linkedin.pinot.core.startree.hll.HllConfig;
 import java.io.BufferedOutputStream;
 import java.io.DataOutputStream;
 import java.io.File;
@@ -347,11 +345,11 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
     File treeBinary = new File(outDir, "star-tree.bin");
 
     if (enableOffHeapFormat) {
-      LOG.debug("Saving tree binary V2 at: {} ", treeBinary);
-      StarTreeSerDe.writeTreeV2(starTree, treeBinary);
+      LOG.debug("Saving tree in off-heap binary format at: {} ", treeBinary);
+      StarTreeSerDe.writeTreeOffHeapFormat(starTree, treeBinary);
     } else {
-      LOG.debug("Saving tree binary V1 at: {} ", treeBinary);
-      StarTreeSerDe.writeTreeV1(starTree, treeBinary);
+      LOG.debug("Saving tree in on-heap binary at: {} ", treeBinary);
+      StarTreeSerDe.writeTreeOnHeapFormat(starTree, treeBinary);
     }
 
     printTree(starTreeRootIndexNode, 0);

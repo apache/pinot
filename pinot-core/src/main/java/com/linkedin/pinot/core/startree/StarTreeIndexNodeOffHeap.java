@@ -20,13 +20,13 @@ import java.util.Iterator;
 import xerial.larray.buffer.LBufferAPI;
 
 
-public class StarTreeIndexNodeV2 implements StarTreeIndexNodeInterf {
+public class StarTreeIndexNodeOffHeap implements StarTreeIndexNodeInterf {
   public static final int INVALID_INDEX = -1;
 
   // Number of fields of this class that will be serialized.
   private static final int NUMBER_OF_SERIALIZABLE_FIELDS = 7;
 
-  // Hard-coded the serializable size of StarTreeIndexNodeV2 object.
+  // Hard-coded the serializable size of StarTreeIndexNodeOffHeap object.
   private static final int NODE_SERIALIZABLE_SIZE = V1Constants.Numbers.INTEGER_SIZE * NUMBER_OF_SERIALIZABLE_FIELDS;
 
   private static final long DIMENSION_NAME_OFFSET = 0;
@@ -57,7 +57,7 @@ public class StarTreeIndexNodeV2 implements StarTreeIndexNodeInterf {
    * @param dataBuffer
    * @param nodeId
    */
-  public StarTreeIndexNodeV2(LBufferAPI dataBuffer, int nodeId) {
+  public StarTreeIndexNodeOffHeap(LBufferAPI dataBuffer, int nodeId) {
     this.dataBuffer = dataBuffer;
     long offset = nodeId * NODE_SERIALIZABLE_SIZE;
 
@@ -210,7 +210,7 @@ public class StarTreeIndexNodeV2 implements StarTreeIndexNodeInterf {
 
     while (lo <= hi) {
       int mid = lo + ((hi - lo) >>> 1);
-      StarTreeIndexNodeV2 midNode = new StarTreeIndexNodeV2(dataBuffer, mid);
+      StarTreeIndexNodeOffHeap midNode = new StarTreeIndexNodeOffHeap(dataBuffer, mid);
       int midValue = midNode.getDimensionValue();
 
       if (midValue == dimensionValue) {
@@ -286,10 +286,10 @@ public class StarTreeIndexNodeV2 implements StarTreeIndexNodeInterf {
   /**
    * Iterator over children nodes.
    */
-  private class ChildIterator implements Iterator<StarTreeIndexNodeV2> {
+  private class ChildIterator implements Iterator<StarTreeIndexNodeOffHeap> {
     private int curChildId;
     private int endChildId;
-    private StarTreeIndexNodeV2 child;
+    private StarTreeIndexNodeOffHeap child;
 
     public ChildIterator() {
       curChildId = getChildrenStartIndex();
@@ -302,8 +302,8 @@ public class StarTreeIndexNodeV2 implements StarTreeIndexNodeInterf {
     }
 
     @Override
-    public StarTreeIndexNodeV2 next() {
-      StarTreeIndexNodeV2 child = new StarTreeIndexNodeV2(dataBuffer, curChildId);
+    public StarTreeIndexNodeOffHeap next() {
+      StarTreeIndexNodeOffHeap child = new StarTreeIndexNodeOffHeap(dataBuffer, curChildId);
       curChildId++;
       return child;
     }

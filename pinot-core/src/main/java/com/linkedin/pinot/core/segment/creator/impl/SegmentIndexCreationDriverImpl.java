@@ -289,9 +289,9 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
 
     File starTreeFile = new File(tempIndexDir, V1Constants.STAR_TREE_INDEX_FILE);
     if (enableOffHeapFormat) {
-      StarTreeSerDe.writeTreeV2(tree, starTreeFile);
+      StarTreeSerDe.writeTreeOffHeapFormat(tree, starTreeFile);
     } else {
-      StarTreeSerDe.writeTreeV1(tree, starTreeFile);
+      StarTreeSerDe.writeTreeOnHeapFormat(tree, starTreeFile);
     }
   }
 

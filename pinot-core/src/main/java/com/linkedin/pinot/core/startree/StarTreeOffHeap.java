@@ -34,7 +34,7 @@ import xerial.larray.mmap.MMapMode;
 /**
  * LBuffer based implementation of star tree interface.
  */
-public class StarTreeV2 implements StarTreeInterf {
+public class StarTreeOffHeap implements StarTreeInterf {
   private static final long serialVersionUID = 1L;
   private static final int DIMENSION_NAME_MAX_LENGTH = 4096;
   private static final String UTF8 = "UTF-8";
@@ -45,7 +45,7 @@ public class StarTreeV2 implements StarTreeInterf {
   // Off heap buffer were the star tree is loaded.
   LBufferAPI dataBuffer;
 
-  StarTreeIndexNodeV2 root;
+  StarTreeIndexNodeOffHeap root;
 
   // Offset of the root node in the file.
   private int rootNodeOffset;
@@ -60,13 +60,13 @@ public class StarTreeV2 implements StarTreeInterf {
   /**
    * Constructor for the class.
    * - Reads in the header
-   * - Loads/MMap's the StarTreeIndexNodeV2 array.
+   * - Loads/MMap's the StarTreeIndexNodeOffHeap array.
    *
    * @param starTreeFile
    * @param readMode
    * @throws IOException
    */
-  public StarTreeV2(File starTreeFile, ReadMode readMode)
+  public StarTreeOffHeap(File starTreeFile, ReadMode readMode)
       throws IOException {
     int rootOffset = readHeader(starTreeFile);
     long size = starTreeFile.length() - rootOffset;
@@ -78,7 +78,7 @@ public class StarTreeV2 implements StarTreeInterf {
     }
 
     // Root node is the first one.
-    root = new StarTreeIndexNodeV2(dataBuffer, 0);
+    root = new StarTreeIndexNodeOffHeap(dataBuffer, 0);
   }
 
   /**
@@ -193,7 +193,7 @@ public class StarTreeV2 implements StarTreeInterf {
    * @return
    */
   public StarTreeFormatVersion getVersion() {
-    return StarTreeFormatVersion.V2;
+    return StarTreeFormatVersion.OFF_HEAP;
   }
 
   @Override

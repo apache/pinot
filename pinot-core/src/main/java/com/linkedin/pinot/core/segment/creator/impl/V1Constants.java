@@ -27,8 +27,8 @@ public class V1Constants {
   public static final String SEGMENT_CREATION_META = "creation.meta";
   public static final String STAR_TREE_INDEX_DIR = "star-tree";
   public static final String STAR_TREE_INDEX_FILE = "star-tree.bin";
-  public static final String STAR_TREE_V1_INDEX_FILE = "star-tree-on-heap.bin";
-  public static final String STAR_TREE_V2_INDEX_FILE = "star-tree-off-heap.bin";
+  public static final String STAR_TREE_ON_HEAP_INDEX_FILE = "star-tree-on-heap.bin";
+  public static final String STAR_TREE_OFF_HEAP_INDEX_FILE = "star-tree-off-heap.bin";
   public static final String VERSIONS_FILE = "versions.vr";
   public static final String SEGMENT_DOWNLOAD_URL = "segment.download.url";
   public static final String SEGMENT_PUSH_TIME = "segment.push.time";

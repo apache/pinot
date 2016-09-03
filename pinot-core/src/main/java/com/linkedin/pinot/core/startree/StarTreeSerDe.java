@@ -65,11 +65,11 @@ public class StarTreeSerDe {
     StarTreeFormatVersion version = getStarTreeVersion(bufferedInputStream);
 
     switch (version) {
-      case V1:
-        return fromBytesV1(bufferedInputStream);
+      case ON_HEAP:
+        return fromBytesToOnHeapFormat(bufferedInputStream);
 
-      case V2:
-        return fromBytesV2(bufferedInputStream);
+      case OFF_HEAP:
+        return fromBytesToOffHeapFormat(bufferedInputStream);
 
       default:
         throw new RuntimeException("StarTree version number not recognized: " + version);
@@ -77,28 +77,28 @@ public class StarTreeSerDe {
   }
 
   /**
-   * Write the V0 version of StarTree to the output file.
+   * Write the on-heap version of StarTree to the output file.
    * @param starTree
    * @param outputFile
    * @throws IOException
    */
-  public static void writeTreeV1(StarTreeInterf starTree, File outputFile)
+  public static void writeTreeOnHeapFormat(StarTreeInterf starTree, File outputFile)
       throws IOException {
-    Preconditions.checkArgument(starTree.getVersion() == StarTreeFormatVersion.V1,
-        "Cannot write V1 version of star tree from another version");
+    Preconditions.checkArgument(starTree.getVersion() == StarTreeFormatVersion.ON_HEAP,
+        "Cannot write on-heap version of star tree from another version");
     starTree.writeTree(outputFile);
   }
 
   /**
-   * Write the V1 version of StarTree to the output file.
+   * Write the off-heap version of StarTree to the output file.
    * @param starTree
    * @param outputFile
    * @throws IOException
    */
-  public static void writeTreeV2(StarTreeInterf starTree, File outputFile)
+  public static void writeTreeOffHeapFormat(StarTreeInterf starTree, File outputFile)
       throws IOException {
-    if (starTree.getVersion() == StarTreeFormatVersion.V1) {
-      writeTreeV2FromV1((StarTree) starTree, outputFile);
+    if (starTree.getVersion() == StarTreeFormatVersion.ON_HEAP) {
+      writeTreeOffHeapFromOnHeap((StarTree) starTree, outputFile);
     } else {
       starTree.writeTree(outputFile);
     }
@@ -106,8 +106,8 @@ public class StarTreeSerDe {
 
   /**
    * Utility method to StarTree version.
-   * Presence of {@value #MAGIC_MARKER} indicates version V1, while its
-   * absence indicates version V0.
+   * Presence of {@ref #MAGIC_MARKER} indicates on-heap format, while its
+   * absence indicates on-heap format.
    *
    * @param bufferedInputStream
    * @return
@@ -126,14 +126,14 @@ public class StarTreeSerDe {
     long magicMarker = lBuffer.getLong(0);
 
     if (magicMarker == MAGIC_MARKER) {
-      return StarTreeFormatVersion.V2;
+      return StarTreeFormatVersion.OFF_HEAP;
     } else {
-      return StarTreeFormatVersion.V1;
+      return StarTreeFormatVersion.ON_HEAP;
     }
   }
 
   /**
-   * Given a star tree file, return its version (v1 or v2).
+   * Given a star tree file, return its version (on-heap or off-heap).
    * Assumes that the file is a valid star tree file.
    *
    * @param starTreeFile
@@ -150,37 +150,37 @@ public class StarTreeSerDe {
   }
 
   /**
-   * Given a StarTree in V1 format, serialize it into V2 format and write to the
+   * Given a StarTree in on-heap format, serialize it into OFF_HEAP format and write to the
    * given file.
    * @param starTree
    * @param outputFile
    */
-  private static void writeTreeV2FromV1(StarTree starTree, File outputFile)
+  private static void writeTreeOffHeapFromOnHeap(StarTree starTree, File outputFile)
       throws IOException {
-    int headerSizeInBytes = computeV2HeaderSizeInBytes(starTree);
-    long totalSize = headerSizeInBytes + computeV2NodesSizeInBytes(starTree);
+    int headerSizeInBytes = computeOffHeapHeaderSizeInBytes(starTree);
+    long totalSize = headerSizeInBytes + computeOffHeapNodesSizeInBytes(starTree);
 
     MMapBuffer mappedByteBuffer = new MMapBuffer(outputFile, 0, totalSize, MMapMode.READ_WRITE);
-    long offset = writeHeaderV2(starTree, headerSizeInBytes, mappedByteBuffer);
+    long offset = writeHeaderOffHeap(starTree, headerSizeInBytes, mappedByteBuffer);
 
     // Ensure that the computed offset is the same as actual offset.
     Preconditions.checkState((offset == headerSizeInBytes), "Error writing Star Tree file, header size mis-match");
 
     // Write the actual star tree nodes in level order.
-    writeNodesV2(starTree, mappedByteBuffer, offset);
+    writeNodesOffHeap(starTree, mappedByteBuffer, offset);
 
     mappedByteBuffer.flush();
     mappedByteBuffer.close();
   }
 
   /**
-   * Helper method to write the star tree nodes for Star Tree V2
+   * Helper method to write the star tree nodes for Star Tree off-heap format
    *
    * @param starTree
    * @param mappedByteBuffer
    * @param offset
    */
-  private static void writeNodesV2(StarTree starTree, MMapBuffer mappedByteBuffer, long offset) {
+  private static void writeNodesOffHeap(StarTree starTree, MMapBuffer mappedByteBuffer, long offset) {
     int index = 0;
     Queue<StarTreeIndexNode> queue = new LinkedList<>();
     StarTreeIndexNode root = (StarTreeIndexNode) starTree.getRoot();
@@ -191,11 +191,11 @@ public class StarTreeSerDe {
       List<StarTreeIndexNode> children = getSortedChildren(node); // Returns empty list instead of null.
 
       int numChildren = children.size();
-      int startChildrenIndex = (numChildren != 0) ? (index + queue.size() + 1) : StarTreeIndexNodeV2.INVALID_INDEX;
+      int startChildrenIndex = (numChildren != 0) ? (index + queue.size() + 1) : StarTreeIndexNodeOffHeap.INVALID_INDEX;
       int endChildrenIndex =
-          (numChildren != 0) ? (startChildrenIndex + numChildren - 1) : StarTreeIndexNodeV2.INVALID_INDEX;
+          (numChildren != 0) ? (startChildrenIndex + numChildren - 1) : StarTreeIndexNodeOffHeap.INVALID_INDEX;
 
-      offset = writeOneV2Node(mappedByteBuffer, offset, node, startChildrenIndex, endChildrenIndex);
+      offset = writeOneOffHeapNode(mappedByteBuffer, offset, node, startChildrenIndex, endChildrenIndex);
       for (StarTreeIndexNode child : children) {
         queue.add(child);
       }
@@ -204,7 +204,7 @@ public class StarTreeSerDe {
   }
 
   /**
-   * Helper method to write the Header information for Star Tree V2
+   * Helper method to write the Header information for Star Tree off-heap format
    * - MAGIC_MARKER
    * - Version
    * - Header size
@@ -217,7 +217,7 @@ public class StarTreeSerDe {
    * @return
    * @throws UnsupportedEncodingException
    */
-  private static long writeHeaderV2(StarTree starTree, int headerSizeInBytes, MMapBuffer mappedByteBuffer)
+  private static long writeHeaderOffHeap(StarTree starTree, int headerSizeInBytes, MMapBuffer mappedByteBuffer)
       throws UnsupportedEncodingException {
     long offset = 0;
     mappedByteBuffer.putLong(offset, MAGIC_MARKER);
@@ -291,7 +291,7 @@ public class StarTreeSerDe {
   }
 
   /**
-   * Helper method to write one StarTreeIndexNodeV2 into the mappedByteBuffer at the provided
+   * Helper method to write one StarTreeIndexNodeOffHeap into the mappedByteBuffer at the provided
    * offset.
    *
    * @param mappedByteBuffer
@@ -300,7 +300,7 @@ public class StarTreeSerDe {
    * @param startChildrenIndex
    * @param endChildrenIndex
    */
-  private static long writeOneV2Node(MMapBuffer mappedByteBuffer, long offset, StarTreeIndexNode node,
+  private static long writeOneOffHeapNode(MMapBuffer mappedByteBuffer, long offset, StarTreeIndexNode node,
       int startChildrenIndex, int endChildrenIndex) {
     mappedByteBuffer.putInt(offset, node.getDimensionName());
     offset += V1Constants.Numbers.INTEGER_SIZE;
@@ -328,7 +328,7 @@ public class StarTreeSerDe {
 
   /**
    * Helper method to compute size of tree in bytes, required to
-   * store in V2 format. The size is computed as follows:
+   * store in off-heap format. The size is computed as follows:
    * - Long (8 bytes) for magic marker
    * - Integer (4 bytes) for size of the header
    * - Integer (4 bytes) for version
@@ -339,7 +339,7 @@ public class StarTreeSerDe {
    * @param starTree
    * @return
    */
-  private static int computeV2HeaderSizeInBytes(StarTreeInterf starTree) {
+  private static int computeOffHeapHeaderSizeInBytes(StarTreeInterf starTree) {
     int size = 20; // magic marker, version, size of header and number of dimensions
 
     HashBiMap<String, Integer> dimensionNameToIndexMap = starTree.getDimensionNameToIndexMap();
@@ -361,8 +361,8 @@ public class StarTreeSerDe {
    * @param starTree
    * @return
    */
-  private static long computeV2NodesSizeInBytes(StarTreeInterf starTree) {
-    return (starTree.getNumNodes() * StarTreeIndexNodeV2.getSerializableSize());
+  private static long computeOffHeapNodesSizeInBytes(StarTreeInterf starTree) {
+    return (starTree.getNumNodes() * StarTreeIndexNodeOffHeap.getSerializableSize());
   }
 
   /**
@@ -374,7 +374,7 @@ public class StarTreeSerDe {
    * @throws IOException
    * @throws ClassNotFoundException
    */
-  private static StarTreeInterf fromBytesV1(InputStream inputStream)
+  private static StarTreeInterf fromBytesToOnHeapFormat(InputStream inputStream)
       throws IOException, ClassNotFoundException {
     ObjectInputStream ois = new ObjectInputStream(inputStream);
     return (StarTree) ois.readObject();
@@ -382,19 +382,19 @@ public class StarTreeSerDe {
 
   /**
    * Utility method that de-serializes bytes from inputStream into
-   * the V1 version of star tree.
+   * the on-heap format of star tree.
    *
    * @param inputStream
    * @return
    */
-  private static StarTreeInterf fromBytesV2(InputStream inputStream) {
-    throw new RuntimeException("StarTree Version V2 does not support reading from bytes.");
+  private static StarTreeInterf fromBytesToOffHeapFormat(InputStream inputStream) {
+    throw new RuntimeException("StarTree Version off-heap does not support reading from bytes.");
   }
 
   /**
    *
    * @param starTreeFile  Star Tree index file
-   * @param readMode Read mode MMAP or HEAP (direct memory), only applicable to StarTreeV2.
+   * @param readMode Read mode MMAP or OFF-HEAP (direct memory), only applicable to StarTreeOffHeap.
    * @return
    */
   public static StarTreeInterf fromFile(File starTreeFile, ReadMode readMode)
@@ -404,25 +404,25 @@ public class StarTreeSerDe {
     BufferedInputStream bufferedInputStream = new BufferedInputStream(inputStream);
     StarTreeFormatVersion starTreeVersion = getStarTreeVersion(bufferedInputStream);
 
-    if (starTreeVersion.equals(StarTreeFormatVersion.V1)) {
-      return fromBytesV1(bufferedInputStream);
-    } else if (starTreeVersion.equals(StarTreeFormatVersion.V2)) {
-      return new StarTreeV2(starTreeFile, readMode);
+    if (starTreeVersion.equals(StarTreeFormatVersion.ON_HEAP)) {
+      return fromBytesToOnHeapFormat(bufferedInputStream);
+    } else if (starTreeVersion.equals(StarTreeFormatVersion.OFF_HEAP)) {
+      return new StarTreeOffHeap(starTreeFile, readMode);
     } else {
       throw new RuntimeException("Unrecognized version for Star Tree " + starTreeVersion);
     }
   }
 
   /**
-   * Utility method to convert star tree from v1 to v2 format:
+   * Utility method to convert star tree from on-heap to off-heap format:
    * <p>- If star tree does not exist, or if actual version is the same as
    *   expected version, then no action is taken. </p>
    *
-   * <p>- If actual version is v1 and expected version is v2, then conversion from
-   *   v1 to v2 is performed. Both v1 and v2 formats are also backed up.</p>
+   * <p>- If actual version is on-heap and expected version is off-heap, then conversion from
+   *   on-heap to off-heap is performed. Both on-heap and off-heap formats are also backed up.</p>
    *
-   * <p>- If actual version is v2 and expected version is v1, then v1 is restored from
-   *   backup version, if available, no-op otherwise. Note, there is no v2 to v1
+   * <p>- If actual version is off-heap and expected version is on-heap, then on-heap is restored from
+   *   backup version, if available, no-op otherwise. Note, there is no off-heap to on-heap
    *   conversion as of now.</p>
    *
    * @param indexDir
@@ -442,35 +442,39 @@ public class StarTreeSerDe {
     }
 
     StarTreeFormatVersion actualVersion = getStarTreeVersion(starTreeFile);
-    if (actualVersion == StarTreeFormatVersion.V1 && starTreeVersionToLoad == StarTreeFormatVersion.V2) {
-      LOGGER.info("Converting Star Tree from V1 to V2 format for {}", starTreeFile.getAbsolutePath());
-      File starTreeV2File = new File(indexDir, V1Constants.STAR_TREE_V2_INDEX_FILE);
-      if (starTreeV2File.exists()) {
-        LOGGER.info("Replacing star tree v1 format with v2 format for {}", starTreeFile.getAbsolutePath());
-        FileUtils.copyFile(starTreeV2File, starTreeFile);
+    if (actualVersion == StarTreeFormatVersion.ON_HEAP && starTreeVersionToLoad == StarTreeFormatVersion.OFF_HEAP) {
+      LOGGER.info("Converting Star Tree from on-heap to off-heap format for {}", starTreeFile.getAbsolutePath());
+      File starTreeOffHeapFile = new File(indexDir, V1Constants.STAR_TREE_OFF_HEAP_INDEX_FILE);
+      if (starTreeOffHeapFile.exists()) {
+        LOGGER.info("Replacing star tree on-heap format with off-heap format for {}", starTreeFile.getAbsolutePath());
+        FileUtils.copyFile(starTreeOffHeapFile, starTreeFile);
       } else {
-        StarTreeInterf starTreeV1 = fromFile(starTreeFile, ReadMode.heap); // V1 only supports HEAP mode.
+        StarTreeInterf starTreeOnHeap = fromFile(starTreeFile, ReadMode.heap); // OnHeap only supports HEAP mode.
 
         try {
-          writeTreeV2(starTreeV1, starTreeV2File);
-          FileUtils.copyFile(starTreeFile, new File(indexDir, V1Constants.STAR_TREE_V1_INDEX_FILE));
-          FileUtils.copyFile(starTreeV2File, starTreeFile);
+          writeTreeOffHeapFormat(starTreeOnHeap, starTreeOffHeapFile);
+          FileUtils.copyFile(starTreeFile, new File(indexDir, V1Constants.STAR_TREE_ON_HEAP_INDEX_FILE));
+          FileUtils.copyFile(starTreeOffHeapFile, starTreeFile);
         } catch (Exception e) {
-          LOGGER.warn("Exception caught while convert star tree v1 to v2 for {}", starTreeFile.getAbsolutePath(), e);
+          LOGGER.warn("Exception caught while convert star tree on-heap to off-heap format for {}",
+              starTreeFile.getAbsolutePath(), e);
         }
       }
-    } else if (actualVersion == StarTreeFormatVersion.V2 && starTreeVersionToLoad == StarTreeFormatVersion.V1) {
-      File starTreeV1File = new File(indexDir, V1Constants.STAR_TREE_V1_INDEX_FILE);
-      if (starTreeV1File.exists()) {
+    } else if (actualVersion == StarTreeFormatVersion.OFF_HEAP
+        && starTreeVersionToLoad == StarTreeFormatVersion.ON_HEAP) {
+      File starTreeOnHeapFile = new File(indexDir, V1Constants.STAR_TREE_ON_HEAP_INDEX_FILE);
+      if (starTreeOnHeapFile.exists()) {
         try {
-          FileUtils.copyFile(starTreeFile, new File(indexDir, V1Constants.STAR_TREE_V2_INDEX_FILE));
-          FileUtils.copyFile(starTreeV1File, starTreeFile);
+          FileUtils.copyFile(starTreeFile, new File(indexDir, V1Constants.STAR_TREE_OFF_HEAP_INDEX_FILE));
+          FileUtils.copyFile(starTreeOnHeapFile, starTreeFile);
         } catch (Exception e) {
-          LOGGER.warn("Exception caught while converting star tree v2 to v1 for {}", starTreeFile.getAbsolutePath(), e);
+          LOGGER.warn("Exception caught while converting star tree off-heap to on-heap for {}",
+              starTreeFile.getAbsolutePath(), e);
         }
       } else {
-        LOGGER.info("Could not replace star tree format v2 to v1 as {} does not exist, will load v2 format",
-            starTreeV1File.getAbsolutePath());
+        LOGGER.info(
+            "Could not replace star tree format off-heap to on-heap as {} does not exist, will load off-heap format",
+            starTreeOnHeapFile.getAbsolutePath());
       }
     }
   }

@@ -17,10 +17,10 @@ package com.linkedin.pinot.core.startree;
 
 /**
  * Enum for StarTree in-memory/on-disk format
- * V1: On heap using HashMaps
- * V2: Off-heap using byte buffers
+ * ON_HEAP: On heap using HashMaps
+ * OFF_HEAP: Off-heap using byte-arrays
  */
 public enum StarTreeFormatVersion {
-  V1,
-  V2
+  ON_HEAP,
+  OFF_HEAP
 }

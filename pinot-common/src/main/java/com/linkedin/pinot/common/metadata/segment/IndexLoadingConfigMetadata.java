@@ -36,7 +36,7 @@ public class IndexLoadingConfigMetadata {
 
   private final Set<String> _loadingInvertedIndexColumnSet = new HashSet<String>();
   private final String DEFAULT_SEGMENT_FORMAT = "v1";
-  private static final String DEFAULT_STAR_TREE_FORMAT = "V1";
+  private static final String DEFAULT_STAR_TREE_FORMAT = "ON_HEAP";
   private String segmentVersionToLoad;
   private boolean enableDefaultColumns;
   private final String starTreeVersionToLoad;

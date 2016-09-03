@@ -27,7 +27,7 @@ import org.testng.annotations.Test;
 
 
 /**
- * Test for Star Tree v1-v2 converter.
+ * Test for Star Tree OnHeap-OffHeap converter.
  */
 public class TestStarTreeConverter {
   private static final String TMP_DIR = System.getProperty("java.io.tmpdir");
@@ -35,7 +35,6 @@ public class TestStarTreeConverter {
   private static final String SEGMENT_NAME = "starTreeSegment";
 
   private IndexSegment _segment;
-  private StarTreeInterf _starTreeV1;
   private File _indexDir;
 
   /**
@@ -47,13 +46,12 @@ public class TestStarTreeConverter {
       throws Exception {
     StarTreeIndexTestSegmentHelper.buildSegment(SEGMENT_DIR_NAME, SEGMENT_NAME, false);
     _segment = StarTreeIndexTestSegmentHelper.loadSegment(SEGMENT_DIR_NAME, SEGMENT_NAME);
-    _starTreeV1 = _segment.getStarTree();
     _indexDir = new File(SEGMENT_DIR_NAME, SEGMENT_NAME);
 
   }
 
   /**
-   * This test builds a star-tree in v1 format, and then performs multiple
+   * This test builds a star-tree in on-heap format, and then performs multiple
    * format conversions, and asserts that all conversions work as expected.
    *
    * @throws IOException
@@ -63,21 +61,21 @@ public class TestStarTreeConverter {
   public void testConverter()
       throws IOException, ClassNotFoundException {
 
-    // Convert from V1 to V1, this should be no-op.
-    StarTreeSerDe.convertStarTreeFormatIfNeeded(_indexDir, StarTreeFormatVersion.V1);
-    assertStarTreeVersion(_indexDir, StarTreeFormatVersion.V1);
+    // Convert from ON_HEAP to ON_HEAP, this should be no-op.
+    StarTreeSerDe.convertStarTreeFormatIfNeeded(_indexDir, StarTreeFormatVersion.ON_HEAP);
+    assertStarTreeVersion(_indexDir, StarTreeFormatVersion.ON_HEAP);
 
-    // Convert from V1 to V2.
-    StarTreeSerDe.convertStarTreeFormatIfNeeded(_indexDir, StarTreeFormatVersion.V2);
-    assertStarTreeVersion(_indexDir, StarTreeFormatVersion.V2);
+    // Convert from ON_HEAP to OFF_HEAP.
+    StarTreeSerDe.convertStarTreeFormatIfNeeded(_indexDir, StarTreeFormatVersion.OFF_HEAP);
+    assertStarTreeVersion(_indexDir, StarTreeFormatVersion.OFF_HEAP);
 
-    // Convert from V2 to V2, this should be no-op
-    StarTreeSerDe.convertStarTreeFormatIfNeeded(_indexDir, StarTreeFormatVersion.V2);
-    assertStarTreeVersion(_indexDir, StarTreeFormatVersion.V2);
+    // Convert from OFF_HEAP to OFF_HEAP, this should be no-op
+    StarTreeSerDe.convertStarTreeFormatIfNeeded(_indexDir, StarTreeFormatVersion.OFF_HEAP);
+    assertStarTreeVersion(_indexDir, StarTreeFormatVersion.OFF_HEAP);
 
-    // Convert from V2 to V1.
-    StarTreeSerDe.convertStarTreeFormatIfNeeded(_indexDir, StarTreeFormatVersion.V1);
-    assertStarTreeVersion(_indexDir, StarTreeFormatVersion.V1);
+    // Convert from OFF_HEAP to ON_HEAP.
+    StarTreeSerDe.convertStarTreeFormatIfNeeded(_indexDir, StarTreeFormatVersion.ON_HEAP);
+    assertStarTreeVersion(_indexDir, StarTreeFormatVersion.ON_HEAP);
   }
 
   private void assertStarTreeVersion(File indexDir, StarTreeFormatVersion expectedVersion)
