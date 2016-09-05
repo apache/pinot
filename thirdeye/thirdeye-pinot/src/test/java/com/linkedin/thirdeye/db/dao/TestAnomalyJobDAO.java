@@ -1,7 +1,7 @@
 package com.linkedin.thirdeye.db.dao;
 
 import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
-import com.linkedin.thirdeye.db.entity.AnomalyJobSpec;
+import com.linkedin.thirdeye.datalayer.dto.JobDTO;
 
 import java.util.List;
 
@@ -23,7 +23,7 @@ public class TestAnomalyJobDAO extends AbstractDbTestBase {
 
   @Test(dependsOnMethods = {"testCreate"})
   public void testFindAll() {
-    List<AnomalyJobSpec> anomalyJobs = anomalyJobDAO.findAll();
+    List<JobDTO> anomalyJobs = anomalyJobDAO.findAll();
     Assert.assertEquals(anomalyJobs.size(), 2);
   }
 
@@ -32,7 +32,7 @@ public class TestAnomalyJobDAO extends AbstractDbTestBase {
     JobStatus status = JobStatus.COMPLETED;
     long jobEndTime = System.currentTimeMillis();
     anomalyJobDAO.updateStatusAndJobEndTime(anomalyJobId1, status, jobEndTime);
-    AnomalyJobSpec anomalyJob = anomalyJobDAO.findById(anomalyJobId1);
+    JobDTO anomalyJob = anomalyJobDAO.findById(anomalyJobId1);
     Assert.assertEquals(anomalyJob.getStatus(), status);
     Assert.assertEquals(anomalyJob.getScheduleEndTime(), jobEndTime);
   }
@@ -40,7 +40,7 @@ public class TestAnomalyJobDAO extends AbstractDbTestBase {
   @Test(dependsOnMethods = {"testUpdateStatusAndJobEndTime"})
   public void testFindByStatus() {
     JobStatus status = JobStatus.COMPLETED;
-    List<AnomalyJobSpec> anomalyJobs = anomalyJobDAO.findByStatus(status);
+    List<JobDTO> anomalyJobs = anomalyJobDAO.findByStatus(status);
     Assert.assertEquals(anomalyJobs.size(), 1);
     Assert.assertEquals(anomalyJobs.get(0).getStatus(), status);
   }
@@ -50,7 +50,7 @@ public class TestAnomalyJobDAO extends AbstractDbTestBase {
     JobStatus status = JobStatus.COMPLETED;
     int numRecordsDeleted = anomalyJobDAO.deleteRecordsOlderThanDaysWithStatus(0, status);
     Assert.assertEquals(numRecordsDeleted, 1);
-    List<AnomalyJobSpec> anomalyJobs = anomalyJobDAO.findByStatus(status);
+    List<JobDTO> anomalyJobs = anomalyJobDAO.findByStatus(status);
     Assert.assertEquals(anomalyJobs.size(), 0);
   }
 }

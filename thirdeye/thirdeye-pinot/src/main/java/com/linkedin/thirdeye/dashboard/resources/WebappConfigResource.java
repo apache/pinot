@@ -22,17 +22,17 @@ import com.linkedin.thirdeye.dashboard.configs.AbstractConfig;
 import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
 import com.linkedin.thirdeye.dashboard.configs.WebappConfigFactory;
 import com.linkedin.thirdeye.dashboard.configs.WebappConfigFactory.WebappConfigType;
-import com.linkedin.thirdeye.db.dao.WebappConfigDAO;
-import com.linkedin.thirdeye.db.entity.WebappConfig;
+import com.linkedin.thirdeye.datalayer.bao.WebappConfigManager;
+import com.linkedin.thirdeye.datalayer.dto.WebappConfigDTO;
 
 @Path(value = "/webapp-config")
 @Produces(MediaType.APPLICATION_JSON)
 public class WebappConfigResource {
 
   private static final Logger LOG = LoggerFactory.getLogger(WebappConfigResource.class);
-  private WebappConfigDAO webappConfigDAO;
+  private WebappConfigManager webappConfigDAO;
 
-  public WebappConfigResource(WebappConfigDAO webappConfigDAO) {
+  public WebappConfigResource(WebappConfigManager webappConfigDAO) {
     this.webappConfigDAO = webappConfigDAO;
   }
 
@@ -56,7 +56,7 @@ public class WebappConfigResource {
       String configName = abstractConfig.getConfigName();
       String config = abstractConfig.toJSON();
 
-      WebappConfig webappConfig = new WebappConfig();
+      WebappConfigDTO webappConfig = new WebappConfigDTO();
       webappConfig.setName(configName);
       webappConfig.setCollection(collection);
       webappConfig.setType(type);
@@ -73,9 +73,9 @@ public class WebappConfigResource {
 
   @GET
   @Path(value = "view")
-  public List<WebappConfig> viewConfigs(@QueryParam("id") Long id, @QueryParam("collection") String collection,
+  public List<WebappConfigDTO> viewConfigs(@QueryParam("id") Long id, @QueryParam("collection") String collection,
       @QueryParam("type") WebappConfigType type) {
-    List<WebappConfig> webappConfigs = new ArrayList<>();
+    List<WebappConfigDTO> webappConfigs = new ArrayList<>();
     if (id != null) {
       webappConfigs.add(webappConfigDAO.findById(id));
     } else if (!StringUtils.isBlank(collection)) {
@@ -102,7 +102,7 @@ public class WebappConfigResource {
       String configName = abstractConfig.getConfigName();
       String config = abstractConfig.toJSON();
 
-      WebappConfig webappConfig = webappConfigDAO.findById(id);
+      WebappConfigDTO webappConfig = webappConfigDAO.findById(id);
       webappConfig.setName(configName);
       webappConfig.setCollection(collection);
       webappConfig.setType(type);
@@ -124,7 +124,7 @@ public class WebappConfigResource {
       if (id == null && StringUtils.isBlank(collection)) {
         throw new IllegalStateException("must specify id or collection");
       }
-      List<WebappConfig> webappConfigs;
+      List<WebappConfigDTO> webappConfigs;
       if (id != null) {
         webappConfigs = new ArrayList<>();
         webappConfigs.add(webappConfigDAO.findById(id));
@@ -133,7 +133,7 @@ public class WebappConfigResource {
       } else {
         webappConfigs = webappConfigDAO.findByCollectionAndType(collection, type);
       }
-      for (WebappConfig webappConfig : webappConfigs) {
+      for (WebappConfigDTO webappConfig : webappConfigs) {
         webappConfigDAO.deleteById(webappConfig.getId());
       }
       return Response.ok(id).build();

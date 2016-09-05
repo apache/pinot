@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.db.entity;
+package com.linkedin.thirdeye.datalayer.dto;
 
 import java.util.Objects;
 
@@ -18,7 +18,7 @@ import com.linkedin.thirdeye.dashboard.configs.WebappConfigFactory.WebappConfigT
 @Entity
 @Table(name = "webapp_config",
   uniqueConstraints = {@UniqueConstraint(columnNames={"name", "collection", "type"})})
-public class WebappConfig  extends AbstractBaseEntity {
+public class WebappConfigDTO  extends AbstractDTO {
 
   @Column(name = "name", nullable = false)
   private String name;
@@ -67,10 +67,10 @@ public class WebappConfig  extends AbstractBaseEntity {
 
   @Override
   public boolean equals(Object o) {
-    if (!(o instanceof WebappConfig)) {
+    if (!(o instanceof WebappConfigDTO)) {
       return false;
     }
-    WebappConfig wc = (WebappConfig) o;
+    WebappConfigDTO wc = (WebappConfigDTO) o;
     return Objects.equals(getId(), wc.getId())
         && Objects.equals(name, wc.getName())
         && Objects.equals(collection, wc.getCollection())

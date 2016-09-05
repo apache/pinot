@@ -12,8 +12,8 @@ import com.linkedin.thirdeye.anomaly.monitor.MonitorConstants.MonitorType;
 import com.linkedin.thirdeye.anomaly.monitor.MonitorTaskInfo;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
-import com.linkedin.thirdeye.db.entity.AnomalyJobSpec;
-import com.linkedin.thirdeye.db.entity.AnomalyTaskSpec;
+import com.linkedin.thirdeye.datalayer.dto.JobDTO;
+import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
 
 public class TestAnomalyTaskDAO extends AbstractDbTestBase {
 
@@ -23,7 +23,7 @@ public class TestAnomalyTaskDAO extends AbstractDbTestBase {
 
   @Test
   public void testCreate() throws JsonProcessingException {
-    AnomalyJobSpec testAnomalyJobSpec = getTestJobSpec();
+    JobDTO testAnomalyJobSpec = getTestJobSpec();
     anomalyJobId = anomalyJobDAO.save(testAnomalyJobSpec);
     anomalyTaskId1 = anomalyTaskDAO.save(getTestTaskSpec(testAnomalyJobSpec));
     Assert.assertNotNull(anomalyTaskId1);
@@ -33,7 +33,7 @@ public class TestAnomalyTaskDAO extends AbstractDbTestBase {
 
   @Test(dependsOnMethods = {"testCreate"})
   public void testFindAll() {
-    List<AnomalyTaskSpec> anomalyTasks = anomalyTaskDAO.findAll();
+    List<TaskDTO> anomalyTasks = anomalyTaskDAO.findAll();
     Assert.assertEquals(anomalyTasks.size(), 2);
   }
 
@@ -44,7 +44,7 @@ public class TestAnomalyTaskDAO extends AbstractDbTestBase {
     Long workerId = 1L;
 
     boolean status  = anomalyTaskDAO.updateStatusAndWorkerId(workerId, anomalyTaskId1, oldStatus, newStatus);
-    AnomalyTaskSpec anomalyTask = anomalyTaskDAO.findById(anomalyTaskId1);
+    TaskDTO anomalyTask = anomalyTaskDAO.findById(anomalyTaskId1);
     Assert.assertTrue(status);
     Assert.assertEquals(anomalyTask.getStatus(), newStatus);
     Assert.assertEquals(anomalyTask.getWorkerId(), workerId);
@@ -52,7 +52,7 @@ public class TestAnomalyTaskDAO extends AbstractDbTestBase {
 
   @Test(dependsOnMethods = {"testUpdateStatusAndWorkerId"})
   public void testFindByStatusOrderByCreationTimeAsc() {
-    List<AnomalyTaskSpec> anomalyTasks =
+    List<TaskDTO> anomalyTasks =
         anomalyTaskDAO.findByStatusOrderByCreateTimeAsc(TaskStatus.WAITING, Integer.MAX_VALUE);
     Assert.assertEquals(anomalyTasks.size(), 1);
   }
@@ -63,7 +63,7 @@ public class TestAnomalyTaskDAO extends AbstractDbTestBase {
     TaskStatus newStatus = TaskStatus.COMPLETED;
     long taskEndTime = System.currentTimeMillis();
     anomalyTaskDAO.updateStatusAndTaskEndTime(anomalyTaskId1, oldStatus, newStatus, taskEndTime);
-    AnomalyTaskSpec anomalyTask = anomalyTaskDAO.findById(anomalyTaskId1);
+    TaskDTO anomalyTask = anomalyTaskDAO.findById(anomalyTaskId1);
     Assert.assertEquals(anomalyTask.getStatus(), newStatus);
     Assert.assertEquals(anomalyTask.getTaskEndTime(), taskEndTime);
   }
@@ -71,7 +71,7 @@ public class TestAnomalyTaskDAO extends AbstractDbTestBase {
   @Test(dependsOnMethods = {"testUpdateStatusAndTaskEndTime"})
   public void testFindByJobIdStatusNotIn() {
     TaskStatus status = TaskStatus.COMPLETED;
-    List<AnomalyTaskSpec> anomalyTaskSpecs = anomalyTaskDAO.findByJobIdStatusNotIn(anomalyJobId, status);
+    List<TaskDTO> anomalyTaskSpecs = anomalyTaskDAO.findByJobIdStatusNotIn(anomalyJobId, status);
     Assert.assertEquals(anomalyTaskSpecs.size(), 1);
   }
 
@@ -82,8 +82,8 @@ public class TestAnomalyTaskDAO extends AbstractDbTestBase {
     Assert.assertEquals(numRecordsDeleted, 1);
   }
 
-  AnomalyTaskSpec getTestTaskSpec(AnomalyJobSpec anomalyJobSpec) throws JsonProcessingException {
-    AnomalyTaskSpec jobSpec = new AnomalyTaskSpec();
+  TaskDTO getTestTaskSpec(JobDTO anomalyJobSpec) throws JsonProcessingException {
+    TaskDTO jobSpec = new TaskDTO();
     jobSpec.setJobName("Test_Anomaly_Task");
     jobSpec.setStatus(TaskStatus.WAITING);
     jobSpec.setTaskType(TaskType.MONITOR);

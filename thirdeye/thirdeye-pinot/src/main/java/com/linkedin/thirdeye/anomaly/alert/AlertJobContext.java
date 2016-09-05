@@ -3,14 +3,14 @@ package com.linkedin.thirdeye.anomaly.alert;
 import org.joda.time.DateTime;
 
 import com.linkedin.thirdeye.anomaly.job.JobContext;
-import com.linkedin.thirdeye.db.entity.EmailConfiguration;
+import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
 
 public class AlertJobContext extends JobContext {
 
   private Long alertConfigId;
   private DateTime windowStartTime;
   private DateTime windowEndTime;
-  private EmailConfiguration alertConfig;
+  private EmailConfigurationDTO alertConfig;
 
   public Long getAlertConfigId() {
     return alertConfigId;
@@ -20,11 +20,11 @@ public class AlertJobContext extends JobContext {
     this.alertConfigId = alertConfigId;
   }
 
-  public EmailConfiguration getAlertConfig() {
+  public EmailConfigurationDTO getAlertConfig() {
     return alertConfig;
   }
 
-  public void setAlertConfig(EmailConfiguration alertConfig) {
+  public void setAlertConfig(EmailConfigurationDTO alertConfig) {
     this.alertConfig = alertConfig;
   }
 

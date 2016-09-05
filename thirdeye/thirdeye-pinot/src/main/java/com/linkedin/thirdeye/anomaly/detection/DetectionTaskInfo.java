@@ -8,7 +8,7 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.google.common.base.MoreObjects;
 import com.linkedin.thirdeye.anomaly.task.TaskInfo;
-import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.util.CustomDateDeserializer;
 import com.linkedin.thirdeye.util.CustomDateSerializer;
 
@@ -23,11 +23,11 @@ public class DetectionTaskInfo implements TaskInfo {
   @JsonSerialize(using = CustomDateSerializer.class)
   @JsonDeserialize(using = CustomDateDeserializer.class)
   private DateTime windowEndTime;
-  private AnomalyFunctionSpec anomalyFunctionSpec;
+  private AnomalyFunctionDTO anomalyFunctionSpec;
   private String groupByDimension;
 
   public DetectionTaskInfo(long jobExecutionId, DateTime windowStartTime,
-      DateTime windowEndTime, AnomalyFunctionSpec anomalyFunctionSpec, String groupByDimension) {
+      DateTime windowEndTime, AnomalyFunctionDTO anomalyFunctionSpec, String groupByDimension) {
     this.jobExecutionId = jobExecutionId;
     this.windowStartTime = windowStartTime;
     this.windowEndTime = windowEndTime;
@@ -63,11 +63,11 @@ public class DetectionTaskInfo implements TaskInfo {
     this.windowEndTime = windowEndTime;
   }
 
-  public AnomalyFunctionSpec getAnomalyFunctionSpec() {
+  public AnomalyFunctionDTO getAnomalyFunctionSpec() {
     return anomalyFunctionSpec;
   }
 
-  public void setAnomalyFunctionSpec(AnomalyFunctionSpec anomalyFunctionSpec) {
+  public void setAnomalyFunctionSpec(AnomalyFunctionDTO anomalyFunctionSpec) {
     this.anomalyFunctionSpec = anomalyFunctionSpec;
   }
 

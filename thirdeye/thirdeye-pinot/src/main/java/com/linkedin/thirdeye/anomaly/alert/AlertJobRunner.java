@@ -1,9 +1,5 @@
 package com.linkedin.thirdeye.anomaly.alert;
 
-import com.linkedin.thirdeye.db.dao.AnomalyJobDAO;
-import com.linkedin.thirdeye.db.dao.AnomalyTaskDAO;
-import com.linkedin.thirdeye.db.dao.EmailConfigurationDAO;
-
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -18,12 +14,15 @@ import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkedin.thirdeye.db.entity.AnomalyJobSpec;
-import com.linkedin.thirdeye.db.entity.AnomalyTaskSpec;
-import com.linkedin.thirdeye.db.entity.EmailConfiguration;
 import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
+import com.linkedin.thirdeye.datalayer.bao.EmailConfigurationManager;
+import com.linkedin.thirdeye.datalayer.bao.JobManager;
+import com.linkedin.thirdeye.datalayer.bao.TaskManager;
+import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
+import com.linkedin.thirdeye.datalayer.dto.JobDTO;
+import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
 import com.linkedin.thirdeye.anomaly.task.TaskGenerator;
 
 public class AlertJobRunner implements Job {
@@ -33,9 +32,9 @@ public class AlertJobRunner implements Job {
 
   public static final String ALERT_JOB_CONTEXT = "ALERT_JOB_CONTEXT";
 
-  private AnomalyJobDAO anomalyJobSpecDAO;
-  private AnomalyTaskDAO anomalyTasksSpecDAO;
-  private EmailConfigurationDAO emailConfigurationDAO;
+  private JobManager anomalyJobSpecDAO;
+  private TaskManager anomalyTasksSpecDAO;
+  private EmailConfigurationManager emailConfigurationDAO;
   private long alertConfigId;
   private DateTime windowStartTime;
   private DateTime windowEndTime;
@@ -58,7 +57,7 @@ public class AlertJobRunner implements Job {
     emailConfigurationDAO = alertJobContext.getEmailConfigurationDAO();
     alertConfigId = alertJobContext.getAlertConfigId();
 
-    EmailConfiguration alertConfig = emailConfigurationDAO.findById(alertConfigId);
+    EmailConfigurationDTO alertConfig = emailConfigurationDAO.findById(alertConfigId);
     alertJobContext.setAlertConfig(alertConfig);
 
     windowEndTime = alertJobContext.getWindowEndTime();
@@ -97,7 +96,7 @@ public class AlertJobRunner implements Job {
   private long createJob() {
     Long jobExecutionId = null;
     try {
-      AnomalyJobSpec anomalyJobSpec = new AnomalyJobSpec();
+      JobDTO anomalyJobSpec = new JobDTO();
       anomalyJobSpec.setJobName(alertJobContext.getJobName());
       anomalyJobSpec.setWindowStartTime(alertJobContext.getWindowStartTime().getMillis());
       anomalyJobSpec.setWindowEndTime(alertJobContext.getWindowEndTime().getMillis());
@@ -127,13 +126,13 @@ public class AlertJobRunner implements Job {
         } catch (JsonProcessingException e) {
           LOG.error("Exception when converting AlertTaskInfo {} to jsonString", taskInfo, e);
         }
-        AnomalyTaskSpec anomalyTaskSpec = new AnomalyTaskSpec();
+        TaskDTO anomalyTaskSpec = new TaskDTO();
         anomalyTaskSpec.setTaskType(TaskType.ALERT);
         anomalyTaskSpec.setJobName(alertJobContext.getJobName());
         anomalyTaskSpec.setStatus(TaskStatus.WAITING);
         anomalyTaskSpec.setTaskStartTime(System.currentTimeMillis());
         anomalyTaskSpec.setTaskInfo(taskInfoJson);
-        AnomalyJobSpec anomalyJobSpec = anomalyJobSpecDAO.findById(alertJobContext.getJobExecutionId());
+        JobDTO anomalyJobSpec = anomalyJobSpecDAO.findById(alertJobContext.getJobExecutionId());
         anomalyTaskSpec.setJob(anomalyJobSpec);
         long taskId = anomalyTasksSpecDAO.save(anomalyTaskSpec);
         taskIds.add(taskId);

@@ -1,14 +1,15 @@
-package com.linkedin.thirdeye.db.dao;
+package com.linkedin.thirdeye.datalayer.bao;
 
 import com.google.inject.persist.Transactional;
 import com.linkedin.thirdeye.api.dto.GroupByKey;
 import com.linkedin.thirdeye.api.dto.GroupByRow;
-import com.linkedin.thirdeye.db.entity.AnomalyResult;
+import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
+
 import java.util.ArrayList;
 import java.util.List;
 import javax.persistence.TypedQuery;
 
-public class AnomalyResultDAO extends AbstractJpaDAO<AnomalyResult> {
+public class RawAnomalyResultManager extends AbstractManager<RawAnomalyResultDTO> {
 
   private static final String FIND_BY_TIME_AND_FUNCTION_ID =
       "SELECT r FROM AnomalyResult r WHERE r.function.id = :functionId "
@@ -44,12 +45,12 @@ public class AnomalyResultDAO extends AbstractJpaDAO<AnomalyResult> {
       "select r from AnomalyResult r where r.function.id = :functionId and r.merged=false "
           + "and r.dataMissing=:dataMissing";
 
-  public AnomalyResultDAO() {
-    super(AnomalyResult.class);
+  public RawAnomalyResultManager() {
+    super(RawAnomalyResultDTO.class);
   }
 
   @Transactional
-  public List<AnomalyResult> findAllByTimeAndFunctionId(long startTime, long endTime,
+  public List<RawAnomalyResultDTO> findAllByTimeAndFunctionId(long startTime, long endTime,
       long functionId) {
     return getEntityManager().createQuery(FIND_BY_TIME_AND_FUNCTION_ID, entityClass)
         .setParameter("startTimeUtc", startTime).setParameter("endTimeUtc", endTime)
@@ -57,7 +58,7 @@ public class AnomalyResultDAO extends AbstractJpaDAO<AnomalyResult> {
   }
 
   @Transactional
-  public List<AnomalyResult> findAllByTimeFunctionIdAndDimensions(long startTime, long endTime,
+  public List<RawAnomalyResultDTO> findAllByTimeFunctionIdAndDimensions(long startTime, long endTime,
       long functionId, String dimensions) {
     return getEntityManager().createQuery(FIND_BY_TIME_FUNCTION_ID_DIMENSIONS, entityClass)
         .setParameter("startTimeUtc", startTime).setParameter("endTimeUtc", endTime)
@@ -109,13 +110,13 @@ public class AnomalyResultDAO extends AbstractJpaDAO<AnomalyResult> {
   }
 
   @Transactional
-  public List<AnomalyResult> findUnmergedByFunctionId(Long functionId) {
+  public List<RawAnomalyResultDTO> findUnmergedByFunctionId(Long functionId) {
     return getEntityManager().createQuery(FIND_UNMERGED_BY_FUNCTION, entityClass)
         .setParameter("functionId", functionId).setParameter("dataMissing", false).getResultList();
   }
 
   @Transactional
-  public List<AnomalyResult> findUnmergedByCollectionMetricAndDimensions(String collection,
+  public List<RawAnomalyResultDTO> findUnmergedByCollectionMetricAndDimensions(String collection,
       String metric, String dimensions) {
     return getEntityManager().createQuery(FIND_UNMERGED_BY_COLLECTION_METRIC_DIMENSION, entityClass)
         .setParameter("collection", collection).setParameter("metric", metric)

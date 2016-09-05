@@ -1,7 +1,7 @@
 package com.linkedin.thirdeye.anomaly.detection;
 
-import com.linkedin.thirdeye.db.dao.AnomalyFunctionDAO;
-import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
+import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 
 import java.util.List;
 
@@ -25,10 +25,10 @@ import org.quartz.SchedulerException;
 @Produces(MediaType.APPLICATION_JSON)
 public class DetectionJobResource {
   private final DetectionJobScheduler detectionJobScheduler;
-  private final AnomalyFunctionDAO anomalyFunctionSpecDAO;
+  private final AnomalyFunctionManager anomalyFunctionSpecDAO;
 
   public DetectionJobResource(DetectionJobScheduler detectionJobScheduler,
-      AnomalyFunctionDAO anomalyFunctionSpecDAO) {
+      AnomalyFunctionManager anomalyFunctionSpecDAO) {
     this.detectionJobScheduler = detectionJobScheduler;
     this.anomalyFunctionSpecDAO = anomalyFunctionSpecDAO;
   }
@@ -72,7 +72,7 @@ public class DetectionJobResource {
   }
 
   private void toggleActive(Long id, boolean state) {
-    AnomalyFunctionSpec anomalyFunctionSpec = anomalyFunctionSpecDAO.findById(id);
+    AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionSpecDAO.findById(id);
     if(anomalyFunctionSpec == null) {
       throw new NullArgumentException("Function spec not found");
     }

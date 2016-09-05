@@ -13,11 +13,11 @@ import com.linkedin.thirdeye.anomaly.alert.AlertJobContext;
 import com.linkedin.thirdeye.anomaly.alert.AlertTaskInfo;
 import com.linkedin.thirdeye.anomaly.detection.DetectionJobContext;
 import com.linkedin.thirdeye.anomaly.detection.DetectionTaskInfo;
-import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
-import com.linkedin.thirdeye.db.entity.AnomalyJobSpec;
-import com.linkedin.thirdeye.db.entity.EmailConfiguration;
 import com.linkedin.thirdeye.anomaly.monitor.MonitorConfiguration;
 import com.linkedin.thirdeye.anomaly.monitor.MonitorConstants.MonitorType;
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
+import com.linkedin.thirdeye.datalayer.dto.JobDTO;
 import com.linkedin.thirdeye.anomaly.monitor.MonitorJobContext;
 import com.linkedin.thirdeye.anomaly.monitor.MonitorTaskInfo;
 
@@ -32,7 +32,7 @@ public class TaskGenerator {
       throws Exception{
 
     List<DetectionTaskInfo> tasks = new ArrayList<>();
-    AnomalyFunctionSpec anomalyFunctionSpec = detectionJobContext.getAnomalyFunctionSpec();
+    AnomalyFunctionDTO anomalyFunctionSpec = detectionJobContext.getAnomalyFunctionSpec();
 
     DateTime windowStartTime = detectionJobContext.getWindowStartTime();
     DateTime windowEndTime = detectionJobContext.getWindowEndTime();
@@ -60,7 +60,7 @@ public class TaskGenerator {
       throws Exception{
 
     List<AlertTaskInfo> tasks = new ArrayList<>();
-    EmailConfiguration alertConfig = alertJobContext.getAlertConfig();
+    EmailConfigurationDTO alertConfig = alertJobContext.getAlertConfig();
     DateTime windowStartTime = alertJobContext.getWindowStartTime();
     DateTime windowEndTime = alertJobContext.getWindowEndTime();
     long jobExecutionId = alertJobContext.getJobExecutionId();
@@ -74,8 +74,8 @@ public class TaskGenerator {
 
   public List<MonitorTaskInfo> createMonitorTasks(MonitorJobContext monitorJobContext) {
     List<MonitorTaskInfo> tasks = new ArrayList<>();
-    List<AnomalyJobSpec> anomalyJobSpecs = monitorJobContext.getAnomalyJobSpecs();
-    for (AnomalyJobSpec anomalyJobSpec : anomalyJobSpecs) {
+    List<JobDTO> anomalyJobSpecs = monitorJobContext.getAnomalyJobSpecs();
+    for (JobDTO anomalyJobSpec : anomalyJobSpecs) {
       MonitorTaskInfo updateTaskInfo = new MonitorTaskInfo();
       updateTaskInfo.setJobExecutionId(anomalyJobSpec.getId());
       updateTaskInfo.setMonitorType(MonitorType.UPDATE);

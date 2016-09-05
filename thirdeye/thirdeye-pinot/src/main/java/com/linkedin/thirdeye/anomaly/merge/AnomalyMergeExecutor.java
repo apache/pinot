@@ -10,12 +10,12 @@ import com.linkedin.thirdeye.client.timeseries.TimeSeriesRequest;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesResponse;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesRow;
 import com.linkedin.thirdeye.dashboard.Utils;
-import com.linkedin.thirdeye.db.dao.AnomalyFunctionDAO;
-import com.linkedin.thirdeye.db.dao.AnomalyMergedResultDAO;
-import com.linkedin.thirdeye.db.dao.AnomalyResultDAO;
-import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
-import com.linkedin.thirdeye.db.entity.AnomalyMergedResult;
-import com.linkedin.thirdeye.db.entity.AnomalyResult;
+import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
+import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
+import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionUtils;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 import java.util.ArrayList;
@@ -33,12 +33,12 @@ import org.slf4j.LoggerFactory;
 
 /**
  * finds raw anomalies grouped by a strategy and merges them with an existing (in the same group) or
- * new {@link com.linkedin.thirdeye.db.entity.AnomalyMergedResult}
+ * new {@link com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO}
  */
 public class AnomalyMergeExecutor implements Runnable {
-  private final AnomalyMergedResultDAO mergedResultDAO;
-  private final AnomalyResultDAO anomalyResultDAO;
-  private final AnomalyFunctionDAO anomalyFunctionDAO;
+  private final MergedAnomalyResultManager mergedResultDAO;
+  private final RawAnomalyResultManager anomalyResultDAO;
+  private final AnomalyFunctionManager anomalyFunctionDAO;
   private final ScheduledExecutorService executorService;
 
   private final QueryCache queryCache;
@@ -49,8 +49,8 @@ public class AnomalyMergeExecutor implements Runnable {
 
   private final static Logger LOG = LoggerFactory.getLogger(AnomalyMergeExecutor.class);
 
-  public AnomalyMergeExecutor(AnomalyMergedResultDAO mergedResultDAO,
-      AnomalyFunctionDAO anomalyFunctionDAO, AnomalyResultDAO anomalyResultDAO,
+  public AnomalyMergeExecutor(MergedAnomalyResultManager mergedResultDAO,
+      AnomalyFunctionManager anomalyFunctionDAO, RawAnomalyResultManager anomalyResultDAO,
       ScheduledExecutorService executorService) {
     this.mergedResultDAO = mergedResultDAO;
     this.anomalyResultDAO = anomalyResultDAO;
@@ -86,12 +86,12 @@ public class AnomalyMergeExecutor implements Runnable {
        *
        * Step 5: persist merged anomalies
        */
-      List<AnomalyFunctionSpec> activeFunctions = anomalyFunctionDAO.findAllActiveFunctions();
+      List<AnomalyFunctionDTO> activeFunctions = anomalyFunctionDAO.findAllActiveFunctions();
 
       // for each anomaly function, find raw unmerged results and perform merge
-      for (AnomalyFunctionSpec function : activeFunctions) {
+      for (AnomalyFunctionDTO function : activeFunctions) {
 
-        List<AnomalyResult> unmergedResults =
+        List<RawAnomalyResultDTO> unmergedResults =
             anomalyResultDAO.findUnmergedByFunctionId(function.getId());
 
         LOG.info("Running merge for function id : [{}], found [{}] raw anomalies", function.getId(),
@@ -103,7 +103,7 @@ public class AnomalyMergeExecutor implements Runnable {
         mergeConfig.setMergeDuration(-1); // no time based split
         mergeConfig.setMergeStrategy(AnomalyMergeStrategy.FUNCTION_DIMENSIONS);
 
-        List<AnomalyMergedResult> output = new ArrayList<>();
+        List<MergedAnomalyResultDTO> output = new ArrayList<>();
 
         if (unmergedResults.size() > 0) {
           switch (mergeConfig.getMergeStrategy()) {
@@ -126,14 +126,14 @@ public class AnomalyMergeExecutor implements Runnable {
     }
   }
 
-  private void updateMergedScoreAndPersist(AnomalyMergedResult mergedResult) {
+  private void updateMergedScoreAndPersist(MergedAnomalyResultDTO mergedResult) {
     double weightedScoreSum = 0.0;
     double weightedWeightSum = 0.0;
     double totalBucketSize = 0.0;
 
     double normalizationFactor = 1000; // to prevent from double overflow
 
-    for (AnomalyResult anomalyResult : mergedResult.getAnomalyResults()) {
+    for (RawAnomalyResultDTO anomalyResult : mergedResult.getAnomalyResults()) {
       anomalyResult.setMerged(true);
       double bucketSizeSeconds =
           (anomalyResult.getEndTimeUtc() - anomalyResult.getStartTimeUtc()) / 1000;
@@ -162,8 +162,8 @@ public class AnomalyMergeExecutor implements Runnable {
     }
   }
 
-  private void updateMergedSeverity(AnomalyMergedResult anomalyMergedResult) throws Exception {
-    AnomalyFunctionSpec anomalyFunctionSpec = anomalyMergedResult.getFunction();
+  private void updateMergedSeverity(MergedAnomalyResultDTO anomalyMergedResult) throws Exception {
+    AnomalyFunctionDTO anomalyFunctionSpec = anomalyMergedResult.getFunction();
 
     // create time series request
     TimeSeriesRequest timeSeriesRequest = new TimeSeriesRequest();
@@ -220,17 +220,17 @@ public class AnomalyMergeExecutor implements Runnable {
     return totalVal;
   }
 
-  private void performMergeBasedOnFunctionId(AnomalyFunctionSpec function,
-      AnomalyMergeConfig mergeConfig, List<AnomalyResult> unmergedResults,
-      List<AnomalyMergedResult> output) {
+  private void performMergeBasedOnFunctionId(AnomalyFunctionDTO function,
+      AnomalyMergeConfig mergeConfig, List<RawAnomalyResultDTO> unmergedResults,
+      List<MergedAnomalyResultDTO> output) {
     // Now find last MergedAnomalyResult in same category
-    AnomalyMergedResult latestMergedResult =
+    MergedAnomalyResultDTO latestMergedResult =
         mergedResultDAO.findLatestByFunctionIdOnly(function.getId());
     // TODO : get mergeConfig from function
-    List<AnomalyMergedResult> mergedResults = AnomalyTimeBasedSummarizer
+    List<MergedAnomalyResultDTO> mergedResults = AnomalyTimeBasedSummarizer
         .mergeAnomalies(latestMergedResult, unmergedResults, mergeConfig.getMergeDuration(),
             mergeConfig.getSequentialAllowedGap());
-    for (AnomalyMergedResult mergedResult : mergedResults) {
+    for (MergedAnomalyResultDTO mergedResult : mergedResults) {
       mergedResult.setFunction(function);
     }
     LOG.info("Merging [{}] raw anomalies into [{}] merged anomalies for function id : [{}]",
@@ -238,11 +238,11 @@ public class AnomalyMergeExecutor implements Runnable {
     output.addAll(mergedResults);
   }
 
-  private void performMergeBasedOnFunctionIdAndDimensions(AnomalyFunctionSpec function,
-      AnomalyMergeConfig mergeConfig, List<AnomalyResult> unmergedResults,
-      List<AnomalyMergedResult> output) {
-    Map<String, List<AnomalyResult>> dimensionsResultMap = new HashMap<>();
-    for (AnomalyResult anomalyResult : unmergedResults) {
+  private void performMergeBasedOnFunctionIdAndDimensions(AnomalyFunctionDTO function,
+      AnomalyMergeConfig mergeConfig, List<RawAnomalyResultDTO> unmergedResults,
+      List<MergedAnomalyResultDTO> output) {
+    Map<String, List<RawAnomalyResultDTO>> dimensionsResultMap = new HashMap<>();
+    for (RawAnomalyResultDTO anomalyResult : unmergedResults) {
       String dimensions = anomalyResult.getDimensions();
       if (!dimensionsResultMap.containsKey(dimensions)) {
         dimensionsResultMap.put(dimensions, new ArrayList<>());
@@ -250,15 +250,15 @@ public class AnomalyMergeExecutor implements Runnable {
       dimensionsResultMap.get(dimensions).add(anomalyResult);
     }
     for (String dimensions : dimensionsResultMap.keySet()) {
-      AnomalyMergedResult latestMergedResult =
+      MergedAnomalyResultDTO latestMergedResult =
           mergedResultDAO.findLatestByFunctionIdDimensions(function.getId(), dimensions);
-      List<AnomalyResult> unmergedResultsByDimensions = dimensionsResultMap.get(dimensions);
+      List<RawAnomalyResultDTO> unmergedResultsByDimensions = dimensionsResultMap.get(dimensions);
 
       // TODO : get mergeConfig from function
-      List<AnomalyMergedResult> mergedResults = AnomalyTimeBasedSummarizer
+      List<MergedAnomalyResultDTO> mergedResults = AnomalyTimeBasedSummarizer
           .mergeAnomalies(latestMergedResult, unmergedResultsByDimensions,
               mergeConfig.getMergeDuration(), mergeConfig.getSequentialAllowedGap());
-      for (AnomalyMergedResult mergedResult : mergedResults) {
+      for (MergedAnomalyResultDTO mergedResult : mergedResults) {
         mergedResult.setFunction(function);
         mergedResult.setDimensions(dimensions);
       }

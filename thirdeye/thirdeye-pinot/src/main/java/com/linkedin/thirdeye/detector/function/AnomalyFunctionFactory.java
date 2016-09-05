@@ -10,7 +10,7 @@ import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 
 public class AnomalyFunctionFactory {
   private static Logger LOGGER = LoggerFactory.getLogger(AnomalyFunctionFactory.class);
@@ -35,7 +35,7 @@ public class AnomalyFunctionFactory {
     }
   }
 
-  public AnomalyFunction fromSpec(AnomalyFunctionSpec functionSpec) throws Exception {
+  public AnomalyFunction fromSpec(AnomalyFunctionDTO functionSpec) throws Exception {
     AnomalyFunction anomalyFunction = null;
     String type = functionSpec.getType();
     if (!props.containsKey(type)) {

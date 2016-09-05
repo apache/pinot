@@ -1,51 +1,104 @@
 package com.linkedin.thirdeye.datalayer.dto;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.google.common.base.MoreObjects;
-import com.google.common.collect.Multimap;
-import com.linkedin.thirdeye.util.ThirdEyeUtils;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+import javax.persistence.CascadeType;
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.FetchType;
+import javax.persistence.JoinColumn;
+import javax.persistence.JoinTable;
+import javax.persistence.ManyToMany;
+import javax.persistence.Table;
+import javax.validation.Valid;
+import javax.validation.constraints.NotNull;
+
+import org.hibernate.validator.constraints.Email;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.google.common.base.MoreObjects;
+import com.google.common.collect.Multimap;
+import com.linkedin.thirdeye.util.ThirdEyeUtils;
+
+@Entity
+@Table(name = "email_configurations")
 public class EmailConfigurationDTO extends AbstractDTO {
 
+  @Valid
+  @NotNull
+  @Column(name = "collection", nullable = false)
   private String collection;
 
+  @Valid
+  @NotNull
+  @Column(name = "metric", nullable = false)
   private String metric;
 
+  @Valid
+  @NotNull
+  @Email
+  @Column(name = "from_address", nullable = false)
   private String fromAddress;
 
+  @Valid
+  @NotNull
+  @Column(name = "to_addresses", nullable = false)
   private String toAddresses;
 
+  @Valid
+  @NotNull
+  @Column(name = "cron", nullable = false)
   private String cron;
 
+  @Valid
+  @NotNull
+  @Column(name = "smtp_host", nullable = false)
   private String smtpHost;
 
+  @Valid
+  @Column(name = "smtp_port", nullable = false)
   private int smtpPort = 25;
 
+  @Column(name = "smtp_user", nullable = true)
   private String smtpUser;
 
+  @Column(name = "smtp_password", nullable = true)
   private String smtpPassword;
 
+  @Valid
+  @NotNull
+  @Column(name = "window_size", nullable = false)
   private int windowSize = 7;
 
+  @Valid
+  @NotNull
+  @Column(name = "window_unit", nullable = false)
   private TimeUnit windowUnit = TimeUnit.DAYS;
 
+  @Column(name = "is_active", nullable = false)
   private boolean isActive;
 
+  @Column(name = "send_zero_anomaly_email", nullable = false)
   private boolean sendZeroAnomalyEmail;
 
+  @Column(name = "filters", nullable = true)
   private String filters;
 
+  @Column(name = "window_delay", nullable = false)
   private Integer windowDelay;
 
+  @Column(name = "window_delay_unit", nullable = false)
   private TimeUnit windowDelayUnit;
 
   public String getCollection() {
     return collection;
   }
 
+  @ManyToMany(fetch = FetchType.EAGER, cascade = CascadeType.MERGE)
+  @JoinTable(name = "email_function_dependencies", joinColumns = { @JoinColumn(name = "email_id")},
+        inverseJoinColumns = { @JoinColumn(name = "function_id") })
   private List<AnomalyFunctionDTO> functions = new ArrayList<>();
 
   public void setCollection(String collection) {
@@ -176,6 +229,14 @@ public class EmailConfigurationDTO extends AbstractDTO {
 
   public void setWindowDelayUnit(TimeUnit windowDelayUnit) {
     this.windowDelayUnit = windowDelayUnit;
+  }
+
+  public List<AnomalyFunctionDTO> getFunctions() {
+    return functions;
+  }
+
+  public void setFunctions(List<AnomalyFunctionDTO> functions) {
+    this.functions = functions;
   }
 
   @Override

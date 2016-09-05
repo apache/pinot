@@ -12,7 +12,7 @@ import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import com.linkedin.thirdeye.db.entity.AnomalyResult;
+import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 
 public class TestUserRuleAnomalyFunction {
   private static final UserRuleAnomalyFunction function = new UserRuleAnomalyFunction();
@@ -43,11 +43,11 @@ public class TestUserRuleAnomalyFunction {
   }
 
   @Test(dataProvider = "getFilteredAndMergedAnomalyResultsProvider")
-  public void getFilteredAndMergedAnomalyResults(List<AnomalyResult> anomalyResults,
+  public void getFilteredAndMergedAnomalyResults(List<RawAnomalyResultDTO> anomalyResults,
       int minConsecutiveSize, long bucketMillis, List<Double> baselineValues,
       List<Double> currentValues, double threshold, String baselineProp,
-      List<AnomalyResult> expectedAnomalyResults) {
-    List<AnomalyResult> actualAnomalyResults =
+      List<RawAnomalyResultDTO> expectedAnomalyResults) {
+    List<RawAnomalyResultDTO> actualAnomalyResults =
         function.getFilteredAndMergedAnomalyResults(anomalyResults, minConsecutiveSize,
             bucketMillis, baselineValues, currentValues, threshold, baselineProp);
     Assert.assertEquals(actualAnomalyResults, expectedAnomalyResults);
@@ -126,7 +126,7 @@ public class TestUserRuleAnomalyFunction {
     };
   }
 
-  private void setAnomalyResultFields(AnomalyResult anomalyResult) {
+  private void setAnomalyResultFields(RawAnomalyResultDTO anomalyResult) {
     anomalyResult.setProperties("properties");
     anomalyResult.setWeight(3);
     anomalyResult.setDimensions("dimensions");
@@ -134,77 +134,77 @@ public class TestUserRuleAnomalyFunction {
 
   @DataProvider(name = "getFilteredAndMergedAnomalyResultsProvider")
   public Object[][] getFilteredAndMergedAnomalyResultsProvider() {
-    AnomalyResult anomalyResult1 = new AnomalyResult();
+    RawAnomalyResultDTO anomalyResult1 = new RawAnomalyResultDTO();
     anomalyResult1.setStartTimeUtc(100L);
     anomalyResult1.setEndTimeUtc(120L);
     anomalyResult1.setMessage("message1");
     anomalyResult1.setScore(2);
     setAnomalyResultFields(anomalyResult1);
 
-    AnomalyResult anomalyResult2 = new AnomalyResult();
+    RawAnomalyResultDTO anomalyResult2 = new RawAnomalyResultDTO();
     anomalyResult2.setStartTimeUtc(120L);
     anomalyResult2.setEndTimeUtc(140L);
     anomalyResult2.setMessage("message2");
     anomalyResult2.setScore(7);
     setAnomalyResultFields(anomalyResult2);
 
-    AnomalyResult anomalyResult3 = new AnomalyResult();
+    RawAnomalyResultDTO anomalyResult3 = new RawAnomalyResultDTO();
     anomalyResult3.setStartTimeUtc(140L);
     anomalyResult3.setEndTimeUtc(160L);
     anomalyResult3.setMessage("message3");
     anomalyResult3.setScore(6);
     setAnomalyResultFields(anomalyResult3);
 
-    AnomalyResult anomalyResult4 = new AnomalyResult();
+    RawAnomalyResultDTO anomalyResult4 = new RawAnomalyResultDTO();
     anomalyResult4.setStartTimeUtc(160L);
     anomalyResult4.setEndTimeUtc(180L);
     anomalyResult4.setMessage("message4");
     anomalyResult4.setScore(5);
     setAnomalyResultFields(anomalyResult4);
 
-    AnomalyResult anomalyResult5 = new AnomalyResult();
+    RawAnomalyResultDTO anomalyResult5 = new RawAnomalyResultDTO();
     anomalyResult5.setStartTimeUtc(500L);
     anomalyResult5.setEndTimeUtc(520L);
     anomalyResult5.setMessage("message5");
     anomalyResult5.setScore(12);
     setAnomalyResultFields(anomalyResult5);
 
-    AnomalyResult anomalyResult6 = new AnomalyResult();
+    RawAnomalyResultDTO anomalyResult6 = new RawAnomalyResultDTO();
     anomalyResult6.setStartTimeUtc(125L);
     anomalyResult6.setEndTimeUtc(145L);
     anomalyResult6.setMessage("message6");
     anomalyResult6.setScore(15);
     setAnomalyResultFields(anomalyResult6);
 
-    AnomalyResult anomalyResult7 = new AnomalyResult();
+    RawAnomalyResultDTO anomalyResult7 = new RawAnomalyResultDTO();
     anomalyResult7.setStartTimeUtc(10L);
     anomalyResult7.setEndTimeUtc(30L);
     anomalyResult7.setMessage("message7");
     anomalyResult7.setScore(3);
     setAnomalyResultFields(anomalyResult7);
 
-    AnomalyResult anomalyResult8 = new AnomalyResult();
+    RawAnomalyResultDTO anomalyResult8 = new RawAnomalyResultDTO();
     anomalyResult8.setStartTimeUtc(520L);
     anomalyResult8.setEndTimeUtc(540L);
     anomalyResult8.setMessage("message8");
     anomalyResult8.setScore(14);
     setAnomalyResultFields(anomalyResult8);
 
-    AnomalyResult anomalyResult9 = new AnomalyResult();
+    RawAnomalyResultDTO anomalyResult9 = new RawAnomalyResultDTO();
     anomalyResult9.setStartTimeUtc(540L);
     anomalyResult9.setEndTimeUtc(560L);
     anomalyResult9.setMessage("message9");
     anomalyResult9.setScore(16);
     setAnomalyResultFields(anomalyResult9);
 
-    List<AnomalyResult> anomalyResults1 = new ArrayList<>();
+    List<RawAnomalyResultDTO> anomalyResults1 = new ArrayList<>();
     anomalyResults1.add(anomalyResult1);
     List<Double> baselineValues1 = Arrays.asList(10.0);
     List<Double> currentValues1 = Arrays.asList(5.0);
     double threshold1 = -0.1;
     String baselineProp1 = "w/w";
 
-    List<AnomalyResult> anomalyResults2 = new ArrayList<>();
+    List<RawAnomalyResultDTO> anomalyResults2 = new ArrayList<>();
     anomalyResults2.add(anomalyResult1);
     anomalyResults2.add(anomalyResult2);
     anomalyResults2.add(anomalyResult3);
@@ -213,7 +213,7 @@ public class TestUserRuleAnomalyFunction {
     double threshold2 = -0.1;
     String baselineProp2 = "w/w";
 
-    List<AnomalyResult> anomalyResults3 = new ArrayList<>();
+    List<RawAnomalyResultDTO> anomalyResults3 = new ArrayList<>();
     anomalyResults3.add(anomalyResult1);
     anomalyResults3.add(anomalyResult2);
     anomalyResults3.add(anomalyResult3);
@@ -224,7 +224,7 @@ public class TestUserRuleAnomalyFunction {
     double threshold3 = -0.15;
     String baselineProp3 = "w/2w";
 
-    List<AnomalyResult> anomalyResults4 = new ArrayList<>();
+    List<RawAnomalyResultDTO> anomalyResults4 = new ArrayList<>();
     anomalyResults4.add(anomalyResult1);
     anomalyResults4.add(anomalyResult2);
     anomalyResults4.add(anomalyResult6); // Breaks the 2 consecutive rule
@@ -236,7 +236,7 @@ public class TestUserRuleAnomalyFunction {
     double threshold4 = -0.2;
     String baselineProp4 = "w/2w";
 
-    List<AnomalyResult> anomalyResults5 = new ArrayList<>();
+    List<RawAnomalyResultDTO> anomalyResults5 = new ArrayList<>();
     anomalyResults5.add(anomalyResult7);
     anomalyResults5.add(anomalyResult1); // Start of 3 consecutive result
     anomalyResults5.add(anomalyResult2);
@@ -247,7 +247,7 @@ public class TestUserRuleAnomalyFunction {
     double threshold5 = -0.1;
     String baselineProp5 = "w/w";
 
-    List<AnomalyResult> anomalyResults6 = new ArrayList<>();
+    List<RawAnomalyResultDTO> anomalyResults6 = new ArrayList<>();
     anomalyResults6.add(anomalyResult1); // Start of min 3 consecutive result
     anomalyResults6.add(anomalyResult2);
     anomalyResults6.add(anomalyResult3);
@@ -261,14 +261,14 @@ public class TestUserRuleAnomalyFunction {
     double threshold6 = -0.05;
     String baselineProp6 = "w/2w";
 
-    AnomalyResult mergedAnomalyResult1 = new AnomalyResult();
+    RawAnomalyResultDTO mergedAnomalyResult1 = new RawAnomalyResultDTO();
     mergedAnomalyResult1.setStartTimeUtc(100L);
     mergedAnomalyResult1.setEndTimeUtc(160L);
     mergedAnomalyResult1.setMessage("threshold=-10%, w/w values: -50%,-50%,-33.33% (20.0 / 30.0)");
     mergedAnomalyResult1.setScore(5);
     setAnomalyResultFields(mergedAnomalyResult1);
 
-    AnomalyResult mergedAnomalyResult2 = new AnomalyResult();
+    RawAnomalyResultDTO mergedAnomalyResult2 = new RawAnomalyResultDTO();
     mergedAnomalyResult2.setStartTimeUtc(100L);
     mergedAnomalyResult2.setEndTimeUtc(180L);
     mergedAnomalyResult2
@@ -276,28 +276,28 @@ public class TestUserRuleAnomalyFunction {
     mergedAnomalyResult2.setScore(5);
     setAnomalyResultFields(mergedAnomalyResult2);
 
-    AnomalyResult mergedAnomalyResult3 = new AnomalyResult();
+    RawAnomalyResultDTO mergedAnomalyResult3 = new RawAnomalyResultDTO();
     mergedAnomalyResult3.setStartTimeUtc(100L);
     mergedAnomalyResult3.setEndTimeUtc(140L);
     mergedAnomalyResult3.setMessage("threshold=-20%, w/2w values: -50%,-50% (10.0 / 20.0)");
     mergedAnomalyResult3.setScore(4.5);
     setAnomalyResultFields(mergedAnomalyResult3);
 
-    AnomalyResult mergedAnomalyResult4 = new AnomalyResult();
+    RawAnomalyResultDTO mergedAnomalyResult4 = new RawAnomalyResultDTO();
     mergedAnomalyResult4.setStartTimeUtc(140L);
     mergedAnomalyResult4.setEndTimeUtc(180L);
     mergedAnomalyResult4.setMessage("threshold=-20%, w/2w values: -25%,-20% (40.0 / 50.0)");
     mergedAnomalyResult4.setScore(5.5);
     setAnomalyResultFields(mergedAnomalyResult4);
 
-    AnomalyResult mergedAnomalyResult5 = new AnomalyResult();
+    RawAnomalyResultDTO mergedAnomalyResult5 = new RawAnomalyResultDTO();
     mergedAnomalyResult5.setStartTimeUtc(100L);
     mergedAnomalyResult5.setEndTimeUtc(160L);
     mergedAnomalyResult5.setMessage("threshold=-10%, w/w values: -33.33%,-25%,-20% (40.0 / 50.0)");
     mergedAnomalyResult5.setScore(5);
     setAnomalyResultFields(mergedAnomalyResult5);
 
-    AnomalyResult mergedAnomalyResult6 = new AnomalyResult();
+    RawAnomalyResultDTO mergedAnomalyResult6 = new RawAnomalyResultDTO();
     mergedAnomalyResult6.setStartTimeUtc(100L);
     mergedAnomalyResult6.setEndTimeUtc(180L);
     mergedAnomalyResult6
@@ -305,7 +305,7 @@ public class TestUserRuleAnomalyFunction {
     mergedAnomalyResult6.setScore(5);
     setAnomalyResultFields(mergedAnomalyResult6);
 
-    AnomalyResult mergedAnomalyResult7 = new AnomalyResult();
+    RawAnomalyResultDTO mergedAnomalyResult7 = new RawAnomalyResultDTO();
     mergedAnomalyResult7.setStartTimeUtc(500L);
     mergedAnomalyResult7.setEndTimeUtc(560L);
     mergedAnomalyResult7
@@ -313,20 +313,20 @@ public class TestUserRuleAnomalyFunction {
     mergedAnomalyResult7.setScore(14);
     setAnomalyResultFields(mergedAnomalyResult7);
 
-    List<AnomalyResult> filteredAndMergedAnomalyResults1 = new ArrayList<>();
+    List<RawAnomalyResultDTO> filteredAndMergedAnomalyResults1 = new ArrayList<>();
     filteredAndMergedAnomalyResults1.add(mergedAnomalyResult1);
 
-    List<AnomalyResult> filteredAndMergedAnomalyResults2 = new ArrayList<>();
+    List<RawAnomalyResultDTO> filteredAndMergedAnomalyResults2 = new ArrayList<>();
     filteredAndMergedAnomalyResults2.add(mergedAnomalyResult2);
 
-    List<AnomalyResult> filteredAndMergedAnomalyResults3 = new ArrayList<>();
+    List<RawAnomalyResultDTO> filteredAndMergedAnomalyResults3 = new ArrayList<>();
     filteredAndMergedAnomalyResults3.add(mergedAnomalyResult3);
     filteredAndMergedAnomalyResults3.add(mergedAnomalyResult4);
 
-    List<AnomalyResult> filteredAndMergedAnomalyResults4 = new ArrayList<>();
+    List<RawAnomalyResultDTO> filteredAndMergedAnomalyResults4 = new ArrayList<>();
     filteredAndMergedAnomalyResults4.add(mergedAnomalyResult5);
 
-    List<AnomalyResult> filteredAndMergedAnomalyResults5 = new ArrayList<>();
+    List<RawAnomalyResultDTO> filteredAndMergedAnomalyResults5 = new ArrayList<>();
     filteredAndMergedAnomalyResults5.add(mergedAnomalyResult6);
     filteredAndMergedAnomalyResults5.add(mergedAnomalyResult7);
 

@@ -4,9 +4,10 @@ import com.linkedin.thirdeye.anomaly.merge.AnomalyMergeConfig;
 import com.linkedin.thirdeye.anomaly.merge.AnomalyMergeExecutor;
 import com.linkedin.thirdeye.anomaly.merge.AnomalyMergeStrategy;
 import com.linkedin.thirdeye.common.persistence.PersistenceUtil;
-import com.linkedin.thirdeye.db.dao.AnomalyFunctionDAO;
-import com.linkedin.thirdeye.db.dao.AnomalyMergedResultDAO;
-import com.linkedin.thirdeye.db.dao.AnomalyResultDAO;
+import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
+import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
+import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.Executors;
@@ -23,9 +24,9 @@ public class AnomalyMergeTester {
     config.setMergeDuration(-1);
     config.setSequentialAllowedGap(2 * 60 * 60_000); // 2 hours
 
-    AnomalyResultDAO resultDAO = PersistenceUtil.getInstance(AnomalyResultDAO.class);
-    AnomalyMergedResultDAO mergedResultDAO = PersistenceUtil.getInstance(AnomalyMergedResultDAO.class);
-    AnomalyFunctionDAO functionDAO = PersistenceUtil.getInstance(AnomalyFunctionDAO.class);
+    RawAnomalyResultManager resultDAO = PersistenceUtil.getInstance(RawAnomalyResultManager.class);
+    MergedAnomalyResultManager mergedResultDAO = PersistenceUtil.getInstance(MergedAnomalyResultManager.class);
+    AnomalyFunctionManager functionDAO = PersistenceUtil.getInstance(AnomalyFunctionManager.class);
     ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
     AnomalyMergeExecutor anomalyMergeExecutor = new AnomalyMergeExecutor(mergedResultDAO, functionDAO, resultDAO, executorService);
     System.out.println("Starting in 1 minute");

@@ -13,19 +13,19 @@ import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
 import com.linkedin.thirdeye.anomaly.job.JobRunner;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
+import com.linkedin.thirdeye.datalayer.bao.JobManager;
+import com.linkedin.thirdeye.datalayer.bao.TaskManager;
+import com.linkedin.thirdeye.datalayer.dto.JobDTO;
+import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
 import com.linkedin.thirdeye.anomaly.task.TaskGenerator;
-import com.linkedin.thirdeye.db.dao.AnomalyJobDAO;
-import com.linkedin.thirdeye.db.dao.AnomalyTaskDAO;
-import com.linkedin.thirdeye.db.entity.AnomalyJobSpec;
-import com.linkedin.thirdeye.db.entity.AnomalyTaskSpec;
 
 public class MonitorJobRunner implements JobRunner {
 
   private static final Logger LOG = LoggerFactory.getLogger(MonitorJobRunner.class);
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
-  private AnomalyJobDAO anomalyJobDAO;
-  private AnomalyTaskDAO anomalyTaskDAO;
+  private JobManager anomalyJobDAO;
+  private TaskManager anomalyTaskDAO;
   private TaskGenerator taskGenerator;
   private MonitorJobContext monitorJobContext;
 
@@ -42,7 +42,7 @@ public class MonitorJobRunner implements JobRunner {
     try {
       LOG.info("Starting monitor job");
 
-      List<AnomalyJobSpec> anomalyJobSpecs = findAnomalyJobsWithStatusScheduled();
+      List<JobDTO> anomalyJobSpecs = findAnomalyJobsWithStatusScheduled();
       monitorJobContext.setJobName(TaskType.MONITOR.toString());
       monitorJobContext.setAnomalyJobSpecs(anomalyJobSpecs);
       Long jobExecutionId = createJob();
@@ -60,7 +60,7 @@ public class MonitorJobRunner implements JobRunner {
     try {
 
       LOG.info("Creating monitor job");
-      AnomalyJobSpec anomalyJobSpec = new AnomalyJobSpec();
+      JobDTO anomalyJobSpec = new JobDTO();
       anomalyJobSpec.setJobName(monitorJobContext.getJobName());
       anomalyJobSpec.setScheduleStartTime(System.currentTimeMillis());
       anomalyJobSpec.setStatus(JobStatus.SCHEDULED);
@@ -88,13 +88,13 @@ public class MonitorJobRunner implements JobRunner {
           LOG.error("Exception when converting MonitorTaskInfo {} to jsonString", taskInfo, e);
         }
 
-        AnomalyTaskSpec anomalyTaskSpec = new AnomalyTaskSpec();
+        TaskDTO anomalyTaskSpec = new TaskDTO();
         anomalyTaskSpec.setTaskType(TaskType.MONITOR);
         anomalyTaskSpec.setJobName(monitorJobContext.getJobName());
         anomalyTaskSpec.setStatus(TaskStatus.WAITING);
         anomalyTaskSpec.setTaskStartTime(System.currentTimeMillis());
         anomalyTaskSpec.setTaskInfo(taskInfoJson);
-        AnomalyJobSpec anomalyJobSpec = anomalyJobDAO.findById(monitorJobContext.getJobExecutionId());
+        JobDTO anomalyJobSpec = anomalyJobDAO.findById(monitorJobContext.getJobExecutionId());
         anomalyTaskSpec.setJob(anomalyJobSpec);
         long taskId = anomalyTaskDAO.save(anomalyTaskSpec);
         taskIds.add(taskId);
@@ -107,8 +107,8 @@ public class MonitorJobRunner implements JobRunner {
 
   }
 
-  private List<AnomalyJobSpec> findAnomalyJobsWithStatusScheduled() {
-    List<AnomalyJobSpec> anomalyJobSpecs = null;
+  private List<JobDTO> findAnomalyJobsWithStatusScheduled() {
+    List<JobDTO> anomalyJobSpecs = null;
     try {
       anomalyJobSpecs = anomalyJobDAO.findByStatus(JobStatus.SCHEDULED);
     } catch (Exception e) {

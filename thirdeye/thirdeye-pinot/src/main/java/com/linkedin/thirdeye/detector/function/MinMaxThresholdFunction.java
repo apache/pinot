@@ -3,7 +3,8 @@ package com.linkedin.thirdeye.detector.function;
 import com.google.common.base.Joiner;
 import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
-import com.linkedin.thirdeye.db.entity.AnomalyResult;
+import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
@@ -34,10 +35,10 @@ public class MinMaxThresholdFunction extends BaseAnomalyFunction {
   }
 
   @Override
-  public List<AnomalyResult> analyze(DimensionKey dimensionKey,
+  public List<RawAnomalyResultDTO> analyze(DimensionKey dimensionKey,
       MetricTimeSeries timeSeries, DateTime windowStart, DateTime windowEnd,
-      List<AnomalyResult> knownAnomalies) throws Exception {
-    List<AnomalyResult> anomalyResults = new ArrayList<>();
+      List<RawAnomalyResultDTO> knownAnomalies) throws Exception {
+    List<RawAnomalyResultDTO> anomalyResults = new ArrayList<>();
     // Parse function properties
     Properties props = getProperties();
 
@@ -74,7 +75,7 @@ public class MinMaxThresholdFunction extends BaseAnomalyFunction {
       double deviationFromThreshold = getDeviationFromThreshold(value, min, max);
 
       if (deviationFromThreshold != 0) {
-        AnomalyResult anomalyResult = new AnomalyResult();
+        RawAnomalyResultDTO anomalyResult = new RawAnomalyResultDTO();
         anomalyResult.setProperties(getSpec().getProperties());
         anomalyResult.setStartTimeUtc(timeBucket);
         anomalyResult.setEndTimeUtc(timeBucket + bucketMillis); // point-in-time

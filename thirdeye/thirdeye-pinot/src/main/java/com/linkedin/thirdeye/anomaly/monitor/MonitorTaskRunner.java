@@ -8,20 +8,20 @@ import org.slf4j.LoggerFactory;
 import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
 import com.linkedin.thirdeye.anomaly.monitor.MonitorConstants.MonitorType;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
+import com.linkedin.thirdeye.datalayer.bao.JobManager;
+import com.linkedin.thirdeye.datalayer.bao.TaskManager;
+import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
 import com.linkedin.thirdeye.anomaly.task.TaskContext;
 import com.linkedin.thirdeye.anomaly.task.TaskInfo;
 import com.linkedin.thirdeye.anomaly.task.TaskResult;
 import com.linkedin.thirdeye.anomaly.task.TaskRunner;
-import com.linkedin.thirdeye.db.dao.AnomalyJobDAO;
-import com.linkedin.thirdeye.db.dao.AnomalyTaskDAO;
-import com.linkedin.thirdeye.db.entity.AnomalyTaskSpec;
 
 public class MonitorTaskRunner implements TaskRunner {
 
   private static final Logger LOG = LoggerFactory.getLogger(MonitorJobRunner.class);
 
-  private AnomalyJobDAO anomalyJobDAO;
-  private AnomalyTaskDAO anomalyTaskDAO;
+  private JobManager anomalyJobDAO;
+  private TaskManager anomalyTaskDAO;
 
   @Override
   public List<TaskResult> execute(TaskInfo taskInfo, TaskContext taskContext) throws Exception {
@@ -46,7 +46,7 @@ public class MonitorTaskRunner implements TaskRunner {
     try {
 
       Long jobExecutionId = monitorTaskInfo.getJobExecutionId();
-      List<AnomalyTaskSpec> anomalyTaskSpecs = anomalyTaskDAO
+      List<TaskDTO> anomalyTaskSpecs = anomalyTaskDAO
           .findByJobIdStatusNotIn(jobExecutionId, TaskStatus.COMPLETED);
       if (anomalyTaskSpecs.isEmpty()) {
         anomalyJobDAO.updateStatusAndJobEndTime(jobExecutionId, JobStatus.COMPLETED, System.currentTimeMillis());

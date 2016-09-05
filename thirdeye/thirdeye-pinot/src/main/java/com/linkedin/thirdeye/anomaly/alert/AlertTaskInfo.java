@@ -8,7 +8,7 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.google.common.base.MoreObjects;
 import com.linkedin.thirdeye.anomaly.task.TaskInfo;
-import com.linkedin.thirdeye.db.entity.EmailConfiguration;
+import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
 import com.linkedin.thirdeye.util.CustomDateDeserializer;
 import com.linkedin.thirdeye.util.CustomDateSerializer;
 
@@ -23,10 +23,10 @@ public class AlertTaskInfo implements TaskInfo {
   @JsonSerialize(using = CustomDateSerializer.class)
   @JsonDeserialize(using = CustomDateDeserializer.class)
   private DateTime windowEndTime;
-  private EmailConfiguration alertConfig;
+  private EmailConfigurationDTO alertConfig;
 
   public AlertTaskInfo(long jobExecutionId, DateTime windowStartTime,
-      DateTime windowEndTime, EmailConfiguration alertConfig) {
+      DateTime windowEndTime, EmailConfigurationDTO alertConfig) {
     this.jobExecutionId = jobExecutionId;
     this.windowStartTime = windowStartTime;
     this.windowEndTime = windowEndTime;
@@ -61,11 +61,11 @@ public class AlertTaskInfo implements TaskInfo {
     this.windowEndTime = windowEndTime;
   }
 
-  public EmailConfiguration getAlertConfig() {
+  public EmailConfigurationDTO getAlertConfig() {
     return alertConfig;
   }
 
-  public void setAlertConfig(EmailConfiguration alertConfig) {
+  public void setAlertConfig(EmailConfigurationDTO alertConfig) {
     this.alertConfig = alertConfig;
   }
 

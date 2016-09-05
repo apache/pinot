@@ -1,15 +1,16 @@
 package com.linkedin.thirdeye.anomaly.merge;
 
-import com.linkedin.thirdeye.db.entity.AnomalyMergedResult;
-import com.linkedin.thirdeye.db.entity.AnomalyResult;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
+
 /**
- * Given list of {@link AnomalyResult} and merge parameters, this utility performs time based merge
+ * Given list of {@link RawAnomalyResultDTO} and merge parameters, this utility performs time based merge
  */
 public abstract class AnomalyTimeBasedSummarizer {
   private final static Logger LOG = LoggerFactory.getLogger(AnomalyTimeBasedSummarizer.class);
@@ -25,7 +26,7 @@ public abstract class AnomalyTimeBasedSummarizer {
    *
    * @return
    */
-  public static List<AnomalyMergedResult> mergeAnomalies(List<AnomalyResult> anomalies,
+  public static List<MergedAnomalyResultDTO> mergeAnomalies(List<RawAnomalyResultDTO> anomalies,
       long mergeDuration, long sequentialAllowedGap) {
     return mergeAnomalies(null, anomalies, mergeDuration, sequentialAllowedGap);
   }
@@ -37,8 +38,8 @@ public abstract class AnomalyTimeBasedSummarizer {
    * @param sequentialAllowedGap : allowed gap between two raw anomalies in order to merge
    * @return
    */
-  public static List<AnomalyMergedResult> mergeAnomalies(AnomalyMergedResult mergedAnomaly,
-      List<AnomalyResult> anomalies, long mergeDuration, long sequentialAllowedGap) {
+  public static List<MergedAnomalyResultDTO> mergeAnomalies(MergedAnomalyResultDTO mergedAnomaly,
+      List<RawAnomalyResultDTO> anomalies, long mergeDuration, long sequentialAllowedGap) {
 
     // sort anomalies in natural order of start time
     Collections
@@ -55,12 +56,12 @@ public abstract class AnomalyTimeBasedSummarizer {
       applySequentialGapBasedSplit = true;
     }
 
-    List<AnomalyMergedResult> mergedAnomalies = new ArrayList<>();
+    List<MergedAnomalyResultDTO> mergedAnomalies = new ArrayList<>();
 
     for (int i = 0; i < anomalies.size(); i++) {
-      AnomalyResult currentResult = anomalies.get(i);
+      RawAnomalyResultDTO currentResult = anomalies.get(i);
       if (mergedAnomaly == null) {
-        mergedAnomaly = new AnomalyMergedResult();
+        mergedAnomaly = new MergedAnomalyResultDTO();
         populateMergedResult(mergedAnomaly, currentResult);
       } else {
         // compare current with merged and decide whether to merge the current result or create a new one
@@ -72,7 +73,7 @@ public abstract class AnomalyTimeBasedSummarizer {
           mergedAnomalies.add(mergedAnomaly);
 
           //set current raw result
-          mergedAnomaly = new AnomalyMergedResult();
+          mergedAnomaly = new MergedAnomalyResultDTO();
           populateMergedResult(mergedAnomaly, currentResult);
         } else {
           // add the current raw result into mergedResult
@@ -113,8 +114,8 @@ public abstract class AnomalyTimeBasedSummarizer {
   }
 
 
-  private static void populateMergedResult(AnomalyMergedResult mergedAnomaly,
-      AnomalyResult currentResult) {
+  private static void populateMergedResult(MergedAnomalyResultDTO mergedAnomaly,
+      RawAnomalyResultDTO currentResult) {
     if (!mergedAnomaly.getAnomalyResults().contains(currentResult)) {
       mergedAnomaly.getAnomalyResults().add(currentResult);
       currentResult.setMerged(true);

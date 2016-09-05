@@ -2,8 +2,8 @@ package com.linkedin.thirdeye.datalayer.util;
 
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
+import com.linkedin.thirdeye.datalayer.dto.AbstractDTO;
 import com.linkedin.thirdeye.datalayer.entity.AbstractEntity;
-import com.linkedin.thirdeye.db.entity.AbstractBaseEntity;
 
 import java.lang.reflect.Field;
 import java.sql.Connection;

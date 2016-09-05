@@ -1,18 +1,18 @@
 package com.linkedin.thirdeye.anomaly.job;
 
-import com.linkedin.thirdeye.db.dao.AnomalyFunctionDAO;
-import com.linkedin.thirdeye.db.dao.AnomalyJobDAO;
-import com.linkedin.thirdeye.db.dao.AnomalyTaskDAO;
-import com.linkedin.thirdeye.db.dao.EmailConfigurationDAO;
+import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
+import com.linkedin.thirdeye.datalayer.bao.EmailConfigurationManager;
+import com.linkedin.thirdeye.datalayer.bao.JobManager;
+import com.linkedin.thirdeye.datalayer.bao.TaskManager;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 
 public abstract class JobContext {
 
-  private AnomalyJobDAO anomalyJobDAO;
-  private AnomalyTaskDAO anomalyTaskDAO;
-  private AnomalyFunctionDAO anomalyFunctionDAO;
+  private JobManager anomalyJobDAO;
+  private TaskManager anomalyTaskDAO;
+  private AnomalyFunctionManager anomalyFunctionDAO;
   private AnomalyFunctionFactory anomalyFunctionFactory;
-  private EmailConfigurationDAO emailConfigurationDAO;
+  private EmailConfigurationManager emailConfigurationDAO;
 
   private String jobName;
   private long jobExecutionId;
@@ -26,27 +26,27 @@ public abstract class JobContext {
     this.jobExecutionId = jobExecutionId;
   }
 
-  public AnomalyJobDAO getAnomalyJobDAO() {
+  public JobManager getAnomalyJobDAO() {
     return anomalyJobDAO;
   }
 
-  public void setAnomalyJobDAO(AnomalyJobDAO anomalyJobDAO) {
+  public void setAnomalyJobDAO(JobManager anomalyJobDAO) {
     this.anomalyJobDAO = anomalyJobDAO;
   }
 
-  public AnomalyTaskDAO getAnomalyTaskDAO() {
+  public TaskManager getAnomalyTaskDAO() {
     return anomalyTaskDAO;
   }
 
-  public void setAnomalyTaskDAO(AnomalyTaskDAO anomalyTaskDAO) {
+  public void setAnomalyTaskDAO(TaskManager anomalyTaskDAO) {
     this.anomalyTaskDAO = anomalyTaskDAO;
   }
 
-  public AnomalyFunctionDAO getAnomalyFunctionDAO() {
+  public AnomalyFunctionManager getAnomalyFunctionDAO() {
     return anomalyFunctionDAO;
   }
 
-  public void setAnomalyFunctionDAO(AnomalyFunctionDAO anomalyFunctionDAO) {
+  public void setAnomalyFunctionDAO(AnomalyFunctionManager anomalyFunctionDAO) {
     this.anomalyFunctionDAO = anomalyFunctionDAO;
   }
 
@@ -66,11 +66,11 @@ public abstract class JobContext {
     this.anomalyFunctionFactory = anomalyFunctionFactory;
   }
 
-  public EmailConfigurationDAO getEmailConfigurationDAO() {
+  public EmailConfigurationManager getEmailConfigurationDAO() {
     return emailConfigurationDAO;
   }
 
-  public void setEmailConfigurationDAO(EmailConfigurationDAO emailConfigurationDAO) {
+  public void setEmailConfigurationDAO(EmailConfigurationManager emailConfigurationDAO) {
     this.emailConfigurationDAO = emailConfigurationDAO;
   }
 

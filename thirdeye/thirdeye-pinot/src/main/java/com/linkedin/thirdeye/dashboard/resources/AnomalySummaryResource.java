@@ -4,10 +4,11 @@ import com.linkedin.thirdeye.anomaly.merge.AnomalyMergeConfig;
 import com.linkedin.thirdeye.anomaly.merge.AnomalyTimeBasedSummarizer;
 import com.linkedin.thirdeye.api.dto.GroupByKey;
 import com.linkedin.thirdeye.api.dto.GroupByRow;
-import com.linkedin.thirdeye.db.dao.AnomalyMergedResultDAO;
-import com.linkedin.thirdeye.db.entity.AnomalyMergedResult;
-import com.linkedin.thirdeye.db.dao.AnomalyResultDAO;
-import com.linkedin.thirdeye.db.entity.AnomalyResult;
+import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
+import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
+import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
+
 import java.util.List;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -22,18 +23,18 @@ import org.apache.commons.lang3.StringUtils;
 @Produces(MediaType.APPLICATION_JSON)
 public class AnomalySummaryResource {
 
-  private AnomalyResultDAO resultDAO;
-  private AnomalyMergedResultDAO mergedResultDAO;
+  private RawAnomalyResultManager resultDAO;
+  private MergedAnomalyResultManager mergedResultDAO;
 
-  public AnomalySummaryResource(AnomalyResultDAO resultDAO,
-      AnomalyMergedResultDAO mergedResultDAO) {
+  public AnomalySummaryResource(RawAnomalyResultManager resultDAO,
+      MergedAnomalyResultManager mergedResultDAO) {
     this.resultDAO = resultDAO;
     this.mergedResultDAO = mergedResultDAO;
   }
 
   @GET
   @Path("merged")
-  public List<AnomalyMergedResult> getMergedResults(@QueryParam("startTime") Long startTime,
+  public List<MergedAnomalyResultDTO> getMergedResults(@QueryParam("startTime") Long startTime,
       @QueryParam("endTime") Long endTime) {
     if(startTime == null) {
       startTime = 0l;
@@ -41,20 +42,20 @@ public class AnomalySummaryResource {
     if(endTime == null) {
       endTime = System.currentTimeMillis();
     }
-    List<AnomalyMergedResult> mergedResults = mergedResultDAO.getAllByTime(startTime, endTime);
+    List<MergedAnomalyResultDTO> mergedResults = mergedResultDAO.getAllByTime(startTime, endTime);
     return mergedResults;
   }
 
   @GET
   @Path("summary/function/{functionId}")
-  public List<AnomalyMergedResult> getSummaryForFunction(@PathParam("functionId") Long functionId,
+  public List<MergedAnomalyResultDTO> getSummaryForFunction(@PathParam("functionId") Long functionId,
       @QueryParam("dimensions") String dimensions) {
     return getAnomalySummaryForFunction(functionId, dimensions, new AnomalyMergeConfig());
   }
 
   @POST
   @Path("summary/function/{functionId}")
-  public List<AnomalyMergedResult> getAnomalySummaryForFunction(
+  public List<MergedAnomalyResultDTO> getAnomalySummaryForFunction(
       @PathParam("functionId") Long functionId, @QueryParam("dimensions") String dimensions,
       AnomalyMergeConfig mergeConfig) {
     if (mergeConfig == null) {
@@ -64,7 +65,7 @@ public class AnomalySummaryResource {
       throw new IllegalArgumentException("Function id can't be null");
     }
 
-    List<AnomalyResult> anomalies;
+    List<RawAnomalyResultDTO> anomalies;
     if (!StringUtils.isEmpty(dimensions)) {
       anomalies = resultDAO.findAllByTimeFunctionIdAndDimensions(mergeConfig.getStartTime(),
           mergeConfig.getEndTime(), functionId, dimensions);

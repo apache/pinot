@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.db.entity;
+package com.linkedin.thirdeye.datalayer.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.util.ArrayList;
@@ -19,7 +19,7 @@ import org.apache.commons.lang.ObjectUtils;
 @JsonIgnoreProperties(ignoreUnknown = true)
 @Entity
 @Table(name = "anomaly_merged_results")
-public class AnomalyMergedResult extends AbstractBaseEntity implements Comparable<AnomalyMergedResult> {
+public class MergedAnomalyResultDTO extends AbstractDTO implements Comparable<MergedAnomalyResultDTO> {
 
   @Column(name = "collection")
   private String collection;
@@ -55,16 +55,16 @@ public class AnomalyMergedResult extends AbstractBaseEntity implements Comparabl
 
   @OneToOne(cascade = CascadeType.ALL, fetch = FetchType.EAGER, orphanRemoval = true)
   @JoinColumn(name = "anomaly_feedback_id")
-  private AnomalyFeedback feedback;
+  private AnomalyFeedbackDTO feedback;
 
   @OneToMany(fetch = FetchType.EAGER, cascade = CascadeType.ALL)
   @JoinTable(name = "anomaly_merged_results_mapping", joinColumns = @JoinColumn(name = "anomaly_merged_result_id"),
       inverseJoinColumns = @JoinColumn(name = "anomaly_result_id"))
-  private List<AnomalyResult> anomalyResults = new ArrayList<>();
+  private List<RawAnomalyResultDTO> anomalyResults = new ArrayList<>();
 
   @ManyToOne(fetch = FetchType.EAGER, cascade = CascadeType.DETACH)
   @JoinColumn(name = "function_id")
-  private AnomalyFunctionSpec function;
+  private AnomalyFunctionDTO function;
 
   public String getMetric() {
     return metric;
@@ -114,19 +114,19 @@ public class AnomalyMergedResult extends AbstractBaseEntity implements Comparabl
     this.createdTime = createdTime;
   }
 
-  public AnomalyFeedback getFeedback() {
+  public AnomalyFeedbackDTO getFeedback() {
     return feedback;
   }
 
-  public void setFeedback(AnomalyFeedback feedback) {
+  public void setFeedback(AnomalyFeedbackDTO feedback) {
     this.feedback = feedback;
   }
 
-  public List<AnomalyResult> getAnomalyResults() {
+  public List<RawAnomalyResultDTO> getAnomalyResults() {
     return anomalyResults;
   }
 
-  public void setAnomalyResults(List<AnomalyResult> anomalyResults) {
+  public void setAnomalyResults(List<RawAnomalyResultDTO> anomalyResults) {
     this.anomalyResults = anomalyResults;
   }
 
@@ -146,11 +146,11 @@ public class AnomalyMergedResult extends AbstractBaseEntity implements Comparabl
     this.collection = collection;
   }
 
-  public AnomalyFunctionSpec getFunction() {
+  public AnomalyFunctionDTO getFunction() {
     return function;
   }
 
-  public void setFunction(AnomalyFunctionSpec function) {
+  public void setFunction(AnomalyFunctionDTO function) {
     this.function = function;
   }
 
@@ -177,17 +177,17 @@ public class AnomalyMergedResult extends AbstractBaseEntity implements Comparabl
 
   @Override
   public boolean equals (Object o) {
-      if (!(o instanceof AnomalyMergedResult)) {
+      if (!(o instanceof MergedAnomalyResultDTO)) {
         return false;
       }
-    AnomalyMergedResult m = (AnomalyMergedResult) o;
+    MergedAnomalyResultDTO m = (MergedAnomalyResultDTO) o;
     return Objects.equals(getId(), m.getId()) && Objects.equals(startTime, m.getStartTime())
         && Objects.equals(endTime, m.getEndTime()) && Objects.equals(collection, m.getCollection())
         && Objects.equals(metric, m.getMetric()) && Objects.equals(dimensions, m.getDimensions());
   }
 
   @Override
-  public int compareTo(AnomalyMergedResult o) {
+  public int compareTo(MergedAnomalyResultDTO o) {
     // compare by dimension, -startTime, functionId, id
     int diff = ObjectUtils.compare(getDimensions(), o.getDimensions());
     if (diff != 0) {

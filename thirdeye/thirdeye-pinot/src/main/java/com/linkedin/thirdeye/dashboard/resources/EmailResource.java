@@ -1,9 +1,10 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
-import com.linkedin.thirdeye.db.dao.AnomalyFunctionDAO;
-import com.linkedin.thirdeye.db.dao.EmailConfigurationDAO;
-import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
-import com.linkedin.thirdeye.db.entity.EmailConfiguration;
+import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
+import com.linkedin.thirdeye.datalayer.bao.EmailConfigurationManager;
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
+
 import java.util.List;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
@@ -18,37 +19,37 @@ import javax.ws.rs.core.Response;
 @Produces(MediaType.APPLICATION_JSON)
 public class EmailResource {
 
-  private final AnomalyFunctionDAO functionDAO;
-  private final EmailConfigurationDAO emailDAO;
+  private final AnomalyFunctionManager functionDAO;
+  private final EmailConfigurationManager emailDAO;
 
-  public EmailResource(AnomalyFunctionDAO functionDAO,
-      EmailConfigurationDAO emailConfigurationDAO) {
+  public EmailResource(AnomalyFunctionManager functionDAO,
+      EmailConfigurationManager emailConfigurationDAO) {
     this.functionDAO = functionDAO;
     this.emailDAO = emailConfigurationDAO;
   }
 
   @POST
-  public Response createEmailConfig(EmailConfiguration emailConfiguration) {
+  public Response createEmailConfig(EmailConfigurationDTO emailConfiguration) {
     Long id = emailDAO.save(emailConfiguration);
     return Response.ok(id).build();
   }
 
   @GET
   @Path("{id}")
-  public EmailConfiguration getEmailConfigById (@PathParam("id") Long id) {
+  public EmailConfigurationDTO getEmailConfigById (@PathParam("id") Long id) {
     return emailDAO.findById(id);
   }
 
   @GET
-  public List<EmailConfiguration> getAllEmailconfigurations() {
+  public List<EmailConfigurationDTO> getAllEmailconfigurations() {
     return emailDAO.findAll();
   }
 
   @POST
   @Path("{emailId}/{functionId}")
   public Response addFunctionInEmail(@PathParam("emailId") Long emailId, @PathParam("functionId") Long functionId) {
-    AnomalyFunctionSpec function = functionDAO.findById(functionId);
-    EmailConfiguration emailConfiguration = emailDAO.findById(emailId);
+    AnomalyFunctionDTO function = functionDAO.findById(functionId);
+    EmailConfigurationDTO emailConfiguration = emailDAO.findById(emailId);
     if (function != null && emailConfiguration != null) {
       if (!emailConfiguration.getFunctions().contains(function)) {
         emailConfiguration.getFunctions().add(function);
@@ -65,8 +66,8 @@ public class EmailResource {
   @Path("{emailId}/{functionId}")
   public Response removeFunctionFromEmail(@PathParam("emailId") Long emailId,
       @PathParam("functionId") Long functionId) {
-    AnomalyFunctionSpec function = functionDAO.findById(functionId);
-    EmailConfiguration emailConfiguration = emailDAO.findById(emailId);
+    AnomalyFunctionDTO function = functionDAO.findById(functionId);
+    EmailConfigurationDTO emailConfiguration = emailDAO.findById(emailId);
     if (function != null && emailConfiguration != null) {
       if (emailConfiguration.getFunctions().contains(function)) {
         emailConfiguration.getFunctions().remove(function);
@@ -85,7 +86,7 @@ public class EmailResource {
 
   @GET
   @Path("email-config/{functionId}")
-  public List<EmailConfiguration> findEmailIdsByFunction(@PathParam("functionId") Long functionId) {
+  public List<EmailConfigurationDTO> findEmailIdsByFunction(@PathParam("functionId") Long functionId) {
     return emailDAO.findByFunctionId(functionId);
   }
 }

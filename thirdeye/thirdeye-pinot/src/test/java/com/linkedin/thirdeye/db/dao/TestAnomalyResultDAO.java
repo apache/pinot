@@ -4,17 +4,18 @@ import com.linkedin.thirdeye.api.dto.GroupByKey;
 import com.linkedin.thirdeye.api.dto.GroupByRow;
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
 import com.linkedin.thirdeye.constant.FeedbackStatus;
-import com.linkedin.thirdeye.db.entity.AnomalyFeedback;
-import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
-import com.linkedin.thirdeye.db.entity.AnomalyResult;
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
+
 import java.util.List;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
 public class TestAnomalyResultDAO extends AbstractDbTestBase {
 
-  AnomalyResult anomalyResult;
-  AnomalyFunctionSpec spec = getTestFunctionSpec("metric", "dataset");
+  RawAnomalyResultDTO anomalyResult;
+  AnomalyFunctionDTO spec = getTestFunctionSpec("metric", "dataset");
 
   @Test
   public void testAnomalyResultCRUD() {
@@ -27,7 +28,7 @@ public class TestAnomalyResultDAO extends AbstractDbTestBase {
     anomalyResult.setFunction(spec);
     anomalyResultDAO.save(anomalyResult);
 
-    AnomalyResult resultRet = anomalyResultDAO.findById(anomalyResult.getId());
+    RawAnomalyResultDTO resultRet = anomalyResultDAO.findById(anomalyResult.getId());
     Assert.assertEquals(resultRet.getFunction(), spec);
   }
 
@@ -42,7 +43,7 @@ public class TestAnomalyResultDAO extends AbstractDbTestBase {
 
   @Test(dependsOnMethods = {"testGetCountByFunction"})
   public void testFindUnmergedByCollectionMetricAndDimensions() {
-    List<AnomalyResult> unmergedResults = anomalyResultDAO
+    List<RawAnomalyResultDTO> unmergedResults = anomalyResultDAO
         .findUnmergedByCollectionMetricAndDimensions(spec.getCollection(), spec.getMetric(),
             anomalyResult.getDimensions() );
     Assert.assertEquals(unmergedResults.size(), 1);
@@ -50,22 +51,22 @@ public class TestAnomalyResultDAO extends AbstractDbTestBase {
 
   @Test(dependsOnMethods = {"testFindUnmergedByCollectionMetricAndDimensions"})
   public void testResultFeedback() {
-    AnomalyResult result = anomalyResultDAO.findById(anomalyResult.getId());
+    RawAnomalyResultDTO result = anomalyResultDAO.findById(anomalyResult.getId());
     Assert.assertNotNull(result);
     Assert.assertNull(result.getFeedback());
 
-    AnomalyFeedback feedback = new AnomalyFeedback();
+    AnomalyFeedbackDTO feedback = new AnomalyFeedbackDTO();
     feedback.setComment("this is a good find");
     feedback.setFeedbackType(AnomalyFeedbackType.ANOMALY);
     feedback.setStatus(FeedbackStatus.NEW);
     result.setFeedback(feedback);
     anomalyResultDAO.save(result);
 
-    AnomalyResult resultRet = anomalyResultDAO.findById(anomalyResult.getId());
+    RawAnomalyResultDTO resultRet = anomalyResultDAO.findById(anomalyResult.getId());
     Assert.assertEquals(resultRet.getId(), result.getId());
     Assert.assertNotNull(resultRet.getFeedback());
 
-    AnomalyFunctionSpec functionSpec = result.getFunction();
+    AnomalyFunctionDTO functionSpec = result.getFunction();
 
     anomalyResultDAO.deleteById(anomalyResult.getId());
     anomalyFunctionDAO.deleteById(functionSpec.getId());

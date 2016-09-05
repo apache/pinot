@@ -4,18 +4,18 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.Properties;
 
-import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 
 public abstract class BaseAnomalyFunction implements AnomalyFunction {
-  private AnomalyFunctionSpec spec;
+  private AnomalyFunctionDTO spec;
 
   @Override
-  public void init(AnomalyFunctionSpec spec) throws Exception {
+  public void init(AnomalyFunctionDTO spec) throws Exception {
     this.spec = spec;
   }
 
   @Override
-  public AnomalyFunctionSpec getSpec() {
+  public AnomalyFunctionDTO getSpec() {
     return spec;
   }
 

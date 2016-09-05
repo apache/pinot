@@ -37,8 +37,8 @@ import org.slf4j.LoggerFactory;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.client.comparison.Row;
 import com.linkedin.thirdeye.client.comparison.Row.Metric;
+import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.client.comparison.TimeOnTimeComparisonResponse;
-import com.linkedin.thirdeye.db.entity.AnomalyResult;
 
 /** Creates JFreeChart images from Thirdeye Data. */
 public class AnomalyGraphGenerator {
@@ -74,7 +74,7 @@ public class AnomalyGraphGenerator {
    */
   public JFreeChart createChart(final TimeOnTimeComparisonResponse data,
       final TimeGranularity timeGranularity, final long windowMillis,
-      final Map<AnomalyResult, String> anomaliesWithLabels) {
+      final Map<RawAnomalyResultDTO, String> anomaliesWithLabels) {
     Set<String> metrics = data.getMetrics();
     // TODO error if more than one metric?
     String metric = metrics.iterator().next();
@@ -90,7 +90,7 @@ public class AnomalyGraphGenerator {
    */
   public JFreeChart createChart(final XYDataset dataset, final String metric,
       final TimeGranularity timeGranularity, final long windowMillis,
-      final Map<AnomalyResult, String> anomaliesWithLabels) {
+      final Map<RawAnomalyResultDTO, String> anomaliesWithLabels) {
 
     // create the chart...
     final JFreeChart chart = ChartFactory.createTimeSeriesChart(null, // no chart title for email
@@ -168,11 +168,11 @@ public class AnomalyGraphGenerator {
   /**
    * Merges overlapping anomalies and creates JFreeChart Markers for each merged point or interval.
    */
-  private List<Marker> getAnomalyIntervals(Map<AnomalyResult, String> anomaliesWithLabels) {
-    TreeMap<AnomalyResult, String> chronologicalAnomaliesWithLabels =
-        new TreeMap<AnomalyResult, String>(new Comparator<AnomalyResult>() {
+  private List<Marker> getAnomalyIntervals(Map<RawAnomalyResultDTO, String> anomaliesWithLabels) {
+    TreeMap<RawAnomalyResultDTO, String> chronologicalAnomaliesWithLabels =
+        new TreeMap<RawAnomalyResultDTO, String>(new Comparator<RawAnomalyResultDTO>() {
           @Override
-          public int compare(AnomalyResult o1, AnomalyResult o2) {
+          public int compare(RawAnomalyResultDTO o1, RawAnomalyResultDTO o2) {
             int diff = Long.compare(o1.getStartTimeUtc(), o2.getStartTimeUtc());
             if (diff == 0) {
               diff = o1.compareTo(o2);
@@ -186,8 +186,8 @@ public class AnomalyGraphGenerator {
     Long intervalEnd = null;
     // StringBuilder labelBuilder = new StringBuilder();
     List<Marker> anomalyMarkers = new ArrayList<>();
-    for (Entry<AnomalyResult, String> entry : chronologicalAnomaliesWithLabels.entrySet()) {
-      AnomalyResult anomalyResult = entry.getKey();
+    for (Entry<RawAnomalyResultDTO, String> entry : chronologicalAnomaliesWithLabels.entrySet()) {
+      RawAnomalyResultDTO anomalyResult = entry.getKey();
       // String label = entry.getValue();
       Long anomalyStart = anomalyResult.getStartTimeUtc();
       Long anomalyEnd = anomalyResult.getEndTimeUtc();

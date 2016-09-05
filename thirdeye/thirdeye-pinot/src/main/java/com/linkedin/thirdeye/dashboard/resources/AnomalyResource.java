@@ -4,13 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
 import com.linkedin.thirdeye.constant.FeedbackStatus;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
-import com.linkedin.thirdeye.db.dao.AnomalyFunctionDAO;
-import com.linkedin.thirdeye.db.dao.AnomalyMergedResultDAO;
-import com.linkedin.thirdeye.db.dao.AnomalyResultDAO;
-import com.linkedin.thirdeye.db.dao.EmailConfigurationDAO;
-import com.linkedin.thirdeye.db.entity.AnomalyFeedback;
 
-import com.linkedin.thirdeye.db.entity.AnomalyMergedResult;
 import java.io.IOException;
 import java.net.URLDecoder;
 import java.util.ArrayList;
@@ -49,9 +43,15 @@ import com.linkedin.thirdeye.api.CollectionSchema;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.dashboard.ThirdEyeDashboardConfiguration;
-import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
-import com.linkedin.thirdeye.db.entity.AnomalyResult;
-import com.linkedin.thirdeye.db.entity.EmailConfiguration;
+import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
+import com.linkedin.thirdeye.datalayer.bao.EmailConfigurationManager;
+import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
+import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
+import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 @Path(value = "/dashboard")
@@ -66,18 +66,18 @@ public class AnomalyResource {
   private static final String DIMENSION_JOINER = ",";
   private static final String DEFAULT_FUNCTION_TYPE = "USER_RULE";
 
-  private AnomalyFunctionDAO anomalyFunctionDAO;
-  private AnomalyMergedResultDAO anomalyMergedResultDAO;
-  private AnomalyResultDAO anomalyResultDAO;
-  private EmailConfigurationDAO emailConfigurationDAO;
+  private AnomalyFunctionManager anomalyFunctionDAO;
+  private MergedAnomalyResultManager anomalyMergedResultDAO;
+  private RawAnomalyResultManager anomalyResultDAO;
+  private EmailConfigurationManager emailConfigurationDAO;
 
   private DetectionResourceHttpUtils detectionResourceHttpUtils;
   private AlertResourceHttpUtils alertResourceHttpUtils;
   private ThirdEyeDashboardConfiguration dashboardConfiguration;
 
   public AnomalyResource(ThirdEyeDashboardConfiguration dashboardConfiguration,
-      AnomalyFunctionDAO anomalyFunctionDAO, AnomalyResultDAO anomalyResultDAO,
-      EmailConfigurationDAO emailConfigurationDAO, AnomalyMergedResultDAO anomalyMergedResultDAO) {
+      AnomalyFunctionManager anomalyFunctionDAO, RawAnomalyResultManager anomalyResultDAO,
+      EmailConfigurationManager emailConfigurationDAO, MergedAnomalyResultManager anomalyMergedResultDAO) {
     this.dashboardConfiguration = dashboardConfiguration;
     this.detectionResourceHttpUtils = new DetectionResourceHttpUtils(dashboardConfiguration.getDetectorHost(),
         dashboardConfiguration.getDetectorPort());
@@ -103,7 +103,7 @@ public class AnomalyResource {
   // View merged anomalies for collection
   @GET
   @Path("/anomalies/view")
-  public List<AnomalyMergedResult> viewAnomaliesInRange(@NotNull @QueryParam("dataset") String dataset,
+  public List<MergedAnomalyResultDTO> viewAnomaliesInRange(@NotNull @QueryParam("dataset") String dataset,
       @QueryParam("startTimeIso") String startTimeIso,
       @QueryParam("endTimeIso") String endTimeIso,
       @QueryParam("metric") String metric,
@@ -121,7 +121,7 @@ public class AnomalyResource {
     if (StringUtils.isNotEmpty(startTimeIso)) {
       startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso);
     }
-    List<AnomalyMergedResult> anomalyResults = new ArrayList<>();
+    List<MergedAnomalyResultDTO> anomalyResults = new ArrayList<>();
     try {
       String[] dimensionPatterns = null;
       if (StringUtils.isNotBlank(dimensions)) {
@@ -175,19 +175,19 @@ public class AnomalyResource {
   // View all anomaly functions
   @GET
   @Path("/anomaly-function/view")
-  public List<AnomalyFunctionSpec> viewAnomalyFunctions(@NotNull @QueryParam("dataset") String dataset,
+  public List<AnomalyFunctionDTO> viewAnomalyFunctions(@NotNull @QueryParam("dataset") String dataset,
       @QueryParam("metric") String metric) {
 
     if (StringUtils.isBlank(dataset)) {
       throw new IllegalArgumentException("dataset is a required query param");
     }
 
-    List<AnomalyFunctionSpec> anomalyFunctionSpecs = anomalyFunctionDAO.findAllByCollection(dataset);
-    List<AnomalyFunctionSpec> anomalyFunctions = anomalyFunctionSpecs;
+    List<AnomalyFunctionDTO> anomalyFunctionSpecs = anomalyFunctionDAO.findAllByCollection(dataset);
+    List<AnomalyFunctionDTO> anomalyFunctions = anomalyFunctionSpecs;
 
     if (StringUtils.isNotEmpty(metric)) {
       anomalyFunctions = new ArrayList<>();
-      for (AnomalyFunctionSpec anomalyFunctionSpec : anomalyFunctionSpecs) {
+      for (AnomalyFunctionDTO anomalyFunctionSpec : anomalyFunctionSpecs) {
         if (metric.equals(anomalyFunctionSpec.getMetric())) {
           anomalyFunctions.add(anomalyFunctionSpec);
         }
@@ -225,7 +225,7 @@ public class AnomalyResource {
     CollectionSchema schema = CACHE_REGISTRY_INSTANCE.getCollectionSchemaCache().get(dataset);
     TimeGranularity dataGranularity = schema.getTime().getDataGranularity();
 
-    AnomalyFunctionSpec anomalyFunctionSpec = new AnomalyFunctionSpec();
+    AnomalyFunctionDTO anomalyFunctionSpec = new AnomalyFunctionDTO();
     anomalyFunctionSpec.setIsActive(false);
     anomalyFunctionSpec.setMetricFunction(MetricAggFunction.valueOf(metric_function));
     anomalyFunctionSpec.setCollection(dataset);
@@ -311,7 +311,7 @@ public class AnomalyResource {
           + ", properties" + properties);
     }
 
-    AnomalyFunctionSpec anomalyFunctionSpec = anomalyFunctionDAO.findById(id);
+    AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionDAO.findById(id);
     if (anomalyFunctionSpec == null) {
       throw new IllegalStateException("AnomalyFunctionSpec with id " + id + " does not exist");
     }
@@ -383,7 +383,7 @@ public class AnomalyResource {
     }
 
     // call endpoint to stop if active
-    AnomalyFunctionSpec anomalyFunctionSpec = anomalyFunctionDAO.findById(id);
+    AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionDAO.findById(id);
     if (anomalyFunctionSpec == null) {
       throw new IllegalStateException("No anomalyFunctionSpec with id " + id);
     }
@@ -410,7 +410,7 @@ public class AnomalyResource {
       throw new IllegalArgumentException("id is a required query param");
     }
 
-    AnomalyFunctionSpec anomalyFunctionSpec = anomalyFunctionDAO.findById(id);
+    AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionDAO.findById(id);
     if (anomalyFunctionSpec == null) {
       throw new IllegalStateException("No anomalyFunctionSpec with id " + id);
     }
@@ -436,17 +436,17 @@ public class AnomalyResource {
   // View all email functions
   @GET
   @Path("/email-config/view")
-  public List<EmailConfiguration> viewEmailConfigs(@NotNull @QueryParam("dataset") String dataset,
+  public List<EmailConfigurationDTO> viewEmailConfigs(@NotNull @QueryParam("dataset") String dataset,
       @QueryParam("metric") String metric) {
 
     if (StringUtils.isEmpty(dataset)) {
       throw new UnsupportedOperationException("dataset is a required query param");
     }
 
-    List<EmailConfiguration> emailConfigSpecs = emailConfigurationDAO.findAll();
+    List<EmailConfigurationDTO> emailConfigSpecs = emailConfigurationDAO.findAll();
 
-    List<EmailConfiguration> emailConfigurations = new ArrayList<>();
-    for (EmailConfiguration emailConfigSpec : emailConfigSpecs) {
+    List<EmailConfigurationDTO> emailConfigurations = new ArrayList<>();
+    for (EmailConfigurationDTO emailConfigSpec : emailConfigSpecs) {
       if (dataset.equals(emailConfigSpec.getCollection()) &&
           (StringUtils.isEmpty(metric) || (StringUtils.isNotEmpty(metric) && metric.equals(emailConfigSpec.getMetric())))) {
 
@@ -484,7 +484,7 @@ public class AnomalyResource {
           + ", toAddresses " + toAddresses);
     }
 
-    EmailConfiguration emailConfiguration = new EmailConfiguration();
+    EmailConfigurationDTO emailConfiguration = new EmailConfigurationDTO();
     emailConfiguration.setIsActive(false);
     emailConfiguration.setCollection(dataset);
     emailConfiguration.setMetric(metric);
@@ -516,9 +516,9 @@ public class AnomalyResource {
     emailConfiguration.setSendZeroAnomalyEmail(sendZeroAnomalyEmail);
     emailConfiguration.setFilters(filters);
 
-    List<AnomalyFunctionSpec> anomalyFunctionSpecs = new ArrayList<>();
+    List<AnomalyFunctionDTO> anomalyFunctionSpecs = new ArrayList<>();
     for (String functionIdString : functionIds.split(",")) {
-      AnomalyFunctionSpec anomalyFunctionSpec = anomalyFunctionDAO.findById(Long.valueOf(functionIdString));
+      AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionDAO.findById(Long.valueOf(functionIdString));
       anomalyFunctionSpecs.add(anomalyFunctionSpec);
     }
     emailConfiguration.setFunctions(anomalyFunctionSpecs);
@@ -562,7 +562,7 @@ public class AnomalyResource {
     }
 
     // stop email report if active
-    EmailConfiguration emailConfiguration = emailConfigurationDAO.findById(id);
+    EmailConfigurationDTO emailConfiguration = emailConfigurationDAO.findById(id);
     if (emailConfiguration == null) {
       throw new IllegalStateException("No email configuration for id " + id);
     }
@@ -601,9 +601,9 @@ public class AnomalyResource {
     emailConfiguration.setSendZeroAnomalyEmail(sendZeroAnomalyEmail);
     emailConfiguration.setFilters(filters);
 
-    List<AnomalyFunctionSpec> anomalyFunctionSpecs = new ArrayList<>();
+    List<AnomalyFunctionDTO> anomalyFunctionSpecs = new ArrayList<>();
     for (String functionIdString : functionIds.split(",")) {
-      AnomalyFunctionSpec anomalyFunctionSpec = anomalyFunctionDAO.findById(Long.valueOf(functionIdString));
+      AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionDAO.findById(Long.valueOf(functionIdString));
       anomalyFunctionSpecs.add(anomalyFunctionSpec);
     }
     emailConfiguration.setFunctions(anomalyFunctionSpecs);
@@ -627,7 +627,7 @@ public class AnomalyResource {
       throw new IllegalArgumentException("id is a required query param");
     }
     // stop schedule if active
-    EmailConfiguration emailConfiguration = emailConfigurationDAO.findById(id);
+    EmailConfigurationDTO emailConfiguration = emailConfigurationDAO.findById(id);
     if (emailConfiguration == null) {
       throw new IllegalStateException("No emailConfiguraiton for id " + id);
     }
@@ -649,7 +649,7 @@ public class AnomalyResource {
     if (id == null) {
       throw new IllegalArgumentException("id is a required query param");
     }
-    EmailConfiguration emailConfiguration = emailConfigurationDAO.findById(id);
+    EmailConfigurationDTO emailConfiguration = emailConfigurationDAO.findById(id);
     if (emailConfiguration == null) {
       throw new IllegalStateException("No emailConfiguraiton for id " + id);
     }
@@ -675,15 +675,15 @@ public class AnomalyResource {
   @Path(value = "anomaly-merged-result/feedback/{anomaly_merged_result_id}")
   public void updateAnomalyMergedResultFeedback(@PathParam("anomaly_merged_result_id") long anomalyResultId, String payload) {
     try {
-      AnomalyMergedResult result = anomalyMergedResultDAO.findById(anomalyResultId);
+      MergedAnomalyResultDTO result = anomalyMergedResultDAO.findById(anomalyResultId);
       if (result == null) {
         throw new IllegalArgumentException("AnomalyResult not found with id " + anomalyResultId);
       }
       ObjectMapper mapper = new ObjectMapper();
-      AnomalyFeedback feedbackRequest = mapper.readValue(payload, AnomalyFeedback.class);
-      AnomalyFeedback feedback = result.getFeedback();
+      AnomalyFeedbackDTO feedbackRequest = mapper.readValue(payload, AnomalyFeedbackDTO.class);
+      AnomalyFeedbackDTO feedback = result.getFeedback();
       if (feedback == null) {
-        feedback = new AnomalyFeedback();
+        feedback = new AnomalyFeedbackDTO();
         result.setFeedback(feedback);
       }
       if (feedbackRequest.getStatus() == null) {
@@ -704,15 +704,15 @@ public class AnomalyResource {
   @Path(value = "anomaly-result/feedback/{anomaly_result_id}")
   public void updateAnomalyResultFeedback(@PathParam("anomaly_result_id") long anomalyResultId, String payload) {
     try {
-      AnomalyResult result = anomalyResultDAO.findById(anomalyResultId);
+      RawAnomalyResultDTO result = anomalyResultDAO.findById(anomalyResultId);
       if (result == null) {
         throw new IllegalArgumentException("AnomalyResult not found with id " + anomalyResultId);
       }
       ObjectMapper mapper = new ObjectMapper();
-      AnomalyFeedback feedbackRequest = mapper.readValue(payload, AnomalyFeedback.class);
-      AnomalyFeedback feedback = result.getFeedback();
+      AnomalyFeedbackDTO feedbackRequest = mapper.readValue(payload, AnomalyFeedbackDTO.class);
+      AnomalyFeedbackDTO feedback = result.getFeedback();
       if (feedback == null) {
-        feedback = new AnomalyFeedback();
+        feedback = new AnomalyFeedbackDTO();
         result.setFeedback(feedback);
       }
       if (feedbackRequest.getStatus() == null) {

@@ -1,43 +1,74 @@
 package com.linkedin.thirdeye.datalayer.dto;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
-import com.linkedin.thirdeye.util.ThirdEyeUtils;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
-public class AnomalyFunctionDTO extends AbstractDTO {
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.EnumType;
+import javax.persistence.Enumerated;
+import javax.persistence.Table;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.google.common.base.MoreObjects;
+import com.google.common.collect.Multimap;
+import com.linkedin.thirdeye.util.ThirdEyeUtils;
+
+@Entity
+@Table(name = "anomaly_functions")
+public class AnomalyFunctionDTO extends AbstractDTO{
+
+  @Column(name = "collection", nullable = false)
   private String collection;
 
+  @Column(name = "function_name", nullable = false)
   private String functionName;
 
+  @Column(name = "metric", nullable = false)
   private String metric;
 
+  @Column(name = "metric_function", nullable = false)
+  @Enumerated(EnumType.STRING)
   private MetricAggFunction metricFunction;
 
+  @Column(name = "type", nullable = false)
   private String type;
 
+  @Column(name = "is_active", nullable = false)
   private boolean isActive = true;
 
+  @Column(name = "properties", nullable = true)
   private String properties;
 
+  @Column(name = "cron", nullable = false)
   private String cron;
 
+  @Column(name = "bucket_size", nullable = false)
   private Integer bucketSize;
 
+  @Column(name = "bucket_unit", nullable = false)
+  @Enumerated(EnumType.STRING)
   private TimeUnit bucketUnit;
 
+  @Column(name = "window_size", nullable = false)
   private Integer windowSize;
 
+  @Column(name = "window_unit", nullable = false)
+  @Enumerated(EnumType.STRING)
   private TimeUnit windowUnit;
 
+  @Column(name = "window_delay", nullable = false)
   private Integer windowDelay;
 
+  @Column(name = "window_delay_unit", nullable = false)
+  @Enumerated(EnumType.STRING)
   private TimeUnit windowDelayUnit;
 
+  @Column(name = "explore_dimensions", nullable = true)
   private String exploreDimensions;
 
+  @Column(name = "filters", nullable = true)
   private String filters;
 
   public String getCollection() {
@@ -172,5 +203,45 @@ public class AnomalyFunctionDTO extends AbstractDTO {
   public void setFilters(String filters) {
     String sortedFilters = ThirdEyeUtils.getSortedFilters(filters);
     this.filters = sortedFilters;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (!(o instanceof AnomalyFunctionDTO)) {
+      return false;
+    }
+    AnomalyFunctionDTO af = (AnomalyFunctionDTO) o;
+    return Objects.equals(getId(), af.getId()) && Objects.equals(collection, af.getCollection())
+        && Objects.equals(metric, af.getMetric())
+        && Objects.equals(metricFunction, af.getMetricFunction())
+        && Objects.equals(type, af.getType())
+        && Objects.equals(isActive, af.getIsActive()) && Objects.equals(cron, af.getCron())
+        && Objects.equals(properties, af.getProperties())
+        && Objects.equals(bucketSize, af.getBucketSize())
+        && Objects.equals(bucketUnit, af.getBucketUnit())
+        && Objects.equals(windowSize, af.getWindowSize())
+        && Objects.equals(windowUnit, af.getWindowUnit())
+        && Objects.equals(windowDelay, af.getWindowDelay())
+        && Objects.equals(windowDelayUnit, af.getWindowDelayUnit())
+        && Objects.equals(exploreDimensions, af.getExploreDimensions())
+        && Objects.equals(filters, af.getFilters());
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(getId(), collection, metric, metricFunction, type, isActive, cron, properties,
+        bucketSize, bucketUnit, windowSize, windowUnit, windowDelay, windowDelayUnit,
+        exploreDimensions, filters);
+  }
+
+  @Override
+  public String toString() {
+    return MoreObjects.toStringHelper(this).add("id", getId()).add("collection", collection)
+        .add("metric", metric).add("metric_function", metricFunction.name()).add("type", type)
+        .add("isActive", isActive).add("cron", cron).add("properties", properties)
+        .add("bucketSize", bucketSize).add("bucketUnit", bucketUnit).add("windowSize", windowSize)
+        .add("windowUnit", windowUnit).add("windowDelay", windowDelay)
+        .add("windowDelayUnit", windowDelayUnit).add("exploreDimensions", exploreDimensions)
+        .add("filters", filters).toString();
   }
 }

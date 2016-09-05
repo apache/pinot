@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.db.entity;
+package com.linkedin.thirdeye.datalayer.dto;
 import com.google.common.base.Joiner;
 import java.util.ArrayList;
 import java.util.List;
@@ -22,7 +22,7 @@ import com.google.common.base.MoreObjects;
 
 @Entity
 @Table(name = "anomaly_results")
-public class AnomalyResult extends AbstractBaseEntity implements Comparable<AnomalyResult> {
+public class RawAnomalyResultDTO extends AbstractDTO implements Comparable<RawAnomalyResultDTO> {
 
   private static Joiner SEMICOLON = Joiner.on(";");
   private static Joiner EQUALS = Joiner.on("=");
@@ -55,7 +55,7 @@ public class AnomalyResult extends AbstractBaseEntity implements Comparable<Anom
 
   @OneToOne(cascade = CascadeType.ALL, fetch = FetchType.EAGER, orphanRemoval = true)
   @JoinColumn(name = "anomaly_feedback_id")
-  private AnomalyFeedback feedback;
+  private AnomalyFeedbackDTO feedback;
 
   @Column(name = "data_missing")
   private boolean dataMissing;
@@ -65,17 +65,17 @@ public class AnomalyResult extends AbstractBaseEntity implements Comparable<Anom
 
   @ManyToOne(fetch = FetchType.EAGER)
   @JoinColumn(name = "function_id")
-  private AnomalyFunctionSpec function;
+  private AnomalyFunctionDTO function;
 
-  public AnomalyResult() {
+  public RawAnomalyResultDTO() {
     creationTimeUtc = DateTime.now().getMillis();
   }
 
-  public AnomalyFunctionSpec getFunction() {
+  public AnomalyFunctionDTO getFunction() {
     return function;
   }
 
-  public void setFunction(AnomalyFunctionSpec function) {
+  public void setFunction(AnomalyFunctionDTO function) {
     this.function = function;
   }
 
@@ -162,11 +162,11 @@ public class AnomalyResult extends AbstractBaseEntity implements Comparable<Anom
     this.creationTimeUtc = creationTimeUtc;
   }
 
-  public AnomalyFeedback getFeedback() {
+  public AnomalyFeedbackDTO getFeedback() {
     return feedback;
   }
 
-  public void setFeedback(AnomalyFeedback feedback) {
+  public void setFeedback(AnomalyFeedbackDTO feedback) {
     this.feedback = feedback;
   }
 
@@ -197,10 +197,10 @@ public class AnomalyResult extends AbstractBaseEntity implements Comparable<Anom
 
   @Override
   public boolean equals(Object o) {
-    if (!(o instanceof AnomalyResult)) {
+    if (!(o instanceof RawAnomalyResultDTO)) {
       return false;
     }
-    AnomalyResult r = (AnomalyResult) o;
+    RawAnomalyResultDTO r = (RawAnomalyResultDTO) o;
     return Objects.equals(getId(), r.getId())
         && Objects.equals(function, r.getFunction())
         && Objects.equals(startTimeUtc, r.getStartTimeUtc())
@@ -221,7 +221,7 @@ public class AnomalyResult extends AbstractBaseEntity implements Comparable<Anom
   }
 
   @Override
-  public int compareTo(AnomalyResult o) {
+  public int compareTo(RawAnomalyResultDTO o) {
     // compare by dimension, -startTime, functionId, id
     int diff = ObjectUtils.compare(getDimensions(), o.getDimensions());
     if (diff != 0) {

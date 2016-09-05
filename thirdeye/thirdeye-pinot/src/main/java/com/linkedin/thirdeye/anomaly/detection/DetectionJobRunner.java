@@ -1,10 +1,5 @@
 package com.linkedin.thirdeye.anomaly.detection;
 
-import com.linkedin.thirdeye.db.dao.AnomalyFunctionDAO;
-import com.linkedin.thirdeye.db.dao.AnomalyJobDAO;
-import com.linkedin.thirdeye.db.dao.AnomalyTaskDAO;
-
-
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -19,12 +14,15 @@ import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
-import com.linkedin.thirdeye.db.entity.AnomalyJobSpec;
-import com.linkedin.thirdeye.db.entity.AnomalyTaskSpec;
 import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
+import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
+import com.linkedin.thirdeye.datalayer.bao.JobManager;
+import com.linkedin.thirdeye.datalayer.bao.TaskManager;
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import com.linkedin.thirdeye.datalayer.dto.JobDTO;
+import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
 import com.linkedin.thirdeye.anomaly.task.TaskGenerator;
 
 public class DetectionJobRunner implements Job {
@@ -34,9 +32,9 @@ public class DetectionJobRunner implements Job {
 
   public static final String DETECTION_JOB_CONTEXT = "DETECTION_JOB_CONTEXT";
 
-  private AnomalyJobDAO anomalyJobSpecDAO;
-  private AnomalyTaskDAO anomalyTasksSpecDAO;
-  private AnomalyFunctionDAO anomalyFunctionSpecDAO;
+  private JobManager anomalyJobSpecDAO;
+  private TaskManager anomalyTasksSpecDAO;
+  private AnomalyFunctionManager anomalyFunctionSpecDAO;
   private long anomalyFunctionId;
   private DateTime windowStartTime;
   private DateTime windowEndTime;
@@ -59,7 +57,7 @@ public class DetectionJobRunner implements Job {
     anomalyFunctionSpecDAO = detectionJobContext.getAnomalyFunctionDAO();
     anomalyFunctionId = detectionJobContext.getAnomalyFunctionId();
 
-    AnomalyFunctionSpec anomalyFunctionSpec = getAnomalyFunctionSpec(anomalyFunctionId);
+    AnomalyFunctionDTO anomalyFunctionSpec = getAnomalyFunctionSpec(anomalyFunctionId);
     detectionJobContext.setAnomalyFunctionSpec(anomalyFunctionSpec);
 
     windowStartTime = detectionJobContext.getWindowStartTime();
@@ -98,7 +96,7 @@ public class DetectionJobRunner implements Job {
   private long createJob() {
     Long jobExecutionId = null;
     try {
-      AnomalyJobSpec anomalyJobSpec = new AnomalyJobSpec();
+      JobDTO anomalyJobSpec = new JobDTO();
       anomalyJobSpec.setJobName(detectionJobContext.getJobName());
       anomalyJobSpec.setWindowStartTime(detectionJobContext.getWindowStartTime().getMillis());
       anomalyJobSpec.setWindowEndTime(detectionJobContext.getWindowEndTime().getMillis());
@@ -128,13 +126,13 @@ public class DetectionJobRunner implements Job {
         } catch (JsonProcessingException e) {
           LOG.error("Exception when converting DetectionTaskInfo {} to jsonString", taskInfo, e);
         }
-        AnomalyTaskSpec anomalyTaskSpec = new AnomalyTaskSpec();
+        TaskDTO anomalyTaskSpec = new TaskDTO();
         anomalyTaskSpec.setTaskType(TaskType.ANOMALY_DETECTION);
         anomalyTaskSpec.setJobName(detectionJobContext.getJobName());
         anomalyTaskSpec.setStatus(TaskStatus.WAITING);
         anomalyTaskSpec.setTaskStartTime(System.currentTimeMillis());
         anomalyTaskSpec.setTaskInfo(taskInfoJson);
-        AnomalyJobSpec anomalyJobSpec = anomalyJobSpecDAO.findById(detectionJobContext.getJobExecutionId());
+        JobDTO anomalyJobSpec = anomalyJobSpecDAO.findById(detectionJobContext.getJobExecutionId());
         anomalyTaskSpec.setJob(anomalyJobSpec);
         long taskId = anomalyTasksSpecDAO.save(anomalyTaskSpec);
         taskIds.add(taskId);
@@ -146,8 +144,8 @@ public class DetectionJobRunner implements Job {
     return taskIds;
   }
 
-  private AnomalyFunctionSpec getAnomalyFunctionSpec(Long anomalyFunctionId) {
-    AnomalyFunctionSpec anomalyFunctionSpec = null;
+  private AnomalyFunctionDTO getAnomalyFunctionSpec(Long anomalyFunctionId) {
+    AnomalyFunctionDTO anomalyFunctionSpec = null;
     try {
       anomalyFunctionSpec = anomalyFunctionSpecDAO.findById(anomalyFunctionId);
     } catch (Exception e)  {

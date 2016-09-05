@@ -63,8 +63,8 @@ import com.linkedin.thirdeye.dashboard.views.heatmap.HeatMapViewResponse;
 import com.linkedin.thirdeye.dashboard.views.tabular.TabularViewHandler;
 import com.linkedin.thirdeye.dashboard.views.tabular.TabularViewRequest;
 import com.linkedin.thirdeye.dashboard.views.tabular.TabularViewResponse;
-import com.linkedin.thirdeye.db.dao.WebappConfigDAO;
-import com.linkedin.thirdeye.db.entity.WebappConfig;
+import com.linkedin.thirdeye.datalayer.bao.WebappConfigManager;
+import com.linkedin.thirdeye.datalayer.dto.WebappConfigDTO;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 @Path(value = "/dashboard")
@@ -85,9 +85,9 @@ public class DashboardResource {
   private LoadingCache<String, Long> collectionMaxDataTimeCache;
   private LoadingCache<String,String> dashboardsCache;
   private LoadingCache<String, String> dimensionFiltersCache;
-  private WebappConfigDAO webappConfigDAO;
+  private WebappConfigManager webappConfigDAO;
 
-  public DashboardResource(WebappConfigDAO webappConfigDAO) {
+  public DashboardResource(WebappConfigManager webappConfigDAO) {
     this.queryCache = CACHE_REGISTRY_INSTANCE.getQueryCache();
     this.collectionsCache = CACHE_REGISTRY_INSTANCE.getCollectionsCache();
     this.collectionSchemaCache = CACHE_REGISTRY_INSTANCE.getCollectionSchemaCache();
@@ -285,10 +285,10 @@ public class DashboardResource {
           metricExpressions.add(new MetricExpression(metric));
         }
       } else {
-        List<WebappConfig> webappConfigs = webappConfigDAO
+        List<WebappConfigDTO> webappConfigs = webappConfigDAO
             .findByCollectionAndType(collection, WebappConfigType.DASHBOARD_CONFIG);
         DashboardConfig dashboardConfig = null;
-        for (WebappConfig webappConfig : webappConfigs) {
+        for (WebappConfigDTO webappConfig : webappConfigs) {
           if (webappConfig.getName().equals(dashboardName)) {
             dashboardConfig = AbstractConfig.fromJSON(webappConfig.getConfig(), DashboardConfig.class);
             break;

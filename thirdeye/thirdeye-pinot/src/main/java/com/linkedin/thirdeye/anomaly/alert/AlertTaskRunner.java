@@ -1,8 +1,5 @@
 package com.linkedin.thirdeye.anomaly.alert;
 
-import com.linkedin.thirdeye.db.dao.AnomalyMergedResultDAO;
-
-import com.linkedin.thirdeye.db.entity.AnomalyMergedResult;
 import java.io.ByteArrayOutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
@@ -37,8 +34,10 @@ import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.client.comparison.TimeOnTimeComparisonHandler;
-import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
-import com.linkedin.thirdeye.db.entity.EmailConfiguration;
+import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
+import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 import freemarker.template.Configuration;
@@ -55,8 +54,8 @@ public class AlertTaskRunner implements TaskRunner {
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE =
       ThirdEyeCacheRegistry.getInstance();
 
-  private AnomalyMergedResultDAO anomalyMergedResultDAO;
-  private EmailConfiguration alertConfig;
+  private MergedAnomalyResultManager anomalyMergedResultDAO;
+  private EmailConfigurationDTO alertConfig;
   private DateTime windowStart;
   private DateTime windowEnd;
   private ThirdEyeAnomalyConfiguration thirdeyeConfig;
@@ -103,7 +102,7 @@ public class AlertTaskRunner implements TaskRunner {
     final String collectionAlias = ThirdEyeUtils.getAliasFromCollection(collection);
 
     // Get the anomalies in that range
-    final List<AnomalyMergedResult> results = anomalyMergedResultDAO.getAllByTimeEmailIdAndNotifiedFalse(windowStart.getMillis(), windowEnd.getMillis(), alertConfig.getId());
+    final List<MergedAnomalyResultDTO> results = anomalyMergedResultDAO.getAllByTimeEmailIdAndNotifiedFalse(windowStart.getMillis(), windowEnd.getMillis(), alertConfig.getId());
 
     if (results.isEmpty() && !alertConfig.getSendZeroAnomalyEmail()) {
       LOG.info("Zero anomalies found, skipping sending email");
@@ -111,8 +110,8 @@ public class AlertTaskRunner implements TaskRunner {
     }
 
     // Group by dimension key, then sort according to anomaly result compareTo method.
-    Map<String, List<AnomalyMergedResult>> groupedResults = new TreeMap<>();
-    for (AnomalyMergedResult result : results) {
+    Map<String, List<MergedAnomalyResultDTO>> groupedResults = new TreeMap<>();
+    for (MergedAnomalyResultDTO result : results) {
       String dimensions = result.getDimensions();
       if (!groupedResults.containsKey(dimensions)) {
         groupedResults.put(dimensions, new ArrayList<>());
@@ -120,11 +119,11 @@ public class AlertTaskRunner implements TaskRunner {
       groupedResults.get(dimensions).add(result);
     }
     // sort each list of anomaly results afterwards and keep track of sequence number in a new list
-    Map<AnomalyMergedResult, String> anomaliesWithLabels = new LinkedHashMap<>();
+    Map<MergedAnomalyResultDTO, String> anomaliesWithLabels = new LinkedHashMap<>();
     int counter = 1;
-    for (List<AnomalyMergedResult> resultsByDimensionKey : groupedResults.values()) {
+    for (List<MergedAnomalyResultDTO> resultsByDimensionKey : groupedResults.values()) {
       Collections.sort(resultsByDimensionKey);
-      for (AnomalyMergedResult result : resultsByDimensionKey) {
+      for (MergedAnomalyResultDTO result : resultsByDimensionKey) {
         anomaliesWithLabels.put(result, String.valueOf(counter));
         counter++;
       }
@@ -146,8 +145,8 @@ public class AlertTaskRunner implements TaskRunner {
     updateNotifiedStatus(results);
   }
 
-  private void sendAlertForAnomalies(String collectionAlias, List<AnomalyMergedResult> results,
-      Map<String, List<AnomalyMergedResult>> groupedResults, List<String> dimensionNames)
+  private void sendAlertForAnomalies(String collectionAlias, List<MergedAnomalyResultDTO> results,
+      Map<String, List<MergedAnomalyResultDTO>> groupedResults, List<String> dimensionNames)
       throws JobExecutionException {
 
     DateTimeZone timeZone = DateTimeZone.forTimeZone(DEFAULT_TIME_ZONE);
@@ -168,7 +167,7 @@ public class AlertTaskRunner implements TaskRunner {
       String filtersJsonEncoded = URLEncoder.encode(filtersJson, "UTF-8");
       String windowUnit = alertConfig.getWindowUnit().toString();
       Set<String> functionTypes = new HashSet<>();
-      for (AnomalyFunctionSpec spec : alertConfig.getFunctions()) {
+      for (AnomalyFunctionDTO spec : alertConfig.getFunctions()) {
         functionTypes.add(spec.getType());
       }
 
@@ -211,8 +210,8 @@ public class AlertTaskRunner implements TaskRunner {
     LOG.info("Sent email with {} anomalies! {}", results.size(), alertConfig);
   }
 
-  private void updateNotifiedStatus(List<AnomalyMergedResult> mergedResults) {
-    for (AnomalyMergedResult mergedResult : mergedResults) {
+  private void updateNotifiedStatus(List<MergedAnomalyResultDTO> mergedResults) {
+    for (MergedAnomalyResultDTO mergedResult : mergedResults) {
       mergedResult.setNotified(true);
       anomalyMergedResultDAO.update(mergedResult);
     }

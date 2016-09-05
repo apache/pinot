@@ -8,16 +8,16 @@ import org.slf4j.LoggerFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.cache.CacheLoader;
 import com.linkedin.thirdeye.dashboard.Utils;
-import com.linkedin.thirdeye.db.dao.WebappConfigDAO;
+import com.linkedin.thirdeye.datalayer.bao.WebappConfigManager;
 
 public class DashboardsCacheLoader extends CacheLoader<String, String> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(DashboardsCacheLoader.class);
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
-  private WebappConfigDAO webappConfigDAO;
+  private WebappConfigManager webappConfigDAO;
 
-  public DashboardsCacheLoader(WebappConfigDAO webappConfigDAO) {
+  public DashboardsCacheLoader(WebappConfigManager webappConfigDAO) {
     this.webappConfigDAO = webappConfigDAO;
   }
 
