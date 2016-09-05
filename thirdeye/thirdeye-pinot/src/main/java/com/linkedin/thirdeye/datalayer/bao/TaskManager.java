@@ -14,14 +14,14 @@ import org.joda.time.DateTime;
 
 public class TaskManager extends AbstractManager<TaskDTO> {
 
-  private static final String FIND_BY_JOB_ID_STATUS_NOT_IN = "SELECT at FROM AnomalyTaskSpec at "
+  private static final String FIND_BY_JOB_ID_STATUS_NOT_IN = "SELECT at FROM TaskDTO at "
       + "WHERE at.job.id = :jobId "
       + "AND at.status != :status";
 
-  private static final String FIND_BY_STATUS_ORDER_BY_CREATE_TIME_ASC = "SELECT at FROM AnomalyTaskSpec at "
+  private static final String FIND_BY_STATUS_ORDER_BY_CREATE_TIME_ASC = "SELECT at FROM TaskDTO at "
       + "WHERE at.status = :status order by at.taskStartTime asc";
 
-  private static final String FIND_BY_STATUS_AND_LAST_MODIFIED_TIME_LT_EXPIRE = "SELECT at FROM AnomalyTaskSpec at "
+  private static final String FIND_BY_STATUS_AND_LAST_MODIFIED_TIME_LT_EXPIRE = "SELECT at FROM TaskDTO at "
       + "WHERE at.status = :status AND at.lastModified < :expireTimestamp";
 
   public TaskManager() {

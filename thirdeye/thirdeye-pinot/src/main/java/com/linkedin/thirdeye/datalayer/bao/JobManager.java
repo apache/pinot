@@ -12,7 +12,7 @@ import org.joda.time.DateTime;
 
 public class JobManager extends AbstractManager<JobDTO> {
 
-  private static final String FIND_BY_STATUS_AND_LAST_MODIFIED_TIME_LT_EXPIRE = "from AnomalyJobSpec aj "
+  private static final String FIND_BY_STATUS_AND_LAST_MODIFIED_TIME_LT_EXPIRE = "from JobDTO aj "
       + "WHERE aj.status = :status AND aj.lastModified < :expireTimestamp";
 
   public JobManager() {

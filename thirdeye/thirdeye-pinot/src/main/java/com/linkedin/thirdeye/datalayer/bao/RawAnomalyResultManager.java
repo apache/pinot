@@ -12,17 +12,17 @@ import javax.persistence.TypedQuery;
 public class RawAnomalyResultManager extends AbstractManager<RawAnomalyResultDTO> {
 
   private static final String FIND_BY_TIME_AND_FUNCTION_ID =
-      "SELECT r FROM AnomalyResult r WHERE r.function.id = :functionId "
+      "SELECT r FROM RawAnomalyResultDTO r WHERE r.function.id = :functionId "
           + "AND ((r.startTimeUtc >= :startTimeUtc AND r.startTimeUtc <= :endTimeUtc) "
           + "OR (r.endTimeUtc >= :startTimeUtc AND r.endTimeUtc <= :endTimeUtc))";
 
   private static final String FIND_BY_TIME_FUNCTION_ID_DIMENSIONS =
-      "SELECT r FROM AnomalyResult r WHERE r.function.id = :functionId and r.dimensions = :dimensions "
+      "SELECT r FROM RawAnomalyResultDTO r WHERE r.function.id = :functionId and r.dimensions = :dimensions "
           + "AND ((r.startTimeUtc >= :startTimeUtc AND r.startTimeUtc <= :endTimeUtc) "
           + "OR (r.endTimeUtc >= :startTimeUtc AND r.endTimeUtc <= :endTimeUtc))";
 
   private static final String COUNT_GROUP_BY_FUNCTION = "select count(r.id) as num, r.function.id,"
-      + "r.function.functionName, r.function.collection, r.function.metric from AnomalyResult r "
+      + "r.function.functionName, r.function.collection, r.function.metric from RawAnomalyResultDTO r "
       + "where r.function.isActive=true "
       + "and ((r.startTimeUtc >= :startTimeUtc and r.startTimeUtc <= :endTimeUtc) "
       + "or (r.endTimeUtc >= :startTimeUtc and r.endTimeUtc <= :endTimeUtc))"
@@ -30,7 +30,7 @@ public class RawAnomalyResultManager extends AbstractManager<RawAnomalyResultDTO
       + "order by r.function.collection, num desc";
 
   private static final String COUNT_GROUP_BY_FUNCTION_DIMENSIONS = "select count(r.id) as num, r.function.id,"
-      + "r.function.functionName, r.function.collection, r.function.metric, r.dimensions from AnomalyResult r "
+      + "r.function.functionName, r.function.collection, r.function.metric, r.dimensions from RawAnomalyResultDTO r "
       + "where r.function.isActive=true "
       + "and ((r.startTimeUtc >= :startTimeUtc and r.startTimeUtc <= :endTimeUtc) "
       + "or (r.endTimeUtc >= :startTimeUtc and r.endTimeUtc <= :endTimeUtc))"
@@ -38,11 +38,11 @@ public class RawAnomalyResultManager extends AbstractManager<RawAnomalyResultDTO
       + "order by r.function.collection, num desc";
 
   private static final String FIND_UNMERGED_BY_COLLECTION_METRIC_DIMENSION =
-      "from AnomalyResult r where r.function.collection = :collection and r.function.metric = :metric "
+      "from RawAnomalyResultDTO r where r.function.collection = :collection and r.function.metric = :metric "
           + "and r.dimensions=:dimensions and r.merged=false and r.dataMissing=:dataMissing";
 
   private static final String FIND_UNMERGED_BY_FUNCTION =
-      "select r from AnomalyResult r where r.function.id = :functionId and r.merged=false "
+      "select r from RawAnomalyResultDTO r where r.function.id = :functionId and r.merged=false "
           + "and r.dataMissing=:dataMissing";
 
   public RawAnomalyResultManager() {

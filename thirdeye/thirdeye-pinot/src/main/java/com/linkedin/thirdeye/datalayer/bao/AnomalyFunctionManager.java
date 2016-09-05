@@ -9,7 +9,7 @@ import java.util.List;
 public class AnomalyFunctionManager extends AbstractManager<AnomalyFunctionDTO> {
 
   private static final String FIND_DISTINCT_METRIC_BY_COLLECTION =
-      "SELECT DISTINCT(af.metric) FROM AnomalyFunctionSpec af WHERE af.collection = :collection";
+      "SELECT DISTINCT(af.metric) FROM AnomalyFunctionDTO af WHERE af.collection = :collection";
 
   public AnomalyFunctionManager() {
     super(AnomalyFunctionDTO.class);

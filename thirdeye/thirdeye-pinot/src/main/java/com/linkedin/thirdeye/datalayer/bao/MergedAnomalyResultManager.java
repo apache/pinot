@@ -10,39 +10,39 @@ import javax.persistence.NoResultException;
 public class MergedAnomalyResultManager extends AbstractManager<MergedAnomalyResultDTO> {
 
   private static final String FIND_BY_COLLECTION_METRIC_DIMENSIONS_ORDER_BY_END_TIME =
-      "from AnomalyMergedResult amr where amr.collection=:collection and amr.metric=:metric "
+      "from MergedAnomalyResultDTO amr where amr.collection=:collection and amr.metric=:metric "
           + "and amr.dimensions=:dimensions order by amr.endTime desc";
 
   // find a conflicting window
   private static final String FIND_BY_COLLECTION_METRIC_DIMENSIONS_TIME =
-      "from AnomalyMergedResult r where r.collection=:collection and r.metric=:metric "
+      "from MergedAnomalyResultDTO r where r.collection=:collection and r.metric=:metric "
           + "and r.dimensions in :dimensions "
           + "and (r.startTime < :endTime and r.endTime > :startTime) "
           + "order by r.endTime desc";
 
   // find a conflicting window
   private static final String FIND_BY_COLLECTION_METRIC_TIME =
-      "from AnomalyMergedResult r where r.collection=:collection and r.metric=:metric "
+      "from MergedAnomalyResultDTO r where r.collection=:collection and r.metric=:metric "
           + "and (r.startTime < :endTime and r.endTime > :startTime) order by r.endTime desc";
 
   // find a conflicting window
   private static final String FIND_BY_COLLECTION_TIME =
-      "from AnomalyMergedResult r where r.collection=:collection "
+      "from MergedAnomalyResultDTO r where r.collection=:collection "
           + "and (r.startTime < :endTime and r.endTime > :startTime) order by r.endTime desc";
 
   private static final String FIND_BY_FUNCTION_AND_DIMENSIONS =
-      "from AnomalyMergedResult amr where amr.function.id=:functionId "
+      "from MergedAnomalyResultDTO amr where amr.function.id=:functionId "
           + "and amr.dimensions=:dimensions order by amr.endTime desc";
 
   private static final String FIND_BY_FUNCTION_AND_NULL_DIMENSION =
-      "from AnomalyMergedResult amr where amr.function.id=:functionId "
+      "from MergedAnomalyResultDTO amr where amr.function.id=:functionId "
           + "and amr.dimensions is null order by amr.endTime desc";
 
   private static final String FIND_BY_TIME =
-      "from AnomalyMergedResult r WHERE (r.startTime < :endTime and r.endTime > :startTime) order by r.endTime desc ";
+      "from MergedAnomalyResultDTO r WHERE (r.startTime < :endTime and r.endTime > :startTime) order by r.endTime desc ";
 
   private static final String FIND_BY_TIME_EMAIL_NOTIFIED_FALSE =
-      "SELECT r FROM EmailConfiguration d JOIN d.functions f, AnomalyMergedResult r "
+      "SELECT r FROM EmailConfiguration d JOIN d.functions f, MergedAnomalyResultDTO r "
           + "WHERE r.function.id=f.id AND d.id = :emailId and r.notified=false "
           + "and (r.startTime < :endTime and r.endTime > :startTime) order by r.endTime desc ";
 

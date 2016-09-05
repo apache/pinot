@@ -3,7 +3,6 @@ package com.linkedin.thirdeye.datalayer.pojo;
 import java.sql.Timestamp;
 import java.util.Objects;
 
-
 import javax.persistence.CascadeType;
 import javax.persistence.Column;
 import javax.persistence.Entity;
@@ -21,17 +20,14 @@ import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
 
 
 /**
- * This class corresponds to anomaly tasks. An execution of an anomaly function creates an anomaly job, which in turn
- * spawns into 1 or more anomaly tasks. The anomaly tasks are picked by the workers
+ * This class corresponds to anomaly tasks. An execution of an anomaly function creates an anomaly
+ * job, which in turn spawns into 1 or more anomaly tasks. The anomaly tasks are picked by the
+ * workers
  */
 @Entity
 @Table(name = "anomaly_tasks")
 
 public class TaskBean extends AbstractBean {
-
-  @ManyToOne(cascade = CascadeType.MERGE, fetch = FetchType.EAGER, optional = true)
-  @JoinColumn(name = "job_id")
-  private JobBean job;
 
   @Enumerated(EnumType.STRING)
   @Column(name = "task_type", nullable = false)
@@ -56,22 +52,13 @@ public class TaskBean extends AbstractBean {
   @Column(name = "task_info", nullable = false)
   private String taskInfo;
 
-  @Column(name = "last_modified", insertable=false, updatable=false,
-      columnDefinition="TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
+  @Column(name = "last_modified", insertable = false, updatable = false,
+      columnDefinition = "TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
   private Timestamp lastModified;
 
   @Version
   @Column(name = "version", columnDefinition = "integer DEFAULT 0", nullable = false)
   private int version;
-
-
-  public JobBean getJob() {
-    return job;
-  }
-
-  public void setJob(JobBean job) {
-    this.job = job;
-  }
 
   public Long getWorkerId() {
     return workerId;
@@ -145,18 +132,20 @@ public class TaskBean extends AbstractBean {
     }
     TaskBean af = (TaskBean) o;
     return Objects.equals(getId(), af.getId()) && Objects.equals(status, af.getStatus())
-        && Objects.equals(taskStartTime, af.getTaskStartTime()) && Objects.equals(taskEndTime, af.getTaskEndTime())
-        && Objects.equals(taskInfo, af.getTaskInfo()) && Objects.equals(job, af.getJob());
+        && Objects.equals(taskStartTime, af.getTaskStartTime())
+        && Objects.equals(taskEndTime, af.getTaskEndTime())
+        && Objects.equals(taskInfo, af.getTaskInfo());
   }
 
-  @Override public int hashCode() {
-    return Objects.hash(getId(), job, status, taskStartTime, taskEndTime, taskInfo);
+  @Override
+  public int hashCode() {
+    return Objects.hash(getId(), status, taskStartTime, taskEndTime, taskInfo);
   }
 
   @Override
   public String toString() {
-    return MoreObjects.toStringHelper(this).add("id", getId()).add("job", getJob())
-        .add("status", status).add("startTime", taskStartTime).add("endTime", taskEndTime)
-        .add("taskInfo", taskInfo).add("lastModified", lastModified).toString();
+    return MoreObjects.toStringHelper(this).add("id", getId()).add("status", status)
+        .add("startTime", taskStartTime).add("endTime", taskEndTime).add("taskInfo", taskInfo)
+        .add("lastModified", lastModified).toString();
   }
 }

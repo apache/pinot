@@ -19,7 +19,7 @@ import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 @Entity
 @Table(name = "anomaly_functions")
-public class AnomalyFunctionBean extends AbstractDTO{
+public class AnomalyFunctionBean extends AbstractBean {
 
   @Column(name = "collection", nullable = false)
   private String collection;
@@ -216,9 +216,8 @@ public class AnomalyFunctionBean extends AbstractDTO{
     return Objects.equals(getId(), af.getId()) && Objects.equals(collection, af.getCollection())
         && Objects.equals(metric, af.getMetric())
         && Objects.equals(metricFunction, af.getMetricFunction())
-        && Objects.equals(type, af.getType())
-        && Objects.equals(isActive, af.getIsActive()) && Objects.equals(cron, af.getCron())
-        && Objects.equals(properties, af.getProperties())
+        && Objects.equals(type, af.getType()) && Objects.equals(isActive, af.getIsActive())
+        && Objects.equals(cron, af.getCron()) && Objects.equals(properties, af.getProperties())
         && Objects.equals(bucketSize, af.getBucketSize())
         && Objects.equals(bucketUnit, af.getBucketUnit())
         && Objects.equals(windowSize, af.getWindowSize())
@@ -231,8 +230,8 @@ public class AnomalyFunctionBean extends AbstractDTO{
 
   @Override
   public int hashCode() {
-    return Objects.hash(getId(), collection, metric, metricFunction, type, isActive, cron, properties,
-        bucketSize, bucketUnit, windowSize, windowUnit, windowDelay, windowDelayUnit,
+    return Objects.hash(getId(), collection, metric, metricFunction, type, isActive, cron,
+        properties, bucketSize, bucketUnit, windowSize, windowUnit, windowDelay, windowDelayUnit,
         exploreDimensions, filters);
   }
 
