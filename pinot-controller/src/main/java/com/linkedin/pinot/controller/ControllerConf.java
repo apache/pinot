@@ -28,6 +28,7 @@ import com.linkedin.pinot.common.utils.StringUtil;
 
 public class ControllerConf extends PropertiesConfiguration {
   private static final String CONTROLLER_VIP_HOST = "controller.vip.host";
+  private static final String CONTROLLER_VIP_PORT = "controller.vip.port";
   private static final String CONTROLLER_VIP_PROTOCOL = "controller.vip.protocol";
   private static final String CONTROLLER_HOST = "controller.host";
   private static final String CONTROLLER_PORT = "controller.port";
@@ -89,6 +90,10 @@ public class ControllerConf extends PropertiesConfiguration {
     setProperty(CONTROLLER_VIP_HOST, vipHost);
   }
 
+  public void setControllerVipPort(String vipPort) {
+    setProperty(CONTROLLER_VIP_PORT, vipPort);
+  }
+
   public void setControllerVipProtocol(String vipProtocol) {
     setProperty(CONTROLLER_VIP_PROTOCOL, vipProtocol);
   }
@@ -133,7 +138,7 @@ public class ControllerConf extends PropertiesConfiguration {
   }
 
   public String generateVipUrl() {
-    return getControllerVipProtocol() + "://" + getControllerVipHost() + ":" + getControllerPort();
+    return getControllerVipProtocol() + "://" + getControllerVipHost() + ":" + getControllerVipPort();
   }
 
   public String getZkStr() {
@@ -164,6 +169,13 @@ public class ControllerConf extends PropertiesConfiguration {
     return (String) getProperty(CONTROLLER_HOST);
   }
 
+  public String getControllerVipPort() {
+    if (containsKey(CONTROLLER_VIP_PORT) && ((String) getProperty(CONTROLLER_VIP_PORT)).length() > 0) {
+      return (String) getProperty(CONTROLLER_VIP_PORT);
+    }
+    return (String) getProperty(CONTROLLER_PORT);
+  }
+  
   public String getControllerVipProtocol() {
     if (containsKey(CONTROLLER_VIP_PROTOCOL) && ((String) getProperty(CONTROLLER_VIP_PROTOCOL)).equals("https")) {
       return "https";
