@@ -46,8 +46,8 @@ public abstract class JobContext {
     return anomalyFunctionDAO;
   }
 
-  public void setAnomalyFunctionDAO(AnomalyFunctionManager anomalyFunctionDAO) {
-    this.anomalyFunctionDAO = anomalyFunctionDAO;
+  public void setAnomalyFunctionDAO(AnomalyFunctionManager anomalyFunctionDAO2) {
+    this.anomalyFunctionDAO = anomalyFunctionDAO2;
   }
 
   public String getJobName() {

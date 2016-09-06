@@ -1,5 +1,10 @@
 package com.linkedin.thirdeye.db.dao;
 
+import java.util.List;
+
+import org.testng.Assert;
+import org.testng.annotations.Test;
+
 import com.linkedin.thirdeye.api.dto.GroupByKey;
 import com.linkedin.thirdeye.api.dto.GroupByRow;
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
@@ -7,10 +12,6 @@ import com.linkedin.thirdeye.constant.FeedbackStatus;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
-
-import java.util.List;
-import org.testng.Assert;
-import org.testng.annotations.Test;
 
 public class TestAnomalyResultDAO extends AbstractDbTestBase {
 

@@ -1,17 +1,18 @@
 package com.linkedin.thirdeye.detector.function;
 
-import com.google.common.base.Joiner;
-import com.linkedin.thirdeye.api.DimensionKey;
-import com.linkedin.thirdeye.api.MetricTimeSeries;
-import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
+
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.google.common.base.Joiner;
+import com.linkedin.thirdeye.api.DimensionKey;
+import com.linkedin.thirdeye.api.MetricTimeSeries;
+import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 
 /**
  * See params for property configuration.

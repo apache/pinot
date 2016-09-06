@@ -10,7 +10,6 @@ import org.joda.time.DateTime;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.client.MetricExpression;
-import com.linkedin.thirdeye.client.MetricFunction;
 import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClient;
 import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewHandler;

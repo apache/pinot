@@ -1,86 +1,27 @@
 package com.linkedin.thirdeye.datalayer.bao;
 
-import com.google.inject.Inject;
-import com.google.inject.Provider;
-import com.google.inject.persist.Transactional;
-import com.linkedin.thirdeye.datalayer.dto.AbstractDTO;
-
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import javax.persistence.EntityManager;
-import javax.persistence.criteria.CriteriaBuilder;
-import javax.persistence.criteria.CriteriaQuery;
-import javax.persistence.criteria.Predicate;
-import javax.persistence.criteria.Root;
+import com.linkedin.thirdeye.datalayer.dto.AbstractDTO;
 
-public class AbstractManager<E extends AbstractDTO> {
 
-  @Inject
-  private Provider<EntityManager> emf;
+public interface AbstractManager<E extends AbstractDTO> {
 
-  final Class<E> entityClass;
+  Long save(E entity);
 
-  AbstractManager(Class<E> entityClass) {
-    this.entityClass = entityClass;
-  }
+  void update(E entity);
 
-  EntityManager getEntityManager() {
-    return emf.get();
-  }
+  void updateAll(List<E> entities);
 
-  @Transactional(rollbackOn = Exception.class)
-  public Long save(E entity) {
-    getEntityManager().persist(entity);
-    return entity.getId();
-  }
+  E findById(Long id);
 
-  @Transactional(rollbackOn = Exception.class)
-  public void update(E entity) {
-    getEntityManager().merge(entity);
-  }
+  void delete(E entity);
 
-  public void updateAll(List<E> entities) {
-    entities.forEach(this::update);
-  }
+  void deleteById(Long id);
 
-  @Transactional
-  public E findById(Long id) {
-    return getEntityManager().find(entityClass, id);
-  }
+  List<E> findAll();
 
-  @Transactional
-  public void delete(E entity) {
-    getEntityManager().remove(entity);
-  }
+  List<E> findByParams(Map<String, Object> filters);
 
-  public void deleteById(Long id) {
-    getEntityManager().remove(findById(id));
-  }
-
-  @Transactional
-  public List<E> findAll() {
-    return getEntityManager().createQuery("from " + entityClass.getSimpleName(), entityClass)
-        .getResultList();
-  }
-
-  @Transactional
-  public List<E> findByParams(Map<String, Object> filters) {
-    CriteriaBuilder builder = getEntityManager().getCriteriaBuilder();
-    CriteriaQuery<E> query = builder.createQuery(entityClass);
-    Root<E> entityRoot = query.from(entityClass);
-    List<Predicate> predicates = new ArrayList<>();
-    for (Map.Entry<String, Object> entry : filters.entrySet()) {
-      if  (entry.getValue() == null ) {
-        predicates.add(builder.isNull(entityRoot.get(entry.getKey())));
-      } else {
-        predicates.add(builder.equal(entityRoot.get(entry.getKey()), entry.getValue()));
-      }
-    }
-    if (predicates.size() > 0) {
-      query.where(predicates.toArray(new Predicate[0]));
-    }
-    return getEntityManager().createQuery(query).getResultList();
-  }
 }

@@ -1,8 +1,5 @@
 package com.linkedin.thirdeye.anomaly.detection;
 
-import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-
 import java.util.List;
 
 import javax.ws.rs.DELETE;
@@ -20,6 +17,9 @@ import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
 import org.joda.time.format.ISODateTimeFormat;
 import org.quartz.SchedulerException;
+
+import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 
 @Path("/detection-job")
 @Produces(MediaType.APPLICATION_JSON)

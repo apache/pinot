@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.client.timeseries;
 
-import com.linkedin.thirdeye.constant.MetricAggFunction;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
@@ -16,6 +15,7 @@ import com.linkedin.thirdeye.client.MetricFunction;
 import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClient;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesRow.TimeSeriesMetric;
+import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.dashboard.Utils;
 
 /** Manual test for verifying code works as expected (ie without exceptions thrown) */

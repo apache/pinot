@@ -1,5 +1,11 @@
 package com.linkedin.thirdeye.db.dao;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import org.testng.Assert;
+import org.testng.annotations.Test;
+
 import com.linkedin.thirdeye.anomaly.merge.AnomalyMergeConfig;
 import com.linkedin.thirdeye.anomaly.merge.AnomalyTimeBasedSummarizer;
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
@@ -8,11 +14,6 @@ import com.linkedin.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
-
-import java.util.ArrayList;
-import java.util.List;
-import org.testng.Assert;
-import org.testng.annotations.Test;
 
 public class TestAnomalyMergedResultDAO extends AbstractDbTestBase {
   MergedAnomalyResultDTO mergedResult = null;

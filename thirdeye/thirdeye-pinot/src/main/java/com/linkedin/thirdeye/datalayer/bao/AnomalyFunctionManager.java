@@ -1,33 +1,16 @@
 package com.linkedin.thirdeye.datalayer.bao;
 
-import com.google.common.collect.ImmutableMap;
-import com.google.inject.persist.Transactional;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-
 import java.util.List;
 
-public class AnomalyFunctionManager extends AbstractManager<AnomalyFunctionDTO> {
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 
-  private static final String FIND_DISTINCT_METRIC_BY_COLLECTION =
-      "SELECT DISTINCT(af.metric) FROM AnomalyFunctionDTO af WHERE af.collection = :collection";
 
-  public AnomalyFunctionManager() {
-    super(AnomalyFunctionDTO.class);
-  }
+public interface AnomalyFunctionManager extends AbstractManager<AnomalyFunctionDTO> {
 
-  @Transactional
-  public List<AnomalyFunctionDTO> findAllByCollection(String collection) {
-    return super.findByParams(ImmutableMap.of("collection", collection));
-  }
+  List<AnomalyFunctionDTO> findAllByCollection(String collection);
 
-  @Transactional
-  public List<String> findDistinctMetricsByCollection(String collection) {
-    return getEntityManager().createQuery(FIND_DISTINCT_METRIC_BY_COLLECTION, String.class)
-        .setParameter("collection", collection).getResultList();
-  }
+  List<String> findDistinctMetricsByCollection(String collection);
 
-  @Transactional
-  public List<AnomalyFunctionDTO> findAllActiveFunctions() {
-    return super.findByParams(ImmutableMap.of("isActive", true));
-  }
+  List<AnomalyFunctionDTO> findAllActiveFunctions();
+
 }

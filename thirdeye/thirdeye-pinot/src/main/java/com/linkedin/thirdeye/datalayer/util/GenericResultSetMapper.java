@@ -1,9 +1,5 @@
 package com.linkedin.thirdeye.datalayer.util;
 
-import com.google.common.collect.BiMap;
-import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
-import com.linkedin.thirdeye.datalayer.entity.AbstractJsonEntity;
-
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -20,11 +16,16 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+
 import org.codehaus.jackson.map.ObjectMapper;
 import org.codehaus.jackson.node.ObjectNode;
 import org.modelmapper.ModelMapper;
 import org.modelmapper.config.Configuration.AccessLevel;
 import org.modelmapper.convention.NameTokenizers;
+
+import com.google.common.collect.BiMap;
+import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
+import com.linkedin.thirdeye.datalayer.entity.AbstractJsonEntity;
 
 public class GenericResultSetMapper {
 

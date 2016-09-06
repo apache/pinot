@@ -1,26 +1,26 @@
 package com.linkedin.thirdeye.anomaly;
 
-import com.linkedin.thirdeye.anomaly.merge.AnomalyMergeExecutor;
-import io.dropwizard.assets.AssetsBundle;
-import io.dropwizard.lifecycle.Managed;
-import io.dropwizard.setup.Bootstrap;
-import io.dropwizard.setup.Environment;
-
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 
 import com.linkedin.thirdeye.anomaly.alert.AlertJobResource;
 import com.linkedin.thirdeye.anomaly.alert.AlertJobScheduler;
 import com.linkedin.thirdeye.anomaly.detection.DetectionJobResource;
 import com.linkedin.thirdeye.anomaly.detection.DetectionJobScheduler;
+import com.linkedin.thirdeye.anomaly.merge.AnomalyMergeExecutor;
 import com.linkedin.thirdeye.anomaly.monitor.MonitorJobScheduler;
 import com.linkedin.thirdeye.anomaly.task.TaskDriver;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
+
+import io.dropwizard.assets.AssetsBundle;
+import io.dropwizard.lifecycle.Managed;
+import io.dropwizard.setup.Bootstrap;
+import io.dropwizard.setup.Environment;
 
 public class ThirdEyeAnomalyApplication
     extends BaseThirdEyeApplication<ThirdEyeAnomalyConfiguration> {

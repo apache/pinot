@@ -1,5 +1,10 @@
 package com.linkedin.thirdeye.client.comparison;
 
+import static com.linkedin.thirdeye.client.comparison.TimeOnTimeConstants.ALL_BASELINE;
+import static com.linkedin.thirdeye.client.comparison.TimeOnTimeConstants.ALL_CURRENT;
+import static com.linkedin.thirdeye.client.comparison.TimeOnTimeConstants.DIMENSION_BASELINE;
+import static com.linkedin.thirdeye.client.comparison.TimeOnTimeConstants.DIMENSION_CURRENT;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -10,8 +15,6 @@ import com.linkedin.thirdeye.client.MetricFunction;
 import com.linkedin.thirdeye.client.ThirdEyeRequest;
 import com.linkedin.thirdeye.client.ThirdEyeRequest.ThirdEyeRequestBuilder;
 import com.linkedin.thirdeye.dashboard.Utils;
-
-import static com.linkedin.thirdeye.client.comparison.TimeOnTimeConstants.*;
 
 public class ThirdEyeRequestGenerator {
 

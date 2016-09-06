@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.client.timeseries;
 
-import com.linkedin.thirdeye.constant.MetricAggFunction;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -21,6 +20,7 @@ import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.client.MetricFunction;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesRow.Builder;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesRow.TimeSeriesMetric;
+import com.linkedin.thirdeye.constant.MetricAggFunction;
 
 public class TestTimeSeriesResponseUtils {
   private static final TimeSeriesResponseConverter converter =

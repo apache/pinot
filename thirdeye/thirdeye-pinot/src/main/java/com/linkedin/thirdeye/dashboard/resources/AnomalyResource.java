@@ -1,10 +1,5 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
-import com.linkedin.thirdeye.constant.FeedbackStatus;
-import com.linkedin.thirdeye.constant.MetricAggFunction;
-
 import java.io.IOException;
 import java.net.URLDecoder;
 import java.util.ArrayList;
@@ -25,9 +20,6 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
-import jersey.repackaged.com.google.common.base.Joiner;
-import jersey.repackaged.com.google.common.collect.Lists;
-
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.client.ClientProtocolException;
 import org.joda.time.DateTime;
@@ -36,12 +28,16 @@ import org.quartz.CronExpression;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.anomaly.utils.AlertResourceHttpUtils;
 import com.linkedin.thirdeye.anomaly.utils.DetectionResourceHttpUtils;
 import com.linkedin.thirdeye.api.CollectionSchema;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
+import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
+import com.linkedin.thirdeye.constant.FeedbackStatus;
+import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.dashboard.ThirdEyeDashboardConfiguration;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.EmailConfigurationManager;
@@ -53,6 +49,9 @@ import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
+
+import jersey.repackaged.com.google.common.base.Joiner;
+import jersey.repackaged.com.google.common.collect.Lists;
 
 @Path(value = "/dashboard")
 @Produces(MediaType.APPLICATION_JSON)

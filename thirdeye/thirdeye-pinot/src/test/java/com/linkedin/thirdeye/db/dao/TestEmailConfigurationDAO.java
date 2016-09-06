@@ -1,13 +1,16 @@
 package com.linkedin.thirdeye.db.dao;
 
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
+
 import java.util.ArrayList;
 import java.util.List;
+
 import org.testng.annotations.Test;
 
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
-
-import static org.testng.Assert.*;
 
 public class TestEmailConfigurationDAO extends AbstractDbTestBase {
 

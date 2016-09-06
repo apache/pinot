@@ -1,5 +1,20 @@
 package com.linkedin.thirdeye.anomaly.merge;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+
+import javax.persistence.PersistenceException;
+
+import org.apache.commons.lang3.StringUtils;
+import org.joda.time.DateTime;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.client.MetricExpression;
 import com.linkedin.thirdeye.client.MetricFunction;
@@ -18,18 +33,6 @@ import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionUtils;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-import javax.persistence.PersistenceException;
-import org.apache.commons.lang3.StringUtils;
-import org.joda.time.DateTime;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * finds raw anomalies grouped by a strategy and merges them with an existing (in the same group) or

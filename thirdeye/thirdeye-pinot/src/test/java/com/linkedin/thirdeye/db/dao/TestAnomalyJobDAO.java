@@ -1,12 +1,12 @@
 package com.linkedin.thirdeye.db.dao;
 
-import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
-import com.linkedin.thirdeye.datalayer.dto.JobDTO;
-
 import java.util.List;
 
 import org.testng.Assert;
 import org.testng.annotations.Test;
+
+import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
+import com.linkedin.thirdeye.datalayer.dto.JobDTO;
 
 public class TestAnomalyJobDAO extends AbstractDbTestBase {
 

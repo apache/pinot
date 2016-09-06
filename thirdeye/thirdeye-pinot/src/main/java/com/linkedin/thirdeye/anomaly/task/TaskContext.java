@@ -45,8 +45,8 @@ public class TaskContext {
     return resultDAO;
   }
 
-  public void setResultDAO(RawAnomalyResultManager resultDAO) {
-    this.resultDAO = resultDAO;
+  public void setResultDAO(RawAnomalyResultManager anomalyResultDAO) {
+    this.resultDAO = anomalyResultDAO;
   }
 
   public AnomalyFunctionFactory getAnomalyFunctionFactory() {

@@ -1,8 +1,5 @@
 package com.linkedin.thirdeye.datalayer.pojo;
 
-import com.linkedin.thirdeye.constant.MetricAggFunction;
-import com.linkedin.thirdeye.datalayer.dto.AbstractDTO;
-
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
@@ -15,6 +12,7 @@ import javax.persistence.Table;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.base.MoreObjects;
 import com.google.common.collect.Multimap;
+import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 @Entity

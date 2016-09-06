@@ -1,8 +1,5 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
-import com.linkedin.thirdeye.constant.MetricAggFunction;
-import com.linkedin.thirdeye.dashboard.ThirdEyeDashboardConfiguration;
-import com.linkedin.thirdeye.detector.function.AnomalyFunction;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -11,13 +8,19 @@ import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
+
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
+
 import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.linkedin.thirdeye.constant.MetricAggFunction;
+import com.linkedin.thirdeye.dashboard.ThirdEyeDashboardConfiguration;
+import com.linkedin.thirdeye.detector.function.AnomalyFunction;
 
 @Path("thirdeye/function")
 @Produces(MediaType.APPLICATION_JSON)

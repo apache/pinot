@@ -17,9 +17,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.thirdeye.api.CollectionSchema;
 import com.linkedin.thirdeye.dashboard.configs.AbstractConfig;
-import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
 import com.linkedin.thirdeye.dashboard.configs.WebappConfigFactory;
 import com.linkedin.thirdeye.dashboard.configs.WebappConfigFactory.WebappConfigType;
 import com.linkedin.thirdeye.datalayer.bao.WebappConfigManager;

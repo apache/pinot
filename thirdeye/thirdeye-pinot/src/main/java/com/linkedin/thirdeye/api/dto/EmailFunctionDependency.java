@@ -1,8 +1,9 @@
 package com.linkedin.thirdeye.api.dto;
 
+import java.util.Objects;
+
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.google.common.base.MoreObjects;
-import java.util.Objects;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class EmailFunctionDependency {

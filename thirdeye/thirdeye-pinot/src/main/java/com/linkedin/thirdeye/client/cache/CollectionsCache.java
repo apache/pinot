@@ -6,8 +6,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
-import jersey.repackaged.com.google.common.collect.Lists;
-
 import org.apache.http.HttpHost;
 import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.methods.CloseableHttpResponse;
@@ -24,6 +22,8 @@ import com.linkedin.thirdeye.api.CollectionSchema;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClientConfig;
 import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
+
+import jersey.repackaged.com.google.common.collect.Lists;
 
 public class CollectionsCache {
 

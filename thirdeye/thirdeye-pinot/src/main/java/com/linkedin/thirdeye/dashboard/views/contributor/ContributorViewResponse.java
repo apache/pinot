@@ -2,7 +2,6 @@ package com.linkedin.thirdeye.dashboard.views.contributor;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import com.linkedin.thirdeye.dashboard.views.GenericResponse;
 import com.linkedin.thirdeye.dashboard.views.TimeBucket;

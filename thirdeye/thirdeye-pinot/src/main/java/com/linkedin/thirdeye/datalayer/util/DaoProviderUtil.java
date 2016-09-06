@@ -1,5 +1,12 @@
 package com.linkedin.thirdeye.datalayer.util;
 
+import java.io.File;
+import java.sql.Connection;
+
+import javax.validation.Validation;
+
+import org.apache.tomcat.jdbc.pool.DataSource;
+
 import com.google.common.base.CaseFormat;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
@@ -18,10 +25,6 @@ import com.linkedin.thirdeye.datalayer.entity.WebappConfig;
 
 import io.dropwizard.configuration.ConfigurationFactory;
 import io.dropwizard.jackson.Jackson;
-import java.io.File;
-import java.sql.Connection;
-import javax.validation.Validation;
-import org.apache.tomcat.jdbc.pool.DataSource;
 
 public abstract class DaoProviderUtil {
 

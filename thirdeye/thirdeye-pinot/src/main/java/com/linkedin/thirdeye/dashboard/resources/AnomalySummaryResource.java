@@ -1,5 +1,17 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
+import java.util.List;
+
+import javax.ws.rs.GET;
+import javax.ws.rs.POST;
+import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
+import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.MediaType;
+
+import org.apache.commons.lang3.StringUtils;
+
 import com.linkedin.thirdeye.anomaly.merge.AnomalyMergeConfig;
 import com.linkedin.thirdeye.anomaly.merge.AnomalyTimeBasedSummarizer;
 import com.linkedin.thirdeye.api.dto.GroupByKey;
@@ -8,16 +20,6 @@ import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
-
-import java.util.List;
-import javax.ws.rs.GET;
-import javax.ws.rs.POST;
-import javax.ws.rs.Path;
-import javax.ws.rs.PathParam;
-import javax.ws.rs.Produces;
-import javax.ws.rs.QueryParam;
-import javax.ws.rs.core.MediaType;
-import org.apache.commons.lang3.StringUtils;
 
 @Path("thirdeye/anomaly")
 @Produces(MediaType.APPLICATION_JSON)

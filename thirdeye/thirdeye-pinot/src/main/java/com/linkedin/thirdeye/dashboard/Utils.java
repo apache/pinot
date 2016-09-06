@@ -1,7 +1,5 @@
 package com.linkedin.thirdeye.dashboard;
 
-import com.linkedin.thirdeye.constant.MetricAggFunction;
-
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -32,6 +30,7 @@ import com.linkedin.thirdeye.client.ThirdEyeRequest;
 import com.linkedin.thirdeye.client.ThirdEyeRequest.ThirdEyeRequestBuilder;
 import com.linkedin.thirdeye.client.ThirdEyeResponse;
 import com.linkedin.thirdeye.client.cache.QueryCache;
+import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.dashboard.configs.AbstractConfig;
 import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
 import com.linkedin.thirdeye.dashboard.configs.DashboardConfig;

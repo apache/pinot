@@ -8,13 +8,13 @@ import org.slf4j.LoggerFactory;
 import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
 import com.linkedin.thirdeye.anomaly.monitor.MonitorConstants.MonitorType;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
-import com.linkedin.thirdeye.datalayer.bao.JobManager;
-import com.linkedin.thirdeye.datalayer.bao.TaskManager;
-import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
 import com.linkedin.thirdeye.anomaly.task.TaskContext;
 import com.linkedin.thirdeye.anomaly.task.TaskInfo;
 import com.linkedin.thirdeye.anomaly.task.TaskResult;
 import com.linkedin.thirdeye.anomaly.task.TaskRunner;
+import com.linkedin.thirdeye.datalayer.bao.JobManager;
+import com.linkedin.thirdeye.datalayer.bao.TaskManager;
+import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
 
 public class MonitorTaskRunner implements TaskRunner {
 

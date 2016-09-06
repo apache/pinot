@@ -1,11 +1,12 @@
 package com.linkedin.thirdeye.db.dao;
 
-import com.linkedin.thirdeye.constant.MetricAggFunction;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-
 import java.util.List;
+
 import org.testng.Assert;
 import org.testng.annotations.Test;
+
+import com.linkedin.thirdeye.constant.MetricAggFunction;
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 
 public class TestAnomalyFunctionDAO extends AbstractDbTestBase {
 

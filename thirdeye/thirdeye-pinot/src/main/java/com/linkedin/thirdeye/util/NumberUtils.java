@@ -1,10 +1,10 @@
 package com.linkedin.thirdeye.util;
 
-import com.linkedin.thirdeye.api.MetricType;
-
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+
+import com.linkedin.thirdeye.api.MetricType;
 
 /**
  * Helper class to convert to and from Number data type. - supports arithmetic

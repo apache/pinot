@@ -1,5 +1,15 @@
 package com.linkedin.thirdeye.common.persistence;
 
+import java.io.File;
+import java.util.Map.Entry;
+import java.util.Properties;
+
+import javax.validation.Validation;
+
+import org.apache.tomcat.jdbc.pool.DataSource;
+import org.hibernate.cfg.Environment;
+import org.hibernate.engine.jdbc.connections.internal.DatasourceConnectionProviderImpl;
+
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.persist.PersistService;
@@ -7,15 +17,6 @@ import com.google.inject.persist.jpa.JpaPersistModule;
 
 import io.dropwizard.configuration.ConfigurationFactory;
 import io.dropwizard.jackson.Jackson;
-
-import java.io.File;
-import java.util.Map.Entry;
-import java.util.Properties;
-
-import javax.validation.Validation;
-import org.apache.tomcat.jdbc.pool.DataSource;
-import org.hibernate.cfg.Environment;
-import org.hibernate.engine.jdbc.connections.internal.DatasourceConnectionProviderImpl;
 
 public abstract class PersistenceUtil {
 

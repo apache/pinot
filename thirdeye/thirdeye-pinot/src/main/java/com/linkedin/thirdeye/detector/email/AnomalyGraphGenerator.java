@@ -37,8 +37,8 @@ import org.slf4j.LoggerFactory;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.client.comparison.Row;
 import com.linkedin.thirdeye.client.comparison.Row.Metric;
-import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.client.comparison.TimeOnTimeComparisonResponse;
+import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 
 /** Creates JFreeChart images from Thirdeye Data. */
 public class AnomalyGraphGenerator {

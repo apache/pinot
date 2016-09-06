@@ -1,7 +1,5 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
-import io.dropwizard.views.View;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URLDecoder;
@@ -66,6 +64,8 @@ import com.linkedin.thirdeye.dashboard.views.tabular.TabularViewResponse;
 import com.linkedin.thirdeye.datalayer.bao.WebappConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.WebappConfigDTO;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
+
+import io.dropwizard.views.View;
 
 @Path(value = "/dashboard")
 // @Produces(MediaType.APPLICATION_JSON)

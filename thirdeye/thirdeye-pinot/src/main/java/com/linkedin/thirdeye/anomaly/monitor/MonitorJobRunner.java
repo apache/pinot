@@ -13,11 +13,11 @@ import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
 import com.linkedin.thirdeye.anomaly.job.JobRunner;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
+import com.linkedin.thirdeye.anomaly.task.TaskGenerator;
 import com.linkedin.thirdeye.datalayer.bao.JobManager;
 import com.linkedin.thirdeye.datalayer.bao.TaskManager;
 import com.linkedin.thirdeye.datalayer.dto.JobDTO;
 import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
-import com.linkedin.thirdeye.anomaly.task.TaskGenerator;
 
 public class MonitorJobRunner implements JobRunner {
 

@@ -15,11 +15,11 @@ import com.linkedin.thirdeye.anomaly.detection.DetectionJobContext;
 import com.linkedin.thirdeye.anomaly.detection.DetectionTaskInfo;
 import com.linkedin.thirdeye.anomaly.monitor.MonitorConfiguration;
 import com.linkedin.thirdeye.anomaly.monitor.MonitorConstants.MonitorType;
+import com.linkedin.thirdeye.anomaly.monitor.MonitorJobContext;
+import com.linkedin.thirdeye.anomaly.monitor.MonitorTaskInfo;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
 import com.linkedin.thirdeye.datalayer.dto.JobDTO;
-import com.linkedin.thirdeye.anomaly.monitor.MonitorJobContext;
-import com.linkedin.thirdeye.anomaly.monitor.MonitorTaskInfo;
 
 /**
  * Generates tasks for a job depending on the task type

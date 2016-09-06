@@ -1,5 +1,26 @@
 package com.linkedin.thirdeye.db.dao;
 
+import java.io.File;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.Statement;
+import java.util.HashSet;
+import java.util.Properties;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
+
+import javax.persistence.EntityManager;
+
+import org.apache.tomcat.jdbc.pool.DataSource;
+import org.hibernate.cfg.Environment;
+import org.hibernate.engine.jdbc.connections.internal.DatasourceConnectionProviderImpl;
+import org.hibernate.internal.SessionImpl;
+import org.joda.time.DateTime;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
+
 import com.linkedin.thirdeye.anomaly.job.JobConstants;
 import com.linkedin.thirdeye.common.persistence.PersistenceConfig;
 import com.linkedin.thirdeye.common.persistence.PersistenceUtil;
@@ -11,30 +32,17 @@ import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.TaskManager;
 import com.linkedin.thirdeye.datalayer.bao.WebappConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.hibernate.AnomalyFunctionManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.hibernate.EmailConfigurationManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.hibernate.JobManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.hibernate.MergedAnomalyResultManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.hibernate.RawAnomalyResultManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.hibernate.TaskManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.hibernate.WebappConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
 import com.linkedin.thirdeye.datalayer.dto.JobDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
-
-import java.io.File;
-import java.net.URISyntaxException;
-import java.net.URL;
-
-import java.sql.Connection;
-import java.sql.ResultSet;
-import java.sql.Statement;
-import java.util.HashSet;
-import java.util.Properties;
-import java.util.Set;
-import java.util.concurrent.TimeUnit;
-import javax.persistence.EntityManager;
-import org.apache.tomcat.jdbc.pool.DataSource;
-import org.hibernate.cfg.Environment;
-import org.hibernate.engine.jdbc.connections.internal.DatasourceConnectionProviderImpl;
-import org.hibernate.internal.SessionImpl;
-import org.joda.time.DateTime;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
 
 public abstract class AbstractDbTestBase {
   protected AnomalyFunctionManager anomalyFunctionDAO;
@@ -85,13 +93,13 @@ public abstract class AbstractDbTestBase {
 
     PersistenceUtil.init(properties);
 
-    anomalyFunctionDAO = PersistenceUtil.getInstance(AnomalyFunctionManager.class);
-    anomalyResultDAO = PersistenceUtil.getInstance(RawAnomalyResultManager.class);
-    anomalyJobDAO = PersistenceUtil.getInstance(JobManager.class);
-    anomalyTaskDAO = PersistenceUtil.getInstance(TaskManager.class);
-    emailConfigurationDAO = PersistenceUtil.getInstance(EmailConfigurationManager.class);
-    mergedResultDAO = PersistenceUtil.getInstance(MergedAnomalyResultManager.class);
-    webappConfigDAO = PersistenceUtil.getInstance(WebappConfigManager.class);
+    anomalyFunctionDAO = PersistenceUtil.getInstance(AnomalyFunctionManagerImpl.class);
+    anomalyResultDAO = PersistenceUtil.getInstance(RawAnomalyResultManagerImpl.class);
+    anomalyJobDAO = PersistenceUtil.getInstance(JobManagerImpl.class);
+    anomalyTaskDAO = PersistenceUtil.getInstance(TaskManagerImpl.class);
+    emailConfigurationDAO = PersistenceUtil.getInstance(EmailConfigurationManagerImpl.class);
+    mergedResultDAO = PersistenceUtil.getInstance(MergedAnomalyResultManagerImpl.class);
+    webappConfigDAO = PersistenceUtil.getInstance(WebappConfigManagerImpl.class);
     entityManager = PersistenceUtil.getInstance(EntityManager.class);
   }
 

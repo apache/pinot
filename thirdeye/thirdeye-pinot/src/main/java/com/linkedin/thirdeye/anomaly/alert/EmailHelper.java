@@ -1,5 +1,16 @@
 package com.linkedin.thirdeye.anomaly.alert;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+
+import org.jfree.chart.JFreeChart;
+import org.joda.time.DateTime;
+import org.quartz.JobExecutionException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.client.MetricExpression;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
@@ -9,15 +20,6 @@ import com.linkedin.thirdeye.client.comparison.TimeOnTimeComparisonResponse;
 import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.detector.email.AnomalyGraphGenerator;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
-import org.jfree.chart.JFreeChart;
-import org.joda.time.DateTime;
-import org.quartz.JobExecutionException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public abstract class EmailHelper {
 

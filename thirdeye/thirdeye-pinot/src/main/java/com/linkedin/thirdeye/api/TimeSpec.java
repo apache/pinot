@@ -1,8 +1,8 @@
 package com.linkedin.thirdeye.api;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-
 import java.util.concurrent.TimeUnit;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 public class TimeSpec {
   private static final TimeGranularity DEFAULT_TIME_GRANULARITY= new TimeGranularity(1, TimeUnit.DAYS);

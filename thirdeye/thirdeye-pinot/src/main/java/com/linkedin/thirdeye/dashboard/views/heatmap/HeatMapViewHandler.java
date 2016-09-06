@@ -12,8 +12,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
-import jersey.repackaged.com.google.common.collect.Lists;
-
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,6 +33,8 @@ import com.linkedin.thirdeye.dashboard.views.GenericResponse;
 import com.linkedin.thirdeye.dashboard.views.GenericResponse.Info;
 import com.linkedin.thirdeye.dashboard.views.GenericResponse.ResponseSchema;
 import com.linkedin.thirdeye.dashboard.views.ViewHandler;
+
+import jersey.repackaged.com.google.common.collect.Lists;
 
 public class HeatMapViewHandler implements ViewHandler<HeatMapViewRequest, HeatMapViewResponse> {
 

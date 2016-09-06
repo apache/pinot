@@ -1,8 +1,5 @@
 package com.linkedin.thirdeye.anomaly.alert;
 
-import com.linkedin.thirdeye.datalayer.bao.EmailConfigurationManager;
-import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
-
 import java.util.List;
 
 import javax.ws.rs.DELETE;
@@ -20,6 +17,9 @@ import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
 import org.joda.time.format.ISODateTimeFormat;
 import org.quartz.SchedulerException;
+
+import com.linkedin.thirdeye.datalayer.bao.EmailConfigurationManager;
+import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
 
 @Path("/alert-job")
 @Produces(MediaType.APPLICATION_JSON)

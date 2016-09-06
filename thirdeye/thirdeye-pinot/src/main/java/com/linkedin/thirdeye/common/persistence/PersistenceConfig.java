@@ -1,10 +1,12 @@
 package com.linkedin.thirdeye.common.persistence;
 
+import java.util.Map;
+
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.Maps;
+
 import io.dropwizard.Configuration;
-import java.util.Map;
 
 public class PersistenceConfig extends Configuration {
 

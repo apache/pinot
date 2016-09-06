@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.datalayer.dto;
 import javax.persistence.Entity;
 import javax.persistence.Table;
 import javax.persistence.UniqueConstraint;
+
 import com.linkedin.thirdeye.datalayer.pojo.WebappConfigBean;
 
 /**

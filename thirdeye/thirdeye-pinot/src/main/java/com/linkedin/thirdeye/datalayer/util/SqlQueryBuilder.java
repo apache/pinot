@@ -1,8 +1,5 @@
 package com.linkedin.thirdeye.datalayer.util;
 
-import com.google.common.collect.BiMap;
-import com.google.common.collect.Sets;
-import com.linkedin.thirdeye.datalayer.entity.AbstractJsonEntity;
 import java.sql.Clob;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -17,6 +14,10 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import com.google.common.collect.BiMap;
+import com.google.common.collect.Sets;
+import com.linkedin.thirdeye.datalayer.entity.AbstractJsonEntity;
 
 public class SqlQueryBuilder {
 
