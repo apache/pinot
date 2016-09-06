@@ -7,7 +7,6 @@ import org.joda.time.DateTime;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.client.MetricExpression;
-import com.linkedin.thirdeye.client.MetricFunction;
 
 public class CompareViewRequest implements ViewRequest {
 

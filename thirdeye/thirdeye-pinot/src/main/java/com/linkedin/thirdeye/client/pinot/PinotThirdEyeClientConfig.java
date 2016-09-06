@@ -2,13 +2,11 @@ package com.linkedin.thirdeye.client.pinot;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.IOException;
 
 import com.fasterxml.jackson.dataformat.yaml.snakeyaml.Yaml;
 import com.fasterxml.jackson.dataformat.yaml.snakeyaml.constructor.Constructor;
 import com.google.common.base.MoreObjects;
 import com.google.common.base.MoreObjects.ToStringHelper;
-import com.google.common.base.Objects;
 import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
 
 public class PinotThirdEyeClientConfig {

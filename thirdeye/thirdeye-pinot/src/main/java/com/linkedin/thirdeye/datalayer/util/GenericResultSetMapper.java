@@ -1,8 +1,5 @@
 package com.linkedin.thirdeye.datalayer.util;
 
-import com.google.common.collect.BiMap;
-import com.linkedin.thirdeye.datalayer.entity.AbstractJsonEntity;
-import com.linkedin.thirdeye.db.entity.AnomalyTaskSpec;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -19,11 +16,16 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+
 import org.codehaus.jackson.map.ObjectMapper;
 import org.codehaus.jackson.node.ObjectNode;
 import org.modelmapper.ModelMapper;
 import org.modelmapper.config.Configuration.AccessLevel;
 import org.modelmapper.convention.NameTokenizers;
+
+import com.google.common.collect.BiMap;
+import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
+import com.linkedin.thirdeye.datalayer.entity.AbstractJsonEntity;
 
 public class GenericResultSetMapper {
 
@@ -182,14 +184,14 @@ public class GenericResultSetMapper {
     result.put("lastModified", "2016-08-24 17:25:53.258");
     result.put("status", "RUNNING");
     result.put("lastModified", "2016-08-24 17:25:53.258");
-    AnomalyTaskSpec taskSpec1 = mapper.map(result, AnomalyTaskSpec.class);
+    TaskDTO taskSpec1 = mapper.map(result, TaskDTO.class);
     System.out.println(taskSpec1);
 
     //INPUT 2
     ObjectInputStream ois =
         new ObjectInputStream(new FileInputStream(new File("/tmp/map.out.1472093046128")));
     Map<String, Object> inputMap = (Map<String, Object>) ois.readObject();
-    AnomalyTaskSpec taskSpec2 = mapper.map(inputMap, AnomalyTaskSpec.class);
+    TaskDTO taskSpec2 = mapper.map(inputMap, TaskDTO.class);
     System.out.println(taskSpec2);
   }
 }

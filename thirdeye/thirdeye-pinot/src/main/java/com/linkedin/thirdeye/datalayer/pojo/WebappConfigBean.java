@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.db.entity;
+package com.linkedin.thirdeye.datalayer.pojo;
 
 import java.util.Objects;
 
@@ -17,8 +17,8 @@ import com.linkedin.thirdeye.dashboard.configs.WebappConfigFactory.WebappConfigT
  */
 @Entity
 @Table(name = "webapp_config",
-  uniqueConstraints = {@UniqueConstraint(columnNames={"name", "collection", "type"})})
-public class WebappConfig  extends AbstractBaseEntity {
+    uniqueConstraints = {@UniqueConstraint(columnNames = {"name", "collection", "type"})})
+public class WebappConfigBean extends AbstractBean {
 
   @Column(name = "name", nullable = false)
   private String name;
@@ -67,29 +67,25 @@ public class WebappConfig  extends AbstractBaseEntity {
 
   @Override
   public boolean equals(Object o) {
-    if (!(o instanceof WebappConfig)) {
+    if (!(o instanceof WebappConfigBean)) {
       return false;
     }
-    WebappConfig wc = (WebappConfig) o;
-    return Objects.equals(getId(), wc.getId())
-        && Objects.equals(name, wc.getName())
-        && Objects.equals(collection, wc.getCollection())
-        && Objects.equals(type, wc.getType())
+    WebappConfigBean wc = (WebappConfigBean) o;
+    return Objects.equals(getId(), wc.getId()) && Objects.equals(name, wc.getName())
+        && Objects.equals(collection, wc.getCollection()) && Objects.equals(type, wc.getType())
         && Objects.equals(config, wc.getConfig());
   }
 
-  @Override public int hashCode() {
+  @Override
+  public int hashCode() {
     return Objects.hash(getId(), name, collection, type, config);
   }
 
   @Override
   public String toString() {
-    return MoreObjects.toStringHelper(this)
-        .add("id", getId())
-        .add("name", getName())
-        .add("collection", getCollection())
-        .add("type", getType())
-        .add("config", getConfig()).toString();
+    return MoreObjects.toStringHelper(this).add("id", getId()).add("name", getName())
+        .add("collection", getCollection()).add("type", getType()).add("config", getConfig())
+        .toString();
   }
 
 }

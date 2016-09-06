@@ -22,8 +22,8 @@ import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClientConfig;
 import com.linkedin.thirdeye.dashboard.configs.AbstractConfig;
 import com.linkedin.thirdeye.dashboard.configs.WebappConfigFactory.WebappConfigType;
-import com.linkedin.thirdeye.db.dao.WebappConfigDAO;
-import com.linkedin.thirdeye.db.entity.WebappConfig;
+import com.linkedin.thirdeye.datalayer.bao.WebappConfigManager;
+import com.linkedin.thirdeye.datalayer.dto.WebappConfigDTO;
 
 public class CollectionSchemaCacheLoader extends CacheLoader<String, CollectionSchema> {
 
@@ -31,10 +31,10 @@ public class CollectionSchemaCacheLoader extends CacheLoader<String, CollectionS
 
   private static final int GRANULARITY_SIZE = 1;
 
-  private WebappConfigDAO webappConfigDAO;
+  private WebappConfigManager webappConfigDAO;
 
   public CollectionSchemaCacheLoader(PinotThirdEyeClientConfig pinotThirdeyeClientConfig,
-      WebappConfigDAO webappConfigDAO) {
+      WebappConfigManager webappConfigDAO) {
     this.webappConfigDAO = webappConfigDAO;
   }
 
@@ -46,7 +46,7 @@ public class CollectionSchemaCacheLoader extends CacheLoader<String, CollectionS
 
   public CollectionSchema getCollectionSchema(String collection) throws Exception {
     CollectionSchema collectionSchema = null;
-    List<WebappConfig> webappConfigs = webappConfigDAO
+    List<WebappConfigDTO> webappConfigs = webappConfigDAO
         .findByCollectionAndType(collection, WebappConfigType.COLLECTION_SCHEMA);
 
     if (webappConfigs.isEmpty()) {

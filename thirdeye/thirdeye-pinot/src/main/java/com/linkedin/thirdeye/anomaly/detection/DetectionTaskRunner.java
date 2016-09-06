@@ -1,7 +1,5 @@
 package com.linkedin.thirdeye.anomaly.detection;
 
-import com.linkedin.thirdeye.db.dao.AnomalyResultDAO;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -30,8 +28,9 @@ import com.linkedin.thirdeye.client.timeseries.TimeSeriesRequest;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesResponse;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesResponseConverter;
 import com.linkedin.thirdeye.dashboard.Utils;
-import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
-import com.linkedin.thirdeye.db.entity.AnomalyResult;
+import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.detector.function.AnomalyFunction;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
@@ -46,16 +45,16 @@ public class DetectionTaskRunner implements TaskRunner {
   private TimeSeriesHandler timeSeriesHandler;
   private TimeSeriesResponseConverter timeSeriesResponseConverter;
 
-  private AnomalyResultDAO resultDAO;
+  private RawAnomalyResultManager resultDAO;
 
   private List<String> collectionDimensions;
   private MetricFunction metricFunction;
   private DateTime windowStart;
   private DateTime windowEnd;
-  private List<AnomalyResult> knownAnomalies;
+  private List<RawAnomalyResultDTO> knownAnomalies;
   private int anomalyCounter;
   private AnomalyFunction anomalyFunction;
-  private AnomalyFunctionSpec anomalyFunctionSpec;
+  private AnomalyFunctionDTO anomalyFunctionSpec;
   private AnomalyFunctionFactory anomalyFunctionFactory;
 
   public DetectionTaskRunner() {
@@ -123,15 +122,15 @@ public class DetectionTaskRunner implements TaskRunner {
         "Running anomaly detection job with windowStartProp: {}, windowEndProp: {}, metricExpressions: {}, timeGranularity: {}, windowStart: {}, windowEnd: {}",
         windowStart, windowEnd, metricExpressions, timeGranularity);
 
-    List<AnomalyResult> results = exploreCombination(topLevelRequest);
+    List<RawAnomalyResultDTO> results = exploreCombination(topLevelRequest);
     LOG.info("{} anomalies found in total", anomalyCounter);
 
     return taskResult;
   }
 
-  private List<AnomalyResult> exploreCombination(TimeSeriesRequest request) throws Exception {
+  private List<RawAnomalyResultDTO> exploreCombination(TimeSeriesRequest request) throws Exception {
     LOG.info("Exploring {}", request);
-    List<AnomalyResult> results = null;
+    List<RawAnomalyResultDTO> results = null;
 
     // Query server
     TimeSeriesResponse response;
@@ -176,8 +175,8 @@ public class DetectionTaskRunner implements TaskRunner {
     return results;
   }
 
-  private List<AnomalyResult> getExistingAnomalies() {
-    List<AnomalyResult> results = new ArrayList<>();
+  private List<RawAnomalyResultDTO> getExistingAnomalies() {
+    List<RawAnomalyResultDTO> results = new ArrayList<>();
     try {
       results.addAll(resultDAO
           .findAllByTimeAndFunctionId(windowStart.getMillis(), windowEnd.getMillis(),
@@ -188,11 +187,11 @@ public class DetectionTaskRunner implements TaskRunner {
     return results;
   }
 
-  private void handleResults(List<AnomalyResult> results) {
-    for (AnomalyResult result : results) {
+  private void handleResults(List<RawAnomalyResultDTO> results) {
+    for (RawAnomalyResultDTO result : results) {
       try {
         // Properties that always come from the function spec
-        AnomalyFunctionSpec spec = anomalyFunction.getSpec();
+        AnomalyFunctionDTO spec = anomalyFunction.getSpec();
         // make sure score and weight are valid numbers
         result.setScore(normalize(result.getScore()));
         result.setWeight(normalize(result.getWeight()));

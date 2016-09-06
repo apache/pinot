@@ -1,21 +1,17 @@
 package com.linkedin.thirdeye.datalayer.bao;
 
-import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
-import com.linkedin.thirdeye.datalayer.dto.JobDTO;
-import com.linkedin.thirdeye.datalayer.entity.Job;
-import com.linkedin.thirdeye.db.entity.AnomalyJobSpec;
 import java.util.List;
 
-public class JobManager extends AbstractManager<JobDTO, Job> {
+import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
+import com.linkedin.thirdeye.datalayer.dto.JobDTO;
 
-  public List<AnomalyJobSpec> findByStatus(JobStatus status) {
-    return null;
-  }
 
-  public void updateStatusAndJobEndTime(Long id, JobStatus status, Long jobEndTime) {
-  }
+public interface JobManager extends AbstractManager<JobDTO>{
 
-  public int deleteRecordsOlderThanDaysWithStatus(int days, JobStatus status) {
-    return 0;
-  }
+  List<JobDTO> findByStatus(JobStatus status);
+
+  void updateStatusAndJobEndTime(Long id, JobStatus status, Long jobEndTime);
+
+  int deleteRecordsOlderThanDaysWithStatus(int days, JobStatus status);
+
 }

@@ -1,12 +1,5 @@
 package com.linkedin.thirdeye.datalayer.dao;
 
-import com.google.inject.Inject;
-import com.linkedin.thirdeye.datalayer.entity.AbstractJsonEntity;
-import com.linkedin.thirdeye.datalayer.util.GenericResultSetMapper;
-import com.linkedin.thirdeye.datalayer.util.Predicate;
-import com.linkedin.thirdeye.datalayer.util.SqlQueryBuilder;
-import com.linkedin.thirdeye.db.entity.AbstractBaseEntity;
-
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -16,7 +9,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
 import javax.sql.DataSource;
+
+import com.google.inject.Inject;
+import com.linkedin.thirdeye.datalayer.entity.AbstractJsonEntity;
+import com.linkedin.thirdeye.datalayer.util.GenericResultSetMapper;
+import com.linkedin.thirdeye.datalayer.util.Predicate;
+import com.linkedin.thirdeye.datalayer.util.SqlQueryBuilder;
 
 public class AbstractBaseDAO<E extends AbstractJsonEntity> {
 

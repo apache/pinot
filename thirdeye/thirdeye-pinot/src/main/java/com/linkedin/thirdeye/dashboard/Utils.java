@@ -1,7 +1,5 @@
 package com.linkedin.thirdeye.dashboard;
 
-import com.linkedin.thirdeye.constant.MetricAggFunction;
-
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -32,12 +30,13 @@ import com.linkedin.thirdeye.client.ThirdEyeRequest;
 import com.linkedin.thirdeye.client.ThirdEyeRequest.ThirdEyeRequestBuilder;
 import com.linkedin.thirdeye.client.ThirdEyeResponse;
 import com.linkedin.thirdeye.client.cache.QueryCache;
+import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.dashboard.configs.AbstractConfig;
 import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
 import com.linkedin.thirdeye.dashboard.configs.DashboardConfig;
 import com.linkedin.thirdeye.dashboard.configs.WebappConfigFactory.WebappConfigType;
-import com.linkedin.thirdeye.db.dao.WebappConfigDAO;
-import com.linkedin.thirdeye.db.entity.WebappConfig;
+import com.linkedin.thirdeye.datalayer.bao.WebappConfigManager;
+import com.linkedin.thirdeye.datalayer.dto.WebappConfigDTO;
 
 public class Utils {
   private static final Logger LOG = LoggerFactory.getLogger(Utils.class);
@@ -131,12 +130,12 @@ public class Utils {
     return dimensionsToGroupBy;
   }
 
-  public static List<String> getDashboards(WebappConfigDAO webappConfigDAO, String collection) throws Exception {
-    List<WebappConfig> webappConfigs = webappConfigDAO
+  public static List<String> getDashboards(WebappConfigManager webappConfigDAO, String collection) throws Exception {
+    List<WebappConfigDTO> webappConfigs = webappConfigDAO
         .findByCollectionAndType(collection, WebappConfigType.DASHBOARD_CONFIG);
 
     List<String> dashboards = new ArrayList<>();
-    for (WebappConfig webappConfig : webappConfigs) {
+    for (WebappConfigDTO webappConfig : webappConfigs) {
       DashboardConfig dashboardConfig = AbstractConfig.fromJSON(webappConfig.getConfig(), DashboardConfig.class);
       dashboards.add(dashboardConfig.getDashboardName());
     }

@@ -1,8 +1,5 @@
 package com.linkedin.thirdeye.anomaly.alert;
 
-import com.linkedin.thirdeye.db.dao.EmailConfigurationDAO;
-import com.linkedin.thirdeye.db.entity.EmailConfiguration;
-
 import java.util.List;
 
 import javax.ws.rs.DELETE;
@@ -21,14 +18,17 @@ import org.joda.time.DateTime;
 import org.joda.time.format.ISODateTimeFormat;
 import org.quartz.SchedulerException;
 
+import com.linkedin.thirdeye.datalayer.bao.EmailConfigurationManager;
+import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
+
 @Path("/alert-job")
 @Produces(MediaType.APPLICATION_JSON)
 public class AlertJobResource {
   private final AlertJobScheduler alertJobScheduler;
-  private final EmailConfigurationDAO emailConfigurationDAO;
+  private final EmailConfigurationManager emailConfigurationDAO;
 
   public AlertJobResource(AlertJobScheduler alertJobScheduler,
-      EmailConfigurationDAO emailConfigurationDAO) {
+      EmailConfigurationManager emailConfigurationDAO) {
     this.alertJobScheduler = alertJobScheduler;
     this.emailConfigurationDAO = emailConfigurationDAO;
   }
@@ -72,7 +72,7 @@ public class AlertJobResource {
   }
 
   private void toggleActive(Long id, boolean state) {
-    EmailConfiguration alertConfig = emailConfigurationDAO.findById(id);
+    EmailConfigurationDTO alertConfig = emailConfigurationDAO.findById(id);
     if(alertConfig == null) {
       throw new NullArgumentException("Alert config not found");
     }

@@ -1,29 +1,25 @@
-package com.linkedin.thirdeye.db.entity;
+package com.linkedin.thirdeye.datalayer.pojo;
 
 import java.sql.Timestamp;
-import java.util.List;
 import java.util.Objects;
 
-import javax.persistence.CascadeType;
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.EnumType;
 import javax.persistence.Enumerated;
-import javax.persistence.FetchType;
-import javax.persistence.OneToMany;
 import javax.persistence.Table;
 
 import com.google.common.base.MoreObjects;
 import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
 
 /**
- * This class corresponds to an anomaly job. An anomaly job is created for every execution of an anomaly function spec
- * An anomaly job consists of 1 or more anomaly tasks
+ * This class corresponds to an anomaly job. An anomaly job is created for every execution of an
+ * anomaly function spec An anomaly job consists of 1 or more anomaly tasks
  */
 @Entity
 @Table(name = "anomaly_jobs")
 
-public class AnomalyJobSpec extends AbstractBaseEntity {
+public class JobBean extends AbstractBean {
 
   @Column(name = "job_name", nullable = false)
   private String jobName;
@@ -44,8 +40,8 @@ public class AnomalyJobSpec extends AbstractBaseEntity {
   @Column(name = "window_end_time")
   private long windowEndTime;
 
-  @Column(name = "last_modified", insertable=false, updatable=false,
-      columnDefinition="TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
+  @Column(name = "last_modified", insertable = false, updatable = false,
+      columnDefinition = "TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
   private Timestamp lastModified;
 
   public String getJobName() {
@@ -100,15 +96,15 @@ public class AnomalyJobSpec extends AbstractBaseEntity {
     return lastModified;
   }
 
-
   @Override
   public boolean equals(Object o) {
-    if (!(o instanceof AnomalyJobSpec)) {
+    if (!(o instanceof JobBean)) {
       return false;
     }
-    AnomalyJobSpec af = (AnomalyJobSpec) o;
+    JobBean af = (JobBean) o;
     return Objects.equals(getId(), af.getId()) && Objects.equals(jobName, af.getJobName())
-        && Objects.equals(status, af.getStatus()) && Objects.equals(scheduleStartTime, af.getScheduleStartTime());
+        && Objects.equals(status, af.getStatus())
+        && Objects.equals(scheduleStartTime, af.getScheduleStartTime());
   }
 
   @Override
@@ -119,9 +115,9 @@ public class AnomalyJobSpec extends AbstractBaseEntity {
   @Override
   public String toString() {
 
-    return MoreObjects.toStringHelper(this).add("id", getId()).add("jobName", jobName).add("status", status)
-        .add("scheduleStartTime", scheduleStartTime).add("scheduleEndTime", scheduleEndTime)
-        .add("windowStartTime", windowStartTime).add("windowEndTime", windowEndTime)
-        .add("lastModified", lastModified).toString();
+    return MoreObjects.toStringHelper(this).add("id", getId()).add("jobName", jobName)
+        .add("status", status).add("scheduleStartTime", scheduleStartTime)
+        .add("scheduleEndTime", scheduleEndTime).add("windowStartTime", windowStartTime)
+        .add("windowEndTime", windowEndTime).add("lastModified", lastModified).toString();
   }
 }

@@ -1,8 +1,8 @@
 package com.linkedin.thirdeye.dashboard;
 
-import com.linkedin.thirdeye.dashboard.resources.AnomalyFunctionResource;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
+import com.linkedin.thirdeye.dashboard.resources.AnomalyFunctionResource;
 import com.linkedin.thirdeye.dashboard.resources.AnomalyResource;
 import com.linkedin.thirdeye.dashboard.resources.AnomalySummaryResource;
 import com.linkedin.thirdeye.dashboard.resources.CacheResource;

@@ -1,16 +1,9 @@
-package com.linkedin.thirdeye.db.entity;
+package com.linkedin.thirdeye.datalayer.pojo;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-import javax.persistence.CascadeType;
 import javax.persistence.Column;
 import javax.persistence.Entity;
-import javax.persistence.FetchType;
-import javax.persistence.JoinColumn;
-import javax.persistence.JoinTable;
-import javax.persistence.ManyToMany;
 import javax.persistence.Table;
 import javax.validation.Valid;
 import javax.validation.constraints.NotNull;
@@ -24,7 +17,7 @@ import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 @Entity
 @Table(name = "email_configurations")
-public class EmailConfiguration extends AbstractBaseEntity {
+public class EmailConfigurationBean extends AbstractBean {
 
   @Valid
   @NotNull
@@ -95,11 +88,6 @@ public class EmailConfiguration extends AbstractBaseEntity {
   public String getCollection() {
     return collection;
   }
-
-  @ManyToMany(fetch = FetchType.EAGER, cascade = CascadeType.MERGE)
-  @JoinTable(name = "email_function_dependencies", joinColumns = { @JoinColumn(name = "email_id")},
-        inverseJoinColumns = { @JoinColumn(name = "function_id") })
-  private List<AnomalyFunctionSpec> functions = new ArrayList<>();
 
   public void setCollection(String collection) {
     this.collection = collection;
@@ -231,14 +219,6 @@ public class EmailConfiguration extends AbstractBaseEntity {
     this.windowDelayUnit = windowDelayUnit;
   }
 
-  public List<AnomalyFunctionSpec> getFunctions() {
-    return functions;
-  }
-
-  public void setFunctions(List<AnomalyFunctionSpec> functions) {
-    this.functions = functions;
-  }
-
   @Override
   public String toString() {
     return MoreObjects.toStringHelper(this).add("collection", collection).add("metric", metric)
@@ -247,6 +227,6 @@ public class EmailConfiguration extends AbstractBaseEntity {
         .add("windowSize", windowSize).add("windowUnit", windowUnit).add("isActive", isActive)
         .add("sendZeroAnomalyEmail", sendZeroAnomalyEmail).add("filters", filters)
         .add("windowDelay", windowDelay).add("windowDelayUnit", windowDelayUnit)
-        .add("functions", functions).toString();
+        .toString();
   }
 }

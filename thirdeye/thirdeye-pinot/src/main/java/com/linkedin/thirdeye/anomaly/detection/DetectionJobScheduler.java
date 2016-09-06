@@ -1,9 +1,5 @@
 package com.linkedin.thirdeye.anomaly.detection;
 
-import com.linkedin.thirdeye.db.dao.AnomalyFunctionDAO;
-import com.linkedin.thirdeye.db.dao.AnomalyJobDAO;
-import com.linkedin.thirdeye.db.dao.AnomalyTaskDAO;
-
 import java.util.ArrayList;
 import java.util.List;
 
@@ -25,7 +21,10 @@ import org.slf4j.LoggerFactory;
 
 import com.linkedin.thirdeye.anomaly.job.JobContext;
 import com.linkedin.thirdeye.anomaly.job.JobScheduler;
-import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
+import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
+import com.linkedin.thirdeye.datalayer.bao.JobManager;
+import com.linkedin.thirdeye.datalayer.bao.TaskManager;
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 
 /**
@@ -36,13 +35,13 @@ public class DetectionJobScheduler implements JobScheduler {
   private static final Logger LOG = LoggerFactory.getLogger(DetectionJobScheduler.class);
   private SchedulerFactory schedulerFactory;
   private Scheduler quartzScheduler;
-  private AnomalyJobDAO anomalyJobDAO;
-  private AnomalyTaskDAO anomalyTaskDAO;
-  private AnomalyFunctionDAO anomalyFunctionDAO;
+  private JobManager anomalyJobDAO;
+  private TaskManager anomalyTaskDAO;
+  private AnomalyFunctionManager anomalyFunctionDAO;
   private AnomalyFunctionFactory anomalyFunctionFactory;
 
-  public DetectionJobScheduler(AnomalyJobDAO anomalyJobDAO, AnomalyTaskDAO anomalyTaskDAO,
-      AnomalyFunctionDAO anomalyFunctionDAO) {
+  public DetectionJobScheduler(JobManager anomalyJobDAO, TaskManager anomalyTaskDAO,
+      AnomalyFunctionManager anomalyFunctionDAO) {
     this.anomalyJobDAO = anomalyJobDAO;
     this.anomalyTaskDAO = anomalyTaskDAO;
     this.anomalyFunctionDAO = anomalyFunctionDAO;
@@ -69,8 +68,8 @@ public class DetectionJobScheduler implements JobScheduler {
     quartzScheduler.start();
 
     // start all active anomaly functions
-    List<AnomalyFunctionSpec>  functionSpecs = readAnomalyFunctionSpecs();
-    for (AnomalyFunctionSpec anomalyFunctionSpec : functionSpecs) {
+    List<AnomalyFunctionDTO>  functionSpecs = readAnomalyFunctionSpecs();
+    for (AnomalyFunctionDTO anomalyFunctionSpec : functionSpecs) {
       if (anomalyFunctionSpec.getIsActive()) {
         DetectionJobContext detectionJobContext = new DetectionJobContext();
         detectionJobContext.setAnomalyFunctionDAO(anomalyFunctionDAO);
@@ -91,7 +90,7 @@ public class DetectionJobScheduler implements JobScheduler {
   }
 
   public void startJob(Long id) throws SchedulerException {
-    AnomalyFunctionSpec anomalyFunctionSpec = anomalyFunctionDAO.findById(id);
+    AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionDAO.findById(id);
     if (anomalyFunctionSpec == null) {
       throw new IllegalArgumentException("No function with id " + id);
     }
@@ -115,7 +114,7 @@ public class DetectionJobScheduler implements JobScheduler {
   }
 
   public void stopJob(Long id) throws SchedulerException {
-    AnomalyFunctionSpec anomalyFunctionSpec = anomalyFunctionDAO.findById(id);
+    AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionDAO.findById(id);
     String functionName = anomalyFunctionSpec.getFunctionName();
     String jobKey = getJobKey(id, functionName);
     if (!quartzScheduler.checkExists(JobKey.jobKey(jobKey))) {
@@ -126,7 +125,7 @@ public class DetectionJobScheduler implements JobScheduler {
   }
 
   public void runAdHoc(Long id, DateTime windowStartTime, DateTime windowEndTime) {
-    AnomalyFunctionSpec anomalyFunctionSpec = anomalyFunctionDAO.findById(id);
+    AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionDAO.findById(id);
     if (anomalyFunctionSpec == null) {
       throw new IllegalArgumentException("No function with id " + id);
     }
@@ -158,7 +157,7 @@ public class DetectionJobScheduler implements JobScheduler {
   }
 
 
-  private void scheduleJob(JobContext jobContext, AnomalyFunctionSpec anomalyFunctionSpec) {
+  private void scheduleJob(JobContext jobContext, AnomalyFunctionDTO anomalyFunctionSpec) {
 
     String triggerKey = String.format("anomaly_scheduler_trigger_%d", anomalyFunctionSpec.getId());
     CronTrigger trigger =
@@ -179,7 +178,7 @@ public class DetectionJobScheduler implements JobScheduler {
     LOG.info("Started {}: {}", jobKey, anomalyFunctionSpec);
   }
 
-  private List<AnomalyFunctionSpec> readAnomalyFunctionSpecs() {
+  private List<AnomalyFunctionDTO> readAnomalyFunctionSpecs() {
     return anomalyFunctionDAO.findAll();
   }
 

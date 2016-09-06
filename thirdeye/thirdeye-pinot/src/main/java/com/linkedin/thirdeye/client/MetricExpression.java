@@ -1,12 +1,13 @@
 package com.linkedin.thirdeye.client;
 
-import com.linkedin.thirdeye.constant.MetricAggFunction;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+
+import com.linkedin.thirdeye.constant.MetricAggFunction;
 
 import parsii.eval.Expression;
 import parsii.eval.Parser;

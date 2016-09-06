@@ -1,69 +1,84 @@
-package com.linkedin.thirdeye.db.dao;
+package com.linkedin.thirdeye.datalayer.bao.hibernate;
 
-import com.google.inject.persist.Transactional;
-import com.linkedin.thirdeye.db.entity.AnomalyMergedResult;
 import java.util.Arrays;
 import java.util.List;
+
 import javax.persistence.NoResultException;
 
-public class AnomalyMergedResultDAO extends AbstractJpaDAO<AnomalyMergedResult> {
+import com.google.inject.persist.Transactional;
+import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
+import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+
+public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAnomalyResultDTO> implements MergedAnomalyResultManager {
 
   private static final String FIND_BY_COLLECTION_METRIC_DIMENSIONS_ORDER_BY_END_TIME =
-      "from AnomalyMergedResult amr where amr.collection=:collection and amr.metric=:metric "
+      "from MergedAnomalyResultDTO amr where amr.collection=:collection and amr.metric=:metric "
           + "and amr.dimensions=:dimensions order by amr.endTime desc";
 
   // find a conflicting window
   private static final String FIND_BY_COLLECTION_METRIC_DIMENSIONS_TIME =
-      "from AnomalyMergedResult r where r.collection=:collection and r.metric=:metric "
+      "from MergedAnomalyResultDTO r where r.collection=:collection and r.metric=:metric "
           + "and r.dimensions in :dimensions "
           + "and (r.startTime < :endTime and r.endTime > :startTime) "
           + "order by r.endTime desc";
 
   // find a conflicting window
   private static final String FIND_BY_COLLECTION_METRIC_TIME =
-      "from AnomalyMergedResult r where r.collection=:collection and r.metric=:metric "
+      "from MergedAnomalyResultDTO r where r.collection=:collection and r.metric=:metric "
           + "and (r.startTime < :endTime and r.endTime > :startTime) order by r.endTime desc";
 
   // find a conflicting window
   private static final String FIND_BY_COLLECTION_TIME =
-      "from AnomalyMergedResult r where r.collection=:collection "
+      "from MergedAnomalyResultDTO r where r.collection=:collection "
           + "and (r.startTime < :endTime and r.endTime > :startTime) order by r.endTime desc";
 
   private static final String FIND_BY_FUNCTION_AND_DIMENSIONS =
-      "from AnomalyMergedResult amr where amr.function.id=:functionId "
+      "from MergedAnomalyResultDTO amr where amr.function.id=:functionId "
           + "and amr.dimensions=:dimensions order by amr.endTime desc";
 
   private static final String FIND_BY_FUNCTION_AND_NULL_DIMENSION =
-      "from AnomalyMergedResult amr where amr.function.id=:functionId "
+      "from MergedAnomalyResultDTO amr where amr.function.id=:functionId "
           + "and amr.dimensions is null order by amr.endTime desc";
 
   private static final String FIND_BY_TIME =
-      "from AnomalyMergedResult r WHERE (r.startTime < :endTime and r.endTime > :startTime) order by r.endTime desc ";
+      "from MergedAnomalyResultDTO r WHERE (r.startTime < :endTime and r.endTime > :startTime) order by r.endTime desc ";
 
   private static final String FIND_BY_TIME_EMAIL_NOTIFIED_FALSE =
-      "SELECT r FROM EmailConfiguration d JOIN d.functions f, AnomalyMergedResult r "
+      "SELECT r FROM EmailConfiguration d JOIN d.functions f, MergedAnomalyResultDTO r "
           + "WHERE r.function.id=f.id AND d.id = :emailId and r.notified=false "
           + "and (r.startTime < :endTime and r.endTime > :startTime) order by r.endTime desc ";
 
-  public AnomalyMergedResultDAO() {
-    super(AnomalyMergedResult.class);
+  public MergedAnomalyResultManagerImpl() {
+    super(MergedAnomalyResultDTO.class);
   }
 
+  /* (non-Javadoc)
+   * @see com.linkedin.thirdeye.datalayer.bao.IMergedAnomalyResultManager#getAllByTime(long, long)
+   */
+  @Override
   @Transactional
-  public List<AnomalyMergedResult> getAllByTime(long startTime, long endTime) {
+  public List<MergedAnomalyResultDTO> getAllByTime(long startTime, long endTime) {
     return getEntityManager().createQuery(FIND_BY_TIME, entityClass)
         .setParameter("startTime", startTime).setParameter("endTime", endTime).getResultList();
   }
 
+  /* (non-Javadoc)
+   * @see com.linkedin.thirdeye.datalayer.bao.IMergedAnomalyResultManager#getAllByTimeEmailIdAndNotifiedFalse(long, long, long)
+   */
+  @Override
   @Transactional
-  public List<AnomalyMergedResult> getAllByTimeEmailIdAndNotifiedFalse(long startTime, long endTime, long emailId) {
+  public List<MergedAnomalyResultDTO> getAllByTimeEmailIdAndNotifiedFalse(long startTime, long endTime, long emailId) {
     return getEntityManager().createQuery(FIND_BY_TIME_EMAIL_NOTIFIED_FALSE, entityClass)
         .setParameter("emailId", emailId).setParameter("startTime", startTime)
         .setParameter("endTime", endTime).getResultList();
   }
 
+  /* (non-Javadoc)
+   * @see com.linkedin.thirdeye.datalayer.bao.IMergedAnomalyResultManager#findByCollectionMetricDimensionsTime(java.lang.String, java.lang.String, java.lang.String[], long, long)
+   */
+  @Override
   @Transactional
-  public List<AnomalyMergedResult> findByCollectionMetricDimensionsTime(String collection,
+  public List<MergedAnomalyResultDTO> findByCollectionMetricDimensionsTime(String collection,
       String metric, String [] dimensions, long startTime, long endTime) {
     List<String> dimList = Arrays.asList(dimensions);
     return getEntityManager()
@@ -73,24 +88,36 @@ public class AnomalyMergedResultDAO extends AbstractJpaDAO<AnomalyMergedResult> 
         .setParameter("endTime", endTime).getResultList();
   }
 
+  /* (non-Javadoc)
+   * @see com.linkedin.thirdeye.datalayer.bao.IMergedAnomalyResultManager#findByCollectionMetricTime(java.lang.String, java.lang.String, long, long)
+   */
+  @Override
   @Transactional
-  public List<AnomalyMergedResult> findByCollectionMetricTime(String collection,
+  public List<MergedAnomalyResultDTO> findByCollectionMetricTime(String collection,
       String metric, long startTime, long endTime) {
     return getEntityManager().createQuery(FIND_BY_COLLECTION_METRIC_TIME, entityClass)
         .setParameter("collection", collection).setParameter("metric", metric)
         .setParameter("startTime", startTime).setParameter("endTime", endTime).getResultList();
   }
 
+  /* (non-Javadoc)
+   * @see com.linkedin.thirdeye.datalayer.bao.IMergedAnomalyResultManager#findByCollectionTime(java.lang.String, long, long)
+   */
+  @Override
   @Transactional
-  public List<AnomalyMergedResult> findByCollectionTime(String collection,
+  public List<MergedAnomalyResultDTO> findByCollectionTime(String collection,
       long startTime, long endTime) {
     return getEntityManager().createQuery(FIND_BY_COLLECTION_TIME, entityClass)
         .setParameter("collection", collection).setParameter("startTime", startTime)
         .setParameter("endTime", endTime).getResultList();
   }
 
+  /* (non-Javadoc)
+   * @see com.linkedin.thirdeye.datalayer.bao.IMergedAnomalyResultManager#findLatestByCollectionMetricDimensions(java.lang.String, java.lang.String, java.lang.String)
+   */
+  @Override
   @Transactional
-  public AnomalyMergedResult findLatestByCollectionMetricDimensions(
+  public MergedAnomalyResultDTO findLatestByCollectionMetricDimensions(
       String collection, String metric, String dimensions) {
     try {
       return getEntityManager()
@@ -102,8 +129,12 @@ public class AnomalyMergedResultDAO extends AbstractJpaDAO<AnomalyMergedResult> 
     }
   }
 
+  /* (non-Javadoc)
+   * @see com.linkedin.thirdeye.datalayer.bao.IMergedAnomalyResultManager#findLatestByFunctionIdDimensions(java.lang.Long, java.lang.String)
+   */
+  @Override
   @Transactional
-  public AnomalyMergedResult findLatestByFunctionIdDimensions(Long functionId, String dimensions) {
+  public MergedAnomalyResultDTO findLatestByFunctionIdDimensions(Long functionId, String dimensions) {
     try {
       return getEntityManager().createQuery(FIND_BY_FUNCTION_AND_DIMENSIONS, entityClass)
           .setParameter("functionId", functionId).setParameter("dimensions", dimensions)
@@ -113,8 +144,12 @@ public class AnomalyMergedResultDAO extends AbstractJpaDAO<AnomalyMergedResult> 
     }
   }
 
+  /* (non-Javadoc)
+   * @see com.linkedin.thirdeye.datalayer.bao.IMergedAnomalyResultManager#findLatestByFunctionIdOnly(java.lang.Long)
+   */
+  @Override
   @Transactional
-  public AnomalyMergedResult findLatestByFunctionIdOnly(Long functionId) {
+  public MergedAnomalyResultDTO findLatestByFunctionIdOnly(Long functionId) {
     try {
       return getEntityManager().createQuery(FIND_BY_FUNCTION_AND_NULL_DIMENSION, entityClass)
           .setParameter("functionId", functionId).setMaxResults(1).getSingleResult();

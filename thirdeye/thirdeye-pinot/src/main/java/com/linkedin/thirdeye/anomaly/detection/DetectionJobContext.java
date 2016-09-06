@@ -3,14 +3,14 @@ package com.linkedin.thirdeye.anomaly.detection;
 import org.joda.time.DateTime;
 
 import com.linkedin.thirdeye.anomaly.job.JobContext;
-import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 
 public class DetectionJobContext extends JobContext {
 
   private Long anomalyFunctionId;
   private DateTime windowStartTime;
   private DateTime windowEndTime;
-  private AnomalyFunctionSpec anomalyFunctionSpec;
+  private AnomalyFunctionDTO anomalyFunctionSpec;
 
   public Long getAnomalyFunctionId() {
     return anomalyFunctionId;
@@ -36,11 +36,11 @@ public class DetectionJobContext extends JobContext {
     this.windowEndTime = windowEndTime;
   }
 
-  public AnomalyFunctionSpec getAnomalyFunctionSpec() {
+  public AnomalyFunctionDTO getAnomalyFunctionSpec() {
     return anomalyFunctionSpec;
   }
 
-  public void setAnomalyFunctionSpec(AnomalyFunctionSpec anomalyFunctionSpec) {
+  public void setAnomalyFunctionSpec(AnomalyFunctionDTO anomalyFunctionSpec) {
     this.anomalyFunctionSpec = anomalyFunctionSpec;
   }
 

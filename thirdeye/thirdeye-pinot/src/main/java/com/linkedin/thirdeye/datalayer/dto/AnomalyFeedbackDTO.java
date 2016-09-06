@@ -1,37 +1,16 @@
 package com.linkedin.thirdeye.datalayer.dto;
 
-import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
-import com.linkedin.thirdeye.constant.FeedbackStatus;
+import java.io.Serializable;
 
-public class AnomalyFeedbackDTO extends AbstractDTO {
+import javax.persistence.Entity;
+import javax.persistence.Table;
 
-  private AnomalyFeedbackType feedbackType;
+import com.linkedin.thirdeye.datalayer.pojo.AnomalyFeedbackBean;
 
-  private FeedbackStatus status;
+@Entity
+@Table(name = "anomaly_feedback")
+public class AnomalyFeedbackDTO extends AnomalyFeedbackBean implements Serializable {
+  private static final long serialVersionUID = 1L;
 
-  private String comment;
 
-  public AnomalyFeedbackType getFeedbackType() {
-    return feedbackType;
-  }
-
-  public void setFeedbackType(AnomalyFeedbackType feedbackType) {
-    this.feedbackType = feedbackType;
-  }
-
-  public FeedbackStatus getStatus() {
-    return status;
-  }
-
-  public void setStatus(FeedbackStatus status) {
-    this.status = status;
-  }
-
-  public String getComment() {
-    return comment;
-  }
-
-  public void setComment(String comment) {
-    this.comment = comment;
-  }
 }

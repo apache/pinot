@@ -1,12 +1,13 @@
 package com.linkedin.thirdeye.datalayer;
 
-import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.net.URL;
 import java.sql.Connection;
+
 import javax.sql.DataSource;
+
+import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 
 public class AbstractBaseTest {
   ScriptRunner scriptRunner;

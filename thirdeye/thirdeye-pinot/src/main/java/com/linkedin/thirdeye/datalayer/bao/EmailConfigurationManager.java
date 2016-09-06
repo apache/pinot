@@ -1,8 +1,12 @@
 package com.linkedin.thirdeye.datalayer.bao;
 
-import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
-import com.linkedin.thirdeye.datalayer.entity.EmailConfiguration;
+import java.util.List;
 
-public class EmailConfigurationManager
-    extends AbstractManager<EmailConfigurationDTO, EmailConfiguration> {
+import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
+
+
+public interface EmailConfigurationManager extends AbstractManager<EmailConfigurationDTO>{
+
+  List<EmailConfigurationDTO> findByFunctionId(Long id);
+
 }

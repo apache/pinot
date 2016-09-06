@@ -9,8 +9,6 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 
 import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
-import org.joda.time.DateTime;
-import org.joda.time.DateTimeZone;
 
 import com.linkedin.thirdeye.dashboard.views.TimeBucket;
 

@@ -1,7 +1,5 @@
 package com.linkedin.thirdeye.client.pinot;
 
-import com.google.common.base.Objects;
-
 public class PinotQuery {
 
   private String pql;

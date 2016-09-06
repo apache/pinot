@@ -3,7 +3,6 @@ package com.linkedin.thirdeye.dashboard.views.tabular;
 import java.util.List;
 import java.util.Map;
 
-
 import com.linkedin.thirdeye.dashboard.views.GenericResponse;
 import com.linkedin.thirdeye.dashboard.views.TimeBucket;
 import com.linkedin.thirdeye.dashboard.views.ViewResponse;

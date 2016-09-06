@@ -1,10 +1,5 @@
 package com.linkedin.thirdeye.anomaly.task;
 
-import com.linkedin.thirdeye.db.dao.AnomalyJobDAO;
-import com.linkedin.thirdeye.db.dao.AnomalyMergedResultDAO;
-import com.linkedin.thirdeye.db.dao.AnomalyResultDAO;
-import com.linkedin.thirdeye.db.dao.AnomalyTaskDAO;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -22,7 +17,11 @@ import org.slf4j.LoggerFactory;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
-import com.linkedin.thirdeye.db.entity.AnomalyTaskSpec;
+import com.linkedin.thirdeye.datalayer.bao.JobManager;
+import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
+import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
+import com.linkedin.thirdeye.datalayer.bao.TaskManager;
+import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 
 public class TaskDriver {
@@ -31,7 +30,7 @@ public class TaskDriver {
 
   private ExecutorService taskExecutorService;
 
-  private final AnomalyTaskDAO anomalyTaskDAO;
+  private final TaskManager anomalyTaskDAO;
   private TaskContext taskContext;
   private long workerId;
 
@@ -42,8 +41,8 @@ public class TaskDriver {
   private static final int TASK_FETCH_SIZE = 10;
   private static final Random RANDOM = new Random();
 
-  public TaskDriver(ThirdEyeAnomalyConfiguration thirdEyeAnomalyConfiguration, AnomalyJobDAO anomalyJobDAO,
-      AnomalyTaskDAO anomalyTaskDAO, AnomalyResultDAO anomalyResultDAO, AnomalyMergedResultDAO mergedResultDAO,
+  public TaskDriver(ThirdEyeAnomalyConfiguration thirdEyeAnomalyConfiguration, JobManager anomalyJobDAO,
+      TaskManager anomalyTaskDAO, RawAnomalyResultManager anomalyResultDAO, MergedAnomalyResultManager mergedResultDAO,
       AnomalyFunctionFactory anomalyFunctionFactory) {
     this.workerId = thirdEyeAnomalyConfiguration.getId();
     this.anomalyTaskDAO = anomalyTaskDAO;
@@ -67,7 +66,7 @@ public class TaskDriver {
               Thread.currentThread().getId());
           try {
             // select a task to execute, and update it to RUNNING
-            AnomalyTaskSpec anomalyTaskSpec = selectAndUpdate();
+            TaskDTO anomalyTaskSpec = selectAndUpdate();
             LOG.info(Thread.currentThread().getId() + " : Executing task: {} {}", anomalyTaskSpec.getId(),
                 anomalyTaskSpec.getTaskInfo());
 
@@ -98,12 +97,12 @@ public class TaskDriver {
     taskExecutorService.shutdown();
   }
 
-  private AnomalyTaskSpec selectAndUpdate() throws Exception {
+  private TaskDTO selectAndUpdate() throws Exception {
     LOG.info(Thread.currentThread().getId() + " : Starting selectAndUpdate {}", Thread.currentThread().getId());
-    AnomalyTaskSpec acquiredTask = null;
+    TaskDTO acquiredTask = null;
     LOG.info(Thread.currentThread().getId() + " : Trying to find a task to execute");
     do {
-      List<AnomalyTaskSpec> anomalyTasks = new ArrayList<>();
+      List<TaskDTO> anomalyTasks = new ArrayList<>();
       try {
         anomalyTasks = anomalyTaskDAO.findByStatusOrderByCreateTimeAsc(TaskStatus.WAITING, TASK_FETCH_SIZE);
       } catch (Exception e) {
@@ -122,7 +121,7 @@ public class TaskDriver {
         Thread.sleep(delay);
       }
 
-      for (AnomalyTaskSpec anomalyTaskSpec : anomalyTasks) {
+      for (TaskDTO anomalyTaskSpec : anomalyTasks) {
         LOG.info(Thread.currentThread().getId() + " : Trying to acquire task : {}", anomalyTaskSpec.getId());
 
         boolean success = false;

@@ -1,18 +1,20 @@
-package com.linkedin.thirdeye.db.entity;
+package com.linkedin.thirdeye.datalayer.pojo;
 
-import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
-import com.linkedin.thirdeye.constant.FeedbackStatus;
 import java.io.Serializable;
 import java.util.Objects;
+
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.EnumType;
 import javax.persistence.Enumerated;
 import javax.persistence.Table;
 
+import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
+import com.linkedin.thirdeye.constant.FeedbackStatus;
+
 @Entity
 @Table(name = "anomaly_feedback")
-public class AnomalyFeedback extends AbstractBaseEntity implements Serializable {
+public class AnomalyFeedbackBean extends AbstractBean implements Serializable {
   private static final long serialVersionUID = 1L;
 
   @Column(name = "feedback_type", nullable = false)
@@ -59,7 +61,7 @@ public class AnomalyFeedback extends AbstractBaseEntity implements Serializable 
       return false;
     }
 
-    AnomalyFeedback that = (AnomalyFeedback) o;
+    AnomalyFeedbackBean that = (AnomalyFeedbackBean) o;
     return Objects.equals(getId(), that.getId()) && Objects.equals(feedbackType, that.getFeedbackType())
         && Objects.equals(status, that.getStatus()) && Objects.equals(comment, that.getComment());
   }

@@ -7,8 +7,8 @@ import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.thirdeye.db.dao.AnomalyJobDAO;
-import com.linkedin.thirdeye.db.dao.AnomalyTaskDAO;
+import com.linkedin.thirdeye.datalayer.bao.JobManager;
+import com.linkedin.thirdeye.datalayer.bao.TaskManager;
 
 public class MonitorJobScheduler {
 
@@ -16,13 +16,13 @@ public class MonitorJobScheduler {
 
   private ScheduledExecutorService scheduledExecutorService;
 
-  private AnomalyJobDAO anomalyJobDAO;
-  private AnomalyTaskDAO anomalyTaskDAO;
+  private JobManager anomalyJobDAO;
+  private TaskManager anomalyTaskDAO;
   private MonitorConfiguration monitorConfiguration;
   private MonitorJobRunner monitorJobRunner;
   private MonitorJobContext monitorJobContext;
 
-  public MonitorJobScheduler(AnomalyJobDAO anomalyJobDAO, AnomalyTaskDAO anomalyTaskDAO,
+  public MonitorJobScheduler(JobManager anomalyJobDAO, TaskManager anomalyTaskDAO,
       MonitorConfiguration monitorConfiguration) {
     this.anomalyJobDAO = anomalyJobDAO;
     this.anomalyTaskDAO = anomalyTaskDAO;

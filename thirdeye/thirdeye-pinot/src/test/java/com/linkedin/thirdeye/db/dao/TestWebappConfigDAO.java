@@ -11,7 +11,7 @@ import org.testng.annotations.Test;
 import com.linkedin.thirdeye.dashboard.configs.AbstractConfig;
 import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
 import com.linkedin.thirdeye.dashboard.configs.WebappConfigFactory.WebappConfigType;
-import com.linkedin.thirdeye.db.entity.WebappConfig;
+import com.linkedin.thirdeye.datalayer.dto.WebappConfigDTO;
 
 public class TestWebappConfigDAO extends AbstractDbTestBase {
 
@@ -24,7 +24,7 @@ public class TestWebappConfigDAO extends AbstractDbTestBase {
 
   @Test
   public void testCreate() {
-    WebappConfig webappConfig = getWebappConfig();
+    WebappConfigDTO webappConfig = getWebappConfig();
     webappConfigId = webappConfigDAO.save(webappConfig);
     Assert.assertNotNull(webappConfigId);
     Assert.assertEquals(webappConfigDAO.findAll().size(), 1);
@@ -32,7 +32,7 @@ public class TestWebappConfigDAO extends AbstractDbTestBase {
 
   @Test(dependsOnMethods = {"testCreate"})
   public void testDuplicteCreate() {
-    WebappConfig webappConfig = getWebappConfig();
+    WebappConfigDTO webappConfig = getWebappConfig();
     Long duplicateId = null;
     boolean insertSuccess = false;
     try {
@@ -54,7 +54,7 @@ public class TestWebappConfigDAO extends AbstractDbTestBase {
 
   @Test(dependsOnMethods = {"testFind"})
   public void testUpdate() throws Exception {
-    WebappConfig webappConfig = webappConfigDAO.findById(webappConfigId);
+    WebappConfigDTO webappConfig = webappConfigDAO.findById(webappConfigId);
     CollectionConfig collectionConfig = AbstractConfig.fromJSON(webappConfig.getConfig(), CollectionConfig.class);
     collectionConfig.setCollectionAlias("testAlias");
     webappConfig.setConfig(collectionConfig.toJSON());
@@ -71,7 +71,7 @@ public class TestWebappConfigDAO extends AbstractDbTestBase {
     Assert.assertNull(webappConfigDAO.findById(webappConfigId));
   }
 
-  private static WebappConfig getWebappConfig() {
+  private static WebappConfigDTO getWebappConfig() {
 
     CollectionConfig collectionConfig = new CollectionConfig();
     collectionConfig.setCollectionName(collection);
@@ -79,7 +79,7 @@ public class TestWebappConfigDAO extends AbstractDbTestBase {
     derivedMetrics.put("dm1", "m1/m2");
     collectionConfig.setDerivedMetrics(derivedMetrics);
 
-    WebappConfig webappConfig = new WebappConfig();
+    WebappConfigDTO webappConfig = new WebappConfigDTO();
     webappConfig.setName(collectionConfig.getConfigName());
     webappConfig.setCollection(collection);
     webappConfig.setType(type);

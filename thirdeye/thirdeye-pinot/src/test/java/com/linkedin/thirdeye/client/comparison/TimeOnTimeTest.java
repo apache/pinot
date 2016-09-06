@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.client.comparison;
 
-import com.linkedin.thirdeye.constant.MetricAggFunction;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executors;
@@ -15,6 +14,7 @@ import com.linkedin.thirdeye.client.MetricFunction;
 import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.client.comparison.Row.Metric;
 import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClient;
+import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.dashboard.Utils;
 
 /** Manual test for verifying code works as expected (ie without exceptions thrown) */

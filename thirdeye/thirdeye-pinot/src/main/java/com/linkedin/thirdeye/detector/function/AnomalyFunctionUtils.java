@@ -1,10 +1,11 @@
 package com.linkedin.thirdeye.detector.function;
 
-import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
+
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 
 public abstract class AnomalyFunctionUtils {
   public static final String BASELINE = "baseline";
@@ -12,7 +13,7 @@ public abstract class AnomalyFunctionUtils {
   private AnomalyFunctionUtils() {
   }
 
-  public static long getBaselineOffset(AnomalyFunctionSpec spec) throws IOException {
+  public static long getBaselineOffset(AnomalyFunctionDTO spec) throws IOException {
     long baselineMillis;
     Properties props = new Properties();
     if (spec.getProperties() != null) {

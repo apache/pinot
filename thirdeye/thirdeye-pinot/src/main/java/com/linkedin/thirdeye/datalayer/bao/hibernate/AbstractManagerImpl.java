@@ -1,9 +1,4 @@
-package com.linkedin.thirdeye.db.dao;
-
-import com.google.inject.Inject;
-import com.google.inject.Provider;
-import com.google.inject.persist.Transactional;
-import com.linkedin.thirdeye.db.entity.AbstractBaseEntity;
+package com.linkedin.thirdeye.datalayer.bao.hibernate;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -15,14 +10,20 @@ import javax.persistence.criteria.CriteriaQuery;
 import javax.persistence.criteria.Predicate;
 import javax.persistence.criteria.Root;
 
-public class AbstractJpaDAO<E extends AbstractBaseEntity> {
+import com.google.inject.Inject;
+import com.google.inject.Provider;
+import com.google.inject.persist.Transactional;
+import com.linkedin.thirdeye.datalayer.bao.AbstractManager;
+import com.linkedin.thirdeye.datalayer.dto.AbstractDTO;
+
+public class AbstractManagerImpl<E extends AbstractDTO> implements AbstractManager<E> {
 
   @Inject
   private Provider<EntityManager> emf;
 
   final Class<E> entityClass;
 
-  AbstractJpaDAO(Class<E> entityClass) {
+  AbstractManagerImpl(Class<E> entityClass) {
     this.entityClass = entityClass;
   }
 
@@ -30,41 +31,73 @@ public class AbstractJpaDAO<E extends AbstractBaseEntity> {
     return emf.get();
   }
 
+  /* (non-Javadoc)
+   * @see com.linkedin.thirdeye.datalayer.bao.IAbstractManager#save(E)
+   */
+  @Override
   @Transactional(rollbackOn = Exception.class)
   public Long save(E entity) {
     getEntityManager().persist(entity);
     return entity.getId();
   }
 
+  /* (non-Javadoc)
+   * @see com.linkedin.thirdeye.datalayer.bao.IAbstractManager#update(E)
+   */
+  @Override
   @Transactional(rollbackOn = Exception.class)
   public void update(E entity) {
     getEntityManager().merge(entity);
   }
 
+  /* (non-Javadoc)
+   * @see com.linkedin.thirdeye.datalayer.bao.IAbstractManager#updateAll(java.util.List)
+   */
+  @Override
   public void updateAll(List<E> entities) {
     entities.forEach(this::update);
   }
 
+  /* (non-Javadoc)
+   * @see com.linkedin.thirdeye.datalayer.bao.IAbstractManager#findById(java.lang.Long)
+   */
+  @Override
   @Transactional
   public E findById(Long id) {
     return getEntityManager().find(entityClass, id);
   }
 
+  /* (non-Javadoc)
+   * @see com.linkedin.thirdeye.datalayer.bao.IAbstractManager#delete(E)
+   */
+  @Override
   @Transactional
   public void delete(E entity) {
     getEntityManager().remove(entity);
   }
 
+  /* (non-Javadoc)
+   * @see com.linkedin.thirdeye.datalayer.bao.IAbstractManager#deleteById(java.lang.Long)
+   */
+  @Override
   public void deleteById(Long id) {
     getEntityManager().remove(findById(id));
   }
 
+  /* (non-Javadoc)
+   * @see com.linkedin.thirdeye.datalayer.bao.IAbstractManager#findAll()
+   */
+  @Override
   @Transactional
   public List<E> findAll() {
     return getEntityManager().createQuery("from " + entityClass.getSimpleName(), entityClass)
         .getResultList();
   }
 
+  /* (non-Javadoc)
+   * @see com.linkedin.thirdeye.datalayer.bao.IAbstractManager#findByParams(java.util.Map)
+   */
+  @Override
   @Transactional
   public List<E> findByParams(Map<String, Object> filters) {
     CriteriaBuilder builder = getEntityManager().getCriteriaBuilder();

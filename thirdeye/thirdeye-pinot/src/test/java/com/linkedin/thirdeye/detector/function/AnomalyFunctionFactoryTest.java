@@ -5,7 +5,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 
 public class AnomalyFunctionFactoryTest {
 
@@ -38,8 +38,8 @@ public class AnomalyFunctionFactoryTest {
   }
 
   // helper to abstract specific implementation details.
-  private AnomalyFunctionSpec specWithType(String type) {
-    AnomalyFunctionSpec spec = new AnomalyFunctionSpec();
+  private AnomalyFunctionDTO specWithType(String type) {
+    AnomalyFunctionDTO spec = new AnomalyFunctionDTO();
     spec.setType(type);
     return spec;
   }

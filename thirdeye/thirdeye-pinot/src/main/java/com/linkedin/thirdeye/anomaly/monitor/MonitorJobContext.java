@@ -3,18 +3,18 @@ package com.linkedin.thirdeye.anomaly.monitor;
 import java.util.List;
 
 import com.linkedin.thirdeye.anomaly.job.JobContext;
-import com.linkedin.thirdeye.db.entity.AnomalyJobSpec;
+import com.linkedin.thirdeye.datalayer.dto.JobDTO;
 
 public class MonitorJobContext extends JobContext {
 
-  private List<AnomalyJobSpec> anomalyJobSpecs;
+  private List<JobDTO> anomalyJobSpecs;
   private MonitorConfiguration monitorConfiguration;
 
-  public List<AnomalyJobSpec> getAnomalyJobSpecs() {
+  public List<JobDTO> getAnomalyJobSpecs() {
     return anomalyJobSpecs;
   }
 
-  public void setAnomalyJobSpecs(List<AnomalyJobSpec> anomalyJobSpecs) {
+  public void setAnomalyJobSpecs(List<JobDTO> anomalyJobSpecs) {
     this.anomalyJobSpecs = anomalyJobSpecs;
   }
 

@@ -1,8 +1,8 @@
 package com.linkedin.thirdeye.api;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-
 import java.util.Properties;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 public class DimensionSpec {
   private String name;

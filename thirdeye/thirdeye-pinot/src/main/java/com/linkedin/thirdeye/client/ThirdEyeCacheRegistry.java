@@ -30,7 +30,7 @@ import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClientConfig;
 import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
 import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
 import com.linkedin.thirdeye.dashboard.resources.CacheResource;
-import com.linkedin.thirdeye.db.dao.WebappConfigDAO;
+import com.linkedin.thirdeye.datalayer.bao.WebappConfigManager;
 
 public class ThirdEyeCacheRegistry {
 
@@ -45,7 +45,7 @@ public class ThirdEyeCacheRegistry {
   private CollectionsCache collectionsCache;
   private QueryCache queryCache;
 
-  private static WebappConfigDAO webappConfigDAO;
+  private static WebappConfigManager webappConfigDAO;
   private static PinotThirdEyeClientConfig pinotThirdeyeClientConfig;
   private static ThirdEyeClient thirdEyeClient;
 
@@ -59,7 +59,7 @@ public class ThirdEyeCacheRegistry {
     return Holder.INSTANCE;
   }
 
-  private static void init(ThirdEyeConfiguration config, WebappConfigDAO configDAO) {
+  private static void init(ThirdEyeConfiguration config, WebappConfigManager configDAO) {
     try {
 
       pinotThirdeyeClientConfig = PinotThirdEyeClientConfig.createThirdEyeClientConfig(config);
@@ -72,7 +72,7 @@ public class ThirdEyeCacheRegistry {
   }
 
   private static void init(ThirdEyeConfiguration config, PinotThirdEyeClientConfig pinotThirdEyeClientConfig,
-      WebappConfigDAO configDAO) {
+      WebappConfigManager configDAO) {
     try {
 
       pinotThirdeyeClientConfig = pinotThirdEyeClientConfig;
@@ -88,7 +88,7 @@ public class ThirdEyeCacheRegistry {
    * Initializes webapp caches
    * @param config
    */
-  public static void initializeCaches(ThirdEyeConfiguration config, WebappConfigDAO configDAO) {
+  public static void initializeCaches(ThirdEyeConfiguration config, WebappConfigManager configDAO) {
 
     init(config, configDAO);
 
@@ -105,7 +105,7 @@ public class ThirdEyeCacheRegistry {
    */
   @Deprecated
   public static void initializeCaches(ThirdEyeConfiguration config, PinotThirdEyeClientConfig pinotThirdeyeClientConfig,
-      WebappConfigDAO configDAO) {
+      WebappConfigManager configDAO) {
 
     init(config, pinotThirdeyeClientConfig, configDAO);
 

@@ -1,5 +1,16 @@
 package com.linkedin.thirdeye.dashboard;
 
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
+import java.util.Locale;
+import java.util.Map;
+import java.util.concurrent.ExecutionException;
+
+import javax.ws.rs.WebApplicationException;
+
 import com.github.jknack.handlebars.Handlebars;
 import com.github.jknack.handlebars.Template;
 import com.github.jknack.handlebars.cache.GuavaTemplateCache;
@@ -10,18 +21,9 @@ import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
+
 import io.dropwizard.views.View;
 import io.dropwizard.views.ViewRenderer;
-
-import javax.ws.rs.WebApplicationException;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.io.OutputStreamWriter;
-import java.io.Writer;
-import java.util.Locale;
-import java.util.Map;
-import java.util.concurrent.ExecutionException;
 
 /**
  * A {@link ViewRenderer} which renders Handlebars ({@code .hbs}) templates.

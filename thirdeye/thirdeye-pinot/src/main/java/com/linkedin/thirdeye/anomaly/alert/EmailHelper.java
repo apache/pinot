@@ -1,23 +1,25 @@
 package com.linkedin.thirdeye.anomaly.alert;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+
+import org.jfree.chart.JFreeChart;
+import org.joda.time.DateTime;
+import org.quartz.JobExecutionException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.client.MetricExpression;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.client.comparison.TimeOnTimeComparisonHandler;
 import com.linkedin.thirdeye.client.comparison.TimeOnTimeComparisonRequest;
 import com.linkedin.thirdeye.client.comparison.TimeOnTimeComparisonResponse;
-import com.linkedin.thirdeye.db.entity.AnomalyResult;
-import com.linkedin.thirdeye.db.entity.EmailConfiguration;
+import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
+import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.detector.email.AnomalyGraphGenerator;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
-import org.jfree.chart.JFreeChart;
-import org.joda.time.DateTime;
-import org.quartz.JobExecutionException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public abstract class EmailHelper {
 
@@ -34,10 +36,10 @@ public abstract class EmailHelper {
 
   }
 
-  public static String writeTimeSeriesChart(final EmailConfiguration config,
+  public static String writeTimeSeriesChart(final EmailConfigurationDTO config,
       TimeOnTimeComparisonHandler timeOnTimeComparisonHandler, final DateTime now,
       final DateTime then, final String collection,
-      final Map<AnomalyResult, String> anomaliesWithLabels) throws JobExecutionException {
+      final Map<RawAnomalyResultDTO, String> anomaliesWithLabels) throws JobExecutionException {
     try {
       int windowSize = config.getWindowSize();
       TimeUnit windowUnit = config.getWindowUnit();
@@ -72,7 +74,7 @@ public abstract class EmailHelper {
    * @throws JobExecutionException
    */
   public static TimeOnTimeComparisonResponse getData(
-      TimeOnTimeComparisonHandler timeOnTimeComparisonHandler, EmailConfiguration config,
+      TimeOnTimeComparisonHandler timeOnTimeComparisonHandler, EmailConfigurationDTO config,
       DateTime start, final DateTime end, long baselinePeriodMillis,
       TimeGranularity bucketGranularity) throws JobExecutionException {
     start = calculateGraphDataStart(start, end, bucketGranularity);

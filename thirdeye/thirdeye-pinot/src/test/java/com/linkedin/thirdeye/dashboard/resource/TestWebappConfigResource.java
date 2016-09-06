@@ -11,8 +11,8 @@ import org.testng.annotations.Test;
 import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
 import com.linkedin.thirdeye.dashboard.configs.WebappConfigFactory.WebappConfigType;
 import com.linkedin.thirdeye.dashboard.resources.WebappConfigResource;
+import com.linkedin.thirdeye.datalayer.dto.WebappConfigDTO;
 import com.linkedin.thirdeye.db.dao.AbstractDbTestBase;
-import com.linkedin.thirdeye.db.entity.WebappConfig;
 
 public class TestWebappConfigResource extends AbstractDbTestBase {
 
@@ -30,7 +30,7 @@ public class TestWebappConfigResource extends AbstractDbTestBase {
     Response r = webappConfigResource.createConfig(collection, type, payload);
     id = (Long) r.getEntity();
 
-    WebappConfig webappConfig = webappConfigDAO.findById(id);
+    WebappConfigDTO webappConfig = webappConfigDAO.findById(id);
     Assert.assertEquals(webappConfig.getId(), id);
     Assert.assertEquals(webappConfig.getCollection(), collection);
     Assert.assertEquals(webappConfig.getType(), type);
@@ -40,7 +40,7 @@ public class TestWebappConfigResource extends AbstractDbTestBase {
 
   @Test(dependsOnMethods = {"testCreateConfig"})
   public void testViewConfigs() throws Exception {
-    List<WebappConfig> webappConfigs = webappConfigResource.viewConfigs(id, null, null);
+    List<WebappConfigDTO> webappConfigs = webappConfigResource.viewConfigs(id, null, null);
     Assert.assertEquals(webappConfigs.size(), 1);
     webappConfigs = webappConfigResource.viewConfigs(null, null, null);
     Assert.assertEquals(webappConfigs.size(), 1);
@@ -60,7 +60,7 @@ public class TestWebappConfigResource extends AbstractDbTestBase {
     String updatedPayload = "{ \"collectionName\" : \"update_collection\", \"collectionAlias\" : \"test_alias\" }";
     webappConfigResource.updateConfig(id, updatedCollection, type, updatedPayload);
 
-    WebappConfig webappConfig = webappConfigDAO.findById(id);
+    WebappConfigDTO webappConfig = webappConfigDAO.findById(id);
     Assert.assertEquals(webappConfig.getCollection(), updatedCollection);
     Assert.assertEquals(webappConfig.getType(), type);
     CollectionConfig expectedCollectionConfig = CollectionConfig.fromJSON(updatedPayload, CollectionConfig.class);

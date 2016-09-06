@@ -1,18 +1,8 @@
 package com.linkedin.thirdeye.db.dao;
 
-import com.linkedin.thirdeye.anomaly.job.JobConstants;
-import com.linkedin.thirdeye.common.persistence.PersistenceConfig;
-import com.linkedin.thirdeye.common.persistence.PersistenceUtil;
-import com.linkedin.thirdeye.constant.MetricAggFunction;
-
-import com.linkedin.thirdeye.db.entity.AnomalyFunctionSpec;
-import com.linkedin.thirdeye.db.entity.AnomalyJobSpec;
-import com.linkedin.thirdeye.db.entity.AnomalyResult;
-import com.linkedin.thirdeye.db.entity.EmailConfiguration;
 import java.io.File;
 import java.net.URISyntaxException;
 import java.net.URL;
-
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
@@ -20,7 +10,9 @@ import java.util.HashSet;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+
 import javax.persistence.EntityManager;
+
 import org.apache.tomcat.jdbc.pool.DataSource;
 import org.hibernate.cfg.Environment;
 import org.hibernate.engine.jdbc.connections.internal.DatasourceConnectionProviderImpl;
@@ -29,14 +21,37 @@ import org.joda.time.DateTime;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 
+import com.linkedin.thirdeye.anomaly.job.JobConstants;
+import com.linkedin.thirdeye.common.persistence.PersistenceConfig;
+import com.linkedin.thirdeye.common.persistence.PersistenceUtil;
+import com.linkedin.thirdeye.constant.MetricAggFunction;
+import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
+import com.linkedin.thirdeye.datalayer.bao.EmailConfigurationManager;
+import com.linkedin.thirdeye.datalayer.bao.JobManager;
+import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
+import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
+import com.linkedin.thirdeye.datalayer.bao.TaskManager;
+import com.linkedin.thirdeye.datalayer.bao.WebappConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.hibernate.AnomalyFunctionManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.hibernate.EmailConfigurationManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.hibernate.JobManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.hibernate.MergedAnomalyResultManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.hibernate.RawAnomalyResultManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.hibernate.TaskManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.hibernate.WebappConfigManagerImpl;
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
+import com.linkedin.thirdeye.datalayer.dto.JobDTO;
+import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
+
 public abstract class AbstractDbTestBase {
-  protected AnomalyFunctionDAO anomalyFunctionDAO;
-  protected AnomalyResultDAO anomalyResultDAO;
-  protected AnomalyJobDAO anomalyJobDAO;
-  protected AnomalyTaskDAO anomalyTaskDAO;
-  protected EmailConfigurationDAO emailConfigurationDAO;
-  protected AnomalyMergedResultDAO mergedResultDAO;
-  protected WebappConfigDAO webappConfigDAO;
+  protected AnomalyFunctionManager anomalyFunctionDAO;
+  protected RawAnomalyResultManager anomalyResultDAO;
+  protected JobManager anomalyJobDAO;
+  protected TaskManager anomalyTaskDAO;
+  protected EmailConfigurationManager emailConfigurationDAO;
+  protected MergedAnomalyResultManager mergedResultDAO;
+  protected WebappConfigManager webappConfigDAO;
   private EntityManager entityManager;
 
   @BeforeClass(alwaysRun = true)
@@ -78,13 +93,13 @@ public abstract class AbstractDbTestBase {
 
     PersistenceUtil.init(properties);
 
-    anomalyFunctionDAO = PersistenceUtil.getInstance(AnomalyFunctionDAO.class);
-    anomalyResultDAO = PersistenceUtil.getInstance(AnomalyResultDAO.class);
-    anomalyJobDAO = PersistenceUtil.getInstance(AnomalyJobDAO.class);
-    anomalyTaskDAO = PersistenceUtil.getInstance(AnomalyTaskDAO.class);
-    emailConfigurationDAO = PersistenceUtil.getInstance(EmailConfigurationDAO.class);
-    mergedResultDAO = PersistenceUtil.getInstance(AnomalyMergedResultDAO.class);
-    webappConfigDAO = PersistenceUtil.getInstance(WebappConfigDAO.class);
+    anomalyFunctionDAO = PersistenceUtil.getInstance(AnomalyFunctionManagerImpl.class);
+    anomalyResultDAO = PersistenceUtil.getInstance(RawAnomalyResultManagerImpl.class);
+    anomalyJobDAO = PersistenceUtil.getInstance(JobManagerImpl.class);
+    anomalyTaskDAO = PersistenceUtil.getInstance(TaskManagerImpl.class);
+    emailConfigurationDAO = PersistenceUtil.getInstance(EmailConfigurationManagerImpl.class);
+    mergedResultDAO = PersistenceUtil.getInstance(MergedAnomalyResultManagerImpl.class);
+    webappConfigDAO = PersistenceUtil.getInstance(WebappConfigManagerImpl.class);
     entityManager = PersistenceUtil.getInstance(EntityManager.class);
   }
 
@@ -117,8 +132,8 @@ public abstract class AbstractDbTestBase {
     s.close();
   }
 
-  protected AnomalyFunctionSpec getTestFunctionSpec(String metricName, String collection) {
-    AnomalyFunctionSpec functionSpec = new AnomalyFunctionSpec();
+  protected AnomalyFunctionDTO getTestFunctionSpec(String metricName, String collection) {
+    AnomalyFunctionDTO functionSpec = new AnomalyFunctionDTO();
     functionSpec.setMetricFunction(MetricAggFunction.SUM);
     functionSpec.setMetric(metricName);
     functionSpec.setBucketSize(5);
@@ -134,8 +149,8 @@ public abstract class AbstractDbTestBase {
     return functionSpec;
   }
 
-  protected EmailConfiguration getEmailConfiguration() {
-    EmailConfiguration emailConfiguration = new EmailConfiguration();
+  protected EmailConfigurationDTO getEmailConfiguration() {
+    EmailConfigurationDTO emailConfiguration = new EmailConfigurationDTO();
     emailConfiguration.setCollection("my pinot collection");
     emailConfiguration.setIsActive(false);
     emailConfiguration.setCron("0 0/10 * * *");
@@ -155,8 +170,8 @@ public abstract class AbstractDbTestBase {
     return emailConfiguration;
   }
 
-  protected AnomalyResult getAnomalyResult() {
-    AnomalyResult anomalyResult = new AnomalyResult();
+  protected RawAnomalyResultDTO getAnomalyResult() {
+    RawAnomalyResultDTO anomalyResult = new RawAnomalyResultDTO();
     anomalyResult.setScore(1.1);
     anomalyResult.setStartTimeUtc(System.currentTimeMillis());
     anomalyResult.setEndTimeUtc(System.currentTimeMillis());
@@ -166,8 +181,8 @@ public abstract class AbstractDbTestBase {
     return anomalyResult;
   }
 
-  AnomalyJobSpec getTestJobSpec() {
-    AnomalyJobSpec jobSpec = new AnomalyJobSpec();
+  JobDTO getTestJobSpec() {
+    JobDTO jobSpec = new JobDTO();
     jobSpec.setJobName("Test_Anomaly_Job");
     jobSpec.setStatus(JobConstants.JobStatus.SCHEDULED);
     jobSpec.setScheduleStartTime(System.currentTimeMillis());

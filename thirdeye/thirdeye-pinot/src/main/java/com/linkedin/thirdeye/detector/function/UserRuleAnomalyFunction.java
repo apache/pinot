@@ -17,7 +17,7 @@ import org.slf4j.LoggerFactory;
 import com.google.common.base.Joiner;
 import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
-import com.linkedin.thirdeye.db.entity.AnomalyResult;
+import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 
 /**
  * See params for property configuration.
@@ -75,19 +75,19 @@ public class UserRuleAnomalyFunction extends BaseAnomalyFunction {
     return message;
   }
 
-  private AnomalyResult getMergedAnomalyResults(List<AnomalyResult> anomalyResults,
+  private RawAnomalyResultDTO getMergedAnomalyResults(List<RawAnomalyResultDTO> anomalyResults,
       List<Double> baselineValues, List<Double> currentValues, double threshold, String baselineProp) {
     int n = anomalyResults.size();
-    AnomalyResult firstAnomalyResult = anomalyResults.get(0);
-    AnomalyResult lastAnomalyResult = anomalyResults.get(n - 1);
-    AnomalyResult mergedAnomalyResult = new AnomalyResult();
+    RawAnomalyResultDTO firstAnomalyResult = anomalyResults.get(0);
+    RawAnomalyResultDTO lastAnomalyResult = anomalyResults.get(n - 1);
+    RawAnomalyResultDTO mergedAnomalyResult = new RawAnomalyResultDTO();
     mergedAnomalyResult.setDimensions(firstAnomalyResult.getDimensions());
     mergedAnomalyResult.setProperties(firstAnomalyResult.getProperties());
     mergedAnomalyResult.setStartTimeUtc(firstAnomalyResult.getStartTimeUtc());
     mergedAnomalyResult.setEndTimeUtc(lastAnomalyResult.getEndTimeUtc());
     mergedAnomalyResult.setWeight(firstAnomalyResult.getWeight());
     double summedScore = 0;
-    for (AnomalyResult anomalyResult : anomalyResults) {
+    for (RawAnomalyResultDTO anomalyResult : anomalyResults) {
       summedScore += anomalyResult.getScore();
     }
     mergedAnomalyResult.setScore(summedScore / n);
@@ -100,10 +100,10 @@ public class UserRuleAnomalyFunction extends BaseAnomalyFunction {
   }
 
   @Override
-  public List<AnomalyResult> analyze(DimensionKey dimensionKey, MetricTimeSeries timeSeries,
-      DateTime windowStart, DateTime windowEnd, List<AnomalyResult> knownAnomalies)
+  public List<RawAnomalyResultDTO> analyze(DimensionKey dimensionKey, MetricTimeSeries timeSeries,
+      DateTime windowStart, DateTime windowEnd, List<RawAnomalyResultDTO> knownAnomalies)
       throws Exception {
-    List<AnomalyResult> anomalyResults = new ArrayList<>();
+    List<RawAnomalyResultDTO> anomalyResults = new ArrayList<>();
 
     // Parse function properties
     Properties props = getProperties();
@@ -150,7 +150,7 @@ public class UserRuleAnomalyFunction extends BaseAnomalyFunction {
       double currentValue = timeSeries.get(currentKey, metric).doubleValue();
       double baselineValue = timeSeries.get(baselineKey, metric).doubleValue();
       if (isAnomaly(currentValue, baselineValue, changeThreshold)) {
-        AnomalyResult anomalyResult = new AnomalyResult();
+        RawAnomalyResultDTO anomalyResult = new RawAnomalyResultDTO();
         anomalyResult.setDimensions(CSV.join(dimensionKey.getDimensionValues()));
         anomalyResult.setProperties(getSpec().getProperties());
         anomalyResult.setStartTimeUtc(currentKey);
@@ -187,23 +187,23 @@ public class UserRuleAnomalyFunction extends BaseAnomalyFunction {
    * @param bucketMillis
    * @return
    */
-  List<AnomalyResult> getFilteredAndMergedAnomalyResults(List<AnomalyResult> anomalyResults,
+  List<RawAnomalyResultDTO> getFilteredAndMergedAnomalyResults(List<RawAnomalyResultDTO> anomalyResults,
       int minConsecutiveSize, long bucketMillis, List<Double> baselineValues,
       List<Double> currentValues, double threshold, String baselineProp) {
 
     int anomalyResultsSize = anomalyResults.size();
     if (minConsecutiveSize > 1) {
-      List<AnomalyResult> anomalyResultsAggregated = new ArrayList<>();
+      List<RawAnomalyResultDTO> anomalyResultsAggregated = new ArrayList<>();
 
       if (anomalyResultsSize >= minConsecutiveSize) {
         int remainingSize = anomalyResultsSize;
 
-        List<AnomalyResult> currentConsecutiveResults = new ArrayList<>();
+        List<RawAnomalyResultDTO> currentConsecutiveResults = new ArrayList<>();
         List<Double> consecutiveCurrentValues = new ArrayList<>();
         List<Double> consecutiveBaselineValues = new ArrayList<>();
 
         int n = -1;
-        for (AnomalyResult anomalyResult : anomalyResults) {
+        for (RawAnomalyResultDTO anomalyResult : anomalyResults) {
           n++;
           if (currentConsecutiveResults.isEmpty()) {
             currentConsecutiveResults.add(anomalyResult);
@@ -211,7 +211,7 @@ public class UserRuleAnomalyFunction extends BaseAnomalyFunction {
             consecutiveBaselineValues.add(baselineValues.get(n));
             remainingSize--;
           } else {
-            AnomalyResult lastConsecutiveAnomalyResult =
+            RawAnomalyResultDTO lastConsecutiveAnomalyResult =
                 currentConsecutiveResults.get(currentConsecutiveResults.size() - 1);
             long lastStartTime = lastConsecutiveAnomalyResult.getStartTimeUtc();
             long currentStarTime = anomalyResult.getStartTimeUtc();

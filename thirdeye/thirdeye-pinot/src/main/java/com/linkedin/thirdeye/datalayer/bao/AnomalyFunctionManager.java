@@ -1,42 +1,16 @@
 package com.linkedin.thirdeye.datalayer.bao;
 
-import com.linkedin.thirdeye.datalayer.dao.AnomalyFunctionDAO;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import com.linkedin.thirdeye.datalayer.entity.AnomalyFunction;
 import java.util.List;
 
-public class AnomalyFunctionManager extends AbstractManager<AnomalyFunctionDTO, AnomalyFunction> {
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 
-  // TODO: inject this
-  private AnomalyFunctionDAO anomalyFunctionDAO;
 
-  public AnomalyFunctionManager(AnomalyFunctionDAO functionDAO) {
-    this.anomalyFunctionDAO = functionDAO;
-  }
+public interface AnomalyFunctionManager extends AbstractManager<AnomalyFunctionDTO> {
 
-  public List<AnomalyFunctionDTO> findAllByCollection(String collection) {
-    return null;
-  }
+  List<AnomalyFunctionDTO> findAllByCollection(String collection);
 
-  public List<String> findDistinctMetricsByCollection(String collection) {
-    return null;
-  }
+  List<String> findDistinctMetricsByCollection(String collection);
 
-  public List<AnomalyFunctionDTO> findAllActiveFunctions() {
-    return null;
-  }
+  List<AnomalyFunctionDTO> findAllActiveFunctions();
 
-  @Override
-  protected AnomalyFunctionDTO covertToDTO(AnomalyFunction e, AnomalyFunctionDTO d) {
-    super.covertToDTO(e, d);
-    // // TODO: 9/2/16 populate dto here
-    return d;
-  }
-
-  @Override
-  protected AnomalyFunction covertToEntity(AnomalyFunctionDTO d, AnomalyFunction e) {
-    super.covertToEntity(d, e);
-    // TODO : populate entitiy here
-    return e;
-  }
 }

@@ -1,20 +1,27 @@
 package com.linkedin.thirdeye.datalayer.bao;
 
+import java.util.List;
+import java.util.Map;
+
 import com.linkedin.thirdeye.datalayer.dto.AbstractDTO;
-import com.linkedin.thirdeye.datalayer.entity.AbstractEntity;
 
-public abstract class AbstractManager<DTO extends AbstractDTO, ENTITY extends AbstractEntity> {
 
-  // Let all managers override these methods to hydrate entities / dtos, also they can set mappings if required
-  protected DTO covertToDTO(ENTITY e, DTO d) {
-    d.setId(e.getId());
-    return d;
-  }
+public interface AbstractManager<E extends AbstractDTO> {
 
-  protected ENTITY covertToEntity(DTO d, ENTITY e) {
-    e.setId(d.getId());
-    return e;
-  }
+  Long save(E entity);
 
-  // add common methods eg: save, delete, update etc which takes dto and converts to entity and performs the operation
+  void update(E entity);
+
+  void updateAll(List<E> entities);
+
+  E findById(Long id);
+
+  void delete(E entity);
+
+  void deleteById(Long id);
+
+  List<E> findAll();
+
+  List<E> findByParams(Map<String, Object> filters);
+
 }

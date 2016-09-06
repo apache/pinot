@@ -1,28 +1,24 @@
-package com.linkedin.thirdeye.db.entity;
-import com.google.common.base.Joiner;
+package com.linkedin.thirdeye.datalayer.pojo;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-
 import java.util.Properties;
-import javax.persistence.CascadeType;
+
 import javax.persistence.Column;
 import javax.persistence.Entity;
-import javax.persistence.FetchType;
-import javax.persistence.JoinColumn;
-import javax.persistence.ManyToOne;
-import javax.persistence.OneToOne;
 import javax.persistence.Table;
 
 import org.apache.commons.lang.ObjectUtils;
 import org.joda.time.DateTime;
 
+import com.google.common.base.Joiner;
 import com.google.common.base.MoreObjects;
 
 @Entity
 @Table(name = "anomaly_results")
-public class AnomalyResult extends AbstractBaseEntity implements Comparable<AnomalyResult> {
+public class RawAnomalyResultBean extends AbstractBean implements Comparable<RawAnomalyResultBean> {
 
   private static Joiner SEMICOLON = Joiner.on(";");
   private static Joiner EQUALS = Joiner.on("=");
@@ -53,30 +49,14 @@ public class AnomalyResult extends AbstractBaseEntity implements Comparable<Anom
   @Column(name = "creation_time_utc", nullable = false)
   private Long creationTimeUtc;
 
-  @OneToOne(cascade = CascadeType.ALL, fetch = FetchType.EAGER, orphanRemoval = true)
-  @JoinColumn(name = "anomaly_feedback_id")
-  private AnomalyFeedback feedback;
-
   @Column(name = "data_missing")
   private boolean dataMissing;
 
   @Column
   private boolean merged;
 
-  @ManyToOne(fetch = FetchType.EAGER)
-  @JoinColumn(name = "function_id")
-  private AnomalyFunctionSpec function;
-
-  public AnomalyResult() {
+  public RawAnomalyResultBean() {
     creationTimeUtc = DateTime.now().getMillis();
-  }
-
-  public AnomalyFunctionSpec getFunction() {
-    return function;
-  }
-
-  public void setFunction(AnomalyFunctionSpec function) {
-    this.function = function;
   }
 
   public String getDimensions() {
@@ -86,25 +66,6 @@ public class AnomalyResult extends AbstractBaseEntity implements Comparable<Anom
   public void setDimensions(String dimensions) {
     this.dimensions = dimensions;
   }
-
-  // --- TODO: remove methods above this comment ---
-  public Long getFunctionId() {
-    return function.getId();
-  }
-
-  public String getMetric() {
-    return function.getMetric();
-  }
-
-  public String getCollection() {
-    return function.getCollection();
-  }
-
-  public String getFilters() {
-    return function.getFilters();
-  }
-
-  // --- remove methods above this comment ---
 
   public Long getStartTimeUtc() {
     return startTimeUtc;
@@ -162,13 +123,6 @@ public class AnomalyResult extends AbstractBaseEntity implements Comparable<Anom
     this.creationTimeUtc = creationTimeUtc;
   }
 
-  public AnomalyFeedback getFeedback() {
-    return feedback;
-  }
-
-  public void setFeedback(AnomalyFeedback feedback) {
-    this.feedback = feedback;
-  }
 
   public boolean isDataMissing() {
     return dataMissing;
@@ -188,40 +142,37 @@ public class AnomalyResult extends AbstractBaseEntity implements Comparable<Anom
 
   @Override
   public String toString() {
-    return MoreObjects.toStringHelper(this).add("id", getId()).add("function", getFunction())
-        .add("startTimeUtc", startTimeUtc).add("dimensions", dimensions)
-        .add("endTimeUtc", endTimeUtc).add("score", score).add("weight", weight)
-        .add("properties", properties).add("message", message)
-        .add("creationTimeUtc", creationTimeUtc).add("feedback", feedback).toString();
+    return MoreObjects.toStringHelper(this).add("id", getId()).add("startTimeUtc", startTimeUtc)
+        .add("dimensions", dimensions).add("endTimeUtc", endTimeUtc).add("score", score)
+        .add("weight", weight).add("properties", properties).add("message", message)
+        .add("creationTimeUtc", creationTimeUtc).toString();
   }
 
   @Override
   public boolean equals(Object o) {
-    if (!(o instanceof AnomalyResult)) {
+    if (!(o instanceof RawAnomalyResultBean)) {
       return false;
     }
-    AnomalyResult r = (AnomalyResult) o;
-    return Objects.equals(getId(), r.getId())
-        && Objects.equals(function, r.getFunction())
-        && Objects.equals(startTimeUtc, r.getStartTimeUtc())
+    RawAnomalyResultBean r = (RawAnomalyResultBean) o;
+    return Objects.equals(getId(), r.getId()) && Objects.equals(startTimeUtc, r.getStartTimeUtc())
         && Objects.equals(dimensions, r.getDimensions())
-        && Objects.equals(endTimeUtc, r.getEndTimeUtc())
-        && Objects.equals(score, r.getScore()) && Objects.equals(weight, r.getWeight())
-        && Objects.equals(properties, r.getProperties()) && Objects.equals(message, r.getMessage());
+        && Objects.equals(endTimeUtc, r.getEndTimeUtc()) && Objects.equals(score, r.getScore())
+        && Objects.equals(weight, r.getWeight()) && Objects.equals(properties, r.getProperties())
+        && Objects.equals(message, r.getMessage());
     // Intentionally omit creationTimeUtc, since start/end are the truly significant dates for
     // anomalies
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(getId(), getFunction(), dimensions, startTimeUtc,
-        endTimeUtc, score, weight, properties, message);
+    return Objects.hash(getId(), dimensions, startTimeUtc, endTimeUtc, score, weight, properties,
+        message);
     // Intentionally omit creationTimeUtc, since start/end are the truly significant dates for
     // anomalies
   }
 
   @Override
-  public int compareTo(AnomalyResult o) {
+  public int compareTo(RawAnomalyResultBean o) {
     // compare by dimension, -startTime, functionId, id
     int diff = ObjectUtils.compare(getDimensions(), o.getDimensions());
     if (diff != 0) {
@@ -229,10 +180,6 @@ public class AnomalyResult extends AbstractBaseEntity implements Comparable<Anom
     }
     diff = -ObjectUtils.compare(startTimeUtc, o.getStartTimeUtc()); // inverted to sort by
     // decreasing time
-    if (diff != 0) {
-      return diff;
-    }
-    diff = ObjectUtils.compare(getFunctionId(), o.getFunctionId());
     if (diff != 0) {
       return diff;
     }

@@ -1,6 +1,5 @@
-package com.linkedin.thirdeye.db.entity;
+package com.linkedin.thirdeye.datalayer.pojo;
 
-import com.linkedin.thirdeye.constant.MetricAggFunction;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
@@ -13,11 +12,12 @@ import javax.persistence.Table;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.base.MoreObjects;
 import com.google.common.collect.Multimap;
+import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 @Entity
 @Table(name = "anomaly_functions")
-public class AnomalyFunctionSpec extends AbstractBaseEntity {
+public class AnomalyFunctionBean extends AbstractBean {
 
   @Column(name = "collection", nullable = false)
   private String collection;
@@ -207,16 +207,15 @@ public class AnomalyFunctionSpec extends AbstractBaseEntity {
 
   @Override
   public boolean equals(Object o) {
-    if (!(o instanceof AnomalyFunctionSpec)) {
+    if (!(o instanceof AnomalyFunctionBean)) {
       return false;
     }
-    AnomalyFunctionSpec af = (AnomalyFunctionSpec) o;
+    AnomalyFunctionBean af = (AnomalyFunctionBean) o;
     return Objects.equals(getId(), af.getId()) && Objects.equals(collection, af.getCollection())
         && Objects.equals(metric, af.getMetric())
         && Objects.equals(metricFunction, af.getMetricFunction())
-        && Objects.equals(type, af.getType())
-        && Objects.equals(isActive, af.getIsActive()) && Objects.equals(cron, af.getCron())
-        && Objects.equals(properties, af.getProperties())
+        && Objects.equals(type, af.getType()) && Objects.equals(isActive, af.getIsActive())
+        && Objects.equals(cron, af.getCron()) && Objects.equals(properties, af.getProperties())
         && Objects.equals(bucketSize, af.getBucketSize())
         && Objects.equals(bucketUnit, af.getBucketUnit())
         && Objects.equals(windowSize, af.getWindowSize())
@@ -229,8 +228,8 @@ public class AnomalyFunctionSpec extends AbstractBaseEntity {
 
   @Override
   public int hashCode() {
-    return Objects.hash(getId(), collection, metric, metricFunction, type, isActive, cron, properties,
-        bucketSize, bucketUnit, windowSize, windowUnit, windowDelay, windowDelayUnit,
+    return Objects.hash(getId(), collection, metric, metricFunction, type, isActive, cron,
+        properties, bucketSize, bucketUnit, windowSize, windowUnit, windowDelay, windowDelayUnit,
         exploreDimensions, filters);
   }
 

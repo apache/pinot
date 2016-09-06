@@ -1,9 +1,5 @@
 package com.linkedin.thirdeye.anomaly.alert;
 
-import com.linkedin.thirdeye.db.dao.AnomalyJobDAO;
-import com.linkedin.thirdeye.db.dao.AnomalyTaskDAO;
-import com.linkedin.thirdeye.db.dao.EmailConfigurationDAO;
-
 import java.util.ArrayList;
 import java.util.List;
 
@@ -26,7 +22,10 @@ import org.slf4j.LoggerFactory;
 import com.linkedin.thirdeye.anomaly.job.JobContext;
 import com.linkedin.thirdeye.anomaly.job.JobScheduler;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
-import com.linkedin.thirdeye.db.entity.EmailConfiguration;
+import com.linkedin.thirdeye.datalayer.bao.EmailConfigurationManager;
+import com.linkedin.thirdeye.datalayer.bao.JobManager;
+import com.linkedin.thirdeye.datalayer.bao.TaskManager;
+import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
 
 /**
  * Scheduler for anomaly detection jobs
@@ -36,12 +35,12 @@ public class AlertJobScheduler implements JobScheduler {
   private static final Logger LOG = LoggerFactory.getLogger(AlertJobScheduler.class);
   private SchedulerFactory schedulerFactory;
   private Scheduler quartzScheduler;
-  private AnomalyJobDAO anomalyJobDAO;
-  private AnomalyTaskDAO anomalyTaskDAO;
-  private EmailConfigurationDAO emailConfigurationDAO;
+  private JobManager anomalyJobDAO;
+  private TaskManager anomalyTaskDAO;
+  private EmailConfigurationManager emailConfigurationDAO;
 
-  public AlertJobScheduler(AnomalyJobDAO anomalyJobDAO, AnomalyTaskDAO anomalyTaskDAO,
-      EmailConfigurationDAO emailConfigurationDAO) {
+  public AlertJobScheduler(JobManager anomalyJobDAO, TaskManager anomalyTaskDAO,
+      EmailConfigurationManager emailConfigurationDAO) {
     this.anomalyJobDAO = anomalyJobDAO;
     this.anomalyTaskDAO = anomalyTaskDAO;
     this.emailConfigurationDAO = emailConfigurationDAO;
@@ -68,8 +67,8 @@ public class AlertJobScheduler implements JobScheduler {
     quartzScheduler.start();
 
     // start all active alert functions
-    List<EmailConfiguration> alertConfigs = emailConfigurationDAO.findAll();
-    for (EmailConfiguration alertConfig : alertConfigs) {
+    List<EmailConfigurationDTO> alertConfigs = emailConfigurationDAO.findAll();
+    for (EmailConfigurationDTO alertConfig : alertConfigs) {
       if (alertConfig.getIsActive()) {
         AlertJobContext alertJobContext = new AlertJobContext();
         alertJobContext.setAnomalyJobDAO(anomalyJobDAO);
@@ -88,7 +87,7 @@ public class AlertJobScheduler implements JobScheduler {
   }
 
   public void startJob(Long id) throws SchedulerException {
-    EmailConfiguration alertConfig = emailConfigurationDAO.findById(id);
+    EmailConfigurationDTO alertConfig = emailConfigurationDAO.findById(id);
     if (alertConfig == null) {
       throw new IllegalArgumentException("No alert config with id " + id);
     }
@@ -120,7 +119,7 @@ public class AlertJobScheduler implements JobScheduler {
   }
 
   public void runAdHoc(Long id, DateTime windowStartTime, DateTime windowEndTime) {
-    EmailConfiguration alertConfig = emailConfigurationDAO.findById(id);
+    EmailConfigurationDTO alertConfig = emailConfigurationDAO.findById(id);
     if (alertConfig == null) {
       throw new IllegalArgumentException("No alert config with id " + id);
     }
@@ -151,7 +150,7 @@ public class AlertJobScheduler implements JobScheduler {
   }
 
 
-  private void scheduleJob(JobContext jobContext, EmailConfiguration alertConfig) {
+  private void scheduleJob(JobContext jobContext, EmailConfigurationDTO alertConfig) {
 
     LOG.info("Starting {}", jobContext.getJobName());
     String triggerKey = String.format("alert_scheduler_trigger_%d", alertConfig.getId());
