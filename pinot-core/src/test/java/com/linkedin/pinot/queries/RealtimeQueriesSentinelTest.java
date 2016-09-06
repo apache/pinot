@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.queries;
 
+import com.linkedin.pinot.common.query.QueryRequest;
 import com.linkedin.pinot.common.response.broker.BrokerResponseNative;
 import com.linkedin.pinot.core.data.manager.offline.TableDataManagerProvider;
 import com.linkedin.pinot.core.query.reduce.BrokerReduceService;
@@ -119,7 +120,8 @@ public class RealtimeQueriesSentinelTest {
       InstanceRequest instanceRequest = new InstanceRequest(counter++, brokerRequest);
       instanceRequest.setSearchSegments(new ArrayList<String>());
       instanceRequest.getSearchSegments().add("testTable_testTable");
-      DataTable instanceResponse = QUERY_EXECUTOR.processQuery(instanceRequest);
+      QueryRequest queryRequest = new QueryRequest(instanceRequest);
+      DataTable instanceResponse = QUERY_EXECUTOR.processQuery(queryRequest);
       instanceResponseMap.clear();
       instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
       final BrokerResponseNative brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
@@ -155,7 +157,8 @@ public class RealtimeQueriesSentinelTest {
     InstanceRequest instanceRequest = new InstanceRequest(485, brokerRequest);
     instanceRequest.setSearchSegments(new ArrayList<String>());
     instanceRequest.getSearchSegments().add("testTable_testTable");
-    DataTable instanceResponse = QUERY_EXECUTOR.processQuery(instanceRequest);
+    QueryRequest queryRequest = new QueryRequest(instanceRequest);
+    DataTable instanceResponse = QUERY_EXECUTOR.processQuery(queryRequest);
     instanceResponseMap.clear();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
     BrokerResponseNative brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
@@ -175,7 +178,8 @@ public class RealtimeQueriesSentinelTest {
       InstanceRequest instanceRequest = new InstanceRequest(counter++, brokerRequest);
       instanceRequest.setSearchSegments(new ArrayList<String>());
       instanceRequest.getSearchSegments().add("testTable_testTable");
-      DataTable instanceResponse = QUERY_EXECUTOR.processQuery(instanceRequest);
+      QueryRequest queryRequest = new QueryRequest(instanceRequest);
+      DataTable instanceResponse = QUERY_EXECUTOR.processQuery(queryRequest);
       instanceResponseMap.clear();
       instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
       Map<Object, Double> expected = groupBy.groupResults;

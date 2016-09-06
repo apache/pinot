@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.server.integration;
 
+import com.linkedin.pinot.common.query.QueryRequest;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
 import java.util.ArrayList;
@@ -78,7 +79,8 @@ public class InstanceServerStarter {
     brokerRequest.setQuerySource(querySource);
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
     try {
-      DataTable instanceResponse = queryExecutor.processQuery(instanceRequest);
+      QueryRequest queryRequest = new QueryRequest(instanceRequest);
+      DataTable instanceResponse = queryExecutor.processQuery(queryRequest);
       System.out.println(instanceResponse.toString());
       System.out.println("Query Time Used : " + instanceResponse.getMetadata().get("timeUsedMs"));
     } catch (Exception e) {

@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.transport.scattergather;
 
+import io.netty.channel.ChannelHandlerContext;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -653,7 +654,7 @@ public class ScatterGatherTest {
     }
 
     @Override
-    public byte[] processRequest(ByteBuf request) {
+    public byte[] processRequest(ChannelHandlerContext channelHandlerContext, ByteBuf request) {
 
       if (_sleepTimeMS > 0) {
         try {

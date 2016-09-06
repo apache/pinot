@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.broker.broker.helix;
 
+import com.linkedin.pinot.requestHandler.BrokerRequestHandler;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -54,6 +55,7 @@ import com.linkedin.pinot.routing.RoutingTableSelectorFactory;
  *
  */
 public class HelixBrokerStarter {
+
   private static final String PROPERTY_STORE = "PROPERTYSTORE";
 
   private final HelixManager _helixManager;
@@ -87,7 +89,7 @@ public class HelixBrokerStarter {
                         + _pinotHelixProperties.getInt(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT,
                     CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT));
 
-    _pinotHelixProperties.addProperty("pinot.broker.id", brokerId);
+    _pinotHelixProperties.addProperty(BrokerRequestHandler.BROKER_ID_CONFIG_KEY, brokerId);
     setupHelixSystemProperties();
 
     // Remove all white-spaces from the list of zkServers (if any).

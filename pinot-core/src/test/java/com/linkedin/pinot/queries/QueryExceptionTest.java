@@ -15,15 +15,35 @@
  */
 package com.linkedin.pinot.queries;
 
+import com.linkedin.pinot.common.metrics.ServerMetrics;
+import com.linkedin.pinot.common.query.QueryExecutor;
+import com.linkedin.pinot.common.query.QueryRequest;
+import com.linkedin.pinot.common.query.ReduceService;
+import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.request.InstanceRequest;
+import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.response.broker.BrokerResponseNative;
+import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.common.utils.DataTable;
+import com.linkedin.pinot.core.data.manager.config.FileBasedInstanceDataManagerConfig;
+import com.linkedin.pinot.core.data.manager.offline.FileBasedInstanceDataManager;
 import com.linkedin.pinot.core.data.manager.offline.TableDataManagerProvider;
+import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import com.linkedin.pinot.core.query.executor.ServerQueryExecutorV1Impl;
 import com.linkedin.pinot.core.query.reduce.BrokerReduceService;
+import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
+import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import com.linkedin.pinot.pql.parsers.Pql2Compiler;
+import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
+import com.linkedin.pinot.util.TestUtils;
+import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-
 import org.antlr.runtime.RecognitionException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
@@ -33,27 +53,6 @@ import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-
-import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.common.query.QueryExecutor;
-import com.linkedin.pinot.common.query.ReduceService;
-import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.request.InstanceRequest;
-import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.common.utils.DataTable;
-import com.linkedin.pinot.core.data.manager.config.FileBasedInstanceDataManagerConfig;
-import com.linkedin.pinot.core.data.manager.offline.FileBasedInstanceDataManager;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import com.linkedin.pinot.core.query.executor.ServerQueryExecutorV1Impl;
-import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
-import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import com.linkedin.pinot.pql.parsers.Pql2Compiler;
-import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
-import com.linkedin.pinot.util.TestUtils;
-import com.yammer.metrics.core.MetricsRegistry;
 
 
 public class QueryExceptionTest {
@@ -128,7 +127,8 @@ public class QueryExceptionTest {
     InstanceRequest instanceRequest = new InstanceRequest(1, brokerRequest);
     instanceRequest.setSearchSegments(new ArrayList<String>());
     instanceRequest.getSearchSegments().add(segmentName);
-    final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(instanceRequest);
+    QueryRequest queryRequest = new QueryRequest(instanceRequest);
+    final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(queryRequest);
     instanceResponseMap.clear();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
     final BrokerResponseNative brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
@@ -144,7 +144,8 @@ public class QueryExceptionTest {
     InstanceRequest instanceRequest = new InstanceRequest(1, brokerRequest);
     instanceRequest.setSearchSegments(new ArrayList<String>());
     instanceRequest.getSearchSegments().add(segmentName);
-    final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(instanceRequest);
+    QueryRequest queryRequest = new QueryRequest(instanceRequest);
+    final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(queryRequest);
     instanceResponseMap.clear();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
     final BrokerResponseNative brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
@@ -161,7 +162,8 @@ public class QueryExceptionTest {
     InstanceRequest instanceRequest = new InstanceRequest(1, brokerRequest);
     instanceRequest.setSearchSegments(new ArrayList<String>());
     instanceRequest.getSearchSegments().add(segmentName);
-    final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(instanceRequest);
+    QueryRequest queryRequest = new QueryRequest(instanceRequest);
+    final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(queryRequest);
     instanceResponseMap.clear();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
     final BrokerResponseNative brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
@@ -178,7 +180,8 @@ public class QueryExceptionTest {
     InstanceRequest instanceRequest = new InstanceRequest(1, brokerRequest);
     instanceRequest.setSearchSegments(new ArrayList<String>());
     instanceRequest.getSearchSegments().add(segmentName);
-    final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(instanceRequest);
+    QueryRequest queryRequest = new QueryRequest(instanceRequest);
+    final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(queryRequest);
     instanceResponseMap.clear();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
     final BrokerResponseNative brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);

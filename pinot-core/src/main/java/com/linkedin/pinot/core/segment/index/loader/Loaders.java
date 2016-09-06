@@ -63,6 +63,7 @@ public class Loaders {
       SegmentMetadataImpl metadata = new SegmentMetadataImpl(indexDir);
       SegmentVersion configuredVersionToLoad = getSegmentVersionToLoad(indexLoadingConfigMetadata);
       SegmentVersion metadataVersion = metadata.getSegmentVersion();
+
       if (indexLoadingConfigMetadata != null) {
         StarTreeFormatVersion starTreeVersionToLoad = getStarTreeVersionToLoad(indexLoadingConfigMetadata);
         StarTreeSerDe.convertStarTreeFormatIfNeeded(indexDir, starTreeVersionToLoad);

@@ -190,7 +190,7 @@ public class NettyCloseChannelTest {
     }
 
     @Override
-    public byte[] processRequest(ByteBuf request) {
+    public byte[] processRequest(ChannelHandlerContext channelHandlerContext, ByteBuf request) {
       byte[] b = new byte[request.readableBytes()];
       request.readBytes(b);
       if (null != _responseHandlingLatch) {

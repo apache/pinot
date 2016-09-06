@@ -57,23 +57,14 @@ import org.eclipse.jetty.webapp.WebAppContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
-/**
- * Aug 4, 2014
- */
 public class BrokerServerBuilder {
   private static final String TRANSPORT_CONFIG_PREFIX = "pinot.broker.transport";
   private static final String CLIENT_CONFIG_PREFIX = "pinot.broker.client";
   private static final String METRICS_CONFIG_PREFIX = "pinot.broker.metrics";
-  private static final String BROKER_TIME_OUT_CONFIG = "pinot.broker.timeoutMs";
+  private static final long DEFAULT_BROKER_DELAY_SHUTDOWN_TIME_MS = 10 * 1000L;
   private static final String BROKER_DELAY_SHUTDOWN_TIME_CONFIG = "pinot.broker.delayShutdownTimeMs";
 
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerServerBuilder.class);
-  private static final long DEFAULT_BROKER_TIME_OUT_MS = 10 * 1000L;
-  private static final long DEFAULT_BROKER_DELAY_SHUTDOWN_TIME_MS = 10 * 1000L;
-  private static final int DEFAULT_BROKER_QUERY_RESPONSE_LIMIT = Integer.MAX_VALUE;
-  private static final String BROKER_QUERY_RESPONSE_LIMIT_CONFIG = "pinot.broker.query.response.limit";
-
   // Connection Pool Related
   private KeyedPool<ServerInstance, NettyClientConnection> _connPool;
   private ScheduledThreadPoolExecutor _poolTimeoutExecutor;
@@ -172,20 +163,11 @@ public class BrokerServerBuilder {
     _scatterGather = new ScatterGatherImpl(_connPool, _requestSenderPool);
 
     // Setup Broker Request Handler
-    long brokerTimeOutMs = DEFAULT_BROKER_TIME_OUT_MS;
-    if (_config.containsKey(BROKER_TIME_OUT_CONFIG)) {
-      try {
-        brokerTimeOutMs = _config.getLong(BROKER_TIME_OUT_CONFIG);
-      } catch (Exception e) {
-        LOGGER.warn("Caught exception while reading broker timeout from config, using default value", e);
-      }
-    }
-    LOGGER.info("Broker timeout is - " + brokerTimeOutMs + " ms");
 
-    int queryResponseLimit = _config.getInt(BROKER_QUERY_RESPONSE_LIMIT_CONFIG, DEFAULT_BROKER_QUERY_RESPONSE_LIMIT);
+
     ReduceServiceRegistry reduceServiceRegistry = buildReduceServiceRegistry();
     _requestHandler = new BrokerRequestHandler(_routingTable, _timeBoundaryService, _scatterGather,
-        reduceServiceRegistry, _brokerMetrics, brokerTimeOutMs, queryResponseLimit);
+        reduceServiceRegistry, _brokerMetrics, _config);
 
     LOGGER.info("Network initialized !!");
   }
@@ -239,7 +221,7 @@ public class BrokerServerBuilder {
     _routingTable.start();
     _state.set(State.RUNNING);
     if (listener != null) {
-      listener.init(_connPool, DEFAULT_BROKER_TIME_OUT_MS);
+      listener.init(_connPool, BrokerRequestHandler.DEFAULT_BROKER_TIME_OUT_MS);
     }
     LOGGER.info("Network running !!");
 

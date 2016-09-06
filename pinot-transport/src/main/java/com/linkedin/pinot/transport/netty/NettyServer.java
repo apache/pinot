@@ -34,7 +34,6 @@ import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.metrics.AggregatedMetricsRegistry;
 import com.linkedin.pinot.common.metrics.MetricsHelper;
 import com.linkedin.pinot.common.metrics.MetricsHelper.TimerContext;
-import com.linkedin.pinot.common.query.QueryExecutor;
 import com.linkedin.pinot.transport.metrics.AggregatedTransportServerMetrics;
 import com.linkedin.pinot.transport.metrics.NettyServerMetrics;
 
@@ -56,7 +55,7 @@ public abstract class NettyServer implements Runnable {
    * The request handler callback which processes the incoming request.
    * This method is executed by the Netty worker thread.
    */
-  public static interface RequestHandler {
+  public interface RequestHandler {
     /**
      * Callback for Servers to process the request and return the response.
      * The ownership of the request bytebuf resides with the caler (NettyServer).
@@ -68,20 +67,22 @@ public abstract class NettyServer implements Runnable {
      * If the implementation throws runtime exceptions, then the underlying connection
      * will be terminated.
      *
+     *
+     * @param channelHandlerContext
      * @param request Serialized request
      * @return Serialized response
      */
-    public byte[] processRequest(ByteBuf request);
+    byte[] processRequest(ChannelHandlerContext channelHandlerContext, ByteBuf request);
   }
 
-  public static interface RequestHandlerFactory {
+  public interface RequestHandlerFactory {
 
     /**
      * Request Handler Factory. The RequestHandler objects are not expected to be
      * thread-safe. Hence, we need a factory for the Channel Initializer to use for each incoming channel.
      * @return
      */
-    public RequestHandler createNewRequestHandler();
+    RequestHandler createNewRequestHandler();
   }
 
   /**
@@ -215,7 +216,7 @@ public abstract class NettyServer implements Runnable {
 
       //Call processing handler
       _lastProcessingLatency = MetricsHelper.startTimer();
-      byte[] response = _handler.processRequest(request);
+      byte[] response = _handler.processRequest(ctx, request);
       _lastProcessingLatency.stop();
 
       // Send Response
