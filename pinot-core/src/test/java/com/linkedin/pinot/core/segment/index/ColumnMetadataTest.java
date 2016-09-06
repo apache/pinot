@@ -16,15 +16,21 @@
 package com.linkedin.pinot.core.segment.index;
 
 import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.common.segment.StarTreeMetadata;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
+import com.linkedin.pinot.core.startree.hll.HllConfig;
+import com.linkedin.pinot.core.startree.hll.SegmentWithHllIndexCreateHelper;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.testng.Assert;
@@ -185,6 +191,34 @@ public class ColumnMetadataTest {
     // Make sure we get null for creator name.
     char paddingCharacter = metadata.getPaddingCharacter();
     Assert.assertEquals(paddingCharacter, '\0');
+  }
+
+  @Test
+  public void testHllIndexRelatedMetadata() throws Exception {
+    SegmentWithHllIndexCreateHelper helper = null;
+    try {
+      // Build the Segment metadata.
+      helper = new SegmentWithHllIndexCreateHelper(
+          "testHllIndexRelatedMetadata", "data/test_data-sv.avro", "daysSinceEpoch", TimeUnit.DAYS);
+      helper.build(true, new HllConfig(new HashSet<String>(Arrays.asList("column7")), 8, "_hllSuffix"));
+
+      // Load segment metadata.
+      IndexSegment segment = Loaders.IndexSegment.load(helper.getSegmentDirectory(), ReadMode.mmap);
+      SegmentMetadataImpl metadata = (SegmentMetadataImpl) segment.getSegmentMetadata();
+
+      // Verify Hll Related Info
+      StarTreeMetadata starTreeMetadata = metadata.getStarTreeMetadata();
+      Assert.assertEquals(starTreeMetadata.isEnableHll(), true);
+      Assert.assertEquals(starTreeMetadata.getHllLog2m(), 8);
+
+      ColumnMetadata column = metadata.getColumnMetadataFor("column7_hllSuffix");
+      Assert.assertEquals(column.getDerivedMetricType(), MetricFieldSpec.DerivedMetricType.HLL);
+      Assert.assertEquals(column.getOriginColumnName(), "column7");
+    } finally {
+      if (helper != null) {
+        helper.cleanTempDir();
+      }
+    }
   }
 }
 

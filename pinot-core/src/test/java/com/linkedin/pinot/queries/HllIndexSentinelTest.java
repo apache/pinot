@@ -95,7 +95,7 @@ public class HllIndexSentinelTest {
     SegmentIndexCreationDriver driver = helper.build(true, hllConfig);
     File segmentFile = helper.getSegmentDirectory();
     segmentName = helper.getSegmentName();
-    LOGGER.info("************************** Segment Directory: " + segmentFile.getAbsolutePath());
+    LOGGER.debug("************************** Segment Directory: " + segmentFile.getAbsolutePath());
 
     // Load Segment
     final IndexSegment indexSegment = ColumnarSegmentLoader.load(segmentFile, ReadMode.heap);
@@ -137,7 +137,7 @@ public class HllIndexSentinelTest {
                 "select distinctcount(" + distinctCountColumn + ") from " + tableName +
                     " where " + filterColumn + " > " + baseValue + " limit 0",
                 0.0));
-        LOGGER.info(ret.toString());
+        LOGGER.debug(ret.toString());
       }
     }
   }
@@ -175,7 +175,7 @@ public class HllIndexSentinelTest {
                   "select distinctcount(" + distinctCountColumn + ") from " + tableName +
                       " where " + filterColumn + " < " + baseValue +
                       " group by " + gbyColumn + " limit 0", null));
-          LOGGER.info(ret.toString());
+          LOGGER.debug(ret.toString());
         }
       }
     }

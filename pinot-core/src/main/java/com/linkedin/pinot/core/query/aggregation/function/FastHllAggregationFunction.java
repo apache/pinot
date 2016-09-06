@@ -60,6 +60,12 @@ public class FastHllAggregationFunction implements AggregationFunction<HyperLogL
     throw new UnsupportedOperationException("Calling old aggregate method of FastHllAggregationFunction is deprecated.");
   }
 
+  /**
+   * shared with both old and new aggregation function
+   * @param aggregationResultList
+   * @param combineLevel
+   * @return
+   */
   @Override
   public List<HyperLogLog> combine(List<HyperLogLog> aggregationResultList, CombineLevel combineLevel) {
     if ((aggregationResultList == null) || aggregationResultList.isEmpty()) {
@@ -71,6 +77,12 @@ public class FastHllAggregationFunction implements AggregationFunction<HyperLogL
     return aggregationResultList;
   }
 
+  /**
+   * shared with both old and new aggregation function
+   * @param aggregationResult0
+   * @param aggregationResult1
+   * @return
+   */
   @Override
   public HyperLogLog combineTwoValues(HyperLogLog aggregationResult0, HyperLogLog aggregationResult1) {
     if (aggregationResult0 == null) {
@@ -88,6 +100,11 @@ public class FastHllAggregationFunction implements AggregationFunction<HyperLogL
     return aggregationResult0;
   }
 
+  /**
+   * shared with both old and new aggregation function
+   * @param combinedResultList
+   * @return
+   */
   @Override
   public Long reduce(List<HyperLogLog> combinedResultList) {
     if ((combinedResultList == null) || combinedResultList.isEmpty()) {

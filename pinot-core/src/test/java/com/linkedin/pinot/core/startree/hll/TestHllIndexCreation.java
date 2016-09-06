@@ -120,7 +120,7 @@ public class TestHllIndexCreation {
       for (String name : helper.getSchema().getColumnNames()) {
         LOGGER.debug("* " + name + ": " + driver.getColumnStatisticsCollector(name).getCardinality());
       }
-      LOGGER.info("Loading ...");
+      LOGGER.debug("Loading ...");
       IndexSegment indexSegment = Loaders.IndexSegment.load(helper.getSegmentDirectory(), ReadMode.mmap);
 
       int[] docIdSet = new int[maxDocLength];

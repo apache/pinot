@@ -108,12 +108,13 @@ public class ColumnMetadata {
             final String originColumnName = config.getString(getKeyFor(column, ORIGIN_COLUMN));
             builder.setOriginColumnName(originColumnName);
           } catch (RuntimeException e) {
-            LOGGER.error("HLL derived column without fieldSize or originColumnName.");
+            LOGGER.error("Column: " + column + " is HLL derived column, but missing log2m, fieldSize or originColumnName.");
             throw e;
           }
           break;
         default:
-          throw new IllegalArgumentException(derivedMetricType + " type is not supported in building column metadata.");
+          throw new IllegalArgumentException("Column: " + column + " with derived metric Type: " + derivedMetricType
+              + " is not supported in building column metadata.");
       }
       builder.setDerivedMetricType(derivedMetricType);
     }
