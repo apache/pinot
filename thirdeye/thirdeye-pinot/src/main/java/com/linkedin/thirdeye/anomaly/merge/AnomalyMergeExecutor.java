@@ -139,7 +139,7 @@ public class AnomalyMergeExecutor implements Runnable {
     for (RawAnomalyResultDTO anomalyResult : mergedResult.getAnomalyResults()) {
       anomalyResult.setMerged(true);
       double bucketSizeSeconds =
-          (anomalyResult.getEndTimeUtc() - anomalyResult.getStartTimeUtc()) / 1000;
+          (anomalyResult.getEndTime() - anomalyResult.getStartTime()) / 1000;
       weightedScoreSum += (anomalyResult.getScore() / normalizationFactor) * bucketSizeSeconds;
       weightedWeightSum += (anomalyResult.getWeight() / normalizationFactor) * bucketSizeSeconds;
       totalBucketSize += bucketSizeSeconds;
@@ -276,8 +276,7 @@ public class AnomalyMergeExecutor implements Runnable {
   }
 
   private String createMessage(double severity, Double currentVal, Double baseLineVal) {
-    return String
-        .format("change : %.2f, currentVal : %.2f, baseLineVal : %.2f", severity * 100, currentVal,
-            baseLineVal);
+    return String.format("change : %.2f %%, currentVal : %.2f, baseLineVal : %.2f", severity * 100,
+        currentVal, baseLineVal);
   }
 }

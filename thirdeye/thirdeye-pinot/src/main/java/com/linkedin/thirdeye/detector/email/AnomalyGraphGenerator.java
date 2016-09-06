@@ -173,7 +173,7 @@ public class AnomalyGraphGenerator {
         new TreeMap<RawAnomalyResultDTO, String>(new Comparator<RawAnomalyResultDTO>() {
           @Override
           public int compare(RawAnomalyResultDTO o1, RawAnomalyResultDTO o2) {
-            int diff = Long.compare(o1.getStartTimeUtc(), o2.getStartTimeUtc());
+            int diff = Long.compare(o1.getStartTime(), o2.getStartTime());
             if (diff == 0) {
               diff = o1.compareTo(o2);
             }
@@ -189,8 +189,8 @@ public class AnomalyGraphGenerator {
     for (Entry<RawAnomalyResultDTO, String> entry : chronologicalAnomaliesWithLabels.entrySet()) {
       RawAnomalyResultDTO anomalyResult = entry.getKey();
       // String label = entry.getValue();
-      Long anomalyStart = anomalyResult.getStartTimeUtc();
-      Long anomalyEnd = anomalyResult.getEndTimeUtc();
+      Long anomalyStart = anomalyResult.getStartTime();
+      Long anomalyEnd = anomalyResult.getEndTime();
       anomalyEnd = anomalyEnd == null ? anomalyStart : anomalyEnd;
       if (intervalStart == null || anomalyStart > intervalEnd) {
         // initialization of intervals

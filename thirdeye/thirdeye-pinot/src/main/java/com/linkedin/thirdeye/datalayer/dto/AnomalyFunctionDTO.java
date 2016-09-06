@@ -9,6 +9,4 @@ import com.linkedin.thirdeye.datalayer.pojo.AnomalyFunctionBean;
 @Table(name = "anomaly_functions")
 public class AnomalyFunctionDTO extends AnomalyFunctionBean {
 
-
-
 }

@@ -41,8 +41,9 @@ public class TaskDriver {
   private static final int TASK_FETCH_SIZE = 10;
   private static final Random RANDOM = new Random();
 
-  public TaskDriver(ThirdEyeAnomalyConfiguration thirdEyeAnomalyConfiguration, JobManager anomalyJobDAO,
-      TaskManager anomalyTaskDAO, RawAnomalyResultManager anomalyResultDAO, MergedAnomalyResultManager mergedResultDAO,
+  public TaskDriver(ThirdEyeAnomalyConfiguration thirdEyeAnomalyConfiguration,
+      JobManager anomalyJobDAO, TaskManager anomalyTaskDAO,
+      RawAnomalyResultManager anomalyResultDAO, MergedAnomalyResultManager mergedResultDAO,
       AnomalyFunctionFactory anomalyFunctionFactory) {
     this.workerId = thirdEyeAnomalyConfiguration.getId();
     this.anomalyTaskDAO = anomalyTaskDAO;
@@ -58,80 +59,101 @@ public class TaskDriver {
   }
 
   public void start() throws Exception {
-    List<Callable<Void>> callables = new ArrayList<>();
     for (int i = 0; i < MAX_PARALLEL_TASK; i++) {
-      Callable<Void> callable = () -> {
+      Callable callable = () -> {
         while (!shutdown) {
-          LOG.info(Thread.currentThread().getId() + " : Finding next task to execute for threadId:{}",
+          LOG.info(
+              Thread.currentThread().getId() + " : Finding next task to execute for threadId:{}",
               Thread.currentThread().getId());
+
+          // select a task to execute, and update it to RUNNING
+          TaskDTO anomalyTaskSpec = acquireTask();
+
           try {
-            // select a task to execute, and update it to RUNNING
-            TaskDTO anomalyTaskSpec = selectAndUpdate();
-            LOG.info(Thread.currentThread().getId() + " : Executing task: {} {}", anomalyTaskSpec.getId(),
-                anomalyTaskSpec.getTaskInfo());
+            LOG.info(Thread.currentThread().getId() + " : Executing task: {} {}",
+                anomalyTaskSpec.getId(), anomalyTaskSpec.getTaskInfo());
 
             // execute the selected task
             TaskType taskType = anomalyTaskSpec.getTaskType();
             TaskRunner taskRunner = TaskRunnerFactory.getTaskRunnerFromTaskType(taskType);
-            TaskInfo taskInfo = TaskInfoFactory.getTaskInfoFromTaskType(taskType, anomalyTaskSpec.getTaskInfo());
+            TaskInfo taskInfo =
+                TaskInfoFactory.getTaskInfoFromTaskType(taskType, anomalyTaskSpec.getTaskInfo());
             LOG.info(Thread.currentThread().getId() + " : Task Info {}", taskInfo);
             List<TaskResult> taskResults = taskRunner.execute(taskInfo, taskContext);
-            LOG.info(Thread.currentThread().getId() + " : DONE Executing task: {}", anomalyTaskSpec.getId());
+            LOG.info(Thread.currentThread().getId() + " : DONE Executing task: {}",
+                anomalyTaskSpec.getId());
             // update status to COMPLETED
-            updateStatusAndTaskEndTime(anomalyTaskSpec.getId(), TaskStatus.RUNNING, TaskStatus.COMPLETED);
+            updateStatusAndTaskEndTime(anomalyTaskSpec.getId(), TaskStatus.RUNNING,
+                TaskStatus.COMPLETED);
           } catch (Exception e) {
             LOG.error("Exception in electing and executing task", e);
+            try {
+              // update task status failed
+              updateStatusAndTaskEndTime(anomalyTaskSpec.getId(), TaskStatus.RUNNING, TaskStatus.FAILED);
+            } catch (Exception e1) {
+              LOG.error("Error in updating failed status", e1);
+            }
           }
         }
-        return null;
+        return 0;
       };
-      callables.add(callable);
-    }
-    for (Callable<Void> callable : callables) {
       taskExecutorService.submit(callable);
+      LOG.info(Thread.currentThread().getId() + " : Started task driver");
     }
-    LOG.info(Thread.currentThread().getId() + " : Started task driver");
   }
 
   public void stop() {
     taskExecutorService.shutdown();
   }
 
-  private TaskDTO selectAndUpdate() throws Exception {
-    LOG.info(Thread.currentThread().getId() + " : Starting selectAndUpdate {}", Thread.currentThread().getId());
+  private TaskDTO acquireTask() {
+    LOG.info(Thread.currentThread().getId() + " : Starting selectAndUpdate {}",
+        Thread.currentThread().getId());
     TaskDTO acquiredTask = null;
     LOG.info(Thread.currentThread().getId() + " : Trying to find a task to execute");
     do {
       List<TaskDTO> anomalyTasks = new ArrayList<>();
       try {
-        anomalyTasks = anomalyTaskDAO.findByStatusOrderByCreateTimeAsc(TaskStatus.WAITING, TASK_FETCH_SIZE);
+        anomalyTasks =
+            anomalyTaskDAO.findByStatusOrderByCreateTimeAsc(TaskStatus.WAITING, TASK_FETCH_SIZE);
       } catch (Exception e) {
         LOG.error("Exception found in fetching new tasks, sleeping for few seconds", e);
-        // TODO : Add better wait / clear call
-        Thread.sleep(TASK_FAILURE_DELAY_MILLIS);
+        try {
+          // TODO : Add better wait / clear call
+          Thread.sleep(TASK_FAILURE_DELAY_MILLIS);
+        } catch (Exception e1) {
+          LOG.error(e1.getMessage(), e1);
+        }
       }
       if (anomalyTasks.size() > 0) {
-        LOG.info(Thread.currentThread().getId() + " : Found {} tasks in waiting state", anomalyTasks.size());
+        LOG.info(Thread.currentThread().getId() + " : Found {} tasks in waiting state",
+            anomalyTasks.size());
       } else {
         // sleep for few seconds if not tasks found - avoid cpu thrashing
         // also add some extra random number of milli seconds to allow threads to start at different times
         // TODO : Add better wait / clear call
         int delay = NO_TASK_IDLE_DELAY_MILLIS + RANDOM.nextInt(NO_TASK_IDLE_DELAY_MILLIS);
         LOG.debug("No tasks found to execute, sleeping for {} MS", delay);
-        Thread.sleep(delay);
+        try {
+          Thread.sleep(delay);
+        } catch (Exception e1) {
+          LOG.error(e1.getMessage(), e1);
+        }
       }
 
       for (TaskDTO anomalyTaskSpec : anomalyTasks) {
-        LOG.info(Thread.currentThread().getId() + " : Trying to acquire task : {}", anomalyTaskSpec.getId());
+        LOG.info(Thread.currentThread().getId() + " : Trying to acquire task : {}",
+            anomalyTaskSpec.getId());
 
         boolean success = false;
         try {
-          success = anomalyTaskDAO.updateStatusAndWorkerId(workerId, anomalyTaskSpec.getId(),TaskStatus.WAITING,
-              TaskStatus.RUNNING);
+          success = anomalyTaskDAO
+              .updateStatusAndWorkerId(workerId, anomalyTaskSpec.getId(), TaskStatus.WAITING,
+                  TaskStatus.RUNNING);
           LOG.info(Thread.currentThread().getId() + " : Task acquired success: {}", success);
         } catch (OptimisticLockException | RollbackException | StaleObjectStateException e) {
-          LOG.warn("[{}] in acquiring task by threadId {} and workerId {}", e.getClass().getSimpleName(),
-              Thread.currentThread().getId(), workerId);
+          LOG.warn("[{}] in acquiring task by threadId {} and workerId {}",
+              e.getClass().getSimpleName(), Thread.currentThread().getId(), workerId);
         }
         if (success) {
           acquiredTask = anomalyTaskSpec;
@@ -143,10 +165,13 @@ public class TaskDriver {
     return acquiredTask;
   }
 
-  private void updateStatusAndTaskEndTime(long taskId, TaskStatus oldStatus, TaskStatus newStatus) throws Exception {
-    LOG.info("{} : Starting updateStatus {}", Thread.currentThread().getId(), Thread.currentThread().getId());
+  private void updateStatusAndTaskEndTime(long taskId, TaskStatus oldStatus, TaskStatus newStatus)
+      throws Exception {
+    LOG.info("{} : Starting updateStatus {}", Thread.currentThread().getId(),
+        Thread.currentThread().getId());
     try {
-      anomalyTaskDAO.updateStatusAndTaskEndTime(taskId, oldStatus, newStatus, System.currentTimeMillis());
+      anomalyTaskDAO
+          .updateStatusAndTaskEndTime(taskId, oldStatus, newStatus, System.currentTimeMillis());
       LOG.info("{} : updated status {}", Thread.currentThread().getId(), newStatus);
     } catch (Exception e) {
       LOG.error("Exception in updating status and task end time", e);

@@ -23,5 +23,4 @@ public interface AbstractManager<E extends AbstractDTO> {
   List<E> findAll();
 
   List<E> findByParams(Map<String, Object> filters);
-
 }

@@ -78,8 +78,8 @@ public class MinMaxThresholdFunction extends BaseAnomalyFunction {
       if (deviationFromThreshold != 0) {
         RawAnomalyResultDTO anomalyResult = new RawAnomalyResultDTO();
         anomalyResult.setProperties(getSpec().getProperties());
-        anomalyResult.setStartTimeUtc(timeBucket);
-        anomalyResult.setEndTimeUtc(timeBucket + bucketMillis); // point-in-time
+        anomalyResult.setStartTime(timeBucket);
+        anomalyResult.setEndTime(timeBucket + bucketMillis); // point-in-time
         anomalyResult.setDimensions(CSV.join(dimensionKey.getDimensionValues()));
         anomalyResult.setScore(averageValue);
         anomalyResult.setWeight(Math.abs(deviationFromThreshold)); // higher change, higher the severity

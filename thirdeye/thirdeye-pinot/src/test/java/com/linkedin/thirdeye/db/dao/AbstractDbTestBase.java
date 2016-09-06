@@ -173,8 +173,8 @@ public abstract class AbstractDbTestBase {
   protected RawAnomalyResultDTO getAnomalyResult() {
     RawAnomalyResultDTO anomalyResult = new RawAnomalyResultDTO();
     anomalyResult.setScore(1.1);
-    anomalyResult.setStartTimeUtc(System.currentTimeMillis());
-    anomalyResult.setEndTimeUtc(System.currentTimeMillis());
+    anomalyResult.setStartTime(System.currentTimeMillis());
+    anomalyResult.setEndTime(System.currentTimeMillis());
     anomalyResult.setWeight(10.1);
     anomalyResult.setDimensions("xyz dimension");
     anomalyResult.setCreationTimeUtc(System.currentTimeMillis());

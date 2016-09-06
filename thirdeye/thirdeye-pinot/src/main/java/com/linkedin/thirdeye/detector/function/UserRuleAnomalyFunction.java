@@ -83,8 +83,8 @@ public class UserRuleAnomalyFunction extends BaseAnomalyFunction {
     RawAnomalyResultDTO mergedAnomalyResult = new RawAnomalyResultDTO();
     mergedAnomalyResult.setDimensions(firstAnomalyResult.getDimensions());
     mergedAnomalyResult.setProperties(firstAnomalyResult.getProperties());
-    mergedAnomalyResult.setStartTimeUtc(firstAnomalyResult.getStartTimeUtc());
-    mergedAnomalyResult.setEndTimeUtc(lastAnomalyResult.getEndTimeUtc());
+    mergedAnomalyResult.setStartTime(firstAnomalyResult.getStartTime());
+    mergedAnomalyResult.setEndTime(lastAnomalyResult.getEndTime());
     mergedAnomalyResult.setWeight(firstAnomalyResult.getWeight());
     double summedScore = 0;
     for (RawAnomalyResultDTO anomalyResult : anomalyResults) {
@@ -153,8 +153,8 @@ public class UserRuleAnomalyFunction extends BaseAnomalyFunction {
         RawAnomalyResultDTO anomalyResult = new RawAnomalyResultDTO();
         anomalyResult.setDimensions(CSV.join(dimensionKey.getDimensionValues()));
         anomalyResult.setProperties(getSpec().getProperties());
-        anomalyResult.setStartTimeUtc(currentKey);
-        anomalyResult.setEndTimeUtc(currentKey + bucketMillis); // point-in-time
+        anomalyResult.setStartTime(currentKey);
+        anomalyResult.setEndTime(currentKey + bucketMillis); // point-in-time
         anomalyResult.setScore(averageValue);
         anomalyResult.setWeight(calculateChange(currentValue, baselineValue));
         String message =
@@ -213,8 +213,8 @@ public class UserRuleAnomalyFunction extends BaseAnomalyFunction {
           } else {
             RawAnomalyResultDTO lastConsecutiveAnomalyResult =
                 currentConsecutiveResults.get(currentConsecutiveResults.size() - 1);
-            long lastStartTime = lastConsecutiveAnomalyResult.getStartTimeUtc();
-            long currentStarTime = anomalyResult.getStartTimeUtc();
+            long lastStartTime = lastConsecutiveAnomalyResult.getStartTime();
+            long currentStarTime = anomalyResult.getStartTime();
 
             if ((lastStartTime + bucketMillis) == currentStarTime) {
               currentConsecutiveResults.add(anomalyResult);
