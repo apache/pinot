@@ -59,7 +59,6 @@ public class TaskDriver {
   }
 
   public void start() throws Exception {
-    List<Callable> callables = new ArrayList<>();
     for (int i = 0; i < MAX_PARALLEL_TASK; i++) {
       Callable callable = () -> {
         while (!shutdown) {
@@ -98,12 +97,9 @@ public class TaskDriver {
         }
         return 0;
       };
-      callables.add(callable);
-    }
-    for (Callable callable : callables) {
       taskExecutorService.submit(callable);
+      LOG.info(Thread.currentThread().getId() + " : Started task driver");
     }
-    LOG.info(Thread.currentThread().getId() + " : Started task driver");
   }
 
   public void stop() {
