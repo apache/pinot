@@ -120,7 +120,7 @@ public class DashboardResource {
           if (StringUtils.isNotEmpty(collectionAlias)) {
             collection = collectionAlias;
           }
-        } catch (InvalidCacheLoadException e){
+        } catch (InvalidCacheLoadException e) {
           LOG.debug("No CollectionConfig for collection {}", collection);
         }
         collections.add(collection);

@@ -135,7 +135,7 @@ public class AnomalyMergeExecutor implements Runnable {
     double totalBucketSize = 0.0;
 
     double normalizationFactor = 1000; // to prevent from double overflow
-
+    String anomalyMessage = "";
     for (RawAnomalyResultDTO anomalyResult : mergedResult.getAnomalyResults()) {
       anomalyResult.setMerged(true);
       double bucketSizeSeconds =
@@ -143,11 +143,14 @@ public class AnomalyMergeExecutor implements Runnable {
       weightedScoreSum += (anomalyResult.getScore() / normalizationFactor) * bucketSizeSeconds;
       weightedWeightSum += (anomalyResult.getWeight() / normalizationFactor) * bucketSizeSeconds;
       totalBucketSize += bucketSizeSeconds;
+      anomalyMessage = anomalyResult.getMessage();
     }
     if (totalBucketSize != 0) {
       mergedResult.setScore((weightedScoreSum / totalBucketSize) * normalizationFactor);
       mergedResult.setWeight((weightedWeightSum / totalBucketSize) * normalizationFactor);
     }
+
+    mergedResult.setMessage(anomalyMessage);
 
     // recompute severity
     try {
@@ -155,7 +158,6 @@ public class AnomalyMergeExecutor implements Runnable {
     } catch (Exception e) {
       LOG.error("Could not recompute severity", e);
     }
-    mergedResult.setMessage(createMessage(mergedResult.getWeight()));
     try {
       // persist the merged result
       mergedResultDAO.update(mergedResult);
@@ -209,6 +211,7 @@ public class AnomalyMergeExecutor implements Runnable {
       severity = 1.0;
     }
     anomalyMergedResult.setWeight(severity);
+    anomalyMergedResult.setMessage(createMessage(severity, currentValue, baselineValue));
   }
 
   private Double getMetricValueSum(TimeSeriesResponse response, String metricName) {
@@ -272,7 +275,9 @@ public class AnomalyMergeExecutor implements Runnable {
     }
   }
 
-  public String createMessage(double severity) {
-    return String.format("percentage change : %.2f", severity * 100);
+  private String createMessage(double severity, Double currentVal, Double baseLineVal) {
+    return String
+        .format("change : %.2f, currentVal : %.2f, baseLineVal : %.2f", severity * 100, currentVal,
+            baseLineVal);
   }
 }

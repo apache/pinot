@@ -32,6 +32,8 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
       "from MergedAnomalyResultDTO r where r.collection=:collection "
           + "and (r.startTime < :endTime and r.endTime > :startTime) order by r.endTime desc";
 
+  private static final String FIND_BY_FUNCTION_ID = "from AnomalyMergedResult r where r.function.id=:functionId";
+
   private static final String FIND_BY_FUNCTION_AND_DIMENSIONS =
       "from MergedAnomalyResultDTO amr where amr.function.id=:functionId "
           + "and amr.dimensions=:dimensions order by amr.endTime desc";
@@ -77,6 +79,11 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
    * @see com.linkedin.thirdeye.datalayer.bao.IMergedAnomalyResultManager#findByCollectionMetricDimensionsTime(java.lang.String, java.lang.String, java.lang.String[], long, long)
    */
   @Override
+  public List<MergedAnomalyResultDTO> findByFunctionId(Long functionId) {
+    return getEntityManager().createQuery(FIND_BY_FUNCTION_ID, entityClass)
+        .setParameter("functionId", functionId).getResultList();
+  }
+
   @Transactional
   public List<MergedAnomalyResultDTO> findByCollectionMetricDimensionsTime(String collection,
       String metric, String [] dimensions, long startTime, long endTime) {

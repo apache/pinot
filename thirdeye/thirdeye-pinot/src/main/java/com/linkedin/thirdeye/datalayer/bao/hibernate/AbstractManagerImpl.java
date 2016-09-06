@@ -81,14 +81,13 @@ public class AbstractManagerImpl<E extends AbstractDTO> implements AbstractManag
    */
   @Override
   public void deleteById(Long id) {
-    getEntityManager().remove(findById(id));
+    delete(findById(id));
   }
 
   /* (non-Javadoc)
    * @see com.linkedin.thirdeye.datalayer.bao.IAbstractManager#findAll()
    */
   @Override
-  @Transactional
   public List<E> findAll() {
     return getEntityManager().createQuery("from " + entityClass.getSimpleName(), entityClass)
         .getResultList();
@@ -98,7 +97,6 @@ public class AbstractManagerImpl<E extends AbstractDTO> implements AbstractManag
    * @see com.linkedin.thirdeye.datalayer.bao.IAbstractManager#findByParams(java.util.Map)
    */
   @Override
-  @Transactional
   public List<E> findByParams(Map<String, Object> filters) {
     CriteriaBuilder builder = getEntityManager().getCriteriaBuilder();
     CriteriaQuery<E> query = builder.createQuery(entityClass);
