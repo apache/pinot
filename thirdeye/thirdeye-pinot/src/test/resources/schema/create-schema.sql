@@ -16,9 +16,9 @@ create table if not exists anomaly_function (
     metric_id bigint(20) not null,
     collection varchar(200),
     metric varchar(200),
-    json_val text,
-    foreign key (metric_id) references metric(id)
+    json_val text
 ) ENGINE=InnoDB;
+create index if not exists anomaly_function_metric_idx on metric(id);
 
 create table if not exists anomaly_merge_config (
     id bigint(20) primary key auto_increment,
@@ -55,6 +55,7 @@ create table if not exists job (
     end_time bigint(20) not null,
     json_val text
 ) ENGINE=InnoDB;
+create index if not exists job_status_idx on job(status);
 
 create table if not exists task (
     id bigint(20) primary key auto_increment,
@@ -66,9 +67,10 @@ create table if not exists task (
     job_id bigint(20),
     worker_id bigint(20),
     version integer,
-    json_val text,
-    foreign key (job_id) references job(id)
+    json_val text
 ) ENGINE=InnoDB;
+create index if not exists task_status_idx on task(status);
+create index if not exists task_job_idx on task(job_id);
 
 create table if not exists anomaly_feedback (
     id bigint(20) primary key auto_increment,
@@ -86,11 +88,11 @@ create table if not exists anomaly_raw_result (
     data_missing boolean default false not null,
     merged boolean default false,
     dimension_value varchar(1023),
-    json_val text,
-    foreign key (anomaly_function_id) references anomaly_function(id),
-    foreign key (anomaly_feedback_id) references anomaly_feedback(id),
-    foreign key (job_id) references job(id)
+    json_val text
 ) ENGINE=InnoDB;
+create index if not exists anomaly_raw_result_function_idx on anomaly_raw_result(anomaly_function_id);
+create index if not exists anomaly_raw_result_feedback_idx on anomaly_raw_result(anomaly_feedback_id);
+create index if not exists anomaly_raw_result_job_idx on anomaly_raw_result(job_id);
 
 create table if not exists anomaly_merged_result (
     id bigint(20) primary key auto_increment,
@@ -103,11 +105,11 @@ create table if not exists anomaly_merged_result (
     metric varchar(200),
     dimension_value varchar(1023),
     notified boolean default false,
-    json_val text,
-    foreign key (anomaly_function_id) references anomaly_function(id),
-    foreign key (anomaly_feedback_id) references anomaly_feedback(id),
-    foreign key (metric_id) references metric(id)
+    json_val text
 ) ENGINE=InnoDB;
+create index if not exists anomaly_merged_result_function_idx on anomaly_merged_result(anomaly_function_id);
+create index if not exists anomaly_merged_result_feedback_idx on anomaly_merged_result(anomaly_feedback_id);
+create index if not exists anomaly_merged_result_metric_idx on anomaly_merged_result(metric_id);
 
 create table if not exists anomaly_raw_result_anomaly_merged_result_mapping (
     anomaly_raw_result_id bigint(20),

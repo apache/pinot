@@ -390,6 +390,26 @@ public class AnomalyResource {
       detectionResourceHttpUtils.disableAnomalyFunction(String.valueOf(id));
     }
 
+    // delete dependent entities
+    // email config mapping
+    List<EmailConfigurationDTO> emailConfigurations = emailConfigurationDAO.findByFunctionId(id);
+    for (EmailConfigurationDTO emailConfiguration : emailConfigurations) {
+      emailConfiguration.getFunctions().remove(anomalyFunctionSpec);
+      emailConfigurationDAO.save(emailConfiguration);
+    }
+
+    // raw result mapping
+    List<RawAnomalyResultDTO> rawResults = anomalyResultDAO.findAllByTimeAndFunctionId(0, System.currentTimeMillis(), id);
+    for (RawAnomalyResultDTO result : rawResults) {
+      anomalyResultDAO.delete(result);
+    }
+
+    // merged anomaly mapping
+    List<MergedAnomalyResultDTO> mergedResults = anomalyMergedResultDAO.findByFunctionId(id);
+    for (MergedAnomalyResultDTO result : mergedResults) {
+      anomalyMergedResultDAO.delete(result);
+    }
+
     // delete from db
     anomalyFunctionDAO.deleteById(id);
 

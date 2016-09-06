@@ -4,7 +4,6 @@ import java.util.List;
 
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 
-
 public interface MergedAnomalyResultManager extends AbstractManager<MergedAnomalyResultDTO> {
 
   List<MergedAnomalyResultDTO> getAllByTime(long startTime, long endTime);
@@ -28,4 +27,5 @@ public interface MergedAnomalyResultManager extends AbstractManager<MergedAnomal
 
   MergedAnomalyResultDTO findLatestByFunctionIdOnly(Long functionId);
 
+  List<MergedAnomalyResultDTO> findByFunctionId(Long functionId);
 }

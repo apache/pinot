@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.dbi.dao;
+package com.linkedin.thirdeye.datalayer;
 
 public class AnomalyFeedbackDAOTest {
 
