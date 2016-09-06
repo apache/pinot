@@ -51,6 +51,13 @@ public class EmailResource {
   public Response addFunctionInEmail(@PathParam("emailId") Long emailId, @PathParam("functionId") Long functionId) {
     AnomalyFunctionDTO function = functionDAO.findById(functionId);
     EmailConfigurationDTO emailConfiguration = emailDAO.findById(emailId);
+    List<EmailConfigurationDTO> emailConfigurationsWithFunction = emailDAO.findByFunctionId(functionId);
+
+    for (EmailConfigurationDTO emailConfigurationDTO : emailConfigurationsWithFunction) {
+      emailConfigurationDTO.getFunctions().remove(function);
+      emailDAO.update(emailConfigurationDTO);
+    }
+
     if (function != null && emailConfiguration != null) {
       if (!emailConfiguration.getFunctions().contains(function)) {
         emailConfiguration.getFunctions().add(function);

@@ -44,7 +44,7 @@ public abstract class AnomalyTimeBasedSummarizer {
 
     // sort anomalies in natural order of start time
     Collections
-        .sort(anomalies, (o1, o2) -> (int) ((o1.getStartTimeUtc() - o2.getStartTimeUtc()) / 1000));
+        .sort(anomalies, (o1, o2) -> (int) ((o1.getStartTime() - o2.getStartTime()) / 1000));
 
     boolean applySequentialGapBasedSplit = false;
     boolean applyMaxDurationBasedSplit = false;
@@ -67,7 +67,7 @@ public abstract class AnomalyTimeBasedSummarizer {
       } else {
         // compare current with merged and decide whether to merge the current result or create a new one
         if (applySequentialGapBasedSplit
-            && (currentResult.getStartTimeUtc() - mergedAnomaly.getEndTime()) > sequentialAllowedGap) {
+            && (currentResult.getStartTime() - mergedAnomaly.getEndTime()) > sequentialAllowedGap) {
 
           // Split here
           // add previous merged result
@@ -78,11 +78,11 @@ public abstract class AnomalyTimeBasedSummarizer {
           populateMergedResult(mergedAnomaly, currentResult);
         } else {
           // add the current raw result into mergedResult
-          if (currentResult.getStartTimeUtc() < mergedAnomaly.getStartTime()) {
-            mergedAnomaly.setStartTime(currentResult.getStartTimeUtc());
+          if (currentResult.getStartTime() < mergedAnomaly.getStartTime()) {
+            mergedAnomaly.setStartTime(currentResult.getStartTime());
           }
-          if (currentResult.getEndTimeUtc() > mergedAnomaly.getEndTime()) {
-            mergedAnomaly.setEndTime(currentResult.getEndTimeUtc());
+          if (currentResult.getEndTime() > mergedAnomaly.getEndTime()) {
+            mergedAnomaly.setEndTime(currentResult.getEndTime());
           }
           if (!mergedAnomaly.getAnomalyResults().contains(currentResult)) {
             mergedAnomaly.getAnomalyResults().add(currentResult);
@@ -96,8 +96,8 @@ public abstract class AnomalyTimeBasedSummarizer {
           // check if Max Duration for merged has passed, if so, create new one
           && mergedAnomaly.getEndTime() - mergedAnomaly.getStartTime() >= mergeDuration) {
         // check if next anomaly has same start time as current one, that should be merged with current one too
-        if (i < (anomalies.size() - 1) && anomalies.get(i + 1).getStartTimeUtc()
-            .equals(currentResult.getStartTimeUtc())) {
+        if (i < (anomalies.size() - 1) && anomalies.get(i + 1).getStartTime()
+            .equals(currentResult.getStartTime())) {
           // no need to split as we want to include the next raw anomaly into the current one
         } else {
           // Split here
@@ -124,8 +124,8 @@ public abstract class AnomalyTimeBasedSummarizer {
     // only set collection, keep metric, dimensions and function null
     mergedAnomaly.setCollection(currentResult.getCollection());
     mergedAnomaly.setMetric(currentResult.getMetric());
-    mergedAnomaly.setStartTime(currentResult.getStartTimeUtc());
-    mergedAnomaly.setEndTime(currentResult.getEndTimeUtc());
+    mergedAnomaly.setStartTime(currentResult.getStartTime());
+    mergedAnomaly.setEndTime(currentResult.getEndTime());
     mergedAnomaly.setCreatedTime(System.currentTimeMillis());
   }
 }

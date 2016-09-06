@@ -1,10 +1,6 @@
 package com.linkedin.thirdeye.datalayer.pojo;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
 import java.util.Objects;
-import java.util.Properties;
 
 import javax.persistence.Column;
 import javax.persistence.Entity;
@@ -13,21 +9,17 @@ import javax.persistence.Table;
 import org.apache.commons.lang.ObjectUtils;
 import org.joda.time.DateTime;
 
-import com.google.common.base.Joiner;
 import com.google.common.base.MoreObjects;
 
 @Entity
 @Table(name = "anomaly_results")
 public class RawAnomalyResultBean extends AbstractBean implements Comparable<RawAnomalyResultBean> {
 
-  private static Joiner SEMICOLON = Joiner.on(";");
-  private static Joiner EQUALS = Joiner.on("=");
-
   @Column(name = "start_time_utc", nullable = false)
-  private Long startTimeUtc;
+  private Long startTime;
 
   @Column(name = "end_time_utc", nullable = true)
-  private Long endTimeUtc;
+  private Long endTime;
 
   @Column(name = "dimensions", nullable = false)
   private String dimensions;
@@ -67,20 +59,20 @@ public class RawAnomalyResultBean extends AbstractBean implements Comparable<Raw
     this.dimensions = dimensions;
   }
 
-  public Long getStartTimeUtc() {
-    return startTimeUtc;
+  public Long getStartTime() {
+    return startTime;
   }
 
-  public void setStartTimeUtc(Long startTimeUtc) {
-    this.startTimeUtc = startTimeUtc;
+  public void setStartTime(Long startTimeUtc) {
+    this.startTime = startTimeUtc;
   }
 
-  public Long getEndTimeUtc() {
-    return endTimeUtc;
+  public Long getEndTime() {
+    return endTime;
   }
 
-  public void setEndTimeUtc(Long endTimeUtc) {
-    this.endTimeUtc = endTimeUtc;
+  public void setEndTime(Long endTimeUtc) {
+    this.endTime = endTimeUtc;
   }
 
   public double getScore() {
@@ -142,8 +134,8 @@ public class RawAnomalyResultBean extends AbstractBean implements Comparable<Raw
 
   @Override
   public String toString() {
-    return MoreObjects.toStringHelper(this).add("id", getId()).add("startTimeUtc", startTimeUtc)
-        .add("dimensions", dimensions).add("endTimeUtc", endTimeUtc).add("score", score)
+    return MoreObjects.toStringHelper(this).add("id", getId()).add("startTimeUtc", startTime)
+        .add("dimensions", dimensions).add("endTimeUtc", endTime).add("score", score)
         .add("weight", weight).add("properties", properties).add("message", message)
         .add("creationTimeUtc", creationTimeUtc).toString();
   }
@@ -154,9 +146,9 @@ public class RawAnomalyResultBean extends AbstractBean implements Comparable<Raw
       return false;
     }
     RawAnomalyResultBean r = (RawAnomalyResultBean) o;
-    return Objects.equals(getId(), r.getId()) && Objects.equals(startTimeUtc, r.getStartTimeUtc())
+    return Objects.equals(getId(), r.getId()) && Objects.equals(startTime, r.getStartTime())
         && Objects.equals(dimensions, r.getDimensions())
-        && Objects.equals(endTimeUtc, r.getEndTimeUtc()) && Objects.equals(score, r.getScore())
+        && Objects.equals(endTime, r.getEndTime()) && Objects.equals(score, r.getScore())
         && Objects.equals(weight, r.getWeight()) && Objects.equals(properties, r.getProperties())
         && Objects.equals(message, r.getMessage());
     // Intentionally omit creationTimeUtc, since start/end are the truly significant dates for
@@ -165,7 +157,7 @@ public class RawAnomalyResultBean extends AbstractBean implements Comparable<Raw
 
   @Override
   public int hashCode() {
-    return Objects.hash(getId(), dimensions, startTimeUtc, endTimeUtc, score, weight, properties,
+    return Objects.hash(getId(), dimensions, startTime, endTime, score, weight, properties,
         message);
     // Intentionally omit creationTimeUtc, since start/end are the truly significant dates for
     // anomalies
@@ -178,19 +170,11 @@ public class RawAnomalyResultBean extends AbstractBean implements Comparable<Raw
     if (diff != 0) {
       return diff;
     }
-    diff = -ObjectUtils.compare(startTimeUtc, o.getStartTimeUtc()); // inverted to sort by
+    diff = -ObjectUtils.compare(startTime, o.getStartTime()); // inverted to sort by
     // decreasing time
     if (diff != 0) {
       return diff;
     }
     return ObjectUtils.compare(getId(), o.getId());
-  }
-
-  public static String encodeCompactedProperties(Properties props) {
-    List<String> parts = new ArrayList<>();
-    for (Map.Entry<Object, Object> entry : props.entrySet()) {
-      parts.add(EQUALS.join(entry.getKey(), entry.getValue()));
-    }
-    return SEMICOLON.join(parts);
   }
 }

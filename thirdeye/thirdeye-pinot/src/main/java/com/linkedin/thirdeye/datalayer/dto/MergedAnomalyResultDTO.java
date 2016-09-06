@@ -51,7 +51,6 @@ public class MergedAnomalyResultDTO extends MergedAnomalyResultBean {
     this.anomalyResults = anomalyResults;
   }
 
-
   public AnomalyFunctionDTO getFunction() {
     return function;
   }
@@ -59,5 +58,4 @@ public class MergedAnomalyResultDTO extends MergedAnomalyResultBean {
   public void setFunction(AnomalyFunctionDTO function) {
     this.function = function;
   }
-
 }

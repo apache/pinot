@@ -44,8 +44,8 @@ public class TestAnomalyMergedResultDAO extends AbstractDbTestBase {
     List<MergedAnomalyResultDTO> mergedResults = AnomalyTimeBasedSummarizer
         .mergeAnomalies(rawResults, mergeConfig.getMergeDuration(),
             mergeConfig.getSequentialAllowedGap());
-    Assert.assertEquals(mergedResults.get(0).getStartTime(),result.getStartTimeUtc());
-    Assert.assertEquals(mergedResults.get(0).getEndTime(),result.getEndTimeUtc());
+    Assert.assertEquals(mergedResults.get(0).getStartTime(),result.getStartTime());
+    Assert.assertEquals(mergedResults.get(0).getEndTime(),result.getEndTime());
     Assert.assertEquals(mergedResults.get(0).getAnomalyResults().get(0), result);
 
     // Let's persist the merged result
