@@ -31,7 +31,7 @@ public class PinotControllerHealthCheck extends ServerResource {
 
   public PinotControllerHealthCheck() throws IOException {
     conf = (ControllerConf) getApplication().getContext().getAttributes().get(ControllerConf.class.toString());
-    vip = StringUtil.join("://", "http", StringUtil.join(":", conf.getControllerVipHost(), conf.getControllerPort()));
+    vip = conf.generateVipUrl();
   }
 
   @Override
