@@ -16,6 +16,7 @@
 package com.linkedin.pinot.common.segment;
 
 import java.util.List;
+import java.util.Map;
 
 
 /**
@@ -29,6 +30,10 @@ public class StarTreeMetadata {
 
   private long _maxLeafRecords;
   private long _skipMaterializationCardinality;
+
+  private boolean _enableHll;
+  private int _hllLog2m;
+  private Map<String, String> _hllOriginToDerivedColumnMap;
 
   public StarTreeMetadata() {
   }
@@ -71,5 +76,33 @@ public class StarTreeMetadata {
 
   public void setSkipMaterializationForDimensions(List<String> skipMaterializationForDimensions) {
     _skipMaterializationForDimensions = skipMaterializationForDimensions;
+  }
+
+  public boolean isEnableHll() {
+    return _enableHll;
+  }
+
+  public void setEnableHll(boolean enableHll) {
+    _enableHll = enableHll;
+  }
+
+  public int getHllLog2m() {
+    return _hllLog2m;
+  }
+
+  public void setHllLog2m(int hllLog2m) {
+    _hllLog2m = hllLog2m;
+  }
+
+  public String getDerivedHllColumnFromOrigin(String originColumn) {
+    String ret = _hllOriginToDerivedColumnMap.get(originColumn);
+    if (ret == null) {
+      throw new IllegalArgumentException("Hll derived column does not exist for " + originColumn);
+    }
+    return ret;
+  }
+
+  public void setHllOriginToDerivedColumnMap(Map<String, String> hllOriginToDerivedColumnMap) {
+    _hllOriginToDerivedColumnMap = hllOriginToDerivedColumnMap;
   }
 }

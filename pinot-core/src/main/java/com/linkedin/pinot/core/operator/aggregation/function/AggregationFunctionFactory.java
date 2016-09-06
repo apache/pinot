@@ -15,6 +15,9 @@
  */
 package com.linkedin.pinot.core.operator.aggregation.function;
 
+import com.linkedin.pinot.common.segment.SegmentMetadata;
+
+
 /**
  * Factory class to create instances of aggregation function of the given name.
  */
@@ -27,6 +30,7 @@ public class AggregationFunctionFactory {
   public static final String MINMAXRANGE_AGGREGATION_FUNCTION = "minmaxrange";
   public static final String DISTINCTCOUNT_AGGREGATION_FUNCTION = "distinctcount";
   public static final String DISTINCTCOUNTHLL_AGGREGATION_FUNCTION = "distinctcounthll";
+  public static final String FASTHLL_AGGREGATION_FUNCTION = "fasthll";
   public static final String PERCENTILE50_AGGREGATION_FUNCTION = "percentile50";
   public static final String PERCENTILE90_AGGREGATION_FUNCTION = "percentile90";
   public static final String PERCENTILE95_AGGREGATION_FUNCTION = "percentile95";
@@ -43,7 +47,7 @@ public class AggregationFunctionFactory {
    * @param functionName
    * @return
    */
-  public static AggregationFunction getAggregationFunction(String functionName) {
+  public static AggregationFunction getAggregationFunction(String functionName, SegmentMetadata segmentMetadata) {
     switch (functionName.toLowerCase()) {
       case COUNT_AGGREGATION_FUNCTION:
         return new CountAggregationFunction();
@@ -68,6 +72,9 @@ public class AggregationFunctionFactory {
 
       case DISTINCTCOUNTHLL_AGGREGATION_FUNCTION:
         return new DistinctCountHLLAggregationFunction();
+
+      case FASTHLL_AGGREGATION_FUNCTION:
+        return new FastHllAggregationFunction(segmentMetadata.getStarTreeMetadata().getHllLog2m());
 
       case PERCENTILE50_AGGREGATION_FUNCTION:
         return new PercentileAggregationFunction(50);

@@ -16,6 +16,7 @@
 package com.linkedin.pinot.core.segment.creator.impl;
 
 import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.core.io.writer.impl.FixedByteSingleValueMultiColWriter;
 import it.unimi.dsi.fastutil.doubles.Double2IntOpenHashMap;
 import it.unimi.dsi.fastutil.floats.Float2IntOpenHashMap;
@@ -87,9 +88,17 @@ public class SegmentDictionaryCreator implements Closeable {
       }
     }
 
-    LOGGER.info(
-        "Creating segment for column {}, hasNulls = {}, cardinality = {}, dataType = {}, single value field = {}, range = {} to {}",
-        spec.getName(), hasNulls, rowCount, spec.getDataType(), spec.isSingleValueField(), first, last);
+    // make hll column log info different than other columns, since range makes no sense for hll column
+    if (spec instanceof MetricFieldSpec &&
+        ((MetricFieldSpec)spec).getDerivedMetricType() == MetricFieldSpec.DerivedMetricType.HLL) {
+      LOGGER.info(
+          "Creating segment for column {}, hasNulls = {}, cardinality = {}, dataType = {}, single value field = {}, is HLL derived column",
+          spec.getName(), hasNulls, rowCount, spec.getDataType(), spec.isSingleValueField());
+    } else {
+      LOGGER.info(
+          "Creating segment for column {}, hasNulls = {}, cardinality = {}, dataType = {}, single value field = {}, range = {} to {}",
+          spec.getName(), hasNulls, rowCount, spec.getDataType(), spec.isSingleValueField(), first, last);
+    }
     this.sortedList = sortedList;
     this.spec = spec;
     this.paddingChar = paddingChar;
@@ -278,7 +287,7 @@ public class SegmentDictionaryCreator implements Closeable {
    *
    * @param inputString
    * @param targetLength
-   * @param paddingChar
+   * @param paddingChar should be in range u0000 to u007F, other chars would occupy more than one byte under utf-8
    * @return
    */
   public static String getPaddedString(String inputString, int targetLength, char paddingChar) {

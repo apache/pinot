@@ -48,12 +48,13 @@ public final class MetricFieldSpec extends FieldSpec {
   // For derived metric fields.
   public MetricFieldSpec(String name, DataType dataType, int fieldSize, DerivedMetricType derivedMetricType) {
     super(name, dataType, true);
+    Preconditions.checkNotNull(derivedMetricType);
     this.fieldSize = fieldSize;
     this.derivedMetricType = derivedMetricType;
   }
 
   public int getFieldSize() {
-    if (fieldSize == -1) {
+    if (fieldSize < 0) {
       return getDataType().size();
     } else {
       return fieldSize;
@@ -106,6 +107,7 @@ public final class MetricFieldSpec extends FieldSpec {
    * {@link com.linkedin.pinot.common.data.FieldSpec.DataType} for storage, and converted back when needed.
    */
   public enum DerivedMetricType {
+    // HLL derived metric
     HLL
   }
 

@@ -15,8 +15,8 @@
  */
 package com.linkedin.pinot.integration.tests;
 
-import com.linkedin.pinot.common.exception.QueryException;
-import com.linkedin.pinot.common.response.broker.QueryProcessingException;
+import com.linkedin.pinot.common.utils.FileUploadUtils;
+import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
 import java.io.FileInputStream;
 import java.util.Collections;
@@ -25,19 +25,14 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.commons.io.FileUtils;
 import org.json.JSONArray;
-import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-
-import com.linkedin.pinot.common.utils.FileUploadUtils;
-import com.linkedin.pinot.util.TestUtils;
 
 /**
  * Integration test that converts Avro data for 12 segments and runs queries against it.
@@ -234,10 +229,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
   @Test
   public void testDistinctCountHLLNoGroupByQuery() throws Exception {
     testApproximationQuery(
-            new String[]{"distinctcount", "distinctcounthll"},
-            new String[]{"AirTime"/* int */, "ArrDelayMinutes"/* int */, "ArrTimeBlk"/* string */, "Carrier"/* string */},
-            null,
-            0.1);
+        new String[]{"distinctcount", "distinctcounthll"},
+        new String[]{"AirTime"/* int */, "ArrDelayMinutes"/* int */, "ArrTimeBlk"/* string */, "Carrier"/* string */},
+        null,
+        TestUtils.hllEstimationThreshold);
   }
 
   /**
@@ -247,28 +242,28 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
   @Test
   public void testDistinctCountHLLGroupByQuery() throws Exception {
     testApproximationQuery(
-            new String[]{"distinctcount", "distinctcounthll"},
-            new String[]{"AirTime"/* int */, "ArrDelayMinutes"/* int */, "ArrTimeBlk"/* string */},
-            "Carrier",
-            0.1);
+        new String[]{"distinctcount", "distinctcounthll"},
+        new String[]{"AirTime"/* int */, "ArrDelayMinutes"/* int */, "ArrTimeBlk"/* string */},
+        "Carrier",
+        TestUtils.hllEstimationThreshold);
   }
 
   @Test
   public void testQuantileNoGroupByQuery() throws Exception {
     testApproximationQuery(
-            new String[]{"percentile50", "percentileest50"},
-            new String[]{"AirTime"/* int */, "ArrTime"/* int */},
-            null,
-            0.1);
+        new String[]{"percentile50", "percentileest50"},
+        new String[]{"AirTime"/* int */, "ArrTime"/* int */},
+        null,
+        TestUtils.digestEstimationThreshold);
   }
 
   @Test
   public void testQuantileGroupByQuery() throws Exception {
     testApproximationQuery(
-            new String[]{"percentile50", "percentileest50"},
-            new String[]{"AirTime"/* int */, "ArrTime"/* int */},
-            "Carrier",
-            0.1);
+        new String[]{"percentile50", "percentileest50"},
+        new String[]{"AirTime"/* int */, "ArrTime"/* int */},
+        "Carrier",
+        TestUtils.digestEstimationThreshold);
   }
 
 

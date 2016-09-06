@@ -24,20 +24,22 @@ import org.codehaus.jackson.annotate.JsonIgnore;
 
 
 /**
+ * This HllConfig is used at segment generation.
  * HllConfig is the config for hll index generation.
  * Note it is only effective when StarTree index generation is enabled.
  */
 public class HllConfig {
-  private boolean enableHllIndex = true;
+  private boolean enableHllIndex = false;
   private int hllLog2m = HllConstants.DEFAULT_LOG2M;
   private int hllFieldSize = HllUtil.getHllFieldSizeFromLog2m(HllConstants.DEFAULT_LOG2M);
   private String hllDeriveColumnSuffix = HllConstants.DEFAULT_HLL_DERIVE_COLUMN_SUFFIX;
   private Set<String> columnsToDeriveHllFields = new HashSet<>();
 
-  private transient Map<String, String> derivedHllFieldsMap;
+  private transient Map<String, String> derivedHllFieldToOriginMap;
 
   /**
    * HllConfig with empty columnsToDeriveHllFields, default hll log2m, default hll suffix.
+   * Hll Index is disabled.
    */
   public HllConfig() {
   }
@@ -72,10 +74,11 @@ public class HllConfig {
   public HllConfig(Set<String> columnsToDeriveHllFields, int hllLog2m, String hllDeriveColumnSuffix) {
     Preconditions.checkNotNull(columnsToDeriveHllFields, "ColumnsToDeriveHllFields should not be null.");
     Preconditions.checkNotNull(hllDeriveColumnSuffix, "HLL Derived Field Suffix should not be null.");
+    this.enableHllIndex = true;
     this.hllLog2m = hllLog2m;
     this.hllFieldSize = HllUtil.getHllFieldSizeFromLog2m(hllLog2m);
-    this.columnsToDeriveHllFields = columnsToDeriveHllFields;
     this.hllDeriveColumnSuffix = hllDeriveColumnSuffix;
+    this.columnsToDeriveHllFields = columnsToDeriveHllFields;
   }
 
   public boolean isEnableHllIndex() {
@@ -116,13 +119,13 @@ public class HllConfig {
   }
 
   @JsonIgnore
-  public Map<String, String> getDerivedHllFieldsMap() {
-    if (derivedHllFieldsMap == null) {
-      derivedHllFieldsMap = new HashMap<>();
+  public Map<String, String> getDerivedHllFieldToOriginMap() {
+    if (derivedHllFieldToOriginMap == null) {
+      derivedHllFieldToOriginMap = new HashMap<>();
       for (String columnName : columnsToDeriveHllFields) {
-        derivedHllFieldsMap.put(columnName, columnName + hllDeriveColumnSuffix);
+        derivedHllFieldToOriginMap.put(columnName + hllDeriveColumnSuffix, columnName);
       }
     }
-    return derivedHllFieldsMap;
+    return derivedHllFieldToOriginMap;
   }
 }

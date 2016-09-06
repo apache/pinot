@@ -30,12 +30,18 @@ import java.util.Set;
  */
 public class SingleValueBlockCache {
   private final DataFetcher _dataFetcher;
+
+  /** _columnXXLoaded must be cleared in initNewBlock */
   private final Set<String> _columnDictIdLoaded = new HashSet<>();
   private final Set<String> _columnValueLoaded = new HashSet<>();
   private final Set<String> _columnHashCodeLoaded = new HashSet<>();
+  private final Set<String> _columnStringLoaded = new HashSet<>();
+
+  /** _columnToXXsMap must be defined accordingly */
   private final Map<String, int[]> _columnToDictIdsMap = new HashMap<>();
   private final Map<String, double[]> _columnToValuesMap = new HashMap<>();
   private final Map<String, double[]> _columnToHashCodesMap = new HashMap<>();
+  private final Map<String, String[]> _columnToStringsMap = new HashMap<>();
 
   private int[] _docIds;
   private int _startPos;
@@ -62,6 +68,7 @@ public class SingleValueBlockCache {
     _columnDictIdLoaded.clear();
     _columnValueLoaded.clear();
     _columnHashCodeLoaded.clear();
+    _columnStringLoaded.clear();
 
     _docIds = docIds;
     _startPos = startPos;
@@ -74,7 +81,7 @@ public class SingleValueBlockCache {
    * @param column column name.
    * @return dictionary id array associated with this column.
    */
-  public int[] getDictIdArrayForColumn(String column) {
+  private int[] getDictIdArrayForColumn(String column) {
     int[] dictIds = _columnToDictIdsMap.get(column);
     if (!_columnDictIdLoaded.contains(column)) {
       if (dictIds == null) {
@@ -126,4 +133,25 @@ public class SingleValueBlockCache {
     }
     return hashCodes;
   }
+
+  /**
+   * Get string value array for a given column for the specific block initialized in the initNewBlock.
+   *
+   * @param column column name.
+   * @return value array associated with this column.
+   */
+  public String[] getStringValueArrayForColumn(String column) {
+    String[] stringValues = _columnToStringsMap.get(column);
+    if (!_columnStringLoaded.contains(column)) {
+      if (stringValues == null) {
+        stringValues = new String[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+        _columnToStringsMap.put(column, stringValues);
+      }
+      int[] dictIds = getDictIdArrayForColumn(column);
+      _dataFetcher.fetchSingleStringValues(column, dictIds, _startPos, _length, stringValues, 0);
+      _columnStringLoaded.add(column);
+    }
+    return stringValues;
+  }
+
 }

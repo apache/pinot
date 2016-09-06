@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.segment.index;
 
+import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
@@ -24,6 +25,7 @@ import com.linkedin.pinot.common.utils.time.TimeUtils;
 import com.linkedin.pinot.core.indexsegment.IndexType;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import com.linkedin.pinot.core.startree.hll.HllConstants;
 import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -267,6 +269,15 @@ public class SegmentMetadataImpl implements SegmentMetadata {
       }
     }
 
+    // Column Metadata
+    for (final String column : _allColumns) {
+      _columnMetadataMap.put(column,
+          ColumnMetadata.fromPropertiesConfiguration(column, _segmentMetadataPropertiesConfiguration));
+    }
+
+    // Segment Name
+    _segmentName = _segmentMetadataPropertiesConfiguration.getString(Segment.SEGMENT_NAME);
+
     // StarTree config here
     _hasStarTree = _segmentMetadataPropertiesConfiguration.getBoolean(
         MetadataKeys.StarTree.STAR_TREE_ENABLED, false);
@@ -274,14 +285,9 @@ public class SegmentMetadataImpl implements SegmentMetadata {
       initStarTreeMetadata();
     }
 
-    _segmentName = _segmentMetadataPropertiesConfiguration.getString(V1Constants.MetadataKeys.Segment.SEGMENT_NAME);
-
-    for (final String column : _allColumns) {
-      _columnMetadataMap.put(column, extractColumnMetadataFor(column));
-    }
-
+    // Build Schema
     for (final String column : _columnMetadataMap.keySet()) {
-      _schema.addField(_columnMetadataMap.get(column).toFieldSpec());
+      _schema.addField(_columnMetadataMap.get(column).getFieldSpec());
     }
   }
 
@@ -290,6 +296,31 @@ public class SegmentMetadataImpl implements SegmentMetadata {
    */
   private void initStarTreeMetadata() {
     _starTreeMetadata = new StarTreeMetadata();
+
+    // Set hll
+    _starTreeMetadata.setEnableHll(
+        _segmentMetadataPropertiesConfiguration.getBoolean(MetadataKeys.StarTree.STAR_TREE_HLL_ENABLED,
+            false));
+    _starTreeMetadata.setHllLog2m(
+        _segmentMetadataPropertiesConfiguration.getInt(MetadataKeys.StarTree.STAR_TREE_HLL_LOG2M,
+            HllConstants.DEFAULT_LOG2M));
+
+    // Build Derived Column Map
+    Map<String, String> hllOriginToDerivedColumnMap = new HashMap<>();
+    for (final ColumnMetadata columnMetadata : _columnMetadataMap.values()) {
+      MetricFieldSpec.DerivedMetricType derivedMetricType = columnMetadata.getDerivedMetricType();
+      if (derivedMetricType != null) {
+        switch (derivedMetricType) {
+          case HLL:
+            hllOriginToDerivedColumnMap.put(columnMetadata.getOriginColumnName(), columnMetadata.getColumnName());
+            break;
+          default:
+            throw new IllegalArgumentException(
+                columnMetadata.getDerivedMetricType() + " type is not supported in building derived columns.");
+        }
+      }
+    }
+    _starTreeMetadata.setHllOriginToDerivedColumnMap(hllOriginToDerivedColumnMap);
 
     // Set the maxLeafRecords
     String maxLeafRecordsString =
@@ -336,10 +367,6 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     if (skipMaterializationCardinalityString != null) {
       _starTreeMetadata.setSkipMaterializationCardinality(Long.valueOf(skipMaterializationCardinalityString));
     }
-  }
-
-  private ColumnMetadata extractColumnMetadataFor(String column) {
-    return ColumnMetadata.fromPropertiesConfiguration(column, _segmentMetadataPropertiesConfiguration);
   }
 
   public ColumnMetadata getColumnMetadataFor(String column) {
@@ -538,4 +565,5 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   @Override public Character getPaddingCharacter() {
     return _paddingCharacter;
   }
+
 }

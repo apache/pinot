@@ -62,6 +62,7 @@ public class AvroRecordReader extends BaseRecordReader {
     _fileName = filePath;
     super.initNullCounters(_schemaExtractor.getSchema());
     init();
+    validateSchema(_schemaExtractor.getSchema());
   }
 
   @Override
@@ -79,7 +80,6 @@ public class AvroRecordReader extends BaseRecordReader {
       _dataStream =
           new DataFileStream<GenericRecord>(new FileInputStream(file), new GenericDatumReader<GenericRecord>());
     }
-    validateSchema(_schemaExtractor.getSchema());
   }
 
   @Override

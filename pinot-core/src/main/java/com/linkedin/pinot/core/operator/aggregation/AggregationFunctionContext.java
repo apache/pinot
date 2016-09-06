@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.operator.aggregation;
 
+import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunction;
 import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunctionFactory;
 
@@ -32,8 +33,8 @@ public class AggregationFunctionContext {
    * @param aggFuncName
    * @param aggrColumns
    */
-  public AggregationFunctionContext(String aggFuncName, String[] aggrColumns) {
-    _aggregationFunction = AggregationFunctionFactory.getAggregationFunction(aggFuncName);
+  public AggregationFunctionContext(String aggFuncName, String[] aggrColumns, SegmentMetadata segmentMetadata) {
+    _aggregationFunction = AggregationFunctionFactory.getAggregationFunction(aggFuncName, segmentMetadata);
     _aggrColumns = aggrColumns;
   }
 

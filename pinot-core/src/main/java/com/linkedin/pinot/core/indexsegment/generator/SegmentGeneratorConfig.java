@@ -77,7 +77,7 @@ public class SegmentGeneratorConfig {
   private String _creatorVersion = null;
   private char _paddingCharacter = V1Constants.Str.DEFAULT_STRING_PAD_CHAR;
 
-  private HllConfig _hllConfig = null;
+  private HllConfig _hllConfig = new HllConfig();
 
   public SegmentGeneratorConfig() {
   }
@@ -387,6 +387,9 @@ public class SegmentGeneratorConfig {
   }
 
   public void setHllConfig(HllConfig hllConfig) {
+    if (hllConfig == null) {
+      hllConfig = new HllConfig();
+    }
     _hllConfig = hllConfig;
   }
 

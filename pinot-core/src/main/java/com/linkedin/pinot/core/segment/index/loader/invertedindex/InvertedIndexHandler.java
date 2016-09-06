@@ -120,7 +120,7 @@ public class InvertedIndexHandler {
     int totalDocs = columnMetadata.getTotalDocs();
     OffHeapBitmapInvertedIndexCreator creator =
         new OffHeapBitmapInvertedIndexCreator(indexDir, columnMetadata.getCardinality(), totalDocs,
-            columnMetadata.getTotalNumberOfEntries(), columnMetadata.toFieldSpec());
+            columnMetadata.getTotalNumberOfEntries(), columnMetadata.getFieldSpec());
 
     try (DataFileReader fwdIndex = getForwardIndexReader(columnMetadata, segmentWriter)) {
       if (columnMetadata.isSingleValue()) {
