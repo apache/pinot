@@ -203,8 +203,7 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
 
       if (tableDir.exists()) {
         for (final File file : tableDir.listFiles()) {
-          final String url = "http://" + StringUtil
-              .join(":", _controllerConf.getControllerVipHost(), _controllerConf.getControllerPort()) + "/segments/" + tableName + "/" + file.getName();
+	  final String url = _controllerConf.generateVipUrl() + "/segments/" + tableName + "/" + file.getName();
           ret.put(url);
         }
       } else {
@@ -237,8 +236,7 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
       }
 
       final String url =
-          "http://" + StringUtil.join(":", _controllerConf.getControllerVipHost(), _controllerConf.getControllerPort()) + "/segments/"
-              + fileName;
+	  _controllerConf.generateVipUrl() + "/segments/" + fileName;
       ret.put(url);
     }
     presentation = new StringRepresentation(ret.toString());
