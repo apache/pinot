@@ -63,13 +63,11 @@ public class DerivedSchemaGenerationTest {
 
     thirdeyeConfig = ThirdEyeConfig.fromProperties(props);
     outputSchema = job.newSchema(thirdeyeConfig);
-    Assert.assertEquals(inputSchema.getFields().size() + 2, outputSchema.getFields().size(),
+    Assert.assertEquals(inputSchema.getFields().size() + 1, outputSchema.getFields().size(),
         "Input schema should not be same as output schema if topk/whitelist in config");
 
-    Assert.assertEquals(outputSchema.getField("d2_raw") != null, true,
-        "Output schema should have _raw entries for columsn in topk/whitelist");
-    Assert.assertEquals(outputSchema.getField("d3_raw") != null, true,
-        "Output schema should have _raw entries for columsn in whitelist");
+    Assert.assertEquals(outputSchema.getField("d2_topk") != null, true,
+        "Output schema should have _topk entries for columsn in topk");
   }
 
 }

@@ -18,7 +18,7 @@
         },
         {
             "doc": "dimension 2",
-            "name": "d2_raw",
+            "name": "d2_topk",
             "type": [
                 "null",
                 "string"

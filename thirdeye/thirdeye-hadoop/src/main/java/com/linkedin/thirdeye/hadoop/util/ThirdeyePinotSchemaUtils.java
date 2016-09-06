@@ -27,7 +27,6 @@ import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.TimeFieldSpec;
@@ -68,7 +67,7 @@ public class ThirdeyePinotSchemaUtils {
 
       if (transformDimensions.contains(dimensionName)) {
         fieldSpec = new DimensionFieldSpec();
-        dimensionName = dimensionName + ThirdEyeConstants.RAW_DIMENSION_SUFFIX;
+        dimensionName = dimensionName + ThirdEyeConstants.TOPK_DIMENSION_SUFFIX;
         fieldSpec.setName(dimensionName);
         fieldSpec.setDataType(DataType.STRING);
         fieldSpec.setSingleValueField(true);

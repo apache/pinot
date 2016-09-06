@@ -57,8 +57,8 @@ public class ThirdeyePinotSchemaUtilsTest {
   public void testThirdeyeConfigToPinotSchemaGeneration() throws Exception {
     Schema schema = ThirdeyePinotSchemaUtils.createSchema(thirdeyeConfig);
 
-    Assert.assertEquals(schema.getAllFieldSpecs().size(), 9, "Incorrect pinot schema fields list size");
-    List<String> dimensions = Arrays.asList("d1", "d1_raw", "d2", "d2_raw", "d3");
+    Assert.assertEquals(schema.getAllFieldSpecs().size(), 8, "Incorrect pinot schema fields list size");
+    List<String> dimensions = Arrays.asList("d1", "d2", "d2_topk", "d3");
     Assert.assertEquals(schema.getDimensionNames().containsAll(dimensions), true,
         "New schema dimensions " + schema.getDimensionNames() + " is missing dimensions");
 

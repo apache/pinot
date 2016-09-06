@@ -136,10 +136,6 @@ public final class ThirdEyeConfig {
           transformDimensions.add(spec.getDimensionName());
         }
       }
-      Map<String, String> whitelist = topKWhitelist.getWhitelist();
-      if (whitelist != null) {
-        transformDimensions.addAll(whitelist.keySet());
-      }
     }
     return transformDimensions;
   }

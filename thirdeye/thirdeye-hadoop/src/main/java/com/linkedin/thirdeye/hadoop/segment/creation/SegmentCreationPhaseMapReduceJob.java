@@ -213,15 +213,14 @@ public class SegmentCreationPhaseMapReduceJob {
       StarTreeIndexSpec starTreeIndexSpec = new StarTreeIndexSpec();
 
       // _raw dimensions should not be in star tree split order
-      // if a dimension has a _raw column, we will include only
+      // if a dimension has a _topk column, we will include only
       // the column with topk, and skip _raw column for materialization in star tree
       Set<String> skipMaterializationForDimensions = new HashSet<>();
       Set<String> transformDimensionsSet = thirdeyeConfig.getTransformDimensions();
-      LOGGER.info("Dimensions with _raw column {}", transformDimensionsSet);
-      for (String transformDimension : transformDimensionsSet) {
-        String rawDimension = transformDimension + ThirdEyeConstants.RAW_DIMENSION_SUFFIX;
-        skipMaterializationForDimensions.add(rawDimension);
-        LOGGER.info("Adding {} to skipMaterialization set", rawDimension);
+      LOGGER.info("Dimensions with _topk column {}", transformDimensionsSet);
+      for (String topkTransformDimension : transformDimensionsSet) {
+        skipMaterializationForDimensions.add(topkTransformDimension);
+        LOGGER.info("Adding {} to skipMaterialization set", topkTransformDimension);
       }
       starTreeIndexSpec.setSkipMaterializationForDimensions(skipMaterializationForDimensions);
       LOGGER.info("Setting skipMaterializationForDimensions {}", skipMaterializationForDimensions);
