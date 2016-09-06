@@ -262,7 +262,7 @@ public class HelixHelper {
     };
 
     // Removing partitions from ideal state
-    LOGGER.info("Trying to remove resource from idealstats");
+    LOGGER.info("Trying to remove resource {} from idealstate", resourceTag);
     HelixHelper.updateIdealState(helixManager, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE, updater,
         DEFAULT_RETRY_POLICY);
   }
