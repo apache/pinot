@@ -28,6 +28,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.helix.AccessOption;
@@ -375,6 +376,7 @@ public class PinotLLCRealtimeSegmentManager {
     oldSegMetadata.setCrc(Long.valueOf(segmentMetadata.getCrc()));
     oldSegMetadata.setStartTime(segmentMetadata.getTimeInterval().getStartMillis());
     oldSegMetadata.setEndTime(segmentMetadata.getTimeInterval().getEndMillis());
+    oldSegMetadata.setTimeUnit(TimeUnit.MILLISECONDS);
     oldSegMetadata.setIndexVersion(segmentMetadata.getVersion());
     oldSegMetadata.setTotalRawDocs(segmentMetadata.getTotalRawDocs());
 
