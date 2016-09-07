@@ -5,6 +5,10 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
@@ -73,6 +77,9 @@ public class AnomalyMergeExecutor implements Runnable {
   }
 
   public void run() {
+    ExecutorService taskExecutorService = Executors.newFixedThreadPool(5);
+    List<Future<Integer>> taskCallbacks = new ArrayList<>();
+
     try {
       /**
        * Step 0: find all active functions
@@ -93,36 +100,46 @@ public class AnomalyMergeExecutor implements Runnable {
 
       // for each anomaly function, find raw unmerged results and perform merge
       for (AnomalyFunctionDTO function : activeFunctions) {
+        Callable<Integer> task = () -> {
+          List<RawAnomalyResultDTO> unmergedResults =
+              anomalyResultDAO.findUnmergedByFunctionId(function.getId());
 
-        List<RawAnomalyResultDTO> unmergedResults =
-            anomalyResultDAO.findUnmergedByFunctionId(function.getId());
+          LOG.info("Running merge for function id : [{}], found [{}] raw anomalies",
+              function.getId(), unmergedResults.size());
 
-        LOG.info("Running merge for function id : [{}], found [{}] raw anomalies", function.getId(),
-            unmergedResults.size());
+          // TODO : move merge config within the AnomalyFunction; Every function should have its own merge config.
+          AnomalyMergeConfig mergeConfig = new AnomalyMergeConfig();
+          mergeConfig.setSequentialAllowedGap(2 * 60 * 60_000); // 2 hours
+          mergeConfig.setMergeDuration(-1); // no time based split
+          mergeConfig.setMergeStrategy(AnomalyMergeStrategy.FUNCTION_DIMENSIONS);
 
-        // TODO : move merge config within the AnomalyFunction; Every function should have its own merge config.
-        AnomalyMergeConfig mergeConfig = new AnomalyMergeConfig();
-        mergeConfig.setSequentialAllowedGap(2 * 60 * 60_000); // 2 hours
-        mergeConfig.setMergeDuration(-1); // no time based split
-        mergeConfig.setMergeStrategy(AnomalyMergeStrategy.FUNCTION_DIMENSIONS);
+          List<MergedAnomalyResultDTO> output = new ArrayList<>();
 
-        List<MergedAnomalyResultDTO> output = new ArrayList<>();
-
-        if (unmergedResults.size() > 0) {
-          switch (mergeConfig.getMergeStrategy()) {
-          case FUNCTION:
-            performMergeBasedOnFunctionId(function, mergeConfig, unmergedResults, output);
-            break;
-          case FUNCTION_DIMENSIONS:
-            performMergeBasedOnFunctionIdAndDimensions(function, mergeConfig, unmergedResults,
-                output);
-            break;
-          default:
-            throw new IllegalArgumentException(
-                "Merge strategy " + mergeConfig.getMergeStrategy() + " not supported");
+          if (unmergedResults.size() > 0) {
+            switch (mergeConfig.getMergeStrategy()) {
+            case FUNCTION:
+              performMergeBasedOnFunctionId(function, mergeConfig, unmergedResults, output);
+              break;
+            case FUNCTION_DIMENSIONS:
+              performMergeBasedOnFunctionIdAndDimensions(function, mergeConfig, unmergedResults,
+                  output);
+              break;
+            default:
+              throw new IllegalArgumentException(
+                  "Merge strategy " + mergeConfig.getMergeStrategy() + " not supported");
+            }
           }
-        }
-        output.forEach(this::updateMergedScoreAndPersist);
+          for (MergedAnomalyResultDTO mergedAnomalyResultDTO : output) {
+            updateMergedScoreAndPersist(mergedAnomalyResultDTO);
+          }
+          return output.size();
+        };
+        Future<Integer> taskFuture = taskExecutorService.submit(task);
+        taskCallbacks.add(taskFuture);
+      }
+      for (Future<Integer> future : taskCallbacks) {
+        // now wait till all the tasks complete
+        future.get();
       }
     } catch (Exception e) {
       LOG.error("Error in merge execution", e);
@@ -138,8 +155,7 @@ public class AnomalyMergeExecutor implements Runnable {
     String anomalyMessage = "";
     for (RawAnomalyResultDTO anomalyResult : mergedResult.getAnomalyResults()) {
       anomalyResult.setMerged(true);
-      double bucketSizeSeconds =
-          (anomalyResult.getEndTime() - anomalyResult.getStartTime()) / 1000;
+      double bucketSizeSeconds = (anomalyResult.getEndTime() - anomalyResult.getStartTime()) / 1000;
       weightedScoreSum += (anomalyResult.getScore() / normalizationFactor) * bucketSizeSeconds;
       weightedWeightSum += (anomalyResult.getWeight() / normalizationFactor) * bucketSizeSeconds;
       totalBucketSize += bucketSizeSeconds;
