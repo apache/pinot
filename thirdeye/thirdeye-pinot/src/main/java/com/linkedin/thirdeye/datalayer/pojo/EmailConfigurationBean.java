@@ -4,6 +4,7 @@ import java.util.concurrent.TimeUnit;
 
 import javax.persistence.Column;
 import javax.persistence.Entity;
+import javax.persistence.MappedSuperclass;
 import javax.persistence.Table;
 import javax.validation.Valid;
 import javax.validation.constraints.NotNull;
@@ -15,8 +16,9 @@ import com.google.common.base.MoreObjects;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
-@Entity
-@Table(name = "email_configurations")
+//@Entity
+//@Table(name = "email_configurations")
+@MappedSuperclass
 public class EmailConfigurationBean extends AbstractBean {
 
   @Valid

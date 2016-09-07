@@ -4,15 +4,17 @@ import java.util.Objects;
 
 import javax.persistence.Column;
 import javax.persistence.Entity;
+import javax.persistence.MappedSuperclass;
 import javax.persistence.Table;
 
 import org.apache.commons.lang.ObjectUtils;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
-@JsonIgnoreProperties(ignoreUnknown = true)
-@Entity
-@Table(name = "anomaly_merged_results")
+//@JsonIgnoreProperties(ignoreUnknown = true)
+//@Entity
+//@Table(name = "anomaly_merged_results")
+@MappedSuperclass
 public class MergedAnomalyResultBean extends AbstractBean
     implements Comparable<MergedAnomalyResultBean> {
 

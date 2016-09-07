@@ -5,6 +5,6 @@ import javax.persistence.MappedSuperclass;
 import com.linkedin.thirdeye.datalayer.dto.AbstractDTO;
 
 @MappedSuperclass
-public abstract class AbstractBean extends AbstractDTO{
-  
+public abstract class AbstractBean extends AbstractDTO {
+
 }
