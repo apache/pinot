@@ -107,19 +107,10 @@ function getAnomalyMetricList() {
 
     //Create metric dropdown
     var url = "/dashboard/anomalies/metrics?dataset=" + hash.dataset;
-
     getData(url).done(function (data) {
 
-        validateFormData(data, "No metrics available in the server.", "anomaly metrics")
-
-        /* Handelbars template for query form single select metric list on anomaly view */
-        var queryFormMetricListData = {data: data};
-        var result_query_form_metric_list_template = HandleBarsTemplates.template_metric_list(queryFormMetricListData);
-        var form = $("#anomalies-form");
-        $(".single-metric-list", form ).each(function () {
-            $(this).html(result_query_form_metric_list_template)
-        });
-
+        validateFormData(data, "No metrics available in the server.", "anomaly metrics");
+        window.datasetConfig.anomalyMetricList = data;
         window.responseDataPopulated++
         formComponentPopulated()
     });
