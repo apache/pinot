@@ -47,7 +47,8 @@ public class BaseHllStarTreeIndexTest {
    * to mimic actual use cases
    */
   private static final Set<String> columnsToDeriveHllFields = new HashSet<>(Arrays.asList("d3", "d4"));
-  protected static final HllConfig HLL_CONFIG = new HllConfig(columnsToDeriveHllFields);
+  protected static final HllConfig HLL_CONFIG = new HllConfig(
+      HllConstants.DEFAULT_LOG2M, columnsToDeriveHllFields, HllConstants.DEFAULT_HLL_DERIVE_COLUMN_SUFFIX);
 
   protected String[] _hardCodedQueries =
           new String[]{

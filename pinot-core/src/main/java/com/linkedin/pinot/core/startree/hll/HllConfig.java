@@ -24,12 +24,12 @@ import org.codehaus.jackson.annotate.JsonIgnore;
 
 
 /**
- * This HllConfig is used at segment generation.
- * HllConfig is the config for hll index generation.
- * Note it is only effective when StarTree index generation is enabled.
+ * HllConfig is used at segment generation.
+ *
+ * If columnsToDeriveHllFields are specified and not empty,
+ * segment builder will generate corresponding hll derived fields on the fly.
  */
 public class HllConfig {
-  private boolean enableHllIndex = false;
   private int hllLog2m = HllConstants.DEFAULT_LOG2M;
   private int hllFieldSize = HllUtil.getHllFieldSizeFromLog2m(HllConstants.DEFAULT_LOG2M);
   private String hllDeriveColumnSuffix = HllConstants.DEFAULT_HLL_DERIVE_COLUMN_SUFFIX;
@@ -38,55 +38,36 @@ public class HllConfig {
   private transient Map<String, String> derivedHllFieldToOriginMap;
 
   /**
-   * HllConfig with empty columnsToDeriveHllFields, default hll log2m, default hll suffix.
-   * Hll Index is disabled.
+   * HllConfig with default hll log2m. No Hll derived field is generated.
    */
   public HllConfig() {
   }
 
   /**
-   * HllConfig with default hll log2m, default hll suffix.
-   * @param columnsToDeriveHllFields columns to generate hll index
-   */
-  public HllConfig(Set<String> columnsToDeriveHllFields) {
-    this(columnsToDeriveHllFields, HllConstants.DEFAULT_LOG2M);
-  }
-
-  /**
-   * HllConfig with default hll suffix.
-   * @param columnsToDeriveHllFields columns to generate hll index
+   * HllConfig with customized hll log2m. No Hll derived field is generated.
    * @param hllLog2m The log2m parameter defines the accuracy of the counter.
    *                 The larger the log2m the better the accuracy.
    *                 accuracy = 1.04/sqrt(2^log2m)
    */
-  public HllConfig(Set<String> columnsToDeriveHllFields, int hllLog2m) {
-    this(columnsToDeriveHllFields, hllLog2m, HllConstants.DEFAULT_HLL_DERIVE_COLUMN_SUFFIX);
+  public HllConfig(int hllLog2m) {
+    this.hllLog2m = hllLog2m;
   }
 
   /**
-   *
-   * @param columnsToDeriveHllFields columns to generate hll index
+   * Hll derived field generation is enabled when columnsToDeriveHllFields is not empty.
    * @param hllLog2m The log2m parameter defines the accuracy of the counter.
    *                 The larger the log2m the better the accuracy.
    *                 accuracy = 1.04/sqrt(2^log2m)
+   * @param columnsToDeriveHllFields columns to generate hll index
    * @param hllDeriveColumnSuffix suffix of column used for hll index
    */
-  public HllConfig(Set<String> columnsToDeriveHllFields, int hllLog2m, String hllDeriveColumnSuffix) {
+  public HllConfig(int hllLog2m, Set<String> columnsToDeriveHllFields, String hllDeriveColumnSuffix) {
     Preconditions.checkNotNull(columnsToDeriveHllFields, "ColumnsToDeriveHllFields should not be null.");
     Preconditions.checkNotNull(hllDeriveColumnSuffix, "HLL Derived Field Suffix should not be null.");
-    this.enableHllIndex = true;
     this.hllLog2m = hllLog2m;
     this.hllFieldSize = HllUtil.getHllFieldSizeFromLog2m(hllLog2m);
     this.hllDeriveColumnSuffix = hllDeriveColumnSuffix;
     this.columnsToDeriveHllFields = columnsToDeriveHllFields;
-  }
-
-  public boolean isEnableHllIndex() {
-    return enableHllIndex;
-  }
-
-  public void setEnableHllIndex(boolean enableHllIndex) {
-    this.enableHllIndex = enableHllIndex;
   }
 
   public int getHllLog2m() {
@@ -111,6 +92,15 @@ public class HllConfig {
 
   public void setColumnsToDeriveHllFields(Set<String> columnsToDeriveHllFields) {
     this.columnsToDeriveHllFields = columnsToDeriveHllFields;
+  }
+
+  /**
+   * Hll derived field generation is enabled when columnsToDeriveHllFields is not empty.
+   * @return
+   */
+  @JsonIgnore
+  public boolean isEnableHllIndex() {
+    return columnsToDeriveHllFields.size() > 0;
   }
 
   @JsonIgnore

@@ -74,7 +74,7 @@ public class HllIndexSentinelTest {
           "column17", "column18"));
 
   private static final HllConfig hllConfig =
-      new HllConfig(columnsToDeriveHllFields, hllLog2m, hllDeriveColumnSuffix);
+      new HllConfig(hllLog2m, columnsToDeriveHllFields, hllDeriveColumnSuffix);
 
   private void setupTableManager() throws Exception {
     TableDataManagerProvider.setServerMetrics(new ServerMetrics(new MetricsRegistry()));

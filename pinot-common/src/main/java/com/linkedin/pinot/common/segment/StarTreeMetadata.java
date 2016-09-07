@@ -31,8 +31,6 @@ public class StarTreeMetadata {
   private long _maxLeafRecords;
   private long _skipMaterializationCardinality;
 
-  private boolean _enableHll;
-  private int _hllLog2m;
   private Map<String, String> _hllOriginToDerivedColumnMap;
 
   public StarTreeMetadata() {
@@ -76,22 +74,6 @@ public class StarTreeMetadata {
 
   public void setSkipMaterializationForDimensions(List<String> skipMaterializationForDimensions) {
     _skipMaterializationForDimensions = skipMaterializationForDimensions;
-  }
-
-  public boolean isEnableHll() {
-    return _enableHll;
-  }
-
-  public void setEnableHll(boolean enableHll) {
-    _enableHll = enableHll;
-  }
-
-  public int getHllLog2m() {
-    return _hllLog2m;
-  }
-
-  public void setHllLog2m(int hllLog2m) {
-    _hllLog2m = hllLog2m;
   }
 
   public String getDerivedHllColumnFromOrigin(String originColumn) {

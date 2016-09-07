@@ -157,6 +157,12 @@ public interface SegmentMetadata {
   Character getPaddingCharacter();
 
   /**
+   * returns Hll Log2m parameter
+   * @return
+   */
+  int getHllLog2m();
+
+  /**
    * @return
    */
   public Map<String, String> toMap();

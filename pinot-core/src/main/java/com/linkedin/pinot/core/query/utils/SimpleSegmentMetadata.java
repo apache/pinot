@@ -17,6 +17,7 @@ package com.linkedin.pinot.core.query.utils;
 
 import com.linkedin.pinot.common.segment.StarTreeMetadata;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import com.linkedin.pinot.core.startree.hll.HllConstants;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -44,6 +45,7 @@ public class SimpleSegmentMetadata implements SegmentMetadata {
   private long _size;
   private String _segmentName;
   private char _paddingCharacter = V1Constants.Str.DEFAULT_STRING_PAD_CHAR;
+  private int _hllLog2m = HllConstants.DEFAULT_LOG2M;
 
   public SimpleSegmentMetadata(String resourceName) {
     init(resourceName, new Schema());
@@ -200,5 +202,10 @@ public class SimpleSegmentMetadata implements SegmentMetadata {
 
   @Override public Character getPaddingCharacter() {
     return _paddingCharacter;
+  }
+
+  @Override
+  public int getHllLog2m() {
+    return _hllLog2m;
   }
 }

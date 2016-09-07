@@ -108,11 +108,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     enableHllIndex = config.getHllConfig().isEnableHllIndex();
 
     if (enableHllIndex && !createStarTree) {
-      LOGGER.warn("Hll configuration works only with star tree. " +
-          "Star Tree generation is not specified. " +
-          "This will not add derived hll fields.");
-      config.getHllConfig().setEnableHllIndex(false);
-      enableHllIndex = false;
+      throw new IllegalArgumentException("Derived HLL fields generation will not work if StarTree is not enabled.");
     }
 
     addDerivedFieldsInSchema();
