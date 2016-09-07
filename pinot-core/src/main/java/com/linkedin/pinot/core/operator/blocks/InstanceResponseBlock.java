@@ -15,7 +15,11 @@
  */
 package com.linkedin.pinot.core.operator.blocks;
 
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.exception.QueryException;
+import com.linkedin.pinot.common.response.ProcessingException;
 import com.linkedin.pinot.common.utils.DataTable;
+import com.linkedin.pinot.common.utils.DataTableBuilder;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
@@ -42,6 +46,9 @@ public class InstanceResponseBlock implements Block {
     try {
       _instanceResponseDataTable = intermediateResultsBlock.getDataTable();
     } catch (Exception e) {
+      _instanceResponseDataTable = new DataTableBuilder(
+          new DataTableBuilder.DataSchema(new String[0], new FieldSpec.DataType[0])).buildExceptions();
+      _instanceResponseDataTable.addException(new ProcessingException(QueryException.INTERNAL_ERROR));
       LOGGER.warn("Caught exception while building InstanceResponseBlock", e);
     }
   }
