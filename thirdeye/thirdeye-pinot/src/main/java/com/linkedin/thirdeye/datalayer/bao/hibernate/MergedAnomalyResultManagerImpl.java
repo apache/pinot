@@ -46,7 +46,7 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
       "from MergedAnomalyResultDTO r WHERE (r.startTime < :endTime and r.endTime > :startTime) order by r.endTime desc ";
 
   private static final String FIND_BY_TIME_EMAIL_NOTIFIED_FALSE =
-      "SELECT r FROM EmailConfiguration d JOIN d.functions f, MergedAnomalyResultDTO r "
+      "SELECT r FROM EmailConfigurationDTO d JOIN d.functions f, MergedAnomalyResultDTO r "
           + "WHERE r.function.id=f.id AND d.id = :emailId and r.notified=false "
           + "and (r.startTime < :endTime and r.endTime > :startTime) order by r.endTime desc ";
 

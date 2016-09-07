@@ -33,7 +33,6 @@ import com.linkedin.thirdeye.anomaly.task.TaskRunner;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.client.cache.QueryCache;
-import com.linkedin.thirdeye.client.comparison.TimeOnTimeComparisonHandler;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
@@ -61,15 +60,12 @@ public class AlertTaskRunner implements TaskRunner {
   private ThirdEyeAnomalyConfiguration thirdeyeConfig;
 
   private QueryCache queryCache;
-  private TimeOnTimeComparisonHandler timeOnTimeComparisonHandler;
-
 
   public static final TimeZone DEFAULT_TIME_ZONE = TimeZone.getTimeZone("America/Los_Angeles");
   public static final String CHARSET = "UTF-8";
 
   public AlertTaskRunner() {
     queryCache = CACHE_REGISTRY_INSTANCE.getQueryCache();
-    timeOnTimeComparisonHandler = new TimeOnTimeComparisonHandler(queryCache);
   }
 
   @Override
@@ -84,16 +80,17 @@ public class AlertTaskRunner implements TaskRunner {
 
     try {
       LOG.info("Begin executing task {}", taskInfo);
-      run();
-    } catch (Throwable t) {
-      LOG.error("Job failed with exception:", t);
+      runTask();
+    } catch (Exception t) {
+      LOG.error("Task failed with exception:", t);
       sendFailureEmail(t);
+      // Let task driver mark this task failed
+      throw t;
     }
-
     return taskResult;
   }
 
-  private void run() throws Exception {
+  private void runTask() throws Exception {
     LOG.info("Starting email report {}", alertConfig.getId());
 
     ThirdEyeClient client = queryCache.getClient();

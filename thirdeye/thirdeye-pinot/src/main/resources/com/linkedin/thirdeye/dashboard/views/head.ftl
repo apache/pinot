@@ -41,8 +41,6 @@
    <!--Compiled uikit components as used-components.compiled.js consists of: sticky.min.js, datepicker.min.js, timepicker.min.js,
    autocomplete.min.js, sortable.min.js, form-select.min.js-->
     <script src="../../../assets/js/uikit/components/used-components.compiled.js" defer></script>
-
-
     <script src="../../../assets/js/lib/utility.js" defer></script>
     <script src="../../../assets/js/lib/get-form-data.js" defer></script>
     <script src="../../../assets/js/lib/tabular.js" defer></script>
