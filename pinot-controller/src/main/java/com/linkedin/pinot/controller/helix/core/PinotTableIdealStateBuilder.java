@@ -209,6 +209,7 @@ public class PinotTableIdealStateBuilder {
     final String topicName = kafkaMetadata.getKafkaTopicName();
     final PinotLLCRealtimeSegmentManager segmentManager = PinotLLCRealtimeSegmentManager.getInstance();
     final int nPartitions = getPartitionsCount(kafkaMetadata);
+    LOGGER.info("Assigning {} partitions to instances for simple consumer for table {}", nPartitions, realtimeTableName);
 
     segmentManager.setupHelixEntries(topicName, realtimeTableName, nPartitions, realtimeInstances, nReplicas,
         kafkaMetadata.getKafkaConsumerProperties().get("auto.offset.reset"), kafkaMetadata.getBootstrapHosts(),

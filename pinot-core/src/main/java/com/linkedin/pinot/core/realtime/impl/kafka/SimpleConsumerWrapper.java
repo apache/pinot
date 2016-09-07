@@ -16,16 +16,17 @@
 
 package com.linkedin.pinot.core.realtime.impl.kafka;
 
-import com.google.common.base.Preconditions;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import org.apache.kafka.common.protocol.Errors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Iterables;
@@ -34,11 +35,12 @@ import com.google.common.util.concurrent.Uninterruptibles;
 import javax.annotation.Nullable;
 import kafka.api.FetchRequestBuilder;
 import kafka.api.PartitionOffsetRequestInfo;
-import kafka.cluster.Broker;
+import kafka.cluster.BrokerEndPoint;
 import kafka.common.TopicAndPartition;
 import kafka.javaapi.FetchResponse;
 import kafka.javaapi.OffsetRequest;
 import kafka.javaapi.OffsetResponse;
+import kafka.javaapi.PartitionMetadata;
 import kafka.javaapi.TopicMetadata;
 import kafka.javaapi.TopicMetadataRequest;
 import kafka.javaapi.TopicMetadataResponse;
@@ -74,7 +76,7 @@ public class SimpleConsumerWrapper implements Closeable {
   private int[] _bootstrapPorts;
   private SimpleConsumer _simpleConsumer;
   private final Random _random = new Random();
-  private Broker _leader;
+  private BrokerEndPoint _leader;
   private String _currentHost;
   private int _currentPort;
 
@@ -230,7 +232,14 @@ public class SimpleConsumerWrapper implements Closeable {
       try {
         TopicMetadataResponse response = _simpleConsumer.send(new TopicMetadataRequest(Collections.singletonList(_topic)));
         try {
-          _leader = response.topicsMetadata().get(0).partitionsMetadata().get(_partition).leader();
+          _leader = null;
+          List<PartitionMetadata> pMetaList = response.topicsMetadata().get(0).partitionsMetadata();
+          for (PartitionMetadata pMeta : pMetaList) {
+            if (pMeta.partitionId() == _partition) {
+              _leader = pMeta.leader();
+              break;
+            }
+          }
 
           // If we've located a broker
           if (_leader != null) {
