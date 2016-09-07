@@ -4,11 +4,9 @@ import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
 import javax.persistence.Column;
-import javax.persistence.Entity;
 import javax.persistence.EnumType;
 import javax.persistence.Enumerated;
 import javax.persistence.MappedSuperclass;
-import javax.persistence.Table;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.base.MoreObjects;
@@ -16,8 +14,6 @@ import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
-//@Entity
-//@Table(name = "anomaly_functions")
 @MappedSuperclass
 public class AnomalyFunctionBean extends AbstractBean {
 
