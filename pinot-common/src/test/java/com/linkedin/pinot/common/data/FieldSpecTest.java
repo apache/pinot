@@ -45,12 +45,10 @@ public class FieldSpecTest {
     fieldSpec1.setName("svDimension");
     fieldSpec1.setDataType(DataType.BOOLEAN);
     fieldSpec1.setDefaultNullValue(false);
-    FieldSpec fieldSpec2 = new DimensionFieldSpec("svDimension", DataType.BOOLEAN, true);
-    fieldSpec2.setDefaultNullValue(false);
+    FieldSpec fieldSpec2 = new DimensionFieldSpec("svDimension", DataType.BOOLEAN, true, false);
     Assert.assertEquals(fieldSpec1, fieldSpec2);
     Assert.assertEquals(fieldSpec1.toString(), fieldSpec2.toString());
     Assert.assertEquals(fieldSpec1.hashCode(), fieldSpec2.hashCode());
-    Assert.assertTrue(fieldSpec1.getDefaultNullValue() instanceof String);
     Assert.assertEquals(fieldSpec1.getDefaultNullValue(), "false");
 
     // Multi-value dimension field.
@@ -62,7 +60,6 @@ public class FieldSpecTest {
     Assert.assertEquals(fieldSpec1, fieldSpec2);
     Assert.assertEquals(fieldSpec1.toString(), fieldSpec2.toString());
     Assert.assertEquals(fieldSpec1.hashCode(), fieldSpec2.hashCode());
-    Assert.assertTrue(fieldSpec1.getDefaultNullValue() instanceof Integer);
     Assert.assertEquals(fieldSpec1.getDefaultNullValue(), Integer.MIN_VALUE);
 
     // Multi-value dimension field with default null value.
@@ -71,12 +68,10 @@ public class FieldSpecTest {
     fieldSpec1.setDataType(DataType.FLOAT);
     fieldSpec1.setSingleValueField(false);
     fieldSpec1.setDefaultNullValue(-0.1);
-    fieldSpec2 = new DimensionFieldSpec("mvDimension", DataType.FLOAT, false);
-    fieldSpec2.setDefaultNullValue(-0.1);
+    fieldSpec2 = new DimensionFieldSpec("mvDimension", DataType.FLOAT, false, -0.1);
     Assert.assertEquals(fieldSpec1, fieldSpec2);
     Assert.assertEquals(fieldSpec1.toString(), fieldSpec2.toString());
     Assert.assertEquals(fieldSpec1.hashCode(), fieldSpec2.hashCode());
-    Assert.assertTrue(fieldSpec1.getDefaultNullValue() instanceof Float);
     Assert.assertEquals(fieldSpec1.getDefaultNullValue(), -0.1F);
 
     // Short type metric field.
@@ -87,7 +82,6 @@ public class FieldSpecTest {
     Assert.assertEquals(fieldSpec1, fieldSpec2);
     Assert.assertEquals(fieldSpec1.toString(), fieldSpec2.toString());
     Assert.assertEquals(fieldSpec1.hashCode(), fieldSpec2.hashCode());
-    Assert.assertTrue(fieldSpec1.getDefaultNullValue() instanceof Integer);
     Assert.assertEquals(fieldSpec1.getDefaultNullValue(), 0);
 
     // Metric field with default null value.
@@ -95,12 +89,10 @@ public class FieldSpecTest {
     fieldSpec1.setName("metric");
     fieldSpec1.setDataType(DataType.LONG);
     fieldSpec1.setDefaultNullValue(1);
-    fieldSpec2 = new MetricFieldSpec("metric", DataType.LONG);
-    fieldSpec2.setDefaultNullValue(1);
+    fieldSpec2 = new MetricFieldSpec("metric", DataType.LONG, 1);
     Assert.assertEquals(fieldSpec1, fieldSpec2);
     Assert.assertEquals(fieldSpec1.toString(), fieldSpec2.toString());
     Assert.assertEquals(fieldSpec1.hashCode(), fieldSpec2.hashCode());
-    Assert.assertTrue(fieldSpec1.getDefaultNullValue() instanceof Long);
     Assert.assertEquals(fieldSpec1.getDefaultNullValue(), 1L);
   }
 
@@ -124,6 +116,82 @@ public class FieldSpecTest {
   }
 
   /**
+   * Test {@link TimeFieldSpec} constructors.
+   */
+  @Test
+  public void testTimeFieldSpecConstructor() {
+    String incomingName = "incoming";
+    DataType incomingDataType = DataType.LONG;
+    TimeUnit incomingTimeUnit = TimeUnit.HOURS;
+    int incomingTimeUnitSize = 1;
+    TimeGranularitySpec incomingTimeGranularitySpec =
+        new TimeGranularitySpec(incomingDataType, incomingTimeUnitSize, incomingTimeUnit, incomingName);
+    String outgoingName = "outgoing";
+    DataType outgoingDataType = DataType.INT;
+    TimeUnit outgoingTimeUnit = TimeUnit.DAYS;
+    int outgoingTimeUnitSize = 1;
+    TimeGranularitySpec outgoingTimeGranularitySpec =
+        new TimeGranularitySpec(outgoingDataType, outgoingTimeUnitSize, outgoingTimeUnit, outgoingName);
+    int defaultNullValue = 17050;
+
+    TimeFieldSpec timeFieldSpec1 = new TimeFieldSpec(incomingName, incomingDataType, incomingTimeUnit);
+    TimeFieldSpec timeFieldSpec2 =
+        new TimeFieldSpec(incomingName, incomingDataType, incomingTimeUnit, defaultNullValue);
+    TimeFieldSpec timeFieldSpec3 =
+        new TimeFieldSpec(incomingName, incomingDataType, incomingTimeUnit, outgoingName, outgoingDataType,
+            outgoingTimeUnit);
+    TimeFieldSpec timeFieldSpec4 =
+        new TimeFieldSpec(incomingName, incomingDataType, incomingTimeUnit, outgoingName, outgoingDataType,
+            outgoingTimeUnit, defaultNullValue);
+    TimeFieldSpec timeFieldSpec5 =
+        new TimeFieldSpec(incomingName, incomingDataType, incomingTimeUnitSize, incomingTimeUnit);
+    TimeFieldSpec timeFieldSpec6 =
+        new TimeFieldSpec(incomingName, incomingDataType, incomingTimeUnitSize, incomingTimeUnit, defaultNullValue);
+    TimeFieldSpec timeFieldSpec7 =
+        new TimeFieldSpec(incomingName, incomingDataType, incomingTimeUnitSize, incomingTimeUnit, outgoingName,
+            outgoingDataType, outgoingTimeUnitSize, outgoingTimeUnit);
+    TimeFieldSpec timeFieldSpec8 =
+        new TimeFieldSpec(incomingName, incomingDataType, incomingTimeUnitSize, incomingTimeUnit, outgoingName,
+            outgoingDataType, outgoingTimeUnitSize, outgoingTimeUnit, defaultNullValue);
+    TimeFieldSpec timeFieldSpec9 = new TimeFieldSpec(incomingTimeGranularitySpec);
+    TimeFieldSpec timeFieldSpec10 = new TimeFieldSpec(incomingTimeGranularitySpec, defaultNullValue);
+    TimeFieldSpec timeFieldSpec11 = new TimeFieldSpec(incomingTimeGranularitySpec, outgoingTimeGranularitySpec);
+    TimeFieldSpec timeFieldSpec12 =
+        new TimeFieldSpec(incomingTimeGranularitySpec, outgoingTimeGranularitySpec, defaultNullValue);
+
+    Assert.assertEquals(timeFieldSpec1, timeFieldSpec5);
+    Assert.assertEquals(timeFieldSpec1, timeFieldSpec9);
+    Assert.assertEquals(timeFieldSpec2, timeFieldSpec6);
+    Assert.assertEquals(timeFieldSpec2, timeFieldSpec10);
+    Assert.assertEquals(timeFieldSpec3, timeFieldSpec7);
+    Assert.assertEquals(timeFieldSpec3, timeFieldSpec11);
+    Assert.assertEquals(timeFieldSpec4, timeFieldSpec8);
+    Assert.assertEquals(timeFieldSpec4, timeFieldSpec12);
+
+    // Before adding default null value.
+    Assert.assertFalse(timeFieldSpec1.equals(timeFieldSpec2));
+    Assert.assertFalse(timeFieldSpec3.equals(timeFieldSpec4));
+    Assert.assertFalse(timeFieldSpec5.equals(timeFieldSpec6));
+    Assert.assertFalse(timeFieldSpec7.equals(timeFieldSpec8));
+    Assert.assertFalse(timeFieldSpec9.equals(timeFieldSpec10));
+    Assert.assertFalse(timeFieldSpec11.equals(timeFieldSpec12));
+
+    // After adding default null value.
+    timeFieldSpec1.setDefaultNullValue(defaultNullValue);
+    timeFieldSpec3.setDefaultNullValue(defaultNullValue);
+    timeFieldSpec5.setDefaultNullValue(defaultNullValue);
+    timeFieldSpec7.setDefaultNullValue(defaultNullValue);
+    timeFieldSpec9.setDefaultNullValue(defaultNullValue);
+    timeFieldSpec11.setDefaultNullValue(defaultNullValue);
+    Assert.assertEquals(timeFieldSpec1, timeFieldSpec2);
+    Assert.assertEquals(timeFieldSpec3, timeFieldSpec4);
+    Assert.assertEquals(timeFieldSpec5, timeFieldSpec6);
+    Assert.assertEquals(timeFieldSpec7, timeFieldSpec8);
+    Assert.assertEquals(timeFieldSpec9, timeFieldSpec10);
+    Assert.assertEquals(timeFieldSpec11, timeFieldSpec12);
+  }
+
+  /**
    * Test different order of fields in serialized JSON string to deserialize {@link FieldSpec}.
    */
   @Test
@@ -131,20 +199,16 @@ public class FieldSpecTest {
     // Metric field with default null value.
     String[] metricFields = {"\"name\":\"metric\"", "\"dataType\":\"INT\"", "\"defaultNullValue\":-1"};
     MetricFieldSpec metricFieldSpec1 = MAPPER.readValue(getRandomOrderJsonString(metricFields), MetricFieldSpec.class);
-    MetricFieldSpec metricFieldSpec2 = new MetricFieldSpec("metric", DataType.INT);
-    metricFieldSpec2.setDefaultNullValue(-1);
+    MetricFieldSpec metricFieldSpec2 = new MetricFieldSpec("metric", DataType.INT, -1);
     Assert.assertEquals(metricFieldSpec1, metricFieldSpec2, ERROR_MESSAGE);
-    Assert.assertTrue(metricFieldSpec1.getDefaultNullValue() instanceof Integer, ERROR_MESSAGE);
     Assert.assertEquals(metricFieldSpec1.getDefaultNullValue(), -1, ERROR_MESSAGE);
 
     // Single-value boolean type dimension field with default null value.
     String[] dimensionFields = {"\"name\":\"dimension\"", "\"dataType\":\"BOOLEAN\"", "\"defaultNullValue\":false"};
     DimensionFieldSpec dimensionFieldSpec1 =
         MAPPER.readValue(getRandomOrderJsonString(dimensionFields), DimensionFieldSpec.class);
-    DimensionFieldSpec dimensionFieldSpec2 = new DimensionFieldSpec("dimension", DataType.BOOLEAN, true);
-    dimensionFieldSpec2.setDefaultNullValue(false);
+    DimensionFieldSpec dimensionFieldSpec2 = new DimensionFieldSpec("dimension", DataType.BOOLEAN, true, false);
     Assert.assertEquals(dimensionFieldSpec1, dimensionFieldSpec2, ERROR_MESSAGE);
-    Assert.assertTrue(dimensionFieldSpec1.getDefaultNullValue() instanceof String, ERROR_MESSAGE);
     Assert.assertEquals(dimensionFieldSpec1.getDefaultNullValue(), "false", ERROR_MESSAGE);
 
     // Multi-value dimension field with default null value.
@@ -152,10 +216,8 @@ public class FieldSpecTest {
         "\"name\":\"dimension\"", "\"dataType\":\"STRING\"", "\"singleValueField\":false",
         "\"defaultNullValue\":\"default\""};
     dimensionFieldSpec1 = MAPPER.readValue(getRandomOrderJsonString(dimensionFields), DimensionFieldSpec.class);
-    dimensionFieldSpec2 = new DimensionFieldSpec("dimension", DataType.STRING, false);
-    dimensionFieldSpec2.setDefaultNullValue("default");
+    dimensionFieldSpec2 = new DimensionFieldSpec("dimension", DataType.STRING, false, "default");
     Assert.assertEquals(dimensionFieldSpec1, dimensionFieldSpec2, ERROR_MESSAGE);
-    Assert.assertTrue(dimensionFieldSpec1.getDefaultNullValue() instanceof String, ERROR_MESSAGE);
     Assert.assertEquals(dimensionFieldSpec1.getDefaultNullValue(), "default", ERROR_MESSAGE);
 
     // Time field with default null value.
@@ -165,11 +227,9 @@ public class FieldSpecTest {
         "\"defaultNullValue\":-1"};
     TimeFieldSpec timeFieldSpec1 = MAPPER.readValue(getRandomOrderJsonString(timeFields), TimeFieldSpec.class);
     TimeFieldSpec timeFieldSpec2 =
-        new TimeFieldSpec(new TimeGranularitySpec(DataType.LONG, TimeUnit.MILLISECONDS, "incomingTime"),
-            new TimeGranularitySpec(DataType.INT, TimeUnit.SECONDS, "outgoingTime"));
-    timeFieldSpec2.setDefaultNullValue(-1);
+        new TimeFieldSpec("incomingTime", DataType.LONG, TimeUnit.MILLISECONDS, "outgoingTime", DataType.INT,
+            TimeUnit.SECONDS, -1);
     Assert.assertEquals(timeFieldSpec1, timeFieldSpec2, ERROR_MESSAGE);
-    Assert.assertTrue(timeFieldSpec1.getDefaultNullValue() instanceof Integer, ERROR_MESSAGE);
     Assert.assertEquals(timeFieldSpec1.getDefaultNullValue(), -1, ERROR_MESSAGE);
   }
 

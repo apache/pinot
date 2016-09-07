@@ -16,6 +16,7 @@
 package com.linkedin.pinot.common.data;
 
 import com.linkedin.pinot.common.utils.EqualityUtils;
+import javax.annotation.Nonnull;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 
@@ -28,8 +29,13 @@ public final class DimensionFieldSpec extends FieldSpec {
     super();
   }
 
-  public DimensionFieldSpec(String name, DataType dataType, boolean isSingleValueField) {
+  public DimensionFieldSpec(@Nonnull String name, @Nonnull DataType dataType, boolean isSingleValueField) {
     super(name, dataType, isSingleValueField);
+  }
+
+  public DimensionFieldSpec(@Nonnull String name, @Nonnull DataType dataType, boolean isSingleValueField,
+      @Nonnull Object defaultNullValue) {
+    super(name, dataType, isSingleValueField, defaultNullValue);
   }
 
   @JsonIgnore

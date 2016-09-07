@@ -19,6 +19,7 @@ import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.utils.EqualityUtils;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nonnull;
 import org.joda.time.DateTime;
 
 
@@ -46,8 +47,7 @@ public class TimeGranularitySpec {
   public TimeGranularitySpec() {
   }
 
-  public TimeGranularitySpec(DataType dataType, TimeUnit timeType, String name) {
-    Preconditions.checkNotNull(dataType);
+  public TimeGranularitySpec(@Nonnull DataType dataType, @Nonnull TimeUnit timeType, @Nonnull String name) {
     Preconditions.checkNotNull(timeType);
     Preconditions.checkNotNull(name);
 
@@ -56,8 +56,8 @@ public class TimeGranularitySpec {
     _name = name;
   }
 
-  public TimeGranularitySpec(DataType dataType, int timeUnitSize, TimeUnit timeType, String name) {
-    Preconditions.checkNotNull(dataType);
+  public TimeGranularitySpec(@Nonnull DataType dataType, int timeUnitSize, @Nonnull TimeUnit timeType,
+      @Nonnull String name) {
     Preconditions.checkNotNull(timeType);
     Preconditions.checkNotNull(name);
 
@@ -65,50 +65,52 @@ public class TimeGranularitySpec {
     _timeType = timeType;
     _timeUnitSize = timeUnitSize;
     _name = name;
-  }
-
-  public void setDataType(DataType dataType) {
-    Preconditions.checkNotNull(dataType);
-
-    _dataType = dataType.getStoredType();
   }
 
   public DataType getDataType() {
     return _dataType;
   }
 
-  public void setTimeType(TimeUnit timeType) {
-    Preconditions.checkNotNull(timeType);
-
-    _timeType = timeType;
+  public void setDataType(@Nonnull DataType dataType) {
+    _dataType = dataType.getStoredType();
   }
 
   public TimeUnit getTimeType() {
     return _timeType;
   }
 
-  // Required by JSON de-serializer. DO NOT REMOVE.
-  public void setTimeUnitSize(int timeUnitSize) {
-    _timeUnitSize = timeUnitSize;
-  }
+  public void setTimeType(@Nonnull TimeUnit timeType) {
+    Preconditions.checkNotNull(timeType);
 
-  // Required by JSON de-serializer (for backward compatible). DO NOT REMOVE.
-  public void setTimeunitSize(int timeUnitSize) {
-    _timeUnitSize = timeUnitSize;
+    _timeType = timeType;
   }
 
   public int getTimeUnitSize() {
     return _timeUnitSize;
   }
 
-  public void setName(String name) {
-    Preconditions.checkNotNull(name);
+  // Required by JSON de-serializer. DO NOT REMOVE.
+  public void setTimeUnitSize(int timeUnitSize) {
+    Preconditions.checkArgument(timeUnitSize > 0);
 
-    _name = name;
+    _timeUnitSize = timeUnitSize;
+  }
+
+  // Required by JSON de-serializer (for backward compatible). DO NOT REMOVE.
+  public void setTimeunitSize(int timeUnitSize) {
+    Preconditions.checkArgument(timeUnitSize > 0);
+
+    _timeUnitSize = timeUnitSize;
   }
 
   public String getName() {
     return _name;
+  }
+
+  public void setName(@Nonnull String name) {
+    Preconditions.checkNotNull(name);
+
+    _name = name;
   }
 
   /**

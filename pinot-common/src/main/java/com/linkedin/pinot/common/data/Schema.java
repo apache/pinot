@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.helix.ZNRecord;
 import org.codehaus.jackson.annotate.JsonIgnore;
@@ -62,28 +63,28 @@ public final class Schema {
   private final Set<String> metrics = new HashSet<>();
   private transient String jsonSchema;
 
-  public static Schema fromFile(File schemaFile)
+  public static Schema fromFile(@Nonnull File schemaFile)
       throws IOException {
     return MAPPER.readValue(schemaFile, Schema.class);
   }
 
-  public static Schema fromString(String schemaString)
+  public static Schema fromString(@Nonnull String schemaString)
       throws IOException {
     return MAPPER.readValue(schemaString, Schema.class);
   }
 
-  public static Schema fromInputSteam(InputStream schemaInputStream)
+  public static Schema fromInputSteam(@Nonnull InputStream schemaInputStream)
       throws IOException {
     return MAPPER.readValue(schemaInputStream, Schema.class);
   }
 
-  public static Schema fromZNRecord(ZNRecord record)
+  public static Schema fromZNRecord(@Nonnull ZNRecord record)
       throws IOException {
     String schemaJSON = record.getSimpleField("schemaJSON");
     return MAPPER.readValue(schemaJSON, Schema.class);
   }
 
-  public static ZNRecord toZNRecord(Schema schema)
+  public static ZNRecord toZNRecord(@Nonnull Schema schema)
       throws IllegalArgumentException, IllegalAccessException {
     ZNRecord record = new ZNRecord(schema.getSchemaName());
     record.setSimpleField("schemaJSON", schema.getJSONSchema());
@@ -94,7 +95,7 @@ public final class Schema {
     return schemaName;
   }
 
-  public void setSchemaName(String schemaName) {
+  public void setSchemaName(@Nonnull String schemaName) {
     Preconditions.checkNotNull(schemaName);
 
     this.schemaName = schemaName;
@@ -104,8 +105,7 @@ public final class Schema {
     return dimensionFieldSpecs;
   }
 
-  public void setDimensionFieldSpecs(List<DimensionFieldSpec> dimensionFieldSpecs) {
-    Preconditions.checkNotNull(dimensionFieldSpecs);
+  public void setDimensionFieldSpecs(@Nonnull List<DimensionFieldSpec> dimensionFieldSpecs) {
     Preconditions.checkState(this.dimensionFieldSpecs.isEmpty());
 
     for (DimensionFieldSpec dimensionFieldSpec : dimensionFieldSpecs) {
@@ -117,8 +117,7 @@ public final class Schema {
     return metricFieldSpecs;
   }
 
-  public void setMetricFieldSpecs(List<MetricFieldSpec> metricFieldSpecs) {
-    Preconditions.checkNotNull(metricFieldSpecs);
+  public void setMetricFieldSpecs(@Nonnull List<MetricFieldSpec> metricFieldSpecs) {
     Preconditions.checkState(this.metricFieldSpecs.isEmpty());
 
     for (MetricFieldSpec metricFieldSpec : metricFieldSpecs) {
@@ -130,23 +129,20 @@ public final class Schema {
     return timeFieldSpec;
   }
 
-  public void setTimeFieldSpec(TimeFieldSpec timeFieldSpec) {
+  public void setTimeFieldSpec(@Nonnull TimeFieldSpec timeFieldSpec) {
     // This check is for JSON de-serializer. For normal use case, should not set null.
     if (timeFieldSpec != null) {
       addField(timeFieldSpec);
     }
   }
 
-  public void addField(FieldSpec fieldSpec) {
+  public void addField(@Nonnull FieldSpec fieldSpec) {
     Preconditions.checkNotNull(fieldSpec);
     String columnName = fieldSpec.getName();
     Preconditions.checkNotNull(columnName);
+    Preconditions.checkState(!fieldSpecMap.containsKey(columnName),
+        "Field spec already exists for column: " + columnName);
 
-    if (fieldSpecMap.containsKey(columnName)) {
-      throw new RuntimeException("Field spec already exists for column: " + columnName);
-    } else {
-      fieldSpecMap.put(columnName, fieldSpec);
-    }
     FieldType fieldType = fieldSpec.getFieldType();
     switch (fieldType) {
       case DIMENSION:
@@ -158,21 +154,29 @@ public final class Schema {
         metricFieldSpecs.add((MetricFieldSpec) fieldSpec);
         break;
       case TIME:
+        Preconditions.checkState(timeFieldSpec == null, "Already defined the time column: " + timeFieldSpec);
         timeFieldSpec = (TimeFieldSpec) fieldSpec;
         break;
       default:
         throw new UnsupportedOperationException("Unsupported field type: " + fieldType);
     }
+
+    fieldSpecMap.put(columnName, fieldSpec);
   }
 
   @Deprecated
   // For third-eye backward compatible.
-  public void addField(String columnName, FieldSpec fieldSpec) {
+  public void addField(@Nonnull String columnName, @Nonnull FieldSpec fieldSpec) {
     addField(fieldSpec);
   }
 
-  public boolean hasColumn(String columnName) {
+  public boolean hasColumn(@Nonnull String columnName) {
     return fieldSpecMap.containsKey(columnName);
+  }
+
+  @JsonIgnore
+  public Map<String, FieldSpec> getFieldSpecMap() {
+    return fieldSpecMap;
   }
 
   @JsonIgnore
@@ -190,12 +194,12 @@ public final class Schema {
   }
 
   @JsonIgnore
-  public FieldSpec getFieldSpecFor(String columnName) {
+  public @Nullable FieldSpec getFieldSpecFor(String columnName) {
     return fieldSpecMap.get(columnName);
   }
 
   @JsonIgnore
-  public MetricFieldSpec getMetricSpec(String metricName) {
+  public @Nullable MetricFieldSpec getMetricSpec(String metricName) {
     FieldSpec fieldSpec = fieldSpecMap.get(metricName);
     if (fieldSpec != null && fieldSpec.getFieldType() == FieldType.METRIC) {
       return (MetricFieldSpec) fieldSpec;
@@ -204,7 +208,7 @@ public final class Schema {
   }
 
   @JsonIgnore
-  public DimensionFieldSpec getDimensionSpec(String dimensionName) {
+  public @Nullable DimensionFieldSpec getDimensionSpec(String dimensionName) {
     FieldSpec fieldSpec = fieldSpecMap.get(dimensionName);
     if (fieldSpec != null && fieldSpec.getFieldType() == FieldType.DIMENSION) {
       return (DimensionFieldSpec) fieldSpec;
@@ -223,17 +227,17 @@ public final class Schema {
   }
 
   @JsonIgnore
-  public String getTimeColumnName() {
+  public @Nullable String getTimeColumnName() {
     return (timeFieldSpec != null) ? timeFieldSpec.getName() : null;
   }
 
   @JsonIgnore
-  public TimeUnit getIncomingTimeUnit() {
+  public @Nullable TimeUnit getIncomingTimeUnit() {
     return (timeFieldSpec != null) ? timeFieldSpec.getIncomingGranularitySpec().getTimeType() : null;
   }
 
   @JsonIgnore
-  public TimeUnit getOutgoingTimeUnit() {
+  public @Nullable TimeUnit getOutgoingTimeUnit() {
     return (timeFieldSpec != null) ? timeFieldSpec.getOutgoingGranularitySpec().getTimeType() : null;
   }
 
@@ -243,7 +247,7 @@ public final class Schema {
       try {
         jsonSchema = MAPPER.writeValueAsString(this);
       } catch (IOException e) {
-        LOGGER.error("Caught exception while writing Schema as JSON format string.", e);
+        throw new RuntimeException("Caught exception while writing Schema as JSON format string.", e);
       }
     }
     return jsonSchema;
@@ -324,71 +328,139 @@ public final class Schema {
       schema = new Schema();
     }
 
-    public SchemaBuilder setSchemaName(String schemaName) {
+    public SchemaBuilder setSchemaName(@Nonnull String schemaName) {
       schema.setSchemaName(schemaName);
       return this;
     }
 
-    public SchemaBuilder addSingleValueDimension(String dimensionName, DataType dataType) {
+    public SchemaBuilder addSingleValueDimension(@Nonnull String dimensionName, @Nonnull DataType dataType) {
       schema.addField(new DimensionFieldSpec(dimensionName, dataType, true));
       return this;
     }
 
-    public SchemaBuilder addMultiValueDimension(String dimensionName, DataType dataType) {
+    public SchemaBuilder addSingleValueDimension(@Nonnull String dimensionName, @Nonnull DataType dataType,
+        @Nonnull Object defaultNullValue) {
+      schema.addField(new DimensionFieldSpec(dimensionName, dataType, true, defaultNullValue));
+      return this;
+    }
+
+    public SchemaBuilder addMultiValueDimension(@Nonnull String dimensionName, @Nonnull DataType dataType) {
       schema.addField(new DimensionFieldSpec(dimensionName, dataType, false));
       return this;
     }
 
-    public SchemaBuilder addMetric(String metricName, DataType dataType) {
+    public SchemaBuilder addMultiValueDimension(@Nonnull String dimensionName, @Nonnull DataType dataType,
+        @Nonnull Object defaultNullValue) {
+      schema.addField(new DimensionFieldSpec(dimensionName, dataType, false, defaultNullValue));
+      return this;
+    }
+
+    public SchemaBuilder addMetric(@Nonnull String metricName, @Nonnull DataType dataType) {
       schema.addField(new MetricFieldSpec(metricName, dataType));
       return this;
     }
 
-    public SchemaBuilder addMetric(String name, DataType dataType, int fieldSize,
-        MetricFieldSpec.DerivedMetricType derivedMetricType) {
+    public SchemaBuilder addMetric(@Nonnull String metricName, @Nonnull DataType dataType,
+        @Nonnull Object defaultNullValue) {
+      schema.addField(new MetricFieldSpec(metricName, dataType, defaultNullValue));
+      return this;
+    }
+
+    public SchemaBuilder addMetric(@Nonnull String name, @Nonnull DataType dataType, int fieldSize,
+        @Nonnull MetricFieldSpec.DerivedMetricType derivedMetricType) {
       schema.addField(new MetricFieldSpec(name, dataType, fieldSize, derivedMetricType));
       return this;
     }
 
-    public SchemaBuilder addTime(String incomingColumnName, TimeUnit incomingGranularity, DataType incomingDataType) {
-      schema.addField(new TimeFieldSpec(incomingColumnName, incomingDataType, incomingGranularity));
+    public SchemaBuilder addMetric(@Nonnull String name, @Nonnull DataType dataType, int fieldSize,
+        @Nonnull MetricFieldSpec.DerivedMetricType derivedMetricType, @Nonnull Object defaultNullValue) {
+      schema.addField(new MetricFieldSpec(name, dataType, fieldSize, derivedMetricType, defaultNullValue));
       return this;
     }
 
-    public SchemaBuilder addTime(String incomingColumnName, TimeUnit incomingGranularity, DataType incomingDataType,
-        String outgoingColumnName, TimeUnit outgoingGranularity, DataType outgoingDataType) {
-      TimeGranularitySpec incomingTimeGranularitySpec =
-          new TimeGranularitySpec(incomingDataType, incomingGranularity, incomingColumnName);
-      TimeGranularitySpec outgoingTimeGranularitySpec =
-          new TimeGranularitySpec(outgoingDataType, outgoingGranularity, outgoingColumnName);
-      schema.addField(new TimeFieldSpec(incomingTimeGranularitySpec, outgoingTimeGranularitySpec));
+    public SchemaBuilder addTime(@Nonnull String incomingName, @Nonnull TimeUnit incomingTimeUnit,
+        @Nonnull DataType incomingDataType) {
+      schema.addField(new TimeFieldSpec(incomingName, incomingDataType, incomingTimeUnit));
       return this;
     }
 
-    public SchemaBuilder addTime(String incomingColumnName, int incomingSize, TimeUnit incomingGranularity,
-        DataType incomingDataType) {
-      schema.addField(new TimeFieldSpec(incomingColumnName, incomingDataType, incomingSize, incomingGranularity));
+    public SchemaBuilder addTime(@Nonnull String incomingName, @Nonnull TimeUnit incomingTimeUnit,
+        @Nonnull DataType incomingDataType, @Nonnull Object defaultNullValue) {
+      schema.addField(new TimeFieldSpec(incomingName, incomingDataType, incomingTimeUnit, defaultNullValue));
       return this;
     }
 
-    public SchemaBuilder addTime(String incomingColumnName, int incomingSize, TimeUnit incomingGranularity,
-        DataType incomingDataType, String outgoingColumnName, int outgoingSize, TimeUnit outgoingGranularity,
-        DataType outgoingDataType) {
-      TimeGranularitySpec incomingTimeGranularitySpec =
-          new TimeGranularitySpec(incomingDataType, incomingSize, incomingGranularity, incomingColumnName);
-      TimeGranularitySpec outgoingTimeGranularitySpec =
-          new TimeGranularitySpec(outgoingDataType, outgoingSize, outgoingGranularity, outgoingColumnName);
-      schema.addField(new TimeFieldSpec(incomingTimeGranularitySpec, outgoingTimeGranularitySpec));
+    public SchemaBuilder addTime(@Nonnull String incomingName, @Nonnull TimeUnit incomingTimeUnit,
+        @Nonnull DataType incomingDataType, @Nonnull String outgoingName, @Nonnull TimeUnit outgoingTimeUnit,
+        @Nonnull DataType outgoingDataType) {
+      schema.addField(
+          new TimeFieldSpec(incomingName, incomingDataType, incomingTimeUnit, outgoingName, outgoingDataType,
+              outgoingTimeUnit));
       return this;
     }
 
-    public void addTime(TimeGranularitySpec incomingTimeGranularitySpec) {
+    public SchemaBuilder addTime(@Nonnull String incomingName, @Nonnull TimeUnit incomingTimeUnit,
+        @Nonnull DataType incomingDataType, @Nonnull String outgoingName, @Nonnull TimeUnit outgoingTimeUnit,
+        @Nonnull DataType outgoingDataType, @Nonnull Object defaultNullValue) {
+      schema.addField(
+          new TimeFieldSpec(incomingName, incomingDataType, incomingTimeUnit, outgoingName, outgoingDataType,
+              outgoingTimeUnit, defaultNullValue));
+      return this;
+    }
+
+    public SchemaBuilder addTime(@Nonnull String incomingName, int incomingTimeUnitSize,
+        @Nonnull TimeUnit incomingTimeUnit, @Nonnull DataType incomingDataType) {
+      schema.addField(new TimeFieldSpec(incomingName, incomingDataType, incomingTimeUnitSize, incomingTimeUnit));
+      return this;
+    }
+
+    public SchemaBuilder addTime(@Nonnull String incomingName, int incomingTimeUnitSize,
+        @Nonnull TimeUnit incomingTimeUnit, @Nonnull DataType incomingDataType, @Nonnull Object defaultNullValue) {
+      schema.addField(
+          new TimeFieldSpec(incomingName, incomingDataType, incomingTimeUnitSize, incomingTimeUnit, defaultNullValue));
+      return this;
+    }
+
+    public SchemaBuilder addTime(@Nonnull String incomingName, int incomingTimeUnitSize,
+        @Nonnull TimeUnit incomingTimeUnit, @Nonnull DataType incomingDataType, @Nonnull String outgoingName,
+        int outgoingTimeUnitSize, @Nonnull TimeUnit outgoingTimeUnit, @Nonnull DataType outgoingDataType) {
+      schema.addField(
+          new TimeFieldSpec(incomingName, incomingDataType, incomingTimeUnitSize, incomingTimeUnit, outgoingName,
+              outgoingDataType, outgoingTimeUnitSize, outgoingTimeUnit));
+      return this;
+    }
+
+    public SchemaBuilder addTime(@Nonnull String incomingName, int incomingTimeUnitSize,
+        @Nonnull TimeUnit incomingTimeUnit, @Nonnull DataType incomingDataType, @Nonnull String outgoingName,
+        int outgoingTimeUnitSize, @Nonnull TimeUnit outgoingTimeUnit, @Nonnull DataType outgoingDataType,
+        @Nonnull Object defaultNullValue) {
+      schema.addField(
+          new TimeFieldSpec(incomingName, incomingDataType, incomingTimeUnitSize, incomingTimeUnit, outgoingName,
+              outgoingDataType, outgoingTimeUnitSize, outgoingTimeUnit, defaultNullValue));
+      return this;
+    }
+
+    public SchemaBuilder addTime(@Nonnull TimeGranularitySpec incomingTimeGranularitySpec) {
       schema.addField(new TimeFieldSpec(incomingTimeGranularitySpec));
+      return this;
     }
 
-    public void addTime(TimeGranularitySpec incomingTimeGranularitySpec,
-        TimeGranularitySpec outgoingTimeGranularitySpec) {
+    public SchemaBuilder addTime(@Nonnull TimeGranularitySpec incomingTimeGranularitySpec,
+        @Nonnull Object defaultNullValue) {
+      schema.addField(new TimeFieldSpec(incomingTimeGranularitySpec, defaultNullValue));
+      return this;
+    }
+
+    public SchemaBuilder addTime(@Nonnull TimeGranularitySpec incomingTimeGranularitySpec,
+        @Nonnull TimeGranularitySpec outgoingTimeGranularitySpec) {
       schema.addField(new TimeFieldSpec(incomingTimeGranularitySpec, outgoingTimeGranularitySpec));
+      return this;
+    }
+
+    public SchemaBuilder addTime(@Nonnull TimeGranularitySpec incomingTimeGranularitySpec,
+        @Nonnull TimeGranularitySpec outgoingTimeGranularitySpec, @Nonnull Object defaultNullValue) {
+      schema.addField(new TimeFieldSpec(incomingTimeGranularitySpec, outgoingTimeGranularitySpec, defaultNullValue));
+      return this;
     }
 
     public Schema build() {

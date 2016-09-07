@@ -16,7 +16,7 @@
 package com.linkedin.pinot.common.data;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.utils.EqualityUtils;
+import javax.annotation.Nonnull;
 import org.apache.avro.Schema.Type;
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -34,16 +34,17 @@ import org.json.JSONObject;
  * <p>- <code>DefaultNullValue</code>: when no value found for this field, use this value. Stored in string format.
  */
 public abstract class FieldSpec {
-  private static final String DEFAULT_DIM_NULL_VALUE_OF_STRING = "null";
   private static final Integer DEFAULT_DIM_NULL_VALUE_OF_INT = Integer.MIN_VALUE;
   private static final Long DEFAULT_DIM_NULL_VALUE_OF_LONG = Long.MIN_VALUE;
   private static final Float DEFAULT_DIM_NULL_VALUE_OF_FLOAT = Float.NEGATIVE_INFINITY;
   private static final Double DEFAULT_DIM_NULL_VALUE_OF_DOUBLE = Double.NEGATIVE_INFINITY;
+  private static final String DEFAULT_DIM_NULL_VALUE_OF_STRING = "null";
 
   private static final Integer DEFAULT_METRIC_NULL_VALUE_OF_INT = 0;
   private static final Long DEFAULT_METRIC_NULL_VALUE_OF_LONG = 0L;
   private static final Float DEFAULT_METRIC_NULL_VALUE_OF_FLOAT = 0.0F;
   private static final Double DEFAULT_METRIC_NULL_VALUE_OF_DOUBLE = 0.0D;
+  private static final String DEFAULT_METRIC_NULL_VALUE_OF_STRING = "null";
 
   private String _name;
   private DataType _dataType;
@@ -55,51 +56,51 @@ public abstract class FieldSpec {
   public FieldSpec() {
   }
 
-  public FieldSpec(String name, DataType dataType, boolean isSingleValueField) {
+  public FieldSpec(@Nonnull String name, @Nonnull DataType dataType, boolean isSingleValueField) {
     Preconditions.checkNotNull(name);
-    Preconditions.checkNotNull(dataType);
 
     _name = name;
     _dataType = dataType.getStoredType();
     _isSingleValueField = isSingleValueField;
   }
 
-  public abstract FieldType getFieldType();
-
-  public void setName(String name) {
+  public FieldSpec(@Nonnull String name, @Nonnull DataType dataType, boolean isSingleValueField,
+      @Nonnull Object defaultNullValue) {
     Preconditions.checkNotNull(name);
 
     _name = name;
+    _dataType = dataType.getStoredType();
+    _isSingleValueField = isSingleValueField;
+    _stringDefaultNullValue = defaultNullValue.toString();
   }
+
+  public abstract FieldType getFieldType();
 
   public String getName() {
     return _name;
   }
 
-  public void setDataType(DataType dataType) {
-    Preconditions.checkNotNull(dataType);
+  public void setName(@Nonnull String name) {
+    Preconditions.checkNotNull(name);
 
-    _dataType = dataType.getStoredType();
-    _cachedDefaultNullValue = null;
+    _name = name;
   }
 
   public DataType getDataType() {
     return _dataType;
   }
 
-  public void setSingleValueField(boolean isSingleValueField) {
-    _isSingleValueField = isSingleValueField;
+  public void setDataType(@Nonnull DataType dataType) {
+    _dataType = dataType.getStoredType();
+    _cachedDefaultNullValue = null;
   }
 
   public boolean isSingleValueField() {
     return _isSingleValueField;
   }
 
-  public void setDefaultNullValue(Object defaultNullValue) {
-    Preconditions.checkNotNull(defaultNullValue);
-
-    _stringDefaultNullValue = defaultNullValue.toString();
-    _cachedDefaultNullValue = null;
+  public void setSingleValueField(boolean isSingleValueField) {
+    _isSingleValueField = isSingleValueField;
   }
 
   public Object getDefaultNullValue() {
@@ -120,8 +121,6 @@ public abstract class FieldSpec {
             _cachedDefaultNullValue = Double.valueOf(_stringDefaultNullValue);
             break;
           case STRING:
-            Preconditions.checkState(fieldType != FieldType.METRIC,
-                "For metric field, no support for non-number data type: " + _dataType);
             _cachedDefaultNullValue = _stringDefaultNullValue;
             break;
           default:
@@ -142,6 +141,9 @@ public abstract class FieldSpec {
                 break;
               case DOUBLE:
                 _cachedDefaultNullValue = DEFAULT_METRIC_NULL_VALUE_OF_DOUBLE;
+                break;
+              case STRING:
+                _cachedDefaultNullValue = DEFAULT_METRIC_NULL_VALUE_OF_STRING;
                 break;
               default:
                 throw new UnsupportedOperationException(
@@ -177,6 +179,11 @@ public abstract class FieldSpec {
       }
     }
     return _cachedDefaultNullValue;
+  }
+
+  public void setDefaultNullValue(@Nonnull Object defaultNullValue) {
+    _stringDefaultNullValue = defaultNullValue.toString();
+    _cachedDefaultNullValue = null;
   }
 
   /**
