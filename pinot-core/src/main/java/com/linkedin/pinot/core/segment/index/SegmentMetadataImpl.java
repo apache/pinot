@@ -75,6 +75,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private StarTreeMetadata _starTreeMetadata = null;
   private String _creatorName;
   private char _paddingCharacter = V1Constants.Str.DEFAULT_STRING_PAD_CHAR;
+  private int _hllLog2m = HllConstants.DEFAULT_LOG2M;
 
   public SegmentMetadataImpl(File indexDir) throws ConfigurationException, IOException {
     LOGGER.debug("SegmentMetadata location: {}", indexDir);
@@ -278,6 +279,9 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     // Segment Name
     _segmentName = _segmentMetadataPropertiesConfiguration.getString(Segment.SEGMENT_NAME);
 
+    // Set hll log2m
+    _hllLog2m = _segmentMetadataPropertiesConfiguration.getInt(Segment.SEGMENT_HLL_LOG2M, HllConstants.DEFAULT_LOG2M);
+
     // StarTree config here
     _hasStarTree = _segmentMetadataPropertiesConfiguration.getBoolean(
         MetadataKeys.StarTree.STAR_TREE_ENABLED, false);
@@ -296,14 +300,6 @@ public class SegmentMetadataImpl implements SegmentMetadata {
    */
   private void initStarTreeMetadata() {
     _starTreeMetadata = new StarTreeMetadata();
-
-    // Set hll
-    _starTreeMetadata.setEnableHll(
-        _segmentMetadataPropertiesConfiguration.getBoolean(MetadataKeys.StarTree.STAR_TREE_HLL_ENABLED,
-            false));
-    _starTreeMetadata.setHllLog2m(
-        _segmentMetadataPropertiesConfiguration.getInt(MetadataKeys.StarTree.STAR_TREE_HLL_LOG2M,
-            HllConstants.DEFAULT_LOG2M));
 
     // Build Derived Column Map
     Map<String, String> hllOriginToDerivedColumnMap = new HashMap<>();
@@ -564,6 +560,11 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
   @Override public Character getPaddingCharacter() {
     return _paddingCharacter;
+  }
+
+  @Override
+  public int getHllLog2m() {
+    return _hllLog2m;
   }
 
 }

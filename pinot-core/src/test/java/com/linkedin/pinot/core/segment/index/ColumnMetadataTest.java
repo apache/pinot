@@ -200,17 +200,16 @@ public class ColumnMetadataTest {
       // Build the Segment metadata.
       helper = new SegmentWithHllIndexCreateHelper(
           "testHllIndexRelatedMetadata", "data/test_data-sv.avro", "daysSinceEpoch", TimeUnit.DAYS);
-      helper.build(true, new HllConfig(new HashSet<String>(Arrays.asList("column7")), 8, "_hllSuffix"));
+      helper.build(true, new HllConfig(9, new HashSet<String>(Arrays.asList("column7")), "_hllSuffix"));
 
       // Load segment metadata.
       IndexSegment segment = Loaders.IndexSegment.load(helper.getSegmentDirectory(), ReadMode.mmap);
       SegmentMetadataImpl metadata = (SegmentMetadataImpl) segment.getSegmentMetadata();
+      Assert.assertEquals(metadata.getHllLog2m(), 9);
 
       // Verify Hll Related Info
       StarTreeMetadata starTreeMetadata = metadata.getStarTreeMetadata();
-      Assert.assertEquals(starTreeMetadata.isEnableHll(), true);
-      Assert.assertEquals(starTreeMetadata.getHllLog2m(), 8);
-
+      Assert.assertNotNull(starTreeMetadata);
       ColumnMetadata column = metadata.getColumnMetadataFor("column7_hllSuffix");
       Assert.assertEquals(column.getDerivedMetricType(), MetricFieldSpec.DerivedMetricType.HLL);
       Assert.assertEquals(column.getOriginColumnName(), "column7");

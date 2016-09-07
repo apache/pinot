@@ -105,8 +105,6 @@ public class V1Constants {
           "star.tree.skip.materialization.for.dimensions";
       public static final String STAR_TREE_SKIP_MATERIALIZATION_CARDINALITY =
           "star.tree.skip.materialization.cardinality";
-      public static final String STAR_TREE_HLL_ENABLED = "startree.hll.enabled";
-      public static final String STAR_TREE_HLL_LOG2M = "startree.hll.log2m";
     }
 
     public static class Segment {
@@ -131,6 +129,7 @@ public class V1Constants {
       public static final String SEGMENT_TOTAL_NULLS = "segment.total.nulls";
       public static final String SEGMENT_TOTAL_CONVERSIONS = "segment.total.conversions";
       public static final String SEGMENT_TOTAL_NULL_COLS = "segment.total.null.cols";
+      public static final String SEGMENT_HLL_LOG2M = "segment.hll.log2m";
 
       // not using currently
       public static final String SEGMENT_INDEX_TYPE = "segment.index.type";

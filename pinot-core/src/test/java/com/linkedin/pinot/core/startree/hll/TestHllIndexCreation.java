@@ -68,7 +68,7 @@ public class TestHllIndexCreation {
 
   @BeforeMethod
   public void setUp() throws Exception {
-    hllConfig = new HllConfig(columnsToDeriveHllFields, hllLog2m, hllDeriveColumnSuffix);
+    hllConfig = new HllConfig(hllLog2m, columnsToDeriveHllFields, hllDeriveColumnSuffix);
 
     Configuration tableConfig = new PropertiesConfiguration();
     tableConfig.addProperty(IndexLoadingConfigMetadata.KEY_OF_SEGMENT_FORMAT_VERSION, "v1");

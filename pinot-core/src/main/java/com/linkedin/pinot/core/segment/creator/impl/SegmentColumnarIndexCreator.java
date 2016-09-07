@@ -229,6 +229,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     properties.setProperty(SEGMENT_TOTAL_NULLS, String.valueOf(totalNulls));
     properties.setProperty(SEGMENT_TOTAL_CONVERSIONS, String.valueOf(totalConversions));
     properties.setProperty(SEGMENT_TOTAL_NULL_COLS, String.valueOf(totalNullCols));
+    properties.setProperty(SEGMENT_HLL_LOG2M, config.getHllConfig().getHllLog2m());
 
     StarTreeIndexSpec starTreeIndexSpec = config.getStarTreeIndexSpec();
     if (starTreeIndexSpec != null) {
@@ -240,8 +241,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
           starTreeIndexSpec.getskipMaterializationCardinalityThreshold());
       properties.setProperty(STAR_TREE_SKIP_MATERIALIZATION_FOR_DIMENSIONS,
           starTreeIndexSpec.getskipMaterializationForDimensions());
-      properties.setProperty(STAR_TREE_HLL_ENABLED, config.getHllConfig().isEnableHllIndex());
-      properties.setProperty(STAR_TREE_HLL_LOG2M, config.getHllConfig().getHllLog2m());
     }
 
     String timeColumn = config.getTimeColumnName();

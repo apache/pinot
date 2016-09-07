@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.controller.validation;
 
+import com.linkedin.pinot.core.startree.hll.HllConstants;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -481,5 +482,9 @@ public class ValidationManagerTest {
       return V1Constants.Str.DEFAULT_STRING_PAD_CHAR;
     }
 
+    @Override
+    public int getHllLog2m() {
+      return HllConstants.DEFAULT_LOG2M;
+    }
   }
 }

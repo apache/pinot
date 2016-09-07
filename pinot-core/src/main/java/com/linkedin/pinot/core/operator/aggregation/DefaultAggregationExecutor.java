@@ -236,7 +236,7 @@ public class DefaultAggregationExecutor implements AggregationExecutor {
       case HLL_PREAGGREGATED:
         HyperLogLog hllPreaggregated = resultHolder.getResult();
         if (hllPreaggregated == null) {
-          return new HyperLogLog(_segmentMetadata.getStarTreeMetadata().getHllLog2m());
+          return new HyperLogLog(_segmentMetadata.getHllLog2m());
         } else {
           return hllPreaggregated;
         }

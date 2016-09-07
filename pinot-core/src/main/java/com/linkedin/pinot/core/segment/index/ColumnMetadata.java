@@ -103,7 +103,7 @@ public class ColumnMetadata {
       switch (derivedMetricType) {
         case HLL:
           try {
-            final int hllLog2m = config.getInt(V1Constants.MetadataKeys.StarTree.STAR_TREE_HLL_LOG2M);
+            final int hllLog2m = config.getInt(V1Constants.MetadataKeys.Segment.SEGMENT_HLL_LOG2M);
             builder.setFieldSize(HllUtil.getHllFieldSizeFromLog2m(hllLog2m));
             final String originColumnName = config.getString(getKeyFor(column, ORIGIN_COLUMN));
             builder.setOriginColumnName(originColumnName);

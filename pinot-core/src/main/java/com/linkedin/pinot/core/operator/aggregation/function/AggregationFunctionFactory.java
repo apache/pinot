@@ -74,7 +74,7 @@ public class AggregationFunctionFactory {
         return new DistinctCountHLLAggregationFunction();
 
       case FASTHLL_AGGREGATION_FUNCTION:
-        return new FastHllAggregationFunction(segmentMetadata.getStarTreeMetadata().getHllLog2m());
+        return new FastHllAggregationFunction(segmentMetadata.getHllLog2m());
 
       case PERCENTILE50_AGGREGATION_FUNCTION:
         return new PercentileAggregationFunction(50);
