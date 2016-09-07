@@ -4,10 +4,9 @@ import java.sql.Timestamp;
 import java.util.Objects;
 
 import javax.persistence.Column;
-import javax.persistence.Entity;
 import javax.persistence.EnumType;
 import javax.persistence.Enumerated;
-import javax.persistence.Table;
+import javax.persistence.MappedSuperclass;
 import javax.persistence.Version;
 
 import com.google.common.base.MoreObjects;
@@ -20,9 +19,7 @@ import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
  * job, which in turn spawns into 1 or more anomaly tasks. The anomaly tasks are picked by the
  * workers
  */
-@Entity
-@Table(name = "anomaly_tasks")
-
+@MappedSuperclass
 public class TaskBean extends AbstractBean {
 
   @Enumerated(EnumType.STRING)

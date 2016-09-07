@@ -15,27 +15,27 @@ public class RawAnomalyResultManagerImpl extends AbstractManagerImpl<RawAnomalyR
 
   private static final String FIND_BY_TIME_AND_FUNCTION_ID =
       "SELECT r FROM RawAnomalyResultDTO r WHERE r.function.id = :functionId "
-          + "AND ((r.startTimeUtc >= :startTimeUtc AND r.startTimeUtc <= :endTimeUtc) "
-          + "OR (r.endTimeUtc >= :startTimeUtc AND r.endTimeUtc <= :endTimeUtc))";
+          + "AND ((r.startTime >= :startTime AND r.startTime <= :endTime) "
+          + "OR (r.endTime >= :startTime AND r.endTime <= :endTime))";
 
   private static final String FIND_BY_TIME_FUNCTION_ID_DIMENSIONS =
       "SELECT r FROM RawAnomalyResultDTO r WHERE r.function.id = :functionId and r.dimensions = :dimensions "
-          + "AND ((r.startTimeUtc >= :startTimeUtc AND r.startTimeUtc <= :endTimeUtc) "
-          + "OR (r.endTimeUtc >= :startTimeUtc AND r.endTimeUtc <= :endTimeUtc))";
+          + "AND ((r.startTime >= :startTime AND r.startTime <= :endTime) "
+          + "OR (r.endTime >= :startTime AND r.endTime <= :endTime))";
 
   private static final String COUNT_GROUP_BY_FUNCTION = "select count(r.id) as num, r.function.id,"
       + "r.function.functionName, r.function.collection, r.function.metric from RawAnomalyResultDTO r "
       + "where r.function.isActive=true "
-      + "and ((r.startTimeUtc >= :startTimeUtc and r.startTimeUtc <= :endTimeUtc) "
-      + "or (r.endTimeUtc >= :startTimeUtc and r.endTimeUtc <= :endTimeUtc))"
+      + "and ((r.startTime >= :startTime and r.startTime <= :endTime) "
+      + "or (r.endTime >= :startTime and r.endTime <= :endTime))"
       + "group by r.function.id, r.function.functionName, r.function.collection, r.function.metric "
       + "order by r.function.collection, num desc";
 
   private static final String COUNT_GROUP_BY_FUNCTION_DIMENSIONS = "select count(r.id) as num, r.function.id,"
       + "r.function.functionName, r.function.collection, r.function.metric, r.dimensions from RawAnomalyResultDTO r "
       + "where r.function.isActive=true "
-      + "and ((r.startTimeUtc >= :startTimeUtc and r.startTimeUtc <= :endTimeUtc) "
-      + "or (r.endTimeUtc >= :startTimeUtc and r.endTimeUtc <= :endTimeUtc))"
+      + "and ((r.startTime >= :startTime and r.startTime <= :endTime) "
+      + "or (r.endTime >= :startTime and r.endTime <= :endTime))"
       + "group by r.function.id, r.function.functionName, r.function.collection, r.function.metric, r.dimensions "
       + "order by r.function.collection, num desc";
 
@@ -59,7 +59,7 @@ public class RawAnomalyResultManagerImpl extends AbstractManagerImpl<RawAnomalyR
   public List<RawAnomalyResultDTO> findAllByTimeAndFunctionId(long startTime, long endTime,
       long functionId) {
     return getEntityManager().createQuery(FIND_BY_TIME_AND_FUNCTION_ID, entityClass)
-        .setParameter("startTimeUtc", startTime).setParameter("endTimeUtc", endTime)
+        .setParameter("startTime", startTime).setParameter("endTime", endTime)
         .setParameter("functionId", functionId).getResultList();
   }
 
@@ -71,7 +71,7 @@ public class RawAnomalyResultManagerImpl extends AbstractManagerImpl<RawAnomalyR
   public List<RawAnomalyResultDTO> findAllByTimeFunctionIdAndDimensions(long startTime, long endTime,
       long functionId, String dimensions) {
     return getEntityManager().createQuery(FIND_BY_TIME_FUNCTION_ID_DIMENSIONS, entityClass)
-        .setParameter("startTimeUtc", startTime).setParameter("endTimeUtc", endTime)
+        .setParameter("startTime", startTime).setParameter("endTime", endTime)
         .setParameter("functionId", functionId).setParameter("dimensions", dimensions)
         .getResultList();
   }
@@ -84,7 +84,7 @@ public class RawAnomalyResultManagerImpl extends AbstractManagerImpl<RawAnomalyR
   public List<GroupByRow<GroupByKey, Long>> getCountByFunction(long startTime, long endTime) {
     List<GroupByRow<GroupByKey, Long>> groupByRecords = new ArrayList<>();
     TypedQuery<Object[]> q = getEntityManager().createQuery(COUNT_GROUP_BY_FUNCTION, Object[].class)
-        .setParameter("startTimeUtc", startTime).setParameter("endTimeUtc", endTime);
+        .setParameter("startTime", startTime).setParameter("endTime", endTime);
     List<Object[]> results = q.getResultList();
     for (int i = 0; i < results.size(); i++) {
       Long count = (Long) results.get(i)[0];
@@ -109,7 +109,7 @@ public class RawAnomalyResultManagerImpl extends AbstractManagerImpl<RawAnomalyR
   public List<GroupByRow<GroupByKey, Long>> getCountByFunctionDimensions(long startTime, long endTime) {
     List<GroupByRow<GroupByKey, Long>> groupByRecords = new ArrayList<>();
     TypedQuery<Object[]> q = getEntityManager().createQuery(COUNT_GROUP_BY_FUNCTION_DIMENSIONS, Object[].class)
-        .setParameter("startTimeUtc", startTime).setParameter("endTimeUtc", endTime);
+        .setParameter("startTime", startTime).setParameter("endTime", endTime);
     List<Object[]> results = q.getResultList();
     for (int i = 0; i < results.size(); i++) {
       Long count = (Long) results.get(i)[0];

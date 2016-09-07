@@ -4,10 +4,9 @@ import java.sql.Timestamp;
 import java.util.Objects;
 
 import javax.persistence.Column;
-import javax.persistence.Entity;
 import javax.persistence.EnumType;
 import javax.persistence.Enumerated;
-import javax.persistence.Table;
+import javax.persistence.MappedSuperclass;
 
 import com.google.common.base.MoreObjects;
 import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
@@ -16,9 +15,7 @@ import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
  * This class corresponds to an anomaly job. An anomaly job is created for every execution of an
  * anomaly function spec An anomaly job consists of 1 or more anomaly tasks
  */
-@Entity
-@Table(name = "anomaly_jobs")
-
+@MappedSuperclass
 public class JobBean extends AbstractBean {
 
   @Column(name = "job_name", nullable = false)

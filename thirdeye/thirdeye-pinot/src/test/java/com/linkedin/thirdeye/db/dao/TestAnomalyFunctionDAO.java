@@ -22,6 +22,9 @@ public class TestAnomalyFunctionDAO extends AbstractDbTestBase {
     // test fetch all
     List<AnomalyFunctionDTO> functions = anomalyFunctionDAO.findAll();
     Assert.assertEquals(functions.size(), 1);
+
+    functions = anomalyFunctionDAO.findAllActiveFunctions();
+    Assert.assertEquals(functions.size(), 1);
   }
 
   @Test(dependsOnMethods = {"testCreate"})

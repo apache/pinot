@@ -146,6 +146,7 @@ public abstract class AbstractDbTestBase {
     functionSpec.setWindowDelayUnit(TimeUnit.HOURS);
     functionSpec.setWindowSize(10);
     functionSpec.setWindowUnit(TimeUnit.HOURS);
+    functionSpec.setIsActive(true);
     return functionSpec;
   }
 

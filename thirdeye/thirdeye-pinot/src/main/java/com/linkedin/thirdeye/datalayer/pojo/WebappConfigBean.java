@@ -3,11 +3,9 @@ package com.linkedin.thirdeye.datalayer.pojo;
 import java.util.Objects;
 
 import javax.persistence.Column;
-import javax.persistence.Entity;
 import javax.persistence.EnumType;
 import javax.persistence.Enumerated;
-import javax.persistence.Table;
-import javax.persistence.UniqueConstraint;
+import javax.persistence.MappedSuperclass;
 
 import com.google.common.base.MoreObjects;
 import com.linkedin.thirdeye.dashboard.configs.WebappConfigFactory.WebappConfigType;
@@ -15,9 +13,7 @@ import com.linkedin.thirdeye.dashboard.configs.WebappConfigFactory.WebappConfigT
 /**
  * Entity class for webapp configs. name, collection, type conbination should be unique
  */
-@Entity
-@Table(name = "webapp_config",
-    uniqueConstraints = {@UniqueConstraint(columnNames = {"name", "collection", "type"})})
+@MappedSuperclass
 public class WebappConfigBean extends AbstractBean {
 
   @Column(name = "name", nullable = false)

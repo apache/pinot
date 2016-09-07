@@ -3,16 +3,14 @@ package com.linkedin.thirdeye.datalayer.pojo;
 import java.util.Objects;
 
 import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.Table;
+import javax.persistence.MappedSuperclass;
 
 import org.apache.commons.lang.ObjectUtils;
 import org.joda.time.DateTime;
 
 import com.google.common.base.MoreObjects;
 
-@Entity
-@Table(name = "anomaly_results")
+@MappedSuperclass
 public class RawAnomalyResultBean extends AbstractBean implements Comparable<RawAnomalyResultBean> {
 
   @Column(name = "start_time_utc", nullable = false)
