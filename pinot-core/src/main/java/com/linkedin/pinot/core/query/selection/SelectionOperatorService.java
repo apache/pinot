@@ -48,6 +48,7 @@ import com.linkedin.pinot.core.segment.index.readers.FloatDictionary;
 import com.linkedin.pinot.core.segment.index.readers.IntDictionary;
 import com.linkedin.pinot.core.segment.index.readers.LongDictionary;
 import com.linkedin.pinot.core.segment.index.readers.StringDictionary;
+import com.linkedin.pinot.core.startree.hll.HllConstants;
 import java.io.Serializable;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
@@ -88,7 +89,6 @@ public class SelectionOperatorService {
   private Comparator<Integer> _rowDocIdComparator;
   private Collection<Integer> _rowDocIdSet;
 
-  private final IndexSegment _indexSegment;
   private final boolean _doOrdering;
 
   public static final Map<DataType, DecimalFormat> DEFAULT_FORMAT_STRING_MAP = new HashMap<DataType, DecimalFormat>();
@@ -112,49 +112,14 @@ public class SelectionOperatorService {
         new DecimalFormat("####################.##########", DecimalFormatSymbols.getInstance(Locale.US)));
   }
 
-  public SelectionOperatorService(Selection selections, IndexSegment indexSegment) {
-    _indexSegment = indexSegment;
-    if ((selections.getSelectionSortSequence() == null) || selections.getSelectionSortSequence().isEmpty()) {
-      _doOrdering = false;
-    } else {
-      _doOrdering = true;
-    }
-    _sortSequence = selections.getSelectionSortSequence();
-    _selectionColumns = getSelectionColumns(selections.getSelectionColumns());
-    _selectionSize = selections.getSize();
-    _selectionOffset = selections.getOffset();
-    _maxRowSize = _selectionOffset + _selectionSize;
-    _dataSchema = getDataSchema(_sortSequence, _selectionColumns, _indexSegment);
-    _rowComparator = getComparator(_sortSequence, _dataSchema);
-    if (_doOrdering) {
-      _rowEventsSet = new PriorityQueue<Serializable[]>(_maxRowSize, _rowComparator);
-    } else {
-      _rowEventsSet = new ArrayList<Serializable[]>(_maxRowSize);
-    }
-    _rowDocIdComparator = null;
-    _rowDocIdSet = null;
-  }
-
-  private List<String> getSelectionColumns(List<String> selectionColumns) {
-    if ((selectionColumns.size() == 1) && selectionColumns.get(0).equals("*")) {
-      final List<String> newSelectionColumns = new ArrayList<String>();
-      for (final String columnName : _indexSegment.getColumnNames()) {
-        newSelectionColumns.add(columnName);
-      }
-      return newSelectionColumns;
-    }
-    return selectionColumns;
-  }
-
   public SelectionOperatorService(Selection selections, DataSchema dataSchema) {
-    _indexSegment = null;
     if ((selections.getSelectionSortSequence() == null) || selections.getSelectionSortSequence().isEmpty()) {
       _doOrdering = false;
     } else {
       _doOrdering = true;
     }
     _sortSequence = selections.getSelectionSortSequence();
-    _selectionColumns = getSelectionColumns(selections.getSelectionColumns(), dataSchema);
+    _selectionColumns = SelectionOperatorUtils.getSelectionColumns(selections.getSelectionColumns(), dataSchema);
     _selectionSize = selections.getSize();
     _selectionOffset = selections.getOffset();
     _maxRowSize = _selectionOffset + _selectionSize;
@@ -167,17 +132,6 @@ public class SelectionOperatorService {
     }
     _rowDocIdComparator = null;
     _rowDocIdSet = null;
-  }
-
-  private List<String> getSelectionColumns(List<String> selectionColumns, DataSchema dataSchema) {
-    if ((selectionColumns.size() == 1) && selectionColumns.get(0).equals("*")) {
-      final List<String> newSelectionColumns = new ArrayList<String>();
-      for (int i = 0; i < dataSchema.size(); ++i) {
-        newSelectionColumns.add(dataSchema.getColumnName(i));
-      }
-      return newSelectionColumns;
-    }
-    return selectionColumns;
   }
 
   public Collection<Serializable[]> merge(Collection<Serializable[]> rowEventsSet1,
@@ -325,10 +279,6 @@ public class SelectionOperatorService {
     return _rowEventsSet;
   }
 
-  public DataSchema getDataSchema() {
-    return _dataSchema;
-  }
-
   public long getNumDocsScanned() {
     return _numDocsScanned;
   }
@@ -413,35 +363,6 @@ public class SelectionOperatorService {
   public SelectionResults renderSelectionResults(Collection<Serializable[]> reduceResults)
       throws Exception {
     return renderSelectionResults(reduceResults, _dataSchema, _selectionOffset);
-  }
-
-  private DataSchema getDataSchema(List<SelectionSort> sortSequence, List<String> selectionColumns,
-      IndexSegment indexSegment) {
-    final List<String> columns = new ArrayList<String>();
-
-    if (sortSequence != null && !sortSequence.isEmpty()) {
-      for (final SelectionSort selectionSort : sortSequence) {
-        columns.add(selectionSort.getColumn());
-      }
-    }
-    String[] selectionColumnArray = selectionColumns.toArray(new String[selectionColumns.size()]);
-    Arrays.sort(selectionColumnArray);
-    for (int i = 0; i < selectionColumnArray.length; ++i) {
-      String selectionColumn = selectionColumnArray[i];
-      if (!columns.contains(selectionColumn)) {
-        columns.add(selectionColumn);
-      }
-    }
-    final DataType[] dataTypes = new DataType[columns.size()];
-    for (int i = 0; i < dataTypes.length; ++i) {
-      DataSource ds = indexSegment.getDataSource(columns.get(i));
-      DataSourceMetadata m = ds.getDataSourceMetadata();
-      dataTypes[i] = m.getDataType();
-      if (!m.isSingleValue()) {
-        dataTypes[i] = DataType.valueOf(dataTypes[i] + "_ARRAY");
-      }
-    }
-    return new DataSchema(columns.toArray(new String[0]), dataTypes);
   }
 
   public void iterateOnBlock(BlockDocIdIterator blockDocIdIterator, Block[] blocks)

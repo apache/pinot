@@ -210,7 +210,7 @@ public class SelectionOnlyQueriesForMultiValueColumnTest {
     final Collection<Serializable[]> reducedResults =
         SelectionOperatorUtils.reduce(instanceResponseMap, brokerRequest.getSelections().getSize());
     List<String> selectionColumns =
-        SelectionOperatorUtils.getSelectionColumns(brokerRequest.getSelections().getSelectionColumns(), _indexSegment);
+        SelectionOperatorUtils.extractSelectionRelatedColumns(brokerRequest.getSelections(), _indexSegment);
     DataSchema dataSchema = resultBlock.getSelectionDataSchema();
     final JSONObject jsonResult = SelectionOperatorUtils.render(reducedResults, selectionColumns, dataSchema);
     System.out.println(jsonResult);
@@ -260,7 +260,7 @@ public class SelectionOnlyQueriesForMultiValueColumnTest {
     final Collection<Serializable[]> reducedResults =
         SelectionOperatorUtils.reduce(instanceResponseMap, brokerRequest.getSelections().getSize());
     List<String> selectionColumns =
-        SelectionOperatorUtils.getSelectionColumns(brokerRequest.getSelections().getSelectionColumns(), _indexSegment);
+        SelectionOperatorUtils.extractSelectionRelatedColumns(brokerRequest.getSelections(), _indexSegment);
     DataSchema dataSchema = resultBlock.getSelectionDataSchema();
     final JSONObject jsonResult = SelectionOperatorUtils.render(reducedResults, selectionColumns, dataSchema);
     System.out.println(jsonResult);
