@@ -15,7 +15,9 @@
  */
 package com.linkedin.pinot.server.starter;
 
+import com.linkedin.pinot.core.query.scheduler.QueryScheduler;
 import com.yammer.metrics.core.MetricsRegistry;
+import java.lang.reflect.InvocationTargetException;
 import org.apache.commons.configuration.ConfigurationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,7 +47,7 @@ public class ServerInstance {
   private RequestHandlerFactory _requestHandlerFactory;
   private NettyServer _nettyServer;
   private ServerMetrics _serverMetrics;
-
+  private QueryScheduler _queryScheduler;
   private Thread _serverThread;
 
   private boolean _istarted = false;
@@ -62,8 +64,9 @@ public class ServerInstance {
    * @throws ClassNotFoundException
    * @throws ConfigurationException
    */
-  public void init(ServerConf serverConf, MetricsRegistry metricsRegistry) throws InstantiationException, IllegalAccessException,
-      ClassNotFoundException, ConfigurationException {
+  public void init(ServerConf serverConf, MetricsRegistry metricsRegistry)
+      throws InstantiationException, IllegalAccessException, ClassNotFoundException, ConfigurationException,
+             NoSuchMethodException, InvocationTargetException {
     _serverConf = serverConf;
     LOGGER.info("Trying to build server config");
     ServerBuilder serverBuilder = new ServerBuilder(_serverConf, metricsRegistry);
@@ -71,8 +74,10 @@ public class ServerInstance {
     _instanceDataManager = serverBuilder.buildInstanceDataManager();
     LOGGER.info("Trying to build QueryExecutor");
     _queryExecutor = serverBuilder.buildQueryExecutor(_instanceDataManager);
+    _queryScheduler = serverBuilder.buildQueryScheduler(_queryExecutor);
+
     LOGGER.info("Trying to build RequestHandlerFactory");
-    setRequestHandlerFactory(serverBuilder.buildRequestHandlerFactory(_queryExecutor));
+    setRequestHandlerFactory(serverBuilder.buildRequestHandlerFactory(_queryScheduler));
     LOGGER.info("Trying to build NettyServer");
     _nettyServer = serverBuilder.buildNettyServer(_serverConf.getNettyConfig(), _requestHandlerFactory);
     setServerThread(new Thread(_nettyServer));

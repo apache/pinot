@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.transport.netty;
 
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFuture;
@@ -66,13 +68,13 @@ public class NettyCloseChannelTest {
     ServerInstance server = new ServerInstance("localhost", port);
     EventLoopGroup eventLoopGroup = new NioEventLoopGroup();
     NettyTCPClientConnection clientConn = new NettyTCPClientConnection(server, eventLoopGroup, timer, metric);
-    LOGGER.info("About to connect the client !!");
+    LOGGER.debug("About to connect the client !!");
     boolean connected = clientConn.connect();
-    LOGGER.info("Client connected !!");
+    LOGGER.debug("Client connected !!");
     Assert.assertTrue(connected, "connected");
     Thread.sleep(1000);
     String request = "dummy request";
-    LOGGER.info("Sending the request !!");
+    LOGGER.debug("Sending the request !!");
     ResponseFuture serverRespFuture = clientConn.sendRequest(Unpooled.wrappedBuffer(request.getBytes()), 1L, 5000L);
     //Close the client
     clientConn.close();
@@ -84,7 +86,7 @@ public class NettyCloseChannelTest {
     Assert.assertFalse(serverRespFuture.isCancelled(), "Is Cancelled");
     Assert.assertTrue(serverRespFuture.getError() != null, "Got Exception");
     serverConn.shutdownGracefully();
-    System.out.println(metric);
+    LOGGER.trace("metrics: {}", metric);
   }
 
   @Test
@@ -118,7 +120,7 @@ public class NettyCloseChannelTest {
     Assert.assertNull(serverResp);
     Assert.assertFalse(serverRespFuture.isCancelled(), "Is Cancelled");
     Assert.assertTrue(serverRespFuture.getError() != null, "Got Exception");
-    System.out.println(metric);
+    LOGGER.trace("metrics: {}", metric);
   }
 
   /**
@@ -148,15 +150,15 @@ public class NettyCloseChannelTest {
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) {
-      LOGGER.info("Closing the channel !!");
+      LOGGER.debug("Closing the channel !!");
       ChannelFuture f = ctx.close();
       f.addListener(this);
-      LOGGER.info("Channel close future added !!");
+      LOGGER.debug("Channel close future added !!");
     }
 
     @Override
     public void operationComplete(ChannelFuture future) throws Exception {
-      LOGGER.info("Channel is closed !!");
+      LOGGER.debug("Channel is closed !!");
     }
   }
 
@@ -174,7 +176,7 @@ public class NettyCloseChannelTest {
       super.initChannel(ch);
       ch.pipeline().removeLast();
       ch.pipeline().addLast("request_handler", new MyNettyChannelInboundHandler());
-      LOGGER.info("Server Channel pipeline setup modified. Pipeline:" + ch.pipeline().names());
+      LOGGER.debug("Server Channel pipeline setup modified. Pipeline: {}", ch.pipeline().names());
 
     }
   }
@@ -190,7 +192,7 @@ public class NettyCloseChannelTest {
     }
 
     @Override
-    public byte[] processRequest(ChannelHandlerContext channelHandlerContext, ByteBuf request) {
+    public ListenableFuture<byte[]> processRequest(ChannelHandlerContext channelHandlerContext, ByteBuf request) {
       byte[] b = new byte[request.readableBytes()];
       request.readBytes(b);
       if (null != _responseHandlingLatch) {
@@ -203,7 +205,7 @@ public class NettyCloseChannelTest {
       _request = new String(b);
 
       //LOG.info("Server got the request (" + _request + ")");
-      return _response.getBytes();
+      return Futures.immediateFuture(_response.getBytes());
     }
 
     public String getRequest() {

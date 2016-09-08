@@ -16,39 +16,28 @@
 package com.linkedin.pinot.server.request;
 
 import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.common.query.QueryExecutor;
+import com.linkedin.pinot.core.query.scheduler.QueryScheduler;
 import com.linkedin.pinot.transport.netty.NettyServer.RequestHandler;
 import com.linkedin.pinot.transport.netty.NettyServer.RequestHandlerFactory;
-
 
 /**
  * A simple implementation of RequestHandlerFactory.
  * Only return a SimpleRequestHandler.
- *
- *
  */
 public class SimpleRequestHandlerFactory implements RequestHandlerFactory {
 
-  private QueryExecutor _queryExecutor;
+  private QueryScheduler _queryScheduler;
 
   private ServerMetrics _serverMetrics;
 
-  public SimpleRequestHandlerFactory() {
-
-  }
-
-  public SimpleRequestHandlerFactory(QueryExecutor queryExecutor, ServerMetrics serverMetrics) {
-    _queryExecutor = queryExecutor;
+  public SimpleRequestHandlerFactory(QueryScheduler scheduler, ServerMetrics serverMetrics) {
+    this._queryScheduler = scheduler;
     _serverMetrics = serverMetrics;
-  }
-
-  public void init(QueryExecutor queryExecutor) {
-    _queryExecutor = queryExecutor;
   }
 
   @Override
   public RequestHandler createNewRequestHandler() {
-    return new SimpleRequestHandler(_queryExecutor, _serverMetrics);
+    return new SimpleRequestHandler(_queryScheduler.getQueryExecutor(), _serverMetrics);
   }
 
 }

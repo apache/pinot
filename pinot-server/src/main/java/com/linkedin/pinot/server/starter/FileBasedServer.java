@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.server.starter;
 
+import com.linkedin.pinot.core.query.scheduler.QueryScheduler;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
 
@@ -89,9 +90,9 @@ public class FileBasedServer {
 
     LOGGER.info("Trying to build QueryExecutor");
     final QueryExecutor queryExecutor = serverBuilder.buildQueryExecutor(instanceDataManager);
-
+    final QueryScheduler queryScheduler = serverBuilder.buildQueryScheduler(queryExecutor);
     LOGGER.info("Trying to build RequestHandlerFactory");
-    RequestHandlerFactory simpleRequestHandlerFactory = serverBuilder.buildRequestHandlerFactory(queryExecutor);
+    RequestHandlerFactory simpleRequestHandlerFactory = serverBuilder.buildRequestHandlerFactory(queryScheduler);
     LOGGER.info("Trying to build NettyServer");
 
     NettyServer nettyServer = new NettyTCPServer(_serverPort, simpleRequestHandlerFactory, null);

@@ -20,9 +20,12 @@ import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.utils.DataTableSerDeRegistry;
 import com.linkedin.pinot.core.data.manager.offline.TableDataManagerProvider;
 import com.linkedin.pinot.core.util.DataTableCustomSerDe;
+import com.linkedin.pinot.core.query.scheduler.QueryScheduler;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
 
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
@@ -124,12 +127,6 @@ public class ServerBuilder {
     initMetrics();
   }
 
-  /**
-   * Build Instance DataManager
-   * @throws InstantiationException
-   * @throws IllegalAccessException
-   * @throws ClassNotFoundException
-   */
   public DataManager buildInstanceDataManager() throws InstantiationException, IllegalAccessException,
       ClassNotFoundException {
     String className = _serverConf.getInstanceDataManagerClassName();
@@ -142,15 +139,6 @@ public class ServerBuilder {
     return instanceDataManager;
   }
 
-  /**
-   * Build QueryExecutor
-   * @param instanceDataManager
-   * @return
-   * @throws InstantiationException
-   * @throws IllegalAccessException
-   * @throws ClassNotFoundException
-   * @throws ConfigurationException
-   */
   public QueryExecutor buildQueryExecutor(DataManager instanceDataManager) throws InstantiationException,
       IllegalAccessException, ClassNotFoundException, ConfigurationException {
     String className = _serverConf.getQueryExecutorClassName();
@@ -160,19 +148,23 @@ public class ServerBuilder {
     return queryExecutor;
   }
 
-  /**
-   * Build RequestHandlerFactory
-   * @param queryExecutor
-   * @return
-   * @throws InstantiationException
-   * @throws IllegalAccessException
-   * @throws ClassNotFoundException
-   */
-  public RequestHandlerFactory buildRequestHandlerFactory(QueryExecutor queryExecutor) throws InstantiationException,
+  public QueryScheduler buildQueryScheduler(QueryExecutor queryExecutor)
+      throws ClassNotFoundException, NoSuchMethodException, IllegalAccessException, InvocationTargetException,
+             InstantiationException {
+    String querySchedulerClassName = _serverConf.getQuerySchedulerClassName();
+    LOGGER.info("Using query scheduler class: {}", querySchedulerClassName);
+    Constructor<?> schedulerConstructor =
+        Class.forName(querySchedulerClassName).getConstructor(Configuration.class, QueryExecutor.class);
+    QueryScheduler scheduler =
+        (QueryScheduler) schedulerConstructor.newInstance(_serverConf.getSchedulerConfig(), queryExecutor);
+    return scheduler;
+  }
+
+  public RequestHandlerFactory buildRequestHandlerFactory(QueryScheduler queryScheduler) throws InstantiationException,
       IllegalAccessException, ClassNotFoundException {
     String className = _serverConf.getRequestHandlerFactoryClassName();
     LOGGER.info("Trying to Load Request Handler Factory by Class : " + className);
-    RequestHandlerFactory requestHandlerFactory = new SimpleRequestHandlerFactory(queryExecutor, _serverMetrics);
+    RequestHandlerFactory requestHandlerFactory = new SimpleRequestHandlerFactory(queryScheduler, _serverMetrics);
     return requestHandlerFactory;
   }
 

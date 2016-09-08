@@ -15,6 +15,9 @@
  */
 package com.linkedin.pinot.transport.netty;
 
+import com.google.common.util.concurrent.FutureCallback;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
@@ -28,6 +31,8 @@ import io.netty.channel.nio.NioEventLoopGroup;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -72,7 +77,7 @@ public abstract class NettyServer implements Runnable {
      * @param request Serialized request
      * @return Serialized response
      */
-    byte[] processRequest(ChannelHandlerContext channelHandlerContext, ByteBuf request);
+    ListenableFuture<byte[]> processRequest(ChannelHandlerContext channelHandlerContext, ByteBuf request);
   }
 
   public interface RequestHandlerFactory {
@@ -171,17 +176,10 @@ public abstract class NettyServer implements Runnable {
    * |                    ...............                       |
    * ------------------------------------------------------------
    */
-  public static class NettyChannelInboundHandler extends ChannelInboundHandlerAdapter implements ChannelFutureListener {
+  public static class NettyChannelInboundHandler extends ChannelInboundHandlerAdapter {
     private final long _defaultLargeQueryLatencyMs;
     private final RequestHandler _handler;
     private final NettyServerMetrics _metric;
-
-    //Metrics Related
-    private long _lastRequsetSizeInBytes;
-    private long _lastResponseSizeInBytes;
-    private TimerContext _lastSendResponseLatency;
-    private TimerContext _lastProcessingLatency;
-    private long _requestStartTime;
 
     public NettyChannelInboundHandler(RequestHandler handler, NettyServerMetrics metric, long defaultLargeQueryLatencyMs) {
       _handler = handler;
@@ -193,69 +191,74 @@ public abstract class NettyServer implements Runnable {
       this(handler, metric, 100);
     }
 
-    public enum State {
-      INIT,
-      REQUEST_RECEIVED,
-      RESPONSE_WRITTEN,
-      RESPONSE_SENT,
-      EXCEPTION
-    }
-
-    /**
-     * Server Channel Handler State
-     */
-    private State _state = State.INIT;
-
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) {
-      _requestStartTime = System.currentTimeMillis();
+      final long requestStartTime = System.currentTimeMillis();
       LOGGER.debug("Request received by server !!");
-      _state = State.REQUEST_RECEIVED;
-      ByteBuf request = (ByteBuf) msg;
-      _lastRequsetSizeInBytes = request.readableBytes();
+
+      final ByteBuf request = (ByteBuf) msg;
+      final long requestSizeInBytes = request.readableBytes();
 
       //Call processing handler
-      _lastProcessingLatency = MetricsHelper.startTimer();
-      byte[] response = _handler.processRequest(ctx, request);
-      _lastProcessingLatency.stop();
+      final TimerContext requestProcessingLatency = MetricsHelper.startTimer();
+      final ChannelHandlerContext requestChannelHandlerContext = ctx;
+      ListenableFuture<byte[]> serializedQueryResponse = _handler.processRequest(ctx, request);
+      Futures.addCallback(serializedQueryResponse, new FutureCallback<byte[]>() {
+        void sendResponse(@Nonnull final byte[] result) {
+          requestProcessingLatency.stop();
 
-      // Send Response
-      ByteBuf responseBuf = Unpooled.wrappedBuffer(response);
-      _lastSendResponseLatency = MetricsHelper.startTimer();
-      ChannelFuture f = ctx.writeAndFlush(responseBuf);
-      _state = State.RESPONSE_WRITTEN;
-      f.addListener(this);
-      request.release();
+          // Send Response
+          final ByteBuf responseBuf = Unpooled.wrappedBuffer(result);
+          final TimerContext responseSendLatency = MetricsHelper.startTimer();
+          ChannelFuture f = requestChannelHandlerContext.writeAndFlush(responseBuf);
+          f.addListener(new ChannelFutureListener() {
+            @Override
+            public void operationComplete(ChannelFuture future)
+                throws Exception {
+              LOGGER.debug("Response has been sent !!");
+              responseSendLatency.stop();
+              _metric.addServingStats(requestSizeInBytes, result.length, 1L, false,
+                  requestProcessingLatency.getLatencyMs(), responseSendLatency.getLatencyMs());
+              long totalQueryTime = System.currentTimeMillis() - requestStartTime;
+              if (totalQueryTime > _defaultLargeQueryLatencyMs) {
+                LOGGER.info("Slow query: request handler processing time: {}, send response latency: {}, total time to handle request: {}",
+                    requestProcessingLatency.getLatencyMs(),
+                    responseSendLatency.getLatencyMs(), totalQueryTime);
+              }
+            }
+          });
+
+          // TODO: check if we can release this right after _handler.processRequest returns
+          request.release();
+        }
+        @Override
+        public void onSuccess(@Nullable byte[] result) {
+          if (result == null) {
+            result = new byte[0];
+          }
+          sendResponse(result);
+        }
+
+        @Override
+        public void onFailure(Throwable t) {
+          LOGGER.error("Request processing returned unhandled exception, error: ", t);
+          sendResponse(new byte[0]);
+        }
+      });
+
     }
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-      _state = State.EXCEPTION;
       LOGGER.error("Got exception in the channel handler", cause);
       _metric.addServingStats(0, 0, 0L, true, 0, 0);
       ctx.close();
     }
 
-    @Override
-    public void operationComplete(ChannelFuture future) throws Exception {
-      LOGGER.debug("Response has been sent !!");
-      _lastSendResponseLatency.stop();
-      _metric.addServingStats(_lastRequsetSizeInBytes, _lastResponseSizeInBytes, 1L, false,
-          _lastProcessingLatency.getLatencyMs(), _lastSendResponseLatency.getLatencyMs());
-      long totalQueryTime = System.currentTimeMillis() - _requestStartTime;
-      if (totalQueryTime > _defaultLargeQueryLatencyMs) {
-        LOGGER.info("Trace Info: request handler processing time : {}, send response latency: {}, total time to handle request: {}", _lastProcessingLatency.getLatencyMs(),
-            _lastSendResponseLatency.getLatencyMs(), totalQueryTime);
-      }
-      _state = State.RESPONSE_SENT;
-    }
 
     @Override
     public String toString() {
-      return "NettyChannelInboundHandler [_handler=" + _handler + ", _metric=" + _metric + ", _lastRequsetSizeInBytes="
-          + _lastRequsetSizeInBytes + ", _lastResponseSizeInBytes=" + _lastResponseSizeInBytes
-          + ", _lastSendResponseLatency=" + _lastSendResponseLatency + ", _lastProcessingLatency="
-          + _lastProcessingLatency + ", _state=" + _state + "]";
+      return "NettyChannelInboundHandler [_handler=" + _handler + ", _metric=" + _metric + "]";
     }
   }
 

@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.server.request;
 
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.metrics.ServerMeter;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
@@ -54,7 +56,7 @@ public class SimpleRequestHandler implements RequestHandler {
   }
 
   @Override
-  public byte[] processRequest(ChannelHandlerContext channelHandlerContext, ByteBuf request) {
+  public ListenableFuture<byte[]> processRequest(ChannelHandlerContext channelHandlerContext, ByteBuf request) {
 
     long queryStartTime = System.nanoTime();
     _serverMetrics.addMeteredGlobalValue(ServerMeter.QUERIES, 1);
@@ -66,35 +68,39 @@ public class SimpleRequestHandler implements RequestHandler {
     byte[] byteArray = new byte[request.readableBytes()];
     request.readBytes(byteArray);
     SerDe serDe = new SerDe(new TCompactProtocol.Factory());
-    BrokerRequest brokerRequest = null;
+    InstanceRequest instanceRequest = null;
     try {
-      final InstanceRequest instanceRequest = new InstanceRequest();
+      instanceRequest = new InstanceRequest();
       if (! serDe.deserialize(instanceRequest, byteArray) ) {
-        // the deserialize method logs and suppresses exceptionx
-        LOGGER.error("Failed to deserialize query request");
+        // the deserialize method logs and suppresses exception
+        LOGGER.error("Failed to deserialize query request from broker ip: {}",
+           ((InetSocketAddress) channelHandlerContext.channel().remoteAddress()).getAddress().getHostAddress());
         DataTable result = new DataTable();
         result.addException(QueryException.INTERNAL_ERROR);
         _serverMetrics.addMeteredGlobalValue(ServerMeter.REQUEST_DESERIALIZATION_EXCEPTIONS, 1);
-        return serializeDataTable(brokerRequest, instanceResponse, queryStartTime);
+        return Futures.immediateFuture(
+            ScheduledRequestHandler.serializeDataTable(instanceRequest, _serverMetrics,
+                instanceResponse, queryStartTime));
       }
       long deserRequestTime = System.nanoTime();
-      brokerRequest = instanceRequest.getQuery();
+      BrokerRequest brokerRequest = instanceRequest.getQuery();
       _serverMetrics.addPhaseTiming(brokerRequest, ServerQueryPhase.REQUEST_DESERIALIZATION, deserRequestTime - queryStartTime);
-      LOGGER.debug("Processing requestId:{},request={}", instanceRequest.getRequestId(), instanceRequest);
+      LOGGER.debug("Processing requestId: {},request: {}", instanceRequest.getRequestId(), instanceRequest);
 
-      QueryRequest queryRequest = new QueryRequest(instanceRequest);
+      QueryRequest queryRequestContext = new QueryRequest(instanceRequest);
       String brokerId = instanceRequest.isSetBrokerId() ? instanceRequest.getBrokerId() :
           ((InetSocketAddress) channelHandlerContext.channel().remoteAddress()).getAddress().getHostAddress();
       // we will set the ip address as client id. This is good enough for start.
       // Ideally, broker should send it's identity as part of the request
-      queryRequest.setClientId(brokerId);
+      queryRequestContext.setClientId(brokerId);
 
       long startTime = System.nanoTime();
-      instanceResponse = _queryExecutor.processQuery(queryRequest);
+      instanceResponse = _queryExecutor.processQuery(queryRequestContext);
       long totalNanos = System.nanoTime() - startTime;
       _serverMetrics.addPhaseTiming(brokerRequest, ServerQueryPhase.QUERY_PROCESSING, totalNanos);
     } catch (Exception e) {
-      LOGGER.error("Got exception while processing request. Returning error response", e);
+      LOGGER.error("Got exception while processing request. Returning error response for requestId: {}, brokerId: {}",
+          instanceRequest.getRequestId(), instanceRequest.getBrokerId(), e);
       _serverMetrics.addMeteredGlobalValue(ServerMeter.UNCAUGHT_EXCEPTIONS, 1);
       DataTableBuilder dataTableBuilder = new DataTableBuilder(null);
       List<ProcessingException> exceptions = new ArrayList<ProcessingException>();
@@ -103,27 +109,9 @@ public class SimpleRequestHandler implements RequestHandler {
       exceptions.add(exception);
       instanceResponse = dataTableBuilder.buildExceptions();
     }
-    return serializeDataTable(brokerRequest, instanceResponse, queryStartTime);
+    byte[] responseBytes = ScheduledRequestHandler.serializeDataTable(instanceRequest, _serverMetrics,
+        instanceResponse, queryStartTime);
+    return Futures.immediateFuture(responseBytes);
   }
 
-  private byte[] serializeDataTable(BrokerRequest brokerRequest, DataTable instanceResponse, long queryStartTime) {
-    byte[] responseByte;
-    long serializationStartTime = System.nanoTime();
-    try {
-      if (instanceResponse == null) {
-        LOGGER.warn("Instance response is null.");
-        responseByte = new byte[0];
-      } else {
-        responseByte = instanceResponse.toBytes();
-      }
-    } catch (Exception e) {
-      _serverMetrics.addMeteredGlobalValue(ServerMeter.RESPONSE_SERIALIZATION_EXCEPTIONS, 1);
-      LOGGER.error("Got exception while serializing response.", e);
-      responseByte = null;
-    }
-    long serializationEndTime = System.nanoTime();
-    _serverMetrics.addPhaseTiming(brokerRequest, ServerQueryPhase.RESPONSE_SERIALIZATION, serializationEndTime - serializationStartTime);
-    _serverMetrics.addPhaseTiming(brokerRequest, ServerQueryPhase.TOTAL_QUERY_TIME, serializationEndTime - queryStartTime);
-    return responseByte;
-  }
 }

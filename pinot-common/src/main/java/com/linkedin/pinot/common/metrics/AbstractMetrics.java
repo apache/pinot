@@ -21,6 +21,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 import java.util.concurrent.atomic.AtomicLong;
+import org.antlr.v4.runtime.misc.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -86,7 +87,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    * @param phase The query phase for which to log time
    * @param nanos The number of nanoseconds that the phase execution took to complete
    */
-  public void addPhaseTiming(final BrokerRequest request, final QP phase, final long nanos) {
+  public void addPhaseTiming(@Nullable final BrokerRequest request, final QP phase, final long nanos) {
     final String fullTimerName = buildMetricName(request, phase.getQueryPhaseName());
     addValueToTimer(fullTimerName, nanos, TimeUnit.NANOSECONDS);
   }
@@ -124,7 +125,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    * @param metricName The metric name to register
    * @return The complete metric name
    */
-  private String buildMetricName(BrokerRequest request, String metricName) {
+  private String buildMetricName(@Nullable BrokerRequest request, String metricName) {
     if (request != null && request.getQuerySource() != null && request.getQuerySource().getTableName() != null) {
       return _metricPrefix + request.getQuerySource().getTableName() + "." + metricName;
     } else {

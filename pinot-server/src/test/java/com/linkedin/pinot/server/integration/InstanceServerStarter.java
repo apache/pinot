@@ -16,6 +16,7 @@
 package com.linkedin.pinot.server.integration;
 
 import com.linkedin.pinot.common.query.QueryRequest;
+import com.linkedin.pinot.core.query.scheduler.QueryScheduler;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
 import java.util.ArrayList;
@@ -65,7 +66,8 @@ public class InstanceServerStarter {
     sendQueryToQueryExecutor(getMinQuery(), queryExecutor);
 
     LOGGER.info("Trying to build RequestHandlerFactory");
-    RequestHandlerFactory simpleRequestHandlerFactory = serverBuilder.buildRequestHandlerFactory(queryExecutor);
+    QueryScheduler queryScheduler = serverBuilder.buildQueryScheduler(queryExecutor);
+    RequestHandlerFactory simpleRequestHandlerFactory = serverBuilder.buildRequestHandlerFactory(queryScheduler);
     LOGGER.info("Trying to build NettyServer");
 
     System.out.println(getMaxQuery());

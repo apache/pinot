@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.transport.scattergather;
 
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
 import io.netty.channel.ChannelHandlerContext;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -654,7 +656,7 @@ public class ScatterGatherTest {
     }
 
     @Override
-    public byte[] processRequest(ChannelHandlerContext channelHandlerContext, ByteBuf request) {
+    public ListenableFuture<byte[]> processRequest(ChannelHandlerContext channelHandlerContext, ByteBuf request) {
 
       if (_sleepTimeMS > 0) {
         try {
@@ -672,7 +674,7 @@ public class ScatterGatherTest {
       _request.add(new String(dst));
       int index = _index.incrementAndGet();
       String res = _responses.get(index);
-      return res.getBytes();
+      return Futures.immediateFuture(res.getBytes());
     }
 
     public List<String> getRequest() {
