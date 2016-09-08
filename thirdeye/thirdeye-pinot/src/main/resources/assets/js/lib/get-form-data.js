@@ -52,11 +52,10 @@ function getAllFormData() {
 
     //Todo: remove these 2 global variables and work with $.when and deferreds
     window.responseDataPopulated = 0;
-    window.numFormComponents = 5;
+    window.numFormComponents = 4;
     getDatasetConfig();
     getDashboardList();
     getMetricList();
-    getAnomalyMetricList();
     getDimensionNValueList();
 }
 
@@ -98,19 +97,6 @@ function getMetricList() {
             $(this).html(result_query_form_metric_list_template)
         });
 
-        window.responseDataPopulated++
-        formComponentPopulated()
-    });
-}
-
-function getAnomalyMetricList() {
-
-    //Create metric dropdown
-    var url = "/dashboard/anomalies/metrics?dataset=" + hash.dataset;
-    getData(url).done(function (data) {
-
-        validateFormData(data, "No metrics available in the server.", "anomaly metrics");
-        window.datasetConfig.anomalyMetricList = data;
         window.responseDataPopulated++
         formComponentPopulated()
     });

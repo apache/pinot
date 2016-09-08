@@ -3,104 +3,106 @@
 
 function getAnomalies(tab) {
 
-    //Creating request url
-    var baselineStart = moment(parseInt(hash.currentStart)).add(-7, 'days')
-    var baselineEnd = moment(parseInt(hash.currentEnd)).add(-7, 'days')
-    var aggTimeGranularity = (window.datasetConfig.dataGranularity) ? window.datasetConfig.dataGranularity : "HOURS";
-    var dataset = hash.dataset;
-    var compareMode = "WoW";
-    var currentStart = hash.currentStart;
-    var currentEnd = hash.currentEnd;
-    var metrics = hash.metrics;
+    //Get dataset anomaly metrics
+    var url = "/dashboard/anomalies/metrics?dataset=" + hash.dataset;
+    getData(url).done(function (anomalyMetricList) {
 
-    var timeSeriesUrl = "/dashboard/data/tabular?dataset=" + dataset + "&compareMode=" + compareMode //
-        + "&currentStart=" + currentStart + "&currentEnd=" + currentEnd  //
-        + "&baselineStart=" + baselineStart + "&baselineEnd=" + baselineEnd   //
-        + "&aggTimeGranularity=" + aggTimeGranularity + "&metrics=" + metrics;
+        //Creating request url
+        var baselineStart = moment(parseInt(hash.currentStart)).add(-7, 'days')
+        var baselineEnd = moment(parseInt(hash.currentEnd)).add(-7, 'days')
+        var aggTimeGranularity = (window.datasetConfig.dataGranularity) ? window.datasetConfig.dataGranularity : "HOURS";
+        var dataset = hash.dataset;
+        var compareMode = "WoW";
+        var currentStart = hash.currentStart;
+        var currentEnd = hash.currentEnd;
+        var metrics = hash.metrics;
 
-    var currentStartISO = moment(parseInt(currentStart)).toISOString();
-    var currentEndISO = moment(parseInt(currentEnd)).toISOString();
+        var timeSeriesUrl = "/dashboard/data/tabular?dataset=" + dataset + "&compareMode=" + compareMode //
+            + "&currentStart=" + currentStart + "&currentEnd=" + currentEnd  //
+            + "&baselineStart=" + baselineStart + "&baselineEnd=" + baselineEnd   //
+            + "&aggTimeGranularity=" + aggTimeGranularity + "&metrics=" + metrics;
 
-    var urlParams = "dataset=" + hash.dataset + "&startTimeIso=" + currentStartISO + "&endTimeIso=" + currentEndISO + "&metric=" + hash.metrics;
-        urlParams += hash.filter ? "&filters=" + hash.filters : "";
-        urlParams += hash.hasOwnProperty("anomalyFunctionId")  ?   "&id=" + hash.anomalyFunctionId : "";
+        var currentStartISO = moment(parseInt(currentStart)).toISOString();
+        var currentEndISO = moment(parseInt(currentEnd)).toISOString();
 
-    if(window.datasetConfig.anomalyMetricList && window.datasetConfig.anomalyMetricList.indexOf(metrics)> -1){
-        var anomaliesUrl = "/dashboard/anomalies/view?" + urlParams;
-        //AJAX for data
-        getData(anomaliesUrl).done(function (anomalyData) {
-            anomaliesDisplayData = anomalyData;
-            getTimeseriesData(anomaliesDisplayData)
+        var urlParams = "dataset=" + hash.dataset + "&startTimeIso=" + currentStartISO + "&endTimeIso=" + currentEndISO + "&metric=" + hash.metrics;
+            urlParams += hash.filter ? "&filters=" + hash.filters : "";
+            urlParams += hash.hasOwnProperty("anomalyFunctionId")  ?   "&id=" + hash.anomalyFunctionId : "";
 
-        });
+        if(anomalyMetricList && anomalyMetricList.indexOf(metrics)> -1){
+            var anomaliesUrl = "/dashboard/anomalies/view?" + urlParams;
+            //AJAX for data
+            getData(anomaliesUrl).done(function (anomalyData) {
+                anomaliesDisplayData = anomalyData;
+                getTimeseriesData(anomaliesDisplayData)
 
-    }else{
-        getTimeseriesData();
-    }
+            });
 
-    function getTimeseriesData(anomalyData) {
-        if(anomalyData){
-            var anomalyMetric = true;
+        }else{
+            getTimeseriesData();
         }
-        var  anomalyData = anomalyData || [];
-        getData(timeSeriesUrl).done(function (timeSeriesData) {
 
-            timeseriesDisplayData = timeSeriesData;
-            //Error handling when data is falsy (empty, undefined or null)
-            if (!timeSeriesData) {
-                $("#" + tab + "-chart-area-error").empty();
-                var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' });
-                warning.append($('<p></p>', { html: 'Something went wrong. Please try and reload the page. Error: metric timeseries data =' + timeSeriesData  }));
-                $("#" + tab + "-chart-area-error").append(warning);
-                $("#" + tab + "-chart-area-error").show();
-                return
-            } else {
-                $("#" + tab + "-chart-area-error").hide();
-                $("#" + tab + "-display-chart-section").empty();
+        function getTimeseriesData(anomalyData) {
+
+            if(anomalyData){
+                var anomalyMetric = true;
             }
-            var placeholder = "linechart-placeholder"
-            renderAnomalyLineChart(timeSeriesData, anomalyData, tab, placeholder);
+            var  anomalyData = anomalyData || [];
+            getData(timeSeriesUrl).done(function (timeSeriesData) {
+                timeseriesDisplayData = timeSeriesData;
+                //Error handling when data is falsy (empty, undefined or null)
+                if (!timeSeriesData) {
+                    $("#" + tab + "-chart-area-error").empty();
+                    var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' });
+                    warning.append($('<p></p>', { html: 'Something went wrong. Please try and reload the page. Error: metric timeseries data =' + timeSeriesData  }));
+                    $("#" + tab + "-chart-area-error").append(warning);
+                    $("#" + tab + "-chart-area-error").show();
+                    return
+                } else {
+                    $("#" + tab + "-chart-area-error").hide();
+                    $("#" + tab + "-display-chart-section").empty();
+                }
+                var placeholder = "linechart-placeholder"
+                renderAnomalyLineChart(timeSeriesData, anomalyData, tab, placeholder);
 
-            if (anomalyMetric) {
-                $(".anomaly-metric-tip").hide();
-                renderAnomalyTable(anomalyData, tab);
-            }else{
-                tipToUser()
-            }
+                if (anomalyMetric) {
+                    $(".anomaly-metric-tip").hide();
+                    renderAnomalyTable(anomalyData, tab);
+                }else{
+                    tipToUser()
+                }
 
-            //anomalyFunctionId is only present in hash when anomaly
-            // function run adhoc was requested on self service tab
-            //needs to be removed to be able to view other functions in later queries on the anomalies view
-            delete hash.anomalyFunctionId
-        });
-    }
+                //anomalyFunctionId is only present in hash when anomaly
+                // function run adhoc was requested on self service tab
+                //needs to be removed to be able to view other functions in later queries on the anomalies view
+                delete hash.anomalyFunctionId
+            });
+        }
 
-    function tipToUser() {
-        var tipToUser = document.createElement("div");
-        tipToUser.id = "anomaly-metric-tip";
-        tipToUser.className = "tip-to-user uk-alert uk-form-row";
-        tipToUser.setAttribute("data-tip-source", "not-anomaly-metric");
-        var closeIcon = document.createElement("i");
-        closeIcon.className = "close-parent uk-icon-close";
-        var msg = document.createElement("p");
-        msg.innerText = "There is no anomaly monitoring function set up for this metric. You can create a function on the"
-        var link = document.createElement("a");
-        link.id = "link-to-self-service";
-        link.innerText = "Self Service tab.";
-        link.setAttribute("href", "/dashboard#dataset="+ hash.dataset +"&view=self-service")
+        function tipToUser() {
+            var tipToUser = document.createElement("div");
+            tipToUser.id = "anomaly-metric-tip";
+            tipToUser.className = "tip-to-user uk-alert uk-form-row";
+            tipToUser.setAttribute("data-tip-source", "not-anomaly-metric");
+            var closeIcon = document.createElement("i");
+            closeIcon.className = "close-parent uk-icon-close";
+            var msg = document.createElement("p");
+            msg.innerText = "There is no anomaly monitoring function set up for this metric. You can create a function on the"
+            var link = document.createElement("a");
+            link.id = "self-service-link";
+            link.innerText = "Self Service tab.";
 
-        msg.appendChild(link);
-        tipToUser.appendChild(closeIcon);
-        tipToUser.appendChild(msg);
-        $("#" + tab + "-display-chart-section").append(tipToUser)
-
-    }
+            msg.appendChild(link);
+            tipToUser.appendChild(closeIcon);
+            tipToUser.appendChild(msg);
+            $("#" + tab + "-display-chart-section").append(tipToUser)
+        }
+    });
 
 }
 
 function renderAnomalyLineChart(timeSeriesData, anomalyData, tab, placeholder) {
 
-    //$("#" + tab + "-display-chart-section").empty();
     /* Handelbars template for time series legend */
     var result_metric_time_series_section = HandleBarsTemplates.template_metric_time_series_section(timeSeriesData);
     $("#" + tab + "-display-chart-section").append(result_metric_time_series_section);
@@ -298,8 +300,10 @@ function renderAnomalyTable(data, tab) {
          anomalyTimeSelectAllCheckbox(this);
      });
 
-     //Preselect first metric on load
-     $($(".time-series-metric-checkbox", currentView)[0]).click();
+ //Select all / deselect all metrics option
+     currentView.on("click", "#self-service-link", function () {
+        $(".header-tab[rel='self-service']").click();
+     });
 
      function anomalyTimeSeriesCheckbox(target) {
          var checkbox = target;
@@ -337,6 +341,8 @@ function renderAnomalyTable(data, tab) {
          }
      }
 
+     //Set initial state of view
+
      //Show the first line on the timeseries
      var firstLegendLabel = $($(".time-series-metric-checkbox")[0])
      if( !firstLegendLabel.is(':checked')) {
@@ -367,7 +373,6 @@ function renderAnomalyTable(data, tab) {
 
 
      $('.feedback-dropdown[data-uk-dropdown]').on('hide.uk.dropdown', function(){
-
          submitAnomalyFeedback(this);
      });
 
@@ -425,7 +430,6 @@ function renderAnomalyTable(data, tab) {
      }
 
      function updateChartForSingleAnomaly(target) {
-
 
          var button = $(target);
          var dimension = button.attr("data-explore-dimensions");
