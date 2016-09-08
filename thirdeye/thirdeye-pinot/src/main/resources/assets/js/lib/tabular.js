@@ -137,12 +137,6 @@ function drawTimeSeries(timeSeriesData, tab) {
         colors[metrics[i] + "-baseline"] = colorArray[i];
         colors[metrics[i] + "-current"] = colorArray[i];
         colors[metrics[i] + "-delta"] = colorArray[i];
-        // chartTypes[metrics[i] + "-current"] = 'spline';
-        // chartTypes[metrics[i] + "-baseline"] = 'spline';
-        // chartTypes[metrics[i] + "-delta"] = 'bar';
-        // axes[metrics[i] + "-current"] = 'y';
-        // axes[metrics[i] + "-baseline"] = 'y';
-        // axes[metrics[i] + "-delta"] = 'y2';
     }
 
     lineChart = c3.generate({

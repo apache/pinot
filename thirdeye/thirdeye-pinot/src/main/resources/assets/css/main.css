@@ -851,10 +851,6 @@ body a{
     height: 310px;
 }
 
-#anomalies-display-chart-section #barchart-placeholder {
-    display: none;
-}
-
 #anomalies-display-chart-section{
     font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
     margin: auto;

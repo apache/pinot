@@ -110,6 +110,7 @@ function renderAnomalyLineChart(timeSeriesData, anomalyData, tab, placeholder) {
 }
 
 var anomalyLineChart;
+var anomalyBarChart
 function drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab, placeholder) {
 
     var currentView = $("#" + tab + "-display-chart-section");
@@ -127,14 +128,14 @@ function drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab, placeholder) {
     }
 
     var lineChartPlaceholder = $("#"+ placeholder, currentView)[0];
+    var barChartPlaceholder = $("#barchart-placeholder", currentView)[0];
     // Metric(s)
     var metrics = timeSeriesData["metrics"];
     var lineChartData = {};
+    var barChartData = {};
     var xTicksBaseline = [];
     var xTicksCurrent = [];
     var colors = {};
-    var chartTypes = {};
-    var axes = {};
     var regions = [];
 
     for (var t = 0, len = timeSeriesData["timeBuckets"].length; t < len; t++) {
@@ -153,6 +154,7 @@ function drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab, placeholder) {
         regions.push({'axis': 'x', 'start': anomalyStart, 'end': anomalyEnd, 'class': 'regionX ' + anomayID });
     }
     lineChartData["time"] = xTicksCurrent;
+    barChartData["time"] = xTicksCurrent;
 
     var colorArray;
     if (metrics.length < 10) {
@@ -167,19 +169,25 @@ function drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab, placeholder) {
         var metricBaselineData = [];
         var metricCurrentData = [];
         var deltaPercentageData = [];
+        var indexOfBaseline = timeSeriesData["data"][metrics[i]]["schema"]["columnsToIndexMapping"]["baselineValue"]
+        var indexOfCurrent = timeSeriesData["data"][metrics[i]]["schema"]["columnsToIndexMapping"]["currentValue"]
+        var indexOfRatio = timeSeriesData["data"][metrics[i]]["schema"]["columnsToIndexMapping"]["ratio"]
         for (var t = 0, len = timeSeriesData["timeBuckets"].length; t < len; t++) {
-            var baselineValue = timeSeriesData["data"][metrics[i]]["responseData"][t][0];
-            var currentValue = timeSeriesData["data"][metrics[i]]["responseData"][t][1];
-            var deltaPercentage = parseInt(timeSeriesData["data"][metrics[i]]["responseData"][t][2] * 100);
+
+            var baselineValue = timeSeriesData["data"][metrics[i]]["responseData"][t][indexOfBaseline];
+            var currentValue = timeSeriesData["data"][metrics[i]]["responseData"][t][indexOfCurrent];
+            var deltaPercentage = parseInt(timeSeriesData["data"][metrics[i]]["responseData"][t][indexOfRatio]);
             metricBaselineData.push(baselineValue);
             metricCurrentData.push(currentValue);
             deltaPercentageData.push(deltaPercentage);
         }
         lineChartData[metrics[i] + "-baseline"] = metricBaselineData;
         lineChartData[metrics[i] + "-current"] = metricCurrentData;
+        barChartData[metrics[i] + "-delta"] = deltaPercentageData;
 
         colors[metrics[i] + "-baseline"] = colorArray[i];
         colors[metrics[i] + "-current"] = colorArray[i];
+        colors[metrics[i] + "-delta"] = colorArray[i];
 
     }
 
@@ -231,8 +239,8 @@ function drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab, placeholder) {
         }
     });
 
-    anomalyLineChart.hide();
-    var numAnomalies = anomalyData.length
+
+    var numAnomalies = anomalyData.length;
     var regionColors;
 
     if (anomalyData.length > 0 && anomalyData[0]["regionColor"]) {
@@ -256,6 +264,69 @@ function drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab, placeholder) {
         d3.select("." + anomalyId + " rect")
             .style("fill", regionColors[i])
     }
+
+    anomalyBarChart = c3.generate({
+
+        bindto: barChartPlaceholder,
+        padding: {
+            top: 0,
+            right: 100,
+            bottom: 0,
+            left: 100
+        },
+        data: {
+            x: 'time',
+            json: barChartData,
+            type: 'area-spline',
+            colors: colors
+        },
+        axis: {
+            x: {
+                label: {
+                    text: "Time"
+                },
+                type: 'timeseries',
+                tick: {
+                    count:11,
+                    width:84,
+                    multiline: true,
+                    format: dateTimeFormat
+                }
+            },
+            y: {
+                label: {
+                    text: "% change",
+                    position: 'outer-middle'
+                },
+                tick: {
+                    count: 5,
+                    format: function (d) {
+                        return d.toFixed(2)
+                    }
+                }
+            }
+        },
+        legend: {
+            show: false
+        },
+        grid: {
+            x: {
+
+            },
+            y: {
+                lines: [
+                    {
+                        value: 0
+                    }
+                ]
+            }
+        },
+        bar: {
+            width: {
+                ratio: .5
+            }
+        }
+    });
 
     attach_TimeSeries_EventListeners(currentView)
 
@@ -313,11 +384,13 @@ function renderAnomalyTable(data, tab) {
              //Show metric's lines on timeseries
              anomalyLineChart.show(metricName + "-current");
              anomalyLineChart.show(metricName + "-baseline");
+             anomalyBarChart.show(metricName + "-delta");
 
          } else {
              //Hide metric's lines on timeseries
              anomalyLineChart.hide(metricName + "-current");
              anomalyLineChart.hide(metricName + "-baseline");
+             anomalyBarChart.hide(metricName + "-delta");
 
          }
      }
