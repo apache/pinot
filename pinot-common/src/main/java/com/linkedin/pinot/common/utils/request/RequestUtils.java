@@ -15,7 +15,12 @@
  */
 package com.linkedin.pinot.common.utils.request;
 
-import com.google.common.collect.ImmutableSet;
+import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.request.AggregationInfo;
+import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.request.FilterOperator;
+import com.linkedin.pinot.common.request.FilterQuery;
+import com.linkedin.pinot.common.request.FilterQueryMap;
 import com.linkedin.pinot.common.request.GroupBy;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.StarTreeMetadata;
@@ -25,15 +30,15 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
-import com.linkedin.pinot.common.request.AggregationInfo;
-import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.request.FilterOperator;
-import com.linkedin.pinot.common.request.FilterQuery;
-import com.linkedin.pinot.common.request.FilterQueryMap;
+import javax.annotation.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class RequestUtils {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(RequestUtils.class);
+
   /**
    * Generates thrift compliant filterQuery and populate it in the broker request
    * @param filterQueryTree
@@ -103,13 +108,11 @@ public class RequestUtils {
     return q2;
   }
 
-  public static final Set<String> ALLOWED_AGGREGATION_FUNCTIONS = ImmutableSet.of("sum", "fasthll");
-
   /**
    * Returns true for the following, false otherwise:
    * - Query is not aggregation/group-by
    * - Segment does not contain star tree
-   * - The only aggregation function in the query should be in {@link #ALLOWED_AGGREGATION_FUNCTIONS}
+   * - The only aggregation function in the query should be sum or fasthll
    * - All group by columns and predicate columns are materialized
    * - Predicates do not contain any metric columns
    * - Query consists only of simple predicates, conjoined by AND.
@@ -153,8 +156,22 @@ public class RequestUtils {
     // We currently support only limited aggregations
     for (AggregationInfo aggregationInfo : aggregationsInfo) {
       String aggregationFunctionName = aggregationInfo.getAggregationType().toLowerCase();
-      if (!ALLOWED_AGGREGATION_FUNCTIONS.contains(aggregationFunctionName)) {
-        return false;
+      switch (aggregationFunctionName) {
+        case "sum":
+          break;
+        case "fasthll":
+          String derivedColumn = extractDerivedColumn(aggregationInfo, starTreeMetadata);
+          if (derivedColumn == null) {
+            // If derivedColumn does not exist, which means we need to aggregate directly on original column,
+            // in that case, star tree can not be used since no generated star tree docs are available.
+            return false;
+          } else {
+            LOGGER.info("Performed rewriting to fasthll({})", derivedColumn);
+            aggregationInfo.getAggregationParams().put("column", derivedColumn);
+            break;
+          }
+        default:
+          return false;
       }
     }
 
@@ -206,4 +223,13 @@ public class RequestUtils {
 
     return true;
   }
+
+  @Nullable
+  private static String extractDerivedColumn(AggregationInfo aggregationInfo, StarTreeMetadata starTreeMetadata) {
+    String[] columns = aggregationInfo.getAggregationParams().get("column").trim().split(",");
+    Preconditions.checkArgument(columns.length == 1);
+    String aggrColumn = columns[0];
+    return starTreeMetadata.getDerivedHllColumnFromOrigin(aggrColumn);
+  }
+
 }

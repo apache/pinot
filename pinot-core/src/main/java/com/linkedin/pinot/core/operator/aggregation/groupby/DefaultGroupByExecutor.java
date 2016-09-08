@@ -170,8 +170,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
         break;
 
       case AggregationFunctionFactory.FASTHLL_AGGREGATION_FUNCTION:
-        String derivedColumn = _segmentMetadata.getStarTreeMetadata().getDerivedHllColumnFromOrigin(aggrColumn);
-        String[] stringArray = _singleValueBlockCache.getStringValueArrayForColumn(derivedColumn);
+        String[] stringArray = _singleValueBlockCache.getStringValueArrayForColumn(aggrColumn);
         if (_hasMultiValuedColumns) {
           aggregationFunction.aggregateGroupByMV(length, _docIdToMVGroupKey, resultHolder, (Object) stringArray);
         } else {
