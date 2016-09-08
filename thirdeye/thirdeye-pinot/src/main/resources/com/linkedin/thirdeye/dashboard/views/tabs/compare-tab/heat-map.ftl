@@ -84,13 +84,15 @@
                     </table>
                 </div>
                 <div id="difference-summary-{{metricName}}" class="difference-summary uk-margin-bottom" data-metric="{{metricName}}">
-                    <h3>Summary</h3>
+                    <h3>Outlier Summary</h3>
                     <table id="heat-map-{{metricName}}-difference-summary-table">
 
                         {{#with @root/summaryData}}
                         <thead>
                         <tr>
                             <th colspan="{{dimensions.length}}">Dimension</th>
+                            <th></th>
+                            <th></th>
                             <th></th>
                             <th></th>
                             <th></th>
@@ -103,7 +105,9 @@
                             {{/with}}
                                 <th>Baseline</th>
                                 <th>Current</th>
-                                <th>Ratio</th>
+                                <th>PercentageChange</th>
+                                <th>ContributionChange</th>
+                                <th>ContributionToOverallChange</th>
                         </tr>
                         </thead>
                         {{#with @root/summaryData/responseRows}}
@@ -113,9 +117,11 @@
                             {{#each row.names as |dimensionValue dimension|}}
                               <td style="background-color: rgba(222, 222, 222, 0.5);">{{dimensionValue}}</td>
                             {{/each}}
-                            <td>{{row.baselineValue}}</td>
-                            <td>{{row.currentValue}}</td>
-                            <td>{{row.ratio}}</td>
+                            <td align="right">{{row.baselineValue}}</td>
+                            <td align="right">{{row.currentValue}}</td>
+                            <td align="right">{{row.percentageChange}}</td>
+                            <td align="right">{{row.contributionChange}}</td>
+                            <td align="right">{{row.contributionToOverallChange}}</td>
                         </tr>
                         {{/each}}
                         {{/with}}<!--end of summaryData -->

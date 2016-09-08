@@ -43,7 +43,6 @@ public class Cube { // the cube (Ca|Cb)
   @JsonIgnore
   private List<List<HierarchyNode>> hierarchicalNodes = new ArrayList<>();
 
-
   public double getTopBaselineValue() {
     return topBaselineValue;
   }
@@ -69,7 +68,8 @@ public class Cube { // the cube (Ca|Cb)
     }
   }
 
-  public void buildWithAutoDimensionOrder(OLAPDataBaseClient olapClient, Dimensions dimensions) throws Exception {
+  public void buildWithAutoDimensionOrder(OLAPDataBaseClient olapClient, Dimensions dimensions)
+      throws Exception {
     buildWithAutoDimensionOrder(olapClient, dimensions, DEFAULT_TOP_DIMENSION, Collections.emptyList());
   }
 
@@ -79,7 +79,8 @@ public class Cube { // the cube (Ca|Cb)
   }
 
   public void buildWithAutoDimensionOrder(OLAPDataBaseClient olapClient, Dimensions dimensions, int topDimension,
-      List<List<String>> hierarchy) throws Exception {
+      List<List<String>> hierarchy)
+      throws Exception {
 
     initializeBasicInfo(olapClient);
     if (dimensions == null || dimensions.size() == 0) {
@@ -94,7 +95,8 @@ public class Cube { // the cube (Ca|Cb)
     buildWithManualDimensionOrder(olapClient, this.dimensions);
   }
 
-  public void buildWithManualDimensionOrder(OLAPDataBaseClient olapClient, Dimensions dimensions) throws Exception {
+  public void buildWithManualDimensionOrder(OLAPDataBaseClient olapClient, Dimensions dimensions)
+      throws Exception {
     if (dimensions == null || dimensions.size() == 0) {
       throw new IllegalArgumentException("Dimensions cannot be empty.");
     }
@@ -129,7 +131,8 @@ public class Cube { // the cube (Ca|Cb)
    * Calculate the change ratio of the top aggregated values.
    * @throws Exception An exception is thrown if OLAP database cannot be connected.
    */
-  private void initializeBasicInfo(OLAPDataBaseClient olapClient) throws Exception {
+  private void initializeBasicInfo(OLAPDataBaseClient olapClient)
+      throws Exception {
     Row topAggValues = olapClient.getTopAggregatedValues();
     topBaselineValue = topAggValues.baselineValue; // aggregated baseline values
     topCurrentValue = topAggValues.currentValue; // aggregated current values
@@ -156,7 +159,7 @@ public class Cube { // the cube (Ca|Cb)
 
       if (level != 0) {
         int parentIndex = 0;
-        HierarchyNode parentNode = hierarchicalNodes.get(level-1).get(parentIndex);
+        HierarchyNode parentNode = hierarchicalNodes.get(level - 1).get(parentIndex);
         for (int index = 0; index < hierarchicalRows.get(level).size(); ++index) {
           Row row = hierarchicalRows.get(level).get(index);
           HierarchyNode node = new HierarchyNode(level, index, row, parentNode);
@@ -165,20 +168,21 @@ public class Cube { // the cube (Ca|Cb)
 
           // For testing if a node has the correct parent node
           boolean haveProblem = false;
-          for (int i = 0; i < level-1; ++i) {
+          for (int i = 0; i < level - 1; ++i) {
             if (parentNode == null || !parentNode.data.dimensionValues.get(i).equals(row.dimensionValues.get(i))) {
               haveProblem = true;
               break;
             }
           }
-          if (haveProblem)
+          if (haveProblem) {
             LOG.info(row + " is incorrectly connected to " + parentNode.data);
+          }
 
           // If the next data does not have the same prefix of dimension values, then it belongs to a different present.
-          if ( (level > 1) && (index != hierarchicalRows.get(level).size()-1) ) {
+          if ((level > 1) && (index != hierarchicalRows.get(level).size() - 1)) {
             Row nextRow = hierarchicalRows.get(level).get(index + 1);
             for (int i = level - 2; i >= 0; --i) {
-              if ( !nextRow.dimensionValues.get(i).equals(row.dimensionValues.get(i)) ) {
+              if (!nextRow.dimensionValues.get(i).equals(row.dimensionValues.get(i))) {
                 ++parentIndex;
                 parentNode = hierarchicalNodes.get(level - 1).get(parentIndex);
                 break;
@@ -202,7 +206,8 @@ public class Cube { // the cube (Ca|Cb)
    * @throws Exception An exception is thrown if OLAP database cannot be connected.
    */
   private static Dimensions sortDimensionOrder(OLAPDataBaseClient olapClient, double topRatio, Dimensions dimensions,
-      int topDimension, List<List<String>> hierarchy) throws Exception {
+      int topDimension, List<List<String>> hierarchy)
+      throws Exception {
     List<MutablePair<String, Double>> dimensionCostPairs = new ArrayList<>();
 
     // Given one dimension name D, returns the hierarchical dimension to which D belong.
@@ -211,7 +216,9 @@ public class Cube { // the cube (Ca|Cb)
     // Process the suggested hierarchy list and filter out only the hierarchies that can be applied to the available
     // dimensions of the dataset.
     for (List<String> suggestedHierarchyList : hierarchy) {
-      if (suggestedHierarchyList == null || suggestedHierarchyList.size() < 2) continue;
+      if (suggestedHierarchyList == null || suggestedHierarchyList.size() < 2) {
+        continue;
+      }
 
       List<String> actualHierarchy = new ArrayList<>();
       for (String dimension : suggestedHierarchyList) {
@@ -257,23 +264,45 @@ public class Cube { // the cube (Ca|Cb)
     // Sort dimensions according to their costs in a descending order
     dimensionCostPairs.sort((new DimensionCostPairSorter()).reversed());
 
+    // If there exists a huge gap (e.g., 1/10 of cost) between two cost pairs, then we chop of the dimensions because
+    // pairs with small costs does not provide useful information
+    // Invariance to keep: cutOffPairIdx <= number of dimensionCostPairs
+    int cutOffPairIdx = 1;
+    if (dimensionCostPairs.size() > 1) {
+      double cutOffCost = dimensionCostPairs.get(0).getRight() / 10d;
+      for (; cutOffPairIdx < dimensionCostPairs.size(); ++cutOffPairIdx) {
+        double curCost = dimensionCostPairs.get(cutOffPairIdx).getRight();
+        if (Double.compare(cutOffCost, curCost) > 0) {
+          break;
+        }
+      }
+    } else {
+      cutOffPairIdx = 0;
+    }
+
     // Create a new Dimension instance whose dimensions follow the calculated order
     ArrayList<String> newDimensions = new ArrayList<>();
+    int pairIdx = 0;
     for (MutablePair<String, Double> dimensionCostPair : dimensionCostPairs) {
       StringBuilder sb = new StringBuilder("  Dimension: ");
       if (hierarchicalDimensionMap.containsKey(dimensionCostPair.getLeft())) {
         HierarchicalDimension hierarchicalDimension = hierarchicalDimensionMap.get(dimensionCostPair.getLeft());
-        newDimensions.addAll(hierarchicalDimension.hierarchy);
+        if (pairIdx <= cutOffPairIdx) {
+          newDimensions.addAll(hierarchicalDimension.hierarchy);
+        }
         sb.append(hierarchicalDimension.hierarchy);
       } else { // The dimension does not belong to any hierarchy
-        newDimensions.add(dimensionCostPair.getLeft());
+        if (pairIdx <= cutOffPairIdx) {
+          newDimensions.add(dimensionCostPair.getLeft());
+        }
         sb.append(dimensionCostPair.getLeft());
       }
       sb.append(", Cost: ");
       sb.append(dimensionCostPair.getRight());
       LOG.info(sb.toString());
+      ++pairIdx;
     }
-    return new Dimensions(newDimensions.subList(0, Math.min(topDimension, dimensions.size())));
+    return new Dimensions(newDimensions.subList(0, Math.min(topDimension, newDimensions.size())));
   }
 
   static class DimensionCostPairSorter implements Comparator<MutablePair<String, Double>> {
@@ -288,11 +317,13 @@ public class Cube { // the cube (Ca|Cb)
     List<String> hierarchy;
   }
 
-  public void toJson(String fileName) throws IOException {
+  public void toJson(String fileName)
+      throws IOException {
     new ObjectMapper().writeValue(new File(fileName), this);
   }
 
-  public static Cube fromJson(String fileName) throws IOException {
+  public static Cube fromJson(String fileName)
+      throws IOException {
     Cube cube = new ObjectMapper().readValue(new File(fileName), Cube.class);
     cube.buildHierarchy();
     return cube;
@@ -301,13 +332,12 @@ public class Cube { // the cube (Ca|Cb)
   @Override
   public String toString() {
     ToStringBuilder tsb = new ToStringBuilder(this, ToStringStyle.MULTI_LINE_STYLE);
-    tsb.append("Baseline Value", topBaselineValue).append("Current Value", topCurrentValue)
-       .append("Ratio", topRatio)
-       .append("Dimentions", this.dimensions)
-       .append("#Detailed Rows", hierarchicalRows.get(hierarchicalRows.size()-1).size());
+    tsb.append("Baseline Value", topBaselineValue)
+        .append("Current Value", topCurrentValue)
+        .append("Ratio", topRatio)
+        .append("Dimentions", this.dimensions)
+        .append("#Detailed Rows", hierarchicalRows.get(hierarchicalRows.size() - 1).size());
     return tsb.toString();
   }
-
-
 }
 

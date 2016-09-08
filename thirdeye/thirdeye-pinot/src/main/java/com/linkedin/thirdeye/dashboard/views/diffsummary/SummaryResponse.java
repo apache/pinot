@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.dashboard.views.diffsummary;
 
+import java.text.DecimalFormat;
+import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -14,6 +16,8 @@ import com.linkedin.thirdeye.client.diffsummary.Dimensions;
 import com.linkedin.thirdeye.client.diffsummary.HierarchyNode;
 
 public class SummaryResponse {
+  private final static NumberFormat DOUBLE_FORMATTER = new DecimalFormat("#0.00");
+
   @JsonProperty("dimensions")
   List<String> dimensions = new ArrayList<>();
 
@@ -34,22 +38,37 @@ public class SummaryResponse {
     return response;
   }
 
-  public static SummaryResponse buildResponse(List<HierarchyNode> nodes, int levelCount) {
+  public static SummaryResponse buildResponse(List<HierarchyNode> nodes, int targetLevelCount) {
     SummaryResponse response = new SummaryResponse();
+
+    // Compute the total baseline and current value
+    double totalBaselineValue = 0d;
+    double totalCurrentValue = 0d;
+    for(HierarchyNode node : nodes) {
+      totalBaselineValue += node.getBaselineValue();
+      totalCurrentValue += node.getCurrentValue();
+    }
+
+    // If all nodes have a lower level count than targetLevelCount, then it is not necessary to print the summary with
+    // height higher than the available level.
+    int maxNodeLevelCount = 0;
+    for (HierarchyNode node : nodes) {
+      maxNodeLevelCount = Math.max(maxNodeLevelCount, node.getLevel());
+    }
+    targetLevelCount = Math.min(maxNodeLevelCount, targetLevelCount);
 
     // Build the header
     Dimensions dimensions = nodes.get(0).getDimensions();
-    for (int i = 0; i < levelCount; ++i) {
+    for (int i = 0; i < targetLevelCount; ++i) {
       response.dimensions.add(dimensions.get(i));
     }
 
     // Build the response
-//    nodes.sort(Summary.NODE_COMPARATOR.reversed()); // pre-order traversal
-    nodes = SummaryResponseTree.sortResponseTree(nodes, levelCount);
+    nodes = SummaryResponseTree.sortResponseTree(nodes, targetLevelCount);
     //   Build name tag for each row of responses
     Map<HierarchyNode, NameTag> nameTags = new HashMap<>();
     for (HierarchyNode node : nodes) {
-      NameTag tag = new NameTag(levelCount);
+      NameTag tag = new NameTag(targetLevelCount);
       nameTags.put(node, tag);
       tag.copyNames(node.getDimensionValues());
     }
@@ -72,11 +91,34 @@ public class SummaryResponse {
       row.names = nameTags.get(node).names;
       row.baselineValue = node.getBaselineValue();
       row.currentValue = node.getCurrentValue();
-      row.ratio = node.currentRatio();
+      row.percentageChange = computePercentageChange(row.baselineValue, row.currentValue);
+      row.contributionChange =
+          computeContributionChange(row.baselineValue, row.currentValue, totalBaselineValue, totalCurrentValue);
+      row.contributionToOverallChange =
+          computeContributionToOverallChange(row.baselineValue, row.currentValue, totalBaselineValue);
       response.responseRows.add(row);
     }
 
     return response;
+  }
+
+  private static String computePercentageChange(double baseline, double current) {
+    double percentageChange = ((current - baseline) / baseline) * 100d;
+    return DOUBLE_FORMATTER.format(roundUp(percentageChange)) + "%";
+  }
+
+  private static String computeContributionChange(double baseline, double current, double totalBaseline, double totalCurrent) {
+    double contributionChange = ((current / totalCurrent) - (baseline / totalBaseline)) * 100d;
+    return DOUBLE_FORMATTER.format(roundUp(contributionChange)) + "%";
+  }
+
+  private static String computeContributionToOverallChange(double baseline, double current, double totalBaseline) {
+    double contributionToOverallChange = ((current - baseline) / (totalBaseline)) * 100d;
+    return DOUBLE_FORMATTER.format(roundUp(contributionToOverallChange)) + "%";
+  }
+
+  private static double roundUp(double number) {
+    return Math.round(number * 100d) / 100d;
   }
 
   public String toString() {
@@ -86,33 +128,6 @@ public class SummaryResponse {
       tsb.append('\n').append(row);
     }
     return tsb.toString();
-  }
-
-  public static class SummaryResponseRow {
-    private List<String> names;
-    private double baselineValue;
-    private double currentValue;
-    private double ratio;
-
-    public List<String> getNames() {
-      return names;
-    }
-
-    public double getBaselineValue() {
-      return baselineValue;
-    }
-
-    public double getCurrentValue() {
-      return currentValue;
-    }
-
-    public double getRatio() {
-      return ratio;
-    }
-
-    public String toString() {
-      return ToStringBuilder.reflectionToString(this, ToStringStyle.SIMPLE_STYLE);
-    }
   }
 
   private static class NameTag {
