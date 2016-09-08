@@ -18,6 +18,7 @@ package com.linkedin.pinot.common.data;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.utils.EqualityUtils;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nonnull;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 
@@ -32,24 +33,90 @@ public final class TimeFieldSpec extends FieldSpec {
     super();
   }
 
-  public TimeFieldSpec(String name, DataType dataType, TimeUnit timeUnit) {
-    super(name, dataType, true);
-    _incomingGranularitySpec = new TimeGranularitySpec(dataType, timeUnit, name);
+  public TimeFieldSpec(@Nonnull String incomingName, @Nonnull DataType incomingDataType,
+      @Nonnull TimeUnit incomingTimeUnit) {
+    super(incomingName, incomingDataType, true);
+    _incomingGranularitySpec = new TimeGranularitySpec(incomingDataType, incomingTimeUnit, incomingName);
   }
 
-
-  public TimeFieldSpec(String name, DataType dataType, int timeUnitSize, TimeUnit timeUnit) {
-    super(name, dataType, true);
-    _incomingGranularitySpec = new TimeGranularitySpec(dataType, timeUnitSize, timeUnit, name);
+  public TimeFieldSpec(@Nonnull String incomingName, @Nonnull DataType incomingDataType,
+      @Nonnull TimeUnit incomingTimeUnit, @Nonnull Object defaultNullValue) {
+    super(incomingName, incomingDataType, true, defaultNullValue);
+    _incomingGranularitySpec = new TimeGranularitySpec(incomingDataType, incomingTimeUnit, incomingName);
   }
 
-  public TimeFieldSpec(TimeGranularitySpec incomingGranularitySpec) {
+  public TimeFieldSpec(@Nonnull String incomingName, @Nonnull DataType incomingDataType,
+      @Nonnull TimeUnit incomingTimeUnit, @Nonnull String outgoingName, @Nonnull DataType outgoingDataType,
+      @Nonnull TimeUnit outgoingTimeUnit) {
+    super(outgoingName, outgoingDataType, true);
+    _incomingGranularitySpec = new TimeGranularitySpec(incomingDataType, incomingTimeUnit, incomingName);
+    _outgoingGranularitySpec = new TimeGranularitySpec(outgoingDataType, outgoingTimeUnit, outgoingName);
+  }
+
+  public TimeFieldSpec(@Nonnull String incomingName, @Nonnull DataType incomingDataType,
+      @Nonnull TimeUnit incomingTimeUnit, @Nonnull String outgoingName, @Nonnull DataType outgoingDataType,
+      @Nonnull TimeUnit outgoingTimeUnit, @Nonnull Object defaultNullValue) {
+    super(outgoingName, outgoingDataType, true, defaultNullValue);
+    _incomingGranularitySpec = new TimeGranularitySpec(incomingDataType, incomingTimeUnit, incomingName);
+    _outgoingGranularitySpec = new TimeGranularitySpec(outgoingDataType, outgoingTimeUnit, outgoingName);
+  }
+
+  public TimeFieldSpec(@Nonnull String incomingName, @Nonnull DataType incomingDataType, int incomingTimeUnitSize,
+      @Nonnull TimeUnit incomingTimeUnit) {
+    super(incomingName, incomingDataType, true);
+    _incomingGranularitySpec =
+        new TimeGranularitySpec(incomingDataType, incomingTimeUnitSize, incomingTimeUnit, incomingName);
+  }
+
+  public TimeFieldSpec(@Nonnull String incomingName, @Nonnull DataType incomingDataType, int incomingTimeUnitSize,
+      @Nonnull TimeUnit incomingTimeUnit, @Nonnull Object defaultNullValue) {
+    super(incomingName, incomingDataType, true, defaultNullValue);
+    _incomingGranularitySpec =
+        new TimeGranularitySpec(incomingDataType, incomingTimeUnitSize, incomingTimeUnit, incomingName);
+  }
+
+  public TimeFieldSpec(@Nonnull String incomingName, @Nonnull DataType incomingDataType, int incomingTimeUnitSize,
+      @Nonnull TimeUnit incomingTimeUnit, @Nonnull String outgoingName, @Nonnull DataType outgoingDataType,
+      int outgoingTimeUnitSize, @Nonnull TimeUnit outgoingTimeUnit) {
+    super(outgoingName, outgoingDataType, true);
+    _incomingGranularitySpec =
+        new TimeGranularitySpec(incomingDataType, incomingTimeUnitSize, incomingTimeUnit, incomingName);
+    _outgoingGranularitySpec =
+        new TimeGranularitySpec(outgoingDataType, outgoingTimeUnitSize, outgoingTimeUnit, outgoingName);
+  }
+
+  public TimeFieldSpec(@Nonnull String incomingName, @Nonnull DataType incomingDataType, int incomingTimeUnitSize,
+      @Nonnull TimeUnit incomingTimeUnit, @Nonnull String outgoingName, @Nonnull DataType outgoingDataType,
+      int outgoingTimeUnitSize, @Nonnull TimeUnit outgoingTimeUnit, @Nonnull Object defaultNullValue) {
+    super(outgoingName, outgoingDataType, true, defaultNullValue);
+    _incomingGranularitySpec =
+        new TimeGranularitySpec(incomingDataType, incomingTimeUnitSize, incomingTimeUnit, incomingName);
+    _outgoingGranularitySpec =
+        new TimeGranularitySpec(outgoingDataType, outgoingTimeUnitSize, outgoingTimeUnit, outgoingName);
+  }
+
+  public TimeFieldSpec(@Nonnull TimeGranularitySpec incomingGranularitySpec) {
     super(incomingGranularitySpec.getName(), incomingGranularitySpec.getDataType(), true);
     _incomingGranularitySpec = incomingGranularitySpec;
   }
 
-  public TimeFieldSpec(TimeGranularitySpec incomingGranularitySpec, TimeGranularitySpec outgoingGranularitySpec) {
+  public TimeFieldSpec(@Nonnull TimeGranularitySpec incomingGranularitySpec, @Nonnull Object defaultNullValue) {
+    super(incomingGranularitySpec.getName(), incomingGranularitySpec.getDataType(), true, defaultNullValue);
+    _incomingGranularitySpec = incomingGranularitySpec;
+  }
+
+  public TimeFieldSpec(@Nonnull TimeGranularitySpec incomingGranularitySpec,
+      @Nonnull TimeGranularitySpec outgoingGranularitySpec) {
     super(outgoingGranularitySpec.getName(), outgoingGranularitySpec.getDataType(), true);
+    Preconditions.checkNotNull(incomingGranularitySpec);
+
+    _incomingGranularitySpec = incomingGranularitySpec;
+    _outgoingGranularitySpec = outgoingGranularitySpec;
+  }
+
+  public TimeFieldSpec(@Nonnull TimeGranularitySpec incomingGranularitySpec,
+      @Nonnull TimeGranularitySpec outgoingGranularitySpec, @Nonnull Object defaultNullValue) {
+    super(outgoingGranularitySpec.getName(), outgoingGranularitySpec.getDataType(), true, defaultNullValue);
     Preconditions.checkNotNull(incomingGranularitySpec);
 
     _incomingGranularitySpec = incomingGranularitySpec;
@@ -63,12 +130,12 @@ public final class TimeFieldSpec extends FieldSpec {
   }
 
   @Override
-  public void setName(String name) {
+  public void setName(@Nonnull String name) {
     // Ignore setName for TimeFieldSpec because we pick the name from TimeGranularitySpec.
   }
 
   @Override
-  public void setDataType(DataType dataType) {
+  public void setDataType(@Nonnull DataType dataType) {
     // Ignore setDataType for TimeFieldSpec because we pick the data type from TimeGranularitySpec.
   }
 
@@ -94,7 +161,11 @@ public final class TimeFieldSpec extends FieldSpec {
     return getName();
   }
 
-  public void setIncomingGranularitySpec(TimeGranularitySpec incomingGranularitySpec) {
+  public TimeGranularitySpec getIncomingGranularitySpec() {
+    return _incomingGranularitySpec;
+  }
+
+  public void setIncomingGranularitySpec(@Nonnull TimeGranularitySpec incomingGranularitySpec) {
     Preconditions.checkNotNull(incomingGranularitySpec);
 
     _incomingGranularitySpec = incomingGranularitySpec;
@@ -104,24 +175,20 @@ public final class TimeFieldSpec extends FieldSpec {
     }
   }
 
-  public TimeGranularitySpec getIncomingGranularitySpec() {
-    return _incomingGranularitySpec;
-  }
-
-  public void setOutgoingGranularitySpec(TimeGranularitySpec outgoingGranularitySpec) {
-    Preconditions.checkNotNull(outgoingGranularitySpec);
-
-    _outgoingGranularitySpec = outgoingGranularitySpec;
-    super.setName(outgoingGranularitySpec.getName());
-    super.setDataType(outgoingGranularitySpec.getDataType());
-  }
-
   public TimeGranularitySpec getOutgoingGranularitySpec() {
     if (_outgoingGranularitySpec == null) {
       return _incomingGranularitySpec;
     } else {
       return _outgoingGranularitySpec;
     }
+  }
+
+  public void setOutgoingGranularitySpec(@Nonnull TimeGranularitySpec outgoingGranularitySpec) {
+    Preconditions.checkNotNull(outgoingGranularitySpec);
+
+    _outgoingGranularitySpec = outgoingGranularitySpec;
+    super.setName(outgoingGranularitySpec.getName());
+    super.setDataType(outgoingGranularitySpec.getDataType());
   }
 
   @Override
