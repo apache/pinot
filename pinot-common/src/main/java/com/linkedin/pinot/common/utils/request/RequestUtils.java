@@ -16,6 +16,7 @@
 package com.linkedin.pinot.common.utils.request;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.FilterOperator;
@@ -108,11 +109,13 @@ public class RequestUtils {
     return q2;
   }
 
+  public static final Set<String> ALLOWED_AGGREGATION_FUNCTIONS = ImmutableSet.of("sum", "fasthll");
+
   /**
    * Returns true for the following, false otherwise:
    * - Query is not aggregation/group-by
    * - Segment does not contain star tree
-   * - The only aggregation function in the query should be sum or fasthll
+   * - The only aggregation function in the query should be in {@link #ALLOWED_AGGREGATION_FUNCTIONS}
    * - All group by columns and predicate columns are materialized
    * - Predicates do not contain any metric columns
    * - Query consists only of simple predicates, conjoined by AND.
@@ -156,22 +159,8 @@ public class RequestUtils {
     // We currently support only limited aggregations
     for (AggregationInfo aggregationInfo : aggregationsInfo) {
       String aggregationFunctionName = aggregationInfo.getAggregationType().toLowerCase();
-      switch (aggregationFunctionName) {
-        case "sum":
-          break;
-        case "fasthll":
-          String derivedColumn = extractDerivedColumn(aggregationInfo, starTreeMetadata);
-          if (derivedColumn == null) {
-            // If derivedColumn does not exist, which means we need to aggregate directly on original column,
-            // in that case, star tree can not be used since no generated star tree docs are available.
-            return false;
-          } else {
-            LOGGER.info("Performed rewriting to fasthll({})", derivedColumn);
-            aggregationInfo.getAggregationParams().put("column", derivedColumn);
-            break;
-          }
-        default:
-          return false;
+      if (!ALLOWED_AGGREGATION_FUNCTIONS.contains(aggregationFunctionName)) {
+        return false;
       }
     }
 
@@ -221,6 +210,36 @@ public class RequestUtils {
       }
     }
 
+    return true;
+  }
+
+  /**
+   * Must be called after a successful check of {@link #isFitForStarTreeIndex}
+   * @return true if no fasthll aggregation or rewriting successful, false otherwise
+   */
+  public static boolean performFastHllRewriting(SegmentMetadata segmentMetadata, BrokerRequest brokerRequest) {
+    List<AggregationInfo> aggregationsInfo = brokerRequest.getAggregationsInfo();
+    StarTreeMetadata starTreeMetadata = segmentMetadata.getStarTreeMetadata();
+    Map<AggregationInfo, String> fastHllAggregationInfoToDerivedColumnNameMap = new HashMap<>();
+    // Check if all fasthll derived columns exist
+    for (AggregationInfo aggregationInfo : aggregationsInfo) {
+      if (aggregationInfo.getAggregationType().toLowerCase().equals("fasthll")) {
+        String derivedColumn = extractDerivedColumn(aggregationInfo, starTreeMetadata);
+        if (derivedColumn == null) {
+          // If derivedColumn does not exist, which means we need to aggregate directly on original column,
+          // in that case, star tree can not be used since no generated star tree docs are available.
+          return false;
+        } else {
+          fastHllAggregationInfoToDerivedColumnNameMap.put(aggregationInfo, derivedColumn);
+        }
+      }
+    }
+    // Rewrite all fasthll derived columns
+    for (AggregationInfo aggregationInfo : fastHllAggregationInfoToDerivedColumnNameMap.keySet()) {
+      String derivedColumn = fastHllAggregationInfoToDerivedColumnNameMap.get(aggregationInfo);
+      LOGGER.info("Performed rewriting to fasthll({})", derivedColumn);
+      aggregationInfo.getAggregationParams().put("column", derivedColumn);
+    }
     return true;
   }
 
