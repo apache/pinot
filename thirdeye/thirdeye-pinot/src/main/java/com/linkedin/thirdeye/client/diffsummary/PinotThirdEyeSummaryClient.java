@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.client.diffsummary;
 
+import com.linkedin.thirdeye.datalayer.bao.WebappConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.hibernate.WebappConfigManagerImpl;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -31,7 +33,6 @@ import com.linkedin.thirdeye.dashboard.ThirdEyeDashboardConfiguration;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
 import com.linkedin.thirdeye.dashboard.views.diffsummary.Summary;
-import com.linkedin.thirdeye.db.dao.WebappConfigDAO;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 
@@ -320,7 +321,7 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
     String persistenceConfig = thirdEyeConfigDir + "/persistence.yml";
     File configFile = new File(persistenceConfig);
     PersistenceUtil.init(configFile);
-    WebappConfigDAO webappConfigDAO = PersistenceUtil.getInstance(WebappConfigDAO.class);
+    WebappConfigManager webappConfigDAO = PersistenceUtil.getInstance(WebappConfigManagerImpl.class);
 
     ThirdEyeConfiguration thirdEyeConfig = new ThirdEyeDashboardConfiguration();
     thirdEyeConfig.setWhitelistCollections(collection);
