@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
+import com.linkedin.thirdeye.constant.MetricAggFunction;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URLDecoder;
@@ -345,7 +346,7 @@ public class DashboardResource {
 
     request.setCollection(collection);
     List<MetricExpression> metricExpressions =
-        Utils.convertToMetricExpressions(metricsJson, collection);
+        Utils.convertToMetricExpressions(metricsJson, MetricAggFunction.SUM, collection);
     request.setMetricExpressions(metricExpressions);
     long maxDataTime = collectionMaxDataTimeCache.get(collection);
     if (currentEnd > maxDataTime) {
@@ -396,7 +397,7 @@ public class DashboardResource {
     request.setCollection(collection);
 
     List<MetricExpression> metricExpressions =
-        Utils.convertToMetricExpressions(metricsJson, collection);
+        Utils.convertToMetricExpressions(metricsJson, MetricAggFunction.SUM, collection);
     request.setMetricExpressions(metricExpressions);
     long maxDataTime = collectionMaxDataTimeCache.get(collection);
     if (currentEnd > maxDataTime) {
@@ -448,7 +449,7 @@ public class DashboardResource {
     request.setCollection(collection);
 
     List<MetricExpression> metricExpressions =
-        Utils.convertToMetricExpressions(metricsJson, collection);
+        Utils.convertToMetricExpressions(metricsJson, MetricAggFunction.SUM, collection);
     request.setMetricExpressions(metricExpressions);
     long maxDataTime = collectionMaxDataTimeCache.get(collection);
     if (currentEnd > maxDataTime) {
@@ -511,7 +512,7 @@ public class DashboardResource {
       request.setFilterSet(ThirdEyeUtils.convertToMultiMap(filterJson));
     }
     List<MetricExpression> metricExpressions =
-        Utils.convertToMetricExpressions(metricsJson, collection);
+        Utils.convertToMetricExpressions(metricsJson, MetricAggFunction.SUM, collection);
     request.setMetricExpressions(metricExpressions);
     request.setAggregationTimeGranularity(Utils.getAggregationTimeGranularity(aggTimeGranularity));
     CollectionSchema collectionSchema = CACHE_REGISTRY_INSTANCE.getCollectionSchemaCache().get(collection);

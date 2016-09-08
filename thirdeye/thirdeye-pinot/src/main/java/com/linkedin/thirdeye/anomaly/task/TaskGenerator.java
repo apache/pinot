@@ -29,7 +29,7 @@ public class TaskGenerator {
   private static Logger LOG = LoggerFactory.getLogger(TaskGenerator.class);
 
   public List<DetectionTaskInfo> createDetectionTasks(DetectionJobContext detectionJobContext)
-      throws Exception{
+      throws Exception {
 
     List<DetectionTaskInfo> tasks = new ArrayList<>();
     AnomalyFunctionDTO anomalyFunctionSpec = detectionJobContext.getAnomalyFunctionSpec();

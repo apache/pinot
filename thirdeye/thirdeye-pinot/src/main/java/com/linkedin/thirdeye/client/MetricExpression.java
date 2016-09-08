@@ -22,6 +22,7 @@ public class MetricExpression {
 
   private String expressionName;
   private String expression;
+  private MetricAggFunction aggFunction = MetricAggFunction.SUM;
 
   public MetricExpression() {
 
@@ -32,8 +33,17 @@ public class MetricExpression {
   }
 
   public MetricExpression(String expressionName, String expression) {
+    this(expressionName, expression, MetricAggFunction.SUM);
+  }
+
+  public MetricExpression(String expressionName, String expression, MetricAggFunction aggFunction) {
     this.expressionName = expressionName;
     this.expression = expression;
+    this.aggFunction = aggFunction;
+  }
+
+  public void setAggFunction(MetricAggFunction aggFunction) {
+    this.aggFunction = aggFunction;
   }
 
   public String getExpressionName() {
@@ -72,10 +82,10 @@ public class MetricExpression {
 
       ArrayList<MetricFunction> metricFunctions = new ArrayList<>();
       for (String metricName : metricNames) {
-        if(metricName.equals(COUNT_METRIC_ESCAPED)){
+        if (metricName.equals(COUNT_METRIC_ESCAPED)) {
           metricName = COUNT_METRIC;
         }
-        metricFunctions.add(new MetricFunction(MetricAggFunction.SUM, metricName));
+        metricFunctions.add(new MetricFunction(aggFunction, metricName));
       }
       return metricFunctions;
     } catch (ParseException e) {

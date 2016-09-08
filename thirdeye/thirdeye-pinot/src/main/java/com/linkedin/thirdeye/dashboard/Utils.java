@@ -144,9 +144,8 @@ public class Utils {
     return dashboards;
   }
 
-
   public static List<MetricExpression> convertToMetricExpressions(String metricsJson,
-      String collection) {
+      MetricAggFunction aggFunction, String collection) {
 
     CollectionConfig collectionConfig = null;
     try {
@@ -165,25 +164,26 @@ public class Utils {
 
       metricExpressionNames = OBJECT_MAPPER.readValue(metricsJson, valueTypeRef);
     } catch (Exception e) {
-      LOG.error("Error parsing metrics json: {} errorMessage:{}", metricsJson, e.getMessage());
+      LOG.warn("Expected json expression for metric [{}], adding as it is. Error in json parsing : [{}]", metricsJson, e.getMessage());
       metricExpressionNames = new ArrayList<>();
       String[] metrics = metricsJson.split(",");
       for (String metric : metrics) {
-        metricExpressionNames.add(metric);
+        metricExpressionNames.add(metric.trim());
       }
     }
     for (String metricExpressionName : metricExpressionNames) {
+      MetricExpression metricExpression;
       if (collectionConfig != null && collectionConfig.getDerivedMetrics() != null
           && collectionConfig.getDerivedMetrics().containsKey(metricsJson)) {
         String metricExpressionString =
             collectionConfig.getDerivedMetrics().get(metricExpressionName);
-        metricExpressions.add(new MetricExpression(metricExpressionName, metricExpressionString));
+        metricExpression = new MetricExpression(metricExpressionName, metricExpressionString, aggFunction);
       } else {
-        metricExpressions.add(new MetricExpression(metricExpressionName));
+        metricExpression = new MetricExpression(metricExpressionName);
+        metricExpression.setAggFunction(aggFunction);
       }
-
+      metricExpressions.add(metricExpression);
     }
-
     return metricExpressions;
   }
 
