@@ -15,8 +15,6 @@
  */
 package com.linkedin.pinot.common.utils;
 
-import java.util.Arrays;
-import java.util.List;
 import org.apache.helix.HelixManager;
 import org.apache.helix.PropertyPathConfig;
 import org.apache.helix.PropertyType;
@@ -31,37 +29,23 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
  */
 public class ZkUtils {
   /**
-   * Returns a handle to the propertyStore, setting up a watch on all nodes under PROPERTYSTORE/clusterName, if
-   * setWatch is specified as true.
+   * Returns a handle to the propertyStore
    *
    * @param helixManager * A valid helix manager bound to a cluster.
    * @param clusterName The pathname under propertyStore that we want a handle for
-   * @param setWatch Must be set to true if it is desired to set up a watch on all nodes under the PROPERTYSTORE node.
    * @return A handle to the propertyStore.
    *
    * @note: Setting up a watch can lead to connection problems with zookeeper during a re-connect from the client. The
    * client ends up sending all the path names in the session request, and that can exceed the max size of a session
    * request if there are too many nodes, causing the connection to be dropped and retried (with the same parameters).
    */
-  public static ZkHelixPropertyStore<ZNRecord> getZkPropertyStore(HelixManager helixManager, String clusterName, boolean setWatch) {
+  public static ZkHelixPropertyStore<ZNRecord> getZkPropertyStore(HelixManager helixManager, String clusterName) {
     ZkBaseDataAccessor<ZNRecord> baseAccessor =
         (ZkBaseDataAccessor<ZNRecord>) helixManager.getHelixDataAccessor().getBaseDataAccessor();
     String propertyStorePath = PropertyPathConfig.getPath(PropertyType.PROPERTYSTORE, clusterName);
 
-    List<String> watchList = null;
-    if (setWatch) {
-      watchList = Arrays.asList(propertyStorePath);
-    }
-
-    ZkHelixPropertyStore<ZNRecord> propertyStore = new ZkHelixPropertyStore<ZNRecord>(baseAccessor, propertyStorePath, watchList);
+    ZkHelixPropertyStore<ZNRecord> propertyStore = new ZkHelixPropertyStore<ZNRecord>(baseAccessor, propertyStorePath, null);
 
     return propertyStore;
-  }
-
-  /*
-   * This method gets a handle to the propertystore without creating a watch on the children.
-   */
-  public static ZkHelixPropertyStore<ZNRecord> getZkPropertyStore(HelixManager helixManager, String clusterName) {
-    return getZkPropertyStore(helixManager, clusterName, false);
   }
 }

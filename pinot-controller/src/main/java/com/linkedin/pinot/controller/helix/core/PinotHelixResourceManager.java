@@ -156,7 +156,7 @@ public class PinotHelixResourceManager {
     _helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(_zkBaseUrl);
     _helixZkManager = HelixSetupUtils.setup(_helixClusterName, _helixZkURL, _instanceId, _isUpdateStateModel);
     _helixAdmin = _helixZkManager.getClusterManagmentTool();
-    _propertyStore = ZkUtils.getZkPropertyStore(_helixZkManager, _helixClusterName, false /* No recursive Watches */);
+    _propertyStore = ZkUtils.getZkPropertyStore(_helixZkManager, _helixClusterName);
     _helixDataAccessor = _helixZkManager.getHelixDataAccessor();
     _keyBuilder = _helixDataAccessor.keyBuilder();
     _segmentDeletionManager = new SegmentDeletionManager(_localDiskDir, _helixAdmin, _helixClusterName, _propertyStore);
