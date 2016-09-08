@@ -119,7 +119,7 @@ public class SelectionOperatorService {
       _doOrdering = true;
     }
     _sortSequence = selections.getSelectionSortSequence();
-    _selectionColumns = SelectionOperatorUtils.getSelectionColumns(selections.getSelectionColumns(), dataSchema);
+    _selectionColumns = SelectionOperatorUtils.getSelectionColumns(selections, dataSchema);
     _selectionSize = selections.getSize();
     _selectionOffset = selections.getOffset();
     _maxRowSize = _selectionOffset + _selectionSize;

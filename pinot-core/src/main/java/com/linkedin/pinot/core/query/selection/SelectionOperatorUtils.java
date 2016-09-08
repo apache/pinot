@@ -92,7 +92,8 @@ public class SelectionOperatorUtils {
         new DecimalFormat("####################.##########", DecimalFormatSymbols.getInstance(Locale.US)));
   }
 
-  public static List<String> getSelectionColumns(List<String> selectionColumns, DataSchema dataSchema) {
+  public static List<String> getSelectionColumns(Selection selection, DataSchema dataSchema) {
+    List<String> selectionColumns = selection.getSelectionColumns();
     if ((selectionColumns.size() == 1) && selectionColumns.get(0).equals("*")) {
       final List<String> newSelectionColumns = new ArrayList<String>();
       for (int i = 0; i < dataSchema.size(); ++i) {
@@ -148,12 +149,12 @@ public class SelectionOperatorUtils {
     return rowEventsSet;
   }
 
-  public static JSONObject render(Collection<Serializable[]> finalResults, List<String> selectionColumns,
+  public static JSONObject render(Collection<Serializable[]> finalResults, Selection selection,
       DataSchema dataSchema)
       throws Exception {
     final LinkedList<JSONArray> rowEventsJSonList = new LinkedList<JSONArray>();
     List<Serializable[]> list = (List<Serializable[]>) finalResults;
-    selectionColumns = getSelectionColumns(selectionColumns, dataSchema);
+    List<String> selectionColumns = getSelectionColumns(selection, dataSchema);
     for (int i = 0; i < list.size(); i++) {
       rowEventsJSonList.add(getJSonArrayFromRow(list.get(i), selectionColumns, dataSchema));
     }
@@ -168,18 +169,18 @@ public class SelectionOperatorUtils {
    * object, to be used in building the BrokerResponse.
    *
    * @param reducedResults
-   * @param selectionColumns
+   * @param selection
    * @param dataSchema
    * @return
    * @throws Exception
    */
   public static SelectionResults renderSelectionResults(Collection<Serializable[]> reducedResults,
-      List<String> selectionColumns, DataSchema dataSchema)
+      Selection selection, DataSchema dataSchema)
       throws Exception {
     List<Serializable[]> rowData = (List<Serializable[]>) reducedResults;
     List<Serializable[]> rows = new ArrayList<Serializable[]>();
 
-    selectionColumns = getSelectionColumns(selectionColumns, dataSchema);
+    List<String> selectionColumns = getSelectionColumns(selection, dataSchema);
 
     for (int i = 0; i < rowData.size(); i++) {
       rows.add(getFormattedRow(rowData.get(i), selectionColumns, dataSchema));

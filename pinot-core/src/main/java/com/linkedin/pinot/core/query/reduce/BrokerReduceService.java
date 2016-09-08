@@ -170,8 +170,7 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
               SelectionOperatorUtils.reduce(instanceResponseMap, brokerRequest.getSelections().getSize());
 
           return SelectionOperatorUtils
-              .renderSelectionResults(reduceResult, brokerRequest.getSelections().getSelectionColumns(),
-                  dt.getDataSchema());
+              .renderSelectionResults(reduceResult, brokerRequest.getSelections(), dt.getDataSchema());
         }
       } else {
         return null;

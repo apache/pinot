@@ -243,7 +243,7 @@ public class SelectionOnlyQueriesTest {
         SelectionOperatorUtils.extractSelectionRelatedColumns(brokerRequest.getSelections(), _indexSegment);
     DataSchema dataSchema = resultBlock.getSelectionDataSchema();
 
-    final JSONObject jsonResult = SelectionOperatorUtils.render(reducedResults, selectionColumns, dataSchema);
+    final JSONObject jsonResult = SelectionOperatorUtils.render(reducedResults, brokerRequest.getSelections(), dataSchema);
     System.out.println(jsonResult);
     return jsonResult;
   }

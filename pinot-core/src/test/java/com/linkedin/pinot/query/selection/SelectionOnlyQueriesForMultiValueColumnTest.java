@@ -212,7 +212,7 @@ public class SelectionOnlyQueriesForMultiValueColumnTest {
     List<String> selectionColumns =
         SelectionOperatorUtils.extractSelectionRelatedColumns(brokerRequest.getSelections(), _indexSegment);
     DataSchema dataSchema = resultBlock.getSelectionDataSchema();
-    final JSONObject jsonResult = SelectionOperatorUtils.render(reducedResults, selectionColumns, dataSchema);
+    final JSONObject jsonResult = SelectionOperatorUtils.render(reducedResults, brokerRequest.getSelections(), dataSchema);
     System.out.println(jsonResult);
     JsonAssert
         .assertEqualsIgnoreOrder(
@@ -262,7 +262,7 @@ public class SelectionOnlyQueriesForMultiValueColumnTest {
     List<String> selectionColumns =
         SelectionOperatorUtils.extractSelectionRelatedColumns(brokerRequest.getSelections(), _indexSegment);
     DataSchema dataSchema = resultBlock.getSelectionDataSchema();
-    final JSONObject jsonResult = SelectionOperatorUtils.render(reducedResults, selectionColumns, dataSchema);
+    final JSONObject jsonResult = SelectionOperatorUtils.render(reducedResults, brokerRequest.getSelections(), dataSchema);
     System.out.println(jsonResult);
     JsonAssert
         .assertEqualsIgnoreOrder(
