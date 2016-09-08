@@ -2,7 +2,7 @@ package com.linkedin.thirdeye.datalayer.entity;
 
 import java.util.List;
 
-public abstract class AbstractMappingEntity<P extends AbstractEntity, Q extends AbstractEntity> {
+public abstract class AbstractMappingEntity<P extends AbstractJsonEntity, Q extends AbstractJsonEntity> {
   List<P> ps;
   List<Q> qs;
 

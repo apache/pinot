@@ -1,5 +1,24 @@
 -- drop database thirdeye_test; create database thirdeye_test; use thirdeye_test;
 
+create table if not exists generic_json_entity (
+    id bigint(20) primary key auto_increment,
+    json_val text,
+    create_time timestamp,
+    update_time timestamp default current_timestamp,
+    beanClass varchar(200),
+    version int(10)
+) ENGINE=InnoDB;
+
+create table if not exists anomaly_function_index_entity (
+    function_name varchar(200) not null,
+    active boolean,
+    metric_id bigint(20) not null,
+    collection varchar(200),
+    metric varchar(200),
+    base_id bigint(20) not null 
+) ENGINE=InnoDB;
+
+
 create table if not exists metric (
     id bigint(20) primary key auto_increment,
     name varchar(200) not null,
@@ -8,17 +27,9 @@ create table if not exists metric (
     dimension_as_metric boolean default false,
     json_val text
 ) ENGINE=InnoDB;
+create index if not exists anomaly_function_index_entity on metric(name);
 
-create table if not exists anomaly_function (
-    id bigint(20) primary key auto_increment,
-    name varchar(200) not null,
-    active boolean,
-    metric_id bigint(20) not null,
-    collection varchar(200),
-    metric varchar(200),
-    json_val text
-) ENGINE=InnoDB;
-create index if not exists anomaly_function_metric_idx on metric(id);
+
 
 create table if not exists anomaly_merge_config (
     id bigint(20) primary key auto_increment,
@@ -29,8 +40,6 @@ create table if not exists anomaly_merge_config (
 create table if not exists anomaly_function_anomaly_merge_config_mapping(
     anomaly_function_id bigint(20),
     anomaly_merge_config_id bigint(20),
-    foreign key (anomaly_function_id) references anomaly_function(id),
-    foreign key (anomaly_merge_config_id) references anomaly_merge_config(id)
 ) ENGINE=InnoDB;
 
 create table if not exists email_configuration (
@@ -43,8 +52,6 @@ create table if not exists email_configuration (
 create table if not exists email_configuration_anomaly_function_mapping (
     email_configuration_id bigint(20),
     anomaly_function_id bigint(20),
-    foreign key (email_configuration_id) references email_configuration(id),
-    foreign key (anomaly_function_id) references anomaly_function(id)
 ) ENGINE=InnoDB;
 
 create table if not exists job (

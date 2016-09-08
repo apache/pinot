@@ -13,12 +13,13 @@ import java.util.Set;
 import javax.sql.DataSource;
 
 import com.google.inject.Inject;
+import com.linkedin.thirdeye.datalayer.entity.AbstractEntity;
 import com.linkedin.thirdeye.datalayer.entity.AbstractJsonEntity;
 import com.linkedin.thirdeye.datalayer.util.GenericResultSetMapper;
 import com.linkedin.thirdeye.datalayer.util.Predicate;
 import com.linkedin.thirdeye.datalayer.util.SqlQueryBuilder;
 
-public class AbstractBaseDAO<E extends AbstractJsonEntity> {
+public class AbstractBaseDAO<E extends AbstractEntity> {
 
   final Class<E> entityClass;
 
@@ -182,7 +183,7 @@ public class AbstractBaseDAO<E extends AbstractJsonEntity> {
     }, 0);
   }
 
-  interface QueryTask<T> {
+  private static interface QueryTask<T> {
     T handle(Connection connection) throws Exception;
   }
 

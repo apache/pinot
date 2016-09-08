@@ -24,6 +24,7 @@ public class EntityMappingHolder {
 
   public void register(Connection connection, Class<? extends AbstractEntity> entityClass,
       String tableName) throws Exception {
+    System.out.println("GENERATING MAPPING FOR TABLE:" + tableName);
     DatabaseMetaData databaseMetaData = connection.getMetaData();
     String catalog = null;
     String schemaPattern = null;
@@ -45,11 +46,12 @@ public class EntityMappingHolder {
     }
     List<Field> fields = new ArrayList<>();
     getAllFields(fields, entityClass);
-    for (Field field : fields) {
-      field.setAccessible(true);
-      String entityColumn = field.getName();
-      for (String dbColumn : columnInfoMap.keySet()) {
-        boolean success = false;
+    for (String dbColumn : columnInfoMap.keySet()) {
+
+      boolean success = false;
+      for (Field field : fields) {
+        field.setAccessible(true);
+        String entityColumn = field.getName();
         if (dbColumn.toLowerCase().equals(entityColumn.toLowerCase())) {
           success = true;
         }
@@ -63,8 +65,14 @@ public class EntityMappingHolder {
           columnInfoMap.get(dbColumn).field = field;
           System.out.println("Mapped " + dbColumn + " to " + entityColumn);
           columnMappingPerTable.get(tableName).put(dbColumn, entityColumn);
+          break;
         }
       }
+      if (!success) {
+        System.out.println(
+            "Unable to map " + dbColumn + " to any field in " + entityClass.getSimpleName());
+      }
+
     }
     columnInfoPerTable.put(tableName, columnInfoMap);
   }
@@ -78,6 +86,7 @@ public class EntityMappingHolder {
   }
 
 }
+
 
 class ColumnInfo {
   String columnNameInDB;

@@ -1,13 +1,20 @@
 package com.linkedin.thirdeye.datalayer.entity;
 
+import java.sql.Timestamp;
+
 /**
  * Abstract superclass for entities with an id of type long.
  */
 public abstract class AbstractEntity {
   protected Long id;
 
-  protected AbstractEntity() {
-  }
+  protected Timestamp createTime;
+
+  protected Timestamp updateTime;
+
+  protected int version;
+
+  protected AbstractEntity() {}
 
   protected AbstractEntity(Long id) {
     this.id = id;
@@ -21,7 +28,32 @@ public abstract class AbstractEntity {
     this.id = id;
   }
 
-  @Override public boolean equals(Object o) {
+  public Timestamp getCreateTime() {
+    return createTime;
+  }
+
+  public void setCreateTime(Timestamp createTime) {
+    this.createTime = createTime;
+  }
+
+  public Timestamp getUpdateTime() {
+    return updateTime;
+  }
+
+  public void setUpdateTime(Timestamp updateTime) {
+    this.updateTime = updateTime;
+  }
+
+  public int getVersion() {
+    return version;
+  }
+
+  public void setVersion(int version) {
+    this.version = version;
+  }
+
+  @Override
+  public boolean equals(Object o) {
     if (this == o) {
       return true;
     }
@@ -36,7 +68,8 @@ public abstract class AbstractEntity {
     return true;
   }
 
-  @Override public int hashCode() {
+  @Override
+  public int hashCode() {
     return id != null ? id.hashCode() : 0;
   }
 }

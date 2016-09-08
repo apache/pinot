@@ -14,14 +14,8 @@ import com.google.inject.Injector;
 import com.google.inject.Provides;
 import com.linkedin.thirdeye.common.persistence.PersistenceConfig;
 import com.linkedin.thirdeye.common.persistence.PersistenceUtil;
-import com.linkedin.thirdeye.datalayer.entity.AnomalyFeedback;
-import com.linkedin.thirdeye.datalayer.entity.AnomalyFunction;
-import com.linkedin.thirdeye.datalayer.entity.MergedAnomalyResult;
-import com.linkedin.thirdeye.datalayer.entity.RawAnomalyResult;
-import com.linkedin.thirdeye.datalayer.entity.EmailConfiguration;
-import com.linkedin.thirdeye.datalayer.entity.Job;
-import com.linkedin.thirdeye.datalayer.entity.Task;
-import com.linkedin.thirdeye.datalayer.entity.WebappConfig;
+import com.linkedin.thirdeye.datalayer.entity.AnomalyFunctionIndexEntity;
+import com.linkedin.thirdeye.datalayer.entity.GenericJsonEntity;
 
 import io.dropwizard.configuration.ConfigurationFactory;
 import io.dropwizard.jackson.Jackson;
@@ -72,14 +66,18 @@ public abstract class DaoProviderUtil {
       this.dataSource = dataSource;
       entityMappingHolder = new EntityMappingHolder();
       try (Connection conn = dataSource.getConnection()) {
-        entityMappingHolder.register(conn, AnomalyFeedback.class, convertCamelCaseToUnderscore(AnomalyFeedback.class.getName()));
-        entityMappingHolder.register(conn, AnomalyFunction.class, convertCamelCaseToUnderscore(AnomalyFunction.class.getName()));
-        entityMappingHolder.register(conn, Job.class, convertCamelCaseToUnderscore(Job.class.getName()));
-        entityMappingHolder.register(conn, MergedAnomalyResult.class, convertCamelCaseToUnderscore(MergedAnomalyResult.class.getName()));
-        entityMappingHolder.register(conn, RawAnomalyResult.class, convertCamelCaseToUnderscore(RawAnomalyResult.class.getName()));
-        entityMappingHolder.register(conn, Task.class, convertCamelCaseToUnderscore(Task.class.getName()));
-        entityMappingHolder.register(conn, EmailConfiguration.class, convertCamelCaseToUnderscore(EmailConfiguration.class.getName()));
-        entityMappingHolder.register(conn, WebappConfig.class, convertCamelCaseToUnderscore(WebappConfig.class.getName()));
+//        entityMappingHolder.register(conn, AnomalyFeedback.class, convertCamelCaseToUnderscore(AnomalyFeedback.class.getName()));
+//        entityMappingHolder.register(conn, AnomalyFunction.class, convertCamelCaseToUnderscore(AnomalyFunction.class.getName()));
+//        entityMappingHolder.register(conn, Job.class, convertCamelCaseToUnderscore(Job.class.getName()));
+//        entityMappingHolder.register(conn, MergedAnomalyResult.class, convertCamelCaseToUnderscore(MergedAnomalyResult.class.getName()));
+//        entityMappingHolder.register(conn, RawAnomalyResult.class, convertCamelCaseToUnderscore(RawAnomalyResult.class.getName()));
+//        entityMappingHolder.register(conn, Task.class, convertCamelCaseToUnderscore(Task.class.getName()));
+//        entityMappingHolder.register(conn, EmailConfiguration.class, convertCamelCaseToUnderscore(EmailConfiguration.class.getName()));
+//        entityMappingHolder.register(conn, WebappConfig.class, convertCamelCaseToUnderscore(WebappConfig.class.getName()));
+        
+      entityMappingHolder.register(conn, GenericJsonEntity.class, "GENERIC_JSON_ENTITY");
+      entityMappingHolder.register(conn, AnomalyFunctionIndexEntity.class, "ANOMALY_FUNCTION_INDEX_ENTITY");
+
       } catch (Exception e) {
         throw new RuntimeException(e);
       }

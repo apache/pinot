@@ -1,4 +1,6 @@
 SET FOREIGN_KEY_CHECKS = 0;
+drop table if EXISTS generic_json_entity;
+drop TABLE if EXISTS anomaly_function_index_entity;
 drop table if EXISTS metric;
 DROP TABLE if EXISTS email_configuration_anomaly_function_mapping;
 DROP TABLE if EXISTS anomaly_function_anomaly_merge_config_mapping;
