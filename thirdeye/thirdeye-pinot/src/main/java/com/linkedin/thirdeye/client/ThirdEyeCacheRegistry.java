@@ -184,6 +184,19 @@ public class ThirdEyeCacheRegistry {
     cacheResource.refreshDimensionFiltersCache();
     cacheResource.refreshDashboardsCache();
 
+    ScheduledExecutorService minuteService = Executors.newSingleThreadScheduledExecutor();
+    minuteService.scheduleAtFixedRate(new Runnable() {
+
+      @Override
+      public void run() {
+        try {
+          cacheResource.refreshMaxDataTimeCache();
+        } catch (Exception e) {
+          LOGGER.error("Exception while loading collections", e);
+        }
+      }
+    }, 5, 5, TimeUnit.MINUTES);
+
     ScheduledExecutorService hourlyService = Executors.newSingleThreadScheduledExecutor();
     hourlyService.scheduleAtFixedRate(new Runnable() {
 
@@ -191,7 +204,6 @@ public class ThirdEyeCacheRegistry {
       public void run() {
         try {
           cacheResource.refreshCollections();
-          cacheResource.refreshMaxDataTimeCache();
         } catch (Exception e) {
           LOGGER.error("Exception while loading collections", e);
         }
