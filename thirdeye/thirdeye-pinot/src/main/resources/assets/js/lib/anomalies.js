@@ -25,12 +25,26 @@ function getAnomalies(tab) {
         urlParams += hash.filter ? "&filters=" + hash.filters : "";
         urlParams += hash.hasOwnProperty("anomalyFunctionId")  ?   "&id=" + hash.anomalyFunctionId : "";
 
-    var anomaliesUrl = "/dashboard/anomalies/view?" + urlParams;
+    if(window.datasetConfig.anomalyMetricList && window.datasetConfig.anomalyMetricList.indexOf(metrics)> -1){
+        var anomaliesUrl = "/dashboard/anomalies/view?" + urlParams;
+        //AJAX for data
+        getData(anomaliesUrl).done(function (anomalyData) {
+            anomaliesDisplayData = anomalyData;
+            getTimeseriesData(anomaliesDisplayData)
 
-    //AJAX for data
-    getData(anomaliesUrl).done(function (anomalyData) {
-        anomaliesDisplayData = anomalyData;
+        });
+
+    }else{
+        getTimeseriesData();
+    }
+
+    function getTimeseriesData(anomalyData) {
+        if(anomalyData){
+            var anomalyMetric = true;
+        }
+        var  anomalyData = anomalyData || [];
         getData(timeSeriesUrl).done(function (timeSeriesData) {
+
             timeseriesDisplayData = timeSeriesData;
             //Error handling when data is falsy (empty, undefined or null)
             if (!timeSeriesData) {
@@ -44,16 +58,44 @@ function getAnomalies(tab) {
                 $("#" + tab + "-chart-area-error").hide();
                 $("#" + tab + "-display-chart-section").empty();
             }
-            var placeholder= "linechart-placeholder"
+            var placeholder = "linechart-placeholder"
             renderAnomalyLineChart(timeSeriesData, anomalyData, tab, placeholder);
-            renderAnomalyTable(anomalyData, tab);
+
+            if (anomalyMetric) {
+                $(".anomaly-metric-tip").hide();
+                renderAnomalyTable(anomalyData, tab);
+            }else{
+                tipToUser()
+            }
 
             //anomalyFunctionId is only present in hash when anomaly
             // function run adhoc was requested on self service tab
             //needs to be removed to be able to view other functions in later queries on the anomalies view
             delete hash.anomalyFunctionId
         });
-    });
+    }
+
+    function tipToUser() {
+        var tipToUser = document.createElement("div");
+        tipToUser.id = "anomaly-metric-tip";
+        tipToUser.className = "tip-to-user uk-alert uk-form-row";
+        tipToUser.setAttribute("data-tip-source", "not-anomaly-metric");
+        var closeIcon = document.createElement("i");
+        closeIcon.className = "close-parent uk-icon-close";
+        var msg = document.createElement("p");
+        msg.innerText = "There is no anomaly monitoring function set up for this metric. You can create a function on the"
+        var link = document.createElement("a");
+        link.id = "link-to-self-service";
+        link.innerText = "Self Service tab.";
+        link.setAttribute("href", "/dashboard#dataset="+ hash.dataset +"&view=self-service")
+
+        msg.appendChild(link);
+        tipToUser.appendChild(closeIcon);
+        tipToUser.appendChild(msg);
+        $("#" + tab + "-display-chart-section").append(tipToUser)
+
+    }
+
 }
 
 function renderAnomalyLineChart(timeSeriesData, anomalyData, tab, placeholder) {

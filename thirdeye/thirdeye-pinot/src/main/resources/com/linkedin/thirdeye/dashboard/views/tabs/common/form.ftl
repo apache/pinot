@@ -48,7 +48,7 @@
                     <div id="selected-metric" class="uk-button">Select metric</div>
                     <button class="add-single-metric-btn uk-button uk-button-primary" type="button"><i class="uk-icon-caret-down"></i></button>
                     <div class="uk-dropdown uk-dropdown-small">
-                        <ul class="single-metric-list uk-nav uk-nav-dropdown single-select">
+                        <ul class="metric-list single-metric-list uk-nav uk-nav-dropdown single-select">
                         </ul>
                     </div>
                 </div>

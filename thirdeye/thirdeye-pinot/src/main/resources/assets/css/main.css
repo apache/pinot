@@ -87,8 +87,11 @@ body a{
 
 .tip-to-user{
     position: relative;
-    pxfont-size: 0.75em;
     z-index: 5;
+}
+
+.tip-to-user p{
+  margin-top:0;
 }
 
 .close-parent{
@@ -866,6 +869,12 @@ body a{
 
 #anomalies-display-chart-area .timeseries-legend-sub-box{
     max-height: 250px;
+}
+
+#link-to-self-service{
+    cursor: pointer;
+    color: #2d7091;
+    text-decoration: underline;
 }
 
 #anomalies-table{
