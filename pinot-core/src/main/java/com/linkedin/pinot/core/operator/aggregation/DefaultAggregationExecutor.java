@@ -137,9 +137,8 @@ public class DefaultAggregationExecutor implements AggregationExecutor {
         break;
 
       case AggregationFunctionFactory.FASTHLL_AGGREGATION_FUNCTION:
-        String derivedColumn = _segmentMetadata.getStarTreeMetadata().getDerivedHllColumnFromOrigin(aggrColumn);
         aggregationFunction.aggregate(length, resultHolder,
-            (Object) _singleValueBlockCache.getStringValueArrayForColumn(derivedColumn));
+            (Object) _singleValueBlockCache.getStringValueArrayForColumn(aggrColumn));
         break;
 
       default:

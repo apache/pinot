@@ -15,7 +15,13 @@
  */
 package com.linkedin.pinot.common.utils.request;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
+import com.linkedin.pinot.common.request.AggregationInfo;
+import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.request.FilterOperator;
+import com.linkedin.pinot.common.request.FilterQuery;
+import com.linkedin.pinot.common.request.FilterQueryMap;
 import com.linkedin.pinot.common.request.GroupBy;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.StarTreeMetadata;
@@ -25,15 +31,15 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
-import com.linkedin.pinot.common.request.AggregationInfo;
-import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.request.FilterOperator;
-import com.linkedin.pinot.common.request.FilterQuery;
-import com.linkedin.pinot.common.request.FilterQueryMap;
+import javax.annotation.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class RequestUtils {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(RequestUtils.class);
+
   /**
    * Generates thrift compliant filterQuery and populate it in the broker request
    * @param filterQueryTree
@@ -206,4 +212,43 @@ public class RequestUtils {
 
     return true;
   }
+
+  /**
+   * Must be called after a successful check of {@link #isFitForStarTreeIndex}
+   * @return true if no fasthll aggregation or rewriting successful, false otherwise
+   */
+  public static boolean performFastHllRewriting(SegmentMetadata segmentMetadata, BrokerRequest brokerRequest) {
+    List<AggregationInfo> aggregationsInfo = brokerRequest.getAggregationsInfo();
+    StarTreeMetadata starTreeMetadata = segmentMetadata.getStarTreeMetadata();
+    Map<AggregationInfo, String> fastHllAggregationInfoToDerivedColumnNameMap = new HashMap<>();
+    // Check if all fasthll derived columns exist
+    for (AggregationInfo aggregationInfo : aggregationsInfo) {
+      if (aggregationInfo.getAggregationType().toLowerCase().equals("fasthll")) {
+        String derivedColumn = extractDerivedColumn(aggregationInfo, starTreeMetadata);
+        if (derivedColumn == null) {
+          // If derivedColumn does not exist, which means we need to aggregate directly on original column,
+          // in that case, star tree can not be used since no generated star tree docs are available.
+          return false;
+        } else {
+          fastHllAggregationInfoToDerivedColumnNameMap.put(aggregationInfo, derivedColumn);
+        }
+      }
+    }
+    // Rewrite all fasthll derived columns
+    for (AggregationInfo aggregationInfo : fastHllAggregationInfoToDerivedColumnNameMap.keySet()) {
+      String derivedColumn = fastHllAggregationInfoToDerivedColumnNameMap.get(aggregationInfo);
+      LOGGER.info("Performed rewriting to fasthll({})", derivedColumn);
+      aggregationInfo.getAggregationParams().put("column", derivedColumn);
+    }
+    return true;
+  }
+
+  @Nullable
+  private static String extractDerivedColumn(AggregationInfo aggregationInfo, StarTreeMetadata starTreeMetadata) {
+    String[] columns = aggregationInfo.getAggregationParams().get("column").trim().split(",");
+    Preconditions.checkArgument(columns.length == 1);
+    String aggrColumn = columns[0];
+    return starTreeMetadata.getDerivedHllColumnFromOrigin(aggrColumn);
+  }
+
 }
