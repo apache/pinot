@@ -18,7 +18,7 @@
             href="#">Timeseries</a></li>
         <li id="anomalies-header-tab" class="header-tab" rel="anomalies"><a href="#">Anomalies</a>
         </li>
-        <li id="anomalies-header-tab" class="header-tab" rel="self-service"><a href="#">Self
+        <li id="self-service-header-tab" class="header-tab" rel="self-service"><a href="#">Self
           Service</a></li>
         <li id="anomalies-header-tab2" class="header-tab" rel="anomalies2" class="uk-hidden"></li>
       </ul>
