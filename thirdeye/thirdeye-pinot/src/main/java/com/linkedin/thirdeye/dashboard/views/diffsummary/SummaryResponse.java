@@ -71,10 +71,12 @@ public class SummaryResponse {
     nodes = SummaryResponseTree.sortResponseTree(nodes, targetLevelCount);
     //   Build name tag for each row of responses
     Map<HierarchyNode, NameTag> nameTags = new HashMap<>();
+    Map<HierarchyNode, List<String>> otherDimensionValues = new HashMap<>();
     for (HierarchyNode node : nodes) {
       NameTag tag = new NameTag(targetLevelCount);
       nameTags.put(node, tag);
       tag.copyNames(node.getDimensionValues());
+      otherDimensionValues.put(node, new ArrayList<>());
     }
     //   pre-condition: parent node is processed before its children nodes
     for (HierarchyNode node : nodes) {
@@ -83,7 +85,17 @@ public class SummaryResponse {
       while ((parent = parent.getParent()) != null) {
         NameTag parentNameTag = nameTags.get(parent);
         if (parentNameTag != null) {
-          parentNameTag.setNotAll(node.getLevel()-levelDiff);
+          // Set tag from ALL to NOT_ALL String.
+          int notAllLevel = node.getLevel()-levelDiff;
+          parentNameTag.setNotAll(notAllLevel);
+          // For users' ease of understanding, we append what dimension values are excluded from NOT_ALL
+          StringBuilder sb = new StringBuilder();
+          String separator = "";
+          for (int i = notAllLevel; i < node.getDimensionValues().size(); ++i) {
+            sb.append(separator).append(node.getDimensionValues().get(i));
+            separator = ".";
+          }
+          otherDimensionValues.get(parent).add(sb.toString());
           break;
         }
         ++levelDiff;
@@ -100,6 +112,13 @@ public class SummaryResponse {
           computeContributionChange(row.baselineValue, row.currentValue, totalBaselineValue, totalCurrentValue);
       row.contributionToOverallChange =
           computeContributionToOverallChange(row.baselineValue, row.currentValue, totalBaselineValue);
+      StringBuilder sb = new StringBuilder();
+      String separator = "";
+      for (String s : otherDimensionValues.get(node)) {
+        sb.append(separator).append(s);
+        separator = ", ";
+      }
+      row.otherDimensionValues = sb.toString();
       response.responseRows.add(row);
     }
 

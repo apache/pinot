@@ -15,6 +15,7 @@ public class SummaryResponseRow {
   public String percentageChange;
   public String contributionChange;
   public String contributionToOverallChange;
+  public String otherDimensionValues;
 
   public String toString() {
     return ToStringBuilder.reflectionToString(this, ToStringStyle.SIMPLE_STYLE);

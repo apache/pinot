@@ -85,7 +85,7 @@
                 </div>
                 <div id="difference-summary-{{metricName}}" class="difference-summary uk-margin-bottom" data-metric="{{metricName}}">
                     <h3>Beta Feature: Outlier Summary</h3>
-                    <table id="heat-map-{{metricName}}-difference-summary-table">
+                    <table id="heat-map-{{metricName}}-difference-summary-table" style="width:100%;">
 
                         {{#with @root/summaryData}}
                         <thead>
@@ -103,11 +103,11 @@
                                 <th>{{dimensionName}}</th>
                             {{/each}}
                             {{/with}}
-                                <th>Baseline</th>
-                                <th>Current</th>
-                                <th>PercentageChange</th>
-                                <th>ContributionChange</th>
-                                <th>ContributionToOverallChange</th>
+                                <th class="summary-header">Baseline</th>
+                                <th class="summary-header">Current</th>
+                                <th class="summary-header thin-column">Percentage Change</th>
+                                <th class="summary-header thin-column">Contribution Change</th>
+                                <th class="summary-header thin-column">Contribution To Overall Change</th>
                         </tr>
                         </thead>
                         {{#with @root/summaryData/responseRows}}
