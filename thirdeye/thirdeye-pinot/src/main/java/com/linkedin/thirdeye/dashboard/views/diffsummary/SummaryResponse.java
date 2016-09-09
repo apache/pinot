@@ -17,6 +17,10 @@ import com.linkedin.thirdeye.client.diffsummary.HierarchyNode;
 
 public class SummaryResponse {
   private final static NumberFormat DOUBLE_FORMATTER = new DecimalFormat("#0.00");
+  private final static String INFINITE = "";
+
+  private static final String ALL = "";
+  private static final String NOT_ALL = "OTHER";
 
   @JsonProperty("dimensions")
   List<String> dimensions = new ArrayList<>();
@@ -103,18 +107,30 @@ public class SummaryResponse {
   }
 
   private static String computePercentageChange(double baseline, double current) {
-    double percentageChange = ((current - baseline) / baseline) * 100d;
-    return DOUBLE_FORMATTER.format(roundUp(percentageChange)) + "%";
+    if (baseline != 0d) {
+      double percentageChange = ((current - baseline) / baseline) * 100d;
+      return DOUBLE_FORMATTER.format(roundUp(percentageChange)) + "%";
+    } else {
+      return INFINITE;
+    }
   }
 
   private static String computeContributionChange(double baseline, double current, double totalBaseline, double totalCurrent) {
-    double contributionChange = ((current / totalCurrent) - (baseline / totalBaseline)) * 100d;
-    return DOUBLE_FORMATTER.format(roundUp(contributionChange)) + "%";
+    if (totalCurrent != 0d && totalBaseline != 0d) {
+      double contributionChange = ((current / totalCurrent) - (baseline / totalBaseline)) * 100d;
+      return DOUBLE_FORMATTER.format(roundUp(contributionChange)) + "%";
+    } else {
+      return INFINITE;
+    }
   }
 
   private static String computeContributionToOverallChange(double baseline, double current, double totalBaseline) {
-    double contributionToOverallChange = ((current - baseline) / (totalBaseline)) * 100d;
-    return DOUBLE_FORMATTER.format(roundUp(contributionToOverallChange)) + "%";
+    if (totalBaseline != 0d) {
+      double contributionToOverallChange = ((current - baseline) / (totalBaseline)) * 100d;
+      return DOUBLE_FORMATTER.format(roundUp(contributionToOverallChange)) + "%";
+    } else {
+      return INFINITE;
+    }
   }
 
   private static double roundUp(double number) {
@@ -131,9 +147,6 @@ public class SummaryResponse {
   }
 
   private static class NameTag {
-    private static final String ALL = "(ALL)";
-    private static final String NOT_ALL = "(ALL)-";
-
     private List<String> names;
 
     public NameTag(int levelCount) {

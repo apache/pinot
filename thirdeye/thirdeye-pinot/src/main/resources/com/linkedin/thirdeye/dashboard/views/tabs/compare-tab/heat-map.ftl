@@ -84,7 +84,7 @@
                     </table>
                 </div>
                 <div id="difference-summary-{{metricName}}" class="difference-summary uk-margin-bottom" data-metric="{{metricName}}">
-                    <h3>Outlier Summary</h3>
+                    <h3>Beta Feature: Outlier Summary</h3>
                     <table id="heat-map-{{metricName}}-difference-summary-table">
 
                         {{#with @root/summaryData}}
