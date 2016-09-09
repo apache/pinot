@@ -1,5 +1,8 @@
 package com.linkedin.thirdeye.anomaly.detection;
 
+import com.linkedin.pinot.pql.parsers.utils.Pair;
+import com.linkedin.thirdeye.client.timeseries.TimeSeriesRow;
+import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -31,7 +34,6 @@ import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
-import com.linkedin.thirdeye.detector.function.AnomalyFunction;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
@@ -52,8 +54,7 @@ public class DetectionTaskRunner implements TaskRunner {
   private DateTime windowStart;
   private DateTime windowEnd;
   private List<RawAnomalyResultDTO> knownAnomalies;
-  private int anomalyCounter;
-  private AnomalyFunction anomalyFunction;
+  private BaseAnomalyFunction anomalyFunction;
   private AnomalyFunctionDTO anomalyFunctionSpec;
   private AnomalyFunctionFactory anomalyFunctionFactory;
 
@@ -90,7 +91,8 @@ public class DetectionTaskRunner implements TaskRunner {
 
     CollectionSchema collectionSchema = null;
     try {
-      collectionSchema = CACHE_REGISTRY_INSTANCE.getCollectionSchemaCache().get(anomalyFunctionSpec.getCollection());
+      collectionSchema = CACHE_REGISTRY_INSTANCE.getCollectionSchemaCache()
+          .get(anomalyFunctionSpec.getCollection());
       collectionDimensions = collectionSchema.getDimensionNames();
     } catch (Exception e) {
       LOG.error("Exception when reading collection schema cache", e);
@@ -100,56 +102,62 @@ public class DetectionTaskRunner implements TaskRunner {
     knownAnomalies = getExistingAnomalies();
 
     // Seed request with top-level...
-    TimeSeriesRequest topLevelRequest = new TimeSeriesRequest();
-    topLevelRequest.setCollectionName(anomalyFunctionSpec.getCollection());
+    TimeSeriesRequest request = new TimeSeriesRequest();
+    request.setCollectionName(anomalyFunctionSpec.getCollection());
     List<MetricExpression> metricExpressions = Utils
         .convertToMetricExpressions(metricFunction.getMetricName(),
             anomalyFunctionSpec.getMetricFunction(), anomalyFunctionSpec.getCollection());
-    topLevelRequest.setMetricExpressions(metricExpressions);
-    topLevelRequest.setAggregationTimeGranularity(timeGranularity);
-    topLevelRequest.setStart(windowStart);
-    topLevelRequest.setEnd(windowEnd);
-    topLevelRequest.setEndDateInclusive(false);
+    request.setMetricExpressions(metricExpressions);
+    request.setAggregationTimeGranularity(timeGranularity);
+    request.setEndDateInclusive(false);
     if (StringUtils.isNotBlank(filters)) {
-      topLevelRequest.setFilterSet(ThirdEyeUtils.getFilterSet(filters));
+      request.setFilterSet(ThirdEyeUtils.getFilterSet(filters));
     }
     String exploreDimension = detectionTaskInfo.getGroupByDimension();
     if (StringUtils.isNotBlank(exploreDimension)) {
-      topLevelRequest
+      request
           .setGroupByDimensions(Collections.singletonList(detectionTaskInfo.getGroupByDimension()));
     }
 
-    LOG.info(
-        "Running anomaly detection job with windowStartProp: {}, windowEndProp: {}, metricExpressions: {}, timeGranularity: {}, windowStart: {}, windowEnd: {}",
-        windowStart, windowEnd, metricExpressions, timeGranularity);
+    List<Pair<Long, Long>> startEndTimeRanges =
+        anomalyFunction.getDataRangeIntervals(windowStart.getMillis(), windowEnd.getMillis());
 
-    List<RawAnomalyResultDTO> results = exploreCombination(topLevelRequest);
-    LOG.info("{} anomalies found in total", anomalyCounter);
+    List<TimeSeriesRow> timeSeriesRows = new ArrayList<>();
 
+    // TODO : replace this with Pinot MultiQuery Request
+    for (Pair<Long, Long> startEndInterval : startEndTimeRanges) {
+      DateTime startTime = new DateTime(startEndInterval.getFirst());
+      DateTime endTime = new DateTime(startEndInterval.getSecond());
+      request.setStart(startTime);
+      request.setEnd(endTime);
+
+      LOG.info(
+          "Fetching data with startTime: [{}], endTime: [{}], metricExpressions: [{}], timeGranularity: [{}]",
+          startTime, endTime, metricExpressions, timeGranularity);
+
+      try {
+        LOG.debug("Executing {}", request);
+        TimeSeriesResponse response = timeSeriesHandler.handle(request);
+        timeSeriesRows.addAll(response.getRows());
+      } catch (Exception e) {
+        throw new JobExecutionException(e);
+      }
+    }
+    TimeSeriesResponse finalResponse = new TimeSeriesResponse(timeSeriesRows);
+    exploreDimensionsAndAnalyze(finalResponse);
     return taskResult;
   }
 
-  private List<RawAnomalyResultDTO> exploreCombination(TimeSeriesRequest request) throws Exception {
-    LOG.info("Exploring {}", request);
+  private void exploreDimensionsAndAnalyze(TimeSeriesResponse finalResponse) {
+    int anomalyCounter = 0;
     List<RawAnomalyResultDTO> results = null;
-
-    // Query server
-    TimeSeriesResponse response;
-    try {
-      LOG.debug("Executing {}", request);
-      response = timeSeriesHandler.handle(request);
-    } catch (Exception e) {
-      throw new JobExecutionException(e);
-    }
     Map<DimensionKey, MetricTimeSeries> res =
-        timeSeriesResponseConverter.toMap(response, collectionDimensions);
-
+        timeSeriesResponseConverter.toMap(finalResponse, collectionDimensions);
     for (Map.Entry<DimensionKey, MetricTimeSeries> entry : res.entrySet()) {
       if (entry.getValue().getTimeWindowSet().size() < 2) {
         LOG.warn("Insufficient data for {} to run anomaly detection function", entry.getKey());
         continue;
       }
-
       try {
         // Run algorithm
         DimensionKey dimensionKey = entry.getKey();
@@ -157,8 +165,8 @@ public class DetectionTaskRunner implements TaskRunner {
         LOG.info("Analyzing anomaly function with dimensionKey: {}, windowStart: {}, windowEnd: {}",
             dimensionKey, windowStart, windowEnd);
 
-        results = anomalyFunction.analyze(dimensionKey, metricTimeSeries, windowStart, windowEnd,
-            knownAnomalies);
+        results = anomalyFunction
+            .analyze(dimensionKey, metricTimeSeries, windowStart, windowEnd, knownAnomalies);
 
         // Handle results
         handleResults(results);
@@ -173,7 +181,7 @@ public class DetectionTaskRunner implements TaskRunner {
         LOG.error("Could not compute for {}", entry.getKey(), e);
       }
     }
-    return results;
+    LOG.info("{} anomalies found in total", anomalyCounter);
   }
 
   private List<RawAnomalyResultDTO> getExistingAnomalies() {
@@ -204,7 +212,9 @@ public class DetectionTaskRunner implements TaskRunner {
     }
   }
 
-  /** Handle any infinite or NaN values by replacing them with +/- max value or 0 */
+  /**
+   * Handle any infinite or NaN values by replacing them with +/- max value or 0
+   */
   private double normalize(double value) {
     if (Double.isInfinite(value)) {
       return (value > 0.0 ? 1 : -1) * Double.MAX_VALUE;

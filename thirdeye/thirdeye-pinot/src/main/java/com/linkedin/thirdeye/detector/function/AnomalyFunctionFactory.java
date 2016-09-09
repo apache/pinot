@@ -35,14 +35,14 @@ public class AnomalyFunctionFactory {
     }
   }
 
-  public AnomalyFunction fromSpec(AnomalyFunctionDTO functionSpec) throws Exception {
-    AnomalyFunction anomalyFunction = null;
+  public BaseAnomalyFunction fromSpec(AnomalyFunctionDTO functionSpec) throws Exception {
+    BaseAnomalyFunction anomalyFunction = null;
     String type = functionSpec.getType();
     if (!props.containsKey(type)) {
       throw new IllegalArgumentException("Unsupported type " + type);
     }
     String className = props.getProperty(type);
-    anomalyFunction = (AnomalyFunction) Class.forName(className).newInstance();
+    anomalyFunction = (BaseAnomalyFunction) Class.forName(className).newInstance();
 
     anomalyFunction.init(functionSpec);
     return anomalyFunction;

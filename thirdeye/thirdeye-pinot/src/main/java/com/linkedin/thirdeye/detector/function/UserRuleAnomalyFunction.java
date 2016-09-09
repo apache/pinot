@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.detector.function;
 
+import com.linkedin.pinot.pql.parsers.utils.Pair;
 import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.List;
@@ -50,6 +51,23 @@ public class UserRuleAnomalyFunction extends BaseAnomalyFunction {
 
   public static String[] getPropertyKeys() {
     return new String [] {BASELINE, CHANGE_THRESHOLD, AVERAGE_VOLUME_THRESHOLD};
+  }
+
+  public List<Pair<Long, Long>> getDataRangeIntervals(Long windowStartTime, Long windowEndTime) {
+    List<Pair<Long, Long>> startEndTimeIntervals = new ArrayList<>();
+    startEndTimeIntervals.add(new Pair<>(windowStartTime, windowEndTime));
+
+    try {
+      Properties anomalyProps = getProperties();
+      // Compute baseline for comparison
+      String baselineProp = anomalyProps.getProperty(BASELINE);
+      long baselineMillis = getBaselineMillis(baselineProp);
+      startEndTimeIntervals
+          .add(new Pair<>(windowStartTime - baselineMillis, windowEndTime - baselineMillis));
+    } catch (Exception e) {
+      LOGGER.error("Error reading the properties", e);
+    }
+    return startEndTimeIntervals;
   }
 
   private String getMergedAnomalyResultMessage(double threshold, String baselineProp,
@@ -140,9 +158,8 @@ public class UserRuleAnomalyFunction extends BaseAnomalyFunction {
       return anomalyResults; // empty list
     }
     // iterate through baseline keys
-    Set<Long> filteredBaselineTimes =
-        filterTimeWindowSet(timeSeries.getTimeWindowSet(), windowStart.getMillis(), windowEnd
-            .minus(baselineMillis).getMillis());
+    Set<Long> filteredBaselineTimes = filterTimeWindowSet(timeSeries.getTimeWindowSet(),
+        windowStart.minus(baselineMillis).getMillis(), windowEnd.minus(baselineMillis).getMillis());
     List<Double> currentValues = new ArrayList<>();
     List<Double> baselineValues = new ArrayList<>();
     for (Long baselineKey : filteredBaselineTimes) {
