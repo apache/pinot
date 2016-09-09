@@ -1,7 +1,10 @@
 package com.linkedin.thirdeye.detector.function;
 
+import com.linkedin.pinot.pql.parsers.utils.Pair;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Properties;
 
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
@@ -39,4 +42,20 @@ public abstract class BaseAnomalyFunction implements AnomalyFunction {
   protected double calculateChange(double currentValue, double baselineValue) {
     return (currentValue - baselineValue) / baselineValue;
   }
+
+  /**
+   * Useful when multiple time intervals are needed for fetching current vs baseline data
+   *
+   * @param scheduleStartTime
+   * @param scheduleEndTime
+   *
+   * @return
+   */
+  public List<Pair<Long, Long>> getDataRangeIntervals(Long scheduleStartTime,
+      Long scheduleEndTime) {
+    List<Pair<Long, Long>> startEndTimeIntervals = new ArrayList<>();
+    startEndTimeIntervals.add(new Pair<>(scheduleStartTime, scheduleEndTime));
+    return startEndTimeIntervals;
+  }
+
 }

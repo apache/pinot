@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.client.timeseries;
 
+import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -38,6 +39,10 @@ public class TimeSeriesResponse {
 
   public TimeSeriesRow getRow(int index) {
     return rows.get(index);
+  }
+
+  public List<TimeSeriesRow> getRows() {
+    return ImmutableList.copyOf(rows);
   }
 
   public static class Builder {
