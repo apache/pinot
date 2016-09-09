@@ -7,9 +7,10 @@ function getAnomalies(tab) {
     var url = "/dashboard/anomalies/metrics?dataset=" + hash.dataset;
     getData(url).done(function (anomalyMetricList) {
 
-        //Creating request url
-        var baselineStart = moment(parseInt(hash.currentStart)).add(-7, 'days')
-        var baselineEnd = moment(parseInt(hash.currentEnd)).add(-7, 'days')
+        var compareMode = hash.fnCompareWeeks ?  hash.fnCompareWeeks : 1;
+        var baselineStart = moment(parseInt(hash.currentStart)).subtract(compareMode, 'week');
+        var baselineEnd = moment(parseInt(hash.currentEnd)).subtract(compareMode, 'week');
+
         var aggTimeGranularity = (window.datasetConfig.dataGranularity) ? window.datasetConfig.dataGranularity : "HOURS";
         var dataset = hash.dataset;
         var compareMode = "WoW";
@@ -72,10 +73,11 @@ function getAnomalies(tab) {
                     tipToUser()
                 }
 
-                //anomalyFunctionId is only present in hash when anomaly
+                //anomalyFunctionId and hash.fnCompareWeeks are only present in hash when anomaly
                 // function run adhoc was requested on self service tab
                 //needs to be removed to be able to view other functions in later queries on the anomalies view
-                delete hash.anomalyFunctionId
+                delete hash.anomalyFunctionId;
+                delete hash.fnCompareWeeks;
             });
         }
 

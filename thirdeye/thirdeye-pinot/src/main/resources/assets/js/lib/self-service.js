@@ -705,12 +705,23 @@ function addSelfServiceListeners() {
         hash.metrics = formData.metric;
         hash.dataset = formData.dataset;
 
-        var maxMillis = window.datasetConfig.maxMillis ? window.datasetConfig.maxMillis : moment();
+        var maxMillis = window.datasetConfig.maxMillis ? window.datasetConfig.maxMillis : moment().valueOf();
         hash.currentEnd = maxMillis;
-        hash.currentStart = moment(maxMillis).add(-1, 'days')._i;
+        hash.currentStart = moment(parseFloat(maxMillis)).add(-1, 'days').valueOf();
         hash.anomalyFunctionId = id;
-
-
+        if(formData.functionType == "USER_RULE") {
+            switch(formData.baseline){
+                case "w/w":
+                    hash.fnCompareWeeks = 1;
+                break;
+                case "w/2w":
+                    hash.fnCompareWeeks = 2;
+                break;
+                case "w/3w":
+                    hash.fnCompareWeeks = 3;
+                break;
+            }
+        }
 
         var currentStartISO = moment(parseInt(hash.currentStart)).toISOString();
         var currentEndISO = moment(parseInt(hash.currentEnd)).toISOString();
