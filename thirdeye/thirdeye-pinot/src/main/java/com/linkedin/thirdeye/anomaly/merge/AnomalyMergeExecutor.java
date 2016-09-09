@@ -176,7 +176,9 @@ public class AnomalyMergeExecutor implements Runnable {
     try {
       // persist the merged result
       mergedResultDAO.update(mergedResult);
-      anomalyResultDAO.updateAll(mergedResult.getAnomalyResults());
+      for (RawAnomalyResultDTO rawAnomalyResultDTO : mergedResult.getAnomalyResults()) {
+        anomalyResultDAO.update(rawAnomalyResultDTO);
+      }
     } catch (PersistenceException e) {
       LOG.error("Could not persist merged result : [" + mergedResult.toString() + "]", e);
     }
