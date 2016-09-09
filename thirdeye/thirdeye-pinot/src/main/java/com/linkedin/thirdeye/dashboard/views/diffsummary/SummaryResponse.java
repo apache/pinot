@@ -19,8 +19,8 @@ public class SummaryResponse {
   private final static NumberFormat DOUBLE_FORMATTER = new DecimalFormat("#0.00");
   private final static String INFINITE = "";
 
-  private static final String ALL = "";
-  private static final String NOT_ALL = "OTHER";
+  private static final String ALL = "(ALL)";
+  private static final String NOT_ALL = "(ALL)-";
 
   @JsonProperty("dimensions")
   List<String> dimensions = new ArrayList<>();

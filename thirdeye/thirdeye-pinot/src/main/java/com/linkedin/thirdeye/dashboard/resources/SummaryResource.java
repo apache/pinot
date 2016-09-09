@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
+import com.linkedin.thirdeye.constant.MetricAggFunction;
 import java.util.Arrays;
 import java.util.List;
 
@@ -66,7 +67,7 @@ public class SummaryResource {
           && collectionConfig.getDerivedMetrics().containsKey(metric)) {
         metric = collectionConfig.getDerivedMetrics().get(metric);
       }
-      List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metric, collection);
+      List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metric, MetricAggFunction.SUM,collection);
 
       OLAPDataBaseClient olapClient = new PinotThirdEyeSummaryClient(CACHE_REGISTRY_INSTANCE.getQueryCache());
       olapClient.setCollection(collection);
@@ -122,7 +123,7 @@ public class SummaryResource {
           && collectionConfig.getDerivedMetrics().containsKey(metric)) {
         metric = collectionConfig.getDerivedMetrics().get(metric);
       }
-      List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metric, collection);
+      List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metric, MetricAggFunction.SUM, collection);
 
       OLAPDataBaseClient olapClient = new PinotThirdEyeSummaryClient(CACHE_REGISTRY_INSTANCE.getQueryCache());
       olapClient.setCollection(collection);

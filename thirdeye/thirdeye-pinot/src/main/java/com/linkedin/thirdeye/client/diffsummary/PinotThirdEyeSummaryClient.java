@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.client.diffsummary;
 
+import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.datalayer.bao.WebappConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.hibernate.WebappConfigManagerImpl;
 import java.io.File;
@@ -343,7 +344,7 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
         && collectionConfig.getDerivedMetrics().containsKey(metricName)) {
       metricName = collectionConfig.getDerivedMetrics().get(metricName);
     }
-    List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metricName, collection);
+    List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metricName, MetricAggFunction.SUM, collection);
     System.out.println(metricExpressions);
 
     OLAPDataBaseClient pinotClient = new PinotThirdEyeSummaryClient(CACHE_REGISTRY_INSTANCE.getQueryCache());
