@@ -53,10 +53,9 @@ public class UserRuleAnomalyFunction extends BaseAnomalyFunction {
     return new String [] {BASELINE, CHANGE_THRESHOLD, AVERAGE_VOLUME_THRESHOLD};
   }
 
-  public List<Pair<Long, Long>> getDataRangeIntervals(Long scheduleStartTime,
-      Long scheduleEndTime) {
+  public List<Pair<Long, Long>> getDataRangeIntervals(Long windowStartTime, Long windowEndTime) {
     List<Pair<Long, Long>> startEndTimeIntervals = new ArrayList<>();
-    startEndTimeIntervals.add(new Pair<>(scheduleStartTime, scheduleEndTime));
+    startEndTimeIntervals.add(new Pair<>(windowStartTime, windowEndTime));
 
     try {
       Properties anomalyProps = getProperties();
@@ -64,7 +63,7 @@ public class UserRuleAnomalyFunction extends BaseAnomalyFunction {
       String baselineProp = anomalyProps.getProperty(BASELINE);
       long baselineMillis = getBaselineMillis(baselineProp);
       startEndTimeIntervals
-          .add(new Pair<>(scheduleStartTime - baselineMillis, scheduleEndTime - baselineMillis));
+          .add(new Pair<>(windowStartTime - baselineMillis, windowEndTime - baselineMillis));
     } catch (Exception e) {
       LOGGER.error("Error reading the properties", e);
     }

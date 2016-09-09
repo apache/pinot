@@ -124,6 +124,7 @@ public class DetectionTaskRunner implements TaskRunner {
 
     List<TimeSeriesRow> timeSeriesRows = new ArrayList<>();
 
+    // TODO : replace this with Pinot MultiQuery Request
     for (Pair<Long, Long> startEndInterval : startEndTimeRanges) {
       DateTime startTime = new DateTime(startEndInterval.getFirst());
       DateTime endTime = new DateTime(startEndInterval.getSecond());
