@@ -387,7 +387,6 @@ public class DashboardResource {
       @QueryParam("timeZone") @DefaultValue(DEFAULT_TIMEZONE_ID) String timeZone,
       @QueryParam("baselineStart") Long baselineStart, @QueryParam("baselineEnd") Long baselineEnd,
       @QueryParam("currentStart") Long currentStart, @QueryParam("currentEnd") Long currentEnd,
-      @QueryParam("compareMode") String compareMode,
       @QueryParam("aggTimeGranularity") String aggTimeGranularity,
       @QueryParam("metrics") String metricsJson) throws Exception {
 
