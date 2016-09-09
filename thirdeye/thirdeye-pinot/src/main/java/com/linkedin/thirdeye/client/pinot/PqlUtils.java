@@ -29,7 +29,7 @@ public class PqlUtils {
   private static final Joiner COMMA = Joiner.on(",");
   private static final Joiner EQUALS = Joiner.on(" = ");
   private static final Logger LOGGER = LoggerFactory.getLogger(PqlUtils.class);
-  private static final int DEFAULT_TOP = 300000;
+  private static final int DEFAULT_TOP = 100000;
 
   /**
    * Returns sql to calculate the sum of all raw metrics required for <tt>request</tt>, grouped by
