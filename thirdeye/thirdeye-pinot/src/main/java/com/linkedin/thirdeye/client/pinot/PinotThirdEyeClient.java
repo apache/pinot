@@ -21,6 +21,7 @@ import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.client.ResultSet;
 import com.linkedin.pinot.client.ResultSetGroup;
 import com.linkedin.thirdeye.api.CollectionSchema;
+import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.client.MetricFunction;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
@@ -120,13 +121,14 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
     if (collectionConfig != null && collectionConfig.isMetricAsDimension()) {
        List<String> pqls = PqlUtils.getMetricAsDimensionPqls(request, dataTimeSpec, collectionConfig);
        for (String pql : pqls) {
+         LOG.debug("PQL isMetricAsDimension : {}", pql);
          ResultSetGroup result = CACHE_INSTANCE.getResultSetGroupCache()
              .get(new PinotQuery(pql, request.getCollection() + "_OFFLINE"));
          resultSetGroups.add(result);
        }
     } else {
       String sql = PqlUtils.getPql(request, dataTimeSpec);
-      LOG.debug("Executing: {}", sql);
+      LOG.debug("PQL: {}", sql);
       ResultSetGroup result = CACHE_INSTANCE.getResultSetGroupCache()
           .get(new PinotQuery(sql, request.getCollection() + "_OFFLINE"));
       resultSetGroups.add(result);
@@ -178,10 +180,10 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
     int numMetrics = request.getMetricFunctions().size();
     int numCols = numGroupByKeys + numMetrics;
     boolean hasGroupByTime = false;
-    TimeUnit dataTimeUnit = null;
+    TimeGranularity dataGranularity = null;
     long startTime = request.getStartTimeInclusive().getMillis();
     long interval = -1;
-    dataTimeUnit = collectionSchema.getTime().getDataGranularity().getUnit();
+    dataGranularity = collectionSchema.getTime().getDataGranularity();
     boolean isISOFormat = false;
     DateTimeFormatter dateTimeFormatter = null;
     String timeFormat = collectionSchema.getTime().getFormat();
@@ -208,7 +210,7 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
               int timeBucket;
               long millis;
               if (!isISOFormat) {
-                millis = dataTimeUnit.toMillis(Double.valueOf(groupKeyVal).longValue());
+                millis = dataGranularity.toMillis(Double.valueOf(groupKeyVal).longValue());
               } else {
                 millis = DateTime.parse(groupKeyVal, dateTimeFormatter).getMillis();
               }
