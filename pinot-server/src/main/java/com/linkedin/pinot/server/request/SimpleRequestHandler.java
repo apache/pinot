@@ -40,8 +40,6 @@ import org.slf4j.LoggerFactory;
 
 /**
  * A simple implementation of RequestHandler.
- *
- *
  */
 public class SimpleRequestHandler implements RequestHandler {
 
@@ -70,21 +68,29 @@ public class SimpleRequestHandler implements RequestHandler {
     SerDe serDe = new SerDe(new TCompactProtocol.Factory());
     BrokerRequest brokerRequest = null;
     try {
-      final InstanceRequest queryRequest = new InstanceRequest();
-      serDe.deserialize(queryRequest, byteArray);
+      final InstanceRequest instanceRequest = new InstanceRequest();
+      if (! serDe.deserialize(instanceRequest, byteArray) ) {
+        // the deserialize method logs and suppresses exceptionx
+        LOGGER.error("Failed to deserialize query request");
+        DataTable result = new DataTable();
+        result.addException(QueryException.INTERNAL_ERROR);
+        _serverMetrics.addMeteredGlobalValue(ServerMeter.REQUEST_DESERIALIZATION_EXCEPTIONS, 1);
+        return serializeDataTable(brokerRequest, instanceResponse, queryStartTime);
+      }
       long deserRequestTime = System.nanoTime();
+      brokerRequest = instanceRequest.getQuery();
       _serverMetrics.addPhaseTiming(brokerRequest, ServerQueryPhase.REQUEST_DESERIALIZATION, deserRequestTime - queryStartTime);
-      LOGGER.debug("Processing requestId:{},request={}", queryRequest.getRequestId(), queryRequest);
-      brokerRequest = queryRequest.getQuery();
-      QueryRequest queryRequestContext = new QueryRequest(queryRequest);
-      String brokerId = queryRequest.isSetBrokerId() ? queryRequest.getBrokerId() :
+      LOGGER.debug("Processing requestId:{},request={}", instanceRequest.getRequestId(), instanceRequest);
+
+      QueryRequest queryRequest = new QueryRequest(instanceRequest);
+      String brokerId = instanceRequest.isSetBrokerId() ? instanceRequest.getBrokerId() :
           ((InetSocketAddress) channelHandlerContext.channel().remoteAddress()).getAddress().getHostAddress();
       // we will set the ip address as client id. This is good enough for start.
       // Ideally, broker should send it's identity as part of the request
-      queryRequestContext.setClientId(brokerId);
+      queryRequest.setClientId(brokerId);
 
       long startTime = System.nanoTime();
-      instanceResponse = _queryExecutor.processQuery(queryRequestContext);
+      instanceResponse = _queryExecutor.processQuery(queryRequest);
       long totalNanos = System.nanoTime() - startTime;
       _serverMetrics.addPhaseTiming(brokerRequest, ServerQueryPhase.QUERY_PROCESSING, totalNanos);
     } catch (Exception e) {
@@ -97,7 +103,10 @@ public class SimpleRequestHandler implements RequestHandler {
       exceptions.add(exception);
       instanceResponse = dataTableBuilder.buildExceptions();
     }
+    return serializeDataTable(brokerRequest, instanceResponse, queryStartTime);
+  }
 
+  private byte[] serializeDataTable(BrokerRequest brokerRequest, DataTable instanceResponse, long queryStartTime) {
     byte[] responseByte;
     long serializationStartTime = System.nanoTime();
     try {
@@ -117,5 +126,4 @@ public class SimpleRequestHandler implements RequestHandler {
     _serverMetrics.addPhaseTiming(brokerRequest, ServerQueryPhase.TOTAL_QUERY_TIME, serializationEndTime - queryStartTime);
     return responseByte;
   }
-
 }
