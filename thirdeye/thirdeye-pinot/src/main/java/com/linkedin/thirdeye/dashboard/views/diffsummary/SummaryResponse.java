@@ -17,10 +17,11 @@ import com.linkedin.thirdeye.client.diffsummary.HierarchyNode;
 
 public class SummaryResponse {
   private final static NumberFormat DOUBLE_FORMATTER = new DecimalFormat("#0.00");
-  private final static String INFINITE = "";
+  static final  String INFINITE = "";
 
-  private static final String ALL = "(ALL)";
-  private static final String NOT_ALL = "(ALL)-";
+  static final String ALL = "(ALL)";
+  static final String NOT_ALL = "(ALL)-";
+  static final String NOT_AVAILABLE = "-na-";
 
   @JsonProperty("dimensions")
   List<String> dimensions = new ArrayList<>();
@@ -32,13 +33,10 @@ public class SummaryResponse {
     return responseRows;
   }
 
-  public static SummaryResponse buildDummyResponse() {
+  public static SummaryResponse buildNotAvailableResponse() {
     SummaryResponse response = new SummaryResponse();
-    response.dimensions.add("-na-");
-    SummaryResponseRow row = new SummaryResponseRow();
-    row.names = new ArrayList<String>();
-    row.names.add("-na-");
-    response.responseRows.add(row);
+    response.dimensions.add(NOT_AVAILABLE);
+    response.responseRows.add(SummaryResponseRow.buildNotAvailableRow());
     return response;
   }
 

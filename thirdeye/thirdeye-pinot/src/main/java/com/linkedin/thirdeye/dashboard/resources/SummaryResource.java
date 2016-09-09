@@ -95,7 +95,7 @@ public class SummaryResource {
       response = summary.computeSummary(summarySize, doOneSideError, topDimensions);
     } catch (Exception e) {
       LOG.error("Exception while generating difference summary", e);
-      response = SummaryResponse.buildDummyResponse();
+      response = SummaryResponse.buildNotAvailableResponse();
     }
     return OBJECT_MAPPER.writeValueAsString(response);
   }
@@ -152,7 +152,7 @@ public class SummaryResource {
       response = summary.computeSummary(summarySize, doOneSideError);
     } catch (Exception e) {
       LOG.error("Exception while generating difference summary", e);
-      response = SummaryResponse.buildDummyResponse();
+      response = SummaryResponse.buildNotAvailableResponse();
     }
     return OBJECT_MAPPER.writeValueAsString(response);
   }
