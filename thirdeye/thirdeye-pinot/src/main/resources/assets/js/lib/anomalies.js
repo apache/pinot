@@ -7,18 +7,18 @@ function getAnomalies(tab) {
     var url = "/dashboard/anomalies/metrics?dataset=" + hash.dataset;
     getData(url).done(function (anomalyMetricList) {
 
+
+        //Define query params for timeseries and anomaly result query
         var compareMode = hash.fnCompareWeeks ?  hash.fnCompareWeeks : 1;
         var baselineStart = moment(parseInt(hash.currentStart)).subtract(compareMode, 'week');
         var baselineEnd = moment(parseInt(hash.currentEnd)).subtract(compareMode, 'week');
-
         var aggTimeGranularity = (window.datasetConfig.dataGranularity) ? window.datasetConfig.dataGranularity : "HOURS";
         var dataset = hash.dataset;
-        var compareMode = "WoW";
         var currentStart = hash.currentStart;
         var currentEnd = hash.currentEnd;
         var metrics = hash.metrics;
 
-        var timeSeriesUrl = "/dashboard/data/tabular?dataset=" + dataset + "&compareMode=" + compareMode //
+        var timeSeriesUrl = "/dashboard/data/tabular?dataset=" + dataset //
             + "&currentStart=" + currentStart + "&currentEnd=" + currentEnd  //
             + "&baselineStart=" + baselineStart + "&baselineEnd=" + baselineEnd   //
             + "&aggTimeGranularity=" + aggTimeGranularity + "&metrics=" + metrics;
@@ -26,13 +26,14 @@ function getAnomalies(tab) {
         var currentStartISO = moment(parseInt(currentStart)).toISOString();
         var currentEndISO = moment(parseInt(currentEnd)).toISOString();
 
-        var urlParams = "dataset=" + hash.dataset + "&startTimeIso=" + currentStartISO + "&endTimeIso=" + currentEndISO + "&metric=" + hash.metrics;
+        if(anomalyMetricList && anomalyMetricList.indexOf(metrics)> -1){
+
+            var urlParams = "dataset=" + hash.dataset + "&startTimeIso=" + currentStartISO + "&endTimeIso=" + currentEndISO + "&metric=" + hash.metrics;
             urlParams += hash.filter ? "&filters=" + hash.filters : "";
             urlParams += hash.hasOwnProperty("anomalyFunctionId")  ?   "&id=" + hash.anomalyFunctionId : "";
-
-        if(anomalyMetricList && anomalyMetricList.indexOf(metrics)> -1){
             var anomaliesUrl = "/dashboard/anomalies/view?" + urlParams;
-            //AJAX for data
+
+            //AJAX for anomaly result data
             getData(anomaliesUrl).done(function (anomalyData) {
                 anomaliesDisplayData = anomalyData;
                 getTimeseriesData(anomaliesDisplayData)
