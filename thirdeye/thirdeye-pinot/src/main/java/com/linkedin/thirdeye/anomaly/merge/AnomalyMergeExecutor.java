@@ -21,7 +21,6 @@ import org.slf4j.LoggerFactory;
 
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.client.MetricExpression;
-import com.linkedin.thirdeye.client.MetricFunction;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesHandler;
@@ -189,10 +188,9 @@ public class AnomalyMergeExecutor implements Runnable {
     // create time series request
     TimeSeriesRequest timeSeriesRequest = new TimeSeriesRequest();
     timeSeriesRequest.setCollectionName(anomalyFunctionSpec.getCollection());
-    MetricFunction metricFunction = new MetricFunction(anomalyFunctionSpec.getMetricFunction(),
-        anomalyFunctionSpec.getMetric());
-    List<MetricFunction> metricFunctions = Collections.singletonList(metricFunction);
-    List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metricFunctions);
+    List<MetricExpression> metricExpressions = Utils
+        .convertToMetricExpressions(anomalyFunctionSpec.getMetric(),
+            anomalyFunctionSpec.getMetricFunction(), anomalyFunctionSpec.getCollection());
     timeSeriesRequest.setMetricExpressions(metricExpressions);
     TimeGranularity timeBucket = new TimeGranularity(anomalyFunctionSpec.getBucketSize(),
         anomalyFunctionSpec.getBucketUnit());

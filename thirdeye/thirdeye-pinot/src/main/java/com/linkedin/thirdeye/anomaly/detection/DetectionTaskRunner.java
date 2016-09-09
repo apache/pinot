@@ -102,8 +102,9 @@ public class DetectionTaskRunner implements TaskRunner {
     // Seed request with top-level...
     TimeSeriesRequest topLevelRequest = new TimeSeriesRequest();
     topLevelRequest.setCollectionName(anomalyFunctionSpec.getCollection());
-    List<MetricFunction> metricFunctions = Collections.singletonList(metricFunction);
-    List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metricFunctions);
+    List<MetricExpression> metricExpressions = Utils
+        .convertToMetricExpressions(metricFunction.getMetricName(),
+            anomalyFunctionSpec.getMetricFunction(), anomalyFunctionSpec.getCollection());
     topLevelRequest.setMetricExpressions(metricExpressions);
     topLevelRequest.setAggregationTimeGranularity(timeGranularity);
     topLevelRequest.setStart(windowStart);
