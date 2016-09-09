@@ -75,7 +75,7 @@ public class AbstractManagerImpl<E extends AbstractDTO> implements AbstractManag
   @Transactional
   public void deleteById(Long id) {
     E entity = getEntityManager().getReference(entityClass, id);
-    delete(entity);
+    getEntityManager().remove(entity);
   }
 
   /* (non-Javadoc)
