@@ -32,7 +32,7 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
       "from MergedAnomalyResultDTO r where r.collection=:collection "
           + "and (r.startTime < :endTime and r.endTime > :startTime) order by r.endTime desc";
 
-  private static final String FIND_BY_FUNCTION_ID = "from AnomalyMergedResult r where r.function.id=:functionId";
+  private static final String FIND_BY_FUNCTION_ID = "from MergedAnomalyResultDTO r where r.function.id=:functionId";
 
   private static final String FIND_BY_FUNCTION_AND_DIMENSIONS =
       "from MergedAnomalyResultDTO amr where amr.function.id=:functionId "

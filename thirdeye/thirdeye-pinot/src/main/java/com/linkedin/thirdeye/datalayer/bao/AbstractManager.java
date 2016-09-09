@@ -12,8 +12,6 @@ public interface AbstractManager<E extends AbstractDTO> {
 
   void update(E entity);
 
-  void updateAll(List<E> entities);
-
   E findById(Long id);
 
   void delete(E entity);

@@ -44,12 +44,6 @@ public class AbstractManagerImpl<E extends AbstractDTO> implements AbstractManag
   }
 
   @Override
-  public void updateAll(List<E> entities) {
-    // TODO Auto-generated method stub
-
-  }
-
-  @Override
   public E findById(Long id) {
     // TODO Auto-generated method stub
     return null;

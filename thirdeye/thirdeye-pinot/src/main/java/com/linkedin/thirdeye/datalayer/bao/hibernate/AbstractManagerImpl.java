@@ -51,14 +51,6 @@ public class AbstractManagerImpl<E extends AbstractDTO> implements AbstractManag
   }
 
   /* (non-Javadoc)
-   * @see com.linkedin.thirdeye.datalayer.bao.IAbstractManager#updateAll(java.util.List)
-   */
-  @Override
-  public void updateAll(List<E> entities) {
-    entities.forEach(this::update);
-  }
-
-  /* (non-Javadoc)
    * @see com.linkedin.thirdeye.datalayer.bao.IAbstractManager#findById(java.lang.Long)
    */
   @Override
@@ -73,15 +65,17 @@ public class AbstractManagerImpl<E extends AbstractDTO> implements AbstractManag
   @Override
   @Transactional
   public void delete(E entity) {
-    getEntityManager().remove(entity);
+    deleteById(entity.getId());
   }
 
   /* (non-Javadoc)
    * @see com.linkedin.thirdeye.datalayer.bao.IAbstractManager#deleteById(java.lang.Long)
    */
   @Override
+  @Transactional
   public void deleteById(Long id) {
-    delete(findById(id));
+    E entity = getEntityManager().getReference(entityClass, id);
+    delete(entity);
   }
 
   /* (non-Javadoc)

@@ -136,7 +136,8 @@ public class WebappConfigResource {
       }
       return Response.ok(id).build();
     } catch (Exception e) {
-      return Response.ok(e).build();
+      LOG.error(e.getMessage(), e);
+      return Response.serverError().build();
     }
   }
 }
