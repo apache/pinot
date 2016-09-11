@@ -1,10 +1,9 @@
-package com.linkedin.thirdeye.datalayer.util;
+package com.linkedin.thirdeye.datalayer.dao;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -17,28 +16,68 @@ import javax.sql.DataSource;
 
 import org.codehaus.jackson.map.ObjectMapper;
 import org.modelmapper.ModelMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.collect.Sets;
 import com.google.inject.Inject;
+import com.linkedin.thirdeye.anomaly.alert.AlertJobScheduler;
 import com.linkedin.thirdeye.datalayer.entity.AbstractEntity;
 import com.linkedin.thirdeye.datalayer.entity.AbstractIndexEntity;
 import com.linkedin.thirdeye.datalayer.entity.AbstractJsonEntity;
-import com.linkedin.thirdeye.datalayer.entity.AnomalyFunctionIndexEntity;
+import com.linkedin.thirdeye.datalayer.entity.AnomalyFeedbackIndex;
+import com.linkedin.thirdeye.datalayer.entity.AnomalyFunctionIndex;
+import com.linkedin.thirdeye.datalayer.entity.EmailConfigurationIndex;
 import com.linkedin.thirdeye.datalayer.entity.GenericJsonEntity;
+import com.linkedin.thirdeye.datalayer.entity.JobIndex;
+import com.linkedin.thirdeye.datalayer.entity.MergedAnomalyResultIndex;
+import com.linkedin.thirdeye.datalayer.entity.RawAnomalyResultIndex;
+import com.linkedin.thirdeye.datalayer.entity.WebappConfigIndex;
 import com.linkedin.thirdeye.datalayer.pojo.AbstractBean;
+import com.linkedin.thirdeye.datalayer.pojo.AnomalyFeedbackBean;
 import com.linkedin.thirdeye.datalayer.pojo.AnomalyFunctionBean;
+import com.linkedin.thirdeye.datalayer.pojo.EmailConfigurationBean;
+import com.linkedin.thirdeye.datalayer.pojo.JobBean;
+import com.linkedin.thirdeye.datalayer.pojo.MergedAnomalyResultBean;
+import com.linkedin.thirdeye.datalayer.pojo.RawAnomalyResultBean;
+import com.linkedin.thirdeye.datalayer.pojo.WebappConfigBean;
+import com.linkedin.thirdeye.datalayer.util.GenericResultSetMapper;
+import com.linkedin.thirdeye.datalayer.util.Predicate;
+import com.linkedin.thirdeye.datalayer.util.SqlQueryBuilder;
 
 public class GenericPojoDao {
-
+  private static final Logger LOG = LoggerFactory.getLogger(GenericPojoDao.class);
 
   static Map<Class<? extends AbstractBean>, PojoInfo> pojoInfoMap =
       new HashMap<Class<? extends AbstractBean>, GenericPojoDao.PojoInfo>();
 
+  static String DEFAULT_BASE_TABLE_NAME = "GENERIC_JSON_ENTITY";
+
   static {
+    pojoInfoMap.put(AnomalyFeedbackBean.class,
+        newPojoInfo(DEFAULT_BASE_TABLE_NAME, AnomalyFeedbackIndex.class));
+    pojoInfoMap.put(AnomalyFunctionBean.class,
+        newPojoInfo(DEFAULT_BASE_TABLE_NAME, AnomalyFunctionIndex.class));
+
+    //    pojoInfoMap.put(Anomalymergec.class,
+    //        newPojoInfo(DEFAULT_BASE_TABLE_NAME, AnomalyMergeConfigIndex.class));
+    pojoInfoMap.put(EmailConfigurationBean.class,
+        newPojoInfo(DEFAULT_BASE_TABLE_NAME, EmailConfigurationIndex.class));
+    pojoInfoMap.put(JobBean.class, newPojoInfo(DEFAULT_BASE_TABLE_NAME, JobIndex.class));
+    pojoInfoMap.put(MergedAnomalyResultBean.class,
+        newPojoInfo(DEFAULT_BASE_TABLE_NAME, MergedAnomalyResultIndex.class));
+    pojoInfoMap.put(RawAnomalyResultBean.class,
+        newPojoInfo(DEFAULT_BASE_TABLE_NAME, RawAnomalyResultIndex.class));
+    pojoInfoMap.put(WebappConfigBean.class,
+        newPojoInfo(DEFAULT_BASE_TABLE_NAME, WebappConfigIndex.class));
+  }
+
+  private static PojoInfo newPojoInfo(String baseTableName,
+      Class<? extends AbstractIndexEntity> indexEntityClass) {
     PojoInfo pojoInfo = new PojoInfo();
-    pojoInfo.baseTableName = "generic_json_entity";
-    pojoInfo.indexEntityClass = AnomalyFunctionIndexEntity.class;
-    pojoInfoMap.put(AnomalyFunctionBean.class, pojoInfo);
+    pojoInfo.baseTableName = baseTableName;
+    pojoInfo.indexEntityClass = indexEntityClass;
+    return pojoInfo;
   }
 
   @Inject
@@ -82,8 +121,8 @@ public class GenericPojoDao {
         genericJsonEntity.setVersion(1);
         genericJsonEntity.setBeanClass(pojo.getClass().getName());
         String jsonVal = OBJECT_MAPPER.writeValueAsString(pojo);
-        System.out.println(jsonVal);
         genericJsonEntity.setJsonVal(jsonVal);
+
         PreparedStatement baseTableInsertStmt =
             sqlQueryBuilder.createInsertStatement(connection, genericJsonEntity);
         int affectedRows = baseTableInsertStmt.executeUpdate();

@@ -24,7 +24,7 @@ public class AbstractBaseTest {
     URL configUrl = getClass().getResource("/persistence-local.yml");
     File configFile = new File(configUrl.toURI());
     DaoProviderUtil.init(configFile);
-    ds = DaoProviderUtil.getInstance(DataSource.class);
+    ds = DaoProviderUtil.getDataSource();
     cleanUp();
   }
   

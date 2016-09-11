@@ -24,30 +24,30 @@ public class EntityMappingHolder {
 
   public void register(Connection connection, Class<? extends AbstractEntity> entityClass,
       String tableName) throws Exception {
+    tableName = tableName.toLowerCase();
     System.out.println("GENERATING MAPPING FOR TABLE:" + tableName);
     DatabaseMetaData databaseMetaData = connection.getMetaData();
     String catalog = null;
     String schemaPattern = null;
-    String tableNamePattern = tableName;
     String columnNamePattern = null;
-    ResultSet rs =
-        databaseMetaData.getColumns(catalog, schemaPattern, tableNamePattern, columnNamePattern);
-
+    LinkedHashMap<String, ColumnInfo> columnInfoMap = new LinkedHashMap<>();
     tableToEntityNameMap.put(tableName, entityClass.getSimpleName());
     columnMappingPerTable.put(tableName, HashBiMap.create());
-    LinkedHashMap<String, ColumnInfo> columnInfoMap = new LinkedHashMap<>();
-
-    while (rs.next()) {
-      String columnName = rs.getString(4);
-      ColumnInfo columnInfo = new ColumnInfo();
-      columnInfo.columnNameInDB = columnName.toLowerCase();
-      columnInfo.sqlType = rs.getInt(5);
-      columnInfoMap.put(columnName.toLowerCase(), columnInfo);
+    for (String tableNamePattern : new String[] {tableName.toLowerCase(),
+        tableName.toUpperCase()}) {
+      ResultSet rs =
+          databaseMetaData.getColumns(catalog, schemaPattern, tableNamePattern, columnNamePattern);
+      while (rs.next()) {
+        String columnName = rs.getString(4);
+        ColumnInfo columnInfo = new ColumnInfo();
+        columnInfo.columnNameInDB = columnName.toLowerCase();
+        columnInfo.sqlType = rs.getInt(5);
+        columnInfoMap.put(columnName.toLowerCase(), columnInfo);
+      }
     }
     List<Field> fields = new ArrayList<>();
     getAllFields(fields, entityClass);
     for (String dbColumn : columnInfoMap.keySet()) {
-
       boolean success = false;
       for (Field field : fields) {
         field.setAccessible(true);
@@ -69,10 +69,11 @@ public class EntityMappingHolder {
         }
       }
       if (!success) {
-        System.out.println(
-            "Unable to map " + dbColumn + " to any field in " + entityClass.getSimpleName());
+        String msg =
+            "Unable to map " + dbColumn + " to any field in " + entityClass.getSimpleName();
+        System.out.println(msg);
+        throw new RuntimeException(msg);
       }
-
     }
     columnInfoPerTable.put(tableName, columnInfoMap);
   }

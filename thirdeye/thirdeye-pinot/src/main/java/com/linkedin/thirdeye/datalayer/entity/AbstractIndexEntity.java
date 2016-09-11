@@ -11,6 +11,4 @@ public abstract class AbstractIndexEntity extends AbstractEntity {
   public void setBaseId(Long baseId) {
     this.baseId = baseId;
   }
-
-  
 }

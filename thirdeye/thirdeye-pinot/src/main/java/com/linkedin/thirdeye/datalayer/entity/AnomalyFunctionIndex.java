@@ -1,6 +1,6 @@
 package com.linkedin.thirdeye.datalayer.entity;
 
-public class AnomalyFunctionIndexEntity extends AbstractIndexEntity {
+public class AnomalyFunctionIndex extends AbstractIndexEntity {
   String functionName;
   boolean active;
   long metricId;

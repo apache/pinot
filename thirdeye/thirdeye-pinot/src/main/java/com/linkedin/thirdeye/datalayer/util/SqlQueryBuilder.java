@@ -14,6 +14,9 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import org.apache.commons.lang3.tuple.ImmutablePair;
+
 import com.google.common.collect.BiMap;
 import com.google.common.collect.Sets;
 import com.linkedin.thirdeye.datalayer.entity.AbstractEntity;
@@ -79,7 +82,7 @@ public class SqlQueryBuilder {
       AbstractEntity entity) throws Exception {
     if (!insertSqlMap.containsKey(tableName)) {
       String insertSql =
-          generateInsertSql(tableName, entityMappingHolder.columnInfoPerTable.get(tableName));
+          generateInsertSql(tableName, entityMappingHolder.columnInfoPerTable.get(tableName.toLowerCase()));
       insertSqlMap.put(tableName, insertSql);
       System.out.println(insertSql);
     }
@@ -316,8 +319,15 @@ public class SqlQueryBuilder {
             .append(predicate.getOper().toString()).append("?");
         parametersMap.put(entityNameToDBNameMapping.get(predicate.getLhs()), predicate.getRhs());
         break;
-      default:
+      case BETWEEN:
+        whereClause.append(entityNameToDBNameMapping.get(predicate.getLhs()))
+        .append(predicate.getOper().toString()).append("? AND ?");
+        ImmutablePair<Object, Object> pair = (ImmutablePair<Object, Object>) predicate.getRhs();
+        parametersMap.put(entityNameToDBNameMapping.get(predicate.getLhs()), pair.getLeft());
+        parametersMap.put(entityNameToDBNameMapping.get(predicate.getLhs()), pair.getRight());
         break;
+      default:
+        throw new RuntimeException("Unsupported predicate type:" + predicate.getOper());
 
     }
   }

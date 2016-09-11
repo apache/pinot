@@ -6,6 +6,7 @@ import java.util.concurrent.TimeUnit;
 import javax.persistence.Column;
 import javax.persistence.EnumType;
 import javax.persistence.Enumerated;
+import javax.persistence.Index;
 import javax.persistence.MappedSuperclass;
 
 import org.codehaus.jackson.annotate.JsonIgnore;

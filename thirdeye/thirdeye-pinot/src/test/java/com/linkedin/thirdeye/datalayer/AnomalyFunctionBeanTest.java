@@ -5,9 +5,9 @@ import java.util.List;
 import org.junit.Assert;
 import org.testng.annotations.Test;
 
+import com.linkedin.thirdeye.datalayer.dao.GenericPojoDao;
 import com.linkedin.thirdeye.datalayer.pojo.AnomalyFunctionBean;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
-import com.linkedin.thirdeye.datalayer.util.GenericPojoDao;
 import com.linkedin.thirdeye.datalayer.util.Predicate;
 
 public class AnomalyFunctionBeanTest extends AbstractBaseTest {
