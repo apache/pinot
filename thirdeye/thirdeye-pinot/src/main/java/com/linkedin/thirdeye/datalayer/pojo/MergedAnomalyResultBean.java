@@ -107,7 +107,10 @@ public class MergedAnomalyResultBean extends AbstractBean
     this.collection = collection;
   }
 
-
+  /**
+   * Severity
+   * @return
+   */
   public double getWeight() {
     return weight;
   }

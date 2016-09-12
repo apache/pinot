@@ -25,7 +25,7 @@ public class MergedAnomalyResultDTO extends MergedAnomalyResultBean {
   @JoinColumn(name = "anomaly_feedback_id")
   private AnomalyFeedbackDTO feedback;
 
-  @OneToMany(fetch = FetchType.EAGER, cascade = CascadeType.ALL)
+  @OneToMany(fetch = FetchType.EAGER, cascade = CascadeType.MERGE)
   @JoinTable(name = "anomaly_merged_results_mapping", joinColumns = @JoinColumn(name = "anomaly_merged_result_id"),
       inverseJoinColumns = @JoinColumn(name = "anomaly_result_id"))
   private List<RawAnomalyResultDTO> anomalyResults = new ArrayList<>();

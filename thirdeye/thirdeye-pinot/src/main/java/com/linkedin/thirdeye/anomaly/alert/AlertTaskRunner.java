@@ -15,6 +15,7 @@ import java.util.Set;
 import java.util.TimeZone;
 import java.util.TreeMap;
 
+import java.util.stream.Collectors;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.commons.mail.EmailException;
@@ -68,8 +69,8 @@ public class AlertTaskRunner implements TaskRunner {
     queryCache = CACHE_REGISTRY_INSTANCE.getQueryCache();
   }
 
-  @Override
-  public List<TaskResult> execute(TaskInfo taskInfo, TaskContext taskContext) throws Exception {
+  @Override public List<TaskResult> execute(TaskInfo taskInfo, TaskContext taskContext)
+      throws Exception {
     AlertTaskInfo alertTaskInfo = (AlertTaskInfo) taskInfo;
     List<TaskResult> taskResult = new ArrayList<>();
     anomalyMergedResultDAO = taskContext.getMergedResultDAO();
@@ -99,7 +100,12 @@ public class AlertTaskRunner implements TaskRunner {
     final String collectionAlias = ThirdEyeUtils.getAliasFromCollection(collection);
 
     // Get the anomalies in that range
-    final List<MergedAnomalyResultDTO> results = anomalyMergedResultDAO.getAllByTimeEmailIdAndNotifiedFalse(windowStart.getMillis(), windowEnd.getMillis(), alertConfig.getId());
+    final List<MergedAnomalyResultDTO> allResults = anomalyMergedResultDAO
+        .getAllByTimeEmailIdAndNotifiedFalse(windowStart.getMillis(), windowEnd.getMillis(),
+            alertConfig.getId());
+
+    // apply filtration rule
+    List<MergedAnomalyResultDTO> results = applyFiltrationRule(allResults);
 
     if (results.isEmpty() && !alertConfig.getSendZeroAnomalyEmail()) {
       LOG.info("Zero anomalies found, skipping sending email");
@@ -139,7 +145,24 @@ public class AlertTaskRunner implements TaskRunner {
     }
 
     sendAlertForAnomalies(collectionAlias, results, groupedResults, dimensionNames);
-    updateNotifiedStatus(results);
+    updateNotifiedStatus(allResults);
+  }
+
+  private List<MergedAnomalyResultDTO> applyFiltrationRule(List<MergedAnomalyResultDTO> results) {
+    if (results.size() == 0) {
+      return results;
+    }
+    // TODO: configure filtration rule at metric level and fetch it from DB
+    AnomalyFiltrationHelper.FiltrationRule filtrationRule =
+        AnomalyFiltrationHelper.getFiltrationRule();
+
+    List<MergedAnomalyResultDTO> qualifiedAnomalies =
+        results.stream().filter(result -> filtrationRule.isQualified(result))
+            .collect(Collectors.toList());
+    LOG.info(
+        "Found [{}] anomalies qualified to alert after applying filtration rule on [{}] anomalies",
+        qualifiedAnomalies.size(), results.size());
+    return qualifiedAnomalies;
   }
 
   private void sendAlertForAnomalies(String collectionAlias, List<MergedAnomalyResultDTO> results,
@@ -195,12 +218,12 @@ public class AlertTaskRunner implements TaskRunner {
 
     // Send email
     try {
-      String alertEmailSubject = String.format("Anomaly Alert!: %d anomalies detected for %s:%s",
-          results.size(), collectionAlias, alertConfig.getMetric());
+      String alertEmailSubject = String
+          .format("Anomaly Alert!: %d anomalies detected for %s:%s", results.size(),
+              collectionAlias, alertConfig.getMetric());
       String alertEmailHtml = new String(baos.toByteArray(), CHARSET);
-      AlertJobUtils
-          .sendEmailWithHtml(email, thirdeyeConfig.getSmtpConfiguration(), alertEmailSubject, alertEmailHtml,
-          alertConfig.getFromAddress(), alertConfig.getToAddresses());
+      EmailHelper.sendEmailWithHtml(email, thirdeyeConfig.getSmtpConfiguration(), alertEmailSubject,
+          alertEmailHtml, alertConfig.getFromAddress(), alertConfig.getToAddresses());
     } catch (Exception e) {
       throw new JobExecutionException(e);
     }
@@ -224,8 +247,8 @@ public class AlertTaskRunner implements TaskRunner {
       this.dimensionNames = dimensionNames;
     }
 
-    @Override
-    public Object exec(@SuppressWarnings("rawtypes") List arguments) throws TemplateModelException {
+    @Override public Object exec(@SuppressWarnings("rawtypes") List arguments)
+        throws TemplateModelException {
       if (arguments.size() != 1) {
         throw new TemplateModelException(
             "Wrong arguments, expected single comma-separated dimension string");
@@ -238,7 +261,7 @@ public class AlertTaskRunner implements TaskRunner {
       for (int i = 0; i < split.length; i++) {
         String value = split[i];
         if (!value.equals(UNASSIGNED_DIMENSION_VALUE)) { // TODO figure out actual constant /
-                                                         // rewrite function API to only
+          // rewrite function API to only
           // return assignments.
           String dimension = dimensionNames.get(i);
           assignments.add(dimension + EQUALS + value);
@@ -260,8 +283,8 @@ public class AlertTaskRunner implements TaskRunner {
       this.TZ = timeZone;
     }
 
-    @Override
-    public Object exec(@SuppressWarnings("rawtypes") List arguments) throws TemplateModelException {
+    @Override public Object exec(@SuppressWarnings("rawtypes") List arguments)
+        throws TemplateModelException {
       if (arguments.size() != 1) {
         throw new TemplateModelException("Wrong arguments, expected single millisSinceEpoch");
       }
@@ -282,13 +305,15 @@ public class AlertTaskRunner implements TaskRunner {
     String collection = alertConfig.getCollection();
     String metric = alertConfig.getMetric();
 
-    String subject =
-        String.format("[ThirdEye Anomaly Detector] FAILED ALERT ID=%d (%s:%s)", alertConfig.getId(), collection, metric);
-    String textBody =
-        String.format("%s%n%nException:%s", alertConfig.toString(), ExceptionUtils.getStackTrace(t));
+    String subject = String
+        .format("[ThirdEye Anomaly Detector] FAILED ALERT ID=%d (%s:%s)", alertConfig.getId(),
+            collection, metric);
+    String textBody = String
+        .format("%s%n%nException:%s", alertConfig.toString(), ExceptionUtils.getStackTrace(t));
     try {
-      AlertJobUtils.sendEmailWithTextBody(email, thirdeyeConfig.getSmtpConfiguration(), subject, textBody,
-          thirdeyeConfig.getFailureFromAddress(), thirdeyeConfig.getFailureToAddress());
+      EmailHelper
+          .sendEmailWithTextBody(email, thirdeyeConfig.getSmtpConfiguration(), subject, textBody,
+              thirdeyeConfig.getFailureFromAddress(), thirdeyeConfig.getFailureToAddress());
     } catch (EmailException e) {
       throw new JobExecutionException(e);
     }
