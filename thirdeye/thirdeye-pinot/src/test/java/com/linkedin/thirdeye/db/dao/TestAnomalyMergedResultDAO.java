@@ -84,12 +84,4 @@ public class TestAnomalyMergedResultDAO extends AbstractDbTestBase {
            new String[] {mergedResult.getDimensions()}, 0, System.currentTimeMillis());
     Assert.assertEquals(mergedResults.get(0), mergedResult);
   }
-
-  @Test(dependsOnMethods = {"testMergedResultCRUD"})
-  public void testFindLatestByCollectionMetricDimensions() {
-    MergedAnomalyResultDTO mergedResult1 = mergedResultDAO
-        .findLatestByCollectionMetricDimensions(mergedResult.getCollection(), mergedResult.getMetric(),
-            mergedResult.getDimensions());
-    Assert.assertEquals(mergedResult1, mergedResult);
-  }
 }

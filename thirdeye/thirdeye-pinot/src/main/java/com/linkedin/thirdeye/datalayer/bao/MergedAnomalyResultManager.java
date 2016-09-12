@@ -6,8 +6,6 @@ import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 
 public interface MergedAnomalyResultManager extends AbstractManager<MergedAnomalyResultDTO> {
 
-  List<MergedAnomalyResultDTO> getAllByTime(long startTime, long endTime);
-
   List<MergedAnomalyResultDTO> getAllByTimeEmailIdAndNotifiedFalse(long startTime, long endTime,
       long emailId);
 
@@ -19,9 +17,6 @@ public interface MergedAnomalyResultManager extends AbstractManager<MergedAnomal
 
   List<MergedAnomalyResultDTO> findByCollectionTime(String collection, long startTime,
       long endTime);
-
-  MergedAnomalyResultDTO findLatestByCollectionMetricDimensions(String collection, String metric,
-      String dimensions);
 
   MergedAnomalyResultDTO findLatestByFunctionIdDimensions(Long functionId, String dimensions);
 

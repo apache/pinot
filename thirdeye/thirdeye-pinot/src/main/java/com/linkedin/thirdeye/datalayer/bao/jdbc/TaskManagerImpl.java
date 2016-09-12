@@ -47,11 +47,8 @@ public class TaskManagerImpl extends AbstractManagerImpl<TaskDTO> implements Tas
     for (TaskBean bean : list) {
       result.add((TaskDTO) MODEL_MAPPER.map(bean, TaskDTO.class));
     }
-
     return result;
-
   }
-
 
   @Override
   public List<TaskDTO> findByStatusOrderByCreateTimeAsc(TaskStatus status, int fetchSize) {

@@ -42,9 +42,6 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
       "from MergedAnomalyResultDTO amr where amr.function.id=:functionId "
           + "and amr.dimensions is null order by amr.endTime desc";
 
-  private static final String FIND_BY_TIME =
-      "from MergedAnomalyResultDTO r WHERE (r.startTime < :endTime and r.endTime > :startTime) order by r.endTime desc ";
-
   private static final String FIND_BY_TIME_EMAIL_NOTIFIED_FALSE =
       "SELECT r FROM EmailConfigurationDTO d JOIN d.functions f, MergedAnomalyResultDTO r "
           + "WHERE r.function.id=f.id AND d.id = :emailId and r.notified=false "
@@ -52,16 +49,6 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
 
   public MergedAnomalyResultManagerImpl() {
     super(MergedAnomalyResultDTO.class);
-  }
-
-  /* (non-Javadoc)
-   * @see com.linkedin.thirdeye.datalayer.bao.IMergedAnomalyResultManager#getAllByTime(long, long)
-   */
-  @Override
-  @Transactional
-  public List<MergedAnomalyResultDTO> getAllByTime(long startTime, long endTime) {
-    return getEntityManager().createQuery(FIND_BY_TIME, entityClass)
-        .setParameter("startTime", startTime).setParameter("endTime", endTime).getResultList();
   }
 
   /* (non-Javadoc)
@@ -117,23 +104,6 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
     return getEntityManager().createQuery(FIND_BY_COLLECTION_TIME, entityClass)
         .setParameter("collection", collection).setParameter("startTime", startTime)
         .setParameter("endTime", endTime).getResultList();
-  }
-
-  /* (non-Javadoc)
-   * @see com.linkedin.thirdeye.datalayer.bao.IMergedAnomalyResultManager#findLatestByCollectionMetricDimensions(java.lang.String, java.lang.String, java.lang.String)
-   */
-  @Override
-  @Transactional
-  public MergedAnomalyResultDTO findLatestByCollectionMetricDimensions(
-      String collection, String metric, String dimensions) {
-    try {
-      return getEntityManager()
-          .createQuery(FIND_BY_COLLECTION_METRIC_DIMENSIONS_ORDER_BY_END_TIME, entityClass)
-          .setParameter("collection", collection).setParameter("metric", metric)
-          .setParameter("dimensions", dimensions).setMaxResults(1).getSingleResult();
-    } catch (NoResultException e) {
-      return null;
-    }
   }
 
   /* (non-Javadoc)

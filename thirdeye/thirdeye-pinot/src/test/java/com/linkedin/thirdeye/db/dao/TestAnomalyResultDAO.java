@@ -5,8 +5,6 @@ import java.util.List;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import com.linkedin.thirdeye.api.dto.GroupByKey;
-import com.linkedin.thirdeye.api.dto.GroupByRow;
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
 import com.linkedin.thirdeye.constant.FeedbackStatus;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
@@ -34,23 +32,6 @@ public class TestAnomalyResultDAO extends AbstractDbTestBase {
   }
 
   @Test(dependsOnMethods = {"testAnomalyResultCRUD"})
-  public void testGetCountByFunction() {
-    List<GroupByRow<GroupByKey, Long>> groupByRows =
-        anomalyResultDAO.getCountByFunction(0l, System.currentTimeMillis());
-    Assert.assertEquals(groupByRows.size(), 1);
-    Assert.assertEquals(groupByRows.get(0).getGroupBy().getFunctionId(), spec.getId());
-    Assert.assertEquals(groupByRows.get(0).getValue().longValue(), 1);
-  }
-
-  @Test(dependsOnMethods = {"testGetCountByFunction"})
-  public void testFindUnmergedByCollectionMetricAndDimensions() {
-    List<RawAnomalyResultDTO> unmergedResults = anomalyResultDAO
-        .findUnmergedByCollectionMetricAndDimensions(spec.getCollection(), spec.getMetric(),
-            anomalyResult.getDimensions() );
-    Assert.assertEquals(unmergedResults.size(), 1);
-  }
-
-  @Test(dependsOnMethods = {"testFindUnmergedByCollectionMetricAndDimensions"})
   public void testResultFeedback() {
     RawAnomalyResultDTO result = anomalyResultDAO.findById(anomalyResult.getId());
     Assert.assertNotNull(result);
