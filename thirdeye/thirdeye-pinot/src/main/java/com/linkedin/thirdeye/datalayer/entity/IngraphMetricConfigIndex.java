@@ -1,6 +1,6 @@
 package com.linkedin.thirdeye.datalayer.entity;
 
-public class IngraphMetricConfig extends AbstractJsonEntity {
+public class IngraphMetricConfigIndex extends AbstractIndexEntity {
   String name;
   String alias;
 

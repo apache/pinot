@@ -2,16 +2,21 @@ package com.linkedin.thirdeye.datalayer.util;
 
 import java.util.List;
 
+import org.apache.commons.lang3.tuple.ImmutablePair;
+
+import com.google.common.collect.Range;
+
 public class Predicate {
   enum OPER {
-    AND("AND"), OR("OR"), EQ("="), GT(">"), LT("<"), NEQ("!="), IN("IN");
+    AND("AND"), OR("OR"), EQ("="), GT(">"), LT("<"), NEQ("!="), IN("IN"), BETWEEN("BETWEEN");
     private String sign;
 
     OPER(String sign) {
       this.sign = sign;
     }
 
-    @Override public String toString() {
+    @Override
+    public String toString() {
       return sign;
     }
 
@@ -52,6 +57,9 @@ public class Predicate {
   public static Predicate EQ(String columnName, Object value) {
     return new Predicate(columnName, OPER.EQ, value);
   }
+  public static Predicate NEQ(String columnName, Object value) {
+    return new Predicate(columnName, OPER.NEQ, value);
+  }
 
   public static Predicate LT(String columnName, Object value) {
     return new Predicate(columnName, OPER.LT, value);
@@ -67,6 +75,11 @@ public class Predicate {
 
   public static Predicate OR(Predicate... childPredicates) {
     return new Predicate(null, OPER.OR, null);
+  }
+
+  public static Predicate BETWEEN(String columnName, Object startValue, Object endValue) {
+    return new Predicate(columnName, OPER.BETWEEN,
+        new ImmutablePair<Object, Object>(startValue, endValue));
   }
 
 }

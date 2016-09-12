@@ -1,7 +1,7 @@
 package com.linkedin.thirdeye.datalayer.entity;
 
-public class AnomalyFunction extends AbstractJsonEntity {
-  String name;
+public class AnomalyFunctionIndex extends AbstractIndexEntity {
+  String functionName;
   boolean active;
   long metricId;
   String collection;
@@ -39,11 +39,11 @@ public class AnomalyFunction extends AbstractJsonEntity {
     this.metricId = metricId;
   }
 
-  public String getName() {
-    return name;
+  public String getFunctionName() {
+    return functionName;
   }
 
-  public void setName(String name) {
-    this.name = name;
+  public void setFunctionName(String functionName) {
+    this.functionName = functionName;
   }
 }

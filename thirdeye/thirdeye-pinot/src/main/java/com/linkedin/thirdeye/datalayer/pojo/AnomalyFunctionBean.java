@@ -6,15 +6,20 @@ import java.util.concurrent.TimeUnit;
 import javax.persistence.Column;
 import javax.persistence.EnumType;
 import javax.persistence.Enumerated;
+import javax.persistence.Index;
 import javax.persistence.MappedSuperclass;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
+import org.codehaus.jackson.annotate.JsonIgnore;
+import org.codehaus.jackson.annotate.JsonIgnoreProperties;
+import org.codehaus.jackson.annotate.JsonProperty;
+
 import com.google.common.base.MoreObjects;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 @MappedSuperclass
+@JsonIgnoreProperties(ignoreUnknown=true)
 public class AnomalyFunctionBean extends AbstractBean {
 
   @Column(name = "collection", nullable = false)
@@ -69,6 +74,8 @@ public class AnomalyFunctionBean extends AbstractBean {
   @Column(name = "filters", nullable = true)
   private String filters;
 
+  private long metricId;
+  
   public String getCollection() {
     return collection;
   }
@@ -194,13 +201,28 @@ public class AnomalyFunctionBean extends AbstractBean {
   }
 
   @JsonIgnore
+  @JsonProperty("wrapper")
   public Multimap<String, String> getFilterSet() {
     return ThirdEyeUtils.getFilterSet(filters);
   }
-
+  
+  @JsonIgnore
+  @JsonProperty("wrapper")
   public void setFilters(String filters) {
     String sortedFilters = ThirdEyeUtils.getSortedFilters(filters);
     this.filters = sortedFilters;
+  }
+  
+  public long getMetricId() {
+    return metricId;
+  }
+
+  public void setMetricId(long metricId) {
+    this.metricId = metricId;
+  }
+
+  public void setActive(boolean isActive) {
+    this.isActive = isActive;
   }
 
   @Override
@@ -234,7 +256,7 @@ public class AnomalyFunctionBean extends AbstractBean {
   @Override
   public String toString() {
     return MoreObjects.toStringHelper(this).add("id", getId()).add("collection", collection)
-        .add("metric", metric).add("metric_function", metricFunction.name()).add("type", type)
+        .add("metric", metric).add("metric_function", getMetricFunction()).add("type", type)
         .add("isActive", isActive).add("cron", cron).add("properties", properties)
         .add("bucketSize", bucketSize).add("bucketUnit", bucketUnit).add("windowSize", windowSize)
         .add("windowUnit", windowUnit).add("windowDelay", windowDelay)

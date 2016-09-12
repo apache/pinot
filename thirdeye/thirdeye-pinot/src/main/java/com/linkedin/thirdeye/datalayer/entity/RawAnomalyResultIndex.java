@@ -1,15 +1,14 @@
 package com.linkedin.thirdeye.datalayer.entity;
 
-public class MergedAnomalyResult extends AbstractJsonEntity {
+public class RawAnomalyResultIndex extends AbstractIndexEntity {
   long anomalyFunctionId;
   long anomalyFeedbackId;
-  long metricId;
+  long jobId;
   long startTime;
   long endTime;
-  String collection;
-  String metric;
   String dimensionValue;
-  boolean notified;
+  boolean merged;
+  boolean dataMissing;
 
   public long getAnomalyFeedbackId() {
     return anomalyFeedbackId;
@@ -27,12 +26,12 @@ public class MergedAnomalyResult extends AbstractJsonEntity {
     this.anomalyFunctionId = anomalyFunctionId;
   }
 
-  public String getCollection() {
-    return collection;
+  public boolean isDataMissing() {
+    return dataMissing;
   }
 
-  public void setCollection(String collection) {
-    this.collection = collection;
+  public void setDataMissing(boolean dataMissing) {
+    this.dataMissing = dataMissing;
   }
 
   public String getDimensionValue() {
@@ -51,20 +50,20 @@ public class MergedAnomalyResult extends AbstractJsonEntity {
     this.endTime = endTime;
   }
 
-  public String getMetric() {
-    return metric;
+  public long getJobId() {
+    return jobId;
   }
 
-  public void setMetric(String metric) {
-    this.metric = metric;
+  public void setJobId(long jobId) {
+    this.jobId = jobId;
   }
 
-  public long getMetricId() {
-    return metricId;
+  public boolean isMerged() {
+    return merged;
   }
 
-  public void setMetricId(long metricId) {
-    this.metricId = metricId;
+  public void setMerged(boolean merged) {
+    this.merged = merged;
   }
 
   public long getStartTime() {
@@ -73,13 +72,5 @@ public class MergedAnomalyResult extends AbstractJsonEntity {
 
   public void setStartTime(long startTime) {
     this.startTime = startTime;
-  }
-
-  public boolean isNotified() {
-    return notified;
-  }
-
-  public void setNotified(boolean notified) {
-    this.notified = notified;
   }
 }

@@ -1,6 +1,6 @@
 package com.linkedin.thirdeye.datalayer.entity;
 
-public class AnomalyMergeConfig extends AbstractJsonEntity {
+public class AnomalyMergeConfigIndex extends AbstractIndexEntity {
   String name;
 
   public String getName() {

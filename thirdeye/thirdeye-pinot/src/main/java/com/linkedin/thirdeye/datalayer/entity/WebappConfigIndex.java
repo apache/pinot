@@ -1,6 +1,6 @@
 package com.linkedin.thirdeye.datalayer.entity;
 
-public class WebappConfig extends AbstractJsonEntity {
+public class WebappConfigIndex extends AbstractIndexEntity {
   String name;
   String collection;
   String type;

@@ -1,6 +1,6 @@
 package com.linkedin.thirdeye.datalayer.entity;
 
-public class Metric extends AbstractJsonEntity {
+public class MetricIndex extends AbstractIndexEntity {
   String name;
   String collection;
   boolean derived;

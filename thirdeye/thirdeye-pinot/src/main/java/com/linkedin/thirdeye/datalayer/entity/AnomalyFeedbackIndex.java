@@ -1,6 +1,6 @@
 package com.linkedin.thirdeye.datalayer.entity;
 
-public class AnomalyFeedback extends AbstractJsonEntity {
+public class AnomalyFeedbackIndex extends AbstractIndexEntity {
   String type;
 
   public String getType() {

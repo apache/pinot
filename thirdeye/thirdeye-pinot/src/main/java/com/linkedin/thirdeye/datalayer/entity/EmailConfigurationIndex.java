@@ -1,6 +1,6 @@
 package com.linkedin.thirdeye.datalayer.entity;
 
-public class EmailConfiguration extends AbstractJsonEntity {
+public class EmailConfigurationIndex extends AbstractIndexEntity {
   String name;
   boolean active;
 

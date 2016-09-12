@@ -15,9 +15,12 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.commons.lang3.tuple.ImmutablePair;
+
 import com.google.common.collect.BiMap;
 import com.google.common.collect.Sets;
-import com.linkedin.thirdeye.datalayer.entity.AbstractJsonEntity;
+import com.linkedin.thirdeye.datalayer.entity.AbstractEntity;
+import com.linkedin.thirdeye.datalayer.entity.AbstractIndexEntity;
 
 public class SqlQueryBuilder {
 
@@ -30,7 +33,8 @@ public class SqlQueryBuilder {
 
   private static final Pattern PARAM_PATTERN =
       Pattern.compile(PARAM_REGEX, Pattern.CASE_INSENSITIVE);
-  private static Set<String> AUTO_UPDATE_COLUMN_SET = Sets.newHashSet("id", "last_modified");
+  private static Set<String> AUTO_UPDATE_COLUMN_SET =
+      Sets.newHashSet("id", "last_modified", "update_time");
 
   private EntityMappingHolder entityMappingHolder;;
 
@@ -49,12 +53,14 @@ public class SqlQueryBuilder {
     String delim = "";
     for (ColumnInfo columnInfo : columnInfoMap.values()) {
       String columnName = columnInfo.columnNameInDB;
-      if (!AUTO_UPDATE_COLUMN_SET.contains(columnName.toLowerCase())) {
+      if (columnInfo.field != null && !AUTO_UPDATE_COLUMN_SET.contains(columnName.toLowerCase())) {
         names.append(delim);
         names.append(columnName);
         values.append(delim);
         values.append("?");
         delim = ",";
+      } else {
+        System.out.println("Skipping column " + columnName + " from insert");
       }
     }
     names.append(")");
@@ -65,7 +71,7 @@ public class SqlQueryBuilder {
     return sb.toString();
   }
 
-  public PreparedStatement createInsertStatement(Connection conn, AbstractJsonEntity entity)
+  public PreparedStatement createInsertStatement(Connection conn, AbstractEntity entity)
       throws Exception {
     String tableName =
         entityMappingHolder.tableToEntityNameMap.inverse().get(entity.getClass().getSimpleName());
@@ -73,10 +79,10 @@ public class SqlQueryBuilder {
   }
 
   public PreparedStatement createInsertStatement(Connection conn, String tableName,
-      AbstractJsonEntity entity) throws Exception {
+      AbstractEntity entity) throws Exception {
     if (!insertSqlMap.containsKey(tableName)) {
       String insertSql =
-          generateInsertSql(tableName, entityMappingHolder.columnInfoPerTable.get(tableName));
+          generateInsertSql(tableName, entityMappingHolder.columnInfoPerTable.get(tableName.toLowerCase()));
       insertSqlMap.put(tableName, insertSql);
       System.out.println(insertSql);
     }
@@ -88,7 +94,8 @@ public class SqlQueryBuilder {
         entityMappingHolder.columnInfoPerTable.get(tableName);
     int parameterIndex = 1;
     for (ColumnInfo columnInfo : columnInfoMap.values()) {
-      if (!AUTO_UPDATE_COLUMN_SET.contains(columnInfo.columnNameInDB.toLowerCase())) {
+      if (columnInfo.field != null
+          && !AUTO_UPDATE_COLUMN_SET.contains(columnInfo.columnNameInDB.toLowerCase())) {
         Object val = columnInfo.field.get(entity);
         System.out.println("Setting value:" + val + " for " + columnInfo.columnNameInDB);
         if (val != null) {
@@ -109,7 +116,7 @@ public class SqlQueryBuilder {
   }
 
   public PreparedStatement createFindByIdStatement(Connection connection,
-      Class<? extends AbstractJsonEntity> entityClass, Long id) throws Exception {
+      Class<? extends AbstractEntity> entityClass, Long id) throws Exception {
     String tableName =
         entityMappingHolder.tableToEntityNameMap.inverse().get(entityClass.getSimpleName());
     String sql = "Select * from " + tableName + " where id=?";
@@ -118,9 +125,23 @@ public class SqlQueryBuilder {
     return prepareStatement;
   }
 
+  public PreparedStatement createFindByIdStatement(Connection connection,
+      Class<? extends AbstractEntity> entityClass, List<Long> ids) throws Exception {
+    String tableName =
+        entityMappingHolder.tableToEntityNameMap.inverse().get(entityClass.getSimpleName());
+    StringBuilder sql = new StringBuilder("Select * from " + tableName + " where id IN (");
+    String delim = "";
+    for (Long id : ids) {
+      sql.append(delim).append(id);
+      delim = ", ";
+    }
+    sql.append(")");
+    PreparedStatement prepareStatement = connection.prepareStatement(sql.toString());
+    return prepareStatement;
+  }
+
   public PreparedStatement createFindByParamsStatement(Connection connection,
-      Class<? extends AbstractJsonEntity> entityClass, Map<String, Object> filters)
-          throws Exception {
+      Class<? extends AbstractEntity> entityClass, Map<String, Object> filters) throws Exception {
     String tableName =
         entityMappingHolder.tableToEntityNameMap.inverse().get(entityClass.getSimpleName());
     BiMap<String, String> entityNameToDBNameMapping =
@@ -151,7 +172,7 @@ public class SqlQueryBuilder {
     return prepareStatement;
   }
 
-  public PreparedStatement createUpdateStatement(Connection connection, AbstractJsonEntity entity,
+  public PreparedStatement createUpdateStatement(Connection connection, AbstractEntity entity,
       Set<String> fieldsToUpdate) throws Exception {
     String tableName =
         entityMappingHolder.tableToEntityNameMap.inverse().get(entity.getClass().getSimpleName());
@@ -194,9 +215,27 @@ public class SqlQueryBuilder {
     return prepareStatement;
   }
 
+  public PreparedStatement createDeleteStatement(Connection connection,
+      Class<? extends AbstractEntity> entityClass, List<Long> ids) throws Exception {
+    if (ids == null || ids.isEmpty()) {
+      throw new IllegalArgumentException("ids to delete cannot be null/empty");
+    }
+    String tableName =
+        entityMappingHolder.tableToEntityNameMap.inverse().get(entityClass.getSimpleName());
+    StringBuilder sqlBuilder = new StringBuilder("DELETE FROM " + tableName);
+    StringBuilder whereClause = new StringBuilder(" WHERE  id IN( ");
+    String delim = "";
+    for (Long id : ids) {
+      whereClause.append(delim).append(id);
+    }
+    whereClause.append(")");
+    sqlBuilder.append(whereClause.toString());
+    PreparedStatement prepareStatement = connection.prepareStatement(sqlBuilder.toString());
+    return prepareStatement;
+  }
+
   public PreparedStatement createDeleteByIdStatement(Connection connection,
-      Class<? extends AbstractJsonEntity> entityClass, Map<String, Object> filters)
-          throws Exception {
+      Class<? extends AbstractEntity> entityClass, Map<String, Object> filters) throws Exception {
     String tableName =
         entityMappingHolder.tableToEntityNameMap.inverse().get(entityClass.getSimpleName());
     BiMap<String, String> entityNameToDBNameMapping =
@@ -225,7 +264,7 @@ public class SqlQueryBuilder {
 
 
   public PreparedStatement createFindAllStatement(Connection connection,
-      Class<? extends AbstractJsonEntity> entityClass) throws Exception {
+      Class<? extends AbstractEntity> entityClass) throws Exception {
     String tableName =
         entityMappingHolder.tableToEntityNameMap.inverse().get(entityClass.getSimpleName());
     String sql = "Select * from " + tableName;
@@ -234,7 +273,7 @@ public class SqlQueryBuilder {
   }
 
   public PreparedStatement createFindByParamsStatement(Connection connection,
-      Class<? extends AbstractJsonEntity> entityClass, Predicate predicate) throws Exception {
+      Class<? extends AbstractEntity> entityClass, Predicate predicate) throws Exception {
     String tableName =
         entityMappingHolder.tableToEntityNameMap.inverse().get(entityClass.getSimpleName());
     BiMap<String, String> entityNameToDBNameMapping =
@@ -276,17 +315,25 @@ public class SqlQueryBuilder {
       case IN:
       case LT:
       case NEQ:
-        whereClause.append(predicate.getLhs()).append(predicate.getOper().toString()).append("?");
+        whereClause.append(entityNameToDBNameMapping.get(predicate.getLhs()))
+            .append(predicate.getOper().toString()).append("?");
         parametersMap.put(entityNameToDBNameMapping.get(predicate.getLhs()), predicate.getRhs());
         break;
-      default:
+      case BETWEEN:
+        whereClause.append(entityNameToDBNameMapping.get(predicate.getLhs()))
+        .append(predicate.getOper().toString()).append("? AND ?");
+        ImmutablePair<Object, Object> pair = (ImmutablePair<Object, Object>) predicate.getRhs();
+        parametersMap.put(entityNameToDBNameMapping.get(predicate.getLhs()), pair.getLeft());
+        parametersMap.put(entityNameToDBNameMapping.get(predicate.getLhs()), pair.getRight());
         break;
+      default:
+        throw new RuntimeException("Unsupported predicate type:" + predicate.getOper());
 
     }
   }
 
   public PreparedStatement createStatementFromSQL(Connection connection, String parameterizedSQL,
-      Map<String, Object> parameterMap, Class<? extends AbstractJsonEntity> entityClass)
+      Map<String, Object> parameterMap, Class<? extends AbstractEntity> entityClass)
           throws Exception {
     String tableName =
         entityMappingHolder.tableToEntityNameMap.inverse().get(entityClass.getSimpleName());
@@ -337,4 +384,46 @@ public class SqlQueryBuilder {
     return ps;
   }
 
+  public PreparedStatement createUpdateStatementForIndexTable(Connection connection,
+      AbstractIndexEntity entity) throws Exception {
+    String tableName =
+        entityMappingHolder.tableToEntityNameMap.inverse().get(entity.getClass().getSimpleName());
+    LinkedHashMap<String, ColumnInfo> columnInfoMap =
+        entityMappingHolder.columnInfoPerTable.get(tableName);
+
+    StringBuilder sqlBuilder = new StringBuilder("UPDATE " + tableName + " SET ");
+    String delim = "";
+    LinkedHashMap<String, Object> parameterMap = new LinkedHashMap<>();
+    for (ColumnInfo columnInfo : columnInfoMap.values()) {
+      String columnNameInDB = columnInfo.columnNameInDB;
+      if (!columnNameInDB.equalsIgnoreCase("base_id") && !AUTO_UPDATE_COLUMN_SET.contains(columnNameInDB)) {
+        Object val = columnInfo.field.get(entity);
+        if (val != null) {
+          if (Enum.class.isAssignableFrom(val.getClass())) {
+            val = val.toString();
+          }
+          sqlBuilder.append(delim);
+          sqlBuilder.append(columnNameInDB);
+          sqlBuilder.append("=");
+          sqlBuilder.append("?");
+          delim = ",";
+          System.out.println("Setting value:" + val + " for " + columnInfo.columnNameInDB);
+          parameterMap.put(columnNameInDB, val);
+        }
+      }
+    }
+    //ADD WHERE CLAUSE TO CHECK FOR ENTITY ID
+    sqlBuilder.append(" WHERE base_id=?");
+    parameterMap.put("base_id", entity.getBaseId());
+    System.out.println("Update statement:" + sqlBuilder.toString());
+    int parameterIndex = 1;
+    PreparedStatement prepareStatement = connection.prepareStatement(sqlBuilder.toString());
+    for (Entry<String, Object> paramEntry : parameterMap.entrySet()) {
+      String dbFieldName = paramEntry.getKey();
+      ColumnInfo info = columnInfoMap.get(dbFieldName);
+      System.out.println("info:" + info  + " for:" + dbFieldName);
+      prepareStatement.setObject(parameterIndex++, paramEntry.getValue(), info.sqlType);
+    }
+    return prepareStatement;
+  }
 }

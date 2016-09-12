@@ -1,95 +1,93 @@
 package com.linkedin.thirdeye.datalayer.bao.jdbc;
 
-import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import org.codehaus.jackson.JsonParseException;
-import org.codehaus.jackson.map.JsonMappingException;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.modelmapper.ModelMapper;
 
+import com.linkedin.thirdeye.anomaly.merge.AnomalyMergeConfig;
 import com.linkedin.thirdeye.datalayer.bao.AbstractManager;
-import com.linkedin.thirdeye.datalayer.dao.AnomalyFeedbackDAO;
-import com.linkedin.thirdeye.datalayer.dao.AnomalyFunctionDAO;
-import com.linkedin.thirdeye.datalayer.dao.RawAnomalyResultDAO;
+import com.linkedin.thirdeye.datalayer.dao.GenericPojoDao;
+//import com.linkedin.thirdeye.datalayer.dao.AnomalyFeedbackDAO;
+//import com.linkedin.thirdeye.datalayer.dao.AnomalyFunctionDAO;
+//import com.linkedin.thirdeye.datalayer.dao.RawAnomalyResultDAO;
 import com.linkedin.thirdeye.datalayer.dto.AbstractDTO;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import com.linkedin.thirdeye.datalayer.entity.AnomalyFeedback;
-import com.linkedin.thirdeye.datalayer.entity.AnomalyFunction;
+import com.linkedin.thirdeye.datalayer.dto.JobDTO;
+import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
+import com.linkedin.thirdeye.datalayer.pojo.AbstractBean;
 import com.linkedin.thirdeye.datalayer.pojo.AnomalyFeedbackBean;
 import com.linkedin.thirdeye.datalayer.pojo.AnomalyFunctionBean;
+import com.linkedin.thirdeye.datalayer.pojo.JobBean;
+import com.linkedin.thirdeye.datalayer.pojo.TaskBean;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 
-public class AbstractManagerImpl<E extends AbstractDTO> implements AbstractManager<E> {
+public abstract class AbstractManagerImpl<E extends AbstractDTO> implements AbstractManager<E> {
 
   protected static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   protected static final ModelMapper MODEL_MAPPER = new ModelMapper();
-  protected static RawAnomalyResultDAO rawAnomalyResultDAO =
-      DaoProviderUtil.getInstance(RawAnomalyResultDAO.class);
-  protected static AnomalyFeedbackDAO anomalyFeedbackDAO =
-      DaoProviderUtil.getInstance(AnomalyFeedbackDAO.class);
-  protected static AnomalyFunctionDAO anomalyFunctionDAO =
-      DaoProviderUtil.getInstance(AnomalyFunctionDAO.class);
+  protected static GenericPojoDao genericPojoDao =
+      DaoProviderUtil.getInstance(GenericPojoDao.class);
+
+  Class<? extends AbstractDTO> dtoClass;
+  Class<? extends AbstractBean> beanClass;
+
+  protected AbstractManagerImpl(Class<? extends AbstractDTO> dtoClass,
+      Class<? extends AbstractBean> beanClass) {
+    this.dtoClass = dtoClass;
+    this.beanClass = beanClass;
+  }
 
   @Override
   public Long save(E entity) {
-    return null;
+    AbstractBean bean = MODEL_MAPPER.map(entity, beanClass);
+    return genericPojoDao.put(bean);
   }
 
   @Override
   public void update(E entity) {
-
+    AbstractBean bean = MODEL_MAPPER.map(entity, beanClass);
+    genericPojoDao.update(bean);
   }
 
-  @Override
   public E findById(Long id) {
-    // TODO Auto-generated method stub
-    return null;
+    AbstractBean abstractBean = genericPojoDao.get(id, beanClass);
+    AbstractDTO abstractDTO = MODEL_MAPPER.map(abstractBean, dtoClass);
+    return (E) abstractDTO;
   }
 
   @Override
   public void delete(E entity) {
-    // TODO Auto-generated method stub
-
+    genericPojoDao.delete(entity.getId(), beanClass);
   }
 
   @Override
   public void deleteById(Long id) {
-    // TODO Auto-generated method stub
-
+    genericPojoDao.delete(id, beanClass);
   }
 
   @Override
   public List<E> findAll() {
     // TODO Auto-generated method stub
+    List<? extends AbstractBean> list = genericPojoDao.getAll(beanClass);
+
     return null;
   }
 
   @Override
   public List<E> findByParams(Map<String, Object> filters) {
-    // TODO Auto-generated method stub
-    return null;
+    List<? extends AbstractBean> list = genericPojoDao.get(filters, beanClass);
+    List<E> result = new ArrayList<>();
+    for(AbstractBean bean:list){
+      AbstractDTO dto = MODEL_MAPPER.map(bean, dtoClass);
+      result.add((E) dto);
+    }
+    return result;
   }
 
-  protected AnomalyFunctionDTO fetchAnomalyFunction(Long anomalyFunctionId)
-      throws IOException, JsonParseException, JsonMappingException {
-    AnomalyFunction anomalyFunction = anomalyFunctionDAO.findById(anomalyFunctionId);
-    AnomalyFunctionBean anomalyFunctionBean =
-        OBJECT_MAPPER.readValue(anomalyFunction.getJsonVal(), AnomalyFunctionBean.class);
-    AnomalyFunctionDTO anomalyFunctionDTO = new AnomalyFunctionDTO();
-    MODEL_MAPPER.map(anomalyFunctionDTO, anomalyFunctionBean);
-    return anomalyFunctionDTO;
-  }
 
-  protected AnomalyFeedbackDTO fetchAnomalyFeedback(Long feedbackId)
-      throws IOException, JsonParseException, JsonMappingException {
-    AnomalyFeedback anomalyFeedback = anomalyFeedbackDAO.findById(feedbackId);
-    AnomalyFeedbackBean anomalyFeedbackBean =
-        OBJECT_MAPPER.readValue(anomalyFeedback.getJsonVal(), AnomalyFeedbackBean.class);
-    AnomalyFeedbackDTO anomalyFeedbackDTO = new AnomalyFeedbackDTO();
-    MODEL_MAPPER.map(anomalyFeedbackDTO, anomalyFeedbackBean);
-    return anomalyFeedbackDTO;
-  }
+
 }
