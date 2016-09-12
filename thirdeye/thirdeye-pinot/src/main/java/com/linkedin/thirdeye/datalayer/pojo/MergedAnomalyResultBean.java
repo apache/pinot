@@ -108,7 +108,7 @@ public class MergedAnomalyResultBean extends AbstractBean
   }
 
   /**
-   * Severity
+   * Weight is Severity
    * @return
    */
   public double getWeight() {

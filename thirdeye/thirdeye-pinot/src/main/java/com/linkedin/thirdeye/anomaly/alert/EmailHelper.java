@@ -141,7 +141,8 @@ public abstract class EmailHelper {
   }
 
   /** Sends email according to the provided config. */
-  private static void sendEmail(SmtpConfiguration config, HtmlEmail email, String subject, String fromAddress, String toAddress) throws EmailException {
+  private static void sendEmail(SmtpConfiguration config, HtmlEmail email, String subject,
+      String fromAddress, String toAddress) throws EmailException {
     if (config != null) {
       email.setSubject(subject);
       LOG.info("Sending email to {}", toAddress);
@@ -157,9 +158,9 @@ public abstract class EmailHelper {
         email.addTo(address);
       }
       email.send();
-      LOG.info("Sent!");
+      LOG.info("Email sent with subject [{}] to address [{}]!", subject, toAddress);
     } else {
-      LOG.error("No failure email configs provided!");
+      LOG.error("No email config provided for email with subject [{}]!", subject);
     }
   }
 }

@@ -152,9 +152,12 @@ public class AlertTaskRunner implements TaskRunner {
     if (results.size() == 0) {
       return results;
     }
-    // TODO: configure filtration rule at metric level and fetch it from DB
-    AnomalyFiltrationHelper.FiltrationRule filtrationRule =
-        AnomalyFiltrationHelper.getFiltrationRule();
+    /**
+     * TODO: configure filtration rule at metric level and fetch it from DB Find
+     * exact filtration rule to be applied based on metric / functionType parameters
+     * The logic of finding filtration rule will be abstracted to AnomalyFiltrationHelper
+     */
+    AnomalyFiltrationHelper.FiltrationRule filtrationRule = AnomalyFiltrationHelper.getFiltrationRule();
 
     List<MergedAnomalyResultDTO> qualifiedAnomalies =
         results.stream().filter(result -> filtrationRule.isQualified(result))
@@ -300,7 +303,6 @@ public class AlertTaskRunner implements TaskRunner {
   }
 
   private void sendFailureEmail(Throwable t) throws JobExecutionException {
-
     HtmlEmail email = new HtmlEmail();
     String collection = alertConfig.getCollection();
     String metric = alertConfig.getMetric();

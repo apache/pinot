@@ -28,13 +28,10 @@ public class AnomalyFiltrationHelper {
     public boolean isQualified(MergedAnomalyResultDTO anomaly) {
       Double lengthInHour =
           (anomaly.getEndTime().doubleValue() - anomaly.getStartTime().doubleValue()) / 36_00_000;
+      // In thirdeye weight is severity
       Double qualificationScore =
           Math.pow(lengthInHour, alpha) * Math.pow(Math.abs(anomaly.getWeight()), beta);
-      if (qualificationScore > threshold) {
-        return true;
-      } else {
-        return false;
-      }
+      return (qualificationScore > threshold);
     }
   }
 }
