@@ -10,6 +10,7 @@ import com.linkedin.thirdeye.api.dto.GroupByKey;
 import com.linkedin.thirdeye.api.dto.GroupByRow;
 import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
+import com.linkedin.thirdeye.datalayer.pojo.RawAnomalyResultBean;
 
 public class RawAnomalyResultManagerImpl extends AbstractManagerImpl<RawAnomalyResultDTO> implements RawAnomalyResultManager {
 
@@ -48,7 +49,7 @@ public class RawAnomalyResultManagerImpl extends AbstractManagerImpl<RawAnomalyR
           + "and r.dataMissing=:dataMissing";
 
   public RawAnomalyResultManagerImpl() {
-    super(RawAnomalyResultDTO.class);
+    super(RawAnomalyResultDTO.class, RawAnomalyResultBean.class);
   }
 
   /* (non-Javadoc)
@@ -58,9 +59,11 @@ public class RawAnomalyResultManagerImpl extends AbstractManagerImpl<RawAnomalyR
   @Transactional
   public List<RawAnomalyResultDTO> findAllByTimeAndFunctionId(long startTime, long endTime,
       long functionId) {
-    return getEntityManager().createQuery(FIND_BY_TIME_AND_FUNCTION_ID, entityClass)
-        .setParameter("startTime", startTime).setParameter("endTime", endTime)
-        .setParameter("functionId", functionId).getResultList();
+//    return getEntityManager().createQuery(FIND_BY_TIME_AND_FUNCTION_ID, entityClass)
+//        .setParameter("startTime", startTime).setParameter("endTime", endTime)
+//        .setParameter("functionId", functionId).getResultList();
+    return null;
+
   }
 
   /* (non-Javadoc)
@@ -70,10 +73,12 @@ public class RawAnomalyResultManagerImpl extends AbstractManagerImpl<RawAnomalyR
   @Transactional
   public List<RawAnomalyResultDTO> findAllByTimeFunctionIdAndDimensions(long startTime, long endTime,
       long functionId, String dimensions) {
-    return getEntityManager().createQuery(FIND_BY_TIME_FUNCTION_ID_DIMENSIONS, entityClass)
-        .setParameter("startTime", startTime).setParameter("endTime", endTime)
-        .setParameter("functionId", functionId).setParameter("dimensions", dimensions)
-        .getResultList();
+//    return getEntityManager().createQuery(FIND_BY_TIME_FUNCTION_ID_DIMENSIONS, entityClass)
+//        .setParameter("startTime", startTime).setParameter("endTime", endTime)
+//        .setParameter("functionId", functionId).setParameter("dimensions", dimensions)
+//        .getResultList();
+    return null;
+
   }
 
   /* (non-Javadoc)
@@ -82,23 +87,25 @@ public class RawAnomalyResultManagerImpl extends AbstractManagerImpl<RawAnomalyR
   @Override
   @Transactional
   public List<GroupByRow<GroupByKey, Long>> getCountByFunction(long startTime, long endTime) {
-    List<GroupByRow<GroupByKey, Long>> groupByRecords = new ArrayList<>();
-    TypedQuery<Object[]> q = getEntityManager().createQuery(COUNT_GROUP_BY_FUNCTION, Object[].class)
-        .setParameter("startTime", startTime).setParameter("endTime", endTime);
-    List<Object[]> results = q.getResultList();
-    for (int i = 0; i < results.size(); i++) {
-      Long count = (Long) results.get(i)[0];
-      GroupByKey functionKey = new GroupByKey();
-      functionKey.setFunctionId((Long) results.get(i)[1]);
-      functionKey.setFunctionName((String) results.get(i)[2]);
-      functionKey.setCollection((String) results.get(i)[3]);
-      functionKey.setMetric((String) results.get(i)[4]);
-      GroupByRow<GroupByKey, Long> row = new GroupByRow<>();
-      row.setGroupBy(functionKey);
-      row.setValue(count);
-      groupByRecords.add(row);
-    }
-    return groupByRecords;
+//    List<GroupByRow<GroupByKey, Long>> groupByRecords = new ArrayList<>();
+//    TypedQuery<Object[]> q = getEntityManager().createQuery(COUNT_GROUP_BY_FUNCTION, Object[].class)
+//        .setParameter("startTime", startTime).setParameter("endTime", endTime);
+//    List<Object[]> results = q.getResultList();
+//    for (int i = 0; i < results.size(); i++) {
+//      Long count = (Long) results.get(i)[0];
+//      GroupByKey functionKey = new GroupByKey();
+//      functionKey.setFunctionId((Long) results.get(i)[1]);
+//      functionKey.setFunctionName((String) results.get(i)[2]);
+//      functionKey.setCollection((String) results.get(i)[3]);
+//      functionKey.setMetric((String) results.get(i)[4]);
+//      GroupByRow<GroupByKey, Long> row = new GroupByRow<>();
+//      row.setGroupBy(functionKey);
+//      row.setValue(count);
+//      groupByRecords.add(row);
+//    }
+//    return groupByRecords;
+    return null;
+
   }
 
   /* (non-Javadoc)
@@ -107,24 +114,26 @@ public class RawAnomalyResultManagerImpl extends AbstractManagerImpl<RawAnomalyR
   @Override
   @Transactional
   public List<GroupByRow<GroupByKey, Long>> getCountByFunctionDimensions(long startTime, long endTime) {
-    List<GroupByRow<GroupByKey, Long>> groupByRecords = new ArrayList<>();
-    TypedQuery<Object[]> q = getEntityManager().createQuery(COUNT_GROUP_BY_FUNCTION_DIMENSIONS, Object[].class)
-        .setParameter("startTime", startTime).setParameter("endTime", endTime);
-    List<Object[]> results = q.getResultList();
-    for (int i = 0; i < results.size(); i++) {
-      Long count = (Long) results.get(i)[0];
-      GroupByKey functionKey = new GroupByKey();
-      functionKey.setFunctionId((Long) results.get(i)[1]);
-      functionKey.setFunctionName((String) results.get(i)[2]);
-      functionKey.setCollection((String) results.get(i)[3]);
-      functionKey.setMetric((String) results.get(i)[4]);
-      functionKey.setDimensions((String)results.get(i)[5]);
-      GroupByRow<GroupByKey, Long> row = new GroupByRow<>();
-      row.setGroupBy(functionKey);
-      row.setValue(count);
-      groupByRecords.add(row);
-    }
-    return groupByRecords;
+//    List<GroupByRow<GroupByKey, Long>> groupByRecords = new ArrayList<>();
+//    TypedQuery<Object[]> q = getEntityManager().createQuery(COUNT_GROUP_BY_FUNCTION_DIMENSIONS, Object[].class)
+//        .setParameter("startTime", startTime).setParameter("endTime", endTime);
+//    List<Object[]> results = q.getResultList();
+//    for (int i = 0; i < results.size(); i++) {
+//      Long count = (Long) results.get(i)[0];
+//      GroupByKey functionKey = new GroupByKey();
+//      functionKey.setFunctionId((Long) results.get(i)[1]);
+//      functionKey.setFunctionName((String) results.get(i)[2]);
+//      functionKey.setCollection((String) results.get(i)[3]);
+//      functionKey.setMetric((String) results.get(i)[4]);
+//      functionKey.setDimensions((String)results.get(i)[5]);
+//      GroupByRow<GroupByKey, Long> row = new GroupByRow<>();
+//      row.setGroupBy(functionKey);
+//      row.setValue(count);
+//      groupByRecords.add(row);
+//    }
+//    return groupByRecords;
+    return null;
+
   }
 
   /* (non-Javadoc)
@@ -133,8 +142,10 @@ public class RawAnomalyResultManagerImpl extends AbstractManagerImpl<RawAnomalyR
   @Override
   @Transactional
   public List<RawAnomalyResultDTO> findUnmergedByFunctionId(Long functionId) {
-    return getEntityManager().createQuery(FIND_UNMERGED_BY_FUNCTION, entityClass)
-        .setParameter("functionId", functionId).setParameter("dataMissing", false).getResultList();
+//    return getEntityManager().createQuery(FIND_UNMERGED_BY_FUNCTION, entityClass)
+//        .setParameter("functionId", functionId).setParameter("dataMissing", false).getResultList();
+    return null;
+
   }
 
   /* (non-Javadoc)
@@ -144,8 +155,10 @@ public class RawAnomalyResultManagerImpl extends AbstractManagerImpl<RawAnomalyR
   @Transactional
   public List<RawAnomalyResultDTO> findUnmergedByCollectionMetricAndDimensions(String collection,
       String metric, String dimensions) {
-    return getEntityManager().createQuery(FIND_UNMERGED_BY_COLLECTION_METRIC_DIMENSION, entityClass)
-        .setParameter("collection", collection).setParameter("metric", metric)
-        .setParameter("dimensions", dimensions).setParameter("dataMissing", false).getResultList();
+//    return getEntityManager().createQuery(FIND_UNMERGED_BY_COLLECTION_METRIC_DIMENSION, entityClass)
+//        .setParameter("collection", collection).setParameter("metric", metric)
+//        .setParameter("dimensions", dimensions).setParameter("dataMissing", false).getResultList();
+    return null;
+
   }
 }

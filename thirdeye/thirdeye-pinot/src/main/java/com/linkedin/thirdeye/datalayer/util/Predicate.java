@@ -57,6 +57,9 @@ public class Predicate {
   public static Predicate EQ(String columnName, Object value) {
     return new Predicate(columnName, OPER.EQ, value);
   }
+  public static Predicate NEQ(String columnName, Object value) {
+    return new Predicate(columnName, OPER.NEQ, value);
+  }
 
   public static Predicate LT(String columnName, Object value) {
     return new Predicate(columnName, OPER.LT, value);

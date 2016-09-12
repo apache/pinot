@@ -10,6 +10,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 
 import javax.sql.DataSource;
@@ -185,6 +186,25 @@ public class GenericPojoDao {
     }, 0);
   }
 
+  public <E extends AbstractBean> List<E> getAll(Class<E> beanClass) {
+    return runTask(new QueryTask<List<E>>() {
+      @Override
+      public List<E> handle(Connection connection) throws Exception {
+        Predicate predicate = Predicate.EQ("beanClass", beanClass.getName());
+        PreparedStatement selectStatement =
+            sqlQueryBuilder.createFindByParamsStatement(connection, GenericJsonEntity.class, predicate);
+        ResultSet resultSet = selectStatement.executeQuery();
+        List<GenericJsonEntity> entities =
+            genericResultSetMapper.mapAll(resultSet, GenericJsonEntity.class);
+        List<E> ret = new ArrayList<>(entities.size());
+        for (GenericJsonEntity entity : entities) {
+          ret.add(OBJECT_MAPPER.readValue(entity.getJsonVal(), beanClass));
+        }
+        return ret;
+      }
+    }, Collections.emptyList());
+  }
+
   public <E extends AbstractBean> E get(Long id, Class<E> pojoClass) {
     return runTask(new QueryTask<E>() {
       @Override
@@ -245,6 +265,17 @@ public class GenericPojoDao {
   }
 
 
+  public <E extends AbstractBean> List<E> get(Map<String, Object> filterParams,
+      Class<E> pojoClass) {
+    Predicate[] childPredicates = new Predicate[filterParams.size()];
+    int index = 0;
+    for (Entry<String, Object> entry : filterParams.entrySet()) {
+      childPredicates[index] = Predicate.EQ(entry.getKey(), entry.getValue());
+      index = index + 1;
+    }
+    return get(Predicate.AND(childPredicates), pojoClass);
+
+  }
 
   public <E extends AbstractBean> List<E> get(Predicate predicate, Class<E> pojoClass) {
     //apply the predicates and fetch the primary key ids
@@ -350,5 +381,6 @@ public class GenericPojoDao {
     Class<? extends AbstractIndexEntity> indexEntityClass;
     List<String> indexTableColumns;
   }
+
 
 }

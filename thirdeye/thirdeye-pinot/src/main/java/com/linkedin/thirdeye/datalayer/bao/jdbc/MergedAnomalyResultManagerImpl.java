@@ -8,6 +8,7 @@ import javax.persistence.NoResultException;
 import com.google.inject.persist.Transactional;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import com.linkedin.thirdeye.datalayer.pojo.MergedAnomalyResultBean;
 
 public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAnomalyResultDTO> implements MergedAnomalyResultManager {
 
@@ -51,7 +52,7 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
           + "and (r.startTime < :endTime and r.endTime > :startTime) order by r.endTime desc ";
 
   public MergedAnomalyResultManagerImpl() {
-    super(MergedAnomalyResultDTO.class);
+    super(MergedAnomalyResultDTO.class, MergedAnomalyResultBean.class);
   }
 
   /* (non-Javadoc)
@@ -60,8 +61,9 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
   @Override
   @Transactional
   public List<MergedAnomalyResultDTO> getAllByTime(long startTime, long endTime) {
-    return getEntityManager().createQuery(FIND_BY_TIME, entityClass)
-        .setParameter("startTime", startTime).setParameter("endTime", endTime).getResultList();
+//    return getEntityManager().createQuery(FIND_BY_TIME, entityClass)
+//        .setParameter("startTime", startTime).setParameter("endTime", endTime).getResultList();
+    return null;
   }
 
   /* (non-Javadoc)
@@ -70,9 +72,10 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
   @Override
   @Transactional
   public List<MergedAnomalyResultDTO> getAllByTimeEmailIdAndNotifiedFalse(long startTime, long endTime, long emailId) {
-    return getEntityManager().createQuery(FIND_BY_TIME_EMAIL_NOTIFIED_FALSE, entityClass)
-        .setParameter("emailId", emailId).setParameter("startTime", startTime)
-        .setParameter("endTime", endTime).getResultList();
+//    return getEntityManager().createQuery(FIND_BY_TIME_EMAIL_NOTIFIED_FALSE, entityClass)
+//        .setParameter("emailId", emailId).setParameter("startTime", startTime)
+//        .setParameter("endTime", endTime).getResultList();
+    return null;
   }
 
   /* (non-Javadoc)
@@ -80,19 +83,22 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
    */
   @Override
   public List<MergedAnomalyResultDTO> findByFunctionId(Long functionId) {
-    return getEntityManager().createQuery(FIND_BY_FUNCTION_ID, entityClass)
-        .setParameter("functionId", functionId).getResultList();
+//    return getEntityManager().createQuery(FIND_BY_FUNCTION_ID, entityClass)
+//        .setParameter("functionId", functionId).getResultList();
+    return null;
   }
 
   @Transactional
   public List<MergedAnomalyResultDTO> findByCollectionMetricDimensionsTime(String collection,
       String metric, String [] dimensions, long startTime, long endTime) {
-    List<String> dimList = Arrays.asList(dimensions);
-    return getEntityManager()
-        .createQuery(FIND_BY_COLLECTION_METRIC_DIMENSIONS_TIME, entityClass)
-        .setParameter("collection", collection).setParameter("metric", metric)
-        .setParameter("dimensions", dimList).setParameter("startTime", startTime)
-        .setParameter("endTime", endTime).getResultList();
+//    List<String> dimList = Arrays.asList(dimensions);
+//    return getEntityManager()
+//        .createQuery(FIND_BY_COLLECTION_METRIC_DIMENSIONS_TIME, entityClass)
+//        .setParameter("collection", collection).setParameter("metric", metric)
+//        .setParameter("dimensions", dimList).setParameter("startTime", startTime)
+//        .setParameter("endTime", endTime).getResultList();
+    return null;
+
   }
 
   /* (non-Javadoc)
@@ -102,9 +108,11 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
   @Transactional
   public List<MergedAnomalyResultDTO> findByCollectionMetricTime(String collection,
       String metric, long startTime, long endTime) {
-    return getEntityManager().createQuery(FIND_BY_COLLECTION_METRIC_TIME, entityClass)
-        .setParameter("collection", collection).setParameter("metric", metric)
-        .setParameter("startTime", startTime).setParameter("endTime", endTime).getResultList();
+//    return getEntityManager().createQuery(FIND_BY_COLLECTION_METRIC_TIME, entityClass)
+//        .setParameter("collection", collection).setParameter("metric", metric)
+//        .setParameter("startTime", startTime).setParameter("endTime", endTime).getResultList();
+    return null;
+
   }
 
   /* (non-Javadoc)
@@ -114,9 +122,10 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
   @Transactional
   public List<MergedAnomalyResultDTO> findByCollectionTime(String collection,
       long startTime, long endTime) {
-    return getEntityManager().createQuery(FIND_BY_COLLECTION_TIME, entityClass)
-        .setParameter("collection", collection).setParameter("startTime", startTime)
-        .setParameter("endTime", endTime).getResultList();
+//    return getEntityManager().createQuery(FIND_BY_COLLECTION_TIME, entityClass)
+//        .setParameter("collection", collection).setParameter("startTime", startTime)
+//        .setParameter("endTime", endTime).getResultList();
+    return null;
   }
 
   /* (non-Javadoc)
@@ -127,10 +136,11 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
   public MergedAnomalyResultDTO findLatestByCollectionMetricDimensions(
       String collection, String metric, String dimensions) {
     try {
-      return getEntityManager()
-          .createQuery(FIND_BY_COLLECTION_METRIC_DIMENSIONS_ORDER_BY_END_TIME, entityClass)
-          .setParameter("collection", collection).setParameter("metric", metric)
-          .setParameter("dimensions", dimensions).setMaxResults(1).getSingleResult();
+//      return getEntityManager()
+//          .createQuery(FIND_BY_COLLECTION_METRIC_DIMENSIONS_ORDER_BY_END_TIME, entityClass)
+//          .setParameter("collection", collection).setParameter("metric", metric)
+//          .setParameter("dimensions", dimensions).setMaxResults(1).getSingleResult();
+      return null;
     } catch (NoResultException e) {
       return null;
     }
@@ -143,9 +153,10 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
   @Transactional
   public MergedAnomalyResultDTO findLatestByFunctionIdDimensions(Long functionId, String dimensions) {
     try {
-      return getEntityManager().createQuery(FIND_BY_FUNCTION_AND_DIMENSIONS, entityClass)
-          .setParameter("functionId", functionId).setParameter("dimensions", dimensions)
-          .setMaxResults(1).getSingleResult();
+//      return getEntityManager().createQuery(FIND_BY_FUNCTION_AND_DIMENSIONS, entityClass)
+//          .setParameter("functionId", functionId).setParameter("dimensions", dimensions)
+//          .setMaxResults(1).getSingleResult();
+      return null;
     } catch (NoResultException e) {
       return null;
     }
@@ -158,8 +169,9 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
   @Transactional
   public MergedAnomalyResultDTO findLatestByFunctionIdOnly(Long functionId) {
     try {
-      return getEntityManager().createQuery(FIND_BY_FUNCTION_AND_NULL_DIMENSION, entityClass)
-          .setParameter("functionId", functionId).setMaxResults(1).getSingleResult();
+//      return getEntityManager().createQuery(FIND_BY_FUNCTION_AND_NULL_DIMENSION, entityClass)
+//          .setParameter("functionId", functionId).setMaxResults(1).getSingleResult();
+      return null;
     } catch (NoResultException e) {
       return null;
     }
