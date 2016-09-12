@@ -20,7 +20,8 @@ function getExistingAnomalyFunctions(dataset) {
             data = {}
         }
 
-        for (var i = 0, len = data.length; i < len; i++) {
+        for (var i = 0, numAnomalyFn = data.length; i < numAnomalyFn; i++) {
+
             if(data[i]){
                 var properties = data[i].properties;
 
