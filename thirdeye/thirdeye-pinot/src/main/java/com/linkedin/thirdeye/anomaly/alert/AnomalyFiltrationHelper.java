@@ -26,12 +26,15 @@ public class AnomalyFiltrationHelper {
 
     @Override
     public boolean isQualified(MergedAnomalyResultDTO anomaly) {
-      Double lengthInHour = (anomaly.getEndTime().doubleValue() - anomaly.getStartTime().doubleValue()) / 36_00_000;
-      Double qualificationScore = Math.pow(lengthInHour, alpha) * Math.pow(Math.abs(anomaly.getWeight()), beta);
+      Double lengthInHour =
+          (anomaly.getEndTime().doubleValue() - anomaly.getStartTime().doubleValue()) / 36_00_000;
+      Double qualificationScore =
+          Math.pow(lengthInHour, alpha) * Math.pow(Math.abs(anomaly.getWeight()), beta);
       if (qualificationScore > threshold) {
         return true;
+      } else {
+        return false;
       }
-      return false;
     }
   }
 }

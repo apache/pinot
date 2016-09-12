@@ -69,8 +69,8 @@ public class AlertTaskRunner implements TaskRunner {
     queryCache = CACHE_REGISTRY_INSTANCE.getQueryCache();
   }
 
-  @Override public List<TaskResult> execute(TaskInfo taskInfo, TaskContext taskContext)
-      throws Exception {
+  @Override
+  public List<TaskResult> execute(TaskInfo taskInfo, TaskContext taskContext) throws Exception {
     AlertTaskInfo alertTaskInfo = (AlertTaskInfo) taskInfo;
     List<TaskResult> taskResult = new ArrayList<>();
     anomalyMergedResultDAO = taskContext.getMergedResultDAO();
@@ -247,8 +247,8 @@ public class AlertTaskRunner implements TaskRunner {
       this.dimensionNames = dimensionNames;
     }
 
-    @Override public Object exec(@SuppressWarnings("rawtypes") List arguments)
-        throws TemplateModelException {
+    @Override
+    public Object exec(@SuppressWarnings("rawtypes") List arguments) throws TemplateModelException {
       if (arguments.size() != 1) {
         throw new TemplateModelException(
             "Wrong arguments, expected single comma-separated dimension string");
@@ -283,8 +283,8 @@ public class AlertTaskRunner implements TaskRunner {
       this.TZ = timeZone;
     }
 
-    @Override public Object exec(@SuppressWarnings("rawtypes") List arguments)
-        throws TemplateModelException {
+    @Override
+    public Object exec(@SuppressWarnings("rawtypes") List arguments) throws TemplateModelException {
       if (arguments.size() != 1) {
         throw new TemplateModelException("Wrong arguments, expected single millisSinceEpoch");
       }
