@@ -395,7 +395,7 @@ public class AnomalyResource {
     List<EmailConfigurationDTO> emailConfigurations = emailConfigurationDAO.findByFunctionId(id);
     for (EmailConfigurationDTO emailConfiguration : emailConfigurations) {
       emailConfiguration.getFunctions().remove(anomalyFunctionSpec);
-      emailConfigurationDAO.save(emailConfiguration);
+      emailConfigurationDAO.update(emailConfiguration);
     }
 
     // raw result mapping
