@@ -23,11 +23,22 @@ public class SummaryResponse {
   static final String NOT_ALL = "(ALL)-";
   static final String NOT_AVAILABLE = "-na-";
 
+  @JsonProperty("metricName")
+  private String metricName;
+
   @JsonProperty("dimensions")
   List<String> dimensions = new ArrayList<>();
 
   @JsonProperty("responseRows")
   private List<SummaryResponseRow> responseRows = new ArrayList<>();
+
+  public String getMetricName() {
+    return metricName;
+  }
+
+  public void setMetricName(String metricName) {
+    this.metricName = metricName;
+  }
 
   public List<SummaryResponseRow> getResponseRows() {
     return responseRows;

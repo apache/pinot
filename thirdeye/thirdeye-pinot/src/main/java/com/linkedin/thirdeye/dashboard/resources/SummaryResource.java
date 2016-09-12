@@ -93,6 +93,7 @@ public class SummaryResource {
 
       Summary summary = new Summary(cube);
       response = summary.computeSummary(summarySize, doOneSideError, topDimensions);
+      response.setMetricName(metric);
     } catch (Exception e) {
       LOG.error("Exception while generating difference summary", e);
       response = SummaryResponse.buildNotAvailableResponse();
@@ -150,6 +151,7 @@ public class SummaryResource {
 
       Summary summary = new Summary(cube);
       response = summary.computeSummary(summarySize, doOneSideError);
+      response.setMetricName(metric);
     } catch (Exception e) {
       LOG.error("Exception while generating difference summary", e);
       response = SummaryResponse.buildNotAvailableResponse();
