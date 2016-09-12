@@ -65,6 +65,10 @@ public class KafkaHighLevelStreamProviderConfig implements StreamProviderConfig 
   private long segmentTimeInMillis = ONE_HOUR;
   private int realtimeRecordsThreshold = FIVE_MILLION;
 
+  public KafkaHighLevelStreamProviderConfig() {
+
+  }
+
   /*
    * kafka.hlc.zk.connect.string : comma separated list of hosts
    * kafka.hlc.broker.port : broker port
