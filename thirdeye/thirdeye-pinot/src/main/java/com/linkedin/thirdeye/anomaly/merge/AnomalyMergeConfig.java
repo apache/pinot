@@ -19,8 +19,6 @@ public class AnomalyMergeConfig {
   private AnomalyMergeStrategy mergeStrategy = AnomalyMergeStrategy.FUNCTION;
   private long sequentialAllowedGap = 30_000; // 30 seconds
   private long mergeDuration = 12 * 60 * 60 * 1000; // 12 hours
-  private long startTime = 0;
-  private long endTime = System.currentTimeMillis();
 
   public AnomalyMergeStrategy getMergeStrategy() {
     return mergeStrategy;
@@ -44,21 +42,5 @@ public class AnomalyMergeConfig {
 
   public void setMergeDuration(long mergeDuration) {
     this.mergeDuration = mergeDuration;
-  }
-
-  public long getStartTime() {
-    return startTime;
-  }
-
-  public void setStartTime(long startTime) {
-    this.startTime = startTime;
-  }
-
-  public long getEndTime() {
-    return endTime;
-  }
-
-  public void setEndTime(long endTime) {
-    this.endTime = endTime;
   }
 }

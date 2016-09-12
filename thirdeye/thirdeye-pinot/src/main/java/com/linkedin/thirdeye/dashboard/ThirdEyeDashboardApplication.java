@@ -4,7 +4,6 @@ import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
 import com.linkedin.thirdeye.dashboard.resources.AnomalyFunctionResource;
 import com.linkedin.thirdeye.dashboard.resources.AnomalyResource;
-import com.linkedin.thirdeye.dashboard.resources.AnomalySummaryResource;
 import com.linkedin.thirdeye.dashboard.resources.CacheResource;
 import com.linkedin.thirdeye.dashboard.resources.DashboardResource;
 import com.linkedin.thirdeye.dashboard.resources.EmailResource;
@@ -44,7 +43,6 @@ public class ThirdEyeDashboardApplication
       LOG.error("Exception while loading caches", e);
     }
     env.jersey().register(new AnomalyFunctionResource(config));
-    env.jersey().register(new AnomalySummaryResource(anomalyResultDAO, anomalyMergedResultDAO));
     env.jersey().register(new DashboardResource(webappConfigDAO));
     env.jersey().register(new CacheResource());
     env.jersey().register(

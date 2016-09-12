@@ -32,8 +32,8 @@ public class AnomalyFunctionManagerImpl extends AbstractManagerImpl<AnomalyFunct
     Predicate predicate = Predicate.EQ("collection", collection);
     List<AnomalyFunctionBean> list = genericPojoDao.get(predicate, AnomalyFunctionBean.class);
     List<AnomalyFunctionDTO> result = new ArrayList<>();
-    for (AbstractBean abstractBean : list) {
-      AnomalyFunctionDTO dto = MODEL_MAPPER.map(abstractBean, dtoClass);
+    for (AnomalyFunctionBean abstractBean : list) {
+      AnomalyFunctionDTO dto = MODEL_MAPPER.map(abstractBean, AnomalyFunctionDTO.class);
       result.add(dto);
     }
     return result;
@@ -48,7 +48,7 @@ public class AnomalyFunctionManagerImpl extends AbstractManagerImpl<AnomalyFunct
     // .setParameter("collection", collection).getResultList();
     Predicate predicate = Predicate.EQ("collection", collection);
     List<AnomalyFunctionBean> list = genericPojoDao.get(predicate, AnomalyFunctionBean.class);
-    Set<String> metrics = new HashSet<>(); 
+    Set<String> metrics = new HashSet<>();
     for (AnomalyFunctionBean anomalyFunctionBean : list) {
       metrics.add(anomalyFunctionBean.getMetric());
     }
@@ -57,7 +57,7 @@ public class AnomalyFunctionManagerImpl extends AbstractManagerImpl<AnomalyFunct
 
   /*
    * (non-Javadoc)
-   * 
+   *
    * @see com.linkedin.thirdeye.datalayer.bao.IAnomalyFunctionManager# findAllActiveFunctions()
    */
   @Override
@@ -67,8 +67,8 @@ public class AnomalyFunctionManagerImpl extends AbstractManagerImpl<AnomalyFunct
     Predicate predicate = Predicate.EQ("active", true);
     List<AnomalyFunctionBean> list = genericPojoDao.get(predicate, AnomalyFunctionBean.class);
     List<AnomalyFunctionDTO> result = new ArrayList<>();
-    for (AbstractBean abstractBean : list) {
-      AnomalyFunctionDTO dto = MODEL_MAPPER.map(abstractBean, dtoClass);
+    for (AnomalyFunctionBean abstractBean : list) {
+      AnomalyFunctionDTO dto = MODEL_MAPPER.map(abstractBean, AnomalyFunctionDTO.class);
       result.add(dto);
     }
     return result;
