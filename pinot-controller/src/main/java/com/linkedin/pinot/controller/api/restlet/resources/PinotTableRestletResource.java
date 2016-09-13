@@ -164,7 +164,7 @@ public class PinotTableRestletResource extends BasePinotControllerRestletResourc
       ret.put(TableType.REALTIME.name(), config.toJSON());
     }
 
-    return new StringRepresentation(ret.toString());
+    return new StringRepresentation(ret.toString(2));
   }
 
   @HttpVerb("get")
@@ -180,7 +180,7 @@ public class PinotTableRestletResource extends BasePinotControllerRestletResourc
       tableArray.put(pinotTableName);
     }
     object.put("tables", tableArray);
-    return new StringRepresentation(object.toString());
+    return new StringRepresentation(object.toString(2));
   }
 
   @HttpVerb("get")
