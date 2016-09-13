@@ -236,8 +236,8 @@ public class AnomalyMergeExecutor implements Runnable {
     timeSeriesRequest.setEnd(new DateTime(anomalyMergedResult.getEndTime() - baselineOffset));
     TimeSeriesResponse responseBaseline = timeSeriesHandler.handle(timeSeriesRequest);
 
-    Double currentValue = getOverAllMetricValue(responseCurrent, anomalyFunctionSpec.getMetric());
-    Double baselineValue = getOverAllMetricValue(responseBaseline, anomalyFunctionSpec.getMetric());
+    Double currentValue = getAvgMetricValuePerBucket(responseCurrent, anomalyFunctionSpec.getMetric());
+    Double baselineValue = getAvgMetricValuePerBucket(responseBaseline, anomalyFunctionSpec.getMetric());
     Double severity;
     if (baselineValue != 0) {
       severity = (currentValue - baselineValue) / baselineValue;
@@ -248,7 +248,15 @@ public class AnomalyMergeExecutor implements Runnable {
     anomalyMergedResult.setMessage(createMessage(severity, currentValue, baselineValue));
   }
 
-  private Double getOverAllMetricValue(TimeSeriesResponse response, String metricName) {
+  /**
+   * Returns average metrics value (per bucket) for given time series
+   *
+   * @param response
+   * @param metricName
+   *
+   * @return
+   */
+  private Double getAvgMetricValuePerBucket(TimeSeriesResponse response, String metricName) {
     Double totalVal = 0.0;
     int numBuckets = 0;
     for (int i = 0; i < response.getNumRows(); i++) {
