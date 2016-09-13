@@ -236,8 +236,8 @@ public class AnomalyMergeExecutor implements Runnable {
     timeSeriesRequest.setEnd(new DateTime(anomalyMergedResult.getEndTime() - baselineOffset));
     TimeSeriesResponse responseBaseline = timeSeriesHandler.handle(timeSeriesRequest);
 
-    Double currentValue = getMetricValueSum(responseCurrent, anomalyFunctionSpec.getMetric());
-    Double baselineValue = getMetricValueSum(responseBaseline, anomalyFunctionSpec.getMetric());
+    Double currentValue = getOverAllMetricValue(responseCurrent, anomalyFunctionSpec.getMetric());
+    Double baselineValue = getOverAllMetricValue(responseBaseline, anomalyFunctionSpec.getMetric());
     Double severity;
     if (baselineValue != 0) {
       severity = (currentValue - baselineValue) / baselineValue;
@@ -248,16 +248,21 @@ public class AnomalyMergeExecutor implements Runnable {
     anomalyMergedResult.setMessage(createMessage(severity, currentValue, baselineValue));
   }
 
-  private Double getMetricValueSum(TimeSeriesResponse response, String metricName) {
+  private Double getOverAllMetricValue(TimeSeriesResponse response, String metricName) {
     Double totalVal = 0.0;
+    int numBuckets = 0;
     for (int i = 0; i < response.getNumRows(); i++) {
       for (TimeSeriesRow.TimeSeriesMetric metricData : response.getRow(i).getMetrics()) {
         if (metricName.equals(metricData.getMetricName())) {
           totalVal += metricData.getValue();
+          numBuckets++;
         }
       }
     }
-    return totalVal;
+    if (numBuckets == 0) {
+      return totalVal;
+    }
+    return totalVal / numBuckets;
   }
 
   private void performMergeBasedOnFunctionId(AnomalyFunctionDTO function,
