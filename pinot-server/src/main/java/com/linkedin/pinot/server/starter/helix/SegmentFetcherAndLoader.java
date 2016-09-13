@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.server.starter.helix;
 
+import com.linkedin.pinot.common.utils.SchemaUtils;
 import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
@@ -22,8 +23,6 @@ import org.apache.commons.configuration.Configuration;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.codehaus.jackson.JsonParseException;
-import org.codehaus.jackson.map.JsonMappingException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.Utils;
@@ -216,7 +215,7 @@ public class SegmentFetcherAndLoader {
     ZNRecord record = propertyStoreHelper.get(schemaName);
     if (record != null) {
       LOGGER.info("Found schema: {}", schemaName);
-      return Schema.fromZNRecord(record);
+      return SchemaUtils.fromZNRecord(record);
     } else {
       return null;
     }

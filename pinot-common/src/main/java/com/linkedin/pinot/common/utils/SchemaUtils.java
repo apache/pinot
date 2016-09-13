@@ -18,6 +18,7 @@ package com.linkedin.pinot.common.utils;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
+import java.io.IOException;
 import java.net.URL;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
@@ -30,6 +31,7 @@ import org.apache.commons.httpclient.methods.multipart.MultipartRequestEntity;
 import org.apache.commons.httpclient.methods.multipart.Part;
 import org.apache.commons.httpclient.methods.multipart.StringPart;
 import org.apache.commons.httpclient.params.HttpMethodParams;
+import org.apache.helix.ZNRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,6 +45,25 @@ public class SchemaUtils {
   private static final HttpClient HTTP_CLIENT = new HttpClient();
 
   private SchemaUtils() {
+  }
+
+  /**
+   * Fetch {@link Schema} from a {@link ZNRecord}.
+   */
+  public static Schema fromZNRecord(@Nonnull ZNRecord record)
+      throws IOException {
+    String schemaJSON = record.getSimpleField("schemaJSON");
+    return Schema.fromString(schemaJSON);
+  }
+
+  /**
+   * Wrap {@link Schema} into a {@link ZNRecord}.
+   */
+  public static ZNRecord toZNRecord(@Nonnull Schema schema)
+      throws IllegalArgumentException, IllegalAccessException {
+    ZNRecord record = new ZNRecord(schema.getSchemaName());
+    record.setSimpleField("schemaJSON", schema.getJSONSchema());
+    return record;
   }
 
   /**

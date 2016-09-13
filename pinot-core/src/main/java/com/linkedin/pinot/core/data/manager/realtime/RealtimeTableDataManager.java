@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.data.manager.realtime;
 
+import com.linkedin.pinot.common.utils.SchemaUtils;
 import java.io.File;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -131,15 +132,15 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
       PinotHelixPropertyStoreZnRecordProvider propertyStoreHelper = PinotHelixPropertyStoreZnRecordProvider.forSchema(propertyStore);
       ZNRecord record = propertyStoreHelper.get(tableConfig.getValidationConfig().getSchemaName());
       LOGGER.info("Found schema {} ", tableConfig.getValidationConfig().getSchemaName());
-      Schema schema = Schema.fromZNRecord(record);
+      Schema schema = SchemaUtils.fromZNRecord(record);
       if (!isValid(schema, tableConfig.getIndexingConfig())) {
         LOGGER.error("Not adding segment {}", segmentId);
         throw new RuntimeException("Mismatching schema/table config for " + _tableName);
       }
       SegmentDataManager manager;
       if (SegmentName.isHighLevelConsumerSegmentName(segmentId)) {
-        manager = new HLRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, instanceZKMetadata, this, _indexDir.getAbsolutePath(), _readMode, Schema.fromZNRecord(record),
-            _serverMetrics);
+        manager = new HLRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, instanceZKMetadata, this,
+            _indexDir.getAbsolutePath(), _readMode, SchemaUtils.fromZNRecord(record), _serverMetrics);
       } else {
         LLCRealtimeSegmentZKMetadata llcSegmentMetadata = (LLCRealtimeSegmentZKMetadata) segmentZKMetadata;
         if (segmentZKMetadata.getStatus().equals(Status.DONE)) {
@@ -157,9 +158,8 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
           replaceLLSegment(segmentId);
           return;
         }
-        manager = new LLRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, instanceZKMetadata, this, _indexDir.getAbsolutePath(),
-            Schema.fromZNRecord(record),
-            _serverMetrics);
+        manager = new LLRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, instanceZKMetadata, this,
+            _indexDir.getAbsolutePath(), SchemaUtils.fromZNRecord(record), _serverMetrics);
       }
       LOGGER.info("Initialize RealtimeSegmentDataManager - " + segmentId);
       try {
