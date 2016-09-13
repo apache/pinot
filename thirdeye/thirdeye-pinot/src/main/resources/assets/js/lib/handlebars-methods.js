@@ -321,13 +321,4 @@ $(document).ready(function () {
 
     var source_existing_anomaly_functions_template = $("#self-service-existing-anomaly-functions-template").html();
     HandleBarsTemplates.template_existing_anomaly_functions = Handlebars.compile(source_existing_anomaly_functions_template);
-
-    var source_anomaly_summary_template = $("#anomaly-summary-template").html();
-    HandleBarsTemplates.template_anomaly_summary = Handlebars.compile(source_anomaly_summary_template);
-
-    var source_anomaly_grouping_by_fun_template = $("#anomaly-grouping-by-fun-template").html();
-    HandleBarsTemplates.template_anomaly_grouping_by_fun = Handlebars.compile(source_anomaly_grouping_by_fun_template);
-
-    var source_anomaly_grouping_by_fun_dim_template = $("#anomaly-grouping-by-fun-dim-template").html();
-    HandleBarsTemplates.template_anomaly_grouping_by_fun_dim = Handlebars.compile(source_anomaly_grouping_by_fun_dim_template);
 })

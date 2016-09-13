@@ -9,6 +9,7 @@ import javax.persistence.Enumerated;
 import javax.persistence.Index;
 import javax.persistence.MappedSuperclass;
 
+import javax.persistence.Transient;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 import org.codehaus.jackson.annotate.JsonProperty;
@@ -74,8 +75,17 @@ public class AnomalyFunctionBean extends AbstractBean {
   @Column(name = "filters", nullable = true)
   private String filters;
 
+  @Transient
   private long metricId;
-  
+
+  public long getMetricId() {
+    return metricId;
+  }
+
+  public void setMetricId(long metricId) {
+    this.metricId = metricId;
+  }
+
   public String getCollection() {
     return collection;
   }
@@ -205,20 +215,12 @@ public class AnomalyFunctionBean extends AbstractBean {
   public Multimap<String, String> getFilterSet() {
     return ThirdEyeUtils.getFilterSet(filters);
   }
-  
+
   @JsonIgnore
   @JsonProperty("wrapper")
   public void setFilters(String filters) {
     String sortedFilters = ThirdEyeUtils.getSortedFilters(filters);
     this.filters = sortedFilters;
-  }
-  
-  public long getMetricId() {
-    return metricId;
-  }
-
-  public void setMetricId(long metricId) {
-    this.metricId = metricId;
   }
 
   public void setActive(boolean isActive) {
