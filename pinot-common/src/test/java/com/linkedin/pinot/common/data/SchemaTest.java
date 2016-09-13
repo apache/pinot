@@ -16,6 +16,7 @@
 package com.linkedin.pinot.common.data;
 
 import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.utils.SchemaUtils;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
@@ -253,7 +254,7 @@ public class SchemaTest {
     Assert.assertEquals(newSchema, schema);
     Assert.assertEquals(newSchema.hashCode(), schema.hashCode());
 
-    newSchema = Schema.fromZNRecord(Schema.toZNRecord(schema));
+    newSchema = SchemaUtils.fromZNRecord(SchemaUtils.toZNRecord(schema));
     Assert.assertEquals(newSchema, schema);
     Assert.assertEquals(newSchema.hashCode(), schema.hashCode());
   }

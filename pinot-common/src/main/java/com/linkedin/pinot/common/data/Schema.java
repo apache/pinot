@@ -32,7 +32,6 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import org.apache.helix.ZNRecord;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 import org.codehaus.jackson.map.ObjectMapper;
@@ -76,19 +75,6 @@ public final class Schema {
   public static Schema fromInputSteam(@Nonnull InputStream schemaInputStream)
       throws IOException {
     return MAPPER.readValue(schemaInputStream, Schema.class);
-  }
-
-  public static Schema fromZNRecord(@Nonnull ZNRecord record)
-      throws IOException {
-    String schemaJSON = record.getSimpleField("schemaJSON");
-    return MAPPER.readValue(schemaJSON, Schema.class);
-  }
-
-  public static ZNRecord toZNRecord(@Nonnull Schema schema)
-      throws IllegalArgumentException, IllegalAccessException {
-    ZNRecord record = new ZNRecord(schema.getSchemaName());
-    record.setSimpleField("schemaJSON", schema.getJSONSchema());
-    return record;
   }
 
   public String getSchemaName() {

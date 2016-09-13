@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.controller.helix.core;
 
+import com.linkedin.pinot.common.utils.SchemaUtils;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -831,7 +832,7 @@ public class PinotHelixResourceManager {
    * @throws IllegalAccessException
    */
   public void addOrUpdateSchema(Schema schema) throws IllegalArgumentException, IllegalAccessException {
-    ZNRecord record = Schema.toZNRecord(schema);
+    ZNRecord record = SchemaUtils.toZNRecord(schema);
     String name = schema.getSchemaName();
     PinotHelixPropertyStoreZnRecordProvider propertyStoreHelper =
         PinotHelixPropertyStoreZnRecordProvider.forSchema(_propertyStore);
@@ -866,7 +867,7 @@ public class PinotHelixResourceManager {
         PinotHelixPropertyStoreZnRecordProvider.forSchema(_propertyStore);
     LOGGER.info("found schema {} ", schemaName);
     ZNRecord record = propertyStoreHelper.get(schemaName);
-    return record != null ? Schema.fromZNRecord(record) : null;
+    return record != null ? SchemaUtils.fromZNRecord(record) : null;
   }
 
   /**
