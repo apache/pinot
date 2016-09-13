@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
+import org.apache.kafka.common.errors.TimeoutException;
 import org.apache.kafka.common.protocol.Errors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -334,21 +335,26 @@ public class SimpleConsumerWrapper implements Closeable {
     _currentState = newState;
   }
 
-  public synchronized int getPartitionCount(String topic, long maxWaitTimeMs) {
+  public synchronized int getPartitionCount(String topic, long timeoutMillis) {
     int unknownTopicReplyCount = 0;
     final int MAX_UNKNOWN_TOPIC_REPLY_COUNT = 10;
     int kafkaErrorCount = 0;
     final int MAX_KAFKA_ERROR_COUNT = 10;
 
-    while(true) {
+    final long endTime = System.currentTimeMillis() + timeoutMillis;
+
+    while(System.currentTimeMillis() < endTime) {
       // Try to get into a state where we're connected to Kafka
-      // TODO This needs a time limit, and perhaps a back-off before we query kafka again.
-      while (!_currentState.isConnectedToKafkaBroker()) {
+      while (!_currentState.isConnectedToKafkaBroker() && System.currentTimeMillis() < endTime) {
         _currentState.process();
       }
 
-      // Send the metadata request to Kafka
+      if (endTime <= System.currentTimeMillis() && !_currentState.isConnectedToKafkaBroker()) {
+        throw new TimeoutException("Failed to get the partition count for topic " + topic + " within " + timeoutMillis
+            + " ms");
+      }
 
+      // Send the metadata request to Kafka
       TopicMetadataResponse topicMetadataResponse = null;
       try {
         topicMetadataResponse = _simpleConsumer.send(new TopicMetadataRequest(Collections.singletonList(topic)));
@@ -386,14 +392,35 @@ public class SimpleConsumerWrapper implements Closeable {
         Uninterruptibles.sleepUninterruptibly(100, TimeUnit.MILLISECONDS);
       }
     }
+
+    throw new TimeoutException();
   }
 
-  public synchronized Iterable<MessageAndOffset> fetchMessages(long startOffset, long endOffset, int timeoutMillis) {
-    Preconditions.checkState(!_metadataOnlyConsumer, "Cannot fetch messages from a metadata-only SimpleConsumerWrapper");
+  /**
+   * Fetch messages from Kafka between the specified offsets.
+   *
+   * @param startOffset The offset of the first message desired, inclusive
+   * @param endOffset The offset of the last message desired, exclusive, or {@link Long#MAX_VALUE} for no end offset.
+   * @param timeoutMillis Timeout in milliseconds
+   * @throws java.util.concurrent.TimeoutException If the operation could not be completed within {@code timeoutMillis}
+   * milliseconds
+   * @return An iterable containing messages fetched from Kafka and their offsets.
+   */
+  public synchronized Iterable<MessageAndOffset> fetchMessages(long startOffset, long endOffset, int timeoutMillis)
+      throws java.util.concurrent.TimeoutException {
+      Preconditions.checkState(!_metadataOnlyConsumer, "Cannot fetch messages from a metadata-only SimpleConsumerWrapper");
     // Ensure that we're connected to the leader
-    // TODO Add a timeout/error handling
-    while(_currentState.getStateValue() != ConsumerState.CONNECTED_TO_PARTITION_LEADER) {
+    // TODO Improve error handling
+
+    final long endTime = System.currentTimeMillis() + timeoutMillis;
+
+    while(_currentState.getStateValue() != ConsumerState.CONNECTED_TO_PARTITION_LEADER &&
+        System.currentTimeMillis() < endTime) {
       _currentState.process();
+    }
+    if (_currentState.getStateValue() != ConsumerState.CONNECTED_TO_PARTITION_LEADER &&
+        endTime <= System.currentTimeMillis()) {
+      throw new TimeoutException();
     }
 
     FetchResponse fetchResponse = _simpleConsumer.fetch(new FetchRequestBuilder()
@@ -414,9 +441,12 @@ public class SimpleConsumerWrapper implements Closeable {
    *
    * @param requestedOffset Either "largest" or "smallest"
    * @param timeoutMillis Timeout in milliseconds
+   * @throws java.util.concurrent.TimeoutException If the operation could not be completed within {@code timeoutMillis}
+   * milliseconds
    * @return An offset
    */
-  public synchronized long fetchPartitionOffset(String requestedOffset, int timeoutMillis) {
+  public synchronized long fetchPartitionOffset(String requestedOffset, int timeoutMillis)
+      throws java.util.concurrent.TimeoutException {
     Preconditions.checkNotNull(requestedOffset);
 
     final long offsetRequestTime;
@@ -433,11 +463,18 @@ public class SimpleConsumerWrapper implements Closeable {
     int kafkaErrorCount = 0;
     final int MAX_KAFKA_ERROR_COUNT = 10;
 
-    while(true) {
+    final long endTime = System.currentTimeMillis() + timeoutMillis;
+
+    while(System.currentTimeMillis() < endTime) {
       // Try to get into a state where we're connected to Kafka
-      // TODO This needs a time limit
-      while (_currentState.getStateValue() != ConsumerState.CONNECTED_TO_PARTITION_LEADER) {
+      while (_currentState.getStateValue() != ConsumerState.CONNECTED_TO_PARTITION_LEADER &&
+          System.currentTimeMillis() < endTime) {
         _currentState.process();
+      }
+
+      if (_currentState.getStateValue() != ConsumerState.CONNECTED_TO_PARTITION_LEADER &&
+          endTime <= System.currentTimeMillis()) {
+        throw new TimeoutException();
       }
 
       // Send the offset request to Kafka
@@ -474,6 +511,8 @@ public class SimpleConsumerWrapper implements Closeable {
         Uninterruptibles.sleepUninterruptibly(100, TimeUnit.MILLISECONDS);
       }
     }
+
+    throw new TimeoutException();
   }
 
   private Iterable<MessageAndOffset> buildOffsetFilteringIterable(final ByteBufferMessageSet messageAndOffsets, final long startOffset, final long endOffset) {

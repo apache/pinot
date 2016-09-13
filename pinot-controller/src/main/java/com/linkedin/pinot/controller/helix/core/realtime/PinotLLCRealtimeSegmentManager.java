@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.helix.AccessOption;
@@ -232,8 +233,13 @@ public class PinotLLCRealtimeSegmentManager {
 
         metadata.setCreationTime(now);
 
-        final long startOffset = kafkaConsumer.fetchPartitionOffset(initialOffset,
-            KAFKA_PARTITION_OFFSET_FETCH_TIMEOUT_MILLIS);
+        final long startOffset;
+        try {
+          startOffset = kafkaConsumer.fetchPartitionOffset(initialOffset, KAFKA_PARTITION_OFFSET_FETCH_TIMEOUT_MILLIS);
+        } catch (TimeoutException e) {
+          LOGGER.warn("Timed out when fetching partition offsets for segment {}", segName);
+          throw new RuntimeException(e);
+        }
         LOGGER.warn("Setting start offset for segment {} to {}", segName, startOffset);
         metadata.setStartOffset(startOffset);
         metadata.setEndOffset(Long.MAX_VALUE);

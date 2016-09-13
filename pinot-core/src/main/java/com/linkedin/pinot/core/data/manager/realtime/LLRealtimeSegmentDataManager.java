@@ -23,6 +23,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
@@ -238,7 +239,14 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     while(!_receivedStop && !endCriteriaReached()) {
       // Consume for the next _kafkaReadTime ms, or we get to final offset, whichever happens earlier,
       // Update _currentOffset upon return from this method
-      Iterable<MessageAndOffset> messagesAndOffsets = _consumerWrapper.fetchMessages(_currentOffset, _endOffset, KAFKA_MAX_FETCH_TIME_MILLIS);
+      Iterable<MessageAndOffset> messagesAndOffsets = null;
+      try {
+        messagesAndOffsets = _consumerWrapper.fetchMessages(_currentOffset, _endOffset, KAFKA_MAX_FETCH_TIME_MILLIS);
+      } catch (TimeoutException e) {
+        segmentLogger.warn("Timed out when fetching messages from Kafka, retrying");
+        continue;
+      }
+
       Iterator<MessageAndOffset> msgIterator = messagesAndOffsets.iterator();
 
       int batchSize = 0;
