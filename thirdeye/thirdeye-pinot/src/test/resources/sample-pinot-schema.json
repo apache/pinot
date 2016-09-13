@@ -1,0 +1,44 @@
+{
+  "dimensionFieldSpecs" : [
+    {
+      "name": "country",
+      "dataType" : "STRING",
+      "delimiter" : null,
+      "singleValueField" : true
+    },
+    {
+      "name": "browser",
+      "dataType" : "STRING",
+      "delimiter" : null,
+      "singleValueField" : true
+    },
+    {
+      "name": "environment",
+      "dataType" : "STRING",
+      "delimiter" : null,
+      "singleValueField" : true
+    }
+  ],
+  "timeFieldSpec" : {
+    "incomingGranularitySpec" : {
+      "timeType" : "HOURS",
+      "dataType" : "LONG",
+      "name" : "time"
+    }
+  },
+"metricFieldSpecs" : [
+    {
+      "name" : "count",
+      "dataType" : "LONG",
+      "delimiter" : null,
+      "singleValueField" : true
+    },
+    {
+      "name" : "cost",
+      "dataType" : "DOUBLE",
+      "delimiter" : null,
+      "singleValueField" : true
+    }
+   ],
+  "schemaName" : "test-collection"
+}

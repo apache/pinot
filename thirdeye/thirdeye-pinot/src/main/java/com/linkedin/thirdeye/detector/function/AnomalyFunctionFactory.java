@@ -35,6 +35,22 @@ public class AnomalyFunctionFactory {
     }
   }
 
+  public AnomalyFunctionFactory(InputStream input) {
+    props = new Properties();
+    try {
+      props.load(input);
+    } catch (IOException e) {
+      LOGGER.error("Error loading the functions from config", e);
+    } finally {
+      IOUtils.closeQuietly(input);
+    }
+
+    LOGGER.info("Found {} entries in anomaly function configuration file {}", props.size());
+    for (Entry<Object, Object> entry : props.entrySet()) {
+      LOGGER.info("{}: {}", entry.getKey(), entry.getValue());
+    }
+  }
+
   public BaseAnomalyFunction fromSpec(AnomalyFunctionDTO functionSpec) throws Exception {
     BaseAnomalyFunction anomalyFunction = null;
     String type = functionSpec.getType();
