@@ -213,6 +213,8 @@ public class AnomalyMergeExecutor implements Runnable {
       String [] dimArr = anomalyDimensions.split(",");
       for (String dim : dimArr) {
         if(!StringUtils.isBlank(dim) && !"*".equals(dim)) {
+          // Only add a specific dimension value filter if there are more values present for the same dimension
+          filters.removeAll(exploreDimension);
           filters.put(exploreDimension, dim);
           LOG.info("Adding filter : [{} = {}] in the query", exploreDimension, dim);
         }
