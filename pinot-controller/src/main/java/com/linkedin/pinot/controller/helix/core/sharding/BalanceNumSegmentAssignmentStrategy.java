@@ -15,24 +15,21 @@
  */
 package com.linkedin.pinot.controller.helix.core.sharding;
 
+import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
+import com.linkedin.pinot.common.utils.Pairs;
+import com.linkedin.pinot.common.utils.Pairs.Number2ObjectPair;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
-
 import org.apache.helix.HelixAdmin;
-import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
-import com.linkedin.pinot.common.utils.Pairs;
-import com.linkedin.pinot.common.utils.Pairs.Number2ObjectPair;
 
 
 /**
@@ -71,9 +68,9 @@ public class BalanceNumSegmentAssignmentStrategy implements SegmentAssignmentStr
           for (String instanceName : instanceToStateMap.keySet()) {
             if (currentNumSegmentsPerInstanceMap.containsKey(instanceName)) {
               currentNumSegmentsPerInstanceMap.put(instanceName, currentNumSegmentsPerInstanceMap.get(instanceName) + 1);
-            } else {
-              currentNumSegmentsPerInstanceMap.put(instanceName, 1);
             }
+            // else, ignore. Do not add servers, that are not tagged, to the map
+            // By this approach, new segments will not be allotted to the server if tags changed
           }
         }
       }
