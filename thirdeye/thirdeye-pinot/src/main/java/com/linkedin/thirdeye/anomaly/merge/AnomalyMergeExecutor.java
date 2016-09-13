@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.anomaly.merge;
 
+import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.Multimap;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -199,13 +201,29 @@ public class AnomalyMergeExecutor implements Runnable {
     timeSeriesRequest.setAggregationTimeGranularity(timeBucket);
 
     timeSeriesRequest.setEndDateInclusive(false);
+
+    Multimap<String, String> filters = ArrayListMultimap.create();
     if (StringUtils.isNotBlank(anomalyFunctionSpec.getFilters())) {
-      timeSeriesRequest.setFilterSet(ThirdEyeUtils.getFilterSet(anomalyFunctionSpec.getFilters()));
+      filters.putAll(ThirdEyeUtils.getFilterSet(anomalyFunctionSpec.getFilters()));
     }
     String exploreDimension = anomalyFunctionSpec.getExploreDimensions();
     if (StringUtils.isNotBlank(exploreDimension)) {
       timeSeriesRequest.setGroupByDimensions(Collections.singletonList(exploreDimension));
+      String anomalyDimensions = anomalyMergedResult.getDimensions();
+      String [] dimArr = anomalyDimensions.split(",");
+      for (String dim : dimArr) {
+        if(!StringUtils.isBlank(dim) && !"*".equals(dim)) {
+          // Only add a specific dimension value filter if there are more values present for the same dimension
+          filters.removeAll(exploreDimension);
+          filters.put(exploreDimension, dim);
+          LOG.info("Adding filter : [{} = {}] in the query", exploreDimension, dim);
+        }
+      }
     }
+
+    LOG.info("Applying final filter : {}", filters.toString());
+    // Set filters including anomaly-dimension
+    timeSeriesRequest.setFilterSet(filters);
 
     // Fetch current time series data
     timeSeriesRequest.setStart(new DateTime(anomalyMergedResult.getStartTime()));
@@ -218,8 +236,8 @@ public class AnomalyMergeExecutor implements Runnable {
     timeSeriesRequest.setEnd(new DateTime(anomalyMergedResult.getEndTime() - baselineOffset));
     TimeSeriesResponse responseBaseline = timeSeriesHandler.handle(timeSeriesRequest);
 
-    Double currentValue = getMetricValueSum(responseCurrent, anomalyFunctionSpec.getMetric());
-    Double baselineValue = getMetricValueSum(responseBaseline, anomalyFunctionSpec.getMetric());
+    Double currentValue = getAvgMetricValuePerBucket(responseCurrent, anomalyFunctionSpec.getMetric());
+    Double baselineValue = getAvgMetricValuePerBucket(responseBaseline, anomalyFunctionSpec.getMetric());
     Double severity;
     if (baselineValue != 0) {
       severity = (currentValue - baselineValue) / baselineValue;
@@ -230,16 +248,29 @@ public class AnomalyMergeExecutor implements Runnable {
     anomalyMergedResult.setMessage(createMessage(severity, currentValue, baselineValue));
   }
 
-  private Double getMetricValueSum(TimeSeriesResponse response, String metricName) {
+  /**
+   * Returns average metrics value (per bucket) for given time series
+   *
+   * @param response
+   * @param metricName
+   *
+   * @return
+   */
+  private Double getAvgMetricValuePerBucket(TimeSeriesResponse response, String metricName) {
     Double totalVal = 0.0;
+    int numBuckets = 0;
     for (int i = 0; i < response.getNumRows(); i++) {
       for (TimeSeriesRow.TimeSeriesMetric metricData : response.getRow(i).getMetrics()) {
         if (metricName.equals(metricData.getMetricName())) {
           totalVal += metricData.getValue();
+          numBuckets++;
         }
       }
     }
-    return totalVal;
+    if (numBuckets == 0) {
+      return totalVal;
+    }
+    return totalVal / numBuckets;
   }
 
   private void performMergeBasedOnFunctionId(AnomalyFunctionDTO function,
