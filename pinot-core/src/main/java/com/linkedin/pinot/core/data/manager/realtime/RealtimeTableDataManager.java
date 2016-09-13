@@ -157,7 +157,8 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
           replaceLLSegment(segmentId);
           return;
         }
-        manager = new LLRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, instanceZKMetadata, this, _indexDir.getAbsolutePath(), _readMode, Schema.fromZNRecord(record),
+        manager = new LLRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, instanceZKMetadata, this, _indexDir.getAbsolutePath(),
+            Schema.fromZNRecord(record),
             _serverMetrics);
       }
       LOGGER.info("Initialize RealtimeSegmentDataManager - " + segmentId);

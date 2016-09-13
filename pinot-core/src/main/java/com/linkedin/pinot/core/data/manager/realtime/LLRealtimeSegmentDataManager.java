@@ -39,7 +39,6 @@ import com.linkedin.pinot.common.metrics.ServerGauge;
 import com.linkedin.pinot.common.metrics.ServerMeter;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
-import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.segment.fetcher.SegmentFetcherFactory;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
@@ -65,7 +64,7 @@ import kafka.message.MessageAndOffset;
  * Segment data manager for low level consumer realtime segments, which manages consumption and segment completion.
  */
 public class LLRealtimeSegmentDataManager extends SegmentDataManager {
-  private enum State {
+  protected enum State {
     // The state machine starts off with this state. While in this state we consume kafka events
     // and index them in memory. We continue to be in this state until the end criteria is satisfied
     // (time or number of rows)
@@ -193,7 +192,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     throw new RuntimeException("Unreachable");
   }
 
-  private void consumeLoop() {
+  protected void consumeLoop() {
     segmentLogger.info("Starting consumption loop start offset {}, end offset {}", _currentOffset, _endOffset);
     while(!_receivedStop && !endCriteriaReached()) {
       // Consume for the next _kafkaReadTime ms, or we get to final offset, whichever happens earlier,
@@ -330,7 +329,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
    * @param buildTgz true if you want the method to also build tgz file
    * @return true if all succeeds.
    */
-  private boolean buildSegment(boolean buildTgz) {
+  protected boolean buildSegment(boolean buildTgz) {
     // Build a segment from in-memory rows.If buildTgz is true, then build the tar.gz file as well
     // TODO Use an auto-closeable object to delete temp resources.
     File tempSegmentFolder = new File(_resourceTmpDir, "tmp-" + _segmentNameStr + "-" + String.valueOf(now()));
@@ -368,7 +367,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     return true;
   }
 
-  private boolean commitSegment() {
+  protected boolean commitSegment() {
     // Send segmentCommit() to the controller
     // if that succeeds, swap in-memory segment with the one built.
     File destSeg = makeSegmentDirPath();
@@ -383,7 +382,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     return true;
   }
 
-  private boolean buildSegmentAndReplace() {
+  protected boolean buildSegmentAndReplace() {
     boolean success = buildSegment(false);
     if (!success) {
       return success;
@@ -392,7 +391,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     return true;
   }
 
-  private void hold() {
+  protected void hold() {
     try {
       Thread.sleep(SegmentCompletionProtocol.MAX_HOLD_TIME_MS);
     } catch (InterruptedException e) {
@@ -400,7 +399,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     }
   }
 
-  private SegmentCompletionProtocol.Response postSegmentConsumedMsg() {
+  protected SegmentCompletionProtocol.Response postSegmentConsumedMsg() {
     // Post segmentConsumed to current leader.
     // Retry maybe once if leader is not found.
     return _protocolHandler.segmentConsumed(_segmentNameStr, _currentOffset);
@@ -452,7 +451,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     }
   }
 
-  private void downloadSegmentAndReplace(LLCRealtimeSegmentZKMetadata metadata) {
+  protected void downloadSegmentAndReplace(LLCRealtimeSegmentZKMetadata metadata) {
     File tempSegmentFolder = new File(_resourceTmpDir, "tmp-" + String.valueOf(now()));
     File tempFile = new File(_resourceTmpDir, _segmentNameStr + ".tar.gz");
     String uri = metadata.getDownloadUrl();
@@ -471,7 +470,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     }
   }
 
-  private long now() {
+  protected long now() {
     return System.currentTimeMillis();
   }
 
@@ -497,8 +496,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     _realtimeSegment.destroy();
   }
 
-  public void start() {
-    _state = State.INITIAL_CONSUMING;
+  protected void start() {
     _consumerThread = new Thread(new PartitionConsumer(), _segmentNameStr);
     segmentLogger.info("Created new consumer thread {} for {}", _consumerThread, this.toString());
     _consumerThread.start();
@@ -513,11 +511,16 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     _consumerThread.join(ms);
   }
 
+  // TODO Make this a factory class.
+  protected KafkaHighLevelStreamProviderConfig createStreamProviderConfig() {
+    return new KafkaHighLevelStreamProviderConfig();
+  }
+
   // Assume that this is called only on OFFLINE to CONSUMING transition.
   // If the transition is OFFLINE to ONLINE, the caller should have downloaded the segment and we don't reach here.
   public LLRealtimeSegmentDataManager(RealtimeSegmentZKMetadata segmentZKMetadata, AbstractTableConfig tableConfig,
       InstanceZKMetadata instanceZKMetadata, RealtimeTableDataManager realtimeTableDataManager, String resourceDataDir,
-      ReadMode readMode, Schema schema, ServerMetrics serverMetrics) throws Exception {
+      Schema schema, ServerMetrics serverMetrics) throws Exception {
     _segmentZKMetadata = (LLCRealtimeSegmentZKMetadata) segmentZKMetadata;
     _tableConfig = tableConfig;
     _realtimeTableDataManager = realtimeTableDataManager;
@@ -530,7 +533,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
 
     // TODO Validate configs
     IndexingConfig indexingConfig = _tableConfig.getIndexingConfig();
-    KafkaHighLevelStreamProviderConfig kafkaStreamProviderConfig = new KafkaHighLevelStreamProviderConfig();
+    KafkaHighLevelStreamProviderConfig kafkaStreamProviderConfig = createStreamProviderConfig();
     kafkaStreamProviderConfig.init(tableConfig, instanceZKMetadata, schema);
     final String bootstrapNodes = indexingConfig.getStreamConfigs()
         .get(CommonConstants.Helix.DataSource.STREAM_PREFIX + "." + CommonConstants.Helix.DataSource.Realtime.Kafka.KAFKA_BROKER_LIST);
@@ -538,8 +541,8 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     _segmentNameStr = _segmentZKMetadata.getSegmentName();
     _segmentName = new LLCSegmentName(_segmentNameStr);
     _kafkaPartitionId = _segmentName.getPartitionId();
-    _segmentMaxRowCount = Integer.parseInt(_tableConfig.getIndexingConfig().getStreamConfigs().get(
-        CommonConstants.Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_SIZE));
+    _segmentMaxRowCount = Integer.parseInt(_tableConfig.getIndexingConfig().getStreamConfigs()
+        .get(CommonConstants.Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_SIZE));
     _tableName = _tableConfig.getTableName();
     segmentLogger = LoggerFactory.getLogger(LLRealtimeSegmentDataManager.class.getName() +
         "_" + _segmentNameStr);
@@ -566,8 +569,8 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
 
 
     List<String> invertedIndexColumns = indexingConfig.getInvertedIndexColumns();
-    if (!indexingConfig.getSortedColumn().isEmpty()) {
-      invertedIndexColumns.add(indexingConfig.getSortedColumn().get(0));
+    if (_sortedColumn != null && !invertedIndexColumns.contains(_sortedColumn)) {
+      invertedIndexColumns.add(_sortedColumn);
     }
     // Start new realtime segment
     _realtimeSegment = new RealtimeSegmentImpl(schema, _segmentMaxRowCount, tableConfig.getTableName(),
@@ -587,6 +590,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     if (!_resourceTmpDir.exists()) {
       _resourceTmpDir.mkdirs();
     }
+    _state = State.INITIAL_CONSUMING;
     start();
   }
 
@@ -636,5 +640,9 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
   @Override
   public String getSegmentName() {
     return _segmentNameStr;
+  }
+
+  public int getMaxTimeForConsumingToOnlineSec() {
+    return _maxTimeForConsumingToOnlineSec;
   }
 }
