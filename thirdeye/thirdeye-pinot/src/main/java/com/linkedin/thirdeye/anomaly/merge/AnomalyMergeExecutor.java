@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.anomaly.merge;
 
+import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.Multimap;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -199,13 +201,27 @@ public class AnomalyMergeExecutor implements Runnable {
     timeSeriesRequest.setAggregationTimeGranularity(timeBucket);
 
     timeSeriesRequest.setEndDateInclusive(false);
+
+    Multimap<String, String> filters = ArrayListMultimap.create();
     if (StringUtils.isNotBlank(anomalyFunctionSpec.getFilters())) {
-      timeSeriesRequest.setFilterSet(ThirdEyeUtils.getFilterSet(anomalyFunctionSpec.getFilters()));
+      filters.putAll(ThirdEyeUtils.getFilterSet(anomalyFunctionSpec.getFilters()));
     }
     String exploreDimension = anomalyFunctionSpec.getExploreDimensions();
     if (StringUtils.isNotBlank(exploreDimension)) {
       timeSeriesRequest.setGroupByDimensions(Collections.singletonList(exploreDimension));
+      String anomalyDimensions = anomalyMergedResult.getDimensions();
+      String [] dimArr = anomalyDimensions.split(",");
+      for (String dim : dimArr) {
+        if(!StringUtils.isBlank(dim) && !"*".equals(dim)) {
+          filters.put(exploreDimension, dim);
+          LOG.info("Adding filter : [{} = {}] in the query", exploreDimension, dim);
+        }
+      }
     }
+
+    LOG.info("Applying final filter : {}", filters.toString());
+    // Set filters including anomaly-dimension
+    timeSeriesRequest.setFilterSet(filters);
 
     // Fetch current time series data
     timeSeriesRequest.setStart(new DateTime(anomalyMergedResult.getStartTime()));
