@@ -47,7 +47,7 @@ public class SummaryResponse {
   public static SummaryResponse buildNotAvailableResponse() {
     SummaryResponse response = new SummaryResponse();
     response.dimensions.add(NOT_AVAILABLE);
-    response.responseRows.add(SummaryResponseRow.buildNotAvailableRow());
+//    response.responseRows.add(SummaryResponseRow.buildNotAvailableRow());
     return response;
   }
 

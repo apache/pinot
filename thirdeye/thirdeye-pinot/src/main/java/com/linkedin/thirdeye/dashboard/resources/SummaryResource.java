@@ -60,14 +60,17 @@ public class SummaryResource {
     if (summarySize < 1) summarySize = 1;
 
     SummaryResponse response = null;
+    String derivedMetricName = null;
     try {
       collection = ThirdEyeUtils.getCollectionFromAlias(collection);
       CollectionConfig collectionConfig = CACHE_REGISTRY_INSTANCE.getCollectionConfigCache().getIfPresent(collection);
       if (collectionConfig != null && collectionConfig.getDerivedMetrics() != null
           && collectionConfig.getDerivedMetrics().containsKey(metric)) {
-        metric = collectionConfig.getDerivedMetrics().get(metric);
+        derivedMetricName = collectionConfig.getDerivedMetrics().get(metric);
+      } else {
+        derivedMetricName = metric;
       }
-      List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metric, MetricAggFunction.SUM,collection);
+      List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(derivedMetricName, MetricAggFunction.SUM,collection);
 
       OLAPDataBaseClient olapClient = new PinotThirdEyeSummaryClient(CACHE_REGISTRY_INSTANCE.getQueryCache());
       olapClient.setCollection(collection);

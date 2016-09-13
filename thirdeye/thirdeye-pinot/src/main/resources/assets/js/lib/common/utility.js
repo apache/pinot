@@ -39,7 +39,6 @@ function getData(url, tab) {
     })
 }
 
-
 function getDataCustomCallback(url, tab) {
     console.log("request url:", url)
 
@@ -68,11 +67,12 @@ function getDataCustomCallback(url, tab) {
                 $("#" + tab + "-chart-area-error").append(error);
                 $("#" + tab + "-chart-area-error").fadeIn(100);
                 return
-            },
-            beforeSend: showLoader(tab)
+            }
+            //,
+            //beforeSend: showLoader(tab)
         }
     }).always(function () {
-        hideLoader(tab);
+
     });
 };
 

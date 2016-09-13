@@ -838,6 +838,10 @@ body a{
 }
 
 /* Heat-map summary related */
+.difference-summary{
+    position: relative;
+}
+
 .summary-header {
     word-break: normal;
     text-align: right;

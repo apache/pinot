@@ -83,54 +83,16 @@
                         {{/each}}
                     </table>
                 </div>
-                <div id="difference-summary-{{metricName}}" class="difference-summary uk-margin-bottom" data-metric="{{metricName}}">
-                    <h3>Beta Feature: Outlier Summary</h3>
-                    <table id="heat-map-{{metricName}}-difference-summary-table" style="width:100%;">
 
-                        {{#with @root/summaryData}}
-                        <thead>
-                        <tr>
-                            <th colspan="{{dimensions.length}}">Dimension</th>
-                            <th></th>
-                            <th></th>
-                            <th></th>
-                            <th></th>
-                            <th></th>
-                        </tr>
-                        <tr>
-                            {{#with @root/summaryData/dimensions}}
-                            {{#each this as |dimensionName dimensionIndex|}}
-                                <th>{{dimensionName}}</th>
-                            {{/each}}
-                            {{/with}}
-                                <th class="summary-header">Baseline</th>
-                                <th class="summary-header">Current</th>
-                                <th class="summary-header thin-column">Percentage Change</th>
-                                <th class="summary-header thin-column">Contribution Change</th>
-                                <th class="summary-header thin-column">Contribution To Overall Change</th>
-                        </tr>
-                        </thead>
-                        {{#with @root/summaryData/responseRows}}
-                        <tbody>
-                        {{#each this as |row rowIndex|}}
-                        <tr>
-                            {{#each row.names as |dimensionValue dimension|}}
-                              <td style="background-color: rgba(222, 222, 222, 0.5);">{{dimensionValue}}</td>
-                            {{/each}}
-                            <td align="right">{{row.baselineValue}}</td>
-                            <td align="right">{{row.currentValue}}</td>
-                            <td align="right">{{row.percentageChange}}</td>
-                            <td align="right">{{row.contributionChange}}</td>
-                            <td align="right">{{row.contributionToOverallChange}}</td>
-                        </tr>
-                        {{/each}}
-                        {{/with}}<!--end of summaryData -->
-                        </tbody>
-                        {{/with}}<!--end of summaryData scope-->
-                    </table>
+            </div>
+
+        </div>
+            <h3>Beta Feature: Outlier Summary</h3>
+            <div id="difference-summary-{{metricName}}" class="difference-summary uk-margin-bottom">
+                <div class="loader">
+                    <i class="uk-icon-spinner uk-icon-spin uk-icon-large"></i>
                 </div>
             </div>
-        </div>
         {{/each}}
         {{/with}}
         <div id="tooltip" class="hidden">
