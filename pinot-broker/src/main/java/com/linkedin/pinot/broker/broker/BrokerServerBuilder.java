@@ -26,7 +26,9 @@ import com.linkedin.pinot.common.metrics.MetricsHelper;
 import com.linkedin.pinot.common.query.ReduceServiceRegistry;
 import com.linkedin.pinot.common.response.BrokerResponseFactory;
 import com.linkedin.pinot.common.response.ServerInstance;
+import com.linkedin.pinot.common.utils.DataTableSerDeRegistry;
 import com.linkedin.pinot.core.query.reduce.BrokerReduceService;
+import com.linkedin.pinot.core.util.DataTableCustomSerDe;
 import com.linkedin.pinot.requestHandler.BrokerRequestHandler;
 import com.linkedin.pinot.routing.CfgBasedRouting;
 import com.linkedin.pinot.routing.HelixExternalViewBasedRouting;
@@ -168,6 +170,9 @@ public class BrokerServerBuilder {
     ReduceServiceRegistry reduceServiceRegistry = buildReduceServiceRegistry();
     _requestHandler = new BrokerRequestHandler(_routingTable, _timeBoundaryService, _scatterGather,
         reduceServiceRegistry, _brokerMetrics, _config);
+
+    // Register SerDe for data-table.
+    DataTableSerDeRegistry.getInstance().register(new DataTableCustomSerDe());
 
     LOGGER.info("Network initialized !!");
   }

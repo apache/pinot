@@ -17,7 +17,7 @@ package com.linkedin.pinot.common.utils.primitive;
 
 import com.linkedin.pinot.common.utils.EqualityUtils;
 import java.io.Serializable;
-import java.util.Objects;
+import java.nio.ByteBuffer;
 
 
 /**
@@ -95,5 +95,29 @@ public class MutableLongValue extends Number implements Serializable, Comparable
   @Override
   public int hashCode() {
     return EqualityUtils.hashCodeOf(value);
+  }
+
+  /**
+   * Serializer for instance of the class.
+   * Serialized byte-array can be de-serialized by {@ref fromBytes}
+   *
+   * @return Serialized byte array for the instance.
+   */
+  public byte[] toBytes() {
+    ByteBuffer byteBuffer = ByteBuffer.allocate(Long.SIZE >> 3);
+    byteBuffer.putLong(value);
+    return byteBuffer.array();
+  }
+
+  /**
+   * De-serializer for instance of the class.
+   * Assumes that byte-array was serialized by {@ref toBytes}
+   *
+   * @param bytes Serialized bytes for the instance
+   * @return De-serialized object from the provided byte-array.
+   */
+  public static MutableLongValue fromBytes(byte[] bytes) {
+    long value = ByteBuffer.wrap(bytes).getLong();
+    return new MutableLongValue(value);
   }
 }

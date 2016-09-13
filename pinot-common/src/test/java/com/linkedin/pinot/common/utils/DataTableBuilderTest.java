@@ -28,11 +28,19 @@ import java.util.Random;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
 public class DataTableBuilderTest {
   private static Logger LOGGER = LoggerFactory.getLogger(DataTableBuilderTest.class);
+
+  private DataTableSerDe _dataTableSerDe;
+
+  @BeforeClass
+  public void setup() {
+    _dataTableSerDe = DataTableSerDeRegistry.getInstance().get();
+  }
 
   @Test
   public void testException() throws Exception {
@@ -59,6 +67,8 @@ public class DataTableBuilderTest {
     final DataSchema schema = new DataSchema(columnNames, columnTypes);
 
     final DataTableBuilder builder = new DataTableBuilder(schema);
+    builder.setDataTableSerDe(_dataTableSerDe);
+
     builder.open();
     final Random r = new Random();
     final int NUM_ROWS = 100;
@@ -156,6 +166,8 @@ public class DataTableBuilderTest {
     String[] columnNames = new String[] { "col-0" };
     DataSchema schema = new DataSchema(columnNames, columnTypes);
     DataTableBuilder builder = new DataTableBuilder(schema);
+    builder.setDataTableSerDe(_dataTableSerDe);
+
     builder.open();
     Random r = new Random();
     int NUM_ROWS = 10;
@@ -191,6 +203,8 @@ public class DataTableBuilderTest {
     String[] columnNames = new String[] { "col-0" };
     DataSchema schema = new DataSchema(columnNames, columnTypes);
     DataTableBuilder builder = new DataTableBuilder(schema);
+    builder.setDataTableSerDe(_dataTableSerDe);
+
     builder.open();
     Random r = new Random();
     int NUM_ROWS = 10;
@@ -227,6 +241,8 @@ public class DataTableBuilderTest {
     String[] columnNames = new String[] { "col-0", "col-1" };
     DataSchema schema = new DataSchema(columnNames, columnTypes);
     DataTableBuilder builder = new DataTableBuilder(schema);
+    builder.setDataTableSerDe(_dataTableSerDe);
+
     builder.open();
     Random r = new Random();
     int NUM_ROWS = 100;
@@ -337,6 +353,8 @@ public class DataTableBuilderTest {
 
     DataSchema schema = new DataSchema(columnNames, columnTypes);
     DataTableBuilder builder = new DataTableBuilder(schema);
+    builder.setDataTableSerDe(_dataTableSerDe);
+
     builder.startRow();
     builder.setColumn(0, "sum_count");
     Map<String, Double> map = new HashMap<String, Double>();
@@ -517,5 +535,13 @@ public class DataTableBuilderTest {
     public int hashCode() {
       return new Integer(i).hashCode();
     }
+  }
+
+  /**
+   * Helper method to set the data table ser/de
+   * @param dataTableSerDe
+   */
+  protected void setDataTableSerDe(DataTableSerDe dataTableSerDe) {
+    _dataTableSerDe = dataTableSerDe;
   }
 }

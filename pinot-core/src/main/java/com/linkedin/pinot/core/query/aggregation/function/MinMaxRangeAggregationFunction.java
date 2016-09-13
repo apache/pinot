@@ -15,7 +15,9 @@
  */
 package com.linkedin.pinot.core.query.aggregation.function;
 
+import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import java.io.Serializable;
+import java.nio.ByteBuffer;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.util.List;
@@ -190,6 +192,30 @@ public class MinMaxRangeAggregationFunction implements AggregationFunction<MinMa
     public String toString() {
       return new DecimalFormat("####################.##########",
           DecimalFormatSymbols.getInstance(Locale.US)).format((getSecond() - getFirst()));
+    }
+
+    /**
+     * Helper method to serialize a MinMaxRangePair into a byte-array.
+     *
+     * @return Serialized byte-array of for the MinMaxRangePair.
+     */
+    public byte[] toBytes() {
+      int size = 2 * V1Constants.Numbers.DOUBLE_SIZE;
+      ByteBuffer byteBuffer = ByteBuffer.allocate(size);
+      byteBuffer.putDouble(getFirst());
+      byteBuffer.putDouble(getSecond());
+      return byteBuffer.array();
+    }
+
+    /**
+     * Helper method to de-serialize a MinMaxRangePair from a byte-array
+     *
+     * @param bytes Serialized byte-array for the MinMaxRangePair
+     * @return De-serialized MinMaxRangePair from byte-array
+     */
+    public static MinMaxRangePair fromBytes(byte[] bytes) {
+      ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+      return new MinMaxRangePair(byteBuffer.getDouble(), byteBuffer.getDouble());
     }
   }
 
