@@ -237,7 +237,7 @@ public class AnomalyResource {
     anomalyFunctionSpec.setWindowSize(Integer.valueOf(windowSize));
     anomalyFunctionSpec.setWindowUnit(TimeUnit.valueOf(windowUnit));
 
-    TimeUnit windowDelayTimeUnit = TimeUnit.valueOf(windowUnit);
+    TimeUnit windowDelayTimeUnit = dataGranularity.getUnit();
     if (StringUtils.isNotEmpty(windowDelayUnit)) {
       windowDelayTimeUnit = TimeUnit.valueOf(windowDelayUnit);
     }
@@ -334,7 +334,7 @@ public class AnomalyResource {
     anomalyFunctionSpec.setWindowUnit(TimeUnit.valueOf(windowUnit));
     anomalyFunctionSpec.setWindowDelay(Integer.valueOf(windowDelay));
     if (StringUtils.isEmpty(windowDelayUnit)) {
-      anomalyFunctionSpec.setWindowDelayUnit(TimeUnit.valueOf(windowUnit));
+      anomalyFunctionSpec.setWindowDelayUnit(dataGranularity.getUnit());
     } else {
       anomalyFunctionSpec.setWindowDelayUnit(TimeUnit.valueOf(windowDelayUnit));
     }
