@@ -33,8 +33,16 @@ import java.util.List;
  */
 public class HllUtil {
 
-  private static final ImmutableBiMap<Integer, Integer> LOG2M_TO_SIZE_IN_BYTES =
-      ImmutableBiMap.of(5, 32, 6, 52, 7, 96, 8, 180, 9, 352);
+  static final ImmutableBiMap<Integer, Integer> LOG2M_TO_SIZE_IN_BYTES = ImmutableBiMap.<Integer, Integer>builder()
+      .put(5, 32)
+      .put(6, 52)
+      .put(7, 96)
+      .put(8, 180)
+      .put(9, 352)
+      .put(10, 692)
+      .put(11, 1376)
+      .put(12, 2740)
+      .build();
 
   private static final Charset charset = Charset.forName("UTF-8");
 

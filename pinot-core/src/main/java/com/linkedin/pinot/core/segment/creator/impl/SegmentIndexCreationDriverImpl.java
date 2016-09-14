@@ -110,6 +110,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     if (enableHllIndex && !createStarTree) {
       throw new IllegalArgumentException("Derived HLL fields generation will not work if StarTree is not enabled.");
     }
+    LOGGER.info("Enable HLL Index: {}", enableHllIndex);
 
     addDerivedFieldsInSchema();
 
@@ -204,6 +205,10 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     starTreeBuilderConfig.setSkipMaterializationForDimensions(skipMaterializationForDimensions);
     starTreeBuilderConfig.setSkipMaterializationCardinalityThreshold(starTreeIndexSpec.getskipMaterializationCardinalityThreshold());
     starTreeBuilderConfig.setOutDir(starTreeTempDir);
+
+    //boolean enableOffHeapFormat = false; //starTreeIndexSpec.isEnableOffHeapFormat();
+    //starTreeBuilderConfig.setEnableOffHealpFormat(false); //enableOffHeapFormat);
+    //System.out.println("starTreeBuilderConfig enable off heap format: " + starTreeBuilderConfig.isEnableOffHealpFormat());
 
     boolean enableOffHeapFormat = starTreeIndexSpec.isEnableOffHeapFormat();
     starTreeBuilderConfig.setEnableOffHealpFormat(enableOffHeapFormat);

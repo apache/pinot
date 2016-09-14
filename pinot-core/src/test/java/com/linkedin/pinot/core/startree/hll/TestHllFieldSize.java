@@ -16,6 +16,7 @@
 package com.linkedin.pinot.core.startree.hll;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
+import java.io.IOException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -27,6 +28,31 @@ import java.util.Random;
 public class TestHllFieldSize {
   private static final Logger LOGGER = LoggerFactory.getLogger(TestHllFieldSize.class);
   private Random rand = new Random();
+
+  private static int calculateHllSerializedSizeInBytes(int log2m) {
+    try {
+      return new HyperLogLog(log2m).getBytes().length;
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+    return -1;
+  }
+
+  @Test
+  public void verifyHllConstantsSize() {
+    // verify size
+    int min = Integer.MAX_VALUE;
+    int max = Integer.MIN_VALUE;
+    for (int key: HllUtil.LOG2M_TO_SIZE_IN_BYTES.keySet()) {
+      if (key > max) max = key;
+      if (key < min) min = key;
+    }
+    for (int log2m = min; log2m <= max; log2m++) {
+      int realSize = calculateHllSerializedSizeInBytes(log2m);
+      LOGGER.info("Log2m {}: SerializedSize {}", log2m, realSize);
+      Assert.assertEquals(realSize, HllUtil.getHllFieldSizeFromLog2m(log2m));
+    }
+  }
 
   @Test
   public void testHllFieldSerializedSize()

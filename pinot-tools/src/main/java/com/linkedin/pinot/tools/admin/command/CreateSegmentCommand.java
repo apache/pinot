@@ -18,6 +18,7 @@ package com.linkedin.pinot.tools.admin.command;
 import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import com.linkedin.pinot.core.startree.hll.HllConfig;
 import com.linkedin.pinot.tools.Command;
 import java.io.File;
 import java.io.FilenameFilter;
@@ -81,6 +82,7 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
   @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
       usage = "Print this message.")
   private boolean _help = false;
+  private HllConfig _hllConfig;
 
   public CreateSegmentCommand setGeneratorConfigFile(String generatorConfigFile) {
     _generatorConfigFile = generatorConfigFile;
@@ -139,6 +141,11 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
 
   public CreateSegmentCommand setNumThreads(int numThreads) {
     _numThreads = numThreads;
+    return this;
+  }
+
+  public CreateSegmentCommand setHllConfig(HllConfig hllConfig) {
+    _hllConfig = hllConfig;
     return this;
   }
 
@@ -309,6 +316,10 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
             _starTreeIndexSpecFile);
       }
       segmentGeneratorConfig.setStarTreeIndexSpecFile(_starTreeIndexSpecFile);
+    }
+
+    if (_hllConfig != null) {
+      segmentGeneratorConfig.setHllConfig(_hllConfig);
     }
 
     ExecutorService executor = Executors.newFixedThreadPool(_numThreads);
