@@ -17,11 +17,9 @@ import org.apache.tomcat.jdbc.pool.DataSource;
 import org.hibernate.cfg.Environment;
 import org.hibernate.engine.jdbc.connections.internal.DatasourceConnectionProviderImpl;
 import org.hibernate.internal.SessionImpl;
-import org.joda.time.DateTime;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 
-import com.linkedin.thirdeye.anomaly.job.JobConstants;
 import com.linkedin.thirdeye.common.persistence.PersistenceConfig;
 import com.linkedin.thirdeye.common.persistence.PersistenceUtil;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
@@ -41,8 +39,6 @@ import com.linkedin.thirdeye.datalayer.bao.hibernate.TaskManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.hibernate.WebappConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
-import com.linkedin.thirdeye.datalayer.dto.JobDTO;
-import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 
 public abstract class AbstractDBIntegrationTestBase {
   protected AnomalyFunctionManager anomalyFunctionDAO;
@@ -172,24 +168,4 @@ public abstract class AbstractDBIntegrationTestBase {
     return emailConfiguration;
   }
 
-  protected RawAnomalyResultDTO getAnomalyResult() {
-    RawAnomalyResultDTO anomalyResult = new RawAnomalyResultDTO();
-    anomalyResult.setScore(1.1);
-    anomalyResult.setStartTime(System.currentTimeMillis());
-    anomalyResult.setEndTime(System.currentTimeMillis());
-    anomalyResult.setWeight(10.1);
-    anomalyResult.setDimensions("xyz dimension");
-    anomalyResult.setCreationTimeUtc(System.currentTimeMillis());
-    return anomalyResult;
-  }
-
-  JobDTO getTestJobSpec() {
-    JobDTO jobSpec = new JobDTO();
-    jobSpec.setJobName("Test_Anomaly_Job");
-    jobSpec.setStatus(JobConstants.JobStatus.SCHEDULED);
-    jobSpec.setScheduleStartTime(System.currentTimeMillis());
-    jobSpec.setWindowStartTime(new DateTime().minusHours(20).getMillis());
-    jobSpec.setWindowEndTime(new DateTime().minusHours(10).getMillis());
-    return jobSpec;
-  }
 }
