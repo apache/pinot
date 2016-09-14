@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.db.dao;
+package com.linkedin.thirdeye.datalayer.bao;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -15,7 +15,7 @@ import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 
-public class TestAnomalyMergedResultDAO extends AbstractDbTestBase {
+public class TestMergedAnomalyResultManager extends AbstractManagerTestBase {
   MergedAnomalyResultDTO mergedResult = null;
   Long anomalyResultId;
   AnomalyFunctionDTO function = getTestFunctionSpec("metric", "dataset");

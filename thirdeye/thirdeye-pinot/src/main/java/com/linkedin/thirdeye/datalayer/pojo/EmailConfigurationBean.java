@@ -1,9 +1,11 @@
 package com.linkedin.thirdeye.datalayer.pojo;
 
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import javax.persistence.Column;
 import javax.persistence.MappedSuperclass;
+import javax.persistence.Transient;
 import javax.validation.Valid;
 import javax.validation.constraints.NotNull;
 
@@ -16,6 +18,9 @@ import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 @MappedSuperclass
 public class EmailConfigurationBean extends AbstractBean {
+
+  @Transient
+  List<Long> functionIds;
 
   @Valid
   @NotNull
@@ -69,7 +74,7 @@ public class EmailConfigurationBean extends AbstractBean {
   private TimeUnit windowUnit = TimeUnit.DAYS;
 
   @Column(name = "is_active", nullable = false)
-  private boolean isActive;
+  private boolean active;
 
   @Column(name = "send_zero_anomaly_email", nullable = false)
   private boolean sendZeroAnomalyEmail;
@@ -82,6 +87,15 @@ public class EmailConfigurationBean extends AbstractBean {
 
   @Column(name = "window_delay_unit", nullable = false)
   private TimeUnit windowDelayUnit;
+
+
+  public List<Long> getFunctionIds() {
+    return functionIds;
+  }
+
+  public void setFunctionIds(List<Long> functionIds) {
+    this.functionIds = functionIds;
+  }
 
   public String getCollection() {
     return collection;
@@ -171,12 +185,12 @@ public class EmailConfigurationBean extends AbstractBean {
     this.windowUnit = windowUnit;
   }
 
-  public boolean getIsActive() {
-    return isActive;
+  public boolean isActive() {
+    return active;
   }
 
-  public void setIsActive(boolean isActive) {
-    this.isActive = isActive;
+  public void setActive(boolean active) {
+    this.active = active;
   }
 
   public boolean getSendZeroAnomalyEmail() {
@@ -222,9 +236,8 @@ public class EmailConfigurationBean extends AbstractBean {
     return MoreObjects.toStringHelper(this).add("collection", collection).add("metric", metric)
         .add("fromAddress", fromAddress).add("toAddresses", toAddresses).add("cron", cron)
         .add("smtpHost", smtpHost).add("smtpPort", smtpPort).add("smtpUser", smtpUser)
-        .add("windowSize", windowSize).add("windowUnit", windowUnit).add("isActive", isActive)
+        .add("windowSize", windowSize).add("windowUnit", windowUnit).add("isActive", active)
         .add("sendZeroAnomalyEmail", sendZeroAnomalyEmail).add("filters", filters)
-        .add("windowDelay", windowDelay).add("windowDelayUnit", windowDelayUnit)
-        .toString();
+        .add("windowDelay", windowDelay).add("windowDelayUnit", windowDelayUnit).toString();
   }
 }

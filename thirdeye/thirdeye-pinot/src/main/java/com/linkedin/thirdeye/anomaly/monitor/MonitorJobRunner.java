@@ -92,7 +92,7 @@ public class MonitorJobRunner implements JobRunner {
         anomalyTaskSpec.setTaskType(TaskType.MONITOR);
         anomalyTaskSpec.setJobName(monitorJobContext.getJobName());
         anomalyTaskSpec.setStatus(TaskStatus.WAITING);
-        anomalyTaskSpec.setTaskStartTime(System.currentTimeMillis());
+        anomalyTaskSpec.setStartTime(System.currentTimeMillis());
         anomalyTaskSpec.setTaskInfo(taskInfoJson);
         JobDTO anomalyJobSpec = anomalyJobDAO.findById(monitorJobContext.getJobExecutionId());
         anomalyTaskSpec.setJob(anomalyJobSpec);

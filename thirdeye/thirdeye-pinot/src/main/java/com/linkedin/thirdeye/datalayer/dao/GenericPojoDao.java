@@ -33,6 +33,7 @@ import com.linkedin.thirdeye.datalayer.entity.GenericJsonEntity;
 import com.linkedin.thirdeye.datalayer.entity.JobIndex;
 import com.linkedin.thirdeye.datalayer.entity.MergedAnomalyResultIndex;
 import com.linkedin.thirdeye.datalayer.entity.RawAnomalyResultIndex;
+import com.linkedin.thirdeye.datalayer.entity.TaskIndex;
 import com.linkedin.thirdeye.datalayer.entity.WebappConfigIndex;
 import com.linkedin.thirdeye.datalayer.pojo.AbstractBean;
 import com.linkedin.thirdeye.datalayer.pojo.AnomalyFeedbackBean;
@@ -41,6 +42,7 @@ import com.linkedin.thirdeye.datalayer.pojo.EmailConfigurationBean;
 import com.linkedin.thirdeye.datalayer.pojo.JobBean;
 import com.linkedin.thirdeye.datalayer.pojo.MergedAnomalyResultBean;
 import com.linkedin.thirdeye.datalayer.pojo.RawAnomalyResultBean;
+import com.linkedin.thirdeye.datalayer.pojo.TaskBean;
 import com.linkedin.thirdeye.datalayer.pojo.WebappConfigBean;
 import com.linkedin.thirdeye.datalayer.util.GenericResultSetMapper;
 import com.linkedin.thirdeye.datalayer.util.Predicate;
@@ -64,7 +66,10 @@ public class GenericPojoDao {
     //        newPojoInfo(DEFAULT_BASE_TABLE_NAME, AnomalyMergeConfigIndex.class));
     pojoInfoMap.put(EmailConfigurationBean.class,
         newPojoInfo(DEFAULT_BASE_TABLE_NAME, EmailConfigurationIndex.class));
+
     pojoInfoMap.put(JobBean.class, newPojoInfo(DEFAULT_BASE_TABLE_NAME, JobIndex.class));
+    pojoInfoMap.put(TaskBean.class, newPojoInfo(DEFAULT_BASE_TABLE_NAME, TaskIndex.class));
+
     pojoInfoMap.put(MergedAnomalyResultBean.class,
         newPojoInfo(DEFAULT_BASE_TABLE_NAME, MergedAnomalyResultIndex.class));
     pojoInfoMap.put(RawAnomalyResultBean.class,
@@ -136,6 +141,9 @@ public class GenericPojoDao {
             AbstractIndexEntity abstractIndexEntity = pojoInfo.indexEntityClass.newInstance();
             MODEL_MAPPER.map(pojo, abstractIndexEntity);
             abstractIndexEntity.setBaseId(pojo.getId());
+            abstractIndexEntity.setCreateTime(new Timestamp(System.currentTimeMillis()));
+            abstractIndexEntity.setUpdateTime(new Timestamp(System.currentTimeMillis()));
+            abstractIndexEntity.setVersion(1);
             PreparedStatement indexTableInsertStatement =
                 sqlQueryBuilder.createInsertStatement(connection, abstractIndexEntity);
             int numRowsCreated = indexTableInsertStatement.executeUpdate();
@@ -173,10 +181,12 @@ public class GenericPojoDao {
             AbstractIndexEntity abstractIndexEntity = pojoInfo.indexEntityClass.newInstance();
             MODEL_MAPPER.map(pojo, abstractIndexEntity);
             abstractIndexEntity.setBaseId(pojo.getId());
+            abstractIndexEntity.setUpdateTime(new Timestamp(System.currentTimeMillis()));
             //updates all columns in the index table by default
             PreparedStatement indexTableInsertStatement =
                 sqlQueryBuilder.createUpdateStatementForIndexTable(connection, abstractIndexEntity);
             int numRowsUpdated = indexTableInsertStatement.executeUpdate();
+            System.out.println("numRowsUpdated: " + numRowsUpdated);
             return numRowsUpdated;
           }
         }
@@ -191,14 +201,16 @@ public class GenericPojoDao {
       @Override
       public List<E> handle(Connection connection) throws Exception {
         Predicate predicate = Predicate.EQ("beanClass", beanClass.getName());
-        PreparedStatement selectStatement =
-            sqlQueryBuilder.createFindByParamsStatement(connection, GenericJsonEntity.class, predicate);
+        PreparedStatement selectStatement = sqlQueryBuilder.createFindByParamsStatement(connection,
+            GenericJsonEntity.class, predicate);
         ResultSet resultSet = selectStatement.executeQuery();
         List<GenericJsonEntity> entities =
             genericResultSetMapper.mapAll(resultSet, GenericJsonEntity.class);
         List<E> ret = new ArrayList<>(entities.size());
         for (GenericJsonEntity entity : entities) {
-          ret.add(OBJECT_MAPPER.readValue(entity.getJsonVal(), beanClass));
+          E e = OBJECT_MAPPER.readValue(entity.getJsonVal(), beanClass);
+          e.setId(entity.getId());
+          ret.add(e);
         }
         return ret;
       }
@@ -224,6 +236,29 @@ public class GenericPojoDao {
     }, null);
   }
 
+  public <E extends AbstractBean> List<E> get(List<Long> idList, Class<E> pojoClass) {
+    return runTask(new QueryTask<List<E>>() {
+      @Override
+      public List<E> handle(Connection connection) throws Exception {
+        PreparedStatement selectStatement =
+            sqlQueryBuilder.createFindByIdStatement(connection, GenericJsonEntity.class, idList);
+        ResultSet resultSet = selectStatement.executeQuery();
+        List<GenericJsonEntity> genericJsonEntities =
+            genericResultSetMapper.mapAll(resultSet, GenericJsonEntity.class);
+        E e = null;
+        List<E> result = new ArrayList<>();
+        if (genericJsonEntities != null && !genericJsonEntities.isEmpty()) {
+          for (GenericJsonEntity genericJsonEntity : genericJsonEntities) {
+            e = OBJECT_MAPPER.readValue(genericJsonEntity.getJsonVal(), pojoClass);
+            e.setId(genericJsonEntity.getId());
+            result.add(e);
+          }
+        }
+        return result;
+      }
+    }, Collections.emptyList());
+  }
+
   /**
    *
    * @param parameterizedSQL second part of the sql (omit select from table section)
@@ -237,15 +272,15 @@ public class GenericPojoDao {
       @Override
       public List<E> handle(Connection connection) throws Exception {
         PojoInfo pojoInfo = pojoInfoMap.get(pojoClass);
+        dumpTable(connection, pojoInfo.indexEntityClass);
         PreparedStatement findMatchingIdsStatement = sqlQueryBuilder.createStatementFromSQL(
-            connection, "select from " + pojoInfo.indexTableColumns + " " + parameterizedSQL,
-            parameterMap, pojoInfo.indexEntityClass);
+            connection, parameterizedSQL, parameterMap, pojoInfo.indexEntityClass);
         ResultSet rs = findMatchingIdsStatement.executeQuery();
         List<? extends AbstractIndexEntity> indexEntities =
             genericResultSetMapper.mapAll(rs, pojoInfo.indexEntityClass);
         List<Long> idsToFind = new ArrayList<>();
-        for (AbstractEntity entity : indexEntities) {
-          idsToFind.add(entity.getId());
+        for (AbstractIndexEntity entity : indexEntities) {
+          idsToFind.add(entity.getBaseId());
         }
 
         //fetch the entities
@@ -294,6 +329,7 @@ public class GenericPojoDao {
         for (AbstractIndexEntity entity : indexEntities) {
           idsToFind.add(entity.getBaseId());
         }
+        dumpTable(connection, pojoInfo.indexEntityClass);
         //fetch the entities
         PreparedStatement selectStatement =
             sqlQueryBuilder.createFindByIdStatement(connection, GenericJsonEntity.class, idsToFind);
@@ -306,7 +342,19 @@ public class GenericPojoDao {
         }
         return ret;
       }
+
     }, Collections.emptyList());
+  }
+
+  private void dumpTable(Connection connection, Class<? extends AbstractEntity> entityClass)
+      throws Exception {
+    PreparedStatement findAllStatement =
+        sqlQueryBuilder.createFindAllStatement(connection, entityClass);
+    ResultSet resultSet = findAllStatement.executeQuery();
+    List<? extends AbstractEntity> entities = genericResultSetMapper.mapAll(resultSet, entityClass);
+    for (AbstractEntity entity : entities) {
+      System.out.println(entity);
+    }
   }
 
   public <E extends AbstractBean> int delete(Long id, Class<E> pojoClass) {
@@ -365,7 +413,9 @@ public class GenericPojoDao {
 
   <T> T runTask(QueryTask<T> task, T defaultReturnValue) {
     try (Connection connection = getConnection()) {
-      return task.handle(connection);
+      T t = task.handle(connection);
+      connection.commit();
+      return t;
     } catch (Exception e) {
       e.printStackTrace();
       return defaultReturnValue;

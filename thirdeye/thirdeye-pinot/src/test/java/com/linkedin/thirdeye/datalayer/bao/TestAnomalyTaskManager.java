@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.db.dao;
+package com.linkedin.thirdeye.datalayer.bao;
 
 import java.util.List;
 
@@ -15,7 +15,7 @@ import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
 import com.linkedin.thirdeye.datalayer.dto.JobDTO;
 import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
 
-public class TestAnomalyTaskDAO extends AbstractDbTestBase {
+public class TestAnomalyTaskManager extends AbstractManagerTestBase {
 
   private Long anomalyTaskId1;
   private Long anomalyTaskId2;
@@ -65,7 +65,7 @@ public class TestAnomalyTaskDAO extends AbstractDbTestBase {
     anomalyTaskDAO.updateStatusAndTaskEndTime(anomalyTaskId1, oldStatus, newStatus, taskEndTime);
     TaskDTO anomalyTask = anomalyTaskDAO.findById(anomalyTaskId1);
     Assert.assertEquals(anomalyTask.getStatus(), newStatus);
-    Assert.assertEquals(anomalyTask.getTaskEndTime(), taskEndTime);
+    Assert.assertEquals(anomalyTask.getEndTime(), taskEndTime);
   }
 
   @Test(dependsOnMethods = {"testUpdateStatusAndTaskEndTime"})
@@ -87,8 +87,8 @@ public class TestAnomalyTaskDAO extends AbstractDbTestBase {
     jobSpec.setJobName("Test_Anomaly_Task");
     jobSpec.setStatus(TaskStatus.WAITING);
     jobSpec.setTaskType(TaskType.MONITOR);
-    jobSpec.setTaskStartTime(new DateTime().minusDays(20).getMillis());
-    jobSpec.setTaskEndTime(new DateTime().minusDays(10).getMillis());
+    jobSpec.setStartTime(new DateTime().minusDays(20).getMillis());
+    jobSpec.setEndTime(new DateTime().minusDays(10).getMillis());
     jobSpec.setTaskInfo(new ObjectMapper().writeValueAsString(getTestMonitorTaskInfo()));
     jobSpec.setJob(anomalyJobSpec);
     return jobSpec;

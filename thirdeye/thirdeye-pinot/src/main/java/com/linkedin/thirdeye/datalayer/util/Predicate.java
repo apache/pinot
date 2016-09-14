@@ -8,7 +8,8 @@ import com.google.common.collect.Range;
 
 public class Predicate {
   enum OPER {
-    AND("AND"), OR("OR"), EQ("="), GT(">"), LT("<"), NEQ("!="), IN("IN"), BETWEEN("BETWEEN");
+    AND("AND"), OR("OR"), EQ("="), GT(">"), GE(">="), LT("<"), LE("<="), NEQ("!="), IN(
+        "IN"), BETWEEN("BETWEEN");
     private String sign;
 
     OPER(String sign) {
@@ -25,7 +26,7 @@ public class Predicate {
   private String lhs;
   private OPER oper;
   private Object rhs;
-  private List<Predicate> childPredicates;
+  private Predicate[] childPredicates;
 
   private Predicate(String lhs, OPER oper, Object rhs) {
     this.lhs = lhs;
@@ -33,7 +34,7 @@ public class Predicate {
     this.rhs = rhs;
   }
 
-  private Predicate(OPER oper, List<Predicate> childPredicates) {
+  private Predicate(OPER oper, Predicate[] childPredicates) {
     this.childPredicates = childPredicates;
     this.oper = oper;
   }
@@ -50,13 +51,14 @@ public class Predicate {
     return rhs;
   }
 
-  public List<Predicate> getChildPredicates() {
+  public Predicate[] getChildPredicates() {
     return childPredicates;
   }
 
   public static Predicate EQ(String columnName, Object value) {
     return new Predicate(columnName, OPER.EQ, value);
   }
+
   public static Predicate NEQ(String columnName, Object value) {
     return new Predicate(columnName, OPER.NEQ, value);
   }
@@ -69,12 +71,23 @@ public class Predicate {
     return new Predicate(columnName, OPER.GT, value);
   }
 
+  public static Predicate LE(String columnName, Object value) {
+    return new Predicate(columnName, OPER.LE, value);
+  }
+
+  public static Predicate GE(String columnName, Object value) {
+    return new Predicate(columnName, OPER.GE, value);
+  }
+  public static Predicate IN(String columnName, Object[] values) {
+    return new Predicate(columnName, OPER.IN, values);
+  }
+
   public static Predicate AND(Predicate... childPredicates) {
-    return new Predicate(null, OPER.AND, null);
+    return new Predicate(OPER.AND, childPredicates);
   }
 
   public static Predicate OR(Predicate... childPredicates) {
-    return new Predicate(null, OPER.OR, null);
+    return new Predicate(OPER.OR, childPredicates);
   }
 
   public static Predicate BETWEEN(String columnName, Object startValue, Object endValue) {

@@ -504,7 +504,7 @@ public class AnomalyResource {
     }
 
     EmailConfigurationDTO emailConfiguration = new EmailConfigurationDTO();
-    emailConfiguration.setIsActive(false);
+    emailConfiguration.setActive(false);
     emailConfiguration.setCollection(dataset);
     emailConfiguration.setMetric(metric);
     emailConfiguration.setFromAddress(fromAddress);
@@ -585,10 +585,10 @@ public class AnomalyResource {
     if (emailConfiguration == null) {
       throw new IllegalStateException("No email configuration for id " + id);
     }
-    if (emailConfiguration.getIsActive()) {
+    if (emailConfiguration.isActive()) {
       alertResourceHttpUtils.disableEmailConfiguration(String.valueOf(id));
     }
-    emailConfiguration.setIsActive(false);
+    emailConfiguration.setActive(false);
     emailConfiguration.setId(id);
     emailConfiguration.setCollection(dataset);
     emailConfiguration.setMetric(metric);
@@ -650,7 +650,7 @@ public class AnomalyResource {
     if (emailConfiguration == null) {
       throw new IllegalStateException("No emailConfiguraiton for id " + id);
     }
-    if (emailConfiguration.getIsActive()) {
+    if (emailConfiguration.isActive()) {
       alertResourceHttpUtils.disableEmailConfiguration(String.valueOf(id));
     }
     // delete from db

@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.db.dao;
+package com.linkedin.thirdeye.datalayer.bao;
 
 import java.util.List;
 
@@ -8,7 +8,7 @@ import org.testng.annotations.Test;
 import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
 import com.linkedin.thirdeye.datalayer.dto.JobDTO;
 
-public class TestAnomalyJobDAO extends AbstractDbTestBase {
+public class TestAnomalyJobManager extends AbstractManagerTestBase {
 
   private Long anomalyJobId1;
   private Long anomalyJobId2;
@@ -19,6 +19,7 @@ public class TestAnomalyJobDAO extends AbstractDbTestBase {
     Assert.assertNotNull(anomalyJobId1);
     anomalyJobId2 = anomalyJobDAO.save(getTestJobSpec());
     Assert.assertNotNull(anomalyJobId2);
+    printAll("After insert");
   }
 
   @Test(dependsOnMethods = {"testCreate"})
@@ -35,6 +36,7 @@ public class TestAnomalyJobDAO extends AbstractDbTestBase {
     JobDTO anomalyJob = anomalyJobDAO.findById(anomalyJobId1);
     Assert.assertEquals(anomalyJob.getStatus(), status);
     Assert.assertEquals(anomalyJob.getScheduleEndTime(), jobEndTime);
+    printAll("After testUpdateStatusAndJobEndTime");
   }
 
   @Test(dependsOnMethods = {"testUpdateStatusAndJobEndTime"})
@@ -43,6 +45,15 @@ public class TestAnomalyJobDAO extends AbstractDbTestBase {
     List<JobDTO> anomalyJobs = anomalyJobDAO.findByStatus(status);
     Assert.assertEquals(anomalyJobs.size(), 1);
     Assert.assertEquals(anomalyJobs.get(0).getStatus(), status);
+  }
+
+  private void printAll(String msg) {
+    List<JobDTO> allAnomalyJobs = anomalyJobDAO.findAll();
+    System.out.println("START:ALL JOB after:"+ msg);
+    for(JobDTO jobDTO:allAnomalyJobs){
+      System.out.println(jobDTO);
+    }
+    System.out.println("END:ALL JOB after:"+ msg);
   }
 
   @Test(dependsOnMethods = { "testFindByStatus" })

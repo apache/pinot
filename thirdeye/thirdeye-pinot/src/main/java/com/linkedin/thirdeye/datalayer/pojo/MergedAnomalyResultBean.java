@@ -1,15 +1,26 @@
 package com.linkedin.thirdeye.datalayer.pojo;
 
+import java.util.List;
 import java.util.Objects;
 
 import javax.persistence.Column;
 import javax.persistence.MappedSuperclass;
+import javax.persistence.Transient;
 
 import org.apache.commons.lang.ObjectUtils;
 
 @MappedSuperclass
 public class MergedAnomalyResultBean extends AbstractBean
     implements Comparable<MergedAnomalyResultBean> {
+
+  @Transient
+  private Long functionId;
+
+  @Transient
+  private Long anomalyFeedbackId;
+
+  @Transient
+  private List<Long> rawAnomalyIdList;
 
   @Column(name = "collection")
   private String collection;
@@ -42,6 +53,31 @@ public class MergedAnomalyResultBean extends AbstractBean
 
   @Column(name = "notified")
   private boolean notified;
+
+  
+  public Long getFunctionId() {
+    return functionId;
+  }
+
+  public void setFunctionId(Long functionId) {
+    this.functionId = functionId;
+  }
+
+  public Long getAnomalyFeedbackId() {
+    return anomalyFeedbackId;
+  }
+
+  public void setAnomalyFeedbackId(Long anomalyFeedbackId) {
+    this.anomalyFeedbackId = anomalyFeedbackId;
+  }
+
+  public List<Long> getRawAnomalyIdList() {
+    return rawAnomalyIdList;
+  }
+
+  public void setRawAnomalyIdList(List<Long> rawAnomalyIdList) {
+    this.rawAnomalyIdList = rawAnomalyIdList;
+  }
 
   public String getMetric() {
     return metric;

@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.db.dao;
+package com.linkedin.thirdeye.datalayer.bao;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -13,9 +13,9 @@ import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
 import com.linkedin.thirdeye.dashboard.configs.WebappConfigFactory.WebappConfigType;
 import com.linkedin.thirdeye.datalayer.dto.WebappConfigDTO;
 
-public class TestWebappConfigDAO extends AbstractDbTestBase {
+public class TestWebappConfigManager extends AbstractManagerTestBase {
 
-  private static final Logger LOG = LoggerFactory.getLogger(TestWebappConfigDAO.class);
+  private static final Logger LOG = LoggerFactory.getLogger(TestWebappConfigManager.class);
 
   private static final String collection = "testCollection";
   private static final WebappConfigType type = WebappConfigType.COLLECTION_CONFIG;
@@ -55,7 +55,8 @@ public class TestWebappConfigDAO extends AbstractDbTestBase {
   @Test(dependsOnMethods = {"testFind"})
   public void testUpdate() throws Exception {
     WebappConfigDTO webappConfig = webappConfigDAO.findById(webappConfigId);
-    CollectionConfig collectionConfig = AbstractConfig.fromJSON(webappConfig.getConfig(), CollectionConfig.class);
+    CollectionConfig collectionConfig =
+        AbstractConfig.fromJSON(webappConfig.getConfig(), CollectionConfig.class);
     collectionConfig.setCollectionAlias("testAlias");
     webappConfig.setConfig(collectionConfig.toJSON());
     webappConfigDAO.update(webappConfig);

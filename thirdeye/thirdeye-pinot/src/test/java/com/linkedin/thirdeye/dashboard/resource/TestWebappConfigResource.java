@@ -11,10 +11,10 @@ import org.testng.annotations.Test;
 import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
 import com.linkedin.thirdeye.dashboard.configs.WebappConfigFactory.WebappConfigType;
 import com.linkedin.thirdeye.dashboard.resources.WebappConfigResource;
+import com.linkedin.thirdeye.datalayer.bao.AbstractManagerTestBase;
 import com.linkedin.thirdeye.datalayer.dto.WebappConfigDTO;
-import com.linkedin.thirdeye.db.dao.AbstractDbTestBase;
 
-public class TestWebappConfigResource extends AbstractDbTestBase {
+public class TestWebappConfigResource extends AbstractManagerTestBase {
 
   private String collection = "test_collection";
   private WebappConfigType type = WebappConfigType.COLLECTION_CONFIG;

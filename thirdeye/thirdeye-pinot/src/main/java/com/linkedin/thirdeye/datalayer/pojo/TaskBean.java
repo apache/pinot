@@ -7,6 +7,7 @@ import javax.persistence.Column;
 import javax.persistence.EnumType;
 import javax.persistence.Enumerated;
 import javax.persistence.MappedSuperclass;
+import javax.persistence.Transient;
 import javax.persistence.Version;
 
 import com.google.common.base.MoreObjects;
@@ -29,6 +30,9 @@ public class TaskBean extends AbstractBean {
   @Column(name = "worker_id")
   private Long workerId;
 
+  @Transient
+  private Long jobId;
+
   @Column(name = "job_name", nullable = false)
   private String jobName;
 
@@ -37,10 +41,10 @@ public class TaskBean extends AbstractBean {
   private TaskStatus status;
 
   @Column(name = "task_start_time")
-  private long taskStartTime;
+  private long startTime;
 
   @Column(name = "task_end_time")
-  private long taskEndTime;
+  private long endTime;
 
   @Column(name = "task_info", nullable = false)
   private String taskInfo;
@@ -77,20 +81,20 @@ public class TaskBean extends AbstractBean {
     this.status = status;
   }
 
-  public long getTaskStartTime() {
-    return taskStartTime;
+  public long getStartTime() {
+    return startTime;
   }
 
-  public void setTaskStartTime(long startTime) {
-    this.taskStartTime = startTime;
+  public void setStartTime(long startTime) {
+    this.startTime = startTime;
   }
 
-  public long getTaskEndTime() {
-    return taskEndTime;
+  public long getEndTime() {
+    return endTime;
   }
 
-  public void setTaskEndTime(long endTime) {
-    this.taskEndTime = endTime;
+  public void setEndTime(long endTime) {
+    this.endTime = endTime;
   }
 
   public String getTaskInfo() {
@@ -114,8 +118,24 @@ public class TaskBean extends AbstractBean {
     return lastModified;
   }
 
+  public void setLastModified(Timestamp lastModified) {
+    this.lastModified = lastModified;
+  }
+
   public int getVersion() {
     return version;
+  }
+
+  public void setVersion(int version) {
+    this.version = version;
+  }
+
+  public Long getJobId() {
+    return jobId;
+  }
+
+  public void setJobId(Long jobId) {
+    this.jobId = jobId;
   }
 
   @Override
@@ -125,20 +145,19 @@ public class TaskBean extends AbstractBean {
     }
     TaskBean af = (TaskBean) o;
     return Objects.equals(getId(), af.getId()) && Objects.equals(status, af.getStatus())
-        && Objects.equals(taskStartTime, af.getTaskStartTime())
-        && Objects.equals(taskEndTime, af.getTaskEndTime())
+        && Objects.equals(startTime, af.getStartTime()) && Objects.equals(endTime, af.getEndTime())
         && Objects.equals(taskInfo, af.getTaskInfo());
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(getId(), status, taskStartTime, taskEndTime, taskInfo);
+    return Objects.hash(getId(), status, startTime, endTime, taskInfo);
   }
 
   @Override
   public String toString() {
     return MoreObjects.toStringHelper(this).add("id", getId()).add("status", status)
-        .add("startTime", taskStartTime).add("endTime", taskEndTime).add("taskInfo", taskInfo)
+        .add("startTime", startTime).add("endTime", endTime).add("taskInfo", taskInfo)
         .add("lastModified", lastModified).toString();
   }
 }

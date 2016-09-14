@@ -130,7 +130,7 @@ public class DetectionJobRunner implements Job {
         anomalyTaskSpec.setTaskType(TaskType.ANOMALY_DETECTION);
         anomalyTaskSpec.setJobName(detectionJobContext.getJobName());
         anomalyTaskSpec.setStatus(TaskStatus.WAITING);
-        anomalyTaskSpec.setTaskStartTime(System.currentTimeMillis());
+        anomalyTaskSpec.setStartTime(System.currentTimeMillis());
         anomalyTaskSpec.setTaskInfo(taskInfoJson);
         JobDTO anomalyJobSpec = anomalyJobSpecDAO.findById(detectionJobContext.getJobExecutionId());
         anomalyTaskSpec.setJob(anomalyJobSpec);

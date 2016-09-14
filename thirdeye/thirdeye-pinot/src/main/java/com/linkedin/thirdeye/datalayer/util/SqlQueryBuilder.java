@@ -25,6 +25,7 @@ import com.linkedin.thirdeye.datalayer.entity.AbstractIndexEntity;
 public class SqlQueryBuilder {
 
 
+  private static final String BASE_ID = "base_id";
   //insert sql per table
   Map<String, String> insertSqlMap = new HashMap<>();
   private static final String NAME_REGEX = "[a-z][_a-z0-9]*";
@@ -81,8 +82,8 @@ public class SqlQueryBuilder {
   public PreparedStatement createInsertStatement(Connection conn, String tableName,
       AbstractEntity entity) throws Exception {
     if (!insertSqlMap.containsKey(tableName)) {
-      String insertSql =
-          generateInsertSql(tableName, entityMappingHolder.columnInfoPerTable.get(tableName.toLowerCase()));
+      String insertSql = generateInsertSql(tableName,
+          entityMappingHolder.columnInfoPerTable.get(tableName.toLowerCase()));
       insertSqlMap.put(tableName, insertSql);
       System.out.println(insertSql);
     }
@@ -147,16 +148,18 @@ public class SqlQueryBuilder {
     BiMap<String, String> entityNameToDBNameMapping =
         entityMappingHolder.columnMappingPerTable.get(tableName).inverse();
     StringBuilder sqlBuilder = new StringBuilder("SELECT * FROM " + tableName);
-    StringBuilder whereClause = new StringBuilder(" WHERE ");
     LinkedHashMap<String, Object> parametersMap = new LinkedHashMap<>();
-    String delim = "";
-    for (String columnName : filters.keySet()) {
-      String dbFieldName = entityNameToDBNameMapping.get(columnName);
-      whereClause.append(delim).append(dbFieldName).append("=").append("?");
-      parametersMap.put(dbFieldName, filters.get(columnName));
-      delim = " AND ";
+    if (filters != null && !filters.isEmpty()) {
+      StringBuilder whereClause = new StringBuilder(" WHERE ");
+      String delim = "";
+      for (String columnName : filters.keySet()) {
+        String dbFieldName = entityNameToDBNameMapping.get(columnName);
+        whereClause.append(delim).append(dbFieldName).append("=").append("?");
+        parametersMap.put(dbFieldName, filters.get(columnName));
+        delim = " AND ";
+      }
+      sqlBuilder.append(whereClause.toString());
     }
-    sqlBuilder.append(whereClause.toString());
     System.out.println("FIND BY SQL:" + sqlBuilder.toString());
     PreparedStatement prepareStatement = connection.prepareStatement(sqlBuilder.toString());
     int parameterIndex = 1;
@@ -283,6 +286,7 @@ public class SqlQueryBuilder {
     LinkedHashMap<String, Object> parametersMap = new LinkedHashMap<>();
     generateWhereClause(entityNameToDBNameMapping, predicate, parametersMap, whereClause);
     sqlBuilder.append(whereClause.toString());
+    System.out.println("createFindByParamsStatement Query " + sqlBuilder.toString());
     PreparedStatement prepareStatement = connection.prepareStatement(sqlBuilder.toString());
     int parameterIndex = 1;
     LinkedHashMap<String, ColumnInfo> columnInfoMap =
@@ -291,6 +295,7 @@ public class SqlQueryBuilder {
       String dbFieldName = paramEntry.getKey();
       ColumnInfo info = columnInfoMap.get(dbFieldName);
       prepareStatement.setObject(parameterIndex++, paramEntry.getValue(), info.sqlType);
+      System.out.println("Setting " + paramEntry.getKey() + " to " + paramEntry.getValue());
     }
     return prepareStatement;
   }
@@ -315,13 +320,15 @@ public class SqlQueryBuilder {
       case IN:
       case LT:
       case NEQ:
+      case LE:
+      case GE:
         whereClause.append(entityNameToDBNameMapping.get(predicate.getLhs()))
             .append(predicate.getOper().toString()).append("?");
         parametersMap.put(entityNameToDBNameMapping.get(predicate.getLhs()), predicate.getRhs());
         break;
       case BETWEEN:
         whereClause.append(entityNameToDBNameMapping.get(predicate.getLhs()))
-        .append(predicate.getOper().toString()).append("? AND ?");
+            .append(predicate.getOper().toString()).append("? AND ?");
         ImmutablePair<Object, Object> pair = (ImmutablePair<Object, Object>) predicate.getRhs();
         parametersMap.put(entityNameToDBNameMapping.get(predicate.getLhs()), pair.getLeft());
         parametersMap.put(entityNameToDBNameMapping.get(predicate.getLhs()), pair.getRight());
@@ -337,6 +344,7 @@ public class SqlQueryBuilder {
           throws Exception {
     String tableName =
         entityMappingHolder.tableToEntityNameMap.inverse().get(entityClass.getSimpleName());
+    parameterizedSQL = "select * from " + tableName + " " + parameterizedSQL;
     parameterizedSQL = parameterizedSQL.replace(entityClass.getSimpleName(), tableName);
     StringBuilder psSql = new StringBuilder();
     List<String> paramNames = new ArrayList<String>();
@@ -378,6 +386,7 @@ public class SqlQueryBuilder {
       if (Enum.class.isAssignableFrom(val.getClass())) {
         val = val.toString();
       }
+      System.out.println("Setting " + dbFieldName + " to " + val);
       ps.setObject(parameterIndex++, val, columnInfo.get(dbFieldName).sqlType);
     }
 
@@ -396,7 +405,8 @@ public class SqlQueryBuilder {
     LinkedHashMap<String, Object> parameterMap = new LinkedHashMap<>();
     for (ColumnInfo columnInfo : columnInfoMap.values()) {
       String columnNameInDB = columnInfo.columnNameInDB;
-      if (!columnNameInDB.equalsIgnoreCase("base_id") && !AUTO_UPDATE_COLUMN_SET.contains(columnNameInDB)) {
+      if (!columnNameInDB.equalsIgnoreCase(BASE_ID)
+          && !AUTO_UPDATE_COLUMN_SET.contains(columnNameInDB)) {
         Object val = columnInfo.field.get(entity);
         if (val != null) {
           if (Enum.class.isAssignableFrom(val.getClass())) {
@@ -407,21 +417,20 @@ public class SqlQueryBuilder {
           sqlBuilder.append("=");
           sqlBuilder.append("?");
           delim = ",";
-          System.out.println("Setting value:" + val + " for " + columnInfo.columnNameInDB);
           parameterMap.put(columnNameInDB, val);
         }
       }
     }
     //ADD WHERE CLAUSE TO CHECK FOR ENTITY ID
     sqlBuilder.append(" WHERE base_id=?");
-    parameterMap.put("base_id", entity.getBaseId());
+    parameterMap.put(BASE_ID, entity.getBaseId());
     System.out.println("Update statement:" + sqlBuilder.toString());
     int parameterIndex = 1;
     PreparedStatement prepareStatement = connection.prepareStatement(sqlBuilder.toString());
     for (Entry<String, Object> paramEntry : parameterMap.entrySet()) {
       String dbFieldName = paramEntry.getKey();
       ColumnInfo info = columnInfoMap.get(dbFieldName);
-      System.out.println("info:" + info  + " for:" + dbFieldName);
+      System.out.println("Setting value:" + paramEntry.getValue() + " for " + dbFieldName);
       prepareStatement.setObject(parameterIndex++, paramEntry.getValue(), info.sqlType);
     }
     return prepareStatement;

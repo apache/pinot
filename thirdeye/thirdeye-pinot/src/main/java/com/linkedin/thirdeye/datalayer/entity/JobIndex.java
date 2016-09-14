@@ -3,15 +3,24 @@ package com.linkedin.thirdeye.datalayer.entity;
 public class JobIndex extends AbstractIndexEntity {
   String name;
   String status;
-  long startTime;
-  long endTime;
+  long scheduleStartTime;
+  long scheduleEndTime;
 
-  public long getEndTime() {
-    return endTime;
+
+  public long getScheduleStartTime() {
+    return scheduleStartTime;
   }
 
-  public void setEndTime(long endTime) {
-    this.endTime = endTime;
+  public void setScheduleStartTime(long scheduleStartTime) {
+    this.scheduleStartTime = scheduleStartTime;
+  }
+
+  public long getScheduleEndTime() {
+    return scheduleEndTime;
+  }
+
+  public void setScheduleEndTime(long scheduleEndTime) {
+    this.scheduleEndTime = scheduleEndTime;
   }
 
   public String getName() {
@@ -22,13 +31,7 @@ public class JobIndex extends AbstractIndexEntity {
     this.name = name;
   }
 
-  public long getStartTime() {
-    return startTime;
-  }
 
-  public void setStartTime(long startTime) {
-    this.startTime = startTime;
-  }
 
   public String getStatus() {
     return status;
@@ -37,4 +40,11 @@ public class JobIndex extends AbstractIndexEntity {
   public void setStatus(String status) {
     this.status = status;
   }
+
+  @Override
+  public String toString() {
+    return "JobIndex [name=" + name + ", status=" + status + ", scheduleStartTime="
+        + scheduleStartTime + ", scheduleEndTime=" + scheduleEndTime + "]";
+  }
+
 }
