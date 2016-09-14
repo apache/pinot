@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.query.aggregation;
 
+import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.response.ProcessingException;
@@ -36,20 +37,18 @@ import org.slf4j.LoggerFactory;
  *
  */
 public class CombineService {
+  private CombineService() {
+  }
 
   private static final Logger LOGGER = LoggerFactory.getLogger(CombineService.class);
 
   public static void mergeTwoBlocks(BrokerRequest brokerRequest, IntermediateResultsBlock mergedBlock,
       IntermediateResultsBlock blockToMerge) {
     // Sanity check
+    Preconditions.checkNotNull(mergedBlock);
     if (blockToMerge == null) {
       return;
     }
-    if (mergedBlock == null) {
-      mergedBlock = blockToMerge;
-      return;
-    }
-
 
     // Combine NumDocsScanned
     mergedBlock.setNumDocsScanned(mergedBlock.getNumDocsScanned() + blockToMerge.getNumDocsScanned());
@@ -88,7 +87,7 @@ public class CombineService {
       // row. If both mergedBlock and blockToMerge have result sets but different schema
       // then the results are random.
       // Data schema can be null if the filter query does not return results
-      if (mergedBlockSchema != null && ! mergedBlockSchema.equals(blockToMergeSchema)) {
+      if (mergedBlockSchema != null && !mergedBlockSchema.equals(blockToMergeSchema)) {
         if (mergedResultSet.size() == 0 && toMergeResultSet.size() > 0) {
           // select the schema that has returned atleast one row
           mergedBlock.setSelectionDataSchema(blockToMergeSchema);
@@ -105,12 +104,12 @@ public class CombineService {
       if (brokerRequest.getSelections().isSetSelectionSortSequence()) {
         SelectionOperatorService selectionService =
             new SelectionOperatorService(brokerRequest.getSelections(), mergedBlockSchema);
-        mergedBlock.setSelectionResult(selectionService.merge(mergedResultSet, toMergeResultSet));
+        selectionService.mergeWithOrdering(mergedResultSet, toMergeResultSet);
       } else {
-        mergedBlock.setSelectionResult(SelectionOperatorUtils.merge(mergedResultSet,
-            toMergeResultSet,
-            brokerRequest.getSelections().getSize()));
+        SelectionOperatorUtils.mergeWithoutOrdering(mergedResultSet, toMergeResultSet,
+            brokerRequest.getSelections().getSize());
       }
+      mergedBlock.setSelectionResult(mergedResultSet);
     }
   }
 

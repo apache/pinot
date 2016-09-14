@@ -164,13 +164,13 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
         if (brokerRequest.getSelections().isSetSelectionSortSequence()) {
           SelectionOperatorService selectionService =
               new SelectionOperatorService(brokerRequest.getSelections(), dt.getDataSchema());
-          return selectionService.renderSelectionResults(selectionService.reduce(instanceResponseMap));
+          return selectionService.renderSelectionResultsWithOrdering(selectionService.reduceWithOrdering(instanceResponseMap));
         } else {
           Collection<Serializable[]> reduceResult =
-              SelectionOperatorUtils.reduce(instanceResponseMap, brokerRequest.getSelections().getSize());
+              SelectionOperatorUtils.reduceWithoutOrdering(instanceResponseMap, brokerRequest.getSelections().getSize());
 
           return SelectionOperatorUtils
-              .renderSelectionResults(reduceResult, brokerRequest.getSelections().getSelectionColumns(),
+              .renderSelectionResultsWithoutOrdering(reduceResult, brokerRequest.getSelections().getSelectionColumns(),
                   dt.getDataSchema());
         }
       } else {
