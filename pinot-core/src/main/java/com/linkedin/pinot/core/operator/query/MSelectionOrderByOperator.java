@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.operator.query;
 
+import com.linkedin.pinot.core.query.selection.SelectionOperatorUtils;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -55,30 +56,17 @@ public class MSelectionOrderByOperator extends BaseOperator {
   private final SelectionOperatorService _selectionOperatorService;
   private final DataSchema _dataSchema;
   private final Block[] _blocks;
-  private final Set<String> _selectionColumns = new HashSet<String>();
+  private final List<String> _selectionColumns;
 
   public MSelectionOrderByOperator(IndexSegment indexSegment, Selection selection, Operator projectionOperator) {
     _indexSegment = indexSegment;
     _selection = selection;
     _projectionOperator = projectionOperator;
 
-    initColumnarDataSourcePlanNodeMap(indexSegment);
-    _selectionOperatorService = new SelectionOperatorService(_selection, indexSegment);
-    _dataSchema = _selectionOperatorService.getDataSchema();
+    _selectionColumns = SelectionOperatorUtils.extractSelectionRelatedColumns(_selection, _indexSegment);
+    _dataSchema = SelectionOperatorUtils.extractDataSchema(_selection.getSelectionSortSequence(), _selectionColumns, indexSegment);
     _blocks = new Block[_selectionColumns.size()];
-  }
-
-  private void initColumnarDataSourcePlanNodeMap(IndexSegment indexSegment) {
-    _selectionColumns.addAll(_selection.getSelectionColumns());
-    if ((_selectionColumns.size() == 1) && ((_selectionColumns.toArray(new String[0]))[0].equals("*"))) {
-      _selectionColumns.clear();
-      _selectionColumns.addAll(Arrays.asList(indexSegment.getColumnNames()));
-    }
-    if (_selection.getSelectionSortSequence() != null) {
-      for (SelectionSort selectionSort : _selection.getSelectionSortSequence()) {
-        _selectionColumns.add(selectionSort.getColumn());
-      }
-    }
+    _selectionOperatorService = new SelectionOperatorService(_selection, _dataSchema);
   }
 
   @Override
@@ -108,7 +96,7 @@ public class MSelectionOrderByOperator extends BaseOperator {
 
       final IntermediateResultsBlock resultBlock = new IntermediateResultsBlock();
       resultBlock.setSelectionResult(_selectionOperatorService.getRowEventsSet());
-      resultBlock.setSelectionDataSchema(_selectionOperatorService.getDataSchema());
+      resultBlock.setSelectionDataSchema(_dataSchema);
       resultBlock.setNumDocsScanned(numDocsScanned);
       resultBlock.setTotalRawDocs(_indexSegment.getSegmentMetadata().getTotalRawDocs());
       final long endTime = System.currentTimeMillis();

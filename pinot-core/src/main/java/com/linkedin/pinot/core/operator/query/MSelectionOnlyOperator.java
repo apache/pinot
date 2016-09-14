@@ -23,6 +23,7 @@ import com.linkedin.pinot.core.operator.BaseOperator;
 import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
 import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
 
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,7 +53,7 @@ public class MSelectionOnlyOperator extends BaseOperator {
   private final Selection _selection;
   private final DataSchema _dataSchema;
   private final Block[] _blocks;
-  private final String[] _selectionColumns;
+  private final List<String> _selectionColumns;
   private final int _limitDocs;
   private final Collection<Serializable[]> _rowEvents;
 
@@ -63,8 +64,8 @@ public class MSelectionOnlyOperator extends BaseOperator {
     _projectionOperator = projectionOperator;
 
     _selectionColumns = SelectionOperatorUtils.extractSelectionRelatedColumns(_selection, _indexSegment);
-    _dataSchema = SelectionOperatorUtils.extractDataSchema(_selectionColumns, indexSegment);
-    _blocks = new Block[_selectionColumns.length];
+    _dataSchema = SelectionOperatorUtils.extractDataSchema(null, _selectionColumns, indexSegment);
+    _blocks = new Block[_selectionColumns.size()];
     _rowEvents = new ArrayList<Serializable[]>();
   }
 

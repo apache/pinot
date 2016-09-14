@@ -92,27 +92,19 @@ public class SelectionOperatorUtils {
         new DecimalFormat("####################.##########", DecimalFormatSymbols.getInstance(Locale.US)));
   }
 
-  public static List<String> getSelectionColumns(List<String> selectionColumns, IndexSegment indexSegment) {
+  public static List<String> getSelectionColumns(Selection selection, DataSchema dataSchema) {
+    List<String> selectionColumns = selection.getSelectionColumns();
     if ((selectionColumns.size() == 1) && selectionColumns.get(0).equals("*")) {
-      selectionColumns.clear();
-      for (final String columnName : indexSegment.getColumnNames()) {
-        selectionColumns.add(columnName);
-      }
-    }
-    return selectionColumns;
-  }
-
-  public static List<String> getSelectionColumns(List<String> selectionColumns, DataSchema dataSchema) {
-    if ((selectionColumns.size() == 1) && selectionColumns.get(0).equals("*")) {
-      selectionColumns.clear();
+      final List<String> newSelectionColumns = new ArrayList<String>();
       for (int i = 0; i < dataSchema.size(); ++i) {
-        selectionColumns.add(dataSchema.getColumnName(i));
+        newSelectionColumns.add(dataSchema.getColumnName(i));
       }
+      return newSelectionColumns;
     }
     return selectionColumns;
   }
 
-  public static String[] extractSelectionRelatedColumns(Selection selection, IndexSegment indexSegment) {
+  public static List<String> extractSelectionRelatedColumns(Selection selection, IndexSegment indexSegment) {
     Set<String> selectionColumns = new HashSet<String>();
     selectionColumns.addAll(selection.getSelectionColumns());
     if ((selectionColumns.size() == 1) && ((selectionColumns.toArray(new String[0]))[0].equals("*"))) {
@@ -124,7 +116,7 @@ public class SelectionOperatorUtils {
         selectionColumns.add(selectionSort.getColumn());
       }
     }
-    return selectionColumns.toArray(new String[0]);
+    return new ArrayList<>(selectionColumns);
   }
 
   public static Collection<Serializable[]> merge(Collection<Serializable[]> rowEventsSet1,
@@ -157,14 +149,12 @@ public class SelectionOperatorUtils {
     return rowEventsSet;
   }
 
-  public static JSONObject render(Collection<Serializable[]> finalResults, List<String> selectionColumns,
+  public static JSONObject render(Collection<Serializable[]> finalResults, Selection selection,
       DataSchema dataSchema)
       throws Exception {
     final LinkedList<JSONArray> rowEventsJSonList = new LinkedList<JSONArray>();
     List<Serializable[]> list = (List<Serializable[]>) finalResults;
-    if (selectionColumns.size() == 1 && selectionColumns.get(0).equals("*")) {
-      selectionColumns = getSelectionColumns(selectionColumns, dataSchema);
-    }
+    List<String> selectionColumns = getSelectionColumns(selection, dataSchema);
     for (int i = 0; i < list.size(); i++) {
       rowEventsJSonList.add(getJSonArrayFromRow(list.get(i), selectionColumns, dataSchema));
     }
@@ -179,20 +169,18 @@ public class SelectionOperatorUtils {
    * object, to be used in building the BrokerResponse.
    *
    * @param reducedResults
-   * @param selectionColumns
+   * @param selection
    * @param dataSchema
    * @return
    * @throws Exception
    */
   public static SelectionResults renderSelectionResults(Collection<Serializable[]> reducedResults,
-      List<String> selectionColumns, DataSchema dataSchema)
+      Selection selection, DataSchema dataSchema)
       throws Exception {
     List<Serializable[]> rowData = (List<Serializable[]>) reducedResults;
     List<Serializable[]> rows = new ArrayList<Serializable[]>();
 
-    if (selectionColumns.size() == 1 && selectionColumns.get(0).equals("*")) {
-      selectionColumns = getSelectionColumns(selectionColumns, dataSchema);
-    }
+    List<String> selectionColumns = getSelectionColumns(selection, dataSchema);
 
     for (int i = 0; i < rowData.size(); i++) {
       rows.add(getFormattedRow(rowData.get(i), selectionColumns, dataSchema));
@@ -209,10 +197,6 @@ public class SelectionOperatorUtils {
       }
     }
     return jsonArray;
-  }
-
-  public static DataSchema extractDataSchema(String[] selectionColumns, IndexSegment indexSegment) {
-    return extractDataSchema(null, Arrays.asList(selectionColumns), indexSegment);
   }
 
   public static DataSchema extractDataSchema(List<SelectionSort> sortSequence, List<String> selectionColumns,

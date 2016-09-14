@@ -52,7 +52,9 @@ public class SelectionPlanNode implements PlanNode {
 
     DocIdSetPlanNode docIdSetPlanNode = new DocIdSetPlanNode(_indexSegment, _brokerRequest, maxDocPerNextCall);
     _projectionPlanNode =
-        new ProjectionPlanNode(_indexSegment, SelectionOperatorUtils.extractSelectionRelatedColumns(_selection, indexSegment), docIdSetPlanNode);
+        new ProjectionPlanNode(_indexSegment,
+            SelectionOperatorUtils.extractSelectionRelatedColumns(_selection, indexSegment).toArray(new String[0]),
+            docIdSetPlanNode);
   }
 
   @Override
