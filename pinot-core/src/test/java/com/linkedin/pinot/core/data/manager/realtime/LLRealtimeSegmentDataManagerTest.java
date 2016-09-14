@@ -48,6 +48,8 @@ public class LLRealtimeSegmentDataManagerTest {
   private static final String _segmentNameStr = _segmentName.getSegmentName();
   private static final long _startOffset = 19885L;
   private static final String _topicName = "someTopic";
+  private static final int maxRowsInSegment = 250000;
+  private static final long maxTimeForSegmentCloseMs = 64368000L;
 
   private static long _timeNow = System.currentTimeMillis();
 
@@ -61,7 +63,8 @@ public class LLRealtimeSegmentDataManagerTest {
       + "  \"tableIndexConfig\": {\n" + "    \"invertedIndexColumns\": ["
       + "    ], \n" + "    \"lazyLoad\": \"false\", \n" + "    \"loadMode\": \"HEAP\", \n"
       + "    \"segmentFormatVersion\": null, \n" + "    \"sortedColumn\": [], \n"
-      + "    \"streamConfigs\": {\n" + "      \"realtime.segment.flush.threshold.size\": \"250000\", \n"
+      + "    \"streamConfigs\": {\n" + "      \"realtime.segment.flush.threshold.size\": \"" + String.valueOf(maxRowsInSegment) + "\", \n"
+      + "      \"realtime.segment.flush.threshold.time\": \"" + String.valueOf(maxTimeForSegmentCloseMs) + "\", \n"
       + "      \"stream.kafka.broker.list\": \"broker:7777\", \n"
       + "      \"stream.kafka.consumer.prop.auto.offset.reset\": \"smallest\", \n"
       + "      \"stream.kafka.consumer.type\": \"simple\", \n"
@@ -386,36 +389,73 @@ public class LLRealtimeSegmentDataManagerTest {
 
   @Test
   public void testEndCriteriaChecking() throws Exception {
-    // consume 10 rows, with no time limit setting while in initial consuming state
+    // test reaching max row limit
     {
       FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
-      final int numRows = 10;
-      segmentDataManager.setSegmentMaxRowCount(numRows); // Max rows constraint
-      segmentDataManager.setConsumeEndTime(0L);  // No time constraint.
+      segmentDataManager._state.set(segmentDataManager, LLRealtimeSegmentDataManager.State.INITIAL_CONSUMING);
       Assert.assertFalse(segmentDataManager.invokeEndCriteriaReached());
-      segmentDataManager.setNumRowsConsumed(numRows - 1);
+      segmentDataManager.setNumRowsConsumed(maxRowsInSegment - 1);
       Assert.assertFalse(segmentDataManager.invokeEndCriteriaReached());
-      segmentDataManager.setNumRowsConsumed(numRows);
+      segmentDataManager.setNumRowsConsumed(maxRowsInSegment);
       Assert.assertTrue(segmentDataManager.invokeEndCriteriaReached());
     }
-    // consume for and stop after time is up. , while in initial consuming state
+    // test reaching max time limit
     {
       FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
-      final long durationMs = 100;
-      final long endTime = segmentDataManager.now() + durationMs;
-      segmentDataManager.setConsumeEndTime(endTime);
+      segmentDataManager._state.set(segmentDataManager, LLRealtimeSegmentDataManager.State.INITIAL_CONSUMING);
       Assert.assertFalse(segmentDataManager.invokeEndCriteriaReached());
-      _timeNow += 10;
-      _timeNow = endTime;
+      _timeNow += maxTimeForSegmentCloseMs;
       Assert.assertTrue(segmentDataManager.invokeEndCriteriaReached());
     }
-    // In catching up state, time is not important, only whether we have caught up to the target or not.
+    // In catching up state, test reaching final offset
     {
       FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
       segmentDataManager._state.set(segmentDataManager, LLRealtimeSegmentDataManager.State.CATCHING_UP);
       final long finalOffset = _startOffset + 100;
       segmentDataManager.setFinalOffset(finalOffset);
+      segmentDataManager.setCurrentOffset(finalOffset-1);
+      Assert.assertFalse(segmentDataManager.invokeEndCriteriaReached());
       segmentDataManager.setCurrentOffset(finalOffset);
+      Assert.assertTrue(segmentDataManager.invokeEndCriteriaReached());
+    }
+    // In catching up state, test reaching final offset ignoring time
+    {
+      FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
+      _timeNow += maxTimeForSegmentCloseMs;
+      segmentDataManager._state.set(segmentDataManager, LLRealtimeSegmentDataManager.State.CATCHING_UP);
+      final long finalOffset = _startOffset + 100;
+      segmentDataManager.setFinalOffset(finalOffset);
+      segmentDataManager.setCurrentOffset(finalOffset-1);
+      Assert.assertFalse(segmentDataManager.invokeEndCriteriaReached());
+      segmentDataManager.setCurrentOffset(finalOffset);
+      Assert.assertTrue(segmentDataManager.invokeEndCriteriaReached());
+    }
+    // When we go from consuming to online state, time and final offset matter.
+    // Case 1. We have reached final offset.
+    {
+      FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
+      _timeNow += 1;
+      segmentDataManager._state.set(segmentDataManager, LLRealtimeSegmentDataManager.State.CONSUMING_TO_ONLINE);
+      segmentDataManager.setConsumeEndTime(_timeNow + 10);
+      final long finalOffset = _startOffset + 100;
+      segmentDataManager.setFinalOffset(finalOffset);
+      segmentDataManager.setCurrentOffset(finalOffset-1);
+      Assert.assertFalse(segmentDataManager.invokeEndCriteriaReached());
+      segmentDataManager.setCurrentOffset(finalOffset);
+      Assert.assertTrue(segmentDataManager.invokeEndCriteriaReached());
+    }
+    // Case 2. We have reached time limit.
+    {
+      FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
+      segmentDataManager._state.set(segmentDataManager, LLRealtimeSegmentDataManager.State.CONSUMING_TO_ONLINE);
+      final long endTime = _timeNow + 10;
+      segmentDataManager.setConsumeEndTime(endTime);
+      final long finalOffset = _startOffset + 100;
+      segmentDataManager.setFinalOffset(finalOffset);
+      segmentDataManager.setCurrentOffset(finalOffset-1);
+      _timeNow = endTime-1;
+      Assert.assertFalse(segmentDataManager.invokeEndCriteriaReached());
+      _timeNow = endTime;
       Assert.assertTrue(segmentDataManager.invokeEndCriteriaReached());
     }
   }
@@ -484,6 +524,8 @@ public class LLRealtimeSegmentDataManagerTest {
       Mockito.doNothing().when(config).init(any(AbstractTableConfig.class), any(InstanceZKMetadata.class), any(Schema.class));
       when(config.getTopicName()).thenReturn(_topicName);
       when(config.getStreamName()).thenReturn(_topicName);
+      when(config.getSizeThresholdToFlushSegment()).thenReturn(maxRowsInSegment);
+      when(config.getTimeThresholdToFlushSegment()).thenReturn(maxTimeForSegmentCloseMs);
       try {
         when(config.getDecoder()).thenReturn(null);
       } catch (Exception e) {

@@ -77,6 +77,11 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     // controller.
     HOLDING,
 
+    // We have been asked to go Online from Consuming state, and are trying a last attempt to catch up to the
+    // target offset. In this state, we have a time constraint as well as a final offset constraint to look into
+    // before we stop consuming.
+    CONSUMING_TO_ONLINE,
+
     // We have been asked by the controller to retain the segment we have in memory at the current offset.
     // We should build the segment, and replace it with the in-memory segment.
     RETAINING,
@@ -100,7 +105,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     ERROR;
 
     public boolean shouldConsume() {
-      if (this.equals(INITIAL_CONSUMING) || this.equals(CATCHING_UP)) {
+      if (this.equals(INITIAL_CONSUMING) || this.equals(CATCHING_UP) || this.equals(CONSUMING_TO_ONLINE)) {
         return true;
       }
       return false;
@@ -125,16 +130,15 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
   private final Schema _schema;
   private final ServerMetrics _serverMetrics;
   private final RealtimeSegmentImpl _realtimeSegment;
-  private long _endOffset = Long.MAX_VALUE; // No upper limit on Kafka offset
-  private long _currentOffset;
+  private volatile long _currentOffset;
   private volatile State _state;
-  private int _numRowsConsumed = 0;
+  private volatile int _numRowsConsumed = 0;
   private long _startTimeMs = 0;
   private final String _segmentNameStr;
   private final SegmentVersion _segmentVersion;
 
   // Segment end criteria
-  private long _consumeEndTime = 0;
+  private volatile long _consumeEndTime = 0;
   private volatile long _finalOffset = -1;
   private volatile boolean _receivedStop = false;
 
@@ -163,36 +167,60 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
   // TODO each time this method is called, we print reason for stop. Good to print only once.
   private boolean endCriteriaReached() {
     Preconditions.checkState(_state.shouldConsume(), "Incorrect state %s", _state);
-    if (_state.equals(State.INITIAL_CONSUMING)) {
-      if (_consumeEndTime > 0) {
-        // We have a time-based constraint.
-        long now = now();
+    long now = now();
+    switch(_state) {
+      case INITIAL_CONSUMING:
+        // The segment has been created, and we have not posted a segmentConsumed() message on the controller yet.
+        // We need to consume as much data as available, until we have either reached the max number of rows or
+        // the max time we are allowed to consume.
         if (now >= _consumeEndTime) {
           segmentLogger.info("Stopping consumption due to time limit start={} now={} numRows={}", _startTimeMs, now, _numRowsConsumed);
           return true;
-        }
-      } else {
-        // We have a number-of-rows based constraint.
-        if (_numRowsConsumed >= _segmentMaxRowCount) {
+        } else if (_numRowsConsumed >= _segmentMaxRowCount) {
           segmentLogger.info("Stopping consumption due to row limit nRows={} maxNRows={}", _numRowsConsumed,
               _segmentMaxRowCount);
           return true;
         }
-      }
-      return false;
-    } else if (_state.equals(State.CATCHING_UP)) {
-      if (_currentOffset == _finalOffset) {
-        segmentLogger.info("Caught up to offset {}", _finalOffset);
-        return true;
-      }
-      if (_currentOffset > _finalOffset) {
-        throw new RuntimeException("Offset higher in catchup mode: current " + _currentOffset + " final " + _finalOffset);
-      }
+        return false;
+
+      case CATCHING_UP:
+        // We have posted segmentConsumed() at least once, and the controller is asking us to catch up to a certain offset.
+        // There is no time limit here, so just check to see that we are still within the offset we need to reach.
+        // Going past the offset is an exception.
+        if (_currentOffset == _finalOffset) {
+          segmentLogger.info("Caught up to offset={}, state={}", _finalOffset, _state.toString());
+          return true;
+        }
+        if (_currentOffset > _finalOffset) {
+          segmentLogger.error("Offset higher in state={}, current={}, final={}", _state.toString(), _currentOffset, _finalOffset);
+          throw new RuntimeException("Past max offset");
+        }
+        return false;
+
+      case CONSUMING_TO_ONLINE:
+        // We are attempting to go from CONSUMING to ONLINE state. We are making a last attempt to catch up to the
+        // target offset. We have a time constraint, and need to stop consuming if we cannot get to the target offset
+        // within that time.
+        if (_currentOffset == _finalOffset) {
+          segmentLogger.info("Caught up to offset={}, state={}", _finalOffset, _state.toString());
+          return true;
+        } else if (now >= _consumeEndTime) {
+          segmentLogger.info("Past max time budget: offset={}, state={}", _currentOffset, _state.toString());
+          return true;
+        }
+        if (_currentOffset > _finalOffset) {
+          segmentLogger.error("Offset higher in state={}, current={}, final={}", _state.toString(), _currentOffset, _finalOffset);
+          throw new RuntimeException("Past max offset");
+        }
+        return false;
+      default:
+        segmentLogger.error("Illegal state {}" + _state.toString());
+        throw new RuntimeException("Illegal state to consume");
     }
-    throw new RuntimeException("Unreachable");
   }
 
   protected void consumeLoop() {
+    final long _endOffset = Long.MAX_VALUE; // No upper limit on Kafka offset
     segmentLogger.info("Starting consumption loop start offset {}, end offset {}", _currentOffset, _endOffset);
     while(!_receivedStop && !endCriteriaReached()) {
       // Consume for the next _kafkaReadTime ms, or we get to final offset, whichever happens earlier,
@@ -477,6 +505,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
   private boolean catchupToFinalOffset(long endOffset, long timeoutMs) {
     _finalOffset = endOffset;
     _consumeEndTime = now() + timeoutMs;
+    _state = State.CONSUMING_TO_ONLINE;
     consumeLoop();
     if (_currentOffset != endOffset) {
       // Timeout?
@@ -541,8 +570,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     _segmentNameStr = _segmentZKMetadata.getSegmentName();
     _segmentName = new LLCSegmentName(_segmentNameStr);
     _kafkaPartitionId = _segmentName.getPartitionId();
-    _segmentMaxRowCount = Integer.parseInt(_tableConfig.getIndexingConfig().getStreamConfigs()
-        .get(CommonConstants.Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_SIZE));
+    _segmentMaxRowCount = kafkaStreamProviderConfig.getSizeThresholdToFlushSegment();
     _tableName = _tableConfig.getTableName();
     segmentLogger = LoggerFactory.getLogger(LLRealtimeSegmentDataManager.class.getName() +
         "_" + _segmentNameStr);
@@ -591,6 +619,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
       _resourceTmpDir.mkdirs();
     }
     _state = State.INITIAL_CONSUMING;
+    _consumeEndTime = now() + kafkaStreamProviderConfig.getTimeThresholdToFlushSegment();
     start();
   }
 
