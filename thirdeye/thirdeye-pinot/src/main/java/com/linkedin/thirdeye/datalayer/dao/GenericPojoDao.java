@@ -15,7 +15,7 @@ import java.util.Set;
 
 import javax.sql.DataSource;
 
-import org.codehaus.jackson.map.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.modelmapper.ModelMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -225,7 +225,7 @@ public class GenericPojoDao {
   }
 
   /**
-   * 
+   *
    * @param parameterizedSQL second part of the sql (omit select from table section)
    * @param parameterMap
    * @return
