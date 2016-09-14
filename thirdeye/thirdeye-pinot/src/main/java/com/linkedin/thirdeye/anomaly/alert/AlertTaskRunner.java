@@ -139,7 +139,7 @@ public class AlertTaskRunner implements TaskRunner {
     // get dimensions for rendering
     List<String> dimensionNames;
     try {
-      dimensionNames = client.getCollectionSchema(collection).getDimensionNames();
+      dimensionNames = CACHE_REGISTRY_INSTANCE.getCollectionSchemaCache().get(collection).getDimensionNames();
     } catch (Exception e) {
       throw new JobExecutionException(e);
     }

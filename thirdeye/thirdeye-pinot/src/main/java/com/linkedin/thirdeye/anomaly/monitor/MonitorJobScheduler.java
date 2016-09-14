@@ -2,7 +2,6 @@ package com.linkedin.thirdeye.anomaly.monitor;
 
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,7 +39,8 @@ public class MonitorJobScheduler {
 
     monitorJobRunner = new MonitorJobRunner(monitorJobContext);
     scheduledExecutorService
-      .scheduleWithFixedDelay(monitorJobRunner, 0, monitorConfiguration.getMonitorFrequencyHours(), TimeUnit.HOURS);
+      .scheduleWithFixedDelay(monitorJobRunner, 0, monitorConfiguration.getMonitorFrequency().getSize(),
+          monitorConfiguration.getMonitorFrequency().getUnit());
   }
 
   public void stop() {

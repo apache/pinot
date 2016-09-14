@@ -44,11 +44,11 @@ import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
 import com.linkedin.thirdeye.datalayer.dto.JobDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 
-public abstract class AbstractRunnerDbTestBase {
+public abstract class AbstractDBIntegrationTestBase {
   protected AnomalyFunctionManager anomalyFunctionDAO;
-  protected RawAnomalyResultManager anomalyResultDAO;
-  protected JobManager anomalyJobDAO;
-  protected TaskManager anomalyTaskDAO;
+  protected RawAnomalyResultManager rawAnomalyResultDAO;
+  protected JobManager jobDAO;
+  protected TaskManager taskDAO;
   protected EmailConfigurationManager emailConfigurationDAO;
   protected MergedAnomalyResultManager mergedResultDAO;
   protected WebappConfigManager webappConfigDAO;
@@ -56,7 +56,7 @@ public abstract class AbstractRunnerDbTestBase {
 
   @BeforeClass(alwaysRun = true)
   public void init() throws URISyntaxException {
-    URL url = AbstractRunnerDbTestBase.class.getResource("/persistence.yml");
+    URL url = AbstractDBIntegrationTestBase.class.getResource("/persistence.yml");
     File configFile = new File(url.toURI());
 
     PersistenceConfig configuration = PersistenceUtil.createConfiguration(configFile);
@@ -94,9 +94,9 @@ public abstract class AbstractRunnerDbTestBase {
     PersistenceUtil.init(properties);
 
     anomalyFunctionDAO = PersistenceUtil.getInstance(AnomalyFunctionManagerImpl.class);
-    anomalyResultDAO = PersistenceUtil.getInstance(RawAnomalyResultManagerImpl.class);
-    anomalyJobDAO = PersistenceUtil.getInstance(JobManagerImpl.class);
-    anomalyTaskDAO = PersistenceUtil.getInstance(TaskManagerImpl.class);
+    rawAnomalyResultDAO = PersistenceUtil.getInstance(RawAnomalyResultManagerImpl.class);
+    jobDAO = PersistenceUtil.getInstance(JobManagerImpl.class);
+    taskDAO = PersistenceUtil.getInstance(TaskManagerImpl.class);
     emailConfigurationDAO = PersistenceUtil.getInstance(EmailConfigurationManagerImpl.class);
     mergedResultDAO = PersistenceUtil.getInstance(MergedAnomalyResultManagerImpl.class);
     webappConfigDAO = PersistenceUtil.getInstance(WebappConfigManagerImpl.class);
@@ -134,18 +134,18 @@ public abstract class AbstractRunnerDbTestBase {
 
   protected AnomalyFunctionDTO getTestFunctionSpec(String metricName, String collection) {
     AnomalyFunctionDTO functionSpec = new AnomalyFunctionDTO();
-    functionSpec.setMetricFunction(MetricAggFunction.SUM);
-    functionSpec.setMetric(metricName);
-    functionSpec.setBucketSize(1);
-    functionSpec.setCollection(collection);
-    functionSpec.setBucketUnit(TimeUnit.HOURS);
-    functionSpec.setCron("0/10 * * * * ?");
-    functionSpec.setFunctionName("my awesome test function");
+    functionSpec.setFunctionName("integration test function 1");
     functionSpec.setType("USER_RULE");
+    functionSpec.setMetric(metricName);
+    functionSpec.setCollection(collection);
+    functionSpec.setMetricFunction(MetricAggFunction.SUM);
+    functionSpec.setCron("0/10 * * * * ?");
+    functionSpec.setBucketSize(1);
+    functionSpec.setBucketUnit(TimeUnit.HOURS);
     functionSpec.setWindowDelay(3);
     functionSpec.setWindowDelayUnit(TimeUnit.HOURS);
-    functionSpec.setWindowSize(10);
-    functionSpec.setWindowUnit(TimeUnit.HOURS);
+    functionSpec.setWindowSize(1);
+    functionSpec.setWindowUnit(TimeUnit.DAYS);
     functionSpec.setProperties("baseline=w/w;changeThreshold=0.001");
     functionSpec.setIsActive(true);
     return functionSpec;
@@ -160,11 +160,11 @@ public abstract class AbstractRunnerDbTestBase {
     emailConfiguration.setFromAddress("thirdeye@linkedin.com");
     emailConfiguration.setMetric(metricName);
     emailConfiguration.setSendZeroAnomalyEmail(true);
-    emailConfiguration.setSmtpHost("email.corp.linkedin.com");
+    emailConfiguration.setSmtpHost("email-server.linkedin.com");
     emailConfiguration.setSmtpPassword(null);
     emailConfiguration.setSmtpPort(25);
     emailConfiguration.setSmtpUser(null);
-    emailConfiguration.setToAddresses("npawar@linkedin.com");
+    emailConfiguration.setToAddresses("anomaly@linkedin.com");
     emailConfiguration.setWindowDelay(2);
     emailConfiguration.setWindowSize(10);
     emailConfiguration.setWindowUnit(TimeUnit.HOURS);

@@ -1,11 +1,11 @@
 package com.linkedin.thirdeye.anomaly.monitor;
 
-
+import com.linkedin.thirdeye.api.TimeGranularity;
 
 public class MonitorConfiguration {
 
   private int expireDaysAgo = MonitorConstants.DEFAULT_EXPIRE_DAYS_AGO;
-  private int monitorFrequencyHours = MonitorConstants.DEFAULT_MONITOR_FREQUENCY_HOURS;
+  private TimeGranularity monitorFrequency = MonitorConstants.DEFAULT_MONITOR_FREQUENCY;
 
   public int getExpireDaysAgo() {
     return expireDaysAgo;
@@ -13,13 +13,10 @@ public class MonitorConfiguration {
   public void setExpireDaysAgo(int expireDaysAgo) {
     this.expireDaysAgo = expireDaysAgo;
   }
-  public int getMonitorFrequencyHours() {
-    return monitorFrequencyHours;
+  public TimeGranularity getMonitorFrequency() {
+    return monitorFrequency;
   }
-  public void setMonitorFrequencyHours(int monitorFrequencyHours) {
-    this.monitorFrequencyHours = monitorFrequencyHours;
+  public void setMonitorFrequency(TimeGranularity monitorFrequency) {
+    this.monitorFrequency = monitorFrequency;
   }
-
-
-
 }
