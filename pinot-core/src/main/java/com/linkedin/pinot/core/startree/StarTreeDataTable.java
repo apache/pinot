@@ -15,13 +15,11 @@
  */
 package com.linkedin.pinot.core.startree;
 
+import com.linkedin.pinot.common.utils.Pairs.IntPair;
 import java.io.File;
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
-import java.nio.MappedByteBuffer;
-import java.nio.channels.FileChannel.MapMode;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -29,16 +27,15 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.tuple.Pair;
-
-import com.linkedin.pinot.common.utils.Pairs.IntPair;
-
 import xerial.larray.mmap.MMapBuffer;
 import xerial.larray.mmap.MMapMode;
 
 
+/**
+ * The StarTreeDataTable should be able to handle the memory range greater than 2GB.
+ * As a result, all fields related to memory position should be declared as long to avoid int overflow.
+ */
 public class StarTreeDataTable {
 
   private File file;
@@ -64,12 +61,12 @@ public class StarTreeDataTable {
     sort(startRecordId, endRecordId, 0, dimensionSizeInBytes);
   }
 
-  public void sort(int startRecordId, int endRecordId, final int startOffsetInRecord, final int endOffsetInRecord) {
+  public void sort(int startRecordId, int endRecordId, final int startOffsetInRecord, final long endOffsetInRecord) {
     final MMapBuffer mappedByteBuffer;
     try {
       int length = endRecordId - startRecordId;
-      final int startOffset = startRecordId * totalSizeInBytes;
-      mappedByteBuffer = new MMapBuffer(file, startOffset, length * totalSizeInBytes, MMapMode.READ_WRITE);
+      final long startOffset = startRecordId * (long) totalSizeInBytes;
+      mappedByteBuffer = new MMapBuffer(file, startOffset, length * (long) totalSizeInBytes, MMapMode.READ_WRITE);
 
       List<Integer> idList = new ArrayList<Integer>();
       for (int i = startRecordId; i < endRecordId; i++) {
@@ -81,11 +78,12 @@ public class StarTreeDataTable {
 
         @Override
         public int compare(Integer o1, Integer o2) {
-          int pos1 = (o1) * totalSizeInBytes;
-          int pos2 = (o2) * totalSizeInBytes;
+          long pos1 = (o1) * (long) totalSizeInBytes;
+          long pos2 = (o2) * (long) totalSizeInBytes;
+
           //System.out.println("pos1="+ pos1 +" , pos2="+ pos2);
-          mappedByteBuffer.copyTo(pos1, buf1, 0, dimensionSizeInBytes);
-          mappedByteBuffer.copyTo(pos2, buf2, 0, dimensionSizeInBytes);
+          mappedByteBuffer.toDirectByteBuffer(pos1, dimensionSizeInBytes).get(buf1);
+          mappedByteBuffer.toDirectByteBuffer(pos2, dimensionSizeInBytes).get(buf2);
           IntBuffer bb1 = ByteBuffer.wrap(buf1).asIntBuffer();
           IntBuffer bb2 = ByteBuffer.wrap(buf2).asIntBuffer();
           for (int dimIndex : sortOrder) {
@@ -117,14 +115,14 @@ public class StarTreeDataTable {
         int thatRecordIdPos = currentPositions[thatRecordId];
 
         //swap the buffers
-        mappedByteBuffer.copyTo(thisRecordIdPos * totalSizeInBytes, buf1, 0, totalSizeInBytes);
-        mappedByteBuffer.copyTo(thatRecordIdPos * totalSizeInBytes, buf2, 0, totalSizeInBytes);
+        mappedByteBuffer.toDirectByteBuffer(thisRecordIdPos * (long) totalSizeInBytes, totalSizeInBytes).get(buf1);
+        mappedByteBuffer.toDirectByteBuffer(thatRecordIdPos * (long) totalSizeInBytes, totalSizeInBytes).get(buf2);
         //        mappedByteBuffer.position(thisRecordIdPos * totalSizeInBytes);
         //        mappedByteBuffer.get(buf1);
         //        mappedByteBuffer.position(thatRecordIdPos * totalSizeInBytes);
         //        mappedByteBuffer.get(buf2);
-        mappedByteBuffer.readFrom(buf2, 0, thisRecordIdPos * totalSizeInBytes, totalSizeInBytes);
-        mappedByteBuffer.readFrom(buf1, 0, thatRecordIdPos * totalSizeInBytes, totalSizeInBytes);
+        mappedByteBuffer.readFrom(buf2, 0, thisRecordIdPos * (long) totalSizeInBytes, totalSizeInBytes);
+        mappedByteBuffer.readFrom(buf1, 0, thatRecordIdPos * (long) totalSizeInBytes, totalSizeInBytes);
         //        mappedByteBuffer.position(thisRecordIdPos * totalSizeInBytes);
         //        mappedByteBuffer.put(buf2);
         //        mappedByteBuffer.position(thatRecordIdPos * totalSizeInBytes);
@@ -159,13 +157,13 @@ public class StarTreeDataTable {
     try {
       int length = endDocId - startDocId;
       Map<Integer, IntPair> rangeMap = new LinkedHashMap<>();
-      final int startOffset = startDocId * totalSizeInBytes;
-      mappedByteBuffer = new MMapBuffer(file, startOffset, length * totalSizeInBytes, MMapMode.READ_WRITE);
+      final long startOffset = startDocId * (long) totalSizeInBytes;
+      mappedByteBuffer = new MMapBuffer(file, startOffset, length * (long) totalSizeInBytes, MMapMode.READ_WRITE);
       int prevValue = -1;
       int prevStart = 0;
       byte[] dimBuff = new byte[dimensionSizeInBytes];
       for (int i = 0; i < length; i++) {
-        mappedByteBuffer.copyTo(i * totalSizeInBytes, dimBuff, 0, dimensionSizeInBytes);
+        mappedByteBuffer.toDirectByteBuffer(i * (long) totalSizeInBytes, dimensionSizeInBytes).get(dimBuff);
         int value = ByteBuffer.wrap(dimBuff).asIntBuffer().get(colIndex);
         if (prevValue != -1 && prevValue != value) {
           rangeMap.put(prevValue, new IntPair(startDocId + prevStart, startDocId + i));
@@ -192,8 +190,8 @@ public class StarTreeDataTable {
   public Iterator<Pair<byte[], byte[]>> iterator(int startDocId, int endDocId) throws IOException {
     try {
       final int length = endDocId - startDocId;
-      final int startOffset = startDocId * totalSizeInBytes;
-      final MMapBuffer mappedByteBuffer = new MMapBuffer(file, startOffset, length * totalSizeInBytes, MMapMode.READ_WRITE);
+      final long startOffset = startDocId * (long) totalSizeInBytes;
+      final MMapBuffer mappedByteBuffer = new MMapBuffer(file, startOffset, length * (long) totalSizeInBytes, MMapMode.READ_WRITE);
       return new Iterator<Pair<byte[], byte[]>>() {
         int pointer = 0;
 
@@ -211,12 +209,12 @@ public class StarTreeDataTable {
         public Pair<byte[], byte[]> next() {
           byte[] dimBuff = new byte[dimensionSizeInBytes];
           byte[] metBuff = new byte[metricSizeInBytes];
-          mappedByteBuffer.copyTo(pointer * totalSizeInBytes, dimBuff, 0, dimensionSizeInBytes);
-//          mappedByteBuffer.position(pointer * totalSizeInBytes);
-//          mappedByteBuffer.get(dimBuff);
+          mappedByteBuffer.toDirectByteBuffer(pointer * (long) totalSizeInBytes, dimensionSizeInBytes).get(dimBuff);
+//        mappedByteBuffer.position(pointer * totalSizeInBytes);
+//        mappedByteBuffer.get(dimBuff);
           if (metricSizeInBytes > 0) {
-            mappedByteBuffer.copyTo(pointer * totalSizeInBytes + dimensionSizeInBytes, metBuff, 0, metricSizeInBytes);
-//            mappedByteBuffer.get(metBuff);
+            mappedByteBuffer.toDirectByteBuffer(pointer * (long) totalSizeInBytes + dimensionSizeInBytes, metricSizeInBytes).get(metBuff);
+//          mappedByteBuffer.get(metBuff);
           }
           pointer = pointer + 1;
           if(pointer == length){
@@ -237,5 +235,4 @@ public class StarTreeDataTable {
     }
 
   }
-
 }
