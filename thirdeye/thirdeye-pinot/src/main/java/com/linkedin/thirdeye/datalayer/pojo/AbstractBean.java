@@ -3,7 +3,7 @@ package com.linkedin.thirdeye.datalayer.pojo;
 
 import javax.persistence.MappedSuperclass;
 
-import org.codehaus.jackson.annotate.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 import com.linkedin.thirdeye.datalayer.dto.AbstractDTO;
 

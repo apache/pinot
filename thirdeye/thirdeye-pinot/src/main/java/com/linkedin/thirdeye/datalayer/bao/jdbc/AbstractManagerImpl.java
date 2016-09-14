@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import org.codehaus.jackson.map.ObjectMapper;
 import org.modelmapper.ModelMapper;
 
 import com.linkedin.thirdeye.anomaly.merge.AnomalyMergeConfig;
@@ -27,7 +26,6 @@ import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 
 public abstract class AbstractManagerImpl<E extends AbstractDTO> implements AbstractManager<E> {
 
-  protected static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   protected static final ModelMapper MODEL_MAPPER = new ModelMapper();
   protected static GenericPojoDao genericPojoDao =
       DaoProviderUtil.getInstance(GenericPojoDao.class);

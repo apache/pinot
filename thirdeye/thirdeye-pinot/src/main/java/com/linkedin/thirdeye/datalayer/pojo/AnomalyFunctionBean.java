@@ -10,9 +10,9 @@ import javax.persistence.Index;
 import javax.persistence.MappedSuperclass;
 
 import javax.persistence.Transient;
-import org.codehaus.jackson.annotate.JsonIgnore;
-import org.codehaus.jackson.annotate.JsonIgnoreProperties;
-import org.codehaus.jackson.annotate.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import com.google.common.base.MoreObjects;
 import com.google.common.collect.Multimap;

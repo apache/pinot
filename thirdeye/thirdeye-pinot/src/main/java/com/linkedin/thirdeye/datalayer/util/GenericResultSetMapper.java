@@ -17,8 +17,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.codehaus.jackson.map.ObjectMapper;
-import org.codehaus.jackson.node.ObjectNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.modelmapper.ModelMapper;
 import org.modelmapper.config.Configuration.AccessLevel;
 import org.modelmapper.convention.NameTokenizers;
@@ -104,7 +104,7 @@ public class GenericResultSetMapper {
          * Long.valueOf(val.toString())); } else { field.set(entityObj, val); }
          */
       }
-      entityObj = mapper.readValue(objectNode, entityClass);
+      entityObj = mapper.treeToValue(objectNode, entityClass);
       entityList.add((E) entityObj);
     }
 
