@@ -291,7 +291,9 @@ public class GenericPojoDao {
             genericResultSetMapper.mapAll(resultSet, GenericJsonEntity.class);
         List<E> ret = new ArrayList<>(entities.size());
         for (GenericJsonEntity entity : entities) {
-          ret.add(OBJECT_MAPPER.readValue(entity.getJsonVal(), pojoClass));
+          E bean = OBJECT_MAPPER.readValue(entity.getJsonVal(), pojoClass);
+          bean.setId(entity.getId());
+          ret.add(bean);
         }
         return ret;
 
@@ -338,7 +340,9 @@ public class GenericPojoDao {
             genericResultSetMapper.mapAll(resultSet, GenericJsonEntity.class);
         List<E> ret = new ArrayList<>(entities.size());
         for (GenericJsonEntity entity : entities) {
-          ret.add(OBJECT_MAPPER.readValue(entity.getJsonVal(), pojoClass));
+          E bean = OBJECT_MAPPER.readValue(entity.getJsonVal(), pojoClass);
+          bean.setId(entity.getId());
+          ret.add(bean);
         }
         return ret;
       }
