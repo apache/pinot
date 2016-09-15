@@ -15,7 +15,9 @@
  */
 package com.linkedin.pinot.tools.admin.command;
 
+import com.google.common.primitives.Longs;
 import com.google.common.util.concurrent.Uninterruptibles;
+import com.linkedin.pinot.common.utils.HashUtil;
 import com.linkedin.pinot.common.utils.KafkaStarterUtils;
 import com.linkedin.pinot.core.indexsegment.utils.AvroUtils;
 import com.linkedin.pinot.tools.Command;
@@ -54,6 +56,9 @@ public class StreamAvroIntoKafkaCommand extends AbstractBaseAdminCommand impleme
   @Option(name="-zkAddress", required=false, metaVar="<string>", usage="Address of Zookeeper.")
   private String _zkAddress = "localhost:2181";
 
+  @Option(name="-millisBetweenMessages", required=false, metaVar="<int>", usage="Delay in milliseconds between messages (default 1000 ms)")
+  private String _millisBetweenMessages = "1000";
+
   @Override
   public boolean getHelp() {
     return _help;
@@ -67,7 +72,7 @@ public class StreamAvroIntoKafkaCommand extends AbstractBaseAdminCommand impleme
   @Override
   public String toString() {
     return "StreamAvroInfoKafka -avroFile " + _avroFile + " -kafkaBrokerList " + _kafkaBrokerList + " -kafkaTopic " +
-        _kafkaTopic;
+        _kafkaTopic + " -millisBetweenMessages " + _millisBetweenMessages;
   }
 
   @Override
@@ -79,6 +84,16 @@ public class StreamAvroIntoKafkaCommand extends AbstractBaseAdminCommand impleme
 
   @Override
   public boolean execute() throws IOException {
+    int messageDelayMillis = Integer.parseInt(_millisBetweenMessages);
+    final boolean sleepRequired = 0 < messageDelayMillis;
+
+    if (sleepRequired) {
+      LOGGER.info("Streaming Avro file into Kafka topic {} with {} ms between messages", _kafkaTopic,
+          _millisBetweenMessages);
+    } else {
+      LOGGER.info("Streaming Avro file into Kafka topic {} with no delay between messages", _kafkaTopic);
+    }
+
     // Create Kafka producer
     Properties properties = new Properties();
     properties.put("metadata.broker.list", _kafkaBrokerList);
@@ -86,7 +101,7 @@ public class StreamAvroIntoKafkaCommand extends AbstractBaseAdminCommand impleme
     properties.put("request.required.acks", "1");
 
     ProducerConfig producerConfig = new ProducerConfig(properties);
-    Producer<String, byte[]> producer = new Producer<String, byte[]>(producerConfig);
+    Producer<byte[], byte[]> producer = new Producer<byte[], byte[]>(producerConfig);
     try {
       // Open the Avro file
       DataFileStream<GenericRecord> reader = AvroUtils.getAvroReader(new File(_avroFile));
@@ -96,12 +111,15 @@ public class StreamAvroIntoKafkaCommand extends AbstractBaseAdminCommand impleme
         // Write the message to Kafka
         String recordJson = genericRecord.toString();
         byte[] bytes = recordJson.getBytes("utf-8");
-        KeyedMessage<String, byte[]> data = new KeyedMessage<String, byte[]>(_kafkaTopic, bytes);
+        KeyedMessage<byte[], byte[]> data = new KeyedMessage<byte[], byte[]>(_kafkaTopic,
+            Longs.toByteArray(HashUtil.hash64(bytes, bytes.length)), bytes);
 
         producer.send(data);
 
-        // Sleep for one second
-        Uninterruptibles.sleepUninterruptibly(1000, TimeUnit.MILLISECONDS);
+        // Sleep between messages
+        if (sleepRequired) {
+          Uninterruptibles.sleepUninterruptibly(messageDelayMillis, TimeUnit.MILLISECONDS);
+        }
       }
 
       reader.close();
