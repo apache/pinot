@@ -28,4 +28,13 @@ public class WebappConfigIndex extends AbstractIndexEntity {
   public void setType(String type) {
     this.type = type;
   }
+
+  @Override
+  public String toString() {
+    return "WebappConfigIndex [name=" + name + ", collection=" + collection + ", type=" + type
+        + ", baseId=" + baseId + ", id=" + id + ", createTime=" + createTime + ", updateTime="
+        + updateTime + ", version=" + version + "]";
+  }
+  
+  
 }
