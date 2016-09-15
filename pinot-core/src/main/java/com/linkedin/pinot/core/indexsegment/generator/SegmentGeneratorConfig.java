@@ -26,6 +26,7 @@ import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.data.readers.RecordReaderConfig;
 import com.linkedin.pinot.core.indexsegment.utils.AvroUtils;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import com.linkedin.pinot.core.startree.hll.HllConfig;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -35,8 +36,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-
-import com.linkedin.pinot.core.startree.hll.HllConfig;
 import org.apache.commons.lang.StringUtils;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
@@ -76,8 +75,7 @@ public class SegmentGeneratorConfig {
   private StarTreeIndexSpec _starTreeIndexSpec = null;
   private String _creatorVersion = null;
   private char _paddingCharacter = V1Constants.Str.DEFAULT_STRING_PAD_CHAR;
-
-  private HllConfig _hllConfig = new HllConfig();
+  private HllConfig _hllConfig = null;
 
   public SegmentGeneratorConfig() {
   }
@@ -387,9 +385,6 @@ public class SegmentGeneratorConfig {
   }
 
   public void setHllConfig(HllConfig hllConfig) {
-    if (hllConfig == null) {
-      hllConfig = new HllConfig();
-    }
     _hllConfig = hllConfig;
   }
 

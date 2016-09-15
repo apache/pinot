@@ -105,10 +105,13 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     recordReader = reader;
     recordReader.init();
     dataSchema = recordReader.getSchema();
-    enableHllIndex = config.getHllConfig().isEnableHllIndex();
 
-    if (enableHllIndex && !createStarTree) {
-      throw new IllegalArgumentException("Derived HLL fields generation will not work if StarTree is not enabled.");
+    if (config.getHllConfig() != null) {
+      if (!createStarTree) {
+        throw new IllegalArgumentException("Derived HLL fields generation will not work if StarTree is not enabled.");
+      } else {
+        enableHllIndex = true;
+      }
     }
 
     addDerivedFieldsInSchema();
