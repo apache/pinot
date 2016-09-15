@@ -1,20 +1,12 @@
 package com.linkedin.thirdeye.dashboard.configs;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.linkedin.thirdeye.api.CollectionSchema;
 
-//@JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, include = JsonTypeInfo.As.PROPERTY, property = "@class")
-@JsonIgnoreProperties(ignoreUnknown = true)
 public abstract class AbstractConfig {
 
-  protected String yaml;
   protected static ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-
-  static {
-  }
 
   public AbstractConfig() {
 
