@@ -172,7 +172,7 @@ public class BrokerServerBuilder {
         reduceServiceRegistry, _brokerMetrics, _config);
 
     // Register SerDe for data-table.
-    DataTableSerDeRegistry.getInstance().register(new DataTableCustomSerDe());
+    DataTableSerDeRegistry.getInstance().register(new DataTableCustomSerDe(_brokerMetrics));
 
     LOGGER.info("Network initialized !!");
   }

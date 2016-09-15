@@ -43,7 +43,12 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
   // to the server. Note that this may be because we have exhausted the (fixed-size) pool for the server, and
   // also reached the maximum number of waiting requests for the server. The metric is counted on a per-table
   // basis.
-  REQUEST_DROPPED_DUE_TO_CONNECTION_ERROR("requestDropped", false);
+  REQUEST_DROPPED_DUE_TO_CONNECTION_ERROR("requestDropped", false),
+
+
+  // This metric is emitted when DataTableCustomSerDe falls back to Java based de-serialization.
+  // This implies that we have identified an object for which we have not implemented custom ser/de.
+  DATA_TABLE_OBJECT_DESERIALIZATION("dataTableObjectDeserialization", true);
 
   private final String brokerMeterName;
   private final String unit;
