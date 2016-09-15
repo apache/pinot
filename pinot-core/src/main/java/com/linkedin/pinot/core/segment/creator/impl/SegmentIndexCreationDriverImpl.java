@@ -206,10 +206,6 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     starTreeBuilderConfig.setSkipMaterializationCardinalityThreshold(starTreeIndexSpec.getskipMaterializationCardinalityThreshold());
     starTreeBuilderConfig.setOutDir(starTreeTempDir);
 
-    //boolean enableOffHeapFormat = false; //starTreeIndexSpec.isEnableOffHeapFormat();
-    //starTreeBuilderConfig.setEnableOffHealpFormat(false); //enableOffHeapFormat);
-    //System.out.println("starTreeBuilderConfig enable off heap format: " + starTreeBuilderConfig.isEnableOffHealpFormat());
-
     boolean enableOffHeapFormat = starTreeIndexSpec.isEnableOffHeapFormat();
     starTreeBuilderConfig.setEnableOffHealpFormat(enableOffHeapFormat);
 
