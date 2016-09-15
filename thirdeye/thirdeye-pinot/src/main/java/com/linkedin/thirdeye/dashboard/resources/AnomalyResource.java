@@ -316,7 +316,11 @@ public class AnomalyResource {
     }
     // call endpoint to stop if active
     if (anomalyFunctionSpec.getIsActive()) {
-      detectionResourceHttpUtils.disableAnomalyFunction(String.valueOf(id));
+      try {
+        detectionResourceHttpUtils.disableAnomalyFunction(String.valueOf(id));
+      } catch (Exception e) {
+        LOG.error("Could not disable the function : " +  id, e);
+      }
     }
 
     CollectionSchema schema = CACHE_REGISTRY_INSTANCE.getCollectionSchemaCache().get(dataset);
