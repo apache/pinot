@@ -120,9 +120,9 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
   }
   private static final Logger LOGGER = LoggerFactory.getLogger(LLRealtimeSegmentDataManager.class);
   private static final int KAFKA_MAX_FETCH_TIME_MILLIS = 1000;
-  private static final long ONE_MINUTE_MS = 60 * 1000L;
-  private static final long ONE_HOUR_MS = 60 * 60 * 1000L;
-  private static final int HUNDRED_K = 100000;
+  private static final long TIME_THRESHOLD_FOR_LOG_MINUTES = 1;
+  private static final long TIME_EXTENSION_ON_EMPTY_SEGMENT_HOURS = 1;
+  private static final int MSG_COUNT_THRESHOLD_FOR_LOG = 100000;
 
   private final LLCRealtimeSegmentZKMetadata _segmentZKMetadata;
   private final AbstractTableConfig _tableConfig;
@@ -183,8 +183,8 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
         // the max time we are allowed to consume.
         if (now >= _consumeEndTime) {
           if (_realtimeSegment.getRawDocumentCount() == 0) {
-            segmentLogger.info("No events came in, extending time by an hour");
-            _consumeEndTime += ONE_HOUR_MS;
+            segmentLogger.info("No events came in, extending time by {} hours", TIME_EXTENSION_ON_EMPTY_SEGMENT_HOURS);
+            _consumeEndTime += TimeUnit.HOURS.toMillis(TIME_EXTENSION_ON_EMPTY_SEGMENT_HOURS);
             return false;
           }
           segmentLogger.info("Stopping consumption due to time limit start={} now={} numRows={}", _startTimeMs, now, _numRowsConsumed);
@@ -458,7 +458,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     stop(timeoutMs);
     long now = now();
     timeoutMs -= (now - transitionStartTimeMs);
-    segmentLogger.info("Consumer thread stopped. Time remaining to catchup: {}ms", timeoutMs);
+    segmentLogger.info("Consumer thread stopped in state {}. Time remaining to catchup: {}ms", _state.toString(), timeoutMs);
     if (timeoutMs <= 0) {
       // we could not get it to stop. Throw an exception and let it go to error state.
       throw new RuntimeException("Could not get to stop consumer thread" + _consumerThread);
@@ -477,6 +477,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
         break;
       case CATCHING_UP:
       case HOLDING:
+      case INITIAL_CONSUMING:
         // Allow to catch up upto final offset, and then replace.
         if (_currentOffset > endOffset) {
           // We moved ahead of the offset that is committed in ZK.
@@ -495,6 +496,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
         }
         break;
       default:
+        segmentLogger.info("Downloading to replace segment while in state {}", _state.toString());
         downloadSegmentAndReplace(llcMetadata);
         break;
     }
@@ -510,7 +512,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
           tempFile.length());
       TarGzCompressionUtils.unTar(tempFile, tempSegmentFolder);
       FileUtils.deleteQuietly(tempFile);
-      FileUtils.moveDirectory(tempSegmentFolder.listFiles()[0], new File(_resourceTmpDir, _segmentNameStr));
+      FileUtils.moveDirectory(tempSegmentFolder.listFiles()[0], new File(_resourceDataDir, _segmentNameStr));
       _realtimeTableDataManager.replaceLLSegment(_segmentNameStr);
     } catch (Exception e) {
       throw new RuntimeException(e);
@@ -692,7 +694,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     final int rowsConsumed = _numRowsConsumed - _lastConsumedCount;
     final long prevTime = _lastConsumedCount == 0 ? _consumeStartTime : _lastLogTime;
     // Log every minute or 100k events
-    if (now - prevTime > ONE_MINUTE_MS || rowsConsumed >= HUNDRED_K) {
+    if (now - prevTime > TimeUnit.MINUTES.toMillis(TIME_THRESHOLD_FOR_LOG_MINUTES) || rowsConsumed >= MSG_COUNT_THRESHOLD_FOR_LOG) {
       segmentLogger.info("Consumed {} events from (rate:{}/s)", rowsConsumed,
             (float) (rowsConsumed) * 1000 / (now - prevTime));
       _lastConsumedCount = _numRowsConsumed;

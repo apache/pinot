@@ -30,6 +30,7 @@ import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
+import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaHighLevelStreamProviderConfig;
 import junit.framework.Assert;
 import static org.mockito.Matchers.any;
@@ -284,7 +285,7 @@ public class LLRealtimeSegmentDataManagerTest {
   // Tests to go online from consuming state
 
   @Test
-  public void testOnlinTransitionOnStopTakingTooLong() throws Exception {
+  public void testOnlineTransitionOnStopTakingTooLong() throws Exception {
     FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
     LLCRealtimeSegmentZKMetadata metadata = new LLCRealtimeSegmentZKMetadata();
     metadata.setEndOffset(_startOffset+600);
@@ -404,6 +405,11 @@ public class LLRealtimeSegmentDataManagerTest {
       FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
       segmentDataManager._state.set(segmentDataManager, LLRealtimeSegmentDataManager.State.INITIAL_CONSUMING);
       Assert.assertFalse(segmentDataManager.invokeEndCriteriaReached());
+      _timeNow += maxTimeForSegmentCloseMs + 1;
+      // We should still get false, since the number of records in the realtime segment is 0
+      Assert.assertFalse(segmentDataManager.invokeEndCriteriaReached());
+      replaceRealtimeSegment(segmentDataManager, 10);
+      // Now we can test when we are far ahead in time
       _timeNow += maxTimeForSegmentCloseMs;
       Assert.assertTrue(segmentDataManager.invokeEndCriteriaReached());
     }
@@ -439,7 +445,7 @@ public class LLRealtimeSegmentDataManagerTest {
       segmentDataManager.setConsumeEndTime(_timeNow + 10);
       final long finalOffset = _startOffset + 100;
       segmentDataManager.setFinalOffset(finalOffset);
-      segmentDataManager.setCurrentOffset(finalOffset-1);
+      segmentDataManager.setCurrentOffset(finalOffset - 1);
       Assert.assertFalse(segmentDataManager.invokeEndCriteriaReached());
       segmentDataManager.setCurrentOffset(finalOffset);
       Assert.assertTrue(segmentDataManager.invokeEndCriteriaReached());
@@ -452,12 +458,21 @@ public class LLRealtimeSegmentDataManagerTest {
       segmentDataManager.setConsumeEndTime(endTime);
       final long finalOffset = _startOffset + 100;
       segmentDataManager.setFinalOffset(finalOffset);
-      segmentDataManager.setCurrentOffset(finalOffset-1);
+      segmentDataManager.setCurrentOffset(finalOffset - 1);
       _timeNow = endTime-1;
       Assert.assertFalse(segmentDataManager.invokeEndCriteriaReached());
       _timeNow = endTime;
       Assert.assertTrue(segmentDataManager.invokeEndCriteriaReached());
     }
+  }
+
+  // Replace the realtime segment with a mock that returns numDocs for raw doc count.
+  private void replaceRealtimeSegment(FakeLLRealtimeSegmentDataManager segmentDataManager, int numDocs) throws Exception {
+    RealtimeSegmentImpl mockSegmentImpl = mock(RealtimeSegmentImpl.class);
+    when(mockSegmentImpl.getRawDocumentCount()).thenReturn(numDocs);
+    Field segmentImpl = LLRealtimeSegmentDataManager.class.getDeclaredField("_realtimeSegment");
+    segmentImpl.setAccessible(true);
+    segmentImpl.set(segmentDataManager, mockSegmentImpl);
   }
 
   public static class FakeLLRealtimeSegmentDataManager extends LLRealtimeSegmentDataManager {
