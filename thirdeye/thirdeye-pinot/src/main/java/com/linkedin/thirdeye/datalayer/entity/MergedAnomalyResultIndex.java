@@ -1,14 +1,16 @@
 package com.linkedin.thirdeye.datalayer.entity;
 
 public class MergedAnomalyResultIndex extends AbstractIndexEntity {
-  long anomalyFunctionId;
+
+
+  long functionId;
   long anomalyFeedbackId;
   long metricId;
   long startTime;
   long endTime;
   String collection;
   String metric;
-  String dimensionValue;
+  String dimensions;
   boolean notified;
 
   public long getAnomalyFeedbackId() {
@@ -19,12 +21,12 @@ public class MergedAnomalyResultIndex extends AbstractIndexEntity {
     this.anomalyFeedbackId = anomalyFeedbackId;
   }
 
-  public long getAnomalyFunctionId() {
-    return anomalyFunctionId;
+  public long getFunctionId() {
+    return functionId;
   }
 
-  public void setAnomalyFunctionId(long anomalyFunctionId) {
-    this.anomalyFunctionId = anomalyFunctionId;
+  public void setFunctionId(long anomalyFunctionId) {
+    this.functionId = anomalyFunctionId;
   }
 
   public String getCollection() {
@@ -35,12 +37,12 @@ public class MergedAnomalyResultIndex extends AbstractIndexEntity {
     this.collection = collection;
   }
 
-  public String getDimensionValue() {
-    return dimensionValue;
+  public String getDimensions() {
+    return dimensions;
   }
 
-  public void setDimensionValue(String dimensionValue) {
-    this.dimensionValue = dimensionValue;
+  public void setDimensions(String dimensions) {
+    this.dimensions = dimensions;
   }
 
   public long getEndTime() {
@@ -81,5 +83,15 @@ public class MergedAnomalyResultIndex extends AbstractIndexEntity {
 
   public void setNotified(boolean notified) {
     this.notified = notified;
+  }
+
+  @Override
+  public String toString() {
+    return "MergedAnomalyResultIndex [functionId=" + functionId + ", anomalyFeedbackId="
+        + anomalyFeedbackId + ", metricId=" + metricId + ", startTime=" + startTime + ", endTime="
+        + endTime + ", collection=" + collection + ", metric=" + metric + ", dimensionValue="
+        + dimensions + ", notified=" + notified + ", baseId=" + baseId + ", id=" + id
+        + ", createTime=" + createTime + ", updateTime=" + updateTime + ", version=" + version
+        + "]";
   }
 }

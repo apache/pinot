@@ -3,15 +3,26 @@ package com.linkedin.thirdeye.datalayer.pojo;
 import java.util.Objects;
 
 import javax.persistence.Column;
+import javax.persistence.FetchType;
+import javax.persistence.JoinColumn;
+import javax.persistence.ManyToOne;
 import javax.persistence.MappedSuperclass;
+import javax.persistence.Transient;
 
 import org.apache.commons.lang.ObjectUtils;
 import org.joda.time.DateTime;
 
 import com.google.common.base.MoreObjects;
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
 
 @MappedSuperclass
 public class RawAnomalyResultBean extends AbstractBean implements Comparable<RawAnomalyResultBean> {
+
+  @Transient
+  private Long functionId;
+
+  @Transient
+  private Long AnomalyFeedbackId;
 
   @Column(name = "start_time_utc", nullable = false)
   private Long startTime;
@@ -130,6 +141,22 @@ public class RawAnomalyResultBean extends AbstractBean implements Comparable<Raw
     this.merged = merged;
   }
 
+  public Long getFunctionId() {
+    return functionId;
+  }
+
+  public void setFunctionId(Long functionId) {
+    this.functionId = functionId;
+  }
+
+  public Long getAnomalyFeedbackId() {
+    return AnomalyFeedbackId;
+  }
+
+  public void setAnomalyFeedbackId(Long anomalyFeedbackId) {
+    AnomalyFeedbackId = anomalyFeedbackId;
+  }
+
   @Override
   public String toString() {
     return MoreObjects.toStringHelper(this).add("id", getId()).add("startTimeUtc", startTime)
@@ -145,10 +172,9 @@ public class RawAnomalyResultBean extends AbstractBean implements Comparable<Raw
     }
     RawAnomalyResultBean r = (RawAnomalyResultBean) o;
     return Objects.equals(getId(), r.getId()) && Objects.equals(startTime, r.getStartTime())
-        && Objects.equals(dimensions, r.getDimensions())
-        && Objects.equals(endTime, r.getEndTime()) && Objects.equals(score, r.getScore())
-        && Objects.equals(weight, r.getWeight()) && Objects.equals(properties, r.getProperties())
-        && Objects.equals(message, r.getMessage());
+        && Objects.equals(dimensions, r.getDimensions()) && Objects.equals(endTime, r.getEndTime())
+        && Objects.equals(score, r.getScore()) && Objects.equals(weight, r.getWeight())
+        && Objects.equals(properties, r.getProperties()) && Objects.equals(message, r.getMessage());
     // Intentionally omit creationTimeUtc, since start/end are the truly significant dates for
     // anomalies
   }

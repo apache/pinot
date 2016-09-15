@@ -1,12 +1,12 @@
 package com.linkedin.thirdeye.datalayer.entity;
 
 public class RawAnomalyResultIndex extends AbstractIndexEntity {
-  long anomalyFunctionId;
+  long functionId;
   long anomalyFeedbackId;
   long jobId;
   long startTime;
   long endTime;
-  String dimensionValue;
+  String dimensions;
   boolean merged;
   boolean dataMissing;
 
@@ -18,12 +18,12 @@ public class RawAnomalyResultIndex extends AbstractIndexEntity {
     this.anomalyFeedbackId = anomalyFeedbackId;
   }
 
-  public long getAnomalyFunctionId() {
-    return anomalyFunctionId;
+  public long getFunctionId() {
+    return functionId;
   }
 
-  public void setAnomalyFunctionId(long anomalyFunctionId) {
-    this.anomalyFunctionId = anomalyFunctionId;
+  public void setFunctionId(long anomalyFunctionId) {
+    this.functionId = anomalyFunctionId;
   }
 
   public boolean isDataMissing() {
@@ -33,13 +33,13 @@ public class RawAnomalyResultIndex extends AbstractIndexEntity {
   public void setDataMissing(boolean dataMissing) {
     this.dataMissing = dataMissing;
   }
-
-  public String getDimensionValue() {
-    return dimensionValue;
+  
+  public String getDimensions() {
+    return dimensions;
   }
 
-  public void setDimensionValue(String dimensionValue) {
-    this.dimensionValue = dimensionValue;
+  public void setDimensions(String dimensions) {
+    this.dimensions = dimensions;
   }
 
   public long getEndTime() {

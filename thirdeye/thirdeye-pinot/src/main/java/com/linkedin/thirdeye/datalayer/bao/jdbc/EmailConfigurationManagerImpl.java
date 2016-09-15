@@ -3,9 +3,10 @@ package com.linkedin.thirdeye.datalayer.bao.jdbc;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.google.inject.persist.Transactional;
 import com.linkedin.thirdeye.datalayer.bao.EmailConfigurationManager;
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
+import com.linkedin.thirdeye.datalayer.pojo.AnomalyFunctionBean;
 import com.linkedin.thirdeye.datalayer.pojo.EmailConfigurationBean;
 import com.linkedin.thirdeye.datalayer.util.Predicate;
 
@@ -18,24 +19,81 @@ public class EmailConfigurationManagerImpl extends AbstractManagerImpl<EmailConf
     super(EmailConfigurationDTO.class, EmailConfigurationBean.class);
   }
 
-  /*
-   * (non-Javadoc)
-   *
-   * @see
-   * com.linkedin.thirdeye.datalayer.bao.IEmailConfigurationManager#findByFunctionId(java.lang.Long)
-   */
   @Override
-  @Transactional
-  public List<EmailConfigurationDTO> findByFunctionId(Long id) {
+  public Long save(EmailConfigurationDTO emailConfigurationDTO) {
+    if (emailConfigurationDTO.getId() != null) {
+      //TODO: throw exception and force the caller to call update instead
+      update(emailConfigurationDTO);
+      return emailConfigurationDTO.getId();
+    }
+    EmailConfigurationBean bean =
+        (EmailConfigurationBean) convertEmailConfigurationDTO2Bean(emailConfigurationDTO);
+    Long id = genericPojoDao.put(bean);
+    emailConfigurationDTO.setId(id);
+    return id;
+  }
+
+  private EmailConfigurationBean convertEmailConfigurationDTO2Bean(
+      EmailConfigurationDTO emailConfigurationDTO) {
+    EmailConfigurationBean emailConfigurationBean =
+        convertDTO2Bean(emailConfigurationDTO, EmailConfigurationBean.class);
+    List<Long> functionIds = new ArrayList<>();
+    for (AnomalyFunctionDTO function : emailConfigurationDTO.getFunctions()) {
+      functionIds.add(function.getId());
+    }
+    emailConfigurationBean.setFunctionIds(functionIds);
+    return emailConfigurationBean;
+  }
+
+  @Override
+  public void update(EmailConfigurationDTO emailConfigurationDTO) {
+    EmailConfigurationBean emailConfigurationBean =
+        (EmailConfigurationBean) convertEmailConfigurationDTO2Bean(emailConfigurationDTO);
+    genericPojoDao.update(emailConfigurationBean);
+  }
+
+  @Override
+  public EmailConfigurationDTO findById(Long id) {
+    EmailConfigurationBean emailConfigurationBean =
+        genericPojoDao.get(id, EmailConfigurationBean.class);
+    if (emailConfigurationBean != null) {
+      EmailConfigurationDTO emailConfigurationDTO =
+          convertEmailConfigurationBean2DTO(emailConfigurationBean);
+      return emailConfigurationDTO;
+    }
+    return null;
+  }
+
+  private EmailConfigurationDTO convertEmailConfigurationBean2DTO(
+      EmailConfigurationBean emailConfigurationBean) {
+    EmailConfigurationDTO emailConfigurationDTO =
+        convertBean2DTO(emailConfigurationBean, EmailConfigurationDTO.class);
+    List<Long> functionIds = emailConfigurationBean.getFunctionIds();
+    if (functionIds != null && !functionIds.isEmpty()) {
+      List<AnomalyFunctionBean> list = genericPojoDao.get(functionIds, AnomalyFunctionBean.class);
+      List<AnomalyFunctionDTO> functions = new ArrayList<>();
+      for (AnomalyFunctionBean bean : list) {
+        AnomalyFunctionDTO dto =
+            (AnomalyFunctionDTO) convertBean2DTO(bean, AnomalyFunctionDTO.class);
+        functions.add(dto);
+      }
+      emailConfigurationDTO.setFunctions(functions);
+    }
+    return emailConfigurationDTO;
+  }
+
+  @Override
+  public List<EmailConfigurationDTO> findByFunctionId(Long functionId) {
     //    return getEntityManager().createQuery(FIND_BY_FUNCTION_ID, entityClass)
     //        .setParameter("id", id)
     //        .getResultList();
-    Predicate predicate = Predicate.EQ("active", true);
-    List<EmailConfigurationBean> list = genericPojoDao.get(predicate, EmailConfigurationBean.class);
+    List<EmailConfigurationBean> list = genericPojoDao.getAll(EmailConfigurationBean.class);
     List<EmailConfigurationDTO> result = new ArrayList<>();
-    for (EmailConfigurationBean abstractBean : list) {
-      EmailConfigurationDTO dto = MODEL_MAPPER.map(abstractBean, EmailConfigurationDTO.class);
-      result.add(dto);
+    for (EmailConfigurationBean bean : list) {
+      if (bean.getFunctionIds() != null && bean.getFunctionIds().contains(functionId)) {
+        EmailConfigurationDTO dto = convertEmailConfigurationBean2DTO(bean);
+        result.add(dto);
+      }
     }
     return result;
   }

@@ -69,7 +69,7 @@ public class AlertJobScheduler implements JobScheduler {
     // start all active alert functions
     List<EmailConfigurationDTO> alertConfigs = emailConfigurationDAO.findAll();
     for (EmailConfigurationDTO alertConfig : alertConfigs) {
-      if (alertConfig.getIsActive()) {
+      if (alertConfig.isActive()) {
         AlertJobContext alertJobContext = new AlertJobContext();
         alertJobContext.setAnomalyJobDAO(anomalyJobDAO);
         alertJobContext.setAnomalyTaskDAO(anomalyTaskDAO);
@@ -91,7 +91,7 @@ public class AlertJobScheduler implements JobScheduler {
     if (alertConfig == null) {
       throw new IllegalArgumentException("No alert config with id " + id);
     }
-    if (!alertConfig.getIsActive()) {
+    if (!alertConfig.isActive()) {
       throw new IllegalStateException("Alert config with id " + id + " is not active");
     }
     String jobKey = getJobKey(alertConfig.getId());

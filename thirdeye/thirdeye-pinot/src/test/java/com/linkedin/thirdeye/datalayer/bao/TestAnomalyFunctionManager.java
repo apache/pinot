@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.db.dao;
+package com.linkedin.thirdeye.datalayer.bao;
 
 import java.util.List;
 
@@ -8,7 +8,7 @@ import org.testng.annotations.Test;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 
-public class TestAnomalyFunctionDAO extends AbstractDbTestBase {
+public class TestAnomalyFunctionManager extends AbstractManagerTestBase {
 
   private Long anomalyFunctionId;
   private static String collection = "my dataset";

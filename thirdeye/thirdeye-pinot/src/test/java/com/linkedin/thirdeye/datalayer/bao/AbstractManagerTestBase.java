@@ -1,7 +1,7 @@
-package com.linkedin.thirdeye.db.dao;
+package com.linkedin.thirdeye.datalayer.bao;
 
 import java.io.File;
-import java.net.URISyntaxException;
+import java.io.FileReader;
 import java.net.URL;
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -25,6 +25,7 @@ import com.linkedin.thirdeye.anomaly.job.JobConstants;
 import com.linkedin.thirdeye.common.persistence.PersistenceConfig;
 import com.linkedin.thirdeye.common.persistence.PersistenceUtil;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
+import com.linkedin.thirdeye.datalayer.ScriptRunner;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.EmailConfigurationManager;
 import com.linkedin.thirdeye.datalayer.bao.JobManager;
@@ -32,19 +33,14 @@ import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.TaskManager;
 import com.linkedin.thirdeye.datalayer.bao.WebappConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.hibernate.AnomalyFunctionManagerImpl;
-import com.linkedin.thirdeye.datalayer.bao.hibernate.EmailConfigurationManagerImpl;
-import com.linkedin.thirdeye.datalayer.bao.hibernate.JobManagerImpl;
-import com.linkedin.thirdeye.datalayer.bao.hibernate.MergedAnomalyResultManagerImpl;
-import com.linkedin.thirdeye.datalayer.bao.hibernate.RawAnomalyResultManagerImpl;
-import com.linkedin.thirdeye.datalayer.bao.hibernate.TaskManagerImpl;
-import com.linkedin.thirdeye.datalayer.bao.hibernate.WebappConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
 import com.linkedin.thirdeye.datalayer.dto.JobDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
+import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 
-public abstract class AbstractDbTestBase {
+public abstract class AbstractManagerTestBase {
+  String implMode = "jdbc";
   protected AnomalyFunctionManager anomalyFunctionDAO;
   protected RawAnomalyResultManager anomalyResultDAO;
   protected JobManager anomalyJobDAO;
@@ -53,10 +49,51 @@ public abstract class AbstractDbTestBase {
   protected MergedAnomalyResultManager mergedResultDAO;
   protected WebappConfigManager webappConfigDAO;
   private EntityManager entityManager;
+  private DataSource ds;
 
   @BeforeClass(alwaysRun = true)
-  public void init() throws URISyntaxException {
-    URL url = AbstractDbTestBase.class.getResource("/persistence.yml");
+  public void init() throws Exception {
+    if (implMode.equalsIgnoreCase("hibernate")) {
+      initHibernate();
+    }
+    if (implMode.equalsIgnoreCase("jdbc")) {
+      initJDBC();
+    }
+  }
+
+  //JDBC related init/cleanup
+  public void initJDBC() throws Exception {
+    URL configUrl = getClass().getResource("/persistence-local.yml");
+    File configFile = new File(configUrl.toURI());
+    DaoProviderUtil.init(configFile);
+    ds = DaoProviderUtil.getDataSource();
+    cleanUp();
+    initDB();
+    initManagers();
+  }
+
+  public void initDB() throws Exception {
+    try (Connection conn = ds.getConnection()) {
+      // create schema
+      URL createSchemaUrl = getClass().getResource("/schema/create-schema.sql");
+      ScriptRunner scriptRunner = new ScriptRunner(conn, false, false);
+      scriptRunner.setDelimiter(";", true);
+      scriptRunner.runScript(new FileReader(createSchemaUrl.getFile()));
+    }
+  }
+
+  public void cleanUpJDBC() throws Exception {
+    try (Connection conn = ds.getConnection()) {
+      URL deleteSchemaUrl = getClass().getResource("/schema/drop-tables.sql");
+      ScriptRunner scriptRunner = new ScriptRunner(conn, false, false);
+      scriptRunner.runScript(new FileReader(deleteSchemaUrl.getFile()));
+    }
+  }
+
+
+  //HIBERNATE related init/clean up
+  public void initHibernate() throws Exception {
+    URL url = AbstractManagerTestBase.class.getResource("/persistence.yml");
     File configFile = new File(url.toURI());
 
     PersistenceConfig configuration = PersistenceUtil.createConfiguration(configFile);
@@ -68,7 +105,8 @@ public abstract class AbstractDbTestBase {
     ds.setUrl(configuration.getDatabaseConfiguration().getUrl() + dbId);
     ds.setPassword(configuration.getDatabaseConfiguration().getPassword());
     ds.setUsername(configuration.getDatabaseConfiguration().getUser());
-    ds.setDriverClassName(configuration.getDatabaseConfiguration().getProperties().get("hibernate.connection.driver_class"));
+    ds.setDriverClassName(configuration.getDatabaseConfiguration().getProperties()
+        .get("hibernate.connection.driver_class"));
 
     // pool size configurations
     ds.setMaxActive(200);
@@ -88,37 +126,78 @@ public abstract class AbstractDbTestBase {
     ds.setRemoveAbandonedTimeout(600_000);
     ds.setRemoveAbandoned(true);
 
-    properties.put(Environment.CONNECTION_PROVIDER, DatasourceConnectionProviderImpl.class.getName());
+    properties.put(Environment.CONNECTION_PROVIDER,
+        DatasourceConnectionProviderImpl.class.getName());
     properties.put(Environment.DATASOURCE, ds);
 
     PersistenceUtil.init(properties);
+    initManagers();
 
-    anomalyFunctionDAO = PersistenceUtil.getInstance(AnomalyFunctionManagerImpl.class);
-    anomalyResultDAO = PersistenceUtil.getInstance(RawAnomalyResultManagerImpl.class);
-    anomalyJobDAO = PersistenceUtil.getInstance(JobManagerImpl.class);
-    anomalyTaskDAO = PersistenceUtil.getInstance(TaskManagerImpl.class);
-    emailConfigurationDAO = PersistenceUtil.getInstance(EmailConfigurationManagerImpl.class);
-    mergedResultDAO = PersistenceUtil.getInstance(MergedAnomalyResultManagerImpl.class);
-    webappConfigDAO = PersistenceUtil.getInstance(WebappConfigManagerImpl.class);
-    entityManager = PersistenceUtil.getInstance(EntityManager.class);
+  }
+
+  String packagePrefix = "com.linkedin.thirdeye.datalayer.bao.";
+
+  public void initManagers() throws Exception {
+    if (implMode.equals("hibernate")) {
+      anomalyFunctionDAO = (AnomalyFunctionManager) PersistenceUtil
+          .getInstance(Class.forName(packagePrefix + implMode + ".AnomalyFunctionManagerImpl"));
+      anomalyResultDAO = (RawAnomalyResultManager) PersistenceUtil
+          .getInstance(Class.forName(packagePrefix + implMode + ".RawAnomalyResultManagerImpl"));
+      anomalyJobDAO = (JobManager) PersistenceUtil
+          .getInstance(Class.forName(packagePrefix + implMode + ".JobManagerImpl"));
+      anomalyTaskDAO = (TaskManager) PersistenceUtil
+          .getInstance(Class.forName(packagePrefix + implMode + ".TaskManagerImpl"));
+      emailConfigurationDAO = (EmailConfigurationManager) PersistenceUtil
+          .getInstance(Class.forName(packagePrefix + implMode + ".EmailConfigurationManagerImpl"));
+      mergedResultDAO = (MergedAnomalyResultManager) PersistenceUtil
+          .getInstance(Class.forName(packagePrefix + implMode + ".MergedAnomalyResultManagerImpl"));
+      webappConfigDAO = (WebappConfigManager) PersistenceUtil
+          .getInstance(Class.forName(packagePrefix + implMode + ".WebappConfigManagerImpl"));
+
+      entityManager = PersistenceUtil.getInstance(EntityManager.class);
+    }
+    if (implMode.equals("jdbc")) {
+      anomalyFunctionDAO = (AnomalyFunctionManager) DaoProviderUtil
+          .getInstance(Class.forName(packagePrefix + implMode + ".AnomalyFunctionManagerImpl"));
+      anomalyResultDAO = (RawAnomalyResultManager) DaoProviderUtil
+          .getInstance(Class.forName(packagePrefix + implMode + ".RawAnomalyResultManagerImpl"));
+      anomalyJobDAO = (JobManager) DaoProviderUtil
+          .getInstance(Class.forName(packagePrefix + implMode + ".JobManagerImpl"));
+      anomalyTaskDAO = (TaskManager) DaoProviderUtil
+          .getInstance(Class.forName(packagePrefix + implMode + ".TaskManagerImpl"));
+      emailConfigurationDAO = (EmailConfigurationManager) DaoProviderUtil
+          .getInstance(Class.forName(packagePrefix + implMode + ".EmailConfigurationManagerImpl"));
+      mergedResultDAO = (MergedAnomalyResultManager) DaoProviderUtil
+          .getInstance(Class.forName(packagePrefix + implMode + ".MergedAnomalyResultManagerImpl"));
+      webappConfigDAO = (WebappConfigManager) DaoProviderUtil
+          .getInstance(Class.forName(packagePrefix + implMode + ".WebappConfigManagerImpl"));
+    }
   }
 
   @AfterClass(alwaysRun = true)
   public void cleanUp() throws Exception {
+    if (implMode.equalsIgnoreCase("hibernate")) {
+      cleanUpHibernate();
+    }
+    if (implMode.equalsIgnoreCase("jdbc")) {
+      cleanUpJDBC();
+    }
+  }
+
+  public void cleanUpHibernate() throws Exception {
     if (entityManager.getTransaction().isActive()) {
       entityManager.getTransaction().rollback();
     }
     clearDatabase();
   }
 
-  public void clearDatabase() throws Exception{
+  public void clearDatabase() throws Exception {
     Connection c = ((SessionImpl) entityManager.getDelegate()).connection();
     Statement s = c.createStatement();
     s.execute("SET DATABASE REFERENTIAL INTEGRITY FALSE");
     Set<String> tables = new HashSet<>();
-    ResultSet rs = s.executeQuery("select table_name " +
-        "from INFORMATION_SCHEMA.system_tables " +
-        "where table_type='TABLE' and table_schem='PUBLIC'");
+    ResultSet rs = s.executeQuery("select table_name " + "from INFORMATION_SCHEMA.system_tables "
+        + "where table_type='TABLE' and table_schem='PUBLIC'");
     while (rs.next()) {
       if (!rs.getString(1).startsWith("DUAL_")) {
         tables.add(rs.getString(1));
@@ -153,7 +232,7 @@ public abstract class AbstractDbTestBase {
   protected EmailConfigurationDTO getEmailConfiguration() {
     EmailConfigurationDTO emailConfiguration = new EmailConfigurationDTO();
     emailConfiguration.setCollection("my pinot collection");
-    emailConfiguration.setIsActive(false);
+    emailConfiguration.setActive(false);
     emailConfiguration.setCron("0 0/10 * * *");
     emailConfiguration.setFilters("foo=bar");
     emailConfiguration.setFromAddress("thirdeye@linkedin.com");

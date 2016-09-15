@@ -25,7 +25,7 @@ public class JobManagerImpl extends AbstractManagerImpl<JobDTO> implements JobMa
   @Override
   @Transactional
   public List<JobDTO> findByStatus(JobStatus status) {
-    return super.findByParams(ImmutableMap.of("status", status));
+    return super.findByParams(ImmutableMap.of("status", status.toString()));
   }
 
   @Override
@@ -42,7 +42,7 @@ public class JobManagerImpl extends AbstractManagerImpl<JobDTO> implements JobMa
   public int deleteRecordsOlderThanDaysWithStatus(int days, JobStatus status) {
     DateTime expireDate = new DateTime().minusDays(days);
     Timestamp expireTimestamp = new Timestamp(expireDate.getMillis());
-    Predicate statusPredicate = Predicate.EQ("status", status);
+    Predicate statusPredicate = Predicate.EQ("status", status.toString());
     Predicate timestampPredicate = Predicate.LT("updateTime", expireTimestamp);
     List<JobBean> list =
         genericPojoDao.get(Predicate.AND(statusPredicate, timestampPredicate), JobBean.class);

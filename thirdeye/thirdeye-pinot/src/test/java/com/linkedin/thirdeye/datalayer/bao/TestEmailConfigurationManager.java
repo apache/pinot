@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.db.dao;
+package com.linkedin.thirdeye.datalayer.bao;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
@@ -12,7 +12,7 @@ import org.testng.annotations.Test;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
 
-public class TestEmailConfigurationDAO extends AbstractDbTestBase {
+public class TestEmailConfigurationManager extends AbstractManagerTestBase {
 
   Long emailConfigId, functionId;
 
