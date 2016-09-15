@@ -61,7 +61,7 @@ public abstract class AnomalyTimeBasedSummarizer {
 
     for (int i = 0; i < anomalies.size(); i++) {
       RawAnomalyResultDTO currentResult = anomalies.get(i);
-      if (mergedAnomaly == null) {
+      if (mergedAnomaly == null || currentResult.getEndTime() < mergedAnomaly.getStartTime()) {
         mergedAnomaly = new MergedAnomalyResultDTO();
         populateMergedResult(mergedAnomaly, currentResult);
       } else {

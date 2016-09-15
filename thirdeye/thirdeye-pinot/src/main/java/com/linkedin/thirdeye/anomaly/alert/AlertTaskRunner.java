@@ -145,7 +145,7 @@ public class AlertTaskRunner implements TaskRunner {
     }
 
     sendAlertForAnomalies(collectionAlias, results, groupedResults, dimensionNames);
-    updateNotifiedStatus(allResults);
+    updateNotifiedStatus(results);
   }
 
   private List<MergedAnomalyResultDTO> applyFiltrationRule(List<MergedAnomalyResultDTO> results) {
