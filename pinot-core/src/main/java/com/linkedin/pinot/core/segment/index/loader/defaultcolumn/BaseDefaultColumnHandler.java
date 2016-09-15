@@ -28,7 +28,6 @@ import com.linkedin.pinot.core.segment.creator.impl.fwd.SingleValueSortedForward
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.loader.LoaderUtils;
-import com.linkedin.pinot.core.startree.hll.HllConfig;
 import java.io.File;
 import java.util.Collection;
 import java.util.HashMap;
@@ -349,6 +348,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
 
     // Add the column metadata information to the metadata properties.
     SegmentColumnarIndexCreator.addColumnMetadataInfo(segmentProperties, column, columnIndexCreationInfo, totalDocs,
-        totalRawDocs, totalAggDocs, fieldSpec, dictionaryElementSize, true/*hasInvertedIndex*/, new HllConfig());
+        totalRawDocs, totalAggDocs, fieldSpec, dictionaryElementSize, true/*hasInvertedIndex*/,
+        null/*hllOriginColumn*/);
   }
 }
