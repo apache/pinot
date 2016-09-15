@@ -25,6 +25,7 @@ import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.response.broker.AggregationResult;
 import com.linkedin.pinot.common.response.broker.BrokerResponseNative;
 import com.linkedin.pinot.common.response.broker.GroupByResult;
+import com.linkedin.pinot.common.response.broker.SelectionResults;
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.core.query.reduce.BrokerReduceService;
 import com.linkedin.pinot.pql.parsers.Pql2Compiler;
@@ -38,17 +39,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class ApproximateQueryTestUtil {
-  private static final Logger LOGGER = LoggerFactory.getLogger(ApproximateQueryTestUtil.class);
+public class QueryTestUtil {
+  private static final Logger LOGGER = LoggerFactory.getLogger(QueryTestUtil.class);
 
   private static final ReduceService<BrokerResponseNative> REDUCE_SERVICE = new BrokerReduceService();
   private static final Pql2Compiler REQUEST_COMPILER = new Pql2Compiler();
   private static long counter = 0;
 
-  public static Object runQuery(QueryExecutor queryExecutor, String segmentName,
-      AvroQueryGenerator.TestAggreationQuery query) {
-    LOGGER.info("\nRunning: " + query.getPql());
-    final BrokerRequest brokerRequest = REQUEST_COMPILER.compileToBrokerRequest(query.getPql());
+  private static BrokerResponseNative compileAndRunQuery(QueryExecutor queryExecutor, String segmentName, String pql) {
+    LOGGER.info("\nRunning: " + pql);
+    final BrokerRequest brokerRequest = REQUEST_COMPILER.compileToBrokerRequest(pql);
     InstanceRequest instanceRequest = new InstanceRequest(counter++, brokerRequest);
     instanceRequest.setSearchSegments(new ArrayList<String>());
     instanceRequest.getSearchSegments().add(segmentName);
@@ -57,6 +57,35 @@ public class ApproximateQueryTestUtil {
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
     final BrokerResponseNative brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
+    return brokerResponse;
+  }
+
+  /**
+   *
+   * @param queryExecutor
+   * @param segmentName
+   * @param pql
+   * @return selection column name list
+   */
+  public static List<String> runSelectionQuery(QueryExecutor queryExecutor, String segmentName, String pql) {
+    final BrokerResponseNative brokerResponse = compileAndRunQuery(queryExecutor, segmentName, pql);
+
+    SelectionResults result = brokerResponse.getSelectionResults();
+    Assert.assertNotNull(result);
+
+    return result.getColumns();
+  }
+
+  /**
+   *
+   * @param queryExecutor
+   * @param segmentName
+   * @param query
+   * @return aggregation or groupBy results
+   */
+  public static Object runAggregationQuery(QueryExecutor queryExecutor, String segmentName,
+      AvroQueryGenerator.TestAggreationQuery query) {
+    final BrokerResponseNative brokerResponse = compileAndRunQuery(queryExecutor, segmentName, query.getPql());
 
     AggregationResult result = brokerResponse.getAggregationResults().get(0);
     Assert.assertNotNull(result);
@@ -85,7 +114,7 @@ public class ApproximateQueryTestUtil {
     Object accurateValue = null;
 
     for (final AvroQueryGenerator.TestAggreationQuery query : queries) {
-      Object val = runQuery(queryExecutor, segmentName, query);
+      Object val = runAggregationQuery(queryExecutor, segmentName, query);
       if (isAccurate) {
         // store accurate value
         accurateValue = val;

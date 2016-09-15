@@ -15,7 +15,9 @@
  */
 package com.linkedin.pinot.core.query.selection;
 
+import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.request.Selection;
 import com.linkedin.pinot.common.request.SelectionSort;
 import com.linkedin.pinot.common.response.ServerInstance;
@@ -222,7 +224,17 @@ public class SelectionOperatorUtils {
       }
     }
 
-    String[] selectionColumnArray = selectionColumns.toArray(new String[selectionColumns.size()]);
+    List<String> columnsWithoutDerived = new ArrayList<>();
+    for (String column: selectionColumns) {
+      FieldSpec spec = indexSegment.getSegmentMetadata().getSchema().getFieldSpecFor(column);
+      if (spec instanceof MetricFieldSpec && ((MetricFieldSpec) spec).isDerivedMetric()) {
+        // skip derived metric
+      } else {
+        columnsWithoutDerived.add(column);
+      }
+    }
+
+    String[] selectionColumnArray = columnsWithoutDerived.toArray(new String[columnsWithoutDerived.size()]);
     Arrays.sort(selectionColumnArray);
     for (String selectionColumn : selectionColumnArray) {
       if (!columns.contains(selectionColumn)) {

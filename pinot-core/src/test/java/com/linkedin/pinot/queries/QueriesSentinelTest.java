@@ -126,7 +126,7 @@ public class QueriesSentinelTest {
       aggCalls.add(new TestSimpleAggreationQuery("select distinctcounthll(column" + i + ") from testTable limit 0", 0.0));
     }
 
-    ApproximateQueryTestUtil.runApproximationQueries(QUERY_EXECUTOR, segmentName, aggCalls, TestUtils.hllEstimationThreshold);
+    QueryTestUtil.runApproximationQueries(QUERY_EXECUTOR, segmentName, aggCalls, TestUtils.hllEstimationThreshold);
   }
 
   @Test
@@ -140,7 +140,7 @@ public class QueriesSentinelTest {
       groupByCalls.add(new TestGroupByAggreationQuery("select distinctcounthll(column2) from testTable group by column" + i + " limit 0", null));
     }
 
-    ApproximateQueryTestUtil.runApproximationQueries(QUERY_EXECUTOR, segmentName, groupByCalls, TestUtils.hllEstimationThreshold);
+    QueryTestUtil.runApproximationQueries(QUERY_EXECUTOR, segmentName, groupByCalls, TestUtils.hllEstimationThreshold);
   }
 
   @Test
@@ -153,7 +153,7 @@ public class QueriesSentinelTest {
       aggCalls.add(new TestSimpleAggreationQuery("select percentileest50(column" + i + ") from testTable limit 0", 0.0));
     }
 
-    ApproximateQueryTestUtil.runApproximationQueries(QUERY_EXECUTOR, segmentName, aggCalls, TestUtils.digestEstimationThreshold);
+    QueryTestUtil.runApproximationQueries(QUERY_EXECUTOR, segmentName, aggCalls, TestUtils.digestEstimationThreshold);
   }
 
   @Test
@@ -168,7 +168,7 @@ public class QueriesSentinelTest {
       groupByCalls.add(new TestGroupByAggreationQuery("select percentileest50(column1) from testTable group by column" + i + " top " + top + " limit 0", null));
     }
 
-    ApproximateQueryTestUtil.runApproximationQueries(QUERY_EXECUTOR, segmentName, groupByCalls, TestUtils.digestEstimationThreshold);
+    QueryTestUtil.runApproximationQueries(QUERY_EXECUTOR, segmentName, groupByCalls, TestUtils.digestEstimationThreshold);
   }
 
   @Test

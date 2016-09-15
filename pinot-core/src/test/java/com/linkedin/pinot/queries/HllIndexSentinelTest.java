@@ -38,6 +38,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import junit.framework.Assert;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -64,7 +65,7 @@ public class HllIndexSentinelTest {
   private static FileBasedInstanceDataManager instanceDataManager;
   private static PropertiesConfiguration serverConf;
   private SegmentWithHllIndexCreateHelper helper;
-  private String segmentName;
+  private String segmentName; // value assigned in setup()
 
   private static final String AVRO_DATA = "data/test_data-sv.avro";
 
@@ -128,11 +129,11 @@ public class HllIndexSentinelTest {
             "select distinctcounthll(" + distinctCountColumn + ") from " + tableName +
                 " where " + filterColumn + " > " + baseValue + " limit 0",
             0.0));
-        ApproximateQueryTestUtil.runApproximationQueries(
+        QueryTestUtil.runApproximationQueries(
             QUERY_EXECUTOR, segmentName, aggCalls, approximationThreshold);
 
         // correct query
-        Object ret = ApproximateQueryTestUtil.runQuery(
+        Object ret = QueryTestUtil.runAggregationQuery(
             QUERY_EXECUTOR, segmentName, new TestSimpleAggreationQuery(
                 "select distinctcount(" + distinctCountColumn + ") from " + tableName +
                     " where " + filterColumn + " > " + baseValue + " limit 0",
@@ -166,11 +167,11 @@ public class HllIndexSentinelTest {
               "select distinctcounthll(" + distinctCountColumn + ") from " + tableName +
                   " where " + filterColumn + " < " + baseValue +
                   " group by " + gbyColumn + " limit 0", null));
-          ApproximateQueryTestUtil.runApproximationQueries(
+          QueryTestUtil.runApproximationQueries(
               QUERY_EXECUTOR, segmentName, groupByCalls, approximationThreshold);
 
           // correct query
-          Object ret = ApproximateQueryTestUtil.runQuery(
+          Object ret = QueryTestUtil.runAggregationQuery(
               QUERY_EXECUTOR, segmentName, new AvroQueryGenerator.TestGroupByAggreationQuery(
                   "select distinctcount(" + distinctCountColumn + ") from " + tableName +
                       " where " + filterColumn + " < " + baseValue +
@@ -178,6 +179,25 @@ public class HllIndexSentinelTest {
           LOGGER.debug(ret.toString());
         }
       }
+    }
+  }
+
+  /**
+   * Derived Columns should not be selected out
+   * @throws Exception
+   */
+  @Test
+  public void testHllColumnSelectStar() throws Exception {
+    String[] queries = new String[]{
+        "select * from " + tableName + " where column17 < 1000000",
+        "select * from " + tableName,
+        "select * from " + tableName + " where column17 < 1000000 order by column1",
+        "select * from " + tableName + " order by column1"
+    };
+    for (String query: queries) {
+      String result = QueryTestUtil.runSelectionQuery(QUERY_EXECUTOR, segmentName, query).toString();
+      LOGGER.debug(result);
+      Assert.assertTrue(!result.contains(hllDeriveColumnSuffix));
     }
   }
 }

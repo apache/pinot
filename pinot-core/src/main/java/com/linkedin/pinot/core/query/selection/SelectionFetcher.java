@@ -57,7 +57,7 @@ public class SelectionFetcher {
   private final SelectionColumnIterator[] selectionColumnIterators;
 
   public SelectionFetcher(Block[] blocks, DataSchema dataSchema) {
-    this.length = blocks.length;
+    this.length = dataSchema.size();
     selectionColumnIterators = new SelectionColumnIterator[blocks.length];
     for (int i = 0; i < dataSchema.size(); ++i) {
       if (blocks[i] instanceof RealtimeSingleValueBlock && blocks[i].getMetadata().hasDictionary()) {
