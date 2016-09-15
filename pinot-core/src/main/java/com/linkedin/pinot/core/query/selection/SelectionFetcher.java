@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.query.selection;
 
+import com.google.common.base.Preconditions;
 import java.io.Serializable;
 
 import com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema;
@@ -57,7 +58,8 @@ public class SelectionFetcher {
   private final SelectionColumnIterator[] selectionColumnIterators;
 
   public SelectionFetcher(Block[] blocks, DataSchema dataSchema) {
-    this.length = dataSchema.size();
+    Preconditions.checkArgument(blocks.length == dataSchema.size());
+    this.length = blocks.length;
     selectionColumnIterators = new SelectionColumnIterator[blocks.length];
     for (int i = 0; i < dataSchema.size(); ++i) {
       if (blocks[i] instanceof RealtimeSingleValueBlock && blocks[i].getMetadata().hasDictionary()) {

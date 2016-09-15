@@ -146,7 +146,15 @@ public class SelectionOperatorUtils {
   public static List<String> getSelectionColumns(@Nonnull List<String> selectionColumns,
       @Nonnull IndexSegment indexSegment) {
     if (selectionColumns.size() == 1 && selectionColumns.get(0).equals("*")) {
-      List<String> allColumns = Arrays.asList(indexSegment.getColumnNames());
+      List<String> allColumns = new ArrayList<>();
+      for (String column: indexSegment.getColumnNames()) {
+        FieldSpec spec = indexSegment.getSegmentMetadata().getSchema().getFieldSpecFor(column);
+        if (spec instanceof MetricFieldSpec && ((MetricFieldSpec) spec).isDerivedMetric()) {
+          // skip derived metric column
+        } else {
+          allColumns.add(column);
+        }
+      }
       Collections.sort(allColumns);
       return allColumns;
     } else {
@@ -224,17 +232,7 @@ public class SelectionOperatorUtils {
       }
     }
 
-    List<String> columnsWithoutDerived = new ArrayList<>();
-    for (String column: selectionColumns) {
-      FieldSpec spec = indexSegment.getSegmentMetadata().getSchema().getFieldSpecFor(column);
-      if (spec instanceof MetricFieldSpec && ((MetricFieldSpec) spec).isDerivedMetric()) {
-        // skip derived metric
-      } else {
-        columnsWithoutDerived.add(column);
-      }
-    }
-
-    String[] selectionColumnArray = columnsWithoutDerived.toArray(new String[columnsWithoutDerived.size()]);
+    String[] selectionColumnArray = selectionColumns.toArray(new String[selectionColumns.size()]);
     Arrays.sort(selectionColumnArray);
     for (String selectionColumn : selectionColumnArray) {
       if (!columns.contains(selectionColumn)) {

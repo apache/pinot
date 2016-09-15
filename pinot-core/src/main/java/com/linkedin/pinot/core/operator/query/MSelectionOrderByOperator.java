@@ -17,7 +17,6 @@ package com.linkedin.pinot.core.operator.query;
 
 import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.request.Selection;
-import com.linkedin.pinot.common.request.SelectionSort;
 import com.linkedin.pinot.common.response.ProcessingException;
 import com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema;
 import com.linkedin.pinot.core.common.Block;
@@ -28,11 +27,9 @@ import com.linkedin.pinot.core.operator.BaseOperator;
 import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
 import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorService;
+import com.linkedin.pinot.core.query.selection.SelectionOperatorUtils;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,30 +49,17 @@ public class MSelectionOrderByOperator extends BaseOperator {
   private final SelectionOperatorService _selectionOperatorService;
   private final DataSchema _dataSchema;
   private final Block[] _blocks;
-  private final Set<String> _selectionColumns = new HashSet<String>();
+  private final String[] _selectionColumns;
 
   public MSelectionOrderByOperator(IndexSegment indexSegment, Selection selection, Operator projectionOperator) {
     _indexSegment = indexSegment;
     _selection = selection;
     _projectionOperator = projectionOperator;
 
-    initColumnarDataSourcePlanNodeMap(indexSegment);
+    _selectionColumns = SelectionOperatorUtils.extractSelectionRelatedColumns(_selection, _indexSegment);
     _selectionOperatorService = new SelectionOperatorService(_selection, indexSegment);
     _dataSchema = _selectionOperatorService.getDataSchema();
-    _blocks = new Block[_selectionColumns.size()];
-  }
-
-  private void initColumnarDataSourcePlanNodeMap(IndexSegment indexSegment) {
-    _selectionColumns.addAll(_selection.getSelectionColumns());
-    if ((_selectionColumns.size() == 1) && ((_selectionColumns.toArray(new String[0]))[0].equals("*"))) {
-      _selectionColumns.clear();
-      _selectionColumns.addAll(Arrays.asList(indexSegment.getColumnNames()));
-    }
-    if (_selection.getSelectionSortSequence() != null) {
-      for (SelectionSort selectionSort : _selection.getSelectionSortSequence()) {
-        _selectionColumns.add(selectionSort.getColumn());
-      }
-    }
+    _blocks = new Block[_selectionColumns.length];
   }
 
   @Override
@@ -106,7 +90,7 @@ public class MSelectionOrderByOperator extends BaseOperator {
 
       final IntermediateResultsBlock resultBlock = new IntermediateResultsBlock();
       resultBlock.setSelectionResult(_selectionOperatorService.getRowEventsSet());
-      resultBlock.setSelectionDataSchema(_selectionOperatorService.getDataSchema());
+      resultBlock.setSelectionDataSchema(_dataSchema);
       resultBlock.setNumDocsScanned(numDocsScanned);
       resultBlock.setTotalRawDocs(_indexSegment.getSegmentMetadata().getTotalRawDocs());
       final long endTime = System.currentTimeMillis();
