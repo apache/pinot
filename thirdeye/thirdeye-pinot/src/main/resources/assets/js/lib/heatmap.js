@@ -6,7 +6,7 @@ function getHeatmap(tab) {
 
         renderD3heatmap(data, tab);
 
-        heatMapEventListeners(tab)
+        heatMapEventListeners(tab);
 
     });
 };

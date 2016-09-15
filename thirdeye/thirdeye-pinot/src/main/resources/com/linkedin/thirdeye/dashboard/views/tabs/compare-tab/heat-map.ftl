@@ -27,8 +27,8 @@
                             <th>Metric:</th>
                             <th> Baseline Total:</th>
                             <th> Current Total:</th>
-                            <th> Delta Value:</th>
-                            <th> Delta (%):</th>
+                            <th> Change Value:</th>
+                            <th> Change (%):</th>
                         </tr>
                         <tr>
                             <td class="title-stat">{{metricName}}  {{lookupInMapByKey @root/metricExpression  key=metricName display="()"}} </td>
