@@ -3,8 +3,6 @@ package com.linkedin.thirdeye.datalayer.util;
 import java.io.File;
 import java.sql.Connection;
 
-import javax.validation.Validation;
-
 import org.apache.tomcat.jdbc.pool.DataSource;
 
 import com.google.common.base.CaseFormat;
@@ -24,9 +22,6 @@ import com.linkedin.thirdeye.datalayer.entity.RawAnomalyResultIndex;
 import com.linkedin.thirdeye.datalayer.entity.TaskIndex;
 import com.linkedin.thirdeye.datalayer.entity.WebappConfigIndex;
 
-import io.dropwizard.configuration.ConfigurationFactory;
-import io.dropwizard.jackson.Jackson;
-
 public abstract class DaoProviderUtil {
 
   private static Injector injector;
@@ -45,25 +40,16 @@ public abstract class DaoProviderUtil {
     dataSource.setDriverClassName(configuration.getDatabaseConfiguration().getDriver());
   }
 
+  public static void init(DataSource ds) {
+    dataSource = ds;
+  }
+
   private synchronized static void initGuice() {
     if (!inited) {
       DataSourceModule dataSourceModule = new DataSourceModule(dataSource);
       injector = Guice.createInjector(dataSourceModule);
       inited = true;
     }
-  }
-
-  public static PersistenceConfig createConfiguration(File configFile) {
-    ConfigurationFactory<PersistenceConfig> factory = new ConfigurationFactory<>(
-        PersistenceConfig.class, Validation.buildDefaultValidatorFactory().getValidator(),
-        Jackson.newObjectMapper(), "");
-    PersistenceConfig configuration;
-    try {
-      configuration = factory.build(configFile);
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
-    return configuration;
   }
 
   public static <T> T getInstance(Class<T> c) {

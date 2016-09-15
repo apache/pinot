@@ -213,9 +213,14 @@ public class AnomalyMergeExecutor implements Runnable {
       String [] dimArr = anomalyDimensions.split(",");
       for (String dim : dimArr) {
         if(!StringUtils.isBlank(dim) && !"*".equals(dim)) {
-          // Only add a specific dimension value filter if there are more values present for the same dimension
           filters.removeAll(exploreDimension);
-          filters.put(exploreDimension, dim);
+          if(dim.equalsIgnoreCase("other")) {
+            filters.put(exploreDimension, dim);
+            filters.put(exploreDimension, "");
+          } else {
+            // Only add a specific dimension value filter if there are more values present for the same dimension
+            filters.put(exploreDimension, dim);
+          }
           LOG.info("Adding filter : [{} = {}] in the query", exploreDimension, dim);
         }
       }
@@ -236,16 +241,39 @@ public class AnomalyMergeExecutor implements Runnable {
     timeSeriesRequest.setEnd(new DateTime(anomalyMergedResult.getEndTime() - baselineOffset));
     TimeSeriesResponse responseBaseline = timeSeriesHandler.handle(timeSeriesRequest);
 
-    Double currentValue = getAvgMetricValuePerBucket(responseCurrent, anomalyFunctionSpec.getMetric());
-    Double baselineValue = getAvgMetricValuePerBucket(responseBaseline, anomalyFunctionSpec.getMetric());
+    Double currentValue;
+    Double baselineValue;
+
+    if (anomalyFunctionSpec.getMetric().toLowerCase().startsWith("percent")) {
+      // TODO: do proper check to find if metric is non additive
+      // TODO: introduce isAdditiveMetric property in collection / schema config
+      currentValue = getAvgMetricValuePerBucket(responseCurrent, anomalyFunctionSpec.getMetric());
+      baselineValue = getAvgMetricValuePerBucket(responseBaseline, anomalyFunctionSpec.getMetric());
+    } else {
+      currentValue = getMetricValueSum(responseCurrent, anomalyFunctionSpec.getMetric());
+      baselineValue = getAvgMetricValuePerBucket(responseBaseline, anomalyFunctionSpec.getMetric());
+    }
+
     Double severity;
     if (baselineValue != 0) {
       severity = (currentValue - baselineValue) / baselineValue;
     } else {
-      severity = 1.0;
+      severity = 0.0;
     }
     anomalyMergedResult.setWeight(severity);
     anomalyMergedResult.setMessage(createMessage(severity, currentValue, baselineValue));
+  }
+
+  private Double getMetricValueSum(TimeSeriesResponse response, String metricName) {
+    Double totalVal = 0.0;
+    for (int i = 0; i < response.getNumRows(); i++) {
+      for (TimeSeriesRow.TimeSeriesMetric metricData : response.getRow(i).getMetrics()) {
+        if (metricName.equals(metricData.getMetricName())) {
+          totalVal += metricData.getValue();
+        }
+      }
+    }
+    return totalVal;
   }
 
   /**

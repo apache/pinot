@@ -26,13 +26,6 @@ import com.linkedin.thirdeye.common.persistence.PersistenceConfig;
 import com.linkedin.thirdeye.common.persistence.PersistenceUtil;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.datalayer.ScriptRunner;
-import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
-import com.linkedin.thirdeye.datalayer.bao.EmailConfigurationManager;
-import com.linkedin.thirdeye.datalayer.bao.JobManager;
-import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
-import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
-import com.linkedin.thirdeye.datalayer.bao.TaskManager;
-import com.linkedin.thirdeye.datalayer.bao.WebappConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
 import com.linkedin.thirdeye.datalayer.dto.JobDTO;
@@ -49,10 +42,23 @@ public abstract class AbstractManagerTestBase {
   protected MergedAnomalyResultManager mergedResultDAO;
   protected WebappConfigManager webappConfigDAO;
   private EntityManager entityManager;
+
+  private PersistenceConfig configuration;
+
   private DataSource ds;
+  private long dbId = System.currentTimeMillis();
 
   @BeforeClass(alwaysRun = true)
   public void init() throws Exception {
+    URL url = AbstractManagerTestBase.class.getResource("/persistence.yml");
+    if (implMode.equalsIgnoreCase("jdbc")) {
+      url = AbstractManagerTestBase.class.getResource("/persistence-local.yml");
+    }
+    File configFile = new File(url.toURI());
+    configuration = PersistenceUtil.createConfiguration(configFile);
+
+    initializeDs(configuration);
+
     if (implMode.equalsIgnoreCase("hibernate")) {
       initHibernate();
     }
@@ -61,47 +67,8 @@ public abstract class AbstractManagerTestBase {
     }
   }
 
-  //JDBC related init/cleanup
-  public void initJDBC() throws Exception {
-    URL configUrl = getClass().getResource("/persistence-local.yml");
-    File configFile = new File(configUrl.toURI());
-    DaoProviderUtil.init(configFile);
-    ds = DaoProviderUtil.getDataSource();
-    cleanUp();
-    initDB();
-    initManagers();
-  }
-
-  public void initDB() throws Exception {
-    try (Connection conn = ds.getConnection()) {
-      // create schema
-      URL createSchemaUrl = getClass().getResource("/schema/create-schema.sql");
-      ScriptRunner scriptRunner = new ScriptRunner(conn, false, false);
-      scriptRunner.setDelimiter(";", true);
-      scriptRunner.runScript(new FileReader(createSchemaUrl.getFile()));
-    }
-  }
-
-  public void cleanUpJDBC() throws Exception {
-    try (Connection conn = ds.getConnection()) {
-      URL deleteSchemaUrl = getClass().getResource("/schema/drop-tables.sql");
-      ScriptRunner scriptRunner = new ScriptRunner(conn, false, false);
-      scriptRunner.runScript(new FileReader(deleteSchemaUrl.getFile()));
-    }
-  }
-
-
-  //HIBERNATE related init/clean up
-  public void initHibernate() throws Exception {
-    URL url = AbstractManagerTestBase.class.getResource("/persistence.yml");
-    File configFile = new File(url.toURI());
-
-    PersistenceConfig configuration = PersistenceUtil.createConfiguration(configFile);
-    Properties properties = PersistenceUtil.createDbPropertiesFromConfiguration(configuration);
-
-    long dbId = System.currentTimeMillis();
-
-    DataSource ds = new DataSource();
+  void initializeDs(PersistenceConfig configuration) {
+    ds = new DataSource();
     ds.setUrl(configuration.getDatabaseConfiguration().getUrl() + dbId);
     ds.setPassword(configuration.getDatabaseConfiguration().getPassword());
     ds.setUsername(configuration.getDatabaseConfiguration().getUser());
@@ -125,14 +92,41 @@ public abstract class AbstractManagerTestBase {
     // Timeout before an abandoned(in use) connection can be removed.
     ds.setRemoveAbandonedTimeout(600_000);
     ds.setRemoveAbandoned(true);
+  }
 
+  //JDBC related init/cleanup
+  public void initJDBC() throws Exception {
+    cleanUp();
+    initDB();
+    initManagers();
+  }
+
+  public void initDB() throws Exception {
+    try (Connection conn = ds.getConnection()) {
+      // create schema
+      URL createSchemaUrl = getClass().getResource("/schema/create-schema.sql");
+      ScriptRunner scriptRunner = new ScriptRunner(conn, false, false);
+      scriptRunner.setDelimiter(";", true);
+      scriptRunner.runScript(new FileReader(createSchemaUrl.getFile()));
+    }
+  }
+
+  public void cleanUpJDBC() throws Exception {
+    try (Connection conn = ds.getConnection()) {
+      URL deleteSchemaUrl = getClass().getResource("/schema/drop-tables.sql");
+      ScriptRunner scriptRunner = new ScriptRunner(conn, false, false);
+      scriptRunner.runScript(new FileReader(deleteSchemaUrl.getFile()));
+    }
+  }
+
+  //HIBERNATE related init/clean up
+  public void initHibernate() throws Exception {
+    Properties properties = PersistenceUtil.createDbPropertiesFromConfiguration(configuration);
     properties.put(Environment.CONNECTION_PROVIDER,
         DatasourceConnectionProviderImpl.class.getName());
     properties.put(Environment.DATASOURCE, ds);
-
     PersistenceUtil.init(properties);
     initManagers();
-
   }
 
   String packagePrefix = "com.linkedin.thirdeye.datalayer.bao.";
