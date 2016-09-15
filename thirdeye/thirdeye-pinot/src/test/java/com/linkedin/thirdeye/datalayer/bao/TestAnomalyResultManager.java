@@ -25,15 +25,15 @@ public class TestAnomalyResultManager extends AbstractManagerTestBase {
     anomalyResult = getAnomalyResult();
 
     anomalyResult.setFunction(spec);
-    anomalyResultDAO.save(anomalyResult);
+    rawResultDAO.save(anomalyResult);
 
-    RawAnomalyResultDTO resultRet = anomalyResultDAO.findById(anomalyResult.getId());
+    RawAnomalyResultDTO resultRet = rawResultDAO.findById(anomalyResult.getId());
     Assert.assertEquals(resultRet.getFunction(), spec);
   }
 
   @Test(dependsOnMethods = {"testAnomalyResultCRUD"})
   public void testResultFeedback() {
-    RawAnomalyResultDTO result = anomalyResultDAO.findById(anomalyResult.getId());
+    RawAnomalyResultDTO result = rawResultDAO.findById(anomalyResult.getId());
     Assert.assertNotNull(result);
     Assert.assertNull(result.getFeedback());
 
@@ -42,15 +42,15 @@ public class TestAnomalyResultManager extends AbstractManagerTestBase {
     feedback.setFeedbackType(AnomalyFeedbackType.ANOMALY);
     feedback.setStatus(FeedbackStatus.NEW);
     result.setFeedback(feedback);
-    anomalyResultDAO.save(result);
+    rawResultDAO.save(result);
 
-    RawAnomalyResultDTO resultRet = anomalyResultDAO.findById(anomalyResult.getId());
+    RawAnomalyResultDTO resultRet = rawResultDAO.findById(anomalyResult.getId());
     Assert.assertEquals(resultRet.getId(), result.getId());
     Assert.assertNotNull(resultRet.getFeedback());
 
     AnomalyFunctionDTO functionSpec = result.getFunction();
 
-    anomalyResultDAO.deleteById(anomalyResult.getId());
+    rawResultDAO.deleteById(anomalyResult.getId());
     anomalyFunctionDAO.deleteById(functionSpec.getId());
   }
 

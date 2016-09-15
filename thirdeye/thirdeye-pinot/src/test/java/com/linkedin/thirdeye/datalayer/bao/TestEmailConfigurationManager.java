@@ -15,10 +15,12 @@ import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
 public class TestEmailConfigurationManager extends AbstractManagerTestBase {
 
   Long emailConfigId, functionId;
+  private static String collection = "my dataset";
+  private static String metricName = "__counts";
 
   @Test
   public void testCreateEmailConfig() {
-    EmailConfigurationDTO request = getEmailConfiguration();
+    EmailConfigurationDTO request = getTestEmailConfiguration(metricName, collection);
     emailConfigId = emailConfigurationDAO.save(request);
     assertNotNull(emailConfigId);
   }

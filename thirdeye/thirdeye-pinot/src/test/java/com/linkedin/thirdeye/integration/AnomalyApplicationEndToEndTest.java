@@ -38,6 +38,7 @@ import com.linkedin.thirdeye.client.ThirdEyeResponse;
 import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.client.pinot.PinotThirdEyeResponse;
 import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
+import com.linkedin.thirdeye.datalayer.bao.AbstractManagerTestBase;
 import com.linkedin.thirdeye.datalayer.dto.JobDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
@@ -45,7 +46,7 @@ import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 
 
-public class AnomalyApplicationEndToEndTest extends AbstractDBIntegrationTestBase {
+public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
 
   private DetectionJobScheduler detectionJobScheduler = null;
   private TaskDriver taskDriver = null;
@@ -217,7 +218,7 @@ public class AnomalyApplicationEndToEndTest extends AbstractDBIntegrationTestBas
     Assert.assertTrue(completedCount > 0);
 
     // check if anomalies present
-    List<RawAnomalyResultDTO> rawAnomalies = rawAnomalyResultDAO.findUnmergedByFunctionId(functionId);
+    List<RawAnomalyResultDTO> rawAnomalies = rawResultDAO.findUnmergedByFunctionId(functionId);
     Assert.assertTrue(rawAnomalies.size() > 0);
 
     // start merge
@@ -246,7 +247,7 @@ public class AnomalyApplicationEndToEndTest extends AbstractDBIntegrationTestBas
   private void startMerger() {
     ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
     anomalyMergeExecutor =
-        new AnomalyMergeExecutor(mergedResultDAO, anomalyFunctionDAO, rawAnomalyResultDAO, executorService);
+        new AnomalyMergeExecutor(mergedResultDAO, anomalyFunctionDAO, rawResultDAO, executorService);
     executorService.scheduleWithFixedDelay(anomalyMergeExecutor, 0, 1, TimeUnit.MINUTES);
   }
 
@@ -260,7 +261,7 @@ public class AnomalyApplicationEndToEndTest extends AbstractDBIntegrationTestBas
   private void startWorker() throws Exception {
     InputStream factoryStream = AnomalyApplicationEndToEndTest.class.getResourceAsStream(functionPropertiesFile);
     anomalyFunctionFactory = new AnomalyFunctionFactory(factoryStream);
-    taskDriver = new TaskDriver(thirdeyeAnomalyConfig, jobDAO, taskDAO, rawAnomalyResultDAO, mergedResultDAO,
+    taskDriver = new TaskDriver(thirdeyeAnomalyConfig, jobDAO, taskDAO, rawResultDAO, mergedResultDAO,
         anomalyFunctionFactory);
     taskDriver.start();
   }

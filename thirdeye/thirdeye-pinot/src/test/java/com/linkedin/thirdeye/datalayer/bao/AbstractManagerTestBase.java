@@ -35,9 +35,9 @@ import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 public abstract class AbstractManagerTestBase {
   String implMode = "jdbc";
   protected AnomalyFunctionManager anomalyFunctionDAO;
-  protected RawAnomalyResultManager anomalyResultDAO;
-  protected JobManager anomalyJobDAO;
-  protected TaskManager anomalyTaskDAO;
+  protected RawAnomalyResultManager rawResultDAO;
+  protected JobManager jobDAO;
+  protected TaskManager taskDAO;
   protected EmailConfigurationManager emailConfigurationDAO;
   protected MergedAnomalyResultManager mergedResultDAO;
   protected WebappConfigManager webappConfigDAO;
@@ -81,7 +81,7 @@ public abstract class AbstractManagerTestBase {
     ds.setInitialSize(10);
 
     // validate connection
-    ds.setValidationQuery("select 1 as dbcp_connection_test");
+    ds.setValidationQuery("select 1 from anomaly_jobs where 1=0");
     ds.setTestWhileIdle(true);
     ds.setTestOnBorrow(true);
 
@@ -135,11 +135,11 @@ public abstract class AbstractManagerTestBase {
     if (implMode.equals("hibernate")) {
       anomalyFunctionDAO = (AnomalyFunctionManager) PersistenceUtil
           .getInstance(Class.forName(packagePrefix + implMode + ".AnomalyFunctionManagerImpl"));
-      anomalyResultDAO = (RawAnomalyResultManager) PersistenceUtil
+      rawResultDAO = (RawAnomalyResultManager) PersistenceUtil
           .getInstance(Class.forName(packagePrefix + implMode + ".RawAnomalyResultManagerImpl"));
-      anomalyJobDAO = (JobManager) PersistenceUtil
+      jobDAO = (JobManager) PersistenceUtil
           .getInstance(Class.forName(packagePrefix + implMode + ".JobManagerImpl"));
-      anomalyTaskDAO = (TaskManager) PersistenceUtil
+      taskDAO = (TaskManager) PersistenceUtil
           .getInstance(Class.forName(packagePrefix + implMode + ".TaskManagerImpl"));
       emailConfigurationDAO = (EmailConfigurationManager) PersistenceUtil
           .getInstance(Class.forName(packagePrefix + implMode + ".EmailConfigurationManagerImpl"));
@@ -153,11 +153,11 @@ public abstract class AbstractManagerTestBase {
     if (implMode.equals("jdbc")) {
       anomalyFunctionDAO = (AnomalyFunctionManager) DaoProviderUtil
           .getInstance(Class.forName(packagePrefix + implMode + ".AnomalyFunctionManagerImpl"));
-      anomalyResultDAO = (RawAnomalyResultManager) DaoProviderUtil
+      rawResultDAO = (RawAnomalyResultManager) DaoProviderUtil
           .getInstance(Class.forName(packagePrefix + implMode + ".RawAnomalyResultManagerImpl"));
-      anomalyJobDAO = (JobManager) DaoProviderUtil
+      jobDAO = (JobManager) DaoProviderUtil
           .getInstance(Class.forName(packagePrefix + implMode + ".JobManagerImpl"));
-      anomalyTaskDAO = (TaskManager) DaoProviderUtil
+      taskDAO = (TaskManager) DaoProviderUtil
           .getInstance(Class.forName(packagePrefix + implMode + ".TaskManagerImpl"));
       emailConfigurationDAO = (EmailConfigurationManager) DaoProviderUtil
           .getInstance(Class.forName(packagePrefix + implMode + ".EmailConfigurationManagerImpl"));
@@ -207,36 +207,37 @@ public abstract class AbstractManagerTestBase {
 
   protected AnomalyFunctionDTO getTestFunctionSpec(String metricName, String collection) {
     AnomalyFunctionDTO functionSpec = new AnomalyFunctionDTO();
-    functionSpec.setMetricFunction(MetricAggFunction.SUM);
-    functionSpec.setMetric(metricName);
-    functionSpec.setBucketSize(5);
-    functionSpec.setCollection(collection);
-    functionSpec.setBucketUnit(TimeUnit.MINUTES);
-    functionSpec.setCron("0 0/5 * * * ?");
-    functionSpec.setFunctionName("my awesome test function");
+    functionSpec.setFunctionName("integration test function 1");
     functionSpec.setType("USER_RULE");
-    functionSpec.setWindowDelay(1);
+    functionSpec.setMetric(metricName);
+    functionSpec.setCollection(collection);
+    functionSpec.setMetricFunction(MetricAggFunction.SUM);
+    functionSpec.setCron("0/10 * * * * ?");
+    functionSpec.setBucketSize(1);
+    functionSpec.setBucketUnit(TimeUnit.HOURS);
+    functionSpec.setWindowDelay(3);
     functionSpec.setWindowDelayUnit(TimeUnit.HOURS);
-    functionSpec.setWindowSize(10);
-    functionSpec.setWindowUnit(TimeUnit.HOURS);
+    functionSpec.setWindowSize(1);
+    functionSpec.setWindowUnit(TimeUnit.DAYS);
+    functionSpec.setProperties("baseline=w/w;changeThreshold=0.001");
     functionSpec.setIsActive(true);
     return functionSpec;
   }
 
-  protected EmailConfigurationDTO getEmailConfiguration() {
+  protected EmailConfigurationDTO getTestEmailConfiguration(String metricName, String collection) {
     EmailConfigurationDTO emailConfiguration = new EmailConfigurationDTO();
-    emailConfiguration.setCollection("my pinot collection");
-    emailConfiguration.setActive(false);
-    emailConfiguration.setCron("0 0/10 * * *");
-    emailConfiguration.setFilters("foo=bar");
+    emailConfiguration.setCollection(collection);
+    emailConfiguration.setActive(true);
+    emailConfiguration.setCron("0/10 * * * * ?");
+    emailConfiguration.setFilters(null);
     emailConfiguration.setFromAddress("thirdeye@linkedin.com");
-    emailConfiguration.setMetric("my metric");
-    emailConfiguration.setSendZeroAnomalyEmail(false);
-    emailConfiguration.setSmtpHost("pinot-email-host");
-    emailConfiguration.setSmtpPassword("mypass");
-    emailConfiguration.setSmtpPort(1000);
-    emailConfiguration.setSmtpUser("user");
-    emailConfiguration.setToAddresses("puneet@linkedin.com");
+    emailConfiguration.setMetric(metricName);
+    emailConfiguration.setSendZeroAnomalyEmail(true);
+    emailConfiguration.setSmtpHost("email-server.linkedin.com");
+    emailConfiguration.setSmtpPassword(null);
+    emailConfiguration.setSmtpPort(25);
+    emailConfiguration.setSmtpUser(null);
+    emailConfiguration.setToAddresses("anomaly@linkedin.com");
     emailConfiguration.setWindowDelay(2);
     emailConfiguration.setWindowSize(10);
     emailConfiguration.setWindowUnit(TimeUnit.HOURS);
