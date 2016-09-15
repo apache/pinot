@@ -306,6 +306,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         String.valueOf(hasInvertedIndex));
     properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, IS_SINGLE_VALUED),
         String.valueOf(fieldSpec.isSingleValueField()));
+    properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, IS_SELECT_STAR_VISIBLE),
+        String.valueOf(fieldSpec.isSelectStarVisible()));
     properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, MAX_MULTI_VALUE_ELEMTS),
         String.valueOf(columnIndexCreationInfo.getMaxNumberOfMultiValueElements()));
     properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, TOTAL_NUMBER_OF_ENTRIES),
@@ -342,6 +344,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     properties.clearProperty(getKeyFor(column, HAS_DICTIONARY));
     properties.clearProperty(getKeyFor(column, HAS_INVERTED_INDEX));
     properties.clearProperty(getKeyFor(column, IS_SINGLE_VALUED));
+    properties.clearProperty(getKeyFor(column, IS_SELECT_STAR_VISIBLE));
     properties.clearProperty(getKeyFor(column, MAX_MULTI_VALUE_ELEMTS));
     properties.clearProperty(getKeyFor(column, TOTAL_NUMBER_OF_ENTRIES));
     properties.clearProperty(getKeyFor(column, IS_AUTO_GENERATED));

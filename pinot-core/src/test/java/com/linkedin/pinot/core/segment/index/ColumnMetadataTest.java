@@ -213,6 +213,7 @@ public class ColumnMetadataTest {
       ColumnMetadata column = metadata.getColumnMetadataFor("column7_hllSuffix");
       Assert.assertEquals(column.getDerivedMetricType(), MetricFieldSpec.DerivedMetricType.HLL);
       Assert.assertEquals(column.getOriginColumnName(), "column7");
+      Assert.assertEquals(column.isSelectStarVisible(), false);
     } finally {
       if (helper != null) {
         helper.cleanTempDir();

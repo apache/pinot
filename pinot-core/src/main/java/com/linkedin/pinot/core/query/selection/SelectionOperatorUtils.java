@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.query.selection;
 
+import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
@@ -149,9 +150,8 @@ public class SelectionOperatorUtils {
       List<String> allColumns = new ArrayList<>();
       for (String column: indexSegment.getColumnNames()) {
         FieldSpec spec = indexSegment.getSegmentMetadata().getSchema().getFieldSpecFor(column);
-        if (spec instanceof MetricFieldSpec && ((MetricFieldSpec) spec).isDerivedMetric()) {
-          // skip derived metric column
-        } else {
+        Preconditions.checkNotNull(spec, "FieldSpec for column: " + column + " is null.");
+        if (spec.isSelectStarVisible()) {
           allColumns.add(column);
         }
       }

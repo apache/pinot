@@ -148,9 +148,10 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
           throw new IllegalArgumentException(
               "Cannot add derived field: " + derivedFieldName + " since it already exists in schema.");
         } else {
-          dataSchema.addField(
-              new MetricFieldSpec(derivedFieldName, FieldSpec.DataType.STRING, hllConfig.getHllFieldSize(),
-                  MetricFieldSpec.DerivedMetricType.HLL));
+          MetricFieldSpec hllDerivedMetricFieldSpec = new MetricFieldSpec(derivedFieldName, FieldSpec.DataType.STRING,
+              hllConfig.getHllFieldSize(), MetricFieldSpec.DerivedMetricType.HLL);
+          hllDerivedMetricFieldSpec.setSelectStarVisible(false);
+          dataSchema.addField(hllDerivedMetricFieldSpec);
         }
       }
     }

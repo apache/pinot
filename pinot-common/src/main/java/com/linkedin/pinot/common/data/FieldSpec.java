@@ -49,6 +49,7 @@ public abstract class FieldSpec {
   private String _name;
   private DataType _dataType;
   private boolean _isSingleValueField = true;
+  private boolean _isSelectStarVisible = true;
   private String _stringDefaultNullValue;
   private Object _cachedDefaultNullValue;
 
@@ -101,6 +102,14 @@ public abstract class FieldSpec {
 
   public void setSingleValueField(boolean isSingleValueField) {
     _isSingleValueField = isSingleValueField;
+  }
+
+  public boolean isSelectStarVisible() {
+    return _isSelectStarVisible;
+  }
+
+  public void setSelectStarVisible(boolean isSelectStarVisible) {
+    _isSelectStarVisible = isSelectStarVisible;
   }
 
   public Object getDefaultNullValue() {
