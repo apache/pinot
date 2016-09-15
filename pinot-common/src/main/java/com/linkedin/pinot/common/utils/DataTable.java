@@ -16,7 +16,6 @@
 package com.linkedin.pinot.common.utils;
 
 import com.linkedin.pinot.common.Utils;
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.response.ProcessingException;
 import com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema;
 import java.io.ByteArrayInputStream;
@@ -25,7 +24,6 @@ import java.io.Closeable;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.io.ObjectInputStream;
 import java.io.ObjectOutput;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
@@ -44,21 +42,45 @@ import org.slf4j.LoggerFactory;
  * Read only Datatable. Use DataTableBuilder to build the data table
  */
 public class DataTable {
+  private static final Logger LOGGER = LoggerFactory.getLogger(DataTable.class);
 
   public static final String EXCEPTION_METADATA_KEY = "Exception";
-
   private static final Charset UTF8 = Charset.forName("UTF-8");
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(DataTable.class);
+  // Data Table version
+  public enum Version {
+    V1(1), // Keep the value of '1' for backward compatibility
+    V2(2);
+
+    private int value;
+
+    Version(int value) {
+      this.value = value;
+    }
+
+    public static Version valueOf(int versionNum) {
+      // Only two elements, so OK to linear search, v.s. overhead of maintaining & looking up map.
+      for (Version version : values()) {
+        if (version.value == versionNum) {
+          return version;
+        }
+      }
+      throw new IllegalArgumentException("Illegal value for version " + versionNum);
+    }
+
+    public int getValue() {
+      return value;
+    }
+  }
+
+  private final DataTableSerDe dataTableSerDe;
+  private final Version version;
 
   int numRows;
 
   int numCols;
 
   DataSchema schema;
-
-  static int VERSION_1 = 1;
-  static int VERSION = VERSION_1;
 
   private Map<String, Map<Integer, String>> dictionary;
 
@@ -86,8 +108,11 @@ public class DataTable {
    * @param variableSizeDataBytes
    * @throws Exception
    */
-  public DataTable(int numRows, Map<String, Map<Integer, String>> dictionary, Map<String, String> metadata,
-      DataSchema schema, byte[] fixedSizeDataBytes, byte[] variableSizeDataBytes) throws Exception {
+  public DataTable(Version version, int numRows, Map<String, Map<Integer, String>> dictionary,
+      Map<String, String> metadata, DataSchema schema, byte[] fixedSizeDataBytes, byte[] variableSizeDataBytes)
+      throws Exception {
+    this.dataTableSerDe = DataTableSerDeRegistry.getInstance().get();
+    this.version = version;
     this.numRows = numRows;
     this.dictionary = dictionary;
     this.metadata = metadata;
@@ -105,6 +130,8 @@ public class DataTable {
    * @param metadata
    */
   public DataTable(Map<String, String> metadata) {
+    dataTableSerDe = DataTableSerDeRegistry.getInstance().get();
+    this.version = deriveVersionFromDataTableSerDe(dataTableSerDe);
     this.metadata = metadata;
   }
 
@@ -119,7 +146,7 @@ public class DataTable {
     }
     final int[] columnOffsets = new int[schema.columnNames.length];
     for (int i = 0; i < schema.columnNames.length; i++) {
-      final DataType type = schema.columnTypes[i];
+      final com.linkedin.pinot.common.data.FieldSpec.DataType type = schema.columnTypes[i];
       columnOffsets[i] = rowSizeInBytes;
       switch (type) {
         case BOOLEAN:
@@ -175,18 +202,15 @@ public class DataTable {
    * @param buffer
    */
   public DataTable(byte[] buffer) {
-
     final ByteBuffer input = ByteBuffer.wrap(buffer);
+    dataTableSerDe = DataTableSerDeRegistry.getInstance().get();
 
-    final int version = input.getInt();
-    if (version == VERSION_1) {
-      decodeV1(input);
-      return;
-    }
-    throw new RuntimeException("Unknown version of DataTable encoding:" + version);
+    // Assert that version can be de-serialized.
+    version = Version.valueOf(input.getInt());
+    deserializeDataTable(input);
   }
 
-  private void decodeV1(ByteBuffer input) {
+  private void deserializeDataTable(ByteBuffer input) {
     numRows = input.getInt();
     numCols = input.getInt();
     // READ dictionary
@@ -254,6 +278,8 @@ public class DataTable {
 
   public DataTable() {
     // Used for empty results.
+    dataTableSerDe = DataTableSerDeRegistry.getInstance().get();
+    version = deriveVersionFromDataTableSerDe(dataTableSerDe);
     metadata = new HashMap<String, String>();
     metadata.put("numDocsScanned", "0");
     metadata.put("totalDocs", "0");
@@ -261,15 +287,35 @@ public class DataTable {
   }
 
   /**
-   *
+   * Helper method to derive version based on the registered DataTableSer/de.
+   * <p> - Version is derived to be V1 if DataTableJavaSerDe is registered.</p>
+   * <p> - Checks for class equality instead of 'instanceof' as other ser/de's can be derived
+   *       from {@link DataTableJavaSerDe}</p>
    * @return
+   */
+  public static Version deriveVersionFromDataTableSerDe(DataTableSerDe dataTableSerDe) {
+    return (dataTableSerDe.getClass().equals(DataTableJavaSerDe.class)) ? Version.V1
+        : Version.V2;
+  }
+
+  /**
+   * Serialize the data table into a byte-array, using {@ref #Version.V1}
+   *
+   * @return Serialized byte-array
    * @throws Exception
    */
   public  byte[] toBytes() throws Exception {
-    return toBytes(VERSION_1);
+    return toBytes(version);
   }
 
-  private byte[] toBytes(int version) throws Exception {
+  /**
+   * Serialize the data table into a byte-array, as per the specified serialization.
+   *
+   * @param version Format version to use for serialization.
+   * @return Serialized byte-array
+   * @throws Exception
+   */
+  public byte[] toBytes(Version version) throws Exception {
     final byte[] dictionaryBytes = serializeDictionary();
     final byte[] metadataBytes = serializeMetadata();
     byte[] schemaBytes = new byte[0];
@@ -283,7 +329,8 @@ public class DataTable {
     // DICTIONARY, METADATA,
     // SCHEMA, DATATABLE, VARIABLE DATA BUFFER --> 4 + 4 + 4 + 5*8 = 52
     // bytes
-    out.writeInt(version);
+
+    out.writeInt(version.getValue());
     out.writeInt(numRows);
     out.writeInt(numCols);
     // dictionary
@@ -452,30 +499,6 @@ public class DataTable {
     }
     long end = System.nanoTime();
     return bytes;
-  }
-
-  @SuppressWarnings("unchecked")
-  private <T extends Serializable> T deserialize(byte[] value) {
-    long start = System.nanoTime();
-    final ByteArrayInputStream bais = new ByteArrayInputStream(value);
-    ObjectInputStream out = null;
-    Object readObject;
-    try {
-      try {
-        out = new ObjectInputStream(bais);
-        readObject = out.readObject();
-
-      } catch (final Exception e) {
-        LOGGER.error("Caught exception while deserializing DataTable", e);
-        return null;
-      }
-    } finally {
-      IOUtils.closeQuietly(out);
-      IOUtils.closeQuietly(bais);
-    }
-    long end = System.nanoTime();
-    return (T) readObject;
-
   }
 
   /**
@@ -749,9 +772,15 @@ public class DataTable {
   @SuppressWarnings("unchecked")
   public <T extends Serializable> T getObject(int rowId, int colId) {
     final int length = positionCursorInVariableBuffer(rowId, colId);
+
+    DataTableSerDe.DataType dataType = DataTableSerDe.DataType.Object;
+    if (version == Version.V2) {
+      dataType = DataTableSerDe.DataType.valueOf(variableSizeData.getInt());
+    }
+
     final byte[] serData = new byte[length];
     variableSizeData.get(serData);
-    return (T) deserialize(serData);
+    return (T) dataTableSerDe.deserialize(serData, dataType);
   }
 
   /**
@@ -779,7 +808,7 @@ public class DataTable {
     fixedSizeData.position(0);
     for (int rowId = 0; rowId < numRows; rowId++) {
       for (int colId = 0; colId < numCols; colId++) {
-        final DataType type = schema.columnTypes[colId];
+        final com.linkedin.pinot.common.data.FieldSpec.DataType type = schema.columnTypes[colId];
         switch (type) {
           case BOOLEAN:
             b.append(fixedSizeData.get());

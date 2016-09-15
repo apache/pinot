@@ -15,7 +15,9 @@
  */
 package com.linkedin.pinot.core.query.aggregation.function;
 
+import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import java.io.Serializable;
+import java.nio.ByteBuffer;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.util.List;
@@ -194,6 +196,29 @@ public class AvgAggregationFunction implements AggregationFunction<AvgPair, Doub
       } else {
         return "0.0";
       }
+    }
+
+    /**
+     * Helper method to serialize an AvgPair into a byte-array
+     * @return Serialized byte-array for the AvgPair.
+     */
+    public byte[] toBytes() {
+      int size = (V1Constants.Numbers.DOUBLE_SIZE) + (V1Constants.Numbers.LONG_SIZE);
+      ByteBuffer byteBuffer = ByteBuffer.allocate(size);
+      byteBuffer.putDouble(getFirst());
+      byteBuffer.putLong(getSecond());
+      return byteBuffer.array();
+    }
+
+    /**
+     * Helper method to de-serialize AvgPair from a byte-array
+     *
+     * @param bytes Serialized bytes of the AvgPair
+     * @return De-serialized AvgPair object from the byte-array
+     */
+    public static AvgPair fromBytes(byte[] bytes) {
+      ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+      return new AvgPair(byteBuffer.getDouble(), byteBuffer.getLong());
     }
   }
 

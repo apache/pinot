@@ -15,22 +15,17 @@
  */
 package com.linkedin.pinot.common.utils;
 
-import com.linkedin.pinot.common.Utils;
+import com.google.common.annotations.VisibleForTesting;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.Closeable;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.io.ObjectOutput;
-import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -78,9 +73,13 @@ import org.slf4j.LoggerFactory;
  */
 public class DataTableBuilder {
   private static final Logger LOGGER = LoggerFactory.getLogger(DataTableBuilder.class);
+
   /**
    * Initialize the datatable with metadata
    */
+
+  // Serializer/De-serializer for the DataTable.
+  private  DataTableSerDe dataTableSerDe;
 
   Map<String, Map<String, Integer>> dictionary;
 
@@ -130,8 +129,14 @@ public class DataTableBuilder {
   ByteHolder variableSizeDataHolder;
 
   boolean isOpen = false;
+  private DataTable.Version version;
 
   public DataTableBuilder(DataSchema schema) {
+    this.dataTableSerDe = DataTableSerDeRegistry.getInstance().get();
+
+    // Derive the version from the ser/de that is registered.
+    this.version = DataTable.deriveVersionFromDataTableSerDe(dataTableSerDe);
+
     this.schema = schema;
     this.metadata = new HashMap<String, String>();
     columnOffsets = new int[schema.columnNames.length];
@@ -323,11 +328,15 @@ public class DataTableBuilder {
    * @throws Exception
    */
   public void setColumn(int columnIndex, Object value) throws Exception {
-
-    byte[] bytes = new byte[0];
-    bytes = serializeObject(value);
+    byte[] bytes = dataTableSerDe.serialize(value);
     currentRowData.position(columnOffsets[columnIndex]);
     currentRowData.putInt(variableSizeDataHolder.position());
+
+    // For custom serialization, we need to write the object type as well.
+    if (version == DataTable.Version.V2) {
+      variableSizeDataHolder.add(dataTableSerDe.getObjectType(value).getValue());
+    }
+
     variableSizeDataHolder.add(bytes);
     currentRowData.putInt(bytes.length);
   }
@@ -469,32 +478,6 @@ public class DataTableBuilder {
 
   /**
    *
-   * @param value
-   * @return
-   */
-  private byte[] serializeObject(Object value) {
-    byte[] bytes;
-    ByteArrayOutputStream bos = new ByteArrayOutputStream();
-    ObjectOutput out = null;
-
-    try {
-      try {
-        out = new ObjectOutputStream(bos);
-        out.writeObject(value);
-      } catch (IOException e) {
-        LOGGER.error("Caught exception", e);
-        Utils.rethrowException(e);
-      }
-      bytes = bos.toByteArray();
-    } finally {
-      IOUtils.closeQuietly((Closeable) out);
-      IOUtils.closeQuietly(bos);
-    }
-    return bytes;
-  }
-
-  /**
-   *
    * @throws Exception
    */
   public void finishRow() throws Exception {
@@ -523,8 +506,7 @@ public class DataTableBuilder {
    * @throws Exception
    */
   public DataTable build() throws Exception {
-
-    return new DataTable(currentRowId, reverseDictionary, metadata, schema, fixedSizeDataHolder.toBytes(),
+    return new DataTable(version, currentRowId, reverseDictionary, metadata, schema, fixedSizeDataHolder.toBytes(),
         variableSizeDataHolder.toBytes());
   }
 
@@ -579,10 +561,10 @@ public class DataTableBuilder {
         dos.writeInt(bytes.length);
         dos.write(bytes);
       }
-      //write the DataTypes, 
+      // Write the DataTypes
       for (int i = 0; i < length; i++) {
-        //we don't want to use ordinal of the enum (even though its reduces the data size) 
-        //since adding a new data type will break things if server and broker use different versions of DataType class.
+        // We don't want to use ordinal of the enum (even though its reduces the data size)
+        // since adding a new data type will break things if server and broker use different versions of DataType class.
         byte[] bytes = columnTypes[i].name().getBytes();
         dos.writeInt(bytes.length);
         dos.write(bytes);
@@ -724,5 +706,18 @@ public class DataTableBuilder {
       baos.flush();
       return baos.toByteArray();
     }
+  }
+
+  /**
+   * Helper method to set the data table ser/de, only used for
+   * testing backward compatibility. DataTable ser/de should always be
+   * queried from {@link DataTableSerDeRegistry}
+   *
+   * @param dataTableSerDe Ser/De to set.
+   */
+  @VisibleForTesting
+  protected void setDataTableSerDe(DataTableSerDe dataTableSerDe) {
+    this.dataTableSerDe = dataTableSerDe;
+    this.version = DataTable.deriveVersionFromDataTableSerDe(dataTableSerDe);
   }
 }
