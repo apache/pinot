@@ -113,10 +113,6 @@
       <groupId>mysql</groupId>
       <artifactId>mysql-connector-java</artifactId>
     </dependency>
-    <dependency>
-     <groupId>org.hibernate</groupId>
-     <artifactId>hibernate-c3p0</artifactId>
-   </dependency>
     <!-- TODO: restructure this -->
     <dependency>
       <groupId>org.modelmapper</groupId>

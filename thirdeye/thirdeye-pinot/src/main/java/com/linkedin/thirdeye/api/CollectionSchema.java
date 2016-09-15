@@ -7,12 +7,10 @@ import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.linkedin.thirdeye.dashboard.configs.AbstractConfig;
 
-@JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, include = JsonTypeInfo.As.PROPERTY, property = "@class")
-@JsonIgnoreProperties(value = "configType")
-public final class CollectionSchema extends AbstractConfig{
+@JsonIgnoreProperties(ignoreUnknown = true)
+public final class CollectionSchema extends AbstractConfig {
 
   private String collection;
   private List<DimensionSpec> dimensions;

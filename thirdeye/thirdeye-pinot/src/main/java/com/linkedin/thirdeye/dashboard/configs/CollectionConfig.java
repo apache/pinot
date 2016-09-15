@@ -1,10 +1,12 @@
 package com.linkedin.thirdeye.dashboard.configs;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.util.List;
 import java.util.Map;
 
 import com.linkedin.thirdeye.client.MetricExpression;
 
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class CollectionConfig extends AbstractConfig {
 
   public static double DEFAULT_THRESHOLD = 0.01;

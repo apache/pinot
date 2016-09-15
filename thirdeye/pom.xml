@@ -49,7 +49,6 @@
     <guice-persist.version>4.1.0</guice-persist.version>
     <hibernate-jpa-2.1-api.version>1.0.0.Final</hibernate-jpa-2.1-api.version>
     <hibernate-entirymanager.version>4.3.10.Final</hibernate-entirymanager.version>
-    <hibernate-c3p0.version>4.3.10.Final</hibernate-c3p0.version>
   </properties>
 
   <build>
@@ -274,11 +273,6 @@
         <groupId>org.hibernate</groupId>
         <artifactId>hibernate-entitymanager</artifactId>
         <version>${hibernate-entirymanager.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.hibernate</groupId>
-        <artifactId>hibernate-c3p0</artifactId>
-        <version>${hibernate-c3p0.version}</version>
       </dependency>
 
       <!-- test dependencies -->

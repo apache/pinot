@@ -3,13 +3,10 @@ package com.linkedin.thirdeye.dashboard.configs;
 import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.linkedin.thirdeye.client.MetricExpression;
 
-@JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, include = JsonTypeInfo.As.PROPERTY, property = "@class")
-@JsonIgnoreProperties(value = "configType")
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class DashboardConfig extends AbstractConfig {
-
 
   public DashboardConfig() {
   }

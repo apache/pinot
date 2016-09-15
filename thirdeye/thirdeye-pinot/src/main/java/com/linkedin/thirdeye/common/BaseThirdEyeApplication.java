@@ -46,5 +46,4 @@ public abstract class BaseThirdEyeApplication<T extends Configuration> extends A
     webappConfigDAO = PersistenceUtil.getInstance(WebappConfigManagerImpl.class);
     anomalyMergedResultDAO = PersistenceUtil.getInstance(MergedAnomalyResultManagerImpl.class);
   }
-
 }
