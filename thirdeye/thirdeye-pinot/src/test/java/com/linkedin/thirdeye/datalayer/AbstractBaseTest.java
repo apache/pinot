@@ -27,7 +27,7 @@ public class AbstractBaseTest {
     ds = DaoProviderUtil.getDataSource();
     cleanUp();
   }
-  
+
   @AfterClass
   public void cleanUp() throws Exception {
     try (Connection conn = ds.getConnection()) {
@@ -36,7 +36,7 @@ public class AbstractBaseTest {
       scriptRunner.runScript(new FileReader(deleteSchemaUrl.getFile()));
     }
   }
-  
+
   @BeforeClass(dependsOnMethods = "init")
   public void initDB() throws Exception {
     try (Connection conn = ds.getConnection()) {
@@ -47,8 +47,6 @@ public class AbstractBaseTest {
       scriptRunner.runScript(new FileReader(createSchemaUrl.getFile()));
     }
   }
-
-
 
   protected AnomalyFunctionDTO getTestFunctionSpec(String metricName, String collection) {
     AnomalyFunctionDTO functionSpec = new AnomalyFunctionDTO();
