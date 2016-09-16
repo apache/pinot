@@ -533,6 +533,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     _finalOffset = endOffset;
     _consumeEndTime = now() + timeoutMs;
     _state = State.CONSUMING_TO_ONLINE;
+    _receivedStop = false;
     consumeLoop();
     if (_currentOffset != endOffset) {
       // Timeout?
