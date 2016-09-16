@@ -120,6 +120,9 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
   }
   private static final Logger LOGGER = LoggerFactory.getLogger(LLRealtimeSegmentDataManager.class);
   private static final int KAFKA_MAX_FETCH_TIME_MILLIS = 1000;
+  private static final long TIME_THRESHOLD_FOR_LOG_MINUTES = 1;
+  private static final long TIME_EXTENSION_ON_EMPTY_SEGMENT_HOURS = 1;
+  private static final int MSG_COUNT_THRESHOLD_FOR_LOG = 100000;
 
   private final LLCRealtimeSegmentZKMetadata _segmentZKMetadata;
   private final AbstractTableConfig _tableConfig;
@@ -162,6 +165,11 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
   private AtomicLong _lastUpdatedRawDocuments = new AtomicLong(0);
   private final String _instance;
   private final ServerSegmentCompletionProtocolHandler _protocolHandler;
+  private final long _consumeStartTime;
+  private final long _startOffset;
+
+  private long _lastLogTime = 0;
+  private int _lastConsumedCount = 0;
 
 
   // TODO each time this method is called, we print reason for stop. Good to print only once.
@@ -174,6 +182,11 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
         // We need to consume as much data as available, until we have either reached the max number of rows or
         // the max time we are allowed to consume.
         if (now >= _consumeEndTime) {
+          if (_realtimeSegment.getRawDocumentCount() == 0) {
+            segmentLogger.info("No events came in, extending time by {} hours", TIME_EXTENSION_ON_EMPTY_SEGMENT_HOURS);
+            _consumeEndTime += TimeUnit.HOURS.toMillis(TIME_EXTENSION_ON_EMPTY_SEGMENT_HOURS);
+            return false;
+          }
           segmentLogger.info("Stopping consumption due to time limit start={} now={} numRows={}", _startTimeMs, now, _numRowsConsumed);
           return true;
         } else if (_numRowsConsumed >= _segmentMaxRowCount) {
@@ -221,7 +234,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
 
   protected void consumeLoop() {
     final long _endOffset = Long.MAX_VALUE; // No upper limit on Kafka offset
-    segmentLogger.info("Starting consumption loop start offset {}, end offset {}", _currentOffset, _endOffset);
+    segmentLogger.info("Starting consumption loop start offset {}, finalOffset {}", _currentOffset, _finalOffset);
     while(!_receivedStop && !endCriteriaReached()) {
       // Consume for the next _kafkaReadTime ms, or we get to final offset, whichever happens earlier,
       // Update _currentOffset upon return from this method
@@ -256,9 +269,9 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
         _currentOffset = messageAndOffset.nextOffset();
         _numRowsConsumed++;
       }
+      updateCurrentDocumentCountMetrics();
       if (batchSize != 0) {
         segmentLogger.debug("Indexed {} messages current offset {}", batchSize, _currentOffset);
-        updateCurrentDocumentCountMetrics();
       } else {
         // If there were no messages to be fetched from Kafka, wait for a little bit as to avoid hammering the
         // Kafka broker
@@ -440,9 +453,12 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     long timeoutMs =_maxTimeForConsumingToOnlineSec * 1000L;
     LLCRealtimeSegmentZKMetadata llcMetadata = (LLCRealtimeSegmentZKMetadata)metadata;
     final long endOffset = llcMetadata.getEndOffset();
+    segmentLogger.info("State: {}, transitioning from CONSUMING to ONLINE (startOffset: {}, endOffset: {})",
+        _state.toString(), _startOffset, endOffset);
     stop(timeoutMs);
     long now = now();
     timeoutMs -= (now - transitionStartTimeMs);
+    segmentLogger.info("Consumer thread stopped in state {}. Time remaining to catchup: {}ms", _state.toString(), timeoutMs);
     if (timeoutMs <= 0) {
       // we could not get it to stop. Throw an exception and let it go to error state.
       throw new RuntimeException("Could not get to stop consumer thread" + _consumerThread);
@@ -452,28 +468,39 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
       case COMMITTED:
       case RETAINED:
         // Nothing to do. we already built local segment and swapped it with in-memory data.
+        segmentLogger.info("State {}. Nothing to do", _state.toString());
         break;
       case DISCARDED:
       case ERROR:
+        segmentLogger.info("State {}. Downloading to replace", _state.toString());
         downloadSegmentAndReplace(llcMetadata);
         break;
       case CATCHING_UP:
       case HOLDING:
+      case INITIAL_CONSUMING:
         // Allow to catch up upto final offset, and then replace.
         if (_currentOffset > endOffset) {
           // We moved ahead of the offset that is committed in ZK.
-          segmentLogger.warn("Current offset {} ahead of the offset in zk {}", _currentOffset, endOffset);
+          segmentLogger.warn("Current offset {} ahead of the offset in zk {}. Downloading to replace", _currentOffset,
+              endOffset);
           downloadSegmentAndReplace(llcMetadata);
+        } else if (_currentOffset == endOffset) {
+          segmentLogger.info("Current offset {} matches offset in zk {}. Replacing segment", _currentOffset, endOffset);
+          buildSegmentAndReplace();
         } else {
+          segmentLogger.info("Attempting to catch up from offset {} to {} ", _currentOffset, endOffset);
           boolean success = catchupToFinalOffset(endOffset, timeoutMs);
           if (success) {
+            segmentLogger.info("Caught up to offset {}", _currentOffset);
             buildSegmentAndReplace();
           } else {
+            segmentLogger.info("Could not catch up to offset (current = {}). Downloading to replace", _currentOffset);
             downloadSegmentAndReplace(llcMetadata);
           }
         }
         break;
       default:
+        segmentLogger.info("Downloading to replace segment while in state {}", _state.toString());
         downloadSegmentAndReplace(llcMetadata);
         break;
     }
@@ -489,7 +516,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
           tempFile.length());
       TarGzCompressionUtils.unTar(tempFile, tempSegmentFolder);
       FileUtils.deleteQuietly(tempFile);
-      FileUtils.moveDirectory(tempSegmentFolder, new File(_resourceTmpDir, _segmentNameStr));
+      FileUtils.moveDirectory(tempSegmentFolder.listFiles()[0], new File(_resourceDataDir, _segmentNameStr));
       _realtimeTableDataManager.replaceLLSegment(_segmentNameStr);
     } catch (Exception e) {
       throw new RuntimeException(e);
@@ -523,6 +550,11 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
       segmentLogger.error("Could not stop consumer thread");
     }
     _realtimeSegment.destroy();
+    try {
+      _consumerWrapper.close();
+    } catch (Exception e) {
+      segmentLogger.warn("Could not close consumer wrapper", e);
+    }
   }
 
   protected void start() {
@@ -613,13 +645,16 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     _fieldExtractor = (PlainFieldExtractor) FieldExtractorFactory.getPlainFieldExtractor(schema);
     _consumerWrapper = SimpleConsumerWrapper.forPartitionConsumption(new KafkaSimpleConsumerFactoryImpl(),
         bootstrapNodes, _clientId, _kafkaTopic, _kafkaPartitionId);
-    _currentOffset = _segmentZKMetadata.getStartOffset();
+    _startOffset = _segmentZKMetadata.getStartOffset();
+    _currentOffset = _startOffset;
     _resourceTmpDir = new File(resourceDataDir, "_tmp");
     if (!_resourceTmpDir.exists()) {
       _resourceTmpDir.mkdirs();
     }
     _state = State.INITIAL_CONSUMING;
-    _consumeEndTime = now() + kafkaStreamProviderConfig.getTimeThresholdToFlushSegment();
+    long now = now();
+    _consumeStartTime = now;
+    _consumeEndTime = now + kafkaStreamProviderConfig.getTimeThresholdToFlushSegment();
     start();
   }
 
@@ -659,6 +694,16 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     _serverMetrics.addValueToTableGauge(_tableName, ServerGauge.DOCUMENT_COUNT, (currentRawDocs - _lastUpdatedRawDocuments
         .get()));
     _lastUpdatedRawDocuments.set(currentRawDocs);
+    final long now = now();
+    final int rowsConsumed = _numRowsConsumed - _lastConsumedCount;
+    final long prevTime = _lastConsumedCount == 0 ? _consumeStartTime : _lastLogTime;
+    // Log every minute or 100k events
+    if (now - prevTime > TimeUnit.MINUTES.toMillis(TIME_THRESHOLD_FOR_LOG_MINUTES) || rowsConsumed >= MSG_COUNT_THRESHOLD_FOR_LOG) {
+      segmentLogger.info("Consumed {} events from (rate:{}/s)", rowsConsumed,
+            (float) (rowsConsumed) * 1000 / (now - prevTime));
+      _lastConsumedCount = _numRowsConsumed;
+      _lastLogTime = now;
+    }
   }
 
   @Override
