@@ -16,6 +16,8 @@
 package com.linkedin.pinot.core.util;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
+import com.linkedin.pinot.common.metrics.BrokerMeter;
+import com.linkedin.pinot.common.metrics.BrokerMetrics;
 import com.linkedin.pinot.common.utils.primitive.MutableLongValue;
 import com.linkedin.pinot.common.utils.DataTableJavaSerDe;
 import com.linkedin.pinot.core.query.aggregation.function.AvgAggregationFunction;
@@ -46,6 +48,26 @@ import org.slf4j.LoggerFactory;
  */
 public class DataTableCustomSerDe extends DataTableJavaSerDe {
   private static final Logger LOGGER = LoggerFactory.getLogger(DataTableCustomSerDe.class);
+  private BrokerMetrics _brokerMetrics;
+
+  /**
+   * Default constructor for the class.
+   */
+  public DataTableCustomSerDe() {
+    _brokerMetrics = null;
+  }
+
+  /**
+   * Constructor for the class, registers the broker metrics to emit a metric each time
+   * we hit a Java serialization/de-serialization, as the goal is to catch all of them
+   * and replace with custom ser/de.
+   *
+   * @param brokerMetrics Broker metrics
+   */
+  public DataTableCustomSerDe(BrokerMetrics brokerMetrics) {
+    _brokerMetrics = brokerMetrics;
+    _brokerMetrics.addMeteredGlobalValue(BrokerMeter.DATA_TABLE_OBJECT_DESERIALIZATION, 0);
+  }
 
   /**
    *
@@ -66,7 +88,15 @@ public class DataTableCustomSerDe extends DataTableJavaSerDe {
    */
   @Override
   public <T extends Serializable> T deserialize(byte[] bytes, DataType dataType) {
-    return deserializeObject(bytes, dataType);
+    T object = deserializeObject(bytes, dataType);
+
+    if (dataType == DataType.Object) {
+      if (_brokerMetrics != null) {
+        _brokerMetrics.addMeteredGlobalValue(BrokerMeter.DATA_TABLE_OBJECT_DESERIALIZATION, 1);
+      }
+      LOGGER.warn("Identified Java serialized object in data table {}", object.getClass().getName());
+    }
+    return object;
   }
 
   @SuppressWarnings("unchecked")
