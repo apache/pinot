@@ -209,73 +209,74 @@ public class UserRuleAnomalyFunction extends BaseAnomalyFunction {
       List<Double> currentValues, double threshold, String baselineProp) {
 
     int anomalyResultsSize = anomalyResults.size();
+    // if minConsecutiveSize is more than 1, create groups of consecutive anomalies
     if (minConsecutiveSize > 1) {
-      List<RawAnomalyResultDTO> anomalyResultsAggregated = new ArrayList<>();
-
+      List<RawAnomalyResultDTO> filteredAndMergedAnomalies = new ArrayList<>();
+      // if number of anomalies >= minConsecutiveSize, only then check, else pass empty results
       if (anomalyResultsSize >= minConsecutiveSize) {
-        int remainingSize = anomalyResultsSize;
-
-        List<RawAnomalyResultDTO> currentConsecutiveResults = new ArrayList<>();
-        List<Double> consecutiveCurrentValues = new ArrayList<>();
-        List<Double> consecutiveBaselineValues = new ArrayList<>();
-
-        int n = -1;
-        for (RawAnomalyResultDTO anomalyResult : anomalyResults) {
-          n++;
-          if (currentConsecutiveResults.isEmpty()) {
-            currentConsecutiveResults.add(anomalyResult);
-            consecutiveCurrentValues.add(currentValues.get(n));
-            consecutiveBaselineValues.add(baselineValues.get(n));
-            remainingSize--;
-          } else {
-            RawAnomalyResultDTO lastConsecutiveAnomalyResult =
-                currentConsecutiveResults.get(currentConsecutiveResults.size() - 1);
-            long lastStartTime = lastConsecutiveAnomalyResult.getStartTime();
-            long currentStarTime = anomalyResult.getStartTime();
-
-            if ((lastStartTime + bucketMillis) == currentStarTime) {
-              currentConsecutiveResults.add(anomalyResult);
-              consecutiveCurrentValues.add(currentValues.get(n));
-              consecutiveBaselineValues.add(baselineValues.get(n));
-              remainingSize--;
-
-              // End of loop. Last element.
-              if (remainingSize == 0) {
-                anomalyResultsAggregated.add(getMergedAnomalyResults(currentConsecutiveResults,
-                    consecutiveBaselineValues, consecutiveCurrentValues, threshold, baselineProp));
-              }
-
-            } else {
-
-              if (currentConsecutiveResults.size() >= minConsecutiveSize) {
-                // Current consecutives have been all added.
-                anomalyResultsAggregated.add(getMergedAnomalyResults(currentConsecutiveResults,
-                    consecutiveBaselineValues, consecutiveCurrentValues, threshold, baselineProp));
-              }
-
-              // Condition for start collecting new consecutives.
-              if (remainingSize >= minConsecutiveSize) {
-                // Reset current consecutive results. Start collecting new consecutives.
-                currentConsecutiveResults.clear();
-                consecutiveCurrentValues.clear();
-                consecutiveBaselineValues.clear();
-
-                currentConsecutiveResults.add(anomalyResult);
-                consecutiveCurrentValues.add(currentValues.get(n));
-                consecutiveBaselineValues.add(baselineValues.get(n));
-                remainingSize--;
-              } else {
-                break;
-
-              }
+        List<RawAnomalyResultDTO> consecutiveAnomalies = new ArrayList<>();
+        List<Double> consecutiveBaselines = new ArrayList<>();
+        List<Double> consecutiveCurrents = new ArrayList<>();
+        int count = -1;
+        for (RawAnomalyResultDTO currentAnomaly : anomalyResults) {
+          count++;
+          // if consecutiveAnomalies container empty, add this anomaly to container
+          if (consecutiveAnomalies.isEmpty()) {
+            consecutiveAnomalies.add(currentAnomaly);
+            consecutiveBaselines.add(baselineValues.get(count));
+            consecutiveCurrents.add(currentValues.get(count));
+            continue;
+          }
+          // if consecutive, add this anomaly to consecutiveAnomalies container
+          RawAnomalyResultDTO previousAnomaly = consecutiveAnomalies.get(consecutiveAnomalies.size() - 1);
+          if (isConsecutiveAnomaly(previousAnomaly, currentAnomaly, bucketMillis)) {
+            consecutiveAnomalies.add(currentAnomaly);
+            consecutiveBaselines.add(baselineValues.get(count));
+            consecutiveCurrents.add(currentValues.get(count));
+          } else { // else if not consecutive,
+            // check if got more than minConsecutive in consecutiveAnomalies container
+            if (hasMinConsecutive(consecutiveAnomalies, minConsecutiveSize)) {
+              // if yes, add this container to main list
+              filteredAndMergedAnomalies.add(getMergedAnomalyResults(consecutiveAnomalies, consecutiveBaselines,
+                  consecutiveCurrents, threshold, baselineProp));
             }
+            // create new container and add this anomaly
+            consecutiveAnomalies = new ArrayList<>();
+            consecutiveBaselines = new ArrayList<>();
+            consecutiveCurrents = new ArrayList<>();
+            consecutiveAnomalies.add(currentAnomaly);
+            consecutiveBaselines.add(baselineValues.get(count));
+            consecutiveCurrents.add(currentValues.get(count));
           }
         }
+        // in the end, check if container has more than minConsecutive remaining, if yes add to main list
+        if (hasMinConsecutive(consecutiveAnomalies, minConsecutiveSize)) {
+          filteredAndMergedAnomalies.add(getMergedAnomalyResults(consecutiveAnomalies, consecutiveBaselines,
+              consecutiveCurrents, threshold, baselineProp));
+        }
       }
-      return anomalyResultsAggregated;
-    } else {
+      return filteredAndMergedAnomalies;
+    } else { // if minConsecutiveSize <=1, just return the existing anomalies as is
       return anomalyResults;
     }
+  }
+
+  private boolean isConsecutiveAnomaly(RawAnomalyResultDTO prevAnomaly, RawAnomalyResultDTO currentAnomaly, long bucketMillis) {
+    boolean isConsecutive = false;
+    long prevStartTime = prevAnomaly.getStartTime();
+    long currentStartTime = currentAnomaly.getStartTime();
+    if (!prevAnomaly.isDataMissing() && !currentAnomaly.isDataMissing() && (prevStartTime + bucketMillis) == currentStartTime) {
+      isConsecutive = true;
+    }
+    return isConsecutive;
+  }
+
+  private boolean hasMinConsecutive(List<RawAnomalyResultDTO> consecutiveAnomalies, int minConsecutive) {
+    boolean hasMinConsecutive = false;
+    if (consecutiveAnomalies.size() >= minConsecutive) {
+      hasMinConsecutive = true;
+    }
+    return hasMinConsecutive;
   }
 
   private String getAnomalyResultMessage(double threshold, String baselineProp,
