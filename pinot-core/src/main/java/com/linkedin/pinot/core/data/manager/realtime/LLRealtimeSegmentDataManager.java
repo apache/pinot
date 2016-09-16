@@ -453,7 +453,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     long timeoutMs =_maxTimeForConsumingToOnlineSec * 1000L;
     LLCRealtimeSegmentZKMetadata llcMetadata = (LLCRealtimeSegmentZKMetadata)metadata;
     final long endOffset = llcMetadata.getEndOffset();
-    segmentLogger.info("State: {}, transitioning from CONSUMING to ONLINE (startOffset: {}, endOffset: {}",
+    segmentLogger.info("State: {}, transitioning from CONSUMING to ONLINE (startOffset: {}, endOffset: {})",
         _state.toString(), _startOffset, endOffset);
     stop(timeoutMs);
     long now = now();
@@ -481,8 +481,12 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
         // Allow to catch up upto final offset, and then replace.
         if (_currentOffset > endOffset) {
           // We moved ahead of the offset that is committed in ZK.
-          segmentLogger.warn("Current offset {} ahead of the offset in zk {}. Downloading to replace", _currentOffset, endOffset);
+          segmentLogger.warn("Current offset {} ahead of the offset in zk {}. Downloading to replace", _currentOffset,
+              endOffset);
           downloadSegmentAndReplace(llcMetadata);
+        } else if (_currentOffset == endOffset) {
+          segmentLogger.info("Current offset {} matches offset in zk {}. Replacing segment", _currentOffset, endOffset);
+          buildSegmentAndReplace();
         } else {
           segmentLogger.info("Attempting to catch up from offset {} to {} ", _currentOffset, endOffset);
           boolean success = catchupToFinalOffset(endOffset, timeoutMs);
