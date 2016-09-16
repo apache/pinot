@@ -49,10 +49,14 @@ import javax.annotation.Nullable;
  * <code>ORDER BY</code>.
  * <p>Expected behavior:
  * <ul>
- * <li>Return selection results with the same order of columns as user passed in.</li>
- * <ul><li>Eg. <code>SELECT colB, colA, colC FROM table -> [valB, valA, valC]</code></li></ul>
- * <li>For <code>'SELECT *'</code>, return columns with alphabetically order.</li>
- * <ul><li>Eg. <code>SELECT * FROM table -> [valA, valB, valC]</code></li></ul>
+ *   <li>Return selection results with the same order of columns as user passed in.</li>
+ *   <ul>
+ *     <li>Eg. <code>SELECT colB, colA, colC FROM table -> [valB, valA, valC]</code></li>
+ *   </ul>
+ *   <li>For <code>'SELECT *'</code>, return columns with alphabetically order.</li>
+ *   <ul>
+ *     <li>Eg. <code>SELECT * FROM table -> [valA, valB, valC]</code></li>
+ *   </ul>
  * </ul>
  */
 public class SelectionOperatorUtils {
