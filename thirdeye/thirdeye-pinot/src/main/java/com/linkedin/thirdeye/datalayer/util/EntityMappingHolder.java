@@ -33,17 +33,22 @@ public class EntityMappingHolder {
     LinkedHashMap<String, ColumnInfo> columnInfoMap = new LinkedHashMap<>();
     tableToEntityNameMap.put(tableName, entityClass.getSimpleName());
     columnMappingPerTable.put(tableName, HashBiMap.create());
+    boolean foundTable = false;
     for (String tableNamePattern : new String[] {tableName.toLowerCase(),
         tableName.toUpperCase()}) {
       ResultSet rs =
           databaseMetaData.getColumns(catalog, schemaPattern, tableNamePattern, columnNamePattern);
       while (rs.next()) {
+        foundTable = true;
         String columnName = rs.getString(4);
         ColumnInfo columnInfo = new ColumnInfo();
         columnInfo.columnNameInDB = columnName.toLowerCase();
         columnInfo.sqlType = rs.getInt(5);
         columnInfoMap.put(columnName.toLowerCase(), columnInfo);
       }
+    }
+    if (!foundTable) {
+      throw new RuntimeException("Unable to find table:" + tableName);
     }
     List<Field> fields = new ArrayList<>();
     getAllFields(fields, entityClass);
