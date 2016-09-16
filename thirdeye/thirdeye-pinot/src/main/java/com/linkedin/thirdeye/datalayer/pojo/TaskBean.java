@@ -46,7 +46,7 @@ public class TaskBean extends AbstractBean {
   @Column(name = "task_end_time")
   private long endTime;
 
-  @Column(name = "task_info", nullable = false)
+  @Column(name = "task_info", nullable = false, length = 10000)
   private String taskInfo;
 
   @Column(name = "last_modified", insertable = false, updatable = false,

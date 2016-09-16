@@ -26,6 +26,7 @@ import com.linkedin.thirdeye.common.persistence.PersistenceConfig;
 import com.linkedin.thirdeye.common.persistence.PersistenceUtil;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.datalayer.ScriptRunner;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.AnomalyFunctionManagerImpl;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
 import com.linkedin.thirdeye.datalayer.dto.JobDTO;
@@ -33,11 +34,11 @@ import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 
 public abstract class AbstractManagerTestBase {
-  String implMode = "jdbc";
+  String implMode = "hibernate";
   protected AnomalyFunctionManager anomalyFunctionDAO;
-  protected RawAnomalyResultManager anomalyResultDAO;
-  protected JobManager anomalyJobDAO;
-  protected TaskManager anomalyTaskDAO;
+  protected RawAnomalyResultManager rawResultDAO;
+  protected JobManager jobDAO;
+  protected TaskManager taskDAO;
   protected EmailConfigurationManager emailConfigurationDAO;
   protected MergedAnomalyResultManager mergedResultDAO;
   protected WebappConfigManager webappConfigDAO;
@@ -53,6 +54,8 @@ public abstract class AbstractManagerTestBase {
     URL url = AbstractManagerTestBase.class.getResource("/persistence.yml");
     if (implMode.equalsIgnoreCase("jdbc")) {
       url = AbstractManagerTestBase.class.getResource("/persistence-local.yml");
+      File configFile = new File(url.toURI());
+      DaoProviderUtil.init(configFile);
     }
     File configFile = new File(url.toURI());
     configuration = PersistenceUtil.createConfiguration(configFile);
@@ -81,7 +84,7 @@ public abstract class AbstractManagerTestBase {
     ds.setInitialSize(10);
 
     // validate connection
-    ds.setValidationQuery("select 1 as dbcp_connection_test");
+    ds.setValidationQuery("select 1 from anomaly_jobs where 1=0");
     ds.setTestWhileIdle(true);
     ds.setTestOnBorrow(true);
 
@@ -96,6 +99,7 @@ public abstract class AbstractManagerTestBase {
 
   //JDBC related init/cleanup
   public void initJDBC() throws Exception {
+
     cleanUp();
     initDB();
     initManagers();
@@ -134,37 +138,39 @@ public abstract class AbstractManagerTestBase {
   public void initManagers() throws Exception {
     if (implMode.equals("hibernate")) {
       anomalyFunctionDAO = (AnomalyFunctionManager) PersistenceUtil
-          .getInstance(Class.forName(packagePrefix + implMode + ".AnomalyFunctionManagerImpl"));
-      anomalyResultDAO = (RawAnomalyResultManager) PersistenceUtil
-          .getInstance(Class.forName(packagePrefix + implMode + ".RawAnomalyResultManagerImpl"));
-      anomalyJobDAO = (JobManager) PersistenceUtil
-          .getInstance(Class.forName(packagePrefix + implMode + ".JobManagerImpl"));
-      anomalyTaskDAO = (TaskManager) PersistenceUtil
-          .getInstance(Class.forName(packagePrefix + implMode + ".TaskManagerImpl"));
+          .getInstance(com.linkedin.thirdeye.datalayer.bao.hibernate.AnomalyFunctionManagerImpl.class);
+      rawResultDAO = (RawAnomalyResultManager) PersistenceUtil
+          .getInstance(com.linkedin.thirdeye.datalayer.bao.hibernate.RawAnomalyResultManagerImpl.class);
+      jobDAO = (JobManager) PersistenceUtil
+          .getInstance(com.linkedin.thirdeye.datalayer.bao.hibernate.JobManagerImpl.class);
+      taskDAO = (TaskManager) PersistenceUtil
+          .getInstance(com.linkedin.thirdeye.datalayer.bao.hibernate.TaskManagerImpl.class);
       emailConfigurationDAO = (EmailConfigurationManager) PersistenceUtil
-          .getInstance(Class.forName(packagePrefix + implMode + ".EmailConfigurationManagerImpl"));
+          .getInstance(com.linkedin.thirdeye.datalayer.bao.hibernate.EmailConfigurationManagerImpl.class);
       mergedResultDAO = (MergedAnomalyResultManager) PersistenceUtil
-          .getInstance(Class.forName(packagePrefix + implMode + ".MergedAnomalyResultManagerImpl"));
+          .getInstance(com.linkedin.thirdeye.datalayer.bao.hibernate.MergedAnomalyResultManagerImpl.class);
       webappConfigDAO = (WebappConfigManager) PersistenceUtil
-          .getInstance(Class.forName(packagePrefix + implMode + ".WebappConfigManagerImpl"));
+          .getInstance(com.linkedin.thirdeye.datalayer.bao.hibernate.WebappConfigManagerImpl.class);
 
       entityManager = PersistenceUtil.getInstance(EntityManager.class);
     }
     if (implMode.equals("jdbc")) {
+      Class<AnomalyFunctionManagerImpl> c = com.linkedin.thirdeye.datalayer.bao.jdbc.AnomalyFunctionManagerImpl.class;
+     System.out.println(c);
       anomalyFunctionDAO = (AnomalyFunctionManager) DaoProviderUtil
-          .getInstance(Class.forName(packagePrefix + implMode + ".AnomalyFunctionManagerImpl"));
-      anomalyResultDAO = (RawAnomalyResultManager) DaoProviderUtil
-          .getInstance(Class.forName(packagePrefix + implMode + ".RawAnomalyResultManagerImpl"));
-      anomalyJobDAO = (JobManager) DaoProviderUtil
-          .getInstance(Class.forName(packagePrefix + implMode + ".JobManagerImpl"));
-      anomalyTaskDAO = (TaskManager) DaoProviderUtil
-          .getInstance(Class.forName(packagePrefix + implMode + ".TaskManagerImpl"));
+          .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.AnomalyFunctionManagerImpl.class);
+      rawResultDAO = (RawAnomalyResultManager) DaoProviderUtil
+          .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.RawAnomalyResultManagerImpl.class);
+      jobDAO = (JobManager) DaoProviderUtil
+          .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.JobManagerImpl.class);
+      taskDAO = (TaskManager) DaoProviderUtil
+          .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.TaskManagerImpl.class);
       emailConfigurationDAO = (EmailConfigurationManager) DaoProviderUtil
-          .getInstance(Class.forName(packagePrefix + implMode + ".EmailConfigurationManagerImpl"));
+          .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.EmailConfigurationManagerImpl.class);
       mergedResultDAO = (MergedAnomalyResultManager) DaoProviderUtil
-          .getInstance(Class.forName(packagePrefix + implMode + ".MergedAnomalyResultManagerImpl"));
+          .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.MergedAnomalyResultManagerImpl.class);
       webappConfigDAO = (WebappConfigManager) DaoProviderUtil
-          .getInstance(Class.forName(packagePrefix + implMode + ".WebappConfigManagerImpl"));
+          .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.WebappConfigManagerImpl.class);
     }
   }
 
@@ -207,36 +213,37 @@ public abstract class AbstractManagerTestBase {
 
   protected AnomalyFunctionDTO getTestFunctionSpec(String metricName, String collection) {
     AnomalyFunctionDTO functionSpec = new AnomalyFunctionDTO();
-    functionSpec.setMetricFunction(MetricAggFunction.SUM);
-    functionSpec.setMetric(metricName);
-    functionSpec.setBucketSize(5);
-    functionSpec.setCollection(collection);
-    functionSpec.setBucketUnit(TimeUnit.MINUTES);
-    functionSpec.setCron("0 0/5 * * * ?");
-    functionSpec.setFunctionName("my awesome test function");
+    functionSpec.setFunctionName("integration test function 1");
     functionSpec.setType("USER_RULE");
-    functionSpec.setWindowDelay(1);
+    functionSpec.setMetric(metricName);
+    functionSpec.setCollection(collection);
+    functionSpec.setMetricFunction(MetricAggFunction.SUM);
+    functionSpec.setCron("0/10 * * * * ?");
+    functionSpec.setBucketSize(1);
+    functionSpec.setBucketUnit(TimeUnit.HOURS);
+    functionSpec.setWindowDelay(3);
     functionSpec.setWindowDelayUnit(TimeUnit.HOURS);
-    functionSpec.setWindowSize(10);
-    functionSpec.setWindowUnit(TimeUnit.HOURS);
+    functionSpec.setWindowSize(1);
+    functionSpec.setWindowUnit(TimeUnit.DAYS);
+    functionSpec.setProperties("baseline=w/w;changeThreshold=0.001");
     functionSpec.setIsActive(true);
     return functionSpec;
   }
 
-  protected EmailConfigurationDTO getEmailConfiguration() {
+  protected EmailConfigurationDTO getTestEmailConfiguration(String metricName, String collection) {
     EmailConfigurationDTO emailConfiguration = new EmailConfigurationDTO();
-    emailConfiguration.setCollection("my pinot collection");
-    emailConfiguration.setActive(false);
-    emailConfiguration.setCron("0 0/10 * * *");
-    emailConfiguration.setFilters("foo=bar");
+    emailConfiguration.setCollection(collection);
+    emailConfiguration.setActive(true);
+    emailConfiguration.setCron("0/10 * * * * ?");
+    emailConfiguration.setFilters(null);
     emailConfiguration.setFromAddress("thirdeye@linkedin.com");
-    emailConfiguration.setMetric("my metric");
-    emailConfiguration.setSendZeroAnomalyEmail(false);
-    emailConfiguration.setSmtpHost("pinot-email-host");
-    emailConfiguration.setSmtpPassword("mypass");
-    emailConfiguration.setSmtpPort(1000);
-    emailConfiguration.setSmtpUser("user");
-    emailConfiguration.setToAddresses("puneet@linkedin.com");
+    emailConfiguration.setMetric(metricName);
+    emailConfiguration.setSendZeroAnomalyEmail(true);
+    emailConfiguration.setSmtpHost("email-server.linkedin.com");
+    emailConfiguration.setSmtpPassword(null);
+    emailConfiguration.setSmtpPort(25);
+    emailConfiguration.setSmtpUser(null);
+    emailConfiguration.setToAddresses("anomaly@linkedin.com");
     emailConfiguration.setWindowDelay(2);
     emailConfiguration.setWindowSize(10);
     emailConfiguration.setWindowUnit(TimeUnit.HOURS);

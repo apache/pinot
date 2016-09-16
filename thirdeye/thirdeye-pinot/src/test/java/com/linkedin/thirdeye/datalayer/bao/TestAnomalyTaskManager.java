@@ -24,16 +24,16 @@ public class TestAnomalyTaskManager extends AbstractManagerTestBase {
   @Test
   public void testCreate() throws JsonProcessingException {
     JobDTO testAnomalyJobSpec = getTestJobSpec();
-    anomalyJobId = anomalyJobDAO.save(testAnomalyJobSpec);
-    anomalyTaskId1 = anomalyTaskDAO.save(getTestTaskSpec(testAnomalyJobSpec));
+    anomalyJobId = jobDAO.save(testAnomalyJobSpec);
+    anomalyTaskId1 = taskDAO.save(getTestTaskSpec(testAnomalyJobSpec));
     Assert.assertNotNull(anomalyTaskId1);
-    anomalyTaskId2 = anomalyTaskDAO.save(getTestTaskSpec(testAnomalyJobSpec));
+    anomalyTaskId2 = taskDAO.save(getTestTaskSpec(testAnomalyJobSpec));
     Assert.assertNotNull(anomalyTaskId2);
   }
 
   @Test(dependsOnMethods = {"testCreate"})
   public void testFindAll() {
-    List<TaskDTO> anomalyTasks = anomalyTaskDAO.findAll();
+    List<TaskDTO> anomalyTasks = taskDAO.findAll();
     Assert.assertEquals(anomalyTasks.size(), 2);
   }
 
@@ -43,8 +43,8 @@ public class TestAnomalyTaskManager extends AbstractManagerTestBase {
     TaskStatus newStatus = TaskStatus.RUNNING;
     Long workerId = 1L;
 
-    boolean status  = anomalyTaskDAO.updateStatusAndWorkerId(workerId, anomalyTaskId1, oldStatus, newStatus);
-    TaskDTO anomalyTask = anomalyTaskDAO.findById(anomalyTaskId1);
+    boolean status  = taskDAO.updateStatusAndWorkerId(workerId, anomalyTaskId1, oldStatus, newStatus);
+    TaskDTO anomalyTask = taskDAO.findById(anomalyTaskId1);
     Assert.assertTrue(status);
     Assert.assertEquals(anomalyTask.getStatus(), newStatus);
     Assert.assertEquals(anomalyTask.getWorkerId(), workerId);
@@ -53,7 +53,7 @@ public class TestAnomalyTaskManager extends AbstractManagerTestBase {
   @Test(dependsOnMethods = {"testUpdateStatusAndWorkerId"})
   public void testFindByStatusOrderByCreationTimeAsc() {
     List<TaskDTO> anomalyTasks =
-        anomalyTaskDAO.findByStatusOrderByCreateTimeAsc(TaskStatus.WAITING, Integer.MAX_VALUE);
+        taskDAO.findByStatusOrderByCreateTimeAsc(TaskStatus.WAITING, Integer.MAX_VALUE);
     Assert.assertEquals(anomalyTasks.size(), 1);
   }
 
@@ -62,8 +62,8 @@ public class TestAnomalyTaskManager extends AbstractManagerTestBase {
     TaskStatus oldStatus = TaskStatus.RUNNING;
     TaskStatus newStatus = TaskStatus.COMPLETED;
     long taskEndTime = System.currentTimeMillis();
-    anomalyTaskDAO.updateStatusAndTaskEndTime(anomalyTaskId1, oldStatus, newStatus, taskEndTime);
-    TaskDTO anomalyTask = anomalyTaskDAO.findById(anomalyTaskId1);
+    taskDAO.updateStatusAndTaskEndTime(anomalyTaskId1, oldStatus, newStatus, taskEndTime);
+    TaskDTO anomalyTask = taskDAO.findById(anomalyTaskId1);
     Assert.assertEquals(anomalyTask.getStatus(), newStatus);
     Assert.assertEquals(anomalyTask.getEndTime(), taskEndTime);
   }
@@ -71,14 +71,14 @@ public class TestAnomalyTaskManager extends AbstractManagerTestBase {
   @Test(dependsOnMethods = {"testUpdateStatusAndTaskEndTime"})
   public void testFindByJobIdStatusNotIn() {
     TaskStatus status = TaskStatus.COMPLETED;
-    List<TaskDTO> anomalyTaskSpecs = anomalyTaskDAO.findByJobIdStatusNotIn(anomalyJobId, status);
+    List<TaskDTO> anomalyTaskSpecs = taskDAO.findByJobIdStatusNotIn(anomalyJobId, status);
     Assert.assertEquals(anomalyTaskSpecs.size(), 1);
   }
 
   @Test(dependsOnMethods = {"testFindByJobIdStatusNotIn"})
   public void testDeleteRecordOlderThanDaysWithStatus() {
     TaskStatus status = TaskStatus.COMPLETED;
-    int numRecordsDeleted = anomalyTaskDAO.deleteRecordsOlderThanDaysWithStatus(0, status);
+    int numRecordsDeleted = taskDAO.deleteRecordsOlderThanDaysWithStatus(0, status);
     Assert.assertEquals(numRecordsDeleted, 1);
   }
 

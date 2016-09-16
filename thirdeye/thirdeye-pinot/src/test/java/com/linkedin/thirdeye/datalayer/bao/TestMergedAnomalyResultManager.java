@@ -28,9 +28,9 @@ public class TestMergedAnomalyResultManager extends AbstractManagerTestBase {
     // create anomaly result
     RawAnomalyResultDTO result = getAnomalyResult();
     result.setFunction(function);
-    anomalyResultDAO.save(result);
+    rawResultDAO.save(result);
 
-    RawAnomalyResultDTO resultRet = anomalyResultDAO.findById(result.getId());
+    RawAnomalyResultDTO resultRet = rawResultDAO.findById(result.getId());
     Assert.assertEquals(resultRet.getFunction(), function);
 
     anomalyResultId = result.getId();

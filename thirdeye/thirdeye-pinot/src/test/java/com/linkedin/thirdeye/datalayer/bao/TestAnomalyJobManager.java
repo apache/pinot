@@ -15,16 +15,16 @@ public class TestAnomalyJobManager extends AbstractManagerTestBase {
 
   @Test
   public void testCreate() {
-    anomalyJobId1 = anomalyJobDAO.save(getTestJobSpec());
+    anomalyJobId1 = jobDAO.save(getTestJobSpec());
     Assert.assertNotNull(anomalyJobId1);
-    anomalyJobId2 = anomalyJobDAO.save(getTestJobSpec());
+    anomalyJobId2 = jobDAO.save(getTestJobSpec());
     Assert.assertNotNull(anomalyJobId2);
     printAll("After insert");
   }
 
   @Test(dependsOnMethods = {"testCreate"})
   public void testFindAll() {
-    List<JobDTO> anomalyJobs = anomalyJobDAO.findAll();
+    List<JobDTO> anomalyJobs = jobDAO.findAll();
     Assert.assertEquals(anomalyJobs.size(), 2);
   }
 
@@ -32,8 +32,8 @@ public class TestAnomalyJobManager extends AbstractManagerTestBase {
   public void testUpdateStatusAndJobEndTime() {
     JobStatus status = JobStatus.COMPLETED;
     long jobEndTime = System.currentTimeMillis();
-    anomalyJobDAO.updateStatusAndJobEndTime(anomalyJobId1, status, jobEndTime);
-    JobDTO anomalyJob = anomalyJobDAO.findById(anomalyJobId1);
+    jobDAO.updateStatusAndJobEndTime(anomalyJobId1, status, jobEndTime);
+    JobDTO anomalyJob = jobDAO.findById(anomalyJobId1);
     Assert.assertEquals(anomalyJob.getStatus(), status);
     Assert.assertEquals(anomalyJob.getScheduleEndTime(), jobEndTime);
     printAll("After testUpdateStatusAndJobEndTime");
@@ -42,13 +42,13 @@ public class TestAnomalyJobManager extends AbstractManagerTestBase {
   @Test(dependsOnMethods = {"testUpdateStatusAndJobEndTime"})
   public void testFindByStatus() {
     JobStatus status = JobStatus.COMPLETED;
-    List<JobDTO> anomalyJobs = anomalyJobDAO.findByStatus(status);
+    List<JobDTO> anomalyJobs = jobDAO.findByStatus(status);
     Assert.assertEquals(anomalyJobs.size(), 1);
     Assert.assertEquals(anomalyJobs.get(0).getStatus(), status);
   }
 
   private void printAll(String msg) {
-    List<JobDTO> allAnomalyJobs = anomalyJobDAO.findAll();
+    List<JobDTO> allAnomalyJobs = jobDAO.findAll();
     System.out.println("START:ALL JOB after:"+ msg);
     for(JobDTO jobDTO:allAnomalyJobs){
       System.out.println(jobDTO);
@@ -59,9 +59,9 @@ public class TestAnomalyJobManager extends AbstractManagerTestBase {
   @Test(dependsOnMethods = { "testFindByStatus" })
   public void testDeleteRecordsOlderThanDaysWithStatus() {
     JobStatus status = JobStatus.COMPLETED;
-    int numRecordsDeleted = anomalyJobDAO.deleteRecordsOlderThanDaysWithStatus(0, status);
+    int numRecordsDeleted = jobDAO.deleteRecordsOlderThanDaysWithStatus(0, status);
     Assert.assertEquals(numRecordsDeleted, 1);
-    List<JobDTO> anomalyJobs = anomalyJobDAO.findByStatus(status);
+    List<JobDTO> anomalyJobs = jobDAO.findByStatus(status);
     Assert.assertEquals(anomalyJobs.size(), 0);
   }
 }

@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.detector.function;
 
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Map.Entry;
@@ -18,9 +19,23 @@ public class AnomalyFunctionFactory {
 
   public AnomalyFunctionFactory(String functionConfigPath) {
     props = new Properties();
-    InputStream input = null;
+
     try {
-      input = new FileInputStream(functionConfigPath);
+      InputStream input = new FileInputStream(functionConfigPath);
+      loadPropertiesFromInputStream(input);
+    } catch (FileNotFoundException e) {
+      LOGGER.error("File {} not found", functionConfigPath, e);
+    }
+
+  }
+
+  public AnomalyFunctionFactory(InputStream input) {
+    props = new Properties();
+    loadPropertiesFromInputStream(input);
+  }
+
+  private void loadPropertiesFromInputStream(InputStream input) {
+    try {
       props.load(input);
     } catch (IOException e) {
       LOGGER.error("Error loading the functions from config", e);
@@ -28,8 +43,7 @@ public class AnomalyFunctionFactory {
       IOUtils.closeQuietly(input);
     }
 
-    LOGGER.info("Found {} entries in anomaly function configuration file {}", props.size(),
-        functionConfigPath);
+    LOGGER.info("Found {} entries in anomaly function configuration file {}", props.size());
     for (Entry<Object, Object> entry : props.entrySet()) {
       LOGGER.info("{}: {}", entry.getKey(), entry.getValue());
     }

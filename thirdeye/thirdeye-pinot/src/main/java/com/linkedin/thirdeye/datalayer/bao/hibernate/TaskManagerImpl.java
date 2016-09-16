@@ -20,7 +20,7 @@ public class TaskManagerImpl extends AbstractManagerImpl<TaskDTO> implements Tas
       "SELECT at FROM TaskDTO at " + "WHERE at.job.id = :jobId " + "AND at.status != :status";
 
   private static final String FIND_BY_STATUS_ORDER_BY_CREATE_TIME_ASC =
-      "SELECT at FROM TaskDTO at " + "WHERE at.status = :status order by at.taskStartTime asc";
+      "SELECT at FROM TaskDTO at " + "WHERE at.status = :status order by at.startTime asc";
 
   private static final String FIND_BY_STATUS_AND_LAST_MODIFIED_TIME_LT_EXPIRE =
       "SELECT at FROM TaskDTO at "
@@ -32,7 +32,7 @@ public class TaskManagerImpl extends AbstractManagerImpl<TaskDTO> implements Tas
 
   /*
    * (non-Javadoc)
-   * 
+   *
    * @see com.linkedin.thirdeye.datalayer.bao.ITaskManager#findByJobIdStatusNotIn(java.lang.Long,
    * com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus)
    */
@@ -45,7 +45,7 @@ public class TaskManagerImpl extends AbstractManagerImpl<TaskDTO> implements Tas
 
   /*
    * (non-Javadoc)
-   * 
+   *
    * @see
    * com.linkedin.thirdeye.datalayer.bao.ITaskManager#findByStatusOrderByCreateTimeAsc(com.linkedin.
    * thirdeye.anomaly.task.TaskConstants.TaskStatus, int)
