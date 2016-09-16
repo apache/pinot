@@ -66,6 +66,8 @@ function getDashboardList() {
 
     getData(url).done(function (data) {
 
+        validateFormData(data, "No dashboard list arrived from the server.", "dashboard-list");
+
         /* Create dashboard dropdown */
         var dashboardListHtml = "";
         for (var i = 0, len = data.length; i < len; i++) {
@@ -158,9 +160,9 @@ function getDatasetConfig() {
 
         /** MIN MAX DATE TIME **/
 
-            //global
+        //global
         window.datasetConfig.maxMillis = parseInt(data["maxTime"]);
-        var maxMillis = window.datasetConfig.maxMillis
+        var maxMillis = window.datasetConfig.maxMillis;
 
         var currentStartDateTime = moment(maxMillis).add(-1, 'days');
 
