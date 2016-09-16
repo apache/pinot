@@ -25,9 +25,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-// TODO
-// Maybe we should have a separate thread that gets the controller leader address, not sure.
-// We should have algorithms here that do not get the address multiple times within a short period.
 // Helix keeps the old controller around for 30s before electing a new one, so we will keep getting
 // the old controller as leader, and it will keep returning NOT_LEADER.
 
@@ -38,7 +35,12 @@ public class ControllerLeaderLocator {
 
   private final HelixManager _helixManager;
   private final String _clusterName;
-  private String controllerLeaderHostPort = null;
+
+  // Co-ordinates of the last known controller leader.
+  private volatile String _controllerLeaderHostPort = null;
+
+  // Should we refresh the controller leader co-ordinates?
+  private volatile boolean _refresh = true;
 
   ControllerLeaderLocator(HelixManager helixManager) {
     _helixManager = helixManager;
@@ -69,18 +71,24 @@ public class ControllerLeaderLocator {
   /**
    * Locate the controller leader so that we can send LLC segment completion requests to it.
    *
-   * @param forceRefresh : If set to true, then makes a zk call to re-fetch the leadership information.
    * @return The host:port string of the current controller leader.
    */
-  public String getControllerLeader(boolean forceRefresh) {
-    if (controllerLeaderHostPort == null || forceRefresh) {
-      BaseDataAccessor<ZNRecord> dataAccessor = _helixManager.getHelixDataAccessor().getBaseDataAccessor();
-      Stat stat = new Stat();
-      ZNRecord znRecord = dataAccessor.get("/" + _clusterName + "/CONTROLLER/LEADER", stat, AccessOption.THROW_EXCEPTION_IFNOTEXIST);
-      String leader = znRecord.getId();
-      int index = leader.lastIndexOf('_');
-      controllerLeaderHostPort = leader.substring(0, index) + ":" + leader.substring(index+1);
+  public synchronized String getControllerLeader() {
+    if (!_refresh) {
+      return _controllerLeaderHostPort;
     }
-    return controllerLeaderHostPort;
+
+    BaseDataAccessor<ZNRecord> dataAccessor = _helixManager.getHelixDataAccessor().getBaseDataAccessor();
+    Stat stat = new Stat();
+    ZNRecord znRecord = dataAccessor.get("/" + _clusterName + "/CONTROLLER/LEADER", stat, AccessOption.THROW_EXCEPTION_IFNOTEXIST);
+    String leader = znRecord.getId();
+    int index = leader.lastIndexOf('_');
+    _controllerLeaderHostPort = leader.substring(0, index) + ":" + leader.substring(index + 1);
+    _refresh = false;
+    return _controllerLeaderHostPort;
+  }
+
+  public synchronized void refreshControllerLeader() {
+    _refresh = true;
   }
 }
