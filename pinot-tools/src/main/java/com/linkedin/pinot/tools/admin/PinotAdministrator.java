@@ -35,11 +35,10 @@ import com.linkedin.pinot.tools.admin.command.StartZookeeperCommand;
 import com.linkedin.pinot.tools.admin.command.StopProcessCommand;
 import com.linkedin.pinot.tools.admin.command.StreamAvroIntoKafkaCommand;
 import com.linkedin.pinot.tools.admin.command.UploadSegmentCommand;
+import com.linkedin.pinot.tools.admin.command.ValidateConfigCommand;
 import com.linkedin.pinot.tools.admin.command.VerifySegmentState;
 import com.linkedin.pinot.tools.segment.converter.PinotSegmentConverter;
-
 import java.lang.reflect.Field;
-
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.CmdLineParser;
@@ -80,6 +79,7 @@ public class PinotAdministrator {
       @SubCommand(name = "ShowClusterInfo", impl = ShowClusterInfoCommand.class),
       @SubCommand(name = "AvroSchemaToPinotSchema", impl = AvroSchemaToPinotSchema.class),
       @SubCommand(name = "RebalanceTable", impl = RebalanceTableCommand.class),
+      @SubCommand(name = "ValidateConfig", impl = ValidateConfigCommand.class),
       @SubCommand(name = "VerifySegmentState", impl = VerifySegmentState.class),
       @SubCommand(name = "PinotSegmentConverter", impl = PinotSegmentConverter.class)
   })
