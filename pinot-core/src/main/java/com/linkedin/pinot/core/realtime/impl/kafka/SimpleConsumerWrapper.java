@@ -35,7 +35,6 @@ import com.google.common.util.concurrent.Uninterruptibles;
 import javax.annotation.Nullable;
 import kafka.api.FetchRequestBuilder;
 import kafka.api.PartitionOffsetRequestInfo;
-import kafka.cluster.BrokerEndPoint;
 import kafka.common.TopicAndPartition;
 import kafka.javaapi.FetchResponse;
 import kafka.javaapi.OffsetRequest;
@@ -76,7 +75,7 @@ public class SimpleConsumerWrapper implements Closeable {
   private int[] _bootstrapPorts;
   private SimpleConsumer _simpleConsumer;
   private final Random _random = new Random();
-  private BrokerEndPoint _leader;
+  private KafkaBrokerWrapper _leader;
   private String _currentHost;
   private int _currentPort;
 
@@ -236,7 +235,7 @@ public class SimpleConsumerWrapper implements Closeable {
           List<PartitionMetadata> pMetaList = response.topicsMetadata().get(0).partitionsMetadata();
           for (PartitionMetadata pMeta : pMetaList) {
             if (pMeta.partitionId() == _partition) {
-              _leader = pMeta.leader();
+              _leader = new KafkaBrokerWrapper(pMeta.leader());
               break;
             }
           }
@@ -276,6 +275,7 @@ public class SimpleConsumerWrapper implements Closeable {
     @Override
     void process() {
       // If we're already connected to the leader broker, don't disconnect and reconnect
+      LOGGER.info("Trying to fetch leader host and port: {}:{}", _leader.host(), _leader.port());
       if (_leader.host().equals(_currentHost) && _leader.port() == _currentPort) {
         setCurrentState(new ConnectedToPartitionLeader());
         return;
