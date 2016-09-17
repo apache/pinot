@@ -57,7 +57,7 @@ public class CollectionMaxDataTimeCacheLoader extends CacheLoader<String, Long> 
         if (StringUtils.isBlank(timeFormat) || TimeSpec.SINCE_EPOCH_FORMAT.equals(timeFormat)) {
           maxTime = timeSpec.getDataGranularity().toMillis(endTime + 1) - 1;
         } else {
-          DateTimeFormatter dateTimeFormatter = DateTimeFormat.forPattern(timeFormat).withZoneUTC();
+          DateTimeFormatter dateTimeFormatter = DateTimeFormat.forPattern(timeFormat);
           maxTime = DateTime.parse(String.valueOf(endTime), dateTimeFormatter).getMillis();
         }
       }

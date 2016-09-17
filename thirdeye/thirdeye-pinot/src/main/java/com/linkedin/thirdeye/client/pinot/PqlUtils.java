@@ -173,24 +173,27 @@ public class PqlUtils {
     long endMillis = endExclusive.getMillis();
     long dataGranularityMillis = dataGranularity.toMillis();
 
-    // Shrink start and end as per data granularity
-    long startAlignmentDelta = startMillis % dataGranularityMillis;
-    if (startAlignmentDelta != 0) {
-      long startMillisAligned = startMillis + dataGranularityMillis - startAlignmentDelta;
-      start = new DateTime(startMillisAligned);
-    }
+    String timeField = timeFieldSpec.getColumnName();
+    String timeFormat = timeFieldSpec.getFormat();
+    if (timeFormat == null || TimeSpec.SINCE_EPOCH_FORMAT.equals(timeFormat)) {
+      // Shrink start and end as per data granularity
+      long startAlignmentDelta = startMillis % dataGranularityMillis;
+      if (startAlignmentDelta != 0) {
+        long startMillisAligned = startMillis + dataGranularityMillis - startAlignmentDelta;
+        start = new DateTime(startMillisAligned);
+      }
 
-    long endAligmentDelta = endMillis % dataGranularityMillis;
-    if (endAligmentDelta != 0) {
-      long endMillisAligned = endMillis - endAligmentDelta;
-      endExclusive = new DateTime(endMillisAligned);
+      long endAligmentDelta = endMillis % dataGranularityMillis;
+      if (endAligmentDelta != 0) {
+        long endMillisAligned = endMillis - endAligmentDelta;
+        endExclusive = new DateTime(endMillisAligned);
+      }
     }
 
     String startQueryTime;
     String endQueryTimeExclusive;
 
-    String timeField = timeFieldSpec.getColumnName();
-    String timeFormat = timeFieldSpec.getFormat();
+
     if (timeFormat == null || TimeSpec.SINCE_EPOCH_FORMAT.equals(timeFormat)) {
       long startInConvertedUnits = dataGranularity.convertToUnit(start.getMillis());
       long endInConvertedUnits = dataGranularity.convertToUnit(endExclusive.getMillis());
@@ -198,7 +201,7 @@ public class PqlUtils {
       endQueryTimeExclusive = (endInConvertedUnits == startInConvertedUnits + 1) ?
           startQueryTime : String.valueOf(endInConvertedUnits);
     } else {
-      DateTimeFormatter dateTimeFormatter = DateTimeFormat.forPattern(timeFormat).withZoneUTC();
+      DateTimeFormatter dateTimeFormatter = DateTimeFormat.forPattern(timeFormat);
       startQueryTime = dateTimeFormatter.print(start);
       endQueryTimeExclusive = dateTimeFormatter.print(endExclusive);
     }
