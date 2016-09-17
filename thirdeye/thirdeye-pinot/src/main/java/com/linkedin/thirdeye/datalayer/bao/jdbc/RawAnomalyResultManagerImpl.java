@@ -84,7 +84,7 @@ public class RawAnomalyResultManagerImpl extends AbstractManagerImpl<RawAnomalyR
         Predicate.AND(Predicate.GE("endTime", startTime), Predicate.LE("endTime", endTime));;
     Predicate functionIdPredicate = Predicate.EQ("functionId", functionId);
     Predicate finalPredicate =
-        Predicate.AND(startTimePredicate, Predicate.OR(endTimeTimePredicate, functionIdPredicate));
+        Predicate.AND(functionIdPredicate, Predicate.OR(endTimeTimePredicate, startTimePredicate));
     List<RawAnomalyResultBean> list =
         genericPojoDao.get(finalPredicate, RawAnomalyResultBean.class);
     List<RawAnomalyResultDTO> result = new ArrayList<>();

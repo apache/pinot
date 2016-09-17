@@ -82,9 +82,9 @@ public abstract class AbstractManagerTestBase {
     ds.setInitialSize(10);
 
     // validate connection
-    //ds.setValidationQuery("select 1 from anomaly_jobs where 1=0");
-    ds.setTestWhileIdle(true);
-    ds.setTestOnBorrow(true);
+//    ds.setValidationQuery("select 1 from generic_ where 1=0");
+//    ds.setTestWhileIdle(true);
+//    ds.setTestOnBorrow(true);
 
     // when returning connection to pool
     ds.setTestOnReturn(true);

@@ -114,6 +114,9 @@ public abstract class AbstractManagerImpl<E extends AbstractDTO> implements Abst
     if (rawAnomalyResultBean.getFunctionId() != null) {
       AnomalyFunctionBean anomalyFunctionBean =
           genericPojoDao.get(rawAnomalyResultBean.getFunctionId(), AnomalyFunctionBean.class);
+      if(anomalyFunctionBean == null){
+        System.out.println("this shud not be null");
+      }
       AnomalyFunctionDTO anomalyFunctionDTO =
           MODEL_MAPPER.map(anomalyFunctionBean, AnomalyFunctionDTO.class);
       rawAnomalyResultDTO.setFunction(anomalyFunctionDTO);

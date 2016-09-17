@@ -25,24 +25,20 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
 
   // find a conflicting window
   private static final String FIND_BY_COLLECTION_METRIC_TIME =
-      "from MergedAnomalyResultDTO where collection=:collection and metric=:metric "
+      "where collection=:collection and metric=:metric "
           + "and (startTime < :endTime and endTime > :startTime) order by endTime desc";
 
   // find a conflicting window
-  private static final String FIND_BY_COLLECTION_TIME =
-      "from MergedAnomalyResultDTO where collection=:collection "
-          + "and (startTime < :endTime and endTime > :startTime) order by endTime desc";
+  private static final String FIND_BY_COLLECTION_TIME = "where collection=:collection "
+      + "and (startTime < :endTime and endTime > :startTime) order by endTime desc";
 
-  private static final String FIND_BY_FUNCTION_ID =
-      "from MergedAnomalyResultDTO r where r.function.id=:functionId";
+  private static final String FIND_BY_FUNCTION_ID = "where functionId=:functionId";
 
   private static final String FIND_BY_FUNCTION_AND_DIMENSIONS =
-      "from MergedAnomalyResultDTO where functionId=:functionId "
-          + "and dimensions=:dimensions order by endTime desc limit 1";
+      "where functionId=:functionId " + "and dimensions=:dimensions order by endTime desc limit 1";
 
   private static final String FIND_BY_FUNCTION_AND_NULL_DIMENSION =
-      "from MergedAnomalyResultDTO where functionId=:functionId "
-          + "and dimensions is null order by endTime desc";
+      "where functionId=:functionId " + "and dimensions is null order by endTime desc";
 
   public MergedAnomalyResultManagerImpl() {
     super(MergedAnomalyResultDTO.class, MergedAnomalyResultBean.class);
@@ -61,8 +57,13 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
   }
 
   public void update(MergedAnomalyResultDTO mergedAnomalyResultDTO) {
-    MergedAnomalyResultBean mergeAnomalyBean = convertMergeAnomalyDTO2Bean(mergedAnomalyResultDTO);
-    genericPojoDao.update(mergeAnomalyBean);
+    if (mergedAnomalyResultDTO.getId() == null) {
+      save(mergedAnomalyResultDTO);
+    } else {
+      MergedAnomalyResultBean mergeAnomalyBean =
+          convertMergeAnomalyDTO2Bean(mergedAnomalyResultDTO);
+      genericPojoDao.update(mergeAnomalyBean);
+    }
   }
 
   public MergedAnomalyResultDTO findById(Long id) {
@@ -83,10 +84,11 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
     EmailConfigurationBean emailConfigurationBean =
         genericPojoDao.get(emailConfigId, EmailConfigurationBean.class);
     List<Long> functionIds = emailConfigurationBean.getFunctionIds();
+    Long[] functionIdArray = functionIds.toArray(new Long[] {});
     Predicate predicate = Predicate.AND(//
         Predicate.LT("startTime", endTime), //
         Predicate.GT("endTime", startTime), //
-        Predicate.IN("functionId", functionIds.toArray(new Long[] {})), //
+        Predicate.IN("functionId", functionIdArray), //
         Predicate.EQ("notified", false)//
     );
     List<MergedAnomalyResultBean> list =

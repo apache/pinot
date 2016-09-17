@@ -33,7 +33,7 @@ public class RawAnomalyResultIndex extends AbstractIndexEntity {
   public void setDataMissing(boolean dataMissing) {
     this.dataMissing = dataMissing;
   }
-  
+
   public String getDimensions() {
     return dimensions;
   }
@@ -73,4 +73,14 @@ public class RawAnomalyResultIndex extends AbstractIndexEntity {
   public void setStartTime(long startTime) {
     this.startTime = startTime;
   }
+
+  @Override
+  public String toString() {
+    return "RawAnomalyResultIndex [functionId=" + functionId + ", anomalyFeedbackId="
+        + anomalyFeedbackId + ", jobId=" + jobId + ", startTime=" + startTime + ", endTime="
+        + endTime + ", dimensions=" + dimensions + ", merged=" + merged + ", dataMissing="
+        + dataMissing + ", baseId=" + baseId + ", id=" + id + ", createTime=" + createTime
+        + ", updateTime=" + updateTime + ", version=" + version + "]";
+  }
+
 }
