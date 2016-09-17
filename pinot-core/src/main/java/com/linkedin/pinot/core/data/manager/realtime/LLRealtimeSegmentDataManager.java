@@ -343,7 +343,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
                 if (success) {
                   _state = State.COMMITTED;
                 } else {
-                  // Back off and retry from holding state again.
+                  segmentLogger.info("Could not commit segment. Retrying after hold");
                   hold();
                 }
               }
@@ -414,7 +414,12 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     File destSeg = makeSegmentDirPath();
     final String segTarFileName = destSeg.getAbsolutePath() + TarGzCompressionUtils.TAR_GZ_FILE_EXTENTION;
     try {
-      _protocolHandler.segmentCommit(_currentOffset, _segmentNameStr, new File(segTarFileName));
+      SegmentCompletionProtocol.Response response = _protocolHandler.segmentCommit(_currentOffset, _segmentNameStr,
+          new File(segTarFileName));
+      if (!response.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS)) {
+        segmentLogger.warn("Received controller response {}", response);
+        return false;
+      }
       FileUtils.deleteQuietly(new File(segTarFileName));
     } catch (FileNotFoundException e) {
       segmentLogger.error("Tar file {} not found", segTarFileName, e);

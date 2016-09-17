@@ -85,7 +85,7 @@ public class ServerSegmentCompletionProtocolHandler {
         new SegmentCompletionProtocol.Response(SegmentCompletionProtocol.ControllerResponseStatus.NOT_SENT, -1L);
     HttpClient httpClient = new HttpClient();
     ControllerLeaderLocator leaderLocator = ControllerLeaderLocator.getInstance();
-    final String leaderAddress = leaderLocator.getControllerLeader(false);
+    final String leaderAddress = leaderLocator.getControllerLeader();
     if (leaderAddress == null) {
       LOGGER.error("No leader found {}", this.toString());
       return new SegmentCompletionProtocol.Response(SegmentCompletionProtocol.ControllerResponseStatus.NOT_LEADER, -1L);
@@ -108,11 +108,14 @@ public class ServerSegmentCompletionProtocolHandler {
       } else {
         response = new SegmentCompletionProtocol.Response(method.getResponseBodyAsString());
         LOGGER.info("Controller response {} for {}", response.toJsonString(), this.toString());
+        if (response.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.NOT_LEADER)) {
+          leaderLocator.refreshControllerLeader();
+        }
         return response;
       }
     } catch (IOException e) {
       LOGGER.error("IOException {}", this.toString(), e);
-      ControllerLeaderLocator.getInstance().getControllerLeader(true);
+      leaderLocator.refreshControllerLeader();
       return response;
     }
   }
