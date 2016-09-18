@@ -140,7 +140,7 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
     return response;
   }
 
-  @Test
+  @Test(enabled=true)
   public void testThirdeyeAnomalyApplication() throws Exception {
 
     // setup caches and config
@@ -153,7 +153,7 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
     startAlertScheduler();
 
     // check for number of entries in tasks and jobs
-    Thread.sleep(10000);
+    Thread.sleep(1000);
     Assert.assertEquals(jobDAO.findAll().size(), 2);
     Assert.assertEquals(taskDAO.findAll().size(), 2);
     Thread.sleep(10000);
@@ -203,8 +203,8 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
 
     // start task drivers
     startWorker();
-    startWorker();
-    startWorker();
+//    startWorker();
+//    startWorker();
 
     // check for change in task status to COMPLETED
     Thread.sleep(30000);

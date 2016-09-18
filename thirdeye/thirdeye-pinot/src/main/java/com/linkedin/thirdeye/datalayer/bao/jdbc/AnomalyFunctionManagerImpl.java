@@ -5,7 +5,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import com.google.inject.persist.Transactional;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.pojo.AnomalyFunctionBean;
@@ -22,7 +21,6 @@ public class AnomalyFunctionManagerImpl extends AbstractManagerImpl<AnomalyFunct
   }
 
   @Override
-  @Transactional
   public List<AnomalyFunctionDTO> findAllByCollection(String collection) {
     // return super.findByParams(ImmutableMap.of("collection", collection));
     Predicate predicate = Predicate.EQ("collection", collection);
@@ -36,7 +34,6 @@ public class AnomalyFunctionManagerImpl extends AbstractManagerImpl<AnomalyFunct
   }
 
   @Override
-  @Transactional
   public List<String> findDistinctMetricsByCollection(String collection) {
     // return
     // getEntityManager().createQuery(FIND_DISTINCT_METRIC_BY_COLLECTION,
@@ -57,7 +54,6 @@ public class AnomalyFunctionManagerImpl extends AbstractManagerImpl<AnomalyFunct
    * @see com.linkedin.thirdeye.datalayer.bao.IAnomalyFunctionManager# findAllActiveFunctions()
    */
   @Override
-  @Transactional
   public List<AnomalyFunctionDTO> findAllActiveFunctions() {
     // return super.findByParams(ImmutableMap.of("isActive", true));
     Predicate predicate = Predicate.EQ("active", true);

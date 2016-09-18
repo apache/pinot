@@ -1,11 +1,13 @@
 package com.linkedin.thirdeye.datalayer.util;
 
+import java.lang.reflect.Array;
 import java.sql.Clob;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.sql.Types;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -16,6 +18,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 
 import com.google.common.collect.BiMap;
 import com.google.common.collect.Sets;
@@ -283,25 +286,30 @@ public class SqlQueryBuilder {
         entityMappingHolder.columnMappingPerTable.get(tableName).inverse();
     StringBuilder sqlBuilder = new StringBuilder("SELECT * FROM " + tableName);
     StringBuilder whereClause = new StringBuilder(" WHERE ");
-    LinkedHashMap<String, Object> parametersMap = new LinkedHashMap<>();
-    generateWhereClause(entityNameToDBNameMapping, predicate, parametersMap, whereClause);
+    List<Pair<String, Object>> parametersList = new ArrayList<>();
+    generateWhereClause(entityNameToDBNameMapping, predicate, parametersList, whereClause);
     sqlBuilder.append(whereClause.toString());
     System.out.println("createFindByParamsStatement Query " + sqlBuilder.toString());
     PreparedStatement prepareStatement = connection.prepareStatement(sqlBuilder.toString());
     int parameterIndex = 1;
     LinkedHashMap<String, ColumnInfo> columnInfoMap =
         entityMappingHolder.columnInfoPerTable.get(tableName);
-    for (Entry<String, Object> paramEntry : parametersMap.entrySet()) {
-      String dbFieldName = paramEntry.getKey();
+    for (Pair<String, Object> pair : parametersList) {
+      String dbFieldName = pair.getKey();
       ColumnInfo info = columnInfoMap.get(dbFieldName);
-      prepareStatement.setObject(parameterIndex++, paramEntry.getValue(), info.sqlType);
-      System.out.println("Setting " + paramEntry.getKey() + " to " + paramEntry.getValue());
+      prepareStatement.setObject(parameterIndex++, pair.getValue(), info.sqlType);
+      System.out.println("Setting " + pair.getKey() + " to " + pair.getValue());
     }
     return prepareStatement;
   }
 
   private void generateWhereClause(BiMap<String, String> entityNameToDBNameMapping,
-      Predicate predicate, LinkedHashMap<String, Object> parametersMap, StringBuilder whereClause) {
+      Predicate predicate, List<Pair<String, Object>> parametersList, StringBuilder whereClause) {
+    String columnName = null;
+
+    if (predicate.getLhs() != null) {
+      columnName = entityNameToDBNameMapping.get(predicate.getLhs());
+    }
     switch (predicate.getOper()) {
       case AND:
       case OR:
@@ -309,7 +317,7 @@ public class SqlQueryBuilder {
         String delim = "";
         for (Predicate childPredicate : predicate.getChildPredicates()) {
           whereClause.append(delim);
-          generateWhereClause(entityNameToDBNameMapping, childPredicate, parametersMap,
+          generateWhereClause(entityNameToDBNameMapping, childPredicate, parametersList,
               whereClause);
           delim = "  " + predicate.getOper().toString() + " ";
         }
@@ -317,21 +325,32 @@ public class SqlQueryBuilder {
         break;
       case EQ:
       case GT:
-      case IN:
       case LT:
       case NEQ:
       case LE:
       case GE:
-        whereClause.append(entityNameToDBNameMapping.get(predicate.getLhs()))
-            .append(predicate.getOper().toString()).append("?");
-        parametersMap.put(entityNameToDBNameMapping.get(predicate.getLhs()), predicate.getRhs());
+        whereClause.append(columnName).append(predicate.getOper().toString()).append("?");
+        parametersList.add(ImmutablePair.of(columnName, predicate.getRhs()));
+        break;
+      case IN:
+        Object rhs = predicate.getRhs();
+        if (rhs != null && rhs.getClass().isArray()) {
+          whereClause.append(columnName).append(" ").append(Predicate.OPER.IN.toString())
+              .append("(");
+          delim = "";
+          for (int i = 0; i < Array.getLength(rhs); i++) {
+            whereClause.append(delim).append("?");
+            parametersList.add(ImmutablePair.of(columnName, Array.get(rhs, i)));
+            delim = ",";
+          }
+          whereClause.append(")");
+        }
         break;
       case BETWEEN:
-        whereClause.append(entityNameToDBNameMapping.get(predicate.getLhs()))
-            .append(predicate.getOper().toString()).append("? AND ?");
+        whereClause.append(columnName).append(predicate.getOper().toString()).append("? AND ?");
         ImmutablePair<Object, Object> pair = (ImmutablePair<Object, Object>) predicate.getRhs();
-        parametersMap.put(entityNameToDBNameMapping.get(predicate.getLhs()), pair.getLeft());
-        parametersMap.put(entityNameToDBNameMapping.get(predicate.getLhs()), pair.getRight());
+        parametersList.add(ImmutablePair.of(columnName, pair.getLeft()));
+        parametersList.add(ImmutablePair.of(columnName, pair.getRight()));
         break;
       default:
         throw new RuntimeException("Unsupported predicate type:" + predicate.getOper());
@@ -435,4 +454,26 @@ public class SqlQueryBuilder {
     }
     return prepareStatement;
   }
+
+//  public static void main(String[] args) {
+//    EntityMappingHolder entityMappingHolder = new EntityMappingHolder();
+//    SqlQueryBuilder builder = new SqlQueryBuilder(entityMappingHolder);
+//    BiMap<String, String> entityNameToDBNameMapping;
+//    Predicate startTimePredicate;
+//    long startTime;
+//    long endTime = "";
+//    long functionId = "1";
+//    startTimePredicate =
+//        Predicate.AND(Predicate.GE("startTime", startTime), Predicate.LE("startTime", endTime));
+//    Predicate endTimeTimePredicate;
+//    endTimeTimePredicate =
+//        Predicate.AND(Predicate.GE("endTime", startTime), Predicate.LE("endTime", endTime));;
+//
+//    Predicate functionIdPredicate = Predicate.EQ("functionId", functionId);
+//    Predicate finalPredicate =
+//        Predicate.AND(functionIdPredicate, Predicate.OR(endTimeTimePredicate, startTimePredicate));
+//    builder.generateWhereClause(entityNameToDBNameMapping, finalPredicate, parametersMap,
+//        whereClause);
+//
+//  }
 }

@@ -30,11 +30,10 @@ public abstract class AbstractManagerImpl<E extends AbstractDTO> implements Abst
     MODEL_MAPPER.getConfiguration().setMatchingStrategy(MatchingStrategies.STRICT);
   }
 
-  protected static GenericPojoDao genericPojoDao =
-      DaoProviderUtil.getInstance(GenericPojoDao.class);
-
   Class<? extends AbstractDTO> dtoClass;
   Class<? extends AbstractBean> beanClass;
+  protected
+  GenericPojoDao genericPojoDao;
 
   protected AbstractManagerImpl(Class<? extends AbstractDTO> dtoClass,
       Class<? extends AbstractBean> beanClass) {
@@ -42,6 +41,10 @@ public abstract class AbstractManagerImpl<E extends AbstractDTO> implements Abst
     this.beanClass = beanClass;
   }
 
+  public void setGenericPojoDao(GenericPojoDao genericPojoDao) {
+    this.genericPojoDao = genericPojoDao;
+  }
+  
   @Override
   public Long save(E entity) {
     if (entity.getId() != null) {
@@ -111,6 +114,9 @@ public abstract class AbstractManagerImpl<E extends AbstractDTO> implements Abst
     if (rawAnomalyResultBean.getFunctionId() != null) {
       AnomalyFunctionBean anomalyFunctionBean =
           genericPojoDao.get(rawAnomalyResultBean.getFunctionId(), AnomalyFunctionBean.class);
+      if(anomalyFunctionBean == null){
+        System.out.println("this shud not be null");
+      }
       AnomalyFunctionDTO anomalyFunctionDTO =
           MODEL_MAPPER.map(anomalyFunctionBean, AnomalyFunctionDTO.class);
       rawAnomalyResultDTO.setFunction(anomalyFunctionDTO);
