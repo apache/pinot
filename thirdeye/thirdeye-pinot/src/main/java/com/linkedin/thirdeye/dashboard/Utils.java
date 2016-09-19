@@ -93,11 +93,8 @@ public class Utils {
         String dimensionValue = row.get(dimension);
         values.add(dimensionValue);
       }
-
       result.put(dimension, values);
-
     }
-
     return result;
   }
 
@@ -106,7 +103,6 @@ public class Utils {
     CollectionSchema schema = queryCache.getClient().getCollectionSchema(collection);
     List<String> dimensions = schema.getDimensionNames();
     Collections.sort(dimensions);
-
     return dimensions;
   }
 
@@ -126,7 +122,6 @@ public class Utils {
     } else {
       return dimensions;
     }
-
     return dimensionsToGroupBy;
   }
 
@@ -174,7 +169,7 @@ public class Utils {
     for (String metricExpressionName : metricExpressionNames) {
       MetricExpression metricExpression;
       if (collectionConfig != null && collectionConfig.getDerivedMetrics() != null
-          && collectionConfig.getDerivedMetrics().containsKey(metricsJson)) {
+          && collectionConfig.getDerivedMetrics().containsKey(metricExpressionName)) {
         String metricExpressionString =
             collectionConfig.getDerivedMetrics().get(metricExpressionName);
         metricExpression = new MetricExpression(metricExpressionName, metricExpressionString, aggFunction);
@@ -185,6 +180,20 @@ public class Utils {
       metricExpressions.add(metricExpression);
     }
     return metricExpressions;
+  }
+
+  public static boolean isDerievedMetric(String collection, String metric) {
+    CollectionConfig collectionConfig = null;
+    try {
+      collectionConfig = CACHE_REGISTRY_INSTANCE.getCollectionConfigCache().get(collection);
+      if (collectionConfig != null && collectionConfig.getDerivedMetrics() != null
+          && collectionConfig.getDerivedMetrics().containsKey(metric)) {
+        return true;
+      }
+    } catch (InvalidCacheLoadException | ExecutionException e) {
+      LOG.debug("No collection configs for collection {}", collection);
+    }
+    return false;
   }
 
   public static List<MetricFunction> computeMetricFunctionsFromExpressions(

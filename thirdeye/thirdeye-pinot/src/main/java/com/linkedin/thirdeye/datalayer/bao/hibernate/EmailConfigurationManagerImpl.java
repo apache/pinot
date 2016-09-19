@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.datalayer.bao.hibernate;
 
+import com.google.common.collect.ImmutableMap;
 import java.util.List;
 
 import com.google.inject.persist.Transactional;
@@ -23,5 +24,17 @@ public class EmailConfigurationManagerImpl extends AbstractManagerImpl<EmailConf
     return getEntityManager().createQuery(FIND_BY_FUNCTION_ID, entityClass)
         .setParameter("id", id)
         .getResultList();
+  }
+
+  @Override
+  @Transactional
+  public List<EmailConfigurationDTO> findByCollectionMetric(String collection,
+      String metric) {
+    return findByParams(ImmutableMap.of("collection", collection, "metric", metric));
+  }
+
+  @Override
+  public List<EmailConfigurationDTO> findByCollection(String collection) {
+    return findByParams(ImmutableMap.of("collection", collection));
   }
 }

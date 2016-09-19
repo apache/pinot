@@ -216,6 +216,7 @@ public class AnomalyMergeExecutor implements Runnable {
           filters.removeAll(exploreDimension);
           if(dim.equalsIgnoreCase("other")) {
             filters.put(exploreDimension, dim);
+            filters.put(exploreDimension, dim.toLowerCase());
             filters.put(exploreDimension, "");
           } else {
             // Only add a specific dimension value filter if there are more values present for the same dimension
@@ -244,14 +245,15 @@ public class AnomalyMergeExecutor implements Runnable {
     Double currentValue;
     Double baselineValue;
 
-    if (anomalyFunctionSpec.getMetric().toLowerCase().startsWith("percent")) {
-      // TODO: do proper check to find if metric is non additive
-      // TODO: introduce isAdditiveMetric property in collection / schema config
+    if (Utils.isDerievedMetric(anomalyFunctionSpec.getCollection(), anomalyFunctionSpec.getMetric())) {
+      LOG.info("Found derived metric [{}], assigning avg value per bucket in the message",
+          anomalyFunctionSpec.getMetric());
       currentValue = getAvgMetricValuePerBucket(responseCurrent, anomalyFunctionSpec.getMetric());
       baselineValue = getAvgMetricValuePerBucket(responseBaseline, anomalyFunctionSpec.getMetric());
     } else {
+      LOG.info("Assigning total value in the message for metric : [{}]", anomalyFunctionSpec.getMetric());
       currentValue = getMetricValueSum(responseCurrent, anomalyFunctionSpec.getMetric());
-      baselineValue = getAvgMetricValuePerBucket(responseBaseline, anomalyFunctionSpec.getMetric());
+      baselineValue = getMetricValueSum(responseBaseline, anomalyFunctionSpec.getMetric());
     }
 
     Double severity;

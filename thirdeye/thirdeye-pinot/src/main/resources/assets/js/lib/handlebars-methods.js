@@ -321,4 +321,7 @@ $(document).ready(function () {
 
     var source_existing_anomaly_functions_template = $("#self-service-existing-anomaly-functions-template").html();
     HandleBarsTemplates.template_existing_anomaly_functions = Handlebars.compile(source_existing_anomaly_functions_template);
+
+    var source_self_service_email_template = $("#self-service-email-template").html();
+    HandleBarsTemplates.template_self_service_email = Handlebars.compile(source_self_service_email_template);
 })

@@ -13,16 +13,12 @@ import com.linkedin.thirdeye.datalayer.util.Predicate;
 public class AnomalyFunctionManagerImpl extends AbstractManagerImpl<AnomalyFunctionDTO>
     implements AnomalyFunctionManager {
 
-  private static final String FIND_DISTINCT_METRIC_BY_COLLECTION =
-      "SELECT DISTINCT(af.metric) FROM AnomalyFunctionDTO af WHERE af.collection = :collection";
-
   public AnomalyFunctionManagerImpl() {
     super(AnomalyFunctionDTO.class, AnomalyFunctionBean.class);
   }
 
   @Override
   public List<AnomalyFunctionDTO> findAllByCollection(String collection) {
-    // return super.findByParams(ImmutableMap.of("collection", collection));
     Predicate predicate = Predicate.EQ("collection", collection);
     List<AnomalyFunctionBean> list = genericPojoDao.get(predicate, AnomalyFunctionBean.class);
     List<AnomalyFunctionDTO> result = new ArrayList<>();
@@ -35,10 +31,6 @@ public class AnomalyFunctionManagerImpl extends AbstractManagerImpl<AnomalyFunct
 
   @Override
   public List<String> findDistinctMetricsByCollection(String collection) {
-    // return
-    // getEntityManager().createQuery(FIND_DISTINCT_METRIC_BY_COLLECTION,
-    // String.class)
-    // .setParameter("collection", collection).getResultList();
     Predicate predicate = Predicate.EQ("collection", collection);
     List<AnomalyFunctionBean> list = genericPojoDao.get(predicate, AnomalyFunctionBean.class);
     Set<String> metrics = new HashSet<>();
@@ -55,7 +47,6 @@ public class AnomalyFunctionManagerImpl extends AbstractManagerImpl<AnomalyFunct
    */
   @Override
   public List<AnomalyFunctionDTO> findAllActiveFunctions() {
-    // return super.findByParams(ImmutableMap.of("isActive", true));
     Predicate predicate = Predicate.EQ("active", true);
     List<AnomalyFunctionBean> list = genericPojoDao.get(predicate, AnomalyFunctionBean.class);
     List<AnomalyFunctionDTO> result = new ArrayList<>();
