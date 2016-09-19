@@ -13,8 +13,8 @@ import java.util.Set;
 
 import org.apache.commons.collections.map.MultiKeyMap;
 
-import com.google.common.collect.ArrayListMultimap;
-import com.google.common.collect.Multimap;
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.SetMultimap;
 import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.MetricSchema;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
@@ -50,7 +50,7 @@ public class TimeSeriesResponseConverter {
     List<MetricType> types = Collections.nCopies(metrics.size(), MetricType.DOUBLE);
     MetricSchema metricSchema = new MetricSchema(metrics, types);
 
-    Multimap<DimensionKey, TimeSeriesRow> dimensionKeyToRows = ArrayListMultimap.create();
+    SetMultimap<DimensionKey, TimeSeriesRow> dimensionKeyToRows = HashMultimap.create();
     // group the rows by their dimension key
     for (int i = 0; i < response.getNumRows(); i++) {
       TimeSeriesRow row = response.getRow(i);

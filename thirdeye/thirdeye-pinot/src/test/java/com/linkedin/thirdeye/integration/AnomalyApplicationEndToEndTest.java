@@ -153,12 +153,16 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
     startAlertScheduler();
 
     // check for number of entries in tasks and jobs
-    Thread.sleep(1000);
-    Assert.assertEquals(jobDAO.findAll().size(), 2);
-    Assert.assertEquals(taskDAO.findAll().size(), 2);
     Thread.sleep(10000);
-    Assert.assertEquals(jobDAO.findAll().size(), 4);
-    Assert.assertEquals(taskDAO.findAll().size(), 4);
+    int jobSize1 = jobDAO.findAll().size();
+    int taskSize1 = taskDAO.findAll().size();
+    Assert.assertTrue(jobSize1 > 0 && jobSize1%2 == 0);
+    Assert.assertTrue(taskSize1 > 0 && taskSize1%2 == 0);
+    Thread.sleep(10000);
+    int jobSize2 = jobDAO.findAll().size();
+    int taskSize2 = taskDAO.findAll().size();
+    Assert.assertTrue(jobSize2 > jobSize1 && jobSize2%2 == 0);
+    Assert.assertTrue(taskSize2 > taskSize1 && taskSize2%2 == 0);
 
     tasks = taskDAO.findAll();
 
@@ -172,8 +176,8 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
         alertCount ++;
       }
     }
-    Assert.assertEquals(detectionCount, 2);
-    Assert.assertEquals(alertCount, 2);
+    Assert.assertTrue(detectionCount > 0);
+    Assert.assertTrue(alertCount > 0);
 
     // check for task status
     tasks = taskDAO.findAll();

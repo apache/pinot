@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.client.timeseries;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 
 import org.apache.commons.lang.ObjectUtils;
 import org.joda.time.DateTime;
@@ -42,6 +43,25 @@ public class TimeSeriesRow implements Comparable<TimeSeriesRow> {
 
   public List<TimeSeriesMetric> getMetrics() {
     return metrics;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (!(o instanceof TimeSeriesRow)) {
+      return false;
+    }
+    TimeSeriesRow ts = (TimeSeriesRow) o;
+    return Objects.equals(start, ts.getStart())
+        && Objects.equals(end, ts.getEnd())
+        && Objects.equals(dimensionName, ts.getDimensionName())
+        && Objects.equals(dimensionValue, ts.getDimensionValue())
+        && Objects.equals(metrics, ts.getMetrics());
+  }
+
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(start, end, dimensionName, dimensionValue, metrics);
   }
 
   @Override
@@ -139,6 +159,21 @@ public class TimeSeriesRow implements Comparable<TimeSeriesRow> {
     public TimeSeriesMetric(String metricName, Double value) {
       this.metricName = metricName;
       this.value = value;
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(metricName, value);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (!(o instanceof TimeSeriesMetric)) {
+        return false;
+      }
+      TimeSeriesMetric ts = (TimeSeriesMetric) o;
+      return Objects.equals(metricName, ts.getMetricName())
+          && Objects.equals(value, ts.getValue());
     }
 
     @Override
