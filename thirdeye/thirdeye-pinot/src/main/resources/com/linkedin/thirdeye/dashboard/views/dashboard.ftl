@@ -20,7 +20,7 @@
         </li>
         <li id="self-service-header-tab" class="header-tab" rel="self-service"><a href="#">Self
           Service</a></li>
-        <li id="anomalies-header-tab2" class="header-tab" rel="alert" ><a href="#">Alert</a></li>
+        <li id="alert-header-tab" class="header-tab uk-hidden" rel="alert" ><a href="#">Alert</a></li>
       </ul>
 
 

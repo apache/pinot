@@ -283,12 +283,10 @@ $(document).ready( function() {
                         }
                         break;
                     case "anomalies":
-
                         var tab = "anomalies";
                         getAnomalies(tab);
                         break;
                     default://dashboard tab
-
                         var tab = "dashboard"
                         getCustomDashboard(tab);
                         break;
