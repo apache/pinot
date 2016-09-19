@@ -20,7 +20,7 @@
         </li>
         <li id="self-service-header-tab" class="header-tab" rel="self-service"><a href="#">Self
           Service</a></li>
-        <li id="anomalies-header-tab2" class="header-tab" rel="anomalies2" class="uk-hidden"></li>
+        <li id="alert-header-tab" class="header-tab uk-hidden" rel="alert" ><a href="#">Alert</a></li>
       </ul>
 
 
@@ -38,7 +38,7 @@
     <li id="timeseries"></li>
     <li id="anomalies"></li>
     <li id="self-service"></li>
-    <li id="anomalies2"></li>
+    <li id="alert"></li>
   </ul>
 </div>
 
@@ -56,6 +56,7 @@
 <#include "tabs/self-service-tab/self-service.ftl">
 <#include "tabs/self-service-tab/anomaly-function-form.ftl">
 <#include "tabs/self-service-tab/self-service-existing-functions.ftl">
+<#include "tabs/self-service-tab/self-service-email.ftl">
 
 </body>
 

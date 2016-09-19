@@ -92,34 +92,15 @@ public class ThirdEyeCacheRegistry {
 
     init(config, configDAO);
 
-    initCaches(config, pinotThirdeyeClientConfig);
+    initCaches(config);
 
     initPeriodicCacheRefresh();
   }
 
-
-  /**
-   * Initialize web app caches with custom PinotThirdEyeClientConfig: ONLY FOR TESTING
-   * @param config
-   * @param pinotThirdeyeClientConfig
-   */
-  @Deprecated
-  public static void initializeCaches(ThirdEyeConfiguration config, PinotThirdEyeClientConfig pinotThirdeyeClientConfig,
-      WebappConfigManager configDAO) {
-
-    init(config, pinotThirdeyeClientConfig, configDAO);
-
-    initCaches(config, pinotThirdeyeClientConfig);
-
-    initPeriodicCacheRefresh();
-  }
-
-
-  private static void initCaches(ThirdEyeConfiguration config, PinotThirdEyeClientConfig pinotThirdEyeClientConfig) {
+  private static void initCaches(ThirdEyeConfiguration config) {
     ThirdEyeCacheRegistry cacheRegistry = ThirdEyeCacheRegistry.getInstance();
 
     RemovalListener<PinotQuery, ResultSetGroup> listener = new RemovalListener<PinotQuery, ResultSetGroup>() {
-
       @Override
       public void onRemoval(RemovalNotification<PinotQuery, ResultSetGroup> notification) {
         LOGGER.info("Expired {}", notification.getKey().getPql());
@@ -134,11 +115,13 @@ public class ThirdEyeCacheRegistry {
 
     // Schema Cache
     LoadingCache<String, Schema> schemaCache =
-        CacheBuilder.newBuilder().build(new SchemaCacheLoader(pinotThirdeyeClientConfig));
+        CacheBuilder.newBuilder().expireAfterAccess(1, TimeUnit.HOURS)
+            .build(new SchemaCacheLoader(pinotThirdeyeClientConfig));
     cacheRegistry.registerSchemaCache(schemaCache);
 
     // Collection Schema Cache
-    LoadingCache<String, CollectionSchema> collectionSchemaCache = CacheBuilder.newBuilder()
+    LoadingCache<String, CollectionSchema> collectionSchemaCache =
+        CacheBuilder.newBuilder().expireAfterAccess(1, TimeUnit.HOURS)
         .build(new CollectionSchemaCacheLoader(pinotThirdeyeClientConfig, webappConfigDAO));
     cacheRegistry.registerCollectionSchemaCache(collectionSchemaCache);
 
@@ -148,7 +131,8 @@ public class ThirdEyeCacheRegistry {
     cacheRegistry.registerCollectionMaxDataTimeCache(collectionMaxDataTimeCache);
 
     // CollectionConfig Cache
-    LoadingCache<String, CollectionConfig> collectionConfigCache = CacheBuilder.newBuilder()
+    LoadingCache<String, CollectionConfig> collectionConfigCache =
+        CacheBuilder.newBuilder().expireAfterAccess(1, TimeUnit.HOURS)
         .build(new CollectionConfigCacheLoader(webappConfigDAO));
     cacheRegistry.registerCollectionConfigCache(collectionConfigCache);
 

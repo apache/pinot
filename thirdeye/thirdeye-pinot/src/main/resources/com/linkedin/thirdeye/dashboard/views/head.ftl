@@ -58,4 +58,5 @@
     <script src="../../../assets/js/lib/dashboard-form-submit.js" defer></script>
     <script src="../../../assets/js/lib/dashboard-chart-area.js" defer></script>
     <script src="../../../assets/js/dashboard.js" defer></script>
+    <script src="../../../assets/js/lib/self-service-email.js" defer></script>
 </head>

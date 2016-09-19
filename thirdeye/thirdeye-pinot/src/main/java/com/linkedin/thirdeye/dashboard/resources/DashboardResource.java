@@ -109,8 +109,7 @@ public class DashboardResource {
   @GET
   @Path(value = "/data/datasets")
   @Produces(MediaType.APPLICATION_JSON)
-  public String getCollections() {
-    String jsonCollections = null;
+  public List<String> getCollections() throws Exception {
     try {
       List<String> collections = new ArrayList<>();
       for (String collection : collectionsCache.getCollections()) {
@@ -126,23 +125,19 @@ public class DashboardResource {
         }
         collections.add(collection);
       }
-
-      jsonCollections = OBJECT_MAPPER.writeValueAsString(collections);
+      return collections;
     } catch (Exception e) {
       LOG.error("Error while fetching datasets", e);
+      throw e;
     }
-
-    return jsonCollections;
   }
 
   @GET
   @Path(value = "/data/metrics")
   @Produces(MediaType.APPLICATION_JSON)
-  public String getMetrics(@QueryParam("dataset") String collection) {
-    String jsonMetrics = null;
+  public List<String> getMetrics(@QueryParam("dataset") String collection) throws Exception {
     try {
       collection = ThirdEyeUtils.getCollectionFromAlias(collection);
-
       CollectionSchema schema = collectionSchemaCache.get(collection);
       List<String> metrics = schema.getMetricNames();
       CollectionConfig collectionConfig = null;
@@ -156,12 +151,11 @@ public class DashboardResource {
         metrics.removeAll(collectionConfig.getDerivedMetrics().values());
       }
       Collections.sort(metrics);
-      jsonMetrics = OBJECT_MAPPER.writeValueAsString(metrics);
+      return metrics;
     } catch (Exception e) {
       LOG.error("Error while fetching metrics", e);
+      throw e;
     }
-
-    return jsonMetrics;
   }
 
   @GET
