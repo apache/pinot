@@ -87,7 +87,7 @@ public class PinotLLCRealtimeSegmentManager {
     }
     INSTANCE = new PinotLLCRealtimeSegmentManager(helixAdmin, clusterName, helixManager, propertyStore,
         helixResourceManager, controllerConf);
-    SegmentCompletionManager.create(helixManager, INSTANCE);
+    SegmentCompletionManager.create(helixManager, INSTANCE, controllerConf);
   }
 
   protected PinotLLCRealtimeSegmentManager(HelixAdmin helixAdmin, String clusterName, HelixManager helixManager,

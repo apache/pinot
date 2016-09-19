@@ -28,6 +28,7 @@ import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
+import com.linkedin.pinot.controller.ControllerConf;
 
 
 /**
@@ -65,11 +66,13 @@ public class SegmentCompletionManager {
     _segmentManager = segmentManager;
   }
 
-  public static SegmentCompletionManager create(HelixManager helixManager, PinotLLCRealtimeSegmentManager segmentManager) {
+  public static SegmentCompletionManager create(HelixManager helixManager,
+      PinotLLCRealtimeSegmentManager segmentManager, ControllerConf controllerConf) {
     if (_instance != null) {
       throw new RuntimeException("Cannot create multiple instances");
     }
     _instance = new SegmentCompletionManager(helixManager, segmentManager);
+    SegmentCompletionProtocol.setMaxSegmentCommitTimeMs(controllerConf.getSegmentCommitTimeoutSeconds() * 1000L);
     return _instance;
   }
 
@@ -234,7 +237,7 @@ public class SegmentCompletionManager {
     // time that we need to consider.
     // We may need to add some time here to allow for getting the lock? For now 0
     // We may need to add some time for the committer come back to us? For now 0.
-    public static final long MAX_TIME_ALLOWED_TO_COMMIT_MS = MAX_TIME_TO_NOTIFY_WINNER_MS + SegmentCompletionProtocol.MAX_SEGMENT_COMMIT_TIME_MS;
+    public static final long MAX_TIME_ALLOWED_TO_COMMIT_MS = MAX_TIME_TO_NOTIFY_WINNER_MS + SegmentCompletionProtocol.getMaxSegmentCommitTimeMs();
 
     public final Logger LOGGER;
 

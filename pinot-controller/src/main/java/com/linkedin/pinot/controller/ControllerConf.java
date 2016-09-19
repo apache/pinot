@@ -20,10 +20,8 @@ import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.List;
-
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
-
 import com.linkedin.pinot.common.utils.StringUtil;
 
 public class ControllerConf extends PropertiesConfiguration {
@@ -43,12 +41,14 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final String VALIDATION_MANAGER_FREQUENCY_IN_SECONDS = "controller.validation.frequencyInSeconds";
   private static final String STATUS_CHECKER_FREQUENCY_IN_SECONDS = "controller.statuschecker.frequencyInSeconds";
   private static final String SERVER_ADMIN_REQUEST_TIMEOUT_SECONDS = "server.request.timeoutSeconds";
+  private static final String SEGMENT_COMMIT_TIMEOUT_SECONDS = "controller.realtime.segment.commit.timeoutSeconds";
 
   private static final int DEFAULT_RETENTION_CONTROLLER_FREQUENCY_IN_SECONDS = 6 * 60 * 60; // 6 Hours.
   private static final int DEFAULT_VALIDATION_CONTROLLER_FREQUENCY_IN_SECONDS = 60 * 60; // 1 Hour.
   private static final int DEFAULT_STATUS_CONTROLLER_FREQUENCY_IN_SECONDS = 5 * 60; // 5 minutes
   private static final long DEFAULT_EXTERNAL_VIEW_ONLINE_TO_OFFLINE_TIMEOUT_MILLIS = 120_000L; // 2 minutes
   private static final int DEFAULT_SERVER_ADMIN_REQUEST_TIMEOUT_SECONDS = 30;
+  private static final int DEFAULT_SEGMENT_COMMIT_TIMEOUT_SECONDS = 45;
 
   public ControllerConf(File file) throws ConfigurationException {
     super(file);
@@ -106,6 +106,10 @@ public class ControllerConf extends PropertiesConfiguration {
     setProperty(DATA_DIR, dataDir);
   }
 
+  public void setRealtimeSegmentCommitTimeoutSeconds(int timoeutSec) {
+    setProperty(SEGMENT_COMMIT_TIMEOUT_SECONDS, Integer.toString(timoeutSec));
+  }
+
   public void setUpdateSegmentStateModel(String updateStateModel) {
     setProperty(UPDATE_SEGMENT_STATE_MODEL, updateStateModel);
   }
@@ -128,6 +132,13 @@ public class ControllerConf extends PropertiesConfiguration {
 
   public String getDataDir() {
     return (String) getProperty(DATA_DIR);
+  }
+
+  public int getSegmentCommitTimeoutSeconds() {
+    if (containsKey(SEGMENT_COMMIT_TIMEOUT_SECONDS)) {
+      return Integer.parseInt((String)getProperty(SEGMENT_COMMIT_TIMEOUT_SECONDS));
+    }
+    return DEFAULT_SEGMENT_COMMIT_TIMEOUT_SECONDS;
   }
 
   public boolean isUpdateSegmentStateModel() {
