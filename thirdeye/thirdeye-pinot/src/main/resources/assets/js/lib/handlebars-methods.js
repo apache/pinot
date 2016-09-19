@@ -206,6 +206,30 @@ $(document).ready(function () {
         return moment(millis).tz(tz).format(dateTimeFormat);
     });
 
+    //Parse string that contains ':' and uses ',' separator
+    Handlebars.registerHelper('parseProperties', function (str, prop) {
+
+        if(str && str.substr(str.length - 1) == ","){
+            str = str.substring(0, str.length-1);
+        }
+        str = str.replace(/,/g, ";")
+        str = str.replace(/ /g, "")
+        str = str.replace(/:/g, "=")
+        var fnProperties = {}
+        var propertiesAry = str.split(";");
+        for (var i = 0, numProp = propertiesAry.length; i < numProp; i++) {
+            var keyValue = propertiesAry[i];
+            keyValue = keyValue.split("=")
+            var key = keyValue[0];
+            var value = keyValue[1];
+            fnProperties[key] = value;
+        }
+
+        return fnProperties[prop];
+    });
+
+
+
     Handlebars.registerHelper('parse', function (str, prop) {
         str = str.replace("/;/g", ',');
         var obj = JSON.parse(str);
