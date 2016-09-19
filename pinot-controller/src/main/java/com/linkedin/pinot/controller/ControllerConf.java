@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
+import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
 import com.linkedin.pinot.common.utils.StringUtil;
 
 public class ControllerConf extends PropertiesConfiguration {
@@ -48,7 +49,6 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final int DEFAULT_STATUS_CONTROLLER_FREQUENCY_IN_SECONDS = 5 * 60; // 5 minutes
   private static final long DEFAULT_EXTERNAL_VIEW_ONLINE_TO_OFFLINE_TIMEOUT_MILLIS = 120_000L; // 2 minutes
   private static final int DEFAULT_SERVER_ADMIN_REQUEST_TIMEOUT_SECONDS = 30;
-  private static final int DEFAULT_SEGMENT_COMMIT_TIMEOUT_SECONDS = 45;
 
   public ControllerConf(File file) throws ConfigurationException {
     super(file);
@@ -138,7 +138,7 @@ public class ControllerConf extends PropertiesConfiguration {
     if (containsKey(SEGMENT_COMMIT_TIMEOUT_SECONDS)) {
       return Integer.parseInt((String)getProperty(SEGMENT_COMMIT_TIMEOUT_SECONDS));
     }
-    return DEFAULT_SEGMENT_COMMIT_TIMEOUT_SECONDS;
+    return SegmentCompletionProtocol.getDefaultMaxSegmentCommitTimeSec();
   }
 
   public boolean isUpdateSegmentStateModel() {

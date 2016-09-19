@@ -19,6 +19,7 @@ package com.linkedin.pinot.controller.helix.core.realtime;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
 import org.slf4j.Logger;
@@ -72,7 +73,9 @@ public class SegmentCompletionManager {
       throw new RuntimeException("Cannot create multiple instances");
     }
     _instance = new SegmentCompletionManager(helixManager, segmentManager);
-    SegmentCompletionProtocol.setMaxSegmentCommitTimeMs(controllerConf.getSegmentCommitTimeoutSeconds() * 1000L);
+    SegmentCompletionProtocol.setMaxSegmentCommitTimeMs(TimeUnit.SECONDS.convert(
+            controllerConf.getSegmentCommitTimeoutSeconds(), TimeUnit.MILLISECONDS)
+        );
     return _instance;
   }
 
@@ -226,18 +229,16 @@ public class SegmentCompletionManager {
     // We will have some variation between hosts, so we add 10% to the max hold time to pick a winner.
     // If there is more than 10% variation, then it is handled as an error case (i.e. the first few to
     // come in will have a winner, and the later ones will just download the segment)
-    public static final long  MAX_TIME_TO_PICK_WINNER_MS =
+    private static final long  MAX_TIME_TO_PICK_WINNER_MS =
       SegmentCompletionProtocol.MAX_HOLD_TIME_MS + (SegmentCompletionProtocol.MAX_HOLD_TIME_MS / 10);
 
     // Once we pick a winner, the winner may get notified in the next call, so add one hold time plus some.
-    public static final long MAX_TIME_TO_NOTIFY_WINNER_MS = MAX_TIME_TO_PICK_WINNER_MS +
+    // It may be that the winner is not the server that we are currently processing a segmentConsumed()
+    // message from. In that case, we will wait for the next segmetnConsumed() message from the picked winner.
+    // If the winner does not come back to us within that time, we abort the state machine and start over.
+    private static final long MAX_TIME_TO_NOTIFY_WINNER_MS = MAX_TIME_TO_PICK_WINNER_MS +
       SegmentCompletionProtocol.MAX_HOLD_TIME_MS + (SegmentCompletionProtocol.MAX_HOLD_TIME_MS / 10);
 
-    // Once the winner is notified, the are expected to commit right away. At this point, it is the segment commit
-    // time that we need to consider.
-    // We may need to add some time here to allow for getting the lock? For now 0
-    // We may need to add some time for the committer come back to us? For now 0.
-    public static final long MAX_TIME_ALLOWED_TO_COMMIT_MS = MAX_TIME_TO_NOTIFY_WINNER_MS + SegmentCompletionProtocol.getMaxSegmentCommitTimeMs();
 
     public final Logger LOGGER;
 
@@ -250,6 +251,11 @@ public class SegmentCompletionManager {
     private String _winner;
     private final PinotLLCRealtimeSegmentManager _segmentManager;
     private final SegmentCompletionManager _segmentCompletionManager;
+    // Once the winner is notified, the are expected to commit right away. At this point, it is the segment build
+    // time that we need to consider.
+    // We may need to add some time here to allow for getting the lock? For now 0
+    // We may need to add some time for the committer come back to us (after the build)? For now 0.
+    private final long _maxTimeAllowedToCommitMs = MAX_TIME_TO_NOTIFY_WINNER_MS + SegmentCompletionProtocol.getMaxSegmentCommitTimeMs();
 
     // Ctor that starts the FSM in HOLDING state
     public SegmentCompletionFSM(PinotLLCRealtimeSegmentManager segmentManager,
@@ -433,7 +439,7 @@ public class SegmentCompletionManager {
     }
 
     private SegmentCompletionProtocol.Response abortIfTooLateAndReturnHold(long now, String instanceId, long offset) {
-      if (now > _startTime + MAX_TIME_ALLOWED_TO_COMMIT_MS) {
+      if (now > _startTime + _maxTimeAllowedToCommitMs) {
         LOGGER.warn("{}:Aborting FSM (too late) instance={} offset={} now={} start={}", _state, instanceId,
             offset, now, _startTime);
         return abortAndReturnHold(now, instanceId, offset);
