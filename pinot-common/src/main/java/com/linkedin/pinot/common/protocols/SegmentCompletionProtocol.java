@@ -53,7 +53,7 @@ public class SegmentCompletionProtocol {
    * it  (via a SegmentCommit message) after the server has been notified that it is the committer.
    */
   private static final int DEFAULT_MAX_SEGMENT_COMMIT_TIME_SEC = 60;
-  private static long MAX_SEGMENT_COMMIT_TIME_MS = TimeUnit.SECONDS.convert(DEFAULT_MAX_SEGMENT_COMMIT_TIME_SEC, TimeUnit.MILLISECONDS);
+  private static long MAX_SEGMENT_COMMIT_TIME_MS = TimeUnit.MILLISECONDS.convert(DEFAULT_MAX_SEGMENT_COMMIT_TIME_SEC, TimeUnit.SECONDS);
 
   public enum ControllerResponseStatus {
     /** Never sent by the controller, but locally used by server when sending a request fails */

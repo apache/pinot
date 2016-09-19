@@ -73,8 +73,8 @@ public class SegmentCompletionManager {
       throw new RuntimeException("Cannot create multiple instances");
     }
     _instance = new SegmentCompletionManager(helixManager, segmentManager);
-    SegmentCompletionProtocol.setMaxSegmentCommitTimeMs(TimeUnit.SECONDS.convert(
-            controllerConf.getSegmentCommitTimeoutSeconds(), TimeUnit.MILLISECONDS)
+    SegmentCompletionProtocol.setMaxSegmentCommitTimeMs(TimeUnit.MILLISECONDS.convert(
+            controllerConf.getSegmentCommitTimeoutSeconds(), TimeUnit.SECONDS)
         );
     return _instance;
   }
