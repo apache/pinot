@@ -3,7 +3,7 @@
   "functionName": "impression percent threshold",
   "metric": "impressions",
   "metricFunction": "SUM",
-  "type": "USER_RULE",
+  "type": "WEEK_OVER_WEEK_RULE",
   "isActive": true,
   "cron": "* 0/5 * * * ?",
   "properties": "changeThreshold=-0.10;averageVolumeThreshold=10000;baseline=w/w",

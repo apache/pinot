@@ -54,7 +54,7 @@
                 </td>
                 <td>
                     <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group uk-display-inline-block">
-                        <div id="selected-function-type" class="uk-button" value="{{#if data/id}}{{data/type}}{{else}}USER_RULE{{/if}}">{{#if data/id}}{{data/type}}{{else}}USER_RULE{{/if}}</div>
+                        <div id="selected-function-type" class="uk-button" value="{{#if data/id}}{{data/type}}{{else}}WEEK_OVER_WEEK_RULE{{/if}}">{{#if data/id}}{{data/type}}{{else}}WEEK_OVER_WEEK_RULE{{/if}}</div>
                         <div class="uk-button uk-button-primary" type="button"><i class="uk-icon-caret-down"></i></div>
                         <div class="uk-dropdown uk-dropdown-small uk-dropdown-bottom" style="top: 30px; left: 0px;">
                             <ul class="uk-nav uk-nav-dropdown single-select">
@@ -95,8 +95,8 @@
                 </div>
             </div>
 
-            <!-- ** USER_RULE PROPERTIES ** -->
-            <div class="USER_RULE-fields function-type-fields uk-display-inline-block {{#if data/functionype}}uk-hidden{{/if}}">
+            <!-- ** WEEK_OVER_WEEK_RULE PROPERTIES ** -->
+            <div class="WEEK_OVER_WEEK_RULE-fields function-type-fields uk-display-inline-block {{#if data/functionype}}uk-hidden{{/if}}">
                 <div id="anomaly-condition-selector" class="uk-form-row uk-form-row uk-display-inline-block" rel="self-service">
                     <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group uk-display-inline-block">
                         <div id="selected-anomaly-condition" class="uk-button" value={{#if fnProperties}}"{{discribeDelta fnProperties/changeThreshold 'description'}}"{{/if}}>
@@ -135,7 +135,7 @@
                     </div>
                 </div>
             </div>
-            <!-- ** END OF USER_RULE PROPERTIES **
+            <!-- ** END OF WEEK_OVER_WEEK_RULE PROPERTIES **
 
             <!-- ** MIN_MAX_THRESHOLD PROPERTIES ** -->
             <div class="MIN_MAX_THRESHOLD-fields function-type-fields uk-display-inline-block uk-hidden">
@@ -168,8 +168,8 @@
         </div>
         <div class="uk-form-row uk-margin-top">
 
-            <!-- ** USER_RULE & MIN_MAX_THRESHOLD PROPERTIES ** -->
-            <div class="USER_RULE-fields MIN_MAX_THRESHOLD-fields function-type-fields">
+            <!-- ** WEEK_OVER_WEEK_RULE & MIN_MAX_THRESHOLD PROPERTIES ** -->
+            <div class="WEEK_OVER_WEEK_RULE-fields MIN_MAX_THRESHOLD-fields function-type-fields">
                 <div id="self-service-view-single-dimension-selector" class="view-single-dimension-selector uk-display-inline-block" rel="self-service">
                     <label class="uk-form-label">in dimension</label>
                     <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group">
@@ -200,7 +200,7 @@
                     <ul  class="selected-filters-list uk-display-inline-block" rel="self-service"</ul>
                 </div>
             </div>
-            <!-- ** USER_RULE & MIN_MAX_THRESHOLD PROPERTIES ** -->
+            <!-- ** WEEK_OVER_WEEK_RULE & MIN_MAX_THRESHOLD PROPERTIES ** -->
         </div>
 
         <!-- ** FUNCTION TYPE PROPERTIES ** -->

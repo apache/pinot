@@ -15,7 +15,7 @@ import org.testng.annotations.Test;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 
 public class TestUserRuleAnomalyFunction {
-  private static final UserRuleAnomalyFunction function = new UserRuleAnomalyFunction();
+  private static final WeekOverWeekRuleFunction function = new WeekOverWeekRuleFunction();
 
   @Test
   public void analyze() {

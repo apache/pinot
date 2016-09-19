@@ -216,7 +216,7 @@ public abstract class AbstractManagerTestBase {
   protected AnomalyFunctionDTO getTestFunctionSpec(String metricName, String collection) {
     AnomalyFunctionDTO functionSpec = new AnomalyFunctionDTO();
     functionSpec.setFunctionName("integration test function 1");
-    functionSpec.setType("USER_RULE");
+    functionSpec.setType("WEEK_OVER_WEEK_RULE");
     functionSpec.setMetric(metricName);
     functionSpec.setCollection(collection);
     functionSpec.setMetricFunction(MetricAggFunction.SUM);

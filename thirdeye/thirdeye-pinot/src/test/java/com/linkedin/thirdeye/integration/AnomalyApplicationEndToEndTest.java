@@ -64,7 +64,7 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
 
   private int id = 0;
   private String dashboardHost = "http://localhost:8080/dashboard";
-  private String functionPropertiesFile = "/sample-config-dir/detector-config/anomaly-functions/functions.properties";
+  private String functionPropertiesFile = "/sample-functions.properties";
   private String thirdeyeCollectionSchema = "/sample-config-dir/webapp-config/CollectionSchema/test-collection.json";
   private String metric = "cost";
   private String collection = "test-collection";

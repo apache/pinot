@@ -150,7 +150,7 @@ $(document).ready( function() {
         ],
         MIN_MAX_THRESHOLD: ["min","max"
         ],
-        USER_RULE: [
+        WEEK_OVER_WEEK_RULE: [
             "baseline","changeThreshold","averageVolumeThreshold"
         ],
         SIGN_TEST: [
@@ -207,9 +207,9 @@ $(document).ready( function() {
                 "SIGN_TEST|seasonalUnit": ["DAYS", "TimeUnit"],
                 "SIGN_TEST|signTestSize": [2, "int"],
                 "SIGN_TEST|signTestUnit": ["HOURS", "TimeUnit"],
-                "USER_RULE|averageVolumeThreshold": [],
-                "USER_RULE|baseline": [],
-                "USER_RULE|changeThreshold": []
+                "WEEK_OVER_WEEK_RULE|averageVolumeThreshold": [],
+                "WEEK_OVER_WEEK_RULE|baseline": [],
+                "WEEK_OVER_WEEK_RULE|changeThreshold": []
             }
         }
 

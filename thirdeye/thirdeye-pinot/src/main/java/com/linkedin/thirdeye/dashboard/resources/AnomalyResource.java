@@ -63,7 +63,7 @@ public class AnomalyResource {
   private static final String UTF8 = "UTF-8";
   private static final String STAR_DIMENSION = "*";
   private static final String DIMENSION_JOINER = ",";
-  private static final String DEFAULT_FUNCTION_TYPE = "USER_RULE";
+  private static final String DEFAULT_FUNCTION_TYPE = "WEEK_OVER_WEEK_RULE";
 
   private AnomalyFunctionManager anomalyFunctionDAO;
   private MergedAnomalyResultManager anomalyMergedResultDAO;
