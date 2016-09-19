@@ -895,7 +895,7 @@ function clearCreateForm() {
 /** Takes an object where separators are ";" "=" returns JSON**/
 function parseProperties(properties){
 
-    if(properties && properties.substr(properties.length - 1) == ","){
+    if(properties && properties.substr(properties.length - 1) == ";"){
         properties = properties.substring(0, properties.length-1);
     }
     var fnProperties = {}

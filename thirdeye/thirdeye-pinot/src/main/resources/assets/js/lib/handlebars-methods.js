@@ -109,7 +109,7 @@ $(document).ready(function () {
     });
 
     //returns classname negative or positive or no classname. The classname related css creates a :before pseudo element triangle up or down
-    Handlebars.registerHelper('discribeDelta', function (value, describeMode) {
+    Handlebars.registerHelper('describeDelta', function (value, describeMode) {
 
         var describeChange;
         if (parseFloat(value) > 0) {
@@ -207,6 +207,7 @@ $(document).ready(function () {
                }
             }
         };
+
         millis = parseInt(millis);
         var tz = getTimeZone();
         return moment(millis).tz(tz).format(displayDateFormat);
@@ -254,15 +255,6 @@ $(document).ready(function () {
         }
         return value;
     });
-
-
-
-    Handlebars.registerHelper('parse', function (str, prop) {
-        str = str.replace("/;/g", ',');
-        var obj = JSON.parse(str);
-        return obj[prop];
-    });
-
 
     /* Add details-cell or heatmap-cell class to cells */
     Handlebars.registerHelper('classify', function (index) {

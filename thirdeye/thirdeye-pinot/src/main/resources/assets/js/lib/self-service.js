@@ -114,9 +114,22 @@ function addSelfServiceListeners() {
     });
 
     // Monitoring window size
+    $("#self-service-forms-section").on("keyup, click", "#min-consecutive-size", function () {
+        var form = $(this).closest("form");
+        hideErrorAndSuccess("min-consecutive-size",form);
+    });
+
+
+    // Monitoring window size
     $("#self-service-forms-section").on("keyup, click", "#monitoring-window-size", function () {
         var form = $(this).closest("form");
         hideErrorAndSuccess("monitoring-window-size",form);
+    });
+
+    // Monitoring repeat unit selection
+    $("#self-service-forms-section").on("click", ".min-consecutive-unit-option", function () {
+        var form = $(this).closest("form");
+        hideErrorAndSuccess("",form);
     });
 
     // Monitoring repeat unit selection
@@ -388,6 +401,8 @@ function addSelfServiceListeners() {
         formData.functionType = $("#selected-function-type", form).attr("value");
         formData.metricFunction = "SUM";
         formData.windowDelay = "1";
+        formData.minConsecutiveSize = $("#min-consecutive-size", form).val(); //
+        formData.minConsecutiveUnit = $("#selected-min-consecutive-unit", form).attr("value");
         formData.windowSize = $("#monitoring-window-size", form).val(); //
         formData.windowUnit = $("#selected-monitoring-window-unit", form).attr("value");
         formData.repeatEverySize = $("#monitoring-repeat-size", form).val() ? $("#monitoring-repeat-size", form).val() : 1;
@@ -507,9 +522,17 @@ function addSelfServiceListeners() {
             return
         }
 
+        //Check if min consecutive window size has value
+        if (!formData.minConsecutiveSize|| formData.minConsecutiveSize < 0 ||  !isInt(formData.minConsecutiveSize) ) {
+            errorMessage.html("Please fill in how many consecutive hours/days/weeks/months should fail the threshold to trigger an alert. The value should be an integer.");
+            errorAlert.attr("data-error-source", "min-consecutive-size");
+            errorAlert.fadeIn(100);
+            return
+        }
+
         //Check if windowSize has value
         if (!formData.windowSize || formData.windowSize < 0) {
-            errorMessage.html("Please fill in how many consecutive hours/days/weeks/months should fail the threshold to trigger an alert.");
+            errorMessage.html("Please fill in what timewindow should be tested each time when monitoring the data.");
             errorAlert.attr("data-error-source", "monitoring-window-size");
             errorAlert.fadeIn(100);
             return
@@ -927,8 +950,10 @@ function addSelfServiceListeners() {
             + "&windowSize=" + formData.windowSize + "&windowUnit=" + formData.windowUnit + "&windowDelay=" + formData.windowDelay
 
             + "&isActive=" + formData.isActive + "&properties="
-        url += (formData.functionType == "WEEK_OVER_WEEK_RULE") ? "baseline=" + formData.baseline + ";changeThreshold=" + formData.condition + formData.changeThreshold : "";
+
+        url += (formData.functionType == "WEEK_OVER_WEEK_RULE") ? "baseline=" + formData.baseline + ";changeThreshold=" + formData.condition + formData.changeThreshold + ";minConsecutiveSize=" + formData.minConsecutiveSize + ";minConsecutiveUnit=" + formData.minConsecutiveUnit : "";
         url += (formData.functionType == "MIN_MAX_THRESHOLD" && formData.min ) ? "min=" + formData.min + ";" : "";
+        url += (formData.functionType == "MIN_MAX_THRESHOLD" && formData.max ) ? "max=" + formData.max + ";" : "";
         url += (formData.functionType != "MIN_MAX_THRESHOLD" && formData.functionType != "WEEK_OVER_WEEK_RULE" ) ? stringifyProperties(formData.properties) : "";
         url += (formData.repeatEveryUnit) ? "&cron=" + cron : "";
         url += (formData.repeatEveryUnit) ? "&repeatEvery=" + formData.repeatEveryUnit : "";
