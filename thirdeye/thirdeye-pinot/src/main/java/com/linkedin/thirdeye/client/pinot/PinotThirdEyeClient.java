@@ -189,7 +189,7 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
     String timeFormat = collectionSchema.getTime().getFormat();
     if (timeFormat != null && !timeFormat.equals(TimeSpec.SINCE_EPOCH_FORMAT)) {
       isISOFormat = true;
-      dateTimeFormatter = DateTimeFormat.forPattern(timeFormat).withZoneUTC();
+      dateTimeFormatter = DateTimeFormat.forPattern(timeFormat);
     }
     if (request.getGroupByTimeGranularity() != null) {
       hasGroupByTime = true;

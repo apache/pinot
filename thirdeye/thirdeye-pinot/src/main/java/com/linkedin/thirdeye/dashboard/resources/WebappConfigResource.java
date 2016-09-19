@@ -91,7 +91,7 @@ public class WebappConfigResource {
   }
 
   @POST
-  @Path(value = "update/{id}/{collection}/{configType}")
+  @Path(value = "update/{id}/{collection}/{type}")
   public Response updateConfig(@PathParam("id") Long id, @PathParam("collection") String collection,
       @PathParam("type") WebappConfigType type, String payload) {
     try {
