@@ -898,6 +898,93 @@ body a{
     padding: 6px;
 }
 
+/** anomalies view / thumbnails related **/
+#anomaly-result-thumbnails{
+    margin-left: 0;
+}
+
+.large-anomaly-box{
+    background: linear-gradient(90deg,#f0f0f0 130px,rgba(240,240,240,0) calc(130px + 20%));/*#f0f0f0*/
+    height: 215px;
+    padding-left:0px;
+    border: 1px solid #ddd;
+    margin: 10px auto 0 auto;
+    position: relative;
+    width:100%;
+}
+
+.large-anomaly-box .c3-axis tspan{
+    color: #666;
+}
+
+.anomalies-box-background{
+    background-color: #f5f5f5;
+    border: 1px solid #ddd;
+    position: relative;
+}
+.box-highchart {
+    position: absolute;
+    width: 100%;
+    top: 0;
+    left: 0;
+    z-index: 1;
+}
+
+.highcharts-container{
+    position: relative;
+    top:35px;
+    left: 14%;
+    overflow: hidden;
+    width: 70%;
+    height: 150px;
+    text-align: left;
+    line-height: normal;
+    -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+}
+
+.highcharts-container .c3-ygrids line:nth-child(even),
+.highcharts-container .c3-axis-y2 .tick:nth-child(even){
+    display: none;
+}
+
+.highcharts-container .c3-axis-y2 .tick:last-child{
+    display: block;
+}
+
+.box-inner{
+    padding: 5px 10px;
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 11px;
+    left: 0;
+    z-index: 2;
+}
+.box-inner *{
+    /*border: 1px solid red;*/
+
+}
+
+.box-inner .change{
+    font-weight: 800
+}
+.box-inner .change.negative-icon{
+    color: darkred;
+}
+
+.box-inner .change.positive-icon {
+    color: darkblue;
+}
+
+.heatmap-icon{
+    display:inline-block;
+    -webkit-transform: rotate(180deg);
+    -moz-transform: rotate(180deg);
+    -ms-transform: rotate(180deg);
+    -o-transform: rotate(180deg);
+    transform: rotate(180deg);
+}
+
 /* Self service related */
 #existing-anomaly-functions-table{
     table-layout:fixed;
@@ -911,38 +998,6 @@ body a{
 #existing-anomaly-functions-table  .properties-cell,
 #existing-anomaly-functions-table  .existing-anomaly-fn-filters-cell{
     border-top: none;
-}
-
-#configure-anomaly-function-form{
-    font-size: 16px;
-}
-
-.anomaly-summary {
-    background-color: lightblue;
-}
-
-.anomaly-detail {
-    background-color: #F5FFFA;
-}
-
-.anomaly2 {
-  font-size: 11px;
-  margin: 10px;
-  padding: 5px;
-  border: 1px #dddddd solid;
-  table-layout: fixed;
-}
-
-.anomaly2 tr {
-  margin: 5px;
-  padding: 5px;
-  border: 1px #dddddd solid;
-}
-
-.anomaly2 td {
-  margin: 2px;
-  padding: 2px;
-  border: 1px #dddddd solid;
 }
 
 /* D3 START*/
@@ -990,7 +1045,6 @@ path {
     position: absolute;
     text-indent: 2px;
 }
-
 
 /*c3*/
 [class*=baseline]{

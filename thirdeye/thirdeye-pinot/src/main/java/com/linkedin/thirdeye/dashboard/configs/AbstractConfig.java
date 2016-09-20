@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.api.CollectionSchema;
 
+
 public abstract class AbstractConfig {
 
   protected static ObjectMapper OBJECT_MAPPER = new ObjectMapper();

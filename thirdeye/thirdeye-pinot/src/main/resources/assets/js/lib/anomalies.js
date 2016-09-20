@@ -1,12 +1,13 @@
- anomaliesDisplayData = "";
- timeseriesDisplayData = "";
+var anomaliesDisplayData = "";
+var timeseriesDisplayData = "";
+var metricLineChart = "";
+var metricChangeChart = ""
 
 function getAnomalies(tab) {
 
     //Get dataset anomaly metrics
     var url = "/dashboard/anomalies/metrics?dataset=" + hash.dataset;
     getData(url).done(function (anomalyMetricList) {
-
 
         //Define query params for timeseries and anomaly result query
         var compareMode = hash.fnCompareWeeks ?  hash.fnCompareWeeks : 1;
@@ -17,7 +18,6 @@ function getAnomalies(tab) {
         var currentStart = hash.currentStart;
         var currentEnd = hash.currentEnd;
         var metrics = hash.metrics;
-
         var timeSeriesUrl = "/dashboard/data/tabular?dataset=" + dataset //
             + "&currentStart=" + currentStart + "&currentEnd=" + currentEnd  //
             + "&baselineStart=" + baselineStart + "&baselineEnd=" + baselineEnd   //
@@ -26,6 +26,7 @@ function getAnomalies(tab) {
         var currentStartISO = moment(parseInt(currentStart)).toISOString();
         var currentEndISO = moment(parseInt(currentEnd)).toISOString();
 
+        //If the dataset has anomaly function set up for the selected metric, query the anomaly results
         if(anomalyMetricList && anomalyMetricList.indexOf(metrics)> -1){
 
             var urlParams = "dataset=" + hash.dataset + "&startTimeIso=" + currentStartISO + "&endTimeIso=" + currentEndISO + "&metric=" + hash.metrics;
@@ -36,8 +37,7 @@ function getAnomalies(tab) {
             //AJAX for anomaly result data
             getData(anomaliesUrl).done(function (anomalyData) {
                 anomaliesDisplayData = anomalyData;
-                getTimeseriesData(anomaliesDisplayData)
-
+                getTimeseriesData(anomaliesDisplayData);
             });
 
         }else{
@@ -65,7 +65,8 @@ function getAnomalies(tab) {
                     $("#" + tab + "-display-chart-section").empty();
                 }
                 var placeholder = "linechart-placeholder"
-                renderAnomalyLineChart(timeSeriesData, anomalyData, tab, placeholder);
+                renderTimeseriesArea(timeSeriesData, tab);
+                drawMetricTimeSeries(timeSeriesData, anomalyData, tab, placeholder);
 
                 if (anomalyMetric) {
                     $(".anomaly-metric-tip").hide();
@@ -80,41 +81,17 @@ function getAnomalies(tab) {
                 delete hash.anomalyFunctionId;
                 delete hash.fnCompareWeeks;
             });
-        }
-
-        function tipToUser() {
-            var tipToUser = document.createElement("div");
-            tipToUser.id = "anomaly-metric-tip";
-            tipToUser.className = "tip-to-user uk-alert uk-form-row";
-            tipToUser.setAttribute("data-tip-source", "not-anomaly-metric");
-            var closeIcon = document.createElement("i");
-            closeIcon.className = "close-parent uk-icon-close";
-            var msg = document.createElement("p");
-            msg.innerText = "There is no anomaly monitoring function set up for this metric. You can create a function on the"
-            var link = document.createElement("a");
-            link.id = "self-service-link";
-            link.innerText = "Self Service tab.";
-
-            msg.appendChild(link);
-            tipToUser.appendChild(closeIcon);
-            tipToUser.appendChild(msg);
-            $("#" + tab + "-display-chart-section").append(tipToUser)
-        }
+        };
     });
+};
 
-}
-
-function renderAnomalyLineChart(timeSeriesData, anomalyData, tab, placeholder) {
-
+function renderTimeseriesArea(timeSeriesData, tab) {
     /* Handelbars template for time series legend */
     var result_metric_time_series_section = HandleBarsTemplates.template_metric_time_series_section(timeSeriesData);
     $("#" + tab + "-display-chart-section").append(result_metric_time_series_section);
-    drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab, placeholder);
 }
 
-var anomalyLineChart;
-var anomalyBarChart
-function drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab, placeholder) {
+function drawMetricTimeSeries(timeSeriesData, anomalyData, tab, placeholder) {
 
     var currentView = $("#" + tab + "-display-chart-section");
 
@@ -132,7 +109,6 @@ function drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab, placeholder) {
 
     var lineChartPlaceholder = $("#"+ placeholder, currentView)[0];
     var barChartPlaceholder = $("#barchart-placeholder", currentView)[0];
-    // Metric(s)
     var metrics = timeSeriesData["metrics"];
     var lineChartData = {};
     var barChartData = {};
@@ -172,14 +148,15 @@ function drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab, placeholder) {
         var metricBaselineData = [];
         var metricCurrentData = [];
         var deltaPercentageData = [];
-        var indexOfBaseline = timeSeriesData["data"][metrics[i]]["schema"]["columnsToIndexMapping"]["baselineValue"]
-        var indexOfCurrent = timeSeriesData["data"][metrics[i]]["schema"]["columnsToIndexMapping"]["currentValue"]
-        var indexOfRatio = timeSeriesData["data"][metrics[i]]["schema"]["columnsToIndexMapping"]["ratio"]
-        for (var t = 0, len = timeSeriesData["timeBuckets"].length; t < len; t++) {
+        var indexOfBaseline = timeSeriesData["data"][metrics[i]]["schema"]["columnsToIndexMapping"]["baselineValue"];
+        var indexOfCurrent = timeSeriesData["data"][metrics[i]]["schema"]["columnsToIndexMapping"]["currentValue"];
+        var indexOfRatio = timeSeriesData["data"][metrics[i]]["schema"]["columnsToIndexMapping"]["ratio"];
 
-            var baselineValue = timeSeriesData["data"][metrics[i]]["responseData"][t][indexOfBaseline];
-            var currentValue = timeSeriesData["data"][metrics[i]]["responseData"][t][indexOfCurrent];
-            var deltaPercentage = parseInt(timeSeriesData["data"][metrics[i]]["responseData"][t][indexOfRatio]);
+        for (var t = 0, tlen = timeSeriesData["timeBuckets"].length; t < tlen; t++) {
+
+            var baselineValue = timeSeriesData["data"][metrics[i]]["responseData"][t][0];
+            var currentValue = timeSeriesData["data"][metrics[i]]["responseData"][t][1];
+            var deltaPercentage = parseInt(timeSeriesData["data"][metrics[i]]["responseData"][t][2]);
             metricBaselineData.push(baselineValue);
             metricCurrentData.push(currentValue);
             deltaPercentageData.push(deltaPercentage);
@@ -194,7 +171,7 @@ function drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab, placeholder) {
 
     }
 
-    anomalyLineChart = c3.generate({
+    metricLineChart = c3.generate({
         bindto: lineChartPlaceholder,
         padding: {
             top: 0,
@@ -213,8 +190,6 @@ function drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab, placeholder) {
                 type: 'timeseries',
                 tick: {
                     count:11,
-                    width:84,
-                    multiline: true,
                     format: dateTimeFormat
                 }
             },
@@ -225,7 +200,7 @@ function drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab, placeholder) {
                 }
             }
         },
-        regions: regions,
+        //regions: regions,
         legend: {
             show: false
         },
@@ -260,6 +235,30 @@ function drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab, placeholder) {
         regionColors = colorScale(numAnomalies);
     }
 
+    //paint the anomaly regions based on anomaly id
+    for (var i = 0; i < numAnomalies; i++) {
+        var anomalyId = "anomaly-id-" + anomalyData[i]["id"];
+        d3.select("." + anomalyId + " rect")
+            .style("fill", regionColors[i])
+    }
+
+    var numAnomalies = anomalyData.length;
+    var regionColors;
+
+    if (anomalyData.length > 0 && anomalyData[0]["regionColor"]) {
+
+        regionColors = [];
+        regionColors.push( anomalyData[0]["regionColor"] )
+
+    } else if(parseInt(numAnomalies) < 10) {
+        regionColors = d3.scale.category10().range();
+
+    } else if (numAnomalies < 20) {
+        regionColors = d3.scale.category20().range();
+    } else {
+        regionColors = colorScale(numAnomalies);
+    }
+
 
     //paint the anomaly regions based on anomaly id
     for (var i = 0; i < numAnomalies; i++) {
@@ -268,7 +267,7 @@ function drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab, placeholder) {
             .style("fill", regionColors[i])
     }
 
-    anomalyBarChart = c3.generate({
+    metricChangeChart = c3.generate({
 
         bindto: barChartPlaceholder,
         padding: {
@@ -302,7 +301,7 @@ function drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab, placeholder) {
                     position: 'outer-middle'
                 },
                 tick: {
-                    count: 5,
+                    //count: 5,
                     format: function (d) {
                         return d.toFixed(2)
                     }
@@ -333,7 +332,159 @@ function drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab, placeholder) {
 
     attach_TimeSeries_EventListeners(currentView)
 
-} //end of drawAnomalyTimeSeries
+} //end of drawMetricTimeSeries
+
+
+function drawAnomalyTimeSeries(timeSeriesData,anomalyData, tab, placeholder) {
+
+     var currentView = $("#" + tab + "-display-chart-section");
+
+     var aggTimeGranularity = (window.datasetConfig.dataGranularity) ? window.datasetConfig.dataGranularity : "HOURS";
+     var dateTimeFormat = "%I:%M %p";
+     if (aggTimeGranularity == "DAYS" ) {
+         dateTimeFormat = "%m-%d";
+     }else if(timeSeriesData.summary.baselineEnd - timeSeriesData.summary.baselineStart > 86400000 ){
+         dateTimeFormat = "%m-%d %I %p";
+     }
+
+     var lineChartPlaceholder = $("#"+ placeholder, currentView)[0];
+     // Metric(s)
+     var metrics = timeSeriesData["metrics"];
+     var lineChartData = {};
+     var xTicksBaseline = [];
+     var xTicksCurrent = [];
+     var colors = {};
+     var regions = [];
+
+     for (var t = 0, len = timeSeriesData["timeBuckets"].length; t < len; t++) {
+         var timeBucket = timeSeriesData["timeBuckets"][t]["currentStart"];
+         var currentEnd = timeSeriesData["timeBuckets"][t]["currentEnd"];
+         xTicksBaseline.push(timeBucket);
+         xTicksCurrent.push(timeBucket);
+     }
+
+     for (var i = 0; i < anomalyData.length; i++) {
+         var anomaly = anomalyData[i];
+
+         var anomalyStart = anomaly.startTime;
+         var anomalyEnd = anomaly.endTime;
+         var anomayID = "anomaly-id-" + anomaly.id;
+         regions.push({'axis': 'x', 'start': anomalyStart, 'end': anomalyEnd, 'class': 'regionX ' + anomayID });
+     }
+     lineChartData["time"] = xTicksCurrent;
+
+//     var colorArray;
+//     if (metrics.length < 10) {
+//         colorArray = d3.scale.category10().range();
+//     } else if (metrics.length < 20) {
+//         colorArray = d3.scale.category20().range();
+//     } else {
+//         colorArray = colorScale(metrics.length)
+//     }
+
+
+     for (var i = 0, mlen = metrics.length; i < mlen; i++) {
+         var baselineData = [];
+         var currentData = [];
+
+         var indexOfBaseline = timeSeriesData["data"][metrics[i]]["schema"]["columnsToIndexMapping"]["baselineValue"];
+         var indexOfCurrent = timeSeriesData["data"][metrics[i]]["schema"]["columnsToIndexMapping"]["currentValue"];
+
+         for (var t = 0, tlen = timeSeriesData["timeBuckets"].length; t < tlen; t++) {
+
+             var baselineValue = timeSeriesData["data"][metrics[i]]["responseData"][t][indexOfBaseline];
+             var currentValue = timeSeriesData["data"][metrics[i]]["responseData"][t][indexOfCurrent];
+             baselineData.push(baselineValue);
+             currentData.push(currentValue);
+         }
+         lineChartData["baseline"] = baselineData;
+         lineChartData["current"] = currentData;
+
+         colors["baseline"] = '#2ca02c';
+         colors["current"] = '#1f77b4' ;
+
+     }
+
+     var anomalyThumbnailLineChart = c3.generate({
+         bindto: lineChartPlaceholder,
+         padding: {
+             top: 0,
+             right: 100,
+             bottom: 20,
+             left: 100
+         },
+         data: {
+             x: 'time',
+             axes: {
+                 baseline: 'y',
+                 current: 'y2'
+             },
+             json: lineChartData,
+             type: 'area-spline',
+             colors: colors
+         },
+         axis: {
+             min:{
+                 y2:0
+             },
+
+             x: {
+                 type: 'timeseries',
+                 tick: {
+
+                     format: dateTimeFormat,
+                     count:5
+                 }
+             },
+             y: {
+                 show: false,
+                 min: 0
+             },
+             y2: {
+                 show: true,
+
+                 tick: {
+                     //format integers with comma-grouping for thousands
+                     format: d3.format(",.1r ")
+
+                 },
+                 min: 0
+             }
+         },
+         regions: regions,
+         legend: {
+             show: false
+         },
+         grid: {
+             x: {
+                 show: false
+             },
+             y: {
+                 show: true
+             }
+         },
+         point: {
+             show: false
+         }
+     });
+
+
+    $(".c3-axis path.domain, .c3-axis-y2 line, .c3-axis-x line", lineChartPlaceholder).hide();
+    $(".c3-axis-x path.domain", lineChartPlaceholder).hide();
+
+     var numAnomalies = anomalyData.length;
+     var regionColors = ['ff7f0e'];
+
+
+
+     //paint the anomaly regions based on anomaly id
+     for (var i = 0; i < numAnomalies; i++) {
+         var anomalyId = "anomaly-id-" + anomalyData[i]["id"];
+         d3.select("." + anomalyId + " rect")
+             .style("fill", regionColors[i])
+     }
+
+ } //end of drawAnomalyTimeSeries
 
 function renderAnomalyTable(data, tab) {
     //Error handling when data is falsy (empty, undefined or null)
@@ -355,9 +506,54 @@ function renderAnomalyTable(data, tab) {
 
     attach_AnomalyTable_EventListeners()
 
+    for(var i = 0, numAnomalies = data.length; i < numAnomalies; i++) {
+        requestLineChart(i);
+
+    }
+
+
+     function requestLineChart(i){
+        var placeholder= "d3charts-" + i;
+        var dimension = data[i]["function"]["exploreDimensions"];
+        var value = data[i]["dimensions"];
+        var startTime = data[i]["startTime"];
+        var endTime = data[i]["endTime"];
+        var anomalyId = data[i]["id"];
+        var baselineStart = moment(parseInt(hash.currentStart)).add(-7, 'days')
+        var baselineEnd = moment(parseInt(hash.currentEnd)).add(-7, 'days')
+        var aggTimeGranularity = (window.datasetConfig.dataGranularity) ? window.datasetConfig.dataGranularity : "HOURS";
+        var dataset = hash.dataset;
+        var compareMode = "WoW";
+        var currentStart = hash.currentStart;
+        var currentEnd = hash.currentEnd;
+        var metrics = hash.metrics;
+
+        value = value.replace(/[,*\s]/g, "");
+        if(value.length == 0){
+            value = "ALL";
+        }
+
+        var filter = "{}";
+        if(dimension && value && value != 'ALL') {
+            filter = '{"'+dimension+'":["'+value+'"]}';
+        }
+
+        var timeSeriesUrl = "/dashboard/data/tabular?dataset=" + dataset + "&compareMode=" + compareMode //
+            + "&currentStart=" + currentStart + "&currentEnd=" + currentEnd  //
+            + "&baselineStart=" + baselineStart + "&baselineEnd=" + baselineEnd   //
+            + "&aggTimeGranularity=" + aggTimeGranularity + "&metrics=" + metrics+ "&filters=" + filter;
+        var tab = hash.view;
+
+        getDataCustomCallback(timeSeriesUrl,tab).done(function (timeSeriesData) {
+            var anomalyRegionData = [];
+            anomalyRegionData.push({startTime: parseInt(startTime), endTime: parseInt(endTime), id: anomalyId, regionColor: '#eedddd'});
+            drawAnomalyTimeSeries(timeSeriesData, anomalyRegionData, tab, placeholder)
+        })
+     }
+
 }
 
- function attach_TimeSeries_EventListeners(currentView){
+function attach_TimeSeries_EventListeners(currentView){
 
      //Unbind previously attached eventlisteners
      currentView.off("click");
@@ -385,16 +581,15 @@ function renderAnomalyTable(data, tab) {
          metricName = checkboxObj.val();
          if (checkboxObj.is(':checked')) {
              //Show metric's lines on timeseries
-             anomalyLineChart.show(metricName + "-current");
-             anomalyLineChart.show(metricName + "-baseline");
-             anomalyBarChart.show(metricName + "-delta");
+             metricLineChart.show(metricName + "-current");
+             metricLineChart.show(metricName + "-baseline");
+             metricChangeChart.show(metricName + "-delta");
 
          } else {
              //Hide metric's lines on timeseries
-             anomalyLineChart.hide(metricName + "-current");
-             anomalyLineChart.hide(metricName + "-baseline");
-             anomalyBarChart.hide(metricName + "-delta");
-
+             metricLineChart.hide(metricName + "-current");
+             metricLineChart.hide(metricName + "-baseline");
+             metricChangeChart.hide(metricName + "-delta");
          }
      }
 
@@ -426,15 +621,17 @@ function renderAnomalyTable(data, tab) {
      }
  }
 
- function attach_AnomalyTable_EventListeners(){
+function attach_AnomalyTable_EventListeners(){
 
      //Unbind previously attached eventlisteners
      $("#anomalies-table").off("click");
      $("#anomalies-table").off("hide.uk.dropdown");
+     $("#anomaly-result-thumbnails").off("click");
+     $("#anomaly-result-thumbnails").off("hide.uk.dropdown");
 
      //Clicking a checkbox in the table toggles the region of that timerange on the timeseries chart
      $("#anomalies-table").on("change", ".anomaly-table-radio-label input", function () {
-         updateChartForSingleAnomaly(this);
+         chartForSingleAnomaly(this, "linechart-placeholder");
      });
 
      //Clicking a checkbox in the table takes user to related heatmap chart
@@ -451,6 +648,16 @@ function renderAnomalyTable(data, tab) {
      $('.feedback-dropdown[data-uk-dropdown]').on('hide.uk.dropdown', function(){
          submitAnomalyFeedback(this);
      });
+
+    //Clicking a checkbox in the table takes user to related heatmap chart
+    $("#anomaly-result-thumbnails").on("click", ".heatmap-link", function () {
+        showHeatMapOfAnomaly(this);
+    });
+
+    //Clicking the feedback option will trigger the ajax - post
+    $("#anomaly-result-thumbnails").on("click", ".feedback-list", function () {
+        $(this).next("textarea").show();
+    });
 
      /** Compare/Tabular view and dashboard view heat-map-cell click switches the view to compare/heat-map
       * focusing on the timerange of the cell or in case of cumulative values it query the cumulative timerange **/
@@ -505,7 +712,7 @@ function renderAnomalyTable(data, tab) {
          }
      }
 
-     function updateChartForSingleAnomaly(target) {
+     function chartForSingleAnomaly(target, placeholder) {
 
          var button = $(target);
          var dimension = button.attr("data-explore-dimensions");
@@ -544,15 +751,45 @@ function renderAnomalyTable(data, tab) {
              } else {
                  $("#" + tab + "-chart-area-error").hide();
              }
-             var placeholder = "linechart-placeholder";
              var anomalyRegionData = [];
-
              anomalyRegionData.push({startTime: parseInt(startTime), endTime: parseInt(endTime), id: anomalyId, regionColor: colorHEX});
-             drawAnomalyTimeSeries(timeSeriesData, anomalyRegionData, tab, placeholder);
+             drawMetricTimeSeries(timeSeriesData, anomalyRegionData, tab, placeholder);
 
          });
      }
+
+    //Set initial state of view
+    $(".box-inner .change").each( function(){
+        var change = $(this).text();
+        change = parseFloat(change.trim())
+        if( change < 0){
+            $(this).addClass("negative-icon");
+
+        }else if( change > 0){
+            $(this).addClass("positive-icon");
+        }
+    });
+
  }
+
+function tipToUser() {
+    var tipToUser = document.createElement("div");
+    tipToUser.id = "anomaly-metric-tip";
+    tipToUser.className = "tip-to-user uk-alert uk-form-row";
+    tipToUser.setAttribute("data-tip-source", "not-anomaly-metric");
+    var closeIcon = document.createElement("i");
+    closeIcon.className = "close-parent uk-icon-close";
+    var msg = document.createElement("p");
+    msg.innerText = "There is no anomaly monitoring function set up for this metric. You can create a function on the"
+    var link = document.createElement("a");
+    link.id = "self-service-link";
+    link.innerText = "Self Service tab.";
+
+    msg.appendChild(link);
+    tipToUser.appendChild(closeIcon);
+    tipToUser.appendChild(msg);
+    $("#" + tab + "-display-chart-section").append(tipToUser)
+}
 
 
 

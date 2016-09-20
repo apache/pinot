@@ -50,7 +50,6 @@ function renderTimeSeriesUsingC3(d, tab) {  //time-series-area
         }
     }
 
-
     var chart = c3.generate({
         bindto: '#time-series-area',
         data: {
