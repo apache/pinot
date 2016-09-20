@@ -85,4 +85,6 @@ public class AnomalyFunctionResource {
   public MetricAggFunction[] getMetricFunctions() {
     return MetricAggFunction.values();
   }
+
+
 }

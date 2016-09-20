@@ -58,7 +58,6 @@ public class TimeSeriesRow implements Comparable<TimeSeriesRow> {
         && Objects.equals(metrics, ts.getMetrics());
   }
 
-
   @Override
   public int hashCode() {
     return Objects.hash(start, end, dimensionName, dimensionValue, metrics);
