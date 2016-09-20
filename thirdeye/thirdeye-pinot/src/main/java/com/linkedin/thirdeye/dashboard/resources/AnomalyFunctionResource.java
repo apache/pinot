@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
 import com.linkedin.thirdeye.anomaly.detection.TimeSeriesUtil;
+import com.linkedin.thirdeye.anomaly.merge.AnomalyTimeBasedSummarizer;
 import com.linkedin.thirdeye.api.CollectionSchema;
 import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
@@ -23,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
+import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
@@ -109,19 +111,18 @@ public class AnomalyFunctionResource {
 
   @POST
   @Path("/analyze")
+  @Consumes(MediaType.APPLICATION_JSON)
   public List<MergedAnomalyResultDTO> analyze(AnomalyFunctionDTO anomalyFunctionSpec,
       @QueryParam("startTime") Long startTime, @QueryParam("endTime") Long endTime)
       throws Exception {
-
+    // TODO: replace this with Job/Task framework and job tracker page
     BaseAnomalyFunction anomalyFunction = anomalyFunctionFactory.fromSpec(anomalyFunctionSpec);
     TimeSeriesResponse finalResponse = TimeSeriesUtil
         .getTimeSeriesResponse(anomalyFunctionSpec, anomalyFunction,
             anomalyFunctionSpec.getExploreDimensions(), startTime, endTime);
 
-    int anomalyCounter = 0;
-
     List<MergedAnomalyResultDTO> mergedAnomalyResults = new ArrayList<>();
-    List<RawAnomalyResultDTO> results;
+    List<RawAnomalyResultDTO> results = new ArrayList<>();
     CollectionSchema collectionSchema;
     List<String> collectionDimensions;
 
@@ -154,12 +155,23 @@ public class AnomalyFunctionResource {
 
         LOG.info("{} has {} anomalies in window {} to {}", entry.getKey(), results.size(),
             startTime, endTime);
-        anomalyCounter += results.size();
       } catch (Exception e) {
         LOG.error("Could not compute for {}", entry.getKey(), e);
       }
     }
-    LOG.info("{} anomalies found in total", anomalyCounter);
+    if (results.size() > 0) {
+      List<RawAnomalyResultDTO> validResults = new ArrayList<>();
+      for (RawAnomalyResultDTO anomaly : results) {
+        if (!anomaly.isDataMissing()) {
+          validResults.add(anomaly);
+        }
+      }
+
+      mergedAnomalyResults
+          .addAll(AnomalyTimeBasedSummarizer.mergeAnomalies(validResults, -1, 2 * 60 * 60 * 1000));
+      LOG.info("Merging [{}] anomalies to [{}] for preview", validResults.size(),
+          mergedAnomalyResults.size());
+    }
     return mergedAnomalyResults;
   }
 }
