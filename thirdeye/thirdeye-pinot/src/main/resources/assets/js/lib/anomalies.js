@@ -200,7 +200,7 @@ function drawMetricTimeSeries(timeSeriesData, anomalyData, tab, placeholder) {
                 }
             }
         },
-        regions: regions,
+        //regions: regions,
         legend: {
             show: false
         },
@@ -382,7 +382,7 @@ function drawAnomalyTimeSeries(timeSeriesData,anomalyData, tab, placeholder) {
 //         colorArray = colorScale(metrics.length)
 //     }
 
-    console.log(lineChartData)
+
      for (var i = 0, mlen = metrics.length; i < mlen; i++) {
          var baselineData = [];
          var currentData = [];
@@ -400,8 +400,8 @@ function drawAnomalyTimeSeries(timeSeriesData,anomalyData, tab, placeholder) {
          lineChartData["baseline"] = baselineData;
          lineChartData["current"] = currentData;
 
-         colors["baseline"] = '#ff7f0e' //'#2ca02c';//'#808080'; //'#7f7f7f';
-         colors["current"] = '#00008b' ;//'#0000ff';//'#1f77b4';//'#ff7f0e';
+         colors["baseline"] = '#2ca02c';
+         colors["current"] = '#1f77b4' ;
 
      }
 
@@ -420,43 +420,35 @@ function drawAnomalyTimeSeries(timeSeriesData,anomalyData, tab, placeholder) {
                  current: 'y2'
              },
              json: lineChartData,
-             type: 'spline',
+             type: 'area-spline',
              colors: colors
          },
          axis: {
+             min:{
+                 y2:0
+             },
+
              x: {
                  type: 'timeseries',
                  tick: {
-//                     culling: {
-//                         max: 5 // the number of tick texts will be adjusted to less than this value
-//                     },
+
                      format: dateTimeFormat,
                      count:5
                  }
              },
              y: {
-                 show: false
-                 //,
-//                 tick: {
-//                     //format integers with comma-grouping for thousands
-//                     format: d3.format(",.1 "),
-//                     count:4
-//
-//                 }
+                 show: false,
+                 min: 0
              },
              y2: {
                  show: true,
-//                 inner: true,
 
                  tick: {
                      //format integers with comma-grouping for thousands
-                     format: d3.format(",.1r "),
-                     count: 4
-                     //,
-//                     culling: {
-//                         max: 5 // the number of tick texts will be adjusted to less than this value
-//                     }
-                 }
+                     format: d3.format(",.1r ")
+
+                 },
+                 min: 0
              }
          },
          regions: regions,
@@ -476,32 +468,13 @@ function drawAnomalyTimeSeries(timeSeriesData,anomalyData, tab, placeholder) {
          }
      });
 
-    //d3.select('.c3-axis-x g.tick').remove();
-   //d3.select('.c3-axis.c3-axis-x',lineChartPlaceholder).attr('clip-path', "")
 
-//     var yTicks = $(".c3-axis-y",lineChartPlaceholder ).html();
-//     $(".c3-axis-y2", lineChartPlaceholder).html(yTicks);
-//     $(".c3-axis-y",lineChartPlaceholder ).hide();
-    //$(".c3-line", lineChartPlaceholder).removeAttr('stroke-dasharray');
-     $(".c3-axis path.domain, .c3-axis-y2 line, .c3-axis-x line", lineChartPlaceholder).hide();
+    $(".c3-axis path.domain, .c3-axis-y2 line, .c3-axis-x line", lineChartPlaceholder).hide();
     $(".c3-axis-x path.domain", lineChartPlaceholder).hide();
 
      var numAnomalies = anomalyData.length;
-     var regionColors;
+     var regionColors = ['ff7f0e'];
 
-     if (anomalyData.length > 0 && anomalyData[0]["regionColor"]) {
-
-         regionColors = [];
-         regionColors.push( anomalyData[0]["regionColor"] )
-
-     } else if(parseInt(numAnomalies) < 10) {
-         regionColors = d3.scale.category10().range();
-
-     } else if (numAnomalies < 20) {
-         regionColors = d3.scale.category20().range();
-     } else {
-         regionColors = colorScale(numAnomalies);
-     }
 
 
      //paint the anomaly regions based on anomaly id
@@ -784,6 +757,19 @@ function attach_AnomalyTable_EventListeners(){
 
          });
      }
+
+    //Set initial state of view
+    $(".box-inner .change").each( function(){
+        var change = $(this).text();
+        change = parseFloat(change.trim())
+        if( change < 0){
+            $(this).addClass("negative-icon");
+
+        }else if( change > 0){
+            $(this).addClass("positive-icon");
+        }
+    });
+
  }
 
 function tipToUser() {

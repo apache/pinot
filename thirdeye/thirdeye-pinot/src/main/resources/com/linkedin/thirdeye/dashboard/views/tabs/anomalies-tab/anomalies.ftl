@@ -42,7 +42,7 @@
                 <td>
                     <p>{{millisToDate anomalyData/startTime showTimeZone=false}} </p>
 
-                    <p> {{millisToDate anomalyData/endTime showTimeZone=false}}</p>
+                    <p> {{millisToDate anomalyData/endTime showTimeZone=false slashSeparator=true}}</p>
                 </td>
                 <td>{{anomalyData/message}}
                     <br/>
@@ -95,74 +95,77 @@
                     <div class="box-inner">
                         <div class="chart-info">
                         </div>
-                        <div>
-                            <div class="feedback-selector" style="float: right; margin:15px;">
-                            <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false"
-                                 class="feedback-dropdown uk-button-group">
-                                <div class="selected-feedback uk-button" data-anomaly-id="{{anomalyData/id}}"
-                                     value="{{#if anomalyData/feedback/feedbackType}}{{anomalyData/feedback/feedbackType}}{{/if}}">
-                                    {{#if
-                                    anomalyData/feedback/feedbackType}}{{anomalyData/feedback/feedbackType}}{{else}}Provide
-                                    Feedback{{/if}}
-                                </div>
-                                <button class="uk-button uk-button-primary" type="button"><i
-                                        class="uk-icon-caret-down"></i>
-                                </button>
-                                <div class="uk-dropdown uk-dropdown-small">
-                                    <ul class="feedback-list uk-nav uk-nav-dropdown single-select">
-                                        <li class="anomaly-feedback-option" value="NOT_ANOMALY"><a>NOT_ANOMALY</a></li>
-                                        <li class="anomaly-feedback-option" value="ANOMALY"><a>ANOMALY</a></li>
-                                        <li class="anomaly-feedback-option" value="ANOMALY_NO_ACTION">
-                                            <a>ANOMALY_NO_ACTION</a></li>
-                                    </ul>
-                                    <textarea
-                                            class="feedback-comment {{#if anomalyData/feedback/comment}}{{else}}hidden{{/if}}">{{#if
-                                        anomalyData/feedback/comment}}{{anomalyData/feedback/comment}}{{/if}}
-                                    </textarea>
-                                </div>
-                            </div>
+                        <div class="anomaly-info">
+
                         </div>
-                    </div>
-                    <div class="anomaly-id">
-                        # {{anomalyData/id}}
-                    </div>
-                    <div>
-                        <h3 style="margin-top:0px;">
-                            {{anomalyData/metric}}
-                        </h3>
-                    </div>
+                        <div class="anomaly-id">
+                            # {{anomalyData/id}}
+                        </div>
+                        <div>
+                            <h3 style="margin-top:0px;">
+                                {{anomalyData/metric}}
+                            </h3>
+                        </div>
 
                     <div>
                         <div class="small-label">dimension:</div>
                         <div class="dimension">
-                            <strong>{{#if
+                            <span style="font-weight: 800;font-size:14px; ">{{#if
                                 anomalyData/function/exploreDimensions}}{{anomalyData/function/exploreDimensions}} :
                                 {{/if}}
                                 {{displayAnomalyResultDimensionValue anomalyData/dimensions}}
-                            </strong>
-                                <span style="float:right;margin-right: 5px;">
-                                    <a class="heatmap-link" href="#" data-start-utc-millis="{{anomalyData/startTime}}"
-                                       data-end-utc-millis="{{anomalyData/endTime}}"
-                                       data-metric="{{anomalyData/metric}}">
-                                       <span class="uk-button" data-uk-tooltip title="See heatmap of this timerange">
-                                           <i class="uk-icon-th-list heatmap-icon"></i>
-                                           <text style="margin-left:5px;">Heatmap</text>
-                                       </span>
-                                    </a>
-                                </span>
+                            </span>
 
-                        </div>
-                        <div class="amounts">
+                            <div class="action-buttons" style="width: 20%; float: right; text-align: right; position: relative;">
 
-                                    <br/>
-                                     <span>
-                                         <strong>{{parseProperties anomalyData/message 'change'}}</strong>
-                                    </span>
+                                <div class="feedback-selector" style=" position: absolute; top:0px; right:0px;">
+                                    <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false"
+                                         class="feedback-dropdown uk-button-group" style="text-align: left;">
+                                        <div class="selected-feedback uk-button" data-anomaly-id="{{anomalyData/id}}"
+                                             value="{{#if anomalyData/feedback/feedbackType}}{{anomalyData/feedback/feedbackType}}{{/if}}">
+                                            {{#if
+                                            anomalyData/feedback/feedbackType}}{{anomalyData/feedback/feedbackType}}{{else}}Provide
+                                            Feedback{{/if}}
+                                        </div>
+                                        <button class="uk-button uk-button-primary" type="button"><i
+                                                class="uk-icon-caret-down"></i>
+                                        </button>
+                                        <div class="uk-dropdown uk-dropdown-small">
+                                            <ul class="feedback-list uk-nav uk-nav-dropdown single-select">
+                                                <li class="anomaly-feedback-option" value="NOT_ANOMALY"><a>NOT_ANOMALY</a></li>
+                                                <li class="anomaly-feedback-option" value="ANOMALY"><a>ANOMALY</a></li>
+                                                <li class="anomaly-feedback-option" value="ANOMALY_NO_ACTION">
+                                                    <a>ANOMALY_NO_ACTION</a></li>
+                                            </ul>
+                                            <textarea
+                                                    class="feedback-comment {{#if anomalyData/feedback/comment}}{{else}}hidden{{/if}}">{{#if
+                                                anomalyData/feedback/comment}}{{anomalyData/feedback/comment}}{{/if}}
+                                            </textarea>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <a class="heatmap-link" href="#" data-start-utc-millis="{{anomalyData/startTime}}"
+                                   data-end-utc-millis="{{anomalyData/endTime}}"
+                                   data-metric="{{anomalyData/metric}}" style="padding: 0px;  position: absolute; top:50px; right:0px;">
+                                   <span class="uk-button" data-uk-tooltip title="See heatmap of this timerange" style="display: inline-block; width:175px;">
+                                       <i class="uk-icon-th-list heatmap-icon"></i>
+                                       <text style="margin-left:5px;">Heatmap</text>
+                                   </span>
+                                </a>
+                            </div>
+
+                            <div class="change" style="margin-top:6px;">
+                               {{parseProperties anomalyData/message 'change'}}
+                            </div>
                         </div>
                         <div class="current-baseline">
                             <br/>
-                            <div class="small-label">current: {{parseProperties anomalyData/message 'currentVal'}}</div>
-                            <div class="small-label">baseline: {{parseProperties anomalyData/message 'baseLineVal'}}
+                            <table>
+                                <tr><td class="small-label" style="padding: 3px 0;">current: </td><td class="green-font" style="color:#1f77b4">{{parseProperties anomalyData/message 'currentVal'}}</td>
+                                    </tr>
+                                <tr><td class="small-label" style="padding: 3px 0;">baseline: </td><td class="green-font" style="color:#2ca02c">{{parseProperties anomalyData/message 'baseLineVal'}}</td></tr>
+                            </table>
 
                         </div>
 
@@ -179,16 +182,16 @@
                 <div class="box-highchart" data-highcharts-chart="{{anomalyIndex}}">
                     <span style="float:right;margin-right: 18%;">
                         <svg class="line-legend" width="80" height="25">
-                            <line x1="0" y1="15" x2="20" y2="15" stroke="#ff7f0e"></line>
+                            <line x1="0" y1="15" x2="20" y2="15" stroke="#2ca02c" stroke-width="3px"  stroke-dasharray="5,5"></line>
                             <text x="25" y="15" dy=".3em"
-                                  style="text-anchor: start; font-family:Arial, sans-serif; font-size:0.75em; color:grey;">
+                                  style="text-anchor: start; font-family:Arial, sans-serif; font-size:0.75em; color:#2ca02c;">
                                 baseline
                             </text>
                         </svg>
                         <svg class="line-legend" width="80" height="25">
-                            <line x1="0" y1="15" x2="20" y2="15" stroke="#00008b"></line>
+                            <line x1="0" y1="15" x2="20" y2="15" stroke-width="3px" stroke="#1f77b4"></line>
                             <text x="25" y="15" dy=".3em"
-                                  style="text-anchor: start; font-family:Arial, sans-serif; font-size:0.75em; color:grey;">
+                                  style="text-anchor: start; font-family:Arial, sans-serif; font-size:0.75em; color:#00008b;">
                                 current
                             </text>
                         </svg>

@@ -181,9 +181,32 @@ $(document).ready(function () {
         }
 
         //Options
-        var showTimeZone = options.hash.hasOwnProperty("showTimeZone") ? (options.hash.showTimeZone == false ? false : true) : true
+        var showTimeZone = options.hash.hasOwnProperty("showTimeZone") ? (options.hash.showTimeZone == false ? false : true) : true;
+        var showYear = options.hash.hasOwnProperty("showYear") ? (options.hash.showYear == false ? false : true) : true;
+        var onlyHour = options.hash.hasOwnProperty("onlyHour") ? (options.hash.onlyHour == false ? false : true) : false;
+        var slashSeparator = options.hash.hasOwnProperty("slashSeparator") ? options.hash.slashSeparator : false;
 
-        var displayDateFormat = showTimeZone ? 'YYYY-MM-DD h a z' : 'YYYY-MM-DD h a'
+
+
+        var displayDateFormat;
+        if(onlyHour){
+            displayDateFormat = 'h a'
+        }else{
+
+            if(showTimeZone){
+                if (showYear){
+                    displayDateFormat = (slashSeparator) ? 'YYYY/MM-DD h a z': 'YYYY-MM-DD h a z';
+                }else{
+                    displayDateFormat = (slashSeparator) ? 'MM/DD h a z' : 'MM-DD h a z';
+                }
+            }else{
+               if(showYear) {
+                   displayDateFormat = (slashSeparator) ? 'YYYY/MM/DD h a': 'YYYY-MM-DD h a';
+               }else{
+                   displayDateFormat = (slashSeparator) ? 'MM/DD h a': 'MM-DD h a';
+               }
+            }
+        };
         millis = parseInt(millis);
         var tz = getTimeZone();
         return moment(millis).tz(tz).format(displayDateFormat);
@@ -225,7 +248,11 @@ $(document).ready(function () {
             fnProperties[key] = value;
         }
 
-        return fnProperties[prop];
+        var value = fnProperties[prop];
+        if(prop == "baseLineVal" || prop == "currentVal" ){
+            value =  value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+        }
+        return value;
     });
 
 

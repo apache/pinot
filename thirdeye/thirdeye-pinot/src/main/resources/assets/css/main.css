@@ -942,9 +942,13 @@ body a{
     -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
 }
 
-.highcharts-container .c3-ygrids line:nth-child(even) {
+.highcharts-container .c3-ygrids line:nth-child(even),
+.highcharts-container .c3-axis-y2 .tick:nth-child(even){
     display: none;
-    /*//stroke: #fff;*/
+}
+
+.highcharts-container .c3-axis-y2 .tick:last-child{
+    display: block;
 }
 
 .box-inner{
@@ -955,6 +959,21 @@ body a{
     bottom: 11px;
     left: 0;
     z-index: 2;
+}
+.box-inner *{
+    /*border: 1px solid red;*/
+
+}
+
+.box-inner .change{
+    font-weight: 800
+}
+.box-inner .change.negative-icon{
+    color: darkred;
+}
+
+.box-inner .change.positive-icon {
+    color: darkblue;
 }
 
 .heatmap-icon{
