@@ -52,7 +52,7 @@ public class SegmentCompletionProtocol {
    * MAX_SEGMENT_COMMIT_TIME_MS is the longest time (msecs) a server will take to complete building a segment and committing
    * it  (via a SegmentCommit message) after the server has been notified that it is the committer.
    */
-  private static final int DEFAULT_MAX_SEGMENT_COMMIT_TIME_SEC = 60;
+  private static final int DEFAULT_MAX_SEGMENT_COMMIT_TIME_SEC = 120;
   private static long MAX_SEGMENT_COMMIT_TIME_MS = TimeUnit.MILLISECONDS.convert(DEFAULT_MAX_SEGMENT_COMMIT_TIME_SEC, TimeUnit.SECONDS);
 
   public enum ControllerResponseStatus {
