@@ -1,16 +1,11 @@
 package com.linkedin.thirdeye.anomaly.detection;
 
-import com.linkedin.pinot.pql.parsers.utils.Pair;
-import com.linkedin.thirdeye.client.timeseries.TimeSeriesRow;
 import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
-import org.quartz.JobExecutionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -21,21 +16,13 @@ import com.linkedin.thirdeye.anomaly.task.TaskRunner;
 import com.linkedin.thirdeye.api.CollectionSchema;
 import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
-import com.linkedin.thirdeye.api.TimeGranularity;
-import com.linkedin.thirdeye.client.MetricExpression;
-import com.linkedin.thirdeye.client.MetricFunction;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
-import com.linkedin.thirdeye.client.cache.QueryCache;
-import com.linkedin.thirdeye.client.timeseries.TimeSeriesHandler;
-import com.linkedin.thirdeye.client.timeseries.TimeSeriesRequest;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesResponse;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesResponseConverter;
-import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
-import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 public class DetectionTaskRunner implements TaskRunner {
 
@@ -43,51 +30,35 @@ public class DetectionTaskRunner implements TaskRunner {
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE =
       ThirdEyeCacheRegistry.getInstance();
 
-  private QueryCache queryCache;
-  private TimeSeriesHandler timeSeriesHandler;
   private TimeSeriesResponseConverter timeSeriesResponseConverter;
 
   private RawAnomalyResultManager resultDAO;
 
   private List<String> collectionDimensions;
-  private MetricFunction metricFunction;
   private DateTime windowStart;
   private DateTime windowEnd;
   private List<RawAnomalyResultDTO> knownAnomalies;
   private BaseAnomalyFunction anomalyFunction;
-  private AnomalyFunctionDTO anomalyFunctionSpec;
-  private AnomalyFunctionFactory anomalyFunctionFactory;
 
   public DetectionTaskRunner() {
-    queryCache = CACHE_REGISTRY_INSTANCE.getQueryCache();
-    timeSeriesHandler = new TimeSeriesHandler(queryCache);
     timeSeriesResponseConverter = TimeSeriesResponseConverter.getInstance();
   }
 
   public List<TaskResult> execute(TaskInfo taskInfo, TaskContext taskContext) throws Exception {
-
     DetectionTaskInfo detectionTaskInfo = (DetectionTaskInfo) taskInfo;
     List<TaskResult> taskResult = new ArrayList<>();
     LOG.info("Begin executing task {}", taskInfo);
     resultDAO = taskContext.getResultDAO();
-    anomalyFunctionFactory = taskContext.getAnomalyFunctionFactory();
-    anomalyFunctionSpec = detectionTaskInfo.getAnomalyFunctionSpec();
+    AnomalyFunctionFactory anomalyFunctionFactory = taskContext.getAnomalyFunctionFactory();
+    AnomalyFunctionDTO anomalyFunctionSpec = detectionTaskInfo.getAnomalyFunctionSpec();
     anomalyFunction = anomalyFunctionFactory.fromSpec(anomalyFunctionSpec);
     windowStart = detectionTaskInfo.getWindowStartTime();
     windowEnd = detectionTaskInfo.getWindowEndTime();
 
-    // Compute metric function
-    TimeGranularity timeGranularity = new TimeGranularity(anomalyFunctionSpec.getBucketSize(),
-        anomalyFunctionSpec.getBucketUnit());
-
-    metricFunction = new MetricFunction(anomalyFunctionSpec.getMetricFunction(),
-        anomalyFunctionSpec.getMetric());
-
-    // Filters
-    String filters = anomalyFunctionSpec.getFilters();
-
-    LOG.info("Running anomaly detection job with metricFunction: {}, collection: {}",
-        metricFunction, anomalyFunctionSpec.getCollection());
+    LOG.info(
+        "Running anomaly detection job with metricFunction: [{}], metric [{}], collection: [{}]",
+        anomalyFunctionSpec.getFunctionName(), anomalyFunctionSpec.getMetric(),
+        anomalyFunctionSpec.getCollection());
 
     CollectionSchema collectionSchema = null;
     try {
@@ -100,50 +71,11 @@ public class DetectionTaskRunner implements TaskRunner {
 
     // Get existing anomalies for this time range
     knownAnomalies = getExistingAnomalies();
+    TimeSeriesResponse finalResponse = TimeSeriesUtil
+        .getTimeSeriesResponse(anomalyFunctionSpec, anomalyFunction,
+            detectionTaskInfo.getGroupByDimension(), windowStart.getMillis(),
+            windowEnd.getMillis());
 
-    // Seed request with top-level...
-    TimeSeriesRequest request = new TimeSeriesRequest();
-    request.setCollectionName(anomalyFunctionSpec.getCollection());
-    List<MetricExpression> metricExpressions = Utils
-        .convertToMetricExpressions(metricFunction.getMetricName(),
-            anomalyFunctionSpec.getMetricFunction(), anomalyFunctionSpec.getCollection());
-    request.setMetricExpressions(metricExpressions);
-    request.setAggregationTimeGranularity(timeGranularity);
-    request.setEndDateInclusive(false);
-    if (StringUtils.isNotBlank(filters)) {
-      request.setFilterSet(ThirdEyeUtils.getFilterSet(filters));
-    }
-    String exploreDimension = detectionTaskInfo.getGroupByDimension();
-    if (StringUtils.isNotBlank(exploreDimension)) {
-      request
-          .setGroupByDimensions(Collections.singletonList(detectionTaskInfo.getGroupByDimension()));
-    }
-
-    List<Pair<Long, Long>> startEndTimeRanges =
-        anomalyFunction.getDataRangeIntervals(windowStart.getMillis(), windowEnd.getMillis());
-
-    List<TimeSeriesRow> timeSeriesRows = new ArrayList<>();
-
-    // TODO : replace this with Pinot MultiQuery Request
-    for (Pair<Long, Long> startEndInterval : startEndTimeRanges) {
-      DateTime startTime = new DateTime(startEndInterval.getFirst());
-      DateTime endTime = new DateTime(startEndInterval.getSecond());
-      request.setStart(startTime);
-      request.setEnd(endTime);
-
-      LOG.info(
-          "Fetching data with startTime: [{}], endTime: [{}], metricExpressions: [{}], timeGranularity: [{}]",
-          startTime, endTime, metricExpressions, timeGranularity);
-
-      try {
-        LOG.debug("Executing {}", request);
-        TimeSeriesResponse response = timeSeriesHandler.handle(request);
-        timeSeriesRows.addAll(response.getRows());
-      } catch (Exception e) {
-        throw new JobExecutionException(e);
-      }
-    }
-    TimeSeriesResponse finalResponse = new TimeSeriesResponse(timeSeriesRows);
     exploreDimensionsAndAnalyze(finalResponse);
     return taskResult;
   }

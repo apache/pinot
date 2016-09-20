@@ -1,20 +1,37 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
+import com.linkedin.thirdeye.anomaly.detection.TimeSeriesUtil;
+import com.linkedin.thirdeye.api.CollectionSchema;
+import com.linkedin.thirdeye.api.DimensionKey;
+import com.linkedin.thirdeye.api.MetricTimeSeries;
+import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
+import com.linkedin.thirdeye.client.timeseries.TimeSeriesResponse;
+import com.linkedin.thirdeye.client.timeseries.TimeSeriesResponseConverter;
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
+import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
+import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
 import javax.ws.rs.GET;
+import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 
 import org.apache.commons.io.IOUtils;
+import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,14 +44,17 @@ import com.linkedin.thirdeye.detector.function.AnomalyFunction;
 public class AnomalyFunctionResource {
 
   private static final Logger LOG = LoggerFactory.getLogger(AnomalyFunctionResource.class);
+  private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE =
+      ThirdEyeCacheRegistry.getInstance();
+  private static final TimeSeriesResponseConverter timeSeriesResponseConverter =
+      TimeSeriesResponseConverter.getInstance();
 
   private final Map<String, Object> anomalyFunctionMetadata = new HashMap<>();
-
-  public AnomalyFunctionResource() {
-  }
+  private final AnomalyFunctionFactory anomalyFunctionFactory;
 
   public AnomalyFunctionResource(ThirdEyeDashboardConfiguration configuration) {
     buildFunctionMetadata(configuration.getFunctionConfigPath());
+    this.anomalyFunctionFactory = new AnomalyFunctionFactory(configuration.getFunctionConfigPath());
   }
 
   private void buildFunctionMetadata(String functionConfigPath) {
@@ -84,5 +104,62 @@ public class AnomalyFunctionResource {
   @Path("metric-function")
   public MetricAggFunction[] getMetricFunctions() {
     return MetricAggFunction.values();
+  }
+
+
+  @POST
+  @Path("/analyze")
+  public List<MergedAnomalyResultDTO> analyze(AnomalyFunctionDTO anomalyFunctionSpec,
+      @QueryParam("startTime") Long startTime, @QueryParam("endTime") Long endTime)
+      throws Exception {
+
+    BaseAnomalyFunction anomalyFunction = anomalyFunctionFactory.fromSpec(anomalyFunctionSpec);
+    TimeSeriesResponse finalResponse = TimeSeriesUtil
+        .getTimeSeriesResponse(anomalyFunctionSpec, anomalyFunction,
+            anomalyFunctionSpec.getExploreDimensions(), startTime, endTime);
+
+    int anomalyCounter = 0;
+
+    List<MergedAnomalyResultDTO> mergedAnomalyResults = new ArrayList<>();
+    List<RawAnomalyResultDTO> results;
+    CollectionSchema collectionSchema;
+    List<String> collectionDimensions;
+
+    try {
+      collectionSchema = CACHE_REGISTRY_INSTANCE.getCollectionSchemaCache()
+          .get(anomalyFunctionSpec.getCollection());
+      collectionDimensions = collectionSchema.getDimensionNames();
+    } catch (Exception e) {
+      LOG.error("Exception when reading collection schema cache", e);
+      return mergedAnomalyResults;
+    }
+
+    Map<DimensionKey, MetricTimeSeries> res =
+        timeSeriesResponseConverter.toMap(finalResponse, collectionDimensions);
+    for (Map.Entry<DimensionKey, MetricTimeSeries> entry : res.entrySet()) {
+      if (entry.getValue().getTimeWindowSet().size() < 2) {
+        LOG.warn("Insufficient data for {} to run anomaly detection function", entry.getKey());
+        continue;
+      }
+      try {
+        // Run algorithm
+        DimensionKey dimensionKey = entry.getKey();
+        MetricTimeSeries metricTimeSeries = entry.getValue();
+        LOG.info("Analyzing anomaly function with dimensionKey: {}, windowStart: {}, windowEnd: {}",
+            dimensionKey, startTime, endTime);
+
+        results = anomalyFunction
+            .analyze(dimensionKey, metricTimeSeries, new DateTime(startTime), new DateTime(endTime),
+                new ArrayList<>());
+
+        LOG.info("{} has {} anomalies in window {} to {}", entry.getKey(), results.size(),
+            startTime, endTime);
+        anomalyCounter += results.size();
+      } catch (Exception e) {
+        LOG.error("Could not compute for {}", entry.getKey(), e);
+      }
+    }
+    LOG.info("{} anomalies found in total", anomalyCounter);
+    return mergedAnomalyResults;
   }
 }
