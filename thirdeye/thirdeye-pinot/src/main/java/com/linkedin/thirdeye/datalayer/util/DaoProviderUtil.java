@@ -12,6 +12,8 @@ import com.google.inject.Injector;
 import com.google.inject.Provides;
 import com.linkedin.thirdeye.common.persistence.PersistenceConfig;
 import com.linkedin.thirdeye.common.persistence.PersistenceUtil;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.AbstractManagerImpl;
+import com.linkedin.thirdeye.datalayer.dto.AbstractDTO;
 import com.linkedin.thirdeye.datalayer.entity.AnomalyFeedbackIndex;
 import com.linkedin.thirdeye.datalayer.entity.AnomalyFunctionIndex;
 import com.linkedin.thirdeye.datalayer.entity.EmailConfigurationIndex;
@@ -24,43 +26,26 @@ import com.linkedin.thirdeye.datalayer.entity.WebappConfigIndex;
 
 public abstract class DaoProviderUtil {
 
-  private static Injector injector;
   private static DataSource dataSource;
   static boolean inited = false;
 
+  static ManagerProvider provider ;
   public static void init(File localConfigFile) {
     PersistenceConfig configuration = PersistenceUtil.createConfiguration(localConfigFile);
     dataSource = new DataSource();
     dataSource.setInitialSize(10);
-    dataSource.setDefaultAutoCommit(true);
+    dataSource.setDefaultAutoCommit(false);
     dataSource.setMaxActive(100);
     dataSource.setUsername(configuration.getDatabaseConfiguration().getUser());
     dataSource.setPassword(configuration.getDatabaseConfiguration().getPassword());
     dataSource.setUrl(configuration.getDatabaseConfiguration().getUrl());
     dataSource.setDriverClassName(configuration.getDatabaseConfiguration().getDriver());
+    provider = new ManagerProvider(dataSource);
   }
 
-  public static void init(DataSource ds) {
-    dataSource = ds;
-  }
-
-  private synchronized static void initGuice() {
-    if (!inited) {
-      DataSourceModule dataSourceModule = new DataSourceModule(dataSource);
-      injector = Guice.createInjector(dataSourceModule);
-      inited = true;
-    }
-  }
-
-  public static <T> T getInstance(Class<T> c) {
-    if (!inited) {
-      synchronized (DaoProviderUtil.class) {
-        if (!inited) {
-          initGuice();
-        }
-      }
-    }
-    return injector.getInstance(c);
+  public static <T extends AbstractManagerImpl<? extends AbstractDTO>> T getInstance(Class<T> c) {
+    T instance = provider.getInstance(c);
+    return instance;
   }
 
   public static DataSource getDataSource() {

@@ -282,18 +282,19 @@ public class GenericPojoDao {
         for (AbstractIndexEntity entity : indexEntities) {
           idsToFind.add(entity.getBaseId());
         }
-
+        List<E> ret = new ArrayList<>();
         //fetch the entities
-        PreparedStatement selectStatement =
-            sqlQueryBuilder.createFindByIdStatement(connection, GenericJsonEntity.class, idsToFind);
-        ResultSet resultSet = selectStatement.executeQuery();
-        List<GenericJsonEntity> entities =
-            genericResultSetMapper.mapAll(resultSet, GenericJsonEntity.class);
-        List<E> ret = new ArrayList<>(entities.size());
-        for (GenericJsonEntity entity : entities) {
-          E bean = OBJECT_MAPPER.readValue(entity.getJsonVal(), pojoClass);
-          bean.setId(entity.getId());
-          ret.add(bean);
+        if (!idsToFind.isEmpty()) {
+          PreparedStatement selectStatement = sqlQueryBuilder.createFindByIdStatement(connection,
+              GenericJsonEntity.class, idsToFind);
+          ResultSet resultSet = selectStatement.executeQuery();
+          List<GenericJsonEntity> entities =
+              genericResultSetMapper.mapAll(resultSet, GenericJsonEntity.class);
+          for (GenericJsonEntity entity : entities) {
+            E bean = OBJECT_MAPPER.readValue(entity.getJsonVal(), pojoClass);
+            bean.setId(entity.getId());
+            ret.add(bean);
+          }
         }
         return ret;
 
@@ -333,16 +334,18 @@ public class GenericPojoDao {
         }
         dumpTable(connection, pojoInfo.indexEntityClass);
         //fetch the entities
-        PreparedStatement selectStatement =
-            sqlQueryBuilder.createFindByIdStatement(connection, GenericJsonEntity.class, idsToFind);
-        ResultSet resultSet = selectStatement.executeQuery();
-        List<GenericJsonEntity> entities =
-            genericResultSetMapper.mapAll(resultSet, GenericJsonEntity.class);
-        List<E> ret = new ArrayList<>(entities.size());
-        for (GenericJsonEntity entity : entities) {
-          E bean = OBJECT_MAPPER.readValue(entity.getJsonVal(), pojoClass);
-          bean.setId(entity.getId());
-          ret.add(bean);
+        List<E> ret = new ArrayList<>();
+        if (!idsToFind.isEmpty()) {
+          PreparedStatement selectStatement = sqlQueryBuilder.createFindByIdStatement(connection,
+              GenericJsonEntity.class, idsToFind);
+          ResultSet resultSet = selectStatement.executeQuery();
+          List<GenericJsonEntity> entities =
+              genericResultSetMapper.mapAll(resultSet, GenericJsonEntity.class);
+          for (GenericJsonEntity entity : entities) {
+            E bean = OBJECT_MAPPER.readValue(entity.getJsonVal(), pojoClass);
+            bean.setId(entity.getId());
+            ret.add(bean);
+          }
         }
         return ret;
       }
@@ -397,15 +400,19 @@ public class GenericPojoDao {
         for (AbstractIndexEntity entity : indexEntities) {
           idsToDelete.add(entity.getBaseId());
         }
-        //delete the ids from both base table and index table
-        PreparedStatement statement = sqlQueryBuilder.createDeleteStatement(connection,
-            pojoInfo.indexEntityClass, idsToDelete);
-        int indexRowsDeleted = statement.executeUpdate();
-        PreparedStatement baseTableDeleteStatement =
-            sqlQueryBuilder.createDeleteStatement(connection, GenericJsonEntity.class, idsToDelete);
-        int baseRowsDeleted = baseTableDeleteStatement.executeUpdate();
-        assert (baseRowsDeleted == indexRowsDeleted);
+        int baseRowsDeleted = 0;
+        if (!idsToDelete.isEmpty()) {
+          //delete the ids from both base table and index table
+          PreparedStatement statement = sqlQueryBuilder.createDeleteStatement(connection,
+              pojoInfo.indexEntityClass, idsToDelete);
+          int indexRowsDeleted = statement.executeUpdate();
+          PreparedStatement baseTableDeleteStatement = sqlQueryBuilder
+              .createDeleteStatement(connection, GenericJsonEntity.class, idsToDelete);
+          baseRowsDeleted = baseTableDeleteStatement.executeUpdate();
+          assert (baseRowsDeleted == indexRowsDeleted);
+        }
         return baseRowsDeleted;
+
       }
     }, 0);
   }

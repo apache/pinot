@@ -21,7 +21,7 @@ create table if not exists anomaly_function_index (
     version int(10)
      
 ) ENGINE=InnoDB;
-
+create index anomaly_function_name_idx on anomaly_function_index(function_name);
 
 create table if not exists metric_index (
     name varchar(200) not null,
@@ -33,7 +33,6 @@ create table if not exists metric_index (
     update_time timestamp default current_timestamp,
     version int(10)
 ) ENGINE=InnoDB;
-create index if not exists anomaly_function_index on metric_index(name);
 
 create table if not exists anomaly_merge_config_index (
     name varchar(200) not null,
@@ -62,7 +61,7 @@ create table if not exists job_index (
     update_time timestamp default current_timestamp,
     version int(10)
 ) ENGINE=InnoDB;
-create index if not exists job_status_idx on job_index(status);
+create index job_status_idx on job_index(status);
 
 create table if not exists task_index (
     name varchar(200) not null,
@@ -77,8 +76,8 @@ create table if not exists task_index (
     update_time timestamp default current_timestamp,
     version int(10)
 ) ENGINE=InnoDB;
-create index if not exists task_status_idx on task_index(status);
-create index if not exists task_job_idx on task_index(job_id);
+create index task_status_idx on task_index(status);
+create index task_job_idx on task_index(job_id);
 
 create table if not exists anomaly_feedback_index (
     type varchar(100) not null,
@@ -102,9 +101,9 @@ create table if not exists raw_anomaly_result_index (
     update_time timestamp default current_timestamp,
     version int(10)
 ) ENGINE=InnoDB;
-create index if not exists raw_anomaly_result_function_idx on raw_anomaly_result_index(function_id);
-create index if not exists raw_anomaly_result_feedback_idx on raw_anomaly_result_index(anomaly_feedback_id);
-create index if not exists raw_anomaly_result_job_idx on raw_anomaly_result_index(job_id);
+create index raw_anomaly_result_function_idx on raw_anomaly_result_index(function_id);
+create index raw_anomaly_result_feedback_idx on raw_anomaly_result_index(anomaly_feedback_id);
+create index raw_anomaly_result_job_idx on raw_anomaly_result_index(job_id);
 
 create table if not exists merged_anomaly_result_index (
     function_id bigint(20),
@@ -121,9 +120,9 @@ create table if not exists merged_anomaly_result_index (
     update_time timestamp default current_timestamp,
     version int(10)
 ) ENGINE=InnoDB;
-create index if not exists merged_anomaly_result_function_idx on merged_anomaly_result_index(function_id);
-create index if not exists merged_anomaly_result_feedback_idx on merged_anomaly_result_index(anomaly_feedback_id);
-create index if not exists merged_anomaly_result_metric_idx on merged_anomaly_result_index(metric_id);
+create index merged_anomaly_result_function_idx on merged_anomaly_result_index(function_id);
+create index merged_anomaly_result_feedback_idx on merged_anomaly_result_index(anomaly_feedback_id);
+create index merged_anomaly_result_metric_idx on merged_anomaly_result_index(metric_id);
 
 create table if not exists ingraph_metric_config (
     name varchar(200) not null,

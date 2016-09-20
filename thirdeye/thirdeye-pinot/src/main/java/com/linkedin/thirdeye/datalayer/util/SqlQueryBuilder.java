@@ -101,12 +101,15 @@ public class SqlQueryBuilder {
       if (columnInfo.field != null
           && !AUTO_UPDATE_COLUMN_SET.contains(columnInfo.columnNameInDB.toLowerCase())) {
         Object val = columnInfo.field.get(entity);
-        System.out.println("Setting value:" + val + " for " + columnInfo.columnNameInDB);
+        System.out.println("Setting value:" + val + " for " + columnInfo.columnNameInDB
+            + " sqlType:" + columnInfo.sqlType);
         if (val != null) {
           if (columnInfo.sqlType == Types.CLOB) {
             Clob clob = conn.createClob();
             clob.setString(1, val.toString());
             preparedStatement.setClob(parameterIndex++, clob);
+          } else if (columnInfo.sqlType == Types.TIMESTAMP) {
+            preparedStatement.setObject(parameterIndex++, val, columnInfo.sqlType);
           } else {
             preparedStatement.setObject(parameterIndex++, val.toString(), columnInfo.sqlType);
           }
@@ -117,6 +120,7 @@ public class SqlQueryBuilder {
       }
     }
     return preparedStatement;
+
   }
 
   public PreparedStatement createFindByIdStatement(Connection connection,
@@ -140,6 +144,7 @@ public class SqlQueryBuilder {
       delim = ", ";
     }
     sql.append(")");
+    System.out.println("find by id(s) sql:"+ sql.toString());
     PreparedStatement prepareStatement = connection.prepareStatement(sql.toString());
     return prepareStatement;
   }
@@ -455,25 +460,25 @@ public class SqlQueryBuilder {
     return prepareStatement;
   }
 
-//  public static void main(String[] args) {
-//    EntityMappingHolder entityMappingHolder = new EntityMappingHolder();
-//    SqlQueryBuilder builder = new SqlQueryBuilder(entityMappingHolder);
-//    BiMap<String, String> entityNameToDBNameMapping;
-//    Predicate startTimePredicate;
-//    long startTime;
-//    long endTime = "";
-//    long functionId = "1";
-//    startTimePredicate =
-//        Predicate.AND(Predicate.GE("startTime", startTime), Predicate.LE("startTime", endTime));
-//    Predicate endTimeTimePredicate;
-//    endTimeTimePredicate =
-//        Predicate.AND(Predicate.GE("endTime", startTime), Predicate.LE("endTime", endTime));;
-//
-//    Predicate functionIdPredicate = Predicate.EQ("functionId", functionId);
-//    Predicate finalPredicate =
-//        Predicate.AND(functionIdPredicate, Predicate.OR(endTimeTimePredicate, startTimePredicate));
-//    builder.generateWhereClause(entityNameToDBNameMapping, finalPredicate, parametersMap,
-//        whereClause);
-//
-//  }
+  //  public static void main(String[] args) {
+  //    EntityMappingHolder entityMappingHolder = new EntityMappingHolder();
+  //    SqlQueryBuilder builder = new SqlQueryBuilder(entityMappingHolder);
+  //    BiMap<String, String> entityNameToDBNameMapping;
+  //    Predicate startTimePredicate;
+  //    long startTime;
+  //    long endTime = "";
+  //    long functionId = "1";
+  //    startTimePredicate =
+  //        Predicate.AND(Predicate.GE("startTime", startTime), Predicate.LE("startTime", endTime));
+  //    Predicate endTimeTimePredicate;
+  //    endTimeTimePredicate =
+  //        Predicate.AND(Predicate.GE("endTime", startTime), Predicate.LE("endTime", endTime));;
+  //
+  //    Predicate functionIdPredicate = Predicate.EQ("functionId", functionId);
+  //    Predicate finalPredicate =
+  //        Predicate.AND(functionIdPredicate, Predicate.OR(endTimeTimePredicate, startTimePredicate));
+  //    builder.generateWhereClause(entityNameToDBNameMapping, finalPredicate, parametersMap,
+  //        whereClause);
+  //
+  //  }
 }
