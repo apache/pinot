@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.common.protocols;
 
+import java.util.concurrent.TimeUnit;
 import com.alibaba.fastjson.JSONObject;
 
 /*
@@ -51,7 +52,8 @@ public class SegmentCompletionProtocol {
    * MAX_SEGMENT_COMMIT_TIME_MS is the longest time (msecs) a server will take to complete building a segment and committing
    * it  (via a SegmentCommit message) after the server has been notified that it is the committer.
    */
-  public static final long MAX_SEGMENT_COMMIT_TIME_MS = 15000;
+  private static final int DEFAULT_MAX_SEGMENT_COMMIT_TIME_SEC = 120;
+  private static long MAX_SEGMENT_COMMIT_TIME_MS = TimeUnit.MILLISECONDS.convert(DEFAULT_MAX_SEGMENT_COMMIT_TIME_SEC, TimeUnit.SECONDS);
 
   public enum ControllerResponseStatus {
     /** Never sent by the controller, but locally used by server when sending a request fails */
@@ -101,6 +103,18 @@ public class SegmentCompletionProtocol {
   public static final Response RESP_DISCARD = new Response(ControllerResponseStatus.DISCARD, -1L);
   public static final Response RESP_COMMIT_SUCCESS = new Response(ControllerResponseStatus.COMMIT_SUCCESS, -1L);
   public static final Response RESP_COMMIT_CONTINUE = new Response(ControllerResponseStatus.COMMIT_CONTINUE, -1L);
+
+  public static long getMaxSegmentCommitTimeMs() {
+    return MAX_SEGMENT_COMMIT_TIME_MS;
+  }
+
+  public static void setMaxSegmentCommitTimeMs(long commitTimeMs) {
+    MAX_SEGMENT_COMMIT_TIME_MS = commitTimeMs;
+  }
+
+  public static int getDefaultMaxSegmentCommitTimeSec() {
+    return DEFAULT_MAX_SEGMENT_COMMIT_TIME_SEC;
+  }
 
   public static abstract class Request {
     final String _segmentName;

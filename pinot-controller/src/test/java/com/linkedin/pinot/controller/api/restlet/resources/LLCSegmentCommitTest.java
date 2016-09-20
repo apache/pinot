@@ -43,7 +43,7 @@ public class LLCSegmentCommitTest {
 
   @Test
   public void testSegmentCommit() throws Exception {
-    SegmentCompletionManager.create(createMockHelixManager(), null);
+    SegmentCompletionManager.create(createMockHelixManager(), null, new ControllerConf());
     FakeLLCSegmentCommit segmentCommit = new FakeLLCSegmentCommit();
     Representation representation;
     String strResponse;

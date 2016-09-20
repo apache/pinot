@@ -207,7 +207,7 @@ public class SegmentCompletionTest {
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.CATCH_UP);
 
     // Max time to commit passes
-    segmentCompletionMgr._secconds += 6 * SegmentCompletionProtocol.MAX_HOLD_TIME_MS/1000;
+    segmentCompletionMgr._secconds += SegmentCompletionProtocol.getMaxSegmentCommitTimeMs() * SegmentCompletionProtocol.MAX_HOLD_TIME_MS/1000;
 
     // s1 comes back with the updated offset, since it was asked to catch up.
     // The FSM will be aborted, and destroyed ...
