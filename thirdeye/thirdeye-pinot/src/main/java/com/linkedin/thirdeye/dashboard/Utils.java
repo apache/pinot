@@ -229,7 +229,10 @@ public class Utils {
     return metricExpressions;
   }
 
-  public static DateTimeZone getTimeZone(String collection) {
+  /*
+   * This method returns the time zone of the data in this collection
+   */
+  public static DateTimeZone getDataTimeZone(String collection) {
     String timezone = CollectionConfig.DEFAULT_TIMEZONE;
     try {
       CollectionConfig collectionConfig = CACHE_REGISTRY_INSTANCE.getCollectionConfigCache().get(collection);

@@ -202,9 +202,9 @@ public class PqlUtils {
       endQueryTimeExclusive = (endInConvertedUnits == startInConvertedUnits + 1) ?
           startQueryTime : String.valueOf(endInConvertedUnits);
     } else {
-      DateTimeFormatter dateTimeFormatter = DateTimeFormat.forPattern(timeFormat).withZone(Utils.getTimeZone(collection));
-      startQueryTime = dateTimeFormatter.print(start);
-      endQueryTimeExclusive = dateTimeFormatter.print(endExclusive);
+      DateTimeFormatter inputDataDateTimeFormatter = DateTimeFormat.forPattern(timeFormat).withZone(Utils.getDataTimeZone(collection));
+      startQueryTime = inputDataDateTimeFormatter.print(start);
+      endQueryTimeExclusive = inputDataDateTimeFormatter.print(endExclusive);
     }
 
     if (startQueryTime.equals(endQueryTimeExclusive)) {

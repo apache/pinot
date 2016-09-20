@@ -186,11 +186,11 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
     long interval = -1;
     dataGranularity = collectionSchema.getTime().getDataGranularity();
     boolean isISOFormat = false;
-    DateTimeFormatter dateTimeFormatter = null;
+    DateTimeFormatter inputDataDateTimeFormatter = null;
     String timeFormat = collectionSchema.getTime().getFormat();
     if (timeFormat != null && !timeFormat.equals(TimeSpec.SINCE_EPOCH_FORMAT)) {
       isISOFormat = true;
-      dateTimeFormatter = DateTimeFormat.forPattern(timeFormat).withZone(Utils.getTimeZone(collection));
+      inputDataDateTimeFormatter = DateTimeFormat.forPattern(timeFormat).withZone(Utils.getDataTimeZone(collection));
     }
     if (request.getGroupByTimeGranularity() != null) {
       hasGroupByTime = true;
@@ -213,7 +213,7 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
               if (!isISOFormat) {
                 millis = dataGranularity.toMillis(Double.valueOf(groupKeyVal).longValue());
               } else {
-                millis = DateTime.parse(groupKeyVal, dateTimeFormatter).getMillis();
+                millis = DateTime.parse(groupKeyVal, inputDataDateTimeFormatter).getMillis();
               }
               if (millis < startTime) {
                 LOG.error("Data point earlier than requested start time {}: {}", startTime, millis);
