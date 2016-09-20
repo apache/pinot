@@ -33,7 +33,7 @@ public abstract class TimeSeriesUtil {
   private TimeSeriesUtil() {
   }
 
-  static TimeSeriesResponse getTimeSeriesResponse(AnomalyFunctionDTO anomalyFunctionSpec,
+  public static TimeSeriesResponse getTimeSeriesResponse(AnomalyFunctionDTO anomalyFunctionSpec,
       BaseAnomalyFunction anomalyFunction, String groupByDimension, long windowStart,
       long windowEnd) throws JobExecutionException {
     // Compute metric function
