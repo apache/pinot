@@ -12,7 +12,9 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -225,5 +227,21 @@ public class Utils {
       metricExpressions.add(new MetricExpression(function.getMetricName()));
     }
     return metricExpressions;
+  }
+
+  /*
+   * This method returns the time zone of the data in this collection
+   */
+  public static DateTimeZone getDataTimeZone(String collection) {
+    String timezone = CollectionConfig.DEFAULT_TIMEZONE;
+    try {
+      CollectionConfig collectionConfig = CACHE_REGISTRY_INSTANCE.getCollectionConfigCache().get(collection);
+      if (collectionConfig != null && StringUtils.isNotBlank(collectionConfig.getTimezone())) {
+        timezone = collectionConfig.getTimezone();
+      }
+    } catch (Exception e) {
+      LOG.info("No collection config for collection {}", collection);
+    }
+    return DateTimeZone.forID(timezone);
   }
 }

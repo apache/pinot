@@ -19,6 +19,7 @@ import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.client.MetricFunction;
 import com.linkedin.thirdeye.client.ThirdEyeRequest;
+import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
 
 /**
@@ -90,7 +91,7 @@ public class PqlUtils {
     String selectionClause = getMetricAsDimensionSelectionClause(metricFunction, metricValuesColumn);
 
     sb.append("SELECT ").append(selectionClause).append(" FROM ").append(collection);
-    String betweenClause = getBetweenClause(startTime, endTimeExclusive, dataTimeSpec);
+    String betweenClause = getBetweenClause(startTime, endTimeExclusive, dataTimeSpec, collection);
     sb.append(" WHERE ").append(betweenClause);
 
     String metricWhereClause = getMetricWhereClause(metricFunction, metricNamesColumn);
@@ -117,7 +118,7 @@ public class PqlUtils {
     String selectionClause = getSelectionClause(metricFunctions);
 
     sb.append("SELECT ").append(selectionClause).append(" FROM ").append(collection);
-    String betweenClause = getBetweenClause(startTime, endTimeExclusive, dataTimeSpec);
+    String betweenClause = getBetweenClause(startTime, endTimeExclusive, dataTimeSpec, collection);
     sb.append(" WHERE ").append(betweenClause);
 
     String dimensionWhereClause = getDimensionWhereClause(filterSet);
@@ -167,7 +168,7 @@ public class PqlUtils {
     return builder.toString();
   }
 
-  static String getBetweenClause(DateTime start, DateTime endExclusive, TimeSpec timeFieldSpec) {
+  static String getBetweenClause(DateTime start, DateTime endExclusive, TimeSpec timeFieldSpec, String collection) {
     TimeGranularity dataGranularity = timeFieldSpec.getDataGranularity();
     long startMillis = start.getMillis();
     long endMillis = endExclusive.getMillis();
@@ -201,9 +202,9 @@ public class PqlUtils {
       endQueryTimeExclusive = (endInConvertedUnits == startInConvertedUnits + 1) ?
           startQueryTime : String.valueOf(endInConvertedUnits);
     } else {
-      DateTimeFormatter dateTimeFormatter = DateTimeFormat.forPattern(timeFormat);
-      startQueryTime = dateTimeFormatter.print(start);
-      endQueryTimeExclusive = dateTimeFormatter.print(endExclusive);
+      DateTimeFormatter inputDataDateTimeFormatter = DateTimeFormat.forPattern(timeFormat).withZone(Utils.getDataTimeZone(collection));
+      startQueryTime = inputDataDateTimeFormatter.print(start);
+      endQueryTimeExclusive = inputDataDateTimeFormatter.print(endExclusive);
     }
 
     if (startQueryTime.equals(endQueryTimeExclusive)) {

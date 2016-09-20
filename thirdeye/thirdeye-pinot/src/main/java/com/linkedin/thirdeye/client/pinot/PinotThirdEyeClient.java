@@ -5,7 +5,6 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Properties;
-import java.util.concurrent.TimeUnit;
 
 import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.manager.zk.ZkClient;
@@ -27,13 +26,14 @@ import com.linkedin.thirdeye.client.MetricFunction;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.client.ThirdEyeRequest;
+import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
 
 public class PinotThirdEyeClient implements ThirdEyeClient {
 
   private static final Logger LOG = LoggerFactory.getLogger(PinotThirdEyeClient.class);
 
-  private static final ThirdEyeCacheRegistry CACHE_INSTANCE = ThirdEyeCacheRegistry.getInstance();
+  private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
   public static final String CONTROLLER_HOST_PROPERTY_KEY = "controllerHost";
   public static final String CONTROLLER_PORT_PROPERTY_KEY = "controllerPort";
   public static final String FIXED_COLLECTIONS_PROPERTY_KEY = "fixedCollections";
@@ -106,7 +106,7 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
   @Override
   public PinotThirdEyeResponse execute(ThirdEyeRequest request) throws Exception {
     CollectionSchema collectionSchema =
-        CACHE_INSTANCE.getCollectionSchemaCache().get(request.getCollection());
+        CACHE_REGISTRY_INSTANCE.getCollectionSchemaCache().get(request.getCollection());
     TimeSpec dataTimeSpec = collectionSchema.getTime();
     List<MetricFunction> metricFunctions = request.getMetricFunctions();
     List<String> dimensionNames = collectionSchema.getDimensionNames();
@@ -114,7 +114,7 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
     List<ResultSetGroup> resultSetGroups = new ArrayList<>();
 
     try {
-      collectionConfig = CACHE_INSTANCE.getCollectionConfigCache().get(request.getCollection());
+      collectionConfig = CACHE_REGISTRY_INSTANCE.getCollectionConfigCache().get(request.getCollection());
     } catch (Exception e) {
       LOG.debug("Collection config for collection {} does not exist", request.getCollection());
     }
@@ -122,14 +122,14 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
        List<String> pqls = PqlUtils.getMetricAsDimensionPqls(request, dataTimeSpec, collectionConfig);
        for (String pql : pqls) {
          LOG.debug("PQL isMetricAsDimension : {}", pql);
-         ResultSetGroup result = CACHE_INSTANCE.getResultSetGroupCache()
+         ResultSetGroup result = CACHE_REGISTRY_INSTANCE.getResultSetGroupCache()
              .get(new PinotQuery(pql, request.getCollection() + "_OFFLINE"));
          resultSetGroups.add(result);
        }
     } else {
       String sql = PqlUtils.getPql(request, dataTimeSpec);
       LOG.debug("PQL: {}", sql);
-      ResultSetGroup result = CACHE_INSTANCE.getResultSetGroupCache()
+      ResultSetGroup result = CACHE_REGISTRY_INSTANCE.getResultSetGroupCache()
           .get(new PinotQuery(sql, request.getCollection() + "_OFFLINE"));
       resultSetGroups.add(result);
       if (LOG.isDebugEnabled()) {
@@ -180,16 +180,17 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
     int numMetrics = request.getMetricFunctions().size();
     int numCols = numGroupByKeys + numMetrics;
     boolean hasGroupByTime = false;
+    String collection = collectionSchema.getCollection();
     TimeGranularity dataGranularity = null;
     long startTime = request.getStartTimeInclusive().getMillis();
     long interval = -1;
     dataGranularity = collectionSchema.getTime().getDataGranularity();
     boolean isISOFormat = false;
-    DateTimeFormatter dateTimeFormatter = null;
+    DateTimeFormatter inputDataDateTimeFormatter = null;
     String timeFormat = collectionSchema.getTime().getFormat();
     if (timeFormat != null && !timeFormat.equals(TimeSpec.SINCE_EPOCH_FORMAT)) {
       isISOFormat = true;
-      dateTimeFormatter = DateTimeFormat.forPattern(timeFormat);
+      inputDataDateTimeFormatter = DateTimeFormat.forPattern(timeFormat).withZone(Utils.getDataTimeZone(collection));
     }
     if (request.getGroupByTimeGranularity() != null) {
       hasGroupByTime = true;
@@ -212,7 +213,7 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
               if (!isISOFormat) {
                 millis = dataGranularity.toMillis(Double.valueOf(groupKeyVal).longValue());
               } else {
-                millis = DateTime.parse(groupKeyVal, dateTimeFormatter).getMillis();
+                millis = DateTime.parse(groupKeyVal, inputDataDateTimeFormatter).getMillis();
               }
               if (millis < startTime) {
                 LOG.error("Data point earlier than requested start time {}: {}", startTime, millis);
@@ -255,22 +256,22 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
 
   @Override
   public CollectionSchema getCollectionSchema(String collection) throws Exception {
-    return CACHE_INSTANCE.getCollectionSchemaCache().get(collection);
+    return CACHE_REGISTRY_INSTANCE.getCollectionSchemaCache().get(collection);
   }
 
   @Override
   public List<String> getCollections() throws Exception {
-    return CACHE_INSTANCE.getCollectionsCache().getCollections();
+    return CACHE_REGISTRY_INSTANCE.getCollectionsCache().getCollections();
   }
 
   @Override
   public CollectionConfig getCollectionConfig(String collection) throws Exception {
-    return CACHE_INSTANCE.getCollectionConfigCache().get(collection);
+    return CACHE_REGISTRY_INSTANCE.getCollectionConfigCache().get(collection);
   }
 
   @Override
   public long getMaxDataTime(String collection) throws Exception {
-    return CACHE_INSTANCE.getCollectionMaxDataTimeCache().get(collection);
+    return CACHE_REGISTRY_INSTANCE.getCollectionMaxDataTimeCache().get(collection);
   }
 
   @Override
