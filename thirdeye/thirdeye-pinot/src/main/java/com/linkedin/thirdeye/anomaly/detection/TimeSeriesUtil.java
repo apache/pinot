@@ -62,6 +62,34 @@ public abstract class TimeSeriesUtil {
     List<Pair<Long, Long>> startEndTimeRanges =
         anomalyFunction.getDataRangeIntervals(windowStart, windowEnd);
 
+    Set<TimeSeriesRow> timeSeriesRowSet = new HashSet<>();
+    // TODO : replace this with Pinot MultiQuery Request
+    for (Pair<Long, Long> startEndInterval : getOptimizedTimeRanges(startEndTimeRanges)) {
+      DateTime startTime = new DateTime(startEndInterval.getFirst());
+      DateTime endTime = new DateTime(startEndInterval.getSecond());
+      request.setStart(startTime);
+      request.setEnd(endTime);
+
+      LOG.info(
+          "Fetching data with startTime: [{}], endTime: [{}], metricExpressions: [{}], timeGranularity: [{}]",
+          startTime, endTime, metricExpressions, timeGranularity);
+
+      try {
+        LOG.debug("Executing {}", request);
+        TimeSeriesResponse response = timeSeriesHandler.handle(request);
+        timeSeriesRowSet.addAll(response.getRows());
+      } catch (Exception e) {
+        throw new JobExecutionException(e);
+      }
+    }
+    List<TimeSeriesRow> timeSeriesRows = new ArrayList<>();
+    timeSeriesRows.addAll(timeSeriesRowSet);
+
+    return new TimeSeriesResponse(timeSeriesRows);
+  }
+
+  private static List<Pair<Long, Long>> getOptimizedTimeRanges(
+      List<Pair<Long, Long>> startEndTimeRanges) {
     List<Pair<Long, Long>> optimizedTimeRanges;
     if (startEndTimeRanges.size() > 1) {
       // optimize timeRange pairs for overlapped time
@@ -84,31 +112,6 @@ public abstract class TimeSeriesUtil {
     } else {
       optimizedTimeRanges = startEndTimeRanges;
     }
-
-    Set<TimeSeriesRow> timeSeriesRowSet = new HashSet<>();
-
-    // TODO : replace this with Pinot MultiQuery Request
-    for (Pair<Long, Long> startEndInterval : optimizedTimeRanges) {
-      DateTime startTime = new DateTime(startEndInterval.getFirst());
-      DateTime endTime = new DateTime(startEndInterval.getSecond());
-      request.setStart(startTime);
-      request.setEnd(endTime);
-
-      LOG.info(
-          "Fetching data with startTime: [{}], endTime: [{}], metricExpressions: [{}], timeGranularity: [{}]",
-          startTime, endTime, metricExpressions, timeGranularity);
-
-      try {
-        LOG.debug("Executing {}", request);
-        TimeSeriesResponse response = timeSeriesHandler.handle(request);
-        timeSeriesRowSet.addAll(response.getRows());
-      } catch (Exception e) {
-        throw new JobExecutionException(e);
-      }
-    }
-    List<TimeSeriesRow> timeSeriesRows = new ArrayList<>();
-    timeSeriesRows.addAll(timeSeriesRowSet);
-
-    return new TimeSeriesResponse(timeSeriesRows);
+    return optimizedTimeRanges;
   }
 }

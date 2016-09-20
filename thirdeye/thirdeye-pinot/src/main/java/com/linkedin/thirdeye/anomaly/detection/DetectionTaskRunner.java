@@ -39,31 +39,31 @@ public class DetectionTaskRunner implements TaskRunner {
   private DateTime windowEnd;
   private List<RawAnomalyResultDTO> knownAnomalies;
   private BaseAnomalyFunction anomalyFunction;
-  private AnomalyFunctionDTO anomalyFunctionSpec;
-  private AnomalyFunctionFactory anomalyFunctionFactory;
 
   public DetectionTaskRunner() {
     timeSeriesResponseConverter = TimeSeriesResponseConverter.getInstance();
   }
 
   public List<TaskResult> execute(TaskInfo taskInfo, TaskContext taskContext) throws Exception {
-
     DetectionTaskInfo detectionTaskInfo = (DetectionTaskInfo) taskInfo;
     List<TaskResult> taskResult = new ArrayList<>();
     LOG.info("Begin executing task {}", taskInfo);
     resultDAO = taskContext.getResultDAO();
-    anomalyFunctionFactory = taskContext.getAnomalyFunctionFactory();
-    anomalyFunctionSpec = detectionTaskInfo.getAnomalyFunctionSpec();
+    AnomalyFunctionFactory anomalyFunctionFactory = taskContext.getAnomalyFunctionFactory();
+    AnomalyFunctionDTO anomalyFunctionSpec = detectionTaskInfo.getAnomalyFunctionSpec();
     anomalyFunction = anomalyFunctionFactory.fromSpec(anomalyFunctionSpec);
     windowStart = detectionTaskInfo.getWindowStartTime();
     windowEnd = detectionTaskInfo.getWindowEndTime();
 
-    LOG.info("Running anomaly detection job with metricFunction: [{}], metric [{}], collection: [{}]",
-        anomalyFunctionSpec.getFunctionName(), anomalyFunctionSpec.getMetric(), anomalyFunctionSpec.getCollection());
+    LOG.info(
+        "Running anomaly detection job with metricFunction: [{}], metric [{}], collection: [{}]",
+        anomalyFunctionSpec.getFunctionName(), anomalyFunctionSpec.getMetric(),
+        anomalyFunctionSpec.getCollection());
 
     CollectionSchema collectionSchema = null;
     try {
-      collectionSchema = CACHE_REGISTRY_INSTANCE.getCollectionSchemaCache().get(anomalyFunctionSpec.getCollection());
+      collectionSchema = CACHE_REGISTRY_INSTANCE.getCollectionSchemaCache()
+          .get(anomalyFunctionSpec.getCollection());
       collectionDimensions = collectionSchema.getDimensionNames();
     } catch (Exception e) {
       LOG.error("Exception when reading collection schema cache", e);
@@ -71,9 +71,10 @@ public class DetectionTaskRunner implements TaskRunner {
 
     // Get existing anomalies for this time range
     knownAnomalies = getExistingAnomalies();
-    TimeSeriesResponse finalResponse = TimeSeriesUtil.getTimeSeriesResponse(
-        anomalyFunctionSpec, anomalyFunction, detectionTaskInfo.getGroupByDimension(),
-        windowStart.getMillis(), windowEnd.getMillis());
+    TimeSeriesResponse finalResponse = TimeSeriesUtil
+        .getTimeSeriesResponse(anomalyFunctionSpec, anomalyFunction,
+            detectionTaskInfo.getGroupByDimension(), windowStart.getMillis(),
+            windowEnd.getMillis());
 
     exploreDimensionsAndAnalyze(finalResponse);
     return taskResult;
