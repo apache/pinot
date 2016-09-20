@@ -18,6 +18,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.logging.Log;
 import org.joda.time.DateTime;
 import org.quartz.JobExecutionException;
 import org.slf4j.Logger;
@@ -62,9 +63,14 @@ public abstract class TimeSeriesUtil {
     List<Pair<Long, Long>> startEndTimeRanges =
         anomalyFunction.getDataRangeIntervals(windowStart, windowEnd);
 
+    LOG.info("Found [{}] time ranges to fetch data", startEndTimeRanges.size());
+    for (Pair<Long, Long> timeRange : startEndTimeRanges) {
+      LOG.info("Start Time [{}], End Time [{}] for anomaly analysis", new DateTime(timeRange.getFirst()), new DateTime(timeRange.getSecond()));
+    }
+
     Set<TimeSeriesRow> timeSeriesRowSet = new HashSet<>();
     // TODO : replace this with Pinot MultiQuery Request
-    for (Pair<Long, Long> startEndInterval : getOptimizedTimeRanges(startEndTimeRanges)) {
+    for (Pair<Long, Long> startEndInterval : startEndTimeRanges) {
       DateTime startTime = new DateTime(startEndInterval.getFirst());
       DateTime endTime = new DateTime(startEndInterval.getSecond());
       request.setStart(startTime);
@@ -86,32 +92,5 @@ public abstract class TimeSeriesUtil {
     timeSeriesRows.addAll(timeSeriesRowSet);
 
     return new TimeSeriesResponse(timeSeriesRows);
-  }
-
-  private static List<Pair<Long, Long>> getOptimizedTimeRanges(
-      List<Pair<Long, Long>> startEndTimeRanges) {
-    List<Pair<Long, Long>> optimizedTimeRanges;
-    if (startEndTimeRanges.size() > 1) {
-      // optimize timeRange pairs for overlapped time
-      optimizedTimeRanges = new ArrayList<>();
-      Pair<Long, Long> lastTimePair = startEndTimeRanges.get(0);
-      for (int i = 1; i < startEndTimeRanges.size(); i++) {
-        Pair<Long, Long> currentTimePair = startEndTimeRanges.get(i);
-        if (lastTimePair.getSecond() < currentTimePair.getFirst()) {
-          optimizedTimeRanges.add(lastTimePair);
-          lastTimePair = currentTimePair;
-        } else {
-          if (lastTimePair.getSecond() < currentTimePair.getSecond()) {
-            lastTimePair.setSecond(currentTimePair.getSecond());
-          }
-        }
-        if (i == startEndTimeRanges.size() - 1) {
-          optimizedTimeRanges.add(lastTimePair);
-        }
-      }
-    } else {
-      optimizedTimeRanges = startEndTimeRanges;
-    }
-    return optimizedTimeRanges;
   }
 }
