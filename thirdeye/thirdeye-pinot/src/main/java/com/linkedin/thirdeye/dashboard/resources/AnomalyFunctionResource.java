@@ -88,7 +88,7 @@ public class AnomalyFunctionResource {
   /**
    * @return map of function name vs function property keys
    * <p/>
-   * eg. { "USER_RULE":["baseline","changeThreshold","averageVolumeThreshold"],
+   * eg. { "WEEK_OVER_WEEK_RULE":["baseline","changeThreshold","averageVolumeThreshold"],
    * "MIN_MAX_THRESHOLD":["min","max"] }
    */
   @GET

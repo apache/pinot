@@ -138,7 +138,7 @@ function addSelfServiceListeners() {
     });
 
     //FUNCTION TYPE SPECIFIC PARAMS
-    //USER_RULE FUNCTION TYPE PARAMS
+    //WEEK_OVER_WEEK_RULE FUNCTION TYPE PARAMS
     // Condition selection
     $("#self-service-forms-section").on("click", ".anomaly-condition-option", function () {
         var form = $(this).closest("form");
@@ -313,8 +313,8 @@ function addSelfServiceListeners() {
         $("." + functionType + "-fields").removeClass("uk-hidden");
 
         //Hide autoPopulated UASER_RULE and MIN_MAX_THRESHOLD to populate only the hard coded customized fields
-        $(".USER_RULE-fields>table").addClass("uk-hidden");
-        $(".USER_RULE-fields>.exceed-txt").addClass("uk-hidden");
+        $(".WEEK_OVER_WEEK_RULE-fields>table").addClass("uk-hidden");
+        $(".WEEK_OVER_WEEK_RULE-fields>.exceed-txt").addClass("uk-hidden");
         $(".MIN_MAX_THRESHOLD-fields>table").addClass("uk-hidden");
         $(".MIN_MAX_THRESHOLD-fields>.exceed-txt").addClass("uk-hidden");
     }
@@ -414,7 +414,7 @@ function addSelfServiceListeners() {
             formData.isActive = false;
         }
 
-        //USER_RULE & MIN_MAX_THRESHOLD
+        //WEEK_OVER_WEEK_RULE & MIN_MAX_THRESHOLD
         var filters = readFiltersAppliedInCurrentView("self-service", {form: form});
 
         //Transform filters Todo: clarify if filters object should be consistent on FE and BE
@@ -423,13 +423,13 @@ function addSelfServiceListeners() {
 
 
         //Function type params
-        //USER_RULE Params
+        //WEEK_OVER_WEEK_RULE Params
         switch(formData.functionType){
-            case "USER_RULE":
+            case "WEEK_OVER_WEEK_RULE":
                 formData.condition = ( $("#selected-anomaly-condition", form).attr("value") == "DROPS" ) ? "-" : ( $("#selected-anomaly-condition", form).attr("value") == "INCREASES" ) ? "" : null;
                 formData.baseline = $("#selected-anomaly-compare-mode", form).attr("value");
                 formData.changeThreshold = parseFloat($("#anomaly-threshold", form).val() / 100);
-                //USER_RULE & MIN_MAX_THRESHOLD
+                //WEEK_OVER_WEEK_RULE & MIN_MAX_THRESHOLD
                 var filters = readFiltersAppliedInCurrentView("self-service", {form: form});
 
                 //Transform filters Todo: clarify if filters object should be consistent on FE and BE
@@ -439,7 +439,7 @@ function addSelfServiceListeners() {
             case "MIN_MAX_THRESHOLD":
                 formData.min = $("#anomaly-threshold-min", form).val();
                 formData.max = $("#anomaly-threshold-max", form).val();
-                //USER_RULE & MIN_MAX_THRESHOLD
+                //WEEK_OVER_WEEK_RULE & MIN_MAX_THRESHOLD
                 var filters = readFiltersAppliedInCurrentView("self-service", {form: form});
 
                 //Transform filters Todo: clarify if filters object should be consistent on FE and BE
@@ -534,7 +534,7 @@ function addSelfServiceListeners() {
 
         //Fields related to FUNCTION_TYPE PROPERTIES
         switch(formData.functionType){
-            case "USER_RULE":
+            case "WEEK_OVER_WEEK_RULE":
                 //Check if condition is selected
                 if ( formData.condition == null) {
                     errorMessage.html("Please select a condition ie. DROP, INCREASE.");
@@ -710,7 +710,7 @@ function addSelfServiceListeners() {
         hash.currentEnd = maxMillis;
         hash.currentStart = moment(parseFloat(maxMillis)).add(-1, 'days').valueOf();
         hash.anomalyFunctionId = id;
-        if(formData.functionType == "USER_RULE") {
+        if(formData.functionType == "WEEK_OVER_WEEK_RULE") {
             switch(formData.baseline){
                 case "w/w":
                     hash.fnCompareWeeks = 1;
@@ -927,9 +927,9 @@ function addSelfServiceListeners() {
             + "&windowSize=" + formData.windowSize + "&windowUnit=" + formData.windowUnit + "&windowDelay=" + formData.windowDelay
 
             + "&isActive=" + formData.isActive + "&properties="
-        url += (formData.functionType == "USER_RULE") ? "baseline=" + formData.baseline + ";changeThreshold=" + formData.condition + formData.changeThreshold : "";
+        url += (formData.functionType == "WEEK_OVER_WEEK_RULE") ? "baseline=" + formData.baseline + ";changeThreshold=" + formData.condition + formData.changeThreshold : "";
         url += (formData.functionType == "MIN_MAX_THRESHOLD" && formData.min ) ? "min=" + formData.min + ";" : "";
-        url += (formData.functionType != "MIN_MAX_THRESHOLD" && formData.functionType != "USER_RULE" ) ? stringifyProperties(formData.properties) : "";
+        url += (formData.functionType != "MIN_MAX_THRESHOLD" && formData.functionType != "WEEK_OVER_WEEK_RULE" ) ? stringifyProperties(formData.properties) : "";
         url += (formData.repeatEveryUnit) ? "&cron=" + cron : "";
         url += (formData.repeatEveryUnit) ? "&repeatEvery=" + formData.repeatEveryUnit : "";
         url += (formData.repeatEveryUnit == "DAYS") ?  "&scheduleMinute=" + formData.scheduleMinute + "&scheduleHour=" + formData.scheduleHour : "";

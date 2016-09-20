@@ -38,8 +38,8 @@ import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
  * value does not meet or exceed the threshold, no anomaly results will be generated. This value
  * should be a double.
  */
-public class UserRuleAnomalyFunction extends BaseAnomalyFunction {
-  private static final Logger LOGGER = LoggerFactory.getLogger(UserRuleAnomalyFunction.class);
+public class WeekOverWeekRuleFunction extends BaseAnomalyFunction {
+  private static final Logger LOGGER = LoggerFactory.getLogger(WeekOverWeekRuleFunction.class);
   public static final String BASELINE = "baseline";
   public static final String CHANGE_THRESHOLD = "changeThreshold";
   public static final String AVERAGE_VOLUME_THRESHOLD = "averageVolumeThreshold";

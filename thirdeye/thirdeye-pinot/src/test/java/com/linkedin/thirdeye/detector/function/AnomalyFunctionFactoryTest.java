@@ -26,7 +26,7 @@ public class AnomalyFunctionFactoryTest {
   public static Object[][] validMappings() {
     return new Object[][] {
         new Object[] {
-            "USER_RULE", UserRuleAnomalyFunction.class
+            "WEEK_OVER_WEEK_RULE", WeekOverWeekRuleFunction.class
         }
     };
   }
