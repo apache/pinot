@@ -19,7 +19,8 @@ public class EmailConfigurationManagerImpl extends AbstractManagerImpl<EmailConf
     super(EmailConfigurationDTO.class, EmailConfigurationBean.class);
   }
 
-  @Override public Long save(EmailConfigurationDTO emailConfigurationDTO) {
+  @Override
+  public Long save(EmailConfigurationDTO emailConfigurationDTO) {
     if (emailConfigurationDTO.getId() != null) {
       //TODO: throw exception and force the caller to call update instead
       update(emailConfigurationDTO);
@@ -44,13 +45,15 @@ public class EmailConfigurationManagerImpl extends AbstractManagerImpl<EmailConf
     return emailConfigurationBean;
   }
 
-  @Override public void update(EmailConfigurationDTO emailConfigurationDTO) {
+  @Override
+  public void update(EmailConfigurationDTO emailConfigurationDTO) {
     EmailConfigurationBean emailConfigurationBean =
         (EmailConfigurationBean) convertEmailConfigurationDTO2Bean(emailConfigurationDTO);
     genericPojoDao.update(emailConfigurationBean);
   }
 
-  @Override public EmailConfigurationDTO findById(Long id) {
+  @Override
+  public EmailConfigurationDTO findById(Long id) {
     EmailConfigurationBean emailConfigurationBean =
         genericPojoDao.get(id, EmailConfigurationBean.class);
     if (emailConfigurationBean != null) {
@@ -78,7 +81,8 @@ public class EmailConfigurationManagerImpl extends AbstractManagerImpl<EmailConf
     return emailConfigurationDTO;
   }
 
-  @Override public List<EmailConfigurationDTO> findByFunctionId(Long functionId) {
+  @Override
+  public List<EmailConfigurationDTO> findByFunctionId(Long functionId) {
     //    return getEntityManager().createQuery(FIND_BY_FUNCTION_ID, entityClass)
     //        .setParameter("id", id)
     //        .getResultList();
@@ -94,16 +98,27 @@ public class EmailConfigurationManagerImpl extends AbstractManagerImpl<EmailConf
   }
 
   @Override
-  public List<EmailConfigurationDTO> findByCollectionMetric(String collection,
-      String metric) {
+  public List<EmailConfigurationDTO> findByCollectionMetric(String collection, String metric) {
     Predicate predicate =
         Predicate.AND(Predicate.EQ("collection", collection), Predicate.EQ("metric", metric));
-    return genericPojoDao.get(predicate, EmailConfigurationDTO.class);
+    List<EmailConfigurationBean> list = genericPojoDao.get(predicate, EmailConfigurationBean.class);
+    List<EmailConfigurationDTO> result = new ArrayList<>();
+    for (EmailConfigurationBean bean : list) {
+      EmailConfigurationDTO dto = convertEmailConfigurationBean2DTO(bean);
+      result.add(dto);
+    }
+    return result;
   }
 
   @Override
   public List<EmailConfigurationDTO> findByCollection(String collection) {
     Predicate predicate = Predicate.EQ("collection", collection);
-    return genericPojoDao.get(predicate, EmailConfigurationDTO.class);
+    List<EmailConfigurationBean> list = genericPojoDao.get(predicate, EmailConfigurationBean.class);
+    List<EmailConfigurationDTO> result = new ArrayList<>();
+    for (EmailConfigurationBean bean : list) {
+      EmailConfigurationDTO dto = convertEmailConfigurationBean2DTO(bean);
+      result.add(dto);
+    }
+    return result;
   }
 }
