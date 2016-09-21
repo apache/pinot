@@ -27,12 +27,11 @@ public abstract class BaseThirdEyeApplication<T extends Configuration> extends A
   protected TaskManager anomalyTaskDAO;
   protected WebappConfigManager webappConfigDAO;
   protected MergedAnomalyResultManager anomalyMergedResultDAO;
-  String mode = "hibernate";
 
-  public void initDAOs() {
+  public void initDAOs(String implMode) {
     String persistenceConfig = System.getProperty("dw.rootDir") + "/persistence.yml";
     LOG.info("Loading persistence config from [{}]", persistenceConfig);
-    if ("jdbc".equalsIgnoreCase(mode)) {
+    if ("jdbc".equalsIgnoreCase(implMode)) {
       DaoProviderUtil.init(new File(persistenceConfig));
       anomalyFunctionDAO = DaoProviderUtil.getInstance(
           com.linkedin.thirdeye.datalayer.bao.jdbc.AnomalyFunctionManagerImpl.class);
