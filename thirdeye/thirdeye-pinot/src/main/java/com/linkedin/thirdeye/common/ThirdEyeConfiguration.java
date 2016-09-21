@@ -19,6 +19,7 @@ public abstract class ThirdEyeConfiguration extends Configuration {
    * <configRootDir>/configStores/file.yml
    */
   private String configStoreType = "FILE";
+  private String implMode = "hibernate";
 
   private String whitelistCollections = "";
   private String blacklistCollections = "";
@@ -53,6 +54,14 @@ public abstract class ThirdEyeConfiguration extends Configuration {
 
   public void setConfigStoreType(String configStoreType) {
     this.configStoreType = configStoreType;
+  }
+
+  public String getImplMode() {
+    return implMode;
+  }
+
+  public void setImplMode(String implMode) {
+    this.implMode = implMode;
   }
 
   public String getWhitelistCollections() {
