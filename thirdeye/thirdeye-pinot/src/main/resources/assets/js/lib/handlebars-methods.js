@@ -102,6 +102,13 @@ $(document).ready(function () {
             case "changeThreshold":
                 value = Math.abs(parseFloat(value)) * 100;
             break;
+            case "minConsecutiveSize":
+                //This condition can be removed when all week over week type functions will have minConsecutiveSize property
+                //when adding this property 09/2016,the earlier functions don't have the property
+                if(!value){
+                    value = 1;
+                };
+            break;
             default:
             break;
         }
