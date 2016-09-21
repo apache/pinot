@@ -583,7 +583,7 @@ public class LLRealtimeSegmentDataManagerTest {
     }
 
     @Override
-    public void stop(long maxWaitTime) {
+    public void stop() {
       _timeNow += _stopWaitTimeMs;
     }
 

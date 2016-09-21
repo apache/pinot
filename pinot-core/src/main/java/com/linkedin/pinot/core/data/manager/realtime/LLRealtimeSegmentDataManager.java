@@ -452,22 +452,12 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
   }
 
   public void goOnlineFromConsuming(RealtimeSegmentZKMetadata metadata) throws InterruptedException {
-    // Takes 30s max to locate a new controller (more if there are multiple controller failures)
-    // set the timeout to 31s;
-    final long transitionStartTimeMs = now();
-    long timeoutMs =_maxTimeForConsumingToOnlineSec * 1000L;
     LLCRealtimeSegmentZKMetadata llcMetadata = (LLCRealtimeSegmentZKMetadata)metadata;
     final long endOffset = llcMetadata.getEndOffset();
     segmentLogger.info("State: {}, transitioning from CONSUMING to ONLINE (startOffset: {}, endOffset: {})",
         _state.toString(), _startOffset, endOffset);
-    stop(timeoutMs);
-    long now = now();
-    timeoutMs -= (now - transitionStartTimeMs);
-    segmentLogger.info("Consumer thread stopped in state {}. Time remaining to catchup: {}ms", _state.toString(), timeoutMs);
-    if (timeoutMs <= 0) {
-      // we could not get it to stop. Throw an exception and let it go to error state.
-      throw new RuntimeException("Could not get to stop consumer thread" + _consumerThread);
-    }
+    stop();
+    segmentLogger.info("Consumer thread stopped in state {}", _state.toString());
 
     switch (_state) {
       case COMMITTED:
@@ -494,7 +484,8 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
           buildSegmentAndReplace();
         } else {
           segmentLogger.info("Attempting to catch up from offset {} to {} ", _currentOffset, endOffset);
-          boolean success = catchupToFinalOffset(endOffset, timeoutMs);
+          boolean success = catchupToFinalOffset(endOffset,
+              TimeUnit.MILLISECONDS.convert(_maxTimeForConsumingToOnlineSec, TimeUnit.SECONDS));
           if (success) {
             segmentLogger.info("Caught up to offset {}", _currentOffset);
             buildSegmentAndReplace();
@@ -551,7 +542,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
 
   public void destroy() {
     try {
-      stop(0);
+      stop();
     } catch (InterruptedException e) {
       segmentLogger.error("Could not stop consumer thread");
     }
@@ -571,11 +562,10 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
 
   /**
    * Stop the consuming thread.
-   * @param ms max number of millis allowed to wait. If 0, then no limit.
    */
-  public void stop(long ms) throws InterruptedException {
+  public void stop() throws InterruptedException {
     _receivedStop = true;
-    _consumerThread.join(ms);
+    _consumerThread.join();
   }
 
   // TODO Make this a factory class.
