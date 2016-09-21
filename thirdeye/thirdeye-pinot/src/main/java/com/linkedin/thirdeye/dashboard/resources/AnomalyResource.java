@@ -237,7 +237,10 @@ public class AnomalyResource {
     anomalyFunctionSpec.setWindowSize(Integer.valueOf(windowSize));
     anomalyFunctionSpec.setWindowUnit(TimeUnit.valueOf(windowUnit));
 
-    TimeUnit windowDelayTimeUnit = dataGranularity.getUnit();
+    TimeUnit dataGranularityUnit = dataGranularity.getUnit();
+    TimeUnit windowDelayTimeUnit =
+        dataGranularityUnit.equals(TimeUnit.MINUTES) || dataGranularityUnit.equals(TimeUnit.HOURS)
+            ? TimeUnit.HOURS : TimeUnit.DAYS;
     if (StringUtils.isNotEmpty(windowDelayUnit)) {
       windowDelayTimeUnit = TimeUnit.valueOf(windowDelayUnit);
     }

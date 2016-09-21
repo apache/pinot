@@ -51,7 +51,8 @@ public class TimeSeriesHandler {
     ThirdEyeRequest request = createThirdEyeRequest("timeseries", timeSeriesRequest, start, end);
 
     Future<ThirdEyeResponse> responseFuture = queryCache.getQueryResultAsync(request);
-    ThirdEyeResponse response = responseFuture.get(60, TimeUnit.SECONDS);
+    // 5 minutes timeout
+    ThirdEyeResponse response = responseFuture.get(5, TimeUnit.MINUTES);
 
     TimeSeriesResponseParser timeSeriesResponseParser =
         new TimeSeriesResponseParser(response, timeranges,

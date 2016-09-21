@@ -54,7 +54,7 @@ public class MergedAnomalyResultBean extends AbstractBean
   @Column(name = "notified")
   private boolean notified;
 
-  
+
   public Long getFunctionId() {
     return functionId;
   }
@@ -192,5 +192,15 @@ public class MergedAnomalyResultBean extends AbstractBean
       return diff;
     }
     return ObjectUtils.compare(getId(), o.getId());
+  }
+
+  @Override
+  public String toString() {
+    return "MergedAnomalyResultBean{" + "anomalyFeedbackId=" + anomalyFeedbackId + ", functionId="
+        + functionId + ", rawAnomalyIdList=" + rawAnomalyIdList + ", collection='" + collection
+        + '\'' + ", metric='" + metric + '\'' + ", dimensions='" + dimensions + '\''
+        + ", startTime=" + startTime + ", endTime=" + endTime + ", score=" + score + ", weight="
+        + weight + ", createdTime=" + createdTime + ", message='" + message + '\'' + ", notified="
+        + notified + '}';
   }
 }

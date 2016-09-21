@@ -104,7 +104,6 @@ public class AnomalyMergeExecutor implements Runnable {
         Callable<Integer> task = () -> {
           List<RawAnomalyResultDTO> unmergedResults =
               anomalyResultDAO.findUnmergedByFunctionId(function.getId());
-
           LOG.info("Running merge for function id : [{}], found [{}] raw anomalies",
               function.getId(), unmergedResults.size());
 
@@ -192,9 +191,11 @@ public class AnomalyMergeExecutor implements Runnable {
     // create time series request
     TimeSeriesRequest timeSeriesRequest = new TimeSeriesRequest();
     timeSeriesRequest.setCollectionName(anomalyFunctionSpec.getCollection());
+
     List<MetricExpression> metricExpressions = Utils
         .convertToMetricExpressions(anomalyFunctionSpec.getMetric(),
             anomalyFunctionSpec.getMetricFunction(), anomalyFunctionSpec.getCollection());
+
     timeSeriesRequest.setMetricExpressions(metricExpressions);
     TimeGranularity timeBucket = new TimeGranularity(anomalyFunctionSpec.getBucketSize(),
         anomalyFunctionSpec.getBucketUnit());
@@ -212,9 +213,9 @@ public class AnomalyMergeExecutor implements Runnable {
       String anomalyDimensions = anomalyMergedResult.getDimensions();
       String [] dimArr = anomalyDimensions.split(",");
       for (String dim : dimArr) {
-        if(!StringUtils.isBlank(dim) && !"*".equals(dim)) {
+        if (!StringUtils.isBlank(dim) && !"*".equals(dim)) {
           filters.removeAll(exploreDimension);
-          if(dim.equalsIgnoreCase("other")) {
+          if (dim.equalsIgnoreCase("other")) {
             filters.put(exploreDimension, dim);
             filters.put(exploreDimension, dim.toLowerCase());
             filters.put(exploreDimension, "");
@@ -260,7 +261,8 @@ public class AnomalyMergeExecutor implements Runnable {
     if (baselineValue != 0) {
       severity = (currentValue - baselineValue) / baselineValue;
     } else {
-      severity = 0.0;
+      LOG.error("Could not recompute severity for merged anomaly [{}], assigning weighted avg", anomalyMergedResult.toString());
+      severity = computeWeightedAverage(anomalyMergedResult.getAnomalyResults());
     }
     anomalyMergedResult.setWeight(severity);
     anomalyMergedResult.setMessage(createMessage(severity, currentValue, baselineValue));
@@ -355,5 +357,17 @@ public class AnomalyMergeExecutor implements Runnable {
   private String createMessage(double severity, Double currentVal, Double baseLineVal) {
     return String.format("change : %.2f %%, currentVal : %.2f, baseLineVal : %.2f", severity * 100,
         currentVal, baseLineVal);
+  }
+
+  private double computeWeightedAverage(List<RawAnomalyResultDTO> rawAnomalies) {
+    Double weightedSum = 0.0;
+    Double totalBucketSum = 0.0;
+    for (RawAnomalyResultDTO rawAnomaly : rawAnomalies) {
+      double bucketSize = (double) ((rawAnomaly.getEndTime() - rawAnomaly.getStartTime()) / 1000);
+      weightedSum += rawAnomaly.getWeight() * bucketSize;
+      totalBucketSum += bucketSize;
+    }
+    if (totalBucketSum == 0.0) return  weightedSum;
+    return weightedSum / totalBucketSum;
   }
 }
