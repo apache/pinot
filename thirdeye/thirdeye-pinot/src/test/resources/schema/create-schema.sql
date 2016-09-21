@@ -18,8 +18,8 @@ create table if not exists anomaly_function_index (
     base_id bigint(20) not null,
     create_time timestamp,
     update_time timestamp default current_timestamp,
-    version int(10)
-     
+    version int(10),
+    CONSTRAINT uc_functionName unique(function_name)
 ) ENGINE=InnoDB;
 create index anomaly_function_name_idx on anomaly_function_index(function_name);
 
@@ -31,14 +31,17 @@ create table if not exists metric_index (
     base_id bigint(20) not null,
     create_time timestamp,
     update_time timestamp default current_timestamp,
-    version int(10)
+    version int(10),
+    CONSTRAINT uc_name unique(name)
 ) ENGINE=InnoDB;
 
 create table if not exists anomaly_merge_config_index (
     name varchar(200) not null,
+    base_id bigint(20) not null,
     create_time timestamp,
     update_time timestamp default current_timestamp,
-    version int(10)
+    version int(10),
+    CONSTRAINT uc_merge_config_name unique(name)
 ) ENGINE=InnoDB;
 
 create table if not exists email_configuration_index (
