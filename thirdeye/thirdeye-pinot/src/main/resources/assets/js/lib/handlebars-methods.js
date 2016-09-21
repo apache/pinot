@@ -160,6 +160,18 @@ $(document).ready(function () {
         }
     });
 
+
+    //returns the dataAggregateGranularity of the dataset
+    Handlebars.registerHelper('returnAggregateGranularity', function () {
+         var aggTimeGranularity;
+         if(window.datasetConfig && window.datasetConfig.hasOwnProperty("dataGranularity")) {
+             aggTimeGranularity =  window.datasetConfig.dataGranularity;
+        }else{
+             aggTimeGranularity =  "HOURS";
+         }
+        return aggTimeGranularity;
+    });
+
     //returns in users timezone
     Handlebars.registerHelper('returnUserTimeZone', function () {
         var tz = getTimeZone();

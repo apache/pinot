@@ -250,11 +250,14 @@ function getDatasetConfig() {
 
 
         /**CONFIG: DATA GRANULARITY **/
-        if (data["dataGranularity"]) {
+        if (data.hasOwnProperty("dataGranularity")) {
 
 
             window.datasetConfig.dataGranularity = data["dataGranularity"];
-            var dataGranularity = window.datasetConfig.dataGranularity;
+
+            /** Render the form elements **/
+
+            var dataGranularity = data["dataGranularity"];
 
             //Todo: you may remove the following if else if the set of values are known
             if (dataGranularity.toLowerCase().indexOf("minutes") > -1) {
@@ -287,7 +290,6 @@ function getDatasetConfig() {
                     $(".baseline-aggregate[unit='DAYS']").addClass("uk-active");
                     $(".granularity-btn-group").removeClass("vertical");
 
-
                     break;
                 default:
                     $(".baseline-aggregate[unit='10_MINUTES']").addClass("uk-hidden");
@@ -295,7 +297,10 @@ function getDatasetConfig() {
                     $(".baseline-aggregate[unit='DAYS']").removeClass("uk-hidden");
                     $(".granularity-btn-group").removeClass("vertical");
             }
+
+            $("#self-service-chart-area .aggregate-granularity").text(dataGranularity)
         }
+
 
         /**CONFIG: INVERT COLOR METRICS **/
         if (data["invertColorMetrics"]) {

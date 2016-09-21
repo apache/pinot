@@ -204,19 +204,10 @@
             <!-- ** WEEK_OVER_WEEK_RULE & MIN_MAX_THRESHOLD PROPERTIES ** -->
            <!-- ** WEEK_OVER_WEEK_RULE PROPERTIES 2/2 ** -->
            <div class="WEEK_OVER_WEEK_RULE-fields function-type-fields uk-display-inline-block uk-margin-large-top">
+
                <span>for</span>
-               <input id="min-consecutive-size" class="thin-input" type="number" value="{{#if data/minConsecutiveSize}}{{data/minConsecutiveSize}}{{else}}1{{/if}}">
-               <span>consecutive</span>
-               <div id="min-consecutive-unit-selector uk-display-inline-block" class="uk-form-row uk-form-row uk-display-inline-block" rel="self-service">
-                   <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group uk-display-inline-block">
-                       <div id="selected-min-consecutive-unit" class="uk-button" value="{{#if data/minConsecutiveUnit}}{{data/minConsecutiveUnit}}{{else}}HOURS{{/if}}">{{#if data/minConsecutiveUnit}}{{data/minConsecutiveUnit}}{{else}}HOUR(S){{/if}}</div>
-                       <div class="uk-button uk-button-primary" type="button"><i class="uk-icon-caret-down"></i></div>
-                       <div class="uk-dropdown uk-dropdown-small uk-dropdown-bottom" style="top: 30px; left: 0px;">
-                           <ul class="uk-nav uk-nav-dropdown single-select">
-                               <li class="min-consecutive-unit-option" value="HOURS"><a href="#" class="uk-dropdown-close">HOUR(S)</a></li>
-                               <li class="min-consecutive-unit-option" value="DAYS"><a href="#" class="uk-dropdown-close" >DAY(S)</a></li>
-                           </ul>
-                       </div>
+               <input id="min-consecutive-size" class="thin-input" type="number" value="{{#if fnProperties}}{{displayAnomalyFunctionProp 'minConsecutiveSize' fnProperties/minConsecutiveSize}}{{else}}1{{/if}}">
+               <span>consecutive </span><span class="aggregate-granularity">{{returnAggregateGranularity}}</span><span>.</span>
                    </div>
                </div>
            </div>
@@ -274,7 +265,7 @@
             </span>
             <input id="monitoring-repeat-size" type="number" class="thin-input {{hide_if_eq schedule/repeatEveryUnit 'DAYS'}}" value="{{#if schedule/repeatEverySize}}{{schedule/repeatEverySize}}{{else}}1{{/if}}">
             <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group uk-display-inline-block">
-                <div id="selected-monitoring-repeat-unit" class="uk-button" value="{{#if schedule/repeatEveryUnit}}{{schedule/repeatEveryUnit}}{{else}}HOURS{{/if}}">{{#if schedule/repeatEveryUnit}}{{schedule/repeatEveryUnit}}{{else}}HOUR(S){{/if}}</div>
+                <div id="selected-monitoring-repeat-unit" class="uk-button" value="{{#if schedule/repeatEveryUnit}}{{schedule/repeatEveryUnit}}{{else}}{{returnAggregateGranularity}}{{/if}}">{{#if schedule/repeatEveryUnit}}{{schedule/repeatEveryUnit}}{{else}}{{returnAggregateGranularity}}{{/if}}</div>
                 <div class="uk-button uk-button-primary" type="button"><i class="uk-icon-caret-down"></i>
                 </div>
                 <div class="uk-dropdown uk-dropdown-small uk-dropdown-bottom" style="top: 30px; left: 0px;">
