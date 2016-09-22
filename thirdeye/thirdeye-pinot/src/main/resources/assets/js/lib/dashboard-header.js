@@ -21,10 +21,6 @@ function switchHeaderTab(target) {
              that contains the ajax requests */
             window.location.hash = encodeHashParameters(hash);
 
-            getExistingAnomalyFunctions(hash.dataset);
-
-        } else {
-            getExistingAnomalyFunctions();
         }
         addSelfServiceListeners()
     }

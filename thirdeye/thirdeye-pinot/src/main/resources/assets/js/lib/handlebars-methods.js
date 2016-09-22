@@ -102,6 +102,13 @@ $(document).ready(function () {
             case "changeThreshold":
                 value = Math.abs(parseFloat(value)) * 100;
             break;
+            case "minConsecutiveSize":
+                //This condition can be removed when all week over week type functions will have minConsecutiveSize property
+                //when adding this property 09/2016,the earlier functions don't have the property
+                if(!value){
+                    value = 1;
+                };
+            break;
             default:
             break;
         }
@@ -109,7 +116,7 @@ $(document).ready(function () {
     });
 
     //returns classname negative or positive or no classname. The classname related css creates a :before pseudo element triangle up or down
-    Handlebars.registerHelper('discribeDelta', function (value, describeMode) {
+    Handlebars.registerHelper('describeDelta', function (value, describeMode) {
 
         var describeChange;
         if (parseFloat(value) > 0) {
@@ -160,6 +167,18 @@ $(document).ready(function () {
         }
     });
 
+
+    //returns the dataAggregateGranularity of the dataset
+    Handlebars.registerHelper('returnAggregateGranularity', function () {
+         var aggTimeGranularity;
+         if(window.datasetConfig && window.datasetConfig.hasOwnProperty("dataGranularity")) {
+             aggTimeGranularity =  window.datasetConfig.dataGranularity;
+        }else{
+             aggTimeGranularity =  "HOURS";
+         }
+        return aggTimeGranularity;
+    });
+
     //returns in users timezone
     Handlebars.registerHelper('returnUserTimeZone', function () {
         var tz = getTimeZone();
@@ -207,6 +226,7 @@ $(document).ready(function () {
                }
             }
         };
+
         millis = parseInt(millis);
         var tz = getTimeZone();
         return moment(millis).tz(tz).format(displayDateFormat);
@@ -254,15 +274,6 @@ $(document).ready(function () {
         }
         return value;
     });
-
-
-
-    Handlebars.registerHelper('parse', function (str, prop) {
-        str = str.replace("/;/g", ',');
-        var obj = JSON.parse(str);
-        return obj[prop];
-    });
-
 
     /* Add details-cell or heatmap-cell class to cells */
     Handlebars.registerHelper('classify', function (index) {
