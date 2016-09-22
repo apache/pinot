@@ -95,6 +95,11 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
         return -1;
       }
       File[] files = segmentDirectory.getParentFile().listFiles();
+      if (files == null) {
+        LOGGER.warn("Empty list of files for path: {}, segmentDirectory: {}", segmentDirectory.getParentFile(), segmentDirectory);
+        return -1;
+      }
+
       long size = 0L;
       for (File file : files) {
         if (file.isFile()) {

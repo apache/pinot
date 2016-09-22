@@ -48,8 +48,9 @@ import org.slf4j.LoggerFactory;
  *           new MultiThreadedHttpConnectionManager());
  *    CompletionService<GetMethod> completionService = mget.execute(urls);
  *    for (int i = 0; i < urls.size(); i++) {
+ *      GetMethod getMethod = null;
  *      try {
- *        GetMethod getMethod = completionService.take().get();
+ *        getMethod = completionService.take().get();
  *        if (getMethod.getStatusCode() >= 300) {
  *          System.out.println("error");
  *          continue;
@@ -59,6 +60,10 @@ import org.slf4j.LoggerFactory;
  *         if (Throwables.getRootcause(e) instanceof SocketTimeoutException) {
  *           System.out.println("Timeout");
  *         }
+ *      } finally {
+ *        if (getMethod != null) {
+ *          getMethod.releaseConnection();
+ *        }
  *      }
  *    }
  * }
