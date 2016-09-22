@@ -284,4 +284,8 @@ public abstract  class AbstractTableDataManager implements TableDataManager {
   public String getTableName() {
     return _tableName;
   }
+
+  public IndexLoadingConfigMetadata getIndexLoadingConfigMetadata() {
+    return _indexLoadingConfigMetadata;
+  }
 }
