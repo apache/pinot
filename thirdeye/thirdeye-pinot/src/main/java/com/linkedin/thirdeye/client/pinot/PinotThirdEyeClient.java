@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.client.pinot;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Properties;
@@ -64,12 +65,10 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
 
   /**
    * Creates a new PinotThirdEyeClient using the clusterName and broker tag
-   * @param config
    * @param controllerHost
    * @param controllerPort
    * @param zkUrl
    * @param clusterName : required property
-   * @param tag : required property
    * @return
    */
   public static PinotThirdEyeClient fromZookeeper(String controllerHost, int controllerPort,
@@ -216,7 +215,7 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
                 millis = DateTime.parse(groupKeyVal, inputDataDateTimeFormatter).getMillis();
               }
               if (millis < startTime) {
-                LOG.error("Data point earlier than requested start time {}: {}", startTime, millis);
+                LOG.error("Data point earlier than requested start time {}: {}", new Date(startTime), new Date(millis));
                 skipRowDueToError = true;
                 break;
               }

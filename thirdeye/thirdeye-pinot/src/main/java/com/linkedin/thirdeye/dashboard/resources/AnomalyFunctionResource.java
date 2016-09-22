@@ -154,7 +154,7 @@ public class AnomalyFunctionResource {
                 new ArrayList<>());
 
         LOG.info("{} has {} anomalies in window {} to {}", entry.getKey(), results.size(),
-            startTime, endTime);
+            new DateTime(startTime), new DateTime(endTime));
       } catch (Exception e) {
         LOG.error("Could not compute for {}", entry.getKey(), e);
       }
@@ -163,6 +163,8 @@ public class AnomalyFunctionResource {
       List<RawAnomalyResultDTO> validResults = new ArrayList<>();
       for (RawAnomalyResultDTO anomaly : results) {
         if (!anomaly.isDataMissing()) {
+          LOG.info("Found anomaly, sev [{}] start [{}] end [{}]", anomaly.getWeight(),
+              new DateTime(anomaly.getStartTime()), new DateTime(anomaly.getEndTime()));
           validResults.add(anomaly);
         }
       }

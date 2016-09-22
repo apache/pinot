@@ -151,6 +151,7 @@ function saveEmailConfig() {
     submitData("/thirdeye/email", payload, "alert").done(function (id) {
       $("#emailId").val(id);
       console.log(id);
+      fetchEmailIfPresent();
     });
   } else {
     console.log("missing params");
