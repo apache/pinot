@@ -211,7 +211,7 @@ public class AnomalyMergeExecutor implements Runnable {
     if (StringUtils.isNotBlank(exploreDimension)) {
       timeSeriesRequest.setGroupByDimensions(Collections.singletonList(exploreDimension));
       String anomalyDimensions = anomalyMergedResult.getDimensions();
-      String [] dimArr = anomalyDimensions.split(",");
+      String[] dimArr = anomalyDimensions.split(",");
       for (String dim : dimArr) {
         if (!StringUtils.isBlank(dim) && !"*".equals(dim)) {
           filters.removeAll(exploreDimension);
@@ -246,13 +246,15 @@ public class AnomalyMergeExecutor implements Runnable {
     Double currentValue;
     Double baselineValue;
 
-    if (Utils.isDerievedMetric(anomalyFunctionSpec.getCollection(), anomalyFunctionSpec.getMetric())) {
+    if (Utils
+        .isDerievedMetric(anomalyFunctionSpec.getCollection(), anomalyFunctionSpec.getMetric())) {
       LOG.info("Found derived metric [{}], assigning avg value per bucket in the message",
           anomalyFunctionSpec.getMetric());
       currentValue = getAvgMetricValuePerBucket(responseCurrent, anomalyFunctionSpec.getMetric());
       baselineValue = getAvgMetricValuePerBucket(responseBaseline, anomalyFunctionSpec.getMetric());
     } else {
-      LOG.info("Assigning total value in the message for metric : [{}]", anomalyFunctionSpec.getMetric());
+      LOG.info("Assigning total value in the message for metric : [{}]",
+          anomalyFunctionSpec.getMetric());
       currentValue = getMetricValueSum(responseCurrent, anomalyFunctionSpec.getMetric());
       baselineValue = getMetricValueSum(responseBaseline, anomalyFunctionSpec.getMetric());
     }
@@ -260,12 +262,13 @@ public class AnomalyMergeExecutor implements Runnable {
     Double severity;
     if (baselineValue != 0) {
       severity = (currentValue - baselineValue) / baselineValue;
+      anomalyMergedResult.setWeight(severity);
     } else {
-      LOG.error("Could not recompute severity for merged anomaly [{}], assigning weighted avg", anomalyMergedResult.toString());
-      severity = computeWeightedAverage(anomalyMergedResult.getAnomalyResults());
+      LOG.error("Could not recompute severity for merged anomaly [{}], assigning weighted avg",
+          anomalyMergedResult.toString());
     }
-    anomalyMergedResult.setWeight(severity);
-    anomalyMergedResult.setMessage(createMessage(severity, currentValue, baselineValue));
+    anomalyMergedResult
+        .setMessage(createMessage(anomalyMergedResult.getWeight(), currentValue, baselineValue));
   }
 
   private Double getMetricValueSum(TimeSeriesResponse response, String metricName) {
@@ -357,17 +360,5 @@ public class AnomalyMergeExecutor implements Runnable {
   private String createMessage(double severity, Double currentVal, Double baseLineVal) {
     return String.format("change : %.2f %%, currentVal : %.2f, baseLineVal : %.2f", severity * 100,
         currentVal, baseLineVal);
-  }
-
-  private double computeWeightedAverage(List<RawAnomalyResultDTO> rawAnomalies) {
-    Double weightedSum = 0.0;
-    Double totalBucketSum = 0.0;
-    for (RawAnomalyResultDTO rawAnomaly : rawAnomalies) {
-      double bucketSize = (double) ((rawAnomaly.getEndTime() - rawAnomaly.getStartTime()) / 1000);
-      weightedSum += rawAnomaly.getWeight() * bucketSize;
-      totalBucketSum += bucketSize;
-    }
-    if (totalBucketSum == 0.0) return  weightedSum;
-    return weightedSum / totalBucketSum;
   }
 }
