@@ -15,23 +15,11 @@
  */
 package com.linkedin.pinot.core.data.manager.realtime;
 
-import java.io.File;
-import java.util.List;
-import java.util.Map;
-import java.util.TimerTask;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
-import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.plist.PropertyListConfiguration;
-import org.apache.commons.io.FileUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.IndexingConfig;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
-import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metrics.ServerGauge;
 import com.linkedin.pinot.common.metrics.ServerMeter;
@@ -52,6 +40,15 @@ import com.linkedin.pinot.core.realtime.converter.RealtimeSegmentConverter;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaHighLevelStreamProviderConfig;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
+import java.io.File;
+import java.util.List;
+import java.util.Map;
+import java.util.TimerTask;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
+import org.apache.commons.io.FileUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class HLRealtimeSegmentDataManager extends SegmentDataManager {
@@ -89,12 +86,11 @@ public class HLRealtimeSegmentDataManager extends SegmentDataManager {
   private Logger segmentLogger = LOGGER;
   private final SegmentVersion _segmentVersion;
   private final RealtimeTableDataManager _realtimeTableDataManager;
-
   // An instance of this class exists only for the duration of the realtime segment that is currently being consumed.
   // Once the segment is committed, the segment is handled by OfflineSegmentDataManager
   public HLRealtimeSegmentDataManager(final RealtimeSegmentZKMetadata segmentMetadata,
       final AbstractTableConfig tableConfig, InstanceZKMetadata instanceMetadata,
-      RealtimeTableDataManager realtimeTableDataManager, final String resourceDataDir, final ReadMode mode,
+      final RealtimeTableDataManager realtimeTableDataManager, final String resourceDataDir, final ReadMode mode,
       final Schema schema, final ServerMetrics serverMetrics) throws Exception {
     super();
     _realtimeTableDataManager = realtimeTableDataManager;
@@ -105,6 +101,7 @@ public class HLRealtimeSegmentDataManager extends SegmentDataManager {
     this.serverMetrics =serverMetrics;
     this.segmentName = segmentMetadata.getSegmentName();
     this.tableName = tableConfig.getTableName();
+
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
     if (indexingConfig.getSortedColumn().isEmpty()) {
       LOGGER.info("RealtimeDataResourceZKMetadata contains no information about sorted column for segment {}",
@@ -260,10 +257,8 @@ public class HLRealtimeSegmentDataManager extends SegmentDataManager {
           long segEndTime = realtimeSegment.getMaxTime();
 
           TimeUnit timeUnit = schema.getTimeFieldSpec().getOutgoingGranularitySpec().getTimeType();
-          Configuration configuration = new PropertyListConfiguration();
-          configuration.setProperty(IndexLoadingConfigMetadata.KEY_OF_LOADING_INVERTED_INDEX, invertedIndexColumns);
-          IndexLoadingConfigMetadata configMetadata = new IndexLoadingConfigMetadata(configuration);
-          IndexSegment segment = Loaders.IndexSegment.load(new File(resourceDir, segmentMetatdaZk.getSegmentName()), mode, configMetadata);
+          IndexSegment segment = Loaders.IndexSegment.load(new File(resourceDir, segmentMetatdaZk.getSegmentName()), mode,
+              realtimeTableDataManager.getIndexLoadingConfigMetadata());
 
           segmentLogger.info("Committing Kafka offsets");
           boolean commitSuccessful = false;
