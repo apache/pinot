@@ -72,7 +72,7 @@ function getAnomalies(tab) {
                     $(".anomaly-metric-tip").hide();
                     renderAnomalyTable(anomalyData, tab);
                 }else{
-                    tipToUser()
+                    tipToUser(tab)
                 }
 
                 //anomalyFunctionId and hash.fnCompareWeeks are only present in hash when anomaly
@@ -772,7 +772,7 @@ function attach_AnomalyTable_EventListeners(){
 
  }
 
-function tipToUser() {
+function tipToUser(tab) {
     var tipToUser = document.createElement("div");
     tipToUser.id = "anomaly-metric-tip";
     tipToUser.className = "tip-to-user uk-alert uk-form-row";

@@ -268,11 +268,17 @@ $(document).ready(function () {
             fnProperties[key] = value;
         }
 
-        var value = fnProperties[prop];
-        if(prop == "baseLineVal" || prop == "currentVal" ){
-            value =  value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+
+
+        var val = fnProperties[prop];
+        if(val){
+            if(prop == "baseLineVal" ||  prop == "currentVal" ){
+                val =  val.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+            }
+            return val;
         }
-        return value;
+        return
+
     });
 
     /* Add details-cell or heatmap-cell class to cells */
