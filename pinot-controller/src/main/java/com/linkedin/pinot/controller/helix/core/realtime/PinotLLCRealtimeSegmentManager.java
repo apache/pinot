@@ -33,8 +33,10 @@ import java.util.concurrent.TimeoutException;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.helix.AccessOption;
+import org.apache.helix.ControllerChangeListener;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
+import org.apache.helix.NotificationContext;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -91,6 +93,15 @@ public class PinotLLCRealtimeSegmentManager {
     SegmentCompletionManager.create(helixManager, INSTANCE, controllerConf);
   }
 
+  public void start() {
+    _helixManager.addControllerListener(new ControllerChangeListener() {
+      @Override
+      public void onControllerChange(NotificationContext changeContext) {
+        onBecomeLeader();
+      }
+    });
+  }
+
   protected PinotLLCRealtimeSegmentManager(HelixAdmin helixAdmin, String clusterName, HelixManager helixManager,
       ZkHelixPropertyStore propertyStore, PinotHelixResourceManager helixResourceManager, ControllerConf controllerConf) {
     _helixAdmin = helixAdmin;
@@ -108,8 +119,7 @@ public class PinotLLCRealtimeSegmentManager {
     return INSTANCE;
   }
 
-  // TODO Hook this up for leadership transfer
-  public void onBecomeLeader() {
+  private void onBecomeLeader() {
     if (isLeader()) {
       if (!_amILeader) {
         // We were not leader before, now we are.
