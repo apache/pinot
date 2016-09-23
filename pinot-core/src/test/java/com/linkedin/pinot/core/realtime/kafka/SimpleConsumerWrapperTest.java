@@ -228,7 +228,7 @@ public class SimpleConsumerWrapperTest {
     );
     SimpleConsumerWrapper consumerWrapper = SimpleConsumerWrapper.forPartitionConsumption(
         simpleConsumerFactory, "abcd:1234,bcde:2345", "clientId", "theTopic", 0);
-    consumerWrapper.fetchMessages(12345L, 23456L, 1000);
+    consumerWrapper.fetchMessages(12345L, 23456L, 10000);
   }
 
   @Test(enabled = false)
@@ -243,7 +243,7 @@ public class SimpleConsumerWrapperTest {
     );
     SimpleConsumerWrapper consumerWrapper = SimpleConsumerWrapper.forPartitionConsumption(
         simpleConsumerFactory, "abcd:1234,bcde:2345", "clientId", "theTopic", 0);
-    consumerWrapper.fetchPartitionOffset("smallest", 1000);
+    consumerWrapper.fetchPartitionOffset("smallest", 10000);
 
   }
 }
