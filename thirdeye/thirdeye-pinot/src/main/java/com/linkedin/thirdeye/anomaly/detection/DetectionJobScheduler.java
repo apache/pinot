@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.anomaly.detection;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.TimeZone;
 
 import org.joda.time.DateTime;
 import org.quartz.CronScheduleBuilder;
@@ -162,7 +163,8 @@ public class DetectionJobScheduler implements JobScheduler {
     String triggerKey = String.format("anomaly_scheduler_trigger_%d", anomalyFunctionSpec.getId());
     CronTrigger trigger =
         TriggerBuilder.newTrigger().withIdentity(triggerKey)
-            .withSchedule(CronScheduleBuilder.cronSchedule(anomalyFunctionSpec.getCron())).build();
+            .withSchedule(CronScheduleBuilder.cronSchedule(anomalyFunctionSpec.getCron())
+                .inTimeZone(TimeZone.getTimeZone("UTC"))).build();
 
     String jobKey = jobContext.getJobName();
     JobDetail job = JobBuilder.newJob(DetectionJobRunner.class).withIdentity(jobKey).build();
