@@ -58,6 +58,10 @@ function renderTimeSeriesUsingC3(d, tab) {  //time-series-area
             type: 'area-spline',
             colors: colors
         },
+        zoom: {
+            enabled: true,
+            rescale:true
+        },
         axis: {
             x: {
                 type: 'timeseries',

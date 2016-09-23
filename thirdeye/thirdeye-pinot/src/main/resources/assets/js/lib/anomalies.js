@@ -185,6 +185,10 @@ function drawMetricTimeSeries(timeSeriesData, anomalyData, tab, placeholder) {
             type: 'spline',
             colors: colors
         },
+        zoom: {
+            enabled: true,
+            rescale:true
+        },
         axis: {
             x: {
                 type: 'timeseries',
@@ -281,6 +285,10 @@ function drawMetricTimeSeries(timeSeriesData, anomalyData, tab, placeholder) {
             json: barChartData,
             type: 'area-spline',
             colors: colors
+        },
+        zoom: {
+        enabled: true,
+            rescale:true
         },
         axis: {
             x: {

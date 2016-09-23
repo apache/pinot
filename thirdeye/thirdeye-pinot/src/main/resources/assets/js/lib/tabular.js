@@ -153,6 +153,10 @@ function drawTimeSeries(timeSeriesData, tab) {
             type: 'spline',
             colors: colors
         },
+        zoom: {
+            enabled: true,
+            rescale:true
+        },
         axis: {
             x: {
                 type: 'timeseries',
@@ -202,6 +206,10 @@ function drawTimeSeries(timeSeriesData, tab) {
 //            },
             //type : 'spline',
             colors: colors
+        },
+        zoom: {
+            enabled: true,
+            rescale:true
         },
         axis: {
             x: {
