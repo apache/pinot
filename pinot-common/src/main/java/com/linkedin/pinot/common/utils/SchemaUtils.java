@@ -79,18 +79,22 @@ public class SchemaUtils {
     try {
       URL url = new URL("http", host, port, "/schemas/" + schemaName);
       GetMethod httpGet = new GetMethod(url.toString());
-      int responseCode = HTTP_CLIENT.executeMethod(httpGet);
-      String response = httpGet.getResponseBodyAsString();
-      if (responseCode >= 400) {
-        // File not find error code.
-        if (responseCode == 404) {
-          LOGGER.info("Cannot find schema: {} from host: {}, port: {}", schemaName, host, port);
-        } else {
-          LOGGER.warn("Got error response code: {}, response: {}", responseCode, response);
+      try {
+        int responseCode = HTTP_CLIENT.executeMethod(httpGet);
+        String response = httpGet.getResponseBodyAsString();
+        if (responseCode >= 400) {
+          // File not find error code.
+          if (responseCode == 404) {
+            LOGGER.info("Cannot find schema: {} from host: {}, port: {}", schemaName, host, port);
+          } else {
+            LOGGER.warn("Got error response code: {}, response: {}", responseCode, response);
+          }
+          return null;
         }
-        return null;
+        return Schema.fromString(response);
+      } finally {
+        httpGet.releaseConnection();
       }
-      return Schema.fromString(response);
     } catch (Exception e) {
       LOGGER.error("Caught exception while getting the schema: {} from host: {}, port: {}", schemaName, host, port, e);
       return null;
@@ -110,16 +114,20 @@ public class SchemaUtils {
     try {
       URL url = new URL("http", host, port, "/schemas");
       PostMethod httpPost = new PostMethod(url.toString());
-      Part[] parts = {new StringPart(schema.getSchemaName(), schema.toString())};
-      MultipartRequestEntity requestEntity = new MultipartRequestEntity(parts, new HttpMethodParams());
-      httpPost.setRequestEntity(requestEntity);
-      int responseCode = HTTP_CLIENT.executeMethod(httpPost);
-      if (responseCode >= 400) {
-        String response = httpPost.getResponseBodyAsString();
-        LOGGER.warn("Got error response code: {}, response: {}", responseCode, response);
-        return false;
+      try {
+        Part[] parts = {new StringPart(schema.getSchemaName(), schema.toString())};
+        MultipartRequestEntity requestEntity = new MultipartRequestEntity(parts, new HttpMethodParams());
+        httpPost.setRequestEntity(requestEntity);
+        int responseCode = HTTP_CLIENT.executeMethod(httpPost);
+        if (responseCode >= 400) {
+          String response = httpPost.getResponseBodyAsString();
+          LOGGER.warn("Got error response code: {}, response: {}", responseCode, response);
+          return false;
+        }
+        return true;
+      } finally {
+        httpPost.releaseConnection();
       }
-      return true;
     } catch (Exception e) {
       LOGGER.error("Caught exception while posting the schema: {} to host: {}, port: {}", schema.getSchemaName(), host,
           port, e);
@@ -140,13 +148,17 @@ public class SchemaUtils {
     try {
       URL url = new URL("http", host, port, "/schemas/" + schemaName);
       DeleteMethod httpDelete = new DeleteMethod(url.toString());
-      int responseCode = HTTP_CLIENT.executeMethod(httpDelete);
-      if (responseCode >= 400) {
-        String response = httpDelete.getResponseBodyAsString();
-        LOGGER.warn("Got error response code: {}, response: {}", responseCode, response);
-        return false;
+      try {
+        int responseCode = HTTP_CLIENT.executeMethod(httpDelete);
+        if (responseCode >= 400) {
+          String response = httpDelete.getResponseBodyAsString();
+          LOGGER.warn("Got error response code: {}, response: {}", responseCode, response);
+          return false;
+        }
+        return true;
+      } finally {
+        httpDelete.releaseConnection();
       }
-      return true;
     } catch (Exception e) {
       LOGGER.error("Caught exception while getting the schema: {} from host: {}, port: {}", schemaName, host, port, e);
       return false;
