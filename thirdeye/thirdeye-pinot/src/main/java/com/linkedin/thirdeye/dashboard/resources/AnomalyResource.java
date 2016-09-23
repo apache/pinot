@@ -244,7 +244,7 @@ public class AnomalyResource {
     if (StringUtils.isNotEmpty(windowDelayUnit)) {
       windowDelayTimeUnit = TimeUnit.valueOf(windowDelayUnit);
     }
-    int windowDelayTime;
+    int windowDelayTime = 2;
     if (StringUtils.isNotEmpty(windowDelay)) {
       windowDelayTime = Integer.valueOf(windowDelay);
     } else {
@@ -340,11 +340,15 @@ public class AnomalyResource {
     anomalyFunctionSpec.setWindowSize(Integer.valueOf(windowSize));
     anomalyFunctionSpec.setWindowUnit(TimeUnit.valueOf(windowUnit));
     anomalyFunctionSpec.setWindowDelay(Integer.valueOf(windowDelay));
-    if (StringUtils.isEmpty(windowDelayUnit)) {
-      anomalyFunctionSpec.setWindowDelayUnit(dataGranularity.getUnit());
-    } else {
-      anomalyFunctionSpec.setWindowDelayUnit(TimeUnit.valueOf(windowDelayUnit));
+
+    TimeUnit dataGranularityUnit = dataGranularity.getUnit();
+    TimeUnit windowDelayTimeUnit =
+        dataGranularityUnit.equals(TimeUnit.MINUTES) || dataGranularityUnit.equals(TimeUnit.HOURS)
+            ? TimeUnit.HOURS : TimeUnit.DAYS;
+    if (StringUtils.isNotEmpty(windowDelayUnit)) {
+      windowDelayTimeUnit = TimeUnit.valueOf(windowDelayUnit);
     }
+    anomalyFunctionSpec.setWindowDelayUnit(windowDelayTimeUnit);
 
     // bucket size and unit are defaulted to the collection granularity
     anomalyFunctionSpec.setBucketSize(dataGranularity.getSize());
@@ -367,13 +371,11 @@ public class AnomalyResource {
       }
     }
     anomalyFunctionSpec.setCron(cron);
-
     anomalyFunctionDAO.update(anomalyFunctionSpec);
 
     if (isActive) {
       detectionResourceHttpUtils.enableAnomalyFunction(String.valueOf(id));
     }
-
     return Response.ok(id).build();
   }
 
