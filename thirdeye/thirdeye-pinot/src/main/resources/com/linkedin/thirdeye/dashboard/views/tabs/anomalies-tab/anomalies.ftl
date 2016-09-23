@@ -172,8 +172,7 @@
                         <div class="timestamp uk-clearfix">
                             <br/>
                                 <span><div class="small-label">Start - End ({{returnUserTimeZone}}):</div>
-                                {{millisToDate anomalyData/startTime showTimeZone=false showYear=false seprator="/"}} -
-                                {{millisToDate anomalyData/endTime showTimeZone=false showYear=false onlyHour=true}}
+                                {{displayDateRange anomalyData/startTime anomalyData/endTime}}
                                 </span>
                         </div>
 

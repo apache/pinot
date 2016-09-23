@@ -17,7 +17,7 @@
             <div class="view-dashboard-selector">
                 <label class="uk-form-label">Dashboards</label>
                 <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="true" class="uk-button-group uk-display-inline-block">
-                    <div id="selected-dashboard" class="uk-button">---</div>
+                    <div id="selected-dashboard" class="uk-button" data-uk-tooltip title="">---</div>
                     <button class="uk-button uk-button-primary" type="button"><i class="uk-icon-caret-down"></i></button>
                     <div class="uk-dropdown uk-dropdown-small uk-dropdown-bottom" style="top: 30px; left: 0px;">
                         <ul id="dashboard-list" class="uk-nav uk-nav-dropdown single-select">
@@ -43,9 +43,8 @@
             {{#if showSingleMetricSelection}}
             <div id="{{tabName}}-view-single-metric-selector" class="view-single-metric-selector" rel="{{tabName}}">
                 <label class="uk-form-label">Anomaly metric</label>
-                <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group"
-                <!--<div class="add-metric add-btn uk-display-inline-block" rel="{{tabName}}" data-uk-dropdown="{mode:'click'}">-->
-                    <div id="selected-metric" class="uk-button">Select metric</div>
+                <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group">
+                    <div id="selected-metric" class="uk-button" data-uk-tooltip title="">Select metric</div>
                     <button class="add-single-metric-btn uk-button uk-button-primary" type="button"><i class="uk-icon-caret-down"></i></button>
                     <div class="uk-dropdown uk-dropdown-small">
                         <ul class="metric-list single-metric-list uk-nav uk-nav-dropdown single-select">

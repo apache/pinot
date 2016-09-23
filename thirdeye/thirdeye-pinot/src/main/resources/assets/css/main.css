@@ -249,6 +249,19 @@ body a{
      background-color: #f5f5f5;
 }
 
+.view-single-metric-selector .uk-button-group,
+.view-dataset-selector .uk-button-group{
+    width: 100%;
+}
+
+.view-single-metric-selector #selected-metric,
+.view-dataset-selector .selected-dataset{
+    width: 71%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 .added-item{
     margin: 5px 0 5px 5px;
     max-width: 100%;
