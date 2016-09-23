@@ -25,7 +25,7 @@ import kafka.api.FetchRequest;
 import kafka.api.PartitionFetchInfo;
 import kafka.api.PartitionMetadata;
 import kafka.api.TopicMetadata;
-import kafka.cluster.Broker;
+import kafka.cluster.BrokerEndPoint;
 import kafka.common.TopicAndPartition;
 import kafka.javaapi.FetchResponse;
 import kafka.javaapi.OffsetRequest;
@@ -57,9 +57,9 @@ public class SimpleConsumerWrapperTest {
       this.ports = ports;
       brokerCount = hosts.length;
 
-      brokerArray = new Broker[brokerCount];
+      brokerArray = new BrokerEndPoint[brokerCount];
       for (int i = 0; i < brokerCount; i++) {
-        brokerArray[i] = new Broker(i, hosts[i], ports[i]);
+        brokerArray[i] = new BrokerEndPoint(i, hosts[i], ports[i]);
       }
 
       Preconditions.checkArgument(partitionStartOffsets.length == partitionEndOffsets.length);
@@ -80,7 +80,7 @@ public class SimpleConsumerWrapperTest {
     private int brokerCount;
     private int partitionCount;
     private String topicName;
-    private Broker[] brokerArray;
+    private BrokerEndPoint[] brokerArray;
 
     private class MockFetchResponse extends FetchResponse {
       java.util.Map<TopicAndPartition, Short> errorMap;
@@ -174,7 +174,7 @@ public class SimpleConsumerWrapperTest {
             PartitionMetadata[] partitionMetadataArray = new PartitionMetadata[partitionCount];
             for (int j = 0; j < partitionCount; j++) {
               partitionMetadataArray[j] = new PartitionMetadata(j, Some.apply(brokerArray[partitionLeaderIndices[j]]),
-                  List.<Broker>empty(), List.<Broker>empty(), Errors.NONE.code());
+                  List.<BrokerEndPoint>empty(), List.<BrokerEndPoint>empty(), Errors.NONE.code());
             }
 
             Seq<PartitionMetadata> partitionsMetadata = List.fromArray(partitionMetadataArray);
@@ -182,7 +182,7 @@ public class SimpleConsumerWrapperTest {
           }
         }
 
-        Seq<Broker> brokers = List.fromArray(brokerArray);
+        Seq<BrokerEndPoint> brokers = List.fromArray(brokerArray);
         Seq<TopicMetadata> topicsMetadata = List.fromArray(topicMetadataArray);
 
         return new TopicMetadataResponse(new kafka.api.TopicMetadataResponse(brokers, topicsMetadata, -1));
@@ -217,7 +217,7 @@ public class SimpleConsumerWrapperTest {
   }
 
   @Test
-  public void testFetchMessages() {
+  public void testFetchMessages() throws Exception {
     MockKafkaSimpleConsumerFactory simpleConsumerFactory = new MockKafkaSimpleConsumerFactory(
         new String[] { "abcd", "bcde" },
         new int[] { 1234, 2345 },
@@ -232,7 +232,7 @@ public class SimpleConsumerWrapperTest {
   }
 
   @Test(enabled = false)
-  public void testFetchOffsets() {
+  public void testFetchOffsets() throws Exception {
     MockKafkaSimpleConsumerFactory simpleConsumerFactory = new MockKafkaSimpleConsumerFactory(
         new String[] { "abcd", "bcde" },
         new int[] { 1234, 2345 },
