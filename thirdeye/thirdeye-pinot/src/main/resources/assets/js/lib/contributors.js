@@ -9,7 +9,9 @@ function getContributors(tab) {
         if (!data) {
             $("#" + tab + "-chart-area-error").empty();
             var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' });
+            var closeBtn = $('<i></i>', { class: 'close-parent uk-icon-close' });
             warning.append($('<p></p>', { html: 'Something went wrong. Please try and reload the page. Error: data =' + data  }));
+            $("#" + tab + "-chart-area-error").append(closeBtn);
             $("#" + tab + "-chart-area-error").append(warning);
             $("#" + tab + "-chart-area-error").show();
             return
@@ -20,7 +22,20 @@ function getContributors(tab) {
         if (data.metrics.length == 0) {
             $("#" + tab + "-chart-area-error").empty();
             var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' });
+            var closeBtn = $('<i></i>', { class: 'close-parent uk-icon-close' });
             warning.append($('<p></p>', { html: 'No metric data is present. Error: data.metrics.length = 0'  }));
+            $("#" + tab + "-chart-area-error").append(closeBtn);
+            $("#" + tab + "-chart-area-error").append(warning);
+            $("#" + tab + "-chart-area-error").show();
+            return
+        }
+
+        if (data.responseData.responseData.length == 0) {
+            $("#" + tab + "-chart-area-error").empty();
+            var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' });
+            var closeBtn = $('<i></i>', { class: 'close-parent uk-icon-close' });
+            warning.append($('<p></p>', { html: 'The result of the query is empty. Error: data.responseData.length = 0'  }));
+            $("#" + tab + "-chart-area-error").append(closeBtn);
             $("#" + tab + "-chart-area-error").append(warning);
             $("#" + tab + "-chart-area-error").show();
             return
