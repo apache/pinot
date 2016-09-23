@@ -152,7 +152,15 @@ public class ControllerRestApplication extends PinotRestletApplication {
     }
 
     try {
-    final Directory swaggerUiDir = new Directory(getContext(), getClass().getClassLoader().getResource("META-INF/resources/webjars/swagger-ui/2.1.4").toString());
+      final Directory swaggerIndexDir = new Directory(getContext(), getClass().getClassLoader().getResource( "swagger-ui/index.html").toString());
+      swaggerIndexDir.setDeeplyAccessible(false);
+      router.attach("/swagger-ui/index.html", swaggerIndexDir);
+    } catch (Exception e) {
+      LOGGER.warn("Failed to initialize route for /swagger-ui/index.html", e);
+    }
+
+    try {
+    final Directory swaggerUiDir = new Directory(getContext(), getClass().getClassLoader().getResource("META-INF/resources/webjars/swagger-ui/2.2.2").toString());
     swaggerUiDir.setDeeplyAccessible(true);
     router.attach("/swagger-ui", swaggerUiDir);
   } catch (Exception e) {
