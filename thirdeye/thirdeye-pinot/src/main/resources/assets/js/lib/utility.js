@@ -892,22 +892,49 @@ function clearCreateForm() {
 }
 
 
-/** Takes an object where separators are ";" "=" returns JSON**/
-function parseProperties(properties){
+/** Takes a string where separators are ";" "=" and there might be duplicates
+ * returns JSON
+ * in the options: {arrayValues:true} will return the values of the JSON params as an array **/
+function parseProperties(properties, options){
 
-    if(properties && properties.substr(properties.length - 1) == ";"){
-        properties = properties.substring(0, properties.length-1);
+    if(!options){
+        options = {}
     }
-    var fnProperties = {}
-    var propertiesAry = properties.split(";");
-    for (var i = 0, numProp = propertiesAry.length; i < numProp; i++) {
-        var keyValue = propertiesAry[i];
-        keyValue = keyValue.split("=")
-        var key = ( keyValue[0] == "null") ? "" : keyValue[0];
-        var value = ( keyValue[0] == "null") ? "" : keyValue[1];
-        fnProperties[key] = value;
+    if( properties ){
+        if( properties.substr(properties.length - 1) == ";"){
+            properties = properties.substring(0, properties.length-1);
+        }
+        var fnProperties = {}
+
+        var propertiesAry = properties.split(";");
+
+        for (var i = 0, numProp = propertiesAry.length; i < numProp; i++) {
+
+
+            var keyValue = propertiesAry[i];
+
+            keyValue = keyValue.split("=")
+            var key = ( keyValue[0] == "null") ? "" : keyValue[0];
+            var value = ( keyValue[0] == "null") ? "" : keyValue[1]
+
+            if(options.arrayValues){
+                if(fnProperties[key]){
+                    fnProperties[key].push(value)
+                }else{
+                    fnProperties[key] = [value];
+                }
+            }else{
+                if(fnProperties[key]){
+                    fnProperties[key] = fnProperties[key] + "," + value
+                }else{
+                    fnProperties[key] = value;
+                }
+            }
+
+
+        }
+        return fnProperties
     }
-    return fnProperties
 }
 
 function stringifyProperties(properties){

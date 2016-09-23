@@ -511,14 +511,14 @@ function renderAnomalyTable(data, tab) {
 
     }
 
-
      function requestLineChart(i){
         var placeholder= "d3charts-" + i;
-        var dimension = data[i]["function"]["exploreDimensions"];
-        var value = data[i]["dimensions"];
+        var exploreDimension = data[i]["function"]["exploreDimensions"];
+        var effectedValue = data[i]["dimensions"];
+        var fnFilters = parseProperties( data[i]["function"]["filters"], {arrayValues:true} );
         var startTime = data[i]["startTime"];
         var endTime = data[i]["endTime"];
-        var anomalyId = data[i]["id"];
+        var anomalyId = data[i]["id"]
         var baselineStart = moment(parseInt(hash.currentStart)).add(-7, 'days')
         var baselineEnd = moment(parseInt(hash.currentEnd)).add(-7, 'days')
         var aggTimeGranularity = (window.datasetConfig.dataGranularity) ? window.datasetConfig.dataGranularity : "HOURS";
@@ -528,20 +528,35 @@ function renderAnomalyTable(data, tab) {
         var currentEnd = hash.currentEnd;
         var metrics = hash.metrics;
 
-        value = value.replace(/[,*\s]/g, "");
-        if(value.length == 0){
-            value = "ALL";
-        }
 
-        var filter = "{}";
-        if(dimension && value && value != 'ALL') {
-            filter = '{"'+dimension+'":["'+value+'"]}';
-        }
+         effectedValue = effectedValue.replace(/[,*\s]/g, "");
+         if(effectedValue.length == 0){
+             effectedValue = "ALL";
+         }
 
+         var filters = {};
+         if(fnFilters){
+             if(exploreDimension){
+                 if(effectedValue !== 'ALL'){
+                     filters = fnFilters;
+                     filters[exploreDimension] = [effectedValue];
+                 }
+             }else{
+                 filters = fnFilters;
+             }
+         }else{
+             if(exploreDimension ){
+                if(effectedValue !== 'ALL'){
+                    filters[exploreDimension] = [effectedValue];
+                }
+             }
+         };
+
+        filters = encodeURIComponent(JSON.stringify(filters));
         var timeSeriesUrl = "/dashboard/data/tabular?dataset=" + dataset + "&compareMode=" + compareMode //
             + "&currentStart=" + currentStart + "&currentEnd=" + currentEnd  //
             + "&baselineStart=" + baselineStart + "&baselineEnd=" + baselineEnd   //
-            + "&aggTimeGranularity=" + aggTimeGranularity + "&metrics=" + metrics+ "&filters=" + filter;
+            + "&aggTimeGranularity=" + aggTimeGranularity + "&metrics=" + metrics  + "&filters=" + filters;
         var tab = hash.view;
 
         getDataCustomCallback(timeSeriesUrl,tab).done(function (timeSeriesData) {

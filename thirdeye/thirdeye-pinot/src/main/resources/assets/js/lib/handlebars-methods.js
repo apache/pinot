@@ -268,8 +268,6 @@ $(document).ready(function () {
             fnProperties[key] = value;
         }
 
-
-
         var val = fnProperties[prop];
         if(val){
             if(prop == "baseLineVal" ||  prop == "currentVal" ){
