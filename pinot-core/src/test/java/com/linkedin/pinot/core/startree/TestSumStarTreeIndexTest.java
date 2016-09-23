@@ -40,7 +40,7 @@ public class TestSumStarTreeIndexTest extends BaseSumStarTreeIndexTest {
   @BeforeSuite
   void setup()
       throws Exception {
-    _schema = StarTreeIndexTestSegmentHelper.buildSegment(SEGMENT_DIR_NAME, SEGMENT_NAME, false);
+    _schema = StarTreeIndexTestSegmentHelper.buildSegment(SEGMENT_DIR_NAME, SEGMENT_NAME, true);
     _segment = StarTreeIndexTestSegmentHelper.loadSegment(SEGMENT_DIR_NAME, SEGMENT_NAME);
   }
 
