@@ -493,6 +493,7 @@ function populateSingleSelect(target) {
     var text = $(target).text();
     $("div:first-child", selectorRoot).text(text);
     $("div:first-child", selectorRoot).attr("value", value);
+    $("div:first-child", selectorRoot).attr("title", value);
 }
 
 function closeClosestDropDown(target) {

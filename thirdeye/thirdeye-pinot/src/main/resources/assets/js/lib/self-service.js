@@ -87,8 +87,9 @@ function addSelfServiceListeners() {
 
         // COMMON PARAMETERS IN EVERY ANOMALY FUNCTION TYPE
         // Dataset selection
-    $("#self-service-forms-section").on("click", ".dataset-option-manage-anomaly-fn", function () {
-        selectDatasetNGetFormData(this);
+    $("#self-service-forms-section").on("click", ".dataset-option", function () {
+        var dataset = $(this).attr("value")
+        getExistingAnomalyFunctions(dataset)
     });
 
     // Name
@@ -254,7 +255,7 @@ function addSelfServiceListeners() {
         enableButton($("#confirm-toggle-active-state"));
     });
 
-    //Confirm toggle button
+    //Confirm toggle button - turn on/off active state of anomaly function
     $("#self-service-forms-section").on("click", "#close-toggle-alert-modal", function () {
 
         var rowId = $(this).attr("data-row-id");
