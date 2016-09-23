@@ -131,6 +131,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
   private final int _segmentMaxRowCount;
   private final String _resourceDataDir;
   private final Schema _schema;
+  private final String _metricKeyName;
   private final ServerMetrics _serverMetrics;
   private final RealtimeSegmentImpl _realtimeSegment;
   private volatile long _currentOffset;
@@ -233,6 +234,8 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
   }
 
   protected void consumeLoop() {
+    _fieldExtractor.resetCounters();
+
     final long _endOffset = Long.MAX_VALUE; // No upper limit on Kafka offset
     segmentLogger.info("Starting consumption loop start offset {}, finalOffset {}", _currentOffset, _finalOffset);
     while(!_receivedStop && !endCriteriaReached()) {
@@ -260,6 +263,11 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
 
         if (row != null) {
           row = _fieldExtractor.transform(row);
+
+          if (row != null) {
+            _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.REALTIME_ROWS_CONSUMED, 1);
+          }
+
           boolean canTakeMore = _realtimeSegment.index(row);  // Ignore the boolean return
           if (!canTakeMore) {
             //TODO
@@ -273,6 +281,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
           }
           batchSize++;
         }
+
         _currentOffset = messageAndOffset.nextOffset();
         _numRowsConsumed++;
       }
@@ -285,6 +294,15 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
         Uninterruptibles.sleepUninterruptibly(100, TimeUnit.MILLISECONDS);
       }
     }
+
+    _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.ROWS_WITH_ERRORS,
+        (long) _fieldExtractor.getTotalErrors());
+    _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.ROWS_NEEDING_CONVERSIONS,
+        (long) _fieldExtractor.getTotalConversions());
+    _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.ROWS_WITH_NULL_VALUES,
+        (long) _fieldExtractor.getTotalNulls());
+    _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.COLUMNS_WITH_NULL_VALUES,
+        (long) _fieldExtractor.getTotalNullCols());
   }
 
   public class PartitionConsumer implements Runnable {
@@ -378,6 +396,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
    * @return true if all succeeds.
    */
   protected boolean buildSegment(boolean buildTgz) {
+    long startTimeMillis = System.currentTimeMillis();
     // Build a segment from in-memory rows.If buildTgz is true, then build the tar.gz file as well
     // TODO Use an auto-closeable object to delete temp resources.
     File tempSegmentFolder = new File(_resourceTmpDir, "tmp-" + _segmentNameStr + "-" + String.valueOf(now()));
@@ -412,6 +431,11 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
       return false;
     }
     FileUtils.deleteQuietly(tempSegmentFolder);
+    long endTimeMillis = System.currentTimeMillis();
+
+    _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LAST_REALTIME_SEGMENT_FLUSH_DURATION_MILLIS,
+        (endTimeMillis - startTimeMillis));
+
     return true;
   }
 
@@ -592,6 +616,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     _kafkaPartitionId = _segmentName.getPartitionId();
     _segmentMaxRowCount = kafkaStreamProviderConfig.getSizeThresholdToFlushSegment();
     _tableName = _tableConfig.getTableName();
+    _metricKeyName = _tableName + "-" + _kafkaTopic + "-" + _kafkaPartitionId;
     segmentLogger = LoggerFactory.getLogger(LLRealtimeSegmentDataManager.class.getName() +
         "_" + _segmentNameStr);
     if (indexingConfig.getSortedColumn().isEmpty()) {

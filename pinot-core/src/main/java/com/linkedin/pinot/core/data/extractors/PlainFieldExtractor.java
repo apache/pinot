@@ -81,6 +81,13 @@ public class PlainFieldExtractor implements FieldExtractor {
     initTimeConverters();
   }
 
+  public void resetCounters() {
+    _totalErrors = 0;
+    _totalNulls = 0;
+    _totalConversions = 0;
+    _totalNullCols = 0;
+  }
+
   private void initErrorCount() {
     for (String column : _schema.getColumnNames()) {
       _errorCount.put(column, 0);
