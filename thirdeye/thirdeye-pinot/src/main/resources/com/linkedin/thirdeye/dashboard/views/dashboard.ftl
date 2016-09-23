@@ -21,6 +21,7 @@
         <li id="self-service-header-tab" class="header-tab" rel="self-service"><a href="#">Self
           Service</a></li>
         <li id="alert-header-tab" class="header-tab uk-hidden" rel="alert" ><a href="#">Alert</a></li>
+        <li id="exp-header-tab" class="header-tab uk-hidden" rel="exp" ><a href="#">Exp</a></li>
       </ul>
 
 
@@ -39,6 +40,7 @@
     <li id="anomalies"></li>
     <li id="self-service"></li>
     <li id="alert"></li>
+    <li id="exp"></li>
   </ul>
 </div>
 
@@ -57,6 +59,7 @@
 <#include "tabs/self-service-tab/anomaly-function-form.ftl">
 <#include "tabs/self-service-tab/self-service-existing-functions.ftl">
 <#include "tabs/self-service-tab/self-service-email.ftl">
+<#include "tabs/experimental/analyze-job.ftl">
 
 </body>
 
