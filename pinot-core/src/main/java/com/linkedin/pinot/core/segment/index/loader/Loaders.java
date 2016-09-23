@@ -126,13 +126,23 @@ public class Loaders {
       return SegmentVersion.fromStringOrDefault(versionName);
     }
 
+    /**
+     * Helper method to determine the star tree format version to load.
+     * Determines the version based on the index loading config.
+     * If the config is null, returns the default value as specified in
+     * {@link CommonConstants.Server#DEFAULT_STAR_TREE_FORMAT_VERSION}.
+     *
+     * @param indexLoadingConfigMetadata Index loading config
+     * @return Star Tree format version to load
+     */
     private static StarTreeFormatVersion getStarTreeVersionToLoad(
         IndexLoadingConfigMetadata indexLoadingConfigMetadata) {
-      if (indexLoadingConfigMetadata == null) {
-        return StarTreeFormatVersion.ON_HEAP;
-      } else {
-        return StarTreeFormatVersion.valueOf(indexLoadingConfigMetadata.getStarTreeVersionToLoad().toUpperCase());
+      String starTreeFormatVersionString = CommonConstants.Server.DEFAULT_STAR_TREE_FORMAT_VERSION;
+
+      if (indexLoadingConfigMetadata != null) {
+        starTreeFormatVersionString = indexLoadingConfigMetadata.getStarTreeVersionToLoad();
       }
+      return StarTreeFormatVersion.valueOf(starTreeFormatVersionString);
     }
   }
 }

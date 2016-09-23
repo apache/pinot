@@ -436,7 +436,7 @@ public class StarTreeSerDe {
 
     // If the star-tree file does not exist, this is not a star tree index, nothing to do here.
     if (!starTreeFile.exists()) {
-      LOGGER.info("Skipping Star Tree format conversion, as no star tree file exists for {}",
+      LOGGER.debug("Skipping Star Tree format conversion, as no star tree file exists for {}",
           starTreeFile.getAbsoluteFile());
       return;
     }

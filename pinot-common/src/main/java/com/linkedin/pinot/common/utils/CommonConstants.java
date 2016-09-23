@@ -202,7 +202,7 @@ public class CommonConstants {
     public static final String DEFAULT_HELIX_FLAPPING_TIMEWINDOW_MS = "0";
     public static final String PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY = "pinot.server.segment.fetcher";
     public static final String DEFAULT_SEGMENT_FORMAT_VERSION = "v1";
-    public static final String DEFAULT_STAR_TREE_FORMAT_VERSION = "v1";
+    public static final String DEFAULT_STAR_TREE_FORMAT_VERSION = "OFF_HEAP";
   }
 
   public static class Metric {

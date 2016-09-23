@@ -36,7 +36,7 @@ public class StarTreeIndexSpec {
   private Set<String> _skipMaterializationForDimensions;
   private int skipMaterializationCardinalityThreshold = DEFAULT_SKIP_MATERIALIZATION_CARDINALITY_THRESHOLD;
 
-  private boolean enableOffHeapFormat = false;
+  private boolean enableOffHeapFormat = true;
 
   public StarTreeIndexSpec() {}
 

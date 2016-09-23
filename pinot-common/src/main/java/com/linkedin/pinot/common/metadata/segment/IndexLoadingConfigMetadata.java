@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.common.metadata.segment;
 
+import com.linkedin.pinot.common.utils.CommonConstants;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
@@ -36,7 +37,6 @@ public class IndexLoadingConfigMetadata {
 
   private final Set<String> _loadingInvertedIndexColumnSet = new HashSet<String>();
   private final String DEFAULT_SEGMENT_FORMAT = "v1";
-  private static final String DEFAULT_STAR_TREE_FORMAT = "ON_HEAP";
   private String segmentVersionToLoad;
   private boolean enableDefaultColumns;
   private final String starTreeVersionToLoad;
@@ -49,7 +49,8 @@ public class IndexLoadingConfigMetadata {
 
     segmentVersionToLoad = tableDataManagerConfig.getString(KEY_OF_SEGMENT_FORMAT_VERSION, DEFAULT_SEGMENT_FORMAT);
     enableDefaultColumns = tableDataManagerConfig.getBoolean(KEY_OF_ENABLE_DEFAULT_COLUMNS, false);
-    starTreeVersionToLoad = tableDataManagerConfig.getString(KEY_OF_STAR_TREE_FORMAT_VERSION, DEFAULT_STAR_TREE_FORMAT);
+    starTreeVersionToLoad = tableDataManagerConfig.getString(KEY_OF_STAR_TREE_FORMAT_VERSION,
+        CommonConstants.Server.DEFAULT_STAR_TREE_FORMAT_VERSION);
   }
 
   public void initLoadingInvertedIndexColumnSet(String[] columnCollections) {
