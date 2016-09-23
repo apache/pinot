@@ -5,8 +5,10 @@ import com.google.common.collect.Multimap;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -18,6 +20,7 @@ import javax.persistence.PersistenceException;
 
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,7 +73,7 @@ public class AnomalyMergeExecutor implements Runnable {
 
   public void start() {
     // running every 15 mins
-    executorService.scheduleWithFixedDelay(this, 1, 15, TimeUnit.MINUTES);
+    executorService.scheduleWithFixedDelay(this, 0, 1, TimeUnit.MINUTES);
   }
 
   public void stop() {
@@ -129,8 +132,13 @@ public class AnomalyMergeExecutor implements Runnable {
                   "Merge strategy " + mergeConfig.getMergeStrategy() + " not supported");
             }
           }
+
+          Set<MergedAnomalyResultDTO> existingMergedResults = new HashSet<>();
+
+          existingMergedResults.addAll(mergedResultDAO.findByFunctionId(function.getId()));
+
           for (MergedAnomalyResultDTO mergedAnomalyResultDTO : output) {
-            updateMergedScoreAndPersist(mergedAnomalyResultDTO);
+            updateMergedScoreAndPersist(mergedAnomalyResultDTO, existingMergedResults);
           }
           return output.size();
         };
@@ -146,7 +154,8 @@ public class AnomalyMergeExecutor implements Runnable {
     }
   }
 
-  private void updateMergedScoreAndPersist(MergedAnomalyResultDTO mergedResult) {
+  private void updateMergedScoreAndPersist(MergedAnomalyResultDTO mergedResult,
+      Set<MergedAnomalyResultDTO> existingResults) {
     double weightedScoreSum = 0.0;
     double weightedWeightSum = 0.0;
     double totalBucketSize = 0.0;
@@ -175,10 +184,15 @@ public class AnomalyMergeExecutor implements Runnable {
       LOG.error("Could not recompute severity", e);
     }
     try {
-      // persist the merged result
-      mergedResultDAO.update(mergedResult);
-      for (RawAnomalyResultDTO rawAnomalyResultDTO : mergedResult.getAnomalyResults()) {
-        anomalyResultDAO.update(rawAnomalyResultDTO);
+      if (!existingResults.contains(mergedResult)) {
+        // persist the merged result
+        mergedResultDAO.update(mergedResult);
+
+        for (RawAnomalyResultDTO rawAnomalyResultDTO : mergedResult.getAnomalyResults()) {
+          anomalyResultDAO.update(rawAnomalyResultDTO);
+        }
+      } else {
+        LOG.info("MergedResult [{}] is already present", mergedResult);
       }
     } catch (PersistenceException e) {
       LOG.error("Could not persist merged result : [" + mergedResult.toString() + "]", e);
@@ -232,16 +246,27 @@ public class AnomalyMergeExecutor implements Runnable {
     // Set filters including anomaly-dimension
     timeSeriesRequest.setFilterSet(filters);
 
+    // TODO : fix the pinot query interface to accept time in millis and have the tz offset fix at one place
+    DateTimeZone tz = Utils.getDataTimeZone(anomalyFunctionSpec.getCollection());
+
     // Fetch current time series data
-    timeSeriesRequest.setStart(new DateTime(anomalyMergedResult.getStartTime()));
-    timeSeriesRequest.setEnd(new DateTime(anomalyMergedResult.getEndTime()));
+    timeSeriesRequest.setStart(new DateTime(anomalyMergedResult.getStartTime(), tz));
+    timeSeriesRequest.setEnd(new DateTime(anomalyMergedResult.getEndTime(), tz));
     TimeSeriesResponse responseCurrent = timeSeriesHandler.handle(timeSeriesRequest);
+
+    LOG.info("printing current start end millis : {} {}, joda {} {}", anomalyMergedResult.getStartTime(),
+        anomalyMergedResult.getEndTime(), new DateTime(anomalyMergedResult.getStartTime(), tz),
+        new DateTime(anomalyMergedResult.getEndTime(), tz));
 
     // Fetch baseline time series data
     long baselineOffset = AnomalyFunctionUtils.getBaselineOffset(anomalyFunctionSpec);
-    timeSeriesRequest.setStart(new DateTime(anomalyMergedResult.getStartTime() - baselineOffset));
-    timeSeriesRequest.setEnd(new DateTime(anomalyMergedResult.getEndTime() - baselineOffset));
+    timeSeriesRequest.setStart(new DateTime(anomalyMergedResult.getStartTime() - baselineOffset, tz));
+    timeSeriesRequest.setEnd(new DateTime(anomalyMergedResult.getEndTime() - baselineOffset, tz));
     TimeSeriesResponse responseBaseline = timeSeriesHandler.handle(timeSeriesRequest);
+
+    LOG.info("printing baseline start end millis : {} {}, joda {} {}", anomalyMergedResult.getStartTime() - baselineOffset,
+        anomalyMergedResult.getEndTime() - baselineOffset, new DateTime(anomalyMergedResult.getStartTime() - baselineOffset, tz),
+        new DateTime(anomalyMergedResult.getEndTime() - baselineOffset, tz));
 
     Double currentValue;
     Double baselineValue;

@@ -141,7 +141,7 @@ function saveEmailConfig() {
     payload += '"metric" : "' + metric + '",';
     payload += '"toAddresses" : "' + toAddress + '",';
     payload += '"fromAddress" : "thirdeye-dev@linkedin.com",';
-    payload += '"cron" : "0 0 0/2 * * ?",';
+    payload += '"cron" : "0 0 0/4 * * ?",';
     payload += '"smtpHost" : "email.corp.linkedin.com",';
     payload += '"active" : true,';
     payload += '"windowDelay" : 0,';
