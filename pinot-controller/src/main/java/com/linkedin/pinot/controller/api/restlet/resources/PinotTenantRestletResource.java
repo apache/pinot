@@ -231,7 +231,7 @@ public class PinotTenantRestletResource extends BasePinotControllerRestletResour
     }
     resourceGetRet.put(TENANT_NAME, tenantName);
 
-    presentation = new StringRepresentation(resourceGetRet.toString(), MediaType.APPLICATION_JSON);
+    presentation = new StringRepresentation(resourceGetRet.toString(2), MediaType.APPLICATION_JSON);
     return presentation;
   }
 
@@ -299,7 +299,7 @@ public class PinotTenantRestletResource extends BasePinotControllerRestletResour
     if (type == null || type.equalsIgnoreCase("broker")) {
       ret.put("BROKER_TENANTS", _pinotHelixResourceManager.getAllBrokerTenantNames());
     }
-    presentation = new StringRepresentation(ret.toString(), MediaType.APPLICATION_JSON);
+    presentation = new StringRepresentation(ret.toString(2), MediaType.APPLICATION_JSON);
     return presentation;
   }
 

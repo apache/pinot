@@ -5,6 +5,7 @@ import com.linkedin.pinot.common.restlet.swagger.HttpVerb;
 import com.linkedin.pinot.common.restlet.swagger.Paths;
 import com.linkedin.pinot.common.restlet.swagger.Summary;
 import com.linkedin.pinot.common.restlet.swagger.Tags;
+import org.json.JSONException;
 import org.json.JSONObject;
 import org.restlet.data.MediaType;
 import org.restlet.representation.Representation;
@@ -28,6 +29,10 @@ public class PinotVersionRestletResource extends BasePinotControllerRestletResou
   @Paths({ "/version" })
   private Representation buildVersionResponse() {
     JSONObject jsonObject = new JSONObject(Utils.getComponentVersions());
-    return new StringRepresentation(jsonObject.toString(), MediaType.APPLICATION_JSON);
+    try {
+      return new StringRepresentation(jsonObject.toString(2), MediaType.APPLICATION_JSON);
+    } catch (JSONException e) {
+      return new StringRepresentation(jsonObject.toString(), MediaType.APPLICATION_JSON);
+    }
   }
 }

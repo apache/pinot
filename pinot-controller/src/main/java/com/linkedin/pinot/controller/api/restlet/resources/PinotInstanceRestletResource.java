@@ -198,7 +198,7 @@ public class PinotInstanceRestletResource extends BasePinotControllerRestletReso
       response.put("port", instanceConfig.getPort());
       response.put("tags", new JSONArray(instanceConfig.getTags()));
 
-      return new StringRepresentation(response.toString());
+      return new StringRepresentation(response.toString(2));
     } catch (Exception e) {
       LOGGER.warn("Caught exception while fetching information for instance {}", instanceName, e);
       setStatus(Status.SERVER_ERROR_INTERNAL);
@@ -228,7 +228,7 @@ public class PinotInstanceRestletResource extends BasePinotControllerRestletReso
     }
 
     object.put("instances", instanceArray);
-    return new StringRepresentation(object.toString());
+    return new StringRepresentation(object.toString(2));
   }
 
   /**

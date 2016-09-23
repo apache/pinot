@@ -129,6 +129,6 @@ public class PinotTableInstances extends BasePinotControllerRestletResource {
 
     ret.put("brokers", brokers);
     ret.put("server", servers);
-    return new StringRepresentation(ret.toString());
+    return new StringRepresentation(ret.toString(2));
   }
 }
