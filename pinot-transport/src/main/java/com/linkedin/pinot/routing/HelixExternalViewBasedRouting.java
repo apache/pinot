@@ -30,6 +30,8 @@ import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.metrics.BrokerMeter;
+import com.linkedin.pinot.common.metrics.BrokerMetrics;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.NetUtil;
@@ -68,6 +70,8 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
   private final HelixExternalViewBasedTimeBoundaryService _timeBoundaryService;
   private final RoutingTableSelector _routingTableSelector;
 
+  private BrokerMetrics _brokerMetrics;
+
   public HelixExternalViewBasedRouting(ZkHelixPropertyStore<ZNRecord> propertyStore,
       RoutingTableSelector routingTableSelector) {
     _timeBoundaryService = new HelixExternalViewBasedTimeBoundaryService(propertyStore);
@@ -83,27 +87,21 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
     List<ServerToSegmentSetMap> serverToSegmentSetMaps;
 
     if (CommonConstants.Helix.TableType.REALTIME.equals(TableNameBuilder.getTableTypeFromTableName(tableName))) {
-//      if (!_brokerRoutingTable.containsKey(tableName) && !_llcBrokerRoutingTable.containsKey(tableName)) {
-//        return null;
-//      }
       if (_brokerRoutingTable.containsKey(tableName) && _brokerRoutingTable.get(tableName).size() != 0) {
         if (_llcBrokerRoutingTable.containsKey(tableName) && _llcBrokerRoutingTable.get(tableName).size() != 0) {
           // Has both high and low-level segments. Follow what the routing table selector says.
           if (_routingTableSelector.shouldUseLLCRouting(tableName)) {
-            serverToSegmentSetMaps = _llcBrokerRoutingTable.get(tableName);
+            serverToSegmentSetMaps = routeToLLC(tableName);
           } else {
-            serverToSegmentSetMaps = _brokerRoutingTable.get(tableName);
+            serverToSegmentSetMaps = routeToHLC(tableName);
           }
         } else {
           // Has only hi-level consumer segments.
-          serverToSegmentSetMaps = _brokerRoutingTable.get(tableName);
+          serverToSegmentSetMaps = routeToHLC(tableName);
         }
       } else {
         // May have only low-level consumer segments
-//        if (!_brokerRoutingTable.containsKey(tableName)) {
-//          return null;
-//        }
-        serverToSegmentSetMaps = _llcBrokerRoutingTable.get(tableName);
+        serverToSegmentSetMaps = routeToLLC(tableName);
       }
     } else {  // Offline table, use the conventional routing table
       serverToSegmentSetMaps = _brokerRoutingTable.get(tableName);
@@ -114,6 +112,24 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
       return Collections.emptyMap();
     }
     return serverToSegmentSetMaps.get(_random.nextInt(serverToSegmentSetMaps.size())).getRouting();
+  }
+
+  private List<ServerToSegmentSetMap> routeToLLC(String tableName) {
+    if (_brokerMetrics != null) {
+      _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.LLC_QUERY_COUNT, 1);
+    }
+    return _llcBrokerRoutingTable.get(tableName);
+  }
+
+  private List<ServerToSegmentSetMap> routeToHLC(String tableName) {
+    if (_brokerMetrics != null) {
+      _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.HLC_QUERY_COUNT, 1);
+    }
+    return _brokerRoutingTable.get(tableName);
+  }
+
+  public void setBrokerMetrics(BrokerMetrics brokerMetrics) {
+    _brokerMetrics = brokerMetrics;
   }
 
   @Override

@@ -45,6 +45,10 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
   // basis.
   REQUEST_DROPPED_DUE_TO_CONNECTION_ERROR("requestDropped", false),
 
+  // Number of queries served by LLC and HLC routing tables
+  LLC_QUERY_COUNT("queries", false),
+  HLC_QUERY_COUNT("queries", false),
+
 
   // This metric is emitted when DataTableCustomSerDe falls back to Java based de-serialization.
   // This implies that we have identified an object for which we have not implemented custom ser/de.
