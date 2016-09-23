@@ -20,19 +20,12 @@ import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
 import java.io.IOException;
 import org.apache.commons.compress.archivers.ArchiveException;
-import org.testng.annotations.Test;
 
 
 /**
  * Hybrid cluster scan comparison integration test for the flights data set.
  */
 public class FlightsHybridClusterScanComparisonIntegrationTest extends HybridClusterScanComparisonIntegrationTest {
-  @Override
-  @Test(enabled = false) // jfim: This should already be covered by our tests against H2
-  public void testGeneratedQueries() throws Exception {
-    super.testGeneratedQueries();
-  }
-
   @Override
   protected String getTimeColumnName() {
     return "DaysSinceEpoch";

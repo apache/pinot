@@ -43,15 +43,17 @@ import org.testng.annotations.Test;
  * <p>In the test, we convert Avro data for 12 segments and run queries against it.
  * <p>We will add extra new columns to the schema to test adding new columns with default value to the offline segments.
  * <p>New columns are: (name, field type, data type, single/multi value, default null value)
- * <p>- "newAddedIntMetric", METRIC, INT, single-value, 1
- * <p>- "newAddedLongMetric", METRIC, LONG, single-value, 1
- * <p>- "newAddedFloatMetric", METRIC, FLOAT, single-value, default (0.0)
- * <p>- "newAddedDoubleMetric", METRIC, DOUBLE, single-value, default (0.0)
- * <p>- "newAddedIntDimension", DIMENSION, INT, single-value, default (Integer.MIN_VALUE)
- * <p>- "newAddedLongDimension", DIMENSION, LONG, single-value, default (Long.MIN_VALUE)
- * <p>- "newAddedFloatDimension", DIMENSION, FLOAT, single-value, default (Float.NEGATIVE_INFINITY)
- * <p>- "newAddedDoubleDimension", DIMENSION, DOUBLE, single-value, default (Double.NEGATIVE_INFINITY)
- * <p>- "newAddedStringDimension", DIMENSION, STRING, multi-value, "newAdded"
+ * <ul>
+ *   <li>"newAddedIntMetric", METRIC, INT, single-value, 1</li>
+ *   <li>"newAddedLongMetric", METRIC, LONG, single-value, 1</li>
+ *   <li>"newAddedFloatMetric", METRIC, FLOAT, single-value, default (0.0)</li>
+ *   <li>"newAddedDoubleMetric", METRIC, DOUBLE, single-value, default (0.0)</li>
+ *   <li>"newAddedIntDimension", DIMENSION, INT, single-value, default (Integer.MIN_VALUE)</li>
+ *   <li>"newAddedLongDimension", DIMENSION, LONG, single-value, default (Long.MIN_VALUE)</li>
+ *   <li>"newAddedFloatDimension", DIMENSION, FLOAT, single-value, default (Float.NEGATIVE_INFINITY)</li>
+ *   <li>"newAddedDoubleDimension", DIMENSION, DOUBLE, single-value, default (Double.NEGATIVE_INFINITY)</li>
+ *   <li>"newAddedStringDimension", DIMENSION, STRING, multi-value, "newAdded"</li>
+ * </ul>
  */
 public class DefaultColumnsClusterIntegrationTest extends BaseClusterIntegrationTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(DefaultColumnsClusterIntegrationTest.class);
@@ -61,7 +63,6 @@ public class DefaultColumnsClusterIntegrationTest extends BaseClusterIntegration
   private static final File TAR_DIR = new File("/tmp/DefaultColumnsClusterIntegrationTest/tarDir");
 
   private static final int SEGMENT_COUNT = 12;
-  private static final int QUERY_COUNT = 1000;
 
   @BeforeClass
   public void setUp()
@@ -150,50 +151,20 @@ public class DefaultColumnsClusterIntegrationTest extends BaseClusterIntegration
   }
 
   @Override
-  @Test(enabled = false)  // jfim: This is disabled because the multivalue one covers the same thing
-  public void testGeneratedQueries()
+  public void testGeneratedQueries(boolean withMultiValues)
       throws Exception {
+    _queryGenerator.setSkipMultiValuePredicates(!withMultiValues);
     int generatedQueryCount = getGeneratedQueryCount();
-
-    QueryGenerator.Query[] queries = new QueryGenerator.Query[generatedQueryCount];
-    _queryGenerator.setSkipMultivaluePredicates(true);
-
-    // Exclude "SELECT *" queries because the result will not match.
-    for (int i = 0; i < queries.length; i++) {
+    for (int i = 0; i < generatedQueryCount; i++) {
       QueryGenerator.Query query = _queryGenerator.generateQuery();
-      while (query.generatePql().contains("SELECT *")) {
+      String pqlQuery = query.generatePql();
+      // Exclude "SELECT *" queries because the result will not match.
+      while (pqlQuery.startsWith("SELECT *")) {
         query = _queryGenerator.generateQuery();
+        pqlQuery = query.generatePql();
       }
-      queries[i] = query;
-    }
-
-    for (QueryGenerator.Query query : queries) {
-      LOGGER.debug("Trying to send query : {}", query.generatePql());
-      runQuery(query.generatePql(), query.generateH2Sql());
-    }
-  }
-
-  @Override
-  @Test
-  public void testGeneratedQueriesWithMultivalues()
-      throws Exception {
-    int generatedQueryCount = getGeneratedQueryCount();
-
-    QueryGenerator.Query[] queries = new QueryGenerator.Query[generatedQueryCount];
-    _queryGenerator.setSkipMultivaluePredicates(false);
-
-    // Exclude "SELECT *" queries because the result will not match.
-    for (int i = 0; i < queries.length; i++) {
-      QueryGenerator.Query query = _queryGenerator.generateQuery();
-      while (query.generatePql().contains("SELECT *")) {
-        query = _queryGenerator.generateQuery();
-      }
-      queries[i] = query;
-    }
-
-    for (QueryGenerator.Query query : queries) {
-      LOGGER.debug("Trying to send query : {}", query.generatePql());
-      runQuery(query.generatePql(), query.generateH2Sql());
+      LOGGER.debug("Running query: {}", pqlQuery);
+      runQuery(pqlQuery, query.generateH2Sql());
     }
   }
 
@@ -298,7 +269,7 @@ public class DefaultColumnsClusterIntegrationTest extends BaseClusterIntegration
     Assert.assertEquals(groupByResult.getJSONArray("group").getString(2), String.valueOf(Float.NEGATIVE_INFINITY));
     Assert.assertEquals(groupByResult.getJSONArray("group").getString(3), String.valueOf(Double.NEGATIVE_INFINITY));
     pqlQuery = "SELECT * FROM mytable";
-    runNoH2ComparisonQuery(pqlQuery);
+    runQuery(pqlQuery, null);
   }
 
   @AfterClass
@@ -314,15 +285,5 @@ public class DefaultColumnsClusterIntegrationTest extends BaseClusterIntegration
       // Swallow ZK Exceptions.
     }
     FileUtils.deleteQuietly(TMP_DIR);
-  }
-
-  @Override
-  protected int getGeneratedQueryCount() {
-    String generatedQueryCountProperty = System.getProperty("integration.test.generatedQueryCount");
-    if (generatedQueryCountProperty != null) {
-      return Integer.parseInt(generatedQueryCountProperty);
-    } else {
-      return QUERY_COUNT;
-    }
   }
 }

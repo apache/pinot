@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import com.google.common.util.concurrent.Uninterruptibles;
+import com.linkedin.pinot.common.data.Schema;
 import java.io.File;
 import java.util.concurrent.TimeUnit;
 import org.json.JSONArray;
@@ -23,8 +25,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.Test;
-import com.google.common.util.concurrent.Uninterruptibles;
-import com.linkedin.pinot.common.data.Schema;
 
 
 /**
@@ -80,31 +80,29 @@ public class RealtimeSchemaChangeIntegrationTest extends RealtimeClusterIntegrat
 
   @Override
   @Test(enabled = false)
-  public void testHardcodedQuerySet() throws Exception {
-    // Ignored
+  public void testHardcodedQueries()
+      throws Exception {
+    // Ignored.
   }
 
   @Override
   @Test(enabled = false)
-  public void testGeneratedQueries() throws Exception {
-    // Ignored
+  public void testHardcodedQuerySet()
+      throws Exception {
+    // Ignored.
   }
 
   @Override
   @Test(enabled = false)
-  public void testSingleQuery() throws Exception {
-    // Ignored
+  public void testGeneratedQueriesWithoutMultiValues()
+      throws Exception {
+    // Ignored.
   }
 
   @Override
   @Test(enabled = false)
-  public void testMultipleQueries() throws Exception {
-    // Ignored
-  }
-
-  @Override
-  @Test(enabled = false)
-  public void testGeneratedQueriesWithMultivalues() throws Exception {
-    // Ignored
+  public void testGeneratedQueriesWithMultiValues()
+      throws Exception {
+    // Ignored.
   }
 }
