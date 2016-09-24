@@ -112,7 +112,7 @@ public class DetectionJobRunner implements Job {
       CollectionSchema collectionSchema = CACHE_REGISTRY_INSTANCE.getCollectionSchemaCache().get(collection);
       TimeGranularity dataGranularity = collectionSchema.getTime().getDataGranularity();
       String timeFormat = collectionSchema.getTime().getFormat();
-      if (dataGranularity.getUnit().equals(TimeUnit.DAYS) && !TimeSpec.SINCE_EPOCH_FORMAT.equals(timeFormat)) {
+      if (dataGranularity.getUnit().equals(TimeUnit.DAYS)) {
         DateTimeZone dataTimeZone = Utils.getDataTimeZone(collection);
         DateTimeFormatter inputDataDateTimeFormatter = DateTimeFormat.forPattern(timeFormat).withZone(dataTimeZone);
 
@@ -186,13 +186,6 @@ public class DetectionJobRunner implements Job {
       LOG.error("Exception in getting anomalyFunctionSpec by id", e);
     }
     return anomalyFunctionSpec;
-  }
-
-  public static void main(String[] args) {
-    DateTime a = new DateTime(DateTimeZone.UTC).plusHours(4);
-    DetectionJobRunner r = new DetectionJobRunner();
-    DateTime b = r.alignTimestampsToDataTimezone(a, "");
-    System.out.println(b);
   }
 
 }
