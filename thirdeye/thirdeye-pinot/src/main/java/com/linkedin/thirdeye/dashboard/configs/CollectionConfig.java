@@ -10,16 +10,14 @@ import com.linkedin.thirdeye.client.MetricExpression;
 public class CollectionConfig extends AbstractConfig {
 
   public static double DEFAULT_THRESHOLD = 0.01;
-  public static String DEFAULT_TIMEZONE = "US/Pacific";
+  public static String DEFAULT_TIMEZONE = "UTC";
 
   String collectionName;
   String collectionAlias;
-
   double metricThreshold = DEFAULT_THRESHOLD;
-
   boolean isActive = true;
   boolean enableCount = false; // Default __COUNT metric
-  String timezone = DEFAULT_TIMEZONE;
+  String timezone = null;
   boolean metricAsDimension = false;
   String metricNamesColumn = null;
   String metricValuesColumn = null;

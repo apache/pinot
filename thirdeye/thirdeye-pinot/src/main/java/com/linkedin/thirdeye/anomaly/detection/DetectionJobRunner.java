@@ -3,9 +3,13 @@ package com.linkedin.thirdeye.anomaly.detection;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
+import org.joda.time.format.DateTimeFormat;
+import org.joda.time.format.DateTimeFormatter;
 import org.quartz.Job;
 import org.quartz.JobExecutionContext;
 import org.quartz.JobExecutionException;
@@ -18,6 +22,11 @@ import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
 import com.linkedin.thirdeye.anomaly.task.TaskGenerator;
+import com.linkedin.thirdeye.api.CollectionSchema;
+import com.linkedin.thirdeye.api.TimeGranularity;
+import com.linkedin.thirdeye.api.TimeSpec;
+import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
+import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.JobManager;
 import com.linkedin.thirdeye.datalayer.bao.TaskManager;
@@ -31,6 +40,7 @@ public class DetectionJobRunner implements Job {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   public static final String DETECTION_JOB_CONTEXT = "DETECTION_JOB_CONTEXT";
+  private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
 
   private JobManager anomalyJobSpecDAO;
   private TaskManager anomalyTasksSpecDAO;
@@ -81,6 +91,9 @@ public class DetectionJobRunner implements Job {
       long windowMillis = TimeUnit.MILLISECONDS.convert(windowSize, windowUnit);
       windowStartTime = windowEndTime.minus(windowMillis);
     }
+
+    windowStartTime = alignTimestampsToDataTimezone(windowStartTime, anomalyFunctionSpec.getCollection());
+    windowEndTime = alignTimestampsToDataTimezone(windowEndTime, anomalyFunctionSpec.getCollection());
     detectionJobContext.setWindowStartTime(windowStartTime);
     detectionJobContext.setWindowEndTime(windowEndTime);
 
@@ -91,6 +104,27 @@ public class DetectionJobRunner implements Job {
     // write to anomaly_tasks
     List<Long> taskIds = createTasks();
 
+  }
+
+  private DateTime alignTimestampsToDataTimezone(DateTime inputDateTime, String collection) {
+
+    try {
+      CollectionSchema collectionSchema = CACHE_REGISTRY_INSTANCE.getCollectionSchemaCache().get(collection);
+      TimeGranularity dataGranularity = collectionSchema.getTime().getDataGranularity();
+      String timeFormat = collectionSchema.getTime().getFormat();
+      if (dataGranularity.getUnit().equals(TimeUnit.DAYS)) {
+        DateTimeZone dataTimeZone = Utils.getDataTimeZone(collection);
+        DateTimeFormatter inputDataDateTimeFormatter = DateTimeFormat.forPattern(timeFormat).withZone(dataTimeZone);
+
+        long inputMillis = inputDateTime.getMillis();
+        String inputDateTimeString = inputDataDateTimeFormatter.print(inputMillis);
+        long timeZoneOffsetMillis = inputDataDateTimeFormatter.parseMillis(inputDateTimeString);
+        inputDateTime = new DateTime(timeZoneOffsetMillis);
+      }
+    } catch (ExecutionException e) {
+      LOG.error("Exeption in aligning timestamp to data time zone", e);
+    }
+    return inputDateTime;
   }
 
   private long createJob() {
