@@ -174,13 +174,17 @@ function renderContributionTimeSeries(ajaxData) {
                     top: 0,
                     right: 10,
                     bottom: 0,
-                    left: 100,
+                    left: 100
                 },
                 data: {
                     x: 'time',
                     json: lineChartData[metricName][dimensionName],
                     type: 'spline',
                     colors: colors
+                },
+                zoom: {
+                    enabled: true,
+                    rescale:true
                 },
                 axis: {
                     x: {
@@ -224,6 +228,10 @@ function renderContributionTimeSeries(ajaxData) {
                     json: barChartData[metricName][dimensionName],
                     type: 'area-spline',
                     colors: colors
+                },
+                zoom: {
+                    enabled: true,
+                    rescale:true
                 },
                 axis: {
                     x: {

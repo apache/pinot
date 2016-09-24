@@ -70,7 +70,7 @@ function getAnomalies(tab) {
 
                 if (anomalyMetric) {
                     $(".anomaly-metric-tip").hide();
-                    renderAnomalyTable(anomalyData, tab);
+                    renderAnomalyThumbnails(anomalyData, tab);
                 }else{
                     tipToUser(tab)
                 }
@@ -185,6 +185,10 @@ function drawMetricTimeSeries(timeSeriesData, anomalyData, tab, placeholder) {
             type: 'spline',
             colors: colors
         },
+        zoom: {
+            enabled: true,
+            rescale:true
+        },
         axis: {
             x: {
                 type: 'timeseries',
@@ -282,6 +286,10 @@ function drawMetricTimeSeries(timeSeriesData, anomalyData, tab, placeholder) {
             type: 'area-spline',
             colors: colors
         },
+        zoom: {
+        enabled: true,
+            rescale:true
+        },
         axis: {
             x: {
                 label: {
@@ -330,7 +338,7 @@ function drawMetricTimeSeries(timeSeriesData, anomalyData, tab, placeholder) {
         }
     });
 
-    attach_TimeSeries_EventListeners(currentView)
+    attach_MetricTimeSeries_EventListeners(currentView)
 
 } //end of drawMetricTimeSeries
 
@@ -400,8 +408,8 @@ function drawAnomalyTimeSeries(timeSeriesData,anomalyData, tab, placeholder) {
          lineChartData["baseline"] = baselineData;
          lineChartData["current"] = currentData;
 
-         colors["baseline"] = '#2ca02c';
-         colors["current"] = '#1f77b4' ;
+         colors["baseline"] = '#1f77b4';
+         colors["current"] = '#ff5f0e';
 
      }
 
@@ -422,6 +430,11 @@ function drawAnomalyTimeSeries(timeSeriesData,anomalyData, tab, placeholder) {
              json: lineChartData,
              type: 'area-spline',
              colors: colors
+
+         },
+         zoom: {
+             enabled: true,
+            rescale:true
          },
          axis: {
              min:{
@@ -473,7 +486,7 @@ function drawAnomalyTimeSeries(timeSeriesData,anomalyData, tab, placeholder) {
     $(".c3-axis-x path.domain", lineChartPlaceholder).hide();
 
      var numAnomalies = anomalyData.length;
-     var regionColors = ['ff7f0e'];
+     var regionColors = ['ff0000'];//'ff7f0e'
 
 
 
@@ -486,7 +499,7 @@ function drawAnomalyTimeSeries(timeSeriesData,anomalyData, tab, placeholder) {
 
  } //end of drawAnomalyTimeSeries
 
-function renderAnomalyTable(data, tab) {
+function renderAnomalyThumbnails(data, tab) {
     //Error handling when data is falsy (empty, undefined or null)
     if (!data) {
         $("#" + tab + "-chart-area-error").empty()
@@ -568,7 +581,7 @@ function renderAnomalyTable(data, tab) {
 
 }
 
-function attach_TimeSeries_EventListeners(currentView){
+function attach_MetricTimeSeries_EventListeners(currentView){
 
      //Unbind previously attached eventlisteners
      currentView.off("click");

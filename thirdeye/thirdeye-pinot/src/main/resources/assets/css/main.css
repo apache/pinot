@@ -935,18 +935,18 @@ body a{
     border: 1px solid #ddd;
     position: relative;
 }
-.box-highchart {
+.box-anom-linechart {
     position: absolute;
     width: 100%;
     top: 0;
     left: 0;
-    z-index: 1;
+    z-index: 3;
 }
 
-.highcharts-container{
+.anom-linecharts-container{
     position: relative;
     top:35px;
-    left: 14%;
+    left: 12%;
     overflow: hidden;
     width: 70%;
     height: 150px;
@@ -955,12 +955,12 @@ body a{
     -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
 }
 
-.highcharts-container .c3-ygrids line:nth-child(even),
-.highcharts-container .c3-axis-y2 .tick:nth-child(even){
+.anom-linecharts-container .c3-ygrids line:nth-child(even),
+.anom-linecharts-container .c3-axis-y2 .tick:nth-child(even){
     display: none;
 }
 
-.highcharts-container .c3-axis-y2 .tick:last-child{
+.anom-linecharts-container .c3-axis-y2 .tick:last-child{
     display: block;
 }
 
@@ -971,11 +971,7 @@ body a{
     right: 0;
     bottom: 11px;
     left: 0;
-    z-index: 2;
-}
-.box-inner *{
-    /*border: 1px solid red;*/
-
+    z-index: 1;
 }
 
 .box-inner .change{
