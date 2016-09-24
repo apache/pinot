@@ -40,7 +40,7 @@ public class PqlUtilsTest {
         getBetweenClauseTestArgs("2016-01-01T01:00:00.000+00:00", "2016-01-01T23:00:00.000+00:00",
             "timeColumn", 2, TimeUnit.HOURS, null, " timeColumn >= 201613 AND timeColumn < 201623"),
         // Incorrectly aligned date ranges, with format
-        getBetweenClauseTestArgs("2016-01-01T09:00:00.000+00:00", "2016-01-02T07:00:00.000+00:00",
+        getBetweenClauseTestArgs("2016-01-01T01:00:00.000+00:00", "2016-01-01T23:00:00.000+00:00",
             "timeColumn", 2, TimeUnit.HOURS, "yyyyMMddHH",
             " timeColumn >= 2016010101 AND timeColumn < 2016010123")
     };
