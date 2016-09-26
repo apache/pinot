@@ -76,11 +76,6 @@ public class ScheduledRequestHandler implements NettyServer.RequestHandler {
     serverMetrics.addPhaseTiming(brokerRequest, ServerQueryPhase.REQUEST_DESERIALIZATION, deserializationEndTime - queryStartTime);
     LOGGER.debug("Processing requestId:{},request={}", instanceRequest.getRequestId(), instanceRequest);
     final QueryRequest queryRequest = new QueryRequest(instanceRequest);
-    String brokerId = instanceRequest.isSetBrokerId() ? instanceRequest.getBrokerId() :
-        ((InetSocketAddress) channelHandlerContext.channel().remoteAddress()).getAddress().getHostAddress();
-    // we will set the ip address as client id. This is good enough for start.
-    // Ideally, broker should send it's identity as part of the request
-    queryRequest.setClientId(brokerId);
 
     final long schedulerSubmitTime = System.nanoTime();
     ListenableFuture<DataTable> queryTask = queryScheduler.submit(queryRequest);

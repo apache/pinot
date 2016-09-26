@@ -88,12 +88,7 @@ public class SimpleRequestHandler implements RequestHandler {
       LOGGER.debug("Processing requestId: {},request: {}", instanceRequest.getRequestId(), instanceRequest);
 
       QueryRequest queryRequestContext = new QueryRequest(instanceRequest);
-      String brokerId = instanceRequest.isSetBrokerId() ? instanceRequest.getBrokerId() :
-          ((InetSocketAddress) channelHandlerContext.channel().remoteAddress()).getAddress().getHostAddress();
-      // we will set the ip address as client id. This is good enough for start.
-      // Ideally, broker should send it's identity as part of the request
-      queryRequestContext.setClientId(brokerId);
-
+      
       long startTime = System.nanoTime();
       instanceResponse = _queryExecutor.processQuery(queryRequestContext);
       long totalNanos = System.nanoTime() - startTime;
