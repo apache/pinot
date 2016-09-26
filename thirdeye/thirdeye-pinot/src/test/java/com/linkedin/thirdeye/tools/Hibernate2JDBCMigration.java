@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.tools;
 
+import com.linkedin.thirdeye.datalayer.bao.EmailConfigurationManager;
+import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
 import java.io.File;
 import java.util.HashSet;
 import java.util.List;
@@ -27,6 +29,32 @@ public class Hibernate2JDBCMigration {
     initTarget();
     cloneWebappConfig();
     cloneAnomalyFunctions();
+    cloneEmailConfigs();
+  }
+
+  private void cloneEmailConfigs() {
+    EmailConfigurationManager hibernateManager = PersistenceUtil
+        .getInstance(com.linkedin.thirdeye.datalayer.bao.hibernate.EmailConfigurationManagerImpl.class);
+    EmailConfigurationManager jdbcManager = DaoProviderUtil
+        .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.EmailConfigurationManagerImpl.class);
+    List<EmailConfigurationDTO> dtoSrcList = hibernateManager.findAll();
+    List<EmailConfigurationDTO> dtoTgtList = jdbcManager.findAll();
+    Set<String> uniques = new HashSet<>();
+    //ALTER TABLE `webapp_config_index` ADD UNIQUE `unique_index`(`name`, `collection`, `type`);
+    for (EmailConfigurationDTO dto : dtoTgtList) {
+      String key = dto.getCollection() + "_" + dto.getMetric();
+      uniques.add(key);
+    }
+    for (EmailConfigurationDTO dto : dtoSrcList) {
+      String key = dto.getCollection() + "_" + dto.getMetric();
+      if (!uniques.contains(key)) {
+        dto.setId(null);
+        jdbcManager.save(dto);
+      } else {
+        System.out.println(
+            "Skipping creating emailConfig for key:" + key + " since it already exists.");
+      }
+    }
   }
 
   private void cloneAnomalyFunctions() {
