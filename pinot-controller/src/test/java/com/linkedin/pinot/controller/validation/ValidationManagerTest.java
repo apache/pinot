@@ -15,13 +15,18 @@
  */
 package com.linkedin.pinot.controller.validation;
 
-import com.linkedin.pinot.core.startree.hll.HllConstants;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import org.apache.helix.AccessOption;
+import org.apache.helix.HelixAdmin;
+import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZkClient;
+import org.apache.helix.model.IdealState;
+import org.apache.helix.store.HelixPropertyStore;
 import org.joda.time.DateTime;
 import org.joda.time.Duration;
 import org.joda.time.Interval;
@@ -30,18 +35,25 @@ import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import com.linkedin.pinot.common.metrics.ValidationMetrics;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.StarTreeMetadata;
 import com.linkedin.pinot.common.utils.HLCSegmentName;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.common.utils.ZkStarter;
+import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
+import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
+import com.linkedin.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import com.linkedin.pinot.core.startree.hll.HllConstants;
 import javax.annotation.Nullable;
 
 
@@ -69,6 +81,7 @@ public class ValidationManagerTest {
     _pinotHelixResourceManager =
         new PinotHelixResourceManager(ZK_STR, HELIX_CLUSTER_NAME, CONTROLLER_INSTANCE_NAME, null, 1000L, true, /*isUpdateStateModel=*/false);
     _pinotHelixResourceManager.start();
+    PinotLLCRealtimeSegmentManager.create(_pinotHelixResourceManager, new ControllerConf());
   }
 
   @Test
@@ -312,6 +325,78 @@ public class ValidationManagerTest {
 
     List<Interval> computeMissingIntervals = ValidationManager.computeMissingIntervals(intervals, frequency);
     Assert.assertEquals(computeMissingIntervals.size(), 22);
+  }
+
+  @Test
+  public void testLLCValidation() throws Exception {
+    final String topicName = "topic";
+    final int kafkaPartitionCount = 2;
+    final String realtimeTableName = "table_REALTIME";
+    final String tableName = TableNameBuilder.extractRawTableName(realtimeTableName);
+    final String S1 = "S1"; // Server 1
+    final String S2 = "S2"; // Server 2
+    final String S3 = "S3"; // Server 3
+    final List<String> hosts = Arrays.asList(new String[]{S1, S2, S3});
+    final HelixPropertyStore propertyStore = _pinotHelixResourceManager.getPropertyStore();
+    final HelixAdmin helixAdmin = _pinotHelixResourceManager.getHelixAdmin();
+
+    ZNRecord znRecord = new ZNRecord(topicName);
+    for (int i = 0; i < kafkaPartitionCount; i++) {
+      znRecord.setListField(Integer.toString(i), hosts);
+    }
+    final String path = ZKMetadataProvider.constructPropertyStorePathForKafkaPartitions(realtimeTableName);
+    propertyStore.set(path, znRecord, AccessOption.PERSISTENT);
+
+    long msSinceEpoch = 1540;
+
+    LLCSegmentName p0s0 = new LLCSegmentName(tableName, 0, 0, msSinceEpoch);
+    LLCSegmentName p0s1 = new LLCSegmentName(tableName, 0, 1, msSinceEpoch);
+    LLCSegmentName p1s0 = new LLCSegmentName(tableName, 1, 0, msSinceEpoch);
+    LLCSegmentName p1s1 = new LLCSegmentName(tableName, 1, 1, msSinceEpoch);
+
+    IdealState idealstate = PinotTableIdealStateBuilder.buildEmptyIdealStateFor(realtimeTableName, 3, helixAdmin, HELIX_CLUSTER_NAME);
+    idealstate.setPartitionState(p0s0.getSegmentName(), S1, PinotHelixSegmentOnlineOfflineStateModelGenerator.ONLINE_STATE);
+    idealstate.setPartitionState(p0s0.getSegmentName(), S2, PinotHelixSegmentOnlineOfflineStateModelGenerator.ONLINE_STATE);
+    idealstate.setPartitionState(p0s0.getSegmentName(), S3, PinotHelixSegmentOnlineOfflineStateModelGenerator.ONLINE_STATE);
+//    idealstate.setPartitionState(p0s1.getSegmentName(), S1, PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE);
+//    idealstate.setPartitionState(p0s1.getSegmentName(), S2, PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE);
+//    idealstate.setPartitionState(p0s1.getSegmentName(), S3, PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE);
+    idealstate.setPartitionState(p1s0.getSegmentName(), S1, PinotHelixSegmentOnlineOfflineStateModelGenerator.ONLINE_STATE);
+    idealstate.setPartitionState(p1s0.getSegmentName(), S2, PinotHelixSegmentOnlineOfflineStateModelGenerator.ONLINE_STATE);
+    idealstate.setPartitionState(p1s0.getSegmentName(), S3, PinotHelixSegmentOnlineOfflineStateModelGenerator.ONLINE_STATE);
+    idealstate.setPartitionState(p1s1.getSegmentName(), S1, PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE);
+    idealstate.setPartitionState(p1s1.getSegmentName(), S2, PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE);
+    idealstate.setPartitionState(p1s1.getSegmentName(), S3, PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE);
+    helixAdmin.addResource(HELIX_CLUSTER_NAME, realtimeTableName, idealstate);
+
+    FakeValidationMetrics validationMetrics = new FakeValidationMetrics();
+
+    ValidationManager validationManager = new ValidationManager(validationMetrics, _pinotHelixResourceManager, new ControllerConf());
+    validationManager.validateLLCSegments(realtimeTableName);
+
+    Assert.assertEquals(validationMetrics.partitionCount, 1);
+
+    helixAdmin.dropResource(HELIX_CLUSTER_NAME, realtimeTableName);
+    idealstate.setPartitionState(p0s1.getSegmentName(), S1, PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE);
+    idealstate.setPartitionState(p0s1.getSegmentName(), S2, PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE);
+    idealstate.setPartitionState(p0s1.getSegmentName(), S3, PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE);
+    helixAdmin.addResource(HELIX_CLUSTER_NAME, realtimeTableName, idealstate);
+    validationManager.validateLLCSegments(realtimeTableName);
+    Assert.assertEquals(validationMetrics.partitionCount, 0);
+
+    helixAdmin.dropResource(HELIX_CLUSTER_NAME, realtimeTableName);
+  }
+
+  private class FakeValidationMetrics extends ValidationMetrics {
+    public int partitionCount = -1;
+
+    public FakeValidationMetrics() {
+      super(null);
+    }
+    @Override
+    public void updateNumNonConsumingPartitions(final String tableName, final int count) {
+      partitionCount = count;
+    }
   }
 
   private class DummyMetadata implements SegmentMetadata {

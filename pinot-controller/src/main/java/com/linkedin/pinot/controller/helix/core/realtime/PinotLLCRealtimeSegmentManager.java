@@ -201,7 +201,7 @@ public class PinotLLCRealtimeSegmentManager {
     _propertyStore.set(path, znRecord, AccessOption.PERSISTENT);
   }
 
-  protected ZNRecord getKafkaPartitionAssignment(final String realtimeTableName) {
+  public ZNRecord getKafkaPartitionAssignment(final String realtimeTableName) {
     final String path = ZKMetadataProvider.constructPropertyStorePathForKafkaPartitions(realtimeTableName);
     return _propertyStore.get(path, null, AccessOption.PERSISTENT);
   }
