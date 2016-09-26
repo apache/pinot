@@ -18,7 +18,6 @@ public class RawAnomalyResultDTO extends RawAnomalyResultBean {
   @JoinColumn(name = "anomaly_feedback_id")
   private AnomalyFeedbackDTO feedback;
 
-
   @ManyToOne(fetch = FetchType.EAGER)
   @JoinColumn(name = "function_id")
   private AnomalyFunctionDTO function;

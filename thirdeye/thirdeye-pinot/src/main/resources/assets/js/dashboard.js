@@ -245,6 +245,11 @@ $(document).ready( function() {
         renderEmailSelfService();
         routeToTab();
     }
+    if (hash.view === 'exp') {
+        renderFunctionAnalyze();
+        routeToTab();
+    }
+
 
     function routeToTab() {
         hash = parseHashParameters(window.location.hash);

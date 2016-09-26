@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.anomaly;
 
+import com.linkedin.thirdeye.dashboard.resources.AnomalyFunctionResource;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -74,8 +75,8 @@ public class ThirdEyeAnomalyApplication
         if (config.isScheduler()) {
           detectionJobScheduler = new DetectionJobScheduler(anomalyJobDAO, anomalyTaskDAO, anomalyFunctionDAO);
           detectionJobScheduler.start();
-          environment.jersey()
-          .register(new DetectionJobResource(detectionJobScheduler, anomalyFunctionDAO));
+          environment.jersey().register(new DetectionJobResource(detectionJobScheduler, anomalyFunctionDAO));
+          environment.jersey().register(new AnomalyFunctionResource(config.getFunctionConfigPath()));
         }
         if (config.isMonitor()) {
           monitorJobScheduler = new MonitorJobScheduler(anomalyJobDAO, anomalyTaskDAO, config.getMonitorConfiguration());
