@@ -16,6 +16,7 @@
 package com.linkedin.pinot.server.starter;
 
 import com.linkedin.pinot.core.query.scheduler.QueryScheduler;
+import com.linkedin.pinot.server.request.ScheduledRequestHandler;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
 
@@ -79,8 +80,8 @@ public class FileBasedServer {
     processCommandLineArgs(args);
 
     LOGGER.info("Trying to build server config");
-    MetricsRegistry metricsRegistry = new MetricsRegistry();
-    ServerBuilder serverBuilder = new ServerBuilder(new File(_serverConfigPath), metricsRegistry);
+    final MetricsRegistry metricsRegistry = new MetricsRegistry();
+    final ServerBuilder serverBuilder = new ServerBuilder(new File(_serverConfigPath), metricsRegistry);
 
     LOGGER.info("Trying to build InstanceDataManager");
     final DataManager instanceDataManager = serverBuilder.buildInstanceDataManager();
@@ -92,7 +93,12 @@ public class FileBasedServer {
     final QueryExecutor queryExecutor = serverBuilder.buildQueryExecutor(instanceDataManager);
     final QueryScheduler queryScheduler = serverBuilder.buildQueryScheduler(queryExecutor);
     LOGGER.info("Trying to build RequestHandlerFactory");
-    RequestHandlerFactory simpleRequestHandlerFactory = serverBuilder.buildRequestHandlerFactory(queryScheduler);
+    RequestHandlerFactory simpleRequestHandlerFactory = new RequestHandlerFactory() {
+      @Override
+      public NettyServer.RequestHandler createNewRequestHandler() {
+        return new ScheduledRequestHandler(queryScheduler, serverBuilder.getServerMetrics());
+      }
+    };
     LOGGER.info("Trying to build NettyServer");
 
     NettyServer nettyServer = new NettyTCPServer(_serverPort, simpleRequestHandlerFactory, null);

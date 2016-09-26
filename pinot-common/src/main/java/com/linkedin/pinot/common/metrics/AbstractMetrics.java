@@ -15,20 +15,18 @@
  */
 package com.linkedin.pinot.common.metrics;
 
-import java.util.Map;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
-
-import java.util.concurrent.atomic.AtomicLong;
-import org.antlr.v4.runtime.misc.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.yammer.metrics.core.MetricName;
 import com.yammer.metrics.core.MetricsRegistry;
+import java.util.Map;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
+import org.antlr.v4.runtime.misc.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -135,6 +133,8 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    */
   private void addValueToTimer(String fullTimerName, final long duration, final TimeUnit timeUnit) {
     final MetricName metricName = new MetricName(_clazz, fullTimerName);
+    com.yammer.metrics.core.Timer timer =
+        MetricsHelper.newTimer(_metricsRegistry, metricName, TimeUnit.MILLISECONDS, TimeUnit.SECONDS);
     MetricsHelper.newTimer(_metricsRegistry, metricName, TimeUnit.MILLISECONDS, TimeUnit.SECONDS).update(duration,
         timeUnit);
   }
@@ -243,6 +243,15 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     }
   }
 
+  public com.yammer.metrics.core.Meter getMeteredTableValue(final String tableName, final M meter) {
+    final String fullMeterName;
+    String meterName = meter.getMeterName();
+    fullMeterName = _metricPrefix + getTableName(tableName) + "." + meterName;
+    final MetricName metricName = new MetricName(_clazz, fullMeterName);
+
+    return MetricsHelper.newMeter(_metricsRegistry, metricName, meter.getUnit(), TimeUnit.SECONDS);
+  }
+
   /**
    * Logs a value to a meter for a specific query.
    *
@@ -259,7 +268,6 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
       fullMeterName = _metricPrefix + meterName;
     }
     final MetricName metricName = new MetricName(_clazz, fullMeterName);
-
     MetricsHelper.newMeter(_metricsRegistry, metricName, meter.getUnit(), TimeUnit.SECONDS).mark(unitCount);
   }
 
