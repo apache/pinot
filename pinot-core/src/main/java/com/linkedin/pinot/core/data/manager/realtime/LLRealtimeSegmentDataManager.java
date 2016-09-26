@@ -40,7 +40,6 @@ import com.linkedin.pinot.common.metrics.ServerGauge;
 import com.linkedin.pinot.common.metrics.ServerMeter;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
-import com.linkedin.pinot.common.segment.fetcher.SegmentFetcherFactory;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.common.utils.NetUtil;
@@ -511,22 +510,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
   }
 
   protected void downloadSegmentAndReplace(LLCRealtimeSegmentZKMetadata metadata) {
-    File tempSegmentFolder = new File(_resourceTmpDir, "tmp-" + String.valueOf(now()));
-    File tempFile = new File(_resourceTmpDir, _segmentNameStr + ".tar.gz");
-    String uri = metadata.getDownloadUrl();
-    try {
-      SegmentFetcherFactory.getSegmentFetcherBasedOnURI(uri).fetchSegmentToLocal(uri, tempFile);
-      segmentLogger.info("Downloaded file from {} to {}; Length of downloaded file: {}", uri, tempFile,
-          tempFile.length());
-      TarGzCompressionUtils.unTar(tempFile, tempSegmentFolder);
-      FileUtils.deleteQuietly(tempFile);
-      FileUtils.moveDirectory(tempSegmentFolder.listFiles()[0], new File(_resourceDataDir, _segmentNameStr));
-      _realtimeTableDataManager.replaceLLSegment(_segmentNameStr);
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    } finally {
-      FileUtils.deleteQuietly(tempSegmentFolder);
-    }
+    _realtimeTableDataManager.downloadAndReplaceSegment(_segmentNameStr, metadata);
   }
 
   protected long now() {
@@ -703,8 +687,8 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     final long prevTime = _lastConsumedCount == 0 ? _consumeStartTime : _lastLogTime;
     // Log every minute or 100k events
     if (now - prevTime > TimeUnit.MINUTES.toMillis(TIME_THRESHOLD_FOR_LOG_MINUTES) || rowsConsumed >= MSG_COUNT_THRESHOLD_FOR_LOG) {
-      segmentLogger.info("Consumed {} events from (rate:{}/s)", rowsConsumed,
-            (float) (rowsConsumed) * 1000 / (now - prevTime));
+      segmentLogger.info("Consumed {} events from (rate:{}/s), currentOffset={}", rowsConsumed,
+            (float) (rowsConsumed) * 1000 / (now - prevTime), _currentOffset);
       _lastConsumedCount = _numRowsConsumed;
       _lastLogTime = now;
     }

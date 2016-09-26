@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.broker.broker.helix;
 
-import com.linkedin.pinot.requestHandler.BrokerRequestHandler;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -44,6 +43,7 @@ import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
 import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.common.utils.StringUtil;
+import com.linkedin.pinot.requestHandler.BrokerRequestHandler;
 import com.linkedin.pinot.routing.HelixExternalViewBasedRouting;
 import com.linkedin.pinot.routing.RoutingTableSelector;
 import com.linkedin.pinot.routing.RoutingTableSelectorFactory;
@@ -169,6 +169,7 @@ public class HelixBrokerStarter {
             _helixExternalViewBasedRouting.getTimeBoundaryService(), _liveInstancesListener);
     brokerServerBuilder.buildNetwork();
     brokerServerBuilder.buildHTTP();
+    _helixExternalViewBasedRouting.setBrokerMetrics(brokerServerBuilder.getBrokerMetrics());
     brokerServerBuilder.start();
 
     LOGGER.info("Pinot broker ready and listening on port {} for API requests",

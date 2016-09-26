@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.core.data.manager.realtime;
 
-import com.linkedin.pinot.common.utils.SchemaUtils;
 import java.io.File;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -37,6 +36,7 @@ import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.fetcher.SegmentFetcherFactory;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
 import com.linkedin.pinot.common.utils.NamedThreadFactory;
+import com.linkedin.pinot.common.utils.SchemaUtils;
 import com.linkedin.pinot.common.utils.SegmentName;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.common.utils.helix.PinotHelixPropertyStoreZnRecordProvider;
@@ -145,17 +145,7 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
         LLCRealtimeSegmentZKMetadata llcSegmentMetadata = (LLCRealtimeSegmentZKMetadata) segmentZKMetadata;
         if (segmentZKMetadata.getStatus().equals(Status.DONE)) {
           // TODO Remove code duplication here and in LLRealtimeSegmentDataManager
-          final String uri = llcSegmentMetadata.getDownloadUrl();
-          File tempSegmentFolder = new File(_indexDir, "tmp-" + String.valueOf(System.currentTimeMillis()));
-          File tempFile = new File(_indexDir, segmentId + ".tar.gz");
-          SegmentFetcherFactory.getSegmentFetcherBasedOnURI(uri).fetchSegmentToLocal(uri, tempFile);
-          LOGGER.info("Downloaded file from {} to {}; Length of downloaded file: {}", uri, tempFile, tempFile.length());
-          TarGzCompressionUtils.unTar(tempFile, tempSegmentFolder);
-          FileUtils.deleteQuietly(tempFile);
-          FileUtils.moveDirectory(tempSegmentFolder.listFiles()[0], new File(_indexDir, segmentId));
-          FileUtils.deleteQuietly(tempSegmentFolder);
-          LOGGER.info("Replacing LLC Segment {}", segmentId);
-          replaceLLSegment(segmentId);
+          downloadAndReplaceSegment(segmentId, llcSegmentMetadata);
           return;
         }
         manager = new LLRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, instanceZKMetadata, this,
@@ -170,6 +160,26 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
       }
       _loadingSegments.add(segmentId);
     }
+  }
+
+  public void downloadAndReplaceSegment(final String segmentNameStr, LLCRealtimeSegmentZKMetadata llcSegmentMetadata) {
+    final String uri = llcSegmentMetadata.getDownloadUrl();
+    File tempSegmentFolder = new File(_indexDir, "tmp-" + String.valueOf(System.currentTimeMillis()));
+    File tempFile = new File(_indexDir, segmentNameStr + ".tar.gz");
+    try {
+      SegmentFetcherFactory.getSegmentFetcherBasedOnURI(uri).fetchSegmentToLocal(uri, tempFile);
+      LOGGER.info("Downloaded file from {} to {}; Length of downloaded file: {}", uri, tempFile, tempFile.length());
+      TarGzCompressionUtils.unTar(tempFile, tempSegmentFolder);
+      FileUtils.deleteQuietly(tempFile);
+      FileUtils.moveDirectory(tempSegmentFolder.listFiles()[0], new File(_indexDir, segmentNameStr));
+      LOGGER.info("Replacing LLC Segment {}", segmentNameStr);
+      replaceLLSegment(segmentNameStr);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    } finally {
+      FileUtils.deleteQuietly(tempSegmentFolder);
+    }
+    return;
   }
 
   // Replace a committed segment.
