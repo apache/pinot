@@ -20,7 +20,6 @@ import javax.persistence.PersistenceException;
 
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
-import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -73,7 +72,7 @@ public class AnomalyMergeExecutor implements Runnable {
 
   public void start() {
     // running every 15 mins
-    executorService.scheduleWithFixedDelay(this, 0, 1, TimeUnit.MINUTES);
+    executorService.scheduleWithFixedDelay(this, 0, 15, TimeUnit.MINUTES);
   }
 
   public void stop() {
@@ -246,26 +245,24 @@ public class AnomalyMergeExecutor implements Runnable {
     timeSeriesRequest.setFilterSet(filters);
 
     // TODO : fix the pinot query interface to accept time in millis and have the tz offset fix at one place
-    DateTimeZone tz = Utils.getDataTimeZone(anomalyFunctionSpec.getCollection());
-
     // Fetch current time series data
-    timeSeriesRequest.setStart(new DateTime(anomalyMergedResult.getStartTime(), tz));
-    timeSeriesRequest.setEnd(new DateTime(anomalyMergedResult.getEndTime(), tz));
+    timeSeriesRequest.setStart(new DateTime(anomalyMergedResult.getStartTime()));
+    timeSeriesRequest.setEnd(new DateTime(anomalyMergedResult.getEndTime()));
     TimeSeriesResponse responseCurrent = timeSeriesHandler.handle(timeSeriesRequest);
 
     LOG.info("printing current start end millis : {} {}, joda {} {}", anomalyMergedResult.getStartTime(),
-        anomalyMergedResult.getEndTime(), new DateTime(anomalyMergedResult.getStartTime(), tz),
-        new DateTime(anomalyMergedResult.getEndTime(), tz));
+        anomalyMergedResult.getEndTime(), new DateTime(anomalyMergedResult.getStartTime()),
+        new DateTime(anomalyMergedResult.getEndTime()));
 
     // Fetch baseline time series data
     long baselineOffset = AnomalyFunctionUtils.getBaselineOffset(anomalyFunctionSpec);
-    timeSeriesRequest.setStart(new DateTime(anomalyMergedResult.getStartTime() - baselineOffset, tz));
-    timeSeriesRequest.setEnd(new DateTime(anomalyMergedResult.getEndTime() - baselineOffset, tz));
+    timeSeriesRequest.setStart(new DateTime(anomalyMergedResult.getStartTime() - baselineOffset));
+    timeSeriesRequest.setEnd(new DateTime(anomalyMergedResult.getEndTime() - baselineOffset));
     TimeSeriesResponse responseBaseline = timeSeriesHandler.handle(timeSeriesRequest);
 
     LOG.info("printing baseline start end millis : {} {}, joda {} {}", anomalyMergedResult.getStartTime() - baselineOffset,
-        anomalyMergedResult.getEndTime() - baselineOffset, new DateTime(anomalyMergedResult.getStartTime() - baselineOffset, tz),
-        new DateTime(anomalyMergedResult.getEndTime() - baselineOffset, tz));
+        anomalyMergedResult.getEndTime() - baselineOffset, new DateTime(anomalyMergedResult.getStartTime() - baselineOffset),
+        new DateTime(anomalyMergedResult.getEndTime() - baselineOffset));
 
     Double currentValue;
     Double baselineValue;

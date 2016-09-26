@@ -1,7 +1,6 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
 import com.linkedin.thirdeye.anomaly.detection.TimeSeriesUtil;
-import com.linkedin.thirdeye.anomaly.merge.AnomalyTimeBasedSummarizer;
 import com.linkedin.thirdeye.api.CollectionSchema;
 import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
@@ -9,7 +8,6 @@ import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesResponse;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesResponseConverter;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
@@ -121,7 +119,7 @@ public class AnomalyFunctionResource {
         .getTimeSeriesResponse(anomalyFunctionSpec, anomalyFunction,
             anomalyFunctionSpec.getExploreDimensions(), startTime, endTime);
 
-    List<MergedAnomalyResultDTO> mergedAnomalyResults = new ArrayList<>();
+    List<RawAnomalyResultDTO> anomalyResults = new ArrayList<>();
     List<RawAnomalyResultDTO> results = new ArrayList<>();
     CollectionSchema collectionSchema;
     List<String> collectionDimensions;
@@ -132,7 +130,7 @@ public class AnomalyFunctionResource {
       collectionDimensions = collectionSchema.getDimensionNames();
     } catch (Exception e) {
       LOG.error("Exception when reading collection schema cache", e);
-      return Response.ok(mergedAnomalyResults).build();
+      return Response.ok(anomalyResults).build();
     }
 
     Map<DimensionKey, MetricTimeSeries> res =
@@ -168,12 +166,8 @@ public class AnomalyFunctionResource {
           validResults.add(anomaly);
         }
       }
-
-      mergedAnomalyResults
-          .addAll(AnomalyTimeBasedSummarizer.mergeAnomalies(validResults, -1, 2 * 60 * 60 * 1000));
-      LOG.info("Merging [{}] anomalies to [{}] for preview", validResults.size(),
-          mergedAnomalyResults.size());
+      anomalyResults.addAll(validResults);
     }
-    return Response.ok(mergedAnomalyResults).build();
+    return Response.ok(anomalyResults).build();
   }
 }
