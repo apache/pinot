@@ -22,7 +22,6 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.collect.Sets;
 import com.google.inject.Inject;
-import com.linkedin.thirdeye.anomaly.alert.AlertJobScheduler;
 import com.linkedin.thirdeye.datalayer.entity.AbstractEntity;
 import com.linkedin.thirdeye.datalayer.entity.AbstractIndexEntity;
 import com.linkedin.thirdeye.datalayer.entity.AbstractJsonEntity;
@@ -186,7 +185,7 @@ public class GenericPojoDao {
             PreparedStatement indexTableInsertStatement =
                 sqlQueryBuilder.createUpdateStatementForIndexTable(connection, abstractIndexEntity);
             int numRowsUpdated = indexTableInsertStatement.executeUpdate();
-            System.out.println("numRowsUpdated: " + numRowsUpdated);
+            LOG.debug("numRowsUpdated: {}", numRowsUpdated);
             return numRowsUpdated;
           }
         }
@@ -360,7 +359,7 @@ public class GenericPojoDao {
     ResultSet resultSet = findAllStatement.executeQuery();
     List<? extends AbstractEntity> entities = genericResultSetMapper.mapAll(resultSet, entityClass);
     for (AbstractEntity entity : entities) {
-      System.out.println(entity);
+      LOG.debug("{}", entity);
     }
   }
 
@@ -428,7 +427,7 @@ public class GenericPojoDao {
       connection.commit();
       return t;
     } catch (Exception e) {
-      e.printStackTrace();
+      LOG.error("Exception while executing query task", e);
       return defaultReturnValue;
     }
   }
