@@ -245,6 +245,8 @@ $(document).ready( function() {
         renderEmailSelfService();
         routeToTab();
     }
+
+    // experimental hidden tab
     if (hash.view === 'exp') {
         renderFunctionAnalyze();
         routeToTab();
