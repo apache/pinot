@@ -120,7 +120,7 @@ public class RealtimeQueriesSentinelTest {
       InstanceRequest instanceRequest = new InstanceRequest(counter++, brokerRequest);
       instanceRequest.setSearchSegments(new ArrayList<String>());
       instanceRequest.getSearchSegments().add("testTable_testTable");
-      QueryRequest queryRequest = new QueryRequest(instanceRequest);
+      QueryRequest queryRequest = new QueryRequest(instanceRequest, TableDataManagerProvider.getServerMetrics());
       DataTable instanceResponse = QUERY_EXECUTOR.processQuery(queryRequest);
       instanceResponseMap.clear();
       instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
@@ -157,7 +157,7 @@ public class RealtimeQueriesSentinelTest {
     InstanceRequest instanceRequest = new InstanceRequest(485, brokerRequest);
     instanceRequest.setSearchSegments(new ArrayList<String>());
     instanceRequest.getSearchSegments().add("testTable_testTable");
-    QueryRequest queryRequest = new QueryRequest(instanceRequest);
+    QueryRequest queryRequest = new QueryRequest(instanceRequest, TableDataManagerProvider.getServerMetrics());
     DataTable instanceResponse = QUERY_EXECUTOR.processQuery(queryRequest);
     instanceResponseMap.clear();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
@@ -178,7 +178,7 @@ public class RealtimeQueriesSentinelTest {
       InstanceRequest instanceRequest = new InstanceRequest(counter++, brokerRequest);
       instanceRequest.setSearchSegments(new ArrayList<String>());
       instanceRequest.getSearchSegments().add("testTable_testTable");
-      QueryRequest queryRequest = new QueryRequest(instanceRequest);
+      QueryRequest queryRequest = new QueryRequest(instanceRequest, TableDataManagerProvider.getServerMetrics());
       DataTable instanceResponse = QUERY_EXECUTOR.processQuery(queryRequest);
       instanceResponseMap.clear();
       instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);

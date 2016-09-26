@@ -22,12 +22,12 @@ import com.linkedin.pinot.common.metrics.ServerMeter;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.metrics.ServerQueryPhase;
 import com.linkedin.pinot.common.query.QueryExecutor;
-import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.query.QueryRequest;
+import com.linkedin.pinot.common.query.context.TimerContext;
 import com.linkedin.pinot.common.request.InstanceRequest;
 import com.linkedin.pinot.common.response.ProcessingException;
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.common.utils.DataTableBuilder;
-import com.linkedin.pinot.common.query.QueryRequest;
 import com.linkedin.pinot.serde.SerDe;
 import com.linkedin.pinot.transport.netty.NettyServer.RequestHandler;
 import io.netty.buffer.ByteBuf;
@@ -58,7 +58,7 @@ public class SimpleRequestHandler implements RequestHandler {
   @Override
   public ListenableFuture<byte[]> processRequest(ChannelHandlerContext channelHandlerContext, ByteBuf request) {
 
-    long queryStartTime = System.nanoTime();
+    long queryStartTimeNs = System.nanoTime();
     _serverMetrics.addMeteredGlobalValue(ServerMeter.QUERIES, 1);
 
     LOGGER.debug("processing request : {}", request);
@@ -69,6 +69,8 @@ public class SimpleRequestHandler implements RequestHandler {
     request.readBytes(byteArray);
     SerDe serDe = new SerDe(new TCompactProtocol.Factory());
     InstanceRequest instanceRequest = null;
+    TimerContext timerContext = null;
+    QueryRequest queryRequest = null;
     try {
       instanceRequest = new InstanceRequest();
       if (! serDe.deserialize(instanceRequest, byteArray) ) {
@@ -78,21 +80,22 @@ public class SimpleRequestHandler implements RequestHandler {
         DataTable result = new DataTable();
         result.addException(QueryException.INTERNAL_ERROR);
         _serverMetrics.addMeteredGlobalValue(ServerMeter.REQUEST_DESERIALIZATION_EXCEPTIONS, 1);
-        return Futures.immediateFuture(
-            ScheduledRequestHandler.serializeDataTable(instanceRequest, _serverMetrics,
-                instanceResponse, queryStartTime));
-      }
-      long deserRequestTime = System.nanoTime();
-      BrokerRequest brokerRequest = instanceRequest.getQuery();
-      _serverMetrics.addPhaseTiming(brokerRequest, ServerQueryPhase.REQUEST_DESERIALIZATION, deserRequestTime - queryStartTime);
-      LOGGER.debug("Processing requestId: {},request: {}", instanceRequest.getRequestId(), instanceRequest);
+        queryRequest = new QueryRequest(null, _serverMetrics);
+        queryRequest.getTimerContext().setQueryArrivalTimeNs(queryStartTimeNs);
 
-      QueryRequest queryRequestContext = new QueryRequest(instanceRequest);
-      
-      long startTime = System.nanoTime();
-      instanceResponse = _queryExecutor.processQuery(queryRequestContext);
-      long totalNanos = System.nanoTime() - startTime;
-      _serverMetrics.addPhaseTiming(brokerRequest, ServerQueryPhase.QUERY_PROCESSING, totalNanos);
+        return Futures.immediateFuture(
+            ScheduledRequestHandler.serializeDataTable(queryRequest, instanceResponse));
+      }
+      queryRequest = new QueryRequest(instanceRequest, _serverMetrics);
+      timerContext = queryRequest.getTimerContext();
+      timerContext.setQueryArrivalTimeNs(queryStartTimeNs);
+      TimerContext.Timer deserializeTimer =
+          timerContext.startNewPhaseTimerAtNs(ServerQueryPhase.REQUEST_DESERIALIZATION, queryStartTimeNs);
+      deserializeTimer.stopAndRecord();
+
+      LOGGER.debug("Processing requestId: {},request: {}", instanceRequest.getRequestId(), instanceRequest);
+      instanceResponse = _queryExecutor.processQuery(queryRequest);
+
     } catch (Exception e) {
       LOGGER.error("Got exception while processing request. Returning error response for requestId: {}, brokerId: {}",
           instanceRequest.getRequestId(), instanceRequest.getBrokerId(), e);
@@ -104,9 +107,11 @@ public class SimpleRequestHandler implements RequestHandler {
       exceptions.add(exception);
       instanceResponse = dataTableBuilder.buildExceptions();
     }
-    byte[] responseBytes = ScheduledRequestHandler.serializeDataTable(instanceRequest, _serverMetrics,
-        instanceResponse, queryStartTime);
-    return Futures.immediateFuture(responseBytes);
+
+    byte[] responseBytes = ScheduledRequestHandler.serializeDataTable(queryRequest, instanceResponse);
+
+    ListenableFuture<byte[]> responseFuture = Futures.immediateFuture(responseBytes);
+    return responseFuture;
   }
 
 }

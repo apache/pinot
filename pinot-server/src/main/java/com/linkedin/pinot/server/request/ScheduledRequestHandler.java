@@ -24,6 +24,7 @@ import com.linkedin.pinot.common.metrics.ServerMeter;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.metrics.ServerQueryPhase;
 import com.linkedin.pinot.common.query.QueryRequest;
+import com.linkedin.pinot.common.query.context.TimerContext;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.InstanceRequest;
 import com.linkedin.pinot.common.utils.DataTable;
@@ -69,15 +70,20 @@ public class ScheduledRequestHandler implements NettyServer.RequestHandler {
       DataTable result = new DataTable();
       result.addException(QueryException.INTERNAL_ERROR);
       serverMetrics.addMeteredGlobalValue(ServerMeter.REQUEST_DESERIALIZATION_EXCEPTIONS, 1);
-      return Futures.immediateFuture(serializeDataTable(null, serverMetrics, result, queryStartTime));
+      QueryRequest queryRequest = new QueryRequest(null, serverMetrics);
+      queryRequest.getTimerContext().setQueryArrivalTimeNs(queryStartTime);
+      return Futures.immediateFuture(serializeDataTable(queryRequest, result));
     }
-    long deserializationEndTime = System.nanoTime();
-    final BrokerRequest brokerRequest = instanceRequest.getQuery();
-    serverMetrics.addPhaseTiming(brokerRequest, ServerQueryPhase.REQUEST_DESERIALIZATION, deserializationEndTime - queryStartTime);
-    LOGGER.debug("Processing requestId:{},request={}", instanceRequest.getRequestId(), instanceRequest);
-    final QueryRequest queryRequest = new QueryRequest(instanceRequest);
+    final QueryRequest queryRequest = new QueryRequest(instanceRequest, serverMetrics);
+    final TimerContext timerContext = queryRequest.getTimerContext();
+    TimerContext.Timer deserializationTimer =
+        timerContext.startNewPhaseTimerAtNs(ServerQueryPhase.REQUEST_DESERIALIZATION, queryStartTime);
+    deserializationTimer.stopAndRecord();
 
-    final long schedulerSubmitTime = System.nanoTime();
+    final BrokerRequest brokerRequest = instanceRequest.getQuery();
+
+    LOGGER.debug("Processing requestId:{},request={}", instanceRequest.getRequestId(), instanceRequest);
+
     ListenableFuture<DataTable> queryTask = queryScheduler.submit(queryRequest);
 
     // following future will provide default response in case of uncaught
@@ -100,20 +106,20 @@ public class ScheduledRequestHandler implements NettyServer.RequestHandler {
       @Nullable
       @Override
       public byte[] apply(@Nullable DataTable instanceResponse) {
-        long totalNanos = System.nanoTime() - schedulerSubmitTime;
-        serverMetrics.addPhaseTiming(brokerRequest, ServerQueryPhase.QUERY_PROCESSING, totalNanos);
-        return serializeDataTable(instanceRequest, serverMetrics, instanceResponse, queryStartTime);
+        return serializeDataTable(queryRequest, instanceResponse);
       }
     });
 
     return serializedQueryResponse;
   }
 
-  static byte[] serializeDataTable(@Nullable InstanceRequest instanceRequest,
-      ServerMetrics metrics,
-      DataTable instanceResponse, long queryStartTime) {
+  static byte[] serializeDataTable(QueryRequest queryRequest, DataTable instanceResponse) {
     byte[] responseByte;
-    long serializationStartTime = System.nanoTime();
+
+    InstanceRequest instanceRequest = queryRequest.getInstanceRequest();
+    ServerMetrics metrics = queryRequest.getServerMetrics();
+    TimerContext timerContext = queryRequest.getTimerContext();
+    timerContext.startNewPhaseTimer(ServerQueryPhase.RESPONSE_SERIALIZATION);
     long requestId = instanceRequest != null ? instanceRequest.getRequestId() : -1;
     String brokerId = instanceRequest != null ? instanceRequest.getBrokerId() : "null";
 
@@ -130,13 +136,11 @@ public class ScheduledRequestHandler implements NettyServer.RequestHandler {
           requestId, brokerId, e);
       responseByte = null;
     }
-    long serializationEndTime = System.nanoTime();
-    BrokerRequest brokerRequest = instanceRequest != null ? instanceRequest.getQuery() : null;
 
-    metrics.addPhaseTiming(brokerRequest, ServerQueryPhase.RESPONSE_SERIALIZATION,
-        serializationEndTime - serializationStartTime);
-    metrics.addPhaseTiming(brokerRequest, ServerQueryPhase.TOTAL_QUERY_TIME,
-        serializationEndTime - queryStartTime);
+    timerContext.getPhaseTimer(ServerQueryPhase.RESPONSE_SERIALIZATION).stopAndRecord();
+    timerContext.startNewPhaseTimerAtNs(ServerQueryPhase.TOTAL_QUERY_TIME, timerContext.getQueryArrivalTimeNs());
+    timerContext.getPhaseTimer(ServerQueryPhase.TOTAL_QUERY_TIME).stopAndRecord();
+
     return responseByte;
   }
 }

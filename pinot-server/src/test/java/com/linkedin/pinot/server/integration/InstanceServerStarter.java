@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.server.integration;
 
+import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.query.QueryRequest;
 import com.linkedin.pinot.core.query.scheduler.QueryScheduler;
 import com.yammer.metrics.core.MetricsRegistry;
@@ -60,10 +61,10 @@ public class InstanceServerStarter {
     final QueryExecutor queryExecutor = serverBuilder.buildQueryExecutor(instanceDataManager);
 
     System.out.println(getCountQuery().toString());
-    sendQueryToQueryExecutor(getCountQuery(), queryExecutor);
-    sendQueryToQueryExecutor(getSumQuery(), queryExecutor);
-    sendQueryToQueryExecutor(getMaxQuery(), queryExecutor);
-    sendQueryToQueryExecutor(getMinQuery(), queryExecutor);
+    sendQueryToQueryExecutor(getCountQuery(), queryExecutor, serverBuilder.getServerMetrics());
+    sendQueryToQueryExecutor(getSumQuery(), queryExecutor, serverBuilder.getServerMetrics());
+    sendQueryToQueryExecutor(getMaxQuery(), queryExecutor, serverBuilder.getServerMetrics());
+    sendQueryToQueryExecutor(getMinQuery(), queryExecutor, serverBuilder.getServerMetrics());
 
     LOGGER.info("Trying to build RequestHandlerFactory");
     QueryScheduler queryScheduler = serverBuilder.buildQueryScheduler(queryExecutor);
@@ -74,14 +75,14 @@ public class InstanceServerStarter {
     String queryJson = "";
   }
 
-  private static void sendQueryToQueryExecutor(BrokerRequest brokerRequest, QueryExecutor queryExecutor) {
+  private static void sendQueryToQueryExecutor(BrokerRequest brokerRequest, QueryExecutor queryExecutor, ServerMetrics metrics) {
 
     QuerySource querySource = new QuerySource();
     querySource.setTableName("midas");
     brokerRequest.setQuerySource(querySource);
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
     try {
-      QueryRequest queryRequest = new QueryRequest(instanceRequest);
+      QueryRequest queryRequest = new QueryRequest(instanceRequest, metrics);
       DataTable instanceResponse = queryExecutor.processQuery(queryRequest);
       System.out.println(instanceResponse.toString());
       System.out.println("Query Time Used : " + instanceResponse.getMetadata().get("timeUsedMs"));

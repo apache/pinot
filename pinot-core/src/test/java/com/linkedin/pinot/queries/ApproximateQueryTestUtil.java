@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.queries;
 
+import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.query.QueryExecutor;
 import com.linkedin.pinot.common.query.QueryRequest;
 import com.linkedin.pinot.common.query.ReduceService;
@@ -46,13 +47,13 @@ public class ApproximateQueryTestUtil {
   private static long counter = 0;
 
   public static Object runQuery(QueryExecutor queryExecutor, String segmentName,
-      AvroQueryGenerator.TestAggreationQuery query) {
+      AvroQueryGenerator.TestAggreationQuery query, ServerMetrics metrics) {
     LOGGER.info("\nRunning: " + query.getPql());
     final BrokerRequest brokerRequest = REQUEST_COMPILER.compileToBrokerRequest(query.getPql());
     InstanceRequest instanceRequest = new InstanceRequest(counter++, brokerRequest);
     instanceRequest.setSearchSegments(new ArrayList<String>());
     instanceRequest.getSearchSegments().add(segmentName);
-    QueryRequest queryRequest = new QueryRequest(instanceRequest);
+    QueryRequest queryRequest = new QueryRequest(instanceRequest, metrics);
     final DataTable instanceResponse = queryExecutor.processQuery(queryRequest);
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
@@ -80,12 +81,12 @@ public class ApproximateQueryTestUtil {
   }
 
   public static void runApproximationQueries(QueryExecutor queryExecutor, String segmentName,
-      List<? extends AvroQueryGenerator.TestAggreationQuery> queries, double precision) throws Exception {
+      List<? extends AvroQueryGenerator.TestAggreationQuery> queries, double precision, ServerMetrics metrics) throws Exception {
     boolean isAccurate = true;
     Object accurateValue = null;
 
     for (final AvroQueryGenerator.TestAggreationQuery query : queries) {
-      Object val = runQuery(queryExecutor, segmentName, query);
+      Object val = runQuery(queryExecutor, segmentName, query, metrics);
       if (isAccurate) {
         // store accurate value
         accurateValue = val;

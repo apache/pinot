@@ -18,6 +18,7 @@ package com.linkedin.pinot.core.query.scheduler;
 
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.linkedin.pinot.common.metrics.ServerQueryPhase;
 import com.linkedin.pinot.common.query.QueryExecutor;
 import com.linkedin.pinot.common.query.QueryRequest;
 import com.linkedin.pinot.common.utils.DataTable;
@@ -43,6 +44,7 @@ public class FCFSQueryScheduler extends QueryScheduler {
 
   @Override
   public ListenableFuture<DataTable> submit(final QueryRequest queryRequest) {
+    queryRequest.getTimerContext().startNewPhaseTimer(ServerQueryPhase.SCHEDULER_WAIT);
     ListenableFuture<DataTable> queryResultFuture = queryRunners.submit(new Callable<DataTable>() {
       @Override
       public DataTable call() {

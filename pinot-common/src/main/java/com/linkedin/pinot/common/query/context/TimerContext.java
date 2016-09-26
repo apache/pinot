@@ -16,79 +16,126 @@
 
 package com.linkedin.pinot.common.query.context;
 
-import org.slf4j.LoggerFactory;
-import org.slf4j.Logger;
-
+import com.linkedin.pinot.common.metrics.ServerMetrics;
+import com.linkedin.pinot.common.metrics.ServerQueryPhase;
+import com.linkedin.pinot.common.request.BrokerRequest;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 
 public class TimerContext {
-  private static final Logger LOGGER = LoggerFactory.getLogger(TimerContext.class);
 
-  private long arrivalTimeNanos;
-  private long schedulerAddTimeNanos;
-  private long execStartTimeNanos;
-  private long execEndTimeNanos;
-  private long responseSubmitTimeNanos;
-  // NOTE: make sure to update toString() if you add a field here
+  private final ServerMetrics serverMetrics;
+  private final Map<ServerQueryPhase, Timer> phaseTimers = new HashMap<>();
+  private final BrokerRequest brokerRequest;
+  private long queryArrivalTimeNs;
 
-  /**
-   * Time in Nanoseconds at which the query request was received by the server
-   */
-  public void setArrivalTimeNanos(long arrivalTimeNanos) {
-    this.arrivalTimeNanos = arrivalTimeNanos;
+  public class Timer implements AutoCloseable {
+    private final ServerQueryPhase queryPhase;
+    long startTimeNs;
+    long endTimeNs;
+    boolean isRunning;
+
+    Timer(ServerQueryPhase phase) {
+      this.queryPhase = phase;
+    }
+
+    void start() {
+      startTimeNs = System.nanoTime();
+      isRunning = true;
+    }
+
+    void setStartTimeNs(long startTimeNs) {
+      this.startTimeNs = startTimeNs;
+      isRunning = true;
+    }
+
+    public void stopAndRecord() {
+      if (isRunning) {
+        endTimeNs = System.nanoTime();
+
+        recordPhaseTime(this);
+        isRunning = false;
+      }
+    }
+
+    public long getDurationNs() {
+      return endTimeNs - startTimeNs;
+    }
+
+    public long getDurationMs() {
+      return TimeUnit.MILLISECONDS.convert(endTimeNs - startTimeNs, TimeUnit.NANOSECONDS);
+    }
+    @Override
+    public void close()
+        throws Exception {
+      stopAndRecord();
+    }
+  }
+
+  public TimerContext(BrokerRequest brokerRequest, ServerMetrics serverMetrics) {
+    this.brokerRequest = brokerRequest;
+    this.serverMetrics = serverMetrics;
+  }
+
+  public void setQueryArrivalTimeNs(long queryStartTimeNs) {
+    this.queryArrivalTimeNs = queryStartTimeNs;
+  }
+
+  public long getQueryArrivalTimeNs() {
+    return queryArrivalTimeNs;
   }
 
   /**
-   * Time at which query request arrived at the server
-   * @return query arrival time in nanoseconds
+   * Creates and starts a new timer for query phase.
+   * Calling this again for same phase will overwrite existing timing information
+   * @param queryPhase query phase that is being timed
+   * @return
    */
-  public long getArrivalTimeNanos() {
-    return arrivalTimeNanos;
+  public Timer startNewPhaseTimer(ServerQueryPhase queryPhase) {
+    Timer phaseTimer = phaseTimers.put(queryPhase, new Timer(queryPhase));
+    phaseTimer.start();
+    return phaseTimer;
   }
 
-  /**
-   * time at which query request was submitted to the scheduler
-   * @param schedulerAddTimeNanos time in nanoseconds
-   */
-  public void setSchedulerAddTimeNanos(long schedulerAddTimeNanos) {
-    this.schedulerAddTimeNanos = schedulerAddTimeNanos;
+  public Timer startNewPhaseTimerAtNs(ServerQueryPhase queryPhase, long startTimeNs) {
+    Timer phaseTimer = startNewPhaseTimer(queryPhase);
+    phaseTimer.setStartTimeNs(startTimeNs);
+    return phaseTimer;
   }
 
-  /**
-   * Time at which query began executing
-   * @param execStartTime time in nanoseconds
-   */
-  public void setExecStartTimeNanos(long execStartTime) {
-    this.execStartTimeNanos = execStartTime;
+  public @Nullable Timer getPhaseTimer(ServerQueryPhase queryPhase) {
+    return phaseTimers.get(queryPhase);
   }
 
-  /**
-   * Time elapsed since the arrival of query at the server
-   * @return Elapsed time in nanoseconds
-   */
-  public long getElapsedTimeNanos() {
-    return System.nanoTime() - this.arrivalTimeNanos;
+  public long getPhaseDurationNs(ServerQueryPhase queryPhase) {
+    Timer timer = phaseTimers.get(queryPhase);
+    if (timer == null) {
+      return -1;
+    }
+    return timer.getDurationNs();
   }
 
-  /**
-   * Set the time at which query finished execution
-   * @param execEndTimeNanos time in nanoseconds
-   */
-  public void setExecEndTimeNanos(long execEndTimeNanos) {
-    this.execEndTimeNanos = execEndTimeNanos;
+  public long getPhaseDurationMs(ServerQueryPhase queryPhase) {
+    return TimeUnit.MILLISECONDS.convert(getPhaseDurationNs(queryPhase), TimeUnit.NANOSECONDS);
   }
 
-  /**
-   * Time at which serialized response was submitted for responding to broker
-   * @param responseSubmitTimeNanos time in nanoseconds
-   */
-  public void setResponseSubmitTimeNanos(long responseSubmitTimeNanos) {
-    this.responseSubmitTimeNanos = responseSubmitTimeNanos;
+  void recordPhaseTime(Timer phaseTimer) {
+    serverMetrics.addPhaseTiming(brokerRequest, phaseTimer.queryPhase, phaseTimer.getDurationNs());
+    phaseTimers.remove(phaseTimer.queryPhase);
   }
 
   // for logging
   @Override
   public String toString() {
-    return String.format("%d,%d,%d,%d,%d", arrivalTimeNanos, schedulerAddTimeNanos,
-        execStartTimeNanos, execEndTimeNanos, responseSubmitTimeNanos);
+    return String.format("%d,%d,%d,%d,%d,%d,%d,%d (in ns)", queryArrivalTimeNs,
+        getPhaseDurationNs(ServerQueryPhase.REQUEST_DESERIALIZATION),
+        getPhaseDurationNs(ServerQueryPhase.SCHEDULER_WAIT),
+        getPhaseDurationNs(ServerQueryPhase.BUILD_QUERY_PLAN),
+        getPhaseDurationNs(ServerQueryPhase.QUERY_PLAN_EXECUTION),
+        getPhaseDurationNs(ServerQueryPhase.QUERY_PROCESSING),
+        getPhaseDurationNs(ServerQueryPhase.RESPONSE_SERIALIZATION),
+        getPhaseDurationNs(ServerQueryPhase.TOTAL_QUERY_TIME));
   }
 }

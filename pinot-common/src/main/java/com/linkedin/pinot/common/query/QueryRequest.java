@@ -18,6 +18,7 @@ package com.linkedin.pinot.common.query;
 
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
+import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.query.context.TimerContext;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.InstanceRequest;
@@ -36,7 +37,7 @@ import org.slf4j.LoggerFactory;
 public class QueryRequest {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryRequest.class);
 
-  private InstanceRequest instanceRequest;
+  private final InstanceRequest instanceRequest;
   // Future to track result of query execution
   private ListenableFuture<DataTable> resultFuture;
   // Timing information for different phases of query execution
@@ -45,12 +46,16 @@ public class QueryRequest {
   // executor service to parallelize query tasks
   private ListeningExecutorService queryWorkers;
 
-  public QueryRequest(InstanceRequest request) {
+  private final ServerMetrics serverMetrics;
+
+  public QueryRequest(InstanceRequest request, ServerMetrics serverMetrics) {
     this.instanceRequest = request;
-    timerContext = new TimerContext();
+    this.serverMetrics = serverMetrics;
+    BrokerRequest brokerRequest = (request == null) ? null : request.getQuery();
+    timerContext = new TimerContext(brokerRequest, serverMetrics);
   }
 
-  public @Nullable String getClientId() {
+  public @Nullable String getBrokerId() {
     return instanceRequest.getBrokerId();
   }
 
@@ -77,6 +82,14 @@ public class QueryRequest {
    */
   public InstanceRequest getInstanceRequest() {
     return instanceRequest;
+  }
+
+  /**
+   * Get server metrics
+   * @return
+   */
+  public ServerMetrics getServerMetrics() {
+    return serverMetrics;
   }
 
   /**

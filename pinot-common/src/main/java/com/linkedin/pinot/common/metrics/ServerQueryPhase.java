@@ -29,8 +29,11 @@ public enum ServerQueryPhase implements AbstractMetrics.QueryPhase {
   BUILD_QUERY_PLAN,
   QUERY_PLAN_EXECUTION,
   RESPONSE_SERIALIZATION,
-  QUERY_PROCESSING;
+  QUERY_PROCESSING,
+  SCHEDULER_WAIT;
 
+  // NOTE: update query.context.TimerContext toString() method if you
+  // time more phases of query execution
   private final String queryPhaseName;
 
   ServerQueryPhase() {

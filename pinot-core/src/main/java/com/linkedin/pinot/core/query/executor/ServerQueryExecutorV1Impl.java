@@ -22,6 +22,7 @@ import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.metrics.ServerQueryPhase;
 import com.linkedin.pinot.common.query.QueryExecutor;
 import com.linkedin.pinot.common.query.QueryRequest;
+import com.linkedin.pinot.common.query.context.TimerContext;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.InstanceRequest;
 import com.linkedin.pinot.common.utils.DataTable;
@@ -41,7 +42,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.slf4j.Logger;
@@ -88,8 +88,11 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
   @Override
   public DataTable processQuery(final QueryRequest queryRequest) {
+    TimerContext timerContext = queryRequest.getTimerContext();
+    timerContext.getPhaseTimer(ServerQueryPhase.SCHEDULER_WAIT).stopAndRecord();
+    TimerContext.Timer queryProcessingTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.QUERY_PROCESSING);
+
     DataTable instanceResponse;
-    long start = System.currentTimeMillis();
     List<SegmentDataManager> queryableSegmentDataManagerList = null;
     InstanceRequest instanceRequest = queryRequest.getInstanceRequest();
     final long requestId = instanceRequest.getRequestId();
@@ -99,24 +102,22 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       TraceContext.register(instanceRequest);
       final BrokerRequest brokerRequest = instanceRequest.getQuery();
       LOGGER.debug("Incoming query is : {}", brokerRequest);
-      long startPruningTime = System.nanoTime();
+
+      TimerContext.Timer segmentPruneTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.SEGMENT_PRUNING);
       queryableSegmentDataManagerList = getPrunedQueryableSegments(instanceRequest);
-      long pruningTime = System.nanoTime() - startPruningTime;
-      _serverMetrics.addPhaseTiming(brokerRequest, ServerQueryPhase.SEGMENT_PRUNING, pruningTime);
+      segmentPruneTimer.stopAndRecord();
+
       nPrunedSegments = queryableSegmentDataManagerList.size();
       LOGGER.debug("Matched {} segments! ", nPrunedSegments);
       if (queryableSegmentDataManagerList.isEmpty()) {
         return null;
       }
-      final long startPlanTime = System.nanoTime();
-      final Plan globalQueryPlan = _planMaker.makeInterSegmentPlan(
-          queryableSegmentDataManagerList,
-          brokerRequest,
-          _instanceDataManager.getTableDataManager(brokerRequest.getQuerySource().getTableName())
-              .getExecutorService(),
-          getResourceTimeOut(instanceRequest.getQuery()));
-      final long planTime = System.nanoTime() - startPlanTime;
-      _serverMetrics.addPhaseTiming(brokerRequest, ServerQueryPhase.BUILD_QUERY_PLAN, planTime);
+
+      TimerContext.Timer planBuildTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.BUILD_QUERY_PLAN);
+      final Plan globalQueryPlan = _planMaker.makeInterSegmentPlan(queryableSegmentDataManagerList, brokerRequest,
+            _instanceDataManager.getTableDataManager(brokerRequest.getQuerySource().getTableName()).getExecutorService(),
+            getResourceTimeOut(instanceRequest.getQuery()));
+      planBuildTimer.stopAndRecord();
 
       if (_printQueryPlan) {
         LOGGER.debug("***************************** Query Plan for Request {} ***********************************", instanceRequest
@@ -125,22 +126,25 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
         LOGGER.debug("*********************************** End Query Plan ***********************************");
       }
 
-      final long executeStartTime = System.nanoTime();
-      globalQueryPlan.execute();
-      final long executeTime = System.nanoTime() - executeStartTime;
-      _serverMetrics.addPhaseTiming(brokerRequest, ServerQueryPhase.QUERY_PLAN_EXECUTION, executeTime);
+      try (TimerContext.Timer planExecTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.QUERY_PLAN_EXECUTION)) {
+        globalQueryPlan.execute();
+      }
+
       instanceResponse = globalQueryPlan.getInstanceResponse();
-      final long end = System.currentTimeMillis();
+      queryProcessingTimer.stopAndRecord();
+
       LOGGER.debug("Searching Instance for Request Id - {}, browse took: {}", instanceRequest.getRequestId(),
-          (end - start));
+          queryProcessingTimer.getDurationNs());
       LOGGER.debug("InstanceResponse for Request Id - {} : {}", instanceRequest.getRequestId(), instanceResponse.toString());
-      instanceResponse.getMetadata().put("timeUsedMs", Long.toString((end - start)));
+      instanceResponse.getMetadata().put("timeUsedMs", Long.toString(queryProcessingTimer.getDurationMs()));
       instanceResponse.getMetadata().put("requestId", Long.toString(instanceRequest.getRequestId()));
       instanceResponse.getMetadata().put("traceInfo", TraceContext.getTraceInfoOfRequestId(instanceRequest.getRequestId()));
-      LOGGER.info("Processed requestId {},reqSegments={},prunedSegments={},planTime={},timeUsed={},executeTime={},broker={}",
-          requestId, nSegmentsInQuery, nPrunedSegments, TimeUnit.MILLISECONDS.convert(planTime, TimeUnit.NANOSECONDS),
-          (end-start), TimeUnit.MILLISECONDS.convert(executeTime, TimeUnit.NANOSECONDS),
-          queryRequest.getClientId());
+      LOGGER.info("Processed requestId {},reqSegments={},prunedToSegmentCount={},planTime={},planExecTime={},totalTimeUsed={},broker={}",
+          requestId, nSegmentsInQuery, nPrunedSegments,
+          planBuildTimer.getDurationMs(),
+          timerContext.getPhaseDurationMs(ServerQueryPhase.QUERY_PLAN_EXECUTION),
+          queryProcessingTimer.getDurationMs(),
+          queryRequest.getBrokerId());
       return instanceResponse;
     } catch (Exception e) {
       _serverMetrics.addMeteredQueryValue(instanceRequest.getQuery(), ServerMeter.QUERY_EXECUTION_EXCEPTIONS, 1);
@@ -148,10 +152,11 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       instanceResponse = new DataTable();
       instanceResponse.addException(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
       TraceContext.logException("ServerQueryExecutorV1Impl", "Exception occurs in processQuery");
-      long end = System.currentTimeMillis();
-      LOGGER.info("Searching Instance for Request Id - {}, browse took: {}", requestId, requestId, (end - start));
-      LOGGER.info("InstanceResponse for Request Id - {} : {}", requestId, instanceResponse.toString());
-      instanceResponse.getMetadata().put("timeUsedMs", Long.toString((end - start)));
+      queryProcessingTimer.stopAndRecord();
+
+      LOGGER.info("Searching Instance for Request Id - {}, browse took: {}, instanceResponse: {}", requestId,
+          queryProcessingTimer.getDurationMs(), instanceResponse.toString());
+      instanceResponse.getMetadata().put("timeUsedMs", Long.toString(queryProcessingTimer.getDurationNs()));
       instanceResponse.getMetadata().put("requestId", Long.toString(instanceRequest.getRequestId()));
       instanceResponse.getMetadata().put("traceInfo", TraceContext.getTraceInfoOfRequestId(instanceRequest.getRequestId()));
       return instanceResponse;
