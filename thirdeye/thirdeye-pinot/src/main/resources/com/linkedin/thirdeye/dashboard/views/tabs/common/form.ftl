@@ -211,6 +211,7 @@
        <ul id="self-service-tabs" data-uk-switcher="{connect:'#self-service-forms'}"  class="uk-tab uk-tab-left" style="position: relative;left: 11px;">
            <li><a>Create anomaly functions</a></li>
            <li id="get-existing-anomaly-functions"><a>Manage existing anomaly functions</a></li>
+           <li id="manage-alerts" ><a>Manage alerts</a></li>
        </ul>
        {{/if}}
     </script>

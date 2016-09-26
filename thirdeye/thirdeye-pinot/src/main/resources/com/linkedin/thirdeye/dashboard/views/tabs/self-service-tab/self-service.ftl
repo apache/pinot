@@ -84,5 +84,50 @@
                     </div>
                 </div>
             </li>
+          <li id="manage-alerts"><h3>Manage Alerts</h3>
+
+            <h3>Setup Alerts</h3>
+
+            <table>
+              <tr>
+                <td>collection</td>
+                <td>
+                  <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group uk-display-inline-block uk-margin-bottom">
+                    <div id="collection" class="selected-dataset uk-button" value="">Select dataset
+                    </div>
+                    <div class="uk-button uk-button-primary" type="button"><i class="uk-icon-caret-down"></i>
+                    </div>
+                    <div class="landing-dataset uk-dropdown uk-dropdown-small uk-dropdown-bottom" style="top: 30px; left: 0px;">
+                    </div>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td>metric</td>
+                <td>
+                  <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false" class="uk-button-group">
+                    <div id="selected-metric" class="uk-button" data-uk-tooltip title="">Select metric</div>
+                    <button class="add-single-metric-btn uk-button uk-button-primary" type="button"><i class="uk-icon-caret-down"></i></button>
+                    <div class="uk-dropdown uk-dropdown-small">
+                      <ul class="metric-list single-metric-list uk-nav uk-nav-dropdown single-select">
+                      </ul>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td>recipients</td>
+                <td><input type='text' name='toAddress' id='toAddress' size='80'/>
+                </td>
+              </tr>
+              <tr>
+                <td><input type='hidden' id='emailId' name='emailId' value=''/>
+                </td>
+                <td><input type='submit' name='save' id='submit' onclick='saveEmailConfig()'/></td>
+              </tr>
+            </table>
+            <div id='email-functions'></div>
+
+          </li>
         </ul>
 </section>

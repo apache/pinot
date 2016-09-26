@@ -240,12 +240,6 @@ $(document).ready( function() {
     //Add onhashchange event listener to window object to enable back button usage on the browser
     window.onhashchange = routeToTab;
 
-    // Load email selfService
-    if (hash.view === 'alert') {
-        renderEmailSelfService();
-        routeToTab();
-    }
-
     // experimental hidden tab
     if (hash.view === 'exp') {
         renderFunctionAnalyze();
