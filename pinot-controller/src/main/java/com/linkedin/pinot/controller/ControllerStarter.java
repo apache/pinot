@@ -118,6 +118,7 @@ public class ControllerStarter {
       validationManager.start();
       LOGGER.info("Starting realtime segment manager");
       realtimeSegmentsManager.start(controllerMetrics);
+      PinotLLCRealtimeSegmentManager.getInstance().start();
       LOGGER.info("Starting segment status manager");
       segmentStatusChecker.start(controllerMetrics);
       LOGGER.info("Pinot controller ready and listening on port {} for API requests", config.getControllerPort());
