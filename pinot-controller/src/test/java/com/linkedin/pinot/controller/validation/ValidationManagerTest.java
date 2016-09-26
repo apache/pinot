@@ -377,9 +377,12 @@ public class ValidationManagerTest {
     Assert.assertEquals(validationMetrics.partitionCount, 1);
 
     helixAdmin.dropResource(HELIX_CLUSTER_NAME, realtimeTableName);
-    idealstate.setPartitionState(p0s1.getSegmentName(), S1, PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE);
-    idealstate.setPartitionState(p0s1.getSegmentName(), S2, PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE);
-    idealstate.setPartitionState(p0s1.getSegmentName(), S3, PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE);
+    idealstate.setPartitionState(p0s1.getSegmentName(), S1,
+        PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE);
+    idealstate.setPartitionState(p0s1.getSegmentName(), S2,
+        PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE);
+    idealstate.setPartitionState(p0s1.getSegmentName(), S3,
+        PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE);
     helixAdmin.addResource(HELIX_CLUSTER_NAME, realtimeTableName, idealstate);
     validationManager.validateLLCSegments(realtimeTableName);
     Assert.assertEquals(validationMetrics.partitionCount, 0);
@@ -394,7 +397,7 @@ public class ValidationManagerTest {
       super(null);
     }
     @Override
-    public void updateNumNonConsumingPartitions(final String tableName, final int count) {
+    public void updateNumNonConsumingPartitionsMetric(final String tableName, final int count) {
       partitionCount = count;
     }
   }

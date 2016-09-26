@@ -188,7 +188,7 @@ public class ValidationMetrics {
    * @param resource The resource for which the guage is updated
    * @param partitionCount Number of kafka partitions that do not have any segment in CONSUMING state.
    */
-  public void updateNumNonConsumingPartitions(final String resource, final int partitionCount) {
+  public void updateNumNonConsumingPartitionsMetric(final String resource, final int partitionCount) {
     final String fullGaugeName = makeGaugeName(resource, "NonConsumingPartitionCount");
     makeGauge(fullGaugeName, makeMetricName(fullGaugeName), _storedValueGaugeFactory, partitionCount);
 

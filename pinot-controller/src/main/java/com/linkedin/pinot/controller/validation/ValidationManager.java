@@ -206,7 +206,7 @@ public class ValidationManager {
     for (Integer kafkaPartition : kafkaPartitions) {
       LOGGER.warn("Table {}, kafka partition {} has no segments in CONSUMING state", realtimeTableName, kafkaPartition);
     }
-    _validationMetrics.updateNumNonConsumingPartitions(realtimeTableName, kafkaPartitions.size());
+    _validationMetrics.updateNumNonConsumingPartitionsMetric(realtimeTableName, kafkaPartitions.size());
   }
 
   // For offline segment pushes, validate that there are no missing segments, and update metrics
