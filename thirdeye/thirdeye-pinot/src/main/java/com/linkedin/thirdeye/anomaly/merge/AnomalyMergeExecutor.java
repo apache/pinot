@@ -244,7 +244,7 @@ public class AnomalyMergeExecutor implements Runnable {
     // Set filters including anomaly-dimension
     timeSeriesRequest.setFilterSet(filters);
 
-    // TODO : fix the pinot query interface to accept time in millis and have the tz offset fix at one place
+    // TODO : fix the pinot query interface to accept time in millis e
     // Fetch current time series data
     timeSeriesRequest.setStart(new DateTime(anomalyMergedResult.getStartTime()));
     timeSeriesRequest.setEnd(new DateTime(anomalyMergedResult.getEndTime()));
