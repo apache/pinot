@@ -15,10 +15,12 @@
  */
 package com.linkedin.pinot.core.common;
 
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+
+import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
 
 /**
@@ -104,6 +106,38 @@ public class DataFetcher {
       int outStartPos) {
     BlockValSet blockValSet = getBlockValSetForColumn(column);
     blockValSet.readIntValues(inDocIds, inStartPos, length, outDictIds, outStartPos);
+  }
+
+  /**
+   * Fetch the dictionary Ids for a multi value column.
+   *
+   * @param column column name.
+   * @param inDocIds document Id array.
+   * @param inStartPos input start position.
+   * @param length input length.
+   * @param outDictIdsArray dictionary Id array array buffer.
+   * @param outStartPos output start position.
+   * @param tempDictIdArray temporary holding dictIds read from BlockMultiValIterator.
+   *        Array size has to be >= max number of entries for this column.
+   */
+  public void fetchMultiValueDictIds(String column, int[] inDocIds, int inStartPos, int length, int[][] outDictIdsArray,
+      int outStartPos, int[] tempDictIdArray) {
+    BlockMultiValIterator iterator = (BlockMultiValIterator) getBlockValSetForColumn(column).iterator();
+    for (int i = inStartPos; i < inStartPos + length; ++i) {
+      iterator.skipTo(inDocIds[i]);
+      int dictIdLength = iterator.nextIntVal(tempDictIdArray);
+      outDictIdsArray[outStartPos++] = Arrays.copyOfRange(tempDictIdArray, 0, dictIdLength);
+    }
+  }
+
+  /**
+   * For a given multi-value column, trying to get the max number of
+   * entries per row.
+   * @param column
+   * @return max number of entries for a given column.
+   */
+  public int getMaxNumberOfEntriesForColumn(String column) {
+    return getDataSourceForColumn(column).nextBlock(BLOCK_ZERO).getMetadata().getMaxNumberOfMultiValues();
   }
 
   /**

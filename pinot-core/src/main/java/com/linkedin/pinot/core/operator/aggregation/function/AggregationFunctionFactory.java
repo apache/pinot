@@ -40,6 +40,23 @@ public class AggregationFunctionFactory {
   public static final String PERCENTILEEST95_AGGREGATION_FUNCTION = "percentileest95";
   public static final String PERCENTILEEST99_AGGREGATION_FUNCTION = "percentileest99";
 
+  public static final String COUNT_MV_AGGREGATION_FUNCTION = "countmv";
+  public static final String MAX_MV_AGGREGATION_FUNCTION = "maxmv";
+  public static final String MIN_MV_AGGREGATION_FUNCTION = "minmv";
+  public static final String SUM_MV_AGGREGATION_FUNCTION = "summv";
+  public static final String AVG_MV_AGGREGATION_FUNCTION = "avgmv";
+  public static final String MINMAXRANGE_MV_AGGREGATION_FUNCTION = "minmaxrangemv";
+  public static final String DISTINCTCOUNT_MV_AGGREGATION_FUNCTION = "distinctcountmv";
+  public static final String DISTINCTCOUNTHLL_MV_AGGREGATION_FUNCTION = "distinctcounthllmv";
+  public static final String PERCENTILE50_MV_AGGREGATION_FUNCTION = "percentile50mv";
+  public static final String PERCENTILE90_MV_AGGREGATION_FUNCTION = "percentile90mv";
+  public static final String PERCENTILE95_MV_AGGREGATION_FUNCTION = "percentile95mv";
+  public static final String PERCENTILE99_MV_AGGREGATION_FUNCTION = "percentile99mv";
+  public static final String PERCENTILEEST50_MV_AGGREGATION_FUNCTION = "percentileest50mv";
+  public static final String PERCENTILEEST90_MV_AGGREGATION_FUNCTION = "percentileest90mv";
+  public static final String PERCENTILEEST95_MV_AGGREGATION_FUNCTION = "percentileest95mv";
+  public static final String PERCENTILEEST99_MV_AGGREGATION_FUNCTION = "percentileest99mv";
+
   /**
    * Given the name of aggregation function, create and return a new instance
    * of the corresponding aggregation function and return.
@@ -99,6 +116,54 @@ public class AggregationFunctionFactory {
 
       case PERCENTILEEST99_AGGREGATION_FUNCTION:
         return new PercentileestAggregationFunction(99);
+
+      case COUNT_MV_AGGREGATION_FUNCTION:
+        return new CountMVAggregationFunction();
+
+      case MIN_MV_AGGREGATION_FUNCTION:
+        return new MinMVAggregationFunction();
+
+      case MAX_MV_AGGREGATION_FUNCTION:
+        return new MaxMVAggregationFunction();
+
+      case SUM_MV_AGGREGATION_FUNCTION:
+        return new SumMVAggregationFunction();
+
+      case AVG_MV_AGGREGATION_FUNCTION:
+        return new AvgMVAggregationFunction();
+
+      case MINMAXRANGE_MV_AGGREGATION_FUNCTION:
+        return new MinMaxRangeMVAggregationFunction();
+
+      case DISTINCTCOUNT_MV_AGGREGATION_FUNCTION:
+        return new DistinctCountMVAggregationFunction();
+
+      case DISTINCTCOUNTHLL_MV_AGGREGATION_FUNCTION:
+        return new DistinctCountHLLMVAggregationFunction();
+
+      case PERCENTILE50_MV_AGGREGATION_FUNCTION:
+        return new PercentileMVAggregationFunction(50);
+
+      case PERCENTILE90_MV_AGGREGATION_FUNCTION:
+        return new PercentileMVAggregationFunction(90);
+
+      case PERCENTILE95_MV_AGGREGATION_FUNCTION:
+        return new PercentileMVAggregationFunction(95);
+
+      case PERCENTILE99_MV_AGGREGATION_FUNCTION:
+        return new PercentileMVAggregationFunction(99);
+
+      case PERCENTILEEST50_MV_AGGREGATION_FUNCTION:
+        return new PercentileestMVAggregationFunction(50);
+
+      case PERCENTILEEST90_MV_AGGREGATION_FUNCTION:
+        return new PercentileestMVAggregationFunction(90);
+
+      case PERCENTILEEST95_MV_AGGREGATION_FUNCTION:
+        return new PercentileestMVAggregationFunction(95);
+
+      case PERCENTILEEST99_MV_AGGREGATION_FUNCTION:
+        return new PercentileestMVAggregationFunction(99);
 
       default:
         throw new RuntimeException("Unsupported aggregation function: " + functionName);

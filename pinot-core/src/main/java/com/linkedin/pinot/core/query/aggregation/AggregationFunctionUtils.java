@@ -60,7 +60,8 @@ public class AggregationFunctionUtils {
   }
 
   public static void ensureAggregationColumnsAreSingleValued(AggregationInfo aggregationInfo, IndexSegment indexSegment) {
-    if (!aggregationInfo.getAggregationType().equalsIgnoreCase("count")) {
+    // Only check fasthll for single valued column.
+    if (aggregationInfo.getAggregationType().equalsIgnoreCase("fasthll")) {
       String[] columns = aggregationInfo.getAggregationParams().get("column").trim().split(",");
       for (String column : columns) {
         if (!indexSegment.getDataSource(column).getDataSourceMetadata().isSingleValue()) {

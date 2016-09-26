@@ -70,7 +70,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
 
   @Override
   public PlanNode makeInnerSegmentPlan(IndexSegment indexSegment, BrokerRequest brokerRequest) {
-    return makeInnerSegmentPlan(indexSegment, brokerRequest, false);
+    return makeInnerSegmentPlan(indexSegment, brokerRequest, _enableNewAggregationGroupByCfg);
   }
 
   public PlanNode makeInnerSegmentPlan(IndexSegment indexSegment, BrokerRequest brokerRequest,

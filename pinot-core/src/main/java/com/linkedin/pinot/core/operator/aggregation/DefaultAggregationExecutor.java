@@ -42,7 +42,7 @@ import java.util.List;
  * aggregations.
  */
 public class DefaultAggregationExecutor implements AggregationExecutor {
-  private final SingleValueBlockCache _singleValueBlockCache;
+  private final DataBlockCache _dataBlockCache;
   private final int _numAggrFunc;
   private final AggregationFunctionContext[] _aggrFuncContextArray;
 
@@ -58,7 +58,7 @@ public class DefaultAggregationExecutor implements AggregationExecutor {
     Preconditions.checkNotNull(aggregationInfoList);
     Preconditions.checkArgument(aggregationInfoList.size() > 0);
 
-    _singleValueBlockCache = new SingleValueBlockCache(new DataFetcher(indexSegment));
+    _dataBlockCache = new DataBlockCache(new DataFetcher(indexSegment));
     _numAggrFunc = aggregationInfoList.size();
     _aggrFuncContextArray = new AggregationFunctionContext[_numAggrFunc];
     _segmentMetadata = indexSegment.getSegmentMetadata();
@@ -102,7 +102,7 @@ public class DefaultAggregationExecutor implements AggregationExecutor {
     Preconditions
         .checkState(_inited, "Method 'aggregate' cannot be called before 'init' for class " + getClass().getName());
 
-    _singleValueBlockCache.initNewBlock(docIdSet, startIndex, length);
+    _dataBlockCache.initNewBlock(docIdSet, startIndex, length);
 
     for (int i = 0; i < _numAggrFunc; i++) {
       aggregateColumn(_aggrFuncContextArray[i], _resultHolderArray[i], length);
@@ -124,27 +124,68 @@ public class DefaultAggregationExecutor implements AggregationExecutor {
 
     Preconditions.checkState(aggrColumns.length == 1);
     String aggrColumn = aggrColumns[0];
-
     switch (aggrFuncName) {
       case AggregationFunctionFactory.COUNT_AGGREGATION_FUNCTION:
         aggregationFunction.aggregate(length, resultHolder);
+        break;
+      case AggregationFunctionFactory.COUNT_MV_AGGREGATION_FUNCTION:
+        aggregationFunction.aggregate(length, resultHolder,
+            (Object) _dataBlockCache.getNumberOfEntriesArrayForColumn(aggrColumn));
         break;
 
       case AggregationFunctionFactory.DISTINCTCOUNT_AGGREGATION_FUNCTION:
       case AggregationFunctionFactory.DISTINCTCOUNTHLL_AGGREGATION_FUNCTION:
         aggregationFunction.aggregate(length, resultHolder,
-            (Object) _singleValueBlockCache.getHashCodeArrayForColumn(aggrColumn));
+            (Object) _dataBlockCache.getHashCodeArrayForColumn(aggrColumn));
+        break;
+
+      case AggregationFunctionFactory.DISTINCTCOUNT_MV_AGGREGATION_FUNCTION:
+      case AggregationFunctionFactory.DISTINCTCOUNTHLL_MV_AGGREGATION_FUNCTION:
+        aggregationFunction.aggregate(length, resultHolder,
+            (Object) _dataBlockCache.getHashCodesArrayForColumn(aggrColumn));
         break;
 
       case AggregationFunctionFactory.FASTHLL_AGGREGATION_FUNCTION:
         aggregationFunction.aggregate(length, resultHolder,
-            (Object) _singleValueBlockCache.getStringValueArrayForColumn(aggrColumn));
+            (Object) _dataBlockCache.getStringValueArrayForColumn(aggrColumn));
+        break;
+
+      case AggregationFunctionFactory.SUM_AGGREGATION_FUNCTION:
+      case AggregationFunctionFactory.AVG_AGGREGATION_FUNCTION:
+      case AggregationFunctionFactory.MAX_AGGREGATION_FUNCTION:
+      case AggregationFunctionFactory.MIN_AGGREGATION_FUNCTION:
+      case AggregationFunctionFactory.MINMAXRANGE_AGGREGATION_FUNCTION:
+      case AggregationFunctionFactory.PERCENTILE50_AGGREGATION_FUNCTION:
+      case AggregationFunctionFactory.PERCENTILE90_AGGREGATION_FUNCTION:
+      case AggregationFunctionFactory.PERCENTILE95_AGGREGATION_FUNCTION:
+      case AggregationFunctionFactory.PERCENTILE99_AGGREGATION_FUNCTION:
+      case AggregationFunctionFactory.PERCENTILEEST50_AGGREGATION_FUNCTION:
+      case AggregationFunctionFactory.PERCENTILEEST90_AGGREGATION_FUNCTION:
+      case AggregationFunctionFactory.PERCENTILEEST95_AGGREGATION_FUNCTION:
+      case AggregationFunctionFactory.PERCENTILEEST99_AGGREGATION_FUNCTION:
+        aggregationFunction.aggregate(length, resultHolder,
+            (Object) _dataBlockCache.getDoubleValueArrayForColumn(aggrColumn));
+        break;
+
+      case AggregationFunctionFactory.SUM_MV_AGGREGATION_FUNCTION:
+      case AggregationFunctionFactory.AVG_MV_AGGREGATION_FUNCTION:
+      case AggregationFunctionFactory.MAX_MV_AGGREGATION_FUNCTION:
+      case AggregationFunctionFactory.MIN_MV_AGGREGATION_FUNCTION:
+      case AggregationFunctionFactory.MINMAXRANGE_MV_AGGREGATION_FUNCTION:
+      case AggregationFunctionFactory.PERCENTILE50_MV_AGGREGATION_FUNCTION:
+      case AggregationFunctionFactory.PERCENTILE90_MV_AGGREGATION_FUNCTION:
+      case AggregationFunctionFactory.PERCENTILE95_MV_AGGREGATION_FUNCTION:
+      case AggregationFunctionFactory.PERCENTILE99_MV_AGGREGATION_FUNCTION:
+      case AggregationFunctionFactory.PERCENTILEEST50_MV_AGGREGATION_FUNCTION:
+      case AggregationFunctionFactory.PERCENTILEEST90_MV_AGGREGATION_FUNCTION:
+      case AggregationFunctionFactory.PERCENTILEEST95_MV_AGGREGATION_FUNCTION:
+      case AggregationFunctionFactory.PERCENTILEEST99_MV_AGGREGATION_FUNCTION:
+        aggregationFunction.aggregate(length, resultHolder,
+            (Object) _dataBlockCache.getDoubleValuesArrayForColumn(aggrColumn));
         break;
 
       default:
-        aggregationFunction.aggregate(length, resultHolder,
-            (Object) _singleValueBlockCache.getDoubleValueArrayForColumn(aggrColumn));
-        break;
+        throw new RuntimeException("Not supported function  " + aggrFuncName + aggrColumn);
     }
   }
 
