@@ -70,8 +70,9 @@ public class ServerTableSizeReader {
     Map<String, List<SegmentSizeInfo>> serverSegmentSizes = new HashMap<>(serverEndPoints.size());
 
     for (int i = 0; i < serverUrls.size(); i++) {
+      GetMethod getMethod = null;
       try {
-        GetMethod getMethod = completionService.take().get();
+        getMethod = completionService.take().get();
         URI uri = getMethod.getURI();
         String instance = endpointsToServers.get(uri.getHost() + ":" + uri.getPort());
         if (getMethod.getStatusCode() >= 300) {
@@ -94,6 +95,10 @@ public class ServerTableSizeReader {
         }
       } catch(Exception e) {
         LOGGER.warn("Error while reading segment sizes for table: {}", table);
+      } finally {
+        if (getMethod != null) {
+          getMethod.releaseConnection();
+        }
       }
     }
     LOGGER.info("Finished reading segment sizes for table: {}", table);

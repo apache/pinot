@@ -68,7 +68,7 @@ public class TableSize extends BasePinotControllerRestletResource {
     TableSizeReader.TableSizeDetails tableSizeDetails = null;
     try {
       tableSizeDetails = tableSizeReader.getTableSizeDetails(tableName,
-          _controllerConf.getServerAdminRequestTimeoutSeconds());
+          _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
     } catch (Throwable t) {
       LOGGER.error("Failed to read table size for: {}", tableName, t);
       return responseRepresentation(Status.SERVER_ERROR_INTERNAL,

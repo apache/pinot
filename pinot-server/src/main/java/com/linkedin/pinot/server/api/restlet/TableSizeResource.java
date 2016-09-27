@@ -86,20 +86,24 @@ public class TableSizeResource extends ServerResource {
     tableSizeInfo.diskSizeInBytes = 0L;
 
     ImmutableList<SegmentDataManager> segmentDataManagers = tableDataManager.acquireAllSegments();
-    for (SegmentDataManager segmentDataManager : segmentDataManagers) {
-      IndexSegment segment = segmentDataManager.getSegment();
-      long segmentSizeBytes = segment.getDiskSizeBytes();
-      if (detailed) {
-        SegmentSizeInfo segmentSizeInfo = new SegmentSizeInfo(segment.getSegmentName(), segmentSizeBytes);
-        tableSizeInfo.segments.add(segmentSizeInfo);
+    try {
+      for (SegmentDataManager segmentDataManager : segmentDataManagers) {
+        IndexSegment segment = segmentDataManager.getSegment();
+        long segmentSizeBytes = segment.getDiskSizeBytes();
+        if (detailed) {
+          SegmentSizeInfo segmentSizeInfo = new SegmentSizeInfo(segment.getSegmentName(), segmentSizeBytes);
+          tableSizeInfo.segments.add(segmentSizeInfo);
+        }
+        tableSizeInfo.diskSizeInBytes += segmentSizeBytes;
       }
-      tableSizeInfo.diskSizeInBytes += segmentSizeBytes;
-    }
-    // we could release segmentDataManagers as we iterate in the loop above
-    // but this is cleaner with clear semantics of usage. Also, above loop
-    // executes fast so duration of holding segments is not a concern
-    for (SegmentDataManager segmentDataManager : segmentDataManagers) {
-      tableDataManager.releaseSegment(segmentDataManager);
+    } finally {
+
+      // we could release segmentDataManagers as we iterate in the loop above
+      // but this is cleaner with clear semantics of usage. Also, above loop
+      // executes fast so duration of holding segments is not a concern
+      for (SegmentDataManager segmentDataManager : segmentDataManagers) {
+        tableDataManager.releaseSegment(segmentDataManager);
+      }
     }
     //invalid to use the segmentDataManagers below
 
