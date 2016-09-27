@@ -13,14 +13,7 @@ function getAnomalies(tab) {
         var compareMode = hash.fnCompareWeeks ?  hash.fnCompareWeeks : 1;
         var baselineStart = moment(parseInt(hash.currentStart)).subtract(compareMode, 'week');
         var baselineEnd = moment(parseInt(hash.currentEnd)).subtract(compareMode, 'week');
-        var aggTimeGranularity;
-        if (parseInt(hash.currentEnd) - parseInt(hash.currentStart) > 172800000) {
-            aggTimeGranularity = "DAYS"
-        } else if (parseInt(hash.currentEnd) - parseInt(hash.currentStart) > 604800000){
-            aggTimeGranularity = "HOURS"
-        }else{
-            aggTimeGranularity = (window.datasetConfig.dataGranularity) ? window.datasetConfig.dataGranularity : "HOURS";
-        }
+        var aggTimeGranularity = calcAggregateGranularity(hash.currentStart,hash.currentEnd);
         var dataset = hash.dataset;
         var currentStart = hash.currentStart;
         var currentEnd = hash.currentEnd;
@@ -541,14 +534,7 @@ function renderAnomalyThumbnails(data, tab) {
          var anomalyId = data[i]["id"]
          var baselineStart = moment(parseInt(hash.currentStart)).add(-7, 'days')
          var baselineEnd = moment(parseInt(hash.currentEnd)).add(-7, 'days')
-         var aggTimeGranularity;
-         if (parseInt(hash.currentEnd) - parseInt(hash.currentStart) > 172800000) {
-             aggTimeGranularity = "DAYS"
-         } else if (parseInt(hash.currentEnd) - parseInt(hash.currentStart) > 604800000){
-             aggTimeGranularity = "HOURS"
-         }else{
-             aggTimeGranularity = (window.datasetConfig.dataGranularity) ? window.datasetConfig.dataGranularity : "HOURS";
-        }
+         var aggTimeGranularity = calcAggregateGranularity(hash.currentStart,hash.currentEnd);
 
         var dataset = hash.dataset;
         var compareMode = "WoW";

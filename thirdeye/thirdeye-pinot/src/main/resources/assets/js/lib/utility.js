@@ -860,6 +860,25 @@ function calcHeatMapBG() {
     })
 };
 
+/** ANOMALIES VIEW related methods **/
+
+/** @function takes the start and end timestamp of the current query,
+ * returns the aggregate granularity **/
+function calcAggregateGranularity(startMillis, endMillis){
+
+    var millisInAWeek = 604800000;
+    var millisInADay = 86400000;
+    var aggTimeGranularity;
+    if (parseInt(endMillis) - parseInt(startMillis) >= millisInAWeek) {
+        aggTimeGranularity = "DAYS"
+    } else if (parseInt(endMillis) - parseInt(startMillis) >= 2 * millisInADay){
+        aggTimeGranularity = "HOURS"
+    }else{
+        aggTimeGranularity = (window.datasetConfig.dataGranularity) ? window.datasetConfig.dataGranularity : "HOURS";
+    }
+    return aggTimeGranularity
+}
+
 
 /** SELF SERVICE related methods **/
 function clearCreateForm() {
