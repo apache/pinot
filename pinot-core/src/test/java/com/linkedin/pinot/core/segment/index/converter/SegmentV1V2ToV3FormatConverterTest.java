@@ -119,12 +119,7 @@ public class SegmentV1V2ToV3FormatConverterTest {
 
     FileTime afterLoadTime = Files.getLastModifiedTime(v3Location.toPath());
     Assert.assertEquals(afterConversionTime, afterLoadTime);
-    // check that the loader can load original segment
-    IndexSegment v2IndexSegment = Loaders.IndexSegment.load(segmentDirectory, ReadMode.mmap, v1LoadingConfig);
-    Assert.assertNotNull(v2IndexSegment);
-    Assert.assertEquals(SegmentVersion.valueOf(v2IndexSegment.getSegmentMetadata().getVersion()),
-        SegmentVersion.v1);
-    Assert.assertTrue(v3Location.exists());
   }
+
 
 }
