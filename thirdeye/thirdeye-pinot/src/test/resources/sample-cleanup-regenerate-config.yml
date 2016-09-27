@@ -1,8 +1,7 @@
-persistenceFile: /Users/npawar/pinotAbookInstance/dashboard-controller/persistence.yml
-detectorHost: lva1-app0038.corp.linkedin.com
-detectorPort: 1867
+persistenceFile: /tmp/persistence.yml
+detectorHost: localhost
+detectorPort: 8080
 startTimeIso: 2016-08-26
 endTimeIso: 2016-09-26
-datasets: 
-#ads_ingraph,feed_sessions_additive,feed_sessions_hourly_additive,feed_updates_viewed_additive,ptrans_hourly_additive,login_additive,reg_additive
-functionIds: 
+datasets: dataset1,dataset2
+functionIds: 1,2,43,6
