@@ -99,10 +99,22 @@ public class RawAnomalyResultManagerImpl extends AbstractManagerImpl<RawAnomalyR
     //        + "and r.dataMissing=:dataMissing";
 
     Predicate predicate = Predicate.AND(//
-        Predicate.EQ("functionId", functionId), // 
+        Predicate.EQ("functionId", functionId), //
         Predicate.EQ("merged", false), //
         Predicate.EQ("dataMissing", false) //
     );
+    List<RawAnomalyResultBean> list = genericPojoDao.get(predicate, RawAnomalyResultBean.class);
+    List<RawAnomalyResultDTO> result = new ArrayList<>();
+    for (RawAnomalyResultBean bean : list) {
+      result.add(createRawAnomalyDTOFromBean(bean));
+    }
+    return result;
+  }
+
+  public List<RawAnomalyResultDTO> findByFunctionId(Long functionId) {
+    //    "select r from RawAnomalyResultDTO r where r.function.id = :functionId";
+
+    Predicate predicate = Predicate.EQ("functionId", functionId);
     List<RawAnomalyResultBean> list = genericPojoDao.get(predicate, RawAnomalyResultBean.class);
     List<RawAnomalyResultDTO> result = new ArrayList<>();
     for (RawAnomalyResultBean bean : list) {

@@ -10,4 +10,6 @@ public interface RawAnomalyResultManager extends AbstractManager<RawAnomalyResul
 
   List<RawAnomalyResultDTO> findUnmergedByFunctionId(Long functionId);
 
+  List<RawAnomalyResultDTO> findByFunctionId(Long functionId);
+
 }

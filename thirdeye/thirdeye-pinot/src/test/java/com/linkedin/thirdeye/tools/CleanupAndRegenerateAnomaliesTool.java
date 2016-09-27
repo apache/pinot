@@ -1,18 +1,16 @@
 package com.linkedin.thirdeye.tools;
 
 import java.io.File;
-import java.util.HashMap;
-import java.util.HashSet;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.collections.Lists;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.linkedin.thirdeye.anomaly.utils.DetectionResourceHttpUtils;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
@@ -26,20 +24,19 @@ import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
  * Utility class to cleanup all anomalies for input datasets,
  * and regenerate anomalies for time range specified in the input
  * Inputs:
- * persistence file input path -
- * detector host - the detector which will run these functions
- * detector port -
- * startTime - start time for anomalies regeneration in ISO (eg 2016-09-01)
- * endTime - end time for anomalies regeneration in ISO
- * datasets - the datasets for which to regenerate anomalies in csv format
+ * config file for config class CleanupAndRegenerateAnomaliesConfig
  */
 public class CleanupAndRegenerateAnomaliesTool {
 
   private static final Logger LOG = LoggerFactory.getLogger(CleanupAndRegenerateAnomaliesTool.class);
-
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper(new YAMLFactory());
+  private enum Mode {
+    DELETE,
+    GENERATE
+  }
   private String startTime;
   private String endTime;
-  private List<String> datasets;
+  private List<Long> functionIds;
 
   private int rawAnomaliesDeleted = 0;
   private int mergedAnomaliesDeleted = 0;
@@ -49,13 +46,13 @@ public class CleanupAndRegenerateAnomaliesTool {
   private MergedAnomalyResultManager mergedResultDAO;
   private DetectionResourceHttpUtils detectionResourceHttpUtils;
 
-  public CleanupAndRegenerateAnomaliesTool(String startTime, String endTime, String datasets, File persistenceFile,
-      String detectionHost, int detectionPort)
+  public CleanupAndRegenerateAnomaliesTool(String startTime, String endTime, String datasets, String functionIds,
+      File persistenceFile, String detectionHost, int detectionPort)
       throws Exception {
     init(persistenceFile);
     this.startTime = startTime;
     this.endTime = endTime;
-    this.datasets = getDatasets(datasets);
+    this.functionIds = getFunctionIds(datasets, functionIds);
     detectionResourceHttpUtils = new DetectionResourceHttpUtils(detectionHost, detectionPort);
   }
 
@@ -69,73 +66,57 @@ public class CleanupAndRegenerateAnomaliesTool {
         .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.MergedAnomalyResultManagerImpl.class);
   }
 
-  /**
-   * Creates arraylist of datasets to process, picks all if datasets not specified in input
-   */
-  private List<String> getDatasets(String datasets) {
-    List<String> datasetsList = null;
-    if (StringUtils.isBlank(datasets)) {
-      Set<String> datasetNames = new HashSet<>();
-      List<AnomalyFunctionDTO> anomalyFunctions = anomalyFunctionDAO.findAll();
-      for (AnomalyFunctionDTO anomalyFunctionDTO : anomalyFunctions) {
-        datasetNames.add(anomalyFunctionDTO.getCollection());
+  private List<Long> getFunctionIds(String datasets, String functionIds) {
+    List<Long> functionIdsList = new ArrayList<>();
+    if (StringUtils.isNotBlank(functionIds)) {
+      String[] tokens = functionIds.split(",");
+      for (String token : tokens) {
+        functionIdsList.add(Long.valueOf(token));
       }
-      datasetsList = Lists.newArrayList(datasetNames);
-    } else {
-      datasetsList = Lists.newArrayList(datasets.split(","));
+    } else if (StringUtils.isNotBlank(datasets)) {
+      List<String> datasetsList = Lists.newArrayList(datasets.split(","));
+      for (String dataset : datasetsList) {
+        List<AnomalyFunctionDTO> anomalyFunctions = anomalyFunctionDAO.findAllByCollection(dataset);
+        for (AnomalyFunctionDTO anomalyFunction : anomalyFunctions) {
+          functionIdsList.add(anomalyFunction.getId());
+        }
+      }
     }
-    LOG.info("Running for datasets {}", datasetsList);
-    return datasetsList;
+    return functionIdsList;
   }
 
   private void deleteExistingAnomalies() {
 
-    Map<Long, List<RawAnomalyResultDTO>> rawResultsByFunctionId = getRawResultsByFunctionId();
-
-    for (String dataset : datasets) {
-      List<AnomalyFunctionDTO> anomalyFunctionDTOs = anomalyFunctionDAO.findAllByCollection(dataset);
-      LOG.info("Beginning cleanup of dataset {}", dataset);
-      for (AnomalyFunctionDTO anomalyFunctionDTO : anomalyFunctionDTOs) {
-        Long functionId = anomalyFunctionDTO.getId();
-        LOG.info("Beginning cleanup of functionId {}", functionId);
-        List<RawAnomalyResultDTO> rawResults = rawResultsByFunctionId.get(functionId);
-        if (CollectionUtils.isNotEmpty(rawResults)) {
-          deleteRawResults(rawResults);
-        }
-        List<MergedAnomalyResultDTO> mergedResults = mergedResultDAO.findByFunctionId(functionId);
-        if (CollectionUtils.isNotEmpty(mergedResults)) {
-          deleteMergedResults(mergedResults);
-        }
+    for (Long functionId : functionIds) {
+      AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(functionId);
+      LOG.info("Beginning cleanup of functionId {} collection {} metric {}",
+          functionId, anomalyFunction.getCollection(), anomalyFunction.getMetric());
+      List<RawAnomalyResultDTO> rawResults = rawResultDAO.findByFunctionId(functionId);
+      if (CollectionUtils.isNotEmpty(rawResults)) {
+        deleteRawResults(rawResults);
+      }
+      List<MergedAnomalyResultDTO> mergedResults = mergedResultDAO.findByFunctionId(functionId);
+      if (CollectionUtils.isNotEmpty(mergedResults)) {
+        deleteMergedResults(mergedResults);
       }
     }
     LOG.info("Deleted {} raw anomalies", rawAnomaliesDeleted);
     LOG.info("Deleted {} merged anomalies", mergedAnomaliesDeleted);
   }
 
-  private Map<Long, List<RawAnomalyResultDTO>> getRawResultsByFunctionId() {
-    Map<Long, List<RawAnomalyResultDTO>> rawResultsByFunctionId = new HashMap<>();
-    List<RawAnomalyResultDTO> rawResults = rawResultDAO.findAll();
-    for (RawAnomalyResultDTO rawResult : rawResults) {
-      Long functionId = rawResult.getFunctionId();
-      if (rawResultsByFunctionId.containsKey(functionId)) {
-        rawResultsByFunctionId.get(functionId).add(rawResult);
-      } else {
-        rawResultsByFunctionId.put(functionId, Lists.newArrayList(rawResult));
-      }
-    }
-    return rawResultsByFunctionId;
-  }
 
   private void regenerateAnomalies() throws Exception {
-    for (String dataset : datasets) {
-      List<AnomalyFunctionDTO> anomalyFunctions = anomalyFunctionDAO.findAllByCollection(dataset);
-      for (AnomalyFunctionDTO anomalyFunction : anomalyFunctions) {
-        Long functionId = anomalyFunction.getId();
-        LOG.info("Running adhoc function {}", functionId);
-        String response = detectionResourceHttpUtils.runAdhocAnomalyFunction(String.valueOf(functionId),
-            startTime, endTime);
-        LOG.info("Response {}", response);
+    for (Long functionId : functionIds) {
+      AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(functionId);
+      boolean isActive = anomalyFunction.getIsActive();
+      if (!isActive) {
+        LOG.info("Skipping function {}", functionId);
+        continue;
       }
+      LOG.info("Running adhoc function {}", functionId);
+      String response = detectionResourceHttpUtils.runAdhocAnomalyFunction(String.valueOf(functionId),
+          startTime, endTime);
+      LOG.info("Response {}", response);
     }
   }
 
@@ -157,36 +138,61 @@ public class CleanupAndRegenerateAnomaliesTool {
     }
   }
 
-  public void run() throws Exception {
-    deleteExistingAnomalies();
-    regenerateAnomalies();
-  }
 
   public static void main(String[] args) throws Exception {
 
-    if (args.length < 5) {
-      System.err.println("USAGE CleanupAndRegenerateAnomaliesTool <persistence_file_path> "
-          + "<detector_host> <detector_port> <start_time_iso> <end_time_iso> <datasets>");
+    if (args.length != 2) {
+      System.err.println("USAGE CleanupAndRegenerateAnomaliesTool <config_yml_file> <mode> \n "
+          + "Please take note: \nDELETE mode will delete all anomalies for that functionId/dataset, "
+          + "\nGENERATE mode will generate anomalies in time range you specify");
       System.exit(1);
     }
-    File persistenceFile = new File(args[0]);
+    File configFile = new File(args[0]);
+    CleanupAndRegenerateAnomaliesConfig config =
+        OBJECT_MAPPER.readValue(configFile, CleanupAndRegenerateAnomaliesConfig.class);
+
+    String mode = args[1];
+
+    File persistenceFile = new File(config.getPersistenceFile());
     if (!persistenceFile.exists()) {
       System.err.println("Missing file:" + persistenceFile);
       System.exit(1);
     }
-    String detectionHost = args[1];
-    int detectionPort = Integer.valueOf(args[2]);
-
-    String startTime = args[3];
-    String endTime = args[4];
-    String datasets = null;
-    if (args.length > 5) {
-      datasets = args[6];
+    String detectorHost = config.getDetectorHost();
+    int detectorPort = config.getDetectorPort();
+    if (StringUtils.isBlank(detectorHost)) {
+      LOG.error("Detector host and port must be provided");
+      System.exit(1);
     }
 
-    CleanupAndRegenerateAnomaliesTool tool = new CleanupAndRegenerateAnomaliesTool(startTime, endTime, datasets,
-        persistenceFile, detectionHost, detectionPort);
-    tool.run();
+    String startTimeIso = config.getStartTimeIso();
+    String endTimeIso = config.getEndTimeIso();
+    if (Mode.valueOf(mode).equals(Mode.GENERATE)
+        && (StringUtils.isBlank(startTimeIso) || StringUtils.isBlank(endTimeIso))) {
+      LOG.error("StarteTime and endTime must be provided in generate mode");
+      System.exit(1);
+    }
+
+    String datasets = config.getDatasets();
+    String functionIds = config.getFunctionIds();
+    if (StringUtils.isBlank(datasets) && StringUtils.isBlank(functionIds)) {
+      LOG.error("Must provide one of datasets or functionIds");
+      System.exit(1);
+    }
+
+    CleanupAndRegenerateAnomaliesTool tool = new CleanupAndRegenerateAnomaliesTool(startTimeIso,
+        endTimeIso, datasets, functionIds, persistenceFile, detectorHost, detectorPort);
+
+    if (Mode.valueOf(mode).equals(Mode.DELETE)) {
+      // DELETE mode deletes *ALL* anomalies for all functions in functionIds or datasets
+      tool.deleteExistingAnomalies();
+    } else if (Mode.valueOf(mode).equals(Mode.GENERATE)) {
+      // GENERATE mode regenerates anomalies for all active functions in functionIds or datasets
+      tool.regenerateAnomalies();
+    } else {
+      LOG.error("Incorrect mode {}", mode);
+      System.exit(1);
+    }
   }
 
 }
