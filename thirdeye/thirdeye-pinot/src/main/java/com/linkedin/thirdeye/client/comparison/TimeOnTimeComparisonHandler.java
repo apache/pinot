@@ -49,10 +49,8 @@ public class TimeOnTimeComparisonHandler {
     DateTime currentEnd = comparisonRequest.getCurrentEnd();
 
     if (comparisonRequest.isEndDateInclusive()) {
-      // ThirdEyeRequest is exclusive endpoint, so increment by one bucket
+      // ThirdEyeRequest is exclusive endpoint, so increment end by one bucket
       long aggTimeBucketMillis = aggregationTimeGranularity.toMillis();
-      currentStart = currentStart.plus(aggTimeBucketMillis);
-      baselineStart = baselineStart.plus(aggTimeBucketMillis);
       currentEnd = currentEnd.plus(aggTimeBucketMillis);
       baselineEnd = baselineEnd.plus(aggTimeBucketMillis);
     }
