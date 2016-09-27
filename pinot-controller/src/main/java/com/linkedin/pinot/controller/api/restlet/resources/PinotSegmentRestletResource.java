@@ -309,7 +309,7 @@ public class PinotSegmentRestletResource extends BasePinotControllerRestletResou
 
     if ((tableType == null || TableType.REALTIME.name().equalsIgnoreCase(tableType))
         && _pinotHelixResourceManager.hasRealtimeTable(tableName)) {
-      String realtimeTableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
+      String realtimeTableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName);
       ret.put(getSegmentMetaData(realtimeTableName, segmentName, TableType.REALTIME));
     }
 
