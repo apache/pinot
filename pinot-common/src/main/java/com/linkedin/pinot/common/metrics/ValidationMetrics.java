@@ -15,12 +15,12 @@
  */
 package com.linkedin.pinot.common.metrics;
 
-import com.yammer.metrics.core.Gauge;
-import com.yammer.metrics.core.MetricName;
-import com.yammer.metrics.core.MetricsRegistry;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import com.yammer.metrics.core.Gauge;
+import com.yammer.metrics.core.MetricName;
+import com.yammer.metrics.core.MetricsRegistry;
 
 
 /**
@@ -181,6 +181,17 @@ public class ValidationMetrics {
   {
     final String fullGaugeName = makeGaugeName(resource, "TotalDocumentCount");
     makeGauge(fullGaugeName, makeMetricName(fullGaugeName), _storedValueGaugeFactory, documentCount);
+  }
+
+  /**
+   *
+   * @param resource The resource for which the guage is updated
+   * @param partitionCount Number of kafka partitions that do not have any segment in CONSUMING state.
+   */
+  public void updateNumNonConsumingPartitionsMetric(final String resource, final int partitionCount) {
+    final String fullGaugeName = makeGaugeName(resource, "NonConsumingPartitionCount");
+    makeGauge(fullGaugeName, makeMetricName(fullGaugeName), _storedValueGaugeFactory, partitionCount);
+
   }
 
   /**

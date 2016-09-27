@@ -452,7 +452,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
       _partitionAssignment = znRecord;
     }
 
-    protected ZNRecord getKafkaPartitionAssignment(final String realtimeTableName) {
+    public ZNRecord getKafkaPartitionAssignment(final String realtimeTableName) {
       return _partitionAssignment;
     }
 
