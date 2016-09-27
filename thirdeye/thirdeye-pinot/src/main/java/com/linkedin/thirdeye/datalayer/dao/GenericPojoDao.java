@@ -49,6 +49,7 @@ import com.linkedin.thirdeye.datalayer.util.SqlQueryBuilder;
 
 public class GenericPojoDao {
   private static final Logger LOG = LoggerFactory.getLogger(GenericPojoDao.class);
+  private static boolean IS_DEBUG = LOG.isDebugEnabled();
 
   static Map<Class<? extends AbstractBean>, PojoInfo> pojoInfoMap =
       new HashMap<Class<? extends AbstractBean>, GenericPojoDao.PojoInfo>();
@@ -354,12 +355,14 @@ public class GenericPojoDao {
 
   private void dumpTable(Connection connection, Class<? extends AbstractEntity> entityClass)
       throws Exception {
-    PreparedStatement findAllStatement =
-        sqlQueryBuilder.createFindAllStatement(connection, entityClass);
-    ResultSet resultSet = findAllStatement.executeQuery();
-    List<? extends AbstractEntity> entities = genericResultSetMapper.mapAll(resultSet, entityClass);
-    for (AbstractEntity entity : entities) {
-      LOG.debug("{}", entity);
+    if (IS_DEBUG) {
+      PreparedStatement findAllStatement =
+          sqlQueryBuilder.createFindAllStatement(connection, entityClass);
+      ResultSet resultSet = findAllStatement.executeQuery();
+      List<? extends AbstractEntity> entities = genericResultSetMapper.mapAll(resultSet, entityClass);
+      for (AbstractEntity entity : entities) {
+        LOG.debug("{}", entity);
+      }
     }
   }
 
