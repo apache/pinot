@@ -17,6 +17,9 @@ public class RawAnomalyResultManagerImpl extends AbstractManagerImpl<RawAnomalyR
       "select r from RawAnomalyResultDTO r where r.function.id = :functionId and r.merged=false "
           + "and r.dataMissing=:dataMissing";
 
+  private static final String FIND_BY_FUNCTION_ID =
+      "select r from RawAnomalyResultDTO r where r.function.id = :functionId";
+
   public RawAnomalyResultManagerImpl() {
     super(RawAnomalyResultDTO.class);
   }
@@ -41,5 +44,11 @@ public class RawAnomalyResultManagerImpl extends AbstractManagerImpl<RawAnomalyR
   public List<RawAnomalyResultDTO> findUnmergedByFunctionId(Long functionId) {
     return getEntityManager().createQuery(FIND_UNMERGED_BY_FUNCTION, entityClass)
         .setParameter("functionId", functionId).setParameter("dataMissing", false).getResultList();
+  }
+
+  @Override
+  public List<RawAnomalyResultDTO> findByFunctionId(Long functionId) {
+    return getEntityManager().createQuery(FIND_BY_FUNCTION_ID, entityClass)
+        .setParameter("functionId", functionId).getResultList();
   }
 }
