@@ -28,4 +28,4 @@ if [ $? -ne 0 ]; then
   exit 0
 fi
 
-mvn clean install -DskipTests=true -Dmaven.javadoc.skip=true -Dassembly.skipAssembly=true
+mvn clean install -B -DskipTests=true -Dmaven.javadoc.skip=true -Dassembly.skipAssembly=true

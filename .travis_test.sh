@@ -28,7 +28,7 @@ if [ $TRAVIS_JDK_VERSION != 'oraclejdk7' ]; then
   exit 0
 fi
 
-mvn test -P travis
+mvn test -B -P travis
 if [ $? -ne 0 ]; then
   exit 1
 fi
