@@ -3,9 +3,6 @@ package com.linkedin.thirdeye.datalayer.pojo;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-import javax.persistence.Column;
-import javax.persistence.MappedSuperclass;
-import javax.persistence.Transient;
 import javax.validation.Valid;
 import javax.validation.constraints.NotNull;
 
@@ -16,78 +13,59 @@ import com.google.common.base.MoreObjects;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
-@MappedSuperclass
 public class EmailConfigurationBean extends AbstractBean {
 
-  @Transient
   List<Long> functionIds;
 
   @Valid
   @NotNull
-  @Column(name = "collection", nullable = false)
   private String collection;
 
   @Valid
   @NotNull
-  @Column(name = "metric", nullable = false)
   private String metric;
 
   @Valid
   @NotNull
   @Email
-  @Column(name = "from_address", nullable = false)
   private String fromAddress;
 
   @Valid
   @NotNull
-  @Column(name = "to_addresses", nullable = false)
   private String toAddresses;
 
   @Valid
   @NotNull
-  @Column(name = "cron", nullable = false)
   private String cron;
 
   @Valid
   @NotNull
-  @Column(name = "smtp_host", nullable = false)
   private String smtpHost;
 
   @Valid
-  @Column(name = "smtp_port", nullable = false)
   private int smtpPort = 25;
 
-  @Column(name = "smtp_user", nullable = true)
   private String smtpUser;
 
-  @Column(name = "smtp_password", nullable = true)
   private String smtpPassword;
 
   @Valid
   @NotNull
-  @Column(name = "window_size", nullable = false)
   private int windowSize = 7;
 
   @Valid
   @NotNull
-  @Column(name = "window_unit", nullable = false)
   private TimeUnit windowUnit = TimeUnit.DAYS;
 
-  @Column(name = "is_active", nullable = false)
   private boolean active;
 
-  @Column(name = "send_zero_anomaly_email", nullable = false)
   private boolean sendZeroAnomalyEmail;
 
-  @Column(name = "filters", nullable = true)
   private String filters;
 
-  @Column(name = "window_delay", nullable = false)
   private Integer windowDelay;
 
-  @Column(name = "window_delay_unit", nullable = false)
   private TimeUnit windowDelayUnit;
-
 
   public List<Long> getFunctionIds() {
     return functionIds;

@@ -3,13 +3,6 @@ package com.linkedin.thirdeye.datalayer.pojo;
 import java.sql.Timestamp;
 import java.util.Objects;
 
-import javax.persistence.Column;
-import javax.persistence.EnumType;
-import javax.persistence.Enumerated;
-import javax.persistence.MappedSuperclass;
-import javax.persistence.Transient;
-import javax.persistence.Version;
-
 import com.google.common.base.MoreObjects;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
@@ -20,41 +13,17 @@ import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
  * job, which in turn spawns into 1 or more anomaly tasks. The anomaly tasks are picked by the
  * workers
  */
-@MappedSuperclass
 public class TaskBean extends AbstractBean {
 
-  @Enumerated(EnumType.STRING)
-  @Column(name = "task_type", nullable = false)
   private TaskType taskType;
-
-  @Column(name = "worker_id")
   private Long workerId;
-
-  @Transient
   private Long jobId;
-
-  @Column(name = "job_name", nullable = false)
   private String jobName;
-
-  @Enumerated(EnumType.STRING)
-  @Column(name = "status", nullable = false)
   private TaskStatus status;
-
-  @Column(name = "task_start_time")
   private long startTime;
-
-  @Column(name = "task_end_time")
   private long endTime;
-
-  @Column(name = "task_info", nullable = false, length = 10000)
   private String taskInfo;
-
-  @Column(name = "last_modified", insertable = false, updatable = false,
-      columnDefinition = "TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
   private Timestamp lastModified;
-
-  @Version
-  @Column(name = "version", columnDefinition = "integer DEFAULT 0", nullable = false)
   private int version;
 
   public Long getWorkerId() {

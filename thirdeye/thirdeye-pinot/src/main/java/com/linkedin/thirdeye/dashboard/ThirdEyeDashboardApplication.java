@@ -36,7 +36,7 @@ public class ThirdEyeDashboardApplication
 
   @Override
   public void run(ThirdEyeDashboardConfiguration config, Environment env) throws Exception {
-    super.initDAOs(config.getImplMode());
+    super.initDAOs();
     try {
       ThirdEyeCacheRegistry.initializeCaches(config, webappConfigDAO);
     } catch (Exception e) {

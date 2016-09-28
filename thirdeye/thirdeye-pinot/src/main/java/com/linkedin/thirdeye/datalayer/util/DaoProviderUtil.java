@@ -1,17 +1,16 @@
 package com.linkedin.thirdeye.datalayer.util;
 
+import io.dropwizard.configuration.ConfigurationFactory;
+import io.dropwizard.jackson.Jackson;
 import java.io.File;
 import java.sql.Connection;
 
+import javax.validation.Validation;
 import org.apache.tomcat.jdbc.pool.DataSource;
 
 import com.google.common.base.CaseFormat;
 import com.google.inject.AbstractModule;
-import com.google.inject.Guice;
-import com.google.inject.Injector;
 import com.google.inject.Provides;
-import com.linkedin.thirdeye.common.persistence.PersistenceConfig;
-import com.linkedin.thirdeye.common.persistence.PersistenceUtil;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.AbstractManagerImpl;
 import com.linkedin.thirdeye.datalayer.dto.AbstractDTO;
 import com.linkedin.thirdeye.datalayer.entity.AnomalyFeedbackIndex;
@@ -27,11 +26,10 @@ import com.linkedin.thirdeye.datalayer.entity.WebappConfigIndex;
 public abstract class DaoProviderUtil {
 
   private static DataSource dataSource;
-  static boolean inited = false;
 
   static ManagerProvider provider ;
   public static void init(File localConfigFile) {
-    PersistenceConfig configuration = PersistenceUtil.createConfiguration(localConfigFile);
+    PersistenceConfig configuration = createConfiguration(localConfigFile);
     dataSource = new DataSource();
     dataSource.setInitialSize(10);
     dataSource.setDefaultAutoCommit(false);
@@ -40,7 +38,7 @@ public abstract class DaoProviderUtil {
     dataSource.setPassword(configuration.getDatabaseConfiguration().getPassword());
     dataSource.setUrl(configuration.getDatabaseConfiguration().getUrl());
     dataSource.setDriverClassName(configuration.getDatabaseConfiguration().getDriver());
-    
+
     dataSource.setValidationQuery("select 1");
     dataSource.setTestWhileIdle(true);
     dataSource.setTestOnBorrow(true);
@@ -52,6 +50,20 @@ public abstract class DaoProviderUtil {
     dataSource.setRemoveAbandonedTimeout(600_000);
     dataSource.setRemoveAbandoned(true);
     provider = new ManagerProvider(dataSource);
+  }
+
+  public static PersistenceConfig createConfiguration(File configFile) {
+    ConfigurationFactory<PersistenceConfig> factory =
+        new ConfigurationFactory<>(PersistenceConfig.class,
+            Validation.buildDefaultValidatorFactory().getValidator(), Jackson.newObjectMapper(),
+            "");
+    PersistenceConfig configuration;
+    try {
+      configuration = factory.build(configFile);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+    return configuration;
   }
 
   public static <T extends AbstractManagerImpl<? extends AbstractDTO>> T getInstance(Class<T> c) {
@@ -104,7 +116,8 @@ public abstract class DaoProviderUtil {
     }
 
     @Override
-    protected void configure() {}
+    protected void configure() {
+    }
 
     @Provides
     javax.sql.DataSource getDataSource() {

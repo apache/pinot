@@ -8,8 +8,13 @@ import java.util.List;
 import java.util.Properties;
 
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public abstract class BaseAnomalyFunction implements AnomalyFunction {
+
+  protected final Logger LOGGER = LoggerFactory.getLogger(getClass());
+
   private AnomalyFunctionDTO spec;
 
   @Override
