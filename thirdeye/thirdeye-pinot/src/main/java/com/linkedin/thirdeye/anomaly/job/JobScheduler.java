@@ -10,7 +10,7 @@ public interface JobScheduler {
 
   public void start() throws SchedulerException;
 
-  public void stop() throws SchedulerException;
+  public void shutdown() throws SchedulerException;
 
   public void startJob(Long id) throws SchedulerException;
 

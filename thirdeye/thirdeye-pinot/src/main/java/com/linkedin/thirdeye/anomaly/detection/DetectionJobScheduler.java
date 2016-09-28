@@ -142,7 +142,7 @@ public class DetectionJobScheduler implements JobScheduler, Runnable {
     }
   }
 
-  public void stop() throws SchedulerException{
+  public void shutdown() throws SchedulerException{
     scheduledExecutorService.shutdown();
     quartzScheduler.shutdown();
   }

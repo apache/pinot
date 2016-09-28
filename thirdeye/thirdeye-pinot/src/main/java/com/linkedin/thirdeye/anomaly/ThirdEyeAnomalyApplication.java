@@ -103,13 +103,13 @@ public class ThirdEyeAnomalyApplication
           taskDriver.stop();
         }
         if (config.isScheduler()) {
-          detectionJobScheduler.stop();
+          detectionJobScheduler.shutdown();
         }
         if (config.isMonitor()) {
           monitorJobScheduler.stop();
         }
         if (config.isAlert()) {
-          alertJobScheduler.stop();
+          alertJobScheduler.shutdown();
         }
         if (config.isMerger()) {
           anomalyMergeExecutor.stop();
