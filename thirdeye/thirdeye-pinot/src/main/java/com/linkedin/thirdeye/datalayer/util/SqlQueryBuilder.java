@@ -344,10 +344,15 @@ public class SqlQueryBuilder {
           whereClause.append(columnName).append(" ").append(Predicate.OPER.IN.toString())
               .append("(");
           delim = "";
-          for (int i = 0; i < Array.getLength(rhs); i++) {
-            whereClause.append(delim).append("?");
-            parametersList.add(ImmutablePair.of(columnName, Array.get(rhs, i)));
-            delim = ",";
+          int length = Array.getLength(rhs);
+          if (length > 0) {
+            for (int i = 0; i < length; i++) {
+              whereClause.append(delim).append("?");
+              parametersList.add(ImmutablePair.of(columnName, Array.get(rhs, i)));
+              delim = ",";
+            }
+          } else {
+            whereClause.append("null");
           }
           whereClause.append(")");
         }
