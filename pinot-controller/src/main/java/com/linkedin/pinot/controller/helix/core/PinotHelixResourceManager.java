@@ -1570,13 +1570,13 @@ public class PinotHelixResourceManager {
    */
   public PinotResourceManagerResponse dropSegments(String tableName, List<String> segments, long timeOutInSeconds) {
     PinotResourceManagerResponse deleteResponse = toggleSegmentState(tableName, segments, false, timeOutInSeconds);
-    if (!deleteResponse.isSuccessfull()) {
+    if (!deleteResponse.isSuccessful()) {
       return deleteResponse;
     }
 
     boolean ret = true;
     for (String segment : segments) {
-      if (!deleteSegment(tableName, segment).isSuccessfull()) {
+      if (!deleteSegment(tableName, segment).isSuccessful()) {
         ret = false;
       }
     }

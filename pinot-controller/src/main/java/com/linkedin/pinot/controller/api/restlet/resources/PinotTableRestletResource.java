@@ -218,9 +218,12 @@ public class PinotTableRestletResource extends BasePinotControllerRestletResourc
       realTime.put(STATE, toggleTableState(realTimeTableName, state).toJSON().toString());
       ret.put(realTime);
     }
-
-    return (tableExists) ? new StringRepresentation(ret.toString()) : new StringRepresentation("Error: Table "
-        + tableName + " not found.");
+    if (tableExists) {
+      return new StringRepresentation(ret.toString());
+    } else {
+      setStatus(Status.CLIENT_ERROR_NOT_FOUND);
+      return new StringRepresentation("Error: Table " + tableName + " not found.");
+    }
   }
 
   /**

@@ -350,7 +350,7 @@ public class PinotTenantRestletResource extends BasePinotControllerRestletResour
         case SERVER:
           if (_pinotHelixResourceManager.isServerTenantDeletable(tenantName)) {
             res = _pinotHelixResourceManager.deleteOfflineServerTenantFor(tenantName);
-            if (res.isSuccessfull()) {
+            if (res.isSuccessful()) {
               res = _pinotHelixResourceManager.deleteRealtimeServerTenantFor(tenantName);
             }
           } else {

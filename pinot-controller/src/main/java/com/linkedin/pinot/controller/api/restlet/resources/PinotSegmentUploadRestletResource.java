@@ -465,7 +465,7 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
       response = _pinotHelixResourceManager.addSegment(metadata, downloadUrl);
     }
 
-    if (response.isSuccessfull()) {
+    if (response.isSuccessful()) {
       setStatus(Status.SUCCESS_OK);
     } else {
       ControllerRestApplication.getControllerMetrics().addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
