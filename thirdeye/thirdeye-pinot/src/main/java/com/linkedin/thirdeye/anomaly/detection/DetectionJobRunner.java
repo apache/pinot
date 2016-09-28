@@ -24,7 +24,6 @@ import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
 import com.linkedin.thirdeye.anomaly.task.TaskGenerator;
 import com.linkedin.thirdeye.api.CollectionSchema;
 import com.linkedin.thirdeye.api.TimeGranularity;
-import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
@@ -68,41 +67,45 @@ public class DetectionJobRunner implements Job {
     anomalyFunctionId = detectionJobContext.getAnomalyFunctionId();
 
     AnomalyFunctionDTO anomalyFunctionSpec = getAnomalyFunctionSpec(anomalyFunctionId);
-    detectionJobContext.setAnomalyFunctionSpec(anomalyFunctionSpec);
+    if (anomalyFunctionSpec == null) {
+      LOG.error("AnomalyFunction with id {} does not exist.. Exiting from job execution", anomalyFunctionId);
+    } else {
+      detectionJobContext.setAnomalyFunctionSpec(anomalyFunctionSpec);
 
-    windowStartTime = detectionJobContext.getWindowStartTime();
-    windowEndTime = detectionJobContext.getWindowEndTime();
+      windowStartTime = detectionJobContext.getWindowStartTime();
+      windowEndTime = detectionJobContext.getWindowEndTime();
 
-    // Compute window end
-    if (windowEndTime == null) {
-      long delayMillis = 0;
-      if (anomalyFunctionSpec.getWindowDelay() != null) {
-        delayMillis = TimeUnit.MILLISECONDS.convert(anomalyFunctionSpec.getWindowDelay(),
-            anomalyFunctionSpec.getWindowDelayUnit());
+      // Compute window end
+      if (windowEndTime == null) {
+        long delayMillis = 0;
+        if (anomalyFunctionSpec.getWindowDelay() != null) {
+          delayMillis = TimeUnit.MILLISECONDS.convert(anomalyFunctionSpec.getWindowDelay(),
+              anomalyFunctionSpec.getWindowDelayUnit());
+        }
+        Date scheduledFireTime = jobExecutionContext.getScheduledFireTime();
+        windowEndTime = new DateTime(scheduledFireTime).minus(delayMillis);
       }
-      Date scheduledFireTime = jobExecutionContext.getScheduledFireTime();
-      windowEndTime = new DateTime(scheduledFireTime).minus(delayMillis);
+
+      // Compute window start
+      if (windowStartTime == null) {
+        int windowSize = anomalyFunctionSpec.getWindowSize();
+        TimeUnit windowUnit = anomalyFunctionSpec.getWindowUnit();
+        long windowMillis = TimeUnit.MILLISECONDS.convert(windowSize, windowUnit);
+        windowStartTime = windowEndTime.minus(windowMillis);
+      }
+
+      windowStartTime = alignTimestampsToDataTimezone(windowStartTime, anomalyFunctionSpec.getCollection());
+      windowEndTime = alignTimestampsToDataTimezone(windowEndTime, anomalyFunctionSpec.getCollection());
+      detectionJobContext.setWindowStartTime(windowStartTime);
+      detectionJobContext.setWindowEndTime(windowEndTime);
+
+      // write to anomaly_jobs
+      Long jobExecutionId = createJob();
+      detectionJobContext.setJobExecutionId(jobExecutionId);
+
+      // write to anomaly_tasks
+      List<Long> taskIds = createTasks();
     }
-
-    // Compute window start
-    if (windowStartTime == null) {
-      int windowSize = anomalyFunctionSpec.getWindowSize();
-      TimeUnit windowUnit = anomalyFunctionSpec.getWindowUnit();
-      long windowMillis = TimeUnit.MILLISECONDS.convert(windowSize, windowUnit);
-      windowStartTime = windowEndTime.minus(windowMillis);
-    }
-
-    windowStartTime = alignTimestampsToDataTimezone(windowStartTime, anomalyFunctionSpec.getCollection());
-    windowEndTime = alignTimestampsToDataTimezone(windowEndTime, anomalyFunctionSpec.getCollection());
-    detectionJobContext.setWindowStartTime(windowStartTime);
-    detectionJobContext.setWindowEndTime(windowEndTime);
-
-    // write to anomaly_jobs
-    Long jobExecutionId = createJob();
-    detectionJobContext.setJobExecutionId(jobExecutionId);
-
-    // write to anomaly_tasks
-    List<Long> taskIds = createTasks();
 
   }
 

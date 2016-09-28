@@ -6,11 +6,11 @@ import org.quartz.SchedulerException;
 
 public interface JobScheduler {
 
-  public List<String> getActiveJobs() throws SchedulerException;
+  public List<String> getScheduledJobs() throws SchedulerException;
 
   public void start() throws SchedulerException;
 
-  public void stop() throws SchedulerException;
+  public void shutdown() throws SchedulerException;
 
   public void startJob(Long id) throws SchedulerException;
 

@@ -281,10 +281,10 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
 
   private void cleanup() throws SchedulerException {
     if (detectionJobScheduler != null) {
-      detectionJobScheduler.stop();
+      detectionJobScheduler.shutdown();
     }
     if (alertJobScheduler != null) {
-      alertJobScheduler.stop();
+      alertJobScheduler.shutdown();
     }
     if (monitorJobScheduler != null) {
       monitorJobScheduler.stop();

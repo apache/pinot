@@ -30,8 +30,6 @@ import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Multimap;
-import com.linkedin.thirdeye.anomaly.utils.AlertResourceHttpUtils;
-import com.linkedin.thirdeye.anomaly.utils.DetectionResourceHttpUtils;
 import com.linkedin.thirdeye.api.CollectionSchema;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
@@ -70,18 +68,12 @@ public class AnomalyResource {
   private RawAnomalyResultManager anomalyResultDAO;
   private EmailConfigurationManager emailConfigurationDAO;
 
-  private DetectionResourceHttpUtils detectionResourceHttpUtils;
-  private AlertResourceHttpUtils alertResourceHttpUtils;
   private ThirdEyeDashboardConfiguration dashboardConfiguration;
 
   public AnomalyResource(ThirdEyeDashboardConfiguration dashboardConfiguration,
       AnomalyFunctionManager anomalyFunctionDAO, RawAnomalyResultManager anomalyResultDAO,
       EmailConfigurationManager emailConfigurationDAO, MergedAnomalyResultManager anomalyMergedResultDAO) {
     this.dashboardConfiguration = dashboardConfiguration;
-    this.detectionResourceHttpUtils = new DetectionResourceHttpUtils(dashboardConfiguration.getDetectorHost(),
-        dashboardConfiguration.getDetectorPort());
-    this.alertResourceHttpUtils = new AlertResourceHttpUtils(dashboardConfiguration.getAlertHost(),
-        dashboardConfiguration.getAlertPort());
     this.anomalyFunctionDAO = anomalyFunctionDAO;
     this.anomalyResultDAO = anomalyResultDAO;
     this.anomalyMergedResultDAO = anomalyMergedResultDAO;
@@ -225,7 +217,7 @@ public class AnomalyResource {
     TimeGranularity dataGranularity = schema.getTime().getDataGranularity();
 
     AnomalyFunctionDTO anomalyFunctionSpec = new AnomalyFunctionDTO();
-    anomalyFunctionSpec.setIsActive(false);
+    anomalyFunctionSpec.setActive(isActive);
     anomalyFunctionSpec.setMetricFunction(MetricAggFunction.valueOf(metric_function));
     anomalyFunctionSpec.setCollection(dataset);
     anomalyFunctionSpec.setFunctionName(functionName);
@@ -278,11 +270,6 @@ public class AnomalyResource {
     anomalyFunctionSpec.setCron(cron);
 
     Long id = anomalyFunctionDAO.save(anomalyFunctionSpec);
-
-    if (isActive) { // this call will set isActive and schedule it
-      detectionResourceHttpUtils.enableAnomalyFunction(String.valueOf(id));
-    }
-
     return Response.ok(id).build();
   }
 
@@ -317,19 +304,11 @@ public class AnomalyResource {
     if (anomalyFunctionSpec == null) {
       throw new IllegalStateException("AnomalyFunctionSpec with id " + id + " does not exist");
     }
-    // call endpoint to stop if active
-    if (anomalyFunctionSpec.getIsActive()) {
-      try {
-        detectionResourceHttpUtils.disableAnomalyFunction(String.valueOf(id));
-      } catch (Exception e) {
-        LOG.error("Could not disable the function : " +  id, e);
-      }
-    }
 
     CollectionSchema schema = CACHE_REGISTRY_INSTANCE.getCollectionSchemaCache().get(dataset);
     TimeGranularity dataGranularity = schema.getTime().getDataGranularity();
 
-    anomalyFunctionSpec.setIsActive(false);
+    anomalyFunctionSpec.setActive(isActive);
     anomalyFunctionSpec.setCollection(dataset);
     anomalyFunctionSpec.setFunctionName(functionName);
     anomalyFunctionSpec.setMetric(metric);
@@ -371,11 +350,8 @@ public class AnomalyResource {
       }
     }
     anomalyFunctionSpec.setCron(cron);
-    anomalyFunctionDAO.update(anomalyFunctionSpec);
 
-    if (isActive) {
-      detectionResourceHttpUtils.enableAnomalyFunction(String.valueOf(id));
-    }
+    anomalyFunctionDAO.update(anomalyFunctionSpec);
     return Response.ok(id).build();
   }
 
@@ -394,9 +370,6 @@ public class AnomalyResource {
     AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionDAO.findById(id);
     if (anomalyFunctionSpec == null) {
       throw new IllegalStateException("No anomalyFunctionSpec with id " + id);
-    }
-    if (anomalyFunctionSpec.getIsActive()) {
-      detectionResourceHttpUtils.disableAnomalyFunction(String.valueOf(id));
     }
 
     // delete dependent entities
@@ -422,40 +395,6 @@ public class AnomalyResource {
     // delete from db
     anomalyFunctionDAO.deleteById(id);
 
-    return Response.noContent().build();
-  }
-
-  // Run anomaly function ad hoc
-  @POST
-  @Path("/anomaly-function/adhoc")
-  public Response runAdhocAnomalyFunctions(@NotNull @QueryParam("id") Long id,
-      @QueryParam("functionName") String functionName,
-      @QueryParam("windowStartIso") String windowStartIso,
-      @QueryParam("windowEndIso") String windowEndIso)
-          throws Exception {
-
-    if (id == null) {
-      throw new IllegalArgumentException("id is a required query param");
-    }
-
-    AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionDAO.findById(id);
-    if (anomalyFunctionSpec == null) {
-      throw new IllegalStateException("No anomalyFunctionSpec with id " + id);
-    }
-    if (StringUtils.isEmpty(windowStartIso) || StringUtils.isEmpty(windowEndIso)) {
-      int windowSize = anomalyFunctionSpec.getWindowSize();
-      TimeUnit windowUnit = anomalyFunctionSpec.getWindowUnit();
-      int delaySize = anomalyFunctionSpec.getWindowDelay();
-      TimeUnit delayUnit = anomalyFunctionSpec.getWindowDelayUnit();
-
-      DateTime now = new DateTime();
-      DateTime windowEnd = now.minus(TimeUnit.MILLISECONDS.convert(delaySize, delayUnit));
-      windowEndIso = windowEnd.toString();
-      DateTime windowStart = windowEnd.minus(TimeUnit.MILLISECONDS.convert(windowSize, windowUnit));
-      windowStartIso = windowStart.toString();
-    }
-    // call endpoint to run adhoc
-    detectionResourceHttpUtils.runAdhocAnomalyFunction(String.valueOf(id), windowStartIso, windowEndIso);
     return Response.noContent().build();
   }
 
@@ -513,7 +452,7 @@ public class AnomalyResource {
     }
 
     EmailConfigurationDTO emailConfiguration = new EmailConfigurationDTO();
-    emailConfiguration.setActive(false);
+    emailConfiguration.setActive(isActive);
     emailConfiguration.setCollection(dataset);
     emailConfiguration.setMetric(metric);
     emailConfiguration.setFromAddress(fromAddress);
@@ -552,10 +491,6 @@ public class AnomalyResource {
     emailConfiguration.setFunctions(anomalyFunctionSpecs);
 
     Long id = emailConfigurationDAO.save(emailConfiguration);
-    // enable id isActive
-    if (isActive) {
-      alertResourceHttpUtils.enableEmailConfiguration(String.valueOf(id));
-    }
 
     return Response.ok(id).build();
   }
@@ -594,10 +529,8 @@ public class AnomalyResource {
     if (emailConfiguration == null) {
       throw new IllegalStateException("No email configuration for id " + id);
     }
-    if (emailConfiguration.isActive()) {
-      alertResourceHttpUtils.disableEmailConfiguration(String.valueOf(id));
-    }
-    emailConfiguration.setActive(false);
+
+    emailConfiguration.setActive(isActive);
     emailConfiguration.setId(id);
     emailConfiguration.setCollection(dataset);
     emailConfiguration.setMetric(metric);
@@ -637,11 +570,6 @@ public class AnomalyResource {
     emailConfiguration.setFunctions(anomalyFunctionSpecs);
 
     emailConfigurationDAO.update(emailConfiguration);
-
-    // call endpoint to start, if active
-    if (isActive) {
-      alertResourceHttpUtils.enableEmailConfiguration(String.valueOf(id));
-    }
     return Response.ok(id).build();
   }
 
@@ -659,31 +587,12 @@ public class AnomalyResource {
     if (emailConfiguration == null) {
       throw new IllegalStateException("No emailConfiguraiton for id " + id);
     }
-    if (emailConfiguration.isActive()) {
-      alertResourceHttpUtils.disableEmailConfiguration(String.valueOf(id));
-    }
+
     // delete from db
     emailConfigurationDAO.deleteById(id);
     return Response.noContent().build();
   }
 
-  // Run email function ad hoc
-  @POST
-  @Path("/email-config/adhoc")
-  public Response runAdhocEmailConfig(@NotNull @QueryParam("id") Long id,
-      @QueryParam("windowStartIso") String windowStartIso,
-      @QueryParam("windowEndIso") String windowEndIso) throws Exception {
-
-    if (id == null) {
-      throw new IllegalArgumentException("id is a required query param");
-    }
-    EmailConfigurationDTO emailConfiguration = emailConfigurationDAO.findById(id);
-    if (emailConfiguration == null) {
-      throw new IllegalStateException("No emailConfiguraiton for id " + id);
-    }
-    alertResourceHttpUtils.runAdhocEmailConfiguration(String.valueOf(id), windowStartIso, windowEndIso);
-    return Response.ok(id).build();
-  }
 
   @GET
   @Path(value = "anomaly-result/feedback")

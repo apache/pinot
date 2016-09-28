@@ -58,38 +58,42 @@ public class AlertJobRunner implements Job {
     alertConfigId = alertJobContext.getAlertConfigId();
 
     EmailConfigurationDTO alertConfig = emailConfigurationDAO.findById(alertConfigId);
-    alertJobContext.setAlertConfig(alertConfig);
+    if (alertConfig == null) {
+      LOG.error("Alert config with id {} does not exist", alertConfigId);
+    } else {
+      alertJobContext.setAlertConfig(alertConfig);
 
-    windowEndTime = alertJobContext.getWindowEndTime();
-    windowStartTime = alertJobContext.getWindowStartTime();
+      windowEndTime = alertJobContext.getWindowEndTime();
+      windowStartTime = alertJobContext.getWindowStartTime();
 
-    // Compute window end
-    if (windowEndTime == null) {
-      long delayMillis = 0;
-      if (alertConfig.getWindowDelay() != null) {
-        delayMillis = TimeUnit.MILLISECONDS.convert(alertConfig.getWindowDelay(),
-            alertConfig.getWindowDelayUnit());
+      // Compute window end
+      if (windowEndTime == null) {
+        long delayMillis = 0;
+        if (alertConfig.getWindowDelay() != null) {
+          delayMillis = TimeUnit.MILLISECONDS.convert(alertConfig.getWindowDelay(),
+              alertConfig.getWindowDelayUnit());
+        }
+        Date scheduledFireTime = jobExecutionContext.getScheduledFireTime();
+        windowEndTime = new DateTime(scheduledFireTime).minus(delayMillis);
       }
-      Date scheduledFireTime = jobExecutionContext.getScheduledFireTime();
-      windowEndTime = new DateTime(scheduledFireTime).minus(delayMillis);
+
+      // Compute window start
+      if (windowStartTime == null) {
+        int windowSize = alertConfig.getWindowSize();
+        TimeUnit windowUnit = alertConfig.getWindowUnit();
+        long windowMillis = TimeUnit.MILLISECONDS.convert(windowSize, windowUnit);
+        windowStartTime = windowEndTime.minus(windowMillis);
+      }
+      alertJobContext.setWindowStartTime(windowStartTime);
+      alertJobContext.setWindowEndTime(windowEndTime);
+
+      // write to anomaly_jobs
+      Long jobExecutionId = createJob();
+      alertJobContext.setJobExecutionId(jobExecutionId);
+
+      // write to anomaly_tasks
+      List<Long> taskIds = createTasks();
     }
-
-    // Compute window start
-    if (windowStartTime == null) {
-      int windowSize = alertConfig.getWindowSize();
-      TimeUnit windowUnit = alertConfig.getWindowUnit();
-      long windowMillis = TimeUnit.MILLISECONDS.convert(windowSize, windowUnit);
-      windowStartTime = windowEndTime.minus(windowMillis);
-    }
-    alertJobContext.setWindowStartTime(windowStartTime);
-    alertJobContext.setWindowEndTime(windowEndTime);
-
-    // write to anomaly_jobs
-    Long jobExecutionId = createJob();
-    alertJobContext.setJobExecutionId(jobExecutionId);
-
-    // write to anomaly_tasks
-    List<Long> taskIds = createTasks();
 
   }
 

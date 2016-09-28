@@ -2,6 +2,9 @@ package com.linkedin.thirdeye.anomaly.alert;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import org.joda.time.DateTime;
 import org.quartz.CronScheduleBuilder;
@@ -30,11 +33,12 @@ import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
 /**
  * Scheduler for anomaly detection jobs
  */
-public class AlertJobScheduler implements JobScheduler {
+public class AlertJobScheduler implements JobScheduler, Runnable {
 
   private static final Logger LOG = LoggerFactory.getLogger(AlertJobScheduler.class);
   private SchedulerFactory schedulerFactory;
   private Scheduler quartzScheduler;
+  private ScheduledExecutorService scheduledExecutorService;
   private JobManager anomalyJobDAO;
   private TaskManager anomalyTaskDAO;
   private EmailConfigurationManager emailConfigurationDAO;
@@ -51,9 +55,10 @@ public class AlertJobScheduler implements JobScheduler {
     } catch (SchedulerException e) {
       LOG.error("Exception while starting quartz scheduler", e);
     }
+    scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
   }
 
-  public List<String> getActiveJobs() throws SchedulerException {
+  public List<String> getScheduledJobs() throws SchedulerException {
     List<String> activeJobKeys = new ArrayList<>();
     for (String groupName : quartzScheduler.getJobGroupNames()) {
       for (JobKey jobKey : quartzScheduler.getJobKeys(GroupMatcher.jobGroupEquals(groupName))) {
@@ -66,23 +71,74 @@ public class AlertJobScheduler implements JobScheduler {
   public void start() throws SchedulerException {
     quartzScheduler.start();
 
-    // start all active alert functions
-    List<EmailConfigurationDTO> alertConfigs = emailConfigurationDAO.findAll();
-    for (EmailConfigurationDTO alertConfig : alertConfigs) {
-      if (alertConfig.isActive()) {
-        AlertJobContext alertJobContext = new AlertJobContext();
-        alertJobContext.setAnomalyJobDAO(anomalyJobDAO);
-        alertJobContext.setAnomalyTaskDAO(anomalyTaskDAO);
-        alertJobContext.setEmailConfigurationDAO(emailConfigurationDAO);
-        alertJobContext.setAlertConfigId(alertConfig.getId());
-        String jobKey = getJobKey(alertConfig.getId());
-        alertJobContext.setJobName(jobKey);
-        scheduleJob(alertJobContext, alertConfig);
+    scheduledExecutorService.scheduleWithFixedDelay(this, 0, 30, TimeUnit.MINUTES);
+  }
+
+  public void run() {
+    try {
+      // read all alert configs
+      LOG.info("Reading all alert configs..");
+      List<EmailConfigurationDTO> alertConfigs = emailConfigurationDAO.findAll();
+
+      // get active jobs
+      List<String> scheduledJobs = getScheduledJobs();
+      LOG.info("Scheduled jobs {}", scheduledJobs);
+
+      for (EmailConfigurationDTO alertConfig : alertConfigs) {
+        Long id = alertConfig.getId();
+        String jobKey = getJobKey(id);
+        boolean isActive = alertConfig.isActive();
+        boolean isScheduled = scheduledJobs.contains(jobKey);
+
+        // for all jobs with isActive, but not in scheduled jobs,
+        // schedule them with quartz, as function is newly created, or newly activated
+        if (isActive && !isScheduled) {
+          LOG.info("Found active but not scheduled {}", id);
+          startJob(alertConfig, jobKey);
+        }
+        // for all jobs with not isActive, but in scheduled jobs,
+        // remove them from quartz, as function is newly deactivated
+        else if (!isActive && isScheduled) {
+          LOG.info("Found inactive but scheduled {}", id);
+          stopJob(jobKey);
+        }
+        // for all jobs with isActive, and isScheduled,
+        // updates to a function will be picked up automatically by the next run
+        // but check for cron updates
+        else if (isActive && isScheduled) {
+          String cronInDatabase = alertConfig.getCron();
+          List<Trigger> triggers = (List<Trigger>) quartzScheduler.getTriggersOfJob(JobKey.jobKey(jobKey));
+          CronTrigger cronTrigger = (CronTrigger) triggers.get(0);
+          String cronInSchedule = cronTrigger.getCronExpression();
+          // cron expression has been updated, restart this job
+          if (!cronInDatabase.equals(cronInSchedule)) {
+            LOG.info("Cron expression for config {} with jobKey {} has been changed from {}  to {}. "
+                + "Restarting schedule", id, jobKey, cronInSchedule, cronInDatabase);
+            stopJob(jobKey);
+            startJob(alertConfig, jobKey);
+          }
+        }
+
+        // for all jobs with not isActive, and not isScheduled, no change required
       }
+
+      // for any scheduled jobs, not having a function in the database,
+      // stop the schedule, as function has been deleted
+      for (String scheduledJobKey : scheduledJobs) {
+        Long configId = getIdFromJobKey(scheduledJobKey);
+        EmailConfigurationDTO alertConfigSpec = emailConfigurationDAO.findById(configId);
+        if (alertConfigSpec == null) {
+          LOG.info("Found scheduled, but not in database {}", configId);
+          stopJob(scheduledJobKey);
+        }
+      }
+    } catch (SchedulerException e) {
+      LOG.error("Exception in reading active jobs", e);
     }
   }
 
-  public void stop() throws SchedulerException {
+  public void shutdown() throws SchedulerException {
+    scheduledExecutorService.shutdown();
     quartzScheduler.shutdown();
   }
 
@@ -95,15 +151,20 @@ public class AlertJobScheduler implements JobScheduler {
       throw new IllegalStateException("Alert config with id " + id + " is not active");
     }
     String jobKey = getJobKey(alertConfig.getId());
+    startJob(alertConfig, jobKey);
+  }
+
+  public void startJob(EmailConfigurationDTO alertConfig, String jobKey) throws SchedulerException {
+
     if (quartzScheduler.checkExists(JobKey.jobKey(jobKey))) {
-      throw new IllegalStateException("Alert config with id " + id + " is already scheduled");
+      throw new IllegalStateException("Alert config  " + jobKey + " is already scheduled");
     }
 
     AlertJobContext alertJobContext = new AlertJobContext();
     alertJobContext.setAnomalyJobDAO(anomalyJobDAO);
     alertJobContext.setAnomalyTaskDAO(anomalyTaskDAO);
     alertJobContext.setEmailConfigurationDAO(emailConfigurationDAO);
-    alertJobContext.setAlertConfigId(id);
+    alertJobContext.setAlertConfigId(alertConfig.getId());
     alertJobContext.setJobName(jobKey);
 
     scheduleJob(alertJobContext, alertConfig);
@@ -111,11 +172,15 @@ public class AlertJobScheduler implements JobScheduler {
 
   public void stopJob(Long id) throws SchedulerException {
     String jobKey = getJobKey(id);
+    stopJob(jobKey);
+  }
+
+  public void stopJob(String jobKey) throws SchedulerException {
     if (!quartzScheduler.checkExists(JobKey.jobKey(jobKey))) {
-      throw new IllegalStateException("Cannot stop alert config with id " + id + ", it has not been scheduled");
+      throw new IllegalStateException("Cannot stop alert config " + jobKey + ", it has not been scheduled");
     }
     quartzScheduler.deleteJob(JobKey.jobKey(jobKey));
-    LOG.info("Stopped alert config {}", id);
+    LOG.info("Stopped alert config {}", jobKey);
   }
 
   public void runAdHoc(Long id, DateTime windowStartTime, DateTime windowEndTime) {
@@ -175,5 +240,11 @@ public class AlertJobScheduler implements JobScheduler {
   private String getJobKey(Long id) {
     String jobKey = String.format("%s_%d", TaskType.ALERT, id);
     return jobKey;
+  }
+
+  private Long getIdFromJobKey(String jobKey) {
+    String[] tokens = jobKey.split("_");
+    String id = tokens[tokens.length - 1];
+    return Long.valueOf(id);
   }
 }
