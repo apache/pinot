@@ -229,18 +229,23 @@ public class PinotSegmentRestletResource extends BasePinotControllerRestletResou
       throws JsonProcessingException, JSONException {
 
     JSONArray ret = new JSONArray();
+    String tableNameWithType = null;
     if ((tableType == null || TableType.OFFLINE.name().equalsIgnoreCase(tableType))
         && _pinotHelixResourceManager.hasOfflineTable(tableName)) {
-      String offlineTableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
-      ret.put(toggleSegmentsForTable(offlineTableName, segmentName, state));
+      tableNameWithType = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
+
     }
 
     if ((tableType == null || TableType.REALTIME.name().equalsIgnoreCase(tableType))
         && _pinotHelixResourceManager.hasRealtimeTable(tableName)) {
-      String realTimeTableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName);
-      ret.put(toggleSegmentsForTable(realTimeTableName, segmentName, state));
+      tableNameWithType = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName);
     }
 
+    if (tableNameWithType != null) {
+      PinotResourceManagerResponse resourceManagerResponse = toggleSegmentsForTable(tableNameWithType, segmentName, state);
+      setStatus(resourceManagerResponse.isSuccessful() ? Status.SUCCESS_OK : Status.SERVER_ERROR_INTERNAL);
+      ret.put(resourceManagerResponse);
+    }
     return new StringRepresentation(ret.toString());
   }
 

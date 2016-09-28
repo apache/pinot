@@ -15,15 +15,8 @@
  */
 package com.linkedin.pinot.controller.helix.core;
 
-import java.util.Map;
-
 import org.json.JSONException;
 import org.json.JSONObject;
-
-
-/**
- * Sep 30, 2014
- */
 
 public class PinotResourceManagerResponse {
 
@@ -35,9 +28,8 @@ public class PinotResourceManagerResponse {
     failure;
   }
 
-  public String message = "DEFAULT_VAL";
+  public String message = "";
   public ResponseStatus status = ResponseStatus.failure;
-  public Map<String, String> metadata;
 
   public PinotResourceManagerResponse() {
   }
@@ -59,8 +51,8 @@ public class PinotResourceManagerResponse {
     }
   }
 
-  public boolean isSuccessfull() {
-    return status == ResponseStatus.success ? true : false;
+  public boolean isSuccessful() {
+    return status == ResponseStatus.success;
   }
 
   public JSONObject toJSON() throws JSONException {
@@ -70,11 +62,6 @@ public class PinotResourceManagerResponse {
       ret.put("message", message);
     } else {
       ret.put("errorMessage", message);
-    }
-    if (metadata != null) {
-      for (final String key : metadata.keySet()) {
-        ret.put(key, metadata.get(key));
-      }
     }
     return ret;
   }
