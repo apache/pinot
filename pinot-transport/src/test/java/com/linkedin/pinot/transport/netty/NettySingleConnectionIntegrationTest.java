@@ -283,8 +283,8 @@ public class NettySingleConnectionIntegrationTest {
       byte[] b2 = new byte[serverResp.readableBytes()];
       serverResp.readBytes(b2);
       String gotResponse = new String(b2);
-      Assert.assertEquals(gotResponse, response, "Response Check at client");
-      Assert.assertEquals(server.getHandler().getRequest(), request, "Request Check at server");
+      Assert.assertTrue(gotResponse.equals(response), "Response Check at client");
+      Assert.assertTrue(server.getHandler().getRequest().equals(request), "Request Check at server");
     } finally {
       if (null != clientConn) {
         clientConn.close();
