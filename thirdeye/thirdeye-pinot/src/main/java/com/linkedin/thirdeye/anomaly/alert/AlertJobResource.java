@@ -35,7 +35,7 @@ public class AlertJobResource {
 
   @GET
   public List<String> showActiveJobs() throws SchedulerException {
-    return alertJobScheduler.getActiveJobs();
+    return alertJobScheduler.getScheduledJobs();
   }
 
   @POST
@@ -78,5 +78,13 @@ public class AlertJobResource {
     }
     alertConfig.setActive(state);
     emailConfigurationDAO.update(alertConfig);
+  }
+
+  @POST
+  @Path("/{id}/restart")
+  public Response restart(@PathParam("id") Long id) throws Exception {
+    alertJobScheduler.stopJob(id);
+    alertJobScheduler.startJob(id);
+    return Response.ok().build();
   }
 }

@@ -34,8 +34,8 @@ public class DetectionJobResource {
   }
 
   @GET
-  public List<String> showActiveJobs() throws SchedulerException {
-    return detectionJobScheduler.getActiveJobs();
+  public List<String> showScheduledJobs() throws SchedulerException {
+    return detectionJobScheduler.getScheduledJobs();
   }
 
   @POST
@@ -78,5 +78,13 @@ public class DetectionJobResource {
     }
     anomalyFunctionSpec.setIsActive(state);
     anomalyFunctionSpecDAO.update(anomalyFunctionSpec);
+  }
+
+  @POST
+  @Path("/{id}/restart")
+  public Response restart(@PathParam("id") Long id) throws Exception {
+    detectionJobScheduler.stopJob(id);
+    detectionJobScheduler.startJob(id);
+    return Response.ok().build();
   }
 }
