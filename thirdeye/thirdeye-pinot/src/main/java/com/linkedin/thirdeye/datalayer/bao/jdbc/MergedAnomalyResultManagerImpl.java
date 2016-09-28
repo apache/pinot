@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.datalayer.bao.jdbc;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -84,6 +85,9 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
     EmailConfigurationBean emailConfigurationBean =
         genericPojoDao.get(emailConfigId, EmailConfigurationBean.class);
     List<Long> functionIds = emailConfigurationBean.getFunctionIds();
+    if (functionIds == null || functionIds.isEmpty()) {
+      return Collections.emptyList();
+    }
     Long[] functionIdArray = functionIds.toArray(new Long[] {});
     Predicate predicate = Predicate.AND(//
         Predicate.LT("startTime", endTime), //
