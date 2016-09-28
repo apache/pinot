@@ -40,6 +40,17 @@ public abstract class DaoProviderUtil {
     dataSource.setPassword(configuration.getDatabaseConfiguration().getPassword());
     dataSource.setUrl(configuration.getDatabaseConfiguration().getUrl());
     dataSource.setDriverClassName(configuration.getDatabaseConfiguration().getDriver());
+    
+    dataSource.setValidationQuery("select 1");
+    dataSource.setTestWhileIdle(true);
+    dataSource.setTestOnBorrow(true);
+    // when returning connection to pool
+    dataSource.setTestOnReturn(true);
+    dataSource.setRollbackOnReturn(true);
+
+    // Timeout before an abandoned(in use) connection can be removed.
+    dataSource.setRemoveAbandonedTimeout(600_000);
+    dataSource.setRemoveAbandoned(true);
     provider = new ManagerProvider(dataSource);
   }
 
