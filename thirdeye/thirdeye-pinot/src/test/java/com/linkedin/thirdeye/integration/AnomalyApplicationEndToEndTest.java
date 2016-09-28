@@ -229,7 +229,7 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
     startMerger();
 
     // check merged anomalies
-    Thread.sleep(10000);
+    Thread.sleep(2000);
     List<MergedAnomalyResultDTO> mergedAnomalies = mergedResultDAO.findByFunctionId(functionId);
     Assert.assertTrue(mergedAnomalies.size() > 0);
 
@@ -242,19 +242,15 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
       }
     }
     Assert.assertTrue(completedJobCount > 0);
-
     // stop schedulers
     cleanup();
   }
 
-
-  private void startMerger() {
+  private void startMerger() throws Exception {
     ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
-    anomalyMergeExecutor =
-        new AnomalyMergeExecutor(mergedResultDAO, anomalyFunctionDAO, rawResultDAO, executorService);
-    executorService.scheduleWithFixedDelay(anomalyMergeExecutor, 0, 1, TimeUnit.MINUTES);
+    anomalyMergeExecutor = new AnomalyMergeExecutor(mergedResultDAO, anomalyFunctionDAO, rawResultDAO, executorService);
+    executorService.scheduleWithFixedDelay(anomalyMergeExecutor, 0, 3, TimeUnit.SECONDS);
   }
-
 
   private void startMonitor() {
     monitorJobScheduler = new MonitorJobScheduler(jobDAO, taskDAO, thirdeyeAnomalyConfig.getMonitorConfiguration());
@@ -300,5 +296,4 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
       taskDriver.stop();
     }
   }
-
 }

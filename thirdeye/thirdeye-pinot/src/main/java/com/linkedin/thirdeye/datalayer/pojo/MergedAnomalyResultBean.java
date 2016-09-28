@@ -2,56 +2,24 @@ package com.linkedin.thirdeye.datalayer.pojo;
 
 import java.util.List;
 import java.util.Objects;
-
-import javax.persistence.Column;
-import javax.persistence.MappedSuperclass;
-import javax.persistence.Transient;
-
 import org.apache.commons.lang.ObjectUtils;
 
-@MappedSuperclass
 public class MergedAnomalyResultBean extends AbstractBean
     implements Comparable<MergedAnomalyResultBean> {
-
-  @Transient
   private Long functionId;
-
-  @Transient
   private Long anomalyFeedbackId;
-
-  @Transient
   private List<Long> rawAnomalyIdList;
-
-  @Column(name = "collection")
   private String collection;
-
-  @Column(name = "metric")
   private String metric;
-
-  @Column(name = "dimensions")
   private String dimensions;
-
-  @Column(name = "start_time", nullable = false)
   private Long startTime;
-
-  @Column(name = "end_time", nullable = false)
   private Long endTime;
-
   // significance level
-  @Column(name = "score", nullable = false)
   private double score;
-
   // severity
-  @Column(name = "weight", nullable = false)
   private double weight;
-
-  @Column(name = "created_time", nullable = false)
   private Long createdTime;
-
-  @Column(name = "message")
   private String message;
-
-  @Column(name = "notified")
   private boolean notified;
 
 

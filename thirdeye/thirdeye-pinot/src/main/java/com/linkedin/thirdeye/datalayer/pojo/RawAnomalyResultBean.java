@@ -2,58 +2,28 @@ package com.linkedin.thirdeye.datalayer.pojo;
 
 import java.util.Objects;
 
-import javax.persistence.Column;
-import javax.persistence.FetchType;
-import javax.persistence.JoinColumn;
-import javax.persistence.ManyToOne;
-import javax.persistence.MappedSuperclass;
-import javax.persistence.Transient;
-
 import org.apache.commons.lang.ObjectUtils;
 import org.joda.time.DateTime;
 
 import com.google.common.base.MoreObjects;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
 
-@MappedSuperclass
 public class RawAnomalyResultBean extends AbstractBean implements Comparable<RawAnomalyResultBean> {
 
-  @Transient
   private Long functionId;
-
-  @Transient
   private Long AnomalyFeedbackId;
-
-  @Column(name = "start_time_utc", nullable = false)
   private Long startTime;
-
-  @Column(name = "end_time_utc", nullable = true)
   private Long endTime;
-
-  @Column(name = "dimensions", nullable = false)
   private String dimensions;
 
   // significance level
-  @Column(name = "score", nullable = false)
   private double score;
 
   // severity
-  @Column(name = "weight", nullable = false)
   private double weight;
-
-  @Column(name = "properties", nullable = true)
   private String properties;
-
-  @Column(name = "message", nullable = true)
   private String message;
-
-  @Column(name = "creation_time_utc", nullable = false)
   private Long creationTimeUtc;
-
-  @Column(name = "data_missing")
   private boolean dataMissing;
-
-  @Column
   private boolean merged;
 
   public RawAnomalyResultBean() {

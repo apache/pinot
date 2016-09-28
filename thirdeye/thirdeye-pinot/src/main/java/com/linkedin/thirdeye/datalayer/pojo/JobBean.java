@@ -3,11 +3,6 @@ package com.linkedin.thirdeye.datalayer.pojo;
 import java.sql.Timestamp;
 import java.util.Objects;
 
-import javax.persistence.Column;
-import javax.persistence.EnumType;
-import javax.persistence.Enumerated;
-import javax.persistence.MappedSuperclass;
-
 import com.google.common.base.MoreObjects;
 import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
 
@@ -15,30 +10,14 @@ import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
  * This class corresponds to an anomaly job. An anomaly job is created for every execution of an
  * anomaly function spec An anomaly job consists of 1 or more anomaly tasks
  */
-@MappedSuperclass
 public class JobBean extends AbstractBean {
 
-  @Column(name = "job_name", nullable = false)
   private String jobName;
-
-  @Enumerated(EnumType.STRING)
-  @Column(name = "status", nullable = false)
   private JobStatus status;
-
-  @Column(name = "schedule_start_time")
   private long scheduleStartTime;
-
-  @Column(name = "schedule_end_time")
   private long scheduleEndTime;
-
-  @Column(name = "window_start_time")
   private long windowStartTime;
-
-  @Column(name = "window_end_time")
   private long windowEndTime;
-
-  @Column(name = "last_modified", insertable = false, updatable = false,
-      columnDefinition = "TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
   private Timestamp lastModified;
 
   public String getJobName() {

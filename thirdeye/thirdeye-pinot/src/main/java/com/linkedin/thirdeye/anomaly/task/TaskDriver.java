@@ -7,10 +7,6 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import javax.persistence.OptimisticLockException;
-import javax.persistence.RollbackException;
-
-import org.hibernate.StaleObjectStateException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -151,7 +147,7 @@ public class TaskDriver {
               .updateStatusAndWorkerId(workerId, anomalyTaskSpec.getId(), TaskStatus.WAITING,
                   TaskStatus.RUNNING);
           LOG.info(Thread.currentThread().getId() + " : Task acquired success: {}", success);
-        } catch (OptimisticLockException | RollbackException | StaleObjectStateException e) {
+        } catch (Exception e) {
           LOG.warn("[{}] in acquiring task by threadId {} and workerId {}",
               e.getClass().getSimpleName(), Thread.currentThread().getId(), workerId);
         }

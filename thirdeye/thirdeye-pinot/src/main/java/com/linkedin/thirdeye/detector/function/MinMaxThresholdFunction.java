@@ -24,8 +24,6 @@ import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
  * (strictly greater than)
  */
 public class MinMaxThresholdFunction extends BaseAnomalyFunction {
-  private static final Logger LOGGER =
-      LoggerFactory.getLogger(MinMaxThresholdFunction.class);
   public static final String DEFAULT_MESSAGE_TEMPLATE = "min=%s, max=%s, value %s, change %s";
   public static final String MIN_VAL = "min";
   public static final String MAX_VAL = "max";

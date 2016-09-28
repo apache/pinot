@@ -2,31 +2,17 @@ package com.linkedin.thirdeye.datalayer.pojo;
 
 import java.util.Objects;
 
-import javax.persistence.Column;
-import javax.persistence.EnumType;
-import javax.persistence.Enumerated;
-import javax.persistence.MappedSuperclass;
-
 import com.google.common.base.MoreObjects;
 import com.linkedin.thirdeye.dashboard.configs.WebappConfigFactory.WebappConfigType;
 
 /**
  * Entity class for webapp configs. name, collection, type conbination should be unique
  */
-@MappedSuperclass
 public class WebappConfigBean extends AbstractBean {
 
-  @Column(name = "name", nullable = false)
   private String name;
-
-  @Column(name = "collection", nullable = false)
   private String collection;
-
-  @Enumerated(EnumType.STRING)
-  @Column(name = "type", nullable = false)
   private WebappConfigType type;
-
-  @Column(name = "config", nullable = false, length = 10000)
   private String config;
 
   public String getName() {

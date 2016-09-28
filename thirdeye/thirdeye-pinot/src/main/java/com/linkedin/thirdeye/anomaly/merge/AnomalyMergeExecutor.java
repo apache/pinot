@@ -16,8 +16,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-import javax.persistence.PersistenceException;
-
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
@@ -192,7 +190,7 @@ public class AnomalyMergeExecutor implements Runnable {
       for (RawAnomalyResultDTO rawAnomalyResultDTO : mergedResult.getAnomalyResults()) {
         anomalyResultDAO.update(rawAnomalyResultDTO);
       }
-    } catch (PersistenceException e) {
+    } catch (Exception e) {
       LOG.error("Could not persist merged result : [" + mergedResult.toString() + "]", e);
     }
   }

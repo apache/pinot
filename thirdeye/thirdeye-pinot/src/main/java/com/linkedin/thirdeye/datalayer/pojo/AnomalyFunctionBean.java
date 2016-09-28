@@ -3,13 +3,6 @@ package com.linkedin.thirdeye.datalayer.pojo;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
-import javax.persistence.Column;
-import javax.persistence.EnumType;
-import javax.persistence.Enumerated;
-import javax.persistence.Index;
-import javax.persistence.MappedSuperclass;
-
-import javax.persistence.Transient;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -19,63 +12,41 @@ import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
-@MappedSuperclass
 @JsonIgnoreProperties(ignoreUnknown=true)
 public class AnomalyFunctionBean extends AbstractBean {
 
-  @Column(name = "collection", nullable = false)
   private String collection;
 
-  @Column(name = "function_name", nullable = false)
   private String functionName;
 
-  @Column(name = "metric", nullable = false)
   private String metric;
 
-  @Column(name = "metric_function", nullable = false)
-  @Enumerated(EnumType.STRING)
   private MetricAggFunction metricFunction;
 
-  @Column(name = "type", nullable = false)
   private String type;
 
-  @Column(name = "is_active", nullable = false)
   private boolean isActive = true;
 
-  @Column(name = "properties", nullable = true)
   private String properties;
 
-  @Column(name = "cron", nullable = false)
   private String cron;
 
-  @Column(name = "bucket_size", nullable = false)
   private Integer bucketSize;
 
-  @Column(name = "bucket_unit", nullable = false)
-  @Enumerated(EnumType.STRING)
   private TimeUnit bucketUnit;
 
-  @Column(name = "window_size", nullable = false)
   private Integer windowSize;
 
-  @Column(name = "window_unit", nullable = false)
-  @Enumerated(EnumType.STRING)
   private TimeUnit windowUnit;
 
-  @Column(name = "window_delay", nullable = false)
   private Integer windowDelay;
 
-  @Column(name = "window_delay_unit", nullable = false)
-  @Enumerated(EnumType.STRING)
   private TimeUnit windowDelayUnit;
 
-  @Column(name = "explore_dimensions", nullable = true)
   private String exploreDimensions;
 
-  @Column(name = "filters", nullable = true)
   private String filters;
 
-  @Transient
   private long metricId;
 
   public long getMetricId() {

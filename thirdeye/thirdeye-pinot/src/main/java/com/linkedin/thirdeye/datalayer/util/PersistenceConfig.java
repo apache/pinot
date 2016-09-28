@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.common.persistence;
+package com.linkedin.thirdeye.datalayer.util;
 
 import java.util.Map;
 

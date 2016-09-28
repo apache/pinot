@@ -3,27 +3,16 @@ package com.linkedin.thirdeye.datalayer.pojo;
 import java.io.Serializable;
 import java.util.Objects;
 
-import javax.persistence.Column;
-import javax.persistence.EnumType;
-import javax.persistence.Enumerated;
-import javax.persistence.MappedSuperclass;
-
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
 import com.linkedin.thirdeye.constant.FeedbackStatus;
 
-@MappedSuperclass
 public class AnomalyFeedbackBean extends AbstractBean implements Serializable {
   private static final long serialVersionUID = 1L;
 
-  @Column(name = "feedback_type", nullable = false)
-  @Enumerated(EnumType.STRING)
   private AnomalyFeedbackType feedbackType;
 
-  @Column(name = "status", nullable = false)
-  @Enumerated(EnumType.STRING)
   private FeedbackStatus status;
 
-  @Column(name = "comment", length = 500)
   private String comment;
 
   public AnomalyFeedbackType getFeedbackType() {
