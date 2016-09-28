@@ -28,8 +28,8 @@ import java.util.Random;
 /**
  * Test Conversion between Hll and String type
  */
-public class TestHllTypeConversion {
-  private static final Logger LOGGER = LoggerFactory.getLogger(TestHllTypeConversion.class);
+public class HllTypeConversionTest {
+  private static final Logger LOGGER = LoggerFactory.getLogger(HllTypeConversionTest.class);
   private static Charset charset = Charset.forName("UTF-8");
   private Random rand = new Random();
 

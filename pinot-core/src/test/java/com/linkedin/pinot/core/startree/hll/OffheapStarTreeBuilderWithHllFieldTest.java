@@ -31,9 +31,9 @@ import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 
-public class TestOffheapStarTreeBuilderWithHllField {
+public class OffheapStarTreeBuilderWithHllFieldTest {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(TestOffheapStarTreeBuilderWithHllField.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(OffheapStarTreeBuilderWithHllFieldTest.class);
   private static final long randomSeed = 31; // a fixed value
 
   private final String memberIdFieldName = "id";

@@ -46,8 +46,8 @@ import org.testng.annotations.Test;
 /**
  * Dictionary Index Size for Hll Field is roughly 10 times of the corresponding index for Long field.
  */
-public class TestHllIndexCreation {
-  private static final Logger LOGGER = LoggerFactory.getLogger(TestHllIndexCreation.class);
+public class HllIndexCreationTest {
+  private static final Logger LOGGER = LoggerFactory.getLogger(HllIndexCreationTest.class);
   private static final String hllDeriveColumnSuffix = HllConstants.DEFAULT_HLL_DERIVE_COLUMN_SUFFIX;
 
   // change this to change the columns that need to create hll index on
@@ -187,14 +187,6 @@ public class TestHllIndexCreation {
       Assert.assertEquals(SegmentVersion.v3,
           SegmentVersion.valueOf(indexSegment.getSegmentMetadata().getVersion()));
 
-      FileTime afterLoadTime = Files.getLastModifiedTime(v3Location.toPath());
-      Assert.assertEquals(afterConversionTime, afterLoadTime);
-      // check that the loader can load original segment
-      IndexSegment v2IndexSegment = Loaders.IndexSegment.load(segmentDirectory, ReadMode.mmap, v1LoadingConfig);
-      Assert.assertNotNull(v2IndexSegment);
-      Assert.assertEquals(SegmentVersion.valueOf(v2IndexSegment.getSegmentMetadata().getVersion()),
-          SegmentVersion.v1);
-      Assert.assertTrue(v3Location.exists());
     } finally {
       if (helper != null) {
         helper.cleanTempDir();
