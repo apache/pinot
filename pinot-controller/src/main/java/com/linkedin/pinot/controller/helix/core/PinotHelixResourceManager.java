@@ -948,36 +948,10 @@ public class PinotHelixResourceManager {
          * We also need to support the case when a high-level consumer already exists for a table and we are adding
          * the low-level consumers.
          */
-        KafkaStreamMetadata kafkaStreamMetadata = new KafkaStreamMetadata(config.getIndexingConfig().getStreamConfigs());
-        IdealState idealState =  _helixAdmin.getResourceIdealState(_helixClusterName, realtimeTableName);
+        IndexingConfig indexingConfig = config.getIndexingConfig();
+        ensureRealtimeClusterIsSetUp(config, realtimeTableName, indexingConfig);
 
-        if (kafkaStreamMetadata.hasHighLevelKafkaConsumerType()) {
-         if (kafkaStreamMetadata.hasSimpleKafkaConsumerType()) {
-           // We may be adding on low-level, or creating both.
-           if (idealState == null) {
-             // Need to create both. Create high-level consumer first.
-             createHelixEntriesForHighLevelConsumer(config, realtimeTableName);
-             idealState =  _helixAdmin.getResourceIdealState(_helixClusterName, realtimeTableName);
-           }
-           // Fall through to create low-level consumers
-         } else {
-           // Only high-level consumer specified in the config.
-           if (idealState != null) {
-             throw new RuntimeException("Table " + realtimeTableName + " already present");
-           }
-           createHelixEntriesForHighLevelConsumer(config, realtimeTableName);
-         }
-        }
-        // Either we have only low-level consumer, or both.
-        if (kafkaStreamMetadata.hasSimpleKafkaConsumerType()) {
-          // Will either create idealstate entry, or update the IS entry with new segments
-          // (unless there are low-level segments already present)
-          PinotTableIdealStateBuilder.buildLowLevelRealtimeIdealStateFor(realtimeTableName, config, _helixAdmin,
-              _helixClusterName, idealState);
-          LOGGER.info("Successfully added  helix entries for low-level consumers for {} ", realtimeTableName);
-        }
-
-        LOGGER.info("Successfully added  or updated the table {} ", realtimeTableName);
+        LOGGER.info("Successfully added or updated the table {} ", realtimeTableName);
         break;
       default:
         throw new RuntimeException("UnSupported table type");
@@ -985,17 +959,60 @@ public class PinotHelixResourceManager {
     handleBrokerResource(config);
   }
 
-  private void createHelixEntriesForHighLevelConsumer(AbstractTableConfig config, String realtimeTableName) {
-    IdealState idealState;
-    idealState = PinotTableIdealStateBuilder
-        .buildInitialHighLevelRealtimeIdealStateFor(realtimeTableName, config, _helixAdmin, _helixClusterName,
-            _propertyStore);
-    LOGGER.info("Adding helix resource with empty IdealState for {}", realtimeTableName);
-    _helixAdmin.addResource(_helixClusterName, realtimeTableName, idealState);
+  private void ensureRealtimeClusterIsSetUp(AbstractTableConfig config, String realtimeTableName,
+      IndexingConfig indexingConfig) {
+    KafkaStreamMetadata kafkaStreamMetadata = new KafkaStreamMetadata(indexingConfig.getStreamConfigs());
+    IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, realtimeTableName);
+
+    if (kafkaStreamMetadata.hasHighLevelKafkaConsumerType()) {
+     if (kafkaStreamMetadata.hasSimpleKafkaConsumerType()) {
+       // We may be adding on low-level, or creating both.
+       if (idealState == null) {
+         // Need to create both. Create high-level consumer first.
+         createHelixEntriesForHighLevelConsumer(config, realtimeTableName, idealState);
+         idealState = _helixAdmin.getResourceIdealState(_helixClusterName, realtimeTableName);
+         LOGGER.info("Configured new HLC for table {}", realtimeTableName);
+       }
+       // Fall through to create low-level consumers
+     } else {
+       // Only high-level consumer specified in the config.
+       createHelixEntriesForHighLevelConsumer(config, realtimeTableName, idealState);
+     }
+    }
+
+    // Either we have only low-level consumer, or both.
+    if (kafkaStreamMetadata.hasSimpleKafkaConsumerType()) {
+      // Will either create idealstate entry, or update the IS entry with new segments
+      // (unless there are low-level segments already present)
+      final String llcKafkaPartitionAssignmentPath = ZKMetadataProvider.constructPropertyStorePathForKafkaPartitions(realtimeTableName);
+      if(!_propertyStore.exists(llcKafkaPartitionAssignmentPath, AccessOption.PERSISTENT)) {
+        PinotTableIdealStateBuilder.buildLowLevelRealtimeIdealStateFor(realtimeTableName, config, _helixAdmin,
+            _helixClusterName, idealState);
+        LOGGER.info("Successfully added Helix entries for low-level consumers for {} ", realtimeTableName);
+      } else {
+        LOGGER.info("LLC is already set up for table {}, not configuring again", realtimeTableName);
+      }
+    }
+  }
+
+  private void createHelixEntriesForHighLevelConsumer(AbstractTableConfig config, String realtimeTableName,
+      IdealState idealState) {
+    if (idealState == null) {
+      idealState = PinotTableIdealStateBuilder
+          .buildInitialHighLevelRealtimeIdealStateFor(realtimeTableName, config, _helixAdmin, _helixClusterName,
+              _propertyStore);
+      LOGGER.info("Adding helix resource with empty HLC IdealState for {}", realtimeTableName);
+      _helixAdmin.addResource(_helixClusterName, realtimeTableName, idealState);
+    } else {
+      // TODO jfim: We get in this block if we're trying to add a HLC or it already exists. If it doesn't already exist, we need to set instance configs properly (which is done in buildInitialHighLevelRealtimeIdealState, surprisingly enough). For now, do nothing.
+      LOGGER.info("Not reconfiguring HLC for table {}", realtimeTableName);
+    }
     LOGGER.info("Successfully created empty ideal state for  high level consumer for {} ", realtimeTableName);
     // Finally, create the propertystore entry that will trigger watchers to create segments
-    _propertyStore.create(ZKMetadataProvider.constructPropertyStorePathForResource(realtimeTableName),
-        new ZNRecord(realtimeTableName), AccessOption.PERSISTENT);
+    String tablePropertyStorePath = ZKMetadataProvider.constructPropertyStorePathForResource(realtimeTableName);
+    if (!_propertyStore.exists(tablePropertyStorePath, AccessOption.PERSISTENT)) {
+      _propertyStore.create(tablePropertyStorePath, new ZNRecord(realtimeTableName), AccessOption.PERSISTENT);
+    }
   }
 
   private void setTableConfig(AbstractTableConfig config, String tableNameWithSuffix, TableType type)
@@ -1060,6 +1077,10 @@ public class PinotHelixResourceManager {
     }
 
     setTableConfig(config, actualTableName, type);
+
+    if (type == TableType.REALTIME) {
+      ensureRealtimeClusterIsSetUp(config, tableName, newConfigs);
+    }
   }
 
   private void handleBrokerResource(AbstractTableConfig tableConfig) {
