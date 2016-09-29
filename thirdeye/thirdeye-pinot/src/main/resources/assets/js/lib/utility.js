@@ -40,7 +40,7 @@ function getData(url, tab) {
 }
 
 
-function getDataCustomCallback(url, tab, callback) {
+function getDataCustomCallback(url, tab) {
     console.log("request url:", url)
 
     tab = tab ? tab : hash.view;
