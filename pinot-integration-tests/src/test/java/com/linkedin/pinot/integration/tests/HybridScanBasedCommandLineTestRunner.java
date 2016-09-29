@@ -53,7 +53,7 @@ import com.linkedin.pinot.common.data.Schema;
 public class HybridScanBasedCommandLineTestRunner {
 
   public static void usage() {
-    System.err.println("Usage: pinot-hybrid-cluster.sh [--record] tableName schemaFilePath segQueryDirPath invIndexCols sortedCol");
+    System.err.println("Usage: pinot-hybrid-cluster.sh [--llc] [--record] tableName schemaFilePath segQueryDirPath invIndexCols sortedCol");
     System.exit(1);
   }
 
@@ -63,15 +63,19 @@ public class HybridScanBasedCommandLineTestRunner {
     }
     int expectedArgsLen = 5;
     int ix = 0;
-    if (args[0].startsWith("-")) {
-      if (args[0].equals("--record")) {
-        ix++;
-        expectedArgsLen++;
-        CustomHybridClusterScanComparisonIntegrationTest._recordScanResponses = true;
-      } else {
-        usage();
-      }
+    // Parse optional arguments first.
+    while (args[ix].startsWith("-")) {
+        if (args[ix].equals("--record")) {
+          CustomHybridClusterScanComparisonIntegrationTest._recordScanResponses = true;
+        } else if (args[ix].equals("--llc")) {
+          CustomHybridClusterScanComparisonIntegrationTest._useLlc = true;
+        } else {
+          usage();
+        }
+      ix++;
+      expectedArgsLen++;
     }
+
     if (args.length != expectedArgsLen) {
       usage();
     }
@@ -119,6 +123,7 @@ public class HybridScanBasedCommandLineTestRunner {
     private static String _logFileName;
     private static boolean _inCmdLine = false;
     private static boolean _recordScanResponses = false;  // Must be done in single-threaded mode if true
+    private static boolean _useLlc = false;  // Whether to use kafka low-level consumer
     private static boolean _compareWithRspFile = true;
     private static String _scanRspFilePath;
 
@@ -185,6 +190,15 @@ public class HybridScanBasedCommandLineTestRunner {
     }
 
     @Override
+    protected int getKafkaPartitionCount() {
+      if (_useLlc) {
+        return 2;
+      } else {
+        return 10;
+      }
+    }
+
+    @Override
     @BeforeClass
     public void setUp() throws Exception {
       if (!_inCmdLine) {
@@ -227,6 +241,11 @@ public class HybridScanBasedCommandLineTestRunner {
         _scanRspFileWriter.close();
       }
       super.tearDown();
+    }
+
+    @Override
+    protected boolean shouldUseLlc() {
+      return _useLlc;
     }
 
     @Override

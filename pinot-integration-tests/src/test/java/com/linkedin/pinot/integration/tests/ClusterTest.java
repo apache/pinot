@@ -15,25 +15,6 @@
  */
 package com.linkedin.pinot.integration.tests;
 
-import com.linkedin.pinot.broker.broker.BrokerTestUtils;
-import com.linkedin.pinot.broker.broker.helix.HelixBrokerStarter;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.request.helper.ControllerRequestBuilder;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource.Realtime.Kafka;
-import com.linkedin.pinot.common.utils.CommonConstants.Server;
-import com.linkedin.pinot.common.utils.FileUploadUtils;
-import com.linkedin.pinot.common.utils.ZkStarter;
-import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
-import com.linkedin.pinot.controller.helix.ControllerTest;
-import com.linkedin.pinot.controller.helix.ControllerTestUtils;
-import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.indexsegment.utils.AvroUtils;
-import com.linkedin.pinot.core.realtime.impl.kafka.AvroRecordToPinotRowGenerator;
-import com.linkedin.pinot.core.realtime.impl.kafka.KafkaMessageDecoder;
-import com.linkedin.pinot.server.starter.helix.DefaultHelixStarterServerConfig;
-import com.linkedin.pinot.server.starter.helix.HelixServerStarter;
 import java.io.File;
 import java.io.FileInputStream;
 import java.util.ArrayList;
@@ -50,6 +31,26 @@ import org.apache.commons.configuration.Configuration;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.linkedin.pinot.broker.broker.BrokerTestUtils;
+import com.linkedin.pinot.broker.broker.helix.HelixBrokerStarter;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.request.helper.ControllerRequestBuilder;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource.Realtime.Kafka;
+import com.linkedin.pinot.common.utils.CommonConstants.Server;
+import com.linkedin.pinot.common.utils.FileUploadUtils;
+import com.linkedin.pinot.common.utils.KafkaStarterUtils;
+import com.linkedin.pinot.common.utils.ZkStarter;
+import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
+import com.linkedin.pinot.controller.helix.ControllerTest;
+import com.linkedin.pinot.controller.helix.ControllerTestUtils;
+import com.linkedin.pinot.core.data.GenericRow;
+import com.linkedin.pinot.core.indexsegment.utils.AvroUtils;
+import com.linkedin.pinot.core.realtime.impl.kafka.AvroRecordToPinotRowGenerator;
+import com.linkedin.pinot.core.realtime.impl.kafka.KafkaMessageDecoder;
+import com.linkedin.pinot.server.starter.helix.DefaultHelixStarterServerConfig;
+import com.linkedin.pinot.server.starter.helix.HelixServerStarter;
 
 
 /**
@@ -212,21 +213,21 @@ public abstract class ClusterTest extends ControllerTest {
       String brokerTenant, File avroFile, int realtimeSegmentFlushSize, String sortedColumn,
       List<String> invertedIndexColumns, String loadMode)
       throws Exception {
-    JSONObject metadata = new JSONObject();
-    metadata.put("streamType", "kafka");
-    metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.CONSUMER_TYPE, Kafka.ConsumerType.highLevel.toString());
-    metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.TOPIC_NAME, kafkaTopic);
-    metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.DECODER_CLASS,
+    JSONObject streamConfig = new JSONObject();
+    streamConfig.put("streamType", "kafka");
+    streamConfig.put(DataSource.STREAM_PREFIX + "." + Kafka.CONSUMER_TYPE, Kafka.ConsumerType.highLevel.toString());
+    streamConfig.put(DataSource.STREAM_PREFIX + "." + Kafka.TOPIC_NAME, kafkaTopic);
+    streamConfig.put(DataSource.STREAM_PREFIX + "." + Kafka.DECODER_CLASS,
         AvroFileSchemaKafkaAvroMessageDecoder.class.getName());
-    metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.ZK_BROKER_URL, kafkaZkUrl);
-    metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.HighLevelConsumer.ZK_CONNECTION_STRING, kafkaZkUrl);
-    metadata.put(DataSource.Realtime.REALTIME_SEGMENT_FLUSH_SIZE, Integer.toString(realtimeSegmentFlushSize));
-    metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.KAFKA_CONSUMER_PROPS_PREFIX + "." + "auto.offset.reset",
+    streamConfig.put(DataSource.STREAM_PREFIX + "." + Kafka.ZK_BROKER_URL, kafkaZkUrl);
+    streamConfig.put(DataSource.STREAM_PREFIX + "." + Kafka.HighLevelConsumer.ZK_CONNECTION_STRING, kafkaZkUrl);
+    streamConfig.put(DataSource.Realtime.REALTIME_SEGMENT_FLUSH_SIZE, Integer.toString(realtimeSegmentFlushSize));
+    streamConfig.put(DataSource.STREAM_PREFIX + "." + Kafka.KAFKA_CONSUMER_PROPS_PREFIX + "." + "auto.offset.reset",
         "smallest");
 
     JSONObject request = ControllerRequestBuilder.buildCreateRealtimeTableJSON(tableName, serverTenant, brokerTenant,
         timeColumnName, timeColumnType, retentionTimeUnit, Integer.toString(retentionDays), 1,
-        "BalanceNumSegmentAssignmentStrategy", metadata, schemaName, sortedColumn, invertedIndexColumns, null, true);
+        "BalanceNumSegmentAssignmentStrategy", streamConfig, schemaName, sortedColumn, invertedIndexColumns, null, true);
     sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTableCreate(), request.toString());
 
     AvroFileSchemaKafkaAvroMessageDecoder.avroFile = avroFile;
@@ -258,11 +259,18 @@ public abstract class ClusterTest extends ControllerTest {
 
   protected void addHybridTable(String tableName, String timeColumnName, String timeColumnType, String kafkaZkUrl,
       String kafkaTopic, String schemaName, String serverTenant, String brokerTenant, File avroFile,
-      String sortedColumn, List<String> invertedIndexColumns, String loadMode) throws Exception {
+      String sortedColumn, List<String> invertedIndexColumns, String loadMode, boolean useLlc) throws Exception {
     int retentionDays = -1;
     String retentionTimeUnit = "";
-    addRealtimeTable(tableName, timeColumnName, timeColumnType, retentionDays, retentionTimeUnit, kafkaZkUrl,
-        kafkaTopic, schemaName, serverTenant, brokerTenant, avroFile, 20000, sortedColumn, invertedIndexColumns, loadMode);
+    if (useLlc) {
+      addLLCRealtimeTable(tableName, timeColumnName, timeColumnType, retentionDays, retentionTimeUnit, KafkaStarterUtils.DEFAULT_KAFKA_BROKER,
+          kafkaTopic, schemaName, serverTenant, brokerTenant, avroFile, 5000,
+          sortedColumn, invertedIndexColumns, loadMode);
+    } else {
+      addRealtimeTable(tableName, timeColumnName, timeColumnType, retentionDays, retentionTimeUnit, kafkaZkUrl,
+          kafkaTopic, schemaName, serverTenant, brokerTenant, avroFile, 20000, sortedColumn, invertedIndexColumns,
+          loadMode);
+    }
     addOfflineTable(tableName, timeColumnName, timeColumnType, retentionDays, retentionTimeUnit, brokerTenant,
         serverTenant, invertedIndexColumns, loadMode);
   }

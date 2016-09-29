@@ -15,13 +15,6 @@
  */
 package com.linkedin.pinot.integration.tests;
 
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.utils.FileUploadUtils;
-import com.linkedin.pinot.common.utils.KafkaStarterUtils;
-import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
-import com.linkedin.pinot.common.utils.ZkStarter;
-import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
 import java.io.FileInputStream;
 import java.sql.ResultSet;
@@ -35,7 +28,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import kafka.server.KafkaServerStartable;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.ExternalViewChangeListener;
 import org.apache.helix.HelixManager;
@@ -47,6 +39,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.utils.FileUploadUtils;
+import com.linkedin.pinot.common.utils.KafkaStarterUtils;
+import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
+import com.linkedin.pinot.common.utils.ZkStarter;
+import com.linkedin.pinot.util.TestUtils;
+import kafka.server.KafkaServerStartable;
 
 
 /**
@@ -94,7 +94,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
     ensureDirectoryExistsAndIsEmpty(_tarDir);
 
     // Start Zk, Kafka and Pinot
-    startHybridCluster();
+    startHybridCluster(10);
 
     // Unpack the Avro files
     TarGzCompressionUtils.unTar(
@@ -113,7 +113,8 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
 
     // Create Pinot table
     addHybridTable("mytable", "DaysSinceEpoch", "daysSinceEpoch", KafkaStarterUtils.DEFAULT_ZK_STR, KAFKA_TOPIC,
-        schema.getSchemaName(), TENANT_NAME, TENANT_NAME, avroFiles.get(0), sortedColumn, invertedIndexColumns, null);
+        schema.getSchemaName(), TENANT_NAME, TENANT_NAME, avroFiles.get(0), sortedColumn, invertedIndexColumns, null,
+        false);
     LOGGER.info("Running with Sorted column=" + sortedColumn + " and inverted index columns = " + invertedIndexColumns);
 
     // Create a subset of the first 8 segments (for offline) and the last 6 segments (for realtime)
@@ -194,6 +195,10 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
     rs.close();
 
     waitForRecordCountToStabilizeToExpectedCount(h2RecordCount, timeInFiveMinutes);
+  }
+
+  protected boolean shouldUseLlc() {
+    return false;
   }
 
   /**
@@ -277,7 +282,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
     return offlineAvroFiles;
   }
 
-  protected void startHybridCluster() throws Exception {
+  protected void startHybridCluster(int partitionCount) throws Exception {
     // Start Zk and Kafka
     startZk();
     kafkaStarter =
@@ -285,7 +290,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
             KafkaStarterUtils.DEFAULT_ZK_STR, KafkaStarterUtils.getDefaultKafkaConfiguration());
 
     // Create Kafka topic
-    KafkaStarterUtils.createTopic(KAFKA_TOPIC, KafkaStarterUtils.DEFAULT_ZK_STR, 10);
+    KafkaStarterUtils.createTopic(KAFKA_TOPIC, KafkaStarterUtils.DEFAULT_ZK_STR, partitionCount);
 
     // Start the Pinot cluster
     startController(true);
