@@ -86,10 +86,7 @@ public class DetectionTaskRunner implements TaskRunner {
     Map<DimensionKey, MetricTimeSeries> res =
         timeSeriesResponseConverter.toMap(finalResponse, collectionDimensions);
     for (Map.Entry<DimensionKey, MetricTimeSeries> entry : res.entrySet()) {
-      if (entry.getValue().getTimeWindowSet().size() < 2) {
-        LOG.warn("Insufficient data for {} to run anomaly detection function", entry.getKey());
-        continue;
-      }
+
       try {
         // Run algorithm
         DimensionKey dimensionKey = entry.getKey();
