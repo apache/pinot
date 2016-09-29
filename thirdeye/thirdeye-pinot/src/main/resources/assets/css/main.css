@@ -262,7 +262,9 @@ body a{
     text-overflow: ellipsis;
 }
 
-.added-item{
+.added-item,
+.remove-linked-function,
+.add-unlinked-function{
     margin: 5px 0 5px 5px;
     max-width: 100%;
     overflow-wrap: break-word;
@@ -362,7 +364,8 @@ body a{
    margin-left: 10px;
 }
 
-#configure-form-table td{
+#configure-functions-form-table td,
+#configure-emails-form-table td{
     padding: 0 10px 15px 10px;
 
 }
@@ -1007,6 +1010,27 @@ body a{
 #existing-anomaly-functions-table  .properties-cell,
 #existing-anomaly-functions-table  .existing-anomaly-fn-filters-cell{
     border-top: none;
+}
+
+.multiselect-header{
+    width:49%;
+    margin:0 auto;
+    background: #ddd;
+    display: inline-block;
+    padding-top:5px;
+    border: 1px solid #ddd;
+    border-radius: 5px 5px 0 0;
+}
+
+.multiselect-content-box{
+    width:49%;
+    overflow-y: scroll;
+    height: 150px;
+    margin:0 auto;
+    border: 1px solid #ddd;
+    border-radius: 0 0 5px 5px;
+    display: inline-block;
+    vertical-align: top;
 }
 
 /* D3 START*/

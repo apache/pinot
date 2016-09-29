@@ -7,7 +7,7 @@
                    <h2>Create anomaly function</h2>
                </div>
            {{/if}}
-    <table id="configure-form-table">
+    <table id="configure-functions-form-table">
             {{#if data/id}}
             <tr>
                <td>

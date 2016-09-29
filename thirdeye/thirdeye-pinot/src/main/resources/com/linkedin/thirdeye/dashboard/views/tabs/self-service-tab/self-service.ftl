@@ -84,5 +84,70 @@
                     </div>
                 </div>
             </li>
+            <li id="manage-alerts">
+                <div class="title-box full-width" style="margin-top:15px;">
+                    <h2>Manage Alerts</h2>
+                </div>
+                <table id="configure-emails-form-table" class="uk-form">
+                    <tr>
+                        <td>Dataset
+                        </td>
+                        <td>
+                            <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false"
+                                 class="uk-button-group">
+                                <div id="collection" class="selected-dataset uk-button" value="">Select dataset
+                                </div>
+                                <div class="uk-button uk-button-primary" type="button"><i
+                                        class="uk-icon-caret-down"></i>
+                                </div>
+                                <div class="landing-dataset uk-dropdown uk-dropdown-small uk-dropdown-bottom"
+                                     style="top: 30px; left: 0px;">
+                                </div>
+                            </div>
+                        </td>
+
+                        <td>Metric</td>
+                        <td>
+                            <div data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false"
+                                 class="uk-button-group">
+                                <div id="selected-metric" class="uk-button" data-uk-tooltip title="">Select metric</div>
+                                <button class="add-single-metric-btn uk-button uk-button-primary" type="button"><i
+                                        class="uk-icon-caret-down"></i></button>
+                                <div class="uk-dropdown uk-dropdown-small">
+                                    <ul class="metric-list single-metric-list uk-nav uk-nav-dropdown single-select">
+                                    </ul>
+                                </div>
+                            </div>
+                        </td>
+                        <td></td>
+                    </tr>
+                    <tr>
+                        <td>Alert <br>recipients</td>
+                        <td colspan="3">
+                            <textarea id='to-address' maxlength="1000" style="width:100%; min-height:90px;"></textarea><input type='hidden' id='email-id' name='emailId' value=''/>
+                            <div id="manage-alerts-error" class="uk-alert uk-alert-danger hidden">
+                                <p></p>
+                            </div>
+                            <div id="manage-alerts-success" class="uk-alert uk-alert-success hidden">
+                                <p>Success</p>
+                            </div>
+                        </td>
+                        <td>
+                            <button id="save-emails" class="uk-button uk-button-primary" type='button'>Update recipients
+                            </button>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colspan="5" style="text-align: center;">
+                        <div class="multiselect-header">Linked functions</div>
+                        <div class="multiselect-header">Unlinked functions</div>
+
+                            <div class="multiselect-content-box"><ul id="linked-functions"></ul></div>
+                            <div class="multiselect-content-box"><ul id="unlinked-functions"></ul></div>
+                        </td>
+                    </tr>
+                </table>
+
+            </li>
         </ul>
 </section>

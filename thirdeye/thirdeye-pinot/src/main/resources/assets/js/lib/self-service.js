@@ -318,6 +318,43 @@ function addSelfServiceListeners() {
 
     });
 
+    /** Manage alerts tab related listeners **/
+    $("#main-view").on("click", "#configure-emails-form-table .dataset-option", function(){
+       clear();
+       $("#configure-emails-form-table #selected-metric").html("Select metric");
+        if ($("#manage-alerts-error").attr("data-error-source") == "params") {
+            $("#manage-alerts-error").hide();
+        }
+        $("#manage-alerts-success").hide();
+    })
+
+    $("#main-view").on("click", "#configure-emails-form-table .metric-option", function(){
+        if ($("#manage-alerts-error").attr("data-error-source") == "params") {
+            $("#manage-alerts-error").hide();
+        }
+        $("#manage-alerts-success").hide();
+       fetchEmailIfPresent();
+    })
+
+    $("#self-service-forms-section").on("click", "#save-emails", function(){
+        saveEmailConfig();
+    })
+
+    $("#self-service-forms-section").on("click", ".add-to-linked-function", function(){
+        addFunctionToEmail( this );
+    })
+
+    $("#self-service-forms-section").on("keydown, click", "#to-address", function(){
+        if ($("#manage-alerts-error").attr("data-error-source") == "to-address") {
+            $("#manage-alerts-error").hide();
+        }
+        $("#manage-alerts-success").hide();
+    })
+
+    $("#self-service-forms-section").on("click", ".remove-linked-function", function(){
+        removeFunctionFromEmail( this );
+    })
+
     /** Event handlers **/
 
     function toggleFunctionTypeFields(target) {
@@ -433,7 +470,6 @@ function addSelfServiceListeners() {
         //WEEK_OVER_WEEK_RULE & MIN_MAX_THRESHOLD
         var filters = readFiltersAppliedInCurrentView("self-service", {form: form});
 
-        //Transform filters Todo: clarify if filters object should be consistent on FE and BE
         formData.filters = encodeURIComponent(JSON.stringify(filters));
         formData.exploreDimension = $("#self-service-view-single-dimension-selector #selected-dimension", form).attr("value");
 
@@ -647,7 +683,6 @@ function addSelfServiceListeners() {
                 }
         }
 
-
         //Check if repeatEverySize is positive integer
         function isPositiveInteger(str) {
             return /^\+?[1-9][\d]*$/.test(str);
@@ -683,11 +718,8 @@ function addSelfServiceListeners() {
             var isInteger = (typeof strNum === "number" && isFinite(strNum) &&  Math.floor(strNum) === strNum);
             return typeof strNum === "number" && isFinite(strNum) &&  Math.floor(strNum) === strNum;
         }
-
-
         return valid
     }
-
 
     //SUBMIT CREATED ANOMALY FUNCTION
     function createAnomalyFunction(callback) {
@@ -716,7 +748,6 @@ function addSelfServiceListeners() {
                     if(callback){
                         callback(id);
                     }
-
             })
         }
     }
@@ -778,7 +809,6 @@ function addSelfServiceListeners() {
                 .row($(".existing-function-row[data-function-id='" + functionId + "']"))
                 .remove()
                 .draw();
-
 
             var successMessage = $("#delete-anomaly-function-success");
             $("p", successMessage).html("success");

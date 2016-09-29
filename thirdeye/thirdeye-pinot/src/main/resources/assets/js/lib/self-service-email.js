@@ -1,62 +1,21 @@
-function renderEmailSelfService() {
-  $("#alert").append("<h3>Setup Alerts</h3><table> "
-      + "<tr><td>collection</td><td><select name='collection' id='collection' onchange='fillMetricForCollection()'>"
-      + "</select></td></tr> <tr><td>metric</td>"
-      + "<td><select name='metric' id='metric' onchange='fetchEmailIfPresent()'></select></td></tr>"
-      + "<tr><td>recipients</td><td><input type='text' name='toAddress' id='toAddress' size='80' />"
-      + "</td></tr><tr><td><input type='hidden' id='emailId' name='emailId' value='' />"
-      + "</td><td><input type='submit' name='save' id='submit' onclick='saveEmailConfig()' /></td></tr>"
-      + "</table></form><div id='email-functions'></div>");
-  renderDataSets();
-}
-
-function renderDataSets() {
-  getData("/dashboard/data/datasets", "alert").done(function (data) {
-    var select = "<option>Select</option>";
-    for (var i in data) {
-      select += "<option>" + data[i] + "</option>";
-    }
-    $("#collection").append(select);
-  });
-}
-
-function fillMetricForCollection() {
-  clear();
-  var collection = $("#collection").find(':selected').text();
-  if (collection === 'Select') {
-    clear();
-    $("#metric").empty();
-  } else {
-    getData("/dashboard/data/metrics?dataset=" + collection, "alert").done(function (data) {
-      var select = "<option>Select</option>";
-      for (var i in data) {
-        select += "<option>" + data[i] + "</option>";
-      }
-      clear();
-      $("#metric").empty();
-      $("#metric").append(select);
-    });
-  }
-}
-
 function fetchEmailIfPresent() {
-  console.log("fetching email details");
+
   clear();
-  var tab = "alert";
-  var collection = $("#collection").find(':selected').text();
-  var metric = $("#metric").find(':selected').text();
-  if (metric != 'Select') {
-    getData("/thirdeye/email?collection=" + collection + "&metric=" + metric, tab).done(
-        function (data) {
-          if (data == undefined || data.length == 0) {
-          } else {
-            var emailId = data[0].id;
-            var recipients = data[0].toAddresses;
-            $("#toAddress").val(recipients);
-            $("#emailId").val(emailId);
-            // get all functions for this metric/collection
-            getData("/dashboard/anomaly-function/view?dataset=" + collection + "&metric=" + metric,
-                tab).done(function (functionData) {
+  tab = "anomalies";
+  var dataset = hash.dataset;
+  var metric = $("#configure-emails-form-table #selected-metric").attr("value");
+
+  if (metric) {
+      getDataCustomCallback("/thirdeye/email?collection=" + dataset + "&metric=" + metric, tab)
+      .done(function (data) {
+          if ( data && data.length > 0){
+              var emailId = data[0].id;
+              var recipients = data[0].toAddresses;
+              $("#to-address").val(recipients);
+              $("#email-id").val(emailId);
+              // get all functions for this metric/dataset
+              getDataCustomCallback("/dashboard/anomaly-function/view?dataset=" + dataset + "&metric=" + metric, tab)
+              .done(function (functionData) {
 
               var linkedFunctionMap = new Object();
               var unlinkedFunctionMap = new Object();
@@ -67,38 +26,25 @@ function fetchEmailIfPresent() {
               var linkedFunctionNames = "";
               var unlinkedFunctionNames = "";
 
-              if (functions != undefined) {
-                for (var i in functions) {
-                  if (linkedFunctionNames != "") {
-                    linkedFunctionNames += ', ';
+              if (functions) {
+                  for (var k in functions) {
+                      linkedFunctionMap[functions[k].id] = functions[k].functionName;
+                      linkedFunctionNames += "<li class='remove-linked-function uk-button  uk-display-block' data-email-id='" + emailId + "'  data-fn-id='"+ functions[k].id + "' style='position:relative;'><a href='#'>" + functions[k].functionName + " <i style='position:absolute;top:5px; right:5px;' class='uk-icon-arrow-circle-right'></i></a></li>";
                   }
-                  linkedFunctionMap[functions[i].id] = functions[i].functionName;
-                  linkedFunctionNames += functions[i].functionName
-                      + "<a onclick='removeFunctionFromEmail(" + emailId + "," + functions[i].id
-                      + ")'>[-]</a>";
-                }
               }
 
-              if (functionData != undefined) {
-                for (var p in functionData) {
-                  if (linkedFunctionMap[functionData[p].id] == undefined) {
-                    if (unlinkedFunctionNames != "") {
-                      unlinkedFunctionNames += ', ';
-                    }
-                    unlinkedFunctionMap[functionData[p].id] = functionData[p].functionName;
-                    unlinkedFunctionNames += functionData[p].functionName
-                        + "<a onclick='addFunctionToEmail(" + emailId + "," + functionData[p].id
-                        + ")'>[+]</a>";
+              if (functionData) {
+                  for (var p in functionData) {
+                      if (typeof linkedFunctionMap[functionData[p].id] == "undefined") {
+                         unlinkedFunctionMap[functionData[p].id] = functionData[p].functionName;
+                         unlinkedFunctionNames +=  "<li class='add-to-linked-function uk-button uk-display-block' data-email-id='" + emailId + "'  data-fn-id='"+ functionData[p].id +"' style='position:relative;'><a href='#'><i style='position:absolute; top:5px; left:5px;' class='uk-icon-arrow-circle-left'></i>" + functionData[p].functionName + "</a></li>"
+                      }
                   }
-                }
               }
-              console.log(linkedFunctionMap);
-              console.log(unlinkedFunctionMap);
 
               if (linkedFunctionNames != "" || unlinkedFunctionNames != "") {
-                $("#email-functions").html(
-                    "<hr/>Linked Functions : " + linkedFunctionNames + "<br/>Unlinked Functions : "
-                    + unlinkedFunctionNames);
+                $("#linked-functions").html(linkedFunctionNames);
+                $("#unlinked-functions").html(unlinkedFunctionNames);
               }
             });
           }
@@ -107,54 +53,93 @@ function fetchEmailIfPresent() {
 }
 
 function clear() {
-  $("#toAddress").val("");
-  $("#email-functions").html("");
-  $("#emailId").val("");
+  $("#to-address").val("");
+  $("#linked-functions").html("");
+  $("#unlinked-functions").html("");
+  $("#email-id").val("");
 }
 
-function removeFunctionFromEmail(emailId, functionId) {
-  console.log("functionRemoved" + functionId);
+function removeFunctionFromEmail(target) {
+    var $target = $(target);
+    var emailId =  $target.attr("data-email-id");
+    var functionId = $target.attr("data-fn-id");
+
   submitData("/thirdeye/email/" + emailId + "/delete/" + functionId, "").done(function () {
     fetchEmailIfPresent();
   });
 }
 
-function addFunctionToEmail(emailId, functionId) {
-  console.log("functionAdded " + functionId);
+function addFunctionToEmail(target) {
+
+    var $target = $(target);
+    var emailId =  $target.attr("data-email-id");
+    var functionId = $target.attr("data-fn-id");
+
   submitData("/thirdeye/email/" + emailId + "/add/" + functionId, "").done(function () {
     fetchEmailIfPresent();
   });
 }
 
 function saveEmailConfig() {
-  var collection = $("#collection").find(':selected').text();
-  var metric = $("#metric").find(':selected').text();
-  var emailId = $("#emailId").val();
-  var toAddress = $("#toAddress").val();
 
-  var payload = "{";
-  if (collection != "Select" && metric != 'Select') {
-    if (emailId != '') {
-      payload += '"id" : ' + emailId + ",";
+    /* Validate form */
+    var errorMessage = $("#manage-alerts-error p");
+    var errorAlert = $("#manage-alerts-error");
+
+    var emailListStr = $("#to-address").val();
+    //Change ';' to ','
+    emailListStr =   emailListStr.replace(/\;/g, ',');
+    //Remove trailing comma
+    emailListStr =   emailListStr.replace(/\,$/, '');
+    var emailListAry = emailListStr.split(',');
+    var emailListToPost = [];
+    for (var n = 0; n < emailListAry.length; n++) {
+        var trim_email = $.trim(emailListAry[n]);
+
+
+        var validRegExp = /^\w+((-\w+)|(\.\w+))*\@[A-Za-z0-9]+((\.|-)[A-Za-z0-9]+)*\.[A-Za-z0-9]+$/;
+
+        if (trim_email.search(validRegExp) == -1) {
+            errorMessage.html('Address list contains an invalid value: "' + trim_email +'".');
+            errorAlert.attr("data-error-source", "to-address");
+            errorAlert.fadeIn(100);
+            return
+        }
+        emailListToPost.push(trim_email);
+
     }
-    payload += '"collection" : "' + collection + '",';
-    payload += '"metric" : "' + metric + '",';
-    payload += '"toAddresses" : "' + toAddress + '",';
-    payload += '"fromAddress" : "thirdeye-dev@linkedin.com",';
-    payload += '"cron" : "0 0 0/4 * * ?",';
-    payload += '"smtpHost" : "email.corp.linkedin.com",';
-    payload += '"active" : true,';
-    payload += '"windowDelay" : 0,';
-    payload += '"windowDelayUnit" : "MINUTES"';
-    payload += "}";
-    console.log(payload);
-    submitData("/thirdeye/email", payload, "alert").done(function (id) {
-      $("#emailId").val(id);
-      console.log(id);
-      fetchEmailIfPresent();
-    });
+    emailListStr = emailListToPost.join(",")
+
+    var dataset = hash.dataset;
+    var metric = $("#manage-alerts #selected-metric").attr("value");
+    var emailId = $("#email-id").val();
+    var toAddress = emailListStr;
+
+    var payload = "{";
+    if (dataset && metric) {
+        if (emailId != '') {
+          payload += '"id" : ' + emailId + ",";
+        }
+        payload += '"collection" : "' + dataset + '",';
+        payload += '"metric" : "' + metric + '",';
+        payload += '"toAddresses" : "' + toAddress + '",';
+        payload += '"fromAddress" : "thirdeye-dev@linkedin.com",';
+        payload += '"cron" : "0 0 0/4 * * ?",';
+        payload += '"smtpHost" : "email.corp.linkedin.com",';
+        payload += '"active" : true,';
+        payload += '"windowDelay" : 0,';
+        payload += '"windowDelayUnit" : "MINUTES"';
+        payload += "}";
+        submitData("/thirdeye/email", payload, "alert").done(function (id) {
+          $("#manage-alerts-success").fadeIn();
+          $("#email-id").val(id);
+          fetchEmailIfPresent();
+        });
   } else {
-    console.log("missing params");
+        errorMessage.html('Please select dataset and metric.');
+        errorAlert.attr("data-error-source", "params");
+        errorAlert.fadeIn(100);
+        return
   }
 }
 

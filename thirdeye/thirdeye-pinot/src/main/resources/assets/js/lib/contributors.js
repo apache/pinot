@@ -53,49 +53,8 @@ function getContributors(tab) {
 
         // Translate UTC date into user selected or local timezone
         transformUTCToTZ();
-
-
         displayFiltersInTitle()
 
-
-        // Select-all-checkbox will set the other checkboxes of
-        // the table to checked/ unchecked
-        /*  Hiding total till ratio metrics are handled */
-        /*$(".contributors-table").on("click", ".select_all_checkbox", function() {
-         var currentTable = $(this).closest("table");
-         if ($(this).is(':checked')) {
-         $("input[type='checkbox']", currentTable).attr('checked', 'checked');
-         $("input[type='checkbox']", currentTable).prop('checked', true);
-         } else {
-         $("input[type='checkbox']", currentTable).removeAttr('checked');
-         }
-         // Todo: rewrite sumColumn with ratio metric values
-
-         //sumColumn(this);
-         })*/
-
-        /*
-         * When a checkbox is clicked loop through each columns that's not
-         * displaying ratio values, take the total of the cells' value in the column
-         * (if the row of the cell is checked and the value id not N/A) and place
-         * the total into the total row. Then calculate the sum row ratio column
-         * cell value based on the 2 previous column's value.
-         */
-        /*  Hiding total till ratio metrics are handled */
-        /*$(".contributors-table").on("click", $("input[checkbox]:not('.select_all_checkbox')"), function(event) {
-         var checkbox = event.target;
-         if ($(checkbox).is(':checked')) {
-         $(checkbox).attr('checked', 'checked');
-         } else {
-         $(checkbox).removeAttr('checked');
-         }
-         sumColumn(checkbox);
-         })*/
-        /*  Hiding total till ratio metrics are handled */
-        // Trigger sumcolumn on load
-        /*$(".contributors-table .select_all_checkbox[rel='discrete']").each(function() {
-         $(this).trigger("click");
-         });*/
     })
 }
 
