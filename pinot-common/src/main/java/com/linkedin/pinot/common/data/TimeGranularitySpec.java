@@ -20,6 +20,8 @@ import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.utils.EqualityUtils;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
+
+import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 import org.joda.time.DateTime;
 
 
@@ -35,14 +37,22 @@ import org.joda.time.DateTime;
  * <p>If the time column is in tenMinutesSinceEpoch, constructor can be invoked as:
  * <p><code>TimeGranularitySpec(LONG, 10, MINUTES, timeColumnName)</code>
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class TimeGranularitySpec {
   private static final int DEFAULT_TIME_UNIT_SIZE = 1;
-
+  
   private DataType _dataType;
   private TimeUnit _timeType;
   private int _timeUnitSize = DEFAULT_TIME_UNIT_SIZE;
+  /*
+   * Can be either EPOCH (default) or SIMPLE_DATE_FORMAT:format e.g SIMPLE_DATE_FORMAT:yyyyMMdd 
+   */
+  private String _timeFormat = TimeFormat.EPOCH.toString();
   private String _name;
-
+  public enum TimeFormat {
+    EPOCH, //default
+    SIMPLE_DATE_FORMAT 
+  }
   // Default constructor required by JSON de-serializer. DO NOT REMOVE.
   public TimeGranularitySpec() {
   }
@@ -55,7 +65,18 @@ public class TimeGranularitySpec {
     _timeType = timeType;
     _name = name;
   }
+  
+  public TimeGranularitySpec(@Nonnull DataType dataType, @Nonnull TimeUnit timeType, @Nonnull String timeFormat,
+      @Nonnull String name) {
+    Preconditions.checkNotNull(timeType);
+    Preconditions.checkNotNull(name);
 
+    _dataType = dataType.getStoredType();
+    _timeType = timeType;
+    _name = name;
+    _timeFormat = timeFormat;
+  }
+  
   public TimeGranularitySpec(@Nonnull DataType dataType, int timeUnitSize, @Nonnull TimeUnit timeType,
       @Nonnull String name) {
     Preconditions.checkNotNull(timeType);
@@ -67,6 +88,18 @@ public class TimeGranularitySpec {
     _name = name;
   }
 
+  public TimeGranularitySpec(@Nonnull DataType dataType, int timeUnitSize, @Nonnull TimeUnit timeType,
+      @Nonnull String timeFormat, @Nonnull String name) {
+    Preconditions.checkNotNull(timeType);
+    Preconditions.checkNotNull(name);
+
+    _dataType = dataType.getStoredType();
+    _timeType = timeType;
+    _timeUnitSize = timeUnitSize;
+    _name = name;
+    _timeFormat = timeFormat;
+  }
+  
   public DataType getDataType() {
     return _dataType;
   }
@@ -113,6 +146,14 @@ public class TimeGranularitySpec {
     _name = name;
   }
 
+  public void setTimeFormat(String timeFormat) {
+    this._timeFormat = timeFormat;
+  }
+  
+  public String getTimeFormat() {
+    return _timeFormat;
+  }
+  
   /**
    * Convert the units of time since epoch to {@link DateTime} format using current <code>TimeGranularitySpec</code>.
    */
@@ -123,7 +164,7 @@ public class TimeGranularitySpec {
   @Override
   public String toString() {
     return "< data type: " + _dataType + ", time type: " + _timeType + ", time unit size: " + _timeUnitSize
-        + ", name: " + _name + " >";
+        + ", name: " + _name + ", timeFormat: " + _timeFormat + " >";
   }
 
   @Override
@@ -136,7 +177,8 @@ public class TimeGranularitySpec {
       return _dataType.equals(anotherTimeGranularitySpec._dataType)
           && _timeType.equals(anotherTimeGranularitySpec._timeType)
           && _timeUnitSize == anotherTimeGranularitySpec._timeUnitSize
-          && _name.equals(anotherTimeGranularitySpec._name);
+          && _name.equals(anotherTimeGranularitySpec._name)
+          && _timeFormat.equals(anotherTimeGranularitySpec._timeFormat);
     }
     return false;
   }
@@ -147,6 +189,7 @@ public class TimeGranularitySpec {
     result = EqualityUtils.hashCodeOf(result, _timeType);
     result = EqualityUtils.hashCodeOf(result, _timeUnitSize);
     result = EqualityUtils.hashCodeOf(result, _name);
+    result = EqualityUtils.hashCodeOf(result, _timeFormat);
     return result;
   }
 }

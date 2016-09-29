@@ -16,15 +16,27 @@
 package com.linkedin.pinot.common.utils.time;
 
 import com.linkedin.pinot.common.data.TimeGranularitySpec;
+import com.linkedin.pinot.common.data.TimeGranularitySpec.TimeFormat;
 
 public class DefaultTimeConverter implements TimeConverter {
 
   TimeGranularitySpec incoming;
   TimeGranularitySpec outgoing;
+  private boolean conversionSupported;
 
   public void init(TimeGranularitySpec incoming, TimeGranularitySpec outgoing) {
     this.incoming = incoming;
     this.outgoing = outgoing;
+    conversionSupported = false;
+    if (TimeFormat.EPOCH.toString().equals(incoming.getTimeFormat())
+        && TimeFormat.EPOCH.toString().equals(outgoing.getTimeFormat())) {
+      conversionSupported = true;
+    }
+    if (conversionSupported) {
+      //TODO: Handle conversion between sdf <-> epoch
+      throw new RuntimeException(
+          "Conversion from Simple Date Format to epoch/simpleDateFormat is not supported");
+    }
   }
 
   @Override
@@ -38,9 +50,15 @@ public class DefaultTimeConverter implements TimeConverter {
     } else {
       duration = Long.parseLong(incomingTimeValue.toString());
     }
-    long outgoingTime = outgoing.getTimeType().convert(duration * incoming.getTimeUnitSize(),
-        incoming.getTimeType());
-    return convertToOutgoingDataType(outgoingTime / outgoing.getTimeUnitSize());
+    if (conversionSupported) {
+      long outgoingTime = outgoing.getTimeType().convert(duration * incoming.getTimeUnitSize(),
+          incoming.getTimeType());
+      return convertToOutgoingDataType(outgoingTime / outgoing.getTimeUnitSize());
+    } else {
+      //TODO: Handle conversion between sdf <-> epoch
+      throw new RuntimeException(
+          "Conversion from Simple Date Format to epoch/simpleDateFormat is not supported");
+    }
   }
 
   private Object convertToOutgoingDataType(long outgoingTimeValue) {

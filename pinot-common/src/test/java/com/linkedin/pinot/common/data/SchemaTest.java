@@ -16,6 +16,8 @@
 package com.linkedin.pinot.common.data;
 
 import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import com.linkedin.pinot.common.data.TimeGranularitySpec.TimeFormat;
 import com.linkedin.pinot.common.utils.SchemaUtils;
 import java.io.File;
 import java.io.IOException;
@@ -257,5 +259,22 @@ public class SchemaTest {
     newSchema = SchemaUtils.fromZNRecord(SchemaUtils.toZNRecord(schema));
     Assert.assertEquals(newSchema, schema);
     Assert.assertEquals(newSchema.hashCode(), schema.hashCode());
+  }
+  
+  @Test
+  public void testSimpleDateFormat() throws IOException {
+    TimeGranularitySpec incomingTimeGranularitySpec = new TimeGranularitySpec(DataType.STRING, 1,
+        TimeUnit.DAYS, TimeFormat.SIMPLE_DATE_FORMAT + ":yyyyMMdd" , "Date");
+    TimeGranularitySpec outgoingTimeGranularitySpec = new TimeGranularitySpec(DataType.STRING, 1,
+        TimeUnit.DAYS, TimeFormat.SIMPLE_DATE_FORMAT + ":yyyyMMdd", "Date");
+    System.out.println(incomingTimeGranularitySpec);
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testSchema")
+        .addTime(incomingTimeGranularitySpec, outgoingTimeGranularitySpec).build();
+    String jsonSchema = schema.getJSONSchema();
+    Schema schemaFromJson = Schema.fromString(jsonSchema);
+    Assert.assertEquals(schemaFromJson, schema);
+    Assert.assertEquals(schemaFromJson.hashCode(), schema.hashCode());
+
+
   }
 }
