@@ -23,16 +23,21 @@ public class DefaultTimeConverter implements TimeConverter {
   TimeGranularitySpec incoming;
   TimeGranularitySpec outgoing;
   private boolean conversionSupported;
+  private boolean needConversion;
 
   public void init(TimeGranularitySpec incoming, TimeGranularitySpec outgoing) {
     this.incoming = incoming;
     this.outgoing = outgoing;
     conversionSupported = false;
+    needConversion = true;
+    if(incoming.equals(outgoing)){
+      needConversion = false;
+    }
     if (TimeFormat.EPOCH.toString().equals(incoming.getTimeFormat())
         && TimeFormat.EPOCH.toString().equals(outgoing.getTimeFormat())) {
       conversionSupported = true;
     }
-    if (conversionSupported) {
+    if (needConversion && !conversionSupported) {
       //TODO: Handle conversion between sdf <-> epoch
       throw new RuntimeException(
           "Conversion from Simple Date Format to epoch/simpleDateFormat is not supported");
