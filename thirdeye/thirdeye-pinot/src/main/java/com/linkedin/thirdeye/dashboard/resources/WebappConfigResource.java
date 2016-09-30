@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
+import com.linkedin.thirdeye.dashboard.Utils;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -26,9 +27,9 @@ import com.linkedin.thirdeye.datalayer.dto.WebappConfigDTO;
 @Path(value = "/webapp-config")
 @Produces(MediaType.APPLICATION_JSON)
 public class WebappConfigResource {
+  private final WebappConfigManager webappConfigDAO;
 
   private static final Logger LOG = LoggerFactory.getLogger(WebappConfigResource.class);
-  private WebappConfigManager webappConfigDAO;
 
   public WebappConfigResource(WebappConfigManager webappConfigDAO) {
     this.webappConfigDAO = webappConfigDAO;
@@ -36,7 +37,6 @@ public class WebappConfigResource {
 
   /**
    * @param collection
-   * @param configType :DashboardConfig/CollectionSchema/CollectionConfig
    * @param payload    : Json payload containing AbstractConfig of configType
    *                     eg. payload
    *                     <p/>
@@ -52,13 +52,11 @@ public class WebappConfigResource {
       AbstractConfig abstractConfig = WebappConfigFactory.getConfigFromConfigTypeAndJson(type, payload);
 
       String configName = abstractConfig.getConfigName();
-      String config = abstractConfig.toJSON();
-
       WebappConfigDTO webappConfig = new WebappConfigDTO();
       webappConfig.setName(configName);
       webappConfig.setCollection(collection);
       webappConfig.setType(type);
-      webappConfig.setConfig(config);
+      webappConfig.setConfigMap(Utils.getMapFromObject(abstractConfig));
       Long id = webappConfigDAO.save(webappConfig);
       LOG.info("Created webappConfig {} with id {}", webappConfig, id);
       return Response.ok(id).build();
@@ -98,13 +96,11 @@ public class WebappConfigResource {
       AbstractConfig abstractConfig = WebappConfigFactory.getConfigFromConfigTypeAndJson(type, payload);
 
       String configName = abstractConfig.getConfigName();
-      String config = abstractConfig.toJSON();
-
       WebappConfigDTO webappConfig = webappConfigDAO.findById(id);
       webappConfig.setName(configName);
       webappConfig.setCollection(collection);
       webappConfig.setType(type);
-      webappConfig.setConfig(config);
+      webappConfig.setConfigMap(Utils.getMapFromObject(abstractConfig));
       webappConfigDAO.update(webappConfig);
       return Response.ok(id).build();
     } catch (Exception e) {

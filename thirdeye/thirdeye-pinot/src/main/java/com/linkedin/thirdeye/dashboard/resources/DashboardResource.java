@@ -285,7 +285,8 @@ public class DashboardResource {
         DashboardConfig dashboardConfig = null;
         for (WebappConfigDTO webappConfig : webappConfigs) {
           if (webappConfig.getName().equals(dashboardName)) {
-            dashboardConfig = AbstractConfig.fromJSON(webappConfig.getConfig(), DashboardConfig.class);
+            String configJson = Utils.getJsonFromObject(webappConfig.getConfigMap());
+            dashboardConfig = AbstractConfig.fromJSON(configJson, DashboardConfig.class);
             break;
           }
         }
