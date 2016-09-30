@@ -20,7 +20,6 @@ $("#main-view").on("change", ".current-date-range-selector", function () {
 });
 
 $("#main-view").on("click", ".time-input-compare-checkbox", function () {
-    //Todo: remove this checkbox in some views it's a must in others it's not needed
     toggleTimeComparison(this)
 });
 

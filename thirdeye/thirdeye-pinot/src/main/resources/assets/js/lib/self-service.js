@@ -484,7 +484,7 @@ function addSelfServiceListeners() {
                 //WEEK_OVER_WEEK_RULE & MIN_MAX_THRESHOLD
                 var filters = readFiltersAppliedInCurrentView("self-service", {form: form});
 
-                //Transform filters Todo: clarify if filters object should be consistent on FE and BE
+                //Transform filters
                 formData.filters = encodeURIComponent(JSON.stringify(filters));
                 formData.exploreDimension = $("#self-service-view-single-dimension-selector #selected-dimension", form).attr("value");
             break;
@@ -574,8 +574,6 @@ function addSelfServiceListeners() {
             errorAlert.fadeIn(100);
             return
         }
-
-        //Todo:Remove this condition if the repeatEverySize and repeatEveryUnit are available on all forms all
 
         if (!isPositiveInteger(formData.repeatEverySize)) {
             errorMessage.html('Please fill in: "Monitor data every" X hours/days/weeks etc., where X should be positive integer.');
@@ -672,7 +670,7 @@ function addSelfServiceListeners() {
                             };
                             break;
                         case "pattern":
-                            //Todo: clarify: is pattern always UP, DOWN
+
                             break;
                         case "string":
                             break;

@@ -1,6 +1,5 @@
 function getHeatmap(tab) {
 
-    //Todo: add the real endpoint
     var url = "/dashboard/data/heatmap?" + window.location.hash.substring(1);
     getData(url, tab).done(function (data) {
 
