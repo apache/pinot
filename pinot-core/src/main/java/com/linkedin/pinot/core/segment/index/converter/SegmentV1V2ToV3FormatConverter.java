@@ -84,6 +84,22 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
     File newLocation = SegmentDirectoryPaths.segmentDirectoryFor(v2SegmentDirectory, SegmentVersion.v3);
     LOGGER.info("v3 segment location for segment: {} is {}", v2Metadata.getName(), newLocation);
     v3TempDirectory.renameTo(newLocation);
+    deleteV2Files(v2SegmentDirectory);
+  }
+
+  private void deleteV2Files(File v2SegmentDirectory) {
+    LOGGER.info("Deleting files in v1 segment directory: {}", v2SegmentDirectory);
+    File[] files = v2SegmentDirectory.listFiles();
+    if (files == null) {
+      // unexpected condition but we don't want to stop server
+      LOGGER.error("v1 segment directory: {}  returned null list of files", v2SegmentDirectory);
+      return;
+    }
+    for (File file : files) {
+      if (file.isFile() && file.exists()) {
+        FileUtils.deleteQuietly(file);
+      }
+    }
   }
 
   @VisibleForTesting

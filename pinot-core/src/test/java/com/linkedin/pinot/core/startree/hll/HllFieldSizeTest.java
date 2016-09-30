@@ -24,8 +24,8 @@ import org.testng.annotations.Test;
 import java.util.Random;
 
 
-public class TestHllFieldSize {
-  private static final Logger LOGGER = LoggerFactory.getLogger(TestHllFieldSize.class);
+public class HllFieldSizeTest {
+  private static final Logger LOGGER = LoggerFactory.getLogger(HllFieldSizeTest.class);
   private Random rand = new Random();
 
   @Test

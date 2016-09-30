@@ -17,9 +17,7 @@ package com.linkedin.pinot.core.segment.index.loader;
 
 import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
 import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
-import com.linkedin.pinot.core.data.readers.PinotSegmentRecordReader;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
@@ -109,27 +107,6 @@ public class LoadersTest {
       Assert.assertEquals(indexSegment.getSegmentMetadata().getVersion(), originalMetadata.getVersion());
       Assert.assertFalse(SegmentDirectoryPaths.segmentDirectoryFor(segmentDirectory, SegmentVersion.v3).exists());
     }
-    {
-      // This block tests that server will load v3 based on configuration. Server correctly
-      // handles configuration flip-flopping between v1 and v3 to simulate testing for rollback to v1
-      // and then roll-forward to v3 again
-
-      // with config pointing to load v3, we convert and load v3.
-      IndexSegment indexSegment = Loaders.IndexSegment.load(segmentDirectory, ReadMode.mmap, v3LoadingConfig);
-      Assert.assertEquals(SegmentVersion.valueOf(indexSegment.getSegmentMetadata().getVersion()),
-          SegmentVersion.v3);
-      Assert.assertTrue(SegmentDirectoryPaths.segmentDirectoryFor(segmentDirectory, SegmentVersion.v3).exists());
-
-      // based on config, we can load v1 or v2...to simulate configuration rollback
-      IndexSegment indexSegment1 = Loaders.IndexSegment.load(segmentDirectory, ReadMode.mmap, v1LoadingConfig);
-      Assert.assertEquals(SegmentVersion.valueOf(indexSegment1.getSegmentMetadata().getVersion()), SegmentVersion.v1);
-      Assert.assertTrue(SegmentDirectoryPaths.segmentDirectoryFor(segmentDirectory, SegmentVersion.v3).exists());
-
-      // roll-forward configuration to v3 again
-      IndexSegment indexSegment2 = Loaders.IndexSegment.load(segmentDirectory, ReadMode.mmap, v3LoadingConfig);
-      Assert.assertEquals(SegmentVersion.valueOf(indexSegment.getSegmentMetadata().getVersion()), SegmentVersion.v3);
-    }
-
   }
 
 
