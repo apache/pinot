@@ -538,11 +538,9 @@ public class DashboardResource {
           if (timeSeriesRow.getDimensionNames() != null
               && timeSeriesRow.getDimensionNames().size() > 0) {
             StringBuilder sb = new StringBuilder(key);
-            for (String dimensionName : timeSeriesRow.getDimensionNames()) {
-              sb.append("|").append(dimensionName);
-            }
-            for (String dimensionValue : timeSeriesRow.getDimensionValues()) {
-              sb.append("|").append(dimensionValue);
+            for (int idx = 0; idx < timeSeriesRow.getDimensionNames().size(); ++idx) {
+              sb.append("||").append(timeSeriesRow.getDimensionNames().get(idx));
+              sb.append("|").append(timeSeriesRow.getDimensionValues().get(idx));
             }
             key = sb.toString();
           }

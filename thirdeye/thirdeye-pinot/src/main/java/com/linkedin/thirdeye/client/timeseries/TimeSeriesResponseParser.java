@@ -139,7 +139,11 @@ public class TimeSeriesResponseParser {
       builder.setStart(timeRange.lowerEndpoint());
       builder.setEnd(timeRange.upperEndpoint());
       builder.setDimensionNames(dimensionName);
-      builder.setDimensionValues(Collections.singletonList(OTHER));
+      List<String> dimensionValues = new ArrayList(dimensionName.size());
+      for (int i = 0; i < dimensionName.size(); ++i) {
+        dimensionValues.add(OTHER);
+      }
+      builder.setDimensionValues(dimensionValues);
       otherBuilders.add(builder);
       double[] other = new double[numMetrics];
       Arrays.fill(other, 0);
