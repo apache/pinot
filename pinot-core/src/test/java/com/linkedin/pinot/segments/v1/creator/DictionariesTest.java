@@ -68,6 +68,8 @@ public class DictionariesTest {
   private static File INDEX_DIR = new File(DictionariesTest.class.toString());
   static Map<String, Set<Object>> uniqueEntries;
 
+  private static File segmentDirectory;
+
   @AfterClass
   public static void cleanup() {
     FileUtils.deleteQuietly(INDEX_DIR);
@@ -88,7 +90,7 @@ public class DictionariesTest {
     final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
     driver.init(config);
     driver.build();
-
+    segmentDirectory = new File(INDEX_DIR, driver.getSegmentName());
     final Schema schema = AvroUtils.extractSchemaFromAvro(new File(filePath));
 
     final DataFileStream<GenericRecord> avroReader = AvroUtils.getAvroReader(new File(filePath));
@@ -137,8 +139,8 @@ public class DictionariesTest {
 
   @Test
   public void test1() throws Exception {
-    final IndexSegmentImpl heapSegment = (IndexSegmentImpl) ColumnarSegmentLoader.load(INDEX_DIR, ReadMode.heap);
-    final IndexSegmentImpl mmapSegment = (IndexSegmentImpl) ColumnarSegmentLoader.load(INDEX_DIR, ReadMode.mmap);
+    final IndexSegmentImpl heapSegment = (IndexSegmentImpl) ColumnarSegmentLoader.load(segmentDirectory, ReadMode.heap);
+    final IndexSegmentImpl mmapSegment = (IndexSegmentImpl) ColumnarSegmentLoader.load(segmentDirectory, ReadMode.mmap);
 
     for (final String column : ((SegmentMetadataImpl) mmapSegment.getSegmentMetadata()).getColumnMetadataMap().keySet()) {
       final ImmutableDictionaryReader heapDictionary = heapSegment.getDictionaryFor(column);
@@ -177,8 +179,8 @@ public class DictionariesTest {
 
   @Test
   public void test2() throws Exception {
-    final IndexSegmentImpl heapSegment = (IndexSegmentImpl) ColumnarSegmentLoader.load(INDEX_DIR, ReadMode.heap);
-    final IndexSegmentImpl mmapSegment = (IndexSegmentImpl) ColumnarSegmentLoader.load(INDEX_DIR, ReadMode.mmap);
+    final IndexSegmentImpl heapSegment = (IndexSegmentImpl) ColumnarSegmentLoader.load(segmentDirectory, ReadMode.heap);
+    final IndexSegmentImpl mmapSegment = (IndexSegmentImpl) ColumnarSegmentLoader.load(segmentDirectory, ReadMode.mmap);
 
     final Map<String, ColumnMetadata> metadataMap = ((SegmentMetadataImpl) mmapSegment.getSegmentMetadata()).getColumnMetadataMap();
     for (final String column : metadataMap.keySet()) {
