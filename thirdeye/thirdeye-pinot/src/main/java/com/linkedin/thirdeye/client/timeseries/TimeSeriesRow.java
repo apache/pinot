@@ -1,18 +1,21 @@
 package com.linkedin.thirdeye.client.timeseries;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 
+import org.apache.commons.collections.comparators.ComparableComparator;
 import org.apache.commons.lang.ObjectUtils;
 import org.joda.time.DateTime;
 
 public class TimeSeriesRow implements Comparable<TimeSeriesRow> {
   private final long start;
   private final long end;
-  private final String dimensionName;
-  private final String dimensionValue;
+  private final List<String> dimensionNames;
+  private final List<String> dimensionValues;
   private final List<TimeSeriesMetric> metrics;
 
   private static final String DELIM = "\t\t";
@@ -20,8 +23,8 @@ public class TimeSeriesRow implements Comparable<TimeSeriesRow> {
   private TimeSeriesRow(Builder builder) {
     this.start = builder.start.getMillis();
     this.end = builder.end.getMillis();
-    this.dimensionName = builder.dimensionName;
-    this.dimensionValue = builder.dimensionValue;
+    this.dimensionNames = builder.dimensionNames;
+    this.dimensionValues = builder.dimensionValues;
     this.metrics = builder.metrics;
   }
 
@@ -33,12 +36,12 @@ public class TimeSeriesRow implements Comparable<TimeSeriesRow> {
     return end;
   }
 
-  public String getDimensionName() {
-    return dimensionName;
+  public List<String> getDimensionNames() {
+    return dimensionNames;
   }
 
-  public String getDimensionValue() {
-    return dimensionValue;
+  public List<String> getDimensionValues() {
+    return dimensionValues;
   }
 
   public List<TimeSeriesMetric> getMetrics() {
@@ -53,21 +56,21 @@ public class TimeSeriesRow implements Comparable<TimeSeriesRow> {
     TimeSeriesRow ts = (TimeSeriesRow) o;
     return Objects.equals(start, ts.getStart())
         && Objects.equals(end, ts.getEnd())
-        && Objects.equals(dimensionName, ts.getDimensionName())
-        && Objects.equals(dimensionValue, ts.getDimensionValue())
+        && Objects.equals(dimensionNames, ts.getDimensionNames())
+        && Objects.equals(dimensionValues, ts.getDimensionValues())
         && Objects.equals(metrics, ts.getMetrics());
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(start, end, dimensionName, dimensionValue, metrics);
+    return Objects.hash(start, end, dimensionNames, dimensionValues, metrics);
   }
 
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append(start).append(DELIM).append(end).append(DELIM).append(dimensionName).append(DELIM)
-        .append(dimensionValue);
+    sb.append(start).append(DELIM).append(end).append(DELIM).append(dimensionNames).append(DELIM)
+        .append(dimensionValues);
     for (TimeSeriesMetric metric : metrics) {
       sb.append(DELIM).append(metric.getValue());
     }
@@ -81,37 +84,42 @@ public class TimeSeriesRow implements Comparable<TimeSeriesRow> {
     if (startDiff != 0)
       return startDiff;
 
-    int dimensionNameDiff = ObjectUtils.compare(this.dimensionName, o.dimensionName);
+    int dimensionNameDiff = compareListOfComparable(this.dimensionNames, o.dimensionNames);
     if (dimensionNameDiff != 0)
       return dimensionNameDiff;
-    int dimensionValueDiff = ObjectUtils.compare(this.dimensionValue, o.dimensionValue);
+    int dimensionValueDiff = compareListOfComparable(this.dimensionValues, o.dimensionValues);
     if (dimensionValueDiff != 0)
       return dimensionValueDiff;
-    List<TimeSeriesMetric> thisMetrics = this.metrics;
+    return compareListOfComparable(this.metrics, o.metrics);
+  }
 
-    List<TimeSeriesMetric> otherMetrics = o.metrics;
-    int thisMetricsSize = thisMetrics.size();
-    int otherMetricsSize = otherMetrics.size();
-    int metricSizeDiff = ObjectUtils.compare(thisMetricsSize, otherMetricsSize);
-    if (metricSizeDiff != 0)
-      return metricSizeDiff;
-    for (int i = 0; i < thisMetricsSize; i++) {
-      TimeSeriesMetric thisMetric = thisMetrics.get(i);
-      TimeSeriesMetric otherMetric = otherMetrics.get(i);
-      int metricDiff = ObjectUtils.compare(thisMetric, otherMetric);
-      if (metricDiff != 0) {
-        return metricDiff;
+  private static <E extends Comparable<E>> int compareListOfComparable(List<E> a, List<E> b) {
+    if (a == null && b == null) return 0;
+    if (a == null) return -1;
+    if (b == null) return 1;
+
+    int sizeA = a.size();
+    int sizeB = b.size();
+    int sizeDiff = ObjectUtils.compare(sizeA, sizeB);
+    if (sizeDiff != 0) {
+      return sizeDiff;
+    }
+    for (int i = 0; i < sizeA; i++) {
+      E comparableA = a.get(i);
+      E comparableB = b.get(i);
+      int comparableDiff = ObjectUtils.compare(comparableA, comparableB);
+      if (comparableDiff != 0) {
+        return comparableDiff;
       }
     }
     return 0;
-
   }
 
   static class Builder {
     private DateTime start;
     private DateTime end;
-    private String dimensionName = "all";
-    private String dimensionValue = "all";
+    private List<String> dimensionNames = Collections.singletonList("all");
+    private List<String> dimensionValues = Collections.singletonList("all");
     private final List<TimeSeriesMetric> metrics = new ArrayList<>();
 
     public void setStart(DateTime start) {
@@ -122,12 +130,12 @@ public class TimeSeriesRow implements Comparable<TimeSeriesRow> {
       this.end = end;
     }
 
-    public void setDimensionName(String dimensionName) {
-      this.dimensionName = dimensionName;
+    public void setDimensionNames(List<String> dimensionNames) {
+      this.dimensionNames = dimensionNames;
     }
 
-    public void setDimensionValue(String dimensionValue) {
-      this.dimensionValue = dimensionValue;
+    public void setDimensionValues(List<String> dimensionValues) {
+      this.dimensionValues = dimensionValues;
     }
 
     public void addMetric(String metricName, double value) {
@@ -145,8 +153,8 @@ public class TimeSeriesRow implements Comparable<TimeSeriesRow> {
     public void clear() {
       setStart(null);
       setEnd(null);
-      setDimensionName(null);
-      setDimensionValue(null);
+      setDimensionNames(null);
+      setDimensionValues(null);
       this.metrics.clear();
     }
   }

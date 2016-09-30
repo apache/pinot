@@ -55,7 +55,7 @@ public class TimeSeriesResponseConverter {
     for (int i = 0; i < response.getNumRows(); i++) {
       TimeSeriesRow row = response.getRow(i);
       DimensionKey dimensionKey =
-          dimensionKeyGenerator.get(row.getDimensionName(), row.getDimensionValue());
+          dimensionKeyGenerator.get(row.getDimensionNames(), row.getDimensionValues());
       dimensionKeyToRows.put(dimensionKey, row);
     }
 
@@ -97,19 +97,28 @@ public class TimeSeriesResponseConverter {
       }
     }
 
-    DimensionKey get(String dimensionName, String dimensionValue) {
-      if (dimensionName == null || !dimensionIndexMap.containsKey(dimensionName)) {
-        // base key or otherwise not grouped properly
+    DimensionKey get(List<String> dimensionNames, List<String> dimensionValues) {
+      // returns base key if the input is not grouped properly
+      if (dimensionNames == null) {
         return baseDimensionKey;
       }
-      if (!dimensionKeyCache.containsKey(dimensionName, dimensionValue)) {
-        String[] key = Arrays.copyOf(this.baseKey, this.baseKey.length);
-        int i = this.dimensionIndexMap.get(dimensionName);
-        key[i] = dimensionValue;
-        DimensionKey dimensionKey = new DimensionKey(key);
-        dimensionKeyCache.put(dimensionName, dimensionValue, dimensionKey);
+      for (String dimensionName : dimensionNames) {
+        if (!dimensionIndexMap.containsKey(dimensionName)) {
+          return baseDimensionKey;
+        }
       }
-      return (DimensionKey) dimensionKeyCache.get(dimensionName, dimensionValue);
+      if (!dimensionKeyCache.containsKey(dimensionNames, dimensionValues)) {
+        String[] key = Arrays.copyOf(this.baseKey, this.baseKey.length);
+        for (int idx = 0; idx < dimensionNames.size(); ++idx) {
+          int i = this.dimensionIndexMap.get(dimensionNames.get(idx));
+          key[i] = dimensionValues.get(idx);
+        }
+        DimensionKey dimensionKey = new DimensionKey(key);
+        dimensionKeyCache.put(dimensionNames, dimensionValues, dimensionKey);
+        return dimensionKey;
+      } else {
+        return (DimensionKey) dimensionKeyCache.get(dimensionNames, dimensionValues);
+      }
     }
   }
 }
