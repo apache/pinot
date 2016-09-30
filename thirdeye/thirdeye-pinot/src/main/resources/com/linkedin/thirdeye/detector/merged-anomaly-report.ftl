@@ -55,7 +55,7 @@
               </td>
               <td style="padding:5px 3px">
               <#-- <a href="${functionEndpoint}${r.functionId?c}" target="_blank"> -->
-              ${functionTypes} (${r.function.id?c})
+              ${r.function.functionName} (type: ${r.function.type}, id :${r.function.id})
               <#-- </a> -->
               </td>
             </tr>
