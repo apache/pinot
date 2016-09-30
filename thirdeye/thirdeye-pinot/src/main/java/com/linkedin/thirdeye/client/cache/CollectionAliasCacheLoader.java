@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.client.cache;
 
+import com.linkedin.thirdeye.dashboard.Utils;
 import java.util.List;
 
 import org.apache.commons.lang3.StringUtils;
@@ -25,9 +26,15 @@ public class CollectionAliasCacheLoader extends CacheLoader<String, String> {
   @Override
   public String load(String collectionAlias) throws Exception {
     String collectionName = null;
-    List<WebappConfigDTO> webappConfigs = webappConfigDAO.findByType(WebappConfigType.COLLECTION_CONFIG);
+    List<WebappConfigDTO> webappConfigs =
+        webappConfigDAO.findByType(WebappConfigType.COLLECTION_CONFIG);
     for (WebappConfigDTO webappConfig : webappConfigs) {
-      CollectionConfig collectionConfig = AbstractConfig.fromJSON(webappConfig.getConfig(), CollectionConfig.class);
+      String configJson = Utils.getJsonFromObject(webappConfig.getConfigMap());
+      CollectionConfig collectionConfig =
+          AbstractConfig.fromJSON(configJson, CollectionConfig.class);
+      if (collectionConfig == null) {
+        continue;
+      }
       String alias = collectionConfig.getCollectionAlias();
       if (StringUtils.isNotEmpty(alias) && alias.equals(collectionAlias)) {
         collectionName = collectionConfig.getCollectionName();

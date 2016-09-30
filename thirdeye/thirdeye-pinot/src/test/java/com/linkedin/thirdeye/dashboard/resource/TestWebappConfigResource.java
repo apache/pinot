@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.dashboard.resource;
 
 
+import com.linkedin.thirdeye.dashboard.Utils;
 import java.util.List;
 
 import javax.ws.rs.core.Response;
@@ -35,7 +36,7 @@ public class TestWebappConfigResource extends AbstractManagerTestBase {
     Assert.assertEquals(webappConfig.getCollection(), collection);
     Assert.assertEquals(webappConfig.getType(), type);
     CollectionConfig expectedCollectionConfig = CollectionConfig.fromJSON(payload, CollectionConfig.class);
-    Assert.assertEquals(webappConfig.getConfig(), expectedCollectionConfig.toJSON());
+    Assert.assertEquals(webappConfig.getConfigMap(), Utils.getMapFromJson(expectedCollectionConfig.toJSON()));
   }
 
   @Test(dependsOnMethods = {"testCreateConfig"})
@@ -64,7 +65,7 @@ public class TestWebappConfigResource extends AbstractManagerTestBase {
     Assert.assertEquals(webappConfig.getCollection(), updatedCollection);
     Assert.assertEquals(webappConfig.getType(), type);
     CollectionConfig expectedCollectionConfig = CollectionConfig.fromJSON(updatedPayload, CollectionConfig.class);
-    Assert.assertEquals(webappConfig.getConfig(), expectedCollectionConfig.toJSON());
+    Assert.assertEquals(webappConfig.getConfigMap(), Utils.getMapFromObject(expectedCollectionConfig));
   }
 
   @Test(dependsOnMethods = {"testUpdateConfig"})

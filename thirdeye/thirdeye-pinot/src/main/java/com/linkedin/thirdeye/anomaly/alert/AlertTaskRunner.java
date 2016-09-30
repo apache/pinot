@@ -194,7 +194,6 @@ public class AlertTaskRunner implements TaskRunner {
         functionTypes.add(spec.getType());
       }
 
-      // templateData.put("anomalyResults", results);
       templateData.put("groupedAnomalyResults", groupedResults);
       templateData.put("anomalyCount", results.size());
       templateData.put("startTime", windowStart.getMillis());

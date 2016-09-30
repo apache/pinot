@@ -36,9 +36,7 @@ public abstract class AbstractConfig {
       };
       T value = OBJECT_MAPPER.readValue(json, typeRef);
       return value;
-
     }
     return null;
   }
-
 }
