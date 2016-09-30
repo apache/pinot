@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.EmailConfigurationManager;
@@ -11,6 +12,7 @@ import com.linkedin.thirdeye.datalayer.dto.WebappConfigDTO;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
@@ -61,7 +63,16 @@ public class EntityManagerResource {
     switch (entityType) {
     case WEBAPP_CONFIG:
       List<WebappConfigDTO> webappConfigDTOs = webappConfigManager.findAll();
-
+      for (WebappConfigDTO webappConfigDTO : webappConfigDTOs) {
+        if (webappConfigDTO.getConfigMap() == null) {
+          TypeReference<HashMap<String,Object>> typeRef = new TypeReference<HashMap<String,Object>>() {};
+          try {
+            webappConfigDTO.setConfigMap(OBJECT_MAPPER.readValue(webappConfigDTO.getConfig(), typeRef));
+          } catch (Exception e) {
+            LOG.error("Unable to read config to map", e);
+          }
+        }
+      }
       results.addAll(webappConfigDTOs);
       break;
     case ANOMALY_FUNCTION:

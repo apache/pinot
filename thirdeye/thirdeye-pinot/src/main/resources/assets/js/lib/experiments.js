@@ -48,7 +48,6 @@ function renderEntityEditor() {
   editor = new JSONEditor(element, {schema: {type: "object"}});
   var entity = "";
   var entityId = $("#entitySelector").find(':selected').val();
-  // $("#entityDetails").empty();
   for (var i in entityData) {
     if (entityData[i].id == entityId) {
       entity = entityData[i];
