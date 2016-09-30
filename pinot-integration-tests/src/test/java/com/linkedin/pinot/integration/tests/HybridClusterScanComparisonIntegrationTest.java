@@ -15,15 +15,6 @@
  */
 package com.linkedin.pinot.integration.tests;
 
-import com.google.common.base.Preconditions;
-import com.google.common.util.concurrent.Uninterruptibles;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.utils.FileUploadUtils;
-import com.linkedin.pinot.common.utils.KafkaStarterUtils;
-import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
-import com.linkedin.pinot.tools.query.comparison.QueryComparison;
-import com.linkedin.pinot.tools.scan.query.QueryResponse;
-import com.linkedin.pinot.tools.scan.query.ScanBasedQueryProcessor;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileWriter;
@@ -54,6 +45,15 @@ import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+import com.google.common.base.Preconditions;
+import com.google.common.util.concurrent.Uninterruptibles;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.utils.FileUploadUtils;
+import com.linkedin.pinot.common.utils.KafkaStarterUtils;
+import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
+import com.linkedin.pinot.tools.query.comparison.QueryComparison;
+import com.linkedin.pinot.tools.scan.query.QueryResponse;
+import com.linkedin.pinot.tools.scan.query.ScanBasedQueryProcessor;
 
 
 /**
@@ -129,7 +129,7 @@ public abstract class HybridClusterScanComparisonIntegrationTest extends HybridC
     Schema schema = Schema.fromFile(schemaFile);
     addSchema(schemaFile, schema.getSchemaName());
     addHybridTable(tableName, timeColumnName, timeColumnType, kafkaZkUrl, kafkaTopic, schema.getSchemaName(),
-        "TestTenant", "TestTenant", avroFile, sortedColumn, invertedIndexColumns, "MMAP");
+        "TestTenant", "TestTenant", avroFile, sortedColumn, invertedIndexColumns, "MMAP", shouldUseLlc());
   }
 
   @Override
@@ -145,7 +145,7 @@ public abstract class HybridClusterScanComparisonIntegrationTest extends HybridC
     ensureDirectoryExistsAndIsEmpty(_unpackedSegments);
 
     // Start Zk, Kafka and Pinot
-    startHybridCluster();
+    startHybridCluster(getKafkaPartitionCount());
 
     extractAvroIfNeeded();
 
@@ -518,5 +518,9 @@ public abstract class HybridClusterScanComparisonIntegrationTest extends HybridC
         return null;
       }
     });
+  }
+
+  protected int getKafkaPartitionCount() {
+    return 10;
   }
 }
