@@ -211,8 +211,6 @@ public class AlertTaskRunner implements TaskRunner {
       templateData.put("filters", filtersJsonEncoded);
       templateData.put("windowUnit", windowUnit);
       templateData.put("dashboardHost", thirdeyeConfig.getDashboardHost());
-      templateData.put("functionTypes", functionTypes.toString());
-
       Template template = freemarkerConfig.getTemplate("merged-anomaly-report.ftl");
       template.process(templateData, out);
     } catch (Exception e) {
