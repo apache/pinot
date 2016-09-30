@@ -17,6 +17,10 @@ ul, ol{
     padding-left: 0px;
 }
 
+li {
+    margin: 10px 0;
+}
+
 body a{
     text-decoration:none;
     color: #444;

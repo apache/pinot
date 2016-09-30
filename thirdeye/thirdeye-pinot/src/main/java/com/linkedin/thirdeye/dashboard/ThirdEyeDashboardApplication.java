@@ -7,6 +7,7 @@ import com.linkedin.thirdeye.dashboard.resources.AnomalyResource;
 import com.linkedin.thirdeye.dashboard.resources.CacheResource;
 import com.linkedin.thirdeye.dashboard.resources.DashboardResource;
 import com.linkedin.thirdeye.dashboard.resources.EmailResource;
+import com.linkedin.thirdeye.dashboard.resources.EntityManagerResource;
 import com.linkedin.thirdeye.dashboard.resources.WebappConfigResource;
 
 import io.dropwizard.assets.AssetsBundle;
@@ -35,7 +36,8 @@ public class ThirdEyeDashboardApplication
   }
 
   @Override
-  public void run(ThirdEyeDashboardConfiguration config, Environment env) throws Exception {
+  public void run(ThirdEyeDashboardConfiguration config, Environment env)
+      throws Exception {
     super.initDAOs();
     try {
       ThirdEyeCacheRegistry.initializeCaches(config, webappConfigDAO);
@@ -46,9 +48,12 @@ public class ThirdEyeDashboardApplication
     env.jersey().register(new DashboardResource(webappConfigDAO));
     env.jersey().register(new CacheResource());
     env.jersey().register(
-        new AnomalyResource(config, anomalyFunctionDAO, anomalyResultDAO, emailConfigurationDAO, anomalyMergedResultDAO));
+        new AnomalyResource(anomalyFunctionDAO, anomalyResultDAO, emailConfigurationDAO,
+            anomalyMergedResultDAO));
     env.jersey().register(new WebappConfigResource(webappConfigDAO));
     env.jersey().register(new EmailResource(anomalyFunctionDAO, emailConfigurationDAO));
+    env.jersey().register(
+        new EntityManagerResource(webappConfigDAO, anomalyFunctionDAO, emailConfigurationDAO));
   }
 
   public static void main(String[] args) throws Exception {

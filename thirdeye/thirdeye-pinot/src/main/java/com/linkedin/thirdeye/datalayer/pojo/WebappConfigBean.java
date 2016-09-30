@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.datalayer.pojo;
 
+import java.util.Map;
 import java.util.Objects;
 
 import com.google.common.base.MoreObjects;
@@ -14,6 +15,7 @@ public class WebappConfigBean extends AbstractBean {
   private String collection;
   private WebappConfigType type;
   private String config;
+  private Map<String, Object> configMap;
 
   public String getName() {
     return name;
@@ -45,6 +47,14 @@ public class WebappConfigBean extends AbstractBean {
 
   public void setConfig(String config) {
     this.config = config;
+  }
+
+  public Map<String, Object> getConfigMap() {
+    return configMap;
+  }
+
+  public void setConfigMap(Map<String, Object> configMap) {
+    this.configMap = configMap;
   }
 
   @Override

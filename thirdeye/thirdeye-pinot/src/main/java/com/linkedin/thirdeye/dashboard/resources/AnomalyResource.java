@@ -21,7 +21,6 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.http.client.ClientProtocolException;
 import org.joda.time.DateTime;
 import org.joda.time.format.ISODateTimeFormat;
 import org.quartz.CronExpression;
@@ -57,7 +56,7 @@ public class AnomalyResource {
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
   private static final Logger LOG = LoggerFactory.getLogger(AnomalyResource.class);
 
-  public static final String DEFAULT_CRON = "0 0 0 * * ?";
+  private static final String DEFAULT_CRON = "0 0 0 * * ?";
   private static final String UTF8 = "UTF-8";
   private static final String STAR_DIMENSION = "*";
   private static final String DIMENSION_JOINER = ",";
@@ -68,12 +67,9 @@ public class AnomalyResource {
   private RawAnomalyResultManager anomalyResultDAO;
   private EmailConfigurationManager emailConfigurationDAO;
 
-  private ThirdEyeDashboardConfiguration dashboardConfiguration;
-
-  public AnomalyResource(ThirdEyeDashboardConfiguration dashboardConfiguration,
-      AnomalyFunctionManager anomalyFunctionDAO, RawAnomalyResultManager anomalyResultDAO,
-      EmailConfigurationManager emailConfigurationDAO, MergedAnomalyResultManager anomalyMergedResultDAO) {
-    this.dashboardConfiguration = dashboardConfiguration;
+  public AnomalyResource(AnomalyFunctionManager anomalyFunctionDAO,
+      RawAnomalyResultManager anomalyResultDAO, EmailConfigurationManager emailConfigurationDAO,
+      MergedAnomalyResultManager anomalyMergedResultDAO) {
     this.anomalyFunctionDAO = anomalyFunctionDAO;
     this.anomalyResultDAO = anomalyResultDAO;
     this.anomalyMergedResultDAO = anomalyMergedResultDAO;
@@ -381,7 +377,8 @@ public class AnomalyResource {
     }
 
     // raw result mapping
-    List<RawAnomalyResultDTO> rawResults = anomalyResultDAO.findAllByTimeAndFunctionId(0, System.currentTimeMillis(), id);
+    List<RawAnomalyResultDTO> rawResults =
+        anomalyResultDAO.findAllByTimeAndFunctionId(0, System.currentTimeMillis(), id);
     for (RawAnomalyResultDTO result : rawResults) {
       anomalyResultDAO.delete(result);
     }
@@ -394,206 +391,10 @@ public class AnomalyResource {
 
     // delete from db
     anomalyFunctionDAO.deleteById(id);
-
     return Response.noContent().build();
   }
 
-  /*************** CRUD for email functions of collection *********************************************/
-
-  // View all email functions
-  @GET
-  @Path("/email-config/view")
-  public List<EmailConfigurationDTO> viewEmailConfigs(@NotNull @QueryParam("dataset") String dataset,
-      @QueryParam("metric") String metric) {
-
-    if (StringUtils.isEmpty(dataset)) {
-      throw new UnsupportedOperationException("dataset is a required query param");
-    }
-
-    List<EmailConfigurationDTO> emailConfigSpecs = emailConfigurationDAO.findAll();
-
-    List<EmailConfigurationDTO> emailConfigurations = new ArrayList<>();
-    for (EmailConfigurationDTO emailConfigSpec : emailConfigSpecs) {
-      if (dataset.equals(emailConfigSpec.getCollection()) &&
-          (StringUtils.isEmpty(metric) || (StringUtils.isNotEmpty(metric) && metric.equals(emailConfigSpec.getMetric())))) {
-
-        emailConfigurations.add(emailConfigSpec);
-      }
-    }
-    return emailConfigurations;
-  }
-
-  // Add email function
-  @POST
-  @Path("/email-config/create")
-  public Response createEmailConfigs(@NotNull @QueryParam("dataset") String dataset,
-      @NotNull @QueryParam("metric") String metric,
-      @NotNull @QueryParam("fromAddress") String fromAddress,
-      @NotNull @QueryParam("toAddresses") String toAddresses,
-      @QueryParam("repeatEvery") String repeatEvery,
-      @QueryParam("scheduleMinute") String scheduleMinute,
-      @QueryParam("scheduleHour") String scheduleHour,
-      @NotNull @QueryParam("windowSize") String windowSize,
-      @NotNull @QueryParam("windowUnit") String windowUnit,
-      @QueryParam("windowDelay") String windowDelay,
-      @QueryParam("windowDelayUnit") String windowDelayUnit,
-      @QueryParam("filters") String filters,
-      @QueryParam("isActive") boolean isActive,
-      @QueryParam("sendZeroAnomalyEmail") boolean sendZeroAnomalyEmail,
-      @QueryParam("functionIds") String functionIds) throws IOException {
-
-    if (StringUtils.isEmpty(dataset) || StringUtils.isEmpty(functionIds) || StringUtils.isEmpty(metric)
-        || StringUtils.isEmpty(windowSize) || StringUtils.isEmpty(windowUnit) || StringUtils.isEmpty(fromAddress)
-        || StringUtils.isEmpty(toAddresses)) {
-      throw new UnsupportedOperationException("Received null for one of the mandatory params: "
-          + "dataset " + dataset + ", functionIds " + functionIds + ", metric " + metric
-          + ", windowSize " + windowSize + ", windowUnit " + windowUnit + ", fromAddress" + fromAddress
-          + ", toAddresses " + toAddresses);
-    }
-
-    EmailConfigurationDTO emailConfiguration = new EmailConfigurationDTO();
-    emailConfiguration.setActive(isActive);
-    emailConfiguration.setCollection(dataset);
-    emailConfiguration.setMetric(metric);
-    emailConfiguration.setFromAddress(fromAddress);
-    emailConfiguration.setToAddresses(toAddresses);
-    String cron = DEFAULT_CRON;
-    if (StringUtils.isNotEmpty(repeatEvery)) {
-      cron = ThirdEyeUtils.constructCron(scheduleMinute, scheduleHour, TimeUnit.valueOf(repeatEvery));
-    }
-    emailConfiguration.setCron(cron);
-
-    emailConfiguration.setSmtpHost(dashboardConfiguration.getSmtpHost());
-    emailConfiguration.setSmtpPort(dashboardConfiguration.getSmtpPort());
-
-    emailConfiguration.setWindowSize(Integer.valueOf(windowSize));
-    emailConfiguration.setWindowUnit(TimeUnit.valueOf(windowUnit));
-
-    TimeUnit windowDelayTimeUnit = TimeUnit.valueOf(windowUnit);
-    if (StringUtils.isNotEmpty(windowDelayUnit)) {
-      windowDelayTimeUnit = TimeUnit.valueOf(windowDelayUnit);
-    }
-    int windowDelayTime = 0;
-    if (StringUtils.isNotEmpty(windowDelay)) {
-      windowDelayTime = Integer.valueOf(windowDelay);
-    }
-    emailConfiguration.setWindowDelayUnit(windowDelayTimeUnit);
-    emailConfiguration.setWindowDelay(windowDelayTime);
-
-    emailConfiguration.setSendZeroAnomalyEmail(sendZeroAnomalyEmail);
-    emailConfiguration.setFilters(filters);
-
-    List<AnomalyFunctionDTO> anomalyFunctionSpecs = new ArrayList<>();
-    for (String functionIdString : functionIds.split(",")) {
-      AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionDAO.findById(Long.valueOf(functionIdString));
-      anomalyFunctionSpecs.add(anomalyFunctionSpec);
-    }
-    emailConfiguration.setFunctions(anomalyFunctionSpecs);
-
-    Long id = emailConfigurationDAO.save(emailConfiguration);
-
-    return Response.ok(id).build();
-  }
-
-  // Update email function
-  @POST
-  @Path("/email-config/update")
-  public Response updateEmailConfigs(@NotNull @QueryParam("id") Long id,
-      @NotNull @QueryParam("dataset") String dataset,
-      @NotNull @QueryParam("metric") String metric,
-      @NotNull @QueryParam("fromAddress") String fromAddress,
-      @NotNull @QueryParam("toAddresses") String toAddresses,
-      @QueryParam("repeatEvery") String repeatEvery,
-      @QueryParam("scheduleMinute") String scheduleMinute,
-      @QueryParam("scheduleHour") String scheduleHour,
-      @NotNull @QueryParam("windowSize") String windowSize,
-      @NotNull @QueryParam("windowUnit") String windowUnit,
-      @QueryParam("windowDelay") String windowDelay,
-      @QueryParam("windowDelayUnit") String windowDelayUnit,
-      @QueryParam("filters") String filters,
-      @QueryParam("isActive") boolean isActive,
-      @QueryParam("sendZeroAnomalyEmail") boolean sendZeroAnomalyEmail,
-      @QueryParam("functionIds") String functionIds) throws IOException {
-
-    if (id == null || StringUtils.isEmpty(dataset) || StringUtils.isEmpty(functionIds) || StringUtils.isEmpty(metric)
-        || StringUtils.isEmpty(windowSize) || StringUtils.isEmpty(windowUnit) || StringUtils.isEmpty(fromAddress)
-        || StringUtils.isEmpty(toAddresses)) {
-      throw new UnsupportedOperationException("Received null for one of the mandatory params: "
-          + "dataset " + dataset + ", functionIds " + functionIds + ", metric " + metric
-          + ", windowSize " + windowSize + ", windowUnit " + windowUnit + ", fromAddress" + fromAddress
-          + ", toAddresses " + toAddresses);
-    }
-
-    // stop email report if active
-    EmailConfigurationDTO emailConfiguration = emailConfigurationDAO.findById(id);
-    if (emailConfiguration == null) {
-      throw new IllegalStateException("No email configuration for id " + id);
-    }
-
-    emailConfiguration.setActive(isActive);
-    emailConfiguration.setId(id);
-    emailConfiguration.setCollection(dataset);
-    emailConfiguration.setMetric(metric);
-    emailConfiguration.setFromAddress(fromAddress);
-    emailConfiguration.setToAddresses(toAddresses);
-    String cron = DEFAULT_CRON;
-    if (StringUtils.isNotEmpty(repeatEvery)) {
-      cron = ThirdEyeUtils.constructCron(scheduleMinute, scheduleHour, TimeUnit.valueOf(repeatEvery));
-    }
-    emailConfiguration.setCron(cron);
-
-    emailConfiguration.setSmtpHost(dashboardConfiguration.getSmtpHost());
-    emailConfiguration.setSmtpPort(dashboardConfiguration.getSmtpPort());
-
-    emailConfiguration.setWindowSize(Integer.valueOf(windowSize));
-    emailConfiguration.setWindowUnit(TimeUnit.valueOf(windowUnit));
-
-    TimeUnit windowDelayTimeUnit = TimeUnit.valueOf(windowUnit);
-    if (StringUtils.isNotEmpty(windowDelayUnit)) {
-      windowDelayTimeUnit = TimeUnit.valueOf(windowDelayUnit);
-    }
-    int windowDelayTime = 0;
-    if (StringUtils.isNotEmpty(windowDelay)) {
-      windowDelayTime = Integer.valueOf(windowDelay);
-    }
-    emailConfiguration.setWindowDelayUnit(windowDelayTimeUnit);
-    emailConfiguration.setWindowDelay(windowDelayTime);
-
-    emailConfiguration.setSendZeroAnomalyEmail(sendZeroAnomalyEmail);
-    emailConfiguration.setFilters(filters);
-
-    List<AnomalyFunctionDTO> anomalyFunctionSpecs = new ArrayList<>();
-    for (String functionIdString : functionIds.split(",")) {
-      AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionDAO.findById(Long.valueOf(functionIdString));
-      anomalyFunctionSpecs.add(anomalyFunctionSpec);
-    }
-    emailConfiguration.setFunctions(anomalyFunctionSpecs);
-
-    emailConfigurationDAO.update(emailConfiguration);
-    return Response.ok(id).build();
-  }
-
-
-  // Delete email function
-  @DELETE
-  @Path("/email-config/delete")
-  public Response deleteEmailConfigs(@NotNull @QueryParam("id") Long id) throws ClientProtocolException, IOException {
-
-    if (id == null) {
-      throw new IllegalArgumentException("id is a required query param");
-    }
-    // stop schedule if active
-    EmailConfigurationDTO emailConfiguration = emailConfigurationDAO.findById(id);
-    if (emailConfiguration == null) {
-      throw new IllegalStateException("No emailConfiguraiton for id " + id);
-    }
-
-    // delete from db
-    emailConfigurationDAO.deleteById(id);
-    return Response.noContent().build();
-  }
-
-
+  /************ Anomaly Feedback **********/
   @GET
   @Path(value = "anomaly-result/feedback")
   @Produces(MediaType.APPLICATION_JSON)

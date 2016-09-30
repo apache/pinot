@@ -8,6 +8,7 @@ create table if not exists generic_json_entity (
     update_time timestamp default current_timestamp,
     version int(10)
 ) ENGINE=InnoDB;
+create index generic_json_entity_beanclass_idx on generic_json_entity(beanClass);
 
 create table if not exists anomaly_function_index (
     function_name varchar(200) not null,
@@ -107,6 +108,8 @@ create table if not exists raw_anomaly_result_index (
 create index raw_anomaly_result_function_idx on raw_anomaly_result_index(function_id);
 create index raw_anomaly_result_feedback_idx on raw_anomaly_result_index(anomaly_feedback_id);
 create index raw_anomaly_result_job_idx on raw_anomaly_result_index(job_id);
+create index raw_anomaly_result_merged_idx on raw_anomaly_result_index(merged);
+create index raw_anomaly_result_data_missing_idx on raw_anomaly_result_index(data_missing);
 
 create table if not exists merged_anomaly_result_index (
     function_id bigint(20),
@@ -126,6 +129,7 @@ create table if not exists merged_anomaly_result_index (
 create index merged_anomaly_result_function_idx on merged_anomaly_result_index(function_id);
 create index merged_anomaly_result_feedback_idx on merged_anomaly_result_index(anomaly_feedback_id);
 create index merged_anomaly_result_metric_idx on merged_anomaly_result_index(metric_id);
+create index merged_anomaly_result_start_time_idx on merged_anomaly_result_index(start_time);
 
 create table if not exists ingraph_metric_config (
     name varchar(200) not null,
@@ -146,4 +150,3 @@ create table if not exists webapp_config_index (
     version int(10)
 ) ENGINE=InnoDB;
 ALTER TABLE `webapp_config_index` ADD UNIQUE `unique_index`(`name`, `collection`, `type`);
-
