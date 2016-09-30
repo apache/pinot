@@ -12,8 +12,6 @@ import com.linkedin.thirdeye.datalayer.util.Predicate;
 
 public class EmailConfigurationManagerImpl extends AbstractManagerImpl<EmailConfigurationDTO>
     implements EmailConfigurationManager {
-  private static final String FIND_BY_FUNCTION_ID =
-      "select ec from EmailConfigurationDTO ec JOIN ec.functions fn where fn.id=:id";
 
   public EmailConfigurationManagerImpl() {
     super(EmailConfigurationDTO.class, EmailConfigurationBean.class);
@@ -83,9 +81,6 @@ public class EmailConfigurationManagerImpl extends AbstractManagerImpl<EmailConf
 
   @Override
   public List<EmailConfigurationDTO> findByFunctionId(Long functionId) {
-    //    return getEntityManager().createQuery(FIND_BY_FUNCTION_ID, entityClass)
-    //        .setParameter("id", id)
-    //        .getResultList();
     List<EmailConfigurationBean> list = genericPojoDao.getAll(EmailConfigurationBean.class);
     List<EmailConfigurationDTO> result = new ArrayList<>();
     for (EmailConfigurationBean bean : list) {

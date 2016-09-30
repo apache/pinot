@@ -60,4 +60,8 @@
     <script src="../../../assets/js/lib/dashboard-chart-area.js" defer></script>
     <script src="../../../assets/js/dashboard.js" defer></script>
     <script src="../../../assets/js/lib/self-service-email.js" defer></script>
+    <script src="../../../assets/js/lib/experiments.js" defer></script>
+    <!-- JSON Editor comes here-->
+  <link rel="stylesheet" href="../../../assets/jsonedit/jsoneditor.min.css"/>
+  <script src="../../../assets/jsonedit/jsoneditor.min.js" defer></script>
 </head>

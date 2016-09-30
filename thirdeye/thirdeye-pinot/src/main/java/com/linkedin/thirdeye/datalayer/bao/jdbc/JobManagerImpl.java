@@ -15,9 +15,6 @@ import com.linkedin.thirdeye.datalayer.util.Predicate;
 
 public class JobManagerImpl extends AbstractManagerImpl<JobDTO> implements JobManager {
 
-  private static final String FIND_BY_STATUS_AND_LAST_MODIFIED_TIME_LT_EXPIRE =
-      "from JobDTO aj " + "WHERE aj.status = :status AND aj.lastModified < :expireTimestamp";
-
   public JobManagerImpl() {
     super(JobDTO.class, JobBean.class);
   }

@@ -72,10 +72,6 @@ public class RawAnomalyResultManagerImpl extends AbstractManagerImpl<RawAnomalyR
 
   public List<RawAnomalyResultDTO> findAllByTimeAndFunctionId(long startTime, long endTime,
       long functionId) {
-    //    "SELECT r FROM RawAnomalyResultDTO r WHERE r.function.id = :functionId "
-    //        + "AND ((r.startTime >= :startTime AND r.startTime <= :endTime) "
-    //        + "OR (r.endTime >= :startTime AND r.endTime <= :endTime))";
-
     Predicate startTimePredicate;
     startTimePredicate =
         Predicate.AND(Predicate.GE("startTime", startTime), Predicate.LE("startTime", endTime));
@@ -112,8 +108,6 @@ public class RawAnomalyResultManagerImpl extends AbstractManagerImpl<RawAnomalyR
   }
 
   public List<RawAnomalyResultDTO> findByFunctionId(Long functionId) {
-    //    "select r from RawAnomalyResultDTO r where r.function.id = :functionId";
-
     Predicate predicate = Predicate.EQ("functionId", functionId);
     List<RawAnomalyResultBean> list = genericPojoDao.get(predicate, RawAnomalyResultBean.class);
     List<RawAnomalyResultDTO> result = new ArrayList<>();
@@ -122,7 +116,4 @@ public class RawAnomalyResultManagerImpl extends AbstractManagerImpl<RawAnomalyR
     }
     return result;
   }
-
-
-
 }

@@ -106,7 +106,6 @@ public class AnomalyFunctionResource {
     return MetricAggFunction.values();
   }
 
-
   @POST
   @Path("/analyze")
   @Consumes(MediaType.APPLICATION_JSON)

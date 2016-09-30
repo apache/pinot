@@ -13,12 +13,6 @@ import com.linkedin.thirdeye.datalayer.util.Predicate;
 
 public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAnomalyResultDTO>
     implements MergedAnomalyResultManager {
-  private static final String FIND_BY_TIME_EMAIL_NOTIFIED_FALSE =
-      "SELECT r FROM EmailConfigurationDTO d JOIN d.functions f, MergedAnomalyResultDTO r "
-          + "WHERE r.function.id=f.id AND d.id = :emailId and r.notified=false "
-          + "and (r.startTime < :endTime and r.endTime > :startTime) order by r.endTime desc ";
-
-
   // find a conflicting window
   private static final String FIND_BY_COLLECTION_METRIC_DIMENSIONS_TIME =
       " where collection=:collection and metric=:metric " + "and dimensions in (:dimensions) "
@@ -106,8 +100,6 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
 
   @Override
   public List<MergedAnomalyResultDTO> findByFunctionId(Long functionId) {
-    //    return getEntityManager().createQuery(FIND_BY_FUNCTION_ID, entityClass)
-    //        .setParameter("functionId", functionId).getResultList();
     Map<String, Object> filterParams = new HashMap<>();
     filterParams.put("functionId", functionId);
 
@@ -160,9 +152,6 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
   @Override
   public List<MergedAnomalyResultDTO> findByCollectionTime(String collection, long startTime,
       long endTime) {
-    //    return getEntityManager().createQuery(FIND_BY_COLLECTION_TIME, entityClass)
-    //        .setParameter("collection", collection).setParameter("startTime", startTime)
-    //        .setParameter("endTime", endTime).getResultList();
     Map<String, Object> filterParams = new HashMap<>();
     filterParams.put("collection", collection);
     filterParams.put("startTime", startTime);
@@ -181,9 +170,6 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
   @Override
   public MergedAnomalyResultDTO findLatestByFunctionIdDimensions(Long functionId,
       String dimensions) {
-    //      return getEntityManager().createQuery(FIND_BY_FUNCTION_AND_DIMENSIONS, entityClass)
-    //          .setParameter("functionId", functionId).setParameter("dimensions", dimensions)
-    //          .setMaxResults(1).getSingleResult();
     Map<String, Object> filterParams = new HashMap<>();
     filterParams.put("functionId", functionId);
     filterParams.put("dimensions", dimensions);
@@ -203,8 +189,6 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
 
   @Override
   public MergedAnomalyResultDTO findLatestByFunctionIdOnly(Long functionId) {
-    //      return getEntityManager().createQuery(FIND_BY_FUNCTION_AND_NULL_DIMENSION, entityClass)
-    //          .setParameter("functionId", functionId).setMaxResults(1).getSingleResult();
     Map<String, Object> filterParams = new HashMap<>();
     filterParams.put("functionId", functionId);
 
