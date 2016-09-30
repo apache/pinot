@@ -854,7 +854,6 @@ body a{
     min-height: 200px;
 }
 
-
 /* Timeseries- view related */
 #timeseries-display-chart-area .timeseries-legend-box{
    top:45px;
@@ -893,30 +892,6 @@ body a{
     text-decoration: underline;
 }
 
-#anomalies-table{
-    width:100%;
-    font-size: 1rem;
-    vertical-align: middle;
-}
-
-#anomalies-table td{
-    vertical-align: middle;
-}
-
-#anomalies-table .metric-label:hover,
-#anomalies-table .heat-map-cell:hover{
-    cursor : pointer;
-    text-decoration: underline;
-}
-
-#anomalies-table .color-box{
-    width: 10px;
-    height: 10px;
-}
-
-#anomalies-table .radio-btn-cell label{
-    padding: 6px;
-}
 
 /** anomalies view / thumbnails related **/
 #anomaly-result-thumbnails{
