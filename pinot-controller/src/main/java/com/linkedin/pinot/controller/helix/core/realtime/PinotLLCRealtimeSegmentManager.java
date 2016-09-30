@@ -43,6 +43,7 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.google.common.base.Function;
+import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
@@ -60,6 +61,7 @@ import com.linkedin.pinot.core.realtime.impl.kafka.KafkaSimpleConsumerFactoryImp
 import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import javax.annotation.Nullable;
 
 
 public class PinotLLCRealtimeSegmentManager {
@@ -194,6 +196,51 @@ public class PinotLLCRealtimeSegmentManager {
     writeKafkaPartitionAssignemnt(realtimeTableName, znRecord);
     setupInitialSegments(realtimeTableName, znRecord, topicName, initialOffset, bootstrapHosts, idealState, create,
         nReplicas);
+  }
+
+  // Remove all trace of LLC for this table.
+  public void cleanupLLC(final String realtimeTableName) {
+    // Start by removing the kafka partition assigment znode. This will prevent any new segments being created.
+    ZKMetadataProvider.removeKafkaPartitionAssignmentFromPropertyStore(_propertyStore, realtimeTableName);
+    LOGGER.info("Removed Kafka partition assignemnt (if any) record for {}", realtimeTableName);
+    // If there are any completions in the pipeline we let them commit.
+    Uninterruptibles.sleepUninterruptibly(1, TimeUnit.SECONDS);
+
+    // Remove segments from propertystore.
+    final List<String> segmentNames = getExistingSegments(realtimeTableName);
+    final List<String> znodesToDelete = new ArrayList<>(segmentNames.size());
+    for (String segmentName : segmentNames) {
+      if (SegmentName.isLowLevelConsumerSegmentName(segmentName)) {
+        final String znodePath = ZKMetadataProvider.constructPropertyStorePathForSegment(realtimeTableName, segmentName);
+        znodesToDelete.add(znodePath);
+      }
+    }
+    _propertyStore.remove(znodesToDelete, AccessOption.PERSISTENT);
+    LOGGER.info("Removed {} LLC segments from PROPERTYSTORE for {}", znodesToDelete.size(), realtimeTableName);
+
+    // Remove segments from IdealState. The segments in the idealstate should be the same as that in propertystore,
+    // but it is better to take what idealstate reports and remove the llc segments from there.
+    HelixHelper.updateIdealState(_helixManager, realtimeTableName, new Function<IdealState, IdealState>() {
+      @Nullable
+      @Override
+      public IdealState apply(@Nullable IdealState idealState) {
+        Set<String> allSegments = idealState.getPartitionSet();
+        List<String> segmentsToRemove = new ArrayList<String>(allSegments.size());
+        int removedCount = 0;
+        for (String segmentName : allSegments) {
+          if (SegmentName.isLowLevelConsumerSegmentName(segmentName)) {
+            segmentsToRemove.add(segmentName);
+            removedCount++;
+          }
+        }
+        LOGGER.info("Attempting to remove {} LLC segments from IDEALSTATE for {}", removedCount, realtimeTableName);
+        for (String segmentName : segmentsToRemove) {
+          idealState.getPartitionSet().remove(segmentName);
+        }
+        return idealState;
+      }
+    }, RetryPolicies.exponentialBackoffRetryPolicy(5, 500L, 2.0f));
+    LOGGER.info("Removed LLC segments from IDEALSTATE (if any) for {}", realtimeTableName);
   }
 
   protected void writeKafkaPartitionAssignemnt(final String realtimeTableName, ZNRecord znRecord) {
@@ -400,6 +447,12 @@ public class PinotLLCRealtimeSegmentManager {
     final String oldZnodePath = ZKMetadataProvider.constructPropertyStorePathForSegment(realtimeTableName, committingSegmentNameStr);
 
     final ZNRecord partitionAssignment = getKafkaPartitionAssignment(realtimeTableName);
+    // If an LLC table is dropped (or cleaned up), we will get null here. In that case we should not be
+    // creating a new segment
+    if (partitionAssignment == null) {
+      LOGGER.warn("Kafka partition assignment not found for {}", realtimeTableName);
+      throw new RuntimeException("Kafka partition assigment not found. Not committing segment");
+    }
     List<String> newInstances = partitionAssignment.getListField(Integer.toString(partitionId));
     final Map<String, List<String>> idealStateEntries = new HashMap<>(1);
 
