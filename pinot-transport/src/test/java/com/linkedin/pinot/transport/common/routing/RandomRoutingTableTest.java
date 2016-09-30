@@ -20,6 +20,7 @@ import java.io.InputStream;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -66,7 +67,7 @@ public class RandomRoutingTableTest {
     double[] globalArrays = new double[9];
 
     for (int numRun = 0; numRun < totalRuns; ++numRun) {
-      RoutingTableLookupRequest request = new RoutingTableLookupRequest(tableName);
+      RoutingTableLookupRequest request = new RoutingTableLookupRequest(tableName, Collections.<String>emptyList());
       Map<ServerInstance, SegmentIdSet> serversMap = routingTable.findServers(request);
       TreeSet<ServerInstance> serverInstances = new TreeSet<ServerInstance>(serversMap.keySet());
 

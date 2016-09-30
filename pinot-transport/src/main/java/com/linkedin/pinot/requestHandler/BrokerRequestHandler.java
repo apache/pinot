@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.requestHandler;
 
+import com.google.common.base.Splitter;
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.exception.QueryException;
@@ -56,6 +57,7 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -151,12 +153,21 @@ public class BrokerRequestHandler {
       // ignore, trace is disabled by default
     }
 
+    Map<String, String> debugOptions = null;
+    if (request.has("debugOptions")) {
+      String routingOptionParameter = request.getString("debugOptions");
+      debugOptions = Splitter.on(';').omitEmptyStrings().trimResults().withKeyValueSeparator('=').split(routingOptionParameter);
+    }
+
     final long startTime = System.nanoTime();
     final BrokerRequest brokerRequest;
     try {
       brokerRequest = REQUEST_COMPILER.compileToBrokerRequest(pql);
       if (isTraceEnabled) {
         brokerRequest.setEnableTrace(true);
+      }
+      if (debugOptions != null) {
+        brokerRequest.setDebugOptions(debugOptions);
       }
       brokerRequest.setResponseFormat(ResponseType.BROKER_RESPONSE_TYPE_NATIVE.name());
     } catch (Exception e) {
@@ -284,19 +295,22 @@ public class BrokerRequestHandler {
   private List<String> getMatchedTables(BrokerRequest request) {
     List<String> matchedTables = new ArrayList<String>();
     String tableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(request.getQuerySource().getTableName());
-    Map<ServerInstance, SegmentIdSet> routingMap = _routingTable.findServers(new RoutingTableLookupRequest(tableName));
+    Map<ServerInstance, SegmentIdSet> routingMap = _routingTable.findServers(
+        new RoutingTableLookupRequest(tableName, extractRoutingOptionsFromBrokerRequest(request)));
     if (routingMap != null && !routingMap.isEmpty()) {
       matchedTables.add(tableName);
     }
     tableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(request.getQuerySource().getTableName());
-    routingMap = _routingTable.findServers(new RoutingTableLookupRequest(tableName));
+    routingMap = _routingTable.findServers(
+        new RoutingTableLookupRequest(tableName, extractRoutingOptionsFromBrokerRequest(request)));
     if (routingMap != null && !routingMap.isEmpty()) {
       matchedTables.add(tableName);
     }
     // For backward compatible
     if (matchedTables.isEmpty()) {
       tableName = request.getQuerySource().getTableName();
-      if (_routingTable.findServers(new RoutingTableLookupRequest(tableName)) != null) {
+      if (_routingTable.findServers(
+          new RoutingTableLookupRequest(tableName, extractRoutingOptionsFromBrokerRequest(request))) != null) {
         matchedTables.add(tableName);
       }
     }
@@ -391,7 +405,8 @@ public class BrokerRequestHandler {
       throws InterruptedException {
     // Step1
     final long routingStartTime = System.nanoTime();
-    RoutingTableLookupRequest rtRequest = new RoutingTableLookupRequest(request.getQuerySource().getTableName());
+    RoutingTableLookupRequest rtRequest = new RoutingTableLookupRequest(request.getQuerySource().getTableName(),
+        extractRoutingOptionsFromBrokerRequest(request));
     Map<ServerInstance, SegmentIdSet> segmentServices = _routingTable.findServers(rtRequest);
     if (segmentServices == null || segmentServices.isEmpty()) {
       LOGGER.warn("Not found ServerInstances to Segments Mapping:");
@@ -489,7 +504,8 @@ public class BrokerRequestHandler {
         new HashMap<BrokerRequest, Pair<CompositeFuture<ServerInstance, ByteBuf>, ScatterGatherStats>>();
     for (BrokerRequest request : requests) {
       final long routingStartTime = System.nanoTime();
-      RoutingTableLookupRequest rtRequest = new RoutingTableLookupRequest(request.getQuerySource().getTableName());
+      RoutingTableLookupRequest rtRequest = new RoutingTableLookupRequest(request.getQuerySource().getTableName(),
+          extractRoutingOptionsFromBrokerRequest(request));
       Map<ServerInstance, SegmentIdSet> segmentServices = _routingTable.findServers(rtRequest);
       if (segmentServices == null || segmentServices.isEmpty()) {
         LOGGER.info("Not found ServerInstances to Segments Mapping for Table - {}", rtRequest.getTableName());
@@ -595,6 +611,20 @@ public class BrokerRequestHandler {
       LOGGER.error("Caught exception while processing query", e);
       Utils.rethrowException(e);
       throw new AssertionError("Should not reach this");
+    }
+  }
+
+  private List<String> extractRoutingOptionsFromBrokerRequest(BrokerRequest request) {
+    if (request.getDebugOptions() == null) {
+      return Collections.emptyList();
+    }
+
+    Map<String, String> debugOptions = request.getDebugOptions();
+
+    if (debugOptions.containsKey("routingOptions")) {
+      return Splitter.on(",").omitEmptyStrings().trimResults().splitToList(debugOptions.get("routingOptions"));
+    } else {
+      return Collections.emptyList();
     }
   }
 

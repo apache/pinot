@@ -59,6 +59,7 @@ public abstract class ControllerTest {
     final JSONObject json = new JSONObject();
     json.put("pql", query);
     json.put("trace", isTraceEnabled);
+//    json.put("debugOptions", "routingOptions=FORCE_LLC,FORCE_HLC;otherOption=foo,bar");
 
     final long start = System.currentTimeMillis();
     final URLConnection conn = new URL(brokerBaseApiUrl + "/query").openConnection();
@@ -81,10 +82,15 @@ public abstract class ControllerTest {
     LOGGER.debug("Time taken for '{}':{}ms", query, (stop - start));
 
     final String res = sb.toString();
-    final JSONObject ret = new JSONObject(res);
-    ret.put("totalTime", (stop - start));
+    try {
+      final JSONObject ret = new JSONObject(res);
+      ret.put("totalTime", (stop - start));
 
-    return ret;
+      return ret;
+    } catch (JSONException e) {
+      LOGGER.warn("Failed to parse response \"{}\" as JSON", res);
+      return null;
+    }
   }
 
   public JSONObject postQuery(String query) throws Exception {

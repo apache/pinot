@@ -86,21 +86,44 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
     String tableName = request.getTableName();
     List<ServerToSegmentSetMap> serverToSegmentSetMaps;
 
+    boolean forceLLC = false;
+    boolean forceHLC = false;
+
+    for (String routingOption : request.getRoutingOptions()) {
+      if (routingOption.equalsIgnoreCase("FORCE_HLC")) {
+        forceHLC = true;
+      }
+
+      if (routingOption.equalsIgnoreCase("FORCE_LLC")) {
+        forceLLC = true;
+      }
+    }
+
+    if (forceHLC && forceLLC) {
+      throw new RuntimeException("Trying to force routing to both HLC and LLC at the same time");
+    }
+
     if (CommonConstants.Helix.TableType.REALTIME.equals(TableNameBuilder.getTableTypeFromTableName(tableName))) {
       if (_brokerRoutingTable.containsKey(tableName) && _brokerRoutingTable.get(tableName).size() != 0) {
         if (_llcBrokerRoutingTable.containsKey(tableName) && _llcBrokerRoutingTable.get(tableName).size() != 0) {
           // Has both high and low-level segments. Follow what the routing table selector says.
-          if (_routingTableSelector.shouldUseLLCRouting(tableName)) {
+          if (!forceHLC && (_routingTableSelector.shouldUseLLCRouting(tableName) || forceLLC)) {
             serverToSegmentSetMaps = routeToLLC(tableName);
           } else {
             serverToSegmentSetMaps = routeToHLC(tableName);
           }
         } else {
           // Has only hi-level consumer segments.
+          if (forceLLC) {
+            throw new RuntimeException("Failed to route to LLC, table has only HLC segments");
+          }
           serverToSegmentSetMaps = routeToHLC(tableName);
         }
       } else {
         // May have only low-level consumer segments
+        if (forceHLC) {
+          throw new RuntimeException("Failed to route to HLC, table has only LLC segments");
+        }
         serverToSegmentSetMaps = routeToLLC(tableName);
       }
     } else {  // Offline table, use the conventional routing table

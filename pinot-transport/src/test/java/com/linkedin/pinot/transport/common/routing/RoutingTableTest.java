@@ -18,6 +18,7 @@ package com.linkedin.pinot.transport.common.routing;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.configuration.Configuration;
@@ -93,7 +94,7 @@ public class RoutingTableTest {
 
   private void assertResourceRequest(HelixExternalViewBasedRouting routingTable, String resource,
       String expectedSegmentList, int expectedNumSegment) {
-    RoutingTableLookupRequest request = new RoutingTableLookupRequest(resource);
+    RoutingTableLookupRequest request = new RoutingTableLookupRequest(resource, Collections.<String>emptyList());
     Map<ServerInstance, SegmentIdSet> serversMap = routingTable.findServers(request);
     List<String> selectedSegments = new ArrayList<String>();
     for (ServerInstance serverInstance : serversMap.keySet()) {
@@ -206,7 +207,7 @@ public class RoutingTableTest {
 
   private void assertResourceRequest(HelixExternalViewBasedRouting routingTable, String resource,
       String[] expectedSegmentLists, int expectedNumSegment) {
-    RoutingTableLookupRequest request = new RoutingTableLookupRequest(resource);
+    RoutingTableLookupRequest request = new RoutingTableLookupRequest(resource, Collections.<String>emptyList());
     Map<ServerInstance, SegmentIdSet> serversMap = routingTable.findServers(request);
     List<String> selectedSegments = new ArrayList<String>();
     for (ServerInstance serverInstance : serversMap.keySet()) {
@@ -230,7 +231,7 @@ public class RoutingTableTest {
 
   // Test that we can switch between llc and hlc routing depending on what the selector tells us.
   @Test
-  public void   testCombinedKafkaRouting() throws Exception {
+  public void testCombinedKafkaRouting() throws Exception {
     HelixExternalViewBasedRouting routingTable = new HelixExternalViewBasedRouting(null, NO_LLC_ROUTING);
 
     final long now = System.currentTimeMillis();
@@ -268,7 +269,7 @@ public class RoutingTableTest {
     ev.setState(llcSegment2.getSegmentName(), helixInstance2, consuming);
     routingTable.markDataResourceOnline(resourceName, ev, instanceConfigs);
 
-    final RoutingTableLookupRequest request = new RoutingTableLookupRequest(resourceName);
+    RoutingTableLookupRequest request = new RoutingTableLookupRequest(resourceName, Collections.<String>emptyList());
     for (int i = 0; i < 100; i++) {
       Map<ServerInstance, SegmentIdSet> routingMap = routingTable.findServers(request);
       Assert.assertEquals(routingMap.size(), 1);
@@ -329,6 +330,56 @@ public class RoutingTableTest {
     // If this test fails
     Assert.assertTrue(hlc >= 10, "Got low values hlc=" + hlc + ",llc="  + llc);
     Assert.assertTrue(llc >= 10, "Got low values hlc=" + hlc + ",llc="  + llc);
+
+    // Check that force HLC works
+    request = new RoutingTableLookupRequest(resourceName, Collections.singletonList("FORCE_HLC"));
+    hlc = 0;
+    llc = 0;
+    for (int i = 0; i < 100; i++) {
+      Map<ServerInstance, SegmentIdSet> routingMap = routingTable.findServers(request);
+      Assert.assertEquals(routingMap.size(), 1);
+      if (routingMap.containsKey(serverInstance2)) {
+        List<String> segments = routingMap.get(serverInstance2).getSegmentsNameList();
+        Assert.assertEquals(segments.size(), 2);
+        Assert.assertTrue(segments.contains(llcSegment1.getSegmentName()));
+        Assert.assertTrue(segments.contains(llcSegment2.getSegmentName()));
+        llc++;
+      } else {
+        List<String> segments = routingMap.get(serverInstance1).getSegmentsNameList();
+        Assert.assertEquals(segments.size(), 2);
+        Assert.assertTrue(segments.contains(s1HlcSegment1.getSegmentName()));
+        Assert.assertTrue(segments.contains(s1HlcSegment2.getSegmentName()));
+        hlc++;
+      }
+    }
+
+    Assert.assertEquals(hlc, 100);
+    Assert.assertEquals(llc, 0);
+
+    // Check that force LLC works
+    request = new RoutingTableLookupRequest(resourceName, Collections.singletonList("FORCE_LLC"));
+    hlc = 0;
+    llc = 0;
+    for (int i = 0; i < 100; i++) {
+      Map<ServerInstance, SegmentIdSet> routingMap = routingTable.findServers(request);
+      Assert.assertEquals(routingMap.size(), 1);
+      if (routingMap.containsKey(serverInstance2)) {
+        List<String> segments = routingMap.get(serverInstance2).getSegmentsNameList();
+        Assert.assertEquals(segments.size(), 2);
+        Assert.assertTrue(segments.contains(llcSegment1.getSegmentName()));
+        Assert.assertTrue(segments.contains(llcSegment2.getSegmentName()));
+        llc++;
+      } else {
+        List<String> segments = routingMap.get(serverInstance1).getSegmentsNameList();
+        Assert.assertEquals(segments.size(), 2);
+        Assert.assertTrue(segments.contains(s1HlcSegment1.getSegmentName()));
+        Assert.assertTrue(segments.contains(s1HlcSegment2.getSegmentName()));
+        hlc++;
+      }
+    }
+
+    Assert.assertEquals(hlc, 0);
+    Assert.assertEquals(llc, 100);
   }
 
   /**

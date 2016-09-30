@@ -15,6 +15,9 @@
  */
 package com.linkedin.pinot.routing;
 
+import java.util.List;
+
+
 /**
  * Routing table lookup request. Future filtering parameters for lookup needs to be added here.
  *
@@ -24,12 +27,19 @@ public class RoutingTableLookupRequest {
 
   private final String tableName;
 
+  private final List<String> routingOptions;
+
   public String getTableName() {
     return tableName;
   }
 
-  public RoutingTableLookupRequest(String tableName) {
+  public List<String> getRoutingOptions() {
+    return routingOptions;
+  }
+
+  public RoutingTableLookupRequest(String tableName, List<String> routingOptions) {
     super();
     this.tableName = tableName;
+    this.routingOptions = routingOptions;
   }
 }
