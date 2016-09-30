@@ -17,9 +17,12 @@ package com.linkedin.pinot.common.data;
 
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import com.linkedin.pinot.common.data.TimeGranularitySpec.TimeFormat;
 import com.linkedin.pinot.common.utils.EqualityUtils;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
+
+import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 import org.joda.time.DateTime;
 
 
@@ -28,25 +31,42 @@ import org.joda.time.DateTime;
  * <p>- <code>DataType</code>: data type of the time column (e.g. INT, LONG).
  * <p>- <code>TimeType</code>: time unit of the time column (e.g. MINUTES, HOURS).
  * <p>- <code>TimeUnitSize</code>: size of the time buckets (e.g. 10 MINUTES, 2 HOURS). By default this is set to 1.
+ * <p>- <code>TimeFormat</code>: Can be either EPOCH (default) or SIMPLE_DATE_FORMAT:pattern e.g SIMPLE_DATE_FORMAT:yyyyMMdd 
  * <p>- <code>Name</code>: name of the time column.
  * <p>E.g.
  * <p>If the time column is in millisecondsSinceEpoch, constructor can be invoked as:
  * <p><code>TimeGranularitySpec(LONG, MILLISECONDS, timeColumnName)</code>
  * <p>If the time column is in tenMinutesSinceEpoch, constructor can be invoked as:
  * <p><code>TimeGranularitySpec(LONG, 10, MINUTES, timeColumnName)</code>
+ * <p>If the time column is in Simple Date Format:
+ * <p><code>new TimeGranularitySpec(DataType.STRING, 1, TimeUnit.HOURS, TimeFormat.SIMPLE_DATE_FORMAT.toString() +":yyyyMMdd", "hour");</code>
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class TimeGranularitySpec {
   private static final int DEFAULT_TIME_UNIT_SIZE = 1;
-
+  
   private DataType _dataType;
   private TimeUnit _timeType;
   private int _timeUnitSize = DEFAULT_TIME_UNIT_SIZE;
+  private String _timeFormat = TimeFormat.EPOCH.toString();
   private String _name;
-
+  /*
+   * Can be either EPOCH (default) or SIMPLE_DATE_FORMAT:pattern e.g SIMPLE_DATE_FORMAT:yyyyMMdd 
+   */
+  public enum TimeFormat {
+    EPOCH, //default
+    SIMPLE_DATE_FORMAT 
+  }
   // Default constructor required by JSON de-serializer. DO NOT REMOVE.
   public TimeGranularitySpec() {
   }
 
+  /**
+   * 
+   * @param dataType
+   * @param timeType
+   * @param name
+   */
   public TimeGranularitySpec(@Nonnull DataType dataType, @Nonnull TimeUnit timeType, @Nonnull String name) {
     Preconditions.checkNotNull(timeType);
     Preconditions.checkNotNull(name);
@@ -55,7 +75,32 @@ public class TimeGranularitySpec {
     _timeType = timeType;
     _name = name;
   }
-
+  /**
+   * 
+   * @param dataType
+   * @param timeType
+   * @param timeFormat Can be either EPOCH (default) or SIMPLE_DATE_FORMAT:pattern e.g SIMPLE_DATE_FORMAT:yyyyMMdd 
+   * @param name
+   */
+  public TimeGranularitySpec(@Nonnull DataType dataType, @Nonnull TimeUnit timeType, @Nonnull String timeFormat,
+      @Nonnull String name) {
+    Preconditions.checkNotNull(timeType);
+    Preconditions.checkNotNull(name);
+    Preconditions.checkNotNull(timeFormat);
+    Preconditions.checkArgument(timeFormat.equals(TimeFormat.EPOCH.toString())
+        || (timeFormat.startsWith(TimeFormat.SIMPLE_DATE_FORMAT.toString())));
+    _dataType = dataType.getStoredType();
+    _timeType = timeType;
+    _name = name;
+    _timeFormat = timeFormat;
+  }
+  /**
+   * 
+   * @param dataType
+   * @param timeUnitSize
+   * @param timeType
+   * @param name
+   */
   public TimeGranularitySpec(@Nonnull DataType dataType, int timeUnitSize, @Nonnull TimeUnit timeType,
       @Nonnull String name) {
     Preconditions.checkNotNull(timeType);
@@ -67,6 +112,28 @@ public class TimeGranularitySpec {
     _name = name;
   }
 
+  /**
+   * 
+   * @param dataType
+   * @param timeUnitSize
+   * @param timeType
+   * @param timeFormat Can be either EPOCH (default) or SIMPLE_DATE_FORMAT:pattern e.g SIMPLE_DATE_FORMAT:yyyyMMdd 
+   * @param name
+   */
+  public TimeGranularitySpec(@Nonnull DataType dataType, int timeUnitSize, @Nonnull TimeUnit timeType,
+      @Nonnull String timeFormat, @Nonnull String name) {
+    Preconditions.checkNotNull(timeType);
+    Preconditions.checkNotNull(name);
+    Preconditions.checkNotNull(timeFormat);
+    Preconditions.checkArgument(timeFormat.equals(TimeFormat.EPOCH.toString())
+        || (timeFormat.startsWith(TimeFormat.SIMPLE_DATE_FORMAT.toString())));
+    _dataType = dataType.getStoredType();
+    _timeType = timeType;
+    _timeUnitSize = timeUnitSize;
+    _name = name;
+    _timeFormat = timeFormat;
+  }
+  
   public DataType getDataType() {
     return _dataType;
   }
@@ -113,6 +180,14 @@ public class TimeGranularitySpec {
     _name = name;
   }
 
+  public void setTimeFormat(String timeFormat) {
+    this._timeFormat = timeFormat;
+  }
+  
+  public String getTimeFormat() {
+    return _timeFormat;
+  }
+  
   /**
    * Convert the units of time since epoch to {@link DateTime} format using current <code>TimeGranularitySpec</code>.
    */
@@ -123,7 +198,7 @@ public class TimeGranularitySpec {
   @Override
   public String toString() {
     return "< data type: " + _dataType + ", time type: " + _timeType + ", time unit size: " + _timeUnitSize
-        + ", name: " + _name + " >";
+        + ", name: " + _name + ", timeFormat: " + _timeFormat + " >";
   }
 
   @Override
@@ -136,7 +211,8 @@ public class TimeGranularitySpec {
       return _dataType.equals(anotherTimeGranularitySpec._dataType)
           && _timeType.equals(anotherTimeGranularitySpec._timeType)
           && _timeUnitSize == anotherTimeGranularitySpec._timeUnitSize
-          && _name.equals(anotherTimeGranularitySpec._name);
+          && _name.equals(anotherTimeGranularitySpec._name)
+          && _timeFormat.equals(anotherTimeGranularitySpec._timeFormat);
     }
     return false;
   }
@@ -147,6 +223,7 @@ public class TimeGranularitySpec {
     result = EqualityUtils.hashCodeOf(result, _timeType);
     result = EqualityUtils.hashCodeOf(result, _timeUnitSize);
     result = EqualityUtils.hashCodeOf(result, _name);
+    result = EqualityUtils.hashCodeOf(result, _timeFormat);
     return result;
   }
 }
