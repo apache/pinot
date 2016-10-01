@@ -29,7 +29,6 @@ import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.JobManager;
 import com.linkedin.thirdeye.datalayer.bao.TaskManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 
 /**
  * Scheduler for anomaly detection jobs
@@ -43,7 +42,6 @@ public class DetectionJobScheduler implements JobScheduler, Runnable {
   private JobManager anomalyJobDAO;
   private TaskManager anomalyTaskDAO;
   private AnomalyFunctionManager anomalyFunctionDAO;
-  private AnomalyFunctionFactory anomalyFunctionFactory;
 
   public DetectionJobScheduler(JobManager anomalyJobDAO, TaskManager anomalyTaskDAO,
       AnomalyFunctionManager anomalyFunctionDAO) {
@@ -70,9 +68,8 @@ public class DetectionJobScheduler implements JobScheduler, Runnable {
     return activeJobKeys;
   }
 
-  public void start() throws SchedulerException{
+  public void start() throws SchedulerException {
     quartzScheduler.start();
-
     scheduledExecutorService.scheduleWithFixedDelay(this, 0, 30, TimeUnit.MINUTES);
   }
 
@@ -167,7 +164,6 @@ public class DetectionJobScheduler implements JobScheduler, Runnable {
     detectionJobContext.setAnomalyFunctionDAO(anomalyFunctionDAO);
     detectionJobContext.setAnomalyJobDAO(anomalyJobDAO);
     detectionJobContext.setAnomalyTaskDAO(anomalyTaskDAO);
-    detectionJobContext.setAnomalyFunctionFactory(anomalyFunctionFactory);
     detectionJobContext.setAnomalyFunctionId(anomalyFunctionSpec.getId());
     detectionJobContext.setJobName(jobKey);
 
@@ -204,7 +200,6 @@ public class DetectionJobScheduler implements JobScheduler, Runnable {
     detectionJobContext.setAnomalyFunctionDAO(anomalyFunctionDAO);
     detectionJobContext.setAnomalyJobDAO(anomalyJobDAO);
     detectionJobContext.setAnomalyTaskDAO(anomalyTaskDAO);
-    detectionJobContext.setAnomalyFunctionFactory(anomalyFunctionFactory);
     detectionJobContext.setAnomalyFunctionId(anomalyFunctionSpec.getId());
     detectionJobContext.setJobName(jobKey);
     detectionJobContext.setWindowStartTime(windowStartTime);

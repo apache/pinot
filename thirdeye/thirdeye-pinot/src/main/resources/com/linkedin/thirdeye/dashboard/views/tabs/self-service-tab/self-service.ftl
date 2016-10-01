@@ -88,7 +88,7 @@
                 <div class="title-box full-width" style="margin-top:15px;">
                     <h2>Manage Alerts</h2>
                 </div>
-                <table id="configure-emails-form-table" class="uk-form">
+                <table id="configure-emails-form-table" initiallenght="100" class="uk-form">
                     <tr>
                         <td>Dataset
                         </td>

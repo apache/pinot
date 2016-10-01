@@ -1,4 +1,4 @@
-/** Time-input-form related eventlisteners of  **/
+/** Time-input-form related eventlisteners  **/
 
 
 $("#main-view").on("click", ".baseline-aggregate", function () {
