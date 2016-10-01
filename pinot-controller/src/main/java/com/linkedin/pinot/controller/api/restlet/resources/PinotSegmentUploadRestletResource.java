@@ -449,16 +449,17 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
       return repr;
     }
 
-    if (segmentFile.exists()) {
-      FileUtils.deleteQuietly(segmentFile);
-    }
-    FileUtils.moveFile(dataFile, segmentFile);
-
     PinotResourceManagerResponse response;
     if (!isSegmentTimeValid(metadata)) {
       response = new PinotResourceManagerResponse("Invalid segment start/end time", false);
     } else {
       if (downloadUrl == null) {
+        // We only move segment file to data directory when Pinot Controller will
+        // serve the data downloading from Pinot Servers.
+        if (segmentFile.exists()) {
+          FileUtils.deleteQuietly(segmentFile);
+        }
+        FileUtils.moveFile(dataFile, segmentFile);
         downloadUrl = ControllerConf.constructDownloadUrl(tableName, dataFile.getName(), vip);
       }
       // TODO: this will read table configuration again from ZK. We should optimize that
