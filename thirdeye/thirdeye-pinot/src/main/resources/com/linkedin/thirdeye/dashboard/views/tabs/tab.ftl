@@ -2,8 +2,7 @@
 <script id="tab-template" type="text/x-handlebars-template">
 <section id="{{tabName}}-section"  class="uk-grid">
 
-    <div id="form-area" class="uk-clearfix uk-width-1-4">
-
+    <div id="{{tabName}}-form-area" class="form-area uk-clearfix uk-width-1-4">
     </div>
     <div id="{{tabName}}-chart-area" class="chart-area uk-clearfix uk-width-3-4">
         <div id="{{tabName}}-display-chart-area" class="display-chart-area" style="position: relative;">
