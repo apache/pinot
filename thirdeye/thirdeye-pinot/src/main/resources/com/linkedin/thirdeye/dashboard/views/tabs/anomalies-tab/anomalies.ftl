@@ -20,7 +20,7 @@
 
                         </div>
                         <div>
-                            <a class="anomaly-details-link blue" data-id="{{anomalyData/id}}"> # {{anomalyData/id}} </a>
+                            <a class="anomaly-details-link blue" class="uk-hidden" data-id="{{anomalyData/id}}"></a> # {{anomalyData/id}}
                         </div>
                         <div>
                             <h3 style="margin-top:0px;">
