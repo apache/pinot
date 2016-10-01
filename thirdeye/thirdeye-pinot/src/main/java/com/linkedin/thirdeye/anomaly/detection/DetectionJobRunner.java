@@ -125,7 +125,7 @@ public class DetectionJobRunner implements Job {
         inputDateTime = new DateTime(timeZoneOffsetMillis);
       }
     } catch (ExecutionException e) {
-      LOG.error("Exeption in aligning timestamp to data time zone", e);
+      LOG.error("Exception in aligning timestamp to data time zone", e);
     }
     return inputDateTime;
   }
