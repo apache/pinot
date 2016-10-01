@@ -150,3 +150,42 @@ create table if not exists webapp_config_index (
     version int(10)
 ) ENGINE=InnoDB;
 ALTER TABLE `webapp_config_index` ADD UNIQUE `unique_index`(`name`, `collection`, `type`);
+
+
+create table if not exists dataset_config_index (
+    dataset varchar(200) not null,
+    base_id bigint(20) not null,
+    create_time timestamp,
+    update_time timestamp default current_timestamp,
+    version int(10),
+    CONSTRAINT uc_dataset unique(dataset)
+) ENGINE=InnoDB;
+create index dataset_config_dataset_idx on dataset_config_index(dataset);
+
+create table if not exists metric_config_index (
+    name varchar(200) not null,
+    dataset varchar(200) not null,
+    alias varchar(200) not null,
+    base_id bigint(20) not null,
+    create_time timestamp,
+    update_time timestamp default current_timestamp,
+    version int(10)
+) ENGINE=InnoDB;
+ALTER TABLE `metric_config_index` ADD UNIQUE `unique_metric_index`(`name`, `dataset`);
+create index metric_config_name_idx on metric_config_index(name);
+create index metric_config_dataset_idx on metric_config_index(dataset);
+create index metric_config_alias_idx on metric_config_index(alias);
+
+
+create table if not exists dashboard_config_index (
+    name varchar(200) not null,
+    dataset varchar(200) not null,
+    base_id bigint(20) not null,
+    create_time timestamp,
+    update_time timestamp default current_timestamp,
+    version int(10),
+    CONSTRAINT uc_dashboard_name unique(name)
+) ENGINE=InnoDB;
+create index dashboard_config_name_idx on dashboard_config_index(name);
+create index dashboard_config_dataset_idx on dashboard_config_index(dataset);
+

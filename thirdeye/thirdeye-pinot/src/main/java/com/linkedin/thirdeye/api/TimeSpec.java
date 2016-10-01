@@ -10,7 +10,8 @@ public class TimeSpec {
   private TimeGranularity dataGranularity = DEFAULT_TIME_GRANULARITY;
   private String format = SINCE_EPOCH_FORMAT; //sinceEpoch or yyyyMMdd
   public static String SINCE_EPOCH_FORMAT  ="sinceEpoch";
-  
+  public static String DEFAULT_TIMEZONE = "UTC";
+
   public TimeSpec() {
   }
 
