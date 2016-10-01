@@ -115,6 +115,7 @@
                                 {{/if}}
                                 {{displayAnomalyResultDimensionValue anomalyData/dimensions}}
                             </span>
+
                             <div class="change" style="margin-top:6px;">
                                {{parseProperties anomalyData/message 'change'}}
                             </div>
@@ -199,6 +200,15 @@
                                </span>
                     </a>
                 </div>
+
+                <div id="function-details" style="position: absolute; right:15px; top: 140px; width: 170px; text-overflow: ellipsis;">
+                    <label>anomaly function details:</label>
+                    <div style="font-weight: 800;font-size:14px; ">{{anomalyData/function/functionName}}
+                    </div>
+                    <div style="font-weight: 800;font-size:14px; ">{{anomalyData/function/type}}
+                    </div>
+                </div>
+
             </div>
         </div>
         {{/each}}
