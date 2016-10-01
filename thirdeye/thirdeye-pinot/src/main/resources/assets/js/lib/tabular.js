@@ -350,7 +350,6 @@ function switchToContributors(target) {
 
     //set the metrics
     metrics = [];
-    // Todo: if metric label it's a derived metric so title contains
     metrics.push(metric)
     hash.metrics = metrics.toString();
 

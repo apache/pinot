@@ -124,9 +124,11 @@ function saveEmailConfig() {
         payload += '"metric" : "' + metric + '",';
         payload += '"toAddresses" : "' + toAddress + '",';
         payload += '"fromAddress" : "thirdeye-dev@linkedin.com",';
-        payload += '"cron" : "0 0 0/4 * * ?",';
+        payload += '"cron" : "0 30 0/4 * * ?",'; // run once every 4 hours starting 00:30
         payload += '"smtpHost" : "email.corp.linkedin.com",';
         payload += '"active" : true,';
+        payload += '"windowSize" : 7,';
+        payload += '"windowUnit" : "DAYS",';
         payload += '"windowDelay" : 0,';
         payload += '"windowDelayUnit" : "MINUTES"';
         payload += "}";

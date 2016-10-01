@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.datalayer.bao;
 
+import com.linkedin.thirdeye.dashboard.Utils;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -55,14 +56,15 @@ public class TestWebappConfigManager extends AbstractManagerTestBase {
   @Test(dependsOnMethods = {"testFind"})
   public void testUpdate() throws Exception {
     WebappConfigDTO webappConfig = webappConfigDAO.findById(webappConfigId);
-    CollectionConfig collectionConfig =
-        AbstractConfig.fromJSON(webappConfig.getConfig(), CollectionConfig.class);
+    String configJson = Utils.getJsonFromObject(webappConfig.getConfigMap());
+    CollectionConfig collectionConfig = AbstractConfig.fromJSON(configJson, CollectionConfig.class);
     collectionConfig.setCollectionAlias("testAlias");
-    webappConfig.setConfig(collectionConfig.toJSON());
+    webappConfig.setConfigMap(Utils.getMapFromObject(collectionConfig));
     webappConfigDAO.update(webappConfig);
 
     webappConfig = webappConfigDAO.findById(webappConfigId);
-    collectionConfig = AbstractConfig.fromJSON(webappConfig.getConfig(), CollectionConfig.class);
+    String configJsonNew = Utils.getJsonFromObject(webappConfig.getConfigMap());
+    collectionConfig = AbstractConfig.fromJSON(configJsonNew, CollectionConfig.class);
     Assert.assertEquals(collectionConfig.getCollectionAlias(), "testAlias");
   }
 
@@ -85,7 +87,7 @@ public class TestWebappConfigManager extends AbstractManagerTestBase {
     webappConfig.setCollection(collection);
     webappConfig.setType(type);
     try {
-      webappConfig.setConfig(collectionConfig.toJSON());
+      webappConfig.setConfigMap(Utils.getMapFromObject(webappConfig));
     } catch (Exception e) {
       LOG.error("Exception in converting config to json", e);
     }

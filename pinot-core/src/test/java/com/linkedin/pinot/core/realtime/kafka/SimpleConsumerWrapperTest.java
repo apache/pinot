@@ -17,8 +17,11 @@
 package com.linkedin.pinot.core.realtime.kafka;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaSimpleConsumerFactory;
 import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
+
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import kafka.api.FetchRequest;
@@ -39,6 +42,8 @@ import org.apache.kafka.common.protocol.Errors;
 import org.testng.annotations.Test;
 import scala.Some;
 import scala.Tuple2;
+import scala.collection.Iterable;
+import scala.collection.JavaConversions;
 import scala.collection.Seq;
 import scala.collection.immutable.List;
 
@@ -173,8 +178,10 @@ public class SimpleConsumerWrapperTest {
           } else {
             PartitionMetadata[] partitionMetadataArray = new PartitionMetadata[partitionCount];
             for (int j = 0; j < partitionCount; j++) {
+              java.util.List<BrokerEndPoint> emptyJavaList = Collections.emptyList();
+              List<BrokerEndPoint> emptyScalaList = JavaConversions.asScalaBuffer(emptyJavaList).toList();
               partitionMetadataArray[j] = new PartitionMetadata(j, Some.apply(brokerArray[partitionLeaderIndices[j]]),
-                  List.<BrokerEndPoint>empty(), List.<BrokerEndPoint>empty(), Errors.NONE.code());
+                  emptyScalaList, emptyScalaList, Errors.NONE.code());
             }
 
             Seq<PartitionMetadata> partitionsMetadata = List.fromArray(partitionMetadataArray);

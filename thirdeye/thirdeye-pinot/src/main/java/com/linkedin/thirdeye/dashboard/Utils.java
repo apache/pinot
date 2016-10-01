@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.dashboard;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -133,7 +135,8 @@ public class Utils {
 
     List<String> dashboards = new ArrayList<>();
     for (WebappConfigDTO webappConfig : webappConfigs) {
-      DashboardConfig dashboardConfig = AbstractConfig.fromJSON(webappConfig.getConfig(), DashboardConfig.class);
+      String configJson = Utils.getJsonFromObject(webappConfig.getConfigMap());
+      DashboardConfig dashboardConfig = AbstractConfig.fromJSON(configJson, DashboardConfig.class);
       dashboards.add(dashboardConfig.getDashboardName());
     }
 
@@ -244,4 +247,19 @@ public class Utils {
     }
     return DateTimeZone.forID(timezone);
   }
+
+  public static String getJsonFromObject(Object obj) throws JsonProcessingException {
+    return OBJECT_MAPPER.writeValueAsString(obj);
+  }
+
+  public static Map<String, Object> getMapFromJson(String json) throws IOException {
+    TypeReference<HashMap<String, Object>> typeRef = new TypeReference<HashMap<String, Object>>() {
+    };
+    return OBJECT_MAPPER.readValue(json, typeRef);
+  }
+
+  public static Map<String, Object> getMapFromObject(Object object) throws IOException {
+    return getMapFromJson(getJsonFromObject(object));
+  }
+
 }

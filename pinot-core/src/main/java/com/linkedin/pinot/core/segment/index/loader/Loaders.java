@@ -60,27 +60,29 @@ public class Loaders {
       Preconditions.checkArgument(indexDir.isDirectory(), "Index directory: {} is not a directory", indexDir);
       // NOTE: indexLoadingConfigMetadata and schema can be null.
 
-      SegmentMetadataImpl metadata = new SegmentMetadataImpl(indexDir);
-      SegmentVersion configuredVersionToLoad = getSegmentVersionToLoad(indexLoadingConfigMetadata);
-      SegmentVersion metadataVersion = metadata.getSegmentVersion();
 
       if (indexLoadingConfigMetadata != null) {
         StarTreeFormatVersion starTreeVersionToLoad = getStarTreeVersionToLoad(indexLoadingConfigMetadata);
         StarTreeSerDe.convertStarTreeFormatIfNeeded(indexDir, starTreeVersionToLoad);
       }
 
-      if (shouldConvertFormat(metadataVersion, configuredVersionToLoad) && !targetFormatAlreadyExists(indexDir,
-          configuredVersionToLoad)) {
-        LOGGER.info("segment:{} needs to be converted from :{} to {} version.", indexDir.getName(), metadataVersion,
-            configuredVersionToLoad);
-        SegmentFormatConverter converter =
-            SegmentFormatConverterFactory.getConverter(metadataVersion, configuredVersionToLoad);
-        LOGGER.info("Using converter:{} to up-convert the format", converter.getClass().getName());
-        converter.convert(indexDir);
-        LOGGER.info("Successfully up-converted segment:{} from :{} to {} version.",
-            indexDir.getName(), metadataVersion, configuredVersionToLoad);
-      }
 
+      SegmentVersion configuredVersionToLoad = getSegmentVersionToLoad(indexLoadingConfigMetadata);
+      if (!targetFormatAlreadyExists(indexDir, configuredVersionToLoad)) {
+        SegmentMetadataImpl metadata = new SegmentMetadataImpl(indexDir);
+        SegmentVersion metadataVersion = metadata.getSegmentVersion();
+        if (shouldConvertFormat(metadataVersion, configuredVersionToLoad)) {
+          LOGGER.info("segment:{} needs to be converted from :{} to {} version.", indexDir.getName(), metadataVersion,
+              configuredVersionToLoad);
+          SegmentFormatConverter converter =
+              SegmentFormatConverterFactory.getConverter(metadataVersion, configuredVersionToLoad);
+          LOGGER.info("Using converter:{} to up-convert segment: {}", converter.getClass().getName(), indexDir.getName());
+          converter.convert(indexDir);
+          LOGGER
+              .info("Successfully up-converted segment:{} from :{} to {} version.", indexDir.getName(), metadataVersion,
+                  configuredVersionToLoad);
+        }
+      }
       // add or removes indexes based on indexLoadingConfigurationMetadata
       // add or replace new columns with default value
       // NOTE: this step may modify the segment metadata.
@@ -91,7 +93,7 @@ public class Loaders {
       }
 
       // load the metadata again since converter and pre-processor may have changed it
-      metadata = new SegmentMetadataImpl(segmentDirectoryPath);
+      SegmentMetadataImpl metadata = new SegmentMetadataImpl(segmentDirectoryPath);
       SegmentDirectory segmentDirectory = SegmentDirectory.createFromLocalFS(segmentDirectoryPath, metadata, readMode);
 
       Map<String, ColumnIndexContainer> indexContainerMap = new HashMap<String, ColumnIndexContainer>();

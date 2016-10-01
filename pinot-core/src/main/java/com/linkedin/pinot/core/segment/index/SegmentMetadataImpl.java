@@ -84,6 +84,11 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     } else {
       _metadataFile = indexDir;
     }
+    if (!_metadataFile.exists()) {
+      String logMessage = String.format("Metadata file: %s does not exist in directory: %s", _metadataFile, indexDir);
+      LOGGER.error(logMessage);
+      throw new RuntimeException(logMessage);
+    }
     _segmentMetadataPropertiesConfiguration = new PropertiesConfiguration(_metadataFile);
     _columnMetadataMap = new HashMap<String, ColumnMetadata>();
     _allColumns = new HashSet<String>();

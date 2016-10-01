@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.client.cache;
 
+import com.linkedin.thirdeye.dashboard.Utils;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -59,7 +60,8 @@ public class CollectionSchemaCacheLoader extends CacheLoader<String, CollectionS
           .setDimensions(dimSpecs).setMetrics(metricSpecs).setTime(timeSpec).build();
       return config;
     } else {
-      collectionSchema = AbstractConfig.fromJSON(webappConfigs.get(0).getConfig(), CollectionSchema.class);
+      String configJson = Utils.getJsonFromObject(webappConfigs.get(0).getConfigMap());
+      collectionSchema = AbstractConfig.fromJSON(configJson, CollectionSchema.class);
     }
 
     return collectionSchema;

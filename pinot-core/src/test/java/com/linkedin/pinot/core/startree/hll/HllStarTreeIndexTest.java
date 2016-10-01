@@ -31,7 +31,7 @@ import java.io.IOException;
  * aggregation results computed using star-tree index operator are the same as
  * aggregation results computed by scanning raw docs.
  */
-public class TestHllStarTreeIndexTest extends BaseHllStarTreeIndexTest {
+public class HllStarTreeIndexTest extends BaseHllStarTreeIndexTest {
 
   private static final String SEGMENT_NAME = "starTreeSegment";
   private static final String SEGMENT_DIR_NAME = "/tmp/star-tree-index";

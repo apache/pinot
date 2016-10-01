@@ -18,19 +18,13 @@ import com.linkedin.thirdeye.datalayer.util.Predicate;
 
 public class TaskManagerImpl extends AbstractManagerImpl<TaskDTO> implements TaskManager {
 
-  private static final String FIND_BY_JOB_ID_STATUS_NOT_IN =
-      "SELECT at FROM TaskDTO at " + "WHERE at.job.id = :jobId " + "AND at.status != :status";
-
   private static final String FIND_BY_STATUS_ORDER_BY_CREATE_TIME_ASC =
       " WHERE status = :status order by startTime asc";
-
-  private static final String FIND_BY_STATUS_AND_LAST_MODIFIED_TIME_LT_EXPIRE =
-      " WHERE status = :status AND lastModified < :expireTimestamp";
 
   public TaskManagerImpl() {
     super(TaskDTO.class, TaskBean.class);
   }
-  
+
   public Long save(TaskDTO entity) {
     if (entity.getId() != null) {
       //TODO: throw exception and force the caller to call update instead
@@ -47,9 +41,6 @@ public class TaskManagerImpl extends AbstractManagerImpl<TaskDTO> implements Tas
 
   @Override
   public List<TaskDTO> findByJobIdStatusNotIn(Long jobId, TaskStatus status) {
-    //    return getEntityManager().createQuery(FIND_BY_JOB_ID_STATUS_NOT_IN, entityClass)
-    //        .setParameter("jobId", jobId)
-    //        .setParameter("status", status).getResultList();
     Predicate jobIdPredicate = Predicate.EQ("jobId", jobId);
     Predicate statusPredicate = Predicate.NEQ("status", status.toString());
     List<TaskBean> list =

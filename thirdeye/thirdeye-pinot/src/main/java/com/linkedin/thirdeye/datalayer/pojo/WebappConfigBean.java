@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.datalayer.pojo;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import java.util.Map;
 import java.util.Objects;
 
 import com.google.common.base.MoreObjects;
@@ -8,12 +10,12 @@ import com.linkedin.thirdeye.dashboard.configs.WebappConfigFactory.WebappConfigT
 /**
  * Entity class for webapp configs. name, collection, type conbination should be unique
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class WebappConfigBean extends AbstractBean {
-
   private String name;
   private String collection;
   private WebappConfigType type;
-  private String config;
+  private Map<String, Object> configMap;
 
   public String getName() {
     return name;
@@ -39,12 +41,12 @@ public class WebappConfigBean extends AbstractBean {
     this.type = type;
   }
 
-  public String getConfig() {
-    return config;
+  public Map<String, Object> getConfigMap() {
+    return configMap;
   }
 
-  public void setConfig(String config) {
-    this.config = config;
+  public void setConfigMap(Map<String, Object> configMap) {
+    this.configMap = configMap;
   }
 
   @Override
@@ -55,18 +57,18 @@ public class WebappConfigBean extends AbstractBean {
     WebappConfigBean wc = (WebappConfigBean) o;
     return Objects.equals(getId(), wc.getId()) && Objects.equals(name, wc.getName())
         && Objects.equals(collection, wc.getCollection()) && Objects.equals(type, wc.getType())
-        && Objects.equals(config, wc.getConfig());
+        && Objects.equals(configMap, wc.getConfigMap());
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(getId(), name, collection, type, config);
+    return Objects.hash(getId(), name, collection, type, configMap);
   }
 
   @Override
   public String toString() {
     return MoreObjects.toStringHelper(this).add("id", getId()).add("name", getName())
-        .add("collection", getCollection()).add("type", getType()).add("config", getConfig())
+        .add("collection", getCollection()).add("type", getType()).add("config", getConfigMap())
         .toString();
   }
 

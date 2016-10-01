@@ -35,13 +35,14 @@ public class PinotAdminEndpointApplication extends PinotRestletApplication {
     // Attach Swagger stuff
     router.attach("/api", SwaggerResource.class);
 
-    final Directory swaggerIndexDir = new Directory(getContext(), getClass().getClassLoader().getResource("swagger-ui/index.html").toString());
-    swaggerIndexDir.setDeeplyAccessible(false);
-    router.attach("/swagger-ui/index.html", swaggerIndexDir);
+    final Directory swaggerIndexDir = new Directory(getContext(), getClass().getClassLoader().getResource("swagger-ui").toString());
+    swaggerIndexDir.setDeeplyAccessible(true);
+    swaggerIndexDir.setIndexName("index.html");
+    router.attach("/swagger-ui", swaggerIndexDir);
 
     final Directory swaggerUiDir = new Directory(getContext(), getClass().getClassLoader().getResource("META-INF/resources/webjars/swagger-ui/2.2.2").toString());
     swaggerUiDir.setDeeplyAccessible(true);
-    router.attach("/swagger-ui", swaggerUiDir);
+    router.attach("/swaggerui-dist", swaggerUiDir);
 
     final Redirector redirector = new Redirector(getContext(), "/swagger-ui/index.html?url=/api", Redirector.MODE_CLIENT_TEMPORARY);
     router.attach("/help", redirector);

@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.client.cache;
 
+import com.linkedin.thirdeye.dashboard.Utils;
 import java.util.List;
 
 import com.google.common.cache.CacheLoader;
@@ -23,7 +24,8 @@ public class CollectionConfigCacheLoader extends CacheLoader<String, CollectionC
     List<WebappConfigDTO> webappConfigs = webappConfigDAO
         .findByCollectionAndType(collection, WebappConfigType.COLLECTION_CONFIG);
     if (!webappConfigs.isEmpty()) {
-      collectionConfig = AbstractConfig.fromJSON(webappConfigs.get(0).getConfig(), CollectionConfig.class);
+      String configJson = Utils.getJsonFromObject(webappConfigs.get(0).getConfigMap());
+      collectionConfig = AbstractConfig.fromJSON(configJson, CollectionConfig.class);
     }
     return collectionConfig;
   }
