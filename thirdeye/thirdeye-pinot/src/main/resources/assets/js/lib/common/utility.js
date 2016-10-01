@@ -880,6 +880,45 @@ function calcAggregateGranularity(startMillis, endMillis){
 }
 
 
+/** ANOMALIES VIEW related methods **/
+
+/** takes the effected value reported by the anomalies endpoint, the anomaly function's filterstring and exploredimension
+returns the filters obj for timeseries query modified by the exploredimension and effected value if the value is specified.
+ * @param effectedValue
+ * @param exploreDimension
+ * @param fnFiltersString
+ */
+function createAnomalyFilters(effectedValue,exploreDimension,fnFiltersString ){
+
+    var fnFilters = parseProperties( fnFiltersString, {arrayValues:true} );
+
+    var effectedValueTrimmed = effectedValue.replace(/[,*\s]/g, "");
+    if(effectedValueTrimmed.length == 0){
+        effectedValueTrimmed = "ALL";
+    }
+
+    var filters = {};
+    if(fnFilters){
+        if(exploreDimension){
+            if(effectedValueTrimmed !== 'ALL'){
+                filters = fnFilters;
+                filters[exploreDimension] = [effectedValueTrimmed];
+            }
+        }else{
+            filters = fnFilters;
+        }
+    }else{
+        if(exploreDimension ){
+            if(effectedValueTrimmed !== 'ALL'){
+                filters[exploreDimension] = [effectedValueTrimmed];
+            }
+        }
+    };
+
+    return filters
+}
+
+
 /** SELF SERVICE related methods **/
 function clearCreateForm() {
 
