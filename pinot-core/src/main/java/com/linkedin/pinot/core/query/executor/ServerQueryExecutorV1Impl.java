@@ -89,7 +89,10 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   @Override
   public DataTable processQuery(final QueryRequest queryRequest) {
     TimerContext timerContext = queryRequest.getTimerContext();
-    timerContext.getPhaseTimer(ServerQueryPhase.SCHEDULER_WAIT).stopAndRecord();
+    TimerContext.Timer schedulerWaitTimer = timerContext.getPhaseTimer(ServerQueryPhase.SCHEDULER_WAIT);
+    if (schedulerWaitTimer != null) {
+      schedulerWaitTimer.stopAndRecord();
+    }
     TimerContext.Timer queryProcessingTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.QUERY_PROCESSING);
 
     DataTable instanceResponse;

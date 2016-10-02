@@ -94,7 +94,8 @@ public class TimerContext {
    * @return
    */
   public Timer startNewPhaseTimer(ServerQueryPhase queryPhase) {
-    Timer phaseTimer = phaseTimers.put(queryPhase, new Timer(queryPhase));
+    Timer phaseTimer = new Timer(queryPhase);
+    phaseTimers.put(queryPhase, phaseTimer);
     phaseTimer.start();
     return phaseTimer;
   }
