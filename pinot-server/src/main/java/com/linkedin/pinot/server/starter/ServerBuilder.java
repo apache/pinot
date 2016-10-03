@@ -15,31 +15,32 @@
  */
 package com.linkedin.pinot.server.starter;
 
+import com.linkedin.pinot.common.data.DataManager;
 import com.linkedin.pinot.common.metrics.MetricsHelper;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
+import com.linkedin.pinot.common.query.QueryExecutor;
+import com.linkedin.pinot.common.request.transform.TransformFunctionFactory;
 import com.linkedin.pinot.common.utils.DataTableSerDeRegistry;
 import com.linkedin.pinot.core.data.manager.offline.TableDataManagerProvider;
-import com.linkedin.pinot.core.util.DataTableCustomSerDe;
+import com.linkedin.pinot.core.operator.transform.TransformUtils;
 import com.linkedin.pinot.core.query.scheduler.QueryScheduler;
-import com.yammer.metrics.core.MetricsRegistry;
-import java.io.File;
-
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
-import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.ConfigurationException;
-import org.apache.commons.configuration.PropertiesConfiguration;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.linkedin.pinot.common.data.DataManager;
-import com.linkedin.pinot.common.query.QueryExecutor;
+import com.linkedin.pinot.core.util.DataTableCustomSerDe;
 import com.linkedin.pinot.server.conf.NettyServerConfig;
 import com.linkedin.pinot.server.conf.ServerConf;
 import com.linkedin.pinot.server.request.SimpleRequestHandlerFactory;
 import com.linkedin.pinot.transport.netty.NettyServer;
 import com.linkedin.pinot.transport.netty.NettyServer.RequestHandlerFactory;
 import com.linkedin.pinot.transport.netty.NettyTCPServer;
+import com.yammer.metrics.core.MetricsRegistry;
+import java.io.File;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
+import org.apache.commons.configuration.Configuration;
+import org.apache.commons.configuration.ConfigurationException;
+import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.commons.lang3.ArrayUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -166,6 +167,17 @@ public class ServerBuilder {
     LOGGER.info("Trying to Load Request Handler Factory by Class : " + className);
     RequestHandlerFactory requestHandlerFactory = new SimpleRequestHandlerFactory(queryScheduler, _serverMetrics);
     return requestHandlerFactory;
+  }
+
+  /**
+   * This method initializes the transform factory containing built-in functions
+   * as well as functions specified in the server configuration.
+   *
+   * @param serverConf Server configuration
+   */
+  public static void init(ServerConf serverConf) {
+    TransformFunctionFactory.init(
+        ArrayUtils.addAll(TransformUtils.getBuiltInTransform(), serverConf.getTransformFunctions()));
   }
 
   public NettyServer buildNettyServer(NettyServerConfig nettyServerConfig, RequestHandlerFactory requestHandlerFactory) {

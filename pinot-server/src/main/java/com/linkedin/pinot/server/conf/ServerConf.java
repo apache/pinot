@@ -38,6 +38,7 @@ public class ServerConf {
   private static final String PINOT_SERVER_QUERY_SCHEDULER_CLASS_CONFIG_KEY = "pinot.server.query.scheduler.class" ;
   private static final String DEFAULT_QUERY_SCHEDULER_CLASS_NAME =
       "com.linkedin.pinot.core.query.scheduler.FCFSQueryScheduler";
+  private static final String PINOT_SERVER_TRANSFORM_FUNCTIONS = "pinot.server.transforms";
 
   private static final String PINOT_QUERY_SCHEDULER_PREFIX = "pinot.query.scheduler";
 
@@ -94,5 +95,13 @@ public class ServerConf {
 
   public Configuration getSchedulerConfig() {
     return _serverConf.subset(PINOT_QUERY_SCHEDULER_PREFIX);
+  }
+
+  /**
+   * Returns an array of transform function names as defined in the config
+   * @return String array of transform functions
+   */
+  public String[] getTransformFunctions() {
+    return _serverConf.getStringArray(PINOT_SERVER_TRANSFORM_FUNCTIONS);
   }
 }

@@ -25,6 +25,7 @@ import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import com.linkedin.pinot.core.startree.hll.HllConfig;
+import com.linkedin.pinot.util.TestUtils;
 import org.apache.commons.lang.mutable.MutableLong;
 import org.apache.commons.math.util.MathUtils;
 import org.slf4j.Logger;
@@ -120,7 +121,7 @@ public class StarTreeIndexTestSegmentHelper {
     }
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    RecordReader reader = createReader(schema, data);
+    RecordReader reader = new TestUtils.GenericRowRecordReader(schema, data);
     driver.init(config, reader);
     driver.build();
 
@@ -139,56 +140,6 @@ public class StarTreeIndexTestSegmentHelper {
     spec.setMaxLeafRecords(1);
     spec.setEnableOffHeapFormat(enableOffHeapFormat);
     return spec;
-  }
-
-  private static RecordReader createReader(final Schema schema, final List<GenericRow> data) {
-    return new RecordReader() {
-
-      int counter = 0;
-
-      @Override
-      public void rewind()
-          throws Exception {
-        counter = 0;
-      }
-
-      @Override
-      public GenericRow next() {
-        return data.get(counter++);
-      }
-
-      @Override
-      public GenericRow next(GenericRow row) {
-        return next();
-      }
-
-      @Override
-      public void init()
-          throws Exception {
-
-      }
-
-      @Override
-      public boolean hasNext() {
-        return counter < data.size();
-      }
-
-      @Override
-      public Schema getSchema() {
-        return schema;
-      }
-
-      @Override
-      public Map<String, MutableLong> getNullCountMap() {
-        return null;
-      }
-
-      @Override
-      public void close()
-          throws Exception {
-
-      }
-    };
   }
 
   /**
