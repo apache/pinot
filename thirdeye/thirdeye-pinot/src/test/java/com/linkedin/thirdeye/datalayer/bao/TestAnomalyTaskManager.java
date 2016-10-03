@@ -1,7 +1,9 @@
 package com.linkedin.thirdeye.datalayer.bao;
 
+import java.util.HashSet;
 import java.util.List;
 
+import java.util.Set;
 import org.joda.time.DateTime;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -20,6 +22,11 @@ public class TestAnomalyTaskManager extends AbstractManagerTestBase {
   private Long anomalyTaskId1;
   private Long anomalyTaskId2;
   private Long anomalyJobId;
+  private static final Set<TaskStatus> allowedOldTaskStatus = new HashSet<>();
+  static  {
+    allowedOldTaskStatus.add(TaskStatus.FAILED);
+    allowedOldTaskStatus.add(TaskStatus.WAITING);
+  }
 
   @Test
   public void testCreate() throws JsonProcessingException {
@@ -39,11 +46,11 @@ public class TestAnomalyTaskManager extends AbstractManagerTestBase {
 
   @Test(dependsOnMethods = { "testFindAll" })
   public void testUpdateStatusAndWorkerId() {
-    TaskStatus oldStatus = TaskStatus.WAITING;
     TaskStatus newStatus = TaskStatus.RUNNING;
     Long workerId = 1L;
 
-    boolean status  = taskDAO.updateStatusAndWorkerId(workerId, anomalyTaskId1, oldStatus, newStatus);
+    boolean status =
+        taskDAO.updateStatusAndWorkerId(workerId, anomalyTaskId1, allowedOldTaskStatus, newStatus);
     TaskDTO anomalyTask = taskDAO.findById(anomalyTaskId1);
     Assert.assertTrue(status);
     Assert.assertEquals(anomalyTask.getStatus(), newStatus);
@@ -53,7 +60,7 @@ public class TestAnomalyTaskManager extends AbstractManagerTestBase {
   @Test(dependsOnMethods = {"testUpdateStatusAndWorkerId"})
   public void testFindByStatusOrderByCreationTimeAsc() {
     List<TaskDTO> anomalyTasks =
-        taskDAO.findByStatusOrderByCreateTime(TaskStatus.WAITING, Integer.MAX_VALUE);
+        taskDAO.findByStatusOrderByCreateTime(TaskStatus.WAITING, Integer.MAX_VALUE, true);
     Assert.assertEquals(anomalyTasks.size(), 1);
   }
 
