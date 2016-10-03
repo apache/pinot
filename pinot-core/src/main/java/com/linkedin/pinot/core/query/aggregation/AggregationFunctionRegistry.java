@@ -71,6 +71,25 @@ public class AggregationFunctionRegistry {
     keyToFunctionWithDictionary.put("percentile90", Percentile90.class);
     keyToFunctionWithDictionary.put("percentile95", Percentile95.class);
     keyToFunctionWithDictionary.put("percentile99", Percentile99.class);
+    
+    // multi-value
+    keyToFunctionWithDictionary.put("countmv", CountAggregationFunction.class);
+    keyToFunctionWithDictionary.put("maxmv", MaxAggregationFunction.class);
+    keyToFunctionWithDictionary.put("minmv", MinAggregationFunction.class);
+    keyToFunctionWithDictionary.put("summv", SumAggregationFunction.class);
+    keyToFunctionWithDictionary.put("avgmv", AvgAggregationFunction.class);
+    keyToFunctionWithDictionary.put("minmaxrangemv", MinMaxRangeAggregationFunction.class);
+    keyToFunctionWithDictionary.put("distinctcountmv", DistinctCountAggregationFunction.class);
+    keyToFunctionWithDictionary.put("distinctcounthllmv", DistinctCountHLLAggregationFunction.class);
+    // multi-value quantiles
+    keyToFunctionWithDictionary.put("percentileest50mv", Percentileest50.class);
+    keyToFunctionWithDictionary.put("percentileest90mv", Percentileest90.class);
+    keyToFunctionWithDictionary.put("percentileest95mv", Percentileest95.class);
+    keyToFunctionWithDictionary.put("percentileest99mv", Percentileest99.class);
+    keyToFunctionWithDictionary.put("percentile50mv", Percentile50.class);
+    keyToFunctionWithDictionary.put("percentile90mv", Percentile90.class);
+    keyToFunctionWithDictionary.put("percentile95mv", Percentile95.class);
+    keyToFunctionWithDictionary.put("percentile99mv", Percentile99.class);
   }
 
   static {

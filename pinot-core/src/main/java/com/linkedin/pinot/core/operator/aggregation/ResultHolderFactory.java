@@ -47,6 +47,10 @@ public class ResultHolderFactory {
       case AggregationFunctionFactory.MAX_AGGREGATION_FUNCTION:
       case AggregationFunctionFactory.MIN_AGGREGATION_FUNCTION:
       case AggregationFunctionFactory.SUM_AGGREGATION_FUNCTION:
+      case AggregationFunctionFactory.COUNT_MV_AGGREGATION_FUNCTION:
+      case AggregationFunctionFactory.MAX_MV_AGGREGATION_FUNCTION:
+      case AggregationFunctionFactory.MIN_MV_AGGREGATION_FUNCTION:
+      case AggregationFunctionFactory.SUM_MV_AGGREGATION_FUNCTION:
         return new DoubleAggregationResultHolder(function.getDefaultValue());
 
       default:
@@ -73,6 +77,10 @@ public class ResultHolderFactory {
       case AggregationFunctionFactory.MAX_AGGREGATION_FUNCTION:
       case AggregationFunctionFactory.MIN_AGGREGATION_FUNCTION:
       case AggregationFunctionFactory.SUM_AGGREGATION_FUNCTION:
+      case AggregationFunctionFactory.COUNT_MV_AGGREGATION_FUNCTION:
+      case AggregationFunctionFactory.MAX_MV_AGGREGATION_FUNCTION:
+      case AggregationFunctionFactory.MIN_MV_AGGREGATION_FUNCTION:
+      case AggregationFunctionFactory.SUM_MV_AGGREGATION_FUNCTION:
         return new DoubleGroupByResultHolder(initialCapacity, capacityCap, function.getDefaultValue());
 
       default:
