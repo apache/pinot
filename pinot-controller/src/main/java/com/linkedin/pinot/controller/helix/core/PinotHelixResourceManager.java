@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.controller.helix.core;
 
-import com.linkedin.pinot.common.utils.SchemaUtils;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -78,6 +77,7 @@ import com.linkedin.pinot.common.utils.CommonConstants.Helix.StateModel.BrokerOn
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
+import com.linkedin.pinot.common.utils.SchemaUtils;
 import com.linkedin.pinot.common.utils.ServerType;
 import com.linkedin.pinot.common.utils.TenantRole;
 import com.linkedin.pinot.common.utils.ZkUtils;
@@ -86,6 +86,7 @@ import com.linkedin.pinot.common.utils.helix.PinotHelixPropertyStoreZnRecordProv
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.api.pojos.Instance;
 import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse.ResponseStatus;
+import com.linkedin.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import com.linkedin.pinot.controller.helix.core.sharding.SegmentAssignmentStrategy;
 import com.linkedin.pinot.controller.helix.core.sharding.SegmentAssignmentStrategyFactory;
 import com.linkedin.pinot.controller.helix.core.util.HelixSetupUtils;
@@ -977,6 +978,8 @@ public class PinotHelixResourceManager {
      } else {
        // Only high-level consumer specified in the config.
        createHelixEntriesForHighLevelConsumer(config, realtimeTableName, idealState);
+       // Clean up any LLC table if they are present
+       PinotLLCRealtimeSegmentManager.getInstance().cleanupLLC(realtimeTableName);
      }
     }
 
