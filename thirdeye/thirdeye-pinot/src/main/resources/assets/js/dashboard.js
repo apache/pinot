@@ -241,7 +241,7 @@ $(document).ready( function() {
     window.onhashchange = routeToTab;
 
     if (hash.view === 'admin') {
-        renderAdminPage();
+        renderAdminLogin();
         routeToTab();
     }
 

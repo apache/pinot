@@ -62,8 +62,6 @@ public class GenericPojoDao {
     pojoInfoMap.put(AnomalyFunctionBean.class,
         newPojoInfo(DEFAULT_BASE_TABLE_NAME, AnomalyFunctionIndex.class));
 
-    //    pojoInfoMap.put(Anomalymergec.class,
-    //        newPojoInfo(DEFAULT_BASE_TABLE_NAME, AnomalyMergeConfigIndex.class));
     pojoInfoMap.put(EmailConfigurationBean.class,
         newPojoInfo(DEFAULT_BASE_TABLE_NAME, EmailConfigurationIndex.class));
 
@@ -444,6 +442,5 @@ public class GenericPojoDao {
     Class<? extends AbstractIndexEntity> indexEntityClass;
     List<String> indexTableColumns;
   }
-
 
 }
