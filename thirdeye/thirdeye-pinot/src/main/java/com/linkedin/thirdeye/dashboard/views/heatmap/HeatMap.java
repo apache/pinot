@@ -8,14 +8,9 @@ import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
-import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
-
 public class HeatMap {
 
   private static final Logger LOG = LoggerFactory.getLogger(HeatMap.class);
-  private static CollectionConfig collectionConfig = null;
-  private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
 
   List<HeatMapCell> heatMapCells;
 
@@ -95,17 +90,17 @@ public class HeatMap {
         double absoluteChange = (currentValue - baselineValue);
 
         double percentageChange = 0;
-        if (baselineValue != 0) {
+        if (Double.compare(baselineValue, 0d) != 0) {
           percentageChange = ((currentValue - baselineValue) / baselineValue) * 100;
         } else {
-          if (currentValue != 0) {
-            percentageChange = -100;
+          if (Double.compare(currentValue, 0d) != 0) {
+            percentageChange = 100;
           }
         }
 
         double contributionDifference = currentContribution - baselineContribution;
 
-        double cellSize = cellSizeStats.getValues().length == 0 ? currentValue : cellSizeStats.getElement(i);
+        double cellSize = cellSizeStats.getValues().length == 0 ? (currentValue + baselineValue) / 2 : cellSizeStats.getElement(i);
         double deltaColor = percentageChange;
         double deltaSize = cellSize;
         double contributionColor = (currentContribution - baselineContribution);
