@@ -1,8 +1,10 @@
 package com.linkedin.thirdeye.datalayer.pojo;
 
 import java.util.Objects;
+
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.google.common.base.MoreObjects;
+import com.linkedin.thirdeye.api.MetricType;
 
 @JsonIgnoreProperties(ignoreUnknown=true)
 public class MetricConfigBean extends AbstractBean {
@@ -14,6 +16,8 @@ public class MetricConfigBean extends AbstractBean {
   private String dataset;
 
   private String alias;
+
+  private MetricType datatype;
 
   private boolean derived = false;
 
@@ -48,6 +52,14 @@ public class MetricConfigBean extends AbstractBean {
 
   public void setAlias(String alias) {
     this.alias = alias;
+  }
+
+  public MetricType getDatatype() {
+    return datatype;
+  }
+
+  public void setDatatype(MetricType datatype) {
+    this.datatype = datatype;
   }
 
   public boolean isDerived() {
