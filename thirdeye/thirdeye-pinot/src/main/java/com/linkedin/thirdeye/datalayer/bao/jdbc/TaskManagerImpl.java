@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import java.util.Set;
 import org.joda.time.DateTime;
 
 import com.google.inject.persist.Transactional;
@@ -20,6 +21,9 @@ public class TaskManagerImpl extends AbstractManagerImpl<TaskDTO> implements Tas
 
   private static final String FIND_BY_STATUS_ORDER_BY_CREATE_TIME_ASC =
       " WHERE status = :status order by startTime asc";
+
+  private static final String FIND_BY_STATUS_ORDER_BY_CREATE_TIME_DESC =
+      " WHERE status = :status order by startTime desc";
 
   public TaskManagerImpl() {
     super(TaskDTO.class, TaskBean.class);
@@ -53,11 +57,19 @@ public class TaskManagerImpl extends AbstractManagerImpl<TaskDTO> implements Tas
   }
 
   @Override
-  public List<TaskDTO> findByStatusOrderByCreateTimeAsc(TaskStatus status, int fetchSize) {
+  public List<TaskDTO> findByStatusOrderByCreateTime(TaskStatus status, int fetchSize, boolean asc) {
     Map<String, Object> parameterMap = new HashMap<>();
     parameterMap.put("status", status.toString());
-    List<TaskBean> list = genericPojoDao.executeParameterizedSQL(
-        FIND_BY_STATUS_ORDER_BY_CREATE_TIME_ASC, parameterMap, TaskBean.class);
+    List<TaskBean> list;
+    if (asc) {
+      list = genericPojoDao
+          .executeParameterizedSQL(FIND_BY_STATUS_ORDER_BY_CREATE_TIME_ASC, parameterMap,
+              TaskBean.class);
+    } else {
+      list = genericPojoDao
+          .executeParameterizedSQL(FIND_BY_STATUS_ORDER_BY_CREATE_TIME_DESC, parameterMap,
+              TaskBean.class);
+    }
     List<TaskDTO> result = new ArrayList<>();
     for (TaskBean bean : list) {
       result.add((TaskDTO) MODEL_MAPPER.map(bean, TaskDTO.class));
@@ -66,10 +78,11 @@ public class TaskManagerImpl extends AbstractManagerImpl<TaskDTO> implements Tas
   }
 
   @Override
-  public boolean updateStatusAndWorkerId(Long workerId, Long id, TaskStatus oldStatus,
+  public boolean updateStatusAndWorkerId(Long workerId, Long id, Set<TaskStatus> permittedOldStatus,
       TaskStatus newStatus) {
+    // TODO: add proper transaction here
     TaskDTO task = findById(id);
-    if (task.getStatus().equals(oldStatus)) {
+    if (permittedOldStatus.contains(task.getStatus())) {
       task.setStatus(newStatus);
       task.setWorkerId(workerId);
       save(task);

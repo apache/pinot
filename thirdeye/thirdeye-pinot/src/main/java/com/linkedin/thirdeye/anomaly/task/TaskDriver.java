@@ -1,8 +1,10 @@
 package com.linkedin.thirdeye.anomaly.task;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -29,12 +31,13 @@ public class TaskDriver {
   private final TaskManager anomalyTaskDAO;
   private TaskContext taskContext;
   private long workerId;
+  private final Set<TaskStatus> allowedOldTaskStatus = new HashSet<>();
 
   private volatile boolean shutdown = false;
   private static final int MAX_PARALLEL_TASK = 5;
   private static final int NO_TASK_IDLE_DELAY_MILLIS = 15_000; // 15 seconds
   private static final int TASK_FAILURE_DELAY_MILLIS = 2 * 60_000; // 2 minutes
-  private static final int TASK_FETCH_SIZE = 10;
+  private static final int TASK_FETCH_SIZE = 50;
   private static final Random RANDOM = new Random();
 
   public TaskDriver(ThirdEyeAnomalyConfiguration thirdEyeAnomalyConfiguration,
@@ -44,7 +47,6 @@ public class TaskDriver {
     this.workerId = thirdEyeAnomalyConfiguration.getId();
     this.anomalyTaskDAO = anomalyTaskDAO;
     taskExecutorService = Executors.newFixedThreadPool(MAX_PARALLEL_TASK);
-
     taskContext = new TaskContext();
     taskContext.setAnomalyJobDAO(anomalyJobDAO);
     taskContext.setAnomalyTaskDAO(anomalyTaskDAO);
@@ -52,6 +54,8 @@ public class TaskDriver {
     taskContext.setAnomalyFunctionFactory(anomalyFunctionFactory);
     taskContext.setMergedResultDAO(mergedResultDAO);
     taskContext.setThirdEyeAnomalyConfiguration(thirdEyeAnomalyConfiguration);
+    allowedOldTaskStatus.add(TaskStatus.FAILED);
+    allowedOldTaskStatus.add(TaskStatus.WAITING);
   }
 
   public void start() throws Exception {
@@ -110,8 +114,9 @@ public class TaskDriver {
     do {
       List<TaskDTO> anomalyTasks = new ArrayList<>();
       try {
-        anomalyTasks =
-            anomalyTaskDAO.findByStatusOrderByCreateTimeAsc(TaskStatus.WAITING, TASK_FETCH_SIZE);
+        boolean orderAscending = System.currentTimeMillis() % 2 == 0;
+        anomalyTasks = anomalyTaskDAO
+            .findByStatusOrderByCreateTime(TaskStatus.WAITING, TASK_FETCH_SIZE, orderAscending);
       } catch (Exception e) {
         LOG.error("Exception found in fetching new tasks, sleeping for few seconds", e);
         try {
@@ -144,7 +149,7 @@ public class TaskDriver {
         boolean success = false;
         try {
           success = anomalyTaskDAO
-              .updateStatusAndWorkerId(workerId, anomalyTaskSpec.getId(), TaskStatus.WAITING,
+              .updateStatusAndWorkerId(workerId, anomalyTaskSpec.getId(), allowedOldTaskStatus,
                   TaskStatus.RUNNING);
           LOG.info(Thread.currentThread().getId() + " : Task acquired success: {}", success);
         } catch (Exception e) {

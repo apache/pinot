@@ -53,7 +53,7 @@ public class TestAnomalyTaskManager extends AbstractManagerTestBase {
   @Test(dependsOnMethods = {"testUpdateStatusAndWorkerId"})
   public void testFindByStatusOrderByCreationTimeAsc() {
     List<TaskDTO> anomalyTasks =
-        taskDAO.findByStatusOrderByCreateTimeAsc(TaskStatus.WAITING, Integer.MAX_VALUE);
+        taskDAO.findByStatusOrderByCreateTime(TaskStatus.WAITING, Integer.MAX_VALUE);
     Assert.assertEquals(anomalyTasks.size(), 1);
   }
 
