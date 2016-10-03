@@ -11,7 +11,6 @@ public abstract class JobContext {
   private JobManager anomalyJobDAO;
   private TaskManager anomalyTaskDAO;
   private AnomalyFunctionManager anomalyFunctionDAO;
-  private AnomalyFunctionFactory anomalyFunctionFactory;
   private EmailConfigurationManager emailConfigurationDAO;
 
   private String jobName;
@@ -56,14 +55,6 @@ public abstract class JobContext {
 
   public void setJobName(String jobName) {
     this.jobName = jobName;
-  }
-
-  public AnomalyFunctionFactory getAnomalyFunctionFactory() {
-    return anomalyFunctionFactory;
-  }
-
-  public void setAnomalyFunctionFactory(AnomalyFunctionFactory anomalyFunctionFactory) {
-    this.anomalyFunctionFactory = anomalyFunctionFactory;
   }
 
   public EmailConfigurationManager getEmailConfigurationDAO() {

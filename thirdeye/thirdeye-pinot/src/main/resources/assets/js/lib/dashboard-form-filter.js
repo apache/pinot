@@ -1,4 +1,4 @@
-//Filters related eventlisteners
+/** Form Filters related event listeners **/
 
 //Enable Apply btn
 $("#main-view").on("change", ".filter-value-checkbox, .filter-select-all-checkbox", function () {
