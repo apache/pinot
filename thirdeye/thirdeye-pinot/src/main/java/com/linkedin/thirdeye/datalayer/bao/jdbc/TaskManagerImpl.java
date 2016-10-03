@@ -61,15 +61,8 @@ public class TaskManagerImpl extends AbstractManagerImpl<TaskDTO> implements Tas
     Map<String, Object> parameterMap = new HashMap<>();
     parameterMap.put("status", status.toString());
     List<TaskBean> list;
-    if (asc) {
-      list = genericPojoDao
-          .executeParameterizedSQL(FIND_BY_STATUS_ORDER_BY_CREATE_TIME_ASC, parameterMap,
-              TaskBean.class);
-    } else {
-      list = genericPojoDao
-          .executeParameterizedSQL(FIND_BY_STATUS_ORDER_BY_CREATE_TIME_DESC, parameterMap,
-              TaskBean.class);
-    }
+    String queryClause = (asc) ? FIND_BY_STATUS_ORDER_BY_CREATE_TIME_ASC : FIND_BY_STATUS_ORDER_BY_CREATE_TIME_DESC;
+    list = genericPojoDao.executeParameterizedSQL(queryClause, parameterMap, TaskBean.class);
     List<TaskDTO> result = new ArrayList<>();
     for (TaskBean bean : list) {
       result.add((TaskDTO) MODEL_MAPPER.map(bean, TaskDTO.class));
