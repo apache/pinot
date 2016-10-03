@@ -82,7 +82,6 @@ public class DetectionTaskRunner implements TaskRunner {
 
   private void exploreDimensionsAndAnalyze(TimeSeriesResponse finalResponse) {
     int anomalyCounter = 0;
-    List<RawAnomalyResultDTO> results = null;
     Map<DimensionKey, MetricTimeSeries> res =
         timeSeriesResponseConverter.toMap(finalResponse, collectionDimensions);
     for (Map.Entry<DimensionKey, MetricTimeSeries> entry : res.entrySet()) {
@@ -97,18 +96,18 @@ public class DetectionTaskRunner implements TaskRunner {
         LOG.info("Analyzing anomaly function with dimensionKey: {}, windowStart: {}, windowEnd: {}",
             dimensionKey, windowStart, windowEnd);
 
-        results = anomalyFunction
+        List<RawAnomalyResultDTO> resultsOfAnEntry = anomalyFunction
             .analyze(dimensionKey, metricTimeSeries, windowStart, windowEnd, knownAnomalies);
 
         // Handle results
-        handleResults(results);
+        handleResults(resultsOfAnEntry);
 
         // Remove any known anomalies
-        results.removeAll(knownAnomalies);
+        resultsOfAnEntry.removeAll(knownAnomalies);
 
-        LOG.info("{} has {} anomalies in window {} to {}", entry.getKey(), results.size(),
+        LOG.info("{} has {} anomalies in window {} to {}", entry.getKey(), resultsOfAnEntry.size(),
             windowStart, windowEnd);
-        anomalyCounter += results.size();
+        anomalyCounter += resultsOfAnEntry.size();
       } catch (Exception e) {
         LOG.error("Could not compute for {}", entry.getKey(), e);
       }
