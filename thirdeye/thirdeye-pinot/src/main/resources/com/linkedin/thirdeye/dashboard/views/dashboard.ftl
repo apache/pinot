@@ -20,8 +20,7 @@
         </li>
         <li id="self-service-header-tab" class="header-tab" rel="self-service"><a href="#">Self
           Service</a></li>
-        <li id="alert-header-tab" class="header-tab uk-hidden" rel="alert" ><a href="#">Alert</a></li>
-        <li id="exp-header-tab" class="header-tab uk-hidden" rel="admin" ><a href="#">Admin</a></li>
+        <li id="admin-header-tab" class="header-tab" rel="admin" ><a href="#" onclick="renderAdminLogin()" >Admin</a></li>
       </ul>
 
       <a id="header-help" class="data-uk-tooltip uk-float-right" title="How to use ThirdEye?"
@@ -38,7 +37,6 @@
     <li id="timeseries"></li>
     <li id="anomalies"></li>
     <li id="self-service"></li>
-    <li id="alert"></li>
     <li id="admin"></li>
   </ul>
 </div>

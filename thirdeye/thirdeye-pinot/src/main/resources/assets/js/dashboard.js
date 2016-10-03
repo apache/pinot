@@ -240,10 +240,11 @@ $(document).ready( function() {
     //Add onhashchange event listener to window object to enable back button usage on the browser
     window.onhashchange = routeToTab;
 
-    if (hash.view === 'admin') {
-        renderAdminPage();
-        routeToTab();
-    }
+    // How we control showing a hidden tab
+    // if (hash.view === 'admin') {
+    //     renderAdminLogin();
+    //     routeToTab();
+    // }
 
     function routeToTab() {
         hash = parseHashParameters(window.location.hash);
