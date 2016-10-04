@@ -44,9 +44,8 @@ public class WeekOverWeekRuleFunction extends BaseAnomalyFunction {
   public static final String CHANGE_THRESHOLD = "changeThreshold";
   public static final String AVERAGE_VOLUME_THRESHOLD = "averageVolumeThreshold";
   public static final String MIN_CONSECUTIVE_SIZE = "minConsecutiveSize";
-  public static final String DEFAULT_MESSAGE_TEMPLATE = "threshold=%s, %s value is %s / %s (%s)";
-  public static final String DEFAULT_MERGED_MESSAGE_TEMPLATE =
-      "threshold=%s, %s values: %s (%s / %s)";
+  public static final String DEFAULT_MESSAGE_TEMPLATE = "change : %.2f %%, currentVal : %.2f, baseLineVal : %.2f, threshold : %s, baseLineProp : %s";
+  public static final String DEFAULT_MERGED_MESSAGE_TEMPLATE = "change : %s, currentVal : %s, baseLineVal : %s, threshold : %s, baseLineProp : %s";
   private static final Joiner CSV = Joiner.on(",");
 
   public static String[] getPropertyKeys() {
@@ -86,10 +85,7 @@ public class WeekOverWeekRuleFunction extends BaseAnomalyFunction {
       String changePercent = percentInstance.format(change);
       percentChanges.add(changePercent);
     }
-
-    String message =
-        String.format(DEFAULT_MERGED_MESSAGE_TEMPLATE, thresholdPercent, baselineProp,
-            CSV.join(percentChanges), currentValues.get(n - 1), baselineValues.get(n - 1));
+    String message = String.format(DEFAULT_MERGED_MESSAGE_TEMPLATE, CSV.join(percentChanges), currentValues.get(n - 1), baselineValues.get(n - 1), thresholdPercent, baselineProp);
     return message;
   }
 
@@ -285,10 +281,9 @@ public class WeekOverWeekRuleFunction extends BaseAnomalyFunction {
     NumberFormat percentInstance = NumberFormat.getPercentInstance();
     percentInstance.setMaximumFractionDigits(2);
     String thresholdPercent = percentInstance.format(threshold);
-    String changePercent = percentInstance.format(change);
-    String message =
-        String.format(DEFAULT_MESSAGE_TEMPLATE, thresholdPercent, baselineProp, currentValue,
-            baselineValue, changePercent);
+    String message = String
+        .format(DEFAULT_MESSAGE_TEMPLATE, change * 100, currentValue, baselineValue,
+            thresholdPercent, baselineProp);
     return message;
   }
 

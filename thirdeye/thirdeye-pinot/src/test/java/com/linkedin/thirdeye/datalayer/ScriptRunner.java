@@ -115,7 +115,7 @@ public class ScriptRunner {
       e.fillInStackTrace();
       printlnError("Error executing: " + command);
       printlnError(e);
-      throw e;
+//      throw e;
     } catch (IOException e) {
       e.fillInStackTrace();
       printlnError("Error executing: " + command);

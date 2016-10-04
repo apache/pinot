@@ -81,6 +81,7 @@ create table if not exists task_index (
     version int(10)
 ) ENGINE=InnoDB;
 create index task_status_idx on task_index(status);
+create index task_type_idx on task_index(type);
 create index task_job_idx on task_index(job_id);
 
 create table if not exists anomaly_feedback_index (
