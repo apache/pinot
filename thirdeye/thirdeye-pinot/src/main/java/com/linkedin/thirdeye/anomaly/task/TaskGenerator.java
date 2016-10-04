@@ -44,12 +44,9 @@ public class TaskGenerator {
           windowStartTime, windowEndTime, anomalyFunctionSpec, null);
       tasks.add(taskInfo);
     } else {
-      List<String> exploreDimensions = Arrays.asList(exploreDimensionsString.split(","));
-      for (String exploreDimension : exploreDimensions) {
         DetectionTaskInfo taskInfo = new DetectionTaskInfo(jobExecutionId, windowStartTime, windowEndTime,
-            anomalyFunctionSpec, exploreDimension);
+            anomalyFunctionSpec, exploreDimensionsString);
         tasks.add(taskInfo);
-      }
     }
 
     return tasks;

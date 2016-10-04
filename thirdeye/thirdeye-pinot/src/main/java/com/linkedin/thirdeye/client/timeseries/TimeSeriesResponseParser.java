@@ -114,14 +114,18 @@ public class TimeSeriesResponseParser {
     // group by time and dimension values
     Set<String> timeDimensionValues = new HashSet<>();
     timeDimensionValues.addAll(responseMap.keySet());
-    Set<String> dimensionValues = new HashSet<>();
+    Set<List<String>> dimensionValuesList = new HashSet<>();
     for (String timeDimensionValue : timeDimensionValues) {
-      String dimensionValue = ResponseParserUtils.extractDimensionValue(timeDimensionValue);
-      dimensionValues.add(dimensionValue);
+      List<String> dimensionValues = ResponseParserUtils.extractDimensionValues(timeDimensionValue);
+      dimensionValuesList.add(dimensionValues);
     }
 
-    // group by dimension name
-    String dimensionName = response.getGroupKeyColumns().get(1);
+    // group by dimension names (the 0th dimension, which is the time bucket, is skipped).
+    List<String> groupKeyColumns = response.getGroupKeyColumns();
+    List<String> dimensionName = new ArrayList<>(groupKeyColumns.size() - 1);
+    for (int i = 1; i < groupKeyColumns.size(); ++i) {
+      dimensionName.add(groupKeyColumns.get(i));
+    }
 
     // other row
     List<TimeSeriesRow.Builder> otherBuilders = new ArrayList<>();
@@ -134,8 +138,12 @@ public class TimeSeriesResponseParser {
       TimeSeriesRow.Builder builder = new TimeSeriesRow.Builder();
       builder.setStart(timeRange.lowerEndpoint());
       builder.setEnd(timeRange.upperEndpoint());
-      builder.setDimensionName(dimensionName);
-      builder.setDimensionValue(OTHER);
+      builder.setDimensionNames(dimensionName);
+      List<String> dimensionValues = new ArrayList(dimensionName.size());
+      for (int i = 0; i < dimensionName.size(); ++i) {
+        dimensionValues.add(OTHER);
+      }
+      builder.setDimensionValues(dimensionValues);
       otherBuilders.add(builder);
       double[] other = new double[numMetrics];
       Arrays.fill(other, 0);
@@ -146,22 +154,22 @@ public class TimeSeriesResponseParser {
     // threshold
     // if it does, we add it to the rows as is
     // else, we add the metric values to the OTHER row
-    for (String dimensionValue : dimensionValues) {
+    for (List<String> dimensionValues : dimensionValuesList) {
       List<TimeSeriesRow> thresholdRows = new ArrayList<>();
       for (int timeBucketId = 0; timeBucketId < numTimeBuckets; timeBucketId++) {
         Range<DateTime> timeRange = ranges.get(timeBucketId);
 
         // compute the time|dimension key
         String timeDimensionValue =
-            ResponseParserUtils.computeTimeDimensionValue(timeBucketId, dimensionValue);
+            ResponseParserUtils.computeTimeDimensionValues(timeBucketId, dimensionValues);
 
         ThirdEyeResponseRow responseRow = responseMap.get(timeDimensionValue);
 
         TimeSeriesRow.Builder builder = new TimeSeriesRow.Builder();
         builder.setStart(timeRange.lowerEndpoint());
         builder.setEnd(timeRange.upperEndpoint());
-        builder.setDimensionName(dimensionName);
-        builder.setDimensionValue(dimensionValue);
+        builder.setDimensionNames(dimensionName);
+        builder.setDimensionValues(dimensionValues);
         addMetric(responseRow, builder);
 
         TimeSeriesRow row = builder.build();

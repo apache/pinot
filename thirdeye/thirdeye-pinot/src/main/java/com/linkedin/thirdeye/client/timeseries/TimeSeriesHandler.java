@@ -35,8 +35,6 @@ public class TimeSeriesHandler {
   }
 
   public TimeSeriesResponse handle(TimeSeriesRequest timeSeriesRequest) throws Exception {
-    ThirdEyeRequestBuilder builder = new ThirdEyeRequestBuilder();
-    builder.setCollection(timeSeriesRequest.getCollectionName());
     List<Range<DateTime>> timeranges = new ArrayList<>();
     TimeGranularity aggregationTimeGranularity = timeSeriesRequest.getAggregationTimeGranularity();
     // time ranges
