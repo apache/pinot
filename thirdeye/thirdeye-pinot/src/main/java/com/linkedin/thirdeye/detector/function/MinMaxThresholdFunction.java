@@ -24,7 +24,7 @@ import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
  * (strictly greater than)
  */
 public class MinMaxThresholdFunction extends BaseAnomalyFunction {
-  public static final String DEFAULT_MESSAGE_TEMPLATE = "min=%s, max=%s, value %s, change %s";
+  public static final String DEFAULT_MESSAGE_TEMPLATE = "change : %.2f %%, currentVal : %.2f, min : %.2f, max : %.2f";
   public static final String MIN_VAL = "min";
   public static final String MAX_VAL = "max";
   private static final Joiner CSV = Joiner.on(",");
@@ -82,7 +82,7 @@ public class MinMaxThresholdFunction extends BaseAnomalyFunction {
         anomalyResult.setScore(averageValue);
         anomalyResult.setWeight(Math.abs(deviationFromThreshold)); // higher change, higher the severity
         String message =
-            String.format(DEFAULT_MESSAGE_TEMPLATE, min, max, value, deviationFromThreshold);
+            String.format(DEFAULT_MESSAGE_TEMPLATE, deviationFromThreshold, value, min, max);
         anomalyResult.setMessage(message);
         if (value == 0.0) {
           anomalyResult.setDataMissing(true);
