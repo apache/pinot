@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.dashboard;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -39,7 +40,11 @@ import com.linkedin.thirdeye.dashboard.configs.AbstractConfig;
 import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
 import com.linkedin.thirdeye.dashboard.configs.DashboardConfig;
 import com.linkedin.thirdeye.dashboard.configs.WebappConfigFactory.WebappConfigType;
+import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.WebappConfigManager;
+import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.WebappConfigDTO;
 
 public class Utils {
@@ -73,7 +78,7 @@ public class Utils {
   }
 
   public static Map<String, List<String>> getFilters(QueryCache queryCache, String collection,
-      String requestReference, String metricName, List<String> dimensions, DateTime start,
+      String requestReference, List<String> dimensions, DateTime start,
       DateTime end) throws Exception {
 
     MetricFunction metricFunction = new MetricFunction(MetricAggFunction.COUNT, "*");
@@ -102,10 +107,10 @@ public class Utils {
     return result;
   }
 
-  public static List<String> getDimensions(QueryCache queryCache, String collection)
+  public static List<String> getDimensions(String collection, DatasetConfigManager datasetConfigDAO)
       throws Exception {
-    CollectionSchema schema = queryCache.getClient().getCollectionSchema(collection);
-    List<String> dimensions = schema.getDimensionNames();
+    DatasetConfigDTO datasetConfig = datasetConfigDAO.findByDataset(collection);
+    List<String> dimensions = datasetConfig.getDimensions();
     Collections.sort(dimensions);
     return dimensions;
   }
@@ -129,18 +134,13 @@ public class Utils {
     return dimensionsToGroupBy;
   }
 
-  public static List<String> getDashboards(WebappConfigManager webappConfigDAO, String collection) throws Exception {
-    List<WebappConfigDTO> webappConfigs = webappConfigDAO
-        .findByCollectionAndType(collection, WebappConfigType.DASHBOARD_CONFIG);
+  public static List<String> getDashboards(DashboardConfigManager dashboardConfigDAO, String collection) throws Exception {
+    List<DashboardConfigDTO> dashboardConfigs = dashboardConfigDAO.findActiveByDataset(collection);
 
     List<String> dashboards = new ArrayList<>();
-    for (WebappConfigDTO webappConfig : webappConfigs) {
-      String configJson = Utils.getJsonFromObject(webappConfig.getConfigMap());
-      DashboardConfig dashboardConfig = AbstractConfig.fromJSON(configJson, DashboardConfig.class);
-      dashboards.add(dashboardConfig.getDashboardName());
+    for (DashboardConfigDTO dashboardConfig : dashboardConfigs) {
+      dashboards.add(dashboardConfig.getName());
     }
-
-    dashboards.add(DEFAULT_DASHBOARD);
     return dashboards;
   }
 

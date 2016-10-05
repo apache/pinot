@@ -8,17 +8,17 @@ import org.slf4j.LoggerFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.cache.CacheLoader;
 import com.linkedin.thirdeye.dashboard.Utils;
-import com.linkedin.thirdeye.datalayer.bao.WebappConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
 
 public class DashboardsCacheLoader extends CacheLoader<String, String> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(DashboardsCacheLoader.class);
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
-  private WebappConfigManager webappConfigDAO;
+  private DashboardConfigManager dashboardConfigDAO;
 
-  public DashboardsCacheLoader(WebappConfigManager webappConfigDAO) {
-    this.webappConfigDAO = webappConfigDAO;
+  public DashboardsCacheLoader(DashboardConfigManager dashboardConfigDAO) {
+    this.dashboardConfigDAO = dashboardConfigDAO;
   }
 
   @Override
@@ -27,7 +27,7 @@ public class DashboardsCacheLoader extends CacheLoader<String, String> {
     String jsonDashboards = null;
     try {
       LOGGER.info("Loading dashboards cache for {}", collection);
-      List<String> dashboards = Utils.getDashboards(webappConfigDAO, collection);
+      List<String> dashboards = Utils.getDashboards(dashboardConfigDAO, collection);
       jsonDashboards = OBJECT_MAPPER.writeValueAsString(dashboards);
     } catch (Exception e) {
       LOGGER.error("Error while fetching dashboards for collection: " + collection, e);

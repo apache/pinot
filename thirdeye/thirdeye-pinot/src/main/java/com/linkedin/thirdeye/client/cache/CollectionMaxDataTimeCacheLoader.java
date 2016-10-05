@@ -13,26 +13,27 @@ import org.slf4j.LoggerFactory;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.linkedin.pinot.client.ResultSetGroup;
-import com.linkedin.thirdeye.api.CollectionSchema;
 import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.client.pinot.PinotQuery;
-import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClientConfig;
 import com.linkedin.thirdeye.dashboard.Utils;
+import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
+import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
+import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 public class CollectionMaxDataTimeCacheLoader extends CacheLoader<String, Long> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(CollectionMaxDataTimeCacheLoader.class);
   private final static String COLLECTION_MAX_TIME_QUERY_TEMPLATE = "SELECT max(%s) FROM %s WHERE %s >= %s";
 
-  private final LoadingCache<String, CollectionSchema> collectionSchemaCache;
   private final LoadingCache<PinotQuery, ResultSetGroup> resultSetGroupCache;
+  private DatasetConfigManager datasetConfigDAO;
 
   private final Map<String, Long> collectionToPrevMaxDataTimeMap = new ConcurrentHashMap<String, Long>();
 
-  public CollectionMaxDataTimeCacheLoader(PinotThirdEyeClientConfig pinotThirdEyeClientConfig,
-      LoadingCache<String, CollectionSchema> collectionSchemaCache, LoadingCache<PinotQuery, ResultSetGroup> resultSetGroupCache) {
-    this.collectionSchemaCache = collectionSchemaCache;
+  public CollectionMaxDataTimeCacheLoader(LoadingCache<PinotQuery, ResultSetGroup> resultSetGroupCache,
+      DatasetConfigManager datasetConfigDAO) {
     this.resultSetGroupCache = resultSetGroupCache;
+    this.datasetConfigDAO = datasetConfigDAO;
   }
 
   @Override
@@ -40,7 +41,8 @@ public class CollectionMaxDataTimeCacheLoader extends CacheLoader<String, Long> 
     LOGGER.info("Loading maxDataTime cache {}", collection);
     long maxTime = 0;
     try {
-      TimeSpec timeSpec = collectionSchemaCache.get(collection).getTime();
+      DatasetConfigDTO datasetConfig = datasetConfigDAO.findByDataset(collection);
+      TimeSpec timeSpec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetConfig);
       long prevMaxDataTime = getPrevMaxDataTime(collection, timeSpec);
       String maxTimePql = String.format(COLLECTION_MAX_TIME_QUERY_TEMPLATE, timeSpec.getColumnName(), collection, timeSpec.getColumnName(),
           prevMaxDataTime);

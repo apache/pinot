@@ -3,11 +3,9 @@ package com.linkedin.thirdeye.dashboard.resources;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.EmailConfigurationManager;
-import com.linkedin.thirdeye.datalayer.bao.WebappConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.AbstractDTO;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
-import com.linkedin.thirdeye.datalayer.dto.WebappConfigDTO;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -29,23 +27,20 @@ import org.slf4j.LoggerFactory;
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 public class EntityManagerResource {
-  private final WebappConfigManager webappConfigManager;
   private final AnomalyFunctionManager anomalyFunctionManager;
   private final EmailConfigurationManager emailConfigurationManager;
 
   public static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static final Logger LOG = LoggerFactory.getLogger(EntityManagerResource.class);
 
-  public EntityManagerResource(WebappConfigManager webappConfigManager,
-      AnomalyFunctionManager anomalyFunctionManager,
+  public EntityManagerResource(AnomalyFunctionManager anomalyFunctionManager,
       EmailConfigurationManager emailConfigurationManager) {
-    this.webappConfigManager = webappConfigManager;
     this.emailConfigurationManager = emailConfigurationManager;
     this.anomalyFunctionManager = anomalyFunctionManager;
   }
 
   private enum EntityType {
-    WEBAPP_CONFIG, ANOMALY_FUNCTION, EMAIL_CONFIGURATION
+    ANOMALY_FUNCTION, EMAIL_CONFIGURATION
   }
 
   @GET
@@ -59,9 +54,6 @@ public class EntityManagerResource {
     EntityType entityType = EntityType.valueOf(entityTypeStr);
     List<AbstractDTO> results = new ArrayList<>();
     switch (entityType) {
-    case WEBAPP_CONFIG:
-      results.addAll(webappConfigManager.findAll());
-      break;
     case ANOMALY_FUNCTION:
       results.addAll(anomalyFunctionManager.findAllActiveFunctions());
       break;
@@ -79,11 +71,7 @@ public class EntityManagerResource {
     EntityType entityType = EntityType.valueOf(entityTypeStr);
     try {
       switch (entityType) {
-      case WEBAPP_CONFIG:
-        WebappConfigDTO webappConfigDTO =
-            OBJECT_MAPPER.readValue(jsonPayload, WebappConfigDTO.class);
-        webappConfigManager.update(webappConfigDTO);
-        break;
+
       case ANOMALY_FUNCTION:
         AnomalyFunctionDTO anomalyFunctionDTO =
             OBJECT_MAPPER.readValue(jsonPayload, AnomalyFunctionDTO.class);

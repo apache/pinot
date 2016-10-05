@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.util;
 
-import java.util.concurrent.TimeUnit;
 
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
@@ -12,18 +11,6 @@ import com.google.common.collect.Multimap;
 
 @Test
 public class ThirdEyeUtilsTest {
-
-  @Test(dataProvider = "testConstructCronDataProvider")
-  public void testConstructCron(String scheduleMinute, String scheduleHour, String repeatEvery, String expectedCron)
-  throws Exception {
-    String actualCron = null;
-    try {
-      actualCron = ThirdEyeUtils.constructCron(scheduleMinute, scheduleHour, TimeUnit.valueOf(repeatEvery));
-    } catch (Exception e) {
-
-    }
-    Assert.assertEquals(actualCron, expectedCron);
-  }
 
   @Test(dataProvider = "testSortedFiltersDataProvider")
   public void testSortedFilters(String filters, String expectedFilters) {

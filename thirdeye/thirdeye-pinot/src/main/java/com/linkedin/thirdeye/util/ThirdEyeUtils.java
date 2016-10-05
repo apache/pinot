@@ -6,8 +6,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
@@ -16,11 +14,14 @@ import org.slf4j.LoggerFactory;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.cache.CacheLoader.InvalidCacheLoadException;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
-import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
-import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
+import com.linkedin.thirdeye.api.TimeGranularity;
+import com.linkedin.thirdeye.api.TimeSpec;
+import com.linkedin.thirdeye.client.MetricExpression;
+import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
+import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
 
 public abstract class ThirdEyeUtils {
   private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeUtils.class);
@@ -31,9 +32,6 @@ public abstract class ThirdEyeUtils {
   private ThirdEyeUtils () {
 
   }
-
-  private static ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry
-      .getInstance();
 
   public static Multimap<String, String> getFilterSet(String filters) {
     Multimap<String, String> filterSet = ArrayListMultimap.create();
@@ -122,51 +120,21 @@ public abstract class ThirdEyeUtils {
     return sortedFilters;
   }
 
-  /** Returns the collection name for the provided alias, or the input string if it is not an alias. */
-  public static String getCollectionFromAlias(String alias) throws ExecutionException {
-    String collectionName = alias;
-    try {
-      collectionName = CACHE_REGISTRY_INSTANCE.getCollectionAliasCache().get(alias);
-    } catch (InvalidCacheLoadException e) {
-      LOG.debug("No collection name for alias {}", alias);
-    }
-    return collectionName;
+  public static TimeSpec getTimeSpecFromDatasetConfig(DatasetConfigDTO datasetConfig) {
+    TimeSpec timespec = new TimeSpec(datasetConfig.getTimeColumn(),
+        new TimeGranularity(datasetConfig.getTimeDuration(), datasetConfig.getTimeUnit()),
+        datasetConfig.getTimeFormat());
+    return timespec;
   }
 
-  /** Returns the alias for the provided collection, or the input string if no alias exists. */
-  public static String getAliasFromCollection(String collection) throws ExecutionException {
-    String result = collection;
-    try {
-      CollectionConfig collectionConfig =
-          CACHE_REGISTRY_INSTANCE.getCollectionConfigCache().get(collection);
-      String configAlias = collectionConfig.getCollectionAlias();
-      if (StringUtils.isNotBlank(configAlias)) {
-        result = configAlias;
-      }
-    } catch (InvalidCacheLoadException e) {
-      LOG.debug("No alias for collection {}", collection);
+  public static MetricExpression getMetricExpressionFromMetricConfig(MetricConfigDTO metricConfig) {
+    MetricExpression metricExpression = new MetricExpression();
+    metricExpression.setExpressionName(metricConfig.getName());
+    if (metricConfig.isDerived()) {
+      metricExpression.setExpression(metricConfig.getDerivedMetricExpression());
+    } else {
+      metricExpression.setExpression(MetricConfigBean.DERIVED_METRIC_ID_PREFIX + metricConfig.getId());
     }
-    return result;
-  }
-
-  public static String constructCron(String scheduleMinute, String scheduleHour, TimeUnit repeatEvery) {
-    if (StringUtils.isNotBlank(scheduleMinute)
-        && (Integer.valueOf(scheduleMinute) < 0 || Integer.valueOf(scheduleMinute) > 59)) {
-      throw new IllegalArgumentException("scheduleMinute " + scheduleMinute + " must be between [0,60)");
-    }
-    if (StringUtils.isNotBlank(scheduleHour)
-        && (Integer.valueOf(scheduleHour) < 0 || Integer.valueOf(scheduleHour) > 23)) {
-      throw new IllegalArgumentException("scheduleHour " + scheduleHour + " must be between [0,23]");
-    }
-    String minute = "0";
-    String hour = "0";
-    if (repeatEvery.equals(TimeUnit.DAYS)) {
-      minute = StringUtils.isEmpty(scheduleMinute) ? minute : scheduleMinute;
-      hour = StringUtils.isEmpty(scheduleHour) ? hour : scheduleHour;
-    } else if (repeatEvery.equals(TimeUnit.HOURS)) {
-      minute = StringUtils.isEmpty(scheduleMinute) ? minute : scheduleMinute;
-      hour = "*";
-    }
-    return String.format("0 %s %s * * ?", minute, hour);
+    return metricExpression;
   }
 }

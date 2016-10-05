@@ -97,7 +97,6 @@ public class AlertTaskRunner implements TaskRunner {
     ThirdEyeClient client = queryCache.getClient();
 
     final String collection = alertConfig.getCollection();
-    final String collectionAlias = ThirdEyeUtils.getAliasFromCollection(collection);
 
     // Get the anomalies in that range
     final List<MergedAnomalyResultDTO> allResults = anomalyMergedResultDAO
@@ -144,7 +143,7 @@ public class AlertTaskRunner implements TaskRunner {
       throw new JobExecutionException(e);
     }
 
-    sendAlertForAnomalies(collectionAlias, results, groupedResults, dimensionNames);
+    sendAlertForAnomalies(collection, results, groupedResults, dimensionNames);
     updateNotifiedStatus(results);
   }
 

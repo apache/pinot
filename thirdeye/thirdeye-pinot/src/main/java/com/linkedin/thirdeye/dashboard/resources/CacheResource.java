@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
-import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 
@@ -141,12 +140,7 @@ public class CacheResource {
   @Path("/refresh/collections")
   public Response refreshCollections() {
     Response response = Response.ok().build();
-    try {
-      CACHE_INSTANCE.getCollectionsCache().loadCollections();
-    } catch (IOException e) {
-      LOGGER.error("Exception while refreshing collections cache", e);
-      response = Response.serverError().build();
-    }
+    CACHE_INSTANCE.getCollectionsCache().loadCollections();
     return response;
   }
 

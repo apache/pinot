@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.cache.CacheLoader;
 import com.linkedin.thirdeye.dashboard.Utils;
+import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 
 public class DimensionFiltersCacheLoader extends CacheLoader<String, String> {
 
@@ -17,9 +18,11 @@ public class DimensionFiltersCacheLoader extends CacheLoader<String, String> {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private QueryCache queryCache;
+  private DatasetConfigManager datasetConfigDAO;
 
-  public DimensionFiltersCacheLoader(QueryCache queryCache) {
+  public DimensionFiltersCacheLoader(QueryCache queryCache, DatasetConfigManager datasetConfigDAO) {
     this.queryCache = queryCache;
+    this.datasetConfigDAO = datasetConfigDAO;
   }
 
   @Override
@@ -30,10 +33,9 @@ public class DimensionFiltersCacheLoader extends CacheLoader<String, String> {
     String jsonFilters = null;
     try {
       LOGGER.info("Loading dimension filters cache {}", collection);
-      List<String> dimensions = Utils.getDimensions(queryCache, collection);
+      List<String> dimensions = Utils.getDimensions(collection, datasetConfigDAO);
       Map<String, List<String>> filters =
-          Utils.getFilters(queryCache, collection, "filters", "__COUNT", dimensions, startDateTime,
-              endDateTime);
+          Utils.getFilters(queryCache, collection, "filters", dimensions, startDateTime, endDateTime);
       jsonFilters = OBJECT_MAPPER.writeValueAsString(filters);
 
     } catch (Exception e) {

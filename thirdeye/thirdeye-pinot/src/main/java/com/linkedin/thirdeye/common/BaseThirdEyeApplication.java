@@ -6,12 +6,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
+import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.EmailConfigurationManager;
 import com.linkedin.thirdeye.datalayer.bao.JobManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
+import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.TaskManager;
-import com.linkedin.thirdeye.datalayer.bao.WebappConfigManager;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 
 import io.dropwizard.Application;
@@ -24,8 +26,10 @@ public abstract class BaseThirdEyeApplication<T extends Configuration> extends A
   protected EmailConfigurationManager emailConfigurationDAO;
   protected JobManager anomalyJobDAO;
   protected TaskManager anomalyTaskDAO;
-  protected WebappConfigManager webappConfigDAO;
   protected MergedAnomalyResultManager anomalyMergedResultDAO;
+  protected DatasetConfigManager datasetConfigDAO;
+  protected MetricConfigManager metricConfigDAO;
+  protected DashboardConfigManager dashboardConfigDAO;
 
   public void initDAOs() {
     String persistenceConfig = System.getProperty("dw.rootDir") + "/persistence.yml";
@@ -41,9 +45,13 @@ public abstract class BaseThirdEyeApplication<T extends Configuration> extends A
         DaoProviderUtil.getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.JobManagerImpl.class);
     anomalyTaskDAO =
         DaoProviderUtil.getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.TaskManagerImpl.class);
-    webappConfigDAO = DaoProviderUtil
-        .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.WebappConfigManagerImpl.class);
     anomalyMergedResultDAO = DaoProviderUtil
         .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.MergedAnomalyResultManagerImpl.class);
+    datasetConfigDAO =
+        DaoProviderUtil.getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.DatasetConfigManagerImpl.class);
+    metricConfigDAO =
+        DaoProviderUtil.getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.MetricConfigManagerImpl.class);
+    dashboardConfigDAO = DaoProviderUtil
+        .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.DashboardConfigManagerImpl.class);
   }
 }

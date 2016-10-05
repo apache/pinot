@@ -40,20 +40,17 @@ public class ThirdEyeDashboardApplication
       throws Exception {
     super.initDAOs();
     try {
-      ThirdEyeCacheRegistry.initializeCaches(config, webappConfigDAO);
+      ThirdEyeCacheRegistry.initializeCaches(config, datasetConfigDAO, dashboardConfigDAO);
     } catch (Exception e) {
       LOG.error("Exception while loading caches", e);
     }
     env.jersey().register(new AnomalyFunctionResource(config.getFunctionConfigPath()));
-    env.jersey().register(new DashboardResource(webappConfigDAO));
+    env.jersey().register(new DashboardResource(datasetConfigDAO, metricConfigDAO, dashboardConfigDAO));
     env.jersey().register(new CacheResource());
     env.jersey().register(
-        new AnomalyResource(anomalyFunctionDAO, anomalyResultDAO, emailConfigurationDAO,
-            anomalyMergedResultDAO));
-    env.jersey().register(new WebappConfigResource(webappConfigDAO));
+        new AnomalyResource(anomalyFunctionDAO, anomalyResultDAO, emailConfigurationDAO, anomalyMergedResultDAO));
     env.jersey().register(new EmailResource(anomalyFunctionDAO, emailConfigurationDAO));
-    env.jersey().register(
-        new EntityManagerResource(webappConfigDAO, anomalyFunctionDAO, emailConfigurationDAO));
+    env.jersey().register( new EntityManagerResource(anomalyFunctionDAO, emailConfigurationDAO));
   }
 
   public static void main(String[] args) throws Exception {
