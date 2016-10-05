@@ -21,8 +21,12 @@ import com.linkedin.thirdeye.datalayer.pojo.AnomalyFunctionBean;
 import com.linkedin.thirdeye.datalayer.pojo.MergedAnomalyResultBean;
 import com.linkedin.thirdeye.datalayer.pojo.RawAnomalyResultBean;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public abstract class AbstractManagerImpl<E extends AbstractDTO> implements AbstractManager<E> {
+
+  protected final Logger LOG = LoggerFactory.getLogger(getClass());
 
   protected static final ModelMapper MODEL_MAPPER = new ModelMapper();
 
@@ -44,7 +48,7 @@ public abstract class AbstractManagerImpl<E extends AbstractDTO> implements Abst
   public void setGenericPojoDao(GenericPojoDao genericPojoDao) {
     this.genericPojoDao = genericPojoDao;
   }
-  
+
   @Override
   public Long save(E entity) {
     if (entity.getId() != null) {
@@ -114,8 +118,8 @@ public abstract class AbstractManagerImpl<E extends AbstractDTO> implements Abst
     if (rawAnomalyResultBean.getFunctionId() != null) {
       AnomalyFunctionBean anomalyFunctionBean =
           genericPojoDao.get(rawAnomalyResultBean.getFunctionId(), AnomalyFunctionBean.class);
-      if(anomalyFunctionBean == null){
-        System.out.println("this shud not be null");
+      if (anomalyFunctionBean == null) {
+        LOG.error("this anomaly function bean should not be null");
       }
       AnomalyFunctionDTO anomalyFunctionDTO =
           MODEL_MAPPER.map(anomalyFunctionBean, AnomalyFunctionDTO.class);

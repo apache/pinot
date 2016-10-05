@@ -232,7 +232,7 @@ public class AnomalyResource {
     if (StringUtils.isNotEmpty(windowDelayUnit)) {
       windowDelayTimeUnit = TimeUnit.valueOf(windowDelayUnit);
     }
-    int windowDelayTime = 2;
+    int windowDelayTime;
     if (StringUtils.isNotEmpty(windowDelay)) {
       windowDelayTime = Integer.valueOf(windowDelay);
     } else {
