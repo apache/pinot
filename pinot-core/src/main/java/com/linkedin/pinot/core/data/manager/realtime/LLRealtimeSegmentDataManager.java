@@ -26,6 +26,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.google.common.base.Preconditions;
@@ -242,8 +243,12 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
       // Consume for the next _kafkaReadTime ms, or we get to final offset, whichever happens earlier,
       // Update _currentOffset upon return from this method
       Iterable<MessageAndOffset> messagesAndOffsets = null;
+      Long highWatermark = null;
       try {
-        messagesAndOffsets = _consumerWrapper.fetchMessages(_currentOffset, _endOffset, KAFKA_MAX_FETCH_TIME_MILLIS);
+        Pair<Iterable<MessageAndOffset>, Long> messagesAndWatermark =
+            _consumerWrapper.fetchMessagesAndHighWatermark(_currentOffset, _endOffset, KAFKA_MAX_FETCH_TIME_MILLIS);
+        messagesAndOffsets = messagesAndWatermark.getLeft();
+        highWatermark = messagesAndWatermark.getRight();
       } catch (TimeoutException e) {
         segmentLogger.warn("Timed out when fetching messages from Kafka, retrying");
         continue;
@@ -251,7 +256,8 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
 
       Iterator<MessageAndOffset> msgIterator = messagesAndOffsets.iterator();
 
-      int batchSize = 0;
+      int indexedMessageCount = 0;
+      int kafkaMessageCount = 0;
       while (!_receivedStop && !endCriteriaReached() && msgIterator.hasNext()) {
         // Get a batch of messages from Kafka
         // Index each message
@@ -261,11 +267,21 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
         int length = messageAndOffset.message().payloadSize();
         GenericRow row = _messageDecoder.decode(array, offset, length);
 
+        // Update lag metric on the first message of each batch
+        if (kafkaMessageCount == 0) {
+          long messageOffset = messageAndOffset.offset();
+          long offsetDifference = highWatermark - messageOffset;
+          _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.KAFKA_PARTITION_OFFSET_LAG, offsetDifference);
+        }
+
         if (row != null) {
           row = _fieldExtractor.transform(row);
 
           if (row != null) {
             _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.REALTIME_ROWS_CONSUMED, 1);
+            indexedMessageCount++;
+          } else {
+            _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.INVALID_REALTIME_ROWS_DROPPED, 1);
           }
 
           boolean canTakeMore = _realtimeSegment.index(row);  // Ignore the boolean return
@@ -279,15 +295,18 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
             // TODO We need to come up with how the system behaves in these cases and document/handle them
             segmentLogger.warn("We got full during indexing");
           }
-          batchSize++;
+        } else {
+          _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.INVALID_REALTIME_ROWS_DROPPED, 1);
         }
 
         _currentOffset = messageAndOffset.nextOffset();
         _numRowsConsumed++;
+        kafkaMessageCount++;
       }
       updateCurrentDocumentCountMetrics();
-      if (batchSize != 0) {
-        segmentLogger.debug("Indexed {} messages current offset {}", batchSize, _currentOffset);
+      if (kafkaMessageCount != 0) {
+        segmentLogger.debug("Indexed {} messages ({} messages read from Kafka) current offset {}", indexedMessageCount,
+            kafkaMessageCount, _currentOffset);
       } else {
         // If there were no messages to be fetched from Kafka, wait for a little bit as to avoid hammering the
         // Kafka broker
@@ -307,6 +326,9 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
 
   public class PartitionConsumer implements Runnable {
     public void run() {
+      long initialConsumptionEnd = 0L;
+      long lastCatchUpStart = 0L;
+      long catchUpTimeMillis = 0L;
       _startTimeMs = now();
       try {
         while (!_state.isFinal()) {
@@ -316,6 +338,19 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
           if (_receivedStop) {
             break;
           }
+
+          if (_state == State.INITIAL_CONSUMING) {
+            initialConsumptionEnd = now();
+            _serverMetrics.setValueOfTableGauge(_metricKeyName,
+                ServerGauge.LAST_REALTIME_SEGMENT_INITIAL_CONSUMPTION_DURATION_SECONDS,
+                TimeUnit.MILLISECONDS.toSeconds(initialConsumptionEnd - _startTimeMs));
+          } else if (_state == State.CATCHING_UP) {
+            catchUpTimeMillis += now() - lastCatchUpStart;
+            _serverMetrics.setValueOfTableGauge(_metricKeyName,
+                ServerGauge.LAST_REALTIME_SEGMENT_CATCHUP_DURATION_SECONDS,
+                TimeUnit.MILLISECONDS.toSeconds(catchUpTimeMillis));
+          }
+
           // If we are sending segmentConsumed() to the controller, we are in HOLDING state.
           _state = State.HOLDING;
           SegmentCompletionProtocol.Response response = postSegmentConsumedMsg();
@@ -324,11 +359,13 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
           boolean success;
           switch (status) {
             case NOT_LEADER:
+              _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.LLC_CONTROLLER_RESPONSE_NOT_LEADER, 1);
               // Retain the same state
               segmentLogger.warn("Got not leader response");
               hold();
               break;
             case CATCH_UP:
+              _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.LLC_CONTROLLER_RESPONSE_CATCH_UP, 1);
               if (rspOffset <= _currentOffset) {
                 // Something wrong with the controller. Back off and try again.
                 segmentLogger.error("Invalid catchup offset {} in controller response, current offset {}", rspOffset,
@@ -337,17 +374,21 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
               } else {
                 _state = State.CATCHING_UP;
                 _finalOffset = rspOffset;
+                lastCatchUpStart = now();
                 // We will restart consumption when we loop back above.
               }
               break;
             case HOLD:
+              _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.LLC_CONTROLLER_RESPONSE_HOLD, 1);
               hold();
               break;
             case DISCARD:
+              _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.LLC_CONTROLLER_RESPONSE_DISCARD, 1);
               // Keep this in memory, but wait for the online transition, and download when it comes in.
               _state = State.DISCARDED;
               break;
             case KEEP:
+              _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.LLC_CONTROLLER_RESPONSE_KEEP, 1);
               _state = State.RETAINING;
               success = buildSegmentAndReplace();
               if (success) {
@@ -358,6 +399,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
               }
               break;
             case COMMIT:
+              _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.LLC_CONTROLLER_RESPONSE_COMMIT, 1);
               _state = State.COMMITTING;
               success = buildSegment(true);
               if (!success) {
@@ -382,6 +424,12 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
       } catch (Exception e) {
         segmentLogger.error("Exception while in work", e);
         _state = State.ERROR;
+      }
+
+      if (initialConsumptionEnd != 0L) {
+        _serverMetrics.setValueOfTableGauge(_metricKeyName,
+            ServerGauge.LAST_REALTIME_SEGMENT_COMPLETION_DURATION_SECONDS,
+            TimeUnit.MILLISECONDS.toSeconds(now() - initialConsumptionEnd));
       }
     }
   }
@@ -433,8 +481,8 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     FileUtils.deleteQuietly(tempSegmentFolder);
     long endTimeMillis = System.currentTimeMillis();
 
-    _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LAST_REALTIME_SEGMENT_FLUSH_DURATION_MILLIS,
-        (endTimeMillis - startTimeMillis));
+    _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LAST_REALTIME_SEGMENT_CREATION_DURATION_SECONDS,
+        TimeUnit.MILLISECONDS.toSeconds(endTimeMillis - startTimeMillis));
 
     return true;
   }

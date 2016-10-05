@@ -25,7 +25,11 @@ import com.linkedin.pinot.common.Utils;
 public enum ServerGauge implements AbstractMetrics.Gauge {
   DOCUMENT_COUNT("documents", false),
   SEGMENT_COUNT("segments", false),
-  LAST_REALTIME_SEGMENT_FLUSH_DURATION_MILLIS("milliseconds", false);
+  LAST_REALTIME_SEGMENT_CREATION_DURATION_SECONDS("seconds", false),
+  LAST_REALTIME_SEGMENT_INITIAL_CONSUMPTION_DURATION_SECONDS("seconds", false),
+  LAST_REALTIME_SEGMENT_CATCHUP_DURATION_SECONDS("seconds", false),
+  LAST_REALTIME_SEGMENT_COMPLETION_DURATION_SECONDS("seconds", false),
+  KAFKA_PARTITION_OFFSET_LAG("messages", false);
 
   private final String gaugeName;
   private final String unit;

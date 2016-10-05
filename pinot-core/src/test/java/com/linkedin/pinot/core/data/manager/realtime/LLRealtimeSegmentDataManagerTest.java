@@ -16,6 +16,7 @@
 
 package com.linkedin.pinot.core.data.manager.realtime;
 
+import com.yammer.metrics.core.MetricsRegistry;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -120,7 +121,7 @@ public class LLRealtimeSegmentDataManagerTest {
     RealtimeTableDataManager tableDataManager = createTableDataManager();
     String resourceDir = _segmentDir;
     Schema schema = Schema.fromString(makeSchema());
-    ServerMetrics serverMetrics  = null;
+    ServerMetrics serverMetrics = new ServerMetrics(new MetricsRegistry());
     FakeLLRealtimeSegmentDataManager segmentDataManager = new FakeLLRealtimeSegmentDataManager(segmentZKMetadata,
         tableConfig, instanceZKMetadata, tableDataManager, resourceDir, schema, serverMetrics);
     return segmentDataManager;

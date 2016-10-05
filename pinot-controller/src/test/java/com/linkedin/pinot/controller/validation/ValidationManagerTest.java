@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.controller.validation;
 
+import com.linkedin.pinot.common.metrics.ControllerMetrics;
+import com.yammer.metrics.core.MetricsRegistry;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -81,7 +83,8 @@ public class ValidationManagerTest {
     _pinotHelixResourceManager =
         new PinotHelixResourceManager(ZK_STR, HELIX_CLUSTER_NAME, CONTROLLER_INSTANCE_NAME, null, 1000L, true, /*isUpdateStateModel=*/false);
     _pinotHelixResourceManager.start();
-    PinotLLCRealtimeSegmentManager.create(_pinotHelixResourceManager, new ControllerConf());
+    PinotLLCRealtimeSegmentManager.create(_pinotHelixResourceManager, new ControllerConf(),
+        new ControllerMetrics(new MetricsRegistry()));
   }
 
   @Test

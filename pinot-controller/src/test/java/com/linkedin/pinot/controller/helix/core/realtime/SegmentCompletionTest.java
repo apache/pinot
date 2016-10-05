@@ -16,6 +16,8 @@
 
 package com.linkedin.pinot.controller.helix.core.realtime;
 
+import com.linkedin.pinot.common.metrics.ControllerMetrics;
+import com.yammer.metrics.core.MetricsRegistry;
 import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Map;
@@ -307,7 +309,7 @@ public class SegmentCompletionTest {
     private static final ControllerConf CONTROLLER_CONF = new ControllerConf();
 
     protected MockPinotLLCRealtimeSegmentManager() {
-      super(null, clusterName, null, null, null, CONTROLLER_CONF);
+      super(null, clusterName, null, null, null, CONTROLLER_CONF, new ControllerMetrics(new MetricsRegistry()));
     }
 
     @Override
@@ -334,7 +336,7 @@ public class SegmentCompletionTest {
   public static class MockSegmentCompletionManager extends SegmentCompletionManager {
     public long _secconds;
     protected MockSegmentCompletionManager(PinotLLCRealtimeSegmentManager segmentManager, boolean isLeader) {
-      super(createMockHelixManager(isLeader), segmentManager);
+      super(createMockHelixManager(isLeader), segmentManager, new ControllerMetrics(new MetricsRegistry()));
     }
     @Override
     protected long getCurrentTimeMs() {

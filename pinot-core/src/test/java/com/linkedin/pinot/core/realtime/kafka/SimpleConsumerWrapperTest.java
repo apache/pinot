@@ -115,6 +115,11 @@ public class SimpleConsumerWrapperTest {
         }
       }
 
+      @Override
+      public long highWatermark(String topic, int partition) {
+        return 0L;
+      }
+
       public boolean hasError() {
         return !errorMap.isEmpty();
       }

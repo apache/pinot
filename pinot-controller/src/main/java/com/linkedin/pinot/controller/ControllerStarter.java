@@ -109,7 +109,7 @@ public class ControllerStarter {
       LOGGER.info("Starting Pinot Helix resource manager and connecting to Zookeeper");
       helixResourceManager.start();
       // Helix resource manager must be started in order to create PinotLLCRealtimeSegmentManager
-      PinotLLCRealtimeSegmentManager.create(helixResourceManager, config);
+      PinotLLCRealtimeSegmentManager.create(helixResourceManager, config, controllerMetrics);
       LOGGER.info("Starting Pinot REST API component");
       component.start();
       LOGGER.info("Starting retention manager");

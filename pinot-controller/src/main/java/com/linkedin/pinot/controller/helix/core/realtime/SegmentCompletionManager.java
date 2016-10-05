@@ -26,6 +26,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
+import com.linkedin.pinot.common.metrics.ControllerMeter;
+import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
@@ -59,23 +61,26 @@ public class SegmentCompletionManager {
   // A map that holds the FSM for each segment.
   private final Map<String, SegmentCompletionFSM> _fsmMap = new ConcurrentHashMap<>();
   private final PinotLLCRealtimeSegmentManager _segmentManager;
+  private final ControllerMetrics _controllerMetrics;
 
   // TODO keep some history of past committed segments so that we can avoid looking up PROPERTYSTORE if some server comes in late.
 
-  protected SegmentCompletionManager(HelixManager helixManager, PinotLLCRealtimeSegmentManager segmentManager) {
+  protected SegmentCompletionManager(HelixManager helixManager, PinotLLCRealtimeSegmentManager segmentManager,
+      ControllerMetrics controllerMetrics) {
     _helixManager = helixManager;
     _segmentManager = segmentManager;
+    _controllerMetrics = controllerMetrics;
   }
 
   public static SegmentCompletionManager create(HelixManager helixManager,
-      PinotLLCRealtimeSegmentManager segmentManager, ControllerConf controllerConf) {
+      PinotLLCRealtimeSegmentManager segmentManager, ControllerConf controllerConf,
+      ControllerMetrics controllerMetrics) {
     if (_instance != null) {
       throw new RuntimeException("Cannot create multiple instances");
     }
-    _instance = new SegmentCompletionManager(helixManager, segmentManager);
-    SegmentCompletionProtocol.setMaxSegmentCommitTimeMs(TimeUnit.MILLISECONDS.convert(
-            controllerConf.getSegmentCommitTimeoutSeconds(), TimeUnit.SECONDS)
-        );
+    _instance = new SegmentCompletionManager(helixManager, segmentManager, controllerMetrics);
+    SegmentCompletionProtocol.setMaxSegmentCommitTimeMs(
+        TimeUnit.MILLISECONDS.convert(controllerConf.getSegmentCommitTimeoutSeconds(), TimeUnit.SECONDS));
     return _instance;
   }
 
@@ -216,7 +221,7 @@ public class SegmentCompletionManager {
    * This class implements the FSM on the controller side for each completing segment.
    *
    * An FSM is is created when we first hear about a segment (typically through the segmentConsumed message).
-   * When an FSM is created, it may have one of two start states (HOLDING, or COMMITTED), depending on the 
+   * When an FSM is created, it may have one of two start states (HOLDING, or COMMITTED), depending on the
    * constructor used.
    *
    * We kick off an FSM in the COMMITTED state (rare) when we find that PROPERTYSTORE already has the segment
@@ -390,6 +395,8 @@ public class SegmentCompletionManager {
           LOGGER.warn("State change during upload: state={} segment={} winner={} winningOffset={}",
               _state, _segmentName.getSegmentName(), _winner, _winningOffset);
           _state = State.ABORTED;
+          _segmentCompletionManager._controllerMetrics.addMeteredTableValue(_segmentName.getTableName(),
+              ControllerMeter.LLC_STATE_MACHINE_ABORTS, 1);
           return SegmentCompletionProtocol.RESP_FAILED;
         }
         if (!success) {
@@ -440,6 +447,8 @@ public class SegmentCompletionManager {
 
     private SegmentCompletionProtocol.Response abortAndReturnHold(long now, String instanceId, long offset) {
       _state = State.ABORTED;
+      _segmentCompletionManager._controllerMetrics.addMeteredTableValue(_segmentName.getTableName(),
+          ControllerMeter.LLC_STATE_MACHINE_ABORTS, 1);
       return hold(instanceId, offset);
     }
 
@@ -454,7 +463,7 @@ public class SegmentCompletionManager {
 
     /*
      * If we have waited "enough", or we have all replicas reported, then we can pick a winner.
-     * 
+     *
      * Otherwise, we ask the server that is reporting to come back again later until one of these conditions hold.
      *
      * If we can pick a winner then we go to COMMITTER_DECIDED or COMMITTER_NOTIIFIED (if the instance
@@ -541,7 +550,7 @@ public class SegmentCompletionManager {
     }
 
     /*
-     * We have notified the committer. If we get a consumed message from another server, we can ask them to 
+     * We have notified the committer. If we get a consumed message from another server, we can ask them to
      * catchup (if the offset is lower). If anything else, then we pretty much ask them to hold.
      */
     private SegmentCompletionProtocol.Response COMMITTER_NOTIFIED__consumed(String instanceId, long offset, long now) {
@@ -581,7 +590,7 @@ public class SegmentCompletionManager {
     }
 
     /*
-     * We have notified the committer. If we get a consumed message from another server, we can ask them to 
+     * We have notified the committer. If we get a consumed message from another server, we can ask them to
      * catchup (if the offset is lower). If anything else, then we pretty much ask them to hold.
      */
     private SegmentCompletionProtocol.Response COMMITTER_NOTIFIED__commit(String instanceId, long offset, long now) {

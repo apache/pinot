@@ -16,6 +16,8 @@
 
 package com.linkedin.pinot.controller.api.restlet.resources;
 
+import com.linkedin.pinot.common.metrics.ControllerMetrics;
+import com.yammer.metrics.core.MetricsRegistry;
 import java.io.IOException;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.helix.HelixManager;
@@ -43,7 +45,8 @@ public class LLCSegmentCommitTest {
 
   @Test
   public void testSegmentCommit() throws Exception {
-    SegmentCompletionManager.create(createMockHelixManager(), null, new ControllerConf());
+    SegmentCompletionManager.create(createMockHelixManager(), null, new ControllerConf(),
+        new ControllerMetrics(new MetricsRegistry()));
     FakeLLCSegmentCommit segmentCommit = new FakeLLCSegmentCommit();
     Representation representation;
     String strResponse;
@@ -145,7 +148,7 @@ public class LLCSegmentCommitTest {
     public boolean uploadSuccess;
 
     protected FakeSegmentCompletionManager() {
-      super(null, null);
+      super(null, null, new ControllerMetrics(new MetricsRegistry()));
     }
 
     @Override

@@ -47,6 +47,7 @@ import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
+import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.common.utils.SegmentName;
@@ -77,22 +78,24 @@ public class PinotLLCRealtimeSegmentManager {
   private final String _clusterName;
   private boolean _amILeader = false;
   private final ControllerConf _controllerConf;
+  private final ControllerMetrics _controllerMetrics;
 
-  public static synchronized void create(PinotHelixResourceManager helixResourceManager, ControllerConf controllerConf) {
+  public static synchronized void create(PinotHelixResourceManager helixResourceManager, ControllerConf controllerConf,
+      ControllerMetrics controllerMetrics) {
     create(helixResourceManager.getHelixAdmin(), helixResourceManager.getHelixClusterName(),
         helixResourceManager.getHelixZkManager(), helixResourceManager.getPropertyStore(), helixResourceManager,
-        controllerConf);
+        controllerConf, controllerMetrics);
   }
 
   private static synchronized void create(HelixAdmin helixAdmin, String clusterName, HelixManager helixManager,
       ZkHelixPropertyStore propertyStore, PinotHelixResourceManager helixResourceManager,
-      ControllerConf controllerConf) {
+      ControllerConf controllerConf, ControllerMetrics controllerMetrics) {
     if (INSTANCE != null) {
       throw new RuntimeException("Instance already created");
     }
     INSTANCE = new PinotLLCRealtimeSegmentManager(helixAdmin, clusterName, helixManager, propertyStore,
-        helixResourceManager, controllerConf);
-    SegmentCompletionManager.create(helixManager, INSTANCE, controllerConf);
+        helixResourceManager, controllerConf, controllerMetrics);
+    SegmentCompletionManager.create(helixManager, INSTANCE, controllerConf, controllerMetrics);
   }
 
   public void start() {
@@ -105,13 +108,15 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   protected PinotLLCRealtimeSegmentManager(HelixAdmin helixAdmin, String clusterName, HelixManager helixManager,
-      ZkHelixPropertyStore propertyStore, PinotHelixResourceManager helixResourceManager, ControllerConf controllerConf) {
+      ZkHelixPropertyStore propertyStore, PinotHelixResourceManager helixResourceManager, ControllerConf controllerConf,
+      ControllerMetrics controllerMetrics) {
     _helixAdmin = helixAdmin;
     _helixManager = helixManager;
     _propertyStore = propertyStore;
     _helixResourceManager = helixResourceManager;
     _clusterName = clusterName;
     _controllerConf = controllerConf;
+    _controllerMetrics = controllerMetrics;
   }
 
   public static PinotLLCRealtimeSegmentManager getInstance() {

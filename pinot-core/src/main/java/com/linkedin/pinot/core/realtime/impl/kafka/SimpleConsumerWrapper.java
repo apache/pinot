@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.kafka.common.errors.TimeoutException;
 import org.apache.kafka.common.protocol.Errors;
 import org.slf4j.Logger;
@@ -397,18 +398,19 @@ public class SimpleConsumerWrapper implements Closeable {
   }
 
   /**
-   * Fetch messages from Kafka between the specified offsets.
+   * Fetch messages and the per-partition high watermark from Kafka between the specified offsets.
    *
    * @param startOffset The offset of the first message desired, inclusive
    * @param endOffset The offset of the last message desired, exclusive, or {@link Long#MAX_VALUE} for no end offset.
    * @param timeoutMillis Timeout in milliseconds
    * @throws java.util.concurrent.TimeoutException If the operation could not be completed within {@code timeoutMillis}
    * milliseconds
-   * @return An iterable containing messages fetched from Kafka and their offsets.
+   * @return An iterable containing messages fetched from Kafka and their offsets, as well as the high watermark for
+   * this partition.
    */
-  public synchronized Iterable<MessageAndOffset> fetchMessages(long startOffset, long endOffset, int timeoutMillis)
-      throws java.util.concurrent.TimeoutException {
-      Preconditions.checkState(!_metadataOnlyConsumer, "Cannot fetch messages from a metadata-only SimpleConsumerWrapper");
+  public synchronized Pair<Iterable<MessageAndOffset>, Long> fetchMessagesAndHighWatermark(long startOffset,
+      long endOffset, int timeoutMillis) throws java.util.concurrent.TimeoutException {
+    Preconditions.checkState(!_metadataOnlyConsumer, "Cannot fetch messages from a metadata-only SimpleConsumerWrapper");
     // Ensure that we're connected to the leader
     // TODO Improve error handling
 
@@ -430,10 +432,27 @@ public class SimpleConsumerWrapper implements Closeable {
         .build());
 
     if (!fetchResponse.hasError()) {
-      return buildOffsetFilteringIterable(fetchResponse.messageSet(_topic, _partition), startOffset, endOffset);
+      final Iterable<MessageAndOffset> messageAndOffsetIterable =
+          buildOffsetFilteringIterable(fetchResponse.messageSet(_topic, _partition), startOffset, endOffset);
+      return Pair.of(messageAndOffsetIterable, fetchResponse.highWatermark(_topic, _partition));
     } else {
       throw Errors.forCode(fetchResponse.errorCode(_topic, _partition)).exception();
     }
+  }
+
+  /**
+   * Fetch messages from Kafka between the specified offsets.
+   *
+   * @param startOffset The offset of the first message desired, inclusive
+   * @param endOffset The offset of the last message desired, exclusive, or {@link Long#MAX_VALUE} for no end offset.
+   * @param timeoutMillis Timeout in milliseconds
+   * @throws java.util.concurrent.TimeoutException If the operation could not be completed within {@code timeoutMillis}
+   * milliseconds
+   * @return An iterable containing messages fetched from Kafka and their offsets.
+   */
+  public synchronized Iterable<MessageAndOffset> fetchMessages(long startOffset, long endOffset, int timeoutMillis)
+      throws java.util.concurrent.TimeoutException {
+    return fetchMessagesAndHighWatermark(startOffset, endOffset, timeoutMillis).getLeft();
   }
 
   /**

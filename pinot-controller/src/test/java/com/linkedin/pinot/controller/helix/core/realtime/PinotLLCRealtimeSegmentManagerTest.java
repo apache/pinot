@@ -16,6 +16,8 @@
 
 package com.linkedin.pinot.controller.helix.core.realtime;
 
+import com.linkedin.pinot.common.metrics.ControllerMetrics;
+import com.yammer.metrics.core.MetricsRegistry;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -401,7 +403,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     private SegmentMetadataImpl segmentMetadata;
 
     protected FakePinotLLCRealtimeSegmentManager(boolean setupInitialSegments, List<String> existingLLCSegments) {
-      super(null, clusterName, null, null, null, CONTROLLER_CONF);
+      super(null, clusterName, null, null, null, CONTROLLER_CONF, new ControllerMetrics(new MetricsRegistry()));
       _setupInitialSegments = setupInitialSegments;
       _existingLLCSegments = existingLLCSegments;
       CONTROLLER_CONF.setControllerVipHost("vip");
