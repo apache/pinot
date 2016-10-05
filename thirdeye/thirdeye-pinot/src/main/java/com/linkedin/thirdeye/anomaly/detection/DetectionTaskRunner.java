@@ -1,10 +1,13 @@
 package com.linkedin.thirdeye.anomaly.detection;
 
+import com.google.common.collect.ArrayListMultimap;
 import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.commons.collections.MultiMap;
+import org.apache.commons.collections.map.MultiValueMap;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,7 +72,7 @@ public class DetectionTaskRunner implements TaskRunner {
       LOG.error("Exception when reading collection schema cache", e);
     }
 
-    // Get existing anomalies for this time range
+    // Get existing anomalies for this time range and this function id
     knownAnomalies = getExistingAnomalies();
     TimeSeriesResponse finalResponse = TimeSeriesUtil
         .getTimeSeriesResponse(anomalyFunctionSpec, anomalyFunction,
@@ -84,11 +87,29 @@ public class DetectionTaskRunner implements TaskRunner {
     int anomalyCounter = 0;
     Map<DimensionKey, MetricTimeSeries> res =
         timeSeriesResponseConverter.toMap(finalResponse, collectionDimensions);
+
+    // Sort the known anomalies by their dimension names
+    ArrayListMultimap<String, RawAnomalyResultDTO> dimensionNamesToKnownAnomalies = ArrayListMultimap.create();
+    for (RawAnomalyResultDTO knownAnomaly : knownAnomalies) {
+      dimensionNamesToKnownAnomalies.put(knownAnomaly.getDimensions(), knownAnomaly);
+    }
+
     for (Map.Entry<DimensionKey, MetricTimeSeries> entry : res.entrySet()) {
       if (entry.getValue().getTimeWindowSet().size() < 1) {
         LOG.warn("Insufficient data for {} to run anomaly detection function", entry.getKey());
         continue;
       }
+
+      // Get current entry's knownAnomalies, which should have the same dimension names.
+      StringBuilder dimensionKeyStringBuilder = new StringBuilder();
+      String separator = "";
+      for (String dimensionValue : entry.getKey().getDimensionValues()) {
+        dimensionKeyStringBuilder.append(separator).append(dimensionValue);
+        separator = ",";
+      }
+      String dimensionKeyString = dimensionKeyStringBuilder.toString();
+      List<RawAnomalyResultDTO> knownAnomaliesOfAnEntry = dimensionNamesToKnownAnomalies.get(dimensionKeyString);
+
       try {
         // Run algorithm
         DimensionKey dimensionKey = entry.getKey();
@@ -97,13 +118,13 @@ public class DetectionTaskRunner implements TaskRunner {
             dimensionKey, windowStart, windowEnd);
 
         List<RawAnomalyResultDTO> resultsOfAnEntry = anomalyFunction
-            .analyze(dimensionKey, metricTimeSeries, windowStart, windowEnd, knownAnomalies);
+            .analyze(dimensionKey, metricTimeSeries, windowStart, windowEnd, knownAnomaliesOfAnEntry);
 
         // Handle results
         handleResults(resultsOfAnEntry);
 
         // Remove any known anomalies
-        resultsOfAnEntry.removeAll(knownAnomalies);
+        resultsOfAnEntry.removeAll(knownAnomaliesOfAnEntry);
 
         LOG.info("{} has {} anomalies in window {} to {}", entry.getKey(), resultsOfAnEntry.size(),
             windowStart, windowEnd);
