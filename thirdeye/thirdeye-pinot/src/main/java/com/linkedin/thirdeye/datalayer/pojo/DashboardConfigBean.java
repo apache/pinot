@@ -8,6 +8,8 @@ import com.google.common.base.MoreObjects;
 @JsonIgnoreProperties(ignoreUnknown=true)
 public class DashboardConfigBean extends AbstractBean {
 
+  public static String DEFAULT_DASHBOARD_PREFIX = "Default_Dashboard_";
+
   private String name;
 
   private String dataset;
@@ -19,6 +21,8 @@ public class DashboardConfigBean extends AbstractBean {
   private String groupBy;
 
   private List<Long> anomalyFunctionIds;
+
+  private boolean active = true;
 
   public String getName() {
     return name;
@@ -69,6 +73,14 @@ public class DashboardConfigBean extends AbstractBean {
     this.anomalyFunctionIds = anomalyFunctionIds;
   }
 
+  public boolean isActive() {
+    return active;
+  }
+
+  public void setActive(boolean active) {
+    this.active = active;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (!(o instanceof DashboardConfigBean)) {
@@ -81,18 +93,19 @@ public class DashboardConfigBean extends AbstractBean {
         && Objects.equals(dataset, dc.getDataset())
         && Objects.equals(filterClause, dc.getFilterClause())
         && Objects.equals(groupBy, dc.getGroupBy())
-        && Objects.equals(anomalyFunctionIds, dc.getAnomalyFunctionIds());
+        && Objects.equals(anomalyFunctionIds, dc.getAnomalyFunctionIds())
+        && Objects.equals(active, dc.isActive());
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(getId(), name, metricIds, dataset, filterClause, groupBy, anomalyFunctionIds);
+    return Objects.hash(getId(), name, metricIds, dataset, filterClause, groupBy, anomalyFunctionIds, active);
   }
 
   @Override
   public String toString() {
     return MoreObjects.toStringHelper(this).add("id", getId()).add("name", name)
         .add("metricIds", metricIds).add("dataset", getDataset()).add("filterClause", filterClause)
-        .add("groupBy", groupBy).add("anomalyFunctionIds", anomalyFunctionIds).toString();
+        .add("groupBy", groupBy).add("anomalyFunctionIds", anomalyFunctionIds).add("active", active).toString();
   }
 }

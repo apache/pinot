@@ -2,10 +2,12 @@ package com.linkedin.thirdeye.datalayer.util;
 
 import io.dropwizard.configuration.ConfigurationFactory;
 import io.dropwizard.jackson.Jackson;
+
 import java.io.File;
 import java.sql.Connection;
 
 import javax.validation.Validation;
+
 import org.apache.tomcat.jdbc.pool.DataSource;
 
 import com.google.common.base.CaseFormat;
@@ -15,10 +17,13 @@ import com.linkedin.thirdeye.datalayer.bao.jdbc.AbstractManagerImpl;
 import com.linkedin.thirdeye.datalayer.dto.AbstractDTO;
 import com.linkedin.thirdeye.datalayer.entity.AnomalyFeedbackIndex;
 import com.linkedin.thirdeye.datalayer.entity.AnomalyFunctionIndex;
+import com.linkedin.thirdeye.datalayer.entity.DashboardConfigIndex;
+import com.linkedin.thirdeye.datalayer.entity.DatasetConfigIndex;
 import com.linkedin.thirdeye.datalayer.entity.EmailConfigurationIndex;
 import com.linkedin.thirdeye.datalayer.entity.GenericJsonEntity;
 import com.linkedin.thirdeye.datalayer.entity.JobIndex;
 import com.linkedin.thirdeye.datalayer.entity.MergedAnomalyResultIndex;
+import com.linkedin.thirdeye.datalayer.entity.MetricConfigIndex;
 import com.linkedin.thirdeye.datalayer.entity.RawAnomalyResultIndex;
 import com.linkedin.thirdeye.datalayer.entity.TaskIndex;
 import com.linkedin.thirdeye.datalayer.entity.WebappConfigIndex;
@@ -103,6 +108,12 @@ public abstract class DaoProviderUtil {
             convertCamelCaseToUnderscore(EmailConfigurationIndex.class.getSimpleName()));
         entityMappingHolder.register(conn, WebappConfigIndex.class,
             convertCamelCaseToUnderscore(WebappConfigIndex.class.getSimpleName()));
+        entityMappingHolder.register(conn, DatasetConfigIndex.class,
+            convertCamelCaseToUnderscore(DatasetConfigIndex.class.getSimpleName()));
+        entityMappingHolder.register(conn, MetricConfigIndex.class,
+            convertCamelCaseToUnderscore(MetricConfigIndex.class.getSimpleName()));
+        entityMappingHolder.register(conn, DashboardConfigIndex.class,
+            convertCamelCaseToUnderscore(DashboardConfigIndex.class.getSimpleName()));
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
