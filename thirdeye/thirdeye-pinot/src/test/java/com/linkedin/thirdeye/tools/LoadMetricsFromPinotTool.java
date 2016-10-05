@@ -190,6 +190,7 @@ public class LoadMetricsFromPinotTool {
           collectionConfig = CollectionConfig.fromJSON(configJson, CollectionConfig.class);
         }
 
+        // TODO: this condition will go away once this tool becomes a pure pull from pinot instead of a migrate existing
         if (collectionConfig != null && collectionConfig.isMetricAsDimension()) {
           loadMetricAsDimensionConfigs(collection, schema, collectionConfig);
         } else {
