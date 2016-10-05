@@ -25,6 +25,7 @@ import com.linkedin.pinot.common.utils.time.TimeUtils;
 import com.linkedin.pinot.core.indexsegment.IndexType;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import com.linkedin.pinot.core.segment.store.SegmentDirectoryPaths;
 import com.linkedin.pinot.core.startree.hll.HllConstants;
 import java.io.DataInputStream;
 import java.io.File;
@@ -79,16 +80,12 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
   public SegmentMetadataImpl(File indexDir) throws ConfigurationException, IOException {
     LOGGER.debug("SegmentMetadata location: {}", indexDir);
-    if (indexDir.isDirectory()) {
-      _metadataFile = new File(indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME);
-    } else {
-      _metadataFile = indexDir;
+    File tmpMetadataFile = SegmentDirectoryPaths.findMetadataFile(indexDir);
+    if (tmpMetadataFile == null) {
+      LOGGER.warn("Metadata file: {} does not exist in directory: {}", tmpMetadataFile, indexDir);
+      tmpMetadataFile = new File(indexDir, MetadataKeys.METADATA_FILE_NAME);
     }
-    if (!_metadataFile.exists()) {
-      String logMessage = String.format("Metadata file: %s does not exist in directory: %s", _metadataFile, indexDir);
-      LOGGER.error(logMessage);
-      throw new RuntimeException(logMessage);
-    }
+    _metadataFile = tmpMetadataFile;
     _segmentMetadataPropertiesConfiguration = new PropertiesConfiguration(_metadataFile);
     _columnMetadataMap = new HashMap<String, ColumnMetadata>();
     _allColumns = new HashSet<String>();
