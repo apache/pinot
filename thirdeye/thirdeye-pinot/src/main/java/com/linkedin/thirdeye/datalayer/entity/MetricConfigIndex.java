@@ -4,6 +4,7 @@ public class MetricConfigIndex extends AbstractIndexEntity {
   String name;
   String alias;
   String dataset;
+  boolean active;
 
   public String getDataset() {
     return dataset;
@@ -29,5 +30,11 @@ public class MetricConfigIndex extends AbstractIndexEntity {
     this.alias = alias;
   }
 
+  public boolean isActive() {
+    return active;
+  }
 
+  public void setActive(boolean active) {
+    this.active = active;
+  }
 }

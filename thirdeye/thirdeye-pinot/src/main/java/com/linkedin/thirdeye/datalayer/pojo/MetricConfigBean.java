@@ -1,19 +1,26 @@
 package com.linkedin.thirdeye.datalayer.pojo;
 
 import java.util.Objects;
+
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.google.common.base.MoreObjects;
+import com.linkedin.thirdeye.api.MetricType;
 
 @JsonIgnoreProperties(ignoreUnknown=true)
 public class MetricConfigBean extends AbstractBean {
 
   public static double DEFAULT_THRESHOLD = 0.01;
+  public static String DERIVED_METRIC_ID_PREFIX = "id";
 
   private String name;
 
   private String dataset;
 
   private String alias;
+
+  private MetricType datatype;
+
+  private boolean additive = true;
 
   private boolean derived = false;
 
@@ -24,6 +31,8 @@ public class MetricConfigBean extends AbstractBean {
   private boolean inverseMetric = false;
 
   private String cellSizeExpression;
+
+  private boolean active = true;
 
 
   public String getName() {
@@ -48,6 +57,22 @@ public class MetricConfigBean extends AbstractBean {
 
   public void setAlias(String alias) {
     this.alias = alias;
+  }
+
+  public MetricType getDatatype() {
+    return datatype;
+  }
+
+  public void setDatatype(MetricType datatype) {
+    this.datatype = datatype;
+  }
+
+  public boolean isAdditive() {
+    return additive;
+  }
+
+  public void setAdditive(boolean additive) {
+    this.additive = additive;
   }
 
   public boolean isDerived() {
@@ -90,6 +115,14 @@ public class MetricConfigBean extends AbstractBean {
     this.cellSizeExpression = cellSizeExpression;
   }
 
+  public boolean isActive() {
+    return active;
+  }
+
+  public void setActive(boolean active) {
+    this.active = active;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (!(o instanceof MetricConfigBean)) {
@@ -100,23 +133,27 @@ public class MetricConfigBean extends AbstractBean {
         && Objects.equals(name, mc.getName())
         && Objects.equals(dataset, mc.getDataset())
         && Objects.equals(alias, mc.getAlias())
+        && Objects.equals(additive, mc.isAdditive())
         && Objects.equals(derived, mc.isDerived())
         && Objects.equals(derivedMetricExpression, mc.getDerivedMetricExpression())
         && Objects.equals(rollupThreshold, mc.getRollupThreshold())
         && Objects.equals(inverseMetric, mc.isInverseMetric())
-        && Objects.equals(cellSizeExpression, mc.getCellSizeExpression());
+        && Objects.equals(cellSizeExpression, mc.getCellSizeExpression())
+        && Objects.equals(active, mc.isActive());
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(getId(), dataset, alias, derived, derivedMetricExpression, rollupThreshold, inverseMetric,
-        cellSizeExpression);
+    return Objects.hash(getId(), dataset, alias, additive, derived, derivedMetricExpression, rollupThreshold,
+        inverseMetric, cellSizeExpression, active);
   }
 
   @Override
   public String toString() {
     return MoreObjects.toStringHelper(this).add("id", getId()).add("dataset", dataset)
-        .add("alias", alias).add("derived", derived).add("derivedMetricExpression", derivedMetricExpression)
-        .add("rollupThreshold", rollupThreshold).add("cellSizeExpression", cellSizeExpression).toString();
+        .add("alias", alias).add("additive", additive).add("derived", derived)
+        .add("derivedMetricExpression", derivedMetricExpression)
+        .add("rollupThreshold", rollupThreshold).add("cellSizeExpression", cellSizeExpression)
+        .add("active", active).toString();
   }
 }

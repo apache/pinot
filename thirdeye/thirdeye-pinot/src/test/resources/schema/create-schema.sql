@@ -155,6 +155,7 @@ ALTER TABLE `webapp_config_index` ADD UNIQUE `unique_index`(`name`, `collection`
 
 create table if not exists dataset_config_index (
     dataset varchar(200) not null,
+    active boolean,
     base_id bigint(20) not null,
     create_time timestamp,
     update_time timestamp default current_timestamp,
@@ -162,11 +163,13 @@ create table if not exists dataset_config_index (
     CONSTRAINT uc_dataset unique(dataset)
 ) ENGINE=InnoDB;
 create index dataset_config_dataset_idx on dataset_config_index(dataset);
+create index dataset_config_active_idx on dataset_config_index(active);
 
 create table if not exists metric_config_index (
     name varchar(200) not null,
     dataset varchar(200) not null,
     alias varchar(200) not null,
+    active boolean,
     base_id bigint(20) not null,
     create_time timestamp,
     update_time timestamp default current_timestamp,
@@ -176,11 +179,13 @@ ALTER TABLE `metric_config_index` ADD UNIQUE `unique_metric_index`(`name`, `data
 create index metric_config_name_idx on metric_config_index(name);
 create index metric_config_dataset_idx on metric_config_index(dataset);
 create index metric_config_alias_idx on metric_config_index(alias);
+create index metric_config_active_idx on metric_config_index(active);
 
 
 create table if not exists dashboard_config_index (
     name varchar(200) not null,
     dataset varchar(200) not null,
+    active boolean,
     base_id bigint(20) not null,
     create_time timestamp,
     update_time timestamp default current_timestamp,
@@ -189,4 +194,5 @@ create table if not exists dashboard_config_index (
 ) ENGINE=InnoDB;
 create index dashboard_config_name_idx on dashboard_config_index(name);
 create index dashboard_config_dataset_idx on dashboard_config_index(dataset);
+create index dashboard_config_active_idx on dashboard_config_index(active);
 

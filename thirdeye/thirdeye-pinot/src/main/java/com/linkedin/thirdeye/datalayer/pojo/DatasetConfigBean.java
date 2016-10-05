@@ -31,6 +31,8 @@ public class DatasetConfigBean extends AbstractBean {
 
   private String metricValuesColumn;
 
+  private boolean active = true;
+
   public String getDataset() {
     return dataset;
   }
@@ -111,6 +113,14 @@ public class DatasetConfigBean extends AbstractBean {
     this.metricValuesColumn = metricValuesColumn;
   }
 
+  public boolean isActive() {
+    return active;
+  }
+
+  public void setActive(boolean active) {
+    this.active = active;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (!(o instanceof DatasetConfigBean)) {
@@ -127,13 +137,14 @@ public class DatasetConfigBean extends AbstractBean {
         && Objects.equals(timezone, dc.getTimezone())
         && Objects.equals(metricAsDimension, dc.isMetricAsDimension())
         && Objects.equals(metricNamesColumn, dc.getMetricNamesColumn())
-        && Objects.equals(metricValuesColumn, dc.getMetricValuesColumn());
+        && Objects.equals(metricValuesColumn, dc.getMetricValuesColumn())
+        && Objects.equals(active, dc.isActive());
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(getId(), dataset, dimensions, timeColumn, timeUnit, timeDuration, timeFormat, timezone,
-        metricAsDimension, metricNamesColumn, metricValuesColumn);
+        metricAsDimension, metricNamesColumn, metricValuesColumn, active);
   }
 
   @Override
@@ -141,6 +152,7 @@ public class DatasetConfigBean extends AbstractBean {
     return MoreObjects.toStringHelper(this).add("id", getId()).add("dataset", dataset)
         .add("dimensions", dimensions).add("dimensions", dimensions).add("timeUnit", timeUnit)
         .add("timeDuration", timeDuration).add("timeFormat", timeFormat).add("metricAsDimension", metricAsDimension)
-        .add("metricNamesColumn", metricNamesColumn).add("metricValuesColumn", metricValuesColumn).toString();
+        .add("metricNamesColumn", metricNamesColumn).add("metricValuesColumn", metricValuesColumn)
+        .add("active", active).toString();
   }
 }

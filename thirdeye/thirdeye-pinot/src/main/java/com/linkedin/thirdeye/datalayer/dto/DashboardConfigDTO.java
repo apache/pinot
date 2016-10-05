@@ -3,9 +3,9 @@ package com.linkedin.thirdeye.datalayer.dto;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
+import com.linkedin.thirdeye.datalayer.pojo.DashboardConfigBean;
 
-public class DashboardConfigDTO extends MetricConfigBean {
+public class DashboardConfigDTO extends DashboardConfigBean {
 
   private List<MetricConfigDTO> metrics = new ArrayList<>();
   private DatasetConfigDTO datasetConfig;
