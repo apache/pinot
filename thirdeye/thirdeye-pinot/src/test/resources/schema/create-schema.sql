@@ -1,4 +1,3 @@
--- drop database thirdeye_test; create database thirdeye_test; use thirdeye_test;
 
 create table if not exists generic_json_entity (
     id bigint(20) primary key auto_increment,
@@ -23,18 +22,6 @@ create table if not exists anomaly_function_index (
     CONSTRAINT uc_functionName unique(function_name)
 ) ENGINE=InnoDB;
 create index anomaly_function_name_idx on anomaly_function_index(function_name);
-
-create table if not exists metric_index (
-    name varchar(200) not null,
-    collection varchar(200) not null,
-    derived boolean default false,
-    dimension_as_metric boolean default false,
-    base_id bigint(20) not null,
-    create_time timestamp,
-    update_time timestamp default current_timestamp,
-    version int(10),
-    CONSTRAINT uc_name unique(name)
-) ENGINE=InnoDB;
 
 create table if not exists anomaly_merge_config_index (
     name varchar(200) not null,

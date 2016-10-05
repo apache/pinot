@@ -26,7 +26,6 @@
                 </td>
 
                 <td>
-
                     {{#if anomalyFunction/filters}}
                     <table>
                         {{#each anomalyFunction/filters as |dimensionValue dimension|}}
