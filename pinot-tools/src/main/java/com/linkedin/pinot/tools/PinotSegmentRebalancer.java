@@ -24,6 +24,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import org.apache.commons.math.stat.descriptive.DescriptiveStatistics;
+import org.apache.helix.HelixManager;
+import org.apache.helix.HelixManagerFactory;
+import org.apache.helix.InstanceType;
 import org.apache.helix.PropertyPathConfig;
 import org.apache.helix.PropertyType;
 import org.apache.helix.ZNRecord;
@@ -40,8 +43,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Lists;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.common.utils.EqualityUtils;
+import com.linkedin.pinot.common.utils.helix.HelixHelper;
+import com.linkedin.pinot.common.utils.retry.RetryPolicies;
+import javax.annotation.Nullable;
 
 
 public class PinotSegmentRebalancer {
@@ -50,6 +57,7 @@ public class PinotSegmentRebalancer {
   static final String rebalanceTenantCmd = "rebalanceTenant";
 
   private ZKHelixAdmin helixAdmin;
+  private HelixManager helixManager;
   private String clusterName;
   private ZkHelixPropertyStore<ZNRecord> propertyStore;
   private ObjectMapper objectMapper;
@@ -58,11 +66,39 @@ public class PinotSegmentRebalancer {
   public PinotSegmentRebalancer(String zkAddress, String clusterName, boolean dryRun) {
     this.clusterName = clusterName;
     helixAdmin = new ZKHelixAdmin(zkAddress);
+    helixManager =
+        HelixManagerFactory
+            .getZKHelixManager(clusterName, "PinotNumReplicaChanger", InstanceType.ADMINISTRATOR, zkAddress);
+    try {
+      helixManager.connect();
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
     ZNRecordSerializer serializer = new ZNRecordSerializer();
     String path = PropertyPathConfig.getPath(PropertyType.PROPERTYSTORE, clusterName);
     propertyStore = new ZkHelixPropertyStore<>(zkAddress, serializer, path);
     objectMapper = new ObjectMapper();
     this.dryRun = dryRun;
+  }
+
+  protected ZKHelixAdmin getZkHelixAdmin() {
+    return helixAdmin;
+  }
+
+  protected String getClusterName() {
+    return clusterName;
+  }
+
+  protected boolean isDryRun() {
+    return dryRun;
+  }
+
+  protected ZkHelixPropertyStore<ZNRecord> getPropertyStore() {
+    return propertyStore;
+  }
+
+  protected HelixManager getHelixManager() {
+    return helixManager;
   }
 
   /**
@@ -145,8 +181,22 @@ public class PinotSegmentRebalancer {
     IdealState currentIdealState = helixAdmin.getResourceIdealState(clusterName, tableName);
     List<String> partitions = Lists.newArrayList(currentIdealState.getPartitionSet());
     LinkedHashMap<String, Integer> states = new LinkedHashMap<>();
+    int numReplicasInIdealState = Integer.parseInt(currentIdealState.getReplicas());
+    final AbstractTableConfig offlineTableConfig =
+        ZKMetadataProvider.getOfflineTableConfig(getPropertyStore(), tableName);
+    final int numReplicasInTableConfig = Integer.parseInt(offlineTableConfig.getValidationConfig().getReplication());
+
+    final int targetNumReplicas = numReplicasInTableConfig;
+    if (numReplicasInTableConfig < numReplicasInIdealState) {
+      // AutoRebalanceStrategy,computePartitionAssignment works correctly if we increase the number of partitions,
+      // but not if we decrease it. We need to use the PinotNumReplicaChanger to reduce the number of replicas.
+      LOGGER.info("You first need to reduce the number of replicas from {} to {} for table {}. Use the ChangeNumReplicas command",
+          numReplicasInIdealState, numReplicasInTableConfig, tableName);
+      return;
+    }
+
     states.put("OFFLINE", 0);
-    states.put("ONLINE", Integer.parseInt(currentIdealState.getReplicas()));
+    states.put("ONLINE", targetNumReplicas);
     Map<String, Map<String, String>> mapFields = currentIdealState.getRecord().getMapFields();
     Set<String> currentHosts = new HashSet<>();
     for (String segment : mapFields.keySet()) {
@@ -161,7 +211,7 @@ public class PinotSegmentRebalancer {
     Map<String, Map<String, String>> currentMapping = currentIdealState.getRecord().getMapFields();
     ZNRecord newZnRecord = rebalanceStrategy
         .computePartitionAssignment(instancesInClusterWithTag, currentMapping, instancesInClusterWithTag);
-    Map<String, Map<String, String>> newMapping = newZnRecord.getMapFields();
+    final Map<String, Map<String, String>> newMapping = newZnRecord.getMapFields();
     LOGGER.info("Current segment Assignment:");
     printSegmentAssignment(currentMapping);
     LOGGER.info("Final segment Assignment:");
@@ -170,28 +220,50 @@ public class PinotSegmentRebalancer {
       if (EqualityUtils.isEqual(newMapping, currentMapping)) {
         LOGGER.info("Skipping rebalancing for table:" + tableName + " since its already balanced");
       } else {
-        IdealState updatedIdealState = new IdealState(currentIdealState.getRecord());
-        updatedIdealState.getRecord().setMapFields(newMapping);
-        LOGGER.info("Updating the idealstate for table:" + tableName);
-        helixAdmin.setResourceIdealState(clusterName, tableName, updatedIdealState);
-        int diff = Integer.MAX_VALUE;
-        Thread.sleep(3000);
-        do {
-          diff = isStable(tableName);
-          if (diff == 0) {
-            break;
-          } else {
-            LOGGER.info(
-                "Waiting for externalView to match idealstate for table:" + tableName + " Num segments difference:" + diff);
-            Thread.sleep(30000);
-          }
-        } while (diff > 0);
+        HelixHelper.updateIdealState(getHelixManager(), tableName,
+            new com.google.common.base.Function<IdealState, IdealState>() {
+              @Nullable
+              @Override
+              public IdealState apply(@Nullable IdealState idealState) {
+                for (String segmentId : newMapping.keySet()) {
+                  Map<String, String> instanceStateMap = newMapping.get(segmentId);
+                  for (String instanceId : instanceStateMap.keySet()) {
+                    idealState.setPartitionState(segmentId, instanceId, instanceStateMap.get(instanceId));
+                  }
+                }
+                return idealState;
+              }
+            }, RetryPolicies.exponentialBackoffRetryPolicy(5, 500L, 2.0f));
+        waitForStable(tableName);
         LOGGER.info("Successfully rebalanced table:" + tableName);
       }
     }
   }
 
-  private void printSegmentAssignment(Map<String, Map<String, String>> mapping) throws Exception {
+  protected void updateIdealState(String resourceName, IdealState updatedIdealState)
+      throws InterruptedException {
+    LOGGER.info("Updating the idealstate for table:" + resourceName);
+    helixAdmin.setResourceIdealState(clusterName, resourceName, updatedIdealState);
+    waitForStable(resourceName);
+  }
+
+  protected void waitForStable(String resourceName)
+      throws InterruptedException {
+    int diff;
+    Thread.sleep(3000);
+    do {
+      diff = isStable(resourceName);
+      if (diff == 0) {
+        break;
+      } else {
+        LOGGER.info(
+            "Waiting for externalView to match idealstate for table:" + resourceName + " Num segments difference:" + diff);
+        Thread.sleep(30000);
+      }
+    } while (diff > 0);
+  }
+
+  protected void printSegmentAssignment(Map<String, Map<String, String>> mapping) throws Exception {
     StringWriter sw = new StringWriter();
     objectMapper.writerWithDefaultPrettyPrinter().writeValue(sw, mapping);
     LOGGER.info(sw.toString());
