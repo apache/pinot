@@ -39,6 +39,7 @@ import org.slf4j.LoggerFactory;
 public class RequestUtils {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(RequestUtils.class);
+  private static final String USE_STAR_TREE_KEY = "useStarTree";
 
   /**
    * Generates thrift compliant filterQuery and populate it in the broker request
@@ -113,6 +114,7 @@ public class RequestUtils {
 
   /**
    * Returns true for the following, false otherwise:
+   * - BrokerRequest debug options have not explicitly disabled use of star tree
    * - Query is not aggregation/group-by
    * - Segment does not contain star tree
    * - The only aggregation function in the query should be in {@link #ALLOWED_AGGREGATION_FUNCTIONS}
@@ -126,6 +128,11 @@ public class RequestUtils {
    */
   public static boolean isFitForStarTreeIndex(SegmentMetadata segmentMetadata, FilterQueryTree filterTree,
       BrokerRequest brokerRequest) {
+
+    // If broker request disables use of star tree, return false.
+    if (!isStarTreeEnabledInBrokerRequest(brokerRequest)) {
+      return false;
+    }
     // Apply the checks in order of their runtime.
     List<AggregationInfo> aggregationsInfo = brokerRequest.getAggregationsInfo();
 
@@ -251,4 +258,20 @@ public class RequestUtils {
     return starTreeMetadata.getDerivedHllColumnFromOrigin(aggrColumn);
   }
 
+
+  /**
+   * This method returns the value of {@link #USE_STAR_TREE_KEY} boolean flag specified in the debug options
+   * in broker request. If the flag is not specified in the debug options, it returns true.
+   *
+   * @param brokerRequest Broker Request
+   * @return Value of {@link #USE_STAR_TREE_KEY} debug option, or true if not option not specified.
+   */
+  public static boolean isStarTreeEnabledInBrokerRequest(BrokerRequest brokerRequest) {
+    Map<String, String> debugOptions = brokerRequest.getDebugOptions();
+    if (debugOptions == null) {
+      return true;
+    }
+    String useStarTreeString = debugOptions.get(USE_STAR_TREE_KEY);
+    return (useStarTreeString != null) ? Boolean.valueOf(useStarTreeString) : true;
+  }
 }
