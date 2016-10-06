@@ -45,7 +45,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     // Create a table with an invalid name
     JSONObject request = ControllerRequestBuilder.buildCreateOfflineTableJSON("bad__table__name", "default", "default",
         "potato", "DAYS", "DAYS", "5", 3, "BalanceNumSegmentAssignmentStrategy", Collections.<String>emptyList(),
-        "MMAP");
+        "MMAP", "v1");
 
     try {
       sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTableCreate(),
@@ -58,7 +58,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     // Create a table with a valid name
     request = ControllerRequestBuilder.buildCreateOfflineTableJSON("valid_table_name", "default", "default",
         "potato", "DAYS", "DAYS", "5", 3, "BalanceNumSegmentAssignmentStrategy", Collections.<String>emptyList(),
-        "MMAP");
+        "MMAP", "v1");
 
     sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTableCreate(), request.toString());
 

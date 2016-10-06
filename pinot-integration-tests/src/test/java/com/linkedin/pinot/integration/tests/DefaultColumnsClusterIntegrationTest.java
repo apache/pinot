@@ -17,6 +17,7 @@ package com.linkedin.pinot.integration.tests;
 
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.FileUploadUtils;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import java.io.File;
 import java.io.FileInputStream;
 import java.net.URL;
@@ -86,7 +87,7 @@ public class DefaultColumnsClusterIntegrationTest extends BaseClusterIntegration
     startServer();
 
     // Create the table.
-    addOfflineTable("mytable", "DaysSinceEpoch", "daysSinceEpoch", -1, "", null, null);
+    addOfflineTable("DaysSinceEpoch", "daysSinceEpoch", -1, "", null, null, "mytable", SegmentVersion.v1);
 
     // Add the schema.
     if (sendSchema) {
@@ -141,7 +142,7 @@ public class DefaultColumnsClusterIntegrationTest extends BaseClusterIntegration
   protected void waitForSegmentsOnline()
       throws Exception {
     long timeInTwoMinutes = System.currentTimeMillis() + 2 * 60 * 1000L;
-    while (getCurrentServingNumDocs() < TOTAL_DOCS) {
+    while (getCurrentServingNumDocs("mytable") < TOTAL_DOCS) {
       if (System.currentTimeMillis() < timeInTwoMinutes) {
         Thread.sleep(1000);
       } else {

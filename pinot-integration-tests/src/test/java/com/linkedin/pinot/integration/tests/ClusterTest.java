@@ -15,6 +15,27 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import com.linkedin.pinot.broker.broker.BrokerTestUtils;
+import com.linkedin.pinot.broker.broker.helix.HelixBrokerStarter;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.request.helper.ControllerRequestBuilder;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource.Realtime.Kafka;
+import com.linkedin.pinot.common.utils.CommonConstants.Server;
+import com.linkedin.pinot.common.utils.FileUploadUtils;
+import com.linkedin.pinot.common.utils.KafkaStarterUtils;
+import com.linkedin.pinot.common.utils.ZkStarter;
+import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
+import com.linkedin.pinot.controller.helix.ControllerTest;
+import com.linkedin.pinot.controller.helix.ControllerTestUtils;
+import com.linkedin.pinot.core.data.GenericRow;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
+import com.linkedin.pinot.core.indexsegment.utils.AvroUtils;
+import com.linkedin.pinot.core.realtime.impl.kafka.AvroRecordToPinotRowGenerator;
+import com.linkedin.pinot.core.realtime.impl.kafka.KafkaMessageDecoder;
+import com.linkedin.pinot.server.starter.helix.DefaultHelixStarterServerConfig;
+import com.linkedin.pinot.server.starter.helix.HelixServerStarter;
 import java.io.File;
 import java.io.FileInputStream;
 import java.util.ArrayList;
@@ -31,26 +52,6 @@ import org.apache.commons.configuration.Configuration;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.linkedin.pinot.broker.broker.BrokerTestUtils;
-import com.linkedin.pinot.broker.broker.helix.HelixBrokerStarter;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.request.helper.ControllerRequestBuilder;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource.Realtime.Kafka;
-import com.linkedin.pinot.common.utils.CommonConstants.Server;
-import com.linkedin.pinot.common.utils.FileUploadUtils;
-import com.linkedin.pinot.common.utils.KafkaStarterUtils;
-import com.linkedin.pinot.common.utils.ZkStarter;
-import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
-import com.linkedin.pinot.controller.helix.ControllerTest;
-import com.linkedin.pinot.controller.helix.ControllerTestUtils;
-import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.indexsegment.utils.AvroUtils;
-import com.linkedin.pinot.core.realtime.impl.kafka.AvroRecordToPinotRowGenerator;
-import com.linkedin.pinot.core.realtime.impl.kafka.KafkaMessageDecoder;
-import com.linkedin.pinot.server.starter.helix.DefaultHelixStarterServerConfig;
-import com.linkedin.pinot.server.starter.helix.HelixServerStarter;
 
 
 /**
@@ -97,6 +98,7 @@ public abstract class ClusterTest extends ControllerTest {
             Integer.toString(Integer.valueOf(Server.DEFAULT_ADMIN_API_PORT) - i));
         configuration.setProperty(Server.CONFIG_OF_NETTY_PORT,
             Integer.toString(Integer.valueOf(Helix.DEFAULT_SERVER_NETTY_PORT) + i));
+        configuration.setProperty(Server.CONFIG_OF_SEGMENT_FORMAT_VERSION, "v3");
         overrideOfflineServerConf(configuration);
         _serverStarters.add(new HelixServerStarter(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR, configuration));
       }
@@ -137,19 +139,20 @@ public abstract class ClusterTest extends ControllerTest {
         schemaName, new FileInputStream(schemaFile), schemaFile.length(), FileUploadUtils.SendFileMethod.PUT);
   }
 
-  protected void addOfflineTable(String tableName, String timeColumnName, String timeColumnType, int retentionTimeValue,
-      String retentionTimeUnit, String brokerTenant, String serverTenant) throws Exception {
-    addOfflineTable(tableName, timeColumnName, timeColumnType, retentionTimeValue, retentionTimeUnit, brokerTenant,
-        serverTenant, new ArrayList<String>(), null);
+  protected void addOfflineTable(String timeColumnName, String timeColumnType, int retentionTimeValue,
+      String retentionTimeUnit, String brokerTenant, String serverTenant, String tableName,
+      SegmentVersion segmentVersion) throws Exception {
+    addOfflineTable(timeColumnName, timeColumnType, retentionTimeValue, retentionTimeUnit, brokerTenant, serverTenant,
+        new ArrayList<String>(), null, tableName, segmentVersion);
   }
 
-  protected void addOfflineTable(String tableName, String timeColumnName, String timeColumnType, int retentionTimeValue,
+  protected void addOfflineTable(String timeColumnName, String timeColumnType, int retentionTimeValue,
       String retentionTimeUnit, String brokerTenant, String serverTenant, List<String> invertedIndexColumns,
-      String loadMode)
+      String loadMode, String tableName, SegmentVersion segmentVersion)
           throws Exception {
     JSONObject request = ControllerRequestBuilder.buildCreateOfflineTableJSON(tableName, serverTenant, brokerTenant,
         timeColumnName, "DAYS", retentionTimeUnit, String.valueOf(retentionTimeValue), 3,
-        "BalanceNumSegmentAssignmentStrategy", invertedIndexColumns, loadMode);
+        "BalanceNumSegmentAssignmentStrategy", invertedIndexColumns, loadMode, segmentVersion.toString());
     sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTableCreate(), request.toString());
   }
 
@@ -269,8 +272,8 @@ public abstract class ClusterTest extends ControllerTest {
           kafkaTopic, schemaName, serverTenant, brokerTenant, avroFile, 20000, sortedColumn, invertedIndexColumns,
           loadMode);
     }
-    addOfflineTable(tableName, timeColumnName, timeColumnType, retentionDays, retentionTimeUnit, brokerTenant,
-        serverTenant, invertedIndexColumns, loadMode);
+    addOfflineTable(timeColumnName, timeColumnType, retentionDays, retentionTimeUnit, brokerTenant, serverTenant,
+        invertedIndexColumns, loadMode, tableName, SegmentVersion.v1);
   }
 
   protected void createBrokerTenant(String tenantName, int brokerCount) throws Exception {

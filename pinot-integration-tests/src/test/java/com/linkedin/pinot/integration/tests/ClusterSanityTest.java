@@ -19,6 +19,7 @@ import com.linkedin.pinot.common.config.Tenant;
 import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
 import com.linkedin.pinot.common.utils.TenantRole;
 import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import org.json.JSONObject;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -67,7 +68,7 @@ public class ClusterSanityTest extends ClusterTest {
     startController();
     startBrokers(numBrokers);
     startServers(numServers);
-    addOfflineTable(TABLE_NAME, "", "", -1, "", tenantName, tenantName);
+    addOfflineTable("", "", -1, "", tenantName, tenantName, TABLE_NAME, SegmentVersion.v1);
   }
 
   /**

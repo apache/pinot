@@ -15,11 +15,10 @@
  */
 package com.linkedin.pinot.controller.helix.core.sharding;
 
-import com.linkedin.pinot.common.request.helper.ControllerRequestBuilder;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.integration.tests.UploadRefreshDeleteIntegrationTest;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
@@ -50,11 +49,6 @@ public class BalanceNumSegmentAssignmentStrategyIntegrationTest extends UploadRe
     startServer();
     startBroker();
 
-    // Create one table with a replication factor of three
-    JSONObject request = ControllerRequestBuilder.buildCreateOfflineTableJSON("mytable", null, null, "DaysSinceEpoch",
-        "DAYS", "DAYS", "300", 3, "BalanceNumSegmentAssignmentStrategy", Collections.<String>emptyList(), "MMAP");
-    sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTableCreate(), request.toString());
-
     // Create eight dummy server instances
     for(int i = 0; i < 8; ++i) {
       JSONObject serverInstance = new JSONObject();
@@ -69,10 +63,7 @@ public class BalanceNumSegmentAssignmentStrategyIntegrationTest extends UploadRe
     // Create Helix connection
     _helixAdmin = new ZKHelixAdmin(ZkStarter.DEFAULT_ZK_STR);
 
-    // Set up temporary directories
-    ensureDirectoryExistsAndIsEmpty(_tmpDir);
-    ensureDirectoryExistsAndIsEmpty(_segmentsDir);
-    ensureDirectoryExistsAndIsEmpty(_tarsDir);
+    // BaseClass @BeforeMethod will setup tablex
   }
 
   @AfterClass
@@ -90,15 +81,15 @@ public class BalanceNumSegmentAssignmentStrategyIntegrationTest extends UploadRe
     FileUtils.deleteQuietly(_tmpDir);
   }
 
-  @Test
-  public void testSegmentAssignmentStrategy() throws Exception {
+  @Test(dataProvider = "configProvider")
+  public void testSegmentAssignmentStrategy(String tableName, SegmentVersion version) throws Exception {
     // Upload nine segments
     for(int i = 0; i < 9; ++i) {
-      generateAndUploadRandomSegment("mytable_" + i, 10);
+      generateAndUploadRandomSegment(tableName + "_" + i, 10);
     }
 
     // Count the number of segments per instance
-    IdealState idealState = _helixAdmin.getResourceIdealState(getHelixClusterName(), "mytable_OFFLINE");
+    IdealState idealState = _helixAdmin.getResourceIdealState(getHelixClusterName(), tableName + "_OFFLINE");
     Map<String, Integer> segmentsPerInstance = new HashMap<String, Integer>();
 
     for (String partitionName : idealState.getPartitionSet()) {
@@ -119,8 +110,8 @@ public class BalanceNumSegmentAssignmentStrategyIntegrationTest extends UploadRe
     }
   }
 
-  @Test
-  public void testRefresh() {
+  @Test(enabled = false)
+  public void testRefresh(String tableName, SegmentVersion version) {
     // Ignore this inherited test
   }
 }

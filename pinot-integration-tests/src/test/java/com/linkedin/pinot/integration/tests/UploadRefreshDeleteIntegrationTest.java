@@ -18,6 +18,7 @@ package com.linkedin.pinot.integration.tests;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.linkedin.pinot.common.utils.FileUploadUtils;
 import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
 import java.io.FileInputStream;
@@ -36,7 +37,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
@@ -51,6 +55,7 @@ public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTe
   protected final File _tmpDir = new File("/tmp/" + getClass().getSimpleName());
   protected final File _segmentsDir = new File(_tmpDir, "segments");
   protected final File _tarsDir = new File(_tmpDir, "tars");
+  private String tableName = null;
 
   @BeforeClass
   public void setUp() throws Exception {
@@ -59,14 +64,29 @@ public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTe
     startController();
     startBroker();
     startServer();
+  }
 
-    addOfflineTable("mytable", "DaysSinceEpoch", "daysSinceEpoch", -1, "", null, null);
-
+  @BeforeMethod
+  public void setupMethod(Object[] args)
+      throws Exception {
+    if (args == null || args.length == 0) {
+      return;
+    }
+    this.tableName = (String) args[0];
+    SegmentVersion version = (SegmentVersion) args[1];
+    addOfflineTable("DaysSinceEpoch", "daysSinceEpoch", -1, "", null, null, this.tableName, version);
     ensureDirectoryExistsAndIsEmpty(_tmpDir);
     ensureDirectoryExistsAndIsEmpty(_segmentsDir);
     ensureDirectoryExistsAndIsEmpty(_tarsDir);
   }
 
+  @AfterMethod
+  public void teardownMethod()
+      throws Exception {
+    if (this.tableName != null) {
+      dropOfflineTable(this.tableName);
+    }
+  }
   protected void generateAndUploadRandomSegment(String segmentName, int rowCount) throws Exception {
     ThreadLocalRandom random = ThreadLocalRandom.current();
     Schema schema = new Schema.Parser().parse(
@@ -90,7 +110,7 @@ public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTe
     ensureDirectoryExistsAndIsEmpty(segmentTarDir);
     ExecutorService executor = MoreExecutors.sameThreadExecutor();
     buildSegmentsFromAvro(Collections.singletonList(avroFile), executor, segmentIndex,
-        new File(_segmentsDir, segmentName), segmentTarDir, "mytable", false, null);
+        new File(_segmentsDir, segmentName), segmentTarDir, this.tableName, false, null);
     executor.shutdown();
     executor.awaitTermination(1L, TimeUnit.MINUTES);
 
@@ -104,8 +124,17 @@ public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTe
     FileUtils.deleteQuietly(segmentTarDir);
   }
 
-  @Test
-  public void testRefresh() throws Exception {
+  @DataProvider(name = "configProvider")
+  public Object[][] configProvider() {
+    Object[][] configs = {
+        { "mytable", SegmentVersion.v1},
+        { "yourtable", SegmentVersion.v3}
+    };
+    return configs;
+  }
+
+  @Test(dataProvider = "configProvider")
+  public void testRefresh(String tableName, SegmentVersion version) throws Exception {
     final int nAtttempts = 5;
     final String segment6 = "segmentToBeRefreshed_6";
     final int nRows1 = 69;
@@ -124,11 +153,12 @@ public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTe
 
   // Verify that the number of rows is either the initial value or the final value but not something else.
   private void verifyNRows(int currentNrows, int finalNrows) throws Exception {
-    int attempt = 0; long sleepTime = 100;
+    int attempt = 0;
+    long sleepTime = 100;
     long nRows = -1;
     while (attempt < 10) {
       Thread.sleep(sleepTime);
-      nRows = getCurrentServingNumDocs();
+      nRows = getCurrentServingNumDocs(this.tableName);
       //nRows can either be the current value or the final value, not any other.
       if (nRows == currentNrows) {
         sleepTime *= 2;
@@ -142,8 +172,8 @@ public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTe
     Assert.fail("Failed to get from " + currentNrows + " to " + finalNrows);
   }
 
-  @Test(enabled = false)
-  public void testUploadRefreshDelete() throws Exception {
+  @Test(enabled = false, dataProvider = "configProvider")
+  public void testUploadRefreshDelete(String tableName, SegmentVersion version) throws Exception {
     final int THREAD_COUNT = 1;
     final int SEGMENT_COUNT = 5;
 
@@ -229,14 +259,14 @@ public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTe
 
       // Wait for up to one minute for the row count to match the expected row count
       LOGGER.info("Awaiting for the row count to match {}", expectedRowCount);
-      int pinotRowCount = (int) getCurrentServingNumDocs();
+      int pinotRowCount = (int) getCurrentServingNumDocs(this.tableName);
       long timeInOneMinute = System.currentTimeMillis() + 60 * 1000L;
       while (System.currentTimeMillis() < timeInOneMinute && pinotRowCount != expectedRowCount) {
         LOGGER.info("Row count is {}, expected {}, awaiting for row count to match", pinotRowCount, expectedRowCount);
         Thread.sleep(5000L);
 
         try {
-          pinotRowCount = (int) getCurrentServingNumDocs();
+          pinotRowCount = (int) getCurrentServingNumDocs(this.tableName);
         } catch (Exception e) {
           LOGGER.warn("Caught exception while sending query to Pinot, retrying", e);
         }
