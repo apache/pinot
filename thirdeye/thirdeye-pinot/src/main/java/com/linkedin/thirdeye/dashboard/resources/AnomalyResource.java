@@ -35,7 +35,6 @@ import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
 import com.linkedin.thirdeye.constant.FeedbackStatus;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
-import com.linkedin.thirdeye.dashboard.ThirdEyeDashboardConfiguration;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.EmailConfigurationManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
@@ -158,7 +157,6 @@ public class AnomalyResource {
   }
 
   /************* CRUD for anomaly functions of collection **********************************************/
-
   // View all anomaly functions
   @GET
   @Path("/anomaly-function/view")
@@ -225,19 +223,15 @@ public class AnomalyResource {
     anomalyFunctionSpec.setWindowSize(Integer.valueOf(windowSize));
     anomalyFunctionSpec.setWindowUnit(TimeUnit.valueOf(windowUnit));
 
+    // Setting window delay time / unit
     TimeUnit dataGranularityUnit = dataGranularity.getUnit();
-    TimeUnit windowDelayTimeUnit =
-        dataGranularityUnit.equals(TimeUnit.MINUTES) || dataGranularityUnit.equals(TimeUnit.HOURS)
-            ? TimeUnit.HOURS : TimeUnit.DAYS;
-    if (StringUtils.isNotEmpty(windowDelayUnit)) {
-      windowDelayTimeUnit = TimeUnit.valueOf(windowDelayUnit);
-    }
-    int windowDelayTime = 2;
-    if (StringUtils.isNotEmpty(windowDelay)) {
-      windowDelayTime = Integer.valueOf(windowDelay);
-    } else {
-      Long maxDateTime = CACHE_REGISTRY_INSTANCE.getCollectionMaxDataTimeCache().get(dataset);
-      windowDelayTime = (int) windowDelayTimeUnit.convert(System.currentTimeMillis() - maxDateTime, TimeUnit.MILLISECONDS);
+
+    // default window delay time = 10 hours
+    int windowDelayTime = 10;
+    TimeUnit windowDelayTimeUnit = TimeUnit.HOURS;
+
+    if(dataGranularityUnit.equals(TimeUnit.MINUTES) || dataGranularityUnit.equals(TimeUnit.HOURS)) {
+      windowDelayTime = 4;
     }
     anomalyFunctionSpec.setWindowDelayUnit(windowDelayTimeUnit);
     anomalyFunctionSpec.setWindowDelay(windowDelayTime);
@@ -314,16 +308,6 @@ public class AnomalyResource {
     anomalyFunctionSpec.setType(type);
     anomalyFunctionSpec.setWindowSize(Integer.valueOf(windowSize));
     anomalyFunctionSpec.setWindowUnit(TimeUnit.valueOf(windowUnit));
-    anomalyFunctionSpec.setWindowDelay(Integer.valueOf(windowDelay));
-
-    TimeUnit dataGranularityUnit = dataGranularity.getUnit();
-    TimeUnit windowDelayTimeUnit =
-        dataGranularityUnit.equals(TimeUnit.MINUTES) || dataGranularityUnit.equals(TimeUnit.HOURS)
-            ? TimeUnit.HOURS : TimeUnit.DAYS;
-    if (StringUtils.isNotEmpty(windowDelayUnit)) {
-      windowDelayTimeUnit = TimeUnit.valueOf(windowDelayUnit);
-    }
-    anomalyFunctionSpec.setWindowDelayUnit(windowDelayTimeUnit);
 
     // bucket size and unit are defaulted to the collection granularity
     anomalyFunctionSpec.setBucketSize(dataGranularity.getSize());

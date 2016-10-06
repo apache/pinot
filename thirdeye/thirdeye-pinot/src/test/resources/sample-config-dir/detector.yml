@@ -1,7 +1,7 @@
 client: pinot
 configStoreType: database
 logging:
-  level: INFO
+  level: DEBUG
   loggers:
     org.hibernate.engine.internal: WARN
 # Runs the application in standard config

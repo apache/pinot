@@ -264,7 +264,7 @@ public class TestUserRuleAnomalyFunction {
     RawAnomalyResultDTO mergedAnomalyResult1 = new RawAnomalyResultDTO();
     mergedAnomalyResult1.setStartTime(100L);
     mergedAnomalyResult1.setEndTime(160L);
-    mergedAnomalyResult1.setMessage("threshold=-10%, w/w values: -50%,-50%,-33.33% (20.0 / 30.0)");
+    mergedAnomalyResult1.setMessage("change : -50%,-50%,-33.33%, currentVal : 20.0, baseLineVal : 30.0, threshold : -10%, baseLineProp : w/w");
     mergedAnomalyResult1.setScore(5);
     setAnomalyResultFields(mergedAnomalyResult1);
 
@@ -272,44 +272,42 @@ public class TestUserRuleAnomalyFunction {
     mergedAnomalyResult2.setStartTime(100L);
     mergedAnomalyResult2.setEndTime(180L);
     mergedAnomalyResult2
-        .setMessage("threshold=-15%, w/2w values: -50%,-50%,-33.33%,-25% (30.0 / 40.0)");
+        .setMessage("change : -50%,-50%,-33.33%,-25%, currentVal : 30.0, baseLineVal : 40.0, threshold : -15%, baseLineProp : w/2w");
     mergedAnomalyResult2.setScore(5);
     setAnomalyResultFields(mergedAnomalyResult2);
 
     RawAnomalyResultDTO mergedAnomalyResult3 = new RawAnomalyResultDTO();
     mergedAnomalyResult3.setStartTime(100L);
     mergedAnomalyResult3.setEndTime(140L);
-    mergedAnomalyResult3.setMessage("threshold=-20%, w/2w values: -50%,-50% (10.0 / 20.0)");
+    mergedAnomalyResult3.setMessage("change : -50%,-50%, currentVal : 10.0, baseLineVal : 20.0, threshold : -20%, baseLineProp : w/2w");
     mergedAnomalyResult3.setScore(4.5);
     setAnomalyResultFields(mergedAnomalyResult3);
 
     RawAnomalyResultDTO mergedAnomalyResult4 = new RawAnomalyResultDTO();
     mergedAnomalyResult4.setStartTime(140L);
     mergedAnomalyResult4.setEndTime(180L);
-    mergedAnomalyResult4.setMessage("threshold=-20%, w/2w values: -25%,-20% (40.0 / 50.0)");
+    mergedAnomalyResult4.setMessage("change : -25%,-20%, currentVal : 40.0, baseLineVal : 50.0, threshold : -20%, baseLineProp : w/2w");
     mergedAnomalyResult4.setScore(5.5);
     setAnomalyResultFields(mergedAnomalyResult4);
 
     RawAnomalyResultDTO mergedAnomalyResult5 = new RawAnomalyResultDTO();
     mergedAnomalyResult5.setStartTime(100L);
     mergedAnomalyResult5.setEndTime(160L);
-    mergedAnomalyResult5.setMessage("threshold=-10%, w/w values: -33.33%,-25%,-20% (40.0 / 50.0)");
+    mergedAnomalyResult5.setMessage("change : -33.33%,-25%,-20%, currentVal : 40.0, baseLineVal : 50.0, threshold : -10%, baseLineProp : w/w");
     mergedAnomalyResult5.setScore(5);
     setAnomalyResultFields(mergedAnomalyResult5);
 
     RawAnomalyResultDTO mergedAnomalyResult6 = new RawAnomalyResultDTO();
     mergedAnomalyResult6.setStartTime(100L);
     mergedAnomalyResult6.setEndTime(180L);
-    mergedAnomalyResult6
-        .setMessage("threshold=-5%, w/2w values: -50%,-33.33%,-25%,-20% (40.0 / 50.0)");
+    mergedAnomalyResult6.setMessage("change : -50%,-33.33%,-25%,-20%, currentVal : 40.0, baseLineVal : 50.0, threshold : -5%, baseLineProp : w/2w");
     mergedAnomalyResult6.setScore(5);
     setAnomalyResultFields(mergedAnomalyResult6);
 
     RawAnomalyResultDTO mergedAnomalyResult7 = new RawAnomalyResultDTO();
     mergedAnomalyResult7.setStartTime(500L);
     mergedAnomalyResult7.setEndTime(560L);
-    mergedAnomalyResult7
-        .setMessage("threshold=-5%, w/2w values: -16.67%,-14.29%,-12.5% (70.0 / 80.0)");
+    mergedAnomalyResult7.setMessage("change : -16.67%,-14.29%,-12.5%, currentVal : 70.0, baseLineVal : 80.0, threshold : -5%, baseLineProp : w/2w");
     mergedAnomalyResult7.setScore(14);
     setAnomalyResultFields(mergedAnomalyResult7);
 

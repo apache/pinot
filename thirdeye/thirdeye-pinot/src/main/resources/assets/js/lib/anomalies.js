@@ -3,6 +3,31 @@ var timeseriesDisplayData = "";
 var metricLineChart = "";
 var metricChangeChart = ""
 
+function getFeedbackTypeString(feedbackType) {
+    switch (feedbackType) {
+        case 'ANOMALY':
+            return "Confirmed Anomaly";
+        case 'NOT_ANOMALY':
+            return 'False Alarm';
+        case 'ANOMALY_NO_ACTION':
+            return 'Confirmed - Not Actionable';
+        default:
+            return feedbackType;
+    }
+}
+function getFeedbackTypeFromString(feedbackTypeStr) {
+    switch (feedbackTypeStr) {
+        case 'Confirmed Anomaly':
+            return "ANOMALY";
+        case 'False Alarm':
+            return 'NOT_ANOMALY';
+        case 'Confirmed - Not Actionable':
+            return 'ANOMALY_NO_ACTION';
+        default:
+            return feedbackTypeStr;
+    }
+}
+
 function getAnomalies(tab) {
 
     //Get dataset anomaly metrics
@@ -36,11 +61,17 @@ function getAnomalies(tab) {
 
             //AJAX for anomaly result data
             getData(anomaliesUrl).done(function (anomalyData) {
+                for (var i in anomalyData) {
+                    if (anomalyData[i].feedback) {
+                        if (anomalyData[i].feedback.feedbackType) {
+                            anomalyData[i].feedback.feedbackType = getFeedbackTypeString(anomalyData[i].feedback.feedbackType);
+                        }
+                    }
+                }
                 anomaliesDisplayData = anomalyData;
                 getTimeseriesData(anomaliesDisplayData);
             });
-
-        }else{
+        } else {
             getTimeseriesData();
         }
 
@@ -381,16 +412,6 @@ function drawAnomalyTimeSeries(timeSeriesData,anomalyData, tab, placeholder) {
      }
      lineChartData["time"] = xTicksCurrent;
 
-//     var colorArray;
-//     if (metrics.length < 10) {
-//         colorArray = d3.scale.category10().range();
-//     } else if (metrics.length < 20) {
-//         colorArray = d3.scale.category20().range();
-//     } else {
-//         colorArray = colorScale(metrics.length)
-//     }
-
-
      for (var i = 0, mlen = metrics.length; i < mlen; i++) {
          var baselineData = [];
          var currentData = [];
@@ -721,7 +742,7 @@ function attach_AnomalyTable_EventListeners(){
      function submitAnomalyFeedback(target) {
          var $target = $(target);
          var selector = $(".selected-feedback", $target);
-         var feedbackType = selector.attr("value");
+         var feedbackType = getFeedbackTypeFromString(selector.attr("value"));
          var anomalyId = selector.attr("data-anomaly-id");
          var comment = $(".feedback-comment", $target).val();
 

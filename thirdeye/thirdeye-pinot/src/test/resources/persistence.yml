@@ -2,11 +2,4 @@ databaseConfiguration:
   url: jdbc:hsqldb:mem:thirdeye
   user: SA
   password:
-  properties:
-    hibernate.dialect: org.hibernate.dialect.HSQLDialect
-    hibernate.show_sql: true
-    hibernate.hbm2ddl.auto: update
-    hibernate.max_fetch_depth: 3
-    hibernate.connection.isolation: 2
-    hibernate.archive.autodetection: class, hbm
-    hibernate.connection.driver_class: org.hsqldb.jdbcDriver
+  driver: org.hsqldb.jdbcDriver
