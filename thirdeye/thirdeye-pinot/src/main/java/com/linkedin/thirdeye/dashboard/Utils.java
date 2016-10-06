@@ -211,14 +211,24 @@ public class Utils {
     return Lists.newArrayList(metricFunctions);
   }
 
-  public static TimeGranularity getAggregationTimeGranularity(String aggTimeGranularity) {
-
+  public static TimeGranularity getAggregationTimeGranularity(String aggTimeGranularity, String collection) {
+    CollectionConfig collectionConfig = null;
+    try {
+      collectionConfig = CACHE_REGISTRY_INSTANCE.getCollectionConfigCache().get(collection);
+    } catch (ExecutionException e) {
+      LOG.debug("No collection configs for collection {}", collection);
+    }
     TimeGranularity timeGranularity;
-    if (aggTimeGranularity.indexOf("_") > -1) {
-      String[] split = aggTimeGranularity.split("_");
-      timeGranularity = new TimeGranularity(Integer.parseInt(split[0]), TimeUnit.valueOf(split[1]));
+    if (collectionConfig == null || !collectionConfig.isNonAdditive()) {
+      if (aggTimeGranularity.indexOf("_") > -1) {
+        String[] split = aggTimeGranularity.split("_");
+        timeGranularity = new TimeGranularity(Integer.parseInt(split[0]), TimeUnit.valueOf(split[1]));
+      } else {
+        timeGranularity = new TimeGranularity(1, TimeUnit.valueOf(aggTimeGranularity));
+      }
     } else {
-      timeGranularity = new TimeGranularity(1, TimeUnit.valueOf(aggTimeGranularity));
+      timeGranularity = new TimeGranularity(collectionConfig.getNonAdditiveBucketSize(),
+          TimeUnit.valueOf(collectionConfig.getNonAdditiveBucketUnit()));
     }
     return timeGranularity;
   }

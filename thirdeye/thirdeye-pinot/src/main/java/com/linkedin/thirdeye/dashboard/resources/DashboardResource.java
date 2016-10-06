@@ -308,7 +308,7 @@ public class DashboardResource {
         request.setFilters(ThirdEyeUtils.convertToMultiMap(filterJson));
       }
 
-      request.setTimeGranularity(Utils.getAggregationTimeGranularity(aggTimeGranularity));
+      request.setTimeGranularity(Utils.getAggregationTimeGranularity(aggTimeGranularity, collection));
 
       TabularViewHandler handler = new TabularViewHandler(queryCache);
       String jsonResponse = null;
@@ -408,7 +408,7 @@ public class DashboardResource {
       filterJson = URLDecoder.decode(filterJson, "UTF-8");
       request.setFilters(ThirdEyeUtils.convertToMultiMap(filterJson));
     }
-    request.setTimeGranularity(Utils.getAggregationTimeGranularity(aggTimeGranularity));
+    request.setTimeGranularity(Utils.getAggregationTimeGranularity(aggTimeGranularity, collection));
 
     TabularViewHandler handler = new TabularViewHandler(queryCache);
     String jsonResponse = null;
@@ -460,7 +460,7 @@ public class DashboardResource {
       filterJson = URLDecoder.decode(filterJson, "UTF-8");
       request.setFilters(ThirdEyeUtils.convertToMultiMap(filterJson));
     }
-    request.setTimeGranularity(Utils.getAggregationTimeGranularity(aggTimeGranularity));
+    request.setTimeGranularity(Utils.getAggregationTimeGranularity(aggTimeGranularity, collection));
     if (groupByDimensions != null && !groupByDimensions.isEmpty()) {
       request.setGroupByDimensions(Arrays.asList(groupByDimensions.trim().split(",")));
     }
@@ -508,7 +508,8 @@ public class DashboardResource {
     List<MetricExpression> metricExpressions =
         Utils.convertToMetricExpressions(metricsJson, MetricAggFunction.SUM, collection);
     request.setMetricExpressions(metricExpressions);
-    request.setAggregationTimeGranularity(Utils.getAggregationTimeGranularity(aggTimeGranularity));
+    CollectionConfig collectionConfig = CACHE_REGISTRY_INSTANCE.getCollectionConfigCache().get(collection);
+    request.setAggregationTimeGranularity(Utils.getAggregationTimeGranularity(aggTimeGranularity, collection));
     CollectionSchema collectionSchema = CACHE_REGISTRY_INSTANCE.getCollectionSchemaCache().get(collection);
     if (!request.getAggregationTimeGranularity().getUnit().equals(TimeUnit.DAYS) ||
         !StringUtils.isBlank(collectionSchema.getTime().getFormat())) {
