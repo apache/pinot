@@ -368,6 +368,9 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
                 if (success) {
                   _state = State.COMMITTED;
                 } else {
+                  // If for any reason commit failed, we don't want to be in COMMITTING state when we hold.
+                  // Change the state to HOLDING before looping around.
+                  _state = State.HOLDING;
                   segmentLogger.info("Could not commit segment. Retrying after hold");
                   hold();
                 }
@@ -451,6 +454,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
         segmentLogger.warn("Received controller response {}", response);
         return false;
       }
+      _realtimeTableDataManager.replaceLLSegment(_segmentNameStr);
       FileUtils.deleteQuietly(new File(segTarFileName));
     } catch (FileNotFoundException e) {
       segmentLogger.error("Tar file {} not found", segTarFileName, e);
