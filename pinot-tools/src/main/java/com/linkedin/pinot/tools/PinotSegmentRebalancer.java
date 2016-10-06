@@ -15,31 +15,19 @@
  */
 package com.linkedin.pinot.tools;
 
-import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeMap;
-import org.apache.commons.math.stat.descriptive.DescriptiveStatistics;
-import org.apache.helix.HelixManager;
-import org.apache.helix.HelixManagerFactory;
-import org.apache.helix.InstanceType;
-import org.apache.helix.PropertyPathConfig;
-import org.apache.helix.PropertyType;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.controller.strategy.AutoRebalanceStrategy;
-import org.apache.helix.manager.zk.ZKHelixAdmin;
-import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Lists;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
@@ -51,54 +39,16 @@ import com.linkedin.pinot.common.utils.retry.RetryPolicies;
 import javax.annotation.Nullable;
 
 
-public class PinotSegmentRebalancer {
+public class PinotSegmentRebalancer extends PinotZKChanger {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotSegmentRebalancer.class);
   static final String rebalanceTableCmd = "rebalanceTable";
   static final String rebalanceTenantCmd = "rebalanceTenant";
 
-  private ZKHelixAdmin helixAdmin;
-  private HelixManager helixManager;
-  private String clusterName;
-  private ZkHelixPropertyStore<ZNRecord> propertyStore;
-  private ObjectMapper objectMapper;
   private boolean dryRun = true;
 
   public PinotSegmentRebalancer(String zkAddress, String clusterName, boolean dryRun) {
-    this.clusterName = clusterName;
-    helixAdmin = new ZKHelixAdmin(zkAddress);
-    helixManager =
-        HelixManagerFactory
-            .getZKHelixManager(clusterName, "PinotNumReplicaChanger", InstanceType.ADMINISTRATOR, zkAddress);
-    try {
-      helixManager.connect();
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
-    ZNRecordSerializer serializer = new ZNRecordSerializer();
-    String path = PropertyPathConfig.getPath(PropertyType.PROPERTYSTORE, clusterName);
-    propertyStore = new ZkHelixPropertyStore<>(zkAddress, serializer, path);
-    objectMapper = new ObjectMapper();
+    super(zkAddress, clusterName);
     this.dryRun = dryRun;
-  }
-
-  protected ZKHelixAdmin getZkHelixAdmin() {
-    return helixAdmin;
-  }
-
-  protected String getClusterName() {
-    return clusterName;
-  }
-
-  protected boolean isDryRun() {
-    return dryRun;
-  }
-
-  protected ZkHelixPropertyStore<ZNRecord> getPropertyStore() {
-    return propertyStore;
-  }
-
-  protected HelixManager getHelixManager() {
-    return helixManager;
   }
 
   /**
@@ -183,7 +133,7 @@ public class PinotSegmentRebalancer {
     LinkedHashMap<String, Integer> states = new LinkedHashMap<>();
     int numReplicasInIdealState = Integer.parseInt(currentIdealState.getReplicas());
     final AbstractTableConfig offlineTableConfig =
-        ZKMetadataProvider.getOfflineTableConfig(getPropertyStore(), tableName);
+        ZKMetadataProvider.getOfflineTableConfig(propertyStore, tableName);
     final int numReplicasInTableConfig = Integer.parseInt(offlineTableConfig.getValidationConfig().getReplication());
 
     final int targetNumReplicas = numReplicasInTableConfig;
@@ -220,7 +170,7 @@ public class PinotSegmentRebalancer {
       if (EqualityUtils.isEqual(newMapping, currentMapping)) {
         LOGGER.info("Skipping rebalancing for table:" + tableName + " since its already balanced");
       } else {
-        HelixHelper.updateIdealState(getHelixManager(), tableName,
+        HelixHelper.updateIdealState(helixManager, tableName,
             new com.google.common.base.Function<IdealState, IdealState>() {
               @Nullable
               @Override
@@ -238,53 +188,6 @@ public class PinotSegmentRebalancer {
         LOGGER.info("Successfully rebalanced table:" + tableName);
       }
     }
-  }
-
-  protected void updateIdealState(String resourceName, IdealState updatedIdealState)
-      throws InterruptedException {
-    LOGGER.info("Updating the idealstate for table:" + resourceName);
-    helixAdmin.setResourceIdealState(clusterName, resourceName, updatedIdealState);
-    waitForStable(resourceName);
-  }
-
-  protected void waitForStable(String resourceName)
-      throws InterruptedException {
-    int diff;
-    Thread.sleep(3000);
-    do {
-      diff = isStable(resourceName);
-      if (diff == 0) {
-        break;
-      } else {
-        LOGGER.info(
-            "Waiting for externalView to match idealstate for table:" + resourceName + " Num segments difference:" + diff);
-        Thread.sleep(30000);
-      }
-    } while (diff > 0);
-  }
-
-  protected void printSegmentAssignment(Map<String, Map<String, String>> mapping) throws Exception {
-    StringWriter sw = new StringWriter();
-    objectMapper.writerWithDefaultPrettyPrinter().writeValue(sw, mapping);
-    LOGGER.info(sw.toString());
-    Map<String, List<String>> serverToSegmentMapping = new TreeMap<>();
-    for (String segment : mapping.keySet()) {
-      Map<String, String> serverToStateMap = mapping.get(segment);
-      for (String server : serverToStateMap.keySet()) {
-        if (!serverToSegmentMapping.containsKey(server)) {
-          serverToSegmentMapping.put(server, new ArrayList<String>());
-        }
-        serverToSegmentMapping.get(server).add(segment);
-      }
-    }
-    DescriptiveStatistics stats = new DescriptiveStatistics();
-    for (String server : serverToSegmentMapping.keySet()) {
-      List<String> list = serverToSegmentMapping.get(server);
-      LOGGER.info("server " + server + " has " + list.size() + " segments");
-      stats.addValue(list.size());
-    }
-    LOGGER.info("Segment Distrbution stat");
-    LOGGER.info(stats.toString());
   }
 
   private static void usage() {

@@ -30,11 +30,14 @@ import com.linkedin.pinot.common.utils.retry.RetryPolicies;
 import javax.annotation.Nullable;
 
 
-public class PinotNumReplicaChanger extends PinotSegmentRebalancer {
+public class PinotNumReplicaChanger extends PinotZKChanger {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotNumReplicaChanger.class);
 
+  private boolean dryRun;
+
   public PinotNumReplicaChanger(String zkAddress, String clusterName, boolean dryRun) {
-    super(zkAddress, clusterName, dryRun);
+    super(zkAddress, clusterName);
+    this.dryRun = dryRun;
   }
 
   private static void usage() {
@@ -48,11 +51,11 @@ public class PinotNumReplicaChanger extends PinotSegmentRebalancer {
     // Get the number of replicas in the tableconfig.
     final String offlineTableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
     final AbstractTableConfig offlineTableConfig =
-        ZKMetadataProvider.getOfflineTableConfig(getPropertyStore(), offlineTableName);
+        ZKMetadataProvider.getOfflineTableConfig(propertyStore, offlineTableName);
     final int newNumReplicas = Integer.parseInt(offlineTableConfig.getValidationConfig().getReplication());
 
     // Now get the idealstate, and get the number of replicas in it.
-    IdealState currentIdealState = getZkHelixAdmin().getResourceIdealState(getClusterName(), offlineTableName);
+    IdealState currentIdealState = helixAdmin.getResourceIdealState(clusterName, offlineTableName);
     int currentNumReplicas = Integer.parseInt(currentIdealState.getReplicas());
 
     if (newNumReplicas > currentNumReplicas) {
@@ -61,12 +64,12 @@ public class PinotNumReplicaChanger extends PinotSegmentRebalancer {
       LOGGER.info("Number of replicas ({}) match in table definition and Idealstate. Nothing to do for {}",
           newNumReplicas, offlineTableName);
     } else if (newNumReplicas < currentNumReplicas) {
-      if (isDryRun()) {
+      if (dryRun) {
         IdealState newIdealState = updateIdealState(currentIdealState, newNumReplicas);
         LOGGER.info("Final segment Assignment:");
         printSegmentAssignment(newIdealState.getRecord().getMapFields());
       } else {
-        HelixHelper.updateIdealState(getHelixManager(), offlineTableName, new Function<IdealState, IdealState>() {
+        HelixHelper.updateIdealState(helixManager, offlineTableName, new Function<IdealState, IdealState>() {
           @Nullable
           @Override
           public IdealState apply(IdealState idealState) {
