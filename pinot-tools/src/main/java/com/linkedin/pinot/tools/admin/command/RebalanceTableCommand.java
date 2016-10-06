@@ -49,6 +49,10 @@ public class RebalanceTableCommand extends AbstractBaseAdminCommand implements C
   }
 
   @Override
+  public String getName() {
+    return "RebalanceTable";
+  }
+  @Override
   public boolean execute() throws Exception {
     boolean _dryRun = !_exec;
     PinotSegmentRebalancer rebalancer = new PinotSegmentRebalancer(_zkAddress, _clusterName, _dryRun);

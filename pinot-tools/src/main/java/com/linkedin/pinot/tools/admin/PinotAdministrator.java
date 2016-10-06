@@ -26,11 +26,11 @@ import org.kohsuke.args4j.spi.SubCommands;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.tools.Command;
-import com.linkedin.pinot.tools.PinotNumReplicaChanger;
 import com.linkedin.pinot.tools.admin.command.AddSchemaCommand;
 import com.linkedin.pinot.tools.admin.command.AddTableCommand;
 import com.linkedin.pinot.tools.admin.command.AddTenantCommand;
 import com.linkedin.pinot.tools.admin.command.AvroSchemaToPinotSchema;
+import com.linkedin.pinot.tools.admin.command.ChangeNumReplicasCommand;
 import com.linkedin.pinot.tools.admin.command.ChangeTableState;
 import com.linkedin.pinot.tools.admin.command.CreateSegmentCommand;
 import com.linkedin.pinot.tools.admin.command.DeleteClusterCommand;
@@ -80,7 +80,7 @@ public class PinotAdministrator {
       @SubCommand(name = "ShowClusterInfo", impl = ShowClusterInfoCommand.class),
       @SubCommand(name = "AvroSchemaToPinotSchema", impl = AvroSchemaToPinotSchema.class),
       @SubCommand(name = "RebalanceTable", impl = RebalanceTableCommand.class),
-      @SubCommand(name = "ChangeNumReplicas", impl = PinotNumReplicaChanger.class),
+      @SubCommand(name = "ChangeNumReplicas", impl = ChangeNumReplicasCommand.class),
       @SubCommand(name = "ValidateConfig", impl = ValidateConfigCommand.class),
       @SubCommand(name = "VerifySegmentState", impl = VerifySegmentState.class),
       @SubCommand(name = "PinotSegmentConverter", impl = PinotSegmentConverter.class)
