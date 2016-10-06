@@ -20,7 +20,7 @@ import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.client.MetricFunction;
 import com.linkedin.thirdeye.client.ThirdEyeRequest;
 import com.linkedin.thirdeye.dashboard.Utils;
-import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
+import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 
 /**
  * Util class for generated PQL queries (pinot).
@@ -52,13 +52,13 @@ public class PqlUtils {
    * @param collectionConfig
    * @return
    */
-  public static List<String> getMetricAsDimensionPqls(ThirdEyeRequest request, TimeSpec dataTimeSpec, CollectionConfig collectionConfig) {
+  public static List<String> getMetricAsDimensionPqls(ThirdEyeRequest request, TimeSpec dataTimeSpec,
+      DatasetConfigDTO datasetConfig) {
 
     // select sum(metric_values_column) from collection
     // where time_clause and metric_names_column=function.getMetricName
-
-    String metricValuesColumn = collectionConfig.getMetricValuesColumn();
-    String metricNamesColumn = collectionConfig.getMetricNamesColumn();
+    String metricValuesColumn = datasetConfig.getMetricValuesColumn();
+    String metricNamesColumn = datasetConfig.getMetricValuesColumn();
 
     List<String> metricAsDimensionPqls = getMetricAsDimensionPqls(request.getCollection(), request.getMetricFunctions(),
         request.getStartTimeInclusive(), request.getEndTimeExclusive(), request.getFilterSet(),

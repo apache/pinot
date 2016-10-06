@@ -69,7 +69,7 @@ public class DetectionTaskRunner implements TaskRunner {
     TimeSeriesResponse finalResponse = TimeSeriesUtil
         .getTimeSeriesResponse(anomalyFunctionSpec, anomalyFunction,
             detectionTaskInfo.getGroupByDimension(), windowStart.getMillis(),
-            windowEnd.getMillis(), metricConfigDAO);
+            windowEnd.getMillis());
 
     exploreDimensionsAndAnalyze(finalResponse);
     return taskResult;

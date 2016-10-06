@@ -61,7 +61,7 @@ public class CollectionMaxDataTimeCacheLoader extends CacheLoader<String, Long> 
           maxTime = timeSpec.getDataGranularity().toMillis(endTime + 1) - 1;
         } else {
           DateTimeFormatter inputDataDateTimeFormatter =
-              DateTimeFormat.forPattern(timeFormat).withZone(Utils.getDataTimeZone(collection, datasetConfigDAO));
+              DateTimeFormat.forPattern(timeFormat).withZone(Utils.getDataTimeZone(collection));
           maxTime = DateTime.parse(String.valueOf(endTime), inputDataDateTimeFormatter).getMillis();
         }
       }

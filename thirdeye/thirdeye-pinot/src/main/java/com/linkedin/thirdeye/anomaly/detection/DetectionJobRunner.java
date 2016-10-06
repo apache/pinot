@@ -124,7 +124,7 @@ public class DetectionJobRunner implements Job {
       TimeGranularity dataGranularity = timespec.getDataGranularity();
       String timeFormat = datasetConfig.getTimeFormat();
       if (dataGranularity.getUnit().equals(TimeUnit.DAYS)) {
-        DateTimeZone dataTimeZone = Utils.getDataTimeZone(collection, datasetConfigDAO);
+        DateTimeZone dataTimeZone = Utils.getDataTimeZone(collection);
         DateTimeFormatter inputDataDateTimeFormatter = DateTimeFormat.forPattern(timeFormat).withZone(dataTimeZone);
 
         long inputMillis = inputDateTime.getMillis();

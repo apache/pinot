@@ -5,6 +5,7 @@ import static com.linkedin.thirdeye.client.ResponseParserUtils.OTHER;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -16,14 +17,15 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.collect.Range;
 import com.linkedin.thirdeye.api.TimeGranularity;
+import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.client.MetricFunction;
 import com.linkedin.thirdeye.client.ResponseParserUtils;
-import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.ThirdEyeResponse;
 import com.linkedin.thirdeye.client.ThirdEyeResponseRow;
 import com.linkedin.thirdeye.client.comparison.Row.Builder;
 import com.linkedin.thirdeye.client.comparison.Row.Metric;
-import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
+import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
+import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 
 public class TimeOnTimeResponseParser {
 
@@ -34,10 +36,8 @@ public class TimeOnTimeResponseParser {
   private final TimeGranularity aggTimeGranularity;
   private final List<String> groupByDimensions;
 
-  private CollectionConfig collectionConfig = null;
-  private static final double DEFAULT_THRESHOLD_PERCENT_FOR_OTHER = 0.001; // 0.1 %
   public static final Logger LOGGER = LoggerFactory.getLogger(TimeOnTimeResponseParser.class);
-  private double metricThreshold = CollectionConfig.DEFAULT_THRESHOLD;
+  private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
   private Map<String, ThirdEyeResponseRow> baselineResponseMap;
   private Map<String, ThirdEyeResponseRow> currentResponseMap;
@@ -45,6 +45,8 @@ public class TimeOnTimeResponseParser {
   private int numMetrics;
   int numTimeBuckets;
   private List<Row> rows;
+  private MetricConfigManager metricConfigDAO;
+  Map<String, Double> metricThresholds = new HashMap<>();
 
   public TimeOnTimeResponseParser(ThirdEyeResponse baselineResponse,
       ThirdEyeResponse currentResponse, List<Range<DateTime>> baselineRanges,
@@ -56,17 +58,13 @@ public class TimeOnTimeResponseParser {
     this.currentRanges = currentRanges;
     this.aggTimeGranularity = timeGranularity;
     this.groupByDimensions = groupByDimensions;
+    this.metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
 
     String collection = baselineResponse.getRequest().getCollection();
-    try {
-      collectionConfig =
-          ThirdEyeCacheRegistry.getInstance().getCollectionConfigCache().get(collection);
-    } catch (Exception e) {
-      LOGGER.debug("No collection configs for collection {}", collection);
-    }
-
-    if (collectionConfig != null) {
-      metricThreshold = collectionConfig.getMetricThreshold();
+    List<String> metrics = baselineResponse.getRequest().getMetricNames();
+    for (String metric : metrics) {
+      MetricConfigDTO metricConfig = metricConfigDAO.findByMetricAndDataset(metric, collection);
+      metricThresholds.put(metric, metricConfig.getRollupThreshold());
     }
   }
 
@@ -174,7 +172,7 @@ public class TimeOnTimeResponseParser {
             otherCurrent[i]);
       }
       Row row = otherBuilder.build();
-      if (isValidMetric(row, Arrays.asList(otherBaseline), Arrays.asList(otherCurrent), DEFAULT_THRESHOLD_PERCENT_FOR_OTHER)) {
+      if (isValidMetric(row, Arrays.asList(otherBaseline), Arrays.asList(otherCurrent))) {
         rows.add(row);
       }
     }
@@ -321,7 +319,7 @@ public class TimeOnTimeResponseParser {
               otherCurrent[i]);
         }
         Row row = otherBuilder.build();
-        if (isValidMetric(row, Arrays.asList(otherBaseline), Arrays.asList(otherCurrent), DEFAULT_THRESHOLD_PERCENT_FOR_OTHER)) {
+        if (isValidMetric(row, Arrays.asList(otherBaseline), Arrays.asList(otherCurrent))) {
           rows.add(row);
         }
       }
@@ -349,11 +347,10 @@ public class TimeOnTimeResponseParser {
 
   private boolean checkMetricSums(Row row, List<Double> baselineMetricSums,
       List<Double> currentMetricSums) {
-    List<Metric> metrics = row.getMetrics();
-    return isValidMetric(row, baselineMetricSums, currentMetricSums, metricThreshold);
+    return isValidMetric(row, baselineMetricSums, currentMetricSums);
   }
 
-  boolean isValidMetric(Row row, List<Double> baselineMetricSums, List<Double> currentMetricSums, Double thresholdFraction) {
+  boolean isValidMetric(Row row, List<Double> baselineMetricSums, List<Double> currentMetricSums) {
     List<Metric> metrics = row.getMetrics();
 
     for (int i = 0; i < metrics.size(); i++) {
@@ -367,6 +364,7 @@ public class TimeOnTimeResponseParser {
       if (currentMetricSums != null) {
         currentSum = currentMetricSums.get(i);
       }
+      Double thresholdFraction = metricThresholds.get(metric.getMetricName());
       if (metric.getBaselineValue() > thresholdFraction * baselineSum
           || metric.getCurrentValue() > thresholdFraction * currentSum) {
         return true;

@@ -401,7 +401,7 @@ public class DashboardResource {
     if (groupByDimensions != null && !groupByDimensions.isEmpty()) {
       request.setGroupByDimensions(Arrays.asList(groupByDimensions.trim().split(",")));
     }
-    ContributorViewHandler handler = new ContributorViewHandler(queryCache, datasetConfigDAO);
+    ContributorViewHandler handler = new ContributorViewHandler(queryCache);
     String jsonResponse = null;
 
     try {

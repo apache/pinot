@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.anomaly.alert;
 
 import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -16,14 +17,18 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.thirdeye.api.TimeGranularity;
+import com.linkedin.thirdeye.api.TimeSpec;
+import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.client.MetricExpression;
-import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.client.comparison.TimeOnTimeComparisonHandler;
 import com.linkedin.thirdeye.client.comparison.TimeOnTimeComparisonRequest;
 import com.linkedin.thirdeye.client.comparison.TimeOnTimeComparisonResponse;
+import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
+import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.detector.email.AnomalyGraphGenerator;
+import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 public abstract class EmailHelper {
 
@@ -38,6 +43,8 @@ public abstract class EmailHelper {
 
   public static final String EMAIL_ADDRESS_SEPARATOR = ",";
 
+  private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
+
   private EmailHelper() {
 
   }
@@ -51,10 +58,11 @@ public abstract class EmailHelper {
       TimeUnit windowUnit = config.getWindowUnit();
       long windowMillis = windowUnit.toMillis(windowSize);
 
-      ThirdEyeClient client = timeOnTimeComparisonHandler.getClient();
       // TODO provide a way for email reports to specify desired graph granularity.
-      TimeGranularity dataGranularity =
-          client.getCollectionSchema(collection).getTime().getDataGranularity();
+      DatasetConfigManager datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
+      DatasetConfigDTO datasetConfig = datasetConfigDAO.findByDataset(collection);
+      TimeSpec timespec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetConfig);
+      TimeGranularity dataGranularity = timespec.getDataGranularity();
 
       TimeOnTimeComparisonResponse chartData =
           getData(timeOnTimeComparisonHandler, config, then, now, WEEK_MILLIS, dataGranularity);

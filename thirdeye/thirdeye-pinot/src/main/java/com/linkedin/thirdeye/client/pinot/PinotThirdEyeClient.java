@@ -115,7 +115,7 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
     List<ResultSetGroup> resultSetGroups = new ArrayList<>();
 
     if (datasetConfig.isMetricAsDimension()) {
-       List<String> pqls = PqlUtils.getMetricAsDimensionPqls(request, dataTimeSpec);
+       List<String> pqls = PqlUtils.getMetricAsDimensionPqls(request, dataTimeSpec, datasetConfig);
        for (String pql : pqls) {
          LOG.debug("PQL isMetricAsDimension : {}", pql);
          ResultSetGroup result = CACHE_REGISTRY_INSTANCE.getResultSetGroupCache()
@@ -133,7 +133,7 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
       }
     }
     List<ResultSet> resultSets = getResultSets(resultSetGroups);
-    List<String[]> resultRows = parseResultSets(request, resultSets, metricFunctions, dimensionNames);
+    List<String[]> resultRows = parseResultSets(request, resultSets, metricFunctions, dimensionNames, datasetConfig);
     PinotThirdEyeResponse resp = new PinotThirdEyeResponse(request, resultRows, dataTimeSpec);
     return resp;
 
@@ -159,7 +159,7 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
   }
 
   private List<String[]> parseResultSets(ThirdEyeRequest request, List<ResultSet> resultSets,
-      List<MetricFunction> metricFunctions, List<String> dimensionNames) {
+      List<MetricFunction> metricFunctions, List<String> dimensionNames, DatasetConfigDTO datasetConfig) {
 
     int numGroupByKeys = 0;
     boolean hasGroupBy = false;
@@ -175,14 +175,15 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
     int numMetrics = request.getMetricFunctions().size();
     int numCols = numGroupByKeys + numMetrics;
     boolean hasGroupByTime = false;
-    String collection = collectionSchema.getCollection();
+    String collection = datasetConfig.getDataset();
     TimeGranularity dataGranularity = null;
     long startTime = request.getStartTimeInclusive().getMillis();
     long interval = -1;
-    dataGranularity = collectionSchema.getTime().getDataGranularity();
+    TimeSpec timespec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetConfig);
+    dataGranularity = timespec.getDataGranularity();
     boolean isISOFormat = false;
     DateTimeFormatter inputDataDateTimeFormatter = null;
-    String timeFormat = collectionSchema.getTime().getFormat();
+    String timeFormat = timespec.getFormat();
     if (timeFormat != null && !timeFormat.equals(TimeSpec.SINCE_EPOCH_FORMAT)) {
       isISOFormat = true;
       inputDataDateTimeFormatter = DateTimeFormat.forPattern(timeFormat).withZone(Utils.getDataTimeZone(collection));
