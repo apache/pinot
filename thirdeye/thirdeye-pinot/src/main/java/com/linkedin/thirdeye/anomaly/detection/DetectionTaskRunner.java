@@ -6,8 +6,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.commons.collections.MultiMap;
-import org.apache.commons.collections.map.MultiValueMap;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -101,13 +99,7 @@ public class DetectionTaskRunner implements TaskRunner {
       }
 
       // Get current entry's knownAnomalies, which should have the same dimension names.
-      StringBuilder dimensionKeyStringBuilder = new StringBuilder();
-      String separator = "";
-      for (String dimensionValue : entry.getKey().getDimensionValues()) {
-        dimensionKeyStringBuilder.append(separator).append(dimensionValue);
-        separator = ",";
-      }
-      String dimensionKeyString = dimensionKeyStringBuilder.toString();
+      String dimensionKeyString = entry.getKey().toCommaSeparatedString();
       List<RawAnomalyResultDTO> knownAnomaliesOfAnEntry = dimensionNamesToKnownAnomalies.get(dimensionKeyString);
 
       try {

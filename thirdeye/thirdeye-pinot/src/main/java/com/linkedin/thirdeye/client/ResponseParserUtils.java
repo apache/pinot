@@ -26,17 +26,9 @@ public class ResponseParserUtils {
     int numRows = thirdEyeResponse.getNumRows();
     for (int i = 0; i < numRows; i++) {
       ThirdEyeResponseRow thirdEyeResponseRow = thirdEyeResponse.getRow(i);
-      if (thirdEyeResponseRow.getDimensions().size() > 1) {
-        StringBuilder compoundKey = new StringBuilder(Integer.toString(thirdEyeResponseRow.getTimeBucketId()));
-        for (String dimensionValue : thirdEyeResponseRow.getDimensions()) {
-          compoundKey.append(TIME_DIMENSION_JOINER).append(dimensionValue);
-        }
-        responseMap.put(compoundKey.toString(), thirdEyeResponseRow);
-      } else {
-        responseMap.put(
-            thirdEyeResponseRow.getTimeBucketId() + TIME_DIMENSION_JOINER + thirdEyeResponseRow.getDimensions().get(0),
-            thirdEyeResponseRow);
-      }
+      String key =
+          computeTimeDimensionValues(thirdEyeResponseRow.getTimeBucketId(), thirdEyeResponseRow.getDimensions());
+      responseMap.put(key, thirdEyeResponseRow);
     }
     return responseMap;
   }
@@ -118,7 +110,9 @@ public class ResponseParserUtils {
   }
 
   public static String computeTimeDimensionValues(int timeBucketId, List<String> dimensionValues) {
-    if (dimensionValues.size() == 1) {
+    if (dimensionValues == null || dimensionValues.size() == 0) {
+      return Integer.toString(timeBucketId);
+    } else if (dimensionValues.size() == 1) {
       return computeTimeDimensionValue(timeBucketId, dimensionValues.get(0));
     } else {
       StringBuilder sb = new StringBuilder(Integer.toString(timeBucketId)).append(TIME_DIMENSION_JOINER);

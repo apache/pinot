@@ -232,22 +232,22 @@ public class AnomalyMergeExecutor implements Runnable {
         LOG.error("Exception when reading collection schema cache", e);
       }
 
-      String anomalyDimensionNames = anomalyMergedResult.getDimensions();
-      String[] dimensionNames = anomalyDimensionNames.split(","); // e.g., [RU, oz-winner, *, *]
-      for (int i = 0; i < dimensionNames.length; ++i) {
-        String dimensionName = dimensionNames[i];
-        if (!StringUtils.isBlank(dimensionName) && !"*".equals(dimensionName)) {
-          String dimensionValue = collectionDimensions.get(i);
-          filters.removeAll(dimensionValue);
-          if (dimensionName.equalsIgnoreCase("other")) {
-            filters.put(dimensionValue, dimensionName);
-            filters.put(dimensionValue, dimensionName.toLowerCase());
-            filters.put(dimensionValue, "");
+      String anomalyDimensionValues = anomalyMergedResult.getDimensions();
+      String[] dimensionValues = anomalyDimensionValues.split(","); // e.g., "RU, oz-winner, *, *"
+      for (int i = 0; i < dimensionValues.length; ++i) {
+        String dimensionValue = dimensionValues[i];
+        if (!StringUtils.isBlank(dimensionValue) && !"*".equals(dimensionValue)) {
+          String dimensionName = collectionDimensions.get(i);
+          filters.removeAll(dimensionName);
+          if (dimensionValue.equalsIgnoreCase("other")) {
+            filters.put(dimensionName, dimensionValue);
+            filters.put(dimensionName, dimensionValue.toLowerCase());
+            filters.put(dimensionName, "");
           } else {
             // Only add a specific dimension value filter if there are more values present for the same dimension
-            filters.put(dimensionValue, dimensionName);
+            filters.put(dimensionName, dimensionValue);
           }
-          LOG.info("Adding filter : [{} = {}] in the query", dimensionValue, dimensionName);
+          LOG.info("Adding filter : [{} = {}] in the query", dimensionName, dimensionValue);
         }
       }
     }
