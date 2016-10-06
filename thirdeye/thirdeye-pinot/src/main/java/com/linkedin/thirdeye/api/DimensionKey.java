@@ -168,4 +168,20 @@ public class DimensionKey implements Comparable<DimensionKey> {
   public String toString() {
     return Arrays.toString(dimensionValues);
   }
+
+  public String toCommaSeparatedString() {
+    if (dimensionValues == null) {
+      return null;
+    }
+    if (dimensionValues.length == 0) {
+      return "";
+    }
+    StringBuilder sb = new StringBuilder();
+    String separator = "";
+    for (String s : dimensionValues) {
+      sb.append(separator).append(s);
+      separator = ",";
+    }
+    return sb.toString();
+  }
 }

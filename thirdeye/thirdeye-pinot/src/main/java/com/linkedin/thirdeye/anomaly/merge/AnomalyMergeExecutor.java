@@ -2,8 +2,9 @@ package com.linkedin.thirdeye.anomaly.merge;
 
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
+import com.linkedin.thirdeye.api.CollectionSchema;
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -217,23 +218,36 @@ public class AnomalyMergeExecutor implements Runnable {
     if (StringUtils.isNotBlank(anomalyFunctionSpec.getFilters())) {
       filters.putAll(ThirdEyeUtils.getFilterSet(anomalyFunctionSpec.getFilters()));
     }
-    String exploreDimension = anomalyFunctionSpec.getExploreDimensions();
-    if (StringUtils.isNotBlank(exploreDimension)) {
-      timeSeriesRequest.setGroupByDimensions(Collections.singletonList(exploreDimension));
-      String anomalyDimensions = anomalyMergedResult.getDimensions();
-      String[] dimArr = anomalyDimensions.split(",");
-      for (String dim : dimArr) {
-        if (!StringUtils.isBlank(dim) && !"*".equals(dim)) {
-          filters.removeAll(exploreDimension);
-          if (dim.equalsIgnoreCase("other")) {
-            filters.put(exploreDimension, dim);
-            filters.put(exploreDimension, dim.toLowerCase());
-            filters.put(exploreDimension, "");
+
+    String exploreDimensions = anomalyFunctionSpec.getExploreDimensions();
+    if (StringUtils.isNotBlank(exploreDimensions)) {
+      timeSeriesRequest.setGroupByDimensions(Arrays.asList(exploreDimensions.trim().split(",")));
+
+      List<String> collectionDimensions = null;
+      try {
+        CollectionSchema collectionSchema =
+            CACHE_REGISTRY_INSTANCE.getCollectionSchemaCache().get(anomalyFunctionSpec.getCollection());
+        collectionDimensions = collectionSchema.getDimensionNames();
+      } catch (Exception e) {
+        LOG.error("Exception when reading collection schema cache", e);
+      }
+
+      String anomalyDimensionValues = anomalyMergedResult.getDimensions();
+      String[] dimensionValues = anomalyDimensionValues.split(","); // e.g., "RU, oz-winner, *, *"
+      for (int i = 0; i < dimensionValues.length; ++i) {
+        String dimensionValue = dimensionValues[i];
+        if (!StringUtils.isBlank(dimensionValue) && !"*".equals(dimensionValue)) {
+          String dimensionName = collectionDimensions.get(i);
+          filters.removeAll(dimensionName);
+          if (dimensionValue.equalsIgnoreCase("other")) {
+            filters.put(dimensionName, dimensionValue);
+            filters.put(dimensionName, dimensionValue.toLowerCase());
+            filters.put(dimensionName, "");
           } else {
             // Only add a specific dimension value filter if there are more values present for the same dimension
-            filters.put(exploreDimension, dim);
+            filters.put(dimensionName, dimensionValue);
           }
-          LOG.info("Adding filter : [{} = {}] in the query", exploreDimension, dim);
+          LOG.info("Adding filter : [{} = {}] in the query", dimensionName, dimensionValue);
         }
       }
     }
@@ -371,7 +385,7 @@ public class AnomalyMergeExecutor implements Runnable {
       }
       LOG.info(
           "Merging [{}] raw anomalies into [{}] merged anomalies for function id : [{}] and dimensions : [{}]",
-          unmergedResults.size(), mergedResults.size(), function.getId(), dimensions);
+          unmergedResultsByDimensions.size(), mergedResults.size(), function.getId(), dimensions);
       output.addAll(mergedResults);
     }
   }

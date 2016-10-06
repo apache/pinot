@@ -535,11 +535,14 @@ public class DashboardResource {
         TimeSeriesRow timeSeriesRow = response.getRow(i);
         for (TimeSeriesMetric metricTimeSeries : timeSeriesRow.getMetrics()) {
           String key = metricTimeSeries.getMetricName();
-          if (timeSeriesRow.getDimensionName() != null
-              && timeSeriesRow.getDimensionName().trim().length() > 0) {
-            key =
-                key + "|" + timeSeriesRow.getDimensionName() + "|"
-                    + timeSeriesRow.getDimensionValue();
+          if (timeSeriesRow.getDimensionNames() != null
+              && timeSeriesRow.getDimensionNames().size() > 0) {
+            StringBuilder sb = new StringBuilder(key);
+            for (int idx = 0; idx < timeSeriesRow.getDimensionNames().size(); ++idx) {
+              sb.append("||").append(timeSeriesRow.getDimensionNames().get(idx));
+              sb.append("|").append(timeSeriesRow.getDimensionValues().get(idx));
+            }
+            key = sb.toString();
           }
           JSONArray valueArray;
           if (!timeseriesMap.has(key)) {

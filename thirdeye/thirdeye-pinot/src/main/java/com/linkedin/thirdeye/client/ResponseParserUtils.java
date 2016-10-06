@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.client;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -24,8 +26,9 @@ public class ResponseParserUtils {
     int numRows = thirdEyeResponse.getNumRows();
     for (int i = 0; i < numRows; i++) {
       ThirdEyeResponseRow thirdEyeResponseRow = thirdEyeResponse.getRow(i);
-      responseMap.put(thirdEyeResponseRow.getTimeBucketId() + TIME_DIMENSION_JOINER
-          + thirdEyeResponseRow.getDimensions().get(0), thirdEyeResponseRow);
+      String key =
+          computeTimeDimensionValues(thirdEyeResponseRow.getTimeBucketId(), thirdEyeResponseRow.getDimensions());
+      responseMap.put(key, thirdEyeResponseRow);
     }
     return responseMap;
   }
@@ -106,9 +109,38 @@ public class ResponseParserUtils {
     return timeBucketId + TIME_DIMENSION_JOINER + dimensionValue;
   }
 
-  public static String extractDimensionValue(String timeDimensionValue) {
+  public static String computeTimeDimensionValues(int timeBucketId, List<String> dimensionValues) {
+    if (dimensionValues == null || dimensionValues.size() == 0) {
+      return Integer.toString(timeBucketId);
+    } else if (dimensionValues.size() == 1) {
+      return computeTimeDimensionValue(timeBucketId, dimensionValues.get(0));
+    } else {
+      StringBuilder sb = new StringBuilder(Integer.toString(timeBucketId)).append(TIME_DIMENSION_JOINER);
+      String separator = "";
+      for (String dimensionValue : dimensionValues) {
+        sb.append(separator).append(dimensionValue);
+        separator = TIME_DIMENSION_JOINER;
+      }
+      return sb.toString();
+    }
+  }
+
+  public static String extractFirstDimensionValue(String timeDimensionValue) {
     String[] tokens = timeDimensionValue.split(TIME_DIMENSION_JOINER_ESCAPED);
     String dimensionValue = tokens.length < 2 ? "" : tokens[1];
     return dimensionValue;
+  }
+
+  public static List<String> extractDimensionValues(String timeDimensionValues) {
+    String[] tokens = timeDimensionValues.split(TIME_DIMENSION_JOINER_ESCAPED);
+    if (tokens.length < 2) {
+      return Collections.emptyList();
+    } else {
+      List<String> res = new ArrayList<>(tokens.length - 1);
+      for (int i = 1; i < tokens.length; ++i) {
+        res.add(tokens[i]);
+      }
+      return res;
+    }
   }
 }

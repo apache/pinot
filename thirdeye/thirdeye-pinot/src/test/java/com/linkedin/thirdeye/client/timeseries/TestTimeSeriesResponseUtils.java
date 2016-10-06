@@ -114,12 +114,12 @@ public class TestTimeSeriesResponseUtils {
           }
           if (groupTimeSeriesMetricsIntoRow) {
             // add them all at once
-            dataGenerator.addEntry(dimension, dimensionValue, start, end,
+            dataGenerator.addEntry(Arrays.asList(dimension), Arrays.asList(dimensionValue), start, end,
                 timeSeriesMetrics.toArray(new TimeSeriesMetric[timeSeriesMetrics.size()]));
           } else {
             // add them individually (one metric per row)
             for (TimeSeriesMetric timeSeriesMetric : timeSeriesMetrics) {
-              dataGenerator.addEntry(dimension, dimensionValue, start, end, timeSeriesMetric);
+              dataGenerator.addEntry(Arrays.asList(dimension), Arrays.asList(dimensionValue), start, end, timeSeriesMetric);
             }
           }
         }
@@ -164,14 +164,16 @@ public class TestTimeSeriesResponseUtils {
           new MetricSchema(metricNames, Collections.nCopies(metricNames.size(), MetricType.DOUBLE));
     }
 
-    void addEntry(String dimensionName, String dimensionValue, DateTime start, DateTime end,
+    void addEntry(List<String> dimensionNames, List<String> dimensionValues, DateTime start, DateTime end,
         TimeSeriesMetric... timeSeriesMetrics) {
-      validateArgs(dimensionName, dimensionValue, start, end, timeSeriesMetrics);
-      timeSeriesRows.add(createRow(dimensionName, dimensionValue, start, end, timeSeriesMetrics));
+      validateArgs(dimensionNames, dimensionValues, start, end, timeSeriesMetrics);
+      timeSeriesRows.add(createRow(dimensionNames, dimensionValues, start, end, timeSeriesMetrics));
       String[] dimensionKeyArr = new String[dimensions.size()];
       Arrays.fill(dimensionKeyArr, "*");
-      if (dimensionName != null) {
-        dimensionKeyArr[dimensions.indexOf(dimensionName)] = dimensionValue;
+      if (dimensionNames != null && dimensionNames.size() != 0) {
+        for (int idx = 0; idx < dimensionNames.size(); ++idx) {
+          dimensionKeyArr[dimensions.indexOf(dimensionNames.get(idx))] = dimensionValues.get(idx);
+        }
       }
       DimensionKey dimensionKey = new DimensionKey(dimensionKeyArr);
       if (!map.containsKey(dimensionKey)) {
@@ -180,22 +182,23 @@ public class TestTimeSeriesResponseUtils {
       incrementMetricData(map.get(dimensionKey), start, end, timeSeriesMetrics);
     }
 
-    private void validateArgs(String dimensionName, String dimensionValue, DateTime start,
+    private void validateArgs(List<String> dimensionNames, List<String> dimensionValue, DateTime start,
         DateTime end, TimeSeriesMetric[] timeSeriesMetrics) {
-      if (dimensionName != null) {
-        Assert.assertTrue(dimensions.contains(dimensionName));
+      if (dimensionNames != null && dimensionNames.size() != 0) {
+        for (String dimensionName : dimensionNames) {
+          Assert.assertTrue(dimensions.contains(dimensionName));
+        }
       }
       for (TimeSeriesMetric metric : timeSeriesMetrics) {
         Assert.assertTrue(metricNames.contains(metric.getMetricName()));
       }
-
     }
 
-    private TimeSeriesRow createRow(String dimensionName, String dimensionValue, DateTime start,
+    private TimeSeriesRow createRow(List<String> dimensionNames, List<String> dimensionValues, DateTime start,
         DateTime end, TimeSeriesMetric... timeSeriesMetrics) {
       Builder builder = new TimeSeriesRow.Builder();
-      builder.setDimensionName(dimensionName);
-      builder.setDimensionValue(dimensionValue);
+      builder.setDimensionNames(dimensionNames);
+      builder.setDimensionValues(dimensionValues);
       builder.setStart(start);
       builder.setEnd(end);
       builder.addMetrics(timeSeriesMetrics);
