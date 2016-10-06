@@ -20,21 +20,24 @@ import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.client.ResultSet;
 import com.linkedin.pinot.client.ResultSetGroup;
-import com.linkedin.thirdeye.api.CollectionSchema;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
+import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.client.MetricFunction;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.client.ThirdEyeRequest;
 import com.linkedin.thirdeye.dashboard.Utils;
-import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
+import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
+import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
+import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 public class PinotThirdEyeClient implements ThirdEyeClient {
 
   private static final Logger LOG = LoggerFactory.getLogger(PinotThirdEyeClient.class);
 
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
+  private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   public static final String CONTROLLER_HOST_PROPERTY_KEY = "controllerHost";
   public static final String CONTROLLER_PORT_PROPERTY_KEY = "controllerPort";
   public static final String FIXED_COLLECTIONS_PROPERTY_KEY = "fixedCollections";
@@ -44,6 +47,7 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
   String segementZKMetadataRootPath;
   private final HttpHost controllerHost;
   private final CloseableHttpClient controllerClient;
+  private final DatasetConfigManager datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
 
   protected PinotThirdEyeClient(String controllerHostName, int controllerPort) {
 
@@ -104,21 +108,14 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
 
   @Override
   public PinotThirdEyeResponse execute(ThirdEyeRequest request) throws Exception {
-    CollectionSchema collectionSchema =
-        CACHE_REGISTRY_INSTANCE.getCollectionSchemaCache().get(request.getCollection());
-    TimeSpec dataTimeSpec = collectionSchema.getTime();
+    DatasetConfigDTO datasetConfig = datasetConfigDAO.findByDataset(request.getCollection());
+    TimeSpec dataTimeSpec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetConfig);
     List<MetricFunction> metricFunctions = request.getMetricFunctions();
-    List<String> dimensionNames = collectionSchema.getDimensionNames();
-    CollectionConfig collectionConfig = null;
+    List<String> dimensionNames = datasetConfig.getDimensions();
     List<ResultSetGroup> resultSetGroups = new ArrayList<>();
 
-    try {
-      collectionConfig = CACHE_REGISTRY_INSTANCE.getCollectionConfigCache().get(request.getCollection());
-    } catch (Exception e) {
-      LOG.debug("Collection config for collection {} does not exist", request.getCollection());
-    }
-    if (collectionConfig != null && collectionConfig.isMetricAsDimension()) {
-       List<String> pqls = PqlUtils.getMetricAsDimensionPqls(request, dataTimeSpec, collectionConfig);
+    if (datasetConfig.isMetricAsDimension()) {
+       List<String> pqls = PqlUtils.getMetricAsDimensionPqls(request, dataTimeSpec);
        for (String pql : pqls) {
          LOG.debug("PQL isMetricAsDimension : {}", pql);
          ResultSetGroup result = CACHE_REGISTRY_INSTANCE.getResultSetGroupCache()
@@ -136,7 +133,7 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
       }
     }
     List<ResultSet> resultSets = getResultSets(resultSetGroups);
-    List<String[]> resultRows = parseResultSets(request, resultSets, metricFunctions, collectionSchema, dimensionNames);
+    List<String[]> resultRows = parseResultSets(request, resultSets, metricFunctions, dimensionNames);
     PinotThirdEyeResponse resp = new PinotThirdEyeResponse(request, resultRows, dataTimeSpec);
     return resp;
 
@@ -162,8 +159,7 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
   }
 
   private List<String[]> parseResultSets(ThirdEyeRequest request, List<ResultSet> resultSets,
-      List<MetricFunction> metricFunctions, CollectionSchema collectionSchema,
-      List<String> dimensionNames) {
+      List<MetricFunction> metricFunctions, List<String> dimensionNames) {
 
     int numGroupByKeys = 0;
     boolean hasGroupBy = false;
@@ -253,20 +249,12 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
 
   }
 
-  @Override
-  public CollectionSchema getCollectionSchema(String collection) throws Exception {
-    return CACHE_REGISTRY_INSTANCE.getCollectionSchemaCache().get(collection);
-  }
 
   @Override
   public List<String> getCollections() throws Exception {
     return CACHE_REGISTRY_INSTANCE.getCollectionsCache().getCollections();
   }
 
-  @Override
-  public CollectionConfig getCollectionConfig(String collection) throws Exception {
-    return CACHE_REGISTRY_INSTANCE.getCollectionConfigCache().get(collection);
-  }
 
   @Override
   public long getMaxDataTime(String collection) throws Exception {

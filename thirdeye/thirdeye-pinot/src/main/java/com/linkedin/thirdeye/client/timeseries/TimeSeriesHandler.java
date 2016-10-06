@@ -10,11 +10,10 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import org.joda.time.DateTime;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.google.common.collect.Range;
 import com.linkedin.thirdeye.api.TimeGranularity;
+import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.client.MetricExpression;
 import com.linkedin.thirdeye.client.MetricFunction;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
@@ -25,13 +24,17 @@ import com.linkedin.thirdeye.client.TimeRangeUtils;
 import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesRow.TimeSeriesMetric;
 import com.linkedin.thirdeye.dashboard.Utils;
+import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 
 public class TimeSeriesHandler {
-  private static final Logger LOG = LoggerFactory.getLogger(TimeSeriesHandler.class);
   private final QueryCache queryCache;
+  private final MetricConfigManager metricConfigDAO;
+
+  private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
   public TimeSeriesHandler(QueryCache queryCache) {
     this.queryCache = queryCache;
+    this.metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
   }
 
   public TimeSeriesResponse handle(TimeSeriesRequest timeSeriesRequest) throws Exception {
@@ -57,7 +60,7 @@ public class TimeSeriesHandler {
     TimeSeriesResponseParser timeSeriesResponseParser =
         new TimeSeriesResponseParser(response, timeranges,
             timeSeriesRequest.getAggregationTimeGranularity(),
-            timeSeriesRequest.getGroupByDimensions());
+            timeSeriesRequest.getGroupByDimensions(), metricConfigDAO);
     List<TimeSeriesRow> rows = timeSeriesResponseParser.parseResponse();
     // compute the derived metrics
     computeDerivedMetrics(timeSeriesRequest, rows);

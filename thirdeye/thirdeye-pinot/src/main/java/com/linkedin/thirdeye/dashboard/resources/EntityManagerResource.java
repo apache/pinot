@@ -1,15 +1,18 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.EmailConfigurationManager;
 import com.linkedin.thirdeye.datalayer.dto.AbstractDTO;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+
 import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -20,6 +23,7 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,13 +34,14 @@ public class EntityManagerResource {
   private final AnomalyFunctionManager anomalyFunctionManager;
   private final EmailConfigurationManager emailConfigurationManager;
 
+  private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
+
   public static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static final Logger LOG = LoggerFactory.getLogger(EntityManagerResource.class);
 
-  public EntityManagerResource(AnomalyFunctionManager anomalyFunctionManager,
-      EmailConfigurationManager emailConfigurationManager) {
-    this.emailConfigurationManager = emailConfigurationManager;
-    this.anomalyFunctionManager = anomalyFunctionManager;
+  public EntityManagerResource() {
+    this.emailConfigurationManager = DAO_REGISTRY.getEmailConfigurationDAO();
+    this.anomalyFunctionManager = DAO_REGISTRY.getAnomalyFunctionDAO();
   }
 
   private enum EntityType {

@@ -3,7 +3,6 @@ package com.linkedin.thirdeye.anomaly.detection;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 import org.joda.time.DateTime;
@@ -22,16 +21,20 @@ import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
 import com.linkedin.thirdeye.anomaly.task.TaskGenerator;
-import com.linkedin.thirdeye.api.CollectionSchema;
 import com.linkedin.thirdeye.api.TimeGranularity;
+import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
+import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.JobManager;
+import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.TaskManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.JobDTO;
 import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
+import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 public class DetectionJobRunner implements Job {
 
@@ -44,6 +47,8 @@ public class DetectionJobRunner implements Job {
   private JobManager anomalyJobSpecDAO;
   private TaskManager anomalyTasksSpecDAO;
   private AnomalyFunctionManager anomalyFunctionSpecDAO;
+  private DatasetConfigManager datasetConfigDAO;
+  private MetricConfigManager metricConfigDAO;
   private long anomalyFunctionId;
   private DateTime windowStartTime;
   private DateTime windowEndTime;
@@ -64,6 +69,8 @@ public class DetectionJobRunner implements Job {
     anomalyJobSpecDAO = detectionJobContext.getAnomalyJobDAO();
     anomalyTasksSpecDAO = detectionJobContext.getAnomalyTaskDAO();
     anomalyFunctionSpecDAO = detectionJobContext.getAnomalyFunctionDAO();
+    datasetConfigDAO = detectionJobContext.getDatasetConfigDAO();
+    metricConfigDAO = detectionJobContext.getMetricConfigDAO();
     anomalyFunctionId = detectionJobContext.getAnomalyFunctionId();
 
     AnomalyFunctionDTO anomalyFunctionSpec = getAnomalyFunctionSpec(anomalyFunctionId);
@@ -112,11 +119,12 @@ public class DetectionJobRunner implements Job {
   private DateTime alignTimestampsToDataTimezone(DateTime inputDateTime, String collection) {
 
     try {
-      CollectionSchema collectionSchema = CACHE_REGISTRY_INSTANCE.getCollectionSchemaCache().get(collection);
-      TimeGranularity dataGranularity = collectionSchema.getTime().getDataGranularity();
-      String timeFormat = collectionSchema.getTime().getFormat();
+      DatasetConfigDTO datasetConfig = datasetConfigDAO.findByDataset(collection);
+      TimeSpec timespec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetConfig);
+      TimeGranularity dataGranularity = timespec.getDataGranularity();
+      String timeFormat = datasetConfig.getTimeFormat();
       if (dataGranularity.getUnit().equals(TimeUnit.DAYS)) {
-        DateTimeZone dataTimeZone = Utils.getDataTimeZone(collection);
+        DateTimeZone dataTimeZone = Utils.getDataTimeZone(collection, datasetConfigDAO);
         DateTimeFormatter inputDataDateTimeFormatter = DateTimeFormat.forPattern(timeFormat).withZone(dataTimeZone);
 
         long inputMillis = inputDateTime.getMillis();
@@ -124,7 +132,7 @@ public class DetectionJobRunner implements Job {
         long timeZoneOffsetMillis = inputDataDateTimeFormatter.parseMillis(inputDateTimeString);
         inputDateTime = new DateTime(timeZoneOffsetMillis);
       }
-    } catch (ExecutionException e) {
+    } catch (Exception e) {
       LOG.error("Exception in aligning timestamp to data time zone", e);
     }
     return inputDateTime;

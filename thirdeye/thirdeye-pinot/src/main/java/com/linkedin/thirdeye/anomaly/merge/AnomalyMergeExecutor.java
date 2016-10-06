@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.anomaly.merge;
 
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -31,7 +32,9 @@ import com.linkedin.thirdeye.client.timeseries.TimeSeriesResponse;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesRow;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
+import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
+import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
@@ -47,6 +50,8 @@ public class AnomalyMergeExecutor implements Runnable {
   private final MergedAnomalyResultManager mergedResultDAO;
   private final RawAnomalyResultManager anomalyResultDAO;
   private final AnomalyFunctionManager anomalyFunctionDAO;
+  private final DatasetConfigManager datasetConfigDAO;
+  private final MetricConfigManager metricConfigDAO;
   private final ScheduledExecutorService executorService;
 
   private final QueryCache queryCache;
@@ -59,10 +64,13 @@ public class AnomalyMergeExecutor implements Runnable {
 
   public AnomalyMergeExecutor(MergedAnomalyResultManager mergedResultDAO,
       AnomalyFunctionManager anomalyFunctionDAO, RawAnomalyResultManager anomalyResultDAO,
+      DatasetConfigManager datasetConfigDAO, MetricConfigManager metricConfigDAO,
       ScheduledExecutorService executorService) {
     this.mergedResultDAO = mergedResultDAO;
     this.anomalyResultDAO = anomalyResultDAO;
     this.anomalyFunctionDAO = anomalyFunctionDAO;
+    this.datasetConfigDAO = datasetConfigDAO;
+    this.metricConfigDAO = metricConfigDAO;
     this.executorService = executorService;
     this.queryCache = CACHE_REGISTRY_INSTANCE.getQueryCache();
     this.timeSeriesHandler = new TimeSeriesHandler(queryCache);

@@ -12,22 +12,20 @@ import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.logging.Log;
 import org.joda.time.DateTime;
 import org.quartz.JobExecutionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public abstract class TimeSeriesUtil {
-
-  private static TimeSeriesHandler timeSeriesHandler =
-      new TimeSeriesHandler(ThirdEyeCacheRegistry.getInstance().getQueryCache());
 
   private static final Logger LOG = LoggerFactory.getLogger(TimeSeriesUtil.class);
 
@@ -37,6 +35,10 @@ public abstract class TimeSeriesUtil {
   public static TimeSeriesResponse getTimeSeriesResponse(AnomalyFunctionDTO anomalyFunctionSpec,
       BaseAnomalyFunction anomalyFunction, String groupByDimension, long windowStart,
       long windowEnd) throws JobExecutionException {
+
+    TimeSeriesHandler timeSeriesHandler =
+        new TimeSeriesHandler(ThirdEyeCacheRegistry.getInstance().getQueryCache());
+
     // Compute metric function
     TimeGranularity timeGranularity = new TimeGranularity(anomalyFunctionSpec.getBucketSize(),
         anomalyFunctionSpec.getBucketUnit());

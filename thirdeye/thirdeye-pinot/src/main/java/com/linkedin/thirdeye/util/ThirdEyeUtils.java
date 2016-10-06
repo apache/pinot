@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -18,7 +19,9 @@ import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
+import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.client.MetricExpression;
+import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
@@ -28,6 +31,7 @@ public abstract class ThirdEyeUtils {
   private static final String FILTER_VALUE_ASSIGNMENT_SEPARATOR = "=";
   private static final String FILTER_CLAUSE_SEPARATOR = ";";
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+  private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
   private ThirdEyeUtils () {
 
@@ -134,6 +138,20 @@ public abstract class ThirdEyeUtils {
       metricExpression.setExpression(metricConfig.getDerivedMetricExpression());
     } else {
       metricExpression.setExpression(MetricConfigBean.DERIVED_METRIC_ID_PREFIX + metricConfig.getId());
+    }
+    return metricExpression;
+  }
+
+  public static String substituteMetricIdsForMetrics(String metricExpression, String dataset) {
+    MetricConfigManager metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
+    List<MetricConfigDTO> metricConfigs = metricConfigDAO.findByDataset(dataset);
+    for (MetricConfigDTO metricConfig : metricConfigs) {
+      if (metricConfig.isDerived()) {
+        continue;
+      }
+      String metricName = metricConfig.getName();
+      metricExpression = metricExpression.replaceAll(metricName,
+          MetricConfigBean.DERIVED_METRIC_ID_PREFIX + metricConfig.getId());
     }
     return metricExpression;
   }

@@ -49,8 +49,8 @@ import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.WebappConfigDTO;
 import com.linkedin.thirdeye.datalayer.pojo.DashboardConfigBean;
-import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
+import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 /**
  * Tool to read all pinot datasets and populate the new metric centered dashboard tables.
@@ -283,11 +283,7 @@ public class LoadMetricsFromPinotTool {
 
           metricConfigDTO.setDerived(true);
           String derivedMetricExpression = entry.getValue();
-          for (String metricName : metricNames) {
-            MetricConfigDTO derivedMetricConfigDTO = metricConfigDAO.findByMetricAndDataset(metricName, dataset);
-            derivedMetricExpression = derivedMetricExpression.replaceAll(metricName,
-                MetricConfigBean.DERIVED_METRIC_ID_PREFIX + derivedMetricConfigDTO.getId());
-          }
+          derivedMetricExpression = ThirdEyeUtils.substituteMetricIdsForMetrics(derivedMetricExpression, dataset);
           metricConfigDTO.setDerivedMetricExpression(derivedMetricExpression);
 
           metricConfigDTO.setDatasetConfig(createdDataset);

@@ -14,8 +14,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
 import java.util.TreeMap;
-
 import java.util.stream.Collectors;
+
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.commons.mail.EmailException;
@@ -34,6 +34,7 @@ import com.linkedin.thirdeye.anomaly.task.TaskRunner;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.client.cache.QueryCache;
+import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
@@ -55,6 +56,7 @@ public class AlertTaskRunner implements TaskRunner {
       ThirdEyeCacheRegistry.getInstance();
 
   private MergedAnomalyResultManager anomalyMergedResultDAO;
+  private DatasetConfigManager datasetConfigDAO;
   private EmailConfigurationDTO alertConfig;
   private DateTime windowStart;
   private DateTime windowEnd;
@@ -74,6 +76,7 @@ public class AlertTaskRunner implements TaskRunner {
     AlertTaskInfo alertTaskInfo = (AlertTaskInfo) taskInfo;
     List<TaskResult> taskResult = new ArrayList<>();
     anomalyMergedResultDAO = taskContext.getMergedResultDAO();
+    datasetConfigDAO = taskContext.getDatasetConfigDAO();
     alertConfig = alertTaskInfo.getAlertConfig();
     windowStart = alertTaskInfo.getWindowStartTime();
     windowEnd = alertTaskInfo.getWindowEndTime();
@@ -136,12 +139,7 @@ public class AlertTaskRunner implements TaskRunner {
     //            collection, anomaliesWithLabels);
 
     // get dimensions for rendering
-    List<String> dimensionNames;
-    try {
-      dimensionNames = CACHE_REGISTRY_INSTANCE.getCollectionSchemaCache().get(collection).getDimensionNames();
-    } catch (Exception e) {
-      throw new JobExecutionException(e);
-    }
+    List<String> dimensionNames = datasetConfigDAO.findByDataset(collection).getDimensions();
 
     sendAlertForAnomalies(collection, results, groupedResults, dimensionNames);
     updateNotifiedStatus(results);

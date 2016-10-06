@@ -62,28 +62,32 @@ public class ThirdEyeAnomalyApplication
       throws Exception {
     LOG.info("Starting ThirdeyeAnomalyApplication : Scheduler {} Worker {}", config.isScheduler(), config.isWorker());
     super.initDAOs();
-    ThirdEyeCacheRegistry.initializeCaches(config, webappConfigDAO);
+    ThirdEyeCacheRegistry.initializeCaches(config, datasetConfigDAO, metricConfigDAO, dashboardConfigDAO);
     environment.lifecycle().manage(new Managed() {
       @Override
       public void start() throws Exception {
 
         if (config.isWorker()) {
           anomalyFunctionFactory = new AnomalyFunctionFactory(config.getFunctionConfigPath());
-          taskDriver = new TaskDriver(config, anomalyJobDAO, anomalyTaskDAO, anomalyResultDAO, anomalyMergedResultDAO, anomalyFunctionFactory);
+          taskDriver = new TaskDriver(config, jobDAO, taskDAO, rawAnomalyResultDAO, mergedAnomalyResultDAO,
+              anomalyFunctionFactory, datasetConfigDAO, metricConfigDAO);
           taskDriver.start();
         }
         if (config.isScheduler()) {
-          detectionJobScheduler = new DetectionJobScheduler(anomalyJobDAO, anomalyTaskDAO, anomalyFunctionDAO);
+          detectionJobScheduler = new DetectionJobScheduler(jobDAO, taskDAO, anomalyFunctionDAO,
+              datasetConfigDAO, metricConfigDAO);
           detectionJobScheduler.start();
           environment.jersey().register(new DetectionJobResource(detectionJobScheduler, anomalyFunctionDAO));
           environment.jersey().register(new AnomalyFunctionResource(config.getFunctionConfigPath()));
         }
         if (config.isMonitor()) {
-          monitorJobScheduler = new MonitorJobScheduler(anomalyJobDAO, anomalyTaskDAO, config.getMonitorConfiguration());
+          monitorJobScheduler = new MonitorJobScheduler(jobDAO, taskDAO, datasetConfigDAO,
+              metricConfigDAO, config.getMonitorConfiguration());
           monitorJobScheduler.start();
         }
         if (config.isAlert()) {
-          alertJobScheduler = new AlertJobScheduler(anomalyJobDAO, anomalyTaskDAO, emailConfigurationDAO);
+          alertJobScheduler = new AlertJobScheduler(jobDAO, taskDAO, emailConfigurationDAO,
+              datasetConfigDAO, metricConfigDAO);
           alertJobScheduler.start();
           environment.jersey()
           .register(new AlertJobResource(alertJobScheduler, emailConfigurationDAO));
@@ -91,8 +95,8 @@ public class ThirdEyeAnomalyApplication
         if (config.isMerger()) {
           ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
           anomalyMergeExecutor =
-              new AnomalyMergeExecutor(anomalyMergedResultDAO, anomalyFunctionDAO, anomalyResultDAO,
-                  executorService);
+              new AnomalyMergeExecutor(mergedAnomalyResultDAO, anomalyFunctionDAO, rawAnomalyResultDAO,
+                  datasetConfigDAO, metricConfigDAO, executorService);
           anomalyMergeExecutor.start();
         }
       }

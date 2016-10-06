@@ -18,6 +18,7 @@ import com.linkedin.thirdeye.datalayer.bao.EmailConfigurationManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
@@ -57,10 +58,11 @@ public class RunAdhocDatabaseQueriesTool {
     anomalyFunctionDAO.update(anomalyFunction);
   }
 
-  private void updateField(Long id) {
-    AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(id);
-    anomalyFunction.setCron("0/20 * * * * ?");
-    anomalyFunctionDAO.update(anomalyFunction);
+  private void updateField() {
+    List<EmailConfigurationDTO> emailConfigs = emailConfigurationDAO.findAll();
+    for (EmailConfigurationDTO emailConfig : emailConfigs) {
+      LOG.info(emailConfig.getId() + " " + emailConfig.getToAddresses());
+    }
   }
 
   private void customFunction() {
@@ -79,6 +81,7 @@ public class RunAdhocDatabaseQueriesTool {
       System.exit(1);
     }
     RunAdhocDatabaseQueriesTool dq = new RunAdhocDatabaseQueriesTool(persistenceFile);
+    dq.updateField();
   }
 
 }

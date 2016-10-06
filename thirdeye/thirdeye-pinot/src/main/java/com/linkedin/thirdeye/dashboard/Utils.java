@@ -11,11 +11,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
@@ -23,37 +21,28 @@ import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.cache.CacheLoader.InvalidCacheLoadException;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
-import com.linkedin.thirdeye.api.CollectionSchema;
 import com.linkedin.thirdeye.api.TimeGranularity;
+import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.client.MetricExpression;
 import com.linkedin.thirdeye.client.MetricFunction;
-import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.ThirdEyeRequest;
 import com.linkedin.thirdeye.client.ThirdEyeRequest.ThirdEyeRequestBuilder;
 import com.linkedin.thirdeye.client.ThirdEyeResponse;
 import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
-import com.linkedin.thirdeye.dashboard.configs.AbstractConfig;
-import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
-import com.linkedin.thirdeye.dashboard.configs.DashboardConfig;
-import com.linkedin.thirdeye.dashboard.configs.WebappConfigFactory.WebappConfigType;
 import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.WebappConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.WebappConfigDTO;
+import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 public class Utils {
   private static final Logger LOG = LoggerFactory.getLogger(Utils.class);
 
-  private static String DEFAULT_DASHBOARD = "Default_Dashboard";
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-  private static ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry
-      .getInstance();
+  private static DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
   public static List<ThirdEyeRequest> generateRequests(String collection, String requestReference,
       MetricFunction metricFunction, List<String> dimensions, DateTime start, DateTime end) {
@@ -115,9 +104,10 @@ public class Utils {
     return dimensions;
   }
 
-  public static List<String> getDimensionsToGroupBy(QueryCache queryCache, String collection,
-      Multimap<String, String> filters) throws Exception {
-    List<String> dimensions = Utils.getDimensions(queryCache, collection);
+  public static List<String> getDimensionsToGroupBy(String collection, Multimap<String, String> filters,
+      DatasetConfigManager datasetConfigDAO)
+      throws Exception {
+    List<String> dimensions = Utils.getDimensions(collection, datasetConfigDAO);
 
     List<String> dimensionsToGroupBy = new ArrayList<>();
     if (filters != null) {
@@ -147,12 +137,6 @@ public class Utils {
   public static List<MetricExpression> convertToMetricExpressions(String metricsJson,
       MetricAggFunction aggFunction, String collection) {
 
-    CollectionConfig collectionConfig = null;
-    try {
-      collectionConfig = CACHE_REGISTRY_INSTANCE.getCollectionConfigCache().get(collection);
-    } catch (InvalidCacheLoadException | ExecutionException e) {
-      LOG.debug("No collection configs for collection {}", collection);
-    }
     List<MetricExpression> metricExpressions = new ArrayList<>();
     if (metricsJson == null) {
       return metricExpressions;
@@ -172,34 +156,15 @@ public class Utils {
       }
     }
     for (String metricExpressionName : metricExpressionNames) {
-      MetricExpression metricExpression;
-      if (collectionConfig != null && collectionConfig.getDerivedMetrics() != null
-          && collectionConfig.getDerivedMetrics().containsKey(metricExpressionName)) {
-        String metricExpressionString =
-            collectionConfig.getDerivedMetrics().get(metricExpressionName);
-        metricExpression = new MetricExpression(metricExpressionName, metricExpressionString, aggFunction);
-      } else {
-        metricExpression = new MetricExpression(metricExpressionName);
-        metricExpression.setAggFunction(aggFunction);
-      }
+      String substitutedMetricExpression = ThirdEyeUtils.substituteMetricIdsForMetrics(metricExpressionName, collection);
+       MetricExpression metricExpression = new MetricExpression(metricExpressionName, substitutedMetricExpression,
+           aggFunction);
       metricExpressions.add(metricExpression);
     }
     return metricExpressions;
   }
 
-  public static boolean isDerievedMetric(String collection, String metric) {
-    CollectionConfig collectionConfig = null;
-    try {
-      collectionConfig = CACHE_REGISTRY_INSTANCE.getCollectionConfigCache().get(collection);
-      if (collectionConfig != null && collectionConfig.getDerivedMetrics() != null
-          && collectionConfig.getDerivedMetrics().containsKey(metric)) {
-        return true;
-      }
-    } catch (InvalidCacheLoadException | ExecutionException e) {
-      LOG.debug("No collection configs for collection {}", collection);
-    }
-    return false;
-  }
+
 
   public static List<MetricFunction> computeMetricFunctionsFromExpressions(
       List<MetricExpression> metricExpressions) {
@@ -236,15 +201,9 @@ public class Utils {
    * This method returns the time zone of the data in this collection
    */
   public static DateTimeZone getDataTimeZone(String collection) {
-    String timezone = CollectionConfig.DEFAULT_TIMEZONE;
-    try {
-      CollectionConfig collectionConfig = CACHE_REGISTRY_INSTANCE.getCollectionConfigCache().get(collection);
-      if (collectionConfig != null && StringUtils.isNotBlank(collectionConfig.getTimezone())) {
-        timezone = collectionConfig.getTimezone();
-      }
-    } catch (Exception e) {
-      LOG.info("No collection config for collection {}", collection);
-    }
+    DatasetConfigManager datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
+    DatasetConfigDTO datasetConfig = datasetConfigDAO.findByDataset(collection);
+    String timezone = datasetConfig.getTimezone();
     return DateTimeZone.forID(timezone);
   }
 

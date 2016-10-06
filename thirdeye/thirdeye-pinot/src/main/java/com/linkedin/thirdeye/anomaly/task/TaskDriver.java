@@ -15,8 +15,10 @@ import org.slf4j.LoggerFactory;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
+import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.JobManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
+import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.TaskManager;
 import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
@@ -43,7 +45,8 @@ public class TaskDriver {
   public TaskDriver(ThirdEyeAnomalyConfiguration thirdEyeAnomalyConfiguration,
       JobManager anomalyJobDAO, TaskManager anomalyTaskDAO,
       RawAnomalyResultManager anomalyResultDAO, MergedAnomalyResultManager mergedResultDAO,
-      AnomalyFunctionFactory anomalyFunctionFactory) {
+      AnomalyFunctionFactory anomalyFunctionFactory, DatasetConfigManager datasetConfigDAO,
+      MetricConfigManager metricConfigDAO) {
     this.workerId = thirdEyeAnomalyConfiguration.getId();
     this.anomalyTaskDAO = anomalyTaskDAO;
     taskExecutorService = Executors.newFixedThreadPool(MAX_PARALLEL_TASK);
@@ -53,6 +56,8 @@ public class TaskDriver {
     taskContext.setResultDAO(anomalyResultDAO);
     taskContext.setAnomalyFunctionFactory(anomalyFunctionFactory);
     taskContext.setMergedResultDAO(mergedResultDAO);
+    taskContext.setDatasetConfigDAO(datasetConfigDAO);
+    taskContext.setMetricConfigDAO(metricConfigDAO);
     taskContext.setThirdEyeAnomalyConfiguration(thirdEyeAnomalyConfiguration);
     allowedOldTaskStatus.add(TaskStatus.FAILED);
     allowedOldTaskStatus.add(TaskStatus.WAITING);

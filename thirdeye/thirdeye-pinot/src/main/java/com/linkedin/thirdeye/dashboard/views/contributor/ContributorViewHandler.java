@@ -18,9 +18,8 @@ import org.joda.time.DateTime;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
-import com.linkedin.thirdeye.api.CollectionSchema;
+import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.client.MetricExpression;
-import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.client.comparison.Row;
 import com.linkedin.thirdeye.client.comparison.Row.Metric;
@@ -33,10 +32,12 @@ import com.linkedin.thirdeye.dashboard.views.GenericResponse.Info;
 import com.linkedin.thirdeye.dashboard.views.GenericResponse.ResponseSchema;
 import com.linkedin.thirdeye.dashboard.views.TimeBucket;
 import com.linkedin.thirdeye.dashboard.views.ViewHandler;
+import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
+import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
+import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 public class ContributorViewHandler implements
     ViewHandler<ContributorViewRequest, ContributorViewResponse> {
-  private static ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
 
   private final Comparator<DateTime> dateTimeComparator = new Comparator<DateTime>() {
     @Override
@@ -59,9 +60,11 @@ public class ContributorViewHandler implements
   };
 
   private final QueryCache queryCache;
+  private DatasetConfigManager datasetConfigDAO;
 
   public ContributorViewHandler(QueryCache queryCache) {
     this.queryCache = queryCache;
+    this.datasetConfigDAO = datasetConfigDAO;
   }
 
   private TimeOnTimeComparisonRequest generateTimeOnTimeComparisonRequest(
@@ -73,16 +76,17 @@ public class ContributorViewHandler implements
     DateTime baselineEnd = request.getBaselineEnd();
     DateTime currentStart = request.getCurrentStart();
     DateTime currentEnd = request.getCurrentEnd();
-    CollectionSchema collectionSchema = CACHE_REGISTRY_INSTANCE.getCollectionSchemaCache().get(collection);
+    DatasetConfigDTO datasetConfig = datasetConfigDAO.findByDataset(collection);
+    TimeSpec timespec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetConfig);
     if (!request.getTimeGranularity().getUnit().equals(TimeUnit.DAYS) ||
-        !StringUtils.isBlank(collectionSchema.getTime().getFormat())) {
+        !StringUtils.isBlank(timespec.getFormat())) {
       comparisonRequest.setEndDateInclusive(true);
     }
 
     Multimap<String, String> filters = request.getFilters();
     List<String> dimensionsToGroupBy = request.getGroupByDimensions();
     if (dimensionsToGroupBy == null || dimensionsToGroupBy.isEmpty()) {
-      List<String> allDimensions = Utils.getDimensionsToGroupBy(queryCache, collection, filters);
+      List<String> allDimensions = Utils.getDimensionsToGroupBy(collection, filters, datasetConfigDAO);
       dimensionsToGroupBy = Lists.newArrayList(allDimensions.get(0));
     }
     List<MetricExpression> metricExpressions = request.getMetricExpressions();

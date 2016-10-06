@@ -35,10 +35,10 @@ import org.slf4j.LoggerFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.google.common.base.Joiner;
-import com.google.common.cache.CacheLoader.InvalidCacheLoadException;
 import com.google.common.cache.LoadingCache;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
+import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.client.MetricExpression;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.cache.CollectionsCache;
@@ -70,15 +70,13 @@ import com.linkedin.thirdeye.util.ThirdEyeUtils;
 import io.dropwizard.views.View;
 
 @Path(value = "/dashboard")
-// @Produces(MediaType.APPLICATION_JSON)
 public class DashboardResource {
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry
       .getInstance();
+  private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private static final Logger LOG = LoggerFactory.getLogger(DashboardResource.class);
   private static final String DEFAULT_TIMEZONE_ID = "UTC";
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-  private static String DEFAULT_DASHBOARD = "Default_Dashboard";
-  private static String COUNT_METRIC = "__COUNT";
 
   private QueryCache queryCache;
   private CollectionsCache collectionsCache;
@@ -90,16 +88,15 @@ public class DashboardResource {
   private MetricConfigManager metricConfigDAO;
   private DashboardConfigManager dashboardConfigDAO;
 
-  public DashboardResource(DatasetConfigManager datasetConfigDAO, MetricConfigManager metricConfigDAO,
-      DashboardConfigManager dashboardConfigDAO) {
+  public DashboardResource() {
     this.queryCache = CACHE_REGISTRY_INSTANCE.getQueryCache();
     this.collectionsCache = CACHE_REGISTRY_INSTANCE.getCollectionsCache();
     this.collectionMaxDataTimeCache = CACHE_REGISTRY_INSTANCE.getCollectionMaxDataTimeCache();
     this.dashboardsCache = CACHE_REGISTRY_INSTANCE.getDashboardsCache();
     this.dimensionFiltersCache = CACHE_REGISTRY_INSTANCE.getDimensionFiltersCache();
-    this.datasetConfigDAO = datasetConfigDAO;
-    this.metricConfigDAO = metricConfigDAO;
-    this.dashboardConfigDAO = dashboardConfigDAO;
+    this.datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
+    this.metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
+    this.dashboardConfigDAO = DAO_REGISTRY.getDashboardConfigDAO();
   }
 
   @GET
@@ -256,7 +253,7 @@ public class DashboardResource {
       }
       request.setTimeGranularity(Utils.getAggregationTimeGranularity(aggTimeGranularity));
 
-      TabularViewHandler handler = new TabularViewHandler(queryCache);
+      TabularViewHandler handler = new TabularViewHandler(queryCache, datasetConfigDAO);
       String jsonResponse = null;
 
       TabularViewResponse response = handler.process(request);
@@ -303,7 +300,7 @@ public class DashboardResource {
       request.setFilters(ThirdEyeUtils.convertToMultiMap(filterJson));
     }
 
-    HeatMapViewHandler handler = new HeatMapViewHandler(queryCache);
+    HeatMapViewHandler handler = new HeatMapViewHandler(queryCache, datasetConfigDAO, metricConfigDAO);
     HeatMapViewResponse response;
     String jsonResponse = null;
 
@@ -352,7 +349,7 @@ public class DashboardResource {
     }
     request.setTimeGranularity(Utils.getAggregationTimeGranularity(aggTimeGranularity));
 
-    TabularViewHandler handler = new TabularViewHandler(queryCache);
+    TabularViewHandler handler = new TabularViewHandler(queryCache, datasetConfigDAO);
     String jsonResponse = null;
 
     try {
@@ -404,7 +401,7 @@ public class DashboardResource {
     if (groupByDimensions != null && !groupByDimensions.isEmpty()) {
       request.setGroupByDimensions(Arrays.asList(groupByDimensions.trim().split(",")));
     }
-    ContributorViewHandler handler = new ContributorViewHandler(queryCache);
+    ContributorViewHandler handler = new ContributorViewHandler(queryCache, datasetConfigDAO);
     String jsonResponse = null;
 
     try {
@@ -448,9 +445,10 @@ public class DashboardResource {
         Utils.convertToMetricExpressions(metricsJson, MetricAggFunction.SUM, collection);
     request.setMetricExpressions(metricExpressions);
     request.setAggregationTimeGranularity(Utils.getAggregationTimeGranularity(aggTimeGranularity));
-    CollectionSchema collectionSchema = CACHE_REGISTRY_INSTANCE.getCollectionSchemaCache().get(collection);
+    DatasetConfigDTO datasetConfig = datasetConfigDAO.findByDataset(collection);
+    TimeSpec timespec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetConfig);
     if (!request.getAggregationTimeGranularity().getUnit().equals(TimeUnit.DAYS) ||
-        !StringUtils.isBlank(collectionSchema.getTime().getFormat())) {
+        !StringUtils.isBlank(timespec.getFormat())) {
       request.setEndDateInclusive(true);
     }
 

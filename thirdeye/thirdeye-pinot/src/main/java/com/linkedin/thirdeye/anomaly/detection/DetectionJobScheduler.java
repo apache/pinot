@@ -26,7 +26,9 @@ import org.slf4j.LoggerFactory;
 import com.linkedin.thirdeye.anomaly.job.JobContext;
 import com.linkedin.thirdeye.anomaly.job.JobScheduler;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
+import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.JobManager;
+import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.TaskManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 
@@ -42,12 +44,17 @@ public class DetectionJobScheduler implements JobScheduler, Runnable {
   private JobManager anomalyJobDAO;
   private TaskManager anomalyTaskDAO;
   private AnomalyFunctionManager anomalyFunctionDAO;
+  private DatasetConfigManager datasetConfigDAO;
+  private MetricConfigManager metricConfigDAO;
 
   public DetectionJobScheduler(JobManager anomalyJobDAO, TaskManager anomalyTaskDAO,
-      AnomalyFunctionManager anomalyFunctionDAO) {
+      AnomalyFunctionManager anomalyFunctionDAO, DatasetConfigManager datasetConfigDAO,
+      MetricConfigManager metricConfigDAO) {
     this.anomalyJobDAO = anomalyJobDAO;
     this.anomalyTaskDAO = anomalyTaskDAO;
     this.anomalyFunctionDAO = anomalyFunctionDAO;
+    this.datasetConfigDAO = datasetConfigDAO;
+    this.metricConfigDAO = metricConfigDAO;
 
     schedulerFactory = new StdSchedulerFactory();
     try {
@@ -164,6 +171,8 @@ public class DetectionJobScheduler implements JobScheduler, Runnable {
     detectionJobContext.setAnomalyFunctionDAO(anomalyFunctionDAO);
     detectionJobContext.setAnomalyJobDAO(anomalyJobDAO);
     detectionJobContext.setAnomalyTaskDAO(anomalyTaskDAO);
+    detectionJobContext.setDatasetConfigDAO(datasetConfigDAO);
+    detectionJobContext.setMetricConfigDAO(metricConfigDAO);
     detectionJobContext.setAnomalyFunctionId(anomalyFunctionSpec.getId());
     detectionJobContext.setJobName(jobKey);
 
@@ -200,6 +209,8 @@ public class DetectionJobScheduler implements JobScheduler, Runnable {
     detectionJobContext.setAnomalyFunctionDAO(anomalyFunctionDAO);
     detectionJobContext.setAnomalyJobDAO(anomalyJobDAO);
     detectionJobContext.setAnomalyTaskDAO(anomalyTaskDAO);
+    detectionJobContext.setDatasetConfigDAO(datasetConfigDAO);
+    detectionJobContext.setMetricConfigDAO(metricConfigDAO);
     detectionJobContext.setAnomalyFunctionId(anomalyFunctionSpec.getId());
     detectionJobContext.setJobName(jobKey);
     detectionJobContext.setWindowStartTime(windowStartTime);

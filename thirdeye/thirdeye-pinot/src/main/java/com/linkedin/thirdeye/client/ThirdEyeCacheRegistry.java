@@ -25,6 +25,8 @@ import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
 import com.linkedin.thirdeye.dashboard.resources.CacheResource;
 import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
+import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 
 public class ThirdEyeCacheRegistry {
 
@@ -36,6 +38,7 @@ public class ThirdEyeCacheRegistry {
   private QueryCache queryCache;
 
   private static DatasetConfigManager datasetConfigDAO;
+  private static MetricConfigManager metricConfigDAO;
   private static DashboardConfigManager dashboardConfigDAO;
   private static PinotThirdEyeClientConfig pinotThirdeyeClientConfig;
   private static ThirdEyeClient thirdEyeClient;
@@ -50,12 +53,13 @@ public class ThirdEyeCacheRegistry {
     return Holder.INSTANCE;
   }
 
-  private static void init(ThirdEyeConfiguration config, DatasetConfigManager datasetDAO,
+  private static void init(ThirdEyeConfiguration config, DatasetConfigManager datasetDAO, MetricConfigManager metricDAO,
       DashboardConfigManager dashboardDAO) {
     try {
       pinotThirdeyeClientConfig = PinotThirdEyeClientConfig.createThirdEyeClientConfig(config);
       thirdEyeClient = PinotThirdEyeClient.fromClientConfig(pinotThirdeyeClientConfig);
       datasetConfigDAO = datasetDAO;
+      metricConfigDAO = metricDAO;
       dashboardConfigDAO = dashboardDAO;
 
     } catch (Exception e) {
@@ -80,9 +84,9 @@ public class ThirdEyeCacheRegistry {
    * @param config
    */
   public static void initializeCaches(ThirdEyeConfiguration config, DatasetConfigManager datasetDAO,
-      DashboardConfigManager dashboardDAO) {
+      MetricConfigManager metricDAO, DashboardConfigManager dashboardDAO) {
 
-    init(config, datasetDAO, dashboardDAO);
+    init(config, datasetDAO, metricDAO, dashboardDAO);
 
     initCaches(config);
 
