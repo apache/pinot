@@ -60,14 +60,13 @@ function getAnomalies(tab) {
 
             //AJAX for anomaly result data
             getData(anomaliesUrl).done(function (anomalyData) {
-                for (var i in anomalyData) {
+               for (var i in anomalyData) {
                     if (anomalyData[i].feedback) {
                         if (anomalyData[i].feedback.feedbackType) {
                             anomalyData[i].feedback.feedbackType = getFeedbackTypeString(anomalyData[i].feedback.feedbackType);
                         }
                     }
                 }
-                // console.log(anomalyData)
                 anomaliesDisplayData = anomalyData;
                 getTimeseriesData(anomaliesDisplayData);
             });
