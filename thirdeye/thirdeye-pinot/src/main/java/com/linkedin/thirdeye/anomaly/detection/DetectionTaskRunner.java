@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.anomaly.detection;
 
 import com.google.common.collect.ArrayListMultimap;
 import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -112,11 +113,11 @@ public class DetectionTaskRunner implements TaskRunner {
         List<RawAnomalyResultDTO> resultsOfAnEntry = anomalyFunction
             .analyze(dimensionKey, metricTimeSeries, windowStart, windowEnd, knownAnomaliesOfAnEntry);
 
-        // Handle results
-        handleResults(resultsOfAnEntry);
-
         // Remove any known anomalies
         resultsOfAnEntry.removeAll(knownAnomaliesOfAnEntry);
+
+        // Handle results
+        handleResults(resultsOfAnEntry);
 
         LOG.info("{} has {} anomalies in window {} to {}", entry.getKey(), resultsOfAnEntry.size(),
             windowStart, windowEnd);
