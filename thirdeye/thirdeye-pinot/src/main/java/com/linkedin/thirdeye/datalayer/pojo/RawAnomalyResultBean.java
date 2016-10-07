@@ -141,7 +141,7 @@ public class RawAnomalyResultBean extends AbstractBean implements Comparable<Raw
       return false;
     }
     RawAnomalyResultBean r = (RawAnomalyResultBean) o;
-    return Objects.equals(getId(), r.getId()) && Objects.equals(startTime, r.getStartTime())
+    return Objects.equals(startTime, r.getStartTime())
         && Objects.equals(dimensions, r.getDimensions()) && Objects.equals(endTime, r.getEndTime())
         && Objects.equals(score, r.getScore()) && Objects.equals(weight, r.getWeight())
         && Objects.equals(properties, r.getProperties()) && Objects.equals(message, r.getMessage());
@@ -151,7 +151,7 @@ public class RawAnomalyResultBean extends AbstractBean implements Comparable<Raw
 
   @Override
   public int hashCode() {
-    return Objects.hash(getId(), dimensions, startTime, endTime, score, weight, properties,
+    return Objects.hash(dimensions, startTime, endTime, score, weight, properties,
         message);
     // Intentionally omit creationTimeUtc, since start/end are the truly significant dates for
     // anomalies
