@@ -48,6 +48,7 @@
     <script src="../../../assets/js/lib/heatmap.js" defer></script>
     <script src="../../../assets/js/lib/timeseries.js" defer></script>
     <script src="../../../assets/js/lib/anomalies.js" defer></script>
+    <script src="../../../assets/js/lib/anomaly-details.js" defer></script>
     <script src="../../../assets/js/lib/self-service.js" defer></script>
     <script src="../../../assets/js/lib/self-service-email.js" defer></script>
     <script src="../../../assets/js/lib/custom-dashboard.js" defer></script>

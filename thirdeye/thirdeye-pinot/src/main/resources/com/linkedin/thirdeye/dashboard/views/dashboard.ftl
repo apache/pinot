@@ -52,6 +52,7 @@
 <#include "tabs/compare-tab/contributors.ftl">
 <#include "tabs/timeseries-tab/timeseries.ftl">
 <#include "tabs/anomalies-tab/anomalies.ftl">
+<#include "tabs/anomalies-tab/anomaly-details.ftl">
 <#include "tabs/self-service-tab/self-service.ftl">
 <#include "tabs/self-service-tab/anomaly-function-form.ftl">
 <#include "tabs/self-service-tab/self-service-existing-functions.ftl">

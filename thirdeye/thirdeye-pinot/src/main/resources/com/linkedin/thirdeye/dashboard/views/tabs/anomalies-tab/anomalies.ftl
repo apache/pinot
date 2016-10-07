@@ -9,9 +9,8 @@
             {{/if}}
             {{/each}}
         </div>
-
         <div id="anomaly-result-thumbnails">
-        {{#each this as |anomalyData anomalyIndex|}}
+            {{#each this as |anomalyData anomalyIndex|}}
             <div class="large-anomaly-box">
                 <div class="anomalies-box-background">
                     <div class="box-inner">
@@ -20,8 +19,8 @@
                         <div class="anomaly-info">
 
                         </div>
-                        <div class="anomaly-id">
-                            # {{anomalyData/id}}
+                        <div>
+                            <a class="anomaly-details-link blue" data-id="{{anomalyData/id}}"># {{anomalyData/id}}</a>
                         </div>
                         <div>
                             <h3 style="margin-top:0px;">
@@ -29,9 +28,9 @@
                             </h3>
                         </div>
 
-                    <div>
-                        <div class="small-label">dimension:</div>
-                        <div class="dimension">
+                        <div>
+                            <div class="small-label">dimension:</div>
+                            <div class="dimension">
                             <span style="font-weight: 800;font-size:14px; ">{{#if
                                 anomalyData/function/exploreDimensions}}{{anomalyData/function/exploreDimensions}} :
                                 {{/if}}
@@ -45,23 +44,26 @@
                         <div class="current-baseline">
                             <br/>
                             <table>
-                                <tr><td class="small-label" style="padding: 3px 0;">current: </td><td class="green-font" style="color:#ff5f0e">{{parseProperties anomalyData/message 'currentVal'}}</td>
+                                <tr><td class="small-label" style="padding: 3px 0;">current: </td><td style="color:#ff5f0e">{{parseProperties anomalyData/message 'currentVal'}}</td>
                                     </tr>
-                                <tr><td class="small-label" style="padding: 3px 0;">baseline: </td><td class="green-font" style="color:#1f77b4">{{parseProperties anomalyData/message 'baseLineVal'}}</td></tr>
+                                <tr><td class="small-label" style="padding: 3px 0;">baseline: </td><td style="color:#1f77b4">{{parseProperties anomalyData/message 'baseLineVal'}}</td></tr>
                             </table>
 
-                        </div>
 
-                        <div class="timestamp uk-clearfix">
-                            <br/>
+                            </div>
+
+                            <div class="timestamp uk-clearfix">
+                                <br/>
                                 <span><div class="small-label">Start - End ({{returnUserTimeZone}}):</div>
                                 {{displayDateRange anomalyData/startTime anomalyData/endTime}}
                                 </span>
-                        </div>
+                            </div>
 
+                        </div>
                     </div>
                 </div>
                 <div class="box-anom-linechart" data-anom-linecharts-chart="{{anomalyIndex}}">
+
                     <span style="float:right;margin-right: 18%;">
                         <svg class="line-legend" width="80" height="25">
                             <line x1="0" y1="15" x2="20" y2="15" stroke="#1f77b4" stroke-width="3px"  stroke-dasharray="5,5"></line>
@@ -131,14 +133,11 @@
                 </div>
 
             </div>
+            {{/each}}
         </div>
-        {{/each}}
-        </div>
-
-            <div id="anomaly-table-tooltip" class="hidden">
+	<div id="anomaly-table-tooltip" class="hidden">
                 <table>
                 </table>
-            </div>
+        </div>
     </script>
 </section>
-

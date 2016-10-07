@@ -65,7 +65,7 @@ $(document).ready( function() {
         showSelfServiceBoard: false
     }
     var result_form_template = HandleBarsTemplates.template_form(dasboard_section_options)
-    $("#dashboard-section #form-area").append(result_form_template);
+    $("#dashboard-form-area").append(result_form_template);
 
     //COMPARE TAB/FORM
     var compare_section_options = {
@@ -82,7 +82,7 @@ $(document).ready( function() {
         showSelfServiceBoard: false
     }
     var result_form_template = HandleBarsTemplates.template_form(compare_section_options)
-    $("#compare-section #form-area").append(result_form_template);
+    $("#compare-form-area").append(result_form_template);
 
     //TIMESERIES TAB/FORM
     var timseries_section_options = {
@@ -100,7 +100,7 @@ $(document).ready( function() {
     }
 
     var result_form_template = HandleBarsTemplates.template_form(timseries_section_options)
-    $("#timeseries-section #form-area").append(result_form_template);
+    $("#timeseries-form-area").append(result_form_template);
 
     //ANOMALIES TAB/FORM
     var anomalies_section_options = {
@@ -118,7 +118,7 @@ $(document).ready( function() {
     }
 
     var result_form_template = HandleBarsTemplates.template_form(anomalies_section_options)
-    $("#anomalies-section #form-area").append(result_form_template);
+    $("#anomalies-form-area").append(result_form_template);
 
     //SELF SERVICE TAB/FORM
     var self_service_section_options = {
@@ -136,7 +136,7 @@ $(document).ready( function() {
     }
 
     var result_form_template = HandleBarsTemplates.template_form(self_service_section_options)
-    $("#self-service-section #form-area").append(result_form_template);
+    $("#self-service-form-area").append(result_form_template);
 
 
     /** Handelbars template for main content
@@ -284,6 +284,8 @@ $(document).ready( function() {
                         break;
                     case "anomalies":
                         var tab = "anomalies";
+
+                        //if()
                         getAnomalies(tab);
                         break;
                     default://dashboard tab
