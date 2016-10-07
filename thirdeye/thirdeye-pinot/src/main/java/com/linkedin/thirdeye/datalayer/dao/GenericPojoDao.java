@@ -172,6 +172,10 @@ public class GenericPojoDao {
   }
 
   public <E extends AbstractBean> int update(E pojo) {
+    return update(pojo, Predicate.EQ("id", pojo.getId()));
+  }
+
+  public <E extends AbstractBean> int update(E pojo, final Predicate predicate) {
     //update base table
     //update indexes
     return runTask(new QueryTask<Integer>() {
@@ -183,9 +187,11 @@ public class GenericPojoDao {
         genericJsonEntity.setUpdateTime(new Timestamp(System.currentTimeMillis()));
         genericJsonEntity.setJsonVal(jsonVal);
         genericJsonEntity.setId(pojo.getId());
-        Set<String> fieldsToUpdate = Sets.newHashSet("jsonVal", "updateTime");
+        genericJsonEntity.setVersion(pojo.getVersion());
+        dumpTable(connection, GenericJsonEntity.class);
+        Set<String> fieldsToUpdate = Sets.newHashSet("jsonVal", "updateTime", "version");
         PreparedStatement baseTableInsertStmt =
-            sqlQueryBuilder.createUpdateStatement(connection, genericJsonEntity, fieldsToUpdate);
+            sqlQueryBuilder.createUpdateStatement(connection, genericJsonEntity, fieldsToUpdate, predicate);
         int affectedRows = baseTableInsertStmt.executeUpdate();
         if (affectedRows == 1) {
           if (pojoInfo.indexEntityClass != null) {
@@ -241,6 +247,7 @@ public class GenericPojoDao {
         if (genericJsonEntity != null) {
           e = OBJECT_MAPPER.readValue(genericJsonEntity.getJsonVal(), pojoClass);
           e.setId(genericJsonEntity.getId());
+          e.setVersion(genericJsonEntity.getVersion());
         }
         return e;
       }
@@ -262,6 +269,7 @@ public class GenericPojoDao {
           for (GenericJsonEntity genericJsonEntity : genericJsonEntities) {
             e = OBJECT_MAPPER.readValue(genericJsonEntity.getJsonVal(), pojoClass);
             e.setId(genericJsonEntity.getId());
+            e.setVersion(genericJsonEntity.getVersion());
             result.add(e);
           }
         }
@@ -304,6 +312,7 @@ public class GenericPojoDao {
           for (GenericJsonEntity entity : entities) {
             E bean = OBJECT_MAPPER.readValue(entity.getJsonVal(), pojoClass);
             bean.setId(entity.getId());
+            bean.setVersion(entity.getVersion());
             ret.add(bean);
           }
         }
@@ -355,6 +364,7 @@ public class GenericPojoDao {
           for (GenericJsonEntity entity : entities) {
             E bean = OBJECT_MAPPER.readValue(entity.getJsonVal(), pojoClass);
             bean.setId(entity.getId());
+            bean.setVersion(entity.getVersion());
             ret.add(bean);
           }
         }

@@ -51,13 +51,18 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
     return id;
   }
 
-  public void update(MergedAnomalyResultDTO mergedAnomalyResultDTO) {
+  public int update(MergedAnomalyResultDTO mergedAnomalyResultDTO) {
     if (mergedAnomalyResultDTO.getId() == null) {
-      save(mergedAnomalyResultDTO);
+      Long id = save(mergedAnomalyResultDTO);
+      if (id > 0) {
+        return 1;
+      } else {
+        return 0;
+      }
     } else {
       MergedAnomalyResultBean mergeAnomalyBean =
           convertMergeAnomalyDTO2Bean(mergedAnomalyResultDTO);
-      genericPojoDao.update(mergeAnomalyBean);
+      return genericPojoDao.update(mergeAnomalyBean);
     }
   }
 
