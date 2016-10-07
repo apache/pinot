@@ -230,8 +230,9 @@ public class DashboardResource {
 
       List<MetricExpression> metricExpressions = new ArrayList<>();
       DashboardConfigDTO dashboardConfig = dashboardConfigDAO.findByName(dashboardName);
-      List<MetricConfigDTO> metricConfigs = dashboardConfig.getMetrics();
-      for (MetricConfigDTO metricConfig : metricConfigs) {
+      List<Long> metricIds = dashboardConfig.getMetricIds();
+      for (Long metricId : metricIds) {
+        MetricConfigDTO metricConfig = metricConfigDAO.findById(metricId);
         MetricExpression metricExpression = ThirdEyeUtils.getMetricExpressionFromMetricConfig(metricConfig);
         metricExpressions.add(metricExpression);
       }

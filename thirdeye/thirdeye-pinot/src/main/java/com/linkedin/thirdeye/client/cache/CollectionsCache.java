@@ -25,10 +25,17 @@ public class CollectionsCache {
 
   public void loadCollections() {
 
+    List<String> whitelist = new ArrayList<>();
+    whitelist.add("thirdeyeKbmi");
+    whitelist.add("ptrans_hourly_additive");
+    whitelist.add("feed_sessions_additive");
+    whitelist.add("ads_ingraph");
     List<DatasetConfigDTO> datasetConfigs = datasetConfigDAO.findActive();
     List<String> collections = new ArrayList<>();
     for (DatasetConfigDTO datasetConfigDTO : datasetConfigs) {
-      collections.add(datasetConfigDTO.getDataset());
+      if (whitelist.contains(datasetConfigDTO.getDataset())) {
+        collections.add(datasetConfigDTO.getDataset());
+      }
     }
     collectionsRef.set(collections);
   }

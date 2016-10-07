@@ -76,7 +76,7 @@ public class TimeOnTimeComparisonHandler {
     for (Entry<ThirdEyeRequest, Future<ThirdEyeResponse>> entry : futureResponseMap.entrySet()) {
       ThirdEyeRequest request = entry.getKey();
       Future<ThirdEyeResponse> responseFuture = entry.getValue();
-      ThirdEyeResponse response = responseFuture.get(60, TimeUnit.SECONDS);
+      ThirdEyeResponse response = responseFuture.get(60000, TimeUnit.SECONDS);
       if (BASELINE.equals(request.getRequestReference())) {
         baselineResponse = response;
       } else if (CURRENT.equals(request.getRequestReference())) {

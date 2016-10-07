@@ -17,10 +17,14 @@ import com.google.common.base.Joiner;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
+import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.client.MetricFunction;
 import com.linkedin.thirdeye.client.ThirdEyeRequest;
 import com.linkedin.thirdeye.dashboard.Utils;
+import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
+import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
 
 /**
  * Util class for generated PQL queries (pinot).
@@ -31,6 +35,9 @@ public class PqlUtils {
   private static final Joiner EQUALS = Joiner.on(" = ");
   private static final Logger LOGGER = LoggerFactory.getLogger(PqlUtils.class);
   private static final int DEFAULT_TOP = 100000;
+
+  private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
+  private static MetricConfigManager metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
 
   /**
    * Returns sql to calculate the sum of all raw metrics required for <tt>request</tt>, grouped by
@@ -151,7 +158,15 @@ public class PqlUtils {
     String delim = "";
     for (MetricFunction function : metricFunctions) {
       builder.append(delim);
-      builder.append(function.getFunctionName()).append("(").append(function.getMetricName())
+      String metricName = null;
+      if (function.getMetricName().equals("*")) {
+        metricName = "*";
+      } else {
+        String metricId = function.getMetricName().replaceAll(MetricConfigBean.DERIVED_METRIC_ID_PREFIX, "");
+        MetricConfigDTO metricConfig = metricConfigDAO.findById(Long.valueOf(metricId));
+        metricName = metricConfig.getName();
+      }
+      builder.append(function.getFunctionName()).append("(").append(metricName)
           .append(")");
       delim = ", ";
     }

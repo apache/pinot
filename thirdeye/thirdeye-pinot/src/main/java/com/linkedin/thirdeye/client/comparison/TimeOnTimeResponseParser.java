@@ -24,8 +24,11 @@ import com.linkedin.thirdeye.client.ThirdEyeResponse;
 import com.linkedin.thirdeye.client.ThirdEyeResponseRow;
 import com.linkedin.thirdeye.client.comparison.Row.Builder;
 import com.linkedin.thirdeye.client.comparison.Row.Metric;
+import com.linkedin.thirdeye.constant.MetricAggFunction;
+import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
+import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
 
 public class TimeOnTimeResponseParser {
 
@@ -60,11 +63,12 @@ public class TimeOnTimeResponseParser {
     this.groupByDimensions = groupByDimensions;
     this.metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
 
-    String collection = baselineResponse.getRequest().getCollection();
-    List<String> metrics = baselineResponse.getRequest().getMetricNames();
-    for (String metric : metrics) {
-      MetricConfigDTO metricConfig = metricConfigDAO.findByMetricAndDataset(metric, collection);
-      metricThresholds.put(metric, metricConfig.getRollupThreshold());
+    metricFunctions = baselineResponse.getMetricFunctions();
+    for (MetricFunction metricFunction : metricFunctions) {
+      String metricName = metricFunction.getMetricName();
+      String metricId = metricName.replaceAll(MetricConfigBean.DERIVED_METRIC_ID_PREFIX, "");
+      MetricConfigDTO metricConfig = metricConfigDAO.findById(Long.valueOf(metricId));
+      metricThresholds.put(metricConfig.getName(), metricConfig.getRollupThreshold());
     }
   }
 
