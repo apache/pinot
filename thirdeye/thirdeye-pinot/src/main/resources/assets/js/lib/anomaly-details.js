@@ -34,9 +34,16 @@ function showAnomalyDetails(id) {
 function lineChartForSingleAnomaly(mergeAnomalyData) {
     var dataset = hash.dataset;
     var mergedAnomalyId = mergeAnomalyData.id;
-    var aggTimeGranularity = (window.datasetConfig.dataGranularity) ? window.datasetConfig.dataGranularity : "HOURS";
 
-  var extensionWindowMillis = (datasetConfig.dataGranularity == "DAYS") ? 86400000 : 3600000;
+    console.log(window.datasetConfig);
+    console.log(mergeAnomalyData);
+
+    var aggTimeGranularity = (window.datasetConfig.dataGranularity) ? window.datasetConfig.dataGranularity : "HOURS";
+    if (aggTimeGranularity === 'MINUTES') {
+      aggTimeGranularity = '5_MINUTES';
+    }
+
+    var extensionWindowMillis = (datasetConfig.dataGranularity == "DAYS") ? 86400000 : 3600000;
     var fnProperties = parseProperties(mergeAnomalyData.function.properties);
 
     var compare = 1;
