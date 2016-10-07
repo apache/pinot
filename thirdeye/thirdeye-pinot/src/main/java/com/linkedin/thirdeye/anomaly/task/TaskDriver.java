@@ -150,7 +150,7 @@ public class TaskDriver {
         try {
           success = anomalyTaskDAO
               .updateStatusAndWorkerId(workerId, anomalyTaskSpec.getId(), allowedOldTaskStatus,
-                  TaskStatus.RUNNING);
+                  TaskStatus.RUNNING, anomalyTaskSpec.getVersion());
           LOG.info(Thread.currentThread().getId() + " : Task acquired success: {}", success);
         } catch (Exception e) {
           LOG.warn("[{}] in acquiring task by threadId {} and workerId {}",

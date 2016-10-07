@@ -24,7 +24,6 @@ public class TaskBean extends AbstractBean {
   private long endTime;
   private String taskInfo;
   private Timestamp lastModified;
-  private int version;
 
   public Long getWorkerId() {
     return workerId;
@@ -89,14 +88,6 @@ public class TaskBean extends AbstractBean {
 
   public void setLastModified(Timestamp lastModified) {
     this.lastModified = lastModified;
-  }
-
-  public int getVersion() {
-    return version;
-  }
-
-  public void setVersion(int version) {
-    this.version = version;
   }
 
   public Long getJobId() {

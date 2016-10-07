@@ -21,6 +21,8 @@ import com.linkedin.thirdeye.datalayer.pojo.AnomalyFunctionBean;
 import com.linkedin.thirdeye.datalayer.pojo.MergedAnomalyResultBean;
 import com.linkedin.thirdeye.datalayer.pojo.RawAnomalyResultBean;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
+import com.linkedin.thirdeye.datalayer.util.Predicate;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,11 +64,16 @@ public abstract class AbstractManagerImpl<E extends AbstractDTO> implements Abst
     return id;
   }
 
-
   @Override
-  public void update(E entity) {
+  public int update(E entity, Predicate predicate) {
     AbstractBean bean = convertDTO2Bean(entity, beanClass);
-    genericPojoDao.update(bean);
+    return genericPojoDao.update(bean, predicate);
+  }
+  
+  @Override
+  public int update(E entity) {
+    AbstractBean bean = convertDTO2Bean(entity, beanClass);
+    return genericPojoDao.update(bean);
   }
 
   public E findById(Long id) {

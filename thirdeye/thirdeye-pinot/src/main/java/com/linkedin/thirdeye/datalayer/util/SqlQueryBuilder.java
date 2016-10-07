@@ -185,7 +185,7 @@ public class SqlQueryBuilder {
   }
 
   public PreparedStatement createUpdateStatement(Connection connection, AbstractEntity entity,
-      Set<String> fieldsToUpdate) throws Exception {
+      Set<String> fieldsToUpdate, Predicate predicate) throws Exception {
     String tableName =
         entityMappingHolder.tableToEntityNameMap.inverse().get(entity.getClass().getSimpleName());
     LinkedHashMap<String, ColumnInfo> columnInfoMap =
@@ -193,7 +193,7 @@ public class SqlQueryBuilder {
 
     StringBuilder sqlBuilder = new StringBuilder("UPDATE " + tableName + " SET ");
     String delim = "";
-    LinkedHashMap<String, Object> parameterMap = new LinkedHashMap<>();
+    List<Pair<String, Object>> parametersList = new ArrayList<>();
     for (ColumnInfo columnInfo : columnInfoMap.values()) {
       String columnNameInDB = columnInfo.columnNameInDB;
       if (!AUTO_UPDATE_COLUMN_SET.contains(columnNameInDB)
@@ -208,21 +208,24 @@ public class SqlQueryBuilder {
           sqlBuilder.append("=");
           sqlBuilder.append("?");
           delim = ",";
-          LOG.debug("Setting value:{} for {}", val, columnInfo.columnNameInDB);
-          parameterMap.put(columnNameInDB, val);
+          parametersList.add(new ImmutablePair<String, Object>(columnNameInDB, val));
         }
       }
     }
-    //ADD WHERE CLAUSE TO CHECK FOR ENTITY ID
-    sqlBuilder.append(" WHERE id=?");
-    parameterMap.put("id", entity.getId());
+    BiMap<String, String> entityNameToDBNameMapping =
+        entityMappingHolder.columnMappingPerTable.get(tableName).inverse();
+    StringBuilder whereClause = new StringBuilder(" WHERE ");
+    generateWhereClause(entityNameToDBNameMapping, predicate, parametersList, whereClause);
+    sqlBuilder.append(whereClause.toString());
     LOG.debug("Update statement:{}" + sqlBuilder);
     int parameterIndex = 1;
     PreparedStatement prepareStatement = connection.prepareStatement(sqlBuilder.toString());
-    for (Entry<String, Object> paramEntry : parameterMap.entrySet()) {
+    for (Pair<String, Object> paramEntry : parametersList) {
       String dbFieldName = paramEntry.getKey();
       ColumnInfo info = columnInfoMap.get(dbFieldName);
       prepareStatement.setObject(parameterIndex++, paramEntry.getValue(), info.sqlType);
+      LOG.debug("Setting value:{} for {}", paramEntry.getValue(), dbFieldName);
+
     }
     return prepareStatement;
   }

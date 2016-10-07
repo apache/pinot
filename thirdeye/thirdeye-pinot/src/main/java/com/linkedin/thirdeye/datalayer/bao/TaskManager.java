@@ -13,7 +13,7 @@ public interface TaskManager extends AbstractManager<TaskDTO>{
   List<TaskDTO> findByStatusOrderByCreateTime(TaskStatus status, int fetchSize, boolean asc);
 
   boolean updateStatusAndWorkerId(Long workerId, Long id, Set<TaskStatus> allowedOldStatus,
-      TaskStatus newStatus);
+      TaskStatus newStatus, int expectedVersion);
 
   void updateStatusAndTaskEndTime(Long id, TaskStatus oldStatus, TaskStatus newStatus,
       Long taskEndTime);
