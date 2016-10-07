@@ -36,8 +36,7 @@ function lineChartForSingleAnomaly(mergeAnomalyData) {
     var mergedAnomalyId = mergeAnomalyData.id;
     var aggTimeGranularity = (window.datasetConfig.dataGranularity) ? window.datasetConfig.dataGranularity : "HOURS";
 
-    var extensionWindowMillis = (datasetConfig.dataGranularity == "HOURS") ? 3 * 3600000 : (datasetConfig.dataGranularity == "DAYS") ?  3 * 86400000 : 0;
-    var maxMillis = window.datasetConfig.maxMillis ? window.datasetConfig.maxMillis : null;
+  var extensionWindowMillis = (datasetConfig.dataGranularity == "DAYS") ? 86400000 : 3600000;
     var fnProperties = parseProperties(mergeAnomalyData.function.properties);
 
     var compare = 1;
@@ -62,14 +61,10 @@ function lineChartForSingleAnomaly(mergeAnomalyData) {
     }
 
     var currentStart = mergeAnomalyData.startTime - extensionWindowMillis;
-    var currentEnd;
-    if(maxMillis){
-        currentEnd =  ( maxMillis < mergeAnomalyData.endTime + extensionWindowMillis) ? maxMillis : mergeAnomalyData.endTime + extensionWindowMillis ;
-    }else{
-        currentEnd = ( moment().unix() < mergeAnomalyData.endTime + extensionWindowMillis) ? moment().unix() : mergeAnomalyData.endTime + extensionWindowMillis;
-    }
-    var baselineStart = moment(parseInt(mergeAnomalyData.startTime)).add((-1* compare), 'weeks');
-    var baselineEnd = moment(parseInt(mergeAnomalyData.endTime)).add( (-1* compare), 'weeks');
+    var currentEnd = mergeAnomalyData.endTime + extensionWindowMillis;
+
+    var baselineStart = moment(parseInt(currentStart)).add((-1* compare), 'weeks');
+    var baselineEnd = moment(parseInt(currentEnd)).add( (-1* compare), 'weeks');
 
     var exploreDimension = mergeAnomalyData.function.exploreDimensions;
     var effectedValue = mergeAnomalyData.dimensions;
@@ -78,8 +73,6 @@ function lineChartForSingleAnomaly(mergeAnomalyData) {
     var metrics = hash.metrics;
     var filters = createAnomalyFilters(effectedValue,exploreDimension,fnFiltersString);
     filters = encodeURIComponent(JSON.stringify(filters));
-
-
 
     var timeSeriesUrl = "/dashboard/data/tabular?dataset=" + dataset + "&compareMode=" + compareMode //
         + "&currentStart=" + currentStart + "&currentEnd=" + currentEnd  //
