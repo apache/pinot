@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.dashboard;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.linkedin.thirdeye.api.TimeSpec;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -104,9 +105,15 @@ public class Utils {
 
   public static List<String> getDimensions(QueryCache queryCache, String collection)
       throws Exception {
+    List<String> dimensions = getUnsortedDimensionNames(queryCache, collection);
+    Collections.sort(dimensions);
+    return dimensions;
+  }
+
+  public static List<String> getUnsortedDimensionNames(QueryCache queryCache, String collection)
+      throws Exception {
     CollectionSchema schema = queryCache.getClient().getCollectionSchema(collection);
     List<String> dimensions = schema.getDimensionNames();
-    Collections.sort(dimensions);
     return dimensions;
   }
 
@@ -211,16 +218,32 @@ public class Utils {
     return Lists.newArrayList(metricFunctions);
   }
 
-  public static TimeGranularity getAggregationTimeGranularity(String aggTimeGranularity) {
+  public static TimeGranularity getAggregationTimeGranularity(String aggTimeGranularity, String collection) {
+    TimeGranularity timeGranularity = getNonAdditiveTimeGranularity(collection);
 
-    TimeGranularity timeGranularity;
-    if (aggTimeGranularity.indexOf("_") > -1) {
-      String[] split = aggTimeGranularity.split("_");
-      timeGranularity = new TimeGranularity(Integer.parseInt(split[0]), TimeUnit.valueOf(split[1]));
-    } else {
-      timeGranularity = new TimeGranularity(1, TimeUnit.valueOf(aggTimeGranularity));
+    if (timeGranularity == null) { // Data is additive and hence use the given time granularity -- aggTimeGranularity
+      if (aggTimeGranularity.indexOf("_") > -1) {
+        String[] split = aggTimeGranularity.split("_");
+        timeGranularity = new TimeGranularity(Integer.parseInt(split[0]), TimeUnit.valueOf(split[1]));
+      } else {
+        timeGranularity = new TimeGranularity(1, TimeUnit.valueOf(aggTimeGranularity));
+      }
     }
     return timeGranularity;
+  }
+
+  public static TimeGranularity getNonAdditiveTimeGranularity(String collection) {
+    CollectionConfig collectionConfig = null;
+    try {
+      collectionConfig = CACHE_REGISTRY_INSTANCE.getCollectionConfigCache().get(collection);
+      if (collectionConfig != null && collectionConfig.isNonAdditive()) {
+        return new TimeGranularity(collectionConfig.getNonAdditiveBucketSize(),
+            TimeUnit.valueOf(collectionConfig.getNonAdditiveBucketUnit()));
+      }
+    } catch (Exception e) {
+      LOG.debug("No collection config for collection {}", collection);
+    }
+    return null;
   }
 
   public static List<MetricExpression> convertToMetricExpressions(
