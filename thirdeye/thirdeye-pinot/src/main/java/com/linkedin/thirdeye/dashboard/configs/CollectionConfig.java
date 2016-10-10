@@ -14,7 +14,7 @@ public class CollectionConfig extends AbstractConfig {
 
   public static double DEFAULT_THRESHOLD = 0.01;
   public static String DEFAULT_TIMEZONE = "UTC";
-  public static String DEFAULT_PREAGGREGATED_KEYWORD = "all";
+  public static String DEFAULT_PREAGGREGATED_DIMENSION_VALUE = "all";
   public static int DEFAULT_NONADDITIVE_BUCKET_SIZE = 5;
   public static String DEFAULT_NONADDITIVE_BUCKET_UNIT = TimeUnit.MINUTES.toString();
 
@@ -30,7 +30,7 @@ public class CollectionConfig extends AbstractConfig {
 
   boolean isNonAdditive = false;
   List<String> dimensionsHaveNoPreAggregation = Collections.emptyList();
-  String preAggregatedKeyword = DEFAULT_PREAGGREGATED_KEYWORD;
+  String preAggregatedKeyword = DEFAULT_PREAGGREGATED_DIMENSION_VALUE;
   int nonAdditiveBucketSize = DEFAULT_NONADDITIVE_BUCKET_SIZE;
   String nonAdditiveBucketUnit = DEFAULT_NONADDITIVE_BUCKET_UNIT;
 
@@ -154,7 +154,7 @@ public class CollectionConfig extends AbstractConfig {
   }
 
   public void setPreAggregatedKeyword(String preAggregatedKeyword) {
-    this.preAggregatedKeyword = preAggregatedKeyword == null ? DEFAULT_PREAGGREGATED_KEYWORD : preAggregatedKeyword;
+    this.preAggregatedKeyword = preAggregatedKeyword == null ? DEFAULT_PREAGGREGATED_DIMENSION_VALUE : preAggregatedKeyword;
   }
 
   public int getNonAdditiveBucketSize() {
