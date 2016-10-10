@@ -95,13 +95,20 @@ $(document).ready(function () {
     });
 
     Handlebars.registerHelper('displayAnomalyResultExploreDimensions', function (dimensionNamesString, dimensionValuesString) {
+        
         var dimensionNames = dimensionNamesString.replace(/[\s]/g, "").split(",");
+        if (dimensionNames.length == 1) {
+            return dimensionValuesString.replace(/[,*\s]/g, "");
+        }
+
         var dimensionValues = dimensionValuesString.replace(/[*\s]/g, "").split(",");
         var displayValue = "";
         var separator = "";
         for (var i = 0; i < dimensionNames.length; ++i) {
-            displayValue = displayValue + separator + dimensionNames[i] + ": " + dimensionValues[i];
-            separator = "; ";
+            if (dimensionValues[i]) {
+                displayValue = displayValue + separator + dimensionNames[i] + ": " + dimensionValues[i];
+                separator = "; ";
+            }
         }
         return displayValue
     });
