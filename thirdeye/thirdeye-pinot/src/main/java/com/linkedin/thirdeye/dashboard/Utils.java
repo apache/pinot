@@ -208,6 +208,21 @@ public class Utils {
     return false;
   }
 
+  public static boolean isDerievedOrNonAdditiveMetric(String collection, String metric) {
+    CollectionConfig collectionConfig = null;
+    try {
+      collectionConfig = CACHE_REGISTRY_INSTANCE.getCollectionConfigCache().get(collection);
+      if (collectionConfig != null && (collectionConfig.getDerivedMetrics() != null
+          && collectionConfig.getDerivedMetrics().containsKey(metric)) || collectionConfig
+          .isNonAdditive()) {
+        return true;
+      }
+    } catch (InvalidCacheLoadException | ExecutionException e) {
+      LOG.debug("No collection configs for collection {}", collection);
+    }
+    return false;
+  }
+
   public static List<MetricFunction> computeMetricFunctionsFromExpressions(
       List<MetricExpression> metricExpressions) {
     Set<MetricFunction> metricFunctions = new HashSet<>();
