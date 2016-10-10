@@ -12,6 +12,7 @@ import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
+
 @JsonIgnoreProperties(ignoreUnknown=true)
 public class AnomalyFunctionBean extends AbstractBean {
 
@@ -191,6 +192,13 @@ public class AnomalyFunctionBean extends AbstractBean {
   @JsonProperty("wrapper")
   public void setFilters(String filters) {
     String sortedFilters = ThirdEyeUtils.getSortedFilters(filters);
+    this.filters = sortedFilters;
+  }
+
+  @JsonIgnore
+  @JsonProperty("wrapper")
+  public void setFilters(Multimap<String, String> filterSet) {
+    String sortedFilters = ThirdEyeUtils.getSortedFiltersFromMultiMap(filterSet);
     this.filters = sortedFilters;
   }
 
