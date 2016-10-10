@@ -6,10 +6,8 @@ import com.linkedin.thirdeye.api.CollectionSchema;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -130,13 +128,8 @@ public class AnomalyMergeExecutor implements Runnable {
                   "Merge strategy " + mergeConfig.getMergeStrategy() + " not supported");
             }
           }
-
-          Set<MergedAnomalyResultDTO> existingMergedResults = new HashSet<>();
-
-          existingMergedResults.addAll(mergedResultDAO.findByFunctionId(function.getId()));
-
           for (MergedAnomalyResultDTO mergedAnomalyResultDTO : output) {
-            updateMergedScoreAndPersist(mergedAnomalyResultDTO, existingMergedResults);
+            updateMergedScoreAndPersist(mergedAnomalyResultDTO);
           }
           return output.size();
         };
@@ -152,8 +145,7 @@ public class AnomalyMergeExecutor implements Runnable {
     }
   }
 
-  private void updateMergedScoreAndPersist(MergedAnomalyResultDTO mergedResult,
-      Set<MergedAnomalyResultDTO> existingResults) {
+  private void updateMergedScoreAndPersist(MergedAnomalyResultDTO mergedResult) {
     double weightedScoreSum = 0.0;
     double weightedWeightSum = 0.0;
     double totalBucketSize = 0.0;
@@ -182,12 +174,8 @@ public class AnomalyMergeExecutor implements Runnable {
       LOG.error("Could not recompute severity", e);
     }
     try {
-      if (!existingResults.contains(mergedResult)) {
-        // persist the merged result
-        mergedResultDAO.update(mergedResult);
-      } else {
-        LOG.info("MergedResult [{}] is already present", mergedResult);
-      }
+      // persist the merged result
+      mergedResultDAO.update(mergedResult);
       for (RawAnomalyResultDTO rawAnomalyResultDTO : mergedResult.getAnomalyResults()) {
         anomalyResultDAO.update(rawAnomalyResultDTO);
       }
@@ -256,7 +244,7 @@ public class AnomalyMergeExecutor implements Runnable {
     // Set filters including anomaly-dimension
     timeSeriesRequest.setFilterSet(filters);
 
-    // TODO : fix the pinot query interface to accept time in millis e
+    // TODO : fix the pinot query interface to accept time in millis
     // Fetch current time series data
     timeSeriesRequest.setStart(new DateTime(anomalyMergedResult.getStartTime()));
     timeSeriesRequest.setEnd(new DateTime(anomalyMergedResult.getEndTime()));
@@ -279,8 +267,8 @@ public class AnomalyMergeExecutor implements Runnable {
     Double currentValue;
     Double baselineValue;
 
-    if (Utils
-        .isDerievedMetric(anomalyFunctionSpec.getCollection(), anomalyFunctionSpec.getMetric())) {
+    if (Utils.isDerievedOrNonAdditiveMetric(anomalyFunctionSpec.getCollection(),
+        anomalyFunctionSpec.getMetric())) {
       LOG.info("Found derived metric [{}], assigning avg value per bucket in the message",
           anomalyFunctionSpec.getMetric());
       currentValue = getAvgMetricValuePerBucket(responseCurrent, anomalyFunctionSpec.getMetric());
