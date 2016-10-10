@@ -127,7 +127,7 @@ public class QueryExceptionTest {
     InstanceRequest instanceRequest = new InstanceRequest(1, brokerRequest);
     instanceRequest.setSearchSegments(new ArrayList<String>());
     instanceRequest.getSearchSegments().add(segmentName);
-    QueryRequest queryRequest = new QueryRequest(instanceRequest);
+    QueryRequest queryRequest = new QueryRequest(instanceRequest, TableDataManagerProvider.getServerMetrics());
     final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(queryRequest);
     instanceResponseMap.clear();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
@@ -144,7 +144,7 @@ public class QueryExceptionTest {
     InstanceRequest instanceRequest = new InstanceRequest(1, brokerRequest);
     instanceRequest.setSearchSegments(new ArrayList<String>());
     instanceRequest.getSearchSegments().add(segmentName);
-    QueryRequest queryRequest = new QueryRequest(instanceRequest);
+    QueryRequest queryRequest = new QueryRequest(instanceRequest, TableDataManagerProvider.getServerMetrics());
     final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(queryRequest);
     instanceResponseMap.clear();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
@@ -162,7 +162,7 @@ public class QueryExceptionTest {
     InstanceRequest instanceRequest = new InstanceRequest(1, brokerRequest);
     instanceRequest.setSearchSegments(new ArrayList<String>());
     instanceRequest.getSearchSegments().add(segmentName);
-    QueryRequest queryRequest = new QueryRequest(instanceRequest);
+    QueryRequest queryRequest = new QueryRequest(instanceRequest, TableDataManagerProvider.getServerMetrics());
     final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(queryRequest);
     instanceResponseMap.clear();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
@@ -180,7 +180,7 @@ public class QueryExceptionTest {
     InstanceRequest instanceRequest = new InstanceRequest(1, brokerRequest);
     instanceRequest.setSearchSegments(new ArrayList<String>());
     instanceRequest.getSearchSegments().add(segmentName);
-    QueryRequest queryRequest = new QueryRequest(instanceRequest);
+    QueryRequest queryRequest = new QueryRequest(instanceRequest, TableDataManagerProvider.getServerMetrics());
     final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(queryRequest);
     instanceResponseMap.clear();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);

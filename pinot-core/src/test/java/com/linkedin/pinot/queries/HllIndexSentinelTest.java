@@ -65,6 +65,7 @@ public class HllIndexSentinelTest {
   private static PropertiesConfiguration serverConf;
   private SegmentWithHllIndexCreateHelper helper;
   private String segmentName;
+  private  ServerMetrics serverMetrics;
 
   private static final String AVRO_DATA = "data/test_data-sv.avro";
 
@@ -77,7 +78,9 @@ public class HllIndexSentinelTest {
       new HllConfig(hllLog2m, columnsToDeriveHllFields, hllDeriveColumnSuffix);
 
   private void setupTableManager() throws Exception {
-    TableDataManagerProvider.setServerMetrics(new ServerMetrics(new MetricsRegistry()));
+    serverMetrics = new ServerMetrics(new MetricsRegistry());
+    TableDataManagerProvider.setServerMetrics(serverMetrics);
+
     serverConf =  new TestingServerPropertiesBuilder(tableName).build();
     serverConf.setDelimiterParsingDisabled(false);
 
@@ -129,14 +132,14 @@ public class HllIndexSentinelTest {
                 " where " + filterColumn + " > " + baseValue + " limit 0",
             0.0));
         ApproximateQueryTestUtil.runApproximationQueries(
-            QUERY_EXECUTOR, segmentName, aggCalls, approximationThreshold);
+            QUERY_EXECUTOR, segmentName, aggCalls, approximationThreshold, serverMetrics);
 
         // correct query
         Object ret = ApproximateQueryTestUtil.runQuery(
             QUERY_EXECUTOR, segmentName, new TestSimpleAggreationQuery(
                 "select distinctcount(" + distinctCountColumn + ") from " + tableName +
                     " where " + filterColumn + " > " + baseValue + " limit 0",
-                0.0));
+                0.0), serverMetrics);
         LOGGER.debug(ret.toString());
       }
     }
@@ -167,14 +170,14 @@ public class HllIndexSentinelTest {
                   " where " + filterColumn + " < " + baseValue +
                   " group by " + gbyColumn + " limit 0", null));
           ApproximateQueryTestUtil.runApproximationQueries(
-              QUERY_EXECUTOR, segmentName, groupByCalls, approximationThreshold);
+              QUERY_EXECUTOR, segmentName, groupByCalls, approximationThreshold, serverMetrics);
 
           // correct query
           Object ret = ApproximateQueryTestUtil.runQuery(
               QUERY_EXECUTOR, segmentName, new AvroQueryGenerator.TestGroupByAggreationQuery(
                   "select distinctcount(" + distinctCountColumn + ") from " + tableName +
                       " where " + filterColumn + " < " + baseValue +
-                      " group by " + gbyColumn + " limit 0", null));
+                      " group by " + gbyColumn + " limit 0", null), serverMetrics);
           LOGGER.debug(ret.toString());
         }
       }

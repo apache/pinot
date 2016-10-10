@@ -61,4 +61,8 @@ public class TableDataManagerProvider {
   public static void setServerMetrics(ServerMetrics serverMetrics) {
     SERVER_METRICS = serverMetrics;
   }
+
+  public static ServerMetrics getServerMetrics() {
+    return SERVER_METRICS;
+  }
 }

@@ -143,7 +143,7 @@ public class IntegrationTest {
     searchSegments.add("testTable_0_9_");
     instanceRequest.setSearchSegments(searchSegments);
     try {
-      QueryRequest queryRequest = new QueryRequest(instanceRequest);
+      QueryRequest queryRequest = new QueryRequest(instanceRequest, _serverInstance.getServerMetrics());
       DataTable instanceResponse = _queryExecutor.processQuery(queryRequest);
       System.out.println(instanceResponse.getLong(0, 0));
       System.out.println(instanceResponse.getMetadata().get("timeUsedMs"));
@@ -164,7 +164,7 @@ public class IntegrationTest {
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
     addTestTableSearchSegmentsToInstanceRequest(instanceRequest);
     try {
-      QueryRequest queryRequest = new QueryRequest(instanceRequest);
+      QueryRequest queryRequest = new QueryRequest(instanceRequest, _serverInstance.getServerMetrics());
       DataTable instanceResponse = _queryExecutor.processQuery(queryRequest);
       System.out.println(instanceResponse.getLong(0, 0));
       System.out.println(instanceResponse.getMetadata().get("timeUsedMs"));
@@ -189,7 +189,7 @@ public class IntegrationTest {
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
     addTestTableSearchSegmentsToInstanceRequest(instanceRequest);
     try {
-      QueryRequest queryRequest = new QueryRequest(instanceRequest);
+      QueryRequest queryRequest = new QueryRequest(instanceRequest, _serverInstance.getServerMetrics());
       DataTable instanceResponse = _queryExecutor.processQuery(queryRequest);
       System.out.println(instanceResponse.getDouble(0, 0));
       System.out.println(instanceResponse.getMetadata().get("timeUsedMs"));
@@ -211,7 +211,7 @@ public class IntegrationTest {
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
     addTestTableSearchSegmentsToInstanceRequest(instanceRequest);
     try {
-      QueryRequest queryRequest = new QueryRequest(instanceRequest);
+      QueryRequest queryRequest = new QueryRequest(instanceRequest, _serverInstance.getServerMetrics());
       DataTable instanceResponse = _queryExecutor.processQuery(queryRequest);
       System.out.println(instanceResponse.getDouble(0, 0));
       System.out.println(instanceResponse.getMetadata().get("timeUsedMs"));
@@ -231,7 +231,7 @@ public class IntegrationTest {
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
     addTestTableSearchSegmentsToInstanceRequest(instanceRequest);
     try {
-      QueryRequest queryRequest = new QueryRequest(instanceRequest);
+      QueryRequest queryRequest = new QueryRequest(instanceRequest, _serverInstance.getServerMetrics());
       DataTable instanceResponse = _queryExecutor.processQuery(queryRequest);
       System.out.println(instanceResponse.getDouble(0, 0));
       System.out.println(instanceResponse.getMetadata().get("timeUsedMs"));

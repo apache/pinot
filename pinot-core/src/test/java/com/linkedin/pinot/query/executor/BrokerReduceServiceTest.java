@@ -152,7 +152,7 @@ public class BrokerReduceServiceTest {
     }
 
     Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
-    QueryRequest queryRequest = new QueryRequest(instanceRequest);
+    QueryRequest queryRequest = new QueryRequest(instanceRequest, TableDataManagerProvider.getServerMetrics());
     DataTable instanceResponse1 = _queryExecutor.processQuery(queryRequest);
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse1);
     DataTable instanceResponse2 = _queryExecutor.processQuery(queryRequest);
@@ -180,7 +180,7 @@ public class BrokerReduceServiceTest {
 
     Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     try {
-      QueryRequest queryRequest = new QueryRequest(instanceRequest);
+      QueryRequest queryRequest = new QueryRequest(instanceRequest, TableDataManagerProvider.getServerMetrics());
       DataTable instanceResponse1 = _queryExecutor.processQuery(queryRequest);
       instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse1);
       DataTable instanceResponse2 = _queryExecutor.processQuery(queryRequest);
@@ -212,7 +212,7 @@ public class BrokerReduceServiceTest {
 
     Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     try {
-      QueryRequest queryRequest = new QueryRequest(instanceRequest);
+      QueryRequest queryRequest = new QueryRequest(instanceRequest, TableDataManagerProvider.getServerMetrics());
       DataTable instanceResponse1 = _queryExecutor.processQuery(queryRequest);
       instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse1);
       DataTable instanceResponse2 = _queryExecutor.processQuery(queryRequest);
@@ -243,7 +243,7 @@ public class BrokerReduceServiceTest {
 
     Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     try {
-      QueryRequest queryRequest = new QueryRequest(instanceRequest);
+      QueryRequest queryRequest = new QueryRequest(instanceRequest, TableDataManagerProvider.getServerMetrics());
       DataTable instanceResponse1 = _queryExecutor.processQuery(queryRequest);
       instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse1);
       DataTable instanceResponse2 = _queryExecutor.processQuery(queryRequest);
@@ -275,7 +275,7 @@ public class BrokerReduceServiceTest {
 
     Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     try {
-      QueryRequest queryRequest = new QueryRequest(instanceRequest);
+      QueryRequest queryRequest = new QueryRequest(instanceRequest, TableDataManagerProvider.getServerMetrics());
       DataTable instanceResponse1 = _queryExecutor.processQuery(queryRequest);
       instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse1);
       DataTable instanceResponse2 = _queryExecutor.processQuery(queryRequest);
@@ -309,7 +309,7 @@ public class BrokerReduceServiceTest {
 
     Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     try {
-      QueryRequest queryRequest = new QueryRequest(instanceRequest);
+      QueryRequest queryRequest = new QueryRequest(instanceRequest, TableDataManagerProvider.getServerMetrics());
       DataTable instanceResponse1 = _queryExecutor.processQuery(queryRequest);
       instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse1);
       DataTable instanceResponse2 = _queryExecutor.processQuery(queryRequest);
@@ -344,7 +344,7 @@ public class BrokerReduceServiceTest {
 
     Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     try {
-      QueryRequest queryRequest = new QueryRequest(instanceRequest);
+      QueryRequest queryRequest = new QueryRequest(instanceRequest, TableDataManagerProvider.getServerMetrics());
       DataTable instanceResponse1 = _queryExecutor.processQuery(queryRequest);
       instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse1);
       DataTable instanceResponse2 = _queryExecutor.processQuery(queryRequest);
@@ -379,7 +379,7 @@ public class BrokerReduceServiceTest {
 
     Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     try {
-      QueryRequest queryRequest = new QueryRequest(instanceRequest);
+      QueryRequest queryRequest = new QueryRequest(instanceRequest, TableDataManagerProvider.getServerMetrics());
       instanceResponseMap.put(new ServerInstance("localhost:0000"), _queryExecutor.processQuery(queryRequest));
       instanceResponseMap.put(new ServerInstance("localhost:1111"), _queryExecutor.processQuery(queryRequest));
       instanceResponseMap.put(new ServerInstance("localhost:2222"), _queryExecutor.processQuery(queryRequest));
