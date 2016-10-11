@@ -935,11 +935,11 @@ body a{
 }
 
 .anom-linecharts-container .c3-ygrids line:nth-child(even),
-.anom-linecharts-container .c3-axis-y2 .tick:nth-child(even){
+.anom-linecharts-container .c3-axis-y .tick:nth-child(even){
     display: none;
 }
 
-.anom-linecharts-container .c3-axis-y2 .tick:last-child{
+.anom-linecharts-container .c3-axis-y .tick:last-child{
     display: block;
 }
 
