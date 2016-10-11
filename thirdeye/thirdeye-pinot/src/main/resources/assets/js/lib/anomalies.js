@@ -217,7 +217,7 @@ function drawMetricTimeSeries(timeSeriesData, anomalyData, tab, placeholder) {
         },
         zoom: {
             enabled: true,
-            rescale:true
+            rescale: true
         },
         axis: {
             x: {
@@ -317,8 +317,8 @@ function drawMetricTimeSeries(timeSeriesData, anomalyData, tab, placeholder) {
             colors: colors
         },
         zoom: {
-        enabled: true,
-            rescale:true
+            enabled: true,
+            rescale: true
         },
         axis: {
             x: {
@@ -447,7 +447,7 @@ function drawAnomalyTimeSeries(timeSeriesData,anomalyData, tab, placeholder, opt
              x: 'time',
              axes: {
                  baseline: 'y',
-                 current: 'y2'
+                 current: 'y'
              },
              json: lineChartData,
              type: 'spline',
@@ -456,32 +456,25 @@ function drawAnomalyTimeSeries(timeSeriesData,anomalyData, tab, placeholder, opt
          },
          zoom: {
              enabled: true,
-            rescale:true
+             rescale: true
          },
          axis: {
              min:{
-                 y2:0
+                 y:0
              },
 
              x: {
                  type: 'timeseries',
                  tick: {
-
                      format: dateTimeFormat,
                      count:5
                  }
              },
              y: {
-                 show: false,
-                 min: 0
-             },
-             y2: {
                  show: true,
-
                  tick: {
                      //format integers with comma-grouping for thousands
-                     format: d3.format(",.1r ")
-
+                     format: d3.format(",.1")
                  },
                  min: 0
              }
@@ -509,7 +502,7 @@ function drawAnomalyTimeSeries(timeSeriesData,anomalyData, tab, placeholder, opt
     var anomalyThumbnailLineChart = c3.generate(settings);
 
 
-    $(".c3-axis path.domain, .c3-axis-y2 line, .c3-axis-x line", lineChartPlaceholder).hide();
+    $(".c3-axis path.domain, .c3-axis-y line, .c3-axis-x line", lineChartPlaceholder).hide();
     $(".c3-axis-x path.domain", lineChartPlaceholder).hide();
 
      var numAnomalies = anomalyData.length;
