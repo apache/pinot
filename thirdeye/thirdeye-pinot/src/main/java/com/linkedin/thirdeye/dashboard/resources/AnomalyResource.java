@@ -142,7 +142,6 @@ public class AnomalyResource {
         dimensionPatterns = dimensionPatternsList.toArray(dimensionPatterns);
       }
 
-
       if (StringUtils.isNotBlank(metric)) {
         if (StringUtils.isNotBlank(dimensions)) {
           anomalyResults = anomalyMergedResultDAO.findByCollectionMetricDimensionsTime(dataset, metric, dimensionPatterns, startTime.getMillis(), endTime.getMillis());
@@ -271,19 +270,9 @@ public class AnomalyResource {
     anomalyFunctionSpec.setBucketSize(dataGranularity.getSize());
     anomalyFunctionSpec.setBucketUnit(dataGranularity.getUnit());
 
-    // Ensure that the explore dimension names are ordered as schema dimension names
-    List<String> schemaDimensionNames = CACHE_REGISTRY_INSTANCE.getSchemaCache().get(dataset).getDimensionNames();
-    Set<String> splitExploreDimensions = new HashSet<>(Arrays.asList(exploreDimensions.trim().split(",")));
-    StringBuilder reorderedExploreDimensions = new StringBuilder();
-    String separator = "";
-    for (String dimensionName : schemaDimensionNames) {
-      if (splitExploreDimensions.contains(dimensionName)) {
-        reorderedExploreDimensions.append(separator).append(dimensionName);
-        separator = ",";
-      }
+    if(StringUtils.isNotEmpty(exploreDimensions)) {
+      anomalyFunctionSpec.setExploreDimensions(getDimensions(dataset, exploreDimensions));
     }
-    anomalyFunctionSpec.setExploreDimensions(reorderedExploreDimensions.toString());
-
     if (!StringUtils.isBlank(filters)) {
       filters = URLDecoder.decode(filters, UTF8);
       String filterString = ThirdEyeUtils.getSortedFiltersFromJson(filters);
@@ -361,19 +350,11 @@ public class AnomalyResource {
       anomalyFunctionSpec.setFilters(filterString);
     }
     anomalyFunctionSpec.setProperties(properties);
-    // Ensure that the explore dimension names are ordered as schema dimension names
-    List<String> schemaDimensionNames = CACHE_REGISTRY_INSTANCE.getSchemaCache().get(dataset).getDimensionNames();
-    Set<String> splitExploreDimensions = new HashSet<>(Arrays.asList(exploreDimensions.trim().split(",")));
-    StringBuilder reorderedExploreDimensions = new StringBuilder();
-    String separator = "";
-    for (String dimensionName : schemaDimensionNames) {
-      if (splitExploreDimensions.contains(dimensionName)) {
-        reorderedExploreDimensions.append(separator).append(dimensionName);
-        separator = ",";
-      }
-    }
-    anomalyFunctionSpec.setExploreDimensions(reorderedExploreDimensions.toString());
 
+    if(StringUtils.isNotEmpty(exploreDimensions)) {
+      // Ensure that the explore dimension names are ordered as schema dimension names
+      anomalyFunctionSpec.setExploreDimensions(getDimensions(dataset, exploreDimensions));
+    }
     if (StringUtils.isEmpty(cron)) {
       cron = DEFAULT_CRON;
     } else {
@@ -386,6 +367,21 @@ public class AnomalyResource {
 
     anomalyFunctionDAO.update(anomalyFunctionSpec);
     return Response.ok(id).build();
+  }
+
+  private String getDimensions(String dataset, String exploreDimensions) throws Exception {
+    // Ensure that the explore dimension names are ordered as schema dimension names
+    List<String> schemaDimensionNames = CACHE_REGISTRY_INSTANCE.getSchemaCache().get(dataset).getDimensionNames();
+    Set<String> splitExploreDimensions = new HashSet<>(Arrays.asList(exploreDimensions.trim().split(",")));
+    StringBuilder reorderedExploreDimensions = new StringBuilder();
+    String separator = "";
+    for (String dimensionName : schemaDimensionNames) {
+      if (splitExploreDimensions.contains(dimensionName)) {
+        reorderedExploreDimensions.append(separator).append(dimensionName);
+        separator = ",";
+      }
+    }
+    return reorderedExploreDimensions.toString();
   }
 
   // Delete anomaly function
