@@ -55,8 +55,6 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
   private AnomalyMergeExecutor anomalyMergeExecutor = null;
   private AnomalyFunctionFactory anomalyFunctionFactory = null;
   private ThirdEyeCacheRegistry cacheRegistry = ThirdEyeCacheRegistry.getInstance();
-  private CollectionSchema testCollectionSchema;
-  private CollectionConfig testCollectionConfig;
   private ThirdEyeAnomalyConfiguration thirdeyeAnomalyConfig;
   private List<TaskDTO> tasks;
   private List<JobDTO> jobs;
@@ -65,7 +63,6 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
   private int id = 0;
   private String dashboardHost = "http://localhost:8080/dashboard";
   private String functionPropertiesFile = "/sample-functions.properties";
-  private String thirdeyeCollectionSchema = "/sample-config-dir/webapp-config/CollectionSchema/test-collection.json";
   private String metric = "cost";
   private String collection = "test-collection";
 
@@ -87,19 +84,6 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
 
     QueryCache mockQueryCache = new QueryCache(mockThirdeyeClient, Executors.newFixedThreadPool(10));
     cacheRegistry.registerQueryCache(mockQueryCache);
-
-    // Mock collection schema cache
-    testCollectionSchema = CollectionSchema.decode(AnomalyApplicationEndToEndTest.class.getResourceAsStream(thirdeyeCollectionSchema));
-    LoadingCache<String, CollectionSchema> mockCollectionSchemaCache = Mockito.mock(LoadingCache.class);
-    Mockito.when(mockCollectionSchemaCache.get(collection)).thenReturn(testCollectionSchema);
-    cacheRegistry.registerCollectionSchemaCache(mockCollectionSchemaCache);
-
-    // Mock collection config cache
-    testCollectionConfig = new CollectionConfig();
-    testCollectionConfig.setCollectionName(collection);
-    LoadingCache<String, CollectionConfig> mockCollectionConfigCache = Mockito.mock(LoadingCache.class);
-    Mockito.when(mockCollectionConfigCache.get(collection)).thenReturn(testCollectionConfig);
-    cacheRegistry.registerCollectionConfigCache(mockCollectionConfigCache);
 
     // Application config
     thirdeyeAnomalyConfig = new ThirdEyeAnomalyConfiguration();
@@ -248,12 +232,12 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
 
   private void startMerger() throws Exception {
     ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
-    anomalyMergeExecutor = new AnomalyMergeExecutor(mergedResultDAO, anomalyFunctionDAO, rawResultDAO, executorService);
+    anomalyMergeExecutor = new AnomalyMergeExecutor(executorService);
     executorService.scheduleWithFixedDelay(anomalyMergeExecutor, 0, 3, TimeUnit.SECONDS);
   }
 
   private void startMonitor() {
-    monitorJobScheduler = new MonitorJobScheduler(jobDAO, taskDAO, thirdeyeAnomalyConfig.getMonitorConfiguration());
+    monitorJobScheduler = new MonitorJobScheduler(thirdeyeAnomalyConfig.getMonitorConfiguration());
     monitorJobScheduler.start();
   }
 
@@ -261,20 +245,19 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
   private void startWorker() throws Exception {
     InputStream factoryStream = AnomalyApplicationEndToEndTest.class.getResourceAsStream(functionPropertiesFile);
     anomalyFunctionFactory = new AnomalyFunctionFactory(factoryStream);
-    taskDriver = new TaskDriver(thirdeyeAnomalyConfig, jobDAO, taskDAO, rawResultDAO, mergedResultDAO,
-        anomalyFunctionFactory);
+    taskDriver = new TaskDriver(thirdeyeAnomalyConfig, anomalyFunctionFactory);
     taskDriver.start();
   }
 
 
   private void startAlertScheduler() throws SchedulerException {
-    alertJobScheduler = new AlertJobScheduler(jobDAO, taskDAO, emailConfigurationDAO);
+    alertJobScheduler = new AlertJobScheduler();
     alertJobScheduler.start();
   }
 
 
   private void startDetectionScheduler() throws SchedulerException {
-    detectionJobScheduler = new DetectionJobScheduler(jobDAO, taskDAO, anomalyFunctionDAO);
+    detectionJobScheduler = new DetectionJobScheduler();
     detectionJobScheduler.start();
   }
 

@@ -29,6 +29,7 @@ import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
+import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 public class TimeOnTimeResponseParser {
 
@@ -64,12 +65,7 @@ public class TimeOnTimeResponseParser {
     this.metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
 
     metricFunctions = baselineResponse.getMetricFunctions();
-    for (MetricFunction metricFunction : metricFunctions) {
-      String metricName = metricFunction.getMetricName();
-      String metricId = metricName.replaceAll(MetricConfigBean.DERIVED_METRIC_ID_PREFIX, "");
-      MetricConfigDTO metricConfig = metricConfigDAO.findById(Long.valueOf(metricId));
-      metricThresholds.put(metricConfig.getName(), metricConfig.getRollupThreshold());
-    }
+    metricThresholds = ThirdEyeUtils.getMetricThresholdsMap(metricFunctions);
   }
 
   public List<Row> parseResponse() {

@@ -65,7 +65,7 @@ public class PqlUtils {
     // select sum(metric_values_column) from collection
     // where time_clause and metric_names_column=function.getMetricName
     String metricValuesColumn = datasetConfig.getMetricValuesColumn();
-    String metricNamesColumn = datasetConfig.getMetricValuesColumn();
+    String metricNamesColumn = datasetConfig.getMetricNamesColumn();
 
     List<String> metricAsDimensionPqls = getMetricAsDimensionPqls(request.getCollection(), request.getMetricFunctions(),
         request.getStartTimeInclusive(), request.getEndTimeExclusive(), request.getFilterSet(),
@@ -145,7 +145,10 @@ public class PqlUtils {
     StringBuilder builder = new StringBuilder();
     if (!metricFunction.getMetricName().equals("*")) {
       builder.append(" AND ");
-      builder.append(String.format("%s='%s'", metricNameColumn, metricFunction.getMetricName()));
+      String metricId = metricFunction.getMetricName().replaceAll(MetricConfigBean.DERIVED_METRIC_ID_PREFIX, "");
+      MetricConfigDTO metricConfig = metricConfigDAO.findById(Long.valueOf(metricId));
+      String metricName = metricConfig.getName();
+      builder.append(String.format("%s='%s'", metricNameColumn, metricName));
     }
     return builder.toString();
   }

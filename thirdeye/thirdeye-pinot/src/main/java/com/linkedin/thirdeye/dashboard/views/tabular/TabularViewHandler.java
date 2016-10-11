@@ -15,10 +15,9 @@ import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
 
 import com.google.common.collect.Multimap;
-import com.linkedin.thirdeye.api.CollectionSchema;
 import com.linkedin.thirdeye.api.TimeSpec;
+import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.client.MetricExpression;
-import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.client.comparison.Row;
 import com.linkedin.thirdeye.client.comparison.Row.Metric;
@@ -35,7 +34,7 @@ import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 public class TabularViewHandler implements ViewHandler<TabularViewRequest, TabularViewResponse> {
-  private static ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
+  private static DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
   private final Comparator<Row> rowComparator = new Comparator<Row>() {
     @Override
@@ -50,9 +49,9 @@ public class TabularViewHandler implements ViewHandler<TabularViewRequest, Tabul
   private final QueryCache queryCache;
   private final DatasetConfigManager datasetConfigDAO;
 
-  public TabularViewHandler(QueryCache queryCache, DatasetConfigManager datasetConfigDAO) {
+  public TabularViewHandler(QueryCache queryCache) {
     this.queryCache = queryCache;
-    this.datasetConfigDAO = datasetConfigDAO;
+    this.datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
   }
 
   private TimeOnTimeComparisonRequest generateTimeOnTimeComparisonRequest(TabularViewRequest request)

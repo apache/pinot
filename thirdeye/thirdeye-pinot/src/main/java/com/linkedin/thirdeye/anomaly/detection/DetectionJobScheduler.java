@@ -25,6 +25,7 @@ import org.slf4j.LoggerFactory;
 
 import com.linkedin.thirdeye.anomaly.job.JobContext;
 import com.linkedin.thirdeye.anomaly.job.JobScheduler;
+import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.JobManager;
@@ -46,15 +47,14 @@ public class DetectionJobScheduler implements JobScheduler, Runnable {
   private AnomalyFunctionManager anomalyFunctionDAO;
   private DatasetConfigManager datasetConfigDAO;
   private MetricConfigManager metricConfigDAO;
+  private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
-  public DetectionJobScheduler(JobManager anomalyJobDAO, TaskManager anomalyTaskDAO,
-      AnomalyFunctionManager anomalyFunctionDAO, DatasetConfigManager datasetConfigDAO,
-      MetricConfigManager metricConfigDAO) {
-    this.anomalyJobDAO = anomalyJobDAO;
-    this.anomalyTaskDAO = anomalyTaskDAO;
-    this.anomalyFunctionDAO = anomalyFunctionDAO;
-    this.datasetConfigDAO = datasetConfigDAO;
-    this.metricConfigDAO = metricConfigDAO;
+  public DetectionJobScheduler() {
+    this.anomalyJobDAO = DAO_REGISTRY.getJobDAO();
+    this.anomalyTaskDAO = DAO_REGISTRY.getTaskDAO();
+    this.anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
+    this.datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
+    this.metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
 
     schedulerFactory = new StdSchedulerFactory();
     try {

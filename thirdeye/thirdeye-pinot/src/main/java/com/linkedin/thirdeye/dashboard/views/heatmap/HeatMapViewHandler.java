@@ -14,13 +14,10 @@ import java.util.concurrent.Future;
 
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.google.common.collect.Multimap;
+import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.client.MetricExpression;
 import com.linkedin.thirdeye.client.MetricFunction;
-import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.client.comparison.Row;
 import com.linkedin.thirdeye.client.comparison.Row.Metric;
@@ -43,16 +40,13 @@ public class HeatMapViewHandler implements ViewHandler<HeatMapViewRequest, HeatM
   private final QueryCache queryCache;
   private DatasetConfigManager datasetConfigDAO;
   private MetricConfigManager metricConfigDAO;
-  private static final Logger LOGGER = LoggerFactory.getLogger(HeatMapViewHandler.class);
-  private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry
-      .getInstance();
+  private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private static final String RATIO_SEPARATOR = "/";
 
-  public HeatMapViewHandler(QueryCache queryCache, DatasetConfigManager datasetConfigDAO,
-      MetricConfigManager metricConfigDAO) {
+  public HeatMapViewHandler(QueryCache queryCache) {
     this.queryCache = queryCache;
-    this.datasetConfigDAO = datasetConfigDAO;
-    this.metricConfigDAO = metricConfigDAO;
+    this.datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
+    this.metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
   }
 
   private TimeOnTimeComparisonRequest generateTimeOnTimeComparisonRequest(HeatMapViewRequest request)
@@ -164,8 +158,10 @@ public class HeatMapViewHandler implements ViewHandler<HeatMapViewRequest, HeatM
             heatMapBuilder = new HeatMap.Builder(groupByDimension);
             data.put(dataKey, heatMapBuilder);
           }
+          System.out.println("Before " + System.currentTimeMillis());
           MetricConfigDTO metricConfig = metricConfigDAO.findByMetricAndDataset(metricName,
               comparisonRequest.getCollectionName());
+          System.out.println("Current " + System.currentTimeMillis());
           if (StringUtils.isNotBlank(metricConfig.getCellSizeExpression())) {
 
             String metricExpression = metricExpressions.get(metricName);
@@ -231,8 +227,11 @@ public class HeatMapViewHandler implements ViewHandler<HeatMapViewRequest, HeatM
           currentContext.put(metricOrExpression,
               currentTotalPerMetricAndDimension.get(metricOrExpression).values().iterator().next());
         }
+        System.out.println("Before evaluate " + System.currentTimeMillis());
         baselineTotal = MetricExpression.evaluateExpression(expression, baselineContext);
+        System.out.println("After evaluate " + System.currentTimeMillis());
         currentTotal = MetricExpression.evaluateExpression(expression, currentContext);
+        System.out.println("After evaluate " + System.currentTimeMillis());
       } else {
         baselineTotal =
             baselineTotalPerMetricAndDimension.get(expression.getExpressionName()).values()

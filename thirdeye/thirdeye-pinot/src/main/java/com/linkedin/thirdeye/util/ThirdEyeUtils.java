@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -21,6 +22,7 @@ import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.client.MetricExpression;
+import com.linkedin.thirdeye.client.MetricFunction;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
@@ -154,5 +156,34 @@ public abstract class ThirdEyeUtils {
           MetricConfigBean.DERIVED_METRIC_ID_PREFIX + metricConfig.getId());
     }
     return metricExpression;
+  }
+
+  public static String getDerivedMetricExpression(String metricExpressionName, String dataset) {
+    String derivedMetricExpression = null;
+    MetricConfigDTO metricConfig = DAO_REGISTRY.getMetricConfigDAO().
+        findByMetricAndDataset(metricExpressionName, dataset);
+    if (metricConfig.isDerived()) {
+      derivedMetricExpression = metricConfig.getDerivedMetricExpression();
+    } else {
+      derivedMetricExpression = MetricConfigBean.DERIVED_METRIC_ID_PREFIX + metricConfig.getId();
+    }
+    return derivedMetricExpression;
+  }
+
+  public static Map<String, Double> getMetricThresholdsMap(List<MetricFunction> metricFunctions) {
+    Map<String, Double> metricThresholds = new HashMap<>();
+    for (MetricFunction metricFunction : metricFunctions) {
+      String derivedMetricExpression = metricFunction.getMetricName();
+      String metricId = derivedMetricExpression.replaceAll(MetricConfigBean.DERIVED_METRIC_ID_PREFIX, "");
+      MetricConfigDTO metricConfig = DAO_REGISTRY.getMetricConfigDAO().findById(Long.valueOf(metricId));
+      metricThresholds.put(derivedMetricExpression, metricConfig.getRollupThreshold());
+    }
+    return metricThresholds;
+  }
+
+  public static String getMetricNameFromFunction(MetricFunction metricFunction) {
+    String metricId = metricFunction.getMetricName().replace(MetricConfigBean.DERIVED_METRIC_ID_PREFIX, "");
+    MetricConfigDTO metricConfig = DAO_REGISTRY.getMetricConfigDAO().findById(Long.valueOf(metricId));
+    return metricConfig.getName();
   }
 }

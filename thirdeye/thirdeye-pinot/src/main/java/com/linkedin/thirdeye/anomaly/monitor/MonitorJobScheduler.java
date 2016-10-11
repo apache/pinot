@@ -6,6 +6,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.datalayer.bao.JobManager;
 import com.linkedin.thirdeye.datalayer.bao.TaskManager;
 
@@ -20,11 +21,11 @@ public class MonitorJobScheduler {
   private MonitorConfiguration monitorConfiguration;
   private MonitorJobRunner monitorJobRunner;
   private MonitorJobContext monitorJobContext;
+  private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
-  public MonitorJobScheduler(JobManager anomalyJobDAO, TaskManager anomalyTaskDAO,
-      MonitorConfiguration monitorConfiguration) {
-    this.anomalyJobDAO = anomalyJobDAO;
-    this.anomalyTaskDAO = anomalyTaskDAO;
+  public MonitorJobScheduler(MonitorConfiguration monitorConfiguration) {
+    this.anomalyJobDAO = DAO_REGISTRY.getJobDAO();
+    this.anomalyTaskDAO = DAO_REGISTRY.getTaskDAO();
     this.monitorConfiguration = monitorConfiguration;
     scheduledExecutorService = Executors.newScheduledThreadPool(10);
   }

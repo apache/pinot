@@ -39,7 +39,7 @@ public class ThirdEyeDashboardApplication
       throws Exception {
     super.initDAOs();
     try {
-      ThirdEyeCacheRegistry.initializeCaches(config, datasetConfigDAO, metricConfigDAO, dashboardConfigDAO);
+      ThirdEyeCacheRegistry.initializeCaches(config);
     } catch (Exception e) {
       LOG.error("Exception while loading caches", e);
     }

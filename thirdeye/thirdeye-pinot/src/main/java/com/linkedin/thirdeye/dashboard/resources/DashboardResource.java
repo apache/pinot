@@ -254,7 +254,7 @@ public class DashboardResource {
       }
       request.setTimeGranularity(Utils.getAggregationTimeGranularity(aggTimeGranularity));
 
-      TabularViewHandler handler = new TabularViewHandler(queryCache, datasetConfigDAO);
+      TabularViewHandler handler = new TabularViewHandler(queryCache);
       String jsonResponse = null;
 
       TabularViewResponse response = handler.process(request);
@@ -301,7 +301,7 @@ public class DashboardResource {
       request.setFilters(ThirdEyeUtils.convertToMultiMap(filterJson));
     }
 
-    HeatMapViewHandler handler = new HeatMapViewHandler(queryCache, datasetConfigDAO, metricConfigDAO);
+    HeatMapViewHandler handler = new HeatMapViewHandler(queryCache);
     HeatMapViewResponse response;
     String jsonResponse = null;
 
@@ -350,7 +350,7 @@ public class DashboardResource {
     }
     request.setTimeGranularity(Utils.getAggregationTimeGranularity(aggTimeGranularity));
 
-    TabularViewHandler handler = new TabularViewHandler(queryCache, datasetConfigDAO);
+    TabularViewHandler handler = new TabularViewHandler(queryCache);
     String jsonResponse = null;
 
     try {

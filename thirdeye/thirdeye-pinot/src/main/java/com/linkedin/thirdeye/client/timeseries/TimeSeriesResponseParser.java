@@ -25,7 +25,7 @@ import com.linkedin.thirdeye.client.ThirdEyeResponseRow;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesRow.Builder;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesRow.TimeSeriesMetric;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
-import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
+import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 //Heavily based off TimeOnTime equivalent
 public class TimeSeriesResponseParser {
@@ -49,12 +49,9 @@ public class TimeSeriesResponseParser {
     this.aggTimeGranularity = timeGranularity;
     this.groupByDimensions = groupByDimensions;
 
-    String collection = response.getRequest().getCollection();
-    List<String> metrics = response.getRequest().getMetricNames();
-    for (String metric : metrics) {
-      MetricConfigDTO metricConfig = metricConfigDAO.findByMetricAndDataset(metric, collection);
-      metricThresholds.put(metric, metricConfig.getRollupThreshold());
-    }
+    metricFunctions = response.getMetricFunctions();
+    metricThresholds = ThirdEyeUtils.getMetricThresholdsMap(metricFunctions);
+
   }
 
   public List<TimeSeriesRow> parseResponse() {
@@ -68,7 +65,6 @@ public class TimeSeriesResponseParser {
 
     boolean hasGroupByDimensions = CollectionUtils.isNotEmpty(groupByDimensions);
 
-    metricFunctions = response.getMetricFunctions();
     numMetrics = metricFunctions.size();
     numTimeBuckets = ranges.size();
     rows = new ArrayList<>();

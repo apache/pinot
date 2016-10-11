@@ -25,6 +25,7 @@ import org.slf4j.LoggerFactory;
 import com.linkedin.thirdeye.anomaly.job.JobContext;
 import com.linkedin.thirdeye.anomaly.job.JobScheduler;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
+import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.datalayer.bao.EmailConfigurationManager;
 import com.linkedin.thirdeye.datalayer.bao.JobManager;
 import com.linkedin.thirdeye.datalayer.bao.TaskManager;
@@ -42,12 +43,12 @@ public class AlertJobScheduler implements JobScheduler, Runnable {
   private JobManager anomalyJobDAO;
   private TaskManager anomalyTaskDAO;
   private EmailConfigurationManager emailConfigurationDAO;
+  private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
-  public AlertJobScheduler(JobManager anomalyJobDAO, TaskManager anomalyTaskDAO,
-      EmailConfigurationManager emailConfigurationDAO) {
-    this.anomalyJobDAO = anomalyJobDAO;
-    this.anomalyTaskDAO = anomalyTaskDAO;
-    this.emailConfigurationDAO = emailConfigurationDAO;
+  public AlertJobScheduler() {
+    this.anomalyJobDAO = DAO_REGISTRY.getJobDAO();
+    this.anomalyTaskDAO = DAO_REGISTRY.getTaskDAO();
+    this.emailConfigurationDAO = DAO_REGISTRY.getEmailConfigurationDAO();
 
     schedulerFactory = new StdSchedulerFactory();
     try {

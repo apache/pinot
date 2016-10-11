@@ -19,6 +19,7 @@ import org.joda.time.DateTime;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.api.TimeSpec;
+import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.client.MetricExpression;
 import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.client.comparison.Row;
@@ -38,6 +39,8 @@ import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 public class ContributorViewHandler implements
     ViewHandler<ContributorViewRequest, ContributorViewResponse> {
+
+  private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
   private final Comparator<DateTime> dateTimeComparator = new Comparator<DateTime>() {
     @Override
@@ -64,7 +67,7 @@ public class ContributorViewHandler implements
 
   public ContributorViewHandler(QueryCache queryCache) {
     this.queryCache = queryCache;
-    this.datasetConfigDAO = datasetConfigDAO;
+    this.datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
   }
 
   private TimeOnTimeComparisonRequest generateTimeOnTimeComparisonRequest(

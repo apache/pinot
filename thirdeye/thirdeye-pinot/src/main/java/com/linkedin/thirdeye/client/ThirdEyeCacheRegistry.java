@@ -25,8 +25,6 @@ import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
 import com.linkedin.thirdeye.dashboard.resources.CacheResource;
 import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
-import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 
 public class ThirdEyeCacheRegistry {
 
@@ -38,10 +36,10 @@ public class ThirdEyeCacheRegistry {
   private QueryCache queryCache;
 
   private static DatasetConfigManager datasetConfigDAO;
-  private static MetricConfigManager metricConfigDAO;
   private static DashboardConfigManager dashboardConfigDAO;
   private static PinotThirdEyeClientConfig pinotThirdeyeClientConfig;
   private static ThirdEyeClient thirdEyeClient;
+  private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ThirdEyeCacheRegistry.class);
 
@@ -53,26 +51,24 @@ public class ThirdEyeCacheRegistry {
     return Holder.INSTANCE;
   }
 
-  private static void init(ThirdEyeConfiguration config, DatasetConfigManager datasetDAO, MetricConfigManager metricDAO,
-      DashboardConfigManager dashboardDAO) {
+  private static void init(ThirdEyeConfiguration config) {
     try {
       pinotThirdeyeClientConfig = PinotThirdEyeClientConfig.createThirdEyeClientConfig(config);
       thirdEyeClient = PinotThirdEyeClient.fromClientConfig(pinotThirdeyeClientConfig);
-      datasetConfigDAO = datasetDAO;
-      metricConfigDAO = metricDAO;
-      dashboardConfigDAO = dashboardDAO;
+      datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
+      dashboardConfigDAO = DAO_REGISTRY.getDashboardConfigDAO();
 
     } catch (Exception e) {
      LOGGER.info("Caught exception while initializing caches", e);
     }
   }
 
-  private static void init(ThirdEyeConfiguration config, PinotThirdEyeClientConfig pinotThirdEyeClientConfig,
-      DatasetConfigManager datasetDAO, DashboardConfigManager dashboardDAO) {
+  private static void init(ThirdEyeConfiguration config, PinotThirdEyeClientConfig pinotThirdEyeClientConfig) {
     try {
       pinotThirdeyeClientConfig = pinotThirdEyeClientConfig;
       thirdEyeClient = PinotThirdEyeClient.fromClientConfig(pinotThirdeyeClientConfig);
-      datasetConfigDAO = datasetDAO;
+      datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
+      dashboardConfigDAO = DAO_REGISTRY.getDashboardConfigDAO();
     } catch (Exception e) {
      LOGGER.info("Caught exception while initializing caches", e);
     }
@@ -83,10 +79,9 @@ public class ThirdEyeCacheRegistry {
    * Initializes webapp caches
    * @param config
    */
-  public static void initializeCaches(ThirdEyeConfiguration config, DatasetConfigManager datasetDAO,
-      MetricConfigManager metricDAO, DashboardConfigManager dashboardDAO) {
+  public static void initializeCaches(ThirdEyeConfiguration config) {
 
-    init(config, datasetDAO, metricDAO, dashboardDAO);
+    init(config);
 
     initCaches(config);
 
@@ -152,7 +147,7 @@ public class ThirdEyeCacheRegistry {
           LOGGER.error("Exception while loading collections", e);
         }
       }
-    }, 5, 5, TimeUnit.MINUTES);
+    }, 5, 50, TimeUnit.MINUTES);
 
     ScheduledExecutorService hourlyService = Executors.newSingleThreadScheduledExecutor();
     hourlyService.scheduleAtFixedRate(new Runnable() {
