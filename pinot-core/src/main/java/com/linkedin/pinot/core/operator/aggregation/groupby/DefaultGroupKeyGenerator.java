@@ -131,8 +131,8 @@ public class DefaultGroupKeyGenerator implements GroupKeyGenerator {
       if (!isSingleValueGroupByColumn) {
         _hasMultiValueGroupByColumn = true;
       }
-      _dictionaries[i] = dataSource.getDictionary();
       Block block = dataSource.nextBlock(BLOCK_ZERO);
+      _dictionaries[i] = block.getDictionary();
       if (isSingleValueGroupByColumn) {
         _singleBlockValSets[i] = block.getBlockValueSet();
         _reusableSingleDictIds[i] = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];

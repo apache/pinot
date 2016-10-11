@@ -19,7 +19,7 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.core.common.Block;
+import com.linkedin.pinot.core.common.AbstractBlock;
 import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
 import com.linkedin.pinot.core.common.BlockId;
@@ -29,9 +29,10 @@ import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnSingleValueReaderWriter;
 import com.linkedin.pinot.core.operator.docvalsets.RealtimeSingleValueSet;
 import com.linkedin.pinot.core.realtime.impl.dictionary.MutableDictionaryReader;
+import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
 
-public class RealtimeSingleValueBlock implements Block {
+public class RealtimeSingleValueBlock extends AbstractBlock {
 
   private final MutableRoaringBitmap filteredBitmap;
   final FieldSpec spec;
@@ -147,5 +148,9 @@ public class RealtimeSingleValueBlock implements Block {
         return spec.getDataType();
       }
     };
+  }
+  @Override
+  public Dictionary getDictionary() {
+    return dictionary;
   }
 }

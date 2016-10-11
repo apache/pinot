@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.core.operator.blocks;
 
-import com.linkedin.pinot.core.common.Block;
+import com.linkedin.pinot.core.common.AbstractBlock;
 import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
 import com.linkedin.pinot.core.common.BlockId;
@@ -31,16 +31,18 @@ import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
  * Nov 15, 2014
  */
 
-public class SortedSingleValueBlock implements Block {
+public class SortedSingleValueBlock extends AbstractBlock {
 
   final SortedForwardIndexReader sVReader;
   private final BlockId id;
   private final BlockMetadata blockMetadata;
+  private ImmutableDictionaryReader dictionaryReader;
 
   public SortedSingleValueBlock(BlockId id, SortedForwardIndexReader singleValueReader,
       ImmutableDictionaryReader dictionaryReader, ColumnMetadata columnMetadata) {
     sVReader = singleValueReader;
     this.id = id;
+    this.dictionaryReader = dictionaryReader;
     this.blockMetadata = new BlockMetadataImpl(columnMetadata, dictionaryReader);
   }
 
@@ -73,4 +75,8 @@ public class SortedSingleValueBlock implements Block {
   public BlockMetadata getMetadata() {
     return blockMetadata;
   }
+  
+  public com.linkedin.pinot.core.segment.index.readers.Dictionary getDictionary() {
+    return dictionaryReader;
+  };
 }

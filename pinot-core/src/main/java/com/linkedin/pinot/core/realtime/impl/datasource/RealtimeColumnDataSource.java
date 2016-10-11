@@ -112,10 +112,10 @@ public class RealtimeColumnDataSource extends DataSource {
     return true;
   }
 
-  @Override
-  public boolean setPredicate(Predicate predicate) {
-    throw new UnsupportedOperationException("cannot set predicate on the data source");
-  }
+//  @Override
+//  public boolean setPredicate(Predicate predicate) {
+//    throw new UnsupportedOperationException("cannot set predicate on the data source");
+//  }
 
   private double getLargerDoubleValue(double value) {
     long bitsValue = Double.doubleToLongBits(value);
@@ -190,8 +190,8 @@ public class RealtimeColumnDataSource extends DataSource {
     return invertedIndex;
   }
 
-  @Override
-  public Dictionary getDictionary() {
-    return dictionary;
-  }
+//  @Override
+//  public Dictionary getDictionary() {
+//    return dictionary;
+//  }
 }

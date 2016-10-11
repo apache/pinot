@@ -368,12 +368,6 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
         dictionaryMap.get(columnName));
   }
 
-  public DataSource getDataSource(String columnName, Predicate p) {
-    DataSource ds = getDataSource(columnName);
-    ds.setPredicate(p);
-    return ds;
-  }
-
   @Override
   public String[] getColumnNames() {
     return dataSchema.getColumnNames().toArray(new String[0]);

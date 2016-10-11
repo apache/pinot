@@ -102,10 +102,10 @@ public class ColumnDataSourceImpl extends DataSource {
     return true;
   }
 
-  @Override
-  public boolean setPredicate(Predicate p) {
-    throw new UnsupportedOperationException("cannnot setPredicate on data source");
-  }
+//  @Override
+//  public boolean setPredicate(Predicate p) {
+//    throw new UnsupportedOperationException("cannnot setPredicate on data source");
+//  }
 
   @Override
   public DataSourceMetadata getDataSourceMetadata() {
@@ -156,8 +156,8 @@ public class ColumnDataSourceImpl extends DataSource {
     return indexContainer.getInvertedIndex();
   }
 
-  @Override
-  public Dictionary getDictionary() {
-    return indexContainer.getDictionary();
-  }
+//  @Override
+//  public Dictionary getDictionary() {
+//    return indexContainer.getDictionary();
+//  }
 }

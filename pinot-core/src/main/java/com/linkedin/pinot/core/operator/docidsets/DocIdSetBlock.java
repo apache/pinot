@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.core.operator.docidsets;
 
-import com.linkedin.pinot.core.common.Block;
+import com.linkedin.pinot.core.common.AbstractBlock;
 import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
 import com.linkedin.pinot.core.common.BlockId;
@@ -24,7 +24,7 @@ import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Predicate;
 
 
-public class DocIdSetBlock implements Block {
+public class DocIdSetBlock extends AbstractBlock {
 
   final int[] _docIdArray;
   final int _searchableLength;

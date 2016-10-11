@@ -16,6 +16,7 @@
 package com.linkedin.pinot.core.operator.blocks;
 
 import com.linkedin.pinot.common.utils.DataTable;
+import com.linkedin.pinot.core.common.AbstractBlock;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
@@ -32,7 +33,7 @@ import org.slf4j.LoggerFactory;
  *
  *
  */
-public class InstanceResponseBlock implements Block {
+public class InstanceResponseBlock extends AbstractBlock {
   private static final Logger LOGGER = LoggerFactory.getLogger(InstanceResponseBlock.class);
 
   private DataTable _instanceResponseDataTable;

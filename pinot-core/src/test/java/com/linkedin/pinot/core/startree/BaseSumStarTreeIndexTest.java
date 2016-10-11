@@ -20,6 +20,7 @@ import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.common.utils.request.RequestUtils;
+import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.core.common.Constants;
@@ -156,15 +157,17 @@ public class BaseSumStarTreeIndexTest {
     for (int i = 0; i < numMetrics; i++) {
       String metricName = metricNames.get(i);
       DataSource dataSource = segment.getDataSource(metricName);
-      metricDictionaries[i] = dataSource.getDictionary();
-      metricValIterators[i] = (BlockSingleValIterator) dataSource.getNextBlock().getBlockValueSet().iterator();
+      Block nextBlock = dataSource.getNextBlock();
+      metricDictionaries[i] = nextBlock.getDictionary();
+      metricValIterators[i] = (BlockSingleValIterator) nextBlock.getBlockValueSet().iterator();
     }
 
     for (int i = 0; i < numGroupByColumns; i++) {
       String groupByColumn = groupByColumns.get(i);
       DataSource dataSource = segment.getDataSource(groupByColumn);
-      groupByDictionaries[i] = dataSource.getDictionary();
-      groupByValIterators[i] = (BlockSingleValIterator) dataSource.getNextBlock().getBlockValueSet().iterator();
+      Block nextBlock = dataSource.getNextBlock();
+      groupByDictionaries[i] = nextBlock.getDictionary();
+      groupByValIterators[i] = (BlockSingleValIterator) nextBlock.getBlockValueSet().iterator();
     }
 
     Map<String, double[]> result = new HashMap<String, double[]>();

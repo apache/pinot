@@ -35,6 +35,7 @@ public class DataFetcher {
   private final IndexSegment _indexSegment;
 
   private final Map<String, DataSource> _columnToDataSourceMap = new HashMap<>();
+  private final Map<String, Block> _columnToBlockMap = new HashMap<>();
   private final Map<String, Dictionary> _columnToDictionaryMap = new HashMap<>();
   private final Map<String, BlockValSet> _columnToBlockValSetMap = new HashMap<>();
 
@@ -71,10 +72,19 @@ public class DataFetcher {
   public Dictionary getDictionaryForColumn(String column) {
     Dictionary dictionary = _columnToDictionaryMap.get(column);
     if (dictionary == null) {
-      dictionary = getDataSourceForColumn(column).getDictionary();
+      dictionary = getBlockForColumn(column).getDictionary();
       _columnToDictionaryMap.put(column, dictionary);
     }
     return dictionary;
+  }
+
+  public Block getBlockForColumn(String column) {
+    Block block  = _columnToBlockMap.get(column);
+    if (block == null) {
+      block = getDataSourceForColumn(column).nextBlock(BLOCK_ZERO);
+      _columnToBlockMap.put(column, block);
+    }
+    return block;
   }
 
   /**

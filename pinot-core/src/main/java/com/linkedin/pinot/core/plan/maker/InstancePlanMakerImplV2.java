@@ -127,8 +127,8 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   private boolean isGroupKeyFitForLong(IndexSegment indexSegment, BrokerRequest brokerRequest) {
     int totalBitSet = 0;
     for (final String column : brokerRequest.getGroupBy().getColumns()) {
-      Dictionary dictionary = indexSegment.getDataSource(column).getDictionary();
-      totalBitSet += BitHacks.findLogBase2(dictionary.length()) + 1;
+      int cardinality = indexSegment.getDataSource(column).getDataSourceMetadata().cardinality();
+      totalBitSet += BitHacks.findLogBase2(cardinality) + 1;
     }
     if (totalBitSet > 64) {
       return false;

@@ -16,7 +16,7 @@
 package com.linkedin.pinot.core.operator.blocks;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.core.common.Block;
+import com.linkedin.pinot.core.common.AbstractBlock;
 import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
 import com.linkedin.pinot.core.common.BlockId;
@@ -29,7 +29,7 @@ import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 
 
-public class MultiValueBlock implements Block {
+public class MultiValueBlock extends AbstractBlock {
 
   final SingleColumnMultiValueReader mVReader;
   private final BlockId id;

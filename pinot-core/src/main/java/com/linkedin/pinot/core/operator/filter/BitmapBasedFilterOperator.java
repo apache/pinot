@@ -63,7 +63,7 @@ public class BitmapBasedFilterOperator extends BaseFilterOperator {
     Predicate predicate = getPredicate();
     InvertedIndexReader invertedIndex = dataSource.getInvertedIndex();
     Block dataSourceBlock = dataSource.nextBlock();
-    Dictionary dictionary = dataSource.getDictionary();
+    Dictionary dictionary = dataSourceBlock.getDictionary();
     PredicateEvaluator evaluator = PredicateEvaluatorProvider.getPredicateFunctionFor(predicate, dictionary);
     int[] dictionaryIds;
     boolean exclusion = false;

@@ -171,15 +171,17 @@ public class BaseHllStarTreeIndexTest {
     for (int i = 0; i < numMetrics; i++) {
       String metricName = metricNames.get(i);
       DataSource dataSource = segment.getDataSource(metricName);
-      metricDictionaries[i] = dataSource.getDictionary();
-      metricValIterators[i] = (BlockSingleValIterator) dataSource.getNextBlock().getBlockValueSet().iterator();
+      Block nextBlock = dataSource.getNextBlock();
+      metricDictionaries[i] = nextBlock.getDictionary();
+      metricValIterators[i] = (BlockSingleValIterator) nextBlock.getBlockValueSet().iterator();
     }
 
     for (int i = 0; i < numGroupByColumns; i++) {
       String groupByColumn = groupByColumns.get(i);
       DataSource dataSource = segment.getDataSource(groupByColumn);
-      groupByDictionaries[i] = dataSource.getDictionary();
-      groupByValIterators[i] = (BlockSingleValIterator) dataSource.getNextBlock().getBlockValueSet().iterator();
+      Block nextBlock = dataSource.getNextBlock();
+      groupByDictionaries[i] = nextBlock.getDictionary();
+      groupByValIterators[i] = (BlockSingleValIterator) nextBlock.getBlockValueSet().iterator();
     }
 
     Map<String, HyperLogLog[]> result = new HashMap<>();

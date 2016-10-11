@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.core.common;
 
+import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+
 /**
  *
  * A block represents a set of rows.A segment will contain one or more blocks
@@ -69,5 +71,6 @@ public interface Block {
    */
   BlockMetadata getMetadata();
 
+  Dictionary getDictionary();
 
 }

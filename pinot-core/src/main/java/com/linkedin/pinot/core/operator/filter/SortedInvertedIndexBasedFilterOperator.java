@@ -71,7 +71,8 @@ public class SortedInvertedIndexBasedFilterOperator extends BaseFilterOperator {
   public BaseFilterBlock nextFilterBlock(BlockId BlockId) {
     Predicate predicate = getPredicate();
     final SortedInvertedIndexReader invertedIndex = (SortedInvertedIndexReader) dataSource.getInvertedIndex();
-    Dictionary dictionary = dataSource.getDictionary();
+    //TODO: push this into the data source.
+    Dictionary dictionary = dataSource.getNextBlock().getDictionary();
     List<IntPair> pairs = new ArrayList<IntPair>();
     PredicateEvaluator evaluator = PredicateEvaluatorProvider.getPredicateFunctionFor(predicate, dictionary);
 

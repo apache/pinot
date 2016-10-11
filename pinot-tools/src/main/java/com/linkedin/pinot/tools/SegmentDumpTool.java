@@ -76,7 +76,7 @@ public class SegmentDumpTool {
       BlockValSet blockValSet = block.getBlockValueSet();
       BlockSingleValIterator itr = (BlockSingleValIterator) blockValSet.iterator();
       iterators.put(columnName, itr);
-      dictionaries.put(columnName, dataSource.getDictionary());
+      dictionaries.put(columnName, block.getDictionary());
     }
 
     System.out.print("Doc\t");

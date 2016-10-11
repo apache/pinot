@@ -49,6 +49,7 @@ import com.linkedin.pinot.core.operator.filter.ScanBasedFilterOperator;
 import com.linkedin.pinot.core.realtime.impl.FileBasedStreamProviderConfig;
 import com.linkedin.pinot.core.realtime.impl.FileBasedStreamProviderImpl;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
+import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 
 public class RealtimeSegmentTest {
@@ -126,8 +127,11 @@ public class RealtimeSegmentTest {
 
   @Test
   public void testMetricPredicateWithInvIdx() throws Exception {
+    DataSource ds = segmentWithInvIdx.getDataSource("count");
+    Block block = ds.nextBlock();
+    Dictionary dictionary = block.getDictionary();
+    
     DataSource ds1 = segmentWithInvIdx.getDataSource("count");
-
     BitmapBasedFilterOperator op = new BitmapBasedFilterOperator(ds1, 0, segmentWithInvIdx.getRawDocumentCount() - 1);
     List<String> rhs = new ArrayList<String>();
     rhs.add("890662862");
@@ -144,7 +148,7 @@ public class RealtimeSegmentTest {
     int counter = 0;
     while (docId != Constants.EOF) {
       blockValIterator.skipTo(docId);
-      Assert.assertEquals(ds1.getDictionary().get(blockValIterator.nextIntVal()), 890662862);
+      Assert.assertEquals(dictionary.get(blockValIterator.nextIntVal()), 890662862);
       docId = iterator.next();
       counter++;
     }
@@ -153,8 +157,11 @@ public class RealtimeSegmentTest {
 
   @Test
   public void testMetricPredicateWithoutInvIdx() throws Exception {
+    DataSource ds = segmentWithInvIdx.getDataSource("count");
+    Block block = ds.nextBlock();
+    Dictionary dictionary = block.getDictionary();
+    
     DataSource ds1 = segmentWithoutInvIdx.getDataSource("count");
-
     ScanBasedFilterOperator op = new ScanBasedFilterOperator(ds1, 0, segmentWithoutInvIdx.getRawDocumentCount() - 1);
     List<String> rhs = new ArrayList<String>();
     rhs.add("890662862");
@@ -171,7 +178,7 @@ public class RealtimeSegmentTest {
     int counter = 0;
     while (docId != Constants.EOF) {
       blockValIterator.skipTo(docId);
-      Assert.assertEquals(ds1.getDictionary().get(blockValIterator.nextIntVal()), 890662862);
+      Assert.assertEquals(dictionary.get(blockValIterator.nextIntVal()), 890662862);
       docId = iterator.next();
       counter++;
     }
@@ -181,7 +188,6 @@ public class RealtimeSegmentTest {
   @Test
   public void testNoMatchFilteringMetricPredicateWithInvIdx() throws Exception {
     DataSource ds1 = segmentWithInvIdx.getDataSource("count");
-
     BitmapBasedFilterOperator op = new BitmapBasedFilterOperator(ds1, 0, segmentWithInvIdx.getRawDocumentCount() - 1);
     List<String> rhs = new ArrayList<String>();
     rhs.add("890662862");
@@ -228,8 +234,11 @@ public class RealtimeSegmentTest {
 
   @Test
   public void testRangeMatchFilteringMetricPredicateWithInvIdx() throws Exception {
-    DataSource ds1 = segmentWithInvIdx.getDataSource("count");
+    DataSource ds = segmentWithInvIdx.getDataSource("count");
+    Block block = ds.nextBlock();
+    Dictionary dictionary = block.getDictionary();
 
+    DataSource ds1 = segmentWithInvIdx.getDataSource("count");
     BitmapBasedFilterOperator op = new BitmapBasedFilterOperator(ds1, 0, segmentWithInvIdx.getRawDocumentCount() - 1);
     List<String> rhs = new ArrayList<String>();
     rhs.add("[0\t\t*)");
@@ -246,7 +255,7 @@ public class RealtimeSegmentTest {
     int counter = 0;
     while (docId != Constants.EOF) {
       blockValIterator.skipTo(docId);
-      Assert.assertEquals(ds1.getDictionary().get(blockValIterator.nextIntVal()), 890662862);
+      Assert.assertEquals(dictionary.get(blockValIterator.nextIntVal()), 890662862);
       docId = iterator.next();
       counter++;
     }
@@ -255,8 +264,11 @@ public class RealtimeSegmentTest {
 
   @Test
   public void testRangeMatchFilteringMetricPredicateWithoutInvIdx() throws Exception {
-    DataSource ds1 = segmentWithoutInvIdx.getDataSource("count");
+    DataSource ds = segmentWithInvIdx.getDataSource("count");
+    Block block = ds.nextBlock();
+    Dictionary dictionary = block.getDictionary();
 
+    DataSource ds1 = segmentWithoutInvIdx.getDataSource("count");
     ScanBasedFilterOperator op = new ScanBasedFilterOperator(ds1, 0, segmentWithoutInvIdx.getRawDocumentCount() - 1);
     List<String> rhs = new ArrayList<String>();
     rhs.add("[0\t\t*)");
@@ -273,7 +285,7 @@ public class RealtimeSegmentTest {
     int counter = 0;
     while (docId != Constants.EOF) {
       blockValIterator.skipTo(docId);
-      Assert.assertEquals(ds1.getDictionary().get(blockValIterator.nextIntVal()), 890662862);
+      Assert.assertEquals(dictionary.get(blockValIterator.nextIntVal()), 890662862);
       docId = iterator.next();
       counter++;
     }

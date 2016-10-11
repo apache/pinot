@@ -13,32 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.operator.blocks;
+package com.linkedin.pinot.core.common;
 
-import java.util.Map;
-
-import com.linkedin.pinot.core.common.AbstractBlock;
-import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.BlockDocIdSet;
-import com.linkedin.pinot.core.common.BlockDocIdValueSet;
-import com.linkedin.pinot.core.common.BlockId;
-import com.linkedin.pinot.core.common.BlockMetadata;
-import com.linkedin.pinot.core.common.BlockValSet;
-import com.linkedin.pinot.core.common.Predicate;
+import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
 /**
- * ProjectionBlock holds a column name to Block Map.
- * It provides DocIdSetBlock and DataBlock for a given column.
+ *
+ * A block represents a set of rows.A segment will contain one or more blocks
+ * Currently, it assumes only one column per block. We might change this in
+ * future
  */
-public class ProjectionBlock extends AbstractBlock {
+public abstract class AbstractBlock implements Block {
 
-  private final Map<String, Block> _blockMap;
-  private final Block _docIdSetBlock;
-
-  public ProjectionBlock(Map<String, Block> blockMap, Block docIdSetBlock) {
-    super();
-    this._blockMap = blockMap;
-    this._docIdSetBlock = docIdSetBlock;
+  @Override
+  public BlockId getId() {
+    throw new UnsupportedOperationException();
   }
 
   @Override
@@ -47,7 +36,7 @@ public class ProjectionBlock extends AbstractBlock {
   }
 
   @Override
-  public BlockId getId() {
+  public BlockDocIdSet getBlockDocIdSet() {
     throw new UnsupportedOperationException();
   }
 
@@ -62,21 +51,12 @@ public class ProjectionBlock extends AbstractBlock {
   }
 
   @Override
-  public BlockDocIdSet getBlockDocIdSet() {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
   public BlockMetadata getMetadata() {
     throw new UnsupportedOperationException();
   }
 
-  public Block getBlock(String column) {
-    return _blockMap.get(column);
+  @Override
+  public Dictionary getDictionary() {
+    throw new UnsupportedOperationException();
   }
-
-  public Block getDocIdSetBlock() {
-    return _docIdSetBlock;
-  }
-
 }

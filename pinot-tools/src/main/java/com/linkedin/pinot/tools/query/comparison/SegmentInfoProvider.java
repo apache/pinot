@@ -137,7 +137,7 @@ public class SegmentInfoProvider {
    */
   private void loadValuesForSingleValueDimension(IndexSegment indexSegment,
       Map<String, Set<Object>> singleValueDimensionValuesMap, String column) {
-    Dictionary dictionary = indexSegment.getDataSource(column).getDictionary();
+    Dictionary dictionary = indexSegment.getDataSource(column).getNextBlock().getDictionary();
 
     Set<Object> values = singleValueDimensionValuesMap.get(column);
     if (values == null) {

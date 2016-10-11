@@ -64,10 +64,10 @@ public class ScanBasedFilterOperator extends BaseFilterOperator {
   @Override
   public BaseFilterBlock nextFilterBlock(BlockId BlockId) {
     Predicate predicate = getPredicate();
-    Dictionary dictionary = dataSource.getDictionary();
     DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
     FilterBlockDocIdSet docIdSet;
     Block nextBlock = dataSource.nextBlock();
+    Dictionary dictionary = nextBlock.getDictionary();
     BlockValSet blockValueSet = nextBlock.getBlockValueSet();
     BlockMetadata blockMetadata = nextBlock.getMetadata();
     PredicateEvaluator evaluator = PredicateEvaluatorProvider.getPredicateFunctionFor(predicate, dictionary);

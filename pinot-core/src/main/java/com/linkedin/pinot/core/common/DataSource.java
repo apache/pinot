@@ -21,11 +21,11 @@ import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
 public abstract class DataSource extends BaseOperator {
 
-  public abstract boolean setPredicate(Predicate predicate);
-
   public abstract DataSourceMetadata getDataSourceMetadata();
 
   public abstract InvertedIndexReader getInvertedIndex();
 
-  public abstract Dictionary getDictionary();
+//  public abstract Dictionary getDictionary();
+  
+//  getFilterOperator(Predicate p, startDocId, endDocId);
 }

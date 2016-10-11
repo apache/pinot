@@ -75,10 +75,10 @@ public class DataSourceUtils {
         return true;
       }
 
-      @Override
-      public boolean setPredicate(Predicate predicate) {
-        throw new UnsupportedOperationException();
-      }
+//      @Override
+//      public boolean setPredicate(Predicate predicate) {
+//        throw new UnsupportedOperationException();
+//      }
 
       @Override
       public DataSourceMetadata getDataSourceMetadata() {
@@ -127,11 +127,11 @@ public class DataSourceUtils {
         return null;
       }
 
-      @Override
-      public Dictionary getDictionary() {
-        // TODO Auto-generated method stub
-        return null;
-      }
+//      @Override
+//      public Dictionary getDictionary() {
+//        // TODO Auto-generated method stub
+//        return null;
+//      }
     };
   }
 

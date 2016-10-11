@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.core.operator.blocks;
 
-import com.linkedin.pinot.core.common.Block;
+import com.linkedin.pinot.core.common.AbstractBlock;
 import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
 import com.linkedin.pinot.core.common.BlockId;
@@ -28,7 +28,7 @@ import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 
 
-public class UnSortedSingleValueBlock implements Block {
+public class UnSortedSingleValueBlock extends AbstractBlock {
 
   final SingleColumnSingleValueReader sVReader;
   private final BlockId id;

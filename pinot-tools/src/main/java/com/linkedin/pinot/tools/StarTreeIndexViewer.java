@@ -86,7 +86,7 @@ public class StarTreeIndexViewer {
       BlockValSet blockValSet = block.getBlockValueSet();
       BlockSingleValIterator itr = (BlockSingleValIterator) blockValSet.iterator();
       valueIterators.put(columnName, itr);
-      dictionaries.put(columnName, dataSource.getDictionary());
+      dictionaries.put(columnName, block.getDictionary());
     }
     File starTreeFile = new File(segmentDir, V1Constants.STAR_TREE_INDEX_FILE);
     StarTreeInterf tree = StarTreeSerDe.fromFile(starTreeFile, ReadMode.mmap);

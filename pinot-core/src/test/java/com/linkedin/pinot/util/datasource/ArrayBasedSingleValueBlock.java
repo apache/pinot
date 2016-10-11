@@ -16,7 +16,7 @@
 package com.linkedin.pinot.util.datasource;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.core.common.Block;
+import com.linkedin.pinot.core.common.AbstractBlock;
 import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
 import com.linkedin.pinot.core.common.BlockId;
@@ -26,7 +26,7 @@ import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
 
-public class ArrayBasedSingleValueBlock implements Block {
+public class ArrayBasedSingleValueBlock extends AbstractBlock {
 
   private final int[] dictionary;
   final int[] values;

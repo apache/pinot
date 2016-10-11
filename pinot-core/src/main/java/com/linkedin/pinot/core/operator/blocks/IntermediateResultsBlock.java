@@ -22,7 +22,7 @@ import com.linkedin.pinot.common.response.ResponseStatistics;
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.common.utils.DataTableBuilder;
 import com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema;
-import com.linkedin.pinot.core.common.Block;
+import com.linkedin.pinot.core.common.AbstractBlock;
 import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
 import com.linkedin.pinot.core.common.BlockId;
@@ -45,7 +45,7 @@ import java.util.Map;
  *
  *
  */
-public class IntermediateResultsBlock implements Block {
+public class IntermediateResultsBlock extends AbstractBlock {
   private List<AggregationFunction> _aggregationFunctionList;
   private List<Serializable> _aggregationResultList;
   private List<ProcessingException> _processingExceptions;

@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.core.operator.blocks;
 
-import com.linkedin.pinot.core.common.Block;
+import com.linkedin.pinot.core.common.AbstractBlock;
 import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
 import com.linkedin.pinot.core.common.BlockMetadata;
@@ -23,7 +23,7 @@ import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.operator.docidsets.FilterBlockDocIdSet;
 
-public abstract class BaseFilterBlock implements Block {
+public abstract class BaseFilterBlock extends AbstractBlock {
 
   @Override
   public boolean applyPredicate(Predicate predicate) {
