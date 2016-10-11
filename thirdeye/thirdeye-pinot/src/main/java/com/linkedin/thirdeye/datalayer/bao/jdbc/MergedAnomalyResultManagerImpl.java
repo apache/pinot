@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.datalayer.bao.jdbc;
 
+import com.linkedin.thirdeye.dashboard.Utils;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;

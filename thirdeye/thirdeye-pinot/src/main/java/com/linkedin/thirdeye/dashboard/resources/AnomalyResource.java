@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
+import com.linkedin.thirdeye.dashboard.Utils;
 import java.io.IOException;
 import java.net.URLDecoder;
 import java.util.ArrayList;
@@ -151,11 +152,39 @@ public class AnomalyResource {
       } else {
         anomalyResults = anomalyMergedResultDAO.findByCollectionTime(dataset, startTime.getMillis(), endTime.getMillis());
       }
-
     } catch (Exception e) {
       LOG.error("Exception in fetching anomalies", e);
     }
+
+    setExploreDimensionsFilterForFrontEnd(anomalyResults, dataset);
+
     return anomalyResults;
+  }
+
+  private void setExploreDimensionsFilterForFrontEnd(List<MergedAnomalyResultDTO> anomalyResults, String collection) {
+    try {
+      List<String> dimensionNames = Utils.getSchemaDimensionNames(CACHE_REGISTRY_INSTANCE.getQueryCache(), collection);
+      for (MergedAnomalyResultDTO mergedAnomalyResultDTO : anomalyResults) {
+        AnomalyFunctionDTO anomalyFunction = mergedAnomalyResultDTO.getFunction();
+        Multimap<String, String> filterSet = anomalyFunction.getFilterSet();
+        String[] exploreDimensionValues = mergedAnomalyResultDTO.getDimensions().trim().split(",");
+        boolean isUpdated = false;
+        for (int i = 0; i < exploreDimensionValues.length; ++i) {
+          String exploreDimensionValue = exploreDimensionValues[i];
+          if (!exploreDimensionValue.equals("") && !exploreDimensionValue.equals("*")) {
+            String dimensionName = dimensionNames.get(i);
+            filterSet.removeAll(dimensionName);
+            filterSet.put(dimensionName, exploreDimensionValue);
+            isUpdated = true;
+          }
+        }
+        if (isUpdated) {
+          anomalyFunction.setFilters(filterSet);
+        }
+      }
+    } catch (Exception e) {
+      LOG.info("Unable to get dimensionNames for {}", collection);
+    }
   }
 
   /************* CRUD for anomaly functions of collection **********************************************/

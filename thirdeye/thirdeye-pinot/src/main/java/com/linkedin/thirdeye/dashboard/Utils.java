@@ -1,7 +1,6 @@
 package com.linkedin.thirdeye.dashboard;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.linkedin.thirdeye.api.TimeSpec;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -105,16 +104,14 @@ public class Utils {
 
   public static List<String> getDimensions(QueryCache queryCache, String collection)
       throws Exception {
-    List<String> dimensions = getUnsortedDimensionNames(queryCache, collection);
+    List<String> dimensions = getSchemaDimensionNames(queryCache, collection);
     Collections.sort(dimensions);
     return dimensions;
   }
 
-  public static List<String> getUnsortedDimensionNames(QueryCache queryCache, String collection)
+  public static List<String> getSchemaDimensionNames(QueryCache queryCache, String collection)
       throws Exception {
-    CollectionSchema schema = queryCache.getClient().getCollectionSchema(collection);
-    List<String> dimensions = schema.getDimensionNames();
-    return dimensions;
+    return queryCache.getClient().getCollectionSchema(collection).getDimensionNames();
   }
 
   public static List<String> getDimensionsToGroupBy(QueryCache queryCache, String collection,

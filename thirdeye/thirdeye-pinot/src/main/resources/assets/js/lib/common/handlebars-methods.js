@@ -94,6 +94,25 @@ $(document).ready(function () {
         return displayValue
     });
 
+    Handlebars.registerHelper('displayAnomalyResultExploreDimensions', function (dimensionNamesString, dimensionValuesString) {
+        
+        var dimensionNames = dimensionNamesString.replace(/[\s]/g, "").split(",");
+        if (dimensionNames.length == 1) {
+            return dimensionValuesString.replace(/[,*\s]/g, "");
+        }
+
+        var dimensionValues = dimensionValuesString.replace(/[*\s]/g, "").split(",");
+        var displayValue = "";
+        var separator = "";
+        for (var i = 0; i < dimensionNames.length; ++i) {
+            if (dimensionValues[i]) {
+                displayValue = displayValue + separator + dimensionNames[i] + ": " + dimensionValues[i];
+                separator = "; ";
+            }
+        }
+        return displayValue
+    });
+
 
     //Helper for anomaly function form, here we can set the desired display of any function property
     Handlebars.registerHelper('displayAnomalyFunctionProp', function (param , value) {

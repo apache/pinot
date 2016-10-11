@@ -543,14 +543,9 @@ function renderAnomalyThumbnails(data, tab) {
 
     for(var i = 0, numAnomalies = data.length; i < numAnomalies; i++) {
         requestLineChart(i);
-
     }
 
      function requestLineChart(i) {
-         var placeholder = "d3charts-" + i;
-         var exploreDimension = data[i]["function"]["exploreDimensions"];
-         var effectedValue = data[i]["dimensions"];
-         var fnFilters = parseProperties(data[i]["function"]["filters"], {arrayValues: true});
          var startTime = data[i]["startTime"];
          var endTime = data[i]["endTime"];
          var anomalyId = data[i]["id"]
@@ -563,10 +558,9 @@ function renderAnomalyThumbnails(data, tab) {
         var currentEnd = hash.currentEnd;
         var metrics = hash.metrics;
         var placeholder= "#d3charts-" + i;
-        var exploreDimension = data[i]["function"]["exploreDimensions"];
-        var effectedValue = data[i]["dimensions"];
         var fnFiltersString = data[i]["function"]["filters"];
-        var filters = createAnomalyFilters(effectedValue,exploreDimension,fnFiltersString);
+        var filters = parseProperties( fnFiltersString, {arrayValues:true} );
+
         filters = encodeURIComponent(JSON.stringify(filters));
         var timeSeriesUrl = "/dashboard/data/tabular?dataset=" + dataset + "&compareMode=" + compareMode //
             + "&currentStart=" + currentStart + "&currentEnd=" + currentEnd  //

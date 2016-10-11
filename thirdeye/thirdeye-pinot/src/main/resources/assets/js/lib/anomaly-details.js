@@ -72,13 +72,11 @@ function lineChartForSingleAnomaly(mergeAnomalyData) {
     var baselineStart = moment(parseInt(currentStart)).add((-1* compare), 'weeks');
     var baselineEnd = moment(parseInt(currentEnd)).add( (-1* compare), 'weeks');
 
-    var exploreDimension = mergeAnomalyData.function.exploreDimensions;
-    var effectedValue = mergeAnomalyData.dimensions;
     var fnFiltersString = mergeAnomalyData.function.filters;
+    var filters = parseProperties( fnFiltersString, {arrayValues:true} );
+    filters = encodeURIComponent(JSON.stringify(filters));
 
     var metrics = hash.metrics;
-    var filters = createAnomalyFilters(effectedValue,exploreDimension,fnFiltersString);
-    filters = encodeURIComponent(JSON.stringify(filters));
 
     var timeSeriesUrl = "/dashboard/data/tabular?dataset=" + dataset + "&compareMode=" + compareMode //
         + "&currentStart=" + currentStart + "&currentEnd=" + currentEnd  //
