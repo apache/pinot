@@ -20,6 +20,7 @@ import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.utils.FileUploadUtils;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.controller.helix.ControllerTestUtils;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.tools.query.comparison.QueryComparison;
 import com.linkedin.pinot.tools.query.comparison.SegmentInfoProvider;
 import com.linkedin.pinot.tools.query.comparison.StarTreeQueryGenerator;
@@ -105,10 +106,10 @@ public class StarTreeClusterIntegrationTest extends ClusterTest {
    * @throws Exception
    */
   private void addOfflineTables() throws Exception {
-    addOfflineTable(DEFAULT_TABLE_NAME, TIME_COLUMN_NAME, TIME_UNIT, RETENTION_TIME,
-        RETENTION_TIME_UNIT, null, null);
-    addOfflineTable(STAR_TREE_TABLE_NAME, TIME_COLUMN_NAME, TIME_UNIT, RETENTION_TIME,
-        RETENTION_TIME_UNIT, null, null);
+    addOfflineTable(TIME_COLUMN_NAME, TIME_UNIT, RETENTION_TIME, RETENTION_TIME_UNIT, null, null, DEFAULT_TABLE_NAME,
+        SegmentVersion.v1);
+    addOfflineTable(TIME_COLUMN_NAME, TIME_UNIT, RETENTION_TIME, RETENTION_TIME_UNIT, null, null, STAR_TREE_TABLE_NAME,
+        SegmentVersion.v1);
   }
 
   /**
