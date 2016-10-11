@@ -35,6 +35,8 @@ public class PinotToolLauncher {
   @Argument(handler = SubCommandHandler.class, metaVar = "<subCommand>")
   @SubCommands({
       @SubCommand(name = "UpdateSegmentState", impl = UpdateSegmentState.class),
+      @SubCommand(name = "PurgeSegmentsFromFiler", impl = FilerSegmentPurger.class),
+
   })
   Command _subCommand;
   // @formatter:on
