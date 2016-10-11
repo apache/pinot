@@ -867,15 +867,19 @@ function calcHeatMapBG() {
 function calcAggregateGranularity(startMillis, endMillis) {
     var millisInAWeek = 604800000;
     var millisInADay = 86400000;
-    var aggTimeGranularity;
-    if (parseInt(endMillis) - parseInt(startMillis) >= millisInAWeek) {
-        aggTimeGranularity = "DAYS"
-    } else if (parseInt(endMillis) - parseInt(startMillis) >= 2 * millisInADay) {
-        aggTimeGranularity = "HOURS"
-    } else {
-        aggTimeGranularity = (window.datasetConfig.dataGranularity) ? window.datasetConfig.dataGranularity : "HOURS";
-        if (aggTimeGranularity === 'MINUTES') {
-            aggTimeGranularity = '5_MINUTES';
+
+    var timeDiff = parseInt(endMillis) - parseInt(startMillis);
+    var dataGranularity = (window.datasetConfig.dataGranularity);
+    var aggTimeGranularity = dataGranularity;
+
+    if (aggTimeGranularity != "DAYS") {
+        if (timeDiff >= millisInAWeek) {
+            aggTimeGranularity = 'DAYS';
+        } else {
+            aggTimeGranularity = 'HOURS';
+            if (timeDiff < millisInADay && dataGranularity === 'MINUTES') {
+                aggTimeGranularity = '5_MINUTES';
+            }
         }
     }
     return aggTimeGranularity
