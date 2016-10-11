@@ -450,7 +450,7 @@ function drawAnomalyTimeSeries(timeSeriesData,anomalyData, tab, placeholder, opt
                  current: 'y2'
              },
              json: lineChartData,
-             type: 'area-spline',
+             type: 'spline',
              colors: colors
 
          },
