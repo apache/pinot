@@ -35,13 +35,12 @@ function lineChartForSingleAnomaly(mergeAnomalyData) {
     var dataset = hash.dataset;
     var mergedAnomalyId = mergeAnomalyData.id;
 
+    // TODO: remove console logs
     console.log(window.datasetConfig);
     console.log(mergeAnomalyData);
 
-    var aggTimeGranularity = (window.datasetConfig.dataGranularity) ? window.datasetConfig.dataGranularity : "HOURS";
-    if (aggTimeGranularity === 'MINUTES') {
-      aggTimeGranularity = '5_MINUTES';
-    }
+    var aggTimeGranularity = calcAggregateGranularity(mergeAnomalyData.startTime, mergeAnomalyData.endTime);
+    console.log(aggTimeGranularity);
 
     var extensionWindowMillis = (datasetConfig.dataGranularity == "DAYS") ? 86400000 : 3600000;
     var fnProperties = parseProperties(mergeAnomalyData.function.properties);
