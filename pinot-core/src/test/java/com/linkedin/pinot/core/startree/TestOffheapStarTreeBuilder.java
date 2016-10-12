@@ -89,7 +89,7 @@ public class TestOffheapStarTreeBuilder {
     Iterator<GenericRow> iterator = builder.iterator(0, totalDocs);
     while(iterator.hasNext()) {
       GenericRow row = iterator.next();
-      System.out.println(row);
+//      System.out.println(row);
     }
 
     iterator = builder.iterator(builder.getTotalRawDocumentCount(), totalDocs);

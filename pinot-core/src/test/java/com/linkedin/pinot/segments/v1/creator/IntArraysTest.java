@@ -61,7 +61,7 @@ public class IntArraysTest {
       FileUtils.deleteQuietly(INDEX_DIR);
     }
 
-    System.out.println(INDEX_DIR.getAbsolutePath());
+//    System.out.println(INDEX_DIR.getAbsolutePath());
     final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
 
     final SegmentGeneratorConfig config =

@@ -59,8 +59,8 @@ public class BalancedRandomRoutingTableBuilderTest {
     ServerToSegmentSetMap previous = routingTableIterator.next();
     while (routingTableIterator.hasNext()) {
       ServerToSegmentSetMap current = routingTableIterator.next();
-      System.out.println("current = " + current);
-      System.out.println("previous = " + previous);
+//      System.out.println("current = " + current);
+//      System.out.println("previous = " + previous);
       if (!current.equals(previous)) {
         // Routing tables differ, test is successful
         return;

@@ -72,16 +72,16 @@ public class FixedByteSkipListSCMVWriterTest {
     dis.read(bitsetBytes);
     CustomBitSet customBit = CustomBitSet.withByteBuffer(numBytesForBitmap, ByteBuffer.wrap(bitsetBytes));
     offset = 0;
-    System.out.println(customBit);
-    RandomAccessFile raf = new RandomAccessFile(file, "r");
-    System.out.println("totalNumValues:" + totalNumValues);
-    System.out.println("totalDocs:" + rows);
-    System.out.println("raf.length():" + raf.length());
-    System.out.println("numChunks:" + numChunks);
-    System.out.println("getTotalSize:" + writer.getTotalSize());
-    System.out.println("getRawDataSize:" + writer.getRawDataSize());
-    System.out.println("getBitsetSize:" + writer.getBitsetSize());
-    System.out.println("getChunkOffsetHeaderSize:" + writer.getChunkOffsetHeaderSize());
+//    System.out.println(customBit);
+//    RandomAccessFile raf = new RandomAccessFile(file, "r");
+//    System.out.println("totalNumValues:" + totalNumValues);
+//    System.out.println("totalDocs:" + rows);
+//    System.out.println("raf.length():" + raf.length());
+//    System.out.println("numChunks:" + numChunks);
+//    System.out.println("getTotalSize:" + writer.getTotalSize());
+//    System.out.println("getRawDataSize:" + writer.getRawDataSize());
+//    System.out.println("getBitsetSize:" + writer.getBitsetSize());
+//    System.out.println("getChunkOffsetHeaderSize:" + writer.getChunkOffsetHeaderSize());
     for (int i = 0; i < rows; i++) {
       Assert.assertTrue(customBit.isBitSet(offset));
       for (int j = 0; j < data[i].length; j++) {
@@ -91,7 +91,7 @@ public class FixedByteSkipListSCMVWriterTest {
     }
     dis.close();
     file.delete();
-    raf.close();
+//    raf.close();
     customBit.close();
   }
 }

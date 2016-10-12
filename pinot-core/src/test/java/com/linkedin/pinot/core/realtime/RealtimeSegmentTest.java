@@ -80,7 +80,7 @@ public class RealtimeSegmentTest {
     schema = SegmentTestUtils.extractSchemaFromAvro(new File(filePath), fieldTypeMap, TimeUnit.MINUTES);
 
     StreamProviderConfig config = new FileBasedStreamProviderConfig(FileFormat.AVRO, filePath, schema);
-    System.out.println(config);
+//    System.out.println(config);
     StreamProvider provider = new FileBasedStreamProviderImpl();
     final String tableName = RealtimeSegmentTest.class.getSimpleName() + ".noTable";
     provider.init(config, tableName, new ServerMetrics(new MetricsRegistry()));

@@ -89,7 +89,7 @@ public class ChunkIndexCreationDriverImplTest {
   public void test2() throws Exception {
     final IndexSegmentImpl segment =
         (IndexSegmentImpl) Loaders.IndexSegment.load(INDEX_DIR.listFiles()[0], ReadMode.mmap);
-    System.out.println("INdex dir:" + INDEX_DIR);
+//    System.out.println("INdex dir:" + INDEX_DIR);
     final DataSource ds = segment.getDataSource("column1");
     final Block bl = ds.nextBlock();
     final BlockValSet valSet = bl.getBlockValueSet();
@@ -143,7 +143,7 @@ public class ChunkIndexCreationDriverImplTest {
       b.append(docId + ",");
       docId = it.next();
     }
-    System.out.println(b.toString());
+//    System.out.println(b.toString());
   }
 
   @Test(enabled = false)
@@ -168,7 +168,7 @@ public class ChunkIndexCreationDriverImplTest {
       b.append(docId + ",");
       docId = it.next();
     }
-    System.out.println(b.toString());
+//    System.out.println(b.toString());
   }
 
   @Test(enabled = false)
@@ -194,7 +194,7 @@ public class ChunkIndexCreationDriverImplTest {
       b.append(docId + ",");
       docId = it.next();
     }
-    System.out.println(b.toString());
+//    System.out.println(b.toString());
   }
 
 }

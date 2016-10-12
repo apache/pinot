@@ -159,7 +159,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
               }
 
               if (onlinePartitionCount == offlineSegmentCount) {
-                System.out.println("Got " + offlineSegmentCount + " online tables, unlatching the main thread");
+//                System.out.println("Got " + offlineSegmentCount + " online tables, unlatching the main thread");
                 latch.countDown();
               }
             }
@@ -171,7 +171,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
     // Upload the segments
     int i = 0;
     for (String segmentName : _tarDir.list()) {
-      System.out.println("Uploading segment " + (i++) + " : " + segmentName);
+//      System.out.println("Uploading segment " + (i++) + " : " + segmentName);
       File file = new File(_tarDir, segmentName);
       FileUploadUtils.sendSegmentFile("localhost", "8998", segmentName, file, file.length());
     }

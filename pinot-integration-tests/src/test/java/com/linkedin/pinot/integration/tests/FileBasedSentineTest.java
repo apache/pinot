@@ -129,7 +129,7 @@ public class FileBasedSentineTest extends ControllerTest {
     final JSONObject selectionRequestResponse = postQuery("select * from 'table1' limit 100",
         "http://localhost:" + FileBasedServerBrokerStarters.BROKER_CLIENT_PORT);
 
-    System.out.println(selectionRequestResponse.toString(1));
+//    System.out.println(selectionRequestResponse.toString(1));
   }
 
   @AfterClass

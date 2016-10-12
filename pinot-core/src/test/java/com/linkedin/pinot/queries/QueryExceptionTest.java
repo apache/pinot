@@ -80,7 +80,7 @@ public class QueryExceptionTest {
     instanceDataManager.init(new FileBasedInstanceDataManagerConfig(serverConf.subset("pinot.server.instance")));
     instanceDataManager.start();
 
-    System.out.println("************************** : " + new File(INDEX_DIR, "segment").getAbsolutePath());
+//    System.out.println("************************** : " + new File(INDEX_DIR, "segment").getAbsolutePath());
     File segmentFile = new File(INDEX_DIR, "segment").listFiles()[0];
     segmentName = segmentFile.getName();
     final IndexSegment indexSegment = ColumnarSegmentLoader.load(segmentFile, ReadMode.heap);
@@ -114,7 +114,7 @@ public class QueryExceptionTest {
     driver.init(config);
     driver.build();
 
-    System.out.println("built at : " + INDEX_DIR.getAbsolutePath());
+//    System.out.println("built at : " + INDEX_DIR.getAbsolutePath());
   }
 
   @Test

@@ -23,10 +23,9 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.Random;
-
+import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
@@ -50,20 +49,20 @@ public class TestStarTreeDataTable {
     out.close();
     dos.flush();
     dos.close();
-    print(data);
-    System.out.println("BEFORE SORTING: " + tempFile.length());
+//    print(data);
+//    System.out.println("BEFORE SORTING: " + tempFile.length());
     int[][] input = read(tempFile, ROWS, COLS);
 
     int[] sortOrder = new int[COLS];
     for (int i = 0; i < COLS; i++) {
       sortOrder[i] = i;
     }
-    
+
     StarTreeDataTable sorter = new StarTreeDataTable(tempFile, COLS * (Integer.SIZE / 8), 0, sortOrder);
     sorter.sort(0, ROWS);
-    System.out.println("AFTER SORTING");
+//    System.out.println("AFTER SORTING");
     int[][] output = read(tempFile, ROWS, COLS);
-    print(output);
+//    print(output);
     Arrays.sort(input, new Comparator<int[]>() {
       @Override
       public int compare(int[] o1, int[] o2) {
@@ -75,12 +74,14 @@ public class TestStarTreeDataTable {
         return 0;
       }
     });
-    if (compare(input, output, ROWS)) {
-      System.out.println("PASSED");
-    } else {
-      System.out.println("FAILED");
-    }
-    System.out.println(sorter.groupByIntColumnCount(0, ROWS, 0));
+
+    Assert.assertTrue(compare(input, output, ROWS));
+//    if (compare(input, output, ROWS)) {
+//      System.out.println("PASSED");
+//    } else {
+//      System.out.println("FAILED");
+//    }
+//    System.out.println(sorter.groupByIntColumnCount(0, ROWS, 0));
 
   }
 
@@ -97,9 +98,9 @@ public class TestStarTreeDataTable {
   }
 
   public static void print(int[][] output) {
-    for (int i = 0; i < output.length; i++) {
-      System.out.println(Arrays.toString(output[i]));
-    }
+//    for (int i = 0; i < output.length; i++) {
+//      System.out.println(Arrays.toString(output[i]));
+//    }
   }
 
   public static int[][] read(File tempFile, int numRows, int numCols) throws IOException {

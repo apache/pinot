@@ -50,7 +50,7 @@ public class FixedByteWidthRowColDataFileReaderTest {
     dos.flush();
     dos.close();
     RandomAccessFile raf = new RandomAccessFile(f, "rw");
-    System.out.println("file size: " + raf.getChannel().size());
+//    System.out.println("file size: " + raf.getChannel().size());
     raf.close();
     
     PinotDataBuffer heapBuffer = PinotDataBuffer.fromFile(f, ReadMode.heap, FileChannel.MapMode.READ_ONLY, "testing");
@@ -100,7 +100,7 @@ public class FixedByteWidthRowColDataFileReaderTest {
     dos.flush();
     dos.close();
     RandomAccessFile raf = new RandomAccessFile(f, "rw");
-    System.out.println("file size: " + raf.getChannel().size());
+//    System.out.println("file size: " + raf.getChannel().size());
     raf.close();
     PinotDataBuffer heapBuffer = PinotDataBuffer.fromFile(f, ReadMode.heap, FileChannel.MapMode.READ_ONLY, "testing-heap");
     FixedByteSingleValueMultiColReader heapReader = new FixedByteSingleValueMultiColReader(heapBuffer, numRows, numCols, new int[] { 4, 4 });

@@ -79,9 +79,9 @@ public class PinotHelixResourceManagerTest {
       throws InterruptedException {
     Set<String> servers = pinotHelixResourceManager.getAllInstancesForServerTenant(ControllerTenantNameBuilder.DEFAULT_TENANT_NAME);
     BiMap<String, String> endpoints = pinotHelixResourceManager.getDataInstanceAdminEndpoints(servers);
-    for (Map.Entry<String, String> endpointEntry : endpoints.entrySet()) {
-      System.out.println(endpointEntry.getKey() + " -- " + endpointEntry.getValue());
-    }
+//    for (Map.Entry<String, String> endpointEntry : endpoints.entrySet()) {
+//      System.out.println(endpointEntry.getKey() + " -- " + endpointEntry.getValue());
+//    }
 
     for (int i = 0; i < numInstances; i++) {
       Assert.assertTrue(endpoints.inverse().containsKey("localhost:" + String.valueOf(adminPortStart + i)));

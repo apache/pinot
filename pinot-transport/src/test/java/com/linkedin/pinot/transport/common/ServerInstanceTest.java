@@ -31,8 +31,8 @@ public class ServerInstanceTest {
     {
       ServerInstance instance1 = new ServerInstance("localhost", 8080);
       ServerInstance instance2 = new ServerInstance("localhost", 8080);
-      System.out.println("Instance 1 :" + instance1);
-      System.out.println("Instance 2 :" + instance2);
+//      System.out.println("Instance 1 :" + instance1);
+//      System.out.println("Instance 2 :" + instance2);
       Assert.assertEquals(instance2, instance1, "Localhost server-instances with same port");
     }
 
@@ -40,16 +40,16 @@ public class ServerInstanceTest {
     {
       ServerInstance instance1 = new ServerInstance("test-host", 8080);
       ServerInstance instance2 = new ServerInstance("test-host", 8080);
-      System.out.println("Instance 1 :" + instance1);
-      System.out.println("Instance 2 :" + instance2);
+//      System.out.println("Instance 1 :" + instance1);
+//      System.out.println("Instance 2 :" + instance2);
       Assert.assertEquals(instance2, instance1, "Localhost server-instances with same port");
     }
     // same hostname but different port
     {
       ServerInstance instance1 = new ServerInstance("localhost", 8081);
       ServerInstance instance2 = new ServerInstance("localhost", 8082);
-      System.out.println("Instance 1 :" + instance1);
-      System.out.println("Instance 2 :" + instance2);
+//      System.out.println("Instance 1 :" + instance1);
+//      System.out.println("Instance 2 :" + instance2);
       Assert.assertFalse(instance1.equals(instance2), "Localhost server-instances with same port");
     }
 
@@ -57,8 +57,8 @@ public class ServerInstanceTest {
     {
       ServerInstance instance1 = new ServerInstance("abcd", 8080);
       ServerInstance instance2 = new ServerInstance("abce", 8080);
-      System.out.println("Instance 1 :" + instance1);
-      System.out.println("Instance 2 :" + instance2);
+//      System.out.println("Instance 1 :" + instance1);
+//      System.out.println("Instance 2 :" + instance2);
       Assert.assertFalse(instance1.equals(instance2), "Localhost server-instances with same port");
     }
 

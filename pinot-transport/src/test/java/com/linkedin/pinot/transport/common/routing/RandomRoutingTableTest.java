@@ -19,6 +19,7 @@ import com.linkedin.pinot.routing.PercentageBasedRoutingTableSelector;
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.lang.reflect.Field;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -47,10 +48,12 @@ import com.linkedin.pinot.transport.common.SegmentIdSet;
 public class RandomRoutingTableTest {
 
   @Test
-  public void testHelixExternalViewBasedRoutingTable() throws Exception {
+  public void testHelixExternalViewBasedRoutingTable()
+      throws Exception {
+    URL resourceUrl = getClass().getClassLoader().getResource("SampleExternalView.json");
+    Assert.assertNotNull(resourceUrl);
+    String fileName = resourceUrl.getFile();
     String tableName = "testTable_OFFLINE";
-    String fileName = RandomRoutingTableTest.class.getClassLoader().getResource("SampleExternalView.json").getFile();
-    System.out.println(fileName);
     InputStream evInputStream = new FileInputStream(fileName);
     ZNRecordSerializer znRecordSerializer = new ZNRecordSerializer();
     ZNRecord externalViewRecord = (ZNRecord) znRecordSerializer.deserialize(IOUtils.toByteArray(evInputStream));
@@ -84,14 +87,14 @@ public class RandomRoutingTableTest {
         Assert.assertTrue(arrays[j] / totalRuns <= 31);
         Assert.assertTrue(arrays[j] / totalRuns >= 28);
       }
-      //System.out.println(Arrays.toString(arrays) + " : " + new StandardDeviation().evaluate(arrays) + " : " + new Mean().evaluate(arrays));
+//      System.out.println(Arrays.toString(arrays) + " : " + new StandardDeviation().evaluate(arrays) + " : " + new Mean().evaluate(arrays));
     }
     for (int i = 0; i < globalArrays.length; ++i) {
       Assert.assertTrue(globalArrays[i] / totalRuns <= 31);
       Assert.assertTrue(globalArrays[i] / totalRuns >= 28);
     }
-    System.out.println(Arrays.toString(globalArrays) + " : " + new StandardDeviation().evaluate(globalArrays) + " : "
-        + new Mean().evaluate(globalArrays));
+//    System.out.println(Arrays.toString(globalArrays) + " : " + new StandardDeviation().evaluate(globalArrays) + " : "
+//        + new Mean().evaluate(globalArrays));
   }
 
   /**

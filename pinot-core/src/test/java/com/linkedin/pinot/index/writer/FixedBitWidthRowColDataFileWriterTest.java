@@ -65,7 +65,7 @@ public class FixedBitWidthRowColDataFileWriterTest {
 
       writer.close();
       final RandomAccessFile raf = new RandomAccessFile(file, "r");
-      System.out.println("file size:" + raf.length());
+//      System.out.println("file size:" + raf.length());
       final byte[] b = new byte[(int) raf.length()];
       raf.read(b);
       final byte[] byteArray = set.toByteArray();

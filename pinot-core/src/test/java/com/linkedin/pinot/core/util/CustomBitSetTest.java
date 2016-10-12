@@ -51,8 +51,8 @@ public class CustomBitSetTest {
     customBitSet.setBit(0);
     customBitSet.setBit(100);
     customBitSet.setBit(250);
-    System.out.println(customBitSet.findNthBitSetAfter(0, 1));
-    System.out.println(customBitSet.findNthBitSetAfter(100, 1));
+//    System.out.println(customBitSet.findNthBitSetAfter(0, 1));
+//    System.out.println(customBitSet.findNthBitSetAfter(100, 1));
     customBitSet.close();
 
   }
@@ -132,7 +132,7 @@ public class CustomBitSetTest {
 
       long nthBitSetAfter = customBitSet.findNthBitSetAfter(startSearchIndex, nthBitToFind);
       if (nthBitSetAfter != expectedIndex) {
-        System.out.println("Bits set " + bitsOnCopy + ", searching for " + nthBitToFind + "th bit from " + startSearchIndex);
+//        System.out.println("Bits set " + bitsOnCopy + ", searching for " + nthBitToFind + "th bit from " + startSearchIndex);
         nthBitSetAfter = customBitSet.findNthBitSetAfter(startSearchIndex, nthBitToFind);
       }
       Assert.assertEquals(nthBitSetAfter, expectedIndex, "Bits set " +
