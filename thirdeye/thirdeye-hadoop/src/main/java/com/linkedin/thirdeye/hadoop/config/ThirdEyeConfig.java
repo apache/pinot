@@ -32,6 +32,7 @@ import org.apache.commons.lang.StringUtils;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.linkedin.pinot.common.data.TimeGranularitySpec.TimeFormat;
 import com.linkedin.thirdeye.hadoop.config.DimensionSpec;
 import com.linkedin.thirdeye.hadoop.config.MetricSpec;
 import com.linkedin.thirdeye.hadoop.config.MetricType;
@@ -56,6 +57,7 @@ public final class ThirdEyeConfig {
   private static final String CONFIG_JOINER = ".";
   private static final String DEFAULT_TIME_TYPE = "HOURS";
   private static final String DEFAULT_TIME_SIZE = "1";
+  private static final String DEFAULT_TIME_FORMAT = TimeFormat.EPOCH.toString();
 
   private String collection;
   private List<DimensionSpec> dimensions;
@@ -351,7 +353,9 @@ public final class ThirdEyeConfig {
     String timeColumnSize = getAndCheck(props,
         ThirdEyeConfigProperties.THIRDEYE_TIMECOLUMN_SIZE.toString(), DEFAULT_TIME_SIZE);
     TimeGranularity timeGranularity = new TimeGranularity(Integer.parseInt(timeColumnSize), TimeUnit.valueOf(timeColumnType));
-    TimeSpec time = new TimeSpec(timeColumnName, timeGranularity);
+    String timeFormat = getAndCheck(props,
+        ThirdEyeConfigProperties.THIRDEYE_TIMECOLUMN_FORMAT.toString(), DEFAULT_TIME_FORMAT);
+    TimeSpec time = new TimeSpec(timeColumnName, timeGranularity, timeFormat);
     return time;
   }
 
@@ -364,9 +368,11 @@ public final class ThirdEyeConfig {
           ThirdEyeConfigProperties.THIRDEYE_INPUT_TIMECOLUMN_TYPE.toString(), null);
     String timeColumnSize = getAndCheck(props,
           ThirdEyeConfigProperties.THIRDEYE_INPUT_TIMECOLUMN_SIZE.toString(), null);
+    String timeFormat = getAndCheck(props,
+        ThirdEyeConfigProperties.THIRDEYE_INPUT_TIMECOLUMN_FORMAT.toString(), DEFAULT_TIME_FORMAT);
     if (timeColumnType != null && timeColumnSize != null) {
       TimeGranularity timeGranularity = new TimeGranularity(Integer.parseInt(timeColumnSize), TimeUnit.valueOf(timeColumnType));
-      inputTime = new TimeSpec(timeColumnName, timeGranularity);
+      inputTime = new TimeSpec(timeColumnName, timeGranularity, timeFormat);
     }
     return inputTime;
   }
