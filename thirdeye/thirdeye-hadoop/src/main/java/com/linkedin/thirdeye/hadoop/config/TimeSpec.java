@@ -16,6 +16,7 @@
 package com.linkedin.thirdeye.hadoop.config;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.linkedin.pinot.common.data.TimeGranularitySpec.TimeFormat;
 
 import java.util.concurrent.TimeUnit;
 
@@ -25,16 +26,19 @@ import java.util.concurrent.TimeUnit;
  */
 public class TimeSpec {
   private static final TimeGranularity DEFAULT_TIME_GRANULARITY = new TimeGranularity(1, TimeUnit.HOURS);
+  private static final String DEFAULT_TIME_FORMAT = TimeFormat.EPOCH.toString();
 
   private String columnName;
   private TimeGranularity timeGranularity = DEFAULT_TIME_GRANULARITY;
+  private String timeFormat = DEFAULT_TIME_FORMAT;
 
   public TimeSpec() {
   }
 
-  public TimeSpec(String columnName, TimeGranularity timeGranularity) {
+  public TimeSpec(String columnName, TimeGranularity timeGranularity, String timeFormat) {
     this.columnName = columnName;
     this.timeGranularity = timeGranularity;
+    this.timeFormat = timeFormat;
   }
 
   @JsonProperty
@@ -46,5 +50,11 @@ public class TimeSpec {
   public TimeGranularity getTimeGranularity() {
     return timeGranularity;
   }
+
+  @JsonProperty
+  public String getTimeFormat() {
+    return timeFormat;
+  }
+
 
 }

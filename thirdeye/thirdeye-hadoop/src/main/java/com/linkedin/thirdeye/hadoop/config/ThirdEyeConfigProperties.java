@@ -41,11 +41,19 @@ public enum ThirdEyeConfigProperties {
   /** Time input bucket size before aggregation*/
   THIRDEYE_INPUT_TIMECOLUMN_SIZE("thirdeye.input.timecolumn.size"),
 
+  /** Time format
+   * Can be either EPOCH (default) or SIMPLE_DATE_FORMAT:pattern e.g SIMPLE_DATE_FORMAT:yyyyMMdd  */
+  THIRDEYE_INPUT_TIMECOLUMN_FORMAT("thirdeye.input.timecolumn.format"),
+
   /** Time column type (HOURS, DAYS etc) */
   THIRDEYE_TIMECOLUMN_TYPE("thirdeye.timecolumn.type"),
 
   /** Time bucket size */
   THIRDEYE_TIMECOLUMN_SIZE("thirdeye.timecolumn.size"),
+
+  /** Time format
+   * Can be either EPOCH (default) or SIMPLE_DATE_FORMAT:pattern e.g SIMPLE_DATE_FORMAT:yyyyMMdd  */
+  THIRDEYE_TIMECOLUMN_FORMAT("thirdeye.timecolumn.format"),
 
   /** Split threshold for star tree */
   THIRDEYE_SPLIT_THRESHOLD("thirdeye.split.threshold"),
