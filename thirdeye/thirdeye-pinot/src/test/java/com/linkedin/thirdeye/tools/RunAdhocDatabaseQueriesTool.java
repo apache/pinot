@@ -58,11 +58,18 @@ public class RunAdhocDatabaseQueriesTool {
     anomalyFunctionDAO.update(anomalyFunction);
   }
 
-  private void updateField() {
+  private void updateFields() {
     List<EmailConfigurationDTO> emailConfigs = emailConfigurationDAO.findAll();
     for (EmailConfigurationDTO emailConfig : emailConfigs) {
       LOG.info(emailConfig.getId() + " " + emailConfig.getToAddresses());
     }
+  }
+
+  private void updateField(Long id) {
+    AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(id);
+    //anomalyFunction.setCron("0/10 * * * * ?");
+    anomalyFunction.setActive(true);
+    anomalyFunctionDAO.update(anomalyFunction);
   }
 
   private void customFunction() {
@@ -81,7 +88,7 @@ public class RunAdhocDatabaseQueriesTool {
       System.exit(1);
     }
     RunAdhocDatabaseQueriesTool dq = new RunAdhocDatabaseQueriesTool(persistenceFile);
-    dq.updateField();
+    dq.updateField(97L);
   }
 
 }
