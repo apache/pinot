@@ -46,8 +46,13 @@ import org.slf4j.LoggerFactory;
  */
 public class InstancePlanMakerImplV2 implements PlanMaker {
   private static final Logger LOGGER = LoggerFactory.getLogger(InstancePlanMakerImplV2.class);
+
   private static final String ENABLE_NEW_AGGREGATION_GROUP_BY_CFG = "new.aggregation.groupby";
+  private static final String NUM_AGGR_GROUPS_LIMIT = "num.aggr.groups.limit";
+  private static final int DEFAULT_NUM_AGGR_GROUPS_LIMIT = 1_000_000;
+
   private boolean _enableNewAggregationGroupByCfg = false;
+  private int _numAggrGroupsLimit; // Limit on number of groups, beyond which results are truncated
 
   /**
    * Default constructor.
@@ -66,6 +71,11 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     _enableNewAggregationGroupByCfg =
         queryExecutorConfig.getConfig().getBoolean(ENABLE_NEW_AGGREGATION_GROUP_BY_CFG, true);
     LOGGER.info("New AggregationGroupBy operator: {}", (_enableNewAggregationGroupByCfg) ? "Enabled" : "Disabled");
+
+    // Read the limit on number of aggregation groups in query result from config.
+    _numAggrGroupsLimit =
+        queryExecutorConfig.getConfig().getInt(NUM_AGGR_GROUPS_LIMIT, DEFAULT_NUM_AGGR_GROUPS_LIMIT);
+    LOGGER.info("Maximum number of allowed groups for group-by query results: '{}'", _numAggrGroupsLimit);
   }
 
   @Override
@@ -88,7 +98,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
         // Aggregation GroupBy
         if (enableNewAggregationGroupBy) {
           // New implementation of group-by aggregations
-          return new AggregationGroupByPlanNode(indexSegment, brokerRequest);
+          return new AggregationGroupByPlanNode(indexSegment, brokerRequest, _numAggrGroupsLimit);
         } else {
           // Old implementation of group-by aggregations
           if (isGroupKeyFitForLong(indexSegment, brokerRequest)) {
