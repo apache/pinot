@@ -26,6 +26,7 @@ import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.client.MetricExpression;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
+import com.linkedin.thirdeye.client.cache.MetricDataset;
 import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesHandler;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesRequest;
@@ -34,7 +35,6 @@ import com.linkedin.thirdeye.client.timeseries.TimeSeriesRow;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
-import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
@@ -51,14 +51,12 @@ public class AnomalyMergeExecutor implements Runnable {
   private final MergedAnomalyResultManager mergedResultDAO;
   private final RawAnomalyResultManager anomalyResultDAO;
   private final AnomalyFunctionManager anomalyFunctionDAO;
-  private final MetricConfigManager metricConfigDAO;
   private final ScheduledExecutorService executorService;
 
   private final QueryCache queryCache;
   private final TimeSeriesHandler timeSeriesHandler;
 
-  private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE =
-      ThirdEyeCacheRegistry.getInstance();
+  private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
   private final static Logger LOG = LoggerFactory.getLogger(AnomalyMergeExecutor.class);
@@ -67,7 +65,6 @@ public class AnomalyMergeExecutor implements Runnable {
     this.mergedResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
     this.anomalyResultDAO = DAO_REGISTRY.getRawAnomalyResultDAO();
     this.anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
-    this.metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
     this.executorService = executorService;
     this.queryCache = CACHE_REGISTRY_INSTANCE.getQueryCache();
     this.timeSeriesHandler = new TimeSeriesHandler(queryCache);
@@ -270,8 +267,9 @@ public class AnomalyMergeExecutor implements Runnable {
     Double currentValue;
     Double baselineValue;
 
-    MetricConfigDTO metricConfig = metricConfigDAO.findByMetricAndDataset(anomalyFunctionSpec.getMetric(),
-        anomalyFunctionSpec.getCollection());
+    MetricDataset metricDataset =
+        new MetricDataset(anomalyFunctionSpec.getMetric(), anomalyFunctionSpec.getCollection());
+    MetricConfigDTO metricConfig = CACHE_REGISTRY_INSTANCE.getMetricConfigCache().get(metricDataset);
     if (metricConfig.isDerived()) {
       LOG.info("Found derived metric [{}], assigning avg value per bucket in the message",
           anomalyFunctionSpec.getMetric());

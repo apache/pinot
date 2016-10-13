@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.client.pinot;
 
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 import org.joda.time.DateTime;
@@ -15,7 +16,7 @@ public class PqlUtilsTest {
 
   @Test(dataProvider = "betweenClauseArgs")
   public void getBetweenClause(DateTime start, DateTime end, TimeSpec timeFieldSpec,
-      String expected) {
+      String expected) throws ExecutionException {
     String betweenClause = PqlUtils.getBetweenClause(start, end, timeFieldSpec, "collection");
     Assert.assertEquals(betweenClause, expected);
   }

@@ -16,8 +16,8 @@ import org.joda.time.DateTime;
 
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.api.TimeSpec;
-import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.client.MetricExpression;
+import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.client.comparison.Row;
 import com.linkedin.thirdeye.client.comparison.Row.Metric;
@@ -29,12 +29,11 @@ import com.linkedin.thirdeye.dashboard.views.GenericResponse.ResponseSchema;
 import com.linkedin.thirdeye.dashboard.views.TimeBucket;
 import com.linkedin.thirdeye.dashboard.views.ViewHandler;
 import com.linkedin.thirdeye.dashboard.views.heatmap.HeatMapCell;
-import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 public class TabularViewHandler implements ViewHandler<TabularViewRequest, TabularViewResponse> {
-  private static DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
+  private static ThirdEyeCacheRegistry CACHE_REGISTRY = ThirdEyeCacheRegistry.getInstance();
 
   private final Comparator<Row> rowComparator = new Comparator<Row>() {
     @Override
@@ -47,11 +46,9 @@ public class TabularViewHandler implements ViewHandler<TabularViewRequest, Tabul
   };
 
   private final QueryCache queryCache;
-  private final DatasetConfigManager datasetConfigDAO;
 
   public TabularViewHandler(QueryCache queryCache) {
     this.queryCache = queryCache;
-    this.datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
   }
 
   private TimeOnTimeComparisonRequest generateTimeOnTimeComparisonRequest(TabularViewRequest request)
@@ -64,7 +61,7 @@ public class TabularViewHandler implements ViewHandler<TabularViewRequest, Tabul
     DateTime currentStart = request.getCurrentStart();
     DateTime currentEnd = request.getCurrentEnd();
 
-    DatasetConfigDTO datasetConfig = datasetConfigDAO.findByDataset(collection);
+    DatasetConfigDTO datasetConfig = CACHE_REGISTRY.getDatasetConfigCache().get(collection);
     TimeSpec timespec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetConfig);
     if (!request.getTimeGranularity().getUnit().equals(TimeUnit.DAYS) ||
         !StringUtils.isBlank(timespec.getFormat())) {

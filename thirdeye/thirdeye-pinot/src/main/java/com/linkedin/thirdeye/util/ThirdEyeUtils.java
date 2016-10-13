@@ -8,6 +8,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
 
 import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
@@ -23,6 +24,8 @@ import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.client.MetricExpression;
 import com.linkedin.thirdeye.client.MetricFunction;
+import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
+import com.linkedin.thirdeye.client.cache.MetricDataset;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
@@ -34,6 +37,7 @@ public abstract class ThirdEyeUtils {
   private static final String FILTER_CLAUSE_SEPARATOR = ";";
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
+  private static final ThirdEyeCacheRegistry CACHE_REGISTRY = ThirdEyeCacheRegistry.getInstance();
 
   private ThirdEyeUtils () {
 
@@ -158,10 +162,10 @@ public abstract class ThirdEyeUtils {
     return metricExpression;
   }
 
-  public static String getDerivedMetricExpression(String metricExpressionName, String dataset) {
+  public static String getDerivedMetricExpression(String metricExpressionName, String dataset) throws ExecutionException {
     String derivedMetricExpression = null;
-    MetricConfigDTO metricConfig = DAO_REGISTRY.getMetricConfigDAO().
-        findByMetricAndDataset(metricExpressionName, dataset);
+    MetricDataset metricDataset = new MetricDataset(metricExpressionName, dataset);
+    MetricConfigDTO metricConfig = CACHE_REGISTRY.getMetricConfigCache().get(metricDataset);
     if (metricConfig.isDerived()) {
       derivedMetricExpression = metricConfig.getDerivedMetricExpression();
     } else {

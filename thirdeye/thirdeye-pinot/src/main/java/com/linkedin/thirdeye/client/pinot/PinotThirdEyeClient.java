@@ -6,6 +6,7 @@ import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Properties;
+import java.util.concurrent.ExecutionException;
 
 import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.manager.zk.ZkClient;
@@ -22,13 +23,11 @@ import com.linkedin.pinot.client.ResultSet;
 import com.linkedin.pinot.client.ResultSetGroup;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
-import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.client.MetricFunction;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.client.ThirdEyeRequest;
 import com.linkedin.thirdeye.dashboard.Utils;
-import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
@@ -37,7 +36,6 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
   private static final Logger LOG = LoggerFactory.getLogger(PinotThirdEyeClient.class);
 
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
-  private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   public static final String CONTROLLER_HOST_PROPERTY_KEY = "controllerHost";
   public static final String CONTROLLER_PORT_PROPERTY_KEY = "controllerPort";
   public static final String FIXED_COLLECTIONS_PROPERTY_KEY = "fixedCollections";
@@ -47,7 +45,6 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
   String segementZKMetadataRootPath;
   private final HttpHost controllerHost;
   private final CloseableHttpClient controllerClient;
-  private final DatasetConfigManager datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
 
   protected PinotThirdEyeClient(String controllerHostName, int controllerPort) {
 
@@ -108,7 +105,7 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
 
   @Override
   public PinotThirdEyeResponse execute(ThirdEyeRequest request) throws Exception {
-    DatasetConfigDTO datasetConfig = datasetConfigDAO.findByDataset(request.getCollection());
+    DatasetConfigDTO datasetConfig = CACHE_REGISTRY_INSTANCE.getDatasetConfigCache().get(request.getCollection());
     TimeSpec dataTimeSpec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetConfig);
     List<MetricFunction> metricFunctions = request.getMetricFunctions();
     List<String> dimensionNames = datasetConfig.getDimensions();
@@ -159,7 +156,8 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
   }
 
   private List<String[]> parseResultSets(ThirdEyeRequest request, List<ResultSet> resultSets,
-      List<MetricFunction> metricFunctions, List<String> dimensionNames, DatasetConfigDTO datasetConfig) {
+      List<MetricFunction> metricFunctions, List<String> dimensionNames, DatasetConfigDTO datasetConfig)
+          throws ExecutionException {
 
     int numGroupByKeys = 0;
     boolean hasGroupBy = false;

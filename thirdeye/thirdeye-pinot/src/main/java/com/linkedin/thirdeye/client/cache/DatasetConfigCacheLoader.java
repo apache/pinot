@@ -18,6 +18,7 @@ public class DatasetConfigCacheLoader extends CacheLoader<String, DatasetConfigD
 
   @Override
   public DatasetConfigDTO load(String collection) throws Exception {
+    LOGGER.info("Loading DatasetConfigCache for {}", collection);
     DatasetConfigDTO datasetConfig = datasetConfigDAO.findByDataset(collection);
     return datasetConfig;
   }

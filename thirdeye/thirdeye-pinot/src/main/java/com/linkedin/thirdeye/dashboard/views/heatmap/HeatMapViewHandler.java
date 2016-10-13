@@ -14,10 +14,12 @@ import java.util.concurrent.Future;
 
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
+
 import com.google.common.collect.Multimap;
-import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.client.MetricExpression;
 import com.linkedin.thirdeye.client.MetricFunction;
+import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
+import com.linkedin.thirdeye.client.cache.MetricDataset;
 import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.client.comparison.Row;
 import com.linkedin.thirdeye.client.comparison.Row.Metric;
@@ -29,8 +31,6 @@ import com.linkedin.thirdeye.dashboard.views.GenericResponse;
 import com.linkedin.thirdeye.dashboard.views.GenericResponse.Info;
 import com.linkedin.thirdeye.dashboard.views.GenericResponse.ResponseSchema;
 import com.linkedin.thirdeye.dashboard.views.ViewHandler;
-import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 
 import jersey.repackaged.com.google.common.collect.Lists;
@@ -38,15 +38,11 @@ import jersey.repackaged.com.google.common.collect.Lists;
 public class HeatMapViewHandler implements ViewHandler<HeatMapViewRequest, HeatMapViewResponse> {
 
   private final QueryCache queryCache;
-  private DatasetConfigManager datasetConfigDAO;
-  private MetricConfigManager metricConfigDAO;
-  private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
+  private static final ThirdEyeCacheRegistry CACHE_REGISTRY = ThirdEyeCacheRegistry.getInstance();
   private static final String RATIO_SEPARATOR = "/";
 
   public HeatMapViewHandler(QueryCache queryCache) {
     this.queryCache = queryCache;
-    this.datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
-    this.metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
   }
 
   private TimeOnTimeComparisonRequest generateTimeOnTimeComparisonRequest(HeatMapViewRequest request)
@@ -61,8 +57,7 @@ public class HeatMapViewHandler implements ViewHandler<HeatMapViewRequest, HeatM
     comparisonRequest.setEndDateInclusive(false);
 
     Multimap<String, String> filters = request.getFilters();
-    List<String> dimensionsToGroupBy =
-        Utils.getDimensionsToGroupBy(collection, filters, datasetConfigDAO);
+    List<String> dimensionsToGroupBy = Utils.getDimensionsToGroupBy(collection, filters);
 
     List<MetricExpression> metricExpressions = request.getMetricExpressions();
     comparisonRequest.setCollectionName(collection);
@@ -159,8 +154,8 @@ public class HeatMapViewHandler implements ViewHandler<HeatMapViewRequest, HeatM
             data.put(dataKey, heatMapBuilder);
           }
           System.out.println("Before " + System.currentTimeMillis());
-          MetricConfigDTO metricConfig = metricConfigDAO.findByMetricAndDataset(metricName,
-              comparisonRequest.getCollectionName());
+          MetricDataset metricDataset = new MetricDataset(metricName, comparisonRequest.getCollectionName());
+          MetricConfigDTO metricConfig = CACHE_REGISTRY.getMetricConfigCache().get(metricDataset);
           System.out.println("Current " + System.currentTimeMillis());
           if (StringUtils.isNotBlank(metricConfig.getCellSizeExpression())) {
 

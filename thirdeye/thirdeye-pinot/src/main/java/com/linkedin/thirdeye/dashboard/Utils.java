@@ -11,6 +11,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
@@ -24,16 +25,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.api.TimeGranularity;
-import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.client.MetricExpression;
 import com.linkedin.thirdeye.client.MetricFunction;
+import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.ThirdEyeRequest;
 import com.linkedin.thirdeye.client.ThirdEyeRequest.ThirdEyeRequestBuilder;
 import com.linkedin.thirdeye.client.ThirdEyeResponse;
 import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
@@ -42,7 +42,7 @@ public class Utils {
   private static final Logger LOG = LoggerFactory.getLogger(Utils.class);
 
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-  private static DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
+  private static ThirdEyeCacheRegistry CACHE_REGISTRY = ThirdEyeCacheRegistry.getInstance();
 
   public static List<ThirdEyeRequest> generateRequests(String collection, String requestReference,
       MetricFunction metricFunction, List<String> dimensions, DateTime start, DateTime end) {
@@ -96,18 +96,17 @@ public class Utils {
     return result;
   }
 
-  public static List<String> getDimensions(String collection, DatasetConfigManager datasetConfigDAO)
+  public static List<String> getDimensions(String collection)
       throws Exception {
-    DatasetConfigDTO datasetConfig = datasetConfigDAO.findByDataset(collection);
+    DatasetConfigDTO datasetConfig = CACHE_REGISTRY.getDatasetConfigCache().get(collection);
     List<String> dimensions = datasetConfig.getDimensions();
     Collections.sort(dimensions);
     return dimensions;
   }
 
-  public static List<String> getDimensionsToGroupBy(String collection, Multimap<String, String> filters,
-      DatasetConfigManager datasetConfigDAO)
+  public static List<String> getDimensionsToGroupBy(String collection, Multimap<String, String> filters)
       throws Exception {
-    List<String> dimensions = Utils.getDimensions(collection, datasetConfigDAO);
+    List<String> dimensions = Utils.getDimensions(collection);
 
     List<String> dimensionsToGroupBy = new ArrayList<>();
     if (filters != null) {
@@ -135,7 +134,7 @@ public class Utils {
   }
 
   public static List<MetricExpression> convertToMetricExpressions(String metricsJson,
-      MetricAggFunction aggFunction, String collection) {
+      MetricAggFunction aggFunction, String collection) throws ExecutionException {
 
     List<MetricExpression> metricExpressions = new ArrayList<>();
     if (metricsJson == null) {
@@ -200,9 +199,8 @@ public class Utils {
   /*
    * This method returns the time zone of the data in this collection
    */
-  public static DateTimeZone getDataTimeZone(String collection) {
-    DatasetConfigManager datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
-    DatasetConfigDTO datasetConfig = datasetConfigDAO.findByDataset(collection);
+  public static DateTimeZone getDataTimeZone(String collection) throws ExecutionException {
+    DatasetConfigDTO datasetConfig = CACHE_REGISTRY.getDatasetConfigCache().get(collection);
     String timezone = datasetConfig.getTimezone();
     return DateTimeZone.forID(timezone);
   }

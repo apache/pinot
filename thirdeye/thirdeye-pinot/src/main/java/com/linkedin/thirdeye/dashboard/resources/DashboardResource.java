@@ -143,7 +143,7 @@ public class DashboardResource {
   public String getDimensions(@QueryParam("dataset") String collection) {
     String jsonDimensions = null;
     try {
-      List<String> dimensions = Utils.getDimensions(collection, datasetConfigDAO);
+      List<String> dimensions = Utils.getDimensions(collection);
       jsonDimensions = OBJECT_MAPPER.writeValueAsString(dimensions);
     } catch (Exception e) {
       LOG.error("Error while fetching dimensions for collection: " + collection, e);
@@ -173,7 +173,7 @@ public class DashboardResource {
 
       HashMap<String, String> map = new HashMap<>();
       long maxDataTime = collectionMaxDataTimeCache.get(collection);
-      DatasetConfigDTO datasetConfig = datasetConfigDAO.findByDataset(collection);
+      DatasetConfigDTO datasetConfig = CACHE_REGISTRY_INSTANCE.getDatasetConfigCache().get(collection);
       TimeSpec timespec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetConfig);
       TimeGranularity dataGranularity = timespec.getDataGranularity();
       map.put("maxTime", "" + maxDataTime);
@@ -446,7 +446,7 @@ public class DashboardResource {
         Utils.convertToMetricExpressions(metricsJson, MetricAggFunction.SUM, collection);
     request.setMetricExpressions(metricExpressions);
     request.setAggregationTimeGranularity(Utils.getAggregationTimeGranularity(aggTimeGranularity));
-    DatasetConfigDTO datasetConfig = datasetConfigDAO.findByDataset(collection);
+    DatasetConfigDTO datasetConfig = CACHE_REGISTRY_INSTANCE.getDatasetConfigCache().get(collection);
     TimeSpec timespec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetConfig);
     if (!request.getAggregationTimeGranularity().getUnit().equals(TimeUnit.DAYS) ||
         !StringUtils.isBlank(timespec.getFormat())) {

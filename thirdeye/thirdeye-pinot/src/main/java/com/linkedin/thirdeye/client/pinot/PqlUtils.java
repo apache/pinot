@@ -5,6 +5,7 @@ import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
@@ -43,8 +44,9 @@ public class PqlUtils {
    * Returns sql to calculate the sum of all raw metrics required for <tt>request</tt>, grouped by
    * time within the requested date range. </br>
    * Due to the summation, all metric column values can be assumed to be doubles.
+   * @throws ExecutionException
    */
-  public static String getPql(ThirdEyeRequest request, TimeSpec dataTimeSpec) {
+  public static String getPql(ThirdEyeRequest request, TimeSpec dataTimeSpec) throws ExecutionException {
     // TODO handle request.getFilterClause()
     return getPql(request.getCollection(), request.getMetricFunctions(),
         request.getStartTimeInclusive(), request.getEndTimeExclusive(), request.getFilterSet(),
@@ -58,9 +60,10 @@ public class PqlUtils {
    * @param dataTimeSpec
    * @param collectionConfig
    * @return
+   * @throws Exception
    */
   public static List<String> getMetricAsDimensionPqls(ThirdEyeRequest request, TimeSpec dataTimeSpec,
-      DatasetConfigDTO datasetConfig) {
+      DatasetConfigDTO datasetConfig) throws Exception {
 
     // select sum(metric_values_column) from collection
     // where time_clause and metric_names_column=function.getMetricName
@@ -78,7 +81,7 @@ public class PqlUtils {
   static List<String> getMetricAsDimensionPqls(String collection, List<MetricFunction> metricFunctions, DateTime startTime,
       DateTime endTimeExclusive, Multimap<String, String> filterSet, List<String> groupBy,
       TimeGranularity timeGranularity, TimeSpec dataTimeSpec, String metricValuesColumn,
-      String metricNamesColumn) {
+      String metricNamesColumn) throws ExecutionException {
 
     List<String> metricAsDimensionPqls = new ArrayList<>();
     for (MetricFunction metricFunction : metricFunctions) {
@@ -92,7 +95,7 @@ public class PqlUtils {
   static String getMetricAsDimensionPql(String collection, MetricFunction metricFunction, DateTime startTime,
       DateTime endTimeExclusive, Multimap<String, String> filterSet, List<String> groupBy,
       TimeGranularity timeGranularity, TimeSpec dataTimeSpec, String metricValuesColumn,
-      String metricNamesColumn) {
+      String metricNamesColumn) throws ExecutionException {
 
     StringBuilder sb = new StringBuilder();
     String selectionClause = getMetricAsDimensionSelectionClause(metricFunction, metricValuesColumn);
@@ -119,7 +122,7 @@ public class PqlUtils {
 
   static String getPql(String collection, List<MetricFunction> metricFunctions, DateTime startTime,
       DateTime endTimeExclusive, Multimap<String, String> filterSet, List<String> groupBy,
-      TimeGranularity timeGranularity, TimeSpec dataTimeSpec) {
+      TimeGranularity timeGranularity, TimeSpec dataTimeSpec) throws ExecutionException {
 
     StringBuilder sb = new StringBuilder();
     String selectionClause = getSelectionClause(metricFunctions);
@@ -186,7 +189,8 @@ public class PqlUtils {
     return builder.toString();
   }
 
-  static String getBetweenClause(DateTime start, DateTime endExclusive, TimeSpec timeFieldSpec, String collection) {
+  static String getBetweenClause(DateTime start, DateTime endExclusive, TimeSpec timeFieldSpec, String collection)
+      throws ExecutionException {
     TimeGranularity dataGranularity = timeFieldSpec.getDataGranularity();
     long startMillis = start.getMillis();
     long endMillis = endExclusive.getMillis();

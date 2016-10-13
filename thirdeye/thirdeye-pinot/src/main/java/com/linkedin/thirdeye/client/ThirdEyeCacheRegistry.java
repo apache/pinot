@@ -130,7 +130,7 @@ public class ThirdEyeCacheRegistry {
 
     // Dimension Filter cache
     LoadingCache<String, String> dimensionFiltersCache = CacheBuilder.newBuilder()
-        .build(new DimensionFiltersCacheLoader(cacheRegistry.getQueryCache(), datasetConfigDAO));
+        .build(new DimensionFiltersCacheLoader(cacheRegistry.getQueryCache()));
     cacheRegistry.registerDimensionFiltersCache(dimensionFiltersCache);
 
     // Dashboards cache
@@ -164,14 +164,15 @@ public class ThirdEyeCacheRegistry {
     // manually refreshing on startup, and setting delay
     // as weeklyService starts before hourlyService finishes,
     // causing NPE in reading collectionsCache
-    cacheResource.refreshCollections();
-    cacheResource.refreshMaxDataTimeCache();
-    cacheResource.refreshDimensionFiltersCache();
-    cacheResource.refreshDashboardsCache();
 
     cacheResource.refreshDatasetConfigCache();
     cacheResource.refreshMetricConfigCache();
     cacheResource.refreshDashoardConfigsCache();
+
+    cacheResource.refreshCollections();
+    cacheResource.refreshMaxDataTimeCache();
+    cacheResource.refreshDimensionFiltersCache();
+    cacheResource.refreshDashboardsCache();
 
     ScheduledExecutorService minuteService = Executors.newSingleThreadScheduledExecutor();
     minuteService.scheduleAtFixedRate(new Runnable() {

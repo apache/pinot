@@ -21,6 +21,7 @@ import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.client.MetricExpression;
+import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.client.comparison.Row;
 import com.linkedin.thirdeye.client.comparison.Row.Metric;
@@ -41,6 +42,7 @@ public class ContributorViewHandler implements
     ViewHandler<ContributorViewRequest, ContributorViewResponse> {
 
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
+  private static final ThirdEyeCacheRegistry CACHE_REGISTRY = ThirdEyeCacheRegistry.getInstance();
 
   private final Comparator<DateTime> dateTimeComparator = new Comparator<DateTime>() {
     @Override
@@ -79,7 +81,7 @@ public class ContributorViewHandler implements
     DateTime baselineEnd = request.getBaselineEnd();
     DateTime currentStart = request.getCurrentStart();
     DateTime currentEnd = request.getCurrentEnd();
-    DatasetConfigDTO datasetConfig = datasetConfigDAO.findByDataset(collection);
+    DatasetConfigDTO datasetConfig = CACHE_REGISTRY.getDatasetConfigCache().get(collection);
     TimeSpec timespec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetConfig);
     if (!request.getTimeGranularity().getUnit().equals(TimeUnit.DAYS) ||
         !StringUtils.isBlank(timespec.getFormat())) {
@@ -89,7 +91,7 @@ public class ContributorViewHandler implements
     Multimap<String, String> filters = request.getFilters();
     List<String> dimensionsToGroupBy = request.getGroupByDimensions();
     if (dimensionsToGroupBy == null || dimensionsToGroupBy.isEmpty()) {
-      List<String> allDimensions = Utils.getDimensionsToGroupBy(collection, filters, datasetConfigDAO);
+      List<String> allDimensions = Utils.getDimensionsToGroupBy(collection, filters);
       dimensionsToGroupBy = Lists.newArrayList(allDimensions.get(0));
     }
     List<MetricExpression> metricExpressions = request.getMetricExpressions();
