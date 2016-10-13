@@ -57,7 +57,6 @@
             <th>Start - End ({{returnUserTimeZone}}):</th>
             <th>Dimension</th>
             <th>Message</th>
-            <th>Severity</th>
             </thead>
 
             <tbody>
@@ -78,9 +77,6 @@
                 </td>
                 <td>
                     {{message}}
-                </td>
-                <td>
-                    {{severity}}
                 </td>
             </tr>
             {{/each}}

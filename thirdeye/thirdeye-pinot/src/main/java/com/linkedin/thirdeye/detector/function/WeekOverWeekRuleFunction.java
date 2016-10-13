@@ -10,7 +10,6 @@ import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.commons.lang.StringUtils;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,9 +42,7 @@ public class WeekOverWeekRuleFunction extends BaseAnomalyFunction {
   public static final String BASELINE = "baseline";
   public static final String CHANGE_THRESHOLD = "changeThreshold";
   public static final String AVERAGE_VOLUME_THRESHOLD = "averageVolumeThreshold";
-  public static final String MIN_CONSECUTIVE_SIZE = "minConsecutiveSize";
   public static final String DEFAULT_MESSAGE_TEMPLATE = "change : %.2f %%, currentVal : %.2f, baseLineVal : %.2f, threshold : %s, baseLineProp : %s";
-  public static final String DEFAULT_MERGED_MESSAGE_TEMPLATE = "change : %s, currentVal : %s, baseLineVal : %s, threshold : %s, baseLineProp : %s";
   private static final Joiner CSV = Joiner.on(",");
 
   public static String[] getPropertyKeys() {
@@ -67,50 +64,6 @@ public class WeekOverWeekRuleFunction extends BaseAnomalyFunction {
       LOGGER.error("Error reading the properties", e);
     }
     return startEndTimeIntervals;
-  }
-
-  private String getMergedAnomalyResultMessage(double threshold, String baselineProp,
-      List<Double> currentValues, List<Double> baselineValues) {
-
-    int n = currentValues.size();
-    NumberFormat percentInstance = NumberFormat.getPercentInstance();
-    percentInstance.setMaximumFractionDigits(2);
-    String thresholdPercent = percentInstance.format(threshold);
-    List<String> percentChanges = new ArrayList<>();
-
-    for (int i = 0; i < n; i++) {
-      double currentValue = currentValues.get(i);
-      double baselineValue = baselineValues.get(i);
-      double change = calculateChange(currentValue, baselineValue);
-      String changePercent = percentInstance.format(change);
-      percentChanges.add(changePercent);
-    }
-    String message = String.format(DEFAULT_MERGED_MESSAGE_TEMPLATE, CSV.join(percentChanges), currentValues.get(n - 1), baselineValues.get(n - 1), thresholdPercent, baselineProp);
-    return message;
-  }
-
-  private RawAnomalyResultDTO getMergedAnomalyResults(List<RawAnomalyResultDTO> anomalyResults,
-      List<Double> baselineValues, List<Double> currentValues, double threshold, String baselineProp) {
-    int n = anomalyResults.size();
-    RawAnomalyResultDTO firstAnomalyResult = anomalyResults.get(0);
-    RawAnomalyResultDTO lastAnomalyResult = anomalyResults.get(n - 1);
-    RawAnomalyResultDTO mergedAnomalyResult = new RawAnomalyResultDTO();
-    mergedAnomalyResult.setDimensions(firstAnomalyResult.getDimensions());
-    mergedAnomalyResult.setProperties(firstAnomalyResult.getProperties());
-    mergedAnomalyResult.setStartTime(firstAnomalyResult.getStartTime());
-    mergedAnomalyResult.setEndTime(lastAnomalyResult.getEndTime());
-    mergedAnomalyResult.setWeight(firstAnomalyResult.getWeight());
-    double summedScore = 0;
-    for (RawAnomalyResultDTO anomalyResult : anomalyResults) {
-      summedScore += anomalyResult.getScore();
-    }
-    mergedAnomalyResult.setScore(summedScore / n);
-
-    String message =
-        getMergedAnomalyResultMessage(threshold, baselineProp, currentValues, baselineValues);
-    mergedAnomalyResult.setMessage(message);
-
-    return mergedAnomalyResult;
   }
 
   @Override
@@ -170,8 +123,7 @@ public class WeekOverWeekRuleFunction extends BaseAnomalyFunction {
         anomalyResult.setEndTime(currentKey + bucketMillis); // point-in-time
         anomalyResult.setScore(averageValue);
         anomalyResult.setWeight(calculateChange(currentValue, baselineValue));
-        String message =
-            getAnomalyResultMessage(changeThreshold, baselineProp, currentValue, baselineValue);
+        String message = getAnomalyResultMessage(changeThreshold, baselineProp, currentValue, baselineValue);
         anomalyResult.setMessage(message);
         anomalyResults.add(anomalyResult);
         currentValues.add(currentValue);
@@ -181,98 +133,7 @@ public class WeekOverWeekRuleFunction extends BaseAnomalyFunction {
         }
       }
     }
-
-    String minConsecutiveSizeStr = props.getProperty(MIN_CONSECUTIVE_SIZE);
-    int minConsecutiveSize = 1;
-    if (StringUtils.isNotBlank(minConsecutiveSizeStr)) {
-      minConsecutiveSize = Integer.valueOf(minConsecutiveSizeStr);
-    }
-
-    return getFilteredAndMergedAnomalyResults(anomalyResults, minConsecutiveSize, bucketMillis,
-        baselineValues, currentValues, changeThreshold, baselineProp);
-  }
-
-  /**
-   * Merge consecutive anomaly results. If anomaly results are not consecutive they are
-   * rejected.
-   * @param anomalyResults
-   * @param minConsecutiveSize
-   * @param bucketMillis
-   * @return
-   */
-  List<RawAnomalyResultDTO> getFilteredAndMergedAnomalyResults(List<RawAnomalyResultDTO> anomalyResults,
-      int minConsecutiveSize, long bucketMillis, List<Double> baselineValues,
-      List<Double> currentValues, double threshold, String baselineProp) {
-
-    int anomalyResultsSize = anomalyResults.size();
-    // if minConsecutiveSize is more than 1, create groups of consecutive anomalies
-    if (minConsecutiveSize > 1) {
-      List<RawAnomalyResultDTO> filteredAndMergedAnomalies = new ArrayList<>();
-      // if number of anomalies >= minConsecutiveSize, only then check, else pass empty results
-      if (anomalyResultsSize >= minConsecutiveSize) {
-        List<RawAnomalyResultDTO> consecutiveAnomalies = new ArrayList<>();
-        List<Double> consecutiveBaselines = new ArrayList<>();
-        List<Double> consecutiveCurrents = new ArrayList<>();
-        int count = -1;
-        for (RawAnomalyResultDTO currentAnomaly : anomalyResults) {
-          count++;
-          // if consecutiveAnomalies container empty, add this anomaly to container
-          if (consecutiveAnomalies.isEmpty()) {
-            consecutiveAnomalies.add(currentAnomaly);
-            consecutiveBaselines.add(baselineValues.get(count));
-            consecutiveCurrents.add(currentValues.get(count));
-            continue;
-          }
-          // if consecutive, add this anomaly to consecutiveAnomalies container
-          RawAnomalyResultDTO previousAnomaly = consecutiveAnomalies.get(consecutiveAnomalies.size() - 1);
-          if (isConsecutiveAnomaly(previousAnomaly, currentAnomaly, bucketMillis)) {
-            consecutiveAnomalies.add(currentAnomaly);
-            consecutiveBaselines.add(baselineValues.get(count));
-            consecutiveCurrents.add(currentValues.get(count));
-          } else { // else if not consecutive,
-            // check if got more than minConsecutive in consecutiveAnomalies container
-            if (hasMinConsecutive(consecutiveAnomalies, minConsecutiveSize)) {
-              // if yes, add this container to main list
-              filteredAndMergedAnomalies.add(getMergedAnomalyResults(consecutiveAnomalies, consecutiveBaselines,
-                  consecutiveCurrents, threshold, baselineProp));
-            }
-            // create new container and add this anomaly
-            consecutiveAnomalies = new ArrayList<>();
-            consecutiveBaselines = new ArrayList<>();
-            consecutiveCurrents = new ArrayList<>();
-            consecutiveAnomalies.add(currentAnomaly);
-            consecutiveBaselines.add(baselineValues.get(count));
-            consecutiveCurrents.add(currentValues.get(count));
-          }
-        }
-        // in the end, check if container has more than minConsecutive remaining, if yes add to main list
-        if (hasMinConsecutive(consecutiveAnomalies, minConsecutiveSize)) {
-          filteredAndMergedAnomalies.add(getMergedAnomalyResults(consecutiveAnomalies, consecutiveBaselines,
-              consecutiveCurrents, threshold, baselineProp));
-        }
-      }
-      return filteredAndMergedAnomalies;
-    } else { // if minConsecutiveSize <=1, just return the existing anomalies as is
-      return anomalyResults;
-    }
-  }
-
-  private boolean isConsecutiveAnomaly(RawAnomalyResultDTO prevAnomaly, RawAnomalyResultDTO currentAnomaly, long bucketMillis) {
-    boolean isConsecutive = false;
-    long prevStartTime = prevAnomaly.getStartTime();
-    long currentStartTime = currentAnomaly.getStartTime();
-    if (!prevAnomaly.isDataMissing() && !currentAnomaly.isDataMissing() && (prevStartTime + bucketMillis) == currentStartTime) {
-      isConsecutive = true;
-    }
-    return isConsecutive;
-  }
-
-  private boolean hasMinConsecutive(List<RawAnomalyResultDTO> consecutiveAnomalies, int minConsecutive) {
-    boolean hasMinConsecutive = false;
-    if (consecutiveAnomalies.size() >= minConsecutive) {
-      hasMinConsecutive = true;
-    }
-    return hasMinConsecutive;
+    return anomalyResults;
   }
 
   private String getAnomalyResultMessage(double threshold, String baselineProp,
