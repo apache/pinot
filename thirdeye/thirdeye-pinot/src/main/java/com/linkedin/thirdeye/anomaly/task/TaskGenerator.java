@@ -28,24 +28,24 @@ public class TaskGenerator {
 
   private static Logger LOG = LoggerFactory.getLogger(TaskGenerator.class);
 
-  public List<DetectionTaskInfo> createDetectionTasks(DetectionJobContext detectionJobContext)
+  public List<DetectionTaskInfo> createDetectionTasks(DetectionJobContext detectionJobContext,
+      DateTime monitoringWindowStartTime, DateTime monitoringWindowEndTime)
       throws Exception {
 
     List<DetectionTaskInfo> tasks = new ArrayList<>();
     AnomalyFunctionDTO anomalyFunctionSpec = detectionJobContext.getAnomalyFunctionSpec();
 
-    DateTime windowStartTime = detectionJobContext.getWindowStartTime();
-    DateTime windowEndTime = detectionJobContext.getWindowEndTime();
     long jobExecutionId = detectionJobContext.getJobExecutionId();
     // generate tasks
     String exploreDimensionsString = anomalyFunctionSpec.getExploreDimensions();
     if (StringUtils.isBlank(exploreDimensionsString)) {
       DetectionTaskInfo taskInfo = new DetectionTaskInfo(jobExecutionId,
-          windowStartTime, windowEndTime, anomalyFunctionSpec, null);
+          monitoringWindowStartTime, monitoringWindowEndTime, anomalyFunctionSpec, null);
       tasks.add(taskInfo);
     } else {
-        DetectionTaskInfo taskInfo = new DetectionTaskInfo(jobExecutionId, windowStartTime, windowEndTime,
-            anomalyFunctionSpec, exploreDimensionsString);
+      DetectionTaskInfo taskInfo =
+          new DetectionTaskInfo(jobExecutionId, monitoringWindowStartTime, monitoringWindowEndTime, anomalyFunctionSpec,
+              exploreDimensionsString);
         tasks.add(taskInfo);
     }
 
@@ -53,17 +53,16 @@ public class TaskGenerator {
 
   }
 
-  public List<AlertTaskInfo> createAlertTasks(AlertJobContext alertJobContext)
+  public List<AlertTaskInfo> createAlertTasks(AlertJobContext alertJobContext, DateTime monitoringWindowStartTime,
+      DateTime monitoringWindowEndTime)
       throws Exception{
 
     List<AlertTaskInfo> tasks = new ArrayList<>();
     EmailConfigurationDTO alertConfig = alertJobContext.getAlertConfig();
-    DateTime windowStartTime = alertJobContext.getWindowStartTime();
-    DateTime windowEndTime = alertJobContext.getWindowEndTime();
     long jobExecutionId = alertJobContext.getJobExecutionId();
 
 
-    AlertTaskInfo taskInfo = new AlertTaskInfo(jobExecutionId, windowStartTime, windowEndTime, alertConfig);
+    AlertTaskInfo taskInfo = new AlertTaskInfo(jobExecutionId, monitoringWindowStartTime, monitoringWindowEndTime, alertConfig);
     tasks.add(taskInfo);
     return tasks;
   }

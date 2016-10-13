@@ -39,6 +39,8 @@ public class DetectionJobRunner implements Job {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   public static final String DETECTION_JOB_CONTEXT = "DETECTION_JOB_CONTEXT";
+  public static final String DETECTION_JOB_MONITORING_WINDOW_START_TIME = "DETECTION_JOB_MONITORING_WINDOW_START_TIME";
+  public static final String DETECTION_JOB_MONITORING_WINDOW_END_TIME = "DETECTION_JOB_MONITORING_WINDOW_END_TIME";
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
 
   private JobManager anomalyJobSpecDAO;
@@ -69,17 +71,10 @@ public class DetectionJobRunner implements Job {
     } else {
       detectionJobContext.setAnomalyFunctionSpec(anomalyFunctionSpec);
 
-      // originalMonitoringWindowStart and EndTime are used to restore the original state of the JobContext at the
-      // end of this method.
-      // Details: This method modifies the variables, windowStartTime and windowEndTime, of detectionJobContext, which
-      //   is an undesirable behavior: Once start and end time are set (non-null), this function stops computing the
-      //   latest start and end time for the current job. Consequently, the current job would work on the same
-      //   monitoring window as the last job. Hence, we need to ensure the original state of JobContext is restored.
-      DateTime originalMonitoringWindowEndTime = detectionJobContext.getWindowEndTime();
-      DateTime originalMonitoringWindowStartTime = detectionJobContext.getWindowStartTime();
-
-      DateTime monitoringWindowStartTime = originalMonitoringWindowStartTime;
-      DateTime monitoringWindowEndTime = originalMonitoringWindowEndTime;
+      DateTime monitoringWindowStartTime =
+          (DateTime) jobExecutionContext.getJobDetail().getJobDataMap().get(DETECTION_JOB_MONITORING_WINDOW_START_TIME);
+      DateTime monitoringWindowEndTime =
+          (DateTime) jobExecutionContext.getJobDetail().getJobDataMap().get(DETECTION_JOB_MONITORING_WINDOW_END_TIME);
 
       // Compute window end
       if (monitoringWindowEndTime == null) {
@@ -101,19 +96,13 @@ public class DetectionJobRunner implements Job {
 
       monitoringWindowStartTime = alignTimestampsToDataTimezone(monitoringWindowStartTime, anomalyFunctionSpec.getCollection());
       monitoringWindowEndTime = alignTimestampsToDataTimezone(monitoringWindowEndTime, anomalyFunctionSpec.getCollection());
-      detectionJobContext.setWindowStartTime(monitoringWindowStartTime);
-      detectionJobContext.setWindowEndTime(monitoringWindowEndTime);
 
       // write to anomaly_jobs
-      Long jobExecutionId = createJob();
+      Long jobExecutionId = createJob(monitoringWindowStartTime, monitoringWindowEndTime);
       detectionJobContext.setJobExecutionId(jobExecutionId);
 
       // write to anomaly_tasks
-      List<Long> taskIds = createTasks();
-
-      // restore the original state of the job; otherwise, it will work on the same monitoring window afterwards
-      detectionJobContext.setWindowStartTime(originalMonitoringWindowStartTime);
-      detectionJobContext.setWindowEndTime(originalMonitoringWindowEndTime);
+      List<Long> taskIds = createTasks(monitoringWindowStartTime, monitoringWindowEndTime);
     }
 
   }
@@ -139,13 +128,13 @@ public class DetectionJobRunner implements Job {
     return inputDateTime;
   }
 
-  private long createJob() {
+  private long createJob(DateTime monitoringWindowStartTime, DateTime monitoringWindowEndTime) {
     Long jobExecutionId = null;
     try {
       JobDTO anomalyJobSpec = new JobDTO();
       anomalyJobSpec.setJobName(detectionJobContext.getJobName());
-      anomalyJobSpec.setWindowStartTime(detectionJobContext.getWindowStartTime().getMillis());
-      anomalyJobSpec.setWindowEndTime(detectionJobContext.getWindowEndTime().getMillis());
+      anomalyJobSpec.setWindowStartTime(monitoringWindowStartTime.getMillis());
+      anomalyJobSpec.setWindowEndTime(monitoringWindowEndTime.getMillis());
       anomalyJobSpec.setScheduleStartTime(System.currentTimeMillis());
       anomalyJobSpec.setStatus(JobStatus.SCHEDULED);
       jobExecutionId = anomalyJobSpecDAO.save(anomalyJobSpec);
@@ -159,11 +148,12 @@ public class DetectionJobRunner implements Job {
     return jobExecutionId;
   }
 
-  private List<Long> createTasks() {
+  private List<Long> createTasks(DateTime monitoringWindowStartTime, DateTime monitoringWindowEndTime) {
     List<Long> taskIds = new ArrayList<>();
     try {
 
-      List<DetectionTaskInfo> tasks = taskGenerator.createDetectionTasks(detectionJobContext);
+      List<DetectionTaskInfo> tasks =
+          taskGenerator.createDetectionTasks(detectionJobContext, monitoringWindowStartTime, monitoringWindowEndTime);
 
       for (DetectionTaskInfo taskInfo : tasks) {
         String taskInfoJson = null;

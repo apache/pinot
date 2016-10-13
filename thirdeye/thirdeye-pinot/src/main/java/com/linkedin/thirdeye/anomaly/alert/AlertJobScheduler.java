@@ -200,10 +200,10 @@ public class AlertJobScheduler implements JobScheduler, Runnable {
     alertJobContext.setEmailConfigurationDAO(emailConfigurationDAO);
     alertJobContext.setAlertConfigId(id);
     alertJobContext.setJobName(jobKey);
-    alertJobContext.setWindowStartTime(windowStartTime);
-    alertJobContext.setWindowEndTime(windowEndTime);
 
     job.getJobDataMap().put(AlertJobRunner.ALERT_JOB_CONTEXT, alertJobContext);
+    job.getJobDataMap().put(AlertJobRunner.ALERT_JOB_MONITORING_WINDOW_START_TIME, windowStartTime);
+    job.getJobDataMap().put(AlertJobRunner.ALERT_JOB_MONITORING_WINDOW_END_TIME, windowEndTime);
 
     try {
       quartzScheduler.scheduleJob(job, trigger);

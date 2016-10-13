@@ -8,8 +8,6 @@ import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 public class DetectionJobContext extends JobContext {
 
   private Long anomalyFunctionId;
-  private DateTime windowStartTime;
-  private DateTime windowEndTime;
   private AnomalyFunctionDTO anomalyFunctionSpec;
 
   public Long getAnomalyFunctionId() {
@@ -18,22 +16,6 @@ public class DetectionJobContext extends JobContext {
 
   public void setAnomalyFunctionId(Long anomalyFunctionId) {
     this.anomalyFunctionId = anomalyFunctionId;
-  }
-
-  public DateTime getWindowStartTime() {
-    return windowStartTime;
-  }
-
-  public void setWindowStartTime(DateTime windowStartTime) {
-    this.windowStartTime = windowStartTime;
-  }
-
-  public DateTime getWindowEndTime() {
-    return windowEndTime;
-  }
-
-  public void setWindowEndTime(DateTime windowEndTime) {
-    this.windowEndTime = windowEndTime;
   }
 
   public AnomalyFunctionDTO getAnomalyFunctionSpec() {

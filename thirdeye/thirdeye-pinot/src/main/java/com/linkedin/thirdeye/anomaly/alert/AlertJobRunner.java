@@ -31,6 +31,8 @@ public class AlertJobRunner implements Job {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   public static final String ALERT_JOB_CONTEXT = "ALERT_JOB_CONTEXT";
+  public static final String ALERT_JOB_MONITORING_WINDOW_START_TIME = "ALERT_JOB_MONITORING_WINDOW_START_TIME";
+  public static final String ALERT_JOB_MONITORING_WINDOW_END_TIME = "ALERT_JOB_MONITORING_WINDOW_END_TIME";
 
   private JobManager anomalyJobSpecDAO;
   private TaskManager anomalyTasksSpecDAO;
@@ -59,17 +61,10 @@ public class AlertJobRunner implements Job {
     } else {
       alertJobContext.setAlertConfig(alertConfig);
 
-      // originalMonitoringWindowStart and EndTime are used to restore the original state of the JobContext at the
-      // end of this method.
-      // Details: This method modifies the variables, windowStartTime and windowEndTime, of alertJobContext, which is
-      //   an undesirable behavior: Once start and end time are set (non-null), this function stops computing the latest
-      //   start and end time for the current job. Consequently, the current job would work on the same monitoring
-      //   window as the last job. Hence, we need to ensure the original state of JobContext is restored.
-      DateTime originalMonitoringWindowEndTime = alertJobContext.getWindowEndTime();
-      DateTime originalMonitoringWindowStartTime = alertJobContext.getWindowStartTime();
-
-      DateTime monitoringWindowStartTime = originalMonitoringWindowStartTime;
-      DateTime monitoringWindowEndTime = originalMonitoringWindowEndTime;
+      DateTime monitoringWindowStartTime =
+          (DateTime) jobExecutionContext.getJobDetail().getJobDataMap().get(ALERT_JOB_MONITORING_WINDOW_START_TIME);
+      DateTime monitoringWindowEndTime =
+          (DateTime) jobExecutionContext.getJobDetail().getJobDataMap().get(ALERT_JOB_MONITORING_WINDOW_END_TIME);
 
       // Compute window end
       if (monitoringWindowEndTime == null) {
@@ -90,30 +85,23 @@ public class AlertJobRunner implements Job {
         monitoringWindowStartTime = monitoringWindowEndTime.minus(windowMillis);
       }
 
-      alertJobContext.setWindowStartTime(monitoringWindowStartTime);
-      alertJobContext.setWindowEndTime(monitoringWindowEndTime);
-
       // write to alert_jobs
-      Long jobExecutionId = createJob();
+      Long jobExecutionId = createJob(monitoringWindowStartTime, monitoringWindowEndTime);
       alertJobContext.setJobExecutionId(jobExecutionId);
 
       // write to alert_tasks
-      List<Long> taskIds = createTasks();
-
-      // restore the original state of the job; otherwise, it will work on the same monitoring window afterwards
-      alertJobContext.setWindowStartTime(originalMonitoringWindowStartTime);
-      alertJobContext.setWindowEndTime(originalMonitoringWindowEndTime);
+      List<Long> taskIds = createTasks(monitoringWindowStartTime, monitoringWindowEndTime);
     }
 
   }
 
-  private long createJob() {
+  private long createJob(DateTime monitoringWindowStartTime, DateTime monitoringWindowEndTime) {
     Long jobExecutionId = null;
     try {
       JobDTO anomalyJobSpec = new JobDTO();
       anomalyJobSpec.setJobName(alertJobContext.getJobName());
-      anomalyJobSpec.setWindowStartTime(alertJobContext.getWindowStartTime().getMillis());
-      anomalyJobSpec.setWindowEndTime(alertJobContext.getWindowEndTime().getMillis());
+      anomalyJobSpec.setWindowStartTime(monitoringWindowStartTime.getMillis());
+      anomalyJobSpec.setWindowEndTime(monitoringWindowEndTime.getMillis());
       anomalyJobSpec.setScheduleStartTime(System.currentTimeMillis());
       anomalyJobSpec.setStatus(JobStatus.SCHEDULED);
       jobExecutionId = anomalyJobSpecDAO.save(anomalyJobSpec);
@@ -127,11 +115,12 @@ public class AlertJobRunner implements Job {
     return jobExecutionId;
   }
 
-  private List<Long> createTasks() {
+  private List<Long> createTasks(DateTime monitoringWindowStartTime, DateTime monitoringWindowEndTime) {
     List<Long> taskIds = new ArrayList<>();
     try {
 
-      List<AlertTaskInfo> tasks = taskGenerator.createAlertTasks(alertJobContext);
+      List<AlertTaskInfo> tasks =
+          taskGenerator.createAlertTasks(alertJobContext, monitoringWindowStartTime, monitoringWindowEndTime);
 
       for (AlertTaskInfo taskInfo : tasks) {
         String taskInfoJson = null;

@@ -8,8 +8,6 @@ import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
 public class AlertJobContext extends JobContext {
 
   private Long alertConfigId;
-  private DateTime windowStartTime;
-  private DateTime windowEndTime;
   private EmailConfigurationDTO alertConfig;
 
   public Long getAlertConfigId() {
@@ -27,22 +25,4 @@ public class AlertJobContext extends JobContext {
   public void setAlertConfig(EmailConfigurationDTO alertConfig) {
     this.alertConfig = alertConfig;
   }
-
-  public DateTime getWindowStartTime() {
-    return windowStartTime;
-  }
-
-  public void setWindowStartTime(DateTime windowStartTime) {
-    this.windowStartTime = windowStartTime;
-  }
-
-  public DateTime getWindowEndTime() {
-    return windowEndTime;
-  }
-
-  public void setWindowEndTime(DateTime windowEndTime) {
-    this.windowEndTime = windowEndTime;
-  }
-
-
 }
