@@ -42,17 +42,6 @@ public class TestUserRuleAnomalyFunction {
     Assert.assertEquals(actual, expected);
   }
 
-  @Test(dataProvider = "getFilteredAndMergedAnomalyResultsProvider")
-  public void getFilteredAndMergedAnomalyResults(List<RawAnomalyResultDTO> anomalyResults,
-      int minConsecutiveSize, long bucketMillis, List<Double> baselineValues,
-      List<Double> currentValues, double threshold, String baselineProp,
-      List<RawAnomalyResultDTO> expectedAnomalyResults) {
-    List<RawAnomalyResultDTO> actualAnomalyResults =
-        function.getFilteredAndMergedAnomalyResults(anomalyResults, minConsecutiveSize,
-            bucketMillis, baselineValues, currentValues, threshold, baselineProp);
-    Assert.assertEquals(actualAnomalyResults, expectedAnomalyResults);
-  }
-
   @DataProvider(name = "filterTimeWindowSetProvider")
   public Object[][] filterTimeWindowSetProvider() {
     // test for min < windowStart, min > windowStart, max < windowEnd, max > windowEnd
