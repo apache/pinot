@@ -44,7 +44,6 @@ public class DetectionJobRunner implements Job {
   private JobManager anomalyJobSpecDAO;
   private TaskManager anomalyTasksSpecDAO;
   private AnomalyFunctionManager anomalyFunctionSpecDAO;
-  private long anomalyFunctionId;
   private DetectionJobContext detectionJobContext;
 
   private TaskGenerator taskGenerator;
@@ -62,7 +61,7 @@ public class DetectionJobRunner implements Job {
     anomalyJobSpecDAO = detectionJobContext.getAnomalyJobDAO();
     anomalyTasksSpecDAO = detectionJobContext.getAnomalyTaskDAO();
     anomalyFunctionSpecDAO = detectionJobContext.getAnomalyFunctionDAO();
-    anomalyFunctionId = detectionJobContext.getAnomalyFunctionId();
+    long anomalyFunctionId = detectionJobContext.getAnomalyFunctionId();
 
     AnomalyFunctionDTO anomalyFunctionSpec = getAnomalyFunctionSpec(anomalyFunctionId);
     if (anomalyFunctionSpec == null) {
@@ -70,9 +69,17 @@ public class DetectionJobRunner implements Job {
     } else {
       detectionJobContext.setAnomalyFunctionSpec(anomalyFunctionSpec);
 
-      DateTime monitoringWindowStartTime = detectionJobContext.getWindowStartTime();
-      DateTime monitoringWindowEndTime = detectionJobContext.getWindowEndTime();
-      boolean needCleanUpMonitoringWindow = (monitoringWindowEndTime == null);
+      // originalMonitoringWindowStart and EndTime are used to restore the original state of the JobContext at the
+      // end of this method.
+      // Details: This method modifies the variables, windowStartTime and windowEndTime, of detectionJobContext, which
+      //   is an undesirable behavior: Once start and end time are set (non-null), this function stops computing the
+      //   latest start and end time for the current job. Consequently, the current job would work on the same
+      //   monitoring window as the last job. Hence, we need to ensure the original state of JobContext is restored.
+      DateTime originalMonitoringWindowEndTime = detectionJobContext.getWindowEndTime();
+      DateTime originalMonitoringWindowStartTime = detectionJobContext.getWindowStartTime();
+
+      DateTime monitoringWindowStartTime = originalMonitoringWindowStartTime;
+      DateTime monitoringWindowEndTime = originalMonitoringWindowEndTime;
 
       // Compute window end
       if (monitoringWindowEndTime == null) {
@@ -104,11 +111,9 @@ public class DetectionJobRunner implements Job {
       // write to anomaly_tasks
       List<Long> taskIds = createTasks();
 
-      // clean up for the next scheduled job; otherwise, it will work on the same monitoring window
-      if (needCleanUpMonitoringWindow) {
-        detectionJobContext.setWindowStartTime(null);
-        detectionJobContext.setWindowEndTime(null);
-      }
+      // restore the original state of the job; otherwise, it will work on the same monitoring window afterwards
+      detectionJobContext.setWindowStartTime(originalMonitoringWindowStartTime);
+      detectionJobContext.setWindowEndTime(originalMonitoringWindowEndTime);
     }
 
   }
