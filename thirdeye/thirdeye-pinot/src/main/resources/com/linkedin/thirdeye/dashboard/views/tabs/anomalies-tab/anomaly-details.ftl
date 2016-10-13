@@ -43,7 +43,7 @@
               <tr><td>Id </td><td> {{function/id}}</td></tr>
               <tr><td>Name </td><td> {{function/functionName}}</td></tr>
               <tr><td>Type </td><td> {{function/type}}</td></tr>
-              <tr><td>Test Size </td><td> {{function/windowSize}} {{function/windowUnit}}</td></tr>
+              <tr><td>Monitor Size </td><td> {{function/windowSize}} {{function/windowUnit}}</td></tr>
               <tr><td>Dimension </td><td> {{function/exploreDimensions}}</td></tr>
               <tr><td>Filters </td><td> {{function/filters}}</td></tr>
               <tr><td>Properties </td><td> {{function/properties}}</td></tr>

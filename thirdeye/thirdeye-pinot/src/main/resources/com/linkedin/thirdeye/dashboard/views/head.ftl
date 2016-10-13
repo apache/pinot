@@ -26,13 +26,13 @@
             document.write(unescape('%3Cscript%20src%3D%22lib/jquery-1.10.2.min.js%22%3E%3C/script%3E'));
         }
     </script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/handlebars.js/4.0.5/handlebars.min.js"></script>
-	<script src="https://d3js.org/d3.v3.min.js" charset="utf-8"  defer></script>
+  <script src="../../../assets/lib/handlebars.min.js"></script>
+	<script src="../../../assets/js/d3/d3.v3.min.js" charset="utf-8"  defer></script>
 	<script src="../../../assets/js/d3/nvtooltip.js"  defer></script>
 	<script src="../../../assets/js/d3/d3legend.js"  defer></script>
 	<script src="../../../assets/js/d3/d3line.js"  defer></script>
 	<script src="../../../assets/js/d3/d3linewithlegend.js"  defer></script>
-    <script src="../../../assets/js/c3/c3.js"  defer></script>
+  <script src="../../../assets/js/c3/c3.js"  defer></script>
 
     <!--Compiled JSTZ.min.js, Moment.min.js, DataTables 1.10.12, jquery.dataTables.columnFilter.min.js, moment-timezone-with-data-2010-2020.min.js into vendorplugins.compiled.js-->
    <script src="../../../assets/js/vendor/vendorplugins.compiled.js" defer></script>
