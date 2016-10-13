@@ -31,13 +31,11 @@ public class AlertJobRunner implements Job {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   public static final String ALERT_JOB_CONTEXT = "ALERT_JOB_CONTEXT";
+  public static final String ALERT_JOB_MONITORING_WINDOW_START_TIME = "ALERT_JOB_MONITORING_WINDOW_START_TIME";
+  public static final String ALERT_JOB_MONITORING_WINDOW_END_TIME = "ALERT_JOB_MONITORING_WINDOW_END_TIME";
 
   private JobManager anomalyJobSpecDAO;
   private TaskManager anomalyTasksSpecDAO;
-  private EmailConfigurationManager emailConfigurationDAO;
-  private long alertConfigId;
-  private DateTime windowStartTime;
-  private DateTime windowEndTime;
   private AlertJobContext alertJobContext;
 
   private TaskGenerator taskGenerator;
@@ -54,8 +52,8 @@ public class AlertJobRunner implements Job {
         .get(ALERT_JOB_CONTEXT);
     anomalyJobSpecDAO = alertJobContext.getAnomalyJobDAO();
     anomalyTasksSpecDAO = alertJobContext.getAnomalyTaskDAO();
-    emailConfigurationDAO = alertJobContext.getEmailConfigurationDAO();
-    alertConfigId = alertJobContext.getAlertConfigId();
+    EmailConfigurationManager emailConfigurationDAO = alertJobContext.getEmailConfigurationDAO();
+    long alertConfigId = alertJobContext.getAlertConfigId();
 
     EmailConfigurationDTO alertConfig = emailConfigurationDAO.findById(alertConfigId);
     if (alertConfig == null) {
@@ -63,47 +61,47 @@ public class AlertJobRunner implements Job {
     } else {
       alertJobContext.setAlertConfig(alertConfig);
 
-      windowEndTime = alertJobContext.getWindowEndTime();
-      windowStartTime = alertJobContext.getWindowStartTime();
+      DateTime monitoringWindowStartTime =
+          (DateTime) jobExecutionContext.getJobDetail().getJobDataMap().get(ALERT_JOB_MONITORING_WINDOW_START_TIME);
+      DateTime monitoringWindowEndTime =
+          (DateTime) jobExecutionContext.getJobDetail().getJobDataMap().get(ALERT_JOB_MONITORING_WINDOW_END_TIME);
 
       // Compute window end
-      if (windowEndTime == null) {
+      if (monitoringWindowEndTime == null) {
         long delayMillis = 0;
         if (alertConfig.getWindowDelay() != null) {
           delayMillis = TimeUnit.MILLISECONDS.convert(alertConfig.getWindowDelay(),
               alertConfig.getWindowDelayUnit());
         }
         Date scheduledFireTime = jobExecutionContext.getScheduledFireTime();
-        windowEndTime = new DateTime(scheduledFireTime).minus(delayMillis);
+        monitoringWindowEndTime = new DateTime(scheduledFireTime).minus(delayMillis);
       }
 
-      // Compute window start
-      if (windowStartTime == null) {
+      // Compute window start according to window end
+      if (monitoringWindowStartTime == null) {
         int windowSize = alertConfig.getWindowSize();
         TimeUnit windowUnit = alertConfig.getWindowUnit();
         long windowMillis = TimeUnit.MILLISECONDS.convert(windowSize, windowUnit);
-        windowStartTime = windowEndTime.minus(windowMillis);
+        monitoringWindowStartTime = monitoringWindowEndTime.minus(windowMillis);
       }
-      alertJobContext.setWindowStartTime(windowStartTime);
-      alertJobContext.setWindowEndTime(windowEndTime);
 
-      // write to anomaly_jobs
-      Long jobExecutionId = createJob();
+      // write to alert_jobs
+      Long jobExecutionId = createJob(monitoringWindowStartTime, monitoringWindowEndTime);
       alertJobContext.setJobExecutionId(jobExecutionId);
 
-      // write to anomaly_tasks
-      List<Long> taskIds = createTasks();
+      // write to alert_tasks
+      List<Long> taskIds = createTasks(monitoringWindowStartTime, monitoringWindowEndTime);
     }
 
   }
 
-  private long createJob() {
+  private long createJob(DateTime monitoringWindowStartTime, DateTime monitoringWindowEndTime) {
     Long jobExecutionId = null;
     try {
       JobDTO anomalyJobSpec = new JobDTO();
       anomalyJobSpec.setJobName(alertJobContext.getJobName());
-      anomalyJobSpec.setWindowStartTime(alertJobContext.getWindowStartTime().getMillis());
-      anomalyJobSpec.setWindowEndTime(alertJobContext.getWindowEndTime().getMillis());
+      anomalyJobSpec.setWindowStartTime(monitoringWindowStartTime.getMillis());
+      anomalyJobSpec.setWindowEndTime(monitoringWindowEndTime.getMillis());
       anomalyJobSpec.setScheduleStartTime(System.currentTimeMillis());
       anomalyJobSpec.setStatus(JobStatus.SCHEDULED);
       jobExecutionId = anomalyJobSpecDAO.save(anomalyJobSpec);
@@ -117,11 +115,12 @@ public class AlertJobRunner implements Job {
     return jobExecutionId;
   }
 
-  private List<Long> createTasks() {
+  private List<Long> createTasks(DateTime monitoringWindowStartTime, DateTime monitoringWindowEndTime) {
     List<Long> taskIds = new ArrayList<>();
     try {
 
-      List<AlertTaskInfo> tasks = taskGenerator.createAlertTasks(alertJobContext);
+      List<AlertTaskInfo> tasks =
+          taskGenerator.createAlertTasks(alertJobContext, monitoringWindowStartTime, monitoringWindowEndTime);
 
       for (AlertTaskInfo taskInfo : tasks) {
         String taskInfoJson = null;
