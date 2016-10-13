@@ -95,7 +95,7 @@ $(document).ready(function () {
     });
 
     Handlebars.registerHelper('displayAnomalyResultExploreDimensions', function (dimensionNamesString, dimensionValuesString) {
-        
+
         var dimensionNames = dimensionNamesString.replace(/[\s]/g, "").split(",");
         if (dimensionNames.length == 1) {
             return dimensionValuesString.replace(/[,*\s]/g, "");
@@ -251,7 +251,6 @@ $(document).ready(function () {
         return moment(millis).tz(tz).format(displayDateFormat);
     });
 
-
     //Takes 2 timestamps and returns a date range where the end date is hours only, month & day & hours, or full date based on the equality of the 2 dates
     Handlebars.registerHelper('displayDateRange', function (start, end) {
 
@@ -260,37 +259,37 @@ $(document).ready(function () {
         }
 
         //Options
-       // var showTimeZone = options.hash.hasOwnProperty("showTimeZone") ? (options.hash.showTimeZone == false ? false : true) : true;
+        // var showTimeZone = options.hash.hasOwnProperty("showTimeZone") ? (options.hash.showTimeZone == false ? false : true) : true;
 
         var tz = getTimeZone();
         var startMillis = parseInt(start);
         var endMillis = parseInt(end);
         var startDate = moment(startMillis).tz(tz).format('YYYY/MM/DD');
-        var endDate =  moment( endMillis).tz(tz).format('YYYY/MM/DD');
+        var endDate = moment(endMillis).tz(tz).format('YYYY/MM/DD');
         var startMonth = moment(startMillis).tz(tz).format('YYYY/MM');
-        var endMonth =  moment( endMillis).tz(tz).format('YYYY/MM');
-        var startYear =  moment(startMillis).tz(tz).format('YYYY');
-        var endYear =  moment( endMillis).tz(tz).format('YYYY');
+        var endMonth = moment(endMillis).tz(tz).format('YYYY/MM');
+        var startYear = moment(startMillis).tz(tz).format('YYYY');
+        var endYear = moment(endMillis).tz(tz).format('YYYY');
 
-        var startDateFormat = 'MM/DD h a';
+        var startDateFormat = 'MM/DD h:m a';
         var endDateFormat;
-        if(startYear == endYear){
-            if(startMonth == endMonth){
-                  if(startDate == endDate){
-                      endDateFormat = 'h a'
-                  }else{
-                      endDateFormat = 'MM/DD h a'
-                  }
-            }else{
-                endDateFormat = 'MM/DD h a'
+        if (startYear == endYear) {
+            if (startMonth == endMonth) {
+                if (startDate == endDate) {
+                    endDateFormat = 'h:m a'
+                } else {
+                    endDateFormat = 'MM/DD h:m a'
+                }
+            } else {
+                endDateFormat = 'MM/DD h:m a'
             }
-        }else{
-            startDateFormat = 'YY/MM/DD h a'
-            endDateFormat = 'YY/MM/DD h a'
-
+        } else {
+            startDateFormat = 'YY/MM/DD h:m a'
+            endDateFormat = 'YY/MM/DD h:m a'
         }
 
-        return moment(startMillis).tz(tz).format(startDateFormat) + " - " + moment(endMillis).tz(tz).format(endDateFormat)
+        return moment(startMillis).tz(tz).format(startDateFormat) + " - " + moment(endMillis).tz(
+                tz).format(endDateFormat)
     });
 
     //takes utc timestamp (milliseconds ie. 1462626000000), returns date and time in users tz in a format in sync with the hash aggregate granularity
