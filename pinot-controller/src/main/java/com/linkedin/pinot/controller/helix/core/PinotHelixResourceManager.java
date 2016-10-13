@@ -290,6 +290,9 @@ public class PinotHelixResourceManager {
 
         // All segments match with the expected external view state
         return true;
+      } else {
+        // Segment doesn't exist in EV, wait for a little bit
+        Uninterruptibles.sleepUninterruptibly(_externalViewUpdateRetryInterval, TimeUnit.MILLISECONDS);
       }
     }
 
