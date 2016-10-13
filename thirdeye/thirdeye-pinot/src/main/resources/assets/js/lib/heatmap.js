@@ -56,10 +56,8 @@ function renderD3heatmap(data, tab, templatePlaceHolder) {
         $("#" + tab + "-chart-area-error").hide()
     }
 
-    //var summaryData = {"dimensions":["continent","countryCode","pageKey"],"responseRows":[{"names":["(ALL)-","(ALL)","(ALL)"],"baselineValue":290076771,"currentValue":290989633,"ratio":1.0031469669110458},{"names":["unknown","(ALL)-","(ALL)"],"baselineValue":49637728,"currentValue":42080059,"ratio":0.8477434543337681},{"names":["unknown","other","p_flagship3_feed_updates"],"baselineValue":12438174,"currentValue":8903781,"ratio":0.7158430972263292},{"names":["Oceania","au","(ALL)"],"baselineValue":17854104,"currentValue":15000436,"ratio":0.8401673923261564},{"names":["North America","us","(ALL)-"],"baselineValue":120970350,"currentValue":105194842,"ratio":0.8695919454643225},{"names":["North America","us","p_flagship3_people_pymk"],"baselineValue":11642301,"currentValue":8071474,"ratio":0.693288551807757},{"names":["North America","us","p_flagship3_feed_updates"],"baselineValue":24534044,"currentValue":17338875,"ratio":0.7067271502407023},{"names":["North America","ca","(ALL)"],"baselineValue":21769165,"currentValue":18074492,"ratio":0.8302795261095224},{"names":["Latin America","br","(ALL)"],"baselineValue":22534261,"currentValue":17793288,"ratio":0.7896104513922156},{"names":["Europe","fr","(ALL)"],"baselineValue":20051472,"currentValue":16703293,"ratio":0.8330207877007733}]};
-
     /* Handelbars template for treemap table */
-    var templateData = {heatMapData : heatMapData}
+    var templateData = {heatMapData : data}
     var result_treemap_template = HandleBarsTemplates.template_treemap(templateData)
     templatePlaceHolder.html(result_treemap_template);
 
