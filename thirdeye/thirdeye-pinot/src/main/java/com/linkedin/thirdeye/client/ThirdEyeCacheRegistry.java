@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.client;
 
+import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -14,8 +15,12 @@ import com.google.common.cache.RemovalNotification;
 import com.linkedin.pinot.client.ResultSetGroup;
 import com.linkedin.thirdeye.client.cache.CollectionMaxDataTimeCacheLoader;
 import com.linkedin.thirdeye.client.cache.CollectionsCache;
+import com.linkedin.thirdeye.client.cache.DashboardConfigCacheLoader;
 import com.linkedin.thirdeye.client.cache.DashboardsCacheLoader;
+import com.linkedin.thirdeye.client.cache.DatasetConfigCacheLoader;
 import com.linkedin.thirdeye.client.cache.DimensionFiltersCacheLoader;
+import com.linkedin.thirdeye.client.cache.MetricConfigCacheLoader;
+import com.linkedin.thirdeye.client.cache.MetricDataset;
 import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.client.cache.ResultSetGroupCacheLoader;
 import com.linkedin.thirdeye.client.pinot.PinotQuery;
@@ -25,9 +30,16 @@ import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
 import com.linkedin.thirdeye.dashboard.resources.CacheResource;
 import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
+import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 
 public class ThirdEyeCacheRegistry {
 
+  private LoadingCache<String, DatasetConfigDTO> datasetConfigCache;
+  private LoadingCache<MetricDataset, MetricConfigDTO> metricConfigCache;
+  private LoadingCache<String, List<DashboardConfigDTO>> dashboardConfigsCache;
   private LoadingCache<PinotQuery, ResultSetGroup> resultSetGroupCache;
   private LoadingCache<String, Long> collectionMaxDataTimeCache;
   private LoadingCache<String, String> dashboardsCache;
@@ -36,6 +48,7 @@ public class ThirdEyeCacheRegistry {
   private QueryCache queryCache;
 
   private static DatasetConfigManager datasetConfigDAO;
+  private static MetricConfigManager metricConfigDAO;
   private static DashboardConfigManager dashboardConfigDAO;
   private static PinotThirdEyeClientConfig pinotThirdeyeClientConfig;
   private static ThirdEyeClient thirdEyeClient;
@@ -56,6 +69,7 @@ public class ThirdEyeCacheRegistry {
       pinotThirdeyeClientConfig = PinotThirdEyeClientConfig.createThirdEyeClientConfig(config);
       thirdEyeClient = PinotThirdEyeClient.fromClientConfig(pinotThirdeyeClientConfig);
       datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
+      metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
       dashboardConfigDAO = DAO_REGISTRY.getDashboardConfigDAO();
 
     } catch (Exception e) {
@@ -68,6 +82,7 @@ public class ThirdEyeCacheRegistry {
       pinotThirdeyeClientConfig = pinotThirdEyeClientConfig;
       thirdEyeClient = PinotThirdEyeClient.fromClientConfig(pinotThirdeyeClientConfig);
       datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
+      metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
       dashboardConfigDAO = DAO_REGISTRY.getDashboardConfigDAO();
     } catch (Exception e) {
      LOGGER.info("Caught exception while initializing caches", e);
@@ -113,16 +128,34 @@ public class ThirdEyeCacheRegistry {
     QueryCache queryCache = new QueryCache(thirdEyeClient, Executors.newFixedThreadPool(10));
     cacheRegistry.registerQueryCache(queryCache);
 
+    // Dimension Filter cache
     LoadingCache<String, String> dimensionFiltersCache = CacheBuilder.newBuilder()
         .build(new DimensionFiltersCacheLoader(cacheRegistry.getQueryCache(), datasetConfigDAO));
     cacheRegistry.registerDimensionFiltersCache(dimensionFiltersCache);
 
+    // Dashboards cache
     LoadingCache<String, String> dashboardsCache = CacheBuilder.newBuilder()
         .build(new DashboardsCacheLoader(dashboardConfigDAO));
     cacheRegistry.registerDashboardsCache(dashboardsCache);
 
+    // Collections cache
     CollectionsCache collectionsCache = new CollectionsCache(datasetConfigDAO);
     cacheRegistry.registerCollectionsCache(collectionsCache);
+
+    // DatasetConfig cache
+    LoadingCache<String, DatasetConfigDTO> datasetConfigCache = CacheBuilder.newBuilder()
+        .build(new DatasetConfigCacheLoader(datasetConfigDAO));
+    cacheRegistry.registerDatasetConfigCache(datasetConfigCache);
+
+    // MetricConfig cache
+    LoadingCache<MetricDataset, MetricConfigDTO> metricConfigCache = CacheBuilder.newBuilder()
+        .build(new MetricConfigCacheLoader(metricConfigDAO));
+    cacheRegistry.registerMetricConfigCache(metricConfigCache);
+
+    // DashboardConfigs cache
+    LoadingCache<String, List<DashboardConfigDTO>> dashboardConfigsCache = CacheBuilder.newBuilder()
+        .build(new DashboardConfigCacheLoader(dashboardConfigDAO));
+    cacheRegistry.registerDashboardConfigsCache(dashboardConfigsCache);
   }
 
   private static void initPeriodicCacheRefresh() {
@@ -135,6 +168,10 @@ public class ThirdEyeCacheRegistry {
     cacheResource.refreshMaxDataTimeCache();
     cacheResource.refreshDimensionFiltersCache();
     cacheResource.refreshDashboardsCache();
+
+    cacheResource.refreshDatasetConfigCache();
+    cacheResource.refreshMetricConfigCache();
+    cacheResource.refreshDashoardConfigsCache();
 
     ScheduledExecutorService minuteService = Executors.newSingleThreadScheduledExecutor();
     minuteService.scheduleAtFixedRate(new Runnable() {
@@ -223,4 +260,29 @@ public class ThirdEyeCacheRegistry {
   public void registerQueryCache(QueryCache queryCache) {
     this.queryCache = queryCache;
   }
+
+  public LoadingCache<String, DatasetConfigDTO> getDatasetConfigCache() {
+    return datasetConfigCache;
+  }
+
+  public void registerDatasetConfigCache(LoadingCache<String, DatasetConfigDTO> datasetConfigCache) {
+    this.datasetConfigCache = datasetConfigCache;
+  }
+
+  public LoadingCache<MetricDataset, MetricConfigDTO> getMetricConfigCache() {
+    return metricConfigCache;
+  }
+
+  public void registerMetricConfigCache(LoadingCache<MetricDataset, MetricConfigDTO> metricConfigCache) {
+    this.metricConfigCache = metricConfigCache;
+  }
+
+  public LoadingCache<String, List<DashboardConfigDTO>> getDashboardConfigsCache() {
+    return dashboardConfigsCache;
+  }
+
+  public void registerDashboardConfigsCache(LoadingCache<String, List<DashboardConfigDTO>> dashboardConfigsCache) {
+    this.dashboardConfigsCache = dashboardConfigsCache;
+  }
+
 }
