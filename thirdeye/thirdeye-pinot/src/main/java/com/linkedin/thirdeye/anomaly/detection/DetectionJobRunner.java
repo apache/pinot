@@ -45,8 +45,6 @@ public class DetectionJobRunner implements Job {
   private TaskManager anomalyTasksSpecDAO;
   private AnomalyFunctionManager anomalyFunctionSpecDAO;
   private long anomalyFunctionId;
-  private DateTime windowStartTime;
-  private DateTime windowEndTime;
   private DetectionJobContext detectionJobContext;
 
   private TaskGenerator taskGenerator;
@@ -72,25 +70,32 @@ public class DetectionJobRunner implements Job {
     } else {
       detectionJobContext.setAnomalyFunctionSpec(anomalyFunctionSpec);
 
+      DateTime monitoringWindowStartTime = detectionJobContext.getWindowStartTime();
+      DateTime monitoringWindowEndTime = detectionJobContext.getWindowEndTime();
+      boolean needCleanUpMonitoringWindow = (monitoringWindowEndTime == null);
+
       // Compute window end
-      long delayMillis = 0;
-      if (anomalyFunctionSpec.getWindowDelay() != null) {
-        delayMillis = TimeUnit.MILLISECONDS.convert(anomalyFunctionSpec.getWindowDelay(),
-            anomalyFunctionSpec.getWindowDelayUnit());
+      if (monitoringWindowEndTime == null) {
+        long delayMillis = 0;
+        if (anomalyFunctionSpec.getWindowDelay() != null) {
+          delayMillis = TimeUnit.MILLISECONDS.convert(anomalyFunctionSpec.getWindowDelay(), anomalyFunctionSpec.getWindowDelayUnit());
+        }
+        Date scheduledFireTime = jobExecutionContext.getScheduledFireTime();
+        monitoringWindowEndTime = new DateTime(scheduledFireTime).minus(delayMillis);
       }
-      Date scheduledFireTime = jobExecutionContext.getScheduledFireTime();
-      windowEndTime = new DateTime(scheduledFireTime).minus(delayMillis);
 
       // Compute window start according to window end
-      int windowSize = anomalyFunctionSpec.getWindowSize();
-      TimeUnit windowUnit = anomalyFunctionSpec.getWindowUnit();
-      long windowMillis = TimeUnit.MILLISECONDS.convert(windowSize, windowUnit);
-      windowStartTime = windowEndTime.minus(windowMillis);
+      if (monitoringWindowStartTime == null) {
+        int windowSize = anomalyFunctionSpec.getWindowSize();
+        TimeUnit windowUnit = anomalyFunctionSpec.getWindowUnit();
+        long windowMillis = TimeUnit.MILLISECONDS.convert(windowSize, windowUnit);
+        monitoringWindowStartTime = monitoringWindowEndTime.minus(windowMillis);
+      }
 
-      windowStartTime = alignTimestampsToDataTimezone(windowStartTime, anomalyFunctionSpec.getCollection());
-      windowEndTime = alignTimestampsToDataTimezone(windowEndTime, anomalyFunctionSpec.getCollection());
-      detectionJobContext.setWindowStartTime(windowStartTime);
-      detectionJobContext.setWindowEndTime(windowEndTime);
+      monitoringWindowStartTime = alignTimestampsToDataTimezone(monitoringWindowStartTime, anomalyFunctionSpec.getCollection());
+      monitoringWindowEndTime = alignTimestampsToDataTimezone(monitoringWindowEndTime, anomalyFunctionSpec.getCollection());
+      detectionJobContext.setWindowStartTime(monitoringWindowStartTime);
+      detectionJobContext.setWindowEndTime(monitoringWindowEndTime);
 
       // write to anomaly_jobs
       Long jobExecutionId = createJob();
@@ -98,6 +103,12 @@ public class DetectionJobRunner implements Job {
 
       // write to anomaly_tasks
       List<Long> taskIds = createTasks();
+
+      // clean up for the next scheduled job; otherwise, it will work on the same monitoring window
+      if (needCleanUpMonitoringWindow) {
+        detectionJobContext.setWindowStartTime(null);
+        detectionJobContext.setWindowEndTime(null);
+      }
     }
 
   }
