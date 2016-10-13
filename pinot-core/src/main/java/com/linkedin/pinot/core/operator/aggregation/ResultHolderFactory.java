@@ -20,6 +20,8 @@ import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunction
 import com.linkedin.pinot.core.operator.aggregation.groupby.DoubleGroupByResultHolder;
 import com.linkedin.pinot.core.operator.aggregation.groupby.GroupByResultHolder;
 import com.linkedin.pinot.core.operator.aggregation.groupby.ObjectGroupByResultHolder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -27,10 +29,12 @@ import com.linkedin.pinot.core.operator.aggregation.groupby.ObjectGroupByResultH
  * Supports both, AggregationResultHolder as well as GroupByResultHolder.
  */
 public class ResultHolderFactory {
+  private static final Logger LOGGER = LoggerFactory.getLogger(ResultHolderFactory.class);
+
   private ResultHolderFactory() {
   }
 
-  public static final int MAX_INITIAL_RESULT_HOLDER_CAPACITY = 10000;
+  public static final int MAX_INITIAL_RESULT_HOLDER_CAPACITY = 10_000;
 
   /**
    * Creates and returns the appropriate implementation of AggregationResultHolder,
@@ -63,25 +67,28 @@ public class ResultHolderFactory {
    * based on aggregation function.
    *
    * @param function Aggregation function
-   * @param maxNumResults Max number of results
+   * @param capacityCap Max number of results
    * @return Appropriate group by result holder
    */
-  public static GroupByResultHolder getGroupByResultHolder(AggregationFunction function, long maxNumResults) {
+  public static GroupByResultHolder getGroupByResultHolder(AggregationFunction function, int capacityCap) {
     String functionName = function.getName();
 
-    int capacityCap = maxNumResults > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) maxNumResults;
     int initialCapacity = Math.min(capacityCap, MAX_INITIAL_RESULT_HOLDER_CAPACITY);
 
     switch (functionName.toLowerCase()) {
       case AggregationFunctionFactory.COUNT_AGGREGATION_FUNCTION:
       case AggregationFunctionFactory.MAX_AGGREGATION_FUNCTION:
-      case AggregationFunctionFactory.MIN_AGGREGATION_FUNCTION:
       case AggregationFunctionFactory.SUM_AGGREGATION_FUNCTION:
       case AggregationFunctionFactory.COUNT_MV_AGGREGATION_FUNCTION:
       case AggregationFunctionFactory.MAX_MV_AGGREGATION_FUNCTION:
-      case AggregationFunctionFactory.MIN_MV_AGGREGATION_FUNCTION:
       case AggregationFunctionFactory.SUM_MV_AGGREGATION_FUNCTION:
-        return new DoubleGroupByResultHolder(initialCapacity, capacityCap, function.getDefaultValue());
+        return new DoubleGroupByResultHolder(initialCapacity, capacityCap, function.getDefaultValue(),
+            false /* minOrder */);
+
+      case AggregationFunctionFactory.MIN_AGGREGATION_FUNCTION:
+      case AggregationFunctionFactory.MIN_MV_AGGREGATION_FUNCTION:
+        return new DoubleGroupByResultHolder(initialCapacity, capacityCap, function.getDefaultValue(),
+            true /* minOrder */);
 
       default:
         return new ObjectGroupByResultHolder(initialCapacity, capacityCap);

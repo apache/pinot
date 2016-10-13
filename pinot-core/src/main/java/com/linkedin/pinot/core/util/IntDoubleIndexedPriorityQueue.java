@@ -93,7 +93,7 @@ public class IntDoubleIndexedPriorityQueue extends BaseIndexedPriorityQueue {
     }
 
     int index = _keyToIndexMap.get(key);
-    double value = _values.get(index);
+    double value = _values.getDouble(index);
     _reusablePair.setIntValue(index);
     _reusablePair.setDoubleValue(value);
 
@@ -118,7 +118,7 @@ public class IntDoubleIndexedPriorityQueue extends BaseIndexedPriorityQueue {
     IntDoublePair poll = peek();
     int lastIndex = _values.size() - 1;
     swapValues(0, lastIndex);
-    _values.remove(lastIndex);
+    _values.removeDouble(lastIndex);
 
     _keyToIndexMap.remove(_indexToKeyMap.get(lastIndex));
     _indexToKeyMap.remove(lastIndex);
@@ -145,7 +145,7 @@ public class IntDoubleIndexedPriorityQueue extends BaseIndexedPriorityQueue {
       throw new RuntimeException("Empty collection");
     }
     _reusablePair.setIntValue(_indexToKeyMap.get(0));
-    _reusablePair.setDoubleValue(_values.get(0));
+    _reusablePair.setDoubleValue(_values.getDouble(0));
     return _reusablePair;
   }
 
@@ -172,8 +172,8 @@ public class IntDoubleIndexedPriorityQueue extends BaseIndexedPriorityQueue {
 
     while (index != 0) {
       int parentIndex = getParentIndex(index);
-      double value = _values.get(index);
-      double parentValue = _values.get(parentIndex);
+      double value = _values.getDouble(index);
+      double parentValue = _values.getDouble(parentIndex);
 
       if (compare(parentValue, value) == 1) {
         swapValues(index, parentIndex);
@@ -210,8 +210,8 @@ public class IntDoubleIndexedPriorityQueue extends BaseIndexedPriorityQueue {
       } else if (rightChildIndex >= size) { // Node only has left child which will be the minimum.
         minIndex = leftChildIndex;
       } else { // Node has both left and right children, find the minimum of the two.
-        double leftChildValue = _values.get(leftChildIndex);
-        double rightChildValue = _values.get(rightChildIndex);
+        double leftChildValue = _values.getDouble(leftChildIndex);
+        double rightChildValue = _values.getDouble(rightChildIndex);
 
         if (compare(leftChildValue, rightChildValue) <= 0) {
           minIndex = leftChildIndex;
@@ -221,7 +221,7 @@ public class IntDoubleIndexedPriorityQueue extends BaseIndexedPriorityQueue {
       }
 
       // One of the children is out of order, need to sift down.
-      if (compare(_values.get(index), _values.get(minIndex)) == 1) {
+      if (compare(_values.getDouble(index), _values.getDouble(minIndex)) == 1) {
         swapValues(index, minIndex);
         index = minIndex;
         sifted = true;
@@ -261,7 +261,10 @@ public class IntDoubleIndexedPriorityQueue extends BaseIndexedPriorityQueue {
     if (index1 == index2) {
       return;
     }
-    Collections.swap(_values, index1, index2);
+
+    double tmp = _values.getDouble(index1);
+    _values.set(index1, _values.getDouble(index2));
+    _values.set(index2, tmp);
     swapKeys(index1, index2);
   }
 
