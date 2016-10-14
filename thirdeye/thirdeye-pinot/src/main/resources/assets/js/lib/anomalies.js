@@ -229,7 +229,6 @@ function drawMetricTimeSeries(timeSeriesData, anomalyData, tab, placeholder) {
             },
             y: {
                 tick: {
-                    //format integers with comma-grouping for thousands and round to 2 decimal numbers for floats
                     format: function (d) {
                         return getFormattedNumber(d);
                     }
@@ -475,7 +474,6 @@ function drawAnomalyTimeSeries(timeSeriesData,anomalyData, tab, placeholder, opt
              y: {
                  show: true,
                  tick: {
-                     //format integers with comma-grouping for thousands and round to 2 decimal numbers for floats
                      format: function (d) {
                          return getFormattedNumber(d);
                      }
