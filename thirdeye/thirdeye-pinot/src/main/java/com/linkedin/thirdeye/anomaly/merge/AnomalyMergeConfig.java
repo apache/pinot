@@ -18,7 +18,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 public class AnomalyMergeConfig {
   private AnomalyMergeStrategy mergeStrategy = AnomalyMergeStrategy.FUNCTION;
   private long sequentialAllowedGap = 30_000; // 30 seconds
-  private long mergeDuration = 12 * 60 * 60 * 1000; // 12 hours
+  private long maxMergeDurationLength = 12 * 60 * 60 * 1000; // 12 hours
 
   public AnomalyMergeStrategy getMergeStrategy() {
     return mergeStrategy;
@@ -36,11 +36,11 @@ public class AnomalyMergeConfig {
     this.sequentialAllowedGap = sequentialAllowedGap;
   }
 
-  public long getMergeDuration() {
-    return mergeDuration;
+  public long getMaxMergeDurationLength() {
+    return maxMergeDurationLength;
   }
 
-  public void setMergeDuration(long mergeDuration) {
-    this.mergeDuration = mergeDuration;
+  public void setMaxMergeDurationLength(long mergeDuration) {
+    this.maxMergeDurationLength = mergeDuration;
   }
 }

@@ -42,7 +42,7 @@ public class TestMergedAnomalyResultManager extends AbstractManagerTestBase {
     AnomalyMergeConfig mergeConfig = new AnomalyMergeConfig();
 
     List<MergedAnomalyResultDTO> mergedResults = AnomalyTimeBasedSummarizer
-        .mergeAnomalies(rawResults, mergeConfig.getMergeDuration(),
+        .mergeAnomalies(rawResults, mergeConfig.getMaxMergeDurationLength(),
             mergeConfig.getSequentialAllowedGap());
     Assert.assertEquals(mergedResults.get(0).getStartTime(),result.getStartTime());
     Assert.assertEquals(mergedResults.get(0).getEndTime(),result.getEndTime());
