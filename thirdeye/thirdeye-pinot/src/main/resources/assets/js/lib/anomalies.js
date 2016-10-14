@@ -231,11 +231,7 @@ function drawMetricTimeSeries(timeSeriesData, anomalyData, tab, placeholder) {
                 tick: {
                     //format integers with comma-grouping for thousands and round to 2 decimal numbers for floats
                     format: function (d) {
-                        if (d % 1 == 0) {
-                            return d3.format(",")(d);
-                        } else {
-                            return d3.format(",.2f")(d);
-                        }
+                        return getFormattedNumber(d);
                     }
                 }
             }
@@ -481,11 +477,7 @@ function drawAnomalyTimeSeries(timeSeriesData,anomalyData, tab, placeholder, opt
                  tick: {
                      //format integers with comma-grouping for thousands and round to 2 decimal numbers for floats
                      format: function (d) {
-                         if (d % 1 == 0) {
-                             return d3.format(",")(d);
-                         } else {
-                             return d3.format(",.2f")(d);
-                         }
+                         return getFormattedNumber(d);
                      }
                  },
                  min: 0
@@ -763,25 +755,12 @@ function tipToUser(tab) {
     $("#" + tab + "-display-chart-section").append(tipToUser)
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+//format integers with comma-grouping for thousands and round to 2 decimal numbers for floats
+function getFormattedNumber(number) {
+    if (number % 1 == 0) {
+        return d3.format(",")(number);
+    } else {
+        return d3.format(",.2f")(number);
+    }
+}
 
