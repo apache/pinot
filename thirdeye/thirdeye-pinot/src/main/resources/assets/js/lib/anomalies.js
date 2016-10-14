@@ -229,8 +229,14 @@ function drawMetricTimeSeries(timeSeriesData, anomalyData, tab, placeholder) {
             },
             y: {
                 tick: {
-                    //format integers with comma-grouping for thousands
-                    format: d3.format(",.1 ")
+                    //format integers with comma-grouping for thousands and round to 2 decimal numbers for floats
+                    format: function (d) {
+                        if (d % 1 == 0) {
+                            return d3.format(",")(d);
+                        } else {
+                            return d3.format(",.2f")(d);
+                        }
+                    }
                 }
             }
         },
@@ -473,8 +479,14 @@ function drawAnomalyTimeSeries(timeSeriesData,anomalyData, tab, placeholder, opt
              y: {
                  show: true,
                  tick: {
-                     //format integers with comma-grouping for thousands
-                     format: d3.format(",.1")
+                     //format integers with comma-grouping for thousands and round to 2 decimal numbers for floats
+                     format: function (d) {
+                         if (d % 1 == 0) {
+                             return d3.format(",")(d);
+                         } else {
+                             return d3.format(",.2f")(d);
+                         }
+                     }
                  },
                  min: 0
              }
