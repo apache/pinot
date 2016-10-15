@@ -153,10 +153,8 @@ public class HeatMapViewHandler implements ViewHandler<HeatMapViewRequest, HeatM
             heatMapBuilder = new HeatMap.Builder(groupByDimension);
             data.put(dataKey, heatMapBuilder);
           }
-          System.out.println("Before " + System.currentTimeMillis());
           MetricDataset metricDataset = new MetricDataset(metricName, comparisonRequest.getCollectionName());
           MetricConfigDTO metricConfig = CACHE_REGISTRY.getMetricConfigCache().get(metricDataset);
-          System.out.println("Current " + System.currentTimeMillis());
           if (StringUtils.isNotBlank(metricConfig.getCellSizeExpression())) {
 
             String metricExpression = metricExpressions.get(metricName);
@@ -222,11 +220,8 @@ public class HeatMapViewHandler implements ViewHandler<HeatMapViewRequest, HeatM
           currentContext.put(metricOrExpression,
               currentTotalPerMetricAndDimension.get(metricOrExpression).values().iterator().next());
         }
-        System.out.println("Before evaluate " + System.currentTimeMillis());
         baselineTotal = MetricExpression.evaluateExpression(expression, baselineContext);
-        System.out.println("After evaluate " + System.currentTimeMillis());
         currentTotal = MetricExpression.evaluateExpression(expression, currentContext);
-        System.out.println("After evaluate " + System.currentTimeMillis());
       } else {
         baselineTotal =
             baselineTotalPerMetricAndDimension.get(expression.getExpressionName()).values()

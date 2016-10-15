@@ -185,7 +185,7 @@ public class ThirdEyeCacheRegistry {
           LOGGER.error("Exception while loading collections", e);
         }
       }
-    }, 5, 50, TimeUnit.MINUTES);
+    }, 5, 5, TimeUnit.MINUTES);
 
     ScheduledExecutorService hourlyService = Executors.newSingleThreadScheduledExecutor();
     hourlyService.scheduleAtFixedRate(new Runnable() {

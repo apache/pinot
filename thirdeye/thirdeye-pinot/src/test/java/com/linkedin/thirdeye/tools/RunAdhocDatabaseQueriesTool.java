@@ -80,6 +80,14 @@ public class RunAdhocDatabaseQueriesTool {
     }
   }
 
+  private void updateEmailConfigs() {
+    List<EmailConfigurationDTO> emailConfigs = emailConfigurationDAO.findByCollection("login_additive");
+    for (EmailConfigurationDTO emailConfig : emailConfigs) {
+      emailConfig.setToAddresses("thirdeye-dev@linkedin.com,zilin@linkedin.com,ehuang@linkedin.com,login-alerts@linkedin.com");
+      emailConfigurationDAO.update(emailConfig);
+    }
+  }
+
   public static void main(String[] args) throws Exception {
 
     File persistenceFile = new File(args[0]);
@@ -88,7 +96,7 @@ public class RunAdhocDatabaseQueriesTool {
       System.exit(1);
     }
     RunAdhocDatabaseQueriesTool dq = new RunAdhocDatabaseQueriesTool(persistenceFile);
-    dq.updateField(97L);
+    dq.updateEmailConfigs();
   }
 
 }

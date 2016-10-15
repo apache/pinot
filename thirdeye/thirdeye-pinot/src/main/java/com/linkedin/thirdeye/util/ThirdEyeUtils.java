@@ -148,6 +148,7 @@ public abstract class ThirdEyeUtils {
     return metricExpression;
   }
 
+  // TODO: Write parser instead of looking for occurrence of every metric
   public static String substituteMetricIdsForMetrics(String metricExpression, String dataset) {
     MetricConfigManager metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
     List<MetricConfigDTO> metricConfigs = metricConfigDAO.findByDataset(dataset);
