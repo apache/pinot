@@ -408,7 +408,7 @@ body a{
 
 
 .loader{
-    position: fixed;
+    position: absolute;
     top: 0;
     left: 0px;
     margin:0px;
