@@ -69,7 +69,7 @@ public abstract class AbstractManagerImpl<E extends AbstractDTO> implements Abst
     AbstractBean bean = convertDTO2Bean(entity, beanClass);
     return genericPojoDao.update(bean, predicate);
   }
-  
+
   @Override
   public int update(E entity) {
     AbstractBean bean = convertDTO2Bean(entity, beanClass);
@@ -162,64 +162,5 @@ public abstract class AbstractManagerImpl<E extends AbstractDTO> implements Abst
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
-  }
-
-  protected MergedAnomalyResultBean convertMergeAnomalyDTO2Bean(MergedAnomalyResultDTO entity) {
-    MergedAnomalyResultBean bean =
-        (MergedAnomalyResultBean) convertDTO2Bean(entity, MergedAnomalyResultBean.class);
-    if (entity.getFeedback() != null) {
-      if (entity.getFeedback().getId() == null) {
-        AnomalyFeedbackBean feedbackBean =
-            (AnomalyFeedbackBean) convertDTO2Bean(entity.getFeedback(), AnomalyFeedbackBean.class);
-        Long feedbackId = genericPojoDao.put(feedbackBean);
-        entity.getFeedback().setId(feedbackId);
-      }
-      bean.setAnomalyFeedbackId(entity.getFeedback().getId());
-    }
-    if (entity.getFunction() != null) {
-      bean.setFunctionId(entity.getFunction().getId());
-    }
-
-    if (entity.getAnomalyResults() != null && !entity.getAnomalyResults().isEmpty()) {
-      List<Long> rawAnomalyIds = new ArrayList<>();
-      for (RawAnomalyResultDTO rawAnomalyDTO : entity.getAnomalyResults()) {
-        rawAnomalyIds.add(rawAnomalyDTO.getId());
-      }
-      bean.setRawAnomalyIdList(rawAnomalyIds);
-    }
-    return bean;
-  }
-
-  protected MergedAnomalyResultDTO convertMergedAnomalyBean2DTO(
-      MergedAnomalyResultBean mergedAnomalyResultBean) {
-    MergedAnomalyResultDTO mergedAnomalyResultDTO;
-    mergedAnomalyResultDTO =
-        MODEL_MAPPER.map(mergedAnomalyResultBean, MergedAnomalyResultDTO.class);
-    if (mergedAnomalyResultBean.getFunctionId() != null) {
-      AnomalyFunctionBean anomalyFunctionBean =
-          genericPojoDao.get(mergedAnomalyResultBean.getFunctionId(), AnomalyFunctionBean.class);
-      AnomalyFunctionDTO anomalyFunctionDTO =
-          MODEL_MAPPER.map(anomalyFunctionBean, AnomalyFunctionDTO.class);
-      mergedAnomalyResultDTO.setFunction(anomalyFunctionDTO);
-    }
-    if (mergedAnomalyResultBean.getAnomalyFeedbackId() != null) {
-      AnomalyFeedbackBean anomalyFeedbackBean = genericPojoDao
-          .get(mergedAnomalyResultBean.getAnomalyFeedbackId(), AnomalyFeedbackBean.class);
-      AnomalyFeedbackDTO anomalyFeedbackDTO =
-          MODEL_MAPPER.map(anomalyFeedbackBean, AnomalyFeedbackDTO.class);
-      mergedAnomalyResultDTO.setFeedback(anomalyFeedbackDTO);
-    }
-    if (mergedAnomalyResultBean.getRawAnomalyIdList() != null
-        && !mergedAnomalyResultBean.getRawAnomalyIdList().isEmpty()) {
-      List<RawAnomalyResultDTO> anomalyResults = new ArrayList<>();
-      List<RawAnomalyResultBean> list = genericPojoDao
-          .get(mergedAnomalyResultBean.getRawAnomalyIdList(), RawAnomalyResultBean.class);
-      for (RawAnomalyResultBean rawAnomalyResultBean : list) {
-        anomalyResults.add(createRawAnomalyDTOFromBean(rawAnomalyResultBean));
-      }
-      mergedAnomalyResultDTO.setAnomalyResults(anomalyResults);
-    }
-
-    return mergedAnomalyResultDTO;
   }
 }
