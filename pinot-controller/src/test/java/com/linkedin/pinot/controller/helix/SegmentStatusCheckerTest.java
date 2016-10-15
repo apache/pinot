@@ -17,14 +17,19 @@ package com.linkedin.pinot.controller.helix;
 
 import com.linkedin.pinot.common.metrics.ControllerGauge;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
+import org.apache.helix.AccessOption;
 import org.apache.helix.HelixAdmin;
+import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.testng.Assert;
 import org.testng.annotations.AfterSuite;
 import org.testng.annotations.BeforeMethod;
@@ -89,7 +94,8 @@ public class SegmentStatusCheckerTest {
     }
     {
       config = mock(ControllerConf.class);
-      when(config.getStatusControllerFrequencyInSeconds()).thenReturn(300);
+      when(config.getStatusCheckerFrequencyInSeconds()).thenReturn(300);
+      when(config.getStatusCheckerWaitForPushTimeInSeconds()).thenReturn(300);
     }
     metricsRegistry = new MetricsRegistry();
     controllerMetrics = new ControllerMetrics(metricsRegistry);
@@ -122,7 +128,8 @@ public class SegmentStatusCheckerTest {
     }
     {
       config = mock(ControllerConf.class);
-      when(config.getStatusControllerFrequencyInSeconds()).thenReturn(300);
+      when(config.getStatusCheckerFrequencyInSeconds()).thenReturn(300);
+      when(config.getStatusCheckerWaitForPushTimeInSeconds()).thenReturn(300);
     }
     metricsRegistry = new MetricsRegistry();
     controllerMetrics = new ControllerMetrics(metricsRegistry);
@@ -159,6 +166,27 @@ public class SegmentStatusCheckerTest {
     externalView.setState("myTable_1","pinot1","ERROR");
     externalView.setState("myTable_1","pinot2","ONLINE");
 
+    ZNRecord znrecord =  new ZNRecord("myTable_0");
+    znrecord.setSimpleField(CommonConstants.Segment.SEGMENT_NAME,"myTable_0");
+    znrecord.setSimpleField(CommonConstants.Segment.TABLE_NAME, "myTable_OFFLINE");
+    znrecord.setSimpleField(CommonConstants.Segment.INDEX_VERSION, "v1");
+    znrecord.setEnumField(CommonConstants.Segment.SEGMENT_TYPE, CommonConstants.Segment.SegmentType.OFFLINE);
+    znrecord.setLongField(CommonConstants.Segment.START_TIME, 1000);
+    znrecord.setLongField(CommonConstants.Segment.END_TIME, 2000);
+    znrecord.setSimpleField(CommonConstants.Segment.TIME_UNIT, TimeUnit.HOURS.toString());
+    znrecord.setLongField(CommonConstants.Segment.TOTAL_DOCS, 10000);
+    znrecord.setLongField(CommonConstants.Segment.CRC, 1234);
+    znrecord.setLongField(CommonConstants.Segment.CREATION_TIME, 3000);
+    znrecord.setSimpleField(CommonConstants.Segment.Offline.DOWNLOAD_URL, "http://localhost:8000/myTable_0");
+    znrecord.setLongField(CommonConstants.Segment.Offline.PUSH_TIME, System.currentTimeMillis());
+    znrecord.setLongField(CommonConstants.Segment.Offline.REFRESH_TIME,System.currentTimeMillis());
+
+    ZkHelixPropertyStore<ZNRecord> propertyStore;
+    {
+      propertyStore = (ZkHelixPropertyStore<ZNRecord>) mock(ZkHelixPropertyStore.class);
+      when(propertyStore.get("/SEGMENTS/myTable_OFFLINE/myTable_3",null, AccessOption.PERSISTENT)).thenReturn(znrecord);
+    }
+
     HelixAdmin helixAdmin;
     {
       helixAdmin = mock(HelixAdmin.class);
@@ -171,10 +199,12 @@ public class SegmentStatusCheckerTest {
       when(helixResourceManager.getAllPinotTableNames()).thenReturn(allTableNames);
       when(helixResourceManager.getHelixClusterName()).thenReturn("StatusChecker");
       when(helixResourceManager.getHelixAdmin()).thenReturn(helixAdmin);
+      when(helixResourceManager.getPropertyStore()).thenReturn(propertyStore);
     }
     {
       config = mock(ControllerConf.class);
-      when(config.getStatusControllerFrequencyInSeconds()).thenReturn(300);
+      when(config.getStatusCheckerFrequencyInSeconds()).thenReturn(300);
+      when(config.getStatusCheckerWaitForPushTimeInSeconds()).thenReturn(0);
     }
     metricsRegistry = new MetricsRegistry();
     controllerMetrics = new ControllerMetrics(metricsRegistry);
@@ -219,7 +249,8 @@ public class SegmentStatusCheckerTest {
     }
     {
       config = mock(ControllerConf.class);
-      when(config.getStatusControllerFrequencyInSeconds()).thenReturn(300);
+      when(config.getStatusCheckerFrequencyInSeconds()).thenReturn(300);
+      when(config.getStatusCheckerWaitForPushTimeInSeconds()).thenReturn(300);
     }
     metricsRegistry = new MetricsRegistry();
     controllerMetrics = new ControllerMetrics(metricsRegistry);
@@ -255,7 +286,8 @@ public class SegmentStatusCheckerTest {
     }
     {
       config = mock(ControllerConf.class);
-      when(config.getStatusControllerFrequencyInSeconds()).thenReturn(300);
+      when(config.getStatusCheckerFrequencyInSeconds()).thenReturn(300);
+      when(config.getStatusCheckerWaitForPushTimeInSeconds()).thenReturn(300);
     }
     metricsRegistry = new MetricsRegistry();
     controllerMetrics = new ControllerMetrics(metricsRegistry);
@@ -266,6 +298,70 @@ public class SegmentStatusCheckerTest {
         ControllerGauge.SEGMENTS_IN_ERROR_STATE), 0);
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName,
         ControllerGauge.NUMBER_OF_REPLICAS), 0);
+    segmentStatusChecker.stop();
+  }
+
+  @Test
+  public void missingEVPartitionPushTest() throws Exception {
+    final String tableName = "myTable_OFFLINE";
+    List<String> allTableNames = new ArrayList<String>();
+    allTableNames.add(tableName);
+    IdealState idealState = new IdealState(tableName);
+    idealState.setPartitionState("myTable_0", "pinot1", "ONLINE");
+    idealState.setReplicas("2");
+    idealState.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
+
+    ExternalView externalView = new ExternalView(tableName);
+
+    HelixAdmin helixAdmin;
+    {
+      helixAdmin = mock(HelixAdmin.class);
+      when(helixAdmin.getResourceIdealState("StatusChecker","myTable_OFFLINE")).thenReturn(idealState);
+      when(helixAdmin.getResourceExternalView("StatusChecker","myTable_OFFLINE")).thenReturn(externalView);
+    }
+    ZNRecord znrecord =  new ZNRecord("myTable_0");
+    znrecord.setSimpleField(CommonConstants.Segment.SEGMENT_NAME,"myTable_0");
+    znrecord.setSimpleField(CommonConstants.Segment.TABLE_NAME, "myTable_OFFLINE");
+    znrecord.setSimpleField(CommonConstants.Segment.INDEX_VERSION, "v1");
+    znrecord.setEnumField(CommonConstants.Segment.SEGMENT_TYPE, CommonConstants.Segment.SegmentType.OFFLINE);
+    znrecord.setLongField(CommonConstants.Segment.START_TIME, 1000);
+    znrecord.setLongField(CommonConstants.Segment.END_TIME, 2000);
+    znrecord.setSimpleField(CommonConstants.Segment.TIME_UNIT, TimeUnit.HOURS.toString());
+    znrecord.setLongField(CommonConstants.Segment.TOTAL_DOCS, 10000);
+    znrecord.setLongField(CommonConstants.Segment.CRC, 1234);
+    znrecord.setLongField(CommonConstants.Segment.CREATION_TIME, 3000);
+    znrecord.setSimpleField(CommonConstants.Segment.Offline.DOWNLOAD_URL, "http://localhost:8000/myTable_0");
+    znrecord.setLongField(CommonConstants.Segment.Offline.PUSH_TIME, System.currentTimeMillis());
+    znrecord.setLongField(CommonConstants.Segment.Offline.REFRESH_TIME,System.currentTimeMillis());
+
+    ZkHelixPropertyStore<ZNRecord> propertyStore;
+    {
+      propertyStore = (ZkHelixPropertyStore<ZNRecord>) mock(ZkHelixPropertyStore.class);
+      when(propertyStore.get("/SEGMENTS/myTable_OFFLINE/myTable_0",null, AccessOption.PERSISTENT)).thenReturn(znrecord);
+    }
+
+    {
+      helixResourceManager = mock(PinotHelixResourceManager.class);
+      when(helixResourceManager.isLeader()).thenReturn(true);
+      when(helixResourceManager.getAllPinotTableNames()).thenReturn(allTableNames);
+      when(helixResourceManager.getHelixClusterName()).thenReturn("StatusChecker");
+      when(helixResourceManager.getHelixAdmin()).thenReturn(helixAdmin);
+      when(helixResourceManager.getPropertyStore()).thenReturn(propertyStore);
+    }
+    {
+      config = mock(ControllerConf.class);
+      when(config.getStatusCheckerFrequencyInSeconds()).thenReturn(300);
+      when(config.getStatusCheckerWaitForPushTimeInSeconds()).thenReturn(300);
+    }
+    metricsRegistry = new MetricsRegistry();
+    controllerMetrics = new ControllerMetrics(metricsRegistry);
+    segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config);
+    segmentStatusChecker.setMetricsRegistry(controllerMetrics);
+    segmentStatusChecker.runSegmentMetrics();
+    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(externalView.getId(),
+        ControllerGauge.SEGMENTS_IN_ERROR_STATE), 0);
+    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(externalView.getId(),
+        ControllerGauge.NUMBER_OF_REPLICAS), 2);
     segmentStatusChecker.stop();
   }
 

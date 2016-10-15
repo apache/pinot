@@ -19,6 +19,9 @@ import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metrics.ControllerGauge;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
+import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 
@@ -30,11 +33,11 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.helix.ControllerChangeListener;
 import org.apache.helix.HelixAdmin;
-import org.apache.helix.HelixManager;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,6 +52,7 @@ import org.slf4j.LoggerFactory;
 public class SegmentStatusChecker {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentStatusChecker.class);
   private static final int SegmentCheckerDefaultIntervalSeconds = 120;
+  private static final int SegmentCheckerDefaultWaitForPushTimeSeconds = 600 * 1000;
   private static final String CONTROLLER_LEADER_CHANGE = "CONTROLLER LEADER CHANGE";
   public static final String ONLINE = "ONLINE";
   public static final String ERROR = "ERROR";
@@ -58,6 +62,7 @@ public class SegmentStatusChecker {
   private final PinotHelixResourceManager _pinotHelixResourceManager;
   private final HelixAdmin _helixAdmin;
   private final long _segmentStatusIntervalSeconds;
+  private final int _waitForPushTimeSeconds;
 
   /**
    * Constructs the segment status checker.
@@ -67,7 +72,8 @@ public class SegmentStatusChecker {
   public SegmentStatusChecker(PinotHelixResourceManager pinotHelixResourceManager, ControllerConf config) {
     _pinotHelixResourceManager = pinotHelixResourceManager;
     _helixAdmin = pinotHelixResourceManager.getHelixAdmin();
-    _segmentStatusIntervalSeconds = config.getStatusControllerFrequencyInSeconds();
+    _segmentStatusIntervalSeconds = config.getStatusCheckerFrequencyInSeconds();
+    _waitForPushTimeSeconds = config.getStatusCheckerWaitForPushTimeInSeconds();
   }
 
   /**
@@ -157,6 +163,7 @@ public class SegmentStatusChecker {
     HelixAdmin helixAdmin = _pinotHelixResourceManager.getHelixAdmin();
     int realTimeTableCount = 0;
     int offlineTableCount = 0;
+    ZkHelixPropertyStore<ZNRecord> propertyStore= _pinotHelixResourceManager.getPropertyStore();
 
     for (String tableName : allTableNames) {
       if (TableNameBuilder.getTableTypeFromTableName(tableName).equals(CommonConstants.Helix.TableType.OFFLINE)) {
@@ -170,6 +177,7 @@ public class SegmentStatusChecker {
       }
       _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.IDEALSTATE_ZNODE_SIZE, idealState.toString().length());
       ExternalView externalView = helixAdmin.getResourceExternalView(helixClusterName, tableName);
+
       final int nReplicasIdeal = Integer.parseInt(idealState.getReplicas());
       int nReplicasExternal = nReplicasIdeal;
       int nErrors = 0;
@@ -192,6 +200,15 @@ public class SegmentStatusChecker {
         }
         if ((externalView == null) || (externalView.getStateMap(partitionName) == null)) {
           // No replicas for this segment
+          TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
+          if ((tableType != null) && (tableType.equals(TableType.OFFLINE))) {
+            OfflineSegmentZKMetadata segmentZKMetadata =
+                ZKMetadataProvider.getOfflineSegmentZKMetadata(propertyStore, tableName, partitionName);
+            if (segmentZKMetadata != null && segmentZKMetadata.getPushTime() > System.currentTimeMillis() - _waitForPushTimeSeconds * 1000) {
+              // push not yet finished, skip
+              continue;
+            }
+          }
           nReplicasExternal = 0;
           continue;
         }
