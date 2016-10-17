@@ -633,7 +633,12 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
    */
   public void stop() throws InterruptedException {
     _receivedStop = true;
-    _consumerThread.join();
+    // This method could be called either when we get an ONLINE transition or
+    // when we commit a segment and replace the realtime segment with a committed
+    // one. In the latter case, we don't want to call join.
+    if (Thread.currentThread() == _consumerThread) {
+      _consumerThread.join();
+    }
   }
 
   // TODO Make this a factory class.
