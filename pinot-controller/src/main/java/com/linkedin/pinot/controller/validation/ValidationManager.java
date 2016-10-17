@@ -15,6 +15,9 @@
  */
 package com.linkedin.pinot.controller.validation;
 
+import com.linkedin.pinot.common.config.OfflineTableConfig;
+import com.linkedin.pinot.common.metrics.ControllerGauge;
+import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -28,6 +31,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.ZNRecord;
+import org.apache.helix.manager.zk.ZKHelixDataAccessor;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.joda.time.Duration;
@@ -69,6 +73,9 @@ public class ValidationManager {
   private final PinotHelixResourceManager _pinotHelixResourceManager;
   private final long _validationIntervalSeconds;
 
+  private ControllerMetrics _controllerMetrics;
+  private int serverInstanceCharCount = -1;
+
   /**
    * Constructs the validation manager.
    *  @param validationMetrics The validation metrics utility used to publish the metrics.
@@ -93,9 +100,11 @@ public class ValidationManager {
 
   /**
    * Starts the validation manager.
+   * @param controllerMetrics
    */
-  public void start() {
+  public void start(ControllerMetrics controllerMetrics) {
     LOGGER.info("Starting validation manager");
+    _controllerMetrics = controllerMetrics;
 
     // Set up an executor that executes validation tasks periodically
     _executorService.scheduleWithFixedDelay(new Runnable() {
@@ -128,6 +137,8 @@ public class ValidationManager {
     }
 
     LOGGER.info("Starting validation");
+    int realTimeTableCount = 0;
+    int offlineTableCount = 0;
     // Fetch the list of tables
     List<String> allTableNames = _pinotHelixResourceManager.getAllPinotTableNames();
     ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
@@ -137,26 +148,53 @@ public class ValidationManager {
       TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
       // For each table, fetch the metadata for all its segments
       if (tableType.equals(TableType.OFFLINE)) {
+        offlineTableCount++;
         validateOfflineSegmentPush(propertyStore, tableName, segmentMetadataList);
+        OfflineTableConfig offlineTableConfig = (OfflineTableConfig) ZKMetadataProvider
+            .getOfflineTableConfig(propertyStore, tableName);
+
+        // To get an approximate size of the IDEALSTATE znode,
+        int replicaCount = offlineTableConfig.getValidationConfig().getReplicationNumber();
+        int instanceCharCount = getServerInstanceCharCount(tableName);
+        long idealstateZnodeSize = computeIdealStateSize(segmentMetadataList, replicaCount, instanceCharCount);
+        _validationMetrics.updateIdealstateZnodeSizeGauge(tableName, idealstateZnodeSize);
       } else if (tableType.equals(TableType.REALTIME)) {
+        realTimeTableCount++;
         List<RealtimeSegmentZKMetadata> realtimeSegmentZKMetadatas = ZKMetadataProvider.getRealtimeSegmentZKMetadataListForTable(propertyStore, tableName);
         boolean countHLCSegments = true;  // false if this table has ONLY LLC segments (i.e. fully migrated)
         AbstractTableConfig tableConfig;
         KafkaStreamMetadata streamMetadata;
+        int replicaCount = 0;
         try {
           tableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(tableName);
           streamMetadata = new KafkaStreamMetadata(tableConfig.getIndexingConfig().getStreamConfigs());
           if (streamMetadata.hasSimpleKafkaConsumerType() && !streamMetadata.hasHighLevelKafkaConsumerType()) {
             countHLCSegments = false;
           }
+          if (streamMetadata.hasSimpleKafkaConsumerType()) {
+            replicaCount = Integer.valueOf(tableConfig.getValidationConfig().getReplicasPerPartition());
+          }
         } catch (Exception e) {
           // TableConfig not present. skip it.
           LOGGER.warn("Cannot get tableconfig for {}", tableName);
           continue;
         }
+        int instanceCharCount = getServerInstanceCharCount(tableName);
+        int llcSegmentCount = 0;
+        long llcSegmentNameCharCount = 0;
         for (RealtimeSegmentZKMetadata realtimeSegmentZKMetadata : realtimeSegmentZKMetadatas) {
           SegmentMetadata segmentMetadata = new SegmentMetadataImpl(realtimeSegmentZKMetadata);
           segmentMetadataList.add(segmentMetadata);
+          if (SegmentName.isLowLevelConsumerSegmentName(segmentMetadata.getName())) {
+            llcSegmentCount++;
+            if (llcSegmentNameCharCount == 0) {
+              llcSegmentNameCharCount = segmentMetadata.getName().length();
+            }
+          }
+        }
+        if (llcSegmentCount > 0) {
+          long idealstateZnodeSize = (llcSegmentNameCharCount + replicaCount * (instanceCharCount + 6))  * llcSegmentCount;
+          _validationMetrics.updateIdealstateZnodeSizeGauge(tableName, idealstateZnodeSize);
         }
         // Update the gauge to contain the total document count in the segments
         _validationMetrics.updateTotalDocumentsGauge(tableName, computeRealtimeTotalDocumentInSegments(segmentMetadataList,
@@ -168,8 +206,50 @@ public class ValidationManager {
         LOGGER.warn("Ignoring table type {} for table {}", tableType, tableName);
       }
     }
+
+    _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.REALTIME_TABLE_COUNT, realTimeTableCount);
+    _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.OFFLINE_TABLE_COUNT, offlineTableCount);
     LOGGER.info("Validation completed");
   }
+
+  // Idealstate znode has some per-table characters, and then the following per-segment metadata:
+  // "segmentaName" : {
+  //   "instance1" : "ONLINE",
+  //   "instance2" : ONLINE,
+  //   as many instances as number of replicas.
+  // }
+  private long computeIdealStateSize(List<SegmentMetadata> segmentMetadataList,
+      int replicaCount, int instanceCharCount){
+    int segmentNameCharCount = 0;
+    if (segmentMetadataList.size() > 0) {
+      SegmentMetadata metadata = segmentMetadataList.get(0);
+      segmentNameCharCount = metadata.getName().length();
+    }
+    long segmentCount = segmentMetadataList.size();
+    return (segmentNameCharCount + replicaCount * (instanceCharCount + 6))  * segmentCount;
+  }
+
+  // Server instance names tend to be more or less of same size, so for now we use the size of any instance
+  // name in the cluster.
+  private int getServerInstanceCharCount(String resourceName) {
+    if (serverInstanceCharCount != -1) {
+      return  serverInstanceCharCount;
+    }
+    try {
+      List<String> instanceList = _pinotHelixResourceManager.getServerInstancesForTable(
+          TableNameBuilder.extractRawTableName(resourceName),
+          TableNameBuilder.getTableTypeFromTableName(resourceName));
+      if (instanceList == null || instanceList.size() == 0) {
+        return 0;
+      }
+      serverInstanceCharCount = instanceList.get(0).length();
+      return serverInstanceCharCount;
+    } catch (Exception e) {
+      // Ignore
+      return 0;
+    }
+  }
+
 
   // For LLC segments, validate that there is at least one segment in CONSUMING state for every partition.
   void validateLLCSegments(final String realtimeTableName) {
