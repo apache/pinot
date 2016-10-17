@@ -99,7 +99,6 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     InstanceRequest instanceRequest = queryRequest.getInstanceRequest();
     final long requestId = instanceRequest.getRequestId();
     final long nSegmentsInQuery = instanceRequest.getSearchSegmentsSize();
-    long nPrunedSegments = -1;
     try {
       TraceContext.register(instanceRequest);
       final BrokerRequest brokerRequest = instanceRequest.getQuery();
@@ -109,8 +108,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       queryableSegmentDataManagerList = getPrunedQueryableSegments(instanceRequest);
       segmentPruneTimer.stopAndRecord();
 
-      nPrunedSegments = queryableSegmentDataManagerList.size();
-      LOGGER.debug("Matched {} segments! ", nPrunedSegments);
+      queryRequest.setSegmentCountAfterPruning(queryableSegmentDataManagerList.size());
+      LOGGER.debug("Matched {} segments", queryRequest.getSegmentCountAfterPruning());
       if (queryableSegmentDataManagerList.isEmpty()) {
         return new DataTableImplV2();
       }
@@ -143,12 +142,6 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       dataTable.getMetadata().put(DataTable.REQUEST_ID_METADATA_KEY, Long.toString(instanceRequest.getRequestId()));
       dataTable.getMetadata()
           .put(DataTable.TRACE_INFO_METADATA_KEY, TraceContext.getTraceInfoOfRequestId(instanceRequest.getRequestId()));
-      LOGGER.info("Processed requestId {},reqSegments={},prunedToSegmentCount={},planTime={},planExecTime={},totalTimeUsed={},broker={}",
-          requestId, nSegmentsInQuery, nPrunedSegments,
-          planBuildTimer.getDurationMs(),
-          timerContext.getPhaseDurationMs(ServerQueryPhase.QUERY_PLAN_EXECUTION),
-          queryProcessingTimer.getDurationMs(),
-          queryRequest.getBrokerId());
       return dataTable;
     } catch (Exception e) {
       _serverMetrics.addMeteredQueryValue(instanceRequest.getQuery(), ServerMeter.QUERY_EXECUTION_EXCEPTIONS, 1);

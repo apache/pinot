@@ -18,6 +18,7 @@ package com.linkedin.pinot.server.request;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.linkedin.pinot.common.exception.QueryException;
+import com.linkedin.pinot.common.metrics.ServerGauge;
 import com.linkedin.pinot.common.metrics.ServerMeter;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.metrics.ServerQueryPhase;
@@ -32,6 +33,7 @@ import com.linkedin.pinot.transport.netty.NettyServer.RequestHandler;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import java.net.InetSocketAddress;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.thrift.protocol.TCompactProtocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,6 +48,7 @@ public class SimpleRequestHandler implements RequestHandler {
 
   private ServerMetrics _serverMetrics;
   QueryExecutor _queryExecutor = null;
+  private final AtomicInteger runningQueries = new AtomicInteger(0);
 
   public SimpleRequestHandler(QueryExecutor queryExecutor, ServerMetrics serverMetrics) {
     _queryExecutor = queryExecutor;
@@ -91,6 +94,10 @@ public class SimpleRequestHandler implements RequestHandler {
       deserializeTimer.stopAndRecord();
 
       LOGGER.debug("Processing requestId: {},request: {}", instanceRequest.getRequestId(), instanceRequest);
+
+      _serverMetrics.addValueToTableGauge(queryRequest.getTableName(), ServerGauge.RUNNING_QUERIES,
+          runningQueries.incrementAndGet());
+
       instanceResponse = _queryExecutor.processQuery(queryRequest);
 
     } catch (Exception e) {
@@ -99,11 +106,29 @@ public class SimpleRequestHandler implements RequestHandler {
       _serverMetrics.addMeteredGlobalValue(ServerMeter.UNCAUGHT_EXCEPTIONS, 1);
       instanceResponse = new DataTableImplV2();
       instanceResponse.addException(QueryException.getException(QueryException.INTERNAL_ERROR, e));
+    } finally {
+      // some inconsistency is possible between the increment+record above and decrement+record below.
+      // these are complex operations that are not atomic but we prefer that to synchronizing
+      // recording of metrics values
+      _serverMetrics.addValueToTableGauge(queryRequest.getTableName(), ServerGauge.RUNNING_QUERIES,
+          runningQueries.decrementAndGet());
     }
 
     byte[] responseBytes = ScheduledRequestHandler.serializeDataTable(queryRequest, instanceResponse);
 
     ListenableFuture<byte[]> responseFuture = Futures.immediateFuture(responseBytes);
+    LOGGER.info("Processed requestId {},reqSegments={},prunedToSegmentCount={},deserTimeMs={},planTimeMs={},planExecTimeMs={},totalExecMs={},serTimeMs={}TotalTimeMs={},broker={}",
+        queryRequest.getInstanceRequest().getRequestId(),
+        queryRequest.getInstanceRequest().getSearchSegments().size(),
+        queryRequest.getSegmentCountAfterPruning(),
+        timerContext.getPhaseDurationMs(ServerQueryPhase.REQUEST_DESERIALIZATION),
+        timerContext.getPhaseDurationMs(ServerQueryPhase.BUILD_QUERY_PLAN),
+        timerContext.getPhaseDurationMs(ServerQueryPhase.QUERY_PLAN_EXECUTION),
+        timerContext.getPhaseDurationMs(ServerQueryPhase.QUERY_PROCESSING),
+        timerContext.getPhaseDurationMs(ServerQueryPhase.RESPONSE_SERIALIZATION),
+        timerContext.getPhaseDurationMs(ServerQueryPhase.TOTAL_QUERY_TIME),
+        queryRequest.getBrokerId());
+
     return responseFuture;
   }
 
