@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.client;
 
+import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -12,42 +13,46 @@ import com.google.common.cache.LoadingCache;
 import com.google.common.cache.RemovalListener;
 import com.google.common.cache.RemovalNotification;
 import com.linkedin.pinot.client.ResultSetGroup;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.thirdeye.api.CollectionSchema;
-import com.linkedin.thirdeye.client.cache.CollectionAliasCacheLoader;
-import com.linkedin.thirdeye.client.cache.CollectionConfigCacheLoader;
 import com.linkedin.thirdeye.client.cache.CollectionMaxDataTimeCacheLoader;
-import com.linkedin.thirdeye.client.cache.CollectionSchemaCacheLoader;
 import com.linkedin.thirdeye.client.cache.CollectionsCache;
+import com.linkedin.thirdeye.client.cache.DashboardConfigCacheLoader;
 import com.linkedin.thirdeye.client.cache.DashboardsCacheLoader;
+import com.linkedin.thirdeye.client.cache.DatasetConfigCacheLoader;
 import com.linkedin.thirdeye.client.cache.DimensionFiltersCacheLoader;
+import com.linkedin.thirdeye.client.cache.MetricConfigCacheLoader;
+import com.linkedin.thirdeye.client.cache.MetricDataset;
 import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.client.cache.ResultSetGroupCacheLoader;
-import com.linkedin.thirdeye.client.cache.SchemaCacheLoader;
 import com.linkedin.thirdeye.client.pinot.PinotQuery;
 import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClient;
 import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClientConfig;
 import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
-import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
 import com.linkedin.thirdeye.dashboard.resources.CacheResource;
-import com.linkedin.thirdeye.datalayer.bao.WebappConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
+import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 
 public class ThirdEyeCacheRegistry {
 
+  private LoadingCache<String, DatasetConfigDTO> datasetConfigCache;
+  private LoadingCache<MetricDataset, MetricConfigDTO> metricConfigCache;
+  private LoadingCache<String, List<DashboardConfigDTO>> dashboardConfigsCache;
   private LoadingCache<PinotQuery, ResultSetGroup> resultSetGroupCache;
-  private LoadingCache<String, Schema> schemaCache;
-  private LoadingCache<String, CollectionSchema> collectionSchemaCache;
   private LoadingCache<String, Long> collectionMaxDataTimeCache;
-  private LoadingCache<String, CollectionConfig> collectionConfigCache;
   private LoadingCache<String, String> dashboardsCache;
   private LoadingCache<String, String> dimensionFiltersCache;
-  private LoadingCache<String, String> collectionAliasCache;
   private CollectionsCache collectionsCache;
   private QueryCache queryCache;
 
-  private static WebappConfigManager webappConfigDAO;
+  private static DatasetConfigManager datasetConfigDAO;
+  private static MetricConfigManager metricConfigDAO;
+  private static DashboardConfigManager dashboardConfigDAO;
   private static PinotThirdEyeClientConfig pinotThirdeyeClientConfig;
   private static ThirdEyeClient thirdEyeClient;
+  private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ThirdEyeCacheRegistry.class);
 
@@ -59,25 +64,26 @@ public class ThirdEyeCacheRegistry {
     return Holder.INSTANCE;
   }
 
-  private static void init(ThirdEyeConfiguration config, WebappConfigManager configDAO) {
+  private static void init(ThirdEyeConfiguration config) {
     try {
-
       pinotThirdeyeClientConfig = PinotThirdEyeClientConfig.createThirdEyeClientConfig(config);
       thirdEyeClient = PinotThirdEyeClient.fromClientConfig(pinotThirdeyeClientConfig);
-      webappConfigDAO = configDAO;
+      datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
+      metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
+      dashboardConfigDAO = DAO_REGISTRY.getDashboardConfigDAO();
 
     } catch (Exception e) {
      LOGGER.info("Caught exception while initializing caches", e);
     }
   }
 
-  private static void init(ThirdEyeConfiguration config, PinotThirdEyeClientConfig pinotThirdEyeClientConfig,
-      WebappConfigManager configDAO) {
+  private static void init(ThirdEyeConfiguration config, PinotThirdEyeClientConfig pinotThirdEyeClientConfig) {
     try {
-
       pinotThirdeyeClientConfig = pinotThirdEyeClientConfig;
       thirdEyeClient = PinotThirdEyeClient.fromClientConfig(pinotThirdeyeClientConfig);
-      webappConfigDAO = configDAO;
+      datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
+      metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
+      dashboardConfigDAO = DAO_REGISTRY.getDashboardConfigDAO();
     } catch (Exception e) {
      LOGGER.info("Caught exception while initializing caches", e);
     }
@@ -88,9 +94,9 @@ public class ThirdEyeCacheRegistry {
    * Initializes webapp caches
    * @param config
    */
-  public static void initializeCaches(ThirdEyeConfiguration config, WebappConfigManager configDAO) {
+  public static void initializeCaches(ThirdEyeConfiguration config) {
 
-    init(config, configDAO);
+    init(config);
 
     initCaches(config);
 
@@ -113,48 +119,43 @@ public class ThirdEyeCacheRegistry {
             .build(new ResultSetGroupCacheLoader(pinotThirdeyeClientConfig));
     cacheRegistry.registerResultSetGroupCache(resultSetGroupCache);
 
-    // Schema Cache
-    LoadingCache<String, Schema> schemaCache =
-        CacheBuilder.newBuilder().expireAfterAccess(1, TimeUnit.HOURS)
-            .build(new SchemaCacheLoader(pinotThirdeyeClientConfig));
-    cacheRegistry.registerSchemaCache(schemaCache);
-
-    // Collection Schema Cache
-    LoadingCache<String, CollectionSchema> collectionSchemaCache =
-        CacheBuilder.newBuilder().expireAfterAccess(1, TimeUnit.HOURS)
-        .build(new CollectionSchemaCacheLoader(pinotThirdeyeClientConfig, webappConfigDAO));
-    cacheRegistry.registerCollectionSchemaCache(collectionSchemaCache);
-
-    // CollectionMaxDataTime Cache
+        // CollectionMaxDataTime Cache
     LoadingCache<String, Long> collectionMaxDataTimeCache = CacheBuilder.newBuilder()
-        .build(new CollectionMaxDataTimeCacheLoader(pinotThirdeyeClientConfig, collectionSchemaCache, resultSetGroupCache));
+        .build(new CollectionMaxDataTimeCacheLoader(resultSetGroupCache, datasetConfigDAO));
     cacheRegistry.registerCollectionMaxDataTimeCache(collectionMaxDataTimeCache);
-
-    // CollectionConfig Cache
-    LoadingCache<String, CollectionConfig> collectionConfigCache =
-        CacheBuilder.newBuilder().expireAfterAccess(1, TimeUnit.HOURS)
-        .build(new CollectionConfigCacheLoader(webappConfigDAO));
-    cacheRegistry.registerCollectionConfigCache(collectionConfigCache);
-
-    // Collection Alias cache
-    LoadingCache<String, String> collectionAliasCache = CacheBuilder.newBuilder()
-        .build(new CollectionAliasCacheLoader(webappConfigDAO));
-    cacheRegistry.registerCollectionAliasCache(collectionAliasCache);
 
     // Query Cache
     QueryCache queryCache = new QueryCache(thirdEyeClient, Executors.newFixedThreadPool(10));
     cacheRegistry.registerQueryCache(queryCache);
 
+    // Dimension Filter cache
     LoadingCache<String, String> dimensionFiltersCache = CacheBuilder.newBuilder()
         .build(new DimensionFiltersCacheLoader(cacheRegistry.getQueryCache()));
     cacheRegistry.registerDimensionFiltersCache(dimensionFiltersCache);
 
+    // Dashboards cache
     LoadingCache<String, String> dashboardsCache = CacheBuilder.newBuilder()
-        .build(new DashboardsCacheLoader(webappConfigDAO));
+        .build(new DashboardsCacheLoader(dashboardConfigDAO));
     cacheRegistry.registerDashboardsCache(dashboardsCache);
 
-    CollectionsCache collectionsCache = new CollectionsCache(pinotThirdeyeClientConfig, config);
+    // Collections cache
+    CollectionsCache collectionsCache = new CollectionsCache(datasetConfigDAO);
     cacheRegistry.registerCollectionsCache(collectionsCache);
+
+    // DatasetConfig cache
+    LoadingCache<String, DatasetConfigDTO> datasetConfigCache = CacheBuilder.newBuilder()
+        .build(new DatasetConfigCacheLoader(datasetConfigDAO));
+    cacheRegistry.registerDatasetConfigCache(datasetConfigCache);
+
+    // MetricConfig cache
+    LoadingCache<MetricDataset, MetricConfigDTO> metricConfigCache = CacheBuilder.newBuilder()
+        .build(new MetricConfigCacheLoader(metricConfigDAO));
+    cacheRegistry.registerMetricConfigCache(metricConfigCache);
+
+    // DashboardConfigs cache
+    LoadingCache<String, List<DashboardConfigDTO>> dashboardConfigsCache = CacheBuilder.newBuilder()
+        .build(new DashboardConfigCacheLoader(dashboardConfigDAO));
+    cacheRegistry.registerDashboardConfigsCache(dashboardConfigsCache);
   }
 
   private static void initPeriodicCacheRefresh() {
@@ -163,6 +164,11 @@ public class ThirdEyeCacheRegistry {
     // manually refreshing on startup, and setting delay
     // as weeklyService starts before hourlyService finishes,
     // causing NPE in reading collectionsCache
+
+    cacheResource.refreshDatasetConfigCache();
+    cacheResource.refreshMetricConfigCache();
+    cacheResource.refreshDashoardConfigsCache();
+
     cacheResource.refreshCollections();
     cacheResource.refreshMaxDataTimeCache();
     cacheResource.refreshDimensionFiltersCache();
@@ -216,22 +222,6 @@ public class ThirdEyeCacheRegistry {
     this.resultSetGroupCache = resultSetGroupCache;
   }
 
-  public LoadingCache<String, Schema> getSchemaCache() {
-    return schemaCache;
-  }
-
-  public void registerSchemaCache(LoadingCache<String, Schema> schemaCache) {
-    this.schemaCache = schemaCache;
-  }
-
-  public LoadingCache<String, CollectionSchema> getCollectionSchemaCache() {
-    return collectionSchemaCache;
-  }
-
-  public void registerCollectionSchemaCache(LoadingCache<String, CollectionSchema> collectionSchemaCache) {
-    this.collectionSchemaCache = collectionSchemaCache;
-  }
-
   public LoadingCache<String, Long> getCollectionMaxDataTimeCache() {
     return collectionMaxDataTimeCache;
   }
@@ -246,22 +236,6 @@ public class ThirdEyeCacheRegistry {
 
   public void registerCollectionsCache(CollectionsCache collectionsCache) {
     this.collectionsCache = collectionsCache;
-  }
-
-  public LoadingCache<String, CollectionConfig> getCollectionConfigCache() {
-    return collectionConfigCache;
-  }
-
-  public void registerCollectionConfigCache(LoadingCache<String, CollectionConfig> collectionConfigCache) {
-    this.collectionConfigCache = collectionConfigCache;
-  }
-
-  public LoadingCache<String, String> getCollectionAliasCache() {
-    return collectionAliasCache;
-  }
-
-  public void registerCollectionAliasCache(LoadingCache<String, String> collectionAliasCache) {
-    this.collectionAliasCache = collectionAliasCache;
   }
 
   public LoadingCache<String, String> getDimensionFiltersCache() {
@@ -287,4 +261,29 @@ public class ThirdEyeCacheRegistry {
   public void registerQueryCache(QueryCache queryCache) {
     this.queryCache = queryCache;
   }
+
+  public LoadingCache<String, DatasetConfigDTO> getDatasetConfigCache() {
+    return datasetConfigCache;
+  }
+
+  public void registerDatasetConfigCache(LoadingCache<String, DatasetConfigDTO> datasetConfigCache) {
+    this.datasetConfigCache = datasetConfigCache;
+  }
+
+  public LoadingCache<MetricDataset, MetricConfigDTO> getMetricConfigCache() {
+    return metricConfigCache;
+  }
+
+  public void registerMetricConfigCache(LoadingCache<MetricDataset, MetricConfigDTO> metricConfigCache) {
+    this.metricConfigCache = metricConfigCache;
+  }
+
+  public LoadingCache<String, List<DashboardConfigDTO>> getDashboardConfigsCache() {
+    return dashboardConfigsCache;
+  }
+
+  public void registerDashboardConfigsCache(LoadingCache<String, List<DashboardConfigDTO>> dashboardConfigsCache) {
+    this.dashboardConfigsCache = dashboardConfigsCache;
+  }
+
 }

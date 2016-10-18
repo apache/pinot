@@ -6,6 +6,7 @@ import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Properties;
+import java.util.concurrent.ExecutionException;
 
 import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.manager.zk.ZkClient;
@@ -20,7 +21,6 @@ import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.client.ResultSet;
 import com.linkedin.pinot.client.ResultSetGroup;
-import com.linkedin.thirdeye.api.CollectionSchema;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.client.MetricFunction;
@@ -28,7 +28,8 @@ import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.client.ThirdEyeRequest;
 import com.linkedin.thirdeye.dashboard.Utils;
-import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
+import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
+import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 public class PinotThirdEyeClient implements ThirdEyeClient {
 
@@ -104,21 +105,14 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
 
   @Override
   public PinotThirdEyeResponse execute(ThirdEyeRequest request) throws Exception {
-    CollectionSchema collectionSchema =
-        CACHE_REGISTRY_INSTANCE.getCollectionSchemaCache().get(request.getCollection());
-    TimeSpec dataTimeSpec = collectionSchema.getTime();
+    DatasetConfigDTO datasetConfig = CACHE_REGISTRY_INSTANCE.getDatasetConfigCache().get(request.getCollection());
+    TimeSpec dataTimeSpec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetConfig);
     List<MetricFunction> metricFunctions = request.getMetricFunctions();
-    List<String> dimensionNames = collectionSchema.getDimensionNames();
-    CollectionConfig collectionConfig = null;
+    List<String> dimensionNames = datasetConfig.getDimensions();
     List<ResultSetGroup> resultSetGroups = new ArrayList<>();
 
-    try {
-      collectionConfig = CACHE_REGISTRY_INSTANCE.getCollectionConfigCache().get(request.getCollection());
-    } catch (Exception e) {
-      LOG.debug("Collection config for collection {} does not exist", request.getCollection());
-    }
-    if (collectionConfig != null && collectionConfig.isMetricAsDimension()) {
-       List<String> pqls = PqlUtils.getMetricAsDimensionPqls(request, dataTimeSpec, collectionConfig);
+    if (datasetConfig.isMetricAsDimension()) {
+       List<String> pqls = PqlUtils.getMetricAsDimensionPqls(request, dataTimeSpec, datasetConfig);
        for (String pql : pqls) {
          LOG.debug("PQL isMetricAsDimension : {}", pql);
          ResultSetGroup result = CACHE_REGISTRY_INSTANCE.getResultSetGroupCache()
@@ -126,11 +120,10 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
          resultSetGroups.add(result);
        }
     } else {
-      if (collectionConfig != null && collectionConfig.isNonAdditive()) {
-        List<String> collectionDimensionNames =
-            CACHE_REGISTRY_INSTANCE.getCollectionSchemaCache().get(request.getCollection()).getDimensionNames();
+      if (!datasetConfig.isAdditive()) {
+        List<String> collectionDimensionNames = datasetConfig.getDimensions();
         PqlUtils.decorateRequestForPrecomputedDataset(request, collectionDimensionNames,
-            collectionConfig.getDimensionsHaveNoPreAggregation(), collectionConfig.getPreAggregatedKeyword());
+            datasetConfig.getDimensionsHaveNoPreAggregation(), datasetConfig.getPreAggregatedKeyword());
       }
 
       String sql = PqlUtils.getPql(request, dataTimeSpec);
@@ -143,7 +136,7 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
       }
     }
     List<ResultSet> resultSets = getResultSets(resultSetGroups);
-    List<String[]> resultRows = parseResultSets(request, resultSets, metricFunctions, collectionSchema, dimensionNames);
+    List<String[]> resultRows = parseResultSets(request, resultSets, metricFunctions, dimensionNames, datasetConfig);
     PinotThirdEyeResponse resp = new PinotThirdEyeResponse(request, resultRows, dataTimeSpec);
     return resp;
 
@@ -169,8 +162,8 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
   }
 
   private List<String[]> parseResultSets(ThirdEyeRequest request, List<ResultSet> resultSets,
-      List<MetricFunction> metricFunctions, CollectionSchema collectionSchema,
-      List<String> dimensionNames) {
+      List<MetricFunction> metricFunctions, List<String> dimensionNames, DatasetConfigDTO datasetConfig)
+          throws ExecutionException {
 
     int numGroupByKeys = 0;
     boolean hasGroupBy = false;
@@ -186,14 +179,15 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
     int numMetrics = request.getMetricFunctions().size();
     int numCols = numGroupByKeys + numMetrics;
     boolean hasGroupByTime = false;
-    String collection = collectionSchema.getCollection();
+    String collection = datasetConfig.getDataset();
     TimeGranularity dataGranularity = null;
     long startTime = request.getStartTimeInclusive().getMillis();
     long interval = -1;
-    dataGranularity = collectionSchema.getTime().getDataGranularity();
+    TimeSpec timespec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetConfig);
+    dataGranularity = timespec.getDataGranularity();
     boolean isISOFormat = false;
     DateTimeFormatter inputDataDateTimeFormatter = null;
-    String timeFormat = collectionSchema.getTime().getFormat();
+    String timeFormat = timespec.getFormat();
     if (timeFormat != null && !timeFormat.equals(TimeSpec.SINCE_EPOCH_FORMAT)) {
       isISOFormat = true;
       inputDataDateTimeFormatter = DateTimeFormat.forPattern(timeFormat).withZone(Utils.getDataTimeZone(collection));
@@ -260,20 +254,12 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
 
   }
 
-  @Override
-  public CollectionSchema getCollectionSchema(String collection) throws Exception {
-    return CACHE_REGISTRY_INSTANCE.getCollectionSchemaCache().get(collection);
-  }
 
   @Override
   public List<String> getCollections() throws Exception {
     return CACHE_REGISTRY_INSTANCE.getCollectionsCache().getCollections();
   }
 
-  @Override
-  public CollectionConfig getCollectionConfig(String collection) throws Exception {
-    return CACHE_REGISTRY_INSTANCE.getCollectionConfigCache().get(collection);
-  }
 
   @Override
   public long getMaxDataTime(String collection) throws Exception {

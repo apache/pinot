@@ -18,6 +18,7 @@ import com.linkedin.thirdeye.datalayer.bao.EmailConfigurationManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
@@ -57,9 +58,17 @@ public class RunAdhocDatabaseQueriesTool {
     anomalyFunctionDAO.update(anomalyFunction);
   }
 
+  private void updateFields() {
+    List<EmailConfigurationDTO> emailConfigs = emailConfigurationDAO.findAll();
+    for (EmailConfigurationDTO emailConfig : emailConfigs) {
+      LOG.info(emailConfig.getId() + " " + emailConfig.getToAddresses());
+    }
+  }
+
   private void updateField(Long id) {
     AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(id);
-    anomalyFunction.setCron("0/20 * * * * ?");
+    //anomalyFunction.setCron("0/10 * * * * ?");
+    anomalyFunction.setActive(true);
     anomalyFunctionDAO.update(anomalyFunction);
   }
 
@@ -71,6 +80,14 @@ public class RunAdhocDatabaseQueriesTool {
     }
   }
 
+  private void updateEmailConfigs() {
+    List<EmailConfigurationDTO> emailConfigs = emailConfigurationDAO.findByCollection("login_additive");
+    for (EmailConfigurationDTO emailConfig : emailConfigs) {
+      emailConfig.setToAddresses("thirdeye-dev@linkedin.com,zilin@linkedin.com,ehuang@linkedin.com,login-alerts@linkedin.com");
+      emailConfigurationDAO.update(emailConfig);
+    }
+  }
+
   public static void main(String[] args) throws Exception {
 
     File persistenceFile = new File(args[0]);
@@ -79,6 +96,7 @@ public class RunAdhocDatabaseQueriesTool {
       System.exit(1);
     }
     RunAdhocDatabaseQueriesTool dq = new RunAdhocDatabaseQueriesTool(persistenceFile);
+    dq.updateEmailConfigs();
   }
 
 }

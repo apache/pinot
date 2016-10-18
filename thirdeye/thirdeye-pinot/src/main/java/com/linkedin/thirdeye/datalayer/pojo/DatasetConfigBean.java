@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.datalayer.pojo;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
@@ -10,6 +11,8 @@ import com.linkedin.thirdeye.api.TimeSpec;
 
 @JsonIgnoreProperties(ignoreUnknown=true)
 public class DatasetConfigBean extends AbstractBean {
+
+  public static String DEFAULT_PREAGGREGATED_DIMENSION_VALUE = "all";
 
   private String dataset;
 
@@ -32,6 +35,12 @@ public class DatasetConfigBean extends AbstractBean {
   private String metricValuesColumn;
 
   private boolean active = true;
+
+  private boolean additive = true;
+  private List<String> dimensionsHaveNoPreAggregation = Collections.emptyList();
+  private String preAggregatedKeyword = DEFAULT_PREAGGREGATED_DIMENSION_VALUE;
+  private Integer nonAdditiveBucketSize;
+  private String nonAdditiveBucketUnit;
 
   public String getDataset() {
     return dataset;
@@ -121,6 +130,46 @@ public class DatasetConfigBean extends AbstractBean {
     this.active = active;
   }
 
+  public boolean isAdditive() {
+    return additive;
+  }
+
+  public void setAdditive(boolean additive) {
+    this.additive = additive;
+  }
+
+  public List<String> getDimensionsHaveNoPreAggregation() {
+    return dimensionsHaveNoPreAggregation;
+  }
+
+  public void setDimensionsHaveNoPreAggregation(List<String> dimensionsHaveNoPreAggregation) {
+    this.dimensionsHaveNoPreAggregation = dimensionsHaveNoPreAggregation;
+  }
+
+  public String getPreAggregatedKeyword() {
+    return preAggregatedKeyword;
+  }
+
+  public void setPreAggregatedKeyword(String preAggregatedKeyword) {
+    this.preAggregatedKeyword = preAggregatedKeyword;
+  }
+
+  public Integer getNonAdditiveBucketSize() {
+    return nonAdditiveBucketSize;
+  }
+
+  public void setNonAdditiveBucketSize(Integer nonAdditiveBucketSize) {
+    this.nonAdditiveBucketSize = nonAdditiveBucketSize;
+  }
+
+  public String getNonAdditiveBucketUnit() {
+    return nonAdditiveBucketUnit;
+  }
+
+  public void setNonAdditiveBucketUnit(String nonAdditiveBucketUnit) {
+    this.nonAdditiveBucketUnit = nonAdditiveBucketUnit;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (!(o instanceof DatasetConfigBean)) {
@@ -138,13 +187,19 @@ public class DatasetConfigBean extends AbstractBean {
         && Objects.equals(metricAsDimension, dc.isMetricAsDimension())
         && Objects.equals(metricNamesColumn, dc.getMetricNamesColumn())
         && Objects.equals(metricValuesColumn, dc.getMetricValuesColumn())
-        && Objects.equals(active, dc.isActive());
+        && Objects.equals(active, dc.isActive())
+        && Objects.equals(additive, dc.isAdditive())
+        && Objects.equals(dimensionsHaveNoPreAggregation, dc.getDimensionsHaveNoPreAggregation())
+        && Objects.equals(preAggregatedKeyword, dc.getPreAggregatedKeyword())
+        && Objects.equals(nonAdditiveBucketUnit, dc.getNonAdditiveBucketUnit())
+        && Objects.equals(nonAdditiveBucketSize, dc.getNonAdditiveBucketSize());
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(getId(), dataset, dimensions, timeColumn, timeUnit, timeDuration, timeFormat, timezone,
-        metricAsDimension, metricNamesColumn, metricValuesColumn, active);
+        metricAsDimension, metricNamesColumn, metricValuesColumn, active, additive,
+        dimensionsHaveNoPreAggregation, preAggregatedKeyword, nonAdditiveBucketSize, nonAdditiveBucketUnit);
   }
 
   @Override
@@ -153,6 +208,9 @@ public class DatasetConfigBean extends AbstractBean {
         .add("dimensions", dimensions).add("dimensions", dimensions).add("timeUnit", timeUnit)
         .add("timeDuration", timeDuration).add("timeFormat", timeFormat).add("metricAsDimension", metricAsDimension)
         .add("metricNamesColumn", metricNamesColumn).add("metricValuesColumn", metricValuesColumn)
-        .add("active", active).toString();
+        .add("active", active).add("additive", additive)
+        .add("dimensionsHaveNoPreAggregation", dimensionsHaveNoPreAggregation)
+        .add("preAggregatedKeyword", preAggregatedKeyword).add("nonAdditiveBucketSize", nonAdditiveBucketSize)
+        .add("nonAdditiveBucketUnit", nonAdditiveBucketUnit).toString();
   }
 }

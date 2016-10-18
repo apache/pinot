@@ -15,12 +15,12 @@ import com.linkedin.thirdeye.anomaly.task.TaskContext;
 import com.linkedin.thirdeye.anomaly.task.TaskInfo;
 import com.linkedin.thirdeye.anomaly.task.TaskResult;
 import com.linkedin.thirdeye.anomaly.task.TaskRunner;
-import com.linkedin.thirdeye.api.CollectionSchema;
 import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
-import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesResponse;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesResponseConverter;
+import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
@@ -29,8 +29,6 @@ import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 public class DetectionTaskRunner implements TaskRunner {
 
   private static final Logger LOG = LoggerFactory.getLogger(DetectionTaskRunner.class);
-  private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE =
-      ThirdEyeCacheRegistry.getInstance();
 
   private TimeSeriesResponseConverter timeSeriesResponseConverter;
 
@@ -41,6 +39,8 @@ public class DetectionTaskRunner implements TaskRunner {
   private DateTime windowEnd;
   private List<RawAnomalyResultDTO> knownAnomalies;
   private BaseAnomalyFunction anomalyFunction;
+  private DatasetConfigManager datasetConfigDAO;
+  private MetricConfigManager metricConfigDAO;
 
   public DetectionTaskRunner() {
     timeSeriesResponseConverter = TimeSeriesResponseConverter.getInstance();
@@ -51,6 +51,7 @@ public class DetectionTaskRunner implements TaskRunner {
     List<TaskResult> taskResult = new ArrayList<>();
     LOG.info("Begin executing task {}", taskInfo);
     resultDAO = taskContext.getResultDAO();
+    datasetConfigDAO = taskContext.getDatasetConfigDAO();
     AnomalyFunctionFactory anomalyFunctionFactory = taskContext.getAnomalyFunctionFactory();
     AnomalyFunctionDTO anomalyFunctionSpec = detectionTaskInfo.getAnomalyFunctionSpec();
     anomalyFunction = anomalyFunctionFactory.fromSpec(anomalyFunctionSpec);
@@ -62,14 +63,7 @@ public class DetectionTaskRunner implements TaskRunner {
         anomalyFunctionSpec.getFunctionName(), anomalyFunctionSpec.getMetric(),
         anomalyFunctionSpec.getCollection());
 
-    CollectionSchema collectionSchema = null;
-    try {
-      collectionSchema = CACHE_REGISTRY_INSTANCE.getCollectionSchemaCache()
-          .get(anomalyFunctionSpec.getCollection());
-      collectionDimensions = collectionSchema.getDimensionNames();
-    } catch (Exception e) {
-      LOG.error("Exception when reading collection schema cache", e);
-    }
+    collectionDimensions = datasetConfigDAO.findByDataset(anomalyFunctionSpec.getCollection()).getDimensions();
 
     // Get existing anomalies for this time range and this function id
     knownAnomalies = getExistingAnomalies();

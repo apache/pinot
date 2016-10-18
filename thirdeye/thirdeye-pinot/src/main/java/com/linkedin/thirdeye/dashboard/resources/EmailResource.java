@@ -12,10 +12,12 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.EmailConfigurationManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
+
 import org.apache.commons.lang3.StringUtils;
 
 @Path("thirdeye/email")
@@ -24,11 +26,11 @@ public class EmailResource {
 
   private final AnomalyFunctionManager functionDAO;
   private final EmailConfigurationManager emailDAO;
+  private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
-  public EmailResource(AnomalyFunctionManager functionDAO,
-      EmailConfigurationManager emailConfigurationDAO) {
-    this.functionDAO = functionDAO;
-    this.emailDAO = emailConfigurationDAO;
+  public EmailResource() {
+    this.functionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
+    this.emailDAO = DAO_REGISTRY.getEmailConfigurationDAO();
   }
 
   @POST

@@ -1,8 +1,6 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
-import java.io.IOException;
 import java.util.List;
-import java.util.concurrent.ExecutionException;
 
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -11,16 +9,16 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
-import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.cache.CacheLoader.InvalidCacheLoadException;
 import com.google.common.cache.LoadingCache;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.thirdeye.api.CollectionSchema;
+import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
-import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
+import com.linkedin.thirdeye.client.cache.MetricDataset;
+import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 
 @Path("/cache")
 @Produces(MediaType.APPLICATION_JSON)
@@ -28,6 +26,7 @@ public class CacheResource {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(CacheResource.class);
   private ThirdEyeCacheRegistry CACHE_INSTANCE = ThirdEyeCacheRegistry.getInstance();
+  private DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
   @GET
   @Path(value = "/")
@@ -44,10 +43,7 @@ public class CacheResource {
 
     List<String> collections = CACHE_INSTANCE.getCollectionsCache().getCollections();
     for (String collection : collections) {
-      CACHE_INSTANCE.getCollectionSchemaCache().refresh(collection);
-      CACHE_INSTANCE.getSchemaCache().refresh(collection);
       CACHE_INSTANCE.getCollectionMaxDataTimeCache().refresh(collection);
-      CACHE_INSTANCE.getCollectionConfigCache().refresh(collection);
       CACHE_INSTANCE.getDimensionFiltersCache().refresh(collection);
       CACHE_INSTANCE.getDashboardsCache().refresh(collection);
     }
@@ -57,27 +53,6 @@ public class CacheResource {
     return Response.ok().build();
   }
 
-  @POST
-  @Path("/refresh/schema")
-  public Response refreshSchemaCache() {
-    List<String> collections = CACHE_INSTANCE.getCollectionsCache().getCollections();
-    LoadingCache<String,Schema> cache = CACHE_INSTANCE.getSchemaCache();
-    for (String collection : collections) {
-      cache.refresh(collection);
-    }
-    return Response.ok().build();
-  }
-
-  @POST
-  @Path("/refresh/collectionSchema")
-  public Response refreshCollectionSchemaCache() {
-    List<String> collections = CACHE_INSTANCE.getCollectionsCache().getCollections();
-    LoadingCache<String,CollectionSchema> cache = CACHE_INSTANCE.getCollectionSchemaCache();
-    for (String collection : collections) {
-      cache.refresh(collection);
-    }
-    return Response.ok().build();
-  }
 
   @POST
   @Path("/refresh/maxDataTime")
@@ -91,29 +66,38 @@ public class CacheResource {
   }
 
   @POST
-  @Path("/refresh/collectionConfig")
-  public Response refreshCollectionConfigCache() {
-    List<String> collections = CACHE_INSTANCE.getCollectionsCache().getCollections();
-    LoadingCache<String, CollectionConfig> collectionConfigCache = CACHE_INSTANCE.getCollectionConfigCache();
-    LoadingCache<String, String> collectionAliasCache = CACHE_INSTANCE.getCollectionAliasCache();
-    collectionAliasCache.invalidateAll();
-    for (String collection : collections) {
-
-      try {
-        collectionConfigCache.refresh(collection);
-
-        // refresh aliases
-        CollectionConfig collectionConfig = collectionConfigCache.get(collection);
-        String collectionAlias = collectionConfig.getCollectionAlias();
-        if (StringUtils.isNotEmpty(collectionAlias)) {
-          collectionAliasCache.refresh(collectionAlias);
-        }
-      } catch (InvalidCacheLoadException | ExecutionException e) {
-        LOGGER.debug("No CollectionConfig for collection", collection);
-      }
+  @Path("/refresh/datasetConfig")
+  public Response refreshDatasetConfigCache() {
+    List<DatasetConfigDTO> datasetConfigs = DAO_REGISTRY.getDatasetConfigDAO().findAll();
+    LoadingCache<String,DatasetConfigDTO> cache = CACHE_INSTANCE.getDatasetConfigCache();
+    for (DatasetConfigDTO datasetConfig : datasetConfigs) {
+      cache.refresh(datasetConfig.getDataset());
     }
     return Response.ok().build();
   }
+
+  @POST
+  @Path("/refresh/metricConfig")
+  public Response refreshMetricConfigCache() {
+    List<MetricConfigDTO> metricConfigs = DAO_REGISTRY.getMetricConfigDAO().findAll();
+    LoadingCache<MetricDataset, MetricConfigDTO> cache = CACHE_INSTANCE.getMetricConfigCache();
+    for (MetricConfigDTO metricConfig : metricConfigs) {
+      cache.refresh(new MetricDataset(metricConfig.getName(), metricConfig.getDataset()));
+    }
+    return Response.ok().build();
+  }
+
+  @POST
+  @Path("/refresh/dashboardConfigs")
+  public Response refreshDashoardConfigsCache() {
+    List<DatasetConfigDTO> datasetConfigs = DAO_REGISTRY.getDatasetConfigDAO().findAll();
+    LoadingCache<String,List<DashboardConfigDTO>> cache = CACHE_INSTANCE.getDashboardConfigsCache();
+    for (DatasetConfigDTO datasetConfig : datasetConfigs) {
+      cache.refresh(datasetConfig.getDataset());
+    }
+    return Response.ok().build();
+  }
+
 
   @POST
   @Path("/refresh/filters")
@@ -141,12 +125,7 @@ public class CacheResource {
   @Path("/refresh/collections")
   public Response refreshCollections() {
     Response response = Response.ok().build();
-    try {
-      CACHE_INSTANCE.getCollectionsCache().loadCollections();
-    } catch (IOException e) {
-      LOGGER.error("Exception while refreshing collections cache", e);
-      response = Response.serverError().build();
-    }
+    CACHE_INSTANCE.getCollectionsCache().loadCollections();
     return response;
   }
 

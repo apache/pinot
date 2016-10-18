@@ -1,8 +1,10 @@
 package com.linkedin.thirdeye.anomaly.task;
 
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
+import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.JobManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
+import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.TaskManager;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
@@ -14,6 +16,8 @@ public class TaskContext {
   private RawAnomalyResultManager resultDAO;
   private MergedAnomalyResultManager mergedResultDAO;
   private AnomalyFunctionFactory anomalyFunctionFactory;
+  private DatasetConfigManager datasetConfigDAO;
+  private MetricConfigManager metricConfigDAO;
   private ThirdEyeAnomalyConfiguration thirdEyeAnomalyConfiguration;
 
   public ThirdEyeAnomalyConfiguration getThirdEyeAnomalyConfiguration() {
@@ -64,4 +68,21 @@ public class TaskContext {
   public void setMergedResultDAO(MergedAnomalyResultManager mergedResultDAO) {
     this.mergedResultDAO = mergedResultDAO;
   }
+
+  public DatasetConfigManager getDatasetConfigDAO() {
+    return datasetConfigDAO;
+  }
+
+  public void setDatasetConfigDAO(DatasetConfigManager datasetConfigDAO) {
+    this.datasetConfigDAO = datasetConfigDAO;
+  }
+
+  public MetricConfigManager getMetricConfigDAO() {
+    return metricConfigDAO;
+  }
+
+  public void setMetricConfigDAO(MetricConfigManager metricConfigDAO) {
+    this.metricConfigDAO = metricConfigDAO;
+  }
+
 }

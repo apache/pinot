@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
-import com.linkedin.thirdeye.dashboard.Utils;
 import java.io.IOException;
 import java.net.URLDecoder;
 import java.util.ArrayList;
@@ -32,18 +31,21 @@ import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Multimap;
-import com.linkedin.thirdeye.api.CollectionSchema;
 import com.linkedin.thirdeye.api.TimeGranularity;
+import com.linkedin.thirdeye.api.TimeSpec;
+import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
 import com.linkedin.thirdeye.constant.FeedbackStatus;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
+import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.EmailConfigurationManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
@@ -68,14 +70,16 @@ public class AnomalyResource {
   private MergedAnomalyResultManager anomalyMergedResultDAO;
   private RawAnomalyResultManager anomalyResultDAO;
   private EmailConfigurationManager emailConfigurationDAO;
+  private DatasetConfigManager datasetConfigDAO;
 
-  public AnomalyResource(AnomalyFunctionManager anomalyFunctionDAO,
-      RawAnomalyResultManager anomalyResultDAO, EmailConfigurationManager emailConfigurationDAO,
-      MergedAnomalyResultManager anomalyMergedResultDAO) {
-    this.anomalyFunctionDAO = anomalyFunctionDAO;
-    this.anomalyResultDAO = anomalyResultDAO;
-    this.anomalyMergedResultDAO = anomalyMergedResultDAO;
-    this.emailConfigurationDAO = emailConfigurationDAO;
+  private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
+
+  public AnomalyResource() {
+    this.anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
+    this.anomalyResultDAO = DAO_REGISTRY.getRawAnomalyResultDAO();
+    this.anomalyMergedResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
+    this.emailConfigurationDAO = DAO_REGISTRY.getEmailConfigurationDAO();
+    this.datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
   }
 
   /************** CRUD for anomalies of a collection ********************************************************/
@@ -115,7 +119,7 @@ public class AnomalyResource {
       String[] dimensionPatterns = null;
       if (StringUtils.isNotBlank(dimensions)) {
         // get dimension names and index position
-        List<String> dimensionNames = CACHE_REGISTRY_INSTANCE.getCollectionSchemaCache().get(dataset).getDimensionNames();
+        List<String> dimensionNames = datasetConfigDAO.findByDataset(dataset).getDimensions();
         Map<String, Integer> dimensionNameToIndexMap = new HashMap<>();
         for (int i = 0; i < dimensionNames.size(); i ++) {
           dimensionNameToIndexMap.put(dimensionNames.get(i), i);
@@ -162,7 +166,7 @@ public class AnomalyResource {
 
   private void setExploreDimensionsFilterForFrontEnd(List<MergedAnomalyResultDTO> anomalyResults, String collection) {
     try {
-      List<String> dimensionNames = Utils.getSchemaDimensionNames(CACHE_REGISTRY_INSTANCE.getQueryCache(), collection);
+      List<String> dimensionNames = CACHE_REGISTRY_INSTANCE.getDatasetConfigCache().get(collection).getDimensions();
       for (MergedAnomalyResultDTO mergedAnomalyResultDTO : anomalyResults) {
         AnomalyFunctionDTO anomalyFunction = mergedAnomalyResultDTO.getFunction();
         Multimap<String, String> filterSet = anomalyFunction.getFilterSet();
@@ -237,8 +241,9 @@ public class AnomalyResource {
           + ", windowSize " + windowSize + ", windowUnit " + windowUnit + ", properties" + properties);
     }
 
-    CollectionSchema schema = CACHE_REGISTRY_INSTANCE.getCollectionSchemaCache().get(dataset);
-    TimeGranularity dataGranularity = schema.getTime().getDataGranularity();
+    DatasetConfigDTO datasetConfig = DAO_REGISTRY.getDatasetConfigDAO().findByDataset(dataset);
+    TimeSpec timespec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetConfig);
+    TimeGranularity dataGranularity = timespec.getDataGranularity();
 
     AnomalyFunctionDTO anomalyFunctionSpec = new AnomalyFunctionDTO();
     anomalyFunctionSpec.setActive(isActive);
@@ -326,8 +331,9 @@ public class AnomalyResource {
       throw new IllegalStateException("AnomalyFunctionSpec with id " + id + " does not exist");
     }
 
-    CollectionSchema schema = CACHE_REGISTRY_INSTANCE.getCollectionSchemaCache().get(dataset);
-    TimeGranularity dataGranularity = schema.getTime().getDataGranularity();
+    DatasetConfigDTO datasetConfig = DAO_REGISTRY.getDatasetConfigDAO().findByDataset(dataset);
+    TimeSpec timespec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetConfig);
+    TimeGranularity dataGranularity = timespec.getDataGranularity();
 
     anomalyFunctionSpec.setActive(isActive);
     anomalyFunctionSpec.setCollection(dataset);
@@ -371,7 +377,7 @@ public class AnomalyResource {
 
   private String getDimensions(String dataset, String exploreDimensions) throws Exception {
     // Ensure that the explore dimension names are ordered as schema dimension names
-    List<String> schemaDimensionNames = CACHE_REGISTRY_INSTANCE.getSchemaCache().get(dataset).getDimensionNames();
+    List<String> schemaDimensionNames = CACHE_REGISTRY_INSTANCE.getDatasetConfigCache().get(dataset).getDimensions();
     Set<String> splitExploreDimensions = new HashSet<>(Arrays.asList(exploreDimensions.trim().split(",")));
     StringBuilder reorderedExploreDimensions = new StringBuilder();
     String separator = "";

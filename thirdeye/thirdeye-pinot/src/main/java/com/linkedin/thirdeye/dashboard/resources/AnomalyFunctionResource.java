@@ -1,16 +1,16 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
 import com.linkedin.thirdeye.anomaly.detection.TimeSeriesUtil;
-import com.linkedin.thirdeye.api.CollectionSchema;
 import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
-import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
+import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesResponse;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesResponseConverter;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
+
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -29,8 +29,8 @@ import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
-
 import javax.ws.rs.core.Response;
+
 import org.apache.commons.io.IOUtils;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
@@ -44,8 +44,7 @@ import com.linkedin.thirdeye.detector.function.AnomalyFunction;
 public class AnomalyFunctionResource {
 
   private static final Logger LOG = LoggerFactory.getLogger(AnomalyFunctionResource.class);
-  private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE =
-      ThirdEyeCacheRegistry.getInstance();
+  private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private static final TimeSeriesResponseConverter timeSeriesResponseConverter =
       TimeSeriesResponseConverter.getInstance();
 
@@ -120,17 +119,8 @@ public class AnomalyFunctionResource {
 
     List<RawAnomalyResultDTO> anomalyResults = new ArrayList<>();
     List<RawAnomalyResultDTO> results = new ArrayList<>();
-    CollectionSchema collectionSchema;
-    List<String> collectionDimensions;
-
-    try {
-      collectionSchema = CACHE_REGISTRY_INSTANCE.getCollectionSchemaCache()
-          .get(anomalyFunctionSpec.getCollection());
-      collectionDimensions = collectionSchema.getDimensionNames();
-    } catch (Exception e) {
-      LOG.error("Exception when reading collection schema cache", e);
-      return Response.ok(anomalyResults).build();
-    }
+    List<String> collectionDimensions = DAO_REGISTRY.getDatasetConfigDAO()
+        .findByDataset(anomalyFunctionSpec.getCollection()).getDimensions();
 
     Map<DimensionKey, MetricTimeSeries> res =
         timeSeriesResponseConverter.toMap(finalResponse, collectionDimensions);

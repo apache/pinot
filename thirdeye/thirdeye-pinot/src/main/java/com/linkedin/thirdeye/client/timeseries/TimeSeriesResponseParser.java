@@ -5,6 +5,7 @@ import static com.linkedin.thirdeye.client.ResponseParserUtils.OTHER;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -19,12 +20,12 @@ import com.google.common.collect.Range;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.client.MetricFunction;
 import com.linkedin.thirdeye.client.ResponseParserUtils;
-import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.ThirdEyeResponse;
 import com.linkedin.thirdeye.client.ThirdEyeResponseRow;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesRow.Builder;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesRow.TimeSeriesMetric;
-import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
+import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
+import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 //Heavily based off TimeOnTime equivalent
 public class TimeSeriesResponseParser {
@@ -34,34 +35,23 @@ public class TimeSeriesResponseParser {
   private final TimeGranularity aggTimeGranularity;
   private final List<String> groupByDimensions;
 
-  private CollectionConfig collectionConfig = null;
-
-  private double metricThreshold = CollectionConfig.DEFAULT_THRESHOLD;
-
   private Map<String, ThirdEyeResponseRow> responseMap;
   private List<MetricFunction> metricFunctions;
   private int numMetrics;
   int numTimeBuckets;
   private List<TimeSeriesRow> rows;
+  private Map<String, Double> metricThresholds = new HashMap<>();
 
   public TimeSeriesResponseParser(ThirdEyeResponse response, List<Range<DateTime>> ranges,
-      TimeGranularity timeGranularity, List<String> groupByDimensions) {
+      TimeGranularity timeGranularity, List<String> groupByDimensions, MetricConfigManager metricConfigDAO) {
     this.response = response;
     this.ranges = ranges;
     this.aggTimeGranularity = timeGranularity;
     this.groupByDimensions = groupByDimensions;
 
-    String collection = response.getRequest().getCollection();
-    try {
-      collectionConfig =
-          ThirdEyeCacheRegistry.getInstance().getCollectionConfigCache().get(collection);
-    } catch (Exception e) {
-      LOGGER.debug("No collection configs for collection {}", collection);
-    }
+    metricFunctions = response.getMetricFunctions();
+    metricThresholds = ThirdEyeUtils.getMetricThresholdsMap(metricFunctions);
 
-    if (collectionConfig != null) {
-      metricThreshold = collectionConfig.getMetricThreshold();
-    }
   }
 
   public List<TimeSeriesRow> parseResponse() {
@@ -75,7 +65,6 @@ public class TimeSeriesResponseParser {
 
     boolean hasGroupByDimensions = CollectionUtils.isNotEmpty(groupByDimensions);
 
-    metricFunctions = response.getMetricFunctions();
     numMetrics = metricFunctions.size();
     numTimeBuckets = ranges.size();
     rows = new ArrayList<>();
@@ -236,7 +225,7 @@ public class TimeSeriesResponseParser {
       if (metricSums != null) {
         sum = metricSums.get(i);
       }
-      if (metric.getValue() > metricThreshold * sum) {
+      if (metric.getValue() > metricThresholds.get(metric.getMetricName()) * sum) {
         return true;
       }
     }

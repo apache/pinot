@@ -18,6 +18,7 @@ import org.joda.time.DateTime;
 import org.joda.time.format.ISODateTimeFormat;
 import org.quartz.SchedulerException;
 
+import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 
@@ -26,11 +27,11 @@ import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 public class DetectionJobResource {
   private final DetectionJobScheduler detectionJobScheduler;
   private final AnomalyFunctionManager anomalyFunctionSpecDAO;
+  private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
-  public DetectionJobResource(DetectionJobScheduler detectionJobScheduler,
-      AnomalyFunctionManager anomalyFunctionSpecDAO) {
+  public DetectionJobResource(DetectionJobScheduler detectionJobScheduler) {
     this.detectionJobScheduler = detectionJobScheduler;
-    this.anomalyFunctionSpecDAO = anomalyFunctionSpecDAO;
+    this.anomalyFunctionSpecDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
   }
 
   @GET

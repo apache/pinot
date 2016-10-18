@@ -15,8 +15,11 @@ import org.slf4j.LoggerFactory;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
+import com.linkedin.thirdeye.client.DAORegistry;
+import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.JobManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
+import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.TaskManager;
 import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
@@ -39,20 +42,21 @@ public class TaskDriver {
   private static final int TASK_FAILURE_DELAY_MILLIS = 2 * 60_000; // 2 minutes
   private static final int TASK_FETCH_SIZE = 50;
   private static final Random RANDOM = new Random();
+  private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
   public TaskDriver(ThirdEyeAnomalyConfiguration thirdEyeAnomalyConfiguration,
-      JobManager anomalyJobDAO, TaskManager anomalyTaskDAO,
-      RawAnomalyResultManager anomalyResultDAO, MergedAnomalyResultManager mergedResultDAO,
       AnomalyFunctionFactory anomalyFunctionFactory) {
     this.workerId = thirdEyeAnomalyConfiguration.getId();
-    this.anomalyTaskDAO = anomalyTaskDAO;
+    this.anomalyTaskDAO = DAO_REGISTRY.getTaskDAO();
     taskExecutorService = Executors.newFixedThreadPool(MAX_PARALLEL_TASK);
     taskContext = new TaskContext();
-    taskContext.setAnomalyJobDAO(anomalyJobDAO);
+    taskContext.setAnomalyJobDAO(DAO_REGISTRY.getJobDAO());
     taskContext.setAnomalyTaskDAO(anomalyTaskDAO);
-    taskContext.setResultDAO(anomalyResultDAO);
+    taskContext.setResultDAO(DAO_REGISTRY.getRawAnomalyResultDAO());
     taskContext.setAnomalyFunctionFactory(anomalyFunctionFactory);
-    taskContext.setMergedResultDAO(mergedResultDAO);
+    taskContext.setMergedResultDAO(DAO_REGISTRY.getMergedAnomalyResultDAO());
+    taskContext.setDatasetConfigDAO(DAO_REGISTRY.getDatasetConfigDAO());
+    taskContext.setMetricConfigDAO(DAO_REGISTRY.getMetricConfigDAO());
     taskContext.setThirdEyeAnomalyConfiguration(thirdEyeAnomalyConfiguration);
     allowedOldTaskStatus.add(TaskStatus.FAILED);
     allowedOldTaskStatus.add(TaskStatus.WAITING);
