@@ -31,6 +31,7 @@ import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.api.CollectionSchema;
 import com.linkedin.thirdeye.api.MetricSpec;
 import com.linkedin.thirdeye.api.MetricType;
+import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.client.MetricExpression;
 import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClientConfig;
 import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
@@ -117,6 +118,8 @@ public class LoadMetricsFromPinotTool {
         .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.MetricConfigManagerImpl.class);
     dashboardConfigDAO = DaoProviderUtil
         .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.DashboardConfigManagerImpl.class);
+    DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
+    DAO_REGISTRY.registerDAOs(anomalyFunctionDAO, null, null, null, null, null, datasetConfigDAO, metricConfigDAO, dashboardConfigDAO);
   }
 
 
@@ -224,6 +227,13 @@ public class LoadMetricsFromPinotTool {
     if (collectionConfig != null) {
       if (StringUtils.isNotBlank(collectionConfig.getTimezone())) {
         datasetConfigDTO.setTimezone(collectionConfig.getTimezone());
+      }
+      if (collectionConfig.isNonAdditive()) {
+        datasetConfigDTO.setAdditive(false);
+        datasetConfigDTO.setDimensionsHaveNoPreAggregation(collectionConfig.getDimensionsHaveNoPreAggregation());
+        datasetConfigDTO.setPreAggregatedKeyword(collectionConfig.getPreAggregatedKeyword());
+        datasetConfigDTO.setNonAdditiveBucketSize(collectionConfig.getNonAdditiveBucketSize());
+        datasetConfigDTO.setNonAdditiveBucketUnit(collectionConfig.getNonAdditiveBucketUnit());
       }
     }
     LOG.info("Creating dataset for {}", dataset);

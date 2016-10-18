@@ -260,7 +260,7 @@ public class ThirdEyeRequest {
     public ThirdEyeRequest build(String requestReference) {
       try {
         DatasetConfigDTO datasetConfig = CACHE_REGISTRY_INSTANCE.getDatasetConfigCache().get(collection);
-        if (datasetConfig.isAdditive()) {
+        if (!datasetConfig.isAdditive()) {
           List<String> collectionDimensionNames = datasetConfig.getDimensions();
           decorateFilterSetForPrecomputedDataset(filterSet, groupBy, collectionDimensionNames,
               datasetConfig.getDimensionsHaveNoPreAggregation(), datasetConfig.getPreAggregatedKeyword());
