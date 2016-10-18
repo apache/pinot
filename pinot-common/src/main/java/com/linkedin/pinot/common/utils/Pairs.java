@@ -36,7 +36,7 @@ public class Pairs {
       this.a = a;
       this.b = b;
     }
-    
+
     public int getLeft() {
       return a;
     }
@@ -123,4 +123,158 @@ public class Pairs {
       return new Double(o2.a.doubleValue()).compareTo(new Double(o1.a.doubleValue()));
     }
   }
+
+  /**
+   * Utility class to store a primitive 'int' and 'double' pair.
+   */
+  public static class IntDoublePair {
+    int _intValue;
+    double _doubleValue;
+
+    /**
+     * Constructor for the class
+     *
+     * @param intVal 'int' value
+     * @param doubleVal 'double' value
+     */
+    public IntDoublePair(int intVal, double doubleVal) {
+      _intValue = intVal;
+      _doubleValue = doubleVal;
+    }
+
+    /**
+     * Sets the provided value into the 'int' field.
+     * @param intVal Value to set
+     */
+    public void setIntValue(int intVal) {
+      _intValue = intVal;
+    }
+
+    /**
+     * Returns the int value of the pair
+     * @return 'int' value
+     */
+    public int getIntValue() {
+      return _intValue;
+    }
+
+    /**
+     * Sets the provided value into the 'double' field.
+     * @param doubleVal Value to set
+     */
+    public void setDoubleValue(double doubleVal) {
+      _doubleValue = doubleVal;
+    }
+
+    /**
+     * Returns the double value of the pair
+     * @return 'double' value
+     */
+    public double getDoubleValue() {
+      return _doubleValue;
+    }
+  }
+
+  /**
+   * Comparator class for comparing {@link IntDoublePair}.
+   */
+  public static class IntDoubleComparator implements Comparator<IntDoublePair> {
+    private final boolean _descending;
+
+    public IntDoubleComparator(boolean descending) {
+      _descending = descending;
+    }
+
+    @Override
+    public int compare(IntDoublePair o1, IntDoublePair o2) {
+      double v1 = o1.getDoubleValue();
+      double v2 = o2.getDoubleValue();
+
+      if (v1 < v2) {
+        return  (_descending) ? 1 : -1;
+      } else if (v1 > v2) {
+        return (_descending) ? -1 : 1;
+      } else {
+        return 0;
+      }
+    }
+  }
+
+  /**
+   * Utility class to store a primitive 'int' and 'Object' pair.
+   */
+  public static class IntObjectPair<T extends Comparable> {
+    int _intValue;
+    T _objectValue;
+
+    /**
+     * Constructor for the class
+     *
+     * @param intVal 'int' value
+     * @param objectVal 'Object' value
+     */
+    public IntObjectPair(int intVal, T objectVal) {
+      _intValue = intVal;
+      _objectValue = objectVal;
+    }
+
+    /**
+     * Sets the provided value into the 'int' field.
+     */
+    public void setIntValue(int intValue) {
+      _intValue = intValue;
+    }
+
+    /**
+     * Returns the int value of the pair
+     * @return 'int' value
+     */
+    public int getIntValue() {
+      return _intValue;
+    }
+
+    /**
+     * Sets the specified object value into the 'object' field.
+     */
+    public void setObjectValue(T objectValue) {
+      _objectValue = objectValue;
+    }
+
+    /**
+     * Returns the object value of the pair
+     * @return 'Object' value
+     */
+    public T getObjectValue() {
+      return _objectValue;
+    }
+  }
+
+  /**
+   * Comparator for {@link IntObjectComparator} class
+   */
+  public static class IntObjectComparator implements Comparator<IntObjectPair> {
+    private final boolean _descending;
+
+    public IntObjectComparator(boolean descending) {
+      _descending = descending;
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public int compare(IntObjectPair pair1, IntObjectPair pair2) {
+
+      Comparable c1 = (Comparable) pair1.getObjectValue();
+      Comparable c2 = (Comparable) pair2.getObjectValue();
+
+      int cmpValue = c1.compareTo(c2);
+      if (cmpValue == -1) {
+        return (_descending) ? 1 : -1;
+      } else if (cmpValue == 1) {
+        return (_descending) ? -1 : 1;
+      } else {
+        return 0;
+      }
+    }
+  }
+
 }
