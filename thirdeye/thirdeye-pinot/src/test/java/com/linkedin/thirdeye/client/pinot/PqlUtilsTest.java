@@ -5,18 +5,28 @@ import java.util.concurrent.TimeUnit;
 
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
+import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import com.google.common.cache.LoadingCache;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
+import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
+import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 
 public class PqlUtilsTest {
 
   @Test(dataProvider = "betweenClauseArgs")
   public void getBetweenClause(DateTime start, DateTime end, TimeSpec timeFieldSpec,
       String expected) throws ExecutionException {
+    String collection = "collection";
+    DatasetConfigDTO datasetConfig = new DatasetConfigDTO();
+    LoadingCache<String, DatasetConfigDTO> mockDatasetConfigCache = Mockito.mock(LoadingCache.class);
+    Mockito.when(mockDatasetConfigCache.get(collection)).thenReturn(datasetConfig);
+    ThirdEyeCacheRegistry.getInstance().registerDatasetConfigCache(mockDatasetConfigCache);
+
     String betweenClause = PqlUtils.getBetweenClause(start, end, timeFieldSpec, "collection");
     Assert.assertEquals(betweenClause, expected);
   }

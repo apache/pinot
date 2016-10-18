@@ -156,7 +156,7 @@ public class Utils {
     }
     for (String metricExpressionName : metricExpressionNames) {
       String derivedMetricExpression = ThirdEyeUtils.getDerivedMetricExpression(metricExpressionName, collection);
-       MetricExpression metricExpression = new MetricExpression(metricExpressionName, derivedMetricExpression,
+      MetricExpression metricExpression = new MetricExpression(metricExpressionName, derivedMetricExpression,
            aggFunction);
       metricExpressions.add(metricExpression);
     }

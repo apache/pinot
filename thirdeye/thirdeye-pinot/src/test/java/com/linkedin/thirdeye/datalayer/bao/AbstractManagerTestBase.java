@@ -1,11 +1,14 @@
 package com.linkedin.thirdeye.datalayer.bao;
 
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
+
 import java.io.File;
 import java.io.FileReader;
 import java.net.URL;
 import java.sql.Connection;
 import java.util.concurrent.TimeUnit;
+
+import jersey.repackaged.com.google.common.collect.Lists;
 
 import org.apache.tomcat.jdbc.pool.DataSource;
 import org.joda.time.DateTime;
@@ -13,13 +16,16 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 
 import com.linkedin.thirdeye.anomaly.job.JobConstants;
+import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.datalayer.util.PersistenceConfig;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.datalayer.ScriptRunner;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.AnomalyFunctionManagerImpl;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
 import com.linkedin.thirdeye.datalayer.dto.JobDTO;
+import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.util.ManagerProvider;
 
@@ -31,6 +37,8 @@ public abstract class AbstractManagerTestBase {
   protected EmailConfigurationManager emailConfigurationDAO;
   protected MergedAnomalyResultManager mergedResultDAO;
   protected WebappConfigManager webappConfigDAO;
+  protected DatasetConfigManager datasetConfigDAO;
+  protected MetricConfigManager metricConfigDAO;
   private ManagerProvider managerProvider;
   private PersistenceConfig configuration;
 
@@ -114,6 +122,10 @@ public abstract class AbstractManagerTestBase {
         .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.MergedAnomalyResultManagerImpl.class);
     webappConfigDAO = (WebappConfigManager) managerProvider
         .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.WebappConfigManagerImpl.class);
+    datasetConfigDAO = (DatasetConfigManager) managerProvider
+        .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.DatasetConfigManagerImpl.class);
+    metricConfigDAO = (MetricConfigManager) managerProvider
+        .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.MetricConfigManagerImpl.class);
   }
 
   @AfterClass(alwaysRun = true)
@@ -180,5 +192,24 @@ public abstract class AbstractManagerTestBase {
     jobSpec.setWindowStartTime(new DateTime().minusHours(20).getMillis());
     jobSpec.setWindowEndTime(new DateTime().minusHours(10).getMillis());
     return jobSpec;
+  }
+
+  protected DatasetConfigDTO getTestDatasetConfig(String collection) {
+    DatasetConfigDTO datasetConfigDTO = new DatasetConfigDTO();
+    datasetConfigDTO.setDataset(collection);
+    datasetConfigDTO.setDimensions(Lists.newArrayList("country", "browser", "environment"));
+    datasetConfigDTO.setTimeColumn("time");
+    datasetConfigDTO.setTimeDuration(1);
+    datasetConfigDTO.setTimeUnit(TimeUnit.HOURS);
+    return datasetConfigDTO;
+  }
+
+  protected MetricConfigDTO getTestMetricConfig(String collection, String metric) {
+    MetricConfigDTO metricConfigDTO = new MetricConfigDTO();
+    metricConfigDTO.setId(1L);
+    metricConfigDTO.setDataset(collection);
+    metricConfigDTO.setDatatype(MetricType.LONG);
+    metricConfigDTO.setName(metric);
+    return metricConfigDTO;
   }
 }

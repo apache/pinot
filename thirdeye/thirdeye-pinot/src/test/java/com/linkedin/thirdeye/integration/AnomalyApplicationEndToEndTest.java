@@ -17,6 +17,7 @@ import org.quartz.SchedulerException;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.LoadingCache;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.alert.AlertJobScheduler;
@@ -31,19 +32,25 @@ import com.linkedin.thirdeye.anomaly.task.TaskDriver;
 import com.linkedin.thirdeye.api.CollectionSchema;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
+import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.client.ThirdEyeRequest;
 import com.linkedin.thirdeye.client.ThirdEyeResponse;
+import com.linkedin.thirdeye.client.cache.MetricConfigCacheLoader;
+import com.linkedin.thirdeye.client.cache.MetricDataset;
 import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.client.pinot.PinotThirdEyeResponse;
 import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
 import com.linkedin.thirdeye.datalayer.bao.AbstractManagerTestBase;
+import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.JobDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
+import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 
 public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
@@ -68,6 +75,10 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
 
   private void setup() throws Exception {
 
+    DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
+    DAO_REGISTRY.registerDAOs(anomalyFunctionDAO, emailConfigurationDAO, rawResultDAO, mergedResultDAO, jobDAO, taskDAO,
+        datasetConfigDAO, metricConfigDAO, null);
+
     // Mock query cache
     ThirdEyeClient mockThirdeyeClient = Mockito.mock(ThirdEyeClient.class);
     Mockito.when(mockThirdeyeClient.execute(Matchers.any(ThirdEyeRequest.class)))
@@ -85,6 +96,11 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
     QueryCache mockQueryCache = new QueryCache(mockThirdeyeClient, Executors.newFixedThreadPool(10));
     cacheRegistry.registerQueryCache(mockQueryCache);
 
+    MetricConfigDTO metricConfig = getTestMetricConfig(collection, metric);
+    LoadingCache<MetricDataset, MetricConfigDTO> mockMetricConfigCache = Mockito.mock(LoadingCache.class);
+    Mockito.when(mockMetricConfigCache.get(new MetricDataset(metric, collection))).thenReturn(metricConfig);
+    cacheRegistry.registerMetricConfigCache(mockMetricConfigCache);
+
     // Application config
     thirdeyeAnomalyConfig = new ThirdEyeAnomalyConfiguration();
     thirdeyeAnomalyConfig.setId(id);
@@ -98,13 +114,17 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
 
     // create test email configuration
     emailConfigurationDAO.save(getTestEmailConfiguration(metric, collection));
+
+    // create test dataset config
+    datasetConfigDAO.save(getTestDatasetConfig(collection));
   }
 
 
   private ThirdEyeResponse getMockResponse(ThirdEyeRequest request) {
     ThirdEyeResponse response = null;
     Random rand = new Random();
-    TimeSpec dataTimeSpec = testCollectionSchema.getTime();
+    DatasetConfigDTO datasetConfig = datasetConfigDAO.findByDataset(collection);
+    TimeSpec dataTimeSpec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetConfig);
     List<String[]> rows = new ArrayList<>();
     DateTime start = request.getStartTimeInclusive();
     DateTime end = request.getEndTimeExclusive();
