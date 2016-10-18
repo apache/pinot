@@ -38,7 +38,28 @@ function lineChartForSingleAnomaly(mergeAnomalyData) {
     console.log(window.datasetConfig);
     console.log(mergeAnomalyData);
 
-    var timeSeriesUrl = "/dashboard/anomaly-merged-result/timeseries/" + mergeAnomalyData.id;
+    var aggTimeGranularity = calcAggregateGranularity(mergeAnomalyData.startTime, mergeAnomalyData.endTime);
+
+    var viewWindowStart = mergeAnomalyData.startTime;
+    var viewWindowEnd = mergeAnomalyData.endTime;
+
+    var extensionWindowMillis;
+    switch (aggTimeGranularity) {
+        case "DAYS":
+            extensionWindowMillis = 86400000;
+            break;
+        case "HOURS":
+        default:
+            var viewWindowSize = viewWindowEnd - viewWindowStart;
+            var multiplier = Math.max(2, parseInt(viewWindowSize / 3600000));
+            extensionWindowMillis = 3600000 * multiplier;
+    }
+
+    viewWindowStart -= extensionWindowMillis;
+    viewWindowEnd += extensionWindowMillis;
+
+    var timeSeriesUrl = "/dashboard/anomaly-merged-result/timeseries/" + mergeAnomalyData.id
+        + "?aggTimeGranularity=" + aggTimeGranularity + "&start=" + viewWindowStart + "&end=" + viewWindowEnd;
     var tab = hash.view;
 
     getDataCustomCallback(timeSeriesUrl, tab).done(function (timeSeriesData) {

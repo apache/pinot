@@ -56,8 +56,8 @@ public abstract class BaseAnomalyFunction implements AnomalyFunction {
   /**
    * Useful when multiple time intervals are needed for fetching current vs baseline data
    *
-   * @param monitoringWindowStartTime
-   * @param monitoringWindowEndTime
+   * @param monitoringWindowStartTime inclusive
+   * @param monitoringWindowEndTime exclusive
    *
    * @return
    */
@@ -69,11 +69,12 @@ public abstract class BaseAnomalyFunction implements AnomalyFunction {
   }
 
   /**
-   * Given the data which is used as the input of {@link #analyze}, this method returns the current and baseline
-   * time series to be presented in the frontend.
+   * Given any metric, this method returns the corresponding current and baseline time series to be presented in the
+   * frontend. The given metric is not necessary the data that is used for detecting anomaly.
    *
-   * For instance, if a function uses the average values of the past 3 weeks as the baseline, then this method should
-   * construct a baseline that contains the average value of the past 3 weeks.
+   * For instance, if a function uses the average values of the past 3 weeks as the baseline for anomaly detection,
+   * then this method should construct a baseline that contains the average value of the past 3 weeks of the given
+   * metric.
    *
    * By default, this method returns the values in the previous week as baseline time series and ignores the
    * information of known anomalies.
@@ -82,22 +83,21 @@ public abstract class BaseAnomalyFunction implements AnomalyFunction {
    * of setting filters, dimension names, etc. for retrieving the data from the backend database. Specifically, it only
    * processes the given data, i.e., timeSeries, for presentation purpose.
    *
-   * @param viewWindowStartTime the start time bucket of current time series, inclusive.
-   * @param viewWindowEndTime the end time buckets of current time series, exclusive.
-   * @return Two set of time series: a current and a baseline values, to be represented in the frontend.
+   * The only difference between this method and {@link #analyze} is that their bucket sizes are different.
+   * This method's bucket size is given by frontend, which should larger or equal to the minimum time granularity of
+   * the data. On the other hand, {@link #analyze}'s buckets size is always the minimum time granularity of the data.
+   *
+   * @param timeSeries the time series that contains the metric to be processed
+   * @param metric the metric name to retrieve the data from the given time series
+   * @param bucketMillis the size of a bucket in milli-seconds
+   * @param viewWindowStartTime the start time bucket of current time series, inclusive
+   * @param viewWindowEndTime the end time buckets of current time series, exclusive
+   * @return Two set of time series: a current and a baseline values, to be represented in the frontend
    */
-  public AnomalyTimelinesView getPresentationTimeseries(MetricTimeSeries timeSeries, Long viewWindowStartTime,
-      Long viewWindowEndTime, List<RawAnomalyResultDTO> knownAnomalies) {
+  public AnomalyTimelinesView getPresentationTimeseries(MetricTimeSeries timeSeries, long bucketMillis, String metric,
+      long viewWindowStartTime, long viewWindowEndTime, List<RawAnomalyResultDTO> knownAnomalies) {
 
     AnomalyTimelinesView anomalyTimelinesView = new AnomalyTimelinesView();
-    anomalyTimelinesView.addSummary("currentStart", Long.toString(viewWindowStartTime));
-    anomalyTimelinesView.addSummary("currentEnd", Long.toString(viewWindowEndTime));
-
-    // Metric
-    String metric = getSpec().getMetric();
-
-    // Compute the bucket size, so we can iterate in those steps
-    long bucketMillis = TimeUnit.MILLISECONDS.convert(getSpec().getBucketSize(), getSpec().getBucketUnit());
 
     // Construct AnomalyTimelinesView
     int bucketCount = (int) ((viewWindowEndTime - viewWindowStartTime) / bucketMillis);

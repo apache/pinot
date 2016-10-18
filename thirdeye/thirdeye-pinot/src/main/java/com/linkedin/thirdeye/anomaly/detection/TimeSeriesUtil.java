@@ -37,7 +37,7 @@ public abstract class TimeSeriesUtil {
   private TimeSeriesUtil() {
   }
 
-  public static TimeSeriesResponse getTimeSeriesResponse(BaseAnomalyFunction anomalyFunction,
+  public static TimeSeriesResponse getTimeSeriesResponseForAnomalyDetection(BaseAnomalyFunction anomalyFunction,
       long monitoringWindowStart, long monitoringWindowEnd)
       throws JobExecutionException, ExecutionException {
     AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunction.getSpec();
@@ -51,12 +51,15 @@ public abstract class TimeSeriesUtil {
         StringUtils.isNotBlank(exploreDimensionString) ? Arrays.asList(exploreDimensionString.trim().split(","))
             : Collections.emptyList();
 
-    return getTimeSeriesResponseImpl(anomalyFunction, filters, groupByDimensions, monitoringWindowStart,
+    TimeGranularity timeGranularity = new TimeGranularity(anomalyFunctionSpec.getBucketSize(),
+        anomalyFunctionSpec.getBucketUnit());
+
+    return getTimeSeriesResponseImpl(anomalyFunction, timeGranularity, filters, groupByDimensions, monitoringWindowStart,
         monitoringWindowEnd);
   }
 
-  public static TimeSeriesResponse getPresentationTimeSeriesResponse(BaseAnomalyFunction anomalyFunction,
-      String dimensionKeyString, long viewWindowStart, long viewWindowEnd)
+  public static TimeSeriesResponse getTimeSeriesResponseForPresentation(BaseAnomalyFunction anomalyFunction,
+      String dimensionKeyString, TimeGranularity timeGranularity, long viewWindowStart, long viewWindowEnd)
       throws JobExecutionException, ExecutionException {
     AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunction.getSpec();
 
@@ -69,22 +72,19 @@ public abstract class TimeSeriesUtil {
     // each anomaly should have a time series with a specific set of dimension values, which is specified in filters.
     List<String> groupByDimensions = Collections.emptyList();
 
-    return getTimeSeriesResponseImpl(anomalyFunction, filters, groupByDimensions, viewWindowStart, viewWindowEnd);
+    return getTimeSeriesResponseImpl(anomalyFunction, timeGranularity, filters, groupByDimensions, viewWindowStart,
+        viewWindowEnd);
   }
 
   private static TimeSeriesResponse getTimeSeriesResponseImpl(BaseAnomalyFunction anomalyFunction,
-      Multimap<String, String> filters, List<String> groupByDimensions, long monitoringWindowStart,
-      long monitoringWindowEnd)
+      TimeGranularity timeGranularity, Multimap<String, String> filters, List<String> groupByDimensions,
+      long monitoringWindowStart, long monitoringWindowEnd)
       throws JobExecutionException, ExecutionException {
 
     TimeSeriesHandler timeSeriesHandler =
         new TimeSeriesHandler(ThirdEyeCacheRegistry.getInstance().getQueryCache());
 
     AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunction.getSpec();
-
-    // Compute metric function
-    TimeGranularity timeGranularity = new TimeGranularity(anomalyFunctionSpec.getBucketSize(),
-        anomalyFunctionSpec.getBucketUnit());
 
     // Seed request with top-level...
     TimeSeriesRequest request = new TimeSeriesRequest();

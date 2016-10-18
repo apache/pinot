@@ -7,6 +7,7 @@ import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesResponse;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesResponseConverter;
 import com.linkedin.thirdeye.dashboard.Utils;
+import com.linkedin.thirdeye.dashboard.views.TimeBucket;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
 import java.io.IOException;
@@ -34,6 +35,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.kafka.common.utils.Time;
 import org.joda.time.DateTime;
 import org.joda.time.format.ISODateTimeFormat;
 import org.quartz.CronExpression;
@@ -104,44 +106,6 @@ public class AnomalyResource {
     }
     List<String> metrics = anomalyFunctionDAO.findDistinctMetricsByCollection(dataset);
     return metrics;
-  }
-
-  @GET
-  @Path("/anomaly-merged-result/timeseries/{anomaly_merged_result_id}")
-  public AnomalyTimelinesView getAnomalyMergedResultTimeSeries(@PathParam("anomaly_merged_result_id") long anomalyResultId)
-      throws Exception {
-
-    MergedAnomalyResultDTO anomalyResult = anomalyMergedResultDAO.findById(anomalyResultId);
-    String dimensions = anomalyResult.getDimensions();
-    AnomalyFunctionDTO anomalyFunctionSpec = anomalyResult.getFunction();
-    BaseAnomalyFunction anomalyFunction = anomalyFunctionFactory.fromSpec(anomalyFunctionSpec);
-    long viewWindowStartTime = anomalyResult.getStartTime();
-    long viewWindowEndTime = anomalyResult.getEndTime();
-
-    long bucketMillis = TimeUnit.MILLISECONDS.convert(anomalyFunctionSpec.getBucketSize(), anomalyFunctionSpec.getBucketUnit());
-    long bucketCount = (viewWindowEndTime - viewWindowStartTime) / bucketMillis;
-    long paddingMillis = (bucketCount / 2) * bucketMillis;
-    viewWindowStartTime -= paddingMillis;
-    viewWindowEndTime += paddingMillis;
-
-    TimeSeriesResponse timeSeriesResponse =
-        TimeSeriesUtil.getPresentationTimeSeriesResponse(anomalyFunction, dimensions, viewWindowStartTime, viewWindowEndTime);
-
-    TimeSeriesResponseConverter timeSeriesResponseConverter = TimeSeriesResponseConverter.getInstance();
-
-    Map<DimensionKey, MetricTimeSeries> res = timeSeriesResponseConverter.toMap(timeSeriesResponse,
-        Utils.getSchemaDimensionNames(anomalyResult.getFunction().getCollection()));
-
-    Iterator<MetricTimeSeries> ite = res.values().iterator();
-    if (ite.hasNext()) {
-      MetricTimeSeries metricTimeSeries = ite.next();
-      AnomalyTimelinesView anomalyTimelinesView =
-          anomalyFunction.getPresentationTimeseries(metricTimeSeries, viewWindowStartTime, viewWindowEndTime, null);
-
-      return anomalyTimelinesView;
-    }
-
-    return null;
   }
 
   // View merged anomalies for collection
@@ -528,4 +492,85 @@ public class AnomalyResource {
       throw new IllegalArgumentException("Invalid payload " + payload, e);
     }
   }
+
+  /**
+   * Returns the time series for the given anomaly.
+   *
+   * If viewWindowStartTime and/or viewWindowEndTime is not given, then a window is padded automatically. The padded
+   * windows is half of the anomaly window size. For instance, if the anomaly lasts for 4 hours, then the pad window
+   * size is 2 hours. The max padding size is 1 day.
+   *
+   * @param anomalyResultId the id of the given anomaly
+   * @param viewWindowStartTime start time of the time series, inclusive
+   * @param viewWindowEndTime end time of the time series, inclusive
+   * @return the time series of the given anomaly
+   * @throws Exception when it fails to retrieve collection, i.e., dataset, information
+   */
+  @GET
+  @Path("/anomaly-merged-result/timeseries/{anomaly_merged_result_id}")
+  public AnomalyTimelinesView getAnomalyMergedResultTimeSeries(@NotNull @PathParam("anomaly_merged_result_id") long anomalyResultId,
+      @NotNull @QueryParam("aggTimeGranularity") String aggTimeGranularity, @QueryParam("start") long viewWindowStartTime,
+      @QueryParam("end") long viewWindowEndTime)
+      throws Exception {
+
+    MergedAnomalyResultDTO anomalyResult = anomalyMergedResultDAO.findById(anomalyResultId);
+    String dimensions = anomalyResult.getDimensions();
+    AnomalyFunctionDTO anomalyFunctionSpec = anomalyResult.getFunction();
+    BaseAnomalyFunction anomalyFunction = anomalyFunctionFactory.fromSpec(anomalyFunctionSpec);
+
+    // Calculate view window start and end if they are not given by the user, which should be 0 if it is not given.
+    // By default, the padding window size is half of the anomaly window.
+    if (viewWindowStartTime == 0 || viewWindowEndTime == 0) {
+      long anomalyWindowStartTime = anomalyResult.getStartTime();
+      long anomalyWindowEndTime = anomalyResult.getEndTime();
+
+      long bucketMillis = TimeUnit.MILLISECONDS.convert(anomalyFunctionSpec.getBucketSize(), anomalyFunctionSpec.getBucketUnit());
+      long bucketCount = (anomalyWindowEndTime - anomalyWindowStartTime) / bucketMillis;
+      long paddingMillis = Math.max(1, (bucketCount / 2)) * bucketMillis;
+      paddingMillis = (paddingMillis <= TimeUnit.DAYS.toMillis(1)) ? paddingMillis : TimeUnit.DAYS.toMillis(1);
+
+      viewWindowStartTime = (viewWindowStartTime == 0) ? anomalyWindowStartTime - paddingMillis : viewWindowStartTime;
+      viewWindowEndTime = (viewWindowEndTime == 0) ? anomalyWindowEndTime + paddingMillis : viewWindowEndTime;
+    }
+
+    TimeGranularity timeGranularity =
+        Utils.getAggregationTimeGranularity(aggTimeGranularity, anomalyFunctionSpec.getCollection());
+    long bucketMillis = timeGranularity.toMillis();
+    // ThirdEye backend is end time exclusive, so one more bucket is appended to make end time inclusive for frontend.
+    viewWindowEndTime += bucketMillis;
+
+    TimeSeriesResponse timeSeriesResponse =
+        TimeSeriesUtil.getTimeSeriesResponseForPresentation(anomalyFunction, dimensions, timeGranularity,
+            viewWindowStartTime, viewWindowEndTime);
+
+    TimeSeriesResponseConverter timeSeriesResponseConverter = TimeSeriesResponseConverter.getInstance();
+    Map<DimensionKey, MetricTimeSeries> res = timeSeriesResponseConverter.toMap(timeSeriesResponse,
+        Utils.getSchemaDimensionNames(anomalyResult.getFunction().getCollection()));
+
+    // Currently, we assume that we get time series for one metric at a time
+    String metricName = anomalyFunctionSpec.getMetric();
+    Iterator<MetricTimeSeries> ite = res.values().iterator();
+    if (ite.hasNext()) {
+      MetricTimeSeries metricTimeSeries = ite.next();
+      AnomalyTimelinesView anomalyTimelinesView =
+          anomalyFunction.getPresentationTimeseries(metricTimeSeries, bucketMillis, metricName, viewWindowStartTime, viewWindowEndTime, null);
+
+      // Generate summary for frontend
+      List<TimeBucket> timeBuckets = anomalyTimelinesView.getTimeBuckets();
+      if (timeBuckets.size() > 0) {
+        TimeBucket firstBucket = timeBuckets.get(0);
+        anomalyTimelinesView.addSummary("currentStart", Long.toString(firstBucket.getCurrentStart()));
+        anomalyTimelinesView.addSummary("baselineStart", Long.toString(firstBucket.getBaselineStart()));
+
+        TimeBucket lastBucket = timeBuckets.get(timeBuckets.size()-1);
+        anomalyTimelinesView.addSummary("currentEnd", Long.toString(lastBucket.getCurrentStart()));
+        anomalyTimelinesView.addSummary("baselineEnd", Long.toString(lastBucket.getBaselineEnd()));
+      }
+
+      return anomalyTimelinesView;
+    }
+
+    return null;
+  }
+
 }

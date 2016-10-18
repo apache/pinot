@@ -188,18 +188,10 @@ public class WeekOverWeekRuleFunction extends BaseAnomalyFunction {
   }
 
   @Override
-  public AnomalyTimelinesView getPresentationTimeseries(MetricTimeSeries timeSeries, Long viewWindowStartTime,
-      Long viewWindowEndTime, List<RawAnomalyResultDTO> knownAnomalies) {
+  public AnomalyTimelinesView getPresentationTimeseries(MetricTimeSeries timeSeries, long bucketMillis, String metric,
+      long viewWindowStartTime, long viewWindowEndTime, List<RawAnomalyResultDTO> knownAnomalies) {
 
     AnomalyTimelinesView anomalyTimelinesView = new AnomalyTimelinesView();
-    anomalyTimelinesView.addSummary("currentStart", Long.toString(viewWindowStartTime));
-    anomalyTimelinesView.addSummary("currentEnd", Long.toString(viewWindowEndTime));
-
-    // Metric
-    String metric = getSpec().getMetric();
-
-    // Compute the bucket size, so we can iterate in those steps
-    long bucketMillis = TimeUnit.MILLISECONDS.convert(getSpec().getBucketSize(), getSpec().getBucketUnit());
 
     // Compute baseline for comparison
     long baselineOffsetInMillis = TimeUnit.MILLISECONDS.convert(7, TimeUnit.DAYS);

@@ -114,7 +114,7 @@ public class AnomalyFunctionResource {
     // TODO: replace this with Job/Task framework and job tracker page
     BaseAnomalyFunction anomalyFunction = anomalyFunctionFactory.fromSpec(anomalyFunctionSpec);
     TimeSeriesResponse finalResponse =
-        TimeSeriesUtil.getTimeSeriesResponse(anomalyFunction, startTime, endTime);
+        TimeSeriesUtil.getTimeSeriesResponseForAnomalyDetection(anomalyFunction, startTime, endTime);
 
     List<RawAnomalyResultDTO> anomalyResults = new ArrayList<>();
     List<RawAnomalyResultDTO> results = new ArrayList<>();

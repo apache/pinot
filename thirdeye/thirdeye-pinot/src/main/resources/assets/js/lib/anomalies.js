@@ -381,7 +381,7 @@ function drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab, placeholder, op
      var dateTimeFormat = "%I:%M %p";
      if (aggTimeGranularity == "DAYS" ) {
          dateTimeFormat = "%m-%d";
-     } else if (timeSeriesData.summary.currentEnd - timeSeriesData.summary.currentStart > 86400000 ){
+     } else if (timeSeriesData.summary.currentEnd - timeSeriesData.summary.currentStart > 86400000){
          dateTimeFormat = "%m-%d %I %p";
      }
 
@@ -530,9 +530,11 @@ function renderAnomalyThumbnails(data, tab) {
      function requestLineChart(i) {
          var startTime = data[i]["startTime"];
          var endTime = data[i]["endTime"];
+         var aggTimeGranularity = calcAggregateGranularity(hash.currentStart,hash.currentEnd);
          var anomalyId = data[i]["id"]
          var placeholder= "#d3charts-" + i;
-         var timeSeriesUrl = "/dashboard/anomaly-merged-result/timeseries/" + anomalyId;
+         var timeSeriesUrl = "/dashboard/anomaly-merged-result/timeseries/" + anomalyId
+             + "?aggTimeGranularity=" + aggTimeGranularity + "&start=" + hash.currentStart + "&end=" + hash.currentEnd;
          var tab = hash.view;
 
         getDataCustomCallback(timeSeriesUrl, tab).done(function (timeSeriesData) {
