@@ -98,11 +98,14 @@ public class Utils {
 
   public static List<String> getDimensions(String collection)
       throws Exception {
-
-    DatasetConfigDTO datasetConfig = CACHE_REGISTRY.getDatasetConfigCache().get(collection);
-    List<String> dimensions = datasetConfig.getDimensions();
+    List<String> dimensions = getSchemaDimensionNames(collection);
     Collections.sort(dimensions);
     return dimensions;
+  }
+
+  public static List<String> getSchemaDimensionNames(String collection) throws Exception {
+    DatasetConfigDTO datasetConfig = CACHE_REGISTRY.getDatasetConfigCache().get(collection);
+    return datasetConfig.getDimensions();
   }
 
   public static List<String> getDimensionsToGroupBy(String collection, Multimap<String, String> filters)

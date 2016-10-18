@@ -32,59 +32,16 @@ function showAnomalyDetails(id) {
 }
 
 function lineChartForSingleAnomaly(mergeAnomalyData) {
-    var dataset = hash.dataset;
     var mergedAnomalyId = mergeAnomalyData.id;
 
     // TODO: remove console logs
     console.log(window.datasetConfig);
     console.log(mergeAnomalyData);
 
-    var aggTimeGranularity = calcAggregateGranularity(mergeAnomalyData.startTime, mergeAnomalyData.endTime);
-    console.log(aggTimeGranularity);
-
-    var extensionWindowMillis = (datasetConfig.dataGranularity == "DAYS") ? 86400000 : 2 * 3600000;
-    var fnProperties = parseProperties(mergeAnomalyData.function.properties);
-
-    var compare = 1;
-    var compareMode = "WOW";
-    //for
-    switch(fnProperties.baseline){
-        case "w/w":
-            compare = 1;
-            compareMode = "WOW";
-            break;
-        case "w/2w":
-            compare = 2;
-            compareMode = "WO2W";
-            break;
-        case "w/3w":
-            compare= 3;
-            compareMode= "WO3W";
-            break;
-        default:
-            compare = 1;
-            compareMode = "WOW";
-    }
-
-    var currentStart = mergeAnomalyData.startTime - extensionWindowMillis;
-    var currentEnd = mergeAnomalyData.endTime + extensionWindowMillis;
-
-    var baselineStart = moment(parseInt(currentStart)).add((-1* compare), 'weeks');
-    var baselineEnd = moment(parseInt(currentEnd)).add( (-1* compare), 'weeks');
-
-    var fnFiltersString = mergeAnomalyData.function.filters;
-    var filters = parseProperties( fnFiltersString, {arrayValues:true} );
-    filters = encodeURIComponent(JSON.stringify(filters));
-
-    var metrics = hash.metrics;
-
-    var timeSeriesUrl = "/dashboard/data/tabular?dataset=" + dataset + "&compareMode=" + compareMode //
-        + "&currentStart=" + currentStart + "&currentEnd=" + currentEnd  //
-        + "&baselineStart=" + baselineStart + "&baselineEnd=" + baselineEnd   //
-        + "&aggTimeGranularity=" + aggTimeGranularity + "&metrics=" + metrics+ "&filters=" + filters;
+    var timeSeriesUrl = "/dashboard/anomaly-merged-result/timeseries/" + mergeAnomalyData.id;
     var tab = hash.view;
 
-    getDataCustomCallback(timeSeriesUrl,tab ).done(function (timeSeriesData) {
+    getDataCustomCallback(timeSeriesUrl, tab).done(function (timeSeriesData) {
         //Error handling when data is falsy (empty, undefined or null)
         if (!timeSeriesData) {
             // do nothing
@@ -100,6 +57,6 @@ function lineChartForSingleAnomaly(mergeAnomalyData) {
         linechartSettings.data.subchart = {};
         linechartSettings.data.subchart.show = true;
 
-        drawAnomalyTimeSeries(timeSeriesData, anomalyRegionData, tab, placeholder,linechartSettings );
+        drawAnomalyTimeSeries(timeSeriesData, anomalyRegionData, tab, placeholder, linechartSettings);
     });
 }

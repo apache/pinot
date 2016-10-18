@@ -1,11 +1,22 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
+import com.linkedin.thirdeye.anomaly.detection.TimeSeriesUtil;
+import com.linkedin.thirdeye.anomaly.views.AnomalyTimelinesView;
+import com.linkedin.thirdeye.api.DimensionKey;
+import com.linkedin.thirdeye.api.MetricTimeSeries;
+import com.linkedin.thirdeye.client.timeseries.TimeSeriesResponse;
+import com.linkedin.thirdeye.client.timeseries.TimeSeriesResponseConverter;
+import com.linkedin.thirdeye.dashboard.Utils;
+import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
+import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
 import java.io.IOException;
 import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -71,15 +82,17 @@ public class AnomalyResource {
   private RawAnomalyResultManager anomalyResultDAO;
   private EmailConfigurationManager emailConfigurationDAO;
   private DatasetConfigManager datasetConfigDAO;
+  private AnomalyFunctionFactory anomalyFunctionFactory;
 
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
-  public AnomalyResource() {
+  public AnomalyResource(String functionConfigPath) {
     this.anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
     this.anomalyResultDAO = DAO_REGISTRY.getRawAnomalyResultDAO();
     this.anomalyMergedResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
     this.emailConfigurationDAO = DAO_REGISTRY.getEmailConfigurationDAO();
     this.datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
+    this.anomalyFunctionFactory = new AnomalyFunctionFactory(functionConfigPath);
   }
 
   /************** CRUD for anomalies of a collection ********************************************************/
@@ -91,6 +104,44 @@ public class AnomalyResource {
     }
     List<String> metrics = anomalyFunctionDAO.findDistinctMetricsByCollection(dataset);
     return metrics;
+  }
+
+  @GET
+  @Path("/anomaly-merged-result/timeseries/{anomaly_merged_result_id}")
+  public AnomalyTimelinesView getAnomalyMergedResultTimeSeries(@PathParam("anomaly_merged_result_id") long anomalyResultId)
+      throws Exception {
+
+    MergedAnomalyResultDTO anomalyResult = anomalyMergedResultDAO.findById(anomalyResultId);
+    String dimensions = anomalyResult.getDimensions();
+    AnomalyFunctionDTO anomalyFunctionSpec = anomalyResult.getFunction();
+    BaseAnomalyFunction anomalyFunction = anomalyFunctionFactory.fromSpec(anomalyFunctionSpec);
+    long viewWindowStartTime = anomalyResult.getStartTime();
+    long viewWindowEndTime = anomalyResult.getEndTime();
+
+    long bucketMillis = TimeUnit.MILLISECONDS.convert(anomalyFunctionSpec.getBucketSize(), anomalyFunctionSpec.getBucketUnit());
+    long bucketCount = (viewWindowEndTime - viewWindowStartTime) / bucketMillis;
+    long paddingMillis = (bucketCount / 2) * bucketMillis;
+    viewWindowStartTime -= paddingMillis;
+    viewWindowEndTime += paddingMillis;
+
+    TimeSeriesResponse timeSeriesResponse =
+        TimeSeriesUtil.getPresentationTimeSeriesResponse(anomalyFunction, dimensions, viewWindowStartTime, viewWindowEndTime);
+
+    TimeSeriesResponseConverter timeSeriesResponseConverter = TimeSeriesResponseConverter.getInstance();
+
+    Map<DimensionKey, MetricTimeSeries> res = timeSeriesResponseConverter.toMap(timeSeriesResponse,
+        Utils.getSchemaDimensionNames(anomalyResult.getFunction().getCollection()));
+
+    Iterator<MetricTimeSeries> ite = res.values().iterator();
+    if (ite.hasNext()) {
+      MetricTimeSeries metricTimeSeries = ite.next();
+      AnomalyTimelinesView anomalyTimelinesView =
+          anomalyFunction.getPresentationTimeseries(metricTimeSeries, viewWindowStartTime, viewWindowEndTime, null);
+
+      return anomalyTimelinesView;
+    }
+
+    return null;
   }
 
   // View merged anomalies for collection
@@ -159,35 +210,7 @@ public class AnomalyResource {
       LOG.error("Exception in fetching anomalies", e);
     }
 
-    setExploreDimensionsFilterForFrontEnd(anomalyResults, dataset);
-
     return anomalyResults;
-  }
-
-  private void setExploreDimensionsFilterForFrontEnd(List<MergedAnomalyResultDTO> anomalyResults, String collection) {
-    try {
-      List<String> dimensionNames = CACHE_REGISTRY_INSTANCE.getDatasetConfigCache().get(collection).getDimensions();
-      for (MergedAnomalyResultDTO mergedAnomalyResultDTO : anomalyResults) {
-        AnomalyFunctionDTO anomalyFunction = mergedAnomalyResultDTO.getFunction();
-        Multimap<String, String> filterSet = anomalyFunction.getFilterSet();
-        String[] exploreDimensionValues = mergedAnomalyResultDTO.getDimensions().trim().split(",");
-        boolean isUpdated = false;
-        for (int i = 0; i < exploreDimensionValues.length; ++i) {
-          String exploreDimensionValue = exploreDimensionValues[i];
-          if (!exploreDimensionValue.equals("") && !exploreDimensionValue.equals("*")) {
-            String dimensionName = dimensionNames.get(i);
-            filterSet.removeAll(dimensionName);
-            filterSet.put(dimensionName, exploreDimensionValue);
-            isUpdated = true;
-          }
-        }
-        if (isUpdated) {
-          anomalyFunction.setFilters(filterSet);
-        }
-      }
-    } catch (Exception e) {
-      LOG.info("Unable to get dimensionNames for {}", collection);
-    }
   }
 
   /************* CRUD for anomaly functions of collection **********************************************/

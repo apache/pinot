@@ -1,7 +1,10 @@
 package com.linkedin.thirdeye.util;
 
+import com.google.common.collect.HashMultimap;
+import com.linkedin.thirdeye.dashboard.Utils;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -31,6 +34,7 @@ import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
 
+
 public abstract class ThirdEyeUtils {
   private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeUtils.class);
   private static final String FILTER_VALUE_ASSIGNMENT_SEPARATOR = "=";
@@ -56,6 +60,41 @@ public abstract class ThirdEyeUtils {
       }
     }
     return filterSet;
+  }
+
+  public static Multimap<String, String> getFilterSetFromDimensionKeyString(String dimensionKeyString, String collection) {
+    return getFilterSetFromDimensionKeyString(dimensionKeyString, collection, null);
+  }
+
+  public static Multimap<String, String> getFilterSetFromDimensionKeyString(String dimensionKeyString,
+      String collection, Multimap<String, String> filterToDecorate) {
+    if (filterToDecorate == null) {
+      filterToDecorate = HashMultimap.create();
+    }
+
+    List<String> schemaDimensionNames;
+    try {
+      schemaDimensionNames = Utils.getSchemaDimensionNames(collection);
+    } catch (Exception e) {
+      LOG.info("Filter is not decorated: Unable to get schema dimension names for collection -- {}. ", collection);
+      schemaDimensionNames = Collections.emptyList();
+    }
+
+    if (schemaDimensionNames.size() > 0) {
+      List<String> dimensionValues =
+          org.apache.commons.lang3.StringUtils.isNotBlank(dimensionKeyString) ? Arrays.asList(dimensionKeyString.trim().split(","))
+              : Collections.emptyList();
+      for (int i = 0; i < dimensionValues.size(); ++i) {
+        String dimensionValue = dimensionValues.get(i).trim();
+        if (!dimensionValue.equals("") && !dimensionValue.equals("*")) {
+          String dimensionName = schemaDimensionNames.get(i);
+          filterToDecorate.removeAll(dimensionName);
+          filterToDecorate.put(dimensionName, dimensionValue);
+        }
+      }
+    }
+
+    return filterToDecorate;
   }
 
   public static String convertMultiMapToJson(Multimap<String, String> multimap)

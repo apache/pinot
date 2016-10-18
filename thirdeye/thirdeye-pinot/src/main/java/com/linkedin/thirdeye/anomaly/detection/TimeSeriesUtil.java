@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.anomaly.detection;
 
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.Multimap;
 import com.linkedin.pinot.pql.parsers.utils.Pair;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.client.MetricExpression;
@@ -27,6 +29,7 @@ import org.quartz.JobExecutionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 public abstract class TimeSeriesUtil {
 
   private static final Logger LOG = LoggerFactory.getLogger(TimeSeriesUtil.class);
@@ -34,19 +37,54 @@ public abstract class TimeSeriesUtil {
   private TimeSeriesUtil() {
   }
 
-  public static TimeSeriesResponse getTimeSeriesResponse(AnomalyFunctionDTO anomalyFunctionSpec,
-      BaseAnomalyFunction anomalyFunction, String groupByDimension, long windowStart,
-      long windowEnd) throws JobExecutionException, ExecutionException {
+  public static TimeSeriesResponse getTimeSeriesResponse(BaseAnomalyFunction anomalyFunction,
+      long monitoringWindowStart, long monitoringWindowEnd)
+      throws JobExecutionException, ExecutionException {
+    AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunction.getSpec();
+    String filterString = anomalyFunctionSpec.getFilters();
+    String exploreDimensionString = anomalyFunctionSpec.getExploreDimensions();
+
+    Multimap<String, String> filters =
+        StringUtils.isNotBlank(filterString) ? ThirdEyeUtils.getFilterSet(filterString) : HashMultimap.create();
+
+    List<String> groupByDimensions =
+        StringUtils.isNotBlank(exploreDimensionString) ? Arrays.asList(exploreDimensionString.trim().split(","))
+            : Collections.emptyList();
+
+    return getTimeSeriesResponseImpl(anomalyFunction, filters, groupByDimensions, monitoringWindowStart,
+        monitoringWindowEnd);
+  }
+
+  public static TimeSeriesResponse getPresentationTimeSeriesResponse(BaseAnomalyFunction anomalyFunction,
+      String dimensionKeyString, long viewWindowStart, long viewWindowEnd)
+      throws JobExecutionException, ExecutionException {
+    AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunction.getSpec();
+
+    String filterString = anomalyFunctionSpec.getFilters();
+    Multimap<String, String> filters =
+        StringUtils.isNotBlank(filterString) ? ThirdEyeUtils.getFilterSet(filterString) : HashMultimap.create();
+    filters = ThirdEyeUtils.getFilterSetFromDimensionKeyString(dimensionKeyString, anomalyFunctionSpec.getCollection(), filters);
+
+    // groupByDimensions (i.e., exploreDimensions) should be empty when retrieving time series for anomalies, because
+    // each anomaly should have a time series with a specific set of dimension values, which is specified in filters.
+    List<String> groupByDimensions = Collections.emptyList();
+
+    return getTimeSeriesResponseImpl(anomalyFunction, filters, groupByDimensions, viewWindowStart, viewWindowEnd);
+  }
+
+  private static TimeSeriesResponse getTimeSeriesResponseImpl(BaseAnomalyFunction anomalyFunction,
+      Multimap<String, String> filters, List<String> groupByDimensions, long monitoringWindowStart,
+      long monitoringWindowEnd)
+      throws JobExecutionException, ExecutionException {
 
     TimeSeriesHandler timeSeriesHandler =
         new TimeSeriesHandler(ThirdEyeCacheRegistry.getInstance().getQueryCache());
 
+    AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunction.getSpec();
+
     // Compute metric function
     TimeGranularity timeGranularity = new TimeGranularity(anomalyFunctionSpec.getBucketSize(),
         anomalyFunctionSpec.getBucketUnit());
-
-    // Filters
-    String filters = anomalyFunctionSpec.getFilters();
 
     // Seed request with top-level...
     TimeSeriesRequest request = new TimeSeriesRequest();
@@ -57,19 +95,16 @@ public abstract class TimeSeriesUtil {
     request.setMetricExpressions(metricExpressions);
     request.setAggregationTimeGranularity(timeGranularity);
     request.setEndDateInclusive(false);
+    request.setFilterSet(filters);
+    request.setGroupByDimensions(groupByDimensions);
 
-    if (StringUtils.isNotBlank(filters)) {
-      request.setFilterSet(ThirdEyeUtils.getFilterSet(filters));
-    }
-    if (StringUtils.isNotBlank(groupByDimension)) {
-      request.setGroupByDimensions(Arrays.asList(groupByDimension.trim().split(",")));
-    }
     List<Pair<Long, Long>> startEndTimeRanges =
-        anomalyFunction.getDataRangeIntervals(windowStart, windowEnd);
+        anomalyFunction.getDataRangeIntervals(monitoringWindowStart, monitoringWindowEnd);
 
     LOG.info("Found [{}] time ranges to fetch data", startEndTimeRanges.size());
     for (Pair<Long, Long> timeRange : startEndTimeRanges) {
-      LOG.info("Start Time [{}], End Time [{}] for anomaly analysis", new DateTime(timeRange.getFirst()), new DateTime(timeRange.getSecond()));
+      LOG.info("Start Time [{}], End Time [{}] for anomaly analysis", new DateTime(timeRange.getFirst()),
+          new DateTime(timeRange.getSecond()));
     }
 
     Set<TimeSeriesRow> timeSeriesRowSet = new HashSet<>();

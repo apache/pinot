@@ -31,7 +31,7 @@ public class TestUserRuleAnomalyFunction {
 
   @Test(dataProvider = "getBaselineMillisProvider")
   public void getBaselineMillis(String baselineProp, long expected) {
-    long actual = function.getBaselineMillis(baselineProp);
+    long actual = function.getBaselineOffsetInMillis(baselineProp);
     Assert.assertEquals(actual, expected);
   }
 
