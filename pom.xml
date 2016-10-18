@@ -381,6 +381,10 @@
             <groupId>com.github.sgroschupf</groupId>
             <artifactId>zkclient</artifactId>
           </exclusion>
+          <exclusion>
+            <groupId>org.jboss.netty</groupId>
+            <artifactId>netty</artifactId>
+          </exclusion>
       </exclusions>
       </dependency>
       <dependency>

@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.anomaly.detection;
 
+import com.google.common.collect.ArrayListMultimap;
 import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
 
 import java.util.ArrayList;
@@ -64,7 +65,7 @@ public class DetectionTaskRunner implements TaskRunner {
 
     collectionDimensions = datasetConfigDAO.findByDataset(anomalyFunctionSpec.getCollection()).getDimensions();
 
-    // Get existing anomalies for this time range
+    // Get existing anomalies for this time range and this function id
     knownAnomalies = getExistingAnomalies();
     TimeSeriesResponse finalResponse = TimeSeriesUtil
         .getTimeSeriesResponse(anomalyFunctionSpec, anomalyFunction,
@@ -77,14 +78,25 @@ public class DetectionTaskRunner implements TaskRunner {
 
   private void exploreDimensionsAndAnalyze(TimeSeriesResponse finalResponse) {
     int anomalyCounter = 0;
-    List<RawAnomalyResultDTO> results = null;
     Map<DimensionKey, MetricTimeSeries> res =
         timeSeriesResponseConverter.toMap(finalResponse, collectionDimensions);
+
+    // Sort the known anomalies by their dimension names
+    ArrayListMultimap<String, RawAnomalyResultDTO> dimensionNamesToKnownAnomalies = ArrayListMultimap.create();
+    for (RawAnomalyResultDTO knownAnomaly : knownAnomalies) {
+      dimensionNamesToKnownAnomalies.put(knownAnomaly.getDimensions(), knownAnomaly);
+    }
+
     for (Map.Entry<DimensionKey, MetricTimeSeries> entry : res.entrySet()) {
       if (entry.getValue().getTimeWindowSet().size() < 1) {
         LOG.warn("Insufficient data for {} to run anomaly detection function", entry.getKey());
         continue;
       }
+
+      // Get current entry's knownAnomalies, which should have the same dimension names.
+      String dimensionKeyString = entry.getKey().toCommaSeparatedString();
+      List<RawAnomalyResultDTO> knownAnomaliesOfAnEntry = dimensionNamesToKnownAnomalies.get(dimensionKeyString);
+
       try {
         // Run algorithm
         DimensionKey dimensionKey = entry.getKey();
@@ -92,18 +104,18 @@ public class DetectionTaskRunner implements TaskRunner {
         LOG.info("Analyzing anomaly function with dimensionKey: {}, windowStart: {}, windowEnd: {}",
             dimensionKey, windowStart, windowEnd);
 
-        results = anomalyFunction
-            .analyze(dimensionKey, metricTimeSeries, windowStart, windowEnd, knownAnomalies);
-
-        // Handle results
-        handleResults(results);
+        List<RawAnomalyResultDTO> resultsOfAnEntry = anomalyFunction
+            .analyze(dimensionKey, metricTimeSeries, windowStart, windowEnd, knownAnomaliesOfAnEntry);
 
         // Remove any known anomalies
-        results.removeAll(knownAnomalies);
+        resultsOfAnEntry.removeAll(knownAnomaliesOfAnEntry);
 
-        LOG.info("{} has {} anomalies in window {} to {}", entry.getKey(), results.size(),
+        // Handle results
+        handleResults(resultsOfAnEntry);
+
+        LOG.info("{} has {} anomalies in window {} to {}", entry.getKey(), resultsOfAnEntry.size(),
             windowStart, windowEnd);
-        anomalyCounter += results.size();
+        anomalyCounter += resultsOfAnEntry.size();
       } catch (Exception e) {
         LOG.error("Could not compute for {}", entry.getKey(), e);
       }

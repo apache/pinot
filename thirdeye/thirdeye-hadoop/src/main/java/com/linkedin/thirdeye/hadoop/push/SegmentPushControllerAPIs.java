@@ -174,18 +174,17 @@ public class SegmentPushControllerAPIs {
         + DROP_PARAMETERS);
     HttpResponse res = controllerClient.execute(controllerHttpHost, req);
     try {
-      if (res.getStatusLine().getStatusCode() != 200) {
-        throw new IllegalStateException(res.getStatusLine().toString());
+      if (res == null || res.getStatusLine() == null || res.getStatusLine().getStatusCode() != 200) {
+        response = "Exception in deleting segment, trying again";
+      } else {
+        InputStream content = res.getEntity().getContent();
+        response = IOUtils.toString(content);
       }
-      InputStream content = res.getEntity().getContent();
-      response = IOUtils.toString(content);
-
     } finally {
       if (res.getEntity() != null) {
         EntityUtils.consume(res.getEntity());
       }
     }
-
     return response;
   }
 

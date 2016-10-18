@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import java.io.File;
 
 import org.testng.annotations.Test;
@@ -30,8 +31,8 @@ public class InvertedIndexOfflineIntegrationTest extends OfflineClusterIntegrati
   protected void setUpTable(File schemaFile, int numBroker, int numOffline) throws Exception {
     addSchema(schemaFile, "schemaFile");
     Schema schema = Schema.fromFile(schemaFile);
-    addOfflineTable("mytable", "DaysSinceEpoch", "daysSinceEpoch", -1, "", null, null, schema.getDimensionNames(),
-        null);
+    addOfflineTable("DaysSinceEpoch", "daysSinceEpoch", -1, "", null, null, schema.getDimensionNames(), null, "mytable",
+        SegmentVersion.v1);
   }
 
 }

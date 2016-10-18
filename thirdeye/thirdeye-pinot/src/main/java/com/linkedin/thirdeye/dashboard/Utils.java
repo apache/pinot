@@ -98,6 +98,7 @@ public class Utils {
 
   public static List<String> getDimensions(String collection)
       throws Exception {
+
     DatasetConfigDTO datasetConfig = CACHE_REGISTRY.getDatasetConfigCache().get(collection);
     List<String> dimensions = datasetConfig.getDimensions();
     Collections.sort(dimensions);
@@ -164,7 +165,6 @@ public class Utils {
   }
 
 
-
   public static List<MetricFunction> computeMetricFunctionsFromExpressions(
       List<MetricExpression> metricExpressions) {
     Set<MetricFunction> metricFunctions = new HashSet<>();
@@ -175,16 +175,35 @@ public class Utils {
     return Lists.newArrayList(metricFunctions);
   }
 
-  public static TimeGranularity getAggregationTimeGranularity(String aggTimeGranularity) {
+  public static TimeGranularity getAggregationTimeGranularity(String aggTimeGranularity, String collection) {
+    TimeGranularity timeGranularity = getNonAdditiveTimeGranularity(collection);
 
-    TimeGranularity timeGranularity;
-    if (aggTimeGranularity.indexOf("_") > -1) {
-      String[] split = aggTimeGranularity.split("_");
-      timeGranularity = new TimeGranularity(Integer.parseInt(split[0]), TimeUnit.valueOf(split[1]));
-    } else {
-      timeGranularity = new TimeGranularity(1, TimeUnit.valueOf(aggTimeGranularity));
+    if (timeGranularity == null) { // Data is additive and hence use the given time granularity -- aggTimeGranularity
+      if (aggTimeGranularity.indexOf("_") > -1) {
+        String[] split = aggTimeGranularity.split("_");
+        timeGranularity = new TimeGranularity(Integer.parseInt(split[0]), TimeUnit.valueOf(split[1]));
+      } else {
+        timeGranularity = new TimeGranularity(1, TimeUnit.valueOf(aggTimeGranularity));
+      }
     }
     return timeGranularity;
+  }
+
+  public static TimeGranularity getNonAdditiveTimeGranularity(String collection) {
+    DatasetConfigDTO datasetConfig;
+    try {
+      datasetConfig = CACHE_REGISTRY.getDatasetConfigCache().get(collection);
+      Integer nonAdditiveBucketSize = datasetConfig.getNonAdditiveBucketSize();
+      String nonAdditiveBucketUnit = datasetConfig.getNonAdditiveBucketUnit();
+      if (nonAdditiveBucketSize != null && nonAdditiveBucketUnit != null) {
+        TimeGranularity timeGranularity = new TimeGranularity(datasetConfig.getNonAdditiveBucketSize(),
+            TimeUnit.valueOf(datasetConfig.getNonAdditiveBucketUnit()));
+        return timeGranularity;
+      }
+    } catch (ExecutionException e) {
+      LOG.info("Exception in fetching non additive time granularity");
+    }
+    return null;
   }
 
   public static List<MetricExpression> convertToMetricExpressions(

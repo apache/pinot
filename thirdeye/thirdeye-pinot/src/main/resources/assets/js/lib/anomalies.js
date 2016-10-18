@@ -1,7 +1,31 @@
 var anomaliesDisplayData = "";
-var timeseriesDisplayData = "";
 var metricLineChart = "";
 var metricChangeChart = ""
+
+function getFeedbackTypeString(feedbackType) {
+    switch (feedbackType) {
+        case 'ANOMALY':
+            return "Confirmed Anomaly";
+        case 'NOT_ANOMALY':
+            return 'False Alarm';
+        case 'ANOMALY_NO_ACTION':
+            return 'Confirmed - Not Actionable';
+        default:
+            return feedbackType;
+    }
+}
+function getFeedbackTypeFromString(feedbackTypeStr) {
+    switch (feedbackTypeStr) {
+        case 'Confirmed Anomaly':
+            return "ANOMALY";
+        case 'False Alarm':
+            return 'NOT_ANOMALY';
+        case 'Confirmed - Not Actionable':
+            return 'ANOMALY_NO_ACTION';
+        default:
+            return feedbackTypeStr;
+    }
+}
 
 function getAnomalies(tab) {
 
@@ -36,11 +60,17 @@ function getAnomalies(tab) {
 
             //AJAX for anomaly result data
             getData(anomaliesUrl).done(function (anomalyData) {
+               for (var i in anomalyData) {
+                    if (anomalyData[i].feedback) {
+                        if (anomalyData[i].feedback.feedbackType) {
+                            anomalyData[i].feedback.feedbackType = getFeedbackTypeString(anomalyData[i].feedback.feedbackType);
+                        }
+                    }
+                }
                 anomaliesDisplayData = anomalyData;
                 getTimeseriesData(anomaliesDisplayData);
             });
-
-        }else{
+        } else {
             getTimeseriesData();
         }
 
@@ -51,7 +81,6 @@ function getAnomalies(tab) {
             }
             var  anomalyData = anomalyData || [];
             getData(timeSeriesUrl).done(function (timeSeriesData) {
-                timeseriesDisplayData = timeSeriesData;
                 //Error handling when data is falsy (empty, undefined or null)
                 if (!timeSeriesData) {
                     $("#" + tab + "-chart-area-error").empty();
@@ -64,7 +93,7 @@ function getAnomalies(tab) {
                     $("#" + tab + "-chart-area-error").hide();
                     $("#" + tab + "-display-chart-section").empty();
                 }
-                var placeholder = "linechart-placeholder"
+                var placeholder = "#linechart-placeholder"
                 renderTimeseriesArea(timeSeriesData, tab);
                 drawMetricTimeSeries(timeSeriesData, anomalyData, tab, placeholder);
 
@@ -86,6 +115,7 @@ function getAnomalies(tab) {
 };
 
 function renderTimeseriesArea(timeSeriesData, tab) {
+
     /* Handelbars template for time series legend */
     var result_metric_time_series_section = HandleBarsTemplates.template_metric_time_series_section(timeSeriesData);
     $("#" + tab + "-display-chart-section").append(result_metric_time_series_section);
@@ -107,7 +137,7 @@ function drawMetricTimeSeries(timeSeriesData, anomalyData, tab, placeholder) {
         dateTimeFormat = "%m-%d %I %p";
     }
 
-    var lineChartPlaceholder = $("#"+ placeholder, currentView)[0];
+    var lineChartPlaceholder = $(placeholder, currentView)[0];
     var barChartPlaceholder = $("#barchart-placeholder", currentView)[0];
     var metrics = timeSeriesData["metrics"];
     var lineChartData = {};
@@ -187,7 +217,7 @@ function drawMetricTimeSeries(timeSeriesData, anomalyData, tab, placeholder) {
         },
         zoom: {
             enabled: true,
-            rescale:true
+            rescale: true
         },
         axis: {
             x: {
@@ -287,8 +317,8 @@ function drawMetricTimeSeries(timeSeriesData, anomalyData, tab, placeholder) {
             colors: colors
         },
         zoom: {
-        enabled: true,
-            rescale:true
+            enabled: true,
+            rescale: true
         },
         axis: {
             x: {
@@ -343,9 +373,10 @@ function drawMetricTimeSeries(timeSeriesData, anomalyData, tab, placeholder) {
 } //end of drawMetricTimeSeries
 
 
-function drawAnomalyTimeSeries(timeSeriesData,anomalyData, tab, placeholder) {
+function drawAnomalyTimeSeries(timeSeriesData,anomalyData, tab, placeholder, options) {
+    console.log(" in drawAnomalyTimeSeries")
 
-     var currentView = $("#" + tab + "-display-chart-section");
+     var currentView = $("#anomalies");
 
      var aggTimeGranularity = (window.datasetConfig.dataGranularity) ? window.datasetConfig.dataGranularity : "HOURS";
      var dateTimeFormat = "%I:%M %p";
@@ -355,7 +386,9 @@ function drawAnomalyTimeSeries(timeSeriesData,anomalyData, tab, placeholder) {
          dateTimeFormat = "%m-%d %I %p";
      }
 
-     var lineChartPlaceholder = $("#"+ placeholder, currentView)[0];
+     var lineChartPlaceholder = $(placeholder, currentView)[0];
+    console.log("lineChartPlaceholder")
+    console.log(lineChartPlaceholder)
      // Metric(s)
      var metrics = timeSeriesData["metrics"];
      var lineChartData = {};
@@ -381,16 +414,6 @@ function drawAnomalyTimeSeries(timeSeriesData,anomalyData, tab, placeholder) {
      }
      lineChartData["time"] = xTicksCurrent;
 
-//     var colorArray;
-//     if (metrics.length < 10) {
-//         colorArray = d3.scale.category10().range();
-//     } else if (metrics.length < 20) {
-//         colorArray = d3.scale.category20().range();
-//     } else {
-//         colorArray = colorScale(metrics.length)
-//     }
-
-
      for (var i = 0, mlen = metrics.length; i < mlen; i++) {
          var baselineData = [];
          var currentData = [];
@@ -412,8 +435,7 @@ function drawAnomalyTimeSeries(timeSeriesData,anomalyData, tab, placeholder) {
          colors["current"] = '#ff5f0e';
 
      }
-
-     var anomalyThumbnailLineChart = c3.generate({
+     var defaultSettings = {
          bindto: lineChartPlaceholder,
          padding: {
              top: 0,
@@ -425,41 +447,34 @@ function drawAnomalyTimeSeries(timeSeriesData,anomalyData, tab, placeholder) {
              x: 'time',
              axes: {
                  baseline: 'y',
-                 current: 'y2'
+                 current: 'y'
              },
              json: lineChartData,
-             type: 'area-spline',
+             type: 'spline',
              colors: colors
 
          },
          zoom: {
              enabled: true,
-            rescale:true
+             rescale: true
          },
          axis: {
              min:{
-                 y2:0
+                 y:0
              },
 
              x: {
                  type: 'timeseries',
                  tick: {
-
                      format: dateTimeFormat,
                      count:5
                  }
              },
              y: {
-                 show: false,
-                 min: 0
-             },
-             y2: {
                  show: true,
-
                  tick: {
                      //format integers with comma-grouping for thousands
-                     format: d3.format(",.1r ")
-
+                     format: d3.format(",.1")
                  },
                  min: 0
              }
@@ -479,16 +494,19 @@ function drawAnomalyTimeSeries(timeSeriesData,anomalyData, tab, placeholder) {
          point: {
              show: false
          }
-     });
+     };
+
+    //Merge then recursively
+    var settings = $.extend(true, defaultSettings, options);
+
+    var anomalyThumbnailLineChart = c3.generate(settings);
 
 
-    $(".c3-axis path.domain, .c3-axis-y2 line, .c3-axis-x line", lineChartPlaceholder).hide();
+    $(".c3-axis path.domain, .c3-axis-y line, .c3-axis-x line", lineChartPlaceholder).hide();
     $(".c3-axis-x path.domain", lineChartPlaceholder).hide();
 
      var numAnomalies = anomalyData.length;
      var regionColors = ['ff0000'];//'ff7f0e'
-
-
 
      //paint the anomaly regions based on anomaly id
      for (var i = 0; i < numAnomalies; i++) {
@@ -514,57 +532,27 @@ function renderAnomalyThumbnails(data, tab) {
     var result_anomalies_template = HandleBarsTemplates.template_anomalies(data);
     $("#" + tab + "-display-chart-section").append(result_anomalies_template);
 
-    /** Create Datatables instance of the anomalies table **/
-    $("#anomalies-table").DataTable();
-
     attach_AnomalyTable_EventListeners()
 
     for(var i = 0, numAnomalies = data.length; i < numAnomalies; i++) {
         requestLineChart(i);
-
     }
 
      function requestLineChart(i) {
-         var placeholder = "d3charts-" + i;
-         var exploreDimension = data[i]["function"]["exploreDimensions"];
-         var effectedValue = data[i]["dimensions"];
-         var fnFilters = parseProperties(data[i]["function"]["filters"], {arrayValues: true});
          var startTime = data[i]["startTime"];
          var endTime = data[i]["endTime"];
          var anomalyId = data[i]["id"]
          var baselineStart = moment(parseInt(hash.currentStart)).add(-7, 'days')
          var baselineEnd = moment(parseInt(hash.currentEnd)).add(-7, 'days')
          var aggTimeGranularity = calcAggregateGranularity(hash.currentStart,hash.currentEnd);
-
         var dataset = hash.dataset;
         var compareMode = "WoW";
         var currentStart = hash.currentStart;
         var currentEnd = hash.currentEnd;
         var metrics = hash.metrics;
-
-
-         effectedValue = effectedValue.replace(/[,*\s]/g, "");
-         if(effectedValue.length == 0){
-             effectedValue = "ALL";
-         }
-
-         var filters = {};
-         if(fnFilters){
-             if(exploreDimension){
-                 if(effectedValue !== 'ALL'){
-                     filters = fnFilters;
-                     filters[exploreDimension] = [effectedValue];
-                 }
-             }else{
-                 filters = fnFilters;
-             }
-         }else{
-             if(exploreDimension ){
-                if(effectedValue !== 'ALL'){
-                    filters[exploreDimension] = [effectedValue];
-                }
-             }
-         };
+        var placeholder= "#d3charts-" + i;
+        var fnFiltersString = data[i]["function"]["filters"];
+        var filters = parseProperties( fnFiltersString, {arrayValues:true} );
 
         filters = encodeURIComponent(JSON.stringify(filters));
         var timeSeriesUrl = "/dashboard/data/tabular?dataset=" + dataset + "&compareMode=" + compareMode //
@@ -658,25 +646,11 @@ function attach_AnomalyTable_EventListeners(){
      $("#anomaly-result-thumbnails").off("click");
      $("#anomaly-result-thumbnails").off("hide.uk.dropdown");
 
-     //Clicking a checkbox in the table toggles the region of that timerange on the timeseries chart
-     $("#anomalies-table").on("change", ".anomaly-table-radio-label input", function () {
-         chartForSingleAnomaly(this, "linechart-placeholder");
-     });
-
-     //Clicking a checkbox in the table takes user to related heatmap chart
-     $("#anomalies-table").on("click", ".heatmap-link", function () {
-         showHeatMapOfAnomaly(this);
-     });
-
-     //Clicking the feedback option will trigger the ajax - post
-     $("#anomalies-table").on("click", ".feedback-list", function () {
-         $(this).next("textarea").show();
-     });
-
-
-     $('.feedback-dropdown[data-uk-dropdown]').on('hide.uk.dropdown', function(){
-         submitAnomalyFeedback(this);
-     });
+    //Clicking a checkbox in the table takes user to related heatmap chart
+    $("#anomalies-section").on("click", ".anomaly-details-link", function () {
+        var mergedAnomalyId = $(this).attr("data-id")
+        showAnomalyDetails(mergedAnomalyId)
+    });
 
     //Clicking a checkbox in the table takes user to related heatmap chart
     $("#anomaly-result-thumbnails").on("click", ".heatmap-link", function () {
@@ -688,10 +662,13 @@ function attach_AnomalyTable_EventListeners(){
         $(this).next("textarea").show();
     });
 
-     /** Compare/Tabular view and dashboard view heat-map-cell click switches the view to compare/heat-map
-      * focusing on the timerange of the cell or in case of cumulative values it query the cumulative timerange **/
-     function showHeatMapOfAnomaly(target) {
 
+    $('.feedback-dropdown[data-uk-dropdown]').on('hide.uk.dropdown', function(){
+        submitAnomalyFeedback(this);
+    });
+
+     /** Switches the view to compare view/heat-map **/
+     function showHeatMapOfAnomaly(target) {
          var $target = $(target);
          hash.view = "compare";
          hash.aggTimeGranularity = "aggregateAll";
@@ -721,7 +698,7 @@ function attach_AnomalyTable_EventListeners(){
      function submitAnomalyFeedback(target) {
          var $target = $(target);
          var selector = $(".selected-feedback", $target);
-         var feedbackType = selector.attr("value");
+         var feedbackType = getFeedbackTypeFromString(selector.attr("value"));
          var anomalyId = selector.attr("data-anomaly-id");
          var comment = $(".feedback-comment", $target).val();
 
@@ -739,52 +716,6 @@ function attach_AnomalyTable_EventListeners(){
                  $(selector).addClass("red-background");
              })
          }
-     }
-
-     function chartForSingleAnomaly(target, placeholder) {
-
-         var button = $(target);
-         var dimension = button.attr("data-explore-dimensions");
-         var value = button.attr("data-dimension-value");
-         var startTime = button.attr("data-start-time");
-         var endTime = button.attr("data-end-time");
-         var anomalyId = button.attr("data-anomaly-id");
-         var row = button.closest('tr')
-         var colorRGB = $(".color-box", row).css("background-color");
-         var colorHEX = rgbToHex(colorRGB);
-         var baselineStart = moment(parseInt(hash.currentStart)).add(-7, 'days')
-         var baselineEnd = moment(parseInt(hash.currentEnd)).add(-7, 'days')
-         var aggTimeGranularity = (window.datasetConfig.dataGranularity) ? window.datasetConfig.dataGranularity : "HOURS";
-         var dataset = hash.dataset;
-         var compareMode = "WoW";
-         var currentStart = hash.currentStart;
-         var currentEnd = hash.currentEnd;
-         var metrics = hash.metrics;
-
-         var filter = "{}";
-         if(dimension && value && value != 'ALL') {
-             filter = '{"'+dimension+'":["'+value+'"]}';
-         }
-
-         var timeSeriesUrl = "/dashboard/data/tabular?dataset=" + dataset + "&compareMode=" + compareMode //
-             + "&currentStart=" + currentStart + "&currentEnd=" + currentEnd  //
-             + "&baselineStart=" + baselineStart + "&baselineEnd=" + baselineEnd   //
-             + "&aggTimeGranularity=" + aggTimeGranularity + "&metrics=" + metrics+ "&filters=" + filter;
-         var tab = hash.view;
-
-         getDataCustomCallback(timeSeriesUrl,tab ).done(function (timeSeriesData) {
-             //Error handling when data is falsy (empty, undefined or null)
-             if (!timeSeriesData) {
-                 // do nothing
-                 return
-             } else {
-                 $("#" + tab + "-chart-area-error").hide();
-             }
-             var anomalyRegionData = [];
-             anomalyRegionData.push({startTime: parseInt(startTime), endTime: parseInt(endTime), id: anomalyId, regionColor: colorHEX});
-             drawMetricTimeSeries(timeSeriesData, anomalyRegionData, tab, placeholder);
-
-         });
      }
 
     //Set initial state of view

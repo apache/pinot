@@ -26,11 +26,10 @@
                 </td>
 
                 <td>
-
                     {{#if anomalyFunction/filters}}
                     <table>
-                        {{#each anomalyFunction/filters as |dimensionValue dimension|}}
-                        <tr><td class="existing-anomaly-fn-filters-cell">{{dimension}}</td><td class="existing-anomaly-fn-filters-cell"><b>{{dimensionValue}}</b></td></tr>
+                        {{#each anomalyFunction/filters as |dimensionValues dimension|}}
+                        <tr><td class="existing-anomaly-fn-filters-cell">{{dimension}}</td><td class="existing-anomaly-fn-filters-cell"><b>{{dimensionValues}}</b></td></tr>
                         {{/each}}
                     </table>
                     {{/if}}

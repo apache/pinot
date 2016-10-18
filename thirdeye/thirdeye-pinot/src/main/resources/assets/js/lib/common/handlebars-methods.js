@@ -94,6 +94,25 @@ $(document).ready(function () {
         return displayValue
     });
 
+    Handlebars.registerHelper('displayAnomalyResultExploreDimensions', function (dimensionNamesString, dimensionValuesString) {
+        
+        var dimensionNames = dimensionNamesString.replace(/[\s]/g, "").split(",");
+        if (dimensionNames.length == 1) {
+            return dimensionValuesString.replace(/[,*\s]/g, "");
+        }
+
+        var dimensionValues = dimensionValuesString.replace(/[*\s]/g, "").split(",");
+        var displayValue = "";
+        var separator = "";
+        for (var i = 0; i < dimensionNames.length; ++i) {
+            if (dimensionValues[i]) {
+                displayValue = displayValue + separator + dimensionNames[i] + ": " + dimensionValues[i];
+                separator = "; ";
+            }
+        }
+        return displayValue
+    });
+
 
     //Helper for anomaly function form, here we can set the desired display of any function property
     Handlebars.registerHelper('displayAnomalyFunctionProp', function (param , value) {
@@ -420,6 +439,9 @@ $(document).ready(function () {
 
     var source_time_series_template = $("#time-series-template").html();
     HandleBarsTemplates.template_time_series = Handlebars.compile(source_time_series_template);
+
+    var source_anomaly_details_template = $("#anomaly-details-template").html();
+    HandleBarsTemplates.template_anomaly_details = Handlebars.compile(source_anomaly_details_template);
 
     var source_anomalies_template = $("#anomalies-template").html();
     HandleBarsTemplates.template_anomalies = Handlebars.compile(source_anomalies_template);

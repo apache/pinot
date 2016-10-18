@@ -4,12 +4,10 @@ import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -37,6 +35,7 @@ import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
@@ -131,13 +130,8 @@ public class AnomalyMergeExecutor implements Runnable {
                   "Merge strategy " + mergeConfig.getMergeStrategy() + " not supported");
             }
           }
-
-          Set<MergedAnomalyResultDTO> existingMergedResults = new HashSet<>();
-
-          existingMergedResults.addAll(mergedResultDAO.findByFunctionId(function.getId()));
-
           for (MergedAnomalyResultDTO mergedAnomalyResultDTO : output) {
-            updateMergedScoreAndPersist(mergedAnomalyResultDTO, existingMergedResults);
+            updateMergedScoreAndPersist(mergedAnomalyResultDTO);
           }
           return output.size();
         };
@@ -153,8 +147,7 @@ public class AnomalyMergeExecutor implements Runnable {
     }
   }
 
-  private void updateMergedScoreAndPersist(MergedAnomalyResultDTO mergedResult,
-      Set<MergedAnomalyResultDTO> existingResults) {
+  private void updateMergedScoreAndPersist(MergedAnomalyResultDTO mergedResult) {
     double weightedScoreSum = 0.0;
     double weightedWeightSum = 0.0;
     double totalBucketSize = 0.0;
@@ -183,12 +176,8 @@ public class AnomalyMergeExecutor implements Runnable {
       LOG.error("Could not recompute severity", e);
     }
     try {
-      if (!existingResults.contains(mergedResult)) {
-        // persist the merged result
-        mergedResultDAO.update(mergedResult);
-      } else {
-        LOG.info("MergedResult [{}] is already present", mergedResult);
-      }
+      // persist the merged result
+      mergedResultDAO.update(mergedResult);
       for (RawAnomalyResultDTO rawAnomalyResultDTO : mergedResult.getAnomalyResults()) {
         anomalyResultDAO.update(rawAnomalyResultDTO);
       }
@@ -219,23 +208,36 @@ public class AnomalyMergeExecutor implements Runnable {
     if (StringUtils.isNotBlank(anomalyFunctionSpec.getFilters())) {
       filters.putAll(ThirdEyeUtils.getFilterSet(anomalyFunctionSpec.getFilters()));
     }
-    String exploreDimension = anomalyFunctionSpec.getExploreDimensions();
-    if (StringUtils.isNotBlank(exploreDimension)) {
-      timeSeriesRequest.setGroupByDimensions(Collections.singletonList(exploreDimension));
-      String anomalyDimensions = anomalyMergedResult.getDimensions();
-      String[] dimArr = anomalyDimensions.split(",");
-      for (String dim : dimArr) {
-        if (!StringUtils.isBlank(dim) && !"*".equals(dim)) {
-          filters.removeAll(exploreDimension);
-          if (dim.equalsIgnoreCase("other")) {
-            filters.put(exploreDimension, dim);
-            filters.put(exploreDimension, dim.toLowerCase());
-            filters.put(exploreDimension, "");
+
+    String exploreDimensions = anomalyFunctionSpec.getExploreDimensions();
+    if (StringUtils.isNotBlank(exploreDimensions)) {
+      timeSeriesRequest.setGroupByDimensions(Arrays.asList(exploreDimensions.trim().split(",")));
+
+      List<String> collectionDimensions = null;
+      try {
+        DatasetConfigDTO datasetConfig = CACHE_REGISTRY_INSTANCE.
+            getDatasetConfigCache().get(anomalyFunctionSpec.getCollection());
+        collectionDimensions = datasetConfig.getDimensions();
+      } catch (Exception e) {
+        LOG.error("Exception when reading collection schema cache", e);
+      }
+
+      String anomalyDimensionValues = anomalyMergedResult.getDimensions();
+      String[] dimensionValues = anomalyDimensionValues.split(","); // e.g., "RU, oz-winner, *, *"
+      for (int i = 0; i < dimensionValues.length; ++i) {
+        String dimensionValue = dimensionValues[i];
+        if (!StringUtils.isBlank(dimensionValue) && !"*".equals(dimensionValue)) {
+          String dimensionName = collectionDimensions.get(i);
+          filters.removeAll(dimensionName);
+          if (dimensionValue.equalsIgnoreCase("other")) {
+            filters.put(dimensionName, dimensionValue);
+            filters.put(dimensionName, dimensionValue.toLowerCase());
+            filters.put(dimensionName, "");
           } else {
             // Only add a specific dimension value filter if there are more values present for the same dimension
-            filters.put(exploreDimension, dim);
+            filters.put(dimensionName, dimensionValue);
           }
-          LOG.info("Adding filter : [{} = {}] in the query", exploreDimension, dim);
+          LOG.info("Adding filter : [{} = {}] in the query", dimensionName, dimensionValue);
         }
       }
     }
@@ -244,7 +246,7 @@ public class AnomalyMergeExecutor implements Runnable {
     // Set filters including anomaly-dimension
     timeSeriesRequest.setFilterSet(filters);
 
-    // TODO : fix the pinot query interface to accept time in millis e
+    // TODO : fix the pinot query interface to accept time in millis
     // Fetch current time series data
     timeSeriesRequest.setStart(new DateTime(anomalyMergedResult.getStartTime()));
     timeSeriesRequest.setEnd(new DateTime(anomalyMergedResult.getEndTime()));
@@ -267,10 +269,12 @@ public class AnomalyMergeExecutor implements Runnable {
     Double currentValue;
     Double baselineValue;
 
+
     MetricDataset metricDataset =
         new MetricDataset(anomalyFunctionSpec.getMetric(), anomalyFunctionSpec.getCollection());
     MetricConfigDTO metricConfig = CACHE_REGISTRY_INSTANCE.getMetricConfigCache().get(metricDataset);
     if (metricConfig.isDerived()) {
+
       LOG.info("Found derived metric [{}], assigning avg value per bucket in the message",
           anomalyFunctionSpec.getMetric());
       currentValue = getAvgMetricValuePerBucket(responseCurrent, anomalyFunctionSpec.getMetric());
@@ -375,7 +379,7 @@ public class AnomalyMergeExecutor implements Runnable {
       }
       LOG.info(
           "Merging [{}] raw anomalies into [{}] merged anomalies for function id : [{}] and dimensions : [{}]",
-          unmergedResults.size(), mergedResults.size(), function.getId(), dimensions);
+          unmergedResultsByDimensions.size(), mergedResults.size(), function.getId(), dimensions);
       output.addAll(mergedResults);
     }
   }

@@ -219,7 +219,7 @@ public class LoadMetricsFromPinotTool {
     datasetConfigDTO.setTimeColumn(timeSpec.getName());
     datasetConfigDTO.setTimeDuration(timeSpec.getTimeUnitSize());
     datasetConfigDTO.setTimeUnit(timeSpec.getTimeType());
-    datasetConfigDTO.setTimeFormat(timeSpec.getTimeFormat());
+    // datasetConfigDTO.setTimeFormat(timeSpec.getTimeFormat());
     // TODO: Change how to fetch this once we don't have CollectionConfig
     if (collectionConfig != null) {
       if (StringUtils.isNotBlank(collectionConfig.getTimezone())) {
@@ -374,7 +374,7 @@ public class LoadMetricsFromPinotTool {
     datasetConfigDTO.setTimeColumn(timeSpec.getName());
     datasetConfigDTO.setTimeDuration(timeSpec.getTimeUnitSize());
     datasetConfigDTO.setTimeUnit(timeSpec.getTimeType());
-    datasetConfigDTO.setTimeFormat(timeSpec.getTimeFormat());
+//    datasetConfigDTO.setTimeFormat(timeSpec.getTimeFormat());
     if (StringUtils.isNotBlank(collectionConfig.getTimezone())) {
       datasetConfigDTO.setTimezone(collectionConfig.getTimezone());
     }

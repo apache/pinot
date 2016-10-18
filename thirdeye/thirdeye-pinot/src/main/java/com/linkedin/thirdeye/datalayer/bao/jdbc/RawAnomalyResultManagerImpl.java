@@ -41,7 +41,7 @@ public class RawAnomalyResultManagerImpl extends AbstractManagerImpl<RawAnomalyR
     return id;
   }
 
-  public void update(RawAnomalyResultDTO entity) {
+  public int update(RawAnomalyResultDTO entity) {
     RawAnomalyResultBean bean =
         (RawAnomalyResultBean) convertDTO2Bean(entity, RawAnomalyResultBean.class);
     if (entity.getFeedback() != null) {
@@ -56,7 +56,7 @@ public class RawAnomalyResultManagerImpl extends AbstractManagerImpl<RawAnomalyR
     if (entity.getFunction() != null) {
       bean.setFunctionId(entity.getFunction().getId());
     }
-    genericPojoDao.update(bean);
+    return genericPojoDao.update(bean);
   }
 
   public RawAnomalyResultDTO findById(Long id) {

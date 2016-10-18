@@ -1235,10 +1235,10 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     }
   }
 
-  protected long getCurrentServingNumDocs() {
+  protected long getCurrentServingNumDocs(String tableName) {
     ensurePinotConnectionIsCreated();
     com.linkedin.pinot.client.ResultSetGroup resultSetGroup =
-        _pinotConnection.execute("SELECT COUNT(*) from mytable LIMIT 0");
+        _pinotConnection.execute("SELECT COUNT(*) from " + tableName + " LIMIT 0");
     if (resultSetGroup.getResultSetCount() > 0) {
       return resultSetGroup.getResultSet(0).getInt(0);
     }

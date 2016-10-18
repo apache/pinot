@@ -94,7 +94,6 @@ public class DataTableCustomSerDe extends DataTableJavaSerDe {
       if (_brokerMetrics != null) {
         _brokerMetrics.addMeteredGlobalValue(BrokerMeter.DATA_TABLE_OBJECT_DESERIALIZATION, 1);
       }
-      LOGGER.warn("Identified Java serialized object in data table {}", object.getClass().getName());
     }
     return object;
   }

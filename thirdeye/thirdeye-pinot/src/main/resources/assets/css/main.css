@@ -60,7 +60,7 @@ body a{
 }
 
 .blue {
-    color: blue;
+    color: #1f77b4;
 }
 
 .thin-input{
@@ -142,6 +142,7 @@ body a{
 .brand:hover{
       position: relative;
       left: -20px;
+      top: 10px;
       font-size: 26px;
       color: #fff;
 }
@@ -163,7 +164,7 @@ body a{
 
 /** FORM related css **/
 
-#form-area{
+.form-area{
     background-color: rgb(250, 250, 250);
     padding: 20px 10px 20px 45px;
     height: 200%;
@@ -407,7 +408,7 @@ body a{
 
 
 .loader{
-    position: absolute;
+    position: fixed;
     top: 0;
     left: 0px;
     margin:0px;
@@ -772,10 +773,6 @@ body a{
     border-bottom: 1px solid #ddd;
 }
 
-.title-box.half-width{
-    width: 50%;
-}
-
 .title-box table{
     width: 100%;
 }
@@ -920,7 +917,7 @@ body a{
 .box-anom-linechart {
     position: absolute;
     width: 100%;
-    top: 0;
+    top: 20px;
     left: 0;
     z-index: 3;
 }
@@ -938,11 +935,11 @@ body a{
 }
 
 .anom-linecharts-container .c3-ygrids line:nth-child(even),
-.anom-linecharts-container .c3-axis-y2 .tick:nth-child(even){
+.anom-linecharts-container .c3-axis-y .tick:nth-child(even){
     display: none;
 }
 
-.anom-linecharts-container .c3-axis-y2 .tick:last-child{
+.anom-linecharts-container .c3-axis-y .tick:last-child{
     display: block;
 }
 
@@ -974,6 +971,15 @@ body a{
     -ms-transform: rotate(180deg);
     -o-transform: rotate(180deg);
     transform: rotate(180deg);
+}
+
+/* Anomalies view anomaly details related*/
+#anomaly-details-box{
+    padding: 1%;
+    padding-left: 65px;
+}
+#anomaly-details-heatmap-placeholder{
+    padding-left: 35px;
 }
 
 /* Self service related */

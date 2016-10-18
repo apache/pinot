@@ -16,9 +16,16 @@
 
 package com.linkedin.pinot.common.query;
 
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListeningExecutorService;
+import com.linkedin.pinot.common.metrics.ServerMetrics;
+import com.linkedin.pinot.common.query.context.TimerContext;
+import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.InstanceRequest;
-import org.slf4j.LoggerFactory;
+import com.linkedin.pinot.common.utils.DataTable;
+import javax.annotation.Nullable;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Class to encapsulate the query request and query processing
@@ -30,24 +37,88 @@ import org.slf4j.Logger;
 public class QueryRequest {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryRequest.class);
 
-  private String clientId = "";
-  private InstanceRequest instanceRequest;
+  private final InstanceRequest instanceRequest;
+  // Future to track result of query execution
+  private ListenableFuture<DataTable> resultFuture;
+  // Timing information for different phases of query execution
+  private final TimerContext timerContext;
 
-  public QueryRequest(InstanceRequest request) {
+  // executor service to parallelize query tasks
+  private ListeningExecutorService queryWorkers;
+
+  private final ServerMetrics serverMetrics;
+
+  public QueryRequest(InstanceRequest request, ServerMetrics serverMetrics) {
     this.instanceRequest = request;
+    this.serverMetrics = serverMetrics;
+    BrokerRequest brokerRequest = (request == null) ? null : request.getQuery();
+    timerContext = new TimerContext(brokerRequest, serverMetrics);
   }
 
-  public String getClientId() {
-    return clientId;
+  public @Nullable String getBrokerId() {
+    return instanceRequest.getBrokerId();
   }
 
-  public void setClientId(String clientId) {
-    this.clientId = clientId;
+  /**
+   * Convenient method to read table name for query
+   * from instance request
+   * @return
+   */
+  public String getTableName() {
+    return instanceRequest.getQuery().getQuerySource().getTableName();
   }
 
+  /**
+   * Convenient method to read broker request object
+   * @return
+   */
+  public BrokerRequest getBrokerRequest() {
+    return instanceRequest.getQuery();
+  }
+
+  /**
+   * Get the instance request received from broker
+   * @return
+   */
   public InstanceRequest getInstanceRequest() {
     return instanceRequest;
   }
 
+  /**
+   * Get server metrics
+   * @return
+   */
+  public ServerMetrics getServerMetrics() {
+    return serverMetrics;
+  }
 
+  /**
+   *
+   * @return ListenableFuture that will used to track the result
+   * of query execution. This can be null if not set
+   */
+  public ListenableFuture<DataTable> getResultFuture() {
+    return resultFuture;
+  }
+
+  public void setResultFuture(ListenableFuture<DataTable> resultFuture) {
+    this.resultFuture = resultFuture;
+  }
+
+  public TimerContext getTimerContext() {
+    return timerContext;
+  }
+
+  /**
+   * Get the executor service to use for running parallel
+   * tasks of a query (For ex: planning across all segments)
+   * @return
+   */
+  public ListeningExecutorService getQueryWorkers() {
+    return queryWorkers;
+  }
+
+  public void setQueryWorkers(ListeningExecutorService queryWorkers) {
+    this.queryWorkers = queryWorkers;
+  }
 }

@@ -60,6 +60,9 @@ function getExistingAnomalyFunctions(dataset) {
         /** Instanciate Datatables on self service view **/
         $("#existing-anomaly-functions-table").DataTable({
             "bAutoWidth": false,
+            "bPaginate":true,
+            "sPaginationType":"full_numbers",
+            "iDisplayLength": 50,
             "columnDefs": [
                 { "targets": 0  },
                 { "targets": 1  },

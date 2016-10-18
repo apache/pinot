@@ -16,6 +16,7 @@
 package com.linkedin.pinot.integration.tests;
 
 import com.linkedin.pinot.common.utils.FileUploadUtils;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
 import java.io.FileInputStream;
@@ -62,7 +63,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
 
   protected void setUpTable(File schemaFile, int numBroker, int numOffline) throws Exception {
     addSchema(schemaFile, "schemaFile");
-    addOfflineTable("mytable", "DaysSinceEpoch", "daysSinceEpoch", -1, "", null, null);
+    addOfflineTable("DaysSinceEpoch", "daysSinceEpoch", -1, "", null, null, "mytable", SegmentVersion.v1);
   }
 
   protected void dropTable() throws Exception {
@@ -113,7 +114,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
     TOTAL_DOCS = 115545;
     long timeInTwoMinutes = System.currentTimeMillis() + 2 * 60 * 1000L;
     long numDocs;
-    while ((numDocs = getCurrentServingNumDocs()) < TOTAL_DOCS) {
+    while ((numDocs = getCurrentServingNumDocs("mytable")) < TOTAL_DOCS) {
       System.out.println("Current number of documents: " + numDocs);
       if (System.currentTimeMillis() < timeInTwoMinutes) {
         Thread.sleep(1000);

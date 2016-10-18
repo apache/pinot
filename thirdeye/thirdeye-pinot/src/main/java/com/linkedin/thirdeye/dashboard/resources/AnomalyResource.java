@@ -5,8 +5,10 @@ import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import javax.validation.constraints.NotNull;
@@ -144,7 +146,6 @@ public class AnomalyResource {
         dimensionPatterns = dimensionPatternsList.toArray(dimensionPatterns);
       }
 
-
       if (StringUtils.isNotBlank(metric)) {
         if (StringUtils.isNotBlank(dimensions)) {
           anomalyResults = anomalyMergedResultDAO.findByCollectionMetricDimensionsTime(dataset, metric, dimensionPatterns, startTime.getMillis(), endTime.getMillis());
@@ -154,15 +155,42 @@ public class AnomalyResource {
       } else {
         anomalyResults = anomalyMergedResultDAO.findByCollectionTime(dataset, startTime.getMillis(), endTime.getMillis());
       }
-
     } catch (Exception e) {
       LOG.error("Exception in fetching anomalies", e);
     }
+
+    setExploreDimensionsFilterForFrontEnd(anomalyResults, dataset);
+
     return anomalyResults;
   }
 
-  /************* CRUD for anomaly functions of collection **********************************************/
+  private void setExploreDimensionsFilterForFrontEnd(List<MergedAnomalyResultDTO> anomalyResults, String collection) {
+    try {
+      List<String> dimensionNames = CACHE_REGISTRY_INSTANCE.getDatasetConfigCache().get(collection).getDimensions();
+      for (MergedAnomalyResultDTO mergedAnomalyResultDTO : anomalyResults) {
+        AnomalyFunctionDTO anomalyFunction = mergedAnomalyResultDTO.getFunction();
+        Multimap<String, String> filterSet = anomalyFunction.getFilterSet();
+        String[] exploreDimensionValues = mergedAnomalyResultDTO.getDimensions().trim().split(",");
+        boolean isUpdated = false;
+        for (int i = 0; i < exploreDimensionValues.length; ++i) {
+          String exploreDimensionValue = exploreDimensionValues[i];
+          if (!exploreDimensionValue.equals("") && !exploreDimensionValue.equals("*")) {
+            String dimensionName = dimensionNames.get(i);
+            filterSet.removeAll(dimensionName);
+            filterSet.put(dimensionName, exploreDimensionValue);
+            isUpdated = true;
+          }
+        }
+        if (isUpdated) {
+          anomalyFunction.setFilters(filterSet);
+        }
+      }
+    } catch (Exception e) {
+      LOG.info("Unable to get dimensionNames for {}", collection);
+    }
+  }
 
+  /************* CRUD for anomaly functions of collection **********************************************/
   // View all anomaly functions
   @GET
   @Path("/anomaly-function/view")
@@ -230,19 +258,15 @@ public class AnomalyResource {
     anomalyFunctionSpec.setWindowSize(Integer.valueOf(windowSize));
     anomalyFunctionSpec.setWindowUnit(TimeUnit.valueOf(windowUnit));
 
+    // Setting window delay time / unit
     TimeUnit dataGranularityUnit = dataGranularity.getUnit();
-    TimeUnit windowDelayTimeUnit =
-        dataGranularityUnit.equals(TimeUnit.MINUTES) || dataGranularityUnit.equals(TimeUnit.HOURS)
-            ? TimeUnit.HOURS : TimeUnit.DAYS;
-    if (StringUtils.isNotEmpty(windowDelayUnit)) {
-      windowDelayTimeUnit = TimeUnit.valueOf(windowDelayUnit);
-    }
-    int windowDelayTime = 2;
-    if (StringUtils.isNotEmpty(windowDelay)) {
-      windowDelayTime = Integer.valueOf(windowDelay);
-    } else {
-      Long maxDateTime = CACHE_REGISTRY_INSTANCE.getCollectionMaxDataTimeCache().get(dataset);
-      windowDelayTime = (int) windowDelayTimeUnit.convert(System.currentTimeMillis() - maxDateTime, TimeUnit.MILLISECONDS);
+
+    // default window delay time = 10 hours
+    int windowDelayTime = 10;
+    TimeUnit windowDelayTimeUnit = TimeUnit.HOURS;
+
+    if(dataGranularityUnit.equals(TimeUnit.MINUTES) || dataGranularityUnit.equals(TimeUnit.HOURS)) {
+      windowDelayTime = 4;
     }
     anomalyFunctionSpec.setWindowDelayUnit(windowDelayTimeUnit);
     anomalyFunctionSpec.setWindowDelay(windowDelayTime);
@@ -251,8 +275,9 @@ public class AnomalyResource {
     anomalyFunctionSpec.setBucketSize(dataGranularity.getSize());
     anomalyFunctionSpec.setBucketUnit(dataGranularity.getUnit());
 
-    anomalyFunctionSpec.setExploreDimensions(exploreDimensions);
-
+    if(StringUtils.isNotEmpty(exploreDimensions)) {
+      anomalyFunctionSpec.setExploreDimensions(getDimensions(dataset, exploreDimensions));
+    }
     if (!StringUtils.isBlank(filters)) {
       filters = URLDecoder.decode(filters, UTF8);
       String filterString = ThirdEyeUtils.getSortedFiltersFromJson(filters);
@@ -320,16 +345,6 @@ public class AnomalyResource {
     anomalyFunctionSpec.setType(type);
     anomalyFunctionSpec.setWindowSize(Integer.valueOf(windowSize));
     anomalyFunctionSpec.setWindowUnit(TimeUnit.valueOf(windowUnit));
-    anomalyFunctionSpec.setWindowDelay(Integer.valueOf(windowDelay));
-
-    TimeUnit dataGranularityUnit = dataGranularity.getUnit();
-    TimeUnit windowDelayTimeUnit =
-        dataGranularityUnit.equals(TimeUnit.MINUTES) || dataGranularityUnit.equals(TimeUnit.HOURS)
-            ? TimeUnit.HOURS : TimeUnit.DAYS;
-    if (StringUtils.isNotEmpty(windowDelayUnit)) {
-      windowDelayTimeUnit = TimeUnit.valueOf(windowDelayUnit);
-    }
-    anomalyFunctionSpec.setWindowDelayUnit(windowDelayTimeUnit);
 
     // bucket size and unit are defaulted to the collection granularity
     anomalyFunctionSpec.setBucketSize(dataGranularity.getSize());
@@ -340,9 +355,12 @@ public class AnomalyResource {
       String filterString = ThirdEyeUtils.getSortedFiltersFromJson(filters);
       anomalyFunctionSpec.setFilters(filterString);
     }
-    anomalyFunctionSpec.setExploreDimensions(exploreDimensions);
     anomalyFunctionSpec.setProperties(properties);
 
+    if(StringUtils.isNotEmpty(exploreDimensions)) {
+      // Ensure that the explore dimension names are ordered as schema dimension names
+      anomalyFunctionSpec.setExploreDimensions(getDimensions(dataset, exploreDimensions));
+    }
     if (StringUtils.isEmpty(cron)) {
       cron = DEFAULT_CRON;
     } else {
@@ -355,6 +373,21 @@ public class AnomalyResource {
 
     anomalyFunctionDAO.update(anomalyFunctionSpec);
     return Response.ok(id).build();
+  }
+
+  private String getDimensions(String dataset, String exploreDimensions) throws Exception {
+    // Ensure that the explore dimension names are ordered as schema dimension names
+    List<String> schemaDimensionNames = CACHE_REGISTRY_INSTANCE.getDatasetConfigCache().get(dataset).getDimensions();
+    Set<String> splitExploreDimensions = new HashSet<>(Arrays.asList(exploreDimensions.trim().split(",")));
+    StringBuilder reorderedExploreDimensions = new StringBuilder();
+    String separator = "";
+    for (String dimensionName : schemaDimensionNames) {
+      if (splitExploreDimensions.contains(dimensionName)) {
+        reorderedExploreDimensions.append(separator).append(dimensionName);
+        separator = ",";
+      }
+    }
+    return reorderedExploreDimensions.toString();
   }
 
   // Delete anomaly function

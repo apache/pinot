@@ -44,10 +44,10 @@ public class EmailConfigurationManagerImpl extends AbstractManagerImpl<EmailConf
   }
 
   @Override
-  public void update(EmailConfigurationDTO emailConfigurationDTO) {
+  public int update(EmailConfigurationDTO emailConfigurationDTO) {
     EmailConfigurationBean emailConfigurationBean =
         (EmailConfigurationBean) convertEmailConfigurationDTO2Bean(emailConfigurationDTO);
-    genericPojoDao.update(emailConfigurationBean);
+    return genericPojoDao.update(emailConfigurationBean);
   }
 
   @Override

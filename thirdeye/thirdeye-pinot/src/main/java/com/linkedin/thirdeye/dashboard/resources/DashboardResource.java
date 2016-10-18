@@ -252,7 +252,8 @@ public class DashboardResource {
         filterJson = URLDecoder.decode(filterJson, "UTF-8");
         request.setFilters(ThirdEyeUtils.convertToMultiMap(filterJson));
       }
-      request.setTimeGranularity(Utils.getAggregationTimeGranularity(aggTimeGranularity));
+
+      request.setTimeGranularity(Utils.getAggregationTimeGranularity(aggTimeGranularity, collection));
 
       TabularViewHandler handler = new TabularViewHandler(queryCache);
       String jsonResponse = null;
@@ -348,7 +349,7 @@ public class DashboardResource {
       filterJson = URLDecoder.decode(filterJson, "UTF-8");
       request.setFilters(ThirdEyeUtils.convertToMultiMap(filterJson));
     }
-    request.setTimeGranularity(Utils.getAggregationTimeGranularity(aggTimeGranularity));
+    request.setTimeGranularity(Utils.getAggregationTimeGranularity(aggTimeGranularity, collection));
 
     TabularViewHandler handler = new TabularViewHandler(queryCache);
     String jsonResponse = null;
@@ -398,7 +399,7 @@ public class DashboardResource {
       filterJson = URLDecoder.decode(filterJson, "UTF-8");
       request.setFilters(ThirdEyeUtils.convertToMultiMap(filterJson));
     }
-    request.setTimeGranularity(Utils.getAggregationTimeGranularity(aggTimeGranularity));
+    request.setTimeGranularity(Utils.getAggregationTimeGranularity(aggTimeGranularity, collection));
     if (groupByDimensions != null && !groupByDimensions.isEmpty()) {
       request.setGroupByDimensions(Arrays.asList(groupByDimensions.trim().split(",")));
     }
@@ -445,9 +446,11 @@ public class DashboardResource {
     List<MetricExpression> metricExpressions =
         Utils.convertToMetricExpressions(metricsJson, MetricAggFunction.SUM, collection);
     request.setMetricExpressions(metricExpressions);
-    request.setAggregationTimeGranularity(Utils.getAggregationTimeGranularity(aggTimeGranularity));
+
+    request.setAggregationTimeGranularity(Utils.getAggregationTimeGranularity(aggTimeGranularity, collection));
     DatasetConfigDTO datasetConfig = CACHE_REGISTRY_INSTANCE.getDatasetConfigCache().get(collection);
     TimeSpec timespec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetConfig);
+
     if (!request.getAggregationTimeGranularity().getUnit().equals(TimeUnit.DAYS) ||
         !StringUtils.isBlank(timespec.getFormat())) {
       request.setEndDateInclusive(true);
@@ -473,11 +476,14 @@ public class DashboardResource {
         TimeSeriesRow timeSeriesRow = response.getRow(i);
         for (TimeSeriesMetric metricTimeSeries : timeSeriesRow.getMetrics()) {
           String key = metricTimeSeries.getMetricName();
-          if (timeSeriesRow.getDimensionName() != null
-              && timeSeriesRow.getDimensionName().trim().length() > 0) {
-            key =
-                key + "|" + timeSeriesRow.getDimensionName() + "|"
-                    + timeSeriesRow.getDimensionValue();
+          if (timeSeriesRow.getDimensionNames() != null
+              && timeSeriesRow.getDimensionNames().size() > 0) {
+            StringBuilder sb = new StringBuilder(key);
+            for (int idx = 0; idx < timeSeriesRow.getDimensionNames().size(); ++idx) {
+              sb.append("||").append(timeSeriesRow.getDimensionNames().get(idx));
+              sb.append("|").append(timeSeriesRow.getDimensionValues().get(idx));
+            }
+            key = sb.toString();
           }
           JSONArray valueArray;
           if (!timeseriesMap.has(key)) {

@@ -61,11 +61,6 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-
-/**
- * Oct 14, 2014
- */
-
 public class QueriesSentinelTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueriesSentinelTest.class);
   private static ReduceService<BrokerResponseNative> REDUCE_SERVICE = new BrokerReduceService();
@@ -77,10 +72,11 @@ public class QueriesSentinelTest {
   private static QueryExecutor QUERY_EXECUTOR;
   private static TestingServerPropertiesBuilder CONFIG_BUILDER;
   private String segmentName;
-
+  private ServerMetrics serverMetrics;
   @BeforeClass
   public void setup() throws Exception {
-    TableDataManagerProvider.setServerMetrics(new ServerMetrics(new MetricsRegistry()));
+    serverMetrics = new ServerMetrics(new MetricsRegistry());
+    TableDataManagerProvider.setServerMetrics(serverMetrics);
 
     CONFIG_BUILDER = new TestingServerPropertiesBuilder("testTable");
 
@@ -126,7 +122,7 @@ public class QueriesSentinelTest {
       aggCalls.add(new TestSimpleAggreationQuery("select distinctcounthll(column" + i + ") from testTable limit 0", 0.0));
     }
 
-    ApproximateQueryTestUtil.runApproximationQueries(QUERY_EXECUTOR, segmentName, aggCalls, TestUtils.hllEstimationThreshold);
+    ApproximateQueryTestUtil.runApproximationQueries(QUERY_EXECUTOR, segmentName, aggCalls, TestUtils.hllEstimationThreshold, serverMetrics);
   }
 
   @Test
@@ -140,7 +136,7 @@ public class QueriesSentinelTest {
       groupByCalls.add(new TestGroupByAggreationQuery("select distinctcounthll(column2) from testTable group by column" + i + " limit 0", null));
     }
 
-    ApproximateQueryTestUtil.runApproximationQueries(QUERY_EXECUTOR, segmentName, groupByCalls, TestUtils.hllEstimationThreshold);
+    ApproximateQueryTestUtil.runApproximationQueries(QUERY_EXECUTOR, segmentName, groupByCalls, TestUtils.hllEstimationThreshold, serverMetrics);
   }
 
   @Test
@@ -153,7 +149,7 @@ public class QueriesSentinelTest {
       aggCalls.add(new TestSimpleAggreationQuery("select percentileest50(column" + i + ") from testTable limit 0", 0.0));
     }
 
-    ApproximateQueryTestUtil.runApproximationQueries(QUERY_EXECUTOR, segmentName, aggCalls, TestUtils.digestEstimationThreshold);
+    ApproximateQueryTestUtil.runApproximationQueries(QUERY_EXECUTOR, segmentName, aggCalls, TestUtils.digestEstimationThreshold, serverMetrics);
   }
 
   @Test
@@ -168,7 +164,7 @@ public class QueriesSentinelTest {
       groupByCalls.add(new TestGroupByAggreationQuery("select percentileest50(column1) from testTable group by column" + i + " top " + top + " limit 0", null));
     }
 
-    ApproximateQueryTestUtil.runApproximationQueries(QUERY_EXECUTOR, segmentName, groupByCalls, TestUtils.digestEstimationThreshold);
+    ApproximateQueryTestUtil.runApproximationQueries(QUERY_EXECUTOR, segmentName, groupByCalls, TestUtils.digestEstimationThreshold, serverMetrics);
   }
 
   @Test
@@ -182,7 +178,7 @@ public class QueriesSentinelTest {
       InstanceRequest instanceRequest = new InstanceRequest(counter++, brokerRequest);
       instanceRequest.setSearchSegments(new ArrayList<String>());
       instanceRequest.getSearchSegments().add(segmentName);
-      QueryRequest queryRequest = new QueryRequest(instanceRequest);
+      QueryRequest queryRequest = new QueryRequest(instanceRequest, TableDataManagerProvider.getServerMetrics());
       final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(queryRequest);
       instanceResponseMap.clear();
       instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
@@ -205,7 +201,7 @@ public class QueriesSentinelTest {
       InstanceRequest instanceRequest = new InstanceRequest(counter++, brokerRequest);
       instanceRequest.setSearchSegments(new ArrayList<String>());
       instanceRequest.getSearchSegments().add(segmentName);
-      QueryRequest queryRequest = new QueryRequest(instanceRequest);
+      QueryRequest queryRequest = new QueryRequest(instanceRequest, TableDataManagerProvider.getServerMetrics());
       final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(queryRequest);
       instanceResponseMap.clear();
       instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
@@ -311,7 +307,7 @@ public class QueriesSentinelTest {
     InstanceRequest instanceRequest = new InstanceRequest(1, brokerRequest);
     instanceRequest.setSearchSegments(new ArrayList<String>());
     instanceRequest.getSearchSegments().add(segmentName);
-    QueryRequest queryRequest = new QueryRequest(instanceRequest);
+    QueryRequest queryRequest = new QueryRequest(instanceRequest, TableDataManagerProvider.getServerMetrics());
     final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(queryRequest);
     instanceResponseMap.clear();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
@@ -328,7 +324,7 @@ public class QueriesSentinelTest {
     InstanceRequest instanceRequest = new InstanceRequest(1, brokerRequest);
     instanceRequest.setSearchSegments(new ArrayList<String>());
     instanceRequest.getSearchSegments().add(segmentName);
-    QueryRequest queryRequest = new QueryRequest(instanceRequest);
+    QueryRequest queryRequest = new QueryRequest(instanceRequest, TableDataManagerProvider.getServerMetrics());
     final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(queryRequest);
     instanceResponseMap.clear();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
@@ -351,7 +347,7 @@ public class QueriesSentinelTest {
     InstanceRequest instanceRequest = new InstanceRequest(1, brokerRequest);
     instanceRequest.setSearchSegments(new ArrayList<String>());
     instanceRequest.getSearchSegments().add(segmentName);
-    QueryRequest queryRequest = new QueryRequest(instanceRequest);
+    QueryRequest queryRequest = new QueryRequest(instanceRequest, TableDataManagerProvider.getServerMetrics());
     final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(queryRequest);
     instanceResponseMap.clear();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
@@ -372,7 +368,7 @@ public class QueriesSentinelTest {
     instanceRequest.setEnableTrace(true); // TODO: add trace settings consistency
     instanceRequest.setSearchSegments(new ArrayList<String>());
     instanceRequest.getSearchSegments().add(segmentName);
-    QueryRequest queryRequest = new QueryRequest(instanceRequest);
+    QueryRequest queryRequest = new QueryRequest(instanceRequest, TableDataManagerProvider.getServerMetrics());
     final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(queryRequest);
     instanceResponseMap.clear();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);

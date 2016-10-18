@@ -15,4 +15,5 @@ public final class ThirdEyeConstants {
   public static final String FIELD_SEPARATOR = ",";
   public static final String TAR_SUFFIX = ".tar.gz";
   public static final String AVRO_SUFFIX = ".avro";
+  public static final String SDF_SEPARATOR = ":";
 }

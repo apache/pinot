@@ -79,27 +79,20 @@ public class DetectionJobRunner implements Job {
     } else {
       detectionJobContext.setAnomalyFunctionSpec(anomalyFunctionSpec);
 
-      windowStartTime = detectionJobContext.getWindowStartTime();
-      windowEndTime = detectionJobContext.getWindowEndTime();
-
       // Compute window end
-      if (windowEndTime == null) {
-        long delayMillis = 0;
-        if (anomalyFunctionSpec.getWindowDelay() != null) {
-          delayMillis = TimeUnit.MILLISECONDS.convert(anomalyFunctionSpec.getWindowDelay(),
-              anomalyFunctionSpec.getWindowDelayUnit());
-        }
-        Date scheduledFireTime = jobExecutionContext.getScheduledFireTime();
-        windowEndTime = new DateTime(scheduledFireTime).minus(delayMillis);
+      long delayMillis = 0;
+      if (anomalyFunctionSpec.getWindowDelay() != null) {
+        delayMillis = TimeUnit.MILLISECONDS.convert(anomalyFunctionSpec.getWindowDelay(),
+            anomalyFunctionSpec.getWindowDelayUnit());
       }
+      Date scheduledFireTime = jobExecutionContext.getScheduledFireTime();
+      windowEndTime = new DateTime(scheduledFireTime).minus(delayMillis);
 
-      // Compute window start
-      if (windowStartTime == null) {
-        int windowSize = anomalyFunctionSpec.getWindowSize();
-        TimeUnit windowUnit = anomalyFunctionSpec.getWindowUnit();
-        long windowMillis = TimeUnit.MILLISECONDS.convert(windowSize, windowUnit);
-        windowStartTime = windowEndTime.minus(windowMillis);
-      }
+      // Compute window start according to window end
+      int windowSize = anomalyFunctionSpec.getWindowSize();
+      TimeUnit windowUnit = anomalyFunctionSpec.getWindowUnit();
+      long windowMillis = TimeUnit.MILLISECONDS.convert(windowSize, windowUnit);
+      windowStartTime = windowEndTime.minus(windowMillis);
 
       windowStartTime = alignTimestampsToDataTimezone(windowStartTime, anomalyFunctionSpec.getCollection());
       windowEndTime = alignTimestampsToDataTimezone(windowEndTime, anomalyFunctionSpec.getCollection());

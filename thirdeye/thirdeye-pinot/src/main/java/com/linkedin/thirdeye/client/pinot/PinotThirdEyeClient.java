@@ -120,6 +120,12 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
          resultSetGroups.add(result);
        }
     } else {
+      if (!datasetConfig.isAdditive()) {
+        List<String> collectionDimensionNames = datasetConfig.getDimensions();
+        PqlUtils.decorateRequestForPrecomputedDataset(request, collectionDimensionNames,
+            datasetConfig.getDimensionsHaveNoPreAggregation(), datasetConfig.getPreAggregatedKeyword());
+      }
+
       String sql = PqlUtils.getPql(request, dataTimeSpec);
       LOG.debug("PQL: {}", sql);
       ResultSetGroup result = CACHE_REGISTRY_INSTANCE.getResultSetGroupCache()

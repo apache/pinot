@@ -169,6 +169,17 @@ public class AlertTaskRunner implements TaskRunner {
       Map<String, List<MergedAnomalyResultDTO>> groupedResults, List<String> dimensionNames)
       throws JobExecutionException {
 
+    long anomalyStartMillis = results.get(0).getStartTime();
+    long anomalyEndMillis = results.get(0).getEndTime();
+    for (MergedAnomalyResultDTO mergedAnomalyResultDTO : results) {
+      if (mergedAnomalyResultDTO.getStartTime() < anomalyStartMillis) {
+        anomalyStartMillis = mergedAnomalyResultDTO.getStartTime();
+      }
+      if (mergedAnomalyResultDTO.getEndTime() > anomalyEndMillis) {
+        anomalyEndMillis = mergedAnomalyResultDTO.getEndTime();
+      }
+    }
+
     DateTimeZone timeZone = DateTimeZone.forTimeZone(DEFAULT_TIME_ZONE);
     DateFormatMethod dateFormatMethod = new DateFormatMethod(timeZone);
 
@@ -193,8 +204,8 @@ public class AlertTaskRunner implements TaskRunner {
 
       templateData.put("groupedAnomalyResults", groupedResults);
       templateData.put("anomalyCount", results.size());
-      templateData.put("startTime", windowStart.getMillis());
-      templateData.put("endTime", windowEnd.getMillis());
+      templateData.put("startTime", anomalyStartMillis);
+      templateData.put("endTime", anomalyEndMillis);
       templateData.put("reportGenerationTimeMillis", System.currentTimeMillis());
       templateData.put("assignedDimensions", new AssignedDimensionsMethod(dimensionNames));
       templateData.put("dateFormat", dateFormatMethod);

@@ -48,13 +48,15 @@ public class TestAnomalyTaskManager extends AbstractManagerTestBase {
   public void testUpdateStatusAndWorkerId() {
     TaskStatus newStatus = TaskStatus.RUNNING;
     Long workerId = 1L;
-
+    TaskDTO taskDTO = taskDAO.findById(anomalyTaskId1);
     boolean status =
-        taskDAO.updateStatusAndWorkerId(workerId, anomalyTaskId1, allowedOldTaskStatus, newStatus);
+        taskDAO.updateStatusAndWorkerId(workerId, anomalyTaskId1, allowedOldTaskStatus, newStatus, taskDTO.getVersion());
     TaskDTO anomalyTask = taskDAO.findById(anomalyTaskId1);
     Assert.assertTrue(status);
     Assert.assertEquals(anomalyTask.getStatus(), newStatus);
     Assert.assertEquals(anomalyTask.getWorkerId(), workerId);
+    Assert.assertEquals(anomalyTask.getVersion(), taskDTO.getVersion() + 1);
+
   }
 
   @Test(dependsOnMethods = {"testUpdateStatusAndWorkerId"})

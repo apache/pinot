@@ -293,9 +293,11 @@ public class AggregationPhaseJob extends Configured {
     job.setOutputValueClass(NullWritable.class);
     AvroJob.setOutputKeySchema(job, avroSchema);
     job.setOutputFormatClass(AvroKeyOutputFormat.class);
-    String numReducers = props.getProperty(ThirdEyeJobProperties.THIRDEYE_NUM_REDUCERS.toString());
+    String numReducers = props.getProperty(ThirdEyeJobProperties.THIRDEYE_NUM_REDUCERS.getName());
+    LOGGER.info("Num Reducers : {}", numReducers);
     if (StringUtils.isNotBlank(numReducers)) {
       job.setNumReduceTasks(Integer.valueOf(numReducers));
+      LOGGER.info("Setting num reducers {}", job.getNumReduceTasks());
     }
 
     job.waitForCompletion(true);

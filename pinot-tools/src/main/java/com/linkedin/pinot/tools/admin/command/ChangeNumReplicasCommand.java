@@ -19,10 +19,10 @@ import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.tools.Command;
-import com.linkedin.pinot.tools.PinotSegmentRebalancer;
+import com.linkedin.pinot.tools.PinotNumReplicaChanger;
 
 
-public class RebalanceTableCommand extends AbstractBaseAdminCommand implements Command {
+public class ChangeNumReplicasCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StartBrokerCommand.class);
 
   @Option(name = "-zkAddress", required = false, metaVar = "<http>", usage = "HTTP address of Zookeeper.")
@@ -31,13 +31,10 @@ public class RebalanceTableCommand extends AbstractBaseAdminCommand implements C
   @Option(name = "-clusterName", required = false, metaVar = "<String>", usage = "Pinot cluster name.")
   private String _clusterName = "PinotCluster";
 
-  @Option(name = "-tableName", required = false, metaVar = "<String>", usage = "Table name to rebalance (e.g. myTable_OFFLINE)", forbids ={"-tenantName"})
+  @Option(name = "-tableName", required = true, metaVar = "<String>", usage = "Table name to rebalance (e.g. myTable_OFFLINE)")
   private String _tableName;
 
-  @Option(name = "-tenantName", required = false, metaVar = "<string>", usage = "Name of the tenant. Note All offline tables belonging this tenant will be rebalanced", forbids ={"-tableName"})
-  private String _tenantName;
-
-  @Option(name = "-exec", required = false, metaVar = "<boolean>", usage = "Execute command (Run the rebalancer)")
+  @Option(name = "-exec", required = false, metaVar = "<boolean>", usage = "Execute command (Run the replica changer)")
   private boolean _exec;
 
   @Option(name = "-help", required = false, help = true, aliases = { "-h", "--h", "--help" },
@@ -50,21 +47,14 @@ public class RebalanceTableCommand extends AbstractBaseAdminCommand implements C
 
   @Override
   public String getName() {
-    return "RebalanceTable";
+    return "ChangeNumReplicas";
   }
+
   @Override
   public boolean execute() throws Exception {
     boolean _dryRun = !_exec;
-    PinotSegmentRebalancer rebalancer = new PinotSegmentRebalancer(_zkAddress, _clusterName, _dryRun);
-    if (_tenantName == null && _tableName == null) {
-      System.err.println("One of tenantName or tableName must be specified");
-      return false;
-    }
-    if (_tenantName != null) {
-      rebalancer.rebalanceTenantTables(_tenantName);
-    } else {
-      rebalancer.rebalanceTable(_tableName);
-    }
+    PinotNumReplicaChanger replicaChanger = new PinotNumReplicaChanger(_zkAddress, _clusterName, _dryRun);
+    replicaChanger.changeNumReplicas(_tableName);
     if (_dryRun) {
       LOGGER.info("That was a dryrun");
       LOGGER.info("Use the -exec option to actually execute the command");
@@ -74,6 +64,6 @@ public class RebalanceTableCommand extends AbstractBaseAdminCommand implements C
 
   @Override
   public String description() {
-    return "Rebalance segments for a single table or all tables belonging to a tenant. This is run after adding new nodes to rebalance the segments";
+    return "Re-writes idealState to reflect the value of numReplicas in table config";
   }
 }

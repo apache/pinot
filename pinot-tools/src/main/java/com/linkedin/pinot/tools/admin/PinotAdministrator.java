@@ -15,11 +15,22 @@
  */
 package com.linkedin.pinot.tools.admin;
 
+import java.lang.reflect.Field;
+import org.kohsuke.args4j.Argument;
+import org.kohsuke.args4j.CmdLineException;
+import org.kohsuke.args4j.CmdLineParser;
+import org.kohsuke.args4j.Option;
+import org.kohsuke.args4j.spi.SubCommand;
+import org.kohsuke.args4j.spi.SubCommandHandler;
+import org.kohsuke.args4j.spi.SubCommands;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.tools.Command;
 import com.linkedin.pinot.tools.admin.command.AddSchemaCommand;
 import com.linkedin.pinot.tools.admin.command.AddTableCommand;
 import com.linkedin.pinot.tools.admin.command.AddTenantCommand;
 import com.linkedin.pinot.tools.admin.command.AvroSchemaToPinotSchema;
+import com.linkedin.pinot.tools.admin.command.ChangeNumReplicasCommand;
 import com.linkedin.pinot.tools.admin.command.ChangeTableState;
 import com.linkedin.pinot.tools.admin.command.CreateSegmentCommand;
 import com.linkedin.pinot.tools.admin.command.DeleteClusterCommand;
@@ -38,16 +49,6 @@ import com.linkedin.pinot.tools.admin.command.UploadSegmentCommand;
 import com.linkedin.pinot.tools.admin.command.ValidateConfigCommand;
 import com.linkedin.pinot.tools.admin.command.VerifySegmentState;
 import com.linkedin.pinot.tools.segment.converter.PinotSegmentConverter;
-import java.lang.reflect.Field;
-import org.kohsuke.args4j.Argument;
-import org.kohsuke.args4j.CmdLineException;
-import org.kohsuke.args4j.CmdLineParser;
-import org.kohsuke.args4j.Option;
-import org.kohsuke.args4j.spi.SubCommand;
-import org.kohsuke.args4j.spi.SubCommandHandler;
-import org.kohsuke.args4j.spi.SubCommands;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -79,6 +80,7 @@ public class PinotAdministrator {
       @SubCommand(name = "ShowClusterInfo", impl = ShowClusterInfoCommand.class),
       @SubCommand(name = "AvroSchemaToPinotSchema", impl = AvroSchemaToPinotSchema.class),
       @SubCommand(name = "RebalanceTable", impl = RebalanceTableCommand.class),
+      @SubCommand(name = "ChangeNumReplicas", impl = ChangeNumReplicasCommand.class),
       @SubCommand(name = "ValidateConfig", impl = ValidateConfigCommand.class),
       @SubCommand(name = "VerifySegmentState", impl = VerifySegmentState.class),
       @SubCommand(name = "PinotSegmentConverter", impl = PinotSegmentConverter.class)

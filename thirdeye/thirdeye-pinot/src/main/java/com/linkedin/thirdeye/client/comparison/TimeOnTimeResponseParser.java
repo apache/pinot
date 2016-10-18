@@ -217,7 +217,7 @@ public class TimeOnTimeResponseParser {
     timeDimensionValues.addAll(currentResponseMap.keySet());
     Set<String> dimensionValues = new HashSet<>();
     for (String timeDimensionValue : timeDimensionValues) {
-      String dimensionValue = ResponseParserUtils.extractDimensionValue(timeDimensionValue);
+      String dimensionValue = ResponseParserUtils.extractFirstDimensionValue(timeDimensionValue);
       dimensionValues.add(dimensionValue);
     }
 

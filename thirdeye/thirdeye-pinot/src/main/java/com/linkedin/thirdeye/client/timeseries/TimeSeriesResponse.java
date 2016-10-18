@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.client.timeseries;
 
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
@@ -11,7 +12,7 @@ import com.linkedin.thirdeye.client.timeseries.TimeSeriesRow.TimeSeriesMetric;
 public class TimeSeriesResponse {
   int numRows;
   private final Set<String> metrics = new TreeSet<>();
-  private final Set<String> dimensions = new TreeSet<>();
+  private final Set<List<String>> dimensions = new HashSet<>();
   private final List<TimeSeriesRow> rows;
 
   public TimeSeriesResponse(List<TimeSeriesRow> rows) {
@@ -20,7 +21,7 @@ public class TimeSeriesResponse {
       for (TimeSeriesMetric metric : row.getMetrics()) {
         metrics.add(metric.getMetricName());
       }
-      dimensions.add(row.getDimensionName());
+      dimensions.add(row.getDimensionNames());
     }
     numRows = rows.size();
   }
@@ -33,7 +34,7 @@ public class TimeSeriesResponse {
     return metrics;
   }
 
-  public Set<String> getDimensions() {
+  public Set<List<String>> getDimensions() {
     return dimensions;
   }
 

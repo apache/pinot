@@ -3,14 +3,23 @@ function getHeatmap(tab) {
     var url = "/dashboard/data/heatmap?" + window.location.hash.substring(1);
     getData(url, tab).done(function (data) {
 
-        renderD3heatmap(data, tab);
+        var templatePlaceHolder;
+        switch(tab){
+            case "anomalies":
+                templatePlaceHolder = $("#anomaly-details-heatmap-placeholder");
+            break;
+            default: //case heatmap
+                templatePlaceHolder = $("#" + tab + "-display-chart-section")
+        }
+
+        renderD3heatmap(data, tab, templatePlaceHolder);
 
         heatMapEventListeners(tab);
 
     });
 };
 
-function renderD3heatmap(data, tab) {
+function renderD3heatmap(data, tab, templatePlaceHolder) {
 
     //Error handling when data is falsy (empty, undefined or null)
     if (!data) {
@@ -25,8 +34,9 @@ function renderD3heatmap(data, tab) {
     }
 
     /* Handelbars template for treemap table */
+
     var result_treemap_template = HandleBarsTemplates.template_treemap(data)
-    $("#" + tab + "-display-chart-section").html(result_treemap_template);
+    templatePlaceHolder.html(result_treemap_template);
 
     //var invertColorMetrics
     var baseForLtZero = 'rgba(255,0,0,'; //lt zero is default red

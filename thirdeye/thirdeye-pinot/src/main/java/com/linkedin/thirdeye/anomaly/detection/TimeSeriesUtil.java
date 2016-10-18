@@ -14,6 +14,7 @@ import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -61,7 +62,7 @@ public abstract class TimeSeriesUtil {
       request.setFilterSet(ThirdEyeUtils.getFilterSet(filters));
     }
     if (StringUtils.isNotBlank(groupByDimension)) {
-      request.setGroupByDimensions(Collections.singletonList(groupByDimension));
+      request.setGroupByDimensions(Arrays.asList(groupByDimension.trim().split(",")));
     }
     List<Pair<Long, Long>> startEndTimeRanges =
         anomalyFunction.getDataRangeIntervals(windowStart, windowEnd);

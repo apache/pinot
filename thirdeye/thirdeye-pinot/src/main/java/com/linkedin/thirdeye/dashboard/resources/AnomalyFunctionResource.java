@@ -136,11 +136,13 @@ public class AnomalyFunctionResource {
         LOG.info("Analyzing anomaly function with dimensionKey: {}, windowStart: {}, windowEnd: {}",
             dimensionKey, startTime, endTime);
 
-        results = anomalyFunction
+        List<RawAnomalyResultDTO> resultsOfAnEntry = anomalyFunction
             .analyze(dimensionKey, metricTimeSeries, new DateTime(startTime), new DateTime(endTime),
                 new ArrayList<>());
-
-        LOG.info("{} has {} anomalies in window {} to {}", entry.getKey(), results.size(),
+        if (resultsOfAnEntry.size() != 0) {
+          results.addAll(resultsOfAnEntry);
+        }
+        LOG.info("{} has {} anomalies in window {} to {}", entry.getKey(), resultsOfAnEntry.size(),
             new DateTime(startTime), new DateTime(endTime));
       } catch (Exception e) {
         LOG.error("Could not compute for {}", entry.getKey(), e);

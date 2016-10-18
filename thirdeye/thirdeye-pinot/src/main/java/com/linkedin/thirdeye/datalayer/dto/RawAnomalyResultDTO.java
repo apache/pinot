@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.datalayer.dto;
 
+
 import com.linkedin.thirdeye.datalayer.pojo.RawAnomalyResultBean;
 
 public class RawAnomalyResultDTO extends RawAnomalyResultBean {
@@ -35,4 +36,5 @@ public class RawAnomalyResultDTO extends RawAnomalyResultBean {
   public void setFeedback(AnomalyFeedbackDTO feedback) {
     this.feedback = feedback;
   }
+
 }

@@ -20,8 +20,6 @@ public class MetricConfigBean extends AbstractBean {
 
   private MetricType datatype;
 
-  private boolean additive = true;
-
   private boolean derived = false;
 
   private String derivedMetricExpression;
@@ -65,14 +63,6 @@ public class MetricConfigBean extends AbstractBean {
 
   public void setDatatype(MetricType datatype) {
     this.datatype = datatype;
-  }
-
-  public boolean isAdditive() {
-    return additive;
-  }
-
-  public void setAdditive(boolean additive) {
-    this.additive = additive;
   }
 
   public boolean isDerived() {
@@ -133,7 +123,6 @@ public class MetricConfigBean extends AbstractBean {
         && Objects.equals(name, mc.getName())
         && Objects.equals(dataset, mc.getDataset())
         && Objects.equals(alias, mc.getAlias())
-        && Objects.equals(additive, mc.isAdditive())
         && Objects.equals(derived, mc.isDerived())
         && Objects.equals(derivedMetricExpression, mc.getDerivedMetricExpression())
         && Objects.equals(rollupThreshold, mc.getRollupThreshold())
@@ -144,15 +133,14 @@ public class MetricConfigBean extends AbstractBean {
 
   @Override
   public int hashCode() {
-    return Objects.hash(getId(), dataset, alias, additive, derived, derivedMetricExpression, rollupThreshold,
+    return Objects.hash(getId(), dataset, alias, derived, derivedMetricExpression, rollupThreshold,
         inverseMetric, cellSizeExpression, active);
   }
 
   @Override
   public String toString() {
     return MoreObjects.toStringHelper(this).add("id", getId()).add("dataset", dataset)
-        .add("alias", alias).add("additive", additive).add("derived", derived)
-        .add("derivedMetricExpression", derivedMetricExpression)
+        .add("alias", alias).add("derived", derived).add("derivedMetricExpression", derivedMetricExpression)
         .add("rollupThreshold", rollupThreshold).add("cellSizeExpression", cellSizeExpression)
         .add("active", active).toString();
   }
