@@ -31,6 +31,7 @@ import java.io.IOException;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericDatumReader;
@@ -272,6 +273,8 @@ public class SegmentCreationPhaseMapReduceJob {
         segmentGeneratorConfig.getCustomProperties().put(SEGMENT_START_TIME, startTime);
         // set end time
         segmentGeneratorConfig.getCustomProperties().put(SEGMENT_END_TIME, endTime);
+        // set time unit
+        segmentGeneratorConfig.setSegmentTimeUnit(TimeUnit.MILLISECONDS);
       }
 
       // Generate segment

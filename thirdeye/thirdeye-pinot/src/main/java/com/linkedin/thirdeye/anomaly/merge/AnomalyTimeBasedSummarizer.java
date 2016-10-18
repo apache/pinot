@@ -35,12 +35,12 @@ public abstract class AnomalyTimeBasedSummarizer {
   /**
    * @param mergedAnomaly : last merged anomaly
    * @param anomalies     : list of raw anomalies to be merged with last mergedAnomaly
-   * @param mergeDuration   : length of a merged anomaly
+   * @param maxMergedDurationMillis   : length of a merged anomaly
    * @param sequentialAllowedGap : allowed gap between two raw anomalies in order to merge
    * @return
    */
   public static List<MergedAnomalyResultDTO> mergeAnomalies(MergedAnomalyResultDTO mergedAnomaly,
-      List<RawAnomalyResultDTO> anomalies, long mergeDuration, long sequentialAllowedGap) {
+      List<RawAnomalyResultDTO> anomalies, long maxMergedDurationMillis, long sequentialAllowedGap) {
 
     // sort anomalies in natural order of start time
     Collections
@@ -49,7 +49,7 @@ public abstract class AnomalyTimeBasedSummarizer {
     boolean applySequentialGapBasedSplit = false;
     boolean applyMaxDurationBasedSplit = false;
 
-    if (mergeDuration > 0) {
+    if (maxMergedDurationMillis > 0) {
       applyMaxDurationBasedSplit = true;
     }
 
@@ -94,7 +94,7 @@ public abstract class AnomalyTimeBasedSummarizer {
       // till this point merged result contains current raw result
       if (applyMaxDurationBasedSplit
           // check if Max Duration for merged has passed, if so, create new one
-          && mergedAnomaly.getEndTime() - mergedAnomaly.getStartTime() >= mergeDuration) {
+          && mergedAnomaly.getEndTime() - mergedAnomaly.getStartTime() >= maxMergedDurationMillis) {
         // check if next anomaly has same start time as current one, that should be merged with current one too
         if (i < (anomalies.size() - 1) && anomalies.get(i + 1).getStartTime()
             .equals(currentResult.getStartTime())) {

@@ -56,50 +56,6 @@ public class PqlUtils {
   }
 
   /**
-   * Definition of Pre-Computed Data: the data that has been pre-calculated or pre-aggregated, and does not require
-   * further aggregation (i.e., aggregation function of Pinot should do no-op). For such data, we assume that there
-   * exists a dimension value named "all", which is user-definable keyword in collection configuration, that stores
-   * the pre-aggregated value.
-   *
-   * By default, when a query does not specify any value on a certain dimension, Pinot aggregates all values at that
-   * dimension, which is an undesirable behavior for pre-computed data. Therefore, this method modifies the request's
-   * dimension filters such that the filter could pick out the "all" value for that dimension.
-   *
-   * Example: Suppose that we have a dataset with 3 dimensions: country, pageName, and osName, and the pre-aggregated
-   * keyword is 'all'. Further assume that the original request's filter = {'country'='US, IN'} and GroupBy dimension =
-   * pageName, then the decorated request has the new filter = {'country'='US, IN', 'osName' = 'all'}.
-   *
-   * @param request the original request
-   * @return a request that is decorated with additional filters for filtering out the pre-aggregated value on the
-   * unspecified dimensions.
-   */
-  public static void decorateRequestForPrecomputedDataset(ThirdEyeRequest request, List<String> allDimensions,
-      List<String> dimensionsHaveNoPreAggregation, String preAggregatedKeyword) {
-    Set<String> preComputedDimensionNames = new HashSet<>(allDimensions);
-
-    if (dimensionsHaveNoPreAggregation.size() != 0) {
-      preComputedDimensionNames.removeAll(dimensionsHaveNoPreAggregation);
-    }
-
-    Multimap<String, String> filterSet = request.getFilterSet();
-    Set<String> filterDimensions = filterSet.asMap().keySet();
-    if (filterDimensions.size() != 0) {
-      preComputedDimensionNames.removeAll(filterDimensions);
-    }
-
-    List<String> groupByDimensions = request.getGroupBy();
-    if (groupByDimensions.size() != 0) {
-      preComputedDimensionNames.removeAll(groupByDimensions);
-    }
-
-    if (preComputedDimensionNames.size() != 0) {
-      for (String preComputedDimensionName : preComputedDimensionNames) {
-        filterSet.put(preComputedDimensionName, preAggregatedKeyword);
-      }
-    }
-  }
-
-  /**
    * Returns pqls to handle tables where metric names are a single dimension column,
    * and the metric values are all in a single value column
    * @param request

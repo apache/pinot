@@ -213,10 +213,10 @@ public class DetectionJobScheduler implements JobScheduler, Runnable {
     detectionJobContext.setMetricConfigDAO(metricConfigDAO);
     detectionJobContext.setAnomalyFunctionId(anomalyFunctionSpec.getId());
     detectionJobContext.setJobName(jobKey);
-    detectionJobContext.setWindowStartTime(windowStartTime);
-    detectionJobContext.setWindowEndTime(windowEndTime);
 
     job.getJobDataMap().put(DetectionJobRunner.DETECTION_JOB_CONTEXT, detectionJobContext);
+    job.getJobDataMap().put(DetectionJobRunner.DETECTION_JOB_MONITORING_WINDOW_START_TIME, windowStartTime);
+    job.getJobDataMap().put(DetectionJobRunner.DETECTION_JOB_MONITORING_WINDOW_END_TIME, windowEndTime);
 
     try {
       quartzScheduler.scheduleJob(job, trigger);

@@ -42,7 +42,7 @@ function lineChartForSingleAnomaly(mergeAnomalyData) {
     var aggTimeGranularity = calcAggregateGranularity(mergeAnomalyData.startTime, mergeAnomalyData.endTime);
     console.log(aggTimeGranularity);
 
-    var extensionWindowMillis = (datasetConfig.dataGranularity == "DAYS") ? 86400000 : 3600000;
+    var extensionWindowMillis = (datasetConfig.dataGranularity == "DAYS") ? 86400000 : 2 * 3600000;
     var fnProperties = parseProperties(mergeAnomalyData.function.properties);
 
     var compare = 1;

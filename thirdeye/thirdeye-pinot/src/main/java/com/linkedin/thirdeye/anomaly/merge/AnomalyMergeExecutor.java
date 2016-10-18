@@ -111,7 +111,7 @@ public class AnomalyMergeExecutor implements Runnable {
           // TODO : move merge config within the AnomalyFunction; Every function should have its own merge config.
           AnomalyMergeConfig mergeConfig = new AnomalyMergeConfig();
           mergeConfig.setSequentialAllowedGap(2 * 60 * 60_000); // 2 hours
-          mergeConfig.setMergeDuration(-1); // no time based split
+          mergeConfig.setMaxMergeDurationLength(-1); // no time based split
           mergeConfig.setMergeStrategy(AnomalyMergeStrategy.FUNCTION_DIMENSIONS);
 
           List<MergedAnomalyResultDTO> output = new ArrayList<>();
@@ -343,7 +343,7 @@ public class AnomalyMergeExecutor implements Runnable {
         mergedResultDAO.findLatestByFunctionIdOnly(function.getId());
     // TODO : get mergeConfig from function
     List<MergedAnomalyResultDTO> mergedResults = AnomalyTimeBasedSummarizer
-        .mergeAnomalies(latestMergedResult, unmergedResults, mergeConfig.getMergeDuration(),
+        .mergeAnomalies(latestMergedResult, unmergedResults, mergeConfig.getMaxMergeDurationLength(),
             mergeConfig.getSequentialAllowedGap());
     for (MergedAnomalyResultDTO mergedResult : mergedResults) {
       mergedResult.setFunction(function);
@@ -372,7 +372,7 @@ public class AnomalyMergeExecutor implements Runnable {
       // TODO : get mergeConfig from function
       List<MergedAnomalyResultDTO> mergedResults = AnomalyTimeBasedSummarizer
           .mergeAnomalies(latestMergedResult, unmergedResultsByDimensions,
-              mergeConfig.getMergeDuration(), mergeConfig.getSequentialAllowedGap());
+              mergeConfig.getMaxMergeDurationLength(), mergeConfig.getSequentialAllowedGap());
       for (MergedAnomalyResultDTO mergedResult : mergedResults) {
         mergedResult.setFunction(function);
         mergedResult.setDimensions(dimensions);

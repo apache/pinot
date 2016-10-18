@@ -1,10 +1,15 @@
 package com.linkedin.thirdeye.client;
 
+import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
+import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -14,6 +19,10 @@ import com.google.common.base.MoreObjects;
 import com.google.common.collect.LinkedListMultimap;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.api.TimeGranularity;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 
 /**
  * Request object containing all information for a {@link ThirdEyeClient} to retrieve data. Request
@@ -130,6 +139,9 @@ public class ThirdEyeRequest {
   }
 
   public static class ThirdEyeRequestBuilder {
+    private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeRequestBuilder.class);
+    private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
+
     private String collection;
     private List<MetricFunction> metricFunctions;
     private DateTime startTime;
@@ -213,7 +225,7 @@ public class ThirdEyeRequest {
       return this;
     }
 
-    /** See {@link #setGroupBy(List)} */
+    /** See {@link #setGroupBy(Collection)} */
     public ThirdEyeRequestBuilder setGroupBy(String... names) {
       return setGroupBy(Arrays.asList(names));
     }
@@ -230,7 +242,7 @@ public class ThirdEyeRequest {
       return this;
     }
 
-    /** See {@link ThirdEyeRequestBuilder#addGroupBy(List)} */
+    /** See {@link ThirdEyeRequestBuilder#addGroupBy(Collection)} */
     public ThirdEyeRequestBuilder addGroupBy(String... names) {
       return addGroupBy(Arrays.asList(names));
     }
@@ -246,9 +258,59 @@ public class ThirdEyeRequest {
     }
 
     public ThirdEyeRequest build(String requestReference) {
+      try {
+        DatasetConfigDTO datasetConfig = CACHE_REGISTRY_INSTANCE.getDatasetConfigCache().get(collection);
+        if (datasetConfig.isAdditive()) {
+          List<String> collectionDimensionNames = datasetConfig.getDimensions();
+          decorateFilterSetForPrecomputedDataset(filterSet, groupBy, collectionDimensionNames,
+              datasetConfig.getDimensionsHaveNoPreAggregation(), datasetConfig.getPreAggregatedKeyword());
+        }
+      } catch (Exception e) {
+        LOG.debug("Collection config for collection {} does not exist", collection);
+      }
       return new ThirdEyeRequest(requestReference, this);
     }
 
-  }
+    /**
+     * Definition of Pre-Computed Data: the data that has been pre-calculated or pre-aggregated, and does not require
+     * further aggregation (i.e., aggregation function of Pinot should do no-op). For such data, we assume that there
+     * exists a dimension value named "all", which is user-definable keyword in collection configuration, that stores
+     * the pre-aggregated value.
+     *
+     * By default, when a query does not specify any value on a certain dimension, Pinot aggregates all values at that
+     * dimension, which is an undesirable behavior for pre-computed data. Therefore, this method modifies the request's
+     * dimension filters such that the filter could pick out the "all" value for that dimension.
+     *
+     * Example: Suppose that we have a dataset with 3 dimensions: country, pageName, and osName, and the pre-aggregated
+     * keyword is 'all'. Further assume that the original request's filter = {'country'='US, IN'} and GroupBy dimension =
+     * pageName, then the decorated request has the new filter = {'country'='US, IN', 'osName' = 'all'}.
+     *
+     * @param filterSet the original filterSet. <dt><b>Postconditions:</b><dd> filterSet is decorated with additional
+     * filters for filtering out the pre-aggregated value on the unspecified dimensions.
+     */
+    public static void decorateFilterSetForPrecomputedDataset(Multimap<String, String> filterSet,
+        List<String> groupByDimensions, List<String> allDimensions, List<String> dimensionsHaveNoPreAggregation,
+        String preAggregatedKeyword) {
+      Set<String> preComputedDimensionNames = new HashSet<>(allDimensions);
 
+      if (dimensionsHaveNoPreAggregation.size() != 0) {
+        preComputedDimensionNames.removeAll(dimensionsHaveNoPreAggregation);
+      }
+
+      Set<String> filterDimensions = filterSet.asMap().keySet();
+      if (filterDimensions.size() != 0) {
+        preComputedDimensionNames.removeAll(filterDimensions);
+      }
+
+      if (groupByDimensions.size() != 0) {
+        preComputedDimensionNames.removeAll(groupByDimensions);
+      }
+
+      if (preComputedDimensionNames.size() != 0) {
+        for (String preComputedDimensionName : preComputedDimensionNames) {
+          filterSet.put(preComputedDimensionName, preAggregatedKeyword);
+        }
+      }
+    }
+  }
 }
