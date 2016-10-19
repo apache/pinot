@@ -86,13 +86,13 @@ public class AnomalyResource {
 
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
-  public AnomalyResource(String functionConfigPath) {
+  public AnomalyResource(AnomalyFunctionFactory anomalyFunctionFactory) {
     this.anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
     this.anomalyResultDAO = DAO_REGISTRY.getRawAnomalyResultDAO();
     this.anomalyMergedResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
     this.emailConfigurationDAO = DAO_REGISTRY.getEmailConfigurationDAO();
     this.datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
-    this.anomalyFunctionFactory = new AnomalyFunctionFactory(functionConfigPath);
+    this.anomalyFunctionFactory = anomalyFunctionFactory;
   }
 
   /************** CRUD for anomalies of a collection ********************************************************/
