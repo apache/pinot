@@ -205,7 +205,7 @@ public class DatasetConfigBean extends AbstractBean {
   @Override
   public String toString() {
     return MoreObjects.toStringHelper(this).add("id", getId()).add("dataset", dataset)
-        .add("dimensions", dimensions).add("dimensions", dimensions).add("timeUnit", timeUnit)
+        .add("dimensions", dimensions).add("timeUnit", timeUnit)
         .add("timeDuration", timeDuration).add("timeFormat", timeFormat).add("metricAsDimension", metricAsDimension)
         .add("metricNamesColumn", metricNamesColumn).add("metricValuesColumn", metricValuesColumn)
         .add("active", active).add("additive", additive)

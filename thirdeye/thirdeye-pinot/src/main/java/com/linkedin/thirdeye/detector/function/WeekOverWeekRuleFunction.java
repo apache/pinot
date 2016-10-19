@@ -1,6 +1,9 @@
 package com.linkedin.thirdeye.detector.function;
 
 import com.linkedin.pinot.pql.parsers.utils.Pair;
+import com.linkedin.thirdeye.anomaly.views.AnomalyTimelinesView;
+import com.linkedin.thirdeye.dashboard.views.TimeBucket;
+import java.io.IOException;
 import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.List;
@@ -49,17 +52,17 @@ public class WeekOverWeekRuleFunction extends BaseAnomalyFunction {
     return new String [] {BASELINE, CHANGE_THRESHOLD, AVERAGE_VOLUME_THRESHOLD};
   }
 
-  public List<Pair<Long, Long>> getDataRangeIntervals(Long windowStartTime, Long windowEndTime) {
+  public List<Pair<Long, Long>> getDataRangeIntervals(Long monitoringWindowStartTime, Long monitoringWindowEndTime) {
     List<Pair<Long, Long>> startEndTimeIntervals = new ArrayList<>();
-    startEndTimeIntervals.add(new Pair<>(windowStartTime, windowEndTime));
+    startEndTimeIntervals.add(new Pair<>(monitoringWindowStartTime, monitoringWindowEndTime));
 
     try {
       Properties anomalyProps = getProperties();
       // Compute baseline for comparison
       String baselineProp = anomalyProps.getProperty(BASELINE);
-      long baselineMillis = getBaselineMillis(baselineProp);
+      long baselineMillis = getBaselineOffsetInMillis(baselineProp);
       startEndTimeIntervals
-          .add(new Pair<>(windowStartTime - baselineMillis, windowEndTime - baselineMillis));
+          .add(new Pair<>(monitoringWindowStartTime - baselineMillis, monitoringWindowEndTime - baselineMillis));
     } catch (Exception e) {
       LOGGER.error("Error reading the properties", e);
     }
@@ -86,7 +89,7 @@ public class WeekOverWeekRuleFunction extends BaseAnomalyFunction {
 
     // Compute baseline for comparison
     String baselineProp = props.getProperty(BASELINE);
-    long baselineMillis = getBaselineMillis(baselineProp);
+    long baselineMillis = getBaselineOffsetInMillis(baselineProp);
 
     // Compute the bucket size, so we can iterate in those steps
     long bucketMillis =
@@ -158,7 +161,7 @@ public class WeekOverWeekRuleFunction extends BaseAnomalyFunction {
     return subSet;
   }
 
-  long getBaselineMillis(String baselineProp) throws IllegalArgumentException {
+  long getBaselineOffsetInMillis(String baselineProp) throws IllegalArgumentException {
     // TODO: Expand options here and use regex to extract numeric parameter
     long baselineMillis;
     if ("w/w".equals(baselineProp)) {
@@ -182,5 +185,37 @@ public class WeekOverWeekRuleFunction extends BaseAnomalyFunction {
       }
     }
     return false;
+  }
+
+  @Override
+  public AnomalyTimelinesView getPresentationTimeseries(MetricTimeSeries timeSeries, long bucketMillis, String metric,
+      long viewWindowStartTime, long viewWindowEndTime, List<RawAnomalyResultDTO> knownAnomalies) {
+
+    AnomalyTimelinesView anomalyTimelinesView = new AnomalyTimelinesView();
+
+    // Compute baseline for comparison
+    long baselineOffsetInMillis = TimeUnit.MILLISECONDS.convert(7, TimeUnit.DAYS);
+    try {
+      Properties props = getProperties();
+      String baselineProp = props.getProperty(BASELINE);
+      baselineOffsetInMillis = getBaselineOffsetInMillis(baselineProp);
+    } catch (IOException e) {
+      LOGGER.info("Cannot get function property when constructing presentation timeseires. Using WoW baseline values.");
+    }
+
+    // Construct AnomalyTimelinesView
+    int bucketCount = (int) ((viewWindowEndTime - viewWindowStartTime) / bucketMillis);
+    for (int i = 0; i < bucketCount; ++i) {
+      long currentBucketMillis = viewWindowStartTime + i * bucketMillis;
+      long baselineBucketMillis = currentBucketMillis - baselineOffsetInMillis;
+      TimeBucket timebucket =
+          new TimeBucket(currentBucketMillis, currentBucketMillis + bucketMillis, baselineBucketMillis,
+              baselineBucketMillis + bucketMillis);
+      anomalyTimelinesView.addTimeBuckets(timebucket);
+      anomalyTimelinesView.addCurrentValues(timeSeries.get(currentBucketMillis, metric).doubleValue());
+      anomalyTimelinesView.addBaselineValues(timeSeries.get(baselineBucketMillis, metric).doubleValue());
+    }
+
+    return anomalyTimelinesView;
   }
 }

@@ -142,7 +142,6 @@ function drawMetricTimeSeries(timeSeriesData, anomalyData, tab, placeholder) {
     var metrics = timeSeriesData["metrics"];
     var lineChartData = {};
     var barChartData = {};
-    var xTicksBaseline = [];
     var xTicksCurrent = [];
     var colors = {};
     var regions = [];
@@ -150,7 +149,6 @@ function drawMetricTimeSeries(timeSeriesData, anomalyData, tab, placeholder) {
     for (var t = 0, len = timeSeriesData["timeBuckets"].length; t < len; t++) {
         var timeBucket = timeSeriesData["timeBuckets"][t]["currentStart"];
         var currentEnd = timeSeriesData["timeBuckets"][t]["currentEnd"];
-        xTicksBaseline.push(timeBucket);
         xTicksCurrent.push(timeBucket);
     }
 
@@ -373,35 +371,57 @@ function drawMetricTimeSeries(timeSeriesData, anomalyData, tab, placeholder) {
 
 } //end of drawMetricTimeSeries
 
+function calculateBucketSize(timeSeriesData) {
+    if (timeSeriesData && timeSeriesData.summary) {
+        var duration = timeSeriesData.summary.currentEnd - timeSeriesData.summary.currentStart;
+        var bucketCount = timeSeriesData["currentValues"].length;
+        return duration / bucketCount;
+    } else {
+        return 300000; // 5-MINUTES in millis
+    }
+}
 
-function drawAnomalyTimeSeries(timeSeriesData,anomalyData, tab, placeholder, options) {
+function drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab, placeholder, options) {
     console.log(" in drawAnomalyTimeSeries")
 
      var currentView = $("#anomalies");
 
-     var aggTimeGranularity = (window.datasetConfig.dataGranularity) ? window.datasetConfig.dataGranularity : "HOURS";
+     // Calculate the time format according to bucket size
+     var bucketSize = calculateBucketSize(timeSeriesData);
      var dateTimeFormat = "%I:%M %p";
-     if (aggTimeGranularity == "DAYS" ) {
+     if (bucketSize >= 86400000) {
          dateTimeFormat = "%m-%d";
-     }else if(timeSeriesData.summary.baselineEnd - timeSeriesData.summary.baselineStart > 86400000 ){
-         dateTimeFormat = "%m-%d %I %p";
+     } else if (bucketSize >= 3600000) {
+         dateTimeFormat = "%I %p";
+     }
+     // Append month and date if the time series is longer than a day; however, if a bucket is larger than a day,
+     // then time format is already in month and date and hence we don't need to append anything.
+     var needToAppendMonthDay = false;
+     if (bucketSize < 86400000 && timeSeriesData.summary) {
+         if (timeSeriesData.summary.currentEnd - timeSeriesData.summary.currentStart > 86400000) {
+             needToAppendMonthDay = true;
+         } else {
+             var startDate = new Date(parseInt(timeSeriesData.summary.currentStart));
+             var endDate = new Date(parseInt(timeSeriesData.summary.currentEnd));
+             if (startDate.getDate() != endDate.getDate()) {
+                 needToAppendMonthDay = true;
+             }
+         }
+     }
+     if (needToAppendMonthDay) {
+         dateTimeFormat = "%m-%d " + dateTimeFormat;
      }
 
      var lineChartPlaceholder = $(placeholder, currentView)[0];
     console.log("lineChartPlaceholder")
     console.log(lineChartPlaceholder)
-     // Metric(s)
-     var metrics = timeSeriesData["metrics"];
      var lineChartData = {};
-     var xTicksBaseline = [];
      var xTicksCurrent = [];
      var colors = {};
      var regions = [];
 
      for (var t = 0, len = timeSeriesData["timeBuckets"].length; t < len; t++) {
          var timeBucket = timeSeriesData["timeBuckets"][t]["currentStart"];
-         var currentEnd = timeSeriesData["timeBuckets"][t]["currentEnd"];
-         xTicksBaseline.push(timeBucket);
          xTicksCurrent.push(timeBucket);
      }
 
@@ -415,27 +435,21 @@ function drawAnomalyTimeSeries(timeSeriesData,anomalyData, tab, placeholder, opt
      }
      lineChartData["time"] = xTicksCurrent;
 
-     for (var i = 0, mlen = metrics.length; i < mlen; i++) {
-         var baselineData = [];
-         var currentData = [];
+     var baselineData = [];
+     var currentData = [];
 
-         var indexOfBaseline = timeSeriesData["data"][metrics[i]]["schema"]["columnsToIndexMapping"]["baselineValue"];
-         var indexOfCurrent = timeSeriesData["data"][metrics[i]]["schema"]["columnsToIndexMapping"]["currentValue"];
-
-         for (var t = 0, tlen = timeSeriesData["timeBuckets"].length; t < tlen; t++) {
-
-             var baselineValue = timeSeriesData["data"][metrics[i]]["responseData"][t][indexOfBaseline];
-             var currentValue = timeSeriesData["data"][metrics[i]]["responseData"][t][indexOfCurrent];
-             baselineData.push(baselineValue);
-             currentData.push(currentValue);
-         }
-         lineChartData["baseline"] = baselineData;
-         lineChartData["current"] = currentData;
-
-         colors["baseline"] = '#1f77b4';
-         colors["current"] = '#ff5f0e';
-
+     for (var t = 0, tlen = timeSeriesData["currentValues"].length; t < tlen; t++) {
+         var baselineValue = timeSeriesData["baselineValues"][t];
+         var currentValue = timeSeriesData["currentValues"][t];
+         baselineData.push(baselineValue);
+         currentData.push(currentValue);
      }
+     lineChartData["baseline"] = baselineData;
+     lineChartData["current"] = currentData;
+
+     colors["baseline"] = '#1f77b4';
+     colors["current"] = '#ff5f0e';
+
      var defaultSettings = {
          bindto: lineChartPlaceholder,
          padding: {
@@ -543,27 +557,14 @@ function renderAnomalyThumbnails(data, tab) {
      function requestLineChart(i) {
          var startTime = data[i]["startTime"];
          var endTime = data[i]["endTime"];
-         var anomalyId = data[i]["id"]
-         var baselineStart = moment(parseInt(hash.currentStart)).add(-7, 'days')
-         var baselineEnd = moment(parseInt(hash.currentEnd)).add(-7, 'days')
          var aggTimeGranularity = calcAggregateGranularity(hash.currentStart,hash.currentEnd);
-        var dataset = hash.dataset;
-        var compareMode = "WoW";
-        var currentStart = hash.currentStart;
-        var currentEnd = hash.currentEnd;
-        var metrics = hash.metrics;
-        var placeholder= "#d3charts-" + i;
-        var fnFiltersString = data[i]["function"]["filters"];
-        var filters = parseProperties( fnFiltersString, {arrayValues:true} );
+         var anomalyId = data[i]["id"]
+         var placeholder= "#d3charts-" + i;
+         var timeSeriesUrl = "/dashboard/anomaly-merged-result/timeseries/" + anomalyId
+             + "?aggTimeGranularity=" + aggTimeGranularity + "&start=" + hash.currentStart + "&end=" + hash.currentEnd;
+         var tab = hash.view;
 
-        filters = encodeURIComponent(JSON.stringify(filters));
-        var timeSeriesUrl = "/dashboard/data/tabular?dataset=" + dataset + "&compareMode=" + compareMode //
-            + "&currentStart=" + currentStart + "&currentEnd=" + currentEnd  //
-            + "&baselineStart=" + baselineStart + "&baselineEnd=" + baselineEnd   //
-            + "&aggTimeGranularity=" + aggTimeGranularity + "&metrics=" + metrics  + "&filters=" + filters;
-        var tab = hash.view;
-
-        getDataCustomCallback(timeSeriesUrl,tab).done(function (timeSeriesData) {
+        getDataCustomCallback(timeSeriesUrl, tab).done(function (timeSeriesData) {
             var anomalyRegionData = [];
             anomalyRegionData.push({startTime: parseInt(startTime), endTime: parseInt(endTime), id: anomalyId, regionColor: '#eedddd'});
             drawAnomalyTimeSeries(timeSeriesData, anomalyRegionData, tab, placeholder)

@@ -30,7 +30,7 @@ public class DimensionFiltersCacheLoader extends CacheLoader<String, String> {
     String jsonFilters = null;
     try {
       LOGGER.info("Loading dimension filters cache {}", collection);
-      List<String> dimensions = Utils.getDimensions(collection);
+      List<String> dimensions = Utils.getSortedDimensionNames(collection);
       Map<String, List<String>> filters =
           Utils.getFilters(queryCache, collection, "filters", dimensions, startDateTime, endDateTime);
       jsonFilters = OBJECT_MAPPER.writeValueAsString(filters);

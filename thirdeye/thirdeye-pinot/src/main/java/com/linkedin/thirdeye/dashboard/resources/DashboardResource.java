@@ -143,7 +143,7 @@ public class DashboardResource {
   public String getDimensions(@QueryParam("dataset") String collection) {
     String jsonDimensions = null;
     try {
-      List<String> dimensions = Utils.getDimensions(collection);
+      List<String> dimensions = Utils.getSortedDimensionNames(collection);
       jsonDimensions = OBJECT_MAPPER.writeValueAsString(dimensions);
     } catch (Exception e) {
       LOG.error("Error while fetching dimensions for collection: " + collection, e);

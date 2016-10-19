@@ -1,7 +1,10 @@
 package com.linkedin.thirdeye.util;
 
+import com.google.common.collect.HashMultimap;
+import com.linkedin.thirdeye.dashboard.Utils;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -31,6 +34,7 @@ import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
 
+
 public abstract class ThirdEyeUtils {
   private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeUtils.class);
   private static final String FILTER_VALUE_ASSIGNMENT_SEPARATOR = "=";
@@ -56,6 +60,59 @@ public abstract class ThirdEyeUtils {
       }
     }
     return filterSet;
+  }
+
+  public static Multimap<String, String> getFilterSetFromDimensionKeyString(String dimensionKeyString, String collection) {
+    return getFilterSetFromDimensionKeyString(dimensionKeyString, collection, null);
+  }
+
+  /**
+   * Returns or modifies a filter that can be for querying the results corresponding to the given dimension key.
+   *
+   * For example, if a dimension key = "IN,front_page,*,*" and the dimension names of this dataset is ["country",
+   * "page_name", "some_dimension", ...], then the two entries will be added or over-written in the filter:
+   * 1. "country"="IN" and 2. "page_name"="front_page".
+   *
+   * Note that if the given filter contains an entry: "country"=["IN", "US", "TW",...], then this entry is replaced by
+   * "country"="IN".
+   *
+   * @param dimensionKeyString a string that represents the dimension key
+   * @param collection the name of the dataset
+   * @param filterToDecorate if it is null, a new filter will be created; otherwise, it is modified.
+   * @return a filter that is modified according to the given dimensionKeyString.
+   */
+  public static Multimap<String, String> getFilterSetFromDimensionKeyString(String dimensionKeyString,
+      String collection, Multimap<String, String> filterToDecorate) {
+    if (filterToDecorate == null) {
+      filterToDecorate = HashMultimap.create();
+    }
+
+    List<String> schemaDimensionNames;
+    try {
+      schemaDimensionNames = Utils.getSchemaDimensionNames(collection);
+    } catch (Exception e) {
+      LOG.info("Filter is not decorated: Unable to get schema dimension names for collection -- {}. ", collection);
+      schemaDimensionNames = Collections.emptyList();
+    }
+
+    if (schemaDimensionNames.size() > 0) {
+      List<String> dimensionValues;
+      if (StringUtils.isNotBlank(dimensionKeyString)) {
+        dimensionValues = Arrays.asList(dimensionKeyString.trim().split(","));
+      } else {
+        dimensionValues = Collections.emptyList();;
+      }
+      for (int i = 0; i < dimensionValues.size(); ++i) {
+        String dimensionValue = dimensionValues.get(i).trim();
+        if (!dimensionValue.equals("") && !dimensionValue.equals("*")) {
+          String dimensionName = schemaDimensionNames.get(i);
+          filterToDecorate.removeAll(dimensionName);
+          filterToDecorate.put(dimensionName, dimensionValue);
+        }
+      }
+    }
+
+    return filterToDecorate;
   }
 
   public static String convertMultiMapToJson(Multimap<String, String> multimap)

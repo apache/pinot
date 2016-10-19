@@ -67,10 +67,8 @@ public class DetectionTaskRunner implements TaskRunner {
 
     // Get existing anomalies for this time range and this function id
     knownAnomalies = getExistingAnomalies();
-    TimeSeriesResponse finalResponse = TimeSeriesUtil
-        .getTimeSeriesResponse(anomalyFunctionSpec, anomalyFunction,
-            detectionTaskInfo.getGroupByDimension(), windowStart.getMillis(),
-            windowEnd.getMillis());
+    TimeSeriesResponse finalResponse =
+        TimeSeriesUtil.getTimeSeriesResponseForAnomalyDetection(anomalyFunction, windowStart.getMillis(), windowEnd.getMillis());
 
     exploreDimensionsAndAnalyze(finalResponse);
     return taskResult;
