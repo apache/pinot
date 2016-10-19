@@ -525,10 +525,16 @@ public class AnomalyResource {
       long bucketMillis = TimeUnit.MILLISECONDS.convert(anomalyFunctionSpec.getBucketSize(), anomalyFunctionSpec.getBucketUnit());
       long bucketCount = (anomalyWindowEndTime - anomalyWindowStartTime) / bucketMillis;
       long paddingMillis = Math.max(1, (bucketCount / 2)) * bucketMillis;
-      paddingMillis = (paddingMillis <= TimeUnit.DAYS.toMillis(1)) ? paddingMillis : TimeUnit.DAYS.toMillis(1);
+      if (paddingMillis > TimeUnit.DAYS.toMillis(1)) {
+        paddingMillis = TimeUnit.DAYS.toMillis(1);
+      }
 
-      viewWindowStartTime = (viewWindowStartTime == 0) ? anomalyWindowStartTime - paddingMillis : viewWindowStartTime;
-      viewWindowEndTime = (viewWindowEndTime == 0) ? anomalyWindowEndTime + paddingMillis : viewWindowEndTime;
+      if (viewWindowStartTime == 0) {
+        viewWindowStartTime = anomalyWindowStartTime - paddingMillis;
+      }
+      if (viewWindowEndTime == 0) {
+        viewWindowEndTime = anomalyWindowEndTime + paddingMillis;
+      }
     }
 
     TimeGranularity timeGranularity =

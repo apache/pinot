@@ -66,6 +66,21 @@ public abstract class ThirdEyeUtils {
     return getFilterSetFromDimensionKeyString(dimensionKeyString, collection, null);
   }
 
+  /**
+   * Returns or modifies a filter that can be for querying the results corresponding to the given dimension key.
+   *
+   * For example, if a dimension key = "IN,front_page,*,*" and the dimension names of this dataset is ["country",
+   * "page_name", "some_dimension", ...], then the two entries will be added or over-written in the filter:
+   * 1. "country"="IN" and 2. "page_name"="front_page".
+   *
+   * Note that if the given filter contains an entry: "country"=["IN", "US", "TW",...], then this entry is replaced by
+   * "country"="IN".
+   *
+   * @param dimensionKeyString a string that represents the dimension key
+   * @param collection the name of the dataset
+   * @param filterToDecorate if it is null, a new filter will be created; otherwise, it is modified.
+   * @return a filter that is modified according to the given dimensionKeyString.
+   */
   public static Multimap<String, String> getFilterSetFromDimensionKeyString(String dimensionKeyString,
       String collection, Multimap<String, String> filterToDecorate) {
     if (filterToDecorate == null) {
@@ -81,9 +96,12 @@ public abstract class ThirdEyeUtils {
     }
 
     if (schemaDimensionNames.size() > 0) {
-      List<String> dimensionValues =
-          org.apache.commons.lang3.StringUtils.isNotBlank(dimensionKeyString) ? Arrays.asList(dimensionKeyString.trim().split(","))
-              : Collections.emptyList();
+      List<String> dimensionValues;
+      if (StringUtils.isNotBlank(dimensionKeyString)) {
+        dimensionValues = Arrays.asList(dimensionKeyString.trim().split(","));
+      } else {
+        dimensionValues = Collections.emptyList();;
+      }
       for (int i = 0; i < dimensionValues.size(); ++i) {
         String dimensionValue = dimensionValues.get(i).trim();
         if (!dimensionValue.equals("") && !dimensionValue.equals("*")) {

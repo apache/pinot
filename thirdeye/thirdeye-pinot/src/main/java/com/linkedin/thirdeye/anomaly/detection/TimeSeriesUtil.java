@@ -37,19 +37,36 @@ public abstract class TimeSeriesUtil {
   private TimeSeriesUtil() {
   }
 
+  /**
+   * Returns the time series that are needed by the given anomaly function for detecting anomalies.
+   *
+   * @param anomalyFunction the anomaly function for detecting anomalies
+   * @param monitoringWindowStart inclusive
+   * @param monitoringWindowEnd exclusive
+   * @return the data that is needed by the anomaly function for detecting anomalies.
+   * @throws JobExecutionException
+   * @throws ExecutionException
+   */
   public static TimeSeriesResponse getTimeSeriesResponseForAnomalyDetection(BaseAnomalyFunction anomalyFunction,
       long monitoringWindowStart, long monitoringWindowEnd)
       throws JobExecutionException, ExecutionException {
     AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunction.getSpec();
+
     String filterString = anomalyFunctionSpec.getFilters();
+    Multimap<String, String> filters;
+    if (StringUtils.isNotBlank(filterString)) {
+      filters = ThirdEyeUtils.getFilterSet(filterString);
+    } else {
+      filters = HashMultimap.create();
+    }
+
+    List<String> groupByDimensions;
     String exploreDimensionString = anomalyFunctionSpec.getExploreDimensions();
-
-    Multimap<String, String> filters =
-        StringUtils.isNotBlank(filterString) ? ThirdEyeUtils.getFilterSet(filterString) : HashMultimap.create();
-
-    List<String> groupByDimensions =
-        StringUtils.isNotBlank(exploreDimensionString) ? Arrays.asList(exploreDimensionString.trim().split(","))
-            : Collections.emptyList();
+    if (StringUtils.isNotBlank(exploreDimensionString)) {
+      groupByDimensions = Arrays.asList(exploreDimensionString.trim().split(","));
+    } else {
+      groupByDimensions = Collections.emptyList();
+    }
 
     TimeGranularity timeGranularity = new TimeGranularity(anomalyFunctionSpec.getBucketSize(),
         anomalyFunctionSpec.getBucketUnit());
@@ -58,14 +75,35 @@ public abstract class TimeSeriesUtil {
         monitoringWindowEnd);
   }
 
+  /**
+   * Returns the time series that were used by the given anomaly function for detecting the anomaly.
+   *
+   * @param anomalyFunction the anomaly function that detects the anomaly
+   * @param dimensionKeyString the string representation of {@link com.linkedin.thirdeye.api.DimensionKey}, which is
+   *                           used to construct the filter for retrieving the corresponding data that was used to
+   *                           detected the anomaly
+   * @param timeGranularity time granularity for the frontend
+   * @param viewWindowStart inclusive
+   * @param viewWindowEnd exclusive
+   * @return the time series that were used by the given anomaly function for detecting the anomaly
+   * @throws JobExecutionException
+   * @throws ExecutionException
+   */
   public static TimeSeriesResponse getTimeSeriesResponseForPresentation(BaseAnomalyFunction anomalyFunction,
       String dimensionKeyString, TimeGranularity timeGranularity, long viewWindowStart, long viewWindowEnd)
       throws JobExecutionException, ExecutionException {
     AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunction.getSpec();
 
+    // Get the original filter
+    Multimap<String, String> filters;
     String filterString = anomalyFunctionSpec.getFilters();
-    Multimap<String, String> filters =
-        StringUtils.isNotBlank(filterString) ? ThirdEyeUtils.getFilterSet(filterString) : HashMultimap.create();
+    if (StringUtils.isNotBlank(filterString)) {
+      filters = ThirdEyeUtils.getFilterSet(filterString);
+    } else {
+      filters = HashMultimap.create();
+    }
+
+    // Decorate the filter according to dimensionKeyString
     filters = ThirdEyeUtils.getFilterSetFromDimensionKeyString(dimensionKeyString, anomalyFunctionSpec.getCollection(), filters);
 
     // groupByDimensions (i.e., exploreDimensions) should be empty when retrieving time series for anomalies, because
