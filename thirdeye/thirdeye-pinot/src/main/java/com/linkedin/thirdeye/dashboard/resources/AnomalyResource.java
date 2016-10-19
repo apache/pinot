@@ -14,7 +14,6 @@ import java.io.IOException;
 import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -35,7 +34,6 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.kafka.common.utils.Time;
 import org.joda.time.DateTime;
 import org.joda.time.format.ISODateTimeFormat;
 import org.quartz.CronExpression;
