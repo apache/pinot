@@ -371,18 +371,45 @@ function drawMetricTimeSeries(timeSeriesData, anomalyData, tab, placeholder) {
 
 } //end of drawMetricTimeSeries
 
+function calculateBucketSize(timeSeriesData) {
+    if (timeSeriesData && timeSeriesData.summary) {
+        var duration = timeSeriesData.summary.currentEnd - timeSeriesData.summary.currentStart;
+        var bucketCount = timeSeriesData["currentValues"].length;
+        return duration / bucketCount;
+    } else {
+        return 300000; // 5-MINUTES in millis
+    }
+}
 
 function drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab, placeholder, options) {
     console.log(" in drawAnomalyTimeSeries")
 
      var currentView = $("#anomalies");
 
-     var aggTimeGranularity = (window.datasetConfig.dataGranularity) ? window.datasetConfig.dataGranularity : "HOURS";
+     // Calculate the time format according to bucket size
+     var bucketSize = calculateBucketSize(timeSeriesData);
      var dateTimeFormat = "%I:%M %p";
-     if (aggTimeGranularity == "DAYS" ) {
+     if (bucketSize >= 86400000) {
          dateTimeFormat = "%m-%d";
-     } else if (timeSeriesData.summary.currentEnd - timeSeriesData.summary.currentStart > 86400000){
-         dateTimeFormat = "%m-%d %I %p";
+     } else if (bucketSize >= 3600000) {
+         dateTimeFormat = "%I %p";
+     }
+     // Append month and date if the time series is longer than a day; however, if a bucket is larger than a day,
+     // then time format is already in month and date and hence we don't need to append anything.
+     var needToAppendMonthDay = false;
+     if (bucketSize < 86400000 && timeSeriesData.summary) {
+         if (timeSeriesData.summary.currentEnd - timeSeriesData.summary.currentStart > 86400000) {
+             needToAppendMonthDay = true;
+         } else {
+             var startDate = new Date(parseInt(timeSeriesData.summary.currentStart));
+             var endDate = new Date(parseInt(timeSeriesData.summary.currentEnd));
+             if (startDate.getDate() != endDate.getDate()) {
+                 needToAppendMonthDay = true;
+             }
+         }
+     }
+     if (needToAppendMonthDay) {
+         dateTimeFormat = "%m-%d " + dateTimeFormat;
      }
 
      var lineChartPlaceholder = $(placeholder, currentView)[0];
