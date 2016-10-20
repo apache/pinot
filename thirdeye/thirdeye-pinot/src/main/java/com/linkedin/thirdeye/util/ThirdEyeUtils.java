@@ -1,7 +1,16 @@
 package com.linkedin.thirdeye.util;
 
 import com.google.common.collect.HashMultimap;
+import com.linkedin.pinot.common.data.DimensionFieldSpec;
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import com.linkedin.pinot.common.data.TimeGranularitySpec.TimeFormat;
+import com.linkedin.pinot.common.data.MetricFieldSpec;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.data.TimeFieldSpec;
+import com.linkedin.pinot.common.data.TimeGranularitySpec;
 import com.linkedin.thirdeye.dashboard.Utils;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -22,6 +31,9 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
+import com.linkedin.thirdeye.api.CollectionSchema;
+import com.linkedin.thirdeye.api.DimensionSpec;
+import com.linkedin.thirdeye.api.MetricSpec;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.client.DAORegistry;
@@ -188,10 +200,22 @@ public abstract class ThirdEyeUtils {
   }
 
   public static TimeSpec getTimeSpecFromDatasetConfig(DatasetConfigDTO datasetConfig) {
+    String timeFormat = datasetConfig.getTimeFormat();
+    if (timeFormat.startsWith(TimeFormat.SIMPLE_DATE_FORMAT.toString())) {
+      timeFormat = getSDFPatternFromTimeFormat(timeFormat);
+    }
     TimeSpec timespec = new TimeSpec(datasetConfig.getTimeColumn(),
-        new TimeGranularity(datasetConfig.getTimeDuration(), datasetConfig.getTimeUnit()),
-        datasetConfig.getTimeFormat());
+        new TimeGranularity(datasetConfig.getTimeDuration(), datasetConfig.getTimeUnit()), timeFormat);
     return timespec;
+  }
+
+  private static String getSDFPatternFromTimeFormat(String timeFormat) {
+    String pattern = timeFormat;
+    String[] tokens = timeFormat.split(":");
+    if (tokens.length == 2) {
+      pattern = tokens[1];
+    }
+    return pattern;
   }
 
   public static MetricExpression getMetricExpressionFromMetricConfig(MetricConfigDTO metricConfig) {
@@ -248,4 +272,47 @@ public abstract class ThirdEyeUtils {
     MetricConfigDTO metricConfig = DAO_REGISTRY.getMetricConfigDAO().findById(Long.valueOf(metricId));
     return metricConfig.getName();
   }
+
+  public static Schema createSchema(CollectionSchema collectionSchema) {
+    Schema schema = new Schema();
+
+    for (DimensionSpec dimensionSpec : collectionSchema.getDimensions()) {
+      FieldSpec fieldSpec = new DimensionFieldSpec();
+      String dimensionName = dimensionSpec.getName();
+      fieldSpec.setName(dimensionName);
+      fieldSpec.setDataType(DataType.STRING);
+      fieldSpec.setSingleValueField(true);
+      schema.addField(dimensionName, fieldSpec);
+    }
+    for (MetricSpec metricSpec : collectionSchema.getMetrics()) {
+      FieldSpec fieldSpec = new MetricFieldSpec();
+      String metricName = metricSpec.getName();
+      fieldSpec.setName(metricName);
+      fieldSpec.setDataType(DataType.valueOf(metricSpec.getType().toString()));
+      fieldSpec.setSingleValueField(true);
+      schema.addField(metricName, fieldSpec);
+    }
+    TimeSpec timeSpec = collectionSchema.getTime();
+    String timeFormat = timeSpec.getFormat().equals("sinceEpoch") ? TimeFormat.EPOCH.toString()
+        : TimeFormat.SIMPLE_DATE_FORMAT.toString() + ":" + timeSpec.getFormat();
+    TimeGranularitySpec incoming =
+        new TimeGranularitySpec(DataType.LONG,
+            timeSpec.getDataGranularity().getSize(),
+            timeSpec.getDataGranularity().getUnit(),
+            timeFormat,
+            timeSpec.getColumnName());
+    TimeGranularitySpec outgoing =
+        new TimeGranularitySpec(DataType.LONG,
+            timeSpec.getDataGranularity().getSize(),
+            timeSpec.getDataGranularity().getUnit(),
+            timeFormat,
+            timeSpec.getColumnName());
+
+    schema.addField(timeSpec.getColumnName(), new TimeFieldSpec(incoming, outgoing));
+
+    schema.setSchemaName(collectionSchema.getCollection());
+
+    return schema;
+  }
+
 }

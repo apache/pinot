@@ -123,7 +123,7 @@ public class DetectionJobRunner implements Job {
       DatasetConfigDTO datasetConfig = datasetConfigDAO.findByDataset(collection);
       TimeSpec timespec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetConfig);
       TimeGranularity dataGranularity = timespec.getDataGranularity();
-      String timeFormat = datasetConfig.getTimeFormat();
+      String timeFormat = timespec.getFormat();
       if (dataGranularity.getUnit().equals(TimeUnit.DAYS)) {
         DateTimeZone dataTimeZone = Utils.getDataTimeZone(collection);
         DateTimeFormatter inputDataDateTimeFormatter = DateTimeFormat.forPattern(timeFormat).withZone(dataTimeZone);

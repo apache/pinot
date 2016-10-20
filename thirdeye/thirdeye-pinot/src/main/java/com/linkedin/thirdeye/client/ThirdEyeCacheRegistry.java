@@ -139,7 +139,7 @@ public class ThirdEyeCacheRegistry {
     cacheRegistry.registerDashboardsCache(dashboardsCache);
 
     // Collections cache
-    CollectionsCache collectionsCache = new CollectionsCache(datasetConfigDAO);
+    CollectionsCache collectionsCache = new CollectionsCache(datasetConfigDAO, config);
     cacheRegistry.registerCollectionsCache(collectionsCache);
 
     // DatasetConfig cache
@@ -165,11 +165,12 @@ public class ThirdEyeCacheRegistry {
     // as weeklyService starts before hourlyService finishes,
     // causing NPE in reading collectionsCache
 
+    cacheResource.refreshCollections();
+
     cacheResource.refreshDatasetConfigCache();
     cacheResource.refreshMetricConfigCache();
     cacheResource.refreshDashoardConfigsCache();
 
-    cacheResource.refreshCollections();
     cacheResource.refreshMaxDataTimeCache();
     cacheResource.refreshDimensionFiltersCache();
     cacheResource.refreshDashboardsCache();
