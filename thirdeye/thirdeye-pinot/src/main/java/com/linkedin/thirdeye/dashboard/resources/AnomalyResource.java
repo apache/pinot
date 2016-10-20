@@ -10,6 +10,7 @@ import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.dashboard.views.TimeBucket;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
+
 import java.io.IOException;
 import java.net.URLDecoder;
 import java.util.ArrayList;
@@ -40,6 +41,7 @@ import org.quartz.CronExpression;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.api.TimeGranularity;
@@ -79,7 +81,7 @@ public class AnomalyResource {
 
   private AnomalyFunctionManager anomalyFunctionDAO;
   private MergedAnomalyResultManager anomalyMergedResultDAO;
-  private RawAnomalyResultManager anomalyResultDAO;
+  private RawAnomalyResultManager rawAnomalyResultDAO;
   private EmailConfigurationManager emailConfigurationDAO;
   private DatasetConfigManager datasetConfigDAO;
   private AnomalyFunctionFactory anomalyFunctionFactory;
@@ -88,7 +90,7 @@ public class AnomalyResource {
 
   public AnomalyResource(AnomalyFunctionFactory anomalyFunctionFactory) {
     this.anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
-    this.anomalyResultDAO = DAO_REGISTRY.getRawAnomalyResultDAO();
+    this.rawAnomalyResultDAO = DAO_REGISTRY.getRawAnomalyResultDAO();
     this.anomalyMergedResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
     this.emailConfigurationDAO = DAO_REGISTRY.getEmailConfigurationDAO();
     this.datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
@@ -109,7 +111,7 @@ public class AnomalyResource {
   // View merged anomalies for collection
   @GET
   @Path("/anomalies/view")
-  public List<MergedAnomalyResultDTO> viewAnomaliesInRange(@NotNull @QueryParam("dataset") String dataset,
+  public List<MergedAnomalyResultDTO> viewMergedAnomaliesInRange(@NotNull @QueryParam("dataset") String dataset,
       @QueryParam("startTimeIso") String startTimeIso,
       @QueryParam("endTimeIso") String endTimeIso,
       @QueryParam("metric") String metric,
@@ -174,6 +176,53 @@ public class AnomalyResource {
 
     return anomalyResults;
   }
+
+
+//View raw anomalies for collection
+ @GET
+ @Path("/raw-anomalies/view")
+ @Produces(MediaType.APPLICATION_JSON)
+ public String viewRawAnomaliesInRange(
+     @QueryParam("functionId") String functionId,
+     @QueryParam("dataset") String dataset,
+     @QueryParam("startTimeIso") String startTimeIso,
+     @QueryParam("endTimeIso") String endTimeIso,
+     @QueryParam("metric") String metric) throws JsonProcessingException {
+
+   if (StringUtils.isBlank(functionId) && StringUtils.isBlank(dataset)) {
+     throw new IllegalArgumentException("must provide dataset or functionId");
+   }
+   DateTime endTime = DateTime.now();
+   if (StringUtils.isNotEmpty(endTimeIso)) {
+     endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso);
+   }
+   DateTime startTime = endTime.minusDays(7);
+   if (StringUtils.isNotEmpty(startTimeIso)) {
+     startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso);
+   }
+
+   List<RawAnomalyResultDTO> rawAnomalyResults = new ArrayList<>();
+   if (StringUtils.isNotBlank(functionId)) {
+     rawAnomalyResults = rawAnomalyResultDAO.
+         findAllByTimeAndFunctionId(startTime.getMillis(), endTime.getMillis(), Long.valueOf(functionId));
+   } else if (StringUtils.isNotBlank(dataset)) {
+     List<AnomalyFunctionDTO> anomalyFunctions = anomalyFunctionDAO.findAllByCollection(dataset);
+     List<Long> functionIds = new ArrayList<>();
+     for (AnomalyFunctionDTO anomalyFunction : anomalyFunctions) {
+       if (StringUtils.isNotBlank(metric) && !anomalyFunction.getMetric().equals(metric)) {
+         continue;
+       }
+       functionIds.add(anomalyFunction.getId());
+     }
+     for (Long id : functionIds) {
+       rawAnomalyResults.addAll(rawAnomalyResultDAO.
+           findAllByTimeAndFunctionId(startTime.getMillis(), endTime.getMillis(), id));
+     }
+   }
+   String response = new ObjectMapper().writerWithDefaultPrettyPrinter().writeValueAsString(rawAnomalyResults);
+   return response;
+ }
+
 
   /************* CRUD for anomaly functions of collection **********************************************/
   // View all anomaly functions
@@ -402,9 +451,9 @@ public class AnomalyResource {
 
     // raw result mapping
     List<RawAnomalyResultDTO> rawResults =
-        anomalyResultDAO.findAllByTimeAndFunctionId(0, System.currentTimeMillis(), id);
+        rawAnomalyResultDAO.findAllByTimeAndFunctionId(0, System.currentTimeMillis(), id);
     for (RawAnomalyResultDTO result : rawResults) {
-      anomalyResultDAO.delete(result);
+      rawAnomalyResultDAO.delete(result);
     }
 
     // merged anomaly mapping
@@ -466,7 +515,7 @@ public class AnomalyResource {
   @Path(value = "anomaly-result/feedback/{anomaly_result_id}")
   public void updateAnomalyResultFeedback(@PathParam("anomaly_result_id") long anomalyResultId, String payload) {
     try {
-      RawAnomalyResultDTO result = anomalyResultDAO.findById(anomalyResultId);
+      RawAnomalyResultDTO result = rawAnomalyResultDAO.findById(anomalyResultId);
       if (result == null) {
         throw new IllegalArgumentException("AnomalyResult not found with id " + anomalyResultId);
       }
@@ -485,7 +534,7 @@ public class AnomalyResource {
       feedback.setComment(feedbackRequest.getComment());
       feedback.setFeedbackType(feedbackRequest.getFeedbackType());
 
-      anomalyResultDAO.update(result);
+      rawAnomalyResultDAO.update(result);
     } catch (IOException e) {
       throw new IllegalArgumentException("Invalid payload " + payload, e);
     }
