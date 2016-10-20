@@ -56,9 +56,10 @@ public class AggregationGroupByOperator extends BaseOperator {
    * @param aggregationsInfoList List of AggregationInfo (contains context for applying aggregation functions).
    * @param groupBy GroupBy to perform
    * @param projectionOperator Projection
+   * @param numGroupsLimit Limit on number of aggr groups allowed, beyond which the results are truncated
    */
   public AggregationGroupByOperator(IndexSegment indexSegment, List<AggregationInfo> aggregationsInfoList,
-      GroupBy groupBy, MProjectionOperator projectionOperator) {
+      GroupBy groupBy, MProjectionOperator projectionOperator, int numGroupsLimit) {
 
     Preconditions.checkNotNull(indexSegment);
     Preconditions.checkArgument((aggregationsInfoList != null) && (aggregationsInfoList.size() > 0));
@@ -68,7 +69,7 @@ public class AggregationGroupByOperator extends BaseOperator {
     _indexSegment = indexSegment;
     _aggregationInfoList = aggregationsInfoList;
     _projectionOperator = projectionOperator;
-    _groupByExecutor = new DefaultGroupByExecutor(indexSegment, aggregationsInfoList, groupBy);
+    _groupByExecutor = new DefaultGroupByExecutor(indexSegment, aggregationsInfoList, groupBy, numGroupsLimit);
   }
 
   /**

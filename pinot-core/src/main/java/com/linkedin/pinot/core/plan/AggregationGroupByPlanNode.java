@@ -36,11 +36,13 @@ public class AggregationGroupByPlanNode implements PlanNode {
   private static final Logger LOGGER = LoggerFactory.getLogger("QueryPlanLog");
   private final IndexSegment _indexSegment;
   private final BrokerRequest _brokerRequest;
+  private int _numAggrGroupsLimit;
   private final ProjectionPlanNode _projectionPlanNode;
 
-  public AggregationGroupByPlanNode(IndexSegment indexSegment, BrokerRequest query) {
+  public AggregationGroupByPlanNode(IndexSegment indexSegment, BrokerRequest query, int numAggrGroupsLimit) {
     _indexSegment = indexSegment;
     _brokerRequest = query;
+    _numAggrGroupsLimit = numAggrGroupsLimit;
     _projectionPlanNode = new ProjectionPlanNode(_indexSegment, getAggregationGroupByRelatedColumns(),
         new DocIdSetPlanNode(_indexSegment, _brokerRequest, 5000));
   }
@@ -62,7 +64,7 @@ public class AggregationGroupByPlanNode implements PlanNode {
   public Operator run() {
     MProjectionOperator projectionOperator = (MProjectionOperator) _projectionPlanNode.run();
     return new AggregationGroupByOperator(_indexSegment, _brokerRequest.getAggregationsInfo(),
-        _brokerRequest.getGroupBy(), projectionOperator);
+        _brokerRequest.getGroupBy(), projectionOperator, _numAggrGroupsLimit);
   }
 
   @Override

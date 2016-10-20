@@ -22,12 +22,14 @@ import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.common.DataFetcher;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.aggregation.AggregationFunctionContext;
-import com.linkedin.pinot.core.operator.aggregation.ResultHolderFactory;
 import com.linkedin.pinot.core.operator.aggregation.DataBlockCache;
+import com.linkedin.pinot.core.operator.aggregation.ResultHolderFactory;
 import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunction;
 import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunctionFactory;
 import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -38,6 +40,8 @@ import java.util.List;
  * - Single/Multi valued columns.
  */
 public class DefaultGroupByExecutor implements GroupByExecutor {
+  private static final Logger LOGGER = LoggerFactory.getLogger(DefaultGroupByExecutor.class);
+
   private final DataBlockCache _singleValueBlockCache;
 
   private final GroupKeyGenerator _groupKeyGenerator;
@@ -45,6 +49,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
   private final AggregationFunctionContext[] _aggrFuncContextArray;
   private final GroupByResultHolder[] _resultHolderArray;
   private final SegmentMetadata _segmentMetadata;
+  private final int _numGroupsLimit;
 
   private int[] _docIdToSVGroupKey;
   private int[][] _docIdToMVGroupKey;
@@ -55,12 +60,14 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
 
   /**
    * Constructor for the class.
-   *
-   * @param indexSegment
-   * @param aggregationInfoList
-   * @param groupBy
+   *  @param indexSegment Segment to process
+   * @param aggregationInfoList Aggregation contexts
+   * @param groupBy GroupBy object from query
+   * @param numGroupsLimit Limit on number of aggr groups allowed (results truncated beyond that limit)
    */
-  public DefaultGroupByExecutor(IndexSegment indexSegment, List<AggregationInfo> aggregationInfoList, GroupBy groupBy) {
+  public DefaultGroupByExecutor(IndexSegment indexSegment, List<AggregationInfo> aggregationInfoList, GroupBy groupBy,
+      int numGroupsLimit) {
+    _numGroupsLimit = numGroupsLimit;
     Preconditions.checkNotNull(indexSegment);
     Preconditions.checkNotNull(aggregationInfoList);
     Preconditions.checkArgument(aggregationInfoList.size() > 0);
@@ -123,10 +130,21 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     Preconditions
         .checkState(_inited, "Method 'process' cannot be called before 'init' for class " + getClass().getName());
 
-    _singleValueBlockCache.initNewBlock(docIdSet, startIndex, length);
+    // We have already reached max number of keys, punt on further processing.
+    if (_groupKeyGenerator.getCurrentGroupKeyUpperBound() > _numGroupsLimit) {
+      return;
+    }
 
+    _singleValueBlockCache.initNewBlock(docIdSet, startIndex, length);
     generateGroupKeysForDocIdSet(docIdSet, startIndex, length);
     int capacityNeeded = _groupKeyGenerator.getCurrentGroupKeyUpperBound();
+
+    // We just crossed max number of keys, punt on further processing.
+    if (capacityNeeded > _numGroupsLimit) {
+      LOGGER.warn("Number of groups '{}' exceed limit '{}', query results may be incorrect.", capacityNeeded,
+          _numGroupsLimit);
+      return;
+    }
 
     for (int i = 0; i < _numAggrFunc; i++) {
       _resultHolderArray[i].ensureCapacity(capacityNeeded);
