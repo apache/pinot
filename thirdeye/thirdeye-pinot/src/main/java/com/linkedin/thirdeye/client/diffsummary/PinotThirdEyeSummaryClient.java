@@ -327,22 +327,9 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
     thirdEyeConfig.setWhitelistCollections(collection);
     thirdEyeConfig.setRootDir(thirdEyeConfigDir);
 
-    ThirdEyeCacheRegistry.initializeCaches(thirdEyeConfig, webappConfigDAO);
+    ThirdEyeCacheRegistry.initializeCaches(thirdEyeConfig);
     ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
 
-    // Get alias collection name and metric name if there exists any
-    try {
-      String aliasCollection = ThirdEyeUtils.getCollectionFromAlias(collection);
-      collection = aliasCollection;
-    } catch (ExecutionException e1) {
-      System.out.println("Failed to get alias collection name for " + collection
-          + ". The original colleciotn name is used.");
-    }
-    CollectionConfig collectionConfig = CACHE_REGISTRY_INSTANCE.getCollectionConfigCache().getIfPresent(collection);
-    if (collectionConfig != null && collectionConfig.getDerivedMetrics() != null
-        && collectionConfig.getDerivedMetrics().containsKey(metricName)) {
-      metricName = collectionConfig.getDerivedMetrics().get(metricName);
-    }
     List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metricName, MetricAggFunction.SUM, collection);
     System.out.println(metricExpressions);
 
@@ -360,7 +347,7 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
 
     Dimensions dimensions;
     try {
-      dimensions = new Dimensions(Utils.getDimensions(CACHE_REGISTRY_INSTANCE.getQueryCache(), collection));
+      dimensions = new Dimensions(Utils.getSchemaDimensionNames(collection));
     } catch (Exception e1) {
       System.out.println("Failed to get dimensions names of the collection: " + collection);
       String[] dimensionNames =

@@ -60,17 +60,17 @@ public class SummaryResource {
     if (summarySize < 1) summarySize = 1;
 
     SummaryResponse response = null;
-    String derivedMetricName = null;
+//    String derivedMetricName = null;
     try {
-      collection = ThirdEyeUtils.getCollectionFromAlias(collection);
-      CollectionConfig collectionConfig = CACHE_REGISTRY_INSTANCE.getCollectionConfigCache().getIfPresent(collection);
-      if (collectionConfig != null && collectionConfig.getDerivedMetrics() != null
-          && collectionConfig.getDerivedMetrics().containsKey(metric)) {
-        derivedMetricName = collectionConfig.getDerivedMetrics().get(metric);
-      } else {
-        derivedMetricName = metric;
-      }
-      List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(derivedMetricName, MetricAggFunction.SUM,collection);
+//      CollectionConfig collectionConfig = CACHE_REGISTRY_INSTANCE.getCollectionConfigCache().getIfPresent(collection);
+//      if (collectionConfig != null && collectionConfig.getDerivedMetrics() != null
+//          && collectionConfig.getDerivedMetrics().containsKey(metric)) {
+//        derivedMetricName = collectionConfig.getDerivedMetrics().get(metric);
+//      } else {
+//        derivedMetricName = metric;
+//      }
+//      List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(derivedMetricName, MetricAggFunction.SUM,collection);
+    List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metric, MetricAggFunction.SUM,collection);
 
       OLAPDataBaseClient olapClient = new PinotThirdEyeSummaryClient(CACHE_REGISTRY_INSTANCE.getQueryCache());
       olapClient.setCollection(collection);
@@ -82,7 +82,7 @@ public class SummaryResource {
 
       Dimensions dimensions;
       if (groupByDimensions == null || groupByDimensions.length() == 0 || groupByDimensions.equals("undefined")) {
-        dimensions = new Dimensions(Utils.getDimensions(CACHE_REGISTRY_INSTANCE.getQueryCache(), collection));
+        dimensions = new Dimensions(Utils.getSchemaDimensionNames(collection));
       } else {
         dimensions = new Dimensions(Arrays.asList(groupByDimensions.trim().split(",")));
       }
@@ -121,12 +121,12 @@ public class SummaryResource {
 
     SummaryResponse response = null;
     try {
-      collection = ThirdEyeUtils.getCollectionFromAlias(collection);
-      CollectionConfig collectionConfig = CACHE_REGISTRY_INSTANCE.getCollectionConfigCache().getIfPresent(collection);
-      if (collectionConfig != null && collectionConfig.getDerivedMetrics() != null
-          && collectionConfig.getDerivedMetrics().containsKey(metric)) {
-        metric = collectionConfig.getDerivedMetrics().get(metric);
-      }
+//      collection = ThirdEyeUtils.getCollectionFromAlias(collection);
+//      CollectionConfig collectionConfig = CACHE_REGISTRY_INSTANCE.getCollectionConfigCache().getIfPresent(collection);
+//      if (collectionConfig != null && collectionConfig.getDerivedMetrics() != null
+//          && collectionConfig.getDerivedMetrics().containsKey(metric)) {
+//        metric = collectionConfig.getDerivedMetrics().get(metric);
+//      }
       List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metric, MetricAggFunction.SUM, collection);
 
       OLAPDataBaseClient olapClient = new PinotThirdEyeSummaryClient(CACHE_REGISTRY_INSTANCE.getQueryCache());
@@ -139,7 +139,7 @@ public class SummaryResource {
 
       List<String> allDimensions;
       if (groupByDimensions == null || groupByDimensions.length() == 0 || groupByDimensions.equals("undefined")) {
-        allDimensions = Utils.getDimensions(CACHE_REGISTRY_INSTANCE.getQueryCache(), collection);
+        allDimensions = Utils.getSchemaDimensionNames(collection);
       } else {
         allDimensions = Arrays.asList(groupByDimensions.trim().split(","));
       }
