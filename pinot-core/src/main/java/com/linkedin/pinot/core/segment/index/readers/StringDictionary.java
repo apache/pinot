@@ -18,6 +18,8 @@ package com.linkedin.pinot.core.segment.index.readers;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.nio.charset.Charset;
+import java.util.Arrays;
+
 
 public class StringDictionary extends ImmutableDictionaryReader {
   private final int lengthofMaxEntry;
@@ -31,15 +33,21 @@ public class StringDictionary extends ImmutableDictionaryReader {
   }
 
   @Override
+  @SuppressWarnings("unchecked")
   public int indexOf(Object rawValue) {
-    final String lookup = rawValue.toString();
-    final int differenceInLength = lengthofMaxEntry - lookup.length();
-    final StringBuilder bld = new StringBuilder();
-    bld.append(lookup);
-    for (int i = 0; i < differenceInLength; i++) {
-      bld.append(paddingChar);
+    final String lookup = (String) rawValue; // This will always be a string
+
+    byte[] lookupBytes = lookup.getBytes(UTF_8);
+    if (lookupBytes.length >= lengthofMaxEntry) {
+      // No need to pad the string
+      return stringIndexOf(lookup);
     }
-    return stringIndexOf(bld.toString());
+
+    // Need to pad the string before looking up
+    byte[] dest = new byte[lengthofMaxEntry];
+    System.arraycopy(lookupBytes, 0, dest, 0, lookupBytes.length);
+    Arrays.fill(dest, lookupBytes.length, dest.length, (byte) paddingChar);
+    return stringIndexOf(new String(dest, UTF_8));
   }
 
   @Override
