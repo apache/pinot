@@ -128,11 +128,11 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
 
   @Override
   public List<MergedAnomalyResultDTO> findByCollectionMetricDimensionsTime(String collection,
-      String metric, String[] dimensions, long startTime, long endTime) {
+      String metric, String dimensions, long startTime, long endTime) {
     Map<String, Object> filterParams = new HashMap<>();
     filterParams.put("collection", collection);
     filterParams.put("metric", metric);
-    filterParams.put("dimensions", dimensions[0]);
+    filterParams.put("dimensions", dimensions);
     filterParams.put("startTime", startTime);
     filterParams.put("endTime", endTime);
 

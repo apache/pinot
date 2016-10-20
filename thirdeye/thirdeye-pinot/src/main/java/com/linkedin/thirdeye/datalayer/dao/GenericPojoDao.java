@@ -18,6 +18,7 @@ import javax.sql.DataSource;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.modelmapper.ModelMapper;
+import org.modelmapper.TypeMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -107,6 +108,11 @@ public class GenericPojoDao {
   GenericResultSetMapper genericResultSetMapper;
 
   static ModelMapper MODEL_MAPPER = new ModelMapper();
+
+  static {
+    MODEL_MAPPER.addMappings(new RawAnomalyResultBean.RawAnomalyResultBeanIndexMap());
+    MODEL_MAPPER.addMappings(new MergedAnomalyResultBean.MergedAnomalyResultBeanIndexMap());
+  }
 
   static ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 

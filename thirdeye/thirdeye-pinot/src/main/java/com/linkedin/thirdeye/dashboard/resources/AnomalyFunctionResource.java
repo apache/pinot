@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.dashboard.resources;
 
 import com.linkedin.thirdeye.anomaly.detection.TimeSeriesUtil;
 import com.linkedin.thirdeye.api.DimensionKey;
+import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesResponse;
@@ -131,12 +132,13 @@ public class AnomalyFunctionResource {
       try {
         // Run algorithm
         DimensionKey dimensionKey = entry.getKey();
+        DimensionMap dimensionMap = DimensionMap.fromDimensionKey(dimensionKey, collectionDimensions);
         MetricTimeSeries metricTimeSeries = entry.getValue();
         LOG.info("Analyzing anomaly function with dimensionKey: {}, windowStart: {}, windowEnd: {}",
             dimensionKey, startTime, endTime);
 
         List<RawAnomalyResultDTO> resultsOfAnEntry = anomalyFunction
-            .analyze(dimensionKey, metricTimeSeries, new DateTime(startTime), new DateTime(endTime),
+            .analyze(dimensionMap, metricTimeSeries, new DateTime(startTime), new DateTime(endTime),
                 new ArrayList<>());
         if (resultsOfAnEntry.size() != 0) {
           results.addAll(resultsOfAnEntry);

@@ -10,7 +10,7 @@ public interface MergedAnomalyResultManager extends AbstractManager<MergedAnomal
       long emailId);
 
   List<MergedAnomalyResultDTO> findByCollectionMetricDimensionsTime(String collection,
-      String metric, String[] dimensions, long startTime, long endTime);
+      String metric, String dimensions, long startTime, long endTime);
 
   List<MergedAnomalyResultDTO> findByCollectionMetricTime(String collection, String metric,
       long startTime, long endTime);

@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.dashboard.resources;
 import com.linkedin.thirdeye.anomaly.detection.TimeSeriesUtil;
 import com.linkedin.thirdeye.anomaly.views.AnomalyTimelinesView;
 import com.linkedin.thirdeye.api.DimensionKey;
+import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesResponse;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesResponseConverter;
@@ -33,6 +34,7 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
 import org.joda.time.format.ISODateTimeFormat;
@@ -73,8 +75,6 @@ public class AnomalyResource {
 
   private static final String DEFAULT_CRON = "0 0 0 * * ?";
   private static final String UTF8 = "UTF-8";
-  private static final String STAR_DIMENSION = "*";
-  private static final String DIMENSION_JOINER = ",";
   private static final String DEFAULT_FUNCTION_TYPE = "WEEK_OVER_WEEK_RULE";
 
   private AnomalyFunctionManager anomalyFunctionDAO;
@@ -113,7 +113,7 @@ public class AnomalyResource {
       @QueryParam("startTimeIso") String startTimeIso,
       @QueryParam("endTimeIso") String endTimeIso,
       @QueryParam("metric") String metric,
-      @QueryParam("dimensions") String dimensions) {
+      @QueryParam("dimensions") String dimensionMapJson) {
 
     if (StringUtils.isBlank(dataset)) {
       throw new IllegalArgumentException("dataset is a required query param");
@@ -129,39 +129,20 @@ public class AnomalyResource {
     }
     List<MergedAnomalyResultDTO> anomalyResults = new ArrayList<>();
     try {
-      String[] dimensionPatterns = null;
-      if (StringUtils.isNotBlank(dimensions)) {
-        // get dimension names and index position
-        List<String> dimensionNames = datasetConfigDAO.findByDataset(dataset).getDimensions();
-        Map<String, Integer> dimensionNameToIndexMap = new HashMap<>();
-        for (int i = 0; i < dimensionNames.size(); i ++) {
-          dimensionNameToIndexMap.put(dimensionNames.get(i), i);
-        }
+      DimensionMap dimensionMap = null;
+      if (StringUtils.isNotBlank(dimensionMapJson)) {
         // get dimensions map from request
-        dimensions = URLDecoder.decode(dimensions, UTF8 );
-        Multimap<String, String> dimensionsMap = ThirdEyeUtils.convertToMultiMap(dimensions);
-        // create dimension patterns
-        String[] dimensionsArray = new String[dimensionNames.size()];
-        Arrays.fill(dimensionsArray, STAR_DIMENSION);
-        List<String> dimensionPatternsList = new ArrayList<>();
-        for (String dimensionName : dimensionsMap.keySet()) {
-          List<String> dimensionValues = Lists.newArrayList(dimensionsMap.get(dimensionName));
-          int dimensionIndex = dimensionNameToIndexMap.get(dimensionName);
-          for (String dimensionValue : dimensionValues) {
-            StringBuffer sb = new StringBuffer();
-            dimensionsArray[dimensionIndex] = dimensionValue;
-            sb.append(Joiner.on(DIMENSION_JOINER).join(Lists.newArrayList(dimensionsArray)));
-            dimensionPatternsList.add(sb.toString());
-            dimensionsArray[dimensionIndex] = STAR_DIMENSION;
-          }
+        dimensionMapJson = URLDecoder.decode(dimensionMapJson, UTF8 );
+        try {
+          dimensionMap = DimensionMap.fromJsonString(dimensionMapJson);
+        } catch (IOException e) {
+          LOG.warn("Unable to construct explore dimensions to dimension map: {}", e.toString());
         }
-        dimensionPatterns = new String[dimensionPatternsList.size()];
-        dimensionPatterns = dimensionPatternsList.toArray(dimensionPatterns);
       }
 
       if (StringUtils.isNotBlank(metric)) {
-        if (StringUtils.isNotBlank(dimensions)) {
-          anomalyResults = anomalyMergedResultDAO.findByCollectionMetricDimensionsTime(dataset, metric, dimensionPatterns, startTime.getMillis(), endTime.getMillis());
+        if (MapUtils.isNotEmpty(dimensionMap.getDimensionMap())) {
+          anomalyResults = anomalyMergedResultDAO.findByCollectionMetricDimensionsTime(dataset, metric, dimensionMap.toString(), startTime.getMillis(), endTime.getMillis());
         } else {
           anomalyResults = anomalyMergedResultDAO.findByCollectionMetricTime(dataset, metric, startTime.getMillis(), endTime.getMillis());
         }
@@ -512,7 +493,7 @@ public class AnomalyResource {
       throws Exception {
 
     MergedAnomalyResultDTO anomalyResult = anomalyMergedResultDAO.findById(anomalyResultId);
-    String dimensions = anomalyResult.getDimensions();
+    DimensionMap dimensions = anomalyResult.getDimensions();
     AnomalyFunctionDTO anomalyFunctionSpec = anomalyResult.getFunction();
     BaseAnomalyFunction anomalyFunction = anomalyFunctionFactory.fromSpec(anomalyFunctionSpec);
 

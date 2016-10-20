@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.anomaly.alert;
 
+import com.linkedin.thirdeye.api.DimensionMap;
 import java.io.ByteArrayOutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
@@ -115,9 +116,9 @@ public class AlertTaskRunner implements TaskRunner {
     }
 
     // Group by dimension key, then sort according to anomaly result compareTo method.
-    Map<String, List<MergedAnomalyResultDTO>> groupedResults = new TreeMap<>();
+    Map<DimensionMap, List<MergedAnomalyResultDTO>> groupedResults = new TreeMap<>();
     for (MergedAnomalyResultDTO result : results) {
-      String dimensions = result.getDimensions();
+      DimensionMap dimensions = result.getDimensions();
       if (!groupedResults.containsKey(dimensions)) {
         groupedResults.put(dimensions, new ArrayList<>());
       }
@@ -126,9 +127,9 @@ public class AlertTaskRunner implements TaskRunner {
     // sort each list of anomaly results afterwards and keep track of sequence number in a new list
     Map<MergedAnomalyResultDTO, String> anomaliesWithLabels = new LinkedHashMap<>();
     int counter = 1;
-    for (List<MergedAnomalyResultDTO> resultsByDimensionKey : groupedResults.values()) {
-      Collections.sort(resultsByDimensionKey);
-      for (MergedAnomalyResultDTO result : resultsByDimensionKey) {
+    for (List<MergedAnomalyResultDTO> resultsByExploredDimensions : groupedResults.values()) {
+      Collections.sort(resultsByExploredDimensions);
+      for (MergedAnomalyResultDTO result : resultsByExploredDimensions) {
         anomaliesWithLabels.put(result, String.valueOf(counter));
         counter++;
       }
@@ -166,7 +167,7 @@ public class AlertTaskRunner implements TaskRunner {
   }
 
   private void sendAlertForAnomalies(String collectionAlias, List<MergedAnomalyResultDTO> results,
-      Map<String, List<MergedAnomalyResultDTO>> groupedResults, List<String> dimensionNames)
+      Map<DimensionMap, List<MergedAnomalyResultDTO>> groupedResults, List<String> dimensionNames)
       throws JobExecutionException {
 
     long anomalyStartMillis = results.get(0).getStartTime();

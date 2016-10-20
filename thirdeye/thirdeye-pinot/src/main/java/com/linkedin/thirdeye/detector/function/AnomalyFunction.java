@@ -1,10 +1,10 @@
 package com.linkedin.thirdeye.detector.function;
 
+import com.linkedin.thirdeye.api.DimensionMap;
 import java.util.List;
 
 import org.joda.time.DateTime;
 
-import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
@@ -18,8 +18,8 @@ public interface AnomalyFunction {
 
   /**
    * Analyzes a metric time series and returns any anomalous points / intervals.
-   * @param dimensionKey
-   *          The dimension combination corresponding to timeSeries.
+   * @param exploredDimensions
+   *          Pairs of dimension value and name corresponding to timeSeries.
    * @param timeSeries
    *          The metric time series data.
    * @param windowStart
@@ -31,7 +31,7 @@ public interface AnomalyFunction {
    * @return
    *         A list of anomalies that were not previously known.
    */
-  List<RawAnomalyResultDTO> analyze(DimensionKey dimensionKey, MetricTimeSeries timeSeries,
+  List<RawAnomalyResultDTO> analyze(DimensionMap exploredDimensions, MetricTimeSeries timeSeries,
       DateTime windowStart, DateTime windowEnd, List<RawAnomalyResultDTO> knownAnomalies)
       throws Exception;
 
