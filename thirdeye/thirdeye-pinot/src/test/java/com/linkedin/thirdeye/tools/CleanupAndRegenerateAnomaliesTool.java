@@ -1,10 +1,16 @@
 package com.linkedin.thirdeye.tools;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
+
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.http.client.ClientProtocolException;
+import org.joda.time.DateTime;
+import org.joda.time.format.ISODateTimeFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.collections.Lists;
@@ -32,10 +38,11 @@ public class CleanupAndRegenerateAnomaliesTool {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper(new YAMLFactory());
   private enum Mode {
     DELETE,
-    GENERATE
+    GENERATE_FOR_RANGE,
+    GENERATE_FOR_WINDOWS_IN_RANGE
   }
-  private String startTime;
-  private String endTime;
+  private String monitoringWindowStartTime;
+  private String monitoringWindowEndTime;
   private List<Long> functionIds;
 
   private int rawAnomaliesDeleted = 0;
@@ -50,8 +57,8 @@ public class CleanupAndRegenerateAnomaliesTool {
       File persistenceFile, String detectionHost, int detectionPort)
       throws Exception {
     init(persistenceFile);
-    this.startTime = startTime;
-    this.endTime = endTime;
+    this.monitoringWindowStartTime = startTime;
+    this.monitoringWindowEndTime = endTime;
     this.functionIds = getFunctionIds(datasets, functionIds);
     detectionResourceHttpUtils = new DetectionResourceHttpUtils(detectionHost, detectionPort);
   }
@@ -105,7 +112,12 @@ public class CleanupAndRegenerateAnomaliesTool {
   }
 
 
-  private void regenerateAnomalies() throws Exception {
+  /**
+   * Regenerates anomalies for the whole given range as one monitoring window
+   * @throws Exception
+   */
+  private void regenerateAnomaliesInRange() throws Exception {
+    LOG.info("Begin regenerate anomalies for entire range...");
     for (Long functionId : functionIds) {
       AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(functionId);
       boolean isActive = anomalyFunction.getIsActive();
@@ -113,11 +125,51 @@ public class CleanupAndRegenerateAnomaliesTool {
         LOG.info("Skipping function {}", functionId);
         continue;
       }
-      LOG.info("Running adhoc function {}", functionId);
-      String response = detectionResourceHttpUtils.runAdhocAnomalyFunction(String.valueOf(functionId),
-          startTime, endTime);
-      LOG.info("Response {}", response);
+      runAdhocFunctionForWindow(functionId, monitoringWindowStartTime, monitoringWindowEndTime);
     }
+  }
+
+  /**
+   * Breaks down the given range into consecutive monitoring windows as per function definition
+   * Regenerates anomalies for each window separately
+   * @throws Exception
+   */
+  private void regenerateAnomaliesForBucketsInRange() throws Exception {
+    LOG.info("Begin regenerate anomalies for each monitoring window in range...");
+
+    DateTime start = ISODateTimeFormat.dateTimeParser().parseDateTime(monitoringWindowStartTime);
+    DateTime end = ISODateTimeFormat.dateTimeParser().parseDateTime(monitoringWindowEndTime);
+
+    for (Long functionId : functionIds) {
+      AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(functionId);
+      boolean isActive = anomalyFunction.getIsActive();
+      if (!isActive) {
+        LOG.info("Skipping function {}", functionId);
+        continue;
+      }
+
+      long monitoringWindowMillis = TimeUnit.MILLISECONDS.convert(anomalyFunction.getWindowSize(),
+          anomalyFunction.getWindowUnit());
+      DateTime currentStart = end;
+      DateTime currentEnd = end;
+
+      while (currentStart.isAfter(start)) {
+        currentStart = currentStart.minus(monitoringWindowMillis);
+        String monitoringWindowStart = ISODateTimeFormat.dateHour().print(currentStart);
+        String monitoringWindowEnd = ISODateTimeFormat.dateHour().print(currentEnd);
+
+        runAdhocFunctionForWindow(functionId, monitoringWindowStart, monitoringWindowEnd);
+        currentEnd = currentStart;
+      }
+    }
+  }
+
+  private void runAdhocFunctionForWindow(Long functionId, String monitoringWindowStart, String monitoringWindowEnd)
+      throws ClientProtocolException, IOException {
+    LOG.info("Running adhoc function {} for range {} to {}", functionId, monitoringWindowStart, monitoringWindowEnd);
+    String response = detectionResourceHttpUtils.runAdhocAnomalyFunction(String.valueOf(functionId),
+        monitoringWindowStart, monitoringWindowEnd);
+    LOG.info("Response {}", response);
   }
 
   private void deleteRawResults(List<RawAnomalyResultDTO> rawResults) {
@@ -167,7 +219,8 @@ public class CleanupAndRegenerateAnomaliesTool {
 
     String startTimeIso = config.getStartTimeIso();
     String endTimeIso = config.getEndTimeIso();
-    if (Mode.valueOf(mode).equals(Mode.GENERATE)
+    Mode runMode = Mode.valueOf(mode);
+    if ((runMode.equals(Mode.GENERATE_FOR_RANGE) || runMode.equals(Mode.GENERATE_FOR_WINDOWS_IN_RANGE))
         && (StringUtils.isBlank(startTimeIso) || StringUtils.isBlank(endTimeIso))) {
       LOG.error("StarteTime and endTime must be provided in generate mode");
       System.exit(1);
@@ -183,16 +236,23 @@ public class CleanupAndRegenerateAnomaliesTool {
     CleanupAndRegenerateAnomaliesTool tool = new CleanupAndRegenerateAnomaliesTool(startTimeIso,
         endTimeIso, datasets, functionIds, persistenceFile, detectorHost, detectorPort);
 
-    if (Mode.valueOf(mode).equals(Mode.DELETE)) {
+    if (runMode.equals(Mode.DELETE)) {
       // DELETE mode deletes *ALL* anomalies for all functions in functionIds or datasets
       tool.deleteExistingAnomalies();
-    } else if (Mode.valueOf(mode).equals(Mode.GENERATE)) {
-      // GENERATE mode regenerates anomalies for all active functions in functionIds or datasets
-      tool.regenerateAnomalies();
+    } else if (runMode.equals(Mode.GENERATE_FOR_RANGE)) {
+      // GENERATE_FOR_RANGE mode regenerates anomalies for all active functions in functionIds or datasets
+      tool.regenerateAnomaliesInRange();
+    } else if (runMode.equals(Mode.GENERATE_FOR_WINDOWS_IN_RANGE)) {
+      // GENERATE_FOR_WINDOWS_IN_RANGE mode regenerates anomalies for all active functions in functionIds or datasets
+      // It will honor the monitoring window size of the function, and run for all consecutive windows, one by one,
+      // to cover the entire range provided as input
+      tool.regenerateAnomaliesForBucketsInRange();
     } else {
       LOG.error("Incorrect mode {}", mode);
       System.exit(1);
     }
+    // Added this because database connection gets stuck at times and program never terminates
+    System.exit(0);
   }
 
 }
