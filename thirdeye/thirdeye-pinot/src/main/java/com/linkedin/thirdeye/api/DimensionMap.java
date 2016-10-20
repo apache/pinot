@@ -20,6 +20,17 @@ import org.apache.commons.lang.ObjectUtils;
 public class DimensionMap implements Comparable<DimensionMap> {
   private static ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
+  public DimensionMap() {
+  }
+
+  /**
+   * (Backward compatibility) For deleting old anomalies
+   * @param dimensionKeyString
+   */
+  public DimensionMap(String dimensionKeyString) {
+
+  }
+
   // Dimension name to dimension value
   private SortedMap<String, String> dimensionMap = Collections.emptySortedMap();
 
