@@ -68,10 +68,10 @@ public class CacheResource {
   @POST
   @Path("/refresh/datasetConfig")
   public Response refreshDatasetConfigCache() {
-    List<DatasetConfigDTO> datasetConfigs = DAO_REGISTRY.getDatasetConfigDAO().findAll();
+    List<String> collections = CACHE_INSTANCE.getCollectionsCache().getCollections();
     LoadingCache<String,DatasetConfigDTO> cache = CACHE_INSTANCE.getDatasetConfigCache();
-    for (DatasetConfigDTO datasetConfig : datasetConfigs) {
-      cache.refresh(datasetConfig.getDataset());
+    for (String collection : collections) {
+      cache.refresh(collection);
     }
     return Response.ok().build();
   }
@@ -79,10 +79,13 @@ public class CacheResource {
   @POST
   @Path("/refresh/metricConfig")
   public Response refreshMetricConfigCache() {
-    List<MetricConfigDTO> metricConfigs = DAO_REGISTRY.getMetricConfigDAO().findAll();
     LoadingCache<MetricDataset, MetricConfigDTO> cache = CACHE_INSTANCE.getMetricConfigCache();
-    for (MetricConfigDTO metricConfig : metricConfigs) {
-      cache.refresh(new MetricDataset(metricConfig.getName(), metricConfig.getDataset()));
+    List<String> collections = CACHE_INSTANCE.getCollectionsCache().getCollections();
+    for (String collection : collections) {
+      List<MetricConfigDTO> metricConfigs = DAO_REGISTRY.getMetricConfigDAO().findByDataset(collection);
+      for (MetricConfigDTO metricConfig : metricConfigs) {
+        cache.refresh(new MetricDataset(metricConfig.getName(), metricConfig.getDataset()));
+      }
     }
     return Response.ok().build();
   }
@@ -90,10 +93,10 @@ public class CacheResource {
   @POST
   @Path("/refresh/dashboardConfigs")
   public Response refreshDashoardConfigsCache() {
-    List<DatasetConfigDTO> datasetConfigs = DAO_REGISTRY.getDatasetConfigDAO().findAll();
+    List<String> collections = CACHE_INSTANCE.getCollectionsCache().getCollections();
     LoadingCache<String,List<DashboardConfigDTO>> cache = CACHE_INSTANCE.getDashboardConfigsCache();
-    for (DatasetConfigDTO datasetConfig : datasetConfigs) {
-      cache.refresh(datasetConfig.getDataset());
+    for (String collection : collections) {
+      cache.refresh(collection);
     }
     return Response.ok().build();
   }

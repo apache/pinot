@@ -10,6 +10,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import jersey.repackaged.com.google.common.collect.Lists;
+
 import org.apache.http.HttpHost;
 import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.methods.CloseableHttpResponse;
@@ -27,6 +29,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.TimeGranularitySpec;
+import com.linkedin.pinot.common.data.TimeGranularitySpec.TimeFormat;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.api.CollectionSchema;
 import com.linkedin.thirdeye.api.MetricSpec;
@@ -123,7 +126,7 @@ public class LoadMetricsFromPinotTool {
   }
 
 
-  private void loadAllCollections() throws ClientProtocolException, IOException {
+  private void loadAllCollections() throws Exception {
 
     HttpGet tablesReq = new HttpGet(TABLES_ENDPOINT);
     LOG.info("Retrieving collections: {}", tablesReq);
@@ -146,6 +149,18 @@ public class LoadMetricsFromPinotTool {
 
     for (JsonNode table : tables) {
     String collection = table.asText();
+
+      CollectionSchema collectionSchema = null;
+      List<WebappConfigDTO> webappConfigDTOs = webappConfigDAO.
+          findByCollectionAndType(collection, WebappConfigType.COLLECTION_SCHEMA);
+      if (CollectionUtils.isNotEmpty(webappConfigDTOs)) {
+        String configJson = Utils.getJsonFromObject(webappConfigDTOs.get(0).getConfigMap());
+        collectionSchema = CollectionSchema.fromJSON(configJson, CollectionSchema.class);
+        Schema pinotSchema = ThirdEyeUtils.createSchema(collectionSchema);
+        allCollections.add(collection);
+        allSchemas.put(collection, pinotSchema);
+        continue;
+      }
 
       HttpGet schemaReq = new HttpGet(String.format(SCHEMA_ENDPOINT_TEMPLATE, URLEncoder.encode(collection, UTF_8)));
       LOG.info("Retrieving schema: {}", schemaReq);
@@ -222,7 +237,7 @@ public class LoadMetricsFromPinotTool {
     datasetConfigDTO.setTimeColumn(timeSpec.getName());
     datasetConfigDTO.setTimeDuration(timeSpec.getTimeUnitSize());
     datasetConfigDTO.setTimeUnit(timeSpec.getTimeType());
-    // datasetConfigDTO.setTimeFormat(timeSpec.getTimeFormat());
+    datasetConfigDTO.setTimeFormat(timeSpec.getTimeFormat());
     // TODO: Change how to fetch this once we don't have CollectionConfig
     if (collectionConfig != null) {
       if (StringUtils.isNotBlank(collectionConfig.getTimezone())) {
@@ -311,6 +326,9 @@ public class LoadMetricsFromPinotTool {
       String configJson = Utils.getJsonFromObject(webappConfig.getConfigMap());
       DashboardConfig dashboardConfig = DashboardConfig.fromJSON(configJson, DashboardConfig.class);
       String dashboardName = dashboardConfig.getDashboardName();
+      if (dashboardConfigDAO.findByName(dashboardName) != null) {
+        dashboardName = dashboardName + "_" + dataset;
+      }
 
       List<Long> metricIds = new ArrayList<>();
       List<MetricConfigDTO> metricConfigs = new ArrayList<>();
