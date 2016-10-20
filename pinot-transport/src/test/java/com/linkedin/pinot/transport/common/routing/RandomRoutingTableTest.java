@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.transport.common.routing;
 
+import com.linkedin.pinot.routing.PercentageBasedRoutingTableSelector;
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.lang.reflect.Field;
@@ -55,7 +56,8 @@ public class RandomRoutingTableTest {
     ZNRecord externalViewRecord = (ZNRecord) znRecordSerializer.deserialize(IOUtils.toByteArray(evInputStream));
     int totalRuns = 10000;
     RoutingTableBuilder routingStrategy = new BalancedRandomRoutingTableBuilder(10);
-    HelixExternalViewBasedRouting routingTable = new HelixExternalViewBasedRouting(null, null);
+    HelixExternalViewBasedRouting routingTable =
+        new HelixExternalViewBasedRouting(null, new PercentageBasedRoutingTableSelector());
     Field offlineRTBField = HelixExternalViewBasedRouting.class.getDeclaredField("_offlineRoutingTableBuilder");
     offlineRTBField.setAccessible(true);
     offlineRTBField.set(routingTable, routingStrategy);

@@ -100,8 +100,8 @@ public class HelixBrokerStarter {
         new ZkClient(getZkAddressForBroker(zkServers, helixClusterName),
             ZkClient.DEFAULT_SESSION_TIMEOUT, ZkClient.DEFAULT_CONNECTION_TIMEOUT, new ZNRecordSerializer());
     _propertyStore = new ZkHelixPropertyStore<ZNRecord>(new ZkBaseDataAccessor<ZNRecord>(_zkClient), "/", null);
-    RoutingTableSelector selector =
-        RoutingTableSelectorFactory.getRoutingTableSelector(pinotHelixProperties.subset(ROUTING_TABLE_SELECTOR_SUBSET_KEY));
+    RoutingTableSelector selector = RoutingTableSelectorFactory.getRoutingTableSelector(
+        pinotHelixProperties.subset(ROUTING_TABLE_SELECTOR_SUBSET_KEY), _propertyStore);
     _helixExternalViewBasedRouting = new HelixExternalViewBasedRouting(_propertyStore, selector);
 
     LOGGER.info("Connecting Helix components");

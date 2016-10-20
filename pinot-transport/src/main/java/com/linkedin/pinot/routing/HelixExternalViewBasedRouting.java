@@ -221,6 +221,8 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
     } catch (Exception e) {
       LOGGER.error("Failed to update the TimeBoundaryService", e);
     }
+
+    _routingTableSelector.registerTable(tableName);
   }
 
   public void markDataResourceOffline(String tableName) {
