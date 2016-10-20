@@ -199,10 +199,10 @@ public class DetectionJobScheduler implements JobScheduler, Runnable {
     if (anomalyFunctionSpec == null) {
       throw new IllegalArgumentException("No function with id " + id);
     }
-    String triggerKey = String.format("anomaly_adhoc_trigger_%d", anomalyFunctionSpec.getId());
+    String triggerKey = String.format("anomaly_adhoc_trigger_%d_%d", windowStartTime.getMillis(), anomalyFunctionSpec.getId());
     Trigger trigger = TriggerBuilder.newTrigger().withIdentity(triggerKey).startNow().build();
 
-    String jobKey = "adhoc_" + getJobKey(anomalyFunctionSpec.getId(), anomalyFunctionSpec.getFunctionName());
+    String jobKey = "adhoc_" + windowStartTime.getMillis() + "_" + getJobKey(anomalyFunctionSpec.getId(), anomalyFunctionSpec.getFunctionName());
     JobDetail job = JobBuilder.newJob(DetectionJobRunner.class).withIdentity(jobKey).build();
 
     DetectionJobContext detectionJobContext = new DetectionJobContext();

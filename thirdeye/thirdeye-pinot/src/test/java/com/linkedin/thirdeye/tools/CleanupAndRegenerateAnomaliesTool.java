@@ -11,6 +11,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.http.client.ClientProtocolException;
 import org.joda.time.DateTime;
 import org.joda.time.format.ISODateTimeFormat;
+import org.quartz.CronExpression;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.collections.Lists;
@@ -148,18 +149,23 @@ public class CleanupAndRegenerateAnomaliesTool {
         continue;
       }
 
-      long monitoringWindowMillis = TimeUnit.MILLISECONDS.convert(anomalyFunction.getWindowSize(),
+      long monitoringWindowSize = TimeUnit.MILLISECONDS.convert(anomalyFunction.getWindowSize(),
           anomalyFunction.getWindowUnit());
-      DateTime currentStart = end;
-      DateTime currentEnd = end;
+      CronExpression cronExpression = new CronExpression(anomalyFunction.getCron());
 
-      while (currentStart.isAfter(start)) {
-        currentStart = currentStart.minus(monitoringWindowMillis);
-        String monitoringWindowStart = ISODateTimeFormat.dateHour().print(currentStart);
-        String monitoringWindowEnd = ISODateTimeFormat.dateHour().print(currentEnd);
+      DateTime currentStart = start;
+      DateTime currentEnd = currentStart.plus(monitoringWindowSize);
+
+      // Make the end time inclusive
+      end = new DateTime(cronExpression.getNextValidTimeAfter(end.toDate()));
+      while (currentEnd.isBefore(end)) {
+        String monitoringWindowStart = ISODateTimeFormat.dateHourMinute().print(currentStart);
+        String monitoringWindowEnd = ISODateTimeFormat.dateHourMinute().print(currentEnd);
 
         runAdhocFunctionForWindow(functionId, monitoringWindowStart, monitoringWindowEnd);
-        currentEnd = currentStart;
+
+        currentStart = new DateTime(cronExpression.getNextValidTimeAfter(currentStart.toDate()));
+        currentEnd = currentStart.plus(monitoringWindowSize);
       }
     }
   }
