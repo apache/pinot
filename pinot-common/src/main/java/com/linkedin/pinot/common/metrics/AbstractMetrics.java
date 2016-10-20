@@ -324,6 +324,13 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
         addMeteredGlobalValue(meter, 0);
       }
     }
+
+    G[] gauges = getGauges();
+    for (G gauge : gauges) {
+      if (gauge.isGlobal()) {
+        setValueOfGlobalGauge(gauge, 0);
+      }
+    }
   }
 
   /**
@@ -351,4 +358,6 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   protected abstract QP[] getQueryPhases();
 
   protected abstract M[] getMeters();
+
+  protected abstract G[] getGauges();
 }

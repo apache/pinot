@@ -206,11 +206,6 @@ public class ValidationMetrics {
     makeGauge(fullGaugeName, makeMetricName(fullGaugeName), _storedValueGaugeFactory, segmentCount);
   }
 
-  public void updateIdealstateZnodeSizeGauge(final String resource, final long znodeSize) {
-    final String fullGaugeName = makeGaugeName(resource, "IdealstateSize");
-    makeGauge(fullGaugeName, makeMetricName(fullGaugeName), _storedValueGaugeFactory, znodeSize);
-  }
-
   private String makeGaugeName(final String resource, final String gaugeName) {
     return "pinot.controller." + resource + "." + gaugeName;
   }

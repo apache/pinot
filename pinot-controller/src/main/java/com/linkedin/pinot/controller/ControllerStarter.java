@@ -115,7 +115,7 @@ public class ControllerStarter {
       LOGGER.info("Starting retention manager");
       retentionManager.start();
       LOGGER.info("Starting validation manager");
-      validationManager.start(controllerMetrics);
+      validationManager.start();
       LOGGER.info("Starting realtime segment manager");
       realtimeSegmentsManager.start(controllerMetrics);
       PinotLLCRealtimeSegmentManager.getInstance().start();
