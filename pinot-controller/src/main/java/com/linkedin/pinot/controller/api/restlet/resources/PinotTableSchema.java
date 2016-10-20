@@ -1,11 +1,13 @@
 package com.linkedin.pinot.controller.api.restlet.resources;
 
+import com.linkedin.pinot.common.data.Schema;
 import java.io.File;
 import java.io.IOException;
 
 import com.linkedin.pinot.common.metrics.ControllerMeter;
 import com.linkedin.pinot.controller.api.ControllerRestApplication;
 import org.apache.commons.io.FileUtils;
+import org.restlet.data.MediaType;
 import org.restlet.data.Status;
 import org.restlet.representation.Representation;
 import org.restlet.representation.StringRepresentation;
@@ -72,8 +74,15 @@ public class PinotTableSchema extends BasePinotControllerRestletResource {
       AbstractTableConfig config;
       try {
         config = _pinotHelixResourceManager.getTableConfig(tableName, TableType.OFFLINE);
-        return new StringRepresentation(_pinotHelixResourceManager.getSchema(config.getValidationConfig().getSchemaName()).getJSONSchema()
-            .toString());
+        String schemaName = config.getValidationConfig().getSchemaName();
+        Schema schema = _pinotHelixResourceManager.getSchema(schemaName);
+        if (schema == null) {
+          setStatus(Status.CLIENT_ERROR_NOT_FOUND);
+          StringRepresentation repr = new StringRepresentation("{\"error\": \"Schema " + schemaName + " not found\"");
+          repr.setMediaType(MediaType.APPLICATION_JSON);
+          return repr;
+        }
+        return new StringRepresentation(schema.getJSONSchema().toString());
       } catch (Exception e) {
         LOGGER.error("Caught exception while fetching schema for a offline table : {} ", tableName, e);
         ControllerRestApplication.getControllerMetrics().addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_SCHEMA_GET_ERROR, 1L);

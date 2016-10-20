@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.Predicate;
 import org.apache.helix.AccessOption;
@@ -863,10 +864,9 @@ public class PinotHelixResourceManager {
    * @throws JsonMappingException
    * @throws IOException
    */
-  public Schema getSchema(String schemaName) throws JsonParseException, JsonMappingException, IOException {
+  public @Nullable Schema getSchema(String schemaName) throws JsonParseException, JsonMappingException, IOException {
     PinotHelixPropertyStoreZnRecordProvider propertyStoreHelper =
         PinotHelixPropertyStoreZnRecordProvider.forSchema(_propertyStore);
-    LOGGER.info("found schema {} ", schemaName);
     ZNRecord record = propertyStoreHelper.get(schemaName);
     return record != null ? SchemaUtils.fromZNRecord(record) : null;
   }
