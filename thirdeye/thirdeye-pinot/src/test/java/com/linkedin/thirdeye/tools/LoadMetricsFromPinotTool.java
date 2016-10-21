@@ -271,7 +271,9 @@ public class LoadMetricsFromPinotTool {
         }
         if (collectionConfig.getCellSizeExpression() != null
             && collectionConfig.getCellSizeExpression().containsKey(metric)) {
-          metricConfigDTO.setCellSizeExpression(collectionConfig.getCellSizeExpression().get(metric).getExpression());
+          String cellSizeExpression = ThirdEyeUtils.substituteMetricIdsForMetrics(
+              collectionConfig.getCellSizeExpression().get(metric).getExpression(), dataset);
+          metricConfigDTO.setCellSizeExpression(cellSizeExpression);
         }
         metricConfigDTO.setRollupThreshold(collectionConfig.getMetricThreshold());
       }
@@ -302,7 +304,9 @@ public class LoadMetricsFromPinotTool {
           }
           if (collectionConfig.getCellSizeExpression() != null
               && collectionConfig.getCellSizeExpression().containsKey(metric)) {
-            metricConfigDTO.setCellSizeExpression(collectionConfig.getCellSizeExpression().get(metric).getExpression());
+            String cellSizeExpression = ThirdEyeUtils.substituteMetricIdsForMetrics(
+                collectionConfig.getCellSizeExpression().get(metric).getExpression(), dataset);
+            metricConfigDTO.setCellSizeExpression(cellSizeExpression);
           }
           metricConfigDTO.setRollupThreshold(collectionConfig.getMetricThreshold());
 
@@ -429,7 +433,9 @@ public class LoadMetricsFromPinotTool {
       }
       if (collectionConfig.getCellSizeExpression() != null
           && collectionConfig.getCellSizeExpression().containsKey(metric)) {
-        metricConfigDTO.setCellSizeExpression(collectionConfig.getCellSizeExpression().get(metric).getExpression());
+        String cellSizeExpression = ThirdEyeUtils.substituteMetricIdsForMetrics(
+              collectionConfig.getCellSizeExpression().get(metric).getExpression(), dataset);
+          metricConfigDTO.setCellSizeExpression(cellSizeExpression);
       }
       metricConfigDTO.setRollupThreshold(collectionConfig.getMetricThreshold());
 
