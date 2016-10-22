@@ -176,11 +176,4 @@ public class RawAnomalyResultBean extends AbstractBean implements Comparable<Raw
     }
     return ObjectUtils.compare(getId(), o.getId());
   }
-
-  public static class RawAnomalyResultBeanIndexMap extends PropertyMap<RawAnomalyResultBean, RawAnomalyResultIndex> {
-    @Override
-    protected void configure() {
-      map(source.getDimensions().toString()).setDimensions(null);
-    }
-  }
 }

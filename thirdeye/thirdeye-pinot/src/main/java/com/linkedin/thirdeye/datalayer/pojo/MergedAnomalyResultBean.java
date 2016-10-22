@@ -175,11 +175,4 @@ public class MergedAnomalyResultBean extends AbstractBean
         + weight + ", createdTime=" + createdTime + ", message='" + message + '\'' + ", notified="
         + notified + '}';
   }
-
-  public static class MergedAnomalyResultBeanIndexMap extends PropertyMap<MergedAnomalyResultBean, MergedAnomalyResultIndex> {
-    @Override
-    protected void configure() {
-      map(source.getDimensions().toString()).setDimensions(null);
-    }
-  }
 }
