@@ -15,8 +15,10 @@
  */
 package com.linkedin.pinot.controller.helix;
 
+import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metrics.ControllerGauge;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 
@@ -153,12 +155,20 @@ public class SegmentStatusChecker {
     List<String> allTableNames = _pinotHelixResourceManager.getAllPinotTableNames();
     String helixClusterName = _pinotHelixResourceManager.getHelixClusterName();
     HelixAdmin helixAdmin = _pinotHelixResourceManager.getHelixAdmin();
+    int realTimeTableCount = 0;
+    int offlineTableCount = 0;
 
     for (String tableName : allTableNames) {
+      if (TableNameBuilder.getTableTypeFromTableName(tableName).equals(CommonConstants.Helix.TableType.OFFLINE)) {
+        offlineTableCount++;
+      } else {
+        realTimeTableCount++;
+      }
       IdealState idealState = helixAdmin.getResourceIdealState(helixClusterName, tableName);
       if (idealState == null) {
         continue;
       }
+      _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.IDEALSTATE_ZNODE_SIZE, idealState.toString().length());
       ExternalView externalView = helixAdmin.getResourceExternalView(helixClusterName, tableName);
       final int nReplicasIdeal = Integer.parseInt(idealState.getReplicas());
       int nReplicasExternal = nReplicasIdeal;
@@ -206,6 +216,8 @@ public class SegmentStatusChecker {
             nReplicasExternal, nReplicasIdeal);
       }
     }
+    _metricsRegistry.setValueOfGlobalGauge(ControllerGauge.REALTIME_TABLE_COUNT, realTimeTableCount);
+    _metricsRegistry.setValueOfGlobalGauge(ControllerGauge.OFFLINE_TABLE_COUNT, offlineTableCount);
     long totalNanos = System.nanoTime() - startTime;
     LOGGER.info("Segment status metrics completed in {}ms",
         TimeUnit.MILLISECONDS.convert(totalNanos, TimeUnit.NANOSECONDS));

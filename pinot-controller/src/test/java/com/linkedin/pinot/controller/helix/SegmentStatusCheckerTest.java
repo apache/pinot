@@ -54,7 +54,7 @@ public class SegmentStatusCheckerTest {
 
   @Test
   public void basicTest() throws Exception {
-    final String tableName = "myTable";
+    final String tableName = "myTable_OFFLINE";
     List<String> allTableNames = new ArrayList<String>();
     allTableNames.add(tableName);
     IdealState idealState = new IdealState(tableName);
@@ -77,8 +77,8 @@ public class SegmentStatusCheckerTest {
     HelixAdmin helixAdmin;
     {
       helixAdmin = mock(HelixAdmin.class);
-      when(helixAdmin.getResourceIdealState("StatusChecker","myTable")).thenReturn(idealState);
-      when(helixAdmin.getResourceExternalView("StatusChecker","myTable")).thenReturn(externalView);
+      when(helixAdmin.getResourceIdealState("StatusChecker",tableName)).thenReturn(idealState);
+      when(helixAdmin.getResourceExternalView("StatusChecker",tableName)).thenReturn(externalView);
     }
     {
       helixResourceManager = mock(PinotHelixResourceManager.class);
@@ -105,7 +105,7 @@ public class SegmentStatusCheckerTest {
 
   @Test
   public void nonLeaderTest() throws Exception {
-    final String tableName = "myTable";
+    final String tableName = "myTable_REALTIME";
     List<String> allTableNames = new ArrayList<String>();
     allTableNames.add(tableName);
 
@@ -138,7 +138,7 @@ public class SegmentStatusCheckerTest {
 
   @Test
   public void missingEVPartitionTest() throws Exception {
-    final String tableName = "myTable";
+    final String tableName = "myTable_OFFLINE";
     List<String> allTableNames = new ArrayList<String>();
     allTableNames.add(tableName);
     IdealState idealState = new IdealState(tableName);
@@ -162,8 +162,8 @@ public class SegmentStatusCheckerTest {
     HelixAdmin helixAdmin;
     {
       helixAdmin = mock(HelixAdmin.class);
-      when(helixAdmin.getResourceIdealState("StatusChecker","myTable")).thenReturn(idealState);
-      when(helixAdmin.getResourceExternalView("StatusChecker","myTable")).thenReturn(externalView);
+      when(helixAdmin.getResourceIdealState("StatusChecker",tableName)).thenReturn(idealState);
+      when(helixAdmin.getResourceExternalView("StatusChecker",tableName)).thenReturn(externalView);
     }
     {
       helixResourceManager = mock(PinotHelixResourceManager.class);
@@ -190,7 +190,7 @@ public class SegmentStatusCheckerTest {
 
   @Test
   public void missingEVTest() throws Exception {
-    final String tableName = "myTable";
+    final String tableName = "myTable_REALTIME";
     List<String> allTableNames = new ArrayList<String>();
     allTableNames.add(tableName);
     IdealState idealState = new IdealState(tableName);
@@ -207,8 +207,8 @@ public class SegmentStatusCheckerTest {
     HelixAdmin helixAdmin;
     {
       helixAdmin = mock(HelixAdmin.class);
-      when(helixAdmin.getResourceIdealState("StatusChecker","myTable")).thenReturn(idealState);
-      when(helixAdmin.getResourceExternalView("StatusChecker","myTable")).thenReturn(null);
+      when(helixAdmin.getResourceIdealState("StatusChecker",tableName)).thenReturn(idealState);
+      when(helixAdmin.getResourceExternalView("StatusChecker",tableName)).thenReturn(null);
     }
     {
       helixResourceManager = mock(PinotHelixResourceManager.class);
@@ -235,7 +235,7 @@ public class SegmentStatusCheckerTest {
 
   @Test
   public void missingIdealTest() throws Exception {
-    final String tableName = "myTable";
+    final String tableName = "myTable_REALTIME";
     List<String> allTableNames = new ArrayList<String>();
     allTableNames.add(tableName);
     IdealState idealState = null;
@@ -243,8 +243,8 @@ public class SegmentStatusCheckerTest {
     HelixAdmin helixAdmin;
     {
       helixAdmin = mock(HelixAdmin.class);
-      when(helixAdmin.getResourceIdealState("StatusChecker","myTable")).thenReturn(null);
-      when(helixAdmin.getResourceExternalView("StatusChecker","myTable")).thenReturn(null);
+      when(helixAdmin.getResourceIdealState("StatusChecker",tableName)).thenReturn(null);
+      when(helixAdmin.getResourceExternalView("StatusChecker",tableName)).thenReturn(null);
     }
     {
       helixResourceManager = mock(PinotHelixResourceManager.class);

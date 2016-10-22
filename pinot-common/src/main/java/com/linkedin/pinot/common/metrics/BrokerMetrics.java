@@ -41,4 +41,8 @@ public class BrokerMetrics extends AbstractMetrics<BrokerQueryPhase, BrokerMeter
   protected BrokerMeter[] getMeters() {
     return BrokerMeter.values();
   }
+
+  protected BrokerGauge[] getGauges() {
+    return BrokerGauge.values();
+  }
 }

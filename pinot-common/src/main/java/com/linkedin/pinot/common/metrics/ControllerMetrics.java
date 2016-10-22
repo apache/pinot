@@ -35,4 +35,9 @@ public class ControllerMetrics extends AbstractMetrics<AbstractMetrics.QueryPhas
   protected ControllerMeter[] getMeters() {
     return ControllerMeter.values();
   }
+
+  @Override
+  protected ControllerGauge[] getGauges() {
+    return ControllerGauge.values();
+  }
 }

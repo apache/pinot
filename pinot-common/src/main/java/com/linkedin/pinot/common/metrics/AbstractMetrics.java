@@ -267,6 +267,35 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   }
 
   /**
+   * Sets the value of a global  gauge.
+   *
+   * @param gauge The gauge to use
+   * @param value The value to set the gauge to
+   */
+  public void setValueOfGlobalGauge(final G gauge, final long value) {
+    final String fullGaugeName;
+    final String gaugeName = gauge.getGaugeName();
+
+    if (!_gaugeValues.containsKey(gaugeName)) {
+      synchronized (_gaugeValues) {
+        if(!_gaugeValues.containsKey(gaugeName)) {
+          _gaugeValues.put(gaugeName, new AtomicLong(value));
+          addCallbackGauge(gaugeName, new Callable<Long>() {
+            @Override
+            public Long call() throws Exception {
+              return _gaugeValues.get(gaugeName).get();
+            }
+          });
+        } else {
+          _gaugeValues.get(gaugeName).set(value);
+        }
+      }
+    } else {
+      _gaugeValues.get(gaugeName).set(value);
+    }
+  }
+
+  /**
    * Gets the value of a table gauge.
    *
    * @param tableName The table name
@@ -293,6 +322,13 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     for (M meter : meters) {
       if (meter.isGlobal()) {
         addMeteredGlobalValue(meter, 0);
+      }
+    }
+
+    G[] gauges = getGauges();
+    for (G gauge : gauges) {
+      if (gauge.isGlobal()) {
+        setValueOfGlobalGauge(gauge, 0);
       }
     }
   }
@@ -322,4 +358,6 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   protected abstract QP[] getQueryPhases();
 
   protected abstract M[] getMeters();
+
+  protected abstract G[] getGauges();
 }
