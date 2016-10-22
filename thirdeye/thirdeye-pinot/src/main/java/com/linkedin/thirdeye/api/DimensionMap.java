@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.api;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.Iterator;
@@ -20,6 +22,8 @@ import org.apache.commons.lang.ObjectUtils;
  * "page_name":"front_page"}}, we only need to store {"country":"US","page_name":"front_page"}.
  */
 public class DimensionMap implements SortedMap<String, String>, Comparable<DimensionMap> {
+  private static ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
   // Dimension name to dimension value pairs, which are sorted by dimension names
   private SortedMap<String, String> sortedDimensionMap = new TreeMap<>();
 
@@ -61,6 +65,11 @@ public class DimensionMap implements SortedMap<String, String>, Comparable<Dimen
     return dimensionMap;
   }
 
+  public String toJson()
+      throws JsonProcessingException {
+    return OBJECT_MAPPER.writeValueAsString(this);
+  }
+
   @Override
   public boolean equals(Object o) {
     if (o instanceof DimensionMap) {
@@ -79,22 +88,19 @@ public class DimensionMap implements SortedMap<String, String>, Comparable<Dimen
   /**
    * Returns the compared result of the string representation of dimension maps.
    *
-   * @param o the other explored dimensions.
+   * Examples:
+   * 1. a={}, b={"K"="V"} --> a="", b="KV" --> a < b
+   * 2. a={"K"="V"}, b={"K"="V"} --> a="KV", b="KV" --> a = b
+   * 3. a={"K2"="V1"}, b={"K1"="V1","K2"="V2"} --> a="K2V1", b="K1V1K2V2" --> b < a
+   *
+   * @param o the dimension to compare to
    */
   @Override
   public int compareTo(DimensionMap o) {
-    if (sortedDimensionMap == null && o.sortedDimensionMap == null) {
-      return 0;
-    } else if (sortedDimensionMap == null) {
-      return -1;
-    } else if (o.sortedDimensionMap == null) {
-      return 1;
-    }
-
     Iterator<Map.Entry<String, String>> thisIte = sortedDimensionMap.entrySet().iterator();
     Iterator<Map.Entry<String, String>> thatIte = o.sortedDimensionMap.entrySet().iterator();
     if (thisIte.hasNext()) {
-      // o has a smaller map
+      // o is a smaller map
       if (!thatIte.hasNext()) {
         return 1;
       }
@@ -113,7 +119,7 @@ public class DimensionMap implements SortedMap<String, String>, Comparable<Dimen
       }
     }
 
-    // o has a larger map
+    // o is a larger map
     if (thatIte.hasNext()) {
       return -1;
     }
@@ -123,7 +129,7 @@ public class DimensionMap implements SortedMap<String, String>, Comparable<Dimen
 
   @Override
   public Comparator<? super String> comparator() {
-    return null;
+    return sortedDimensionMap.comparator();
   }
 
   @Override

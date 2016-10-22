@@ -109,14 +109,12 @@ public class GenericPojoDao {
   GenericResultSetMapper genericResultSetMapper;
 
   static ModelMapper MODEL_MAPPER = new ModelMapper();
-
   static {
     MODEL_MAPPER.addMappings(new RawAnomalyResultBeanIndexMap());
     MODEL_MAPPER.addMappings(new MergedAnomalyResultBeanIndexMap());
   }
 
   static ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-
 
   public GenericPojoDao() {}
 
@@ -477,7 +475,7 @@ public class GenericPojoDao {
     @Override
     protected void configure() {
       try {
-        map(OBJECT_MAPPER.writeValueAsString(source.getDimensions())).setDimensions(null);
+        map(source.getDimensions().toJson()).setDimensions(null);
       } catch (JsonProcessingException e) {
         LOG.warn("Failed to convert sorted dimension map to json string for persistence: {}", e.toString());
       }
@@ -488,7 +486,7 @@ public class GenericPojoDao {
     @Override
     protected void configure() {
       try {
-        map(OBJECT_MAPPER.writeValueAsString(source.getDimensions())).setDimensions(null);
+        map(source.getDimensions().toJson()).setDimensions(null);
       } catch (JsonProcessingException e) {
         LOG.warn("Failed to convert sorted dimension map to json string for persistence: {}", e.toString());
       }
