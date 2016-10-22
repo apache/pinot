@@ -15,7 +15,6 @@ import java.io.IOException;
 import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -34,7 +33,6 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
-import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
 import org.joda.time.format.ISODateTimeFormat;
@@ -43,7 +41,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.client.DAORegistry;
@@ -64,14 +61,12 @@ import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
-import jersey.repackaged.com.google.common.base.Joiner;
-import jersey.repackaged.com.google.common.collect.Lists;
-
 @Path(value = "/dashboard")
 @Produces(MediaType.APPLICATION_JSON)
 public class AnomalyResource {
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
   private static final Logger LOG = LoggerFactory.getLogger(AnomalyResource.class);
+  private static ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private static final String DEFAULT_CRON = "0 0 0 * * ?";
   private static final String UTF8 = "UTF-8";
@@ -113,7 +108,7 @@ public class AnomalyResource {
       @QueryParam("startTimeIso") String startTimeIso,
       @QueryParam("endTimeIso") String endTimeIso,
       @QueryParam("metric") String metric,
-      @QueryParam("dimensions") String dimensionMapJson) {
+      @QueryParam("dimensions") String exploredDimensions) {
 
     if (StringUtils.isBlank(dataset)) {
       throw new IllegalArgumentException("dataset is a required query param");
@@ -129,20 +124,21 @@ public class AnomalyResource {
     }
     List<MergedAnomalyResultDTO> anomalyResults = new ArrayList<>();
     try {
-      DimensionMap dimensionMap = null;
-      if (StringUtils.isNotBlank(dimensionMapJson)) {
-        // get dimensions map from request
-        dimensionMapJson = URLDecoder.decode(dimensionMapJson, UTF8 );
+      if (StringUtils.isNotBlank(exploredDimensions)) {
+        // Decode dimensions map from request, which may contain encode symbols such as "%20D", etc.
+        exploredDimensions = URLDecoder.decode(exploredDimensions, UTF8);
         try {
-          dimensionMap = DimensionMap.fromJsonString(dimensionMapJson);
+          // Ensure the dimension names are sorted in order to match the string in backend database
+          DimensionMap sortedDimensions = OBJECT_MAPPER.readValue(exploredDimensions, DimensionMap.class);
+          exploredDimensions = OBJECT_MAPPER.writeValueAsString(sortedDimensions);
         } catch (IOException e) {
-          LOG.warn("Unable to construct explore dimensions to dimension map: {}", e.toString());
+          LOG.warn("exploreDimensions may not be sorted because failed to read it as a json string: {}", e.toString());
         }
       }
 
       if (StringUtils.isNotBlank(metric)) {
-        if (MapUtils.isNotEmpty(dimensionMap.getDimensionMap())) {
-          anomalyResults = anomalyMergedResultDAO.findByCollectionMetricDimensionsTime(dataset, metric, dimensionMap.toString(), startTime.getMillis(), endTime.getMillis());
+        if (StringUtils.isNotBlank(exploredDimensions)) {
+          anomalyResults = anomalyMergedResultDAO.findByCollectionMetricDimensionsTime(dataset, metric, exploredDimensions, startTime.getMillis(), endTime.getMillis());
         } else {
           anomalyResults = anomalyMergedResultDAO.findByCollectionMetricTime(dataset, metric, startTime.getMillis(), endTime.getMillis());
         }
@@ -422,8 +418,7 @@ public class AnomalyResource {
       if (result == null) {
         throw new IllegalArgumentException("AnomalyResult not found with id " + anomalyResultId);
       }
-      ObjectMapper mapper = new ObjectMapper();
-      AnomalyFeedbackDTO feedbackRequest = mapper.readValue(payload, AnomalyFeedbackDTO.class);
+      AnomalyFeedbackDTO feedbackRequest = OBJECT_MAPPER.readValue(payload, AnomalyFeedbackDTO.class);
       AnomalyFeedbackDTO feedback = result.getFeedback();
       if (feedback == null) {
         feedback = new AnomalyFeedbackDTO();
@@ -451,8 +446,7 @@ public class AnomalyResource {
       if (result == null) {
         throw new IllegalArgumentException("AnomalyResult not found with id " + anomalyResultId);
       }
-      ObjectMapper mapper = new ObjectMapper();
-      AnomalyFeedbackDTO feedbackRequest = mapper.readValue(payload, AnomalyFeedbackDTO.class);
+      AnomalyFeedbackDTO feedbackRequest = OBJECT_MAPPER.readValue(payload, AnomalyFeedbackDTO.class);
       AnomalyFeedbackDTO feedback = result.getFeedback();
       if (feedback == null) {
         feedback = new AnomalyFeedbackDTO();

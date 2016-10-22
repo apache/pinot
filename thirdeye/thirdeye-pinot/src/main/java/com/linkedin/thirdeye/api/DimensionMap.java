@@ -1,12 +1,11 @@
 package com.linkedin.thirdeye.api;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import java.io.IOException;
-import java.util.Collections;
+import java.util.Collection;
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import org.apache.commons.collections.CollectionUtils;
@@ -14,37 +13,27 @@ import org.apache.commons.lang.ObjectUtils;
 
 
 /**
- * Wrapper class to represent key-value pairs of explored dimension name and value. The paris of explore dimensions are
- * sorted by their dimension names in ascending order.
+ * Stores key-value pairs of dimension name and value. The paris are sorted by their dimension names in ascending order.
+ *
+ * To reduces the length of string to be stored in database, this class implements SortedMap<String, String> for
+ * converting to/from Json string in Map format, i.e., instead of storing {"sortedDimensionMap":{"country":"US",
+ * "page_name":"front_page"}}, we only need to store {"country":"US","page_name":"front_page"}.
  */
-public class DimensionMap implements Comparable<DimensionMap> {
-  private static ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+public class DimensionMap implements SortedMap<String, String>, Comparable<DimensionMap> {
+  // Dimension name to dimension value pairs, which are sorted by dimension names
+  private SortedMap<String, String> sortedDimensionMap = new TreeMap<>();
 
   public DimensionMap() {
   }
 
   /**
-   * (Backward compatibility) For deleting old anomalies
+   * (Backward compatibility) For cleaning old anomalies from database.
+   *
+   * TODO: Remove this constructor after old anomalies are deleted
+   *
    * @param dimensionKeyString
    */
   public DimensionMap(String dimensionKeyString) {
-
-  }
-
-  // Dimension name to dimension value
-  private SortedMap<String, String> dimensionMap = Collections.emptySortedMap();
-
-  public SortedMap<String, String> getDimensionMap() {
-    return Collections.unmodifiableSortedMap(dimensionMap);
-  }
-
-  public void setDimensionMap(Map<String, String> dimensionMap) {
-    this.dimensionMap = new TreeMap<>(dimensionMap);
-  }
-
-  public static DimensionMap fromJsonString(String dimensionMapJsonString)
-      throws IOException {
-    return OBJECT_MAPPER.readValue(dimensionMapJsonString, DimensionMap.class);
   }
 
   /**
@@ -60,40 +49,23 @@ public class DimensionMap implements Comparable<DimensionMap> {
   public static DimensionMap fromDimensionKey(DimensionKey dimensionKey, List<String> schemaDimensionNames) {
     DimensionMap dimensionMap = new DimensionMap();
     if (CollectionUtils.isNotEmpty(schemaDimensionNames)) {
-      SortedMap<String, String> exploredDimensionMap = new TreeMap<>();
       String[] dimensionValues = dimensionKey.getDimensionValues();
       for (int i = 0; i < dimensionValues.length; ++i) {
         String dimensionValue = dimensionValues[i].trim();
         if (!dimensionValue.equals("") && !dimensionValue.equals("*")) {
           String dimensionName = schemaDimensionNames.get(i);
-          exploredDimensionMap.put(dimensionName, dimensionValue);
+          dimensionMap.put(dimensionName, dimensionValue);
         }
       }
-      dimensionMap.setDimensionMap(exploredDimensionMap);
-    } else {
-      dimensionMap.setDimensionMap(Collections.emptySortedMap());
     }
     return dimensionMap;
-  }
-
-  public int size() {
-    return dimensionMap.size();
-  }
-
-  @Override
-  public String toString() {
-    try {
-      return OBJECT_MAPPER.writeValueAsString(this);
-    } catch (JsonProcessingException e) {
-      return this.toString();
-    }
   }
 
   @Override
   public boolean equals(Object o) {
     if (o instanceof DimensionMap) {
       DimensionMap otherDimensionMap = (DimensionMap) o;
-      return ObjectUtils.equals(dimensionMap, otherDimensionMap.dimensionMap);
+      return ObjectUtils.equals(sortedDimensionMap, otherDimensionMap.sortedDimensionMap);
     } else {
       return false;
     }
@@ -101,7 +73,7 @@ public class DimensionMap implements Comparable<DimensionMap> {
 
   @Override
   public int hashCode() {
-    return dimensionMap.hashCode();
+    return sortedDimensionMap.hashCode();
   }
 
   /**
@@ -111,16 +83,16 @@ public class DimensionMap implements Comparable<DimensionMap> {
    */
   @Override
   public int compareTo(DimensionMap o) {
-    if (dimensionMap == null && o.dimensionMap == null) {
+    if (sortedDimensionMap == null && o.sortedDimensionMap == null) {
       return 0;
-    } else if (dimensionMap == null) {
+    } else if (sortedDimensionMap == null) {
       return -1;
-    } else if (o.dimensionMap == null) {
+    } else if (o.sortedDimensionMap == null) {
       return 1;
     }
 
-    Iterator<Map.Entry<String, String>> thisIte = dimensionMap.entrySet().iterator();
-    Iterator<Map.Entry<String, String>> thatIte = o.dimensionMap.entrySet().iterator();
+    Iterator<Map.Entry<String, String>> thisIte = sortedDimensionMap.entrySet().iterator();
+    Iterator<Map.Entry<String, String>> thatIte = o.sortedDimensionMap.entrySet().iterator();
     if (thisIte.hasNext()) {
       // o has a smaller map
       if (!thatIte.hasNext()) {
@@ -148,4 +120,95 @@ public class DimensionMap implements Comparable<DimensionMap> {
 
     return 0;
   }
+
+  @Override
+  public Comparator<? super String> comparator() {
+    return null;
+  }
+
+  @Override
+  public SortedMap<String, String> subMap(String fromKey, String toKey) {
+    return sortedDimensionMap.subMap(fromKey, toKey);
+  }
+
+  @Override
+  public SortedMap<String, String> headMap(String toKey) {
+    return sortedDimensionMap.headMap(toKey);
+  }
+
+  @Override
+  public SortedMap<String, String> tailMap(String fromKey) {
+    return sortedDimensionMap.tailMap(fromKey);
+  }
+
+  @Override
+  public String firstKey() {
+    return sortedDimensionMap.firstKey();
+  }
+
+  @Override
+  public String lastKey() {
+    return sortedDimensionMap.lastKey();
+  }
+
+  @Override
+  public int size() {
+    return sortedDimensionMap.size();
+  }
+
+  @Override
+  public boolean isEmpty() {
+    return sortedDimensionMap.isEmpty();
+  }
+
+  @Override
+  public boolean containsKey(Object key) {
+    return sortedDimensionMap.containsKey(key);
+  }
+
+  @Override
+  public boolean containsValue(Object value) {
+    return sortedDimensionMap.containsValue(value);
+  }
+
+  @Override
+  public String get(Object key) {
+    return sortedDimensionMap.get(key);
+  }
+
+  @Override
+  public String put(String key, String value) {
+    return sortedDimensionMap.put(key, value);
+  }
+
+  @Override
+  public String remove(Object key) {
+    return sortedDimensionMap.remove(key);
+  }
+
+  @Override
+  public void putAll(Map<? extends String, ? extends String> m) {
+    sortedDimensionMap.putAll(m);
+  }
+
+  @Override
+  public void clear() {
+    sortedDimensionMap.clear();
+  }
+
+  @Override
+  public Set<String> keySet() {
+    return sortedDimensionMap.keySet();
+  }
+
+  @Override
+  public Collection<String> values() {
+    return sortedDimensionMap.values();
+  }
+
+  @Override
+  public Set<Entry<String, String>> entrySet() {
+    return sortedDimensionMap.entrySet();
+  }
+
 }

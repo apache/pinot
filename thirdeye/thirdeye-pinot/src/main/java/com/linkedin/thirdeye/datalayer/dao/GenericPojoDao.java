@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.datalayer.dao;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -18,7 +19,7 @@ import javax.sql.DataSource;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.modelmapper.ModelMapper;
-import org.modelmapper.TypeMap;
+import org.modelmapper.PropertyMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -110,8 +111,8 @@ public class GenericPojoDao {
   static ModelMapper MODEL_MAPPER = new ModelMapper();
 
   static {
-    MODEL_MAPPER.addMappings(new RawAnomalyResultBean.RawAnomalyResultBeanIndexMap());
-    MODEL_MAPPER.addMappings(new MergedAnomalyResultBean.MergedAnomalyResultBeanIndexMap());
+    MODEL_MAPPER.addMappings(new RawAnomalyResultBeanIndexMap());
+    MODEL_MAPPER.addMappings(new MergedAnomalyResultBeanIndexMap());
   }
 
   static ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -470,6 +471,28 @@ public class GenericPojoDao {
     String indexTableName;
     Class<? extends AbstractIndexEntity> indexEntityClass;
     List<String> indexTableColumns;
+  }
+
+  public static class RawAnomalyResultBeanIndexMap extends PropertyMap<RawAnomalyResultBean, RawAnomalyResultIndex> {
+    @Override
+    protected void configure() {
+      try {
+        map(OBJECT_MAPPER.writeValueAsString(source.getDimensions())).setDimensions(null);
+      } catch (JsonProcessingException e) {
+        LOG.warn("Failed to convert sorted dimension map to json string for persistence: {}", e.toString());
+      }
+    }
+  }
+
+  public static class MergedAnomalyResultBeanIndexMap extends PropertyMap<MergedAnomalyResultBean, MergedAnomalyResultIndex> {
+    @Override
+    protected void configure() {
+      try {
+        map(OBJECT_MAPPER.writeValueAsString(source.getDimensions())).setDimensions(null);
+      } catch (JsonProcessingException e) {
+        LOG.warn("Failed to convert sorted dimension map to json string for persistence: {}", e.toString());
+      }
+    }
   }
 
 }

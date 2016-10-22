@@ -92,7 +92,7 @@ public abstract class ThirdEyeUtils {
       filterToDecorate = HashMultimap.create();
     }
 
-    for (Map.Entry<String, String> entry : dimensionMap.getDimensionMap().entrySet()) {
+    for (Map.Entry<String, String> entry : dimensionMap.entrySet()) {
       String dimensionName = entry.getKey();
       String dimensionValue = entry.getValue();
       filterToDecorate.removeAll(dimensionName);

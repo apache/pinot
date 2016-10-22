@@ -182,10 +182,8 @@ public abstract class AbstractManagerTestBase {
     anomalyResult.setStartTime(System.currentTimeMillis());
     anomalyResult.setEndTime(System.currentTimeMillis());
     anomalyResult.setWeight(10.1);
-    SortedMap<String, String> exploredDimensions = new TreeMap<>();
-    exploredDimensions.put("dimensionName", "dimensionValue");
     DimensionMap dimensionMap = new DimensionMap();
-    dimensionMap.setDimensionMap(exploredDimensions);
+    dimensionMap.put("dimensionName", "dimensionValue");
     anomalyResult.setDimensions(dimensionMap);
     anomalyResult.setCreationTimeUtc(System.currentTimeMillis());
     return anomalyResult;

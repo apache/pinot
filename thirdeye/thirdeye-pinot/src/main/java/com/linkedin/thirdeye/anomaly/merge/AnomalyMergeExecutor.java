@@ -214,7 +214,7 @@ public class AnomalyMergeExecutor implements Runnable {
       timeSeriesRequest.setGroupByDimensions(Arrays.asList(exploreDimensions.trim().split(",")));
 
       DimensionMap exploredDimensions = anomalyMergedResult.getDimensions();
-      for (Map.Entry<String, String> entry : exploredDimensions.getDimensionMap().entrySet()) {
+      for (Map.Entry<String, String> entry : exploredDimensions.entrySet()) {
         String dimensionName = entry.getKey();
         String dimensionValue = entry.getValue();
         filters.removeAll(dimensionName);
