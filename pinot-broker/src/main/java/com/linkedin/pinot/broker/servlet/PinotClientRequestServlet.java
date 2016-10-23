@@ -89,6 +89,7 @@ public class PinotClientRequestServlet extends HttpServlet {
   }
 
   private JSONObject extractJSON(HttpServletRequest req) throws IOException, JSONException {
+    req.setCharacterEncoding("UTF-8");
     final StringBuilder requestStr = new StringBuilder();
     String line;
     final BufferedReader reader = req.getReader();

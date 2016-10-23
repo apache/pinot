@@ -415,6 +415,39 @@ public class DictionariesTest {
   }
 
   /**
+   * Test for ensuring that Strings with special characters can be handled
+   * correctly.
+   *
+   * @throws Exception
+   */
+  @Test
+  public void testUTF8Characters()
+      throws Exception {
+    File indexDir = new File("/tmp/dict.test");
+    indexDir.deleteOnExit();
+    FieldSpec fieldSpec = new DimensionFieldSpec("test", DataType.STRING, true);
+
+    String[] inputStrings = new String[3];
+    char paddingChar = '%';
+
+    inputStrings[0] = new String(new byte[] {67, 97, 102, -61, -87}); // "Café";
+    inputStrings[1] = new String(new byte[] {70, 114, 97, 110, -61, -89, 111, 105, 115}); // "François";
+    inputStrings[2] = new String(new byte[] {67, -61, -76, 116, 101, 32, 100, 39, 73, 118, 111, 105, 114, 101}); // "Côte d'Ivoire";
+    Arrays.sort(inputStrings);
+
+    SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(false, inputStrings, fieldSpec, indexDir,
+        paddingChar);
+    dictionaryCreator.build(new boolean[] {false});
+
+    for (String inputString : inputStrings) {
+      Assert.assertTrue(dictionaryCreator.indexOfSV(inputString) >= 0, "Value not found in dictionary " + inputString);
+    }
+
+    dictionaryCreator.close();
+    FileUtils.deleteQuietly(indexDir);
+  }
+
+  /**
    * Tests SegmentDictionaryCreator for case when there is only one string
    * and it is empty
    *
