@@ -1,8 +1,12 @@
 package com.linkedin.thirdeye.datalayer.pojo;
 
+import com.linkedin.thirdeye.api.DimensionMap;
+import com.linkedin.thirdeye.datalayer.entity.MergedAnomalyResultIndex;
 import java.util.List;
 import java.util.Objects;
 import org.apache.commons.lang.ObjectUtils;
+import org.modelmapper.PropertyMap;
+
 
 public class MergedAnomalyResultBean extends AbstractBean
     implements Comparable<MergedAnomalyResultBean> {
@@ -11,7 +15,7 @@ public class MergedAnomalyResultBean extends AbstractBean
   private List<Long> rawAnomalyIdList;
   private String collection;
   private String metric;
-  private String dimensions;
+  private DimensionMap dimensions;
   private Long startTime;
   private Long endTime;
   // significance level
@@ -71,11 +75,11 @@ public class MergedAnomalyResultBean extends AbstractBean
     this.endTime = endTime;
   }
 
-  public String getDimensions() {
+  public DimensionMap getDimensions() {
     return dimensions;
   }
 
-  public void setDimensions(String dimensions) {
+  public void setDimensions(DimensionMap dimensions) {
     this.dimensions = dimensions;
   }
 

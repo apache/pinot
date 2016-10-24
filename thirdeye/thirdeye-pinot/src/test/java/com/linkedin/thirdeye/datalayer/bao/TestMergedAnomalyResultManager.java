@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.datalayer.bao;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -79,9 +81,17 @@ public class TestMergedAnomalyResultManager extends AbstractManagerTestBase {
 
   @Test(dependsOnMethods = {"testMergedResultCRUD"})
   public void testFindByCollectionMetricDimensions() {
+    String exploredDimensionString;
+    try {
+      ObjectMapper mapper = new ObjectMapper();
+      exploredDimensionString = mapper.writeValueAsString(mergedResult.getDimensions());
+    } catch (JsonProcessingException e) {
+      exploredDimensionString = "";
+    }
     List<MergedAnomalyResultDTO> mergedResults = mergedResultDAO
         .findByCollectionMetricDimensionsTime(mergedResult.getCollection(), mergedResult.getMetric(),
-           new String[] {mergedResult.getDimensions()}, 0, System.currentTimeMillis());
+           exploredDimensionString, 0, System.currentTimeMillis());
+
     Assert.assertEquals(mergedResults.get(0), mergedResult);
   }
 }

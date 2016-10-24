@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.anomaly.merge;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 
+import com.linkedin.thirdeye.api.DimensionMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -35,7 +36,6 @@ import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
@@ -213,32 +213,20 @@ public class AnomalyMergeExecutor implements Runnable {
     if (StringUtils.isNotBlank(exploreDimensions)) {
       timeSeriesRequest.setGroupByDimensions(Arrays.asList(exploreDimensions.trim().split(",")));
 
-      List<String> collectionDimensions = null;
-      try {
-        DatasetConfigDTO datasetConfig = CACHE_REGISTRY_INSTANCE.
-            getDatasetConfigCache().get(anomalyFunctionSpec.getCollection());
-        collectionDimensions = datasetConfig.getDimensions();
-      } catch (Exception e) {
-        LOG.error("Exception when reading collection schema cache", e);
-      }
-
-      String anomalyDimensionValues = anomalyMergedResult.getDimensions();
-      String[] dimensionValues = anomalyDimensionValues.split(","); // e.g., "RU, oz-winner, *, *"
-      for (int i = 0; i < dimensionValues.length; ++i) {
-        String dimensionValue = dimensionValues[i];
-        if (!StringUtils.isBlank(dimensionValue) && !"*".equals(dimensionValue)) {
-          String dimensionName = collectionDimensions.get(i);
-          filters.removeAll(dimensionName);
-          if (dimensionValue.equalsIgnoreCase("other")) {
-            filters.put(dimensionName, dimensionValue);
-            filters.put(dimensionName, dimensionValue.toLowerCase());
-            filters.put(dimensionName, "");
-          } else {
-            // Only add a specific dimension value filter if there are more values present for the same dimension
-            filters.put(dimensionName, dimensionValue);
-          }
-          LOG.info("Adding filter : [{} = {}] in the query", dimensionName, dimensionValue);
+      DimensionMap exploredDimensions = anomalyMergedResult.getDimensions();
+      for (Map.Entry<String, String> entry : exploredDimensions.entrySet()) {
+        String dimensionName = entry.getKey();
+        String dimensionValue = entry.getValue();
+        filters.removeAll(dimensionName);
+        if (dimensionValue.equalsIgnoreCase("other")) {
+          filters.put(dimensionName, dimensionValue);
+          filters.put(dimensionName, dimensionValue.toLowerCase());
+          filters.put(dimensionName, "");
+        } else {
+          // Only add a specific dimension value filter if there are more values present for the same dimension
+          filters.put(dimensionName, dimensionValue);
         }
+        LOG.info("Adding filter : [{} = {}] in the query", dimensionName, dimensionValue);
       }
     }
 
@@ -356,18 +344,18 @@ public class AnomalyMergeExecutor implements Runnable {
   private void performMergeBasedOnFunctionIdAndDimensions(AnomalyFunctionDTO function,
       AnomalyMergeConfig mergeConfig, List<RawAnomalyResultDTO> unmergedResults,
       List<MergedAnomalyResultDTO> output) {
-    Map<String, List<RawAnomalyResultDTO>> dimensionsResultMap = new HashMap<>();
+    Map<DimensionMap, List<RawAnomalyResultDTO>> dimensionsResultMap = new HashMap<>();
     for (RawAnomalyResultDTO anomalyResult : unmergedResults) {
-      String dimensions = anomalyResult.getDimensions();
-      if (!dimensionsResultMap.containsKey(dimensions)) {
-        dimensionsResultMap.put(dimensions, new ArrayList<>());
+      DimensionMap exploredDimensions = anomalyResult.getDimensions();
+      if (!dimensionsResultMap.containsKey(exploredDimensions)) {
+        dimensionsResultMap.put(exploredDimensions, new ArrayList<>());
       }
-      dimensionsResultMap.get(dimensions).add(anomalyResult);
+      dimensionsResultMap.get(exploredDimensions).add(anomalyResult);
     }
-    for (String dimensions : dimensionsResultMap.keySet()) {
+    for (DimensionMap exploredDimensions : dimensionsResultMap.keySet()) {
       MergedAnomalyResultDTO latestMergedResult =
-          mergedResultDAO.findLatestByFunctionIdDimensions(function.getId(), dimensions);
-      List<RawAnomalyResultDTO> unmergedResultsByDimensions = dimensionsResultMap.get(dimensions);
+          mergedResultDAO.findLatestByFunctionIdDimensions(function.getId(), exploredDimensions.toString());
+      List<RawAnomalyResultDTO> unmergedResultsByDimensions = dimensionsResultMap.get(exploredDimensions);
 
       // TODO : get mergeConfig from function
       List<MergedAnomalyResultDTO> mergedResults = AnomalyTimeBasedSummarizer
@@ -375,11 +363,11 @@ public class AnomalyMergeExecutor implements Runnable {
               mergeConfig.getMaxMergeDurationLength(), mergeConfig.getSequentialAllowedGap());
       for (MergedAnomalyResultDTO mergedResult : mergedResults) {
         mergedResult.setFunction(function);
-        mergedResult.setDimensions(dimensions);
+        mergedResult.setDimensions(exploredDimensions);
       }
       LOG.info(
           "Merging [{}] raw anomalies into [{}] merged anomalies for function id : [{}] and dimensions : [{}]",
-          unmergedResultsByDimensions.size(), mergedResults.size(), function.getId(), dimensions);
+          unmergedResultsByDimensions.size(), mergedResults.size(), function.getId(), exploredDimensions);
       output.addAll(mergedResults);
     }
   }

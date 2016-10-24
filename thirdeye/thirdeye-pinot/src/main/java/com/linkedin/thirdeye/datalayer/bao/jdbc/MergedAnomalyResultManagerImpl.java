@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.datalayer.bao.jdbc;
 
-import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
@@ -17,7 +16,6 @@ import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.pojo.EmailConfigurationBean;
 import com.linkedin.thirdeye.datalayer.pojo.MergedAnomalyResultBean;
 import com.linkedin.thirdeye.datalayer.util.Predicate;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -128,11 +126,11 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
 
   @Override
   public List<MergedAnomalyResultDTO> findByCollectionMetricDimensionsTime(String collection,
-      String metric, String[] dimensions, long startTime, long endTime) {
+      String metric, String dimensions, long startTime, long endTime) {
     Map<String, Object> filterParams = new HashMap<>();
     filterParams.put("collection", collection);
     filterParams.put("metric", metric);
-    filterParams.put("dimensions", dimensions[0]);
+    filterParams.put("dimensions", dimensions);
     filterParams.put("startTime", startTime);
     filterParams.put("endTime", endTime);
 

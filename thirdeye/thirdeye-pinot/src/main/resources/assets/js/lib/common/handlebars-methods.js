@@ -83,34 +83,22 @@ $(document).ready(function () {
         }
     });
 
-
-    //Helper for anomaly function form, here we can set the desired display of any function property
-    Handlebars.registerHelper('displayAnomalyResultDimensionValue', function (value) {
-
-        var displayValue = value.replace(/[,*\s]/g, "");
-        if(displayValue.length == 0){
-            displayValue = "ALL";
-        }
-        return displayValue
-    });
-
-    Handlebars.registerHelper('displayAnomalyResultExploreDimensions', function (dimensionNamesString, dimensionValuesString) {
-
-        var dimensionNames = dimensionNamesString.replace(/[\s]/g, "").split(",");
-        if (dimensionNames.length == 1) {
-            return dimensionValuesString.replace(/[,*\s]/g, "");
-        }
-
-        var dimensionValues = dimensionValuesString.replace(/[*\s]/g, "").split(",");
-        var displayValue = "";
+    Handlebars.registerHelper('displayAnomalyResultExploreDimensions', function (dimensionMap) {
+        var dimensionString = "";
         var separator = "";
-        for (var i = 0; i < dimensionNames.length; ++i) {
-            if (dimensionValues[i]) {
-                displayValue = displayValue + separator + dimensionNames[i] + ": " + dimensionValues[i];
+        var mapSize = 0;
+        for (var dimensionName in dimensionMap) {
+            if (dimensionMap.hasOwnProperty(dimensionName)) {
+                dimensionString += separator + dimensionName + ":" + dimensionMap[dimensionName];
                 separator = "; ";
+                ++mapSize;
             }
         }
-        return displayValue
+        if (mapSize == 0) {
+            return "ALL";
+        } else {
+            return dimensionString;
+        }
     });
 
 

@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.anomaly.detection;
 
 import com.google.common.collect.ArrayListMultimap;
+import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
 
 import java.util.ArrayList;
@@ -20,7 +21,6 @@ import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesResponse;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesResponseConverter;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
@@ -40,7 +40,6 @@ public class DetectionTaskRunner implements TaskRunner {
   private List<RawAnomalyResultDTO> knownAnomalies;
   private BaseAnomalyFunction anomalyFunction;
   private DatasetConfigManager datasetConfigDAO;
-  private MetricConfigManager metricConfigDAO;
 
   public DetectionTaskRunner() {
     timeSeriesResponseConverter = TimeSeriesResponseConverter.getInstance();
@@ -80,7 +79,7 @@ public class DetectionTaskRunner implements TaskRunner {
         timeSeriesResponseConverter.toMap(finalResponse, collectionDimensions);
 
     // Sort the known anomalies by their dimension names
-    ArrayListMultimap<String, RawAnomalyResultDTO> dimensionNamesToKnownAnomalies = ArrayListMultimap.create();
+    ArrayListMultimap<DimensionMap, RawAnomalyResultDTO> dimensionNamesToKnownAnomalies = ArrayListMultimap.create();
     for (RawAnomalyResultDTO knownAnomaly : knownAnomalies) {
       dimensionNamesToKnownAnomalies.put(knownAnomaly.getDimensions(), knownAnomaly);
     }
@@ -91,19 +90,19 @@ public class DetectionTaskRunner implements TaskRunner {
         continue;
       }
 
-      // Get current entry's knownAnomalies, which should have the same dimension names.
-      String dimensionKeyString = entry.getKey().toCommaSeparatedString();
-      List<RawAnomalyResultDTO> knownAnomaliesOfAnEntry = dimensionNamesToKnownAnomalies.get(dimensionKeyString);
+      // Get current entry's knownAnomalies, which should have the same explored dimensions
+      DimensionKey dimensionKey = entry.getKey();
+      DimensionMap exploredDimensions = DimensionMap.fromDimensionKey(dimensionKey, collectionDimensions);
+      List<RawAnomalyResultDTO> knownAnomaliesOfAnEntry = dimensionNamesToKnownAnomalies.get(exploredDimensions);
 
       try {
         // Run algorithm
-        DimensionKey dimensionKey = entry.getKey();
         MetricTimeSeries metricTimeSeries = entry.getValue();
-        LOG.info("Analyzing anomaly function with dimensionKey: {}, windowStart: {}, windowEnd: {}",
-            dimensionKey, windowStart, windowEnd);
+        LOG.info("Analyzing anomaly function with explored dimensions: {}, windowStart: {}, windowEnd: {}",
+            exploredDimensions, windowStart, windowEnd);
 
         List<RawAnomalyResultDTO> resultsOfAnEntry = anomalyFunction
-            .analyze(dimensionKey, metricTimeSeries, windowStart, windowEnd, knownAnomaliesOfAnEntry);
+            .analyze(exploredDimensions, metricTimeSeries, windowStart, windowEnd, knownAnomaliesOfAnEntry);
 
         // Remove any known anomalies
         resultsOfAnEntry.removeAll(knownAnomaliesOfAnEntry);

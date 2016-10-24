@@ -31,11 +31,8 @@
                         <div>
                             <div class="small-label">dimension:</div>
                             <div class="dimension">
-                            <span style="font-weight: 800;font-size:14px; ">{{#if
-                                anomalyData/function/exploreDimensions}}{{displayAnomalyResultExploreDimensions anomalyData/function/exploreDimensions anomalyData/dimensions}}
-                                {{else}}
-                                    {{displayAnomalyResultDimensionValue anomalyData/dimensions}}
-                                {{/if}}
+                            <span style="font-weight: 800;font-size:14px; ">
+                                {{displayAnomalyResultExploreDimensions anomalyData/dimensions}}
                             </span>
 
                             <div class="change" style="margin-top:6px;">

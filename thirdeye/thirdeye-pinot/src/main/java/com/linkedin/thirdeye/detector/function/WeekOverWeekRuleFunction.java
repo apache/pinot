@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.detector.function;
 
 import com.linkedin.pinot.pql.parsers.utils.Pair;
 import com.linkedin.thirdeye.anomaly.views.AnomalyTimelinesView;
+import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.dashboard.views.TimeBucket;
 import java.io.IOException;
 import java.text.NumberFormat;
@@ -18,7 +19,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Joiner;
-import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 
@@ -70,7 +70,7 @@ public class WeekOverWeekRuleFunction extends BaseAnomalyFunction {
   }
 
   @Override
-  public List<RawAnomalyResultDTO> analyze(DimensionKey dimensionKey, MetricTimeSeries timeSeries,
+  public List<RawAnomalyResultDTO> analyze(DimensionMap exploredDimensions, MetricTimeSeries timeSeries,
       DateTime windowStart, DateTime windowEnd, List<RawAnomalyResultDTO> knownAnomalies)
       throws Exception {
     List<RawAnomalyResultDTO> anomalyResults = new ArrayList<>();
@@ -105,8 +105,7 @@ public class WeekOverWeekRuleFunction extends BaseAnomalyFunction {
 
     // Check if this time series even meets our volume threshold
     if (averageValue < volumeThreshold) {
-      LOGGER.info("{} does not meet volume threshold {}: {}", dimensionKey, volumeThreshold,
-          averageValue);
+      LOGGER.info("{} does not meet volume threshold {}: {}", exploredDimensions, volumeThreshold, averageValue);
       return anomalyResults; // empty list
     }
     // iterate through baseline keys
@@ -120,7 +119,7 @@ public class WeekOverWeekRuleFunction extends BaseAnomalyFunction {
       double baselineValue = timeSeries.get(baselineKey, metric).doubleValue();
       if (isAnomaly(currentValue, baselineValue, changeThreshold)) {
         RawAnomalyResultDTO anomalyResult = new RawAnomalyResultDTO();
-        anomalyResult.setDimensions(CSV.join(dimensionKey.getDimensionValues()));
+        anomalyResult.setDimensions(exploredDimensions);
         anomalyResult.setProperties(getSpec().getProperties());
         anomalyResult.setStartTime(currentKey);
         anomalyResult.setEndTime(currentKey + bucketMillis); // point-in-time

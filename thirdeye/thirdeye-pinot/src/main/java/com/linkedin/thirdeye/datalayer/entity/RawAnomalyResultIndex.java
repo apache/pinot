@@ -1,12 +1,15 @@
 package com.linkedin.thirdeye.datalayer.entity;
 
+import com.linkedin.thirdeye.api.DimensionMap;
+
+
 public class RawAnomalyResultIndex extends AbstractIndexEntity {
   long functionId;
   long anomalyFeedbackId;
   long jobId;
   long startTime;
   long endTime;
-  String dimensions;
+  DimensionMap dimensions;
   boolean merged;
   boolean dataMissing;
 
@@ -34,11 +37,11 @@ public class RawAnomalyResultIndex extends AbstractIndexEntity {
     this.dataMissing = dataMissing;
   }
 
-  public String getDimensions() {
+  public DimensionMap getDimensions() {
     return dimensions;
   }
 
-  public void setDimensions(String dimensions) {
+  public void setDimensions(DimensionMap dimensions) {
     this.dimensions = dimensions;
   }
 

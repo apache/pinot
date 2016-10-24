@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.detector.function;
 
+import com.linkedin.thirdeye.api.DimensionMap;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
@@ -34,7 +35,7 @@ public class MinMaxThresholdFunction extends BaseAnomalyFunction {
   }
 
   @Override
-  public List<RawAnomalyResultDTO> analyze(DimensionKey dimensionKey,
+  public List<RawAnomalyResultDTO> analyze(DimensionMap exploredDimensions,
       MetricTimeSeries timeSeries, DateTime windowStart, DateTime windowEnd,
       List<RawAnomalyResultDTO> knownAnomalies) throws Exception {
     List<RawAnomalyResultDTO> anomalyResults = new ArrayList<>();
@@ -78,7 +79,7 @@ public class MinMaxThresholdFunction extends BaseAnomalyFunction {
         anomalyResult.setProperties(getSpec().getProperties());
         anomalyResult.setStartTime(timeBucket);
         anomalyResult.setEndTime(timeBucket + bucketMillis); // point-in-time
-        anomalyResult.setDimensions(CSV.join(dimensionKey.getDimensionValues()));
+        anomalyResult.setDimensions(exploredDimensions);
         anomalyResult.setScore(averageValue);
         anomalyResult.setWeight(Math.abs(deviationFromThreshold)); // higher change, higher the severity
         String message =

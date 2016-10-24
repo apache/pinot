@@ -9,11 +9,10 @@ import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.TimeFieldSpec;
 import com.linkedin.pinot.common.data.TimeGranularitySpec;
-import com.linkedin.thirdeye.dashboard.Utils;
 
+import com.linkedin.thirdeye.api.DimensionMap;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -74,54 +73,30 @@ public abstract class ThirdEyeUtils {
     return filterSet;
   }
 
-  public static Multimap<String, String> getFilterSetFromDimensionKeyString(String dimensionKeyString, String collection) {
-    return getFilterSetFromDimensionKeyString(dimensionKeyString, collection, null);
-  }
-
   /**
-   * Returns or modifies a filter that can be for querying the results corresponding to the given dimension key.
+   * Returns or modifies a filter that can be for querying the results corresponding to the given dimension map.
    *
-   * For example, if a dimension key = "IN,front_page,*,*" and the dimension names of this dataset is ["country",
-   * "page_name", "some_dimension", ...], then the two entries will be added or over-written in the filter:
-   * 1. "country"="IN" and 2. "page_name"="front_page".
+   * For example, if a dimension map = {country=IN,page_name=front_page}, then the two entries will be added or
+   * over-written to the given filter.
    *
-   * Note that if the given filter contains an entry: "country"=["IN", "US", "TW",...], then this entry is replaced by
-   * "country"="IN".
+   * Note that if the given filter contains an entry: country=["IN", "US", "TW",...], then this entry is replaced by
+   * country=IN.
    *
-   * @param dimensionKeyString a string that represents the dimension key
-   * @param collection the name of the dataset
+   * @param dimensionMap the dimension map to add to the filter
    * @param filterToDecorate if it is null, a new filter will be created; otherwise, it is modified.
-   * @return a filter that is modified according to the given dimensionKeyString.
+   * @return a filter that is modified according to the given dimension map.
    */
-  public static Multimap<String, String> getFilterSetFromDimensionKeyString(String dimensionKeyString,
-      String collection, Multimap<String, String> filterToDecorate) {
+  public static Multimap<String, String> getFilterSetFromDimensionMap(DimensionMap dimensionMap,
+      Multimap<String, String> filterToDecorate) {
     if (filterToDecorate == null) {
       filterToDecorate = HashMultimap.create();
     }
 
-    List<String> schemaDimensionNames;
-    try {
-      schemaDimensionNames = Utils.getSchemaDimensionNames(collection);
-    } catch (Exception e) {
-      LOG.info("Filter is not decorated: Unable to get schema dimension names for collection -- {}. ", collection);
-      schemaDimensionNames = Collections.emptyList();
-    }
-
-    if (schemaDimensionNames.size() > 0) {
-      List<String> dimensionValues;
-      if (StringUtils.isNotBlank(dimensionKeyString)) {
-        dimensionValues = Arrays.asList(dimensionKeyString.trim().split(","));
-      } else {
-        dimensionValues = Collections.emptyList();;
-      }
-      for (int i = 0; i < dimensionValues.size(); ++i) {
-        String dimensionValue = dimensionValues.get(i).trim();
-        if (!dimensionValue.equals("") && !dimensionValue.equals("*")) {
-          String dimensionName = schemaDimensionNames.get(i);
-          filterToDecorate.removeAll(dimensionName);
-          filterToDecorate.put(dimensionName, dimensionValue);
-        }
-      }
+    for (Map.Entry<String, String> entry : dimensionMap.entrySet()) {
+      String dimensionName = entry.getKey();
+      String dimensionValue = entry.getValue();
+      filterToDecorate.removeAll(dimensionName);
+      filterToDecorate.put(dimensionName, dimensionValue);
     }
 
     return filterToDecorate;

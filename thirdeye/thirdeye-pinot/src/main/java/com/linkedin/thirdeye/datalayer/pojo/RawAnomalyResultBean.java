@@ -1,11 +1,16 @@
 package com.linkedin.thirdeye.datalayer.pojo;
 
+import com.linkedin.thirdeye.api.DimensionMap;
+import com.linkedin.thirdeye.datalayer.entity.RawAnomalyResultIndex;
+import com.linkedin.thirdeye.util.ThirdEyeUtils;
 import java.util.Objects;
 
 import org.apache.commons.lang.ObjectUtils;
 import org.joda.time.DateTime;
 
 import com.google.common.base.MoreObjects;
+import org.modelmapper.PropertyMap;
+
 
 public class RawAnomalyResultBean extends AbstractBean implements Comparable<RawAnomalyResultBean> {
 
@@ -13,7 +18,7 @@ public class RawAnomalyResultBean extends AbstractBean implements Comparable<Raw
   private Long AnomalyFeedbackId;
   private Long startTime;
   private Long endTime;
-  private String dimensions;
+  private DimensionMap dimensions;
 
   // significance level
   private double score;
@@ -30,11 +35,11 @@ public class RawAnomalyResultBean extends AbstractBean implements Comparable<Raw
     creationTimeUtc = DateTime.now().getMillis();
   }
 
-  public String getDimensions() {
+  public DimensionMap getDimensions() {
     return dimensions;
   }
 
-  public void setDimensions(String dimensions) {
+  public void setDimensions(DimensionMap dimensions) {
     this.dimensions = dimensions;
   }
 

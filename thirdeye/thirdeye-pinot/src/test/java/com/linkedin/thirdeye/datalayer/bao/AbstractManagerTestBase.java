@@ -1,11 +1,14 @@
 package com.linkedin.thirdeye.datalayer.bao;
 
+import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 
 import java.io.File;
 import java.io.FileReader;
 import java.net.URL;
 import java.sql.Connection;
+import java.util.SortedMap;
+import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 
 import jersey.repackaged.com.google.common.collect.Lists;
@@ -179,7 +182,9 @@ public abstract class AbstractManagerTestBase {
     anomalyResult.setStartTime(System.currentTimeMillis());
     anomalyResult.setEndTime(System.currentTimeMillis());
     anomalyResult.setWeight(10.1);
-    anomalyResult.setDimensions("xyz dimension");
+    DimensionMap dimensionMap = new DimensionMap();
+    dimensionMap.put("dimensionName", "dimensionValue");
+    anomalyResult.setDimensions(dimensionMap);
     anomalyResult.setCreationTimeUtc(System.currentTimeMillis());
     return anomalyResult;
   }

@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.detector.function;
 
+import com.linkedin.thirdeye.api.DimensionMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -118,7 +119,9 @@ public class TestUserRuleAnomalyFunction {
   private void setAnomalyResultFields(RawAnomalyResultDTO anomalyResult) {
     anomalyResult.setProperties("properties");
     anomalyResult.setWeight(3);
-    anomalyResult.setDimensions("dimensions");
+    anomalyResult.setDimensions(new DimensionMap() {{
+      put("dimensionName", "dimensionName");
+    }});
   }
 
   @DataProvider(name = "getFilteredAndMergedAnomalyResultsProvider")

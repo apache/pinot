@@ -107,9 +107,7 @@ public class GenericPojoDao {
   GenericResultSetMapper genericResultSetMapper;
 
   static ModelMapper MODEL_MAPPER = new ModelMapper();
-
   static ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-
 
   public GenericPojoDao() {}
 
@@ -465,5 +463,5 @@ public class GenericPojoDao {
     Class<? extends AbstractIndexEntity> indexEntityClass;
     List<String> indexTableColumns;
   }
-
+  
 }

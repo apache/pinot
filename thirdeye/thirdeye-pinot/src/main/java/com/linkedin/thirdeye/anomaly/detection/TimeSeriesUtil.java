@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.anomaly.detection;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
 import com.linkedin.pinot.pql.parsers.utils.Pair;
+import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.client.MetricExpression;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
@@ -79,9 +80,8 @@ public abstract class TimeSeriesUtil {
    * Returns the time series that were used by the given anomaly function for detecting the anomaly.
    *
    * @param anomalyFunction the anomaly function that detects the anomaly
-   * @param dimensionKeyString the string representation of {@link com.linkedin.thirdeye.api.DimensionKey}, which is
-   *                           used to construct the filter for retrieving the corresponding data that was used to
-   *                           detected the anomaly
+   * @param dimensionMap a dimension map that is used to construct the filter for retrieving the corresponding data
+   *                     that was used to detected the anomaly
    * @param timeGranularity time granularity for the frontend
    * @param viewWindowStart inclusive
    * @param viewWindowEnd exclusive
@@ -90,7 +90,7 @@ public abstract class TimeSeriesUtil {
    * @throws ExecutionException
    */
   public static TimeSeriesResponse getTimeSeriesResponseForPresentation(BaseAnomalyFunction anomalyFunction,
-      String dimensionKeyString, TimeGranularity timeGranularity, long viewWindowStart, long viewWindowEnd)
+      DimensionMap dimensionMap, TimeGranularity timeGranularity, long viewWindowStart, long viewWindowEnd)
       throws JobExecutionException, ExecutionException {
     AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunction.getSpec();
 
@@ -104,7 +104,7 @@ public abstract class TimeSeriesUtil {
     }
 
     // Decorate the filter according to dimensionKeyString
-    filters = ThirdEyeUtils.getFilterSetFromDimensionKeyString(dimensionKeyString, anomalyFunctionSpec.getCollection(), filters);
+    filters = ThirdEyeUtils.getFilterSetFromDimensionMap(dimensionMap, filters);
 
     // groupByDimensions (i.e., exploreDimensions) should be empty when retrieving time series for anomalies, because
     // each anomaly should have a time series with a specific set of dimension values, which is specified in filters.
