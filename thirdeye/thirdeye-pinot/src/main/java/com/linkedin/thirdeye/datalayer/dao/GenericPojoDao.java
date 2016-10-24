@@ -109,11 +109,6 @@ public class GenericPojoDao {
   GenericResultSetMapper genericResultSetMapper;
 
   static ModelMapper MODEL_MAPPER = new ModelMapper();
-  static {
-    MODEL_MAPPER.addMappings(new RawAnomalyResultBeanIndexMap());
-    MODEL_MAPPER.addMappings(new MergedAnomalyResultBeanIndexMap());
-  }
-
   static ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   public GenericPojoDao() {}
@@ -470,27 +465,4 @@ public class GenericPojoDao {
     Class<? extends AbstractIndexEntity> indexEntityClass;
     List<String> indexTableColumns;
   }
-
-  public static class RawAnomalyResultBeanIndexMap extends PropertyMap<RawAnomalyResultBean, RawAnomalyResultIndex> {
-    @Override
-    protected void configure() {
-      try {
-        map(source.getDimensions().toJson()).setDimensions(null);
-      } catch (JsonProcessingException e) {
-        LOG.warn("Failed to convert sorted dimension map to json string for persistence: {}", e.toString());
-      }
-    }
-  }
-
-  public static class MergedAnomalyResultBeanIndexMap extends PropertyMap<MergedAnomalyResultBean, MergedAnomalyResultIndex> {
-    @Override
-    protected void configure() {
-      try {
-        map(source.getDimensions().toJson()).setDimensions(null);
-      } catch (JsonProcessingException e) {
-        LOG.warn("Failed to convert sorted dimension map to json string for persistence: {}", e.toString());
-      }
-    }
-  }
-
 }

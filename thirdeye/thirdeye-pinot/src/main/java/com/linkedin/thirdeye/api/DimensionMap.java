@@ -70,6 +70,26 @@ public class DimensionMap implements SortedMap<String, String>, Comparable<Dimen
     return OBJECT_MAPPER.writeValueAsString(this);
   }
 
+  /**
+   * Returns a JSON string representation of this dimension map for {@link com.linkedin.thirdeye.datalayer.dao.GenericPojoDao}
+   * to persistent the map to backend database.
+   *
+   * It returns the generic string representation of this dimension map if any exception occurs when generating the JSON
+   * string. In that case, the constructor {@link DimensionMap(String)} will be invoked during the construction of that
+   * dimension map.
+   *
+   * @return a JSON string representation of this dimension map for {@link com.linkedin.thirdeye.datalayer.dao.GenericPojoDao}
+   * to persistent the map to backend database.
+   */
+  @Override
+  public String toString() {
+    try {
+      return this.toJson();
+    } catch (JsonProcessingException e) {
+      return super.toString();
+    }
+  }
+
   @Override
   public boolean equals(Object o) {
     if (o instanceof DimensionMap) {

@@ -69,11 +69,7 @@
                     {{displayDateRange rawAnomaly/startTime rawAnomaly/endTime}}
                 </td>
                 <td>
-                   {{#if rawAnomaly/function/exploreDimensions}}
-                      {{displayAnomalyResultExploreDimensions rawAnomaly/function/exploreDimensions rawAnomaly/dimensions}}
-                   {{else}}
-                      {{displayAnomalyResultDimensionValue rawAnomaly/dimensions}}
-                   {{/if}}
+                    {{displayAnomalyResultExploreDimensions rawAnomaly/dimensions}}
                 </td>
                 <td>
                     {{message}}
