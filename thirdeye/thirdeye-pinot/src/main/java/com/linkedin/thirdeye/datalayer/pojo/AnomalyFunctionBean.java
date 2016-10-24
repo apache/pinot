@@ -195,13 +195,6 @@ public class AnomalyFunctionBean extends AbstractBean {
     this.filters = sortedFilters;
   }
 
-  @JsonIgnore
-  @JsonProperty("wrapper")
-  public void setFilters(Multimap<String, String> filterSet) {
-    String sortedFilters = ThirdEyeUtils.getSortedFiltersFromMultiMap(filterSet);
-    this.filters = sortedFilters;
-  }
-
   public void setActive(boolean isActive) {
     this.isActive = isActive;
   }
