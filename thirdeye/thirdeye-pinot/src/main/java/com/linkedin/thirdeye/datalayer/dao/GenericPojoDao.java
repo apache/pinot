@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.datalayer.dao;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -19,7 +18,6 @@ import javax.sql.DataSource;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.modelmapper.ModelMapper;
-import org.modelmapper.PropertyMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -465,4 +463,5 @@ public class GenericPojoDao {
     Class<? extends AbstractIndexEntity> indexEntityClass;
     List<String> indexTableColumns;
   }
+  
 }
