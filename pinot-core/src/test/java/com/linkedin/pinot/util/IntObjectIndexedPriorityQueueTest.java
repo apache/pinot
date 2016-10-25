@@ -61,9 +61,7 @@ public class IntObjectIndexedPriorityQueueTest {
    * @param minHeap Min mode
    */
   public void test(boolean minHeap) {
-    long seed = System.nanoTime();
-    Random random = new Random(seed);
-    final String randomSeedMsg = "Random seed : " + seed;
+    Random random = new Random(0);
 
     IntObjectIndexedPriorityQueue<AvgPair> pq = new IntObjectIndexedPriorityQueue<>(NUM_RECORDS, minHeap);
     Map<Integer, AvgPair> map = new HashMap<>(NUM_RECORDS);
@@ -108,11 +106,11 @@ public class IntObjectIndexedPriorityQueueTest {
       Pairs.IntObjectPair<AvgPair> actual = pq.poll();
       Pairs.IntObjectPair<AvgPair> expected = list.get(i++);
 
-      Assert.assertEquals(actual.getIntValue(), expected.getIntValue(), randomSeedMsg);
-      Assert.assertEquals(actual.getObjectValue(), expected.getObjectValue(), randomSeedMsg);
+      Assert.assertEquals(actual.getIntValue(), expected.getIntValue());
+      Assert.assertEquals(actual.getObjectValue(), expected.getObjectValue());
     }
 
     // Assert that priority queue had expected number of elements.
-    Assert.assertEquals(i, list.size(), randomSeedMsg);
+    Assert.assertEquals(i, list.size());
   }
 }
