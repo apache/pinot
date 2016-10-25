@@ -63,7 +63,6 @@ public class HelixSetupUtils {
   public static synchronized HelixManager setup(String helixClusterName, String zkPath, String pinotControllerInstanceId,
       boolean isUpdateStateModel) {
 
-    setupConfigForHelix();
     try {
       createHelixClusterIfNeeded(helixClusterName, zkPath, isUpdateStateModel);
     } catch (final Exception e) {
@@ -77,18 +76,6 @@ public class HelixSetupUtils {
       LOGGER.error("Caught exception", e);
       return null;
     }
-  }
-
-  private static void setupConfigForHelix(){
-
-    // setup helix properties. These settings are not advertised and
-    // hence we've to System.setProperty().
-    // [PINOT-2435] setup helix to never disconnect from ZK if there is flapping
-    // Controller is considered flapping if it disconnects maxDisconnectThreshold number
-    // of times at that instant (same millisecond)
-    final String helixFlappingTimeWindowPropName = "helixmanager.flappingTimeWindow";
-    System.setProperty(helixFlappingTimeWindowPropName, Integer.toString(0));
-    LOGGER.info("Setting helix flappingTimeWindow to 0");
   }
 
   public static void createHelixClusterIfNeeded(String helixClusterName, String zkPath) {
