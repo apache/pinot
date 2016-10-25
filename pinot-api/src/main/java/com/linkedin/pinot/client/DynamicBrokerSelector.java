@@ -23,10 +23,11 @@ import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
-
+import javax.annotation.Nullable;
 import org.I0Itec.zkclient.IZkDataListener;
 import org.I0Itec.zkclient.ZkClient;
 import org.I0Itec.zkclient.serialize.BytesPushThroughSerializer;
+
 import static com.linkedin.pinot.client.ExternalViewReader.OFFLINE_SUFFIX;
 import static com.linkedin.pinot.client.ExternalViewReader.REALTIME_SUFFIX;
 
@@ -61,10 +62,14 @@ public class DynamicBrokerSelector implements BrokerSelector, IZkDataListener {
   }
 
   @Override
-  public String selectBroker(String table) {
+  public @Nullable String selectBroker(String table) {
     if (table == null) {
       List<String> list = allBrokerListRef.get();
-      return list.get(_random.nextInt(list.size()));
+      if (list != null && !list.isEmpty()) {
+        return list.get(_random.nextInt(list.size()));
+      } else {
+        return null;
+      }
     }
     String tableName = table.replace(OFFLINE_SUFFIX, "").replace(REALTIME_SUFFIX, "");
     List<String> list = tableToBrokerListMapRef.get().get(tableName);
