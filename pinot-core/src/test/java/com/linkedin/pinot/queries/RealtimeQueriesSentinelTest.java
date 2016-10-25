@@ -28,7 +28,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-import org.antlr.runtime.RecognitionException;
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.commons.configuration.PropertiesConfiguration;
@@ -144,7 +143,7 @@ public class RealtimeQueriesSentinelTest {
   }
 
   @Test
-  public void test1() throws RecognitionException, Exception {
+  public void test1() throws Exception {
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     String query = "select sum('count') from testTable where column13='1540094560' group by column3 top 100 limit 0";
     Map<Object, Double> fromAvro = new HashMap<Object, Double>();

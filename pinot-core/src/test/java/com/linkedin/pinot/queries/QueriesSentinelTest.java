@@ -51,7 +51,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import org.antlr.runtime.RecognitionException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
@@ -297,7 +296,7 @@ public class QueriesSentinelTest {
   }
 
   @Test
-  public void testSingleQuery() throws RecognitionException, Exception {
+  public void testSingleQuery() throws Exception {
     String query;
     query = "select count(*) from testTable where column5='kCMyNVGCASKYDdQbftOPaqVMWc'";
     //query= "select sum('count') from testTable where column1='660156454'";
@@ -316,7 +315,7 @@ public class QueriesSentinelTest {
   }
 
   @Test
-  public void testMatchAllQuery() throws RecognitionException, Exception {
+  public void testMatchAllQuery() throws Exception {
     String query = "select count(*),sum(count) from testTable  ";
     LOGGER.info("running  : " + query);
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
@@ -339,7 +338,7 @@ public class QueriesSentinelTest {
   }
 
   @Test
-  public void testRangeQuery() throws RecognitionException, Exception {
+  public void testRangeQuery() throws Exception {
     String query = "select count(*) from testTable where column1 in ('999983251', '510705831', '1000720716', '1001058817', '1001099410')";
     LOGGER.info("running  : " + query);
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
@@ -358,7 +357,7 @@ public class QueriesSentinelTest {
   }
 
   @Test
-  public void testTrace() throws RecognitionException, Exception {
+  public void testTrace() throws Exception {
     String query = "select count(*) from testTable where column1='186154188'";
     LOGGER.info("running  : " + query);
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();

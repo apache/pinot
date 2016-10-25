@@ -44,7 +44,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import org.antlr.runtime.RecognitionException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
@@ -119,7 +118,7 @@ public class QueryExceptionTest {
   }
 
   @Test
-  public void testSingleQuery() throws RecognitionException, Exception {
+  public void testSingleQuery() throws Exception {
     String query = "select count(*) from testTable where column1='24516187'";
     LOGGER.info("running  : " + query);
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
@@ -136,7 +135,7 @@ public class QueryExceptionTest {
   }
 
   @Test
-  public void testQueryParsingFailedQuery() throws RecognitionException, Exception {
+  public void testQueryParsingFailedQuery() throws Exception {
     String query = "select sudm(blablaa) from testTable where column1='24516187'";
     LOGGER.info("running  : " + query);
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
@@ -154,7 +153,7 @@ public class QueryExceptionTest {
   }
 
   @Test
-  public void testQueryPlanFailedQuery() throws RecognitionException, Exception {
+  public void testQueryPlanFailedQuery() throws Exception {
     String query = "select sum(blablaa) from testTable where column1='24516187'";
     LOGGER.info("running  : " + query);
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
@@ -172,7 +171,7 @@ public class QueryExceptionTest {
   }
 
   @Test
-  public void testQueryExecuteFailedQuery() throws RecognitionException, Exception {
+  public void testQueryExecuteFailedQuery() throws Exception {
     String query = "select count(*) from testTable where column1='24516187' group by bla";
     LOGGER.info("running  : " + query);
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
