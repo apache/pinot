@@ -191,6 +191,27 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
               RealtimeSegmentZKMetadata realtimeSegmentZKMetadata = ZKMetadataProvider
                   .getRealtimeSegmentZKMetadata(_pinotHelixResourceManager.getPropertyStore(), segName.getTableName(),
                       partition);
+              if (realtimeSegmentZKMetadata == null) {
+                // jfim: If we end up here, this means that for some reason we can't read the segment metadata from the
+                // property store. This could be because of a transient ZK error, because someone deleted the property
+                // store entry after we read the ideal state or because someone deleted the property store manually
+                // without updating the ideal state.
+                //
+                // In this case, we assume that the ideal state contains an appropriate state that reflects whether or
+                // not the segment was still in progress.
+                LOGGER.warn("Failed to read segment metadata for segment {}", partition);
+
+                // Since the ideal state update is atomic, we assume that if one partition is consuming, they're all
+                // consuming. As such, we don't need to reassign a new segment for this Kafka partition.
+                if (state.getInstanceStateMap(partition).values().contains("CONSUMING")) {
+                  LOGGER.warn(
+                      "Assumed that segment {} is in progress due to being in CONSUMING state in at least one replica, instance states are {}",
+                      partition, state.getInstanceStateMap(partition));
+                  instancesToAssignRealtimeSegment.removeAll(state.getInstanceSet(partition));
+                }
+
+                continue;
+              }
               if (realtimeSegmentZKMetadata.getStatus() == Status.IN_PROGRESS) {
                 instancesToAssignRealtimeSegment.removeAll(state.getInstanceSet(partition));
               }

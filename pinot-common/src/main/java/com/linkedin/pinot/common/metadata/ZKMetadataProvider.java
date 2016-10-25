@@ -135,6 +135,12 @@ public class ZKMetadataProvider {
     String realtimeTableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName);
     ZNRecord znRecord = propertyStore
         .get(constructPropertyStorePathForSegment(realtimeTableName, segmentName), null, AccessOption.PERSISTENT);
+
+    if (znRecord == null) {
+      LOGGER.warn("Failed to read ZNRecord for segment {} of table {}", segmentName, realtimeTableName);
+      return null;
+    }
+
     if (SegmentName.isHighLevelConsumerSegmentName(segmentName)) {
       return new RealtimeSegmentZKMetadata(znRecord);
     } else {
