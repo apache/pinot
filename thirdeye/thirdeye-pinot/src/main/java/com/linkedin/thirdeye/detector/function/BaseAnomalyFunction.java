@@ -65,6 +65,11 @@ public abstract class BaseAnomalyFunction implements AnomalyFunction {
       Long monitoringWindowEndTime) {
     List<Pair<Long, Long>> startEndTimeIntervals = new ArrayList<>();
     startEndTimeIntervals.add(new Pair<>(monitoringWindowStartTime, monitoringWindowEndTime));
+
+    long baselineOffsetMillis = TimeUnit.MILLISECONDS.convert(7, TimeUnit.DAYS);
+    startEndTimeIntervals.add(
+        new Pair<>(monitoringWindowStartTime - baselineOffsetMillis, monitoringWindowEndTime - baselineOffsetMillis));
+
     return startEndTimeIntervals;
   }
 
