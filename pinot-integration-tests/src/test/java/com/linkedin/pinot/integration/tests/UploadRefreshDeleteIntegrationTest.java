@@ -16,6 +16,7 @@
 package com.linkedin.pinot.integration.tests;
 
 import com.google.common.util.concurrent.MoreExecutors;
+import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.common.utils.FileUploadUtils;
 import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
@@ -75,6 +76,7 @@ public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTe
     this.tableName = (String) args[0];
     SegmentVersion version = (SegmentVersion) args[1];
     addOfflineTable("DaysSinceEpoch", "daysSinceEpoch", -1, "", null, null, this.tableName, version);
+    Uninterruptibles.sleepUninterruptibly(200, TimeUnit.MILLISECONDS);
     ensureDirectoryExistsAndIsEmpty(_tmpDir);
     ensureDirectoryExistsAndIsEmpty(_segmentsDir);
     ensureDirectoryExistsAndIsEmpty(_tarsDir);

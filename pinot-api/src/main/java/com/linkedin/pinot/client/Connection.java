@@ -16,7 +16,6 @@
 package com.linkedin.pinot.client;
 
 import java.util.List;
-import java.util.Random;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -75,6 +74,10 @@ public class Connection {
    */
   public ResultSetGroup execute(String tableName, String statement) throws PinotClientException {
     String brokerHostPort = _brokerSelector.selectBroker(tableName);
+    if (brokerHostPort == null) {
+      throw new PinotClientException("Could not find broker to query for table: " +
+          (tableName == null ? "null" : tableName));
+    }
     BrokerResponse response = _transport.executeQuery(brokerHostPort, statement);
     if (response.hasExceptions()) {
       throw new PinotClientException("Query had processing exceptions: \n" + response.getExceptions());
@@ -90,8 +93,12 @@ public class Connection {
    * @throws PinotClientException If an exception occurs while processing the query
    */
   public Future<ResultSetGroup> executeAsync(String statement) throws PinotClientException {
-    final Future<BrokerResponse> responseFuture = _transport.executeQueryAsync(_brokerSelector.selectBroker(null), statement);
-
+    String brokerHostPort = _brokerSelector.selectBroker(null);
+    if (brokerHostPort == null) {
+      throw new PinotClientException("Could not find broker to query for statement: " +
+          (statement == null ? "null" : statement));
+    }
+    final Future<BrokerResponse> responseFuture = _transport.executeQueryAsync(brokerHostPort, statement);
     return new ResultSetGroupFuture(responseFuture);
   }
 
