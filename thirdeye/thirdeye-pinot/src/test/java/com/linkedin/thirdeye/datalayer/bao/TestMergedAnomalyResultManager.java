@@ -1,7 +1,5 @@
 package com.linkedin.thirdeye.datalayer.bao;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -58,9 +56,15 @@ public class TestMergedAnomalyResultManager extends AbstractManagerTestBase {
     Assert.assertNotNull(mergedResult.getId());
 
     // verify the merged result
-    MergedAnomalyResultDTO mergedResult1 = mergedResultDAO.findById(mergedResult.getId());
-    Assert.assertEquals(mergedResult1.getAnomalyResults(), rawResults);
-    Assert.assertEquals(mergedResult1.getAnomalyResults().get(0).getId(), anomalyResultId);
+    MergedAnomalyResultDTO mergedResultById = mergedResultDAO.findById(mergedResult.getId());
+    Assert.assertEquals(mergedResultById.getAnomalyResults(), rawResults);
+    Assert.assertEquals(mergedResultById.getAnomalyResults().get(0).getId(), anomalyResultId);
+
+    List<MergedAnomalyResultDTO> mergedResultsByMetricDimensionsTime = mergedResultDAO
+        .findByCollectionMetricDimensionsTime(mergedResult.getCollection(), mergedResult.getMetric(),
+            mergedResult.getDimensions().toString(), 0, System.currentTimeMillis());
+
+    Assert.assertEquals(mergedResultsByMetricDimensionsTime.get(0), mergedResult);
   }
 
   @Test(dependsOnMethods = {"testMergedResultCRUD"})
@@ -77,21 +81,5 @@ public class TestMergedAnomalyResultManager extends AbstractManagerTestBase {
     MergedAnomalyResultDTO mergedResult1 = mergedResultDAO.findById(mergedResult.getId());
     Assert.assertEquals(mergedResult1.getAnomalyResults().get(0).getId(), anomalyResultId);
     Assert.assertEquals(mergedResult1.getFeedback().getFeedbackType(), AnomalyFeedbackType.ANOMALY);
-  }
-
-  @Test(dependsOnMethods = {"testMergedResultCRUD"})
-  public void testFindByCollectionMetricDimensions() {
-    String exploredDimensionString;
-    try {
-      ObjectMapper mapper = new ObjectMapper();
-      exploredDimensionString = mapper.writeValueAsString(mergedResult.getDimensions());
-    } catch (JsonProcessingException e) {
-      exploredDimensionString = "";
-    }
-    List<MergedAnomalyResultDTO> mergedResults = mergedResultDAO
-        .findByCollectionMetricDimensionsTime(mergedResult.getCollection(), mergedResult.getMetric(),
-           exploredDimensionString, 0, System.currentTimeMillis());
-
-    Assert.assertEquals(mergedResults.get(0), mergedResult);
   }
 }

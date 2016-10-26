@@ -125,17 +125,17 @@ public class AnomalyFunctionResource {
     Map<DimensionKey, MetricTimeSeries> res =
         timeSeriesResponseConverter.toMap(finalResponse, collectionDimensions);
     for (Map.Entry<DimensionKey, MetricTimeSeries> entry : res.entrySet()) {
+      DimensionKey dimensionKey = entry.getKey();
+      DimensionMap dimensionMap = DimensionMap.fromDimensionKey(dimensionKey, collectionDimensions);
       if (entry.getValue().getTimeWindowSet().size() < 2) {
-        LOG.warn("Insufficient data for {} to run anomaly detection function", entry.getKey());
+        LOG.warn("Insufficient data for {} to run anomaly detection function", dimensionMap);
         continue;
       }
       try {
         // Run algorithm
-        DimensionKey dimensionKey = entry.getKey();
-        DimensionMap dimensionMap = DimensionMap.fromDimensionKey(dimensionKey, collectionDimensions);
         MetricTimeSeries metricTimeSeries = entry.getValue();
         LOG.info("Analyzing anomaly function with dimensionKey: {}, windowStart: {}, windowEnd: {}",
-            dimensionKey, startTime, endTime);
+            dimensionMap, startTime, endTime);
 
         List<RawAnomalyResultDTO> resultsOfAnEntry = anomalyFunction
             .analyze(dimensionMap, metricTimeSeries, new DateTime(startTime), new DateTime(endTime),
@@ -143,10 +143,10 @@ public class AnomalyFunctionResource {
         if (resultsOfAnEntry.size() != 0) {
           results.addAll(resultsOfAnEntry);
         }
-        LOG.info("{} has {} anomalies in window {} to {}", entry.getKey(), resultsOfAnEntry.size(),
+        LOG.info("{} has {} anomalies in window {} to {}", dimensionMap, resultsOfAnEntry.size(),
             new DateTime(startTime), new DateTime(endTime));
       } catch (Exception e) {
-        LOG.error("Could not compute for {}", entry.getKey(), e);
+        LOG.error("Could not compute for {}", dimensionMap, e);
       }
     }
     if (results.size() > 0) {

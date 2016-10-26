@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.api;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.Serializable;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.Iterator;
@@ -21,7 +22,7 @@ import org.apache.commons.lang.ObjectUtils;
  * converting to/from Json string in Map format, i.e., instead of storing {"sortedDimensionMap":{"country":"US",
  * "page_name":"front_page"}}, we only need to store {"country":"US","page_name":"front_page"}.
  */
-public class DimensionMap implements SortedMap<String, String>, Comparable<DimensionMap> {
+public class DimensionMap implements SortedMap<String, String>, Comparable<DimensionMap>, Serializable {
   private static ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   // Dimension name to dimension value pairs, which are sorted by dimension names
