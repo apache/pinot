@@ -25,6 +25,8 @@ import com.linkedin.pinot.core.operator.aggregation.ResultHolderFactory;
 import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
 import com.linkedin.pinot.core.query.aggregation.groupby.GroupByConstants;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import it.unimi.dsi.fastutil.ints.Int2LongOpenHashMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.longs.Long2IntMap;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
@@ -88,8 +90,26 @@ public class DefaultGroupKeyGenerator implements GroupKeyGenerator {
   private int _numGroupKeys = 0;
   // For LONG_MAP_BASED storage type.
   private Long2IntOpenHashMap _groupKeyToId;
+
+  // Reverse mapping for trimming group keys
+  private Int2LongOpenHashMap _idToGroupKey;
+
   // For ARRAY_MAP_BASED storage type.
   private Object2IntOpenHashMap<IntArrayList> _arrayGroupKeyToId;
+
+  // The following data structures are used for trimming group keys.
+
+  // Reverse mapping from KeyIds to groupKeys. purgeGroupKeys takes an array of keyIds to remove,
+  // this map tracks keyIds to groupKeys, to serve the purging.
+  private Int2ObjectOpenHashMap<IntArrayList> _idToArrayGroupKey;
+
+  // Enum to reflect if trimming of group keys is ON or OFF. Once ON, we need to start tracking
+  // the keyIds that are removed.
+  private enum TrimMode {
+    OFF,
+    ON
+  }
+  private TrimMode _trimMode;
 
   /**
    * Constructor for the class. Initializes data members (reusable arrays).
@@ -145,18 +165,23 @@ public class DefaultGroupKeyGenerator implements GroupKeyGenerator {
     // Allocate a big enough buffer for all the multi value group-by columns.
     _reusableMultiValDictIdBuffer = new int[maxNumMultiValues];
 
+    // We do not trim group keys unless we exceed the _maxCapacity for the holder.
+    _trimMode = TrimMode.OFF;
+
     // Decide the storage type based on the over flow flag and cardinality product.
     if (longOverflow) {
       // Array map based storage type.
       _storageType = StorageType.ARRAY_MAP_BASED;
       _arrayGroupKeyToId = new Object2IntOpenHashMap<>();
       _arrayGroupKeyToId.defaultReturnValue(INVALID_ID);
+      _idToArrayGroupKey = null;
     } else {
       if (_cardinalityProduct > ResultHolderFactory.MAX_INITIAL_RESULT_HOLDER_CAPACITY) {
         // Long map based storage type.
         _storageType = StorageType.LONG_MAP_BASED;
         _groupKeyToId = new Long2IntOpenHashMap();
         _groupKeyToId.defaultReturnValue(INVALID_ID);
+        _idToGroupKey = null;
       } else {
         // Array based storage type.
         _storageType = StorageType.ARRAY_BASED;
@@ -298,7 +323,89 @@ public class DefaultGroupKeyGenerator implements GroupKeyGenerator {
       case ARRAY_MAP_BASED:
         return new ArrayMapBasedGroupKeyIterator();
       default:
-        throw new RuntimeException("Unsupported storage type.");
+        throw new RuntimeException("Unsupported storage type for key generator " + _storageType);
+    }
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @param keyIdsToPurge Group keys to purge
+   */
+  @Override
+  public void purgeKeys(int[] keyIdsToPurge) {
+    switch (_storageType) {
+      case ARRAY_BASED:
+        if (keyIdsToPurge != null && keyIdsToPurge.length != 0) {
+          throw new RuntimeException("Illegal operation: Purging group keys not allowed for array-based key generator");
+        } // else nothing to be done.
+        break;
+
+      case ARRAY_MAP_BASED:
+        purgeArrayMapKeys(keyIdsToPurge);
+        break;
+
+      case LONG_MAP_BASED:
+        purgeLongMapKeys(keyIdsToPurge);
+        break;
+
+        default:
+          throw new RuntimeException("Unsupported storage type for key generator " + _storageType);
+    }
+  }
+
+  /**
+   * Helper method to purge group keys that got trimmed from the group by result.
+   * Lazily builds a reverse map from id to array group key on the first call.
+   *
+   * @param groupKeys Group keys to purge
+   */
+  private void purgeLongMapKeys(int[] groupKeys) {
+    if (groupKeys == null || groupKeys.length == 0) {
+      return; // Nothing to purge
+    }
+
+    // Lazily build the idToGroupKey reverse map only once, and then keep the two maps in-sync after that.
+    if (_trimMode == TrimMode.OFF) {
+      _idToGroupKey = new Int2LongOpenHashMap(_groupKeyToId.size());
+      for (Long2IntMap.Entry entry : _groupKeyToId.long2IntEntrySet()) {
+        _idToGroupKey.put(entry.getIntValue(), entry.getLongKey());
+      }
+      _trimMode = TrimMode.ON;
+    }
+
+    // Purge the specified keys
+    for (int groupKey : groupKeys) {
+      _groupKeyToId.remove(_idToGroupKey.get(groupKey));
+      _idToGroupKey.remove(groupKey);
+    }
+  }
+
+  /**
+   * Helper method to purge group keys that got trimmed from the group by result.
+   * Lazily builds a reverse map from id to array group key on the first call.
+   *
+   * @param groupKeys Group keys to purge
+   */
+  private void purgeArrayMapKeys(int[] groupKeys) {
+    if (groupKeys == null || groupKeys.length == 0) {
+      return; // Nothing to purge
+    }
+
+    // Lazily build the idToGroupKey reverse map only once, and then keep the two maps in-sync after that.
+    if (_trimMode == TrimMode.OFF) {
+      _idToArrayGroupKey = new Int2ObjectOpenHashMap<>(_groupKeyToId.size());
+
+      for (Object2IntMap.Entry<IntArrayList> entry : _arrayGroupKeyToId.object2IntEntrySet()) {
+        _idToArrayGroupKey.put(entry.getIntValue(), entry.getKey());
+      }
+      _trimMode = TrimMode.ON;
+    }
+
+    // Purge the specified keys
+    for (int groupKey : groupKeys) {
+      _arrayGroupKeyToId.remove(_idToArrayGroupKey.get(groupKey));
+      _idToArrayGroupKey.remove(groupKey);
     }
   }
 
@@ -315,6 +422,11 @@ public class DefaultGroupKeyGenerator implements GroupKeyGenerator {
     if (groupKey == INVALID_ID) {
       groupKey = _numGroupKeys++;
       _groupKeyToId.put(rawKey, groupKey);
+
+      // We are in trim mode, so we need reverse map from id to group key
+      if (_trimMode == TrimMode.ON) {
+        _idToGroupKey.put(groupKey, rawKey);
+      }
     }
     return groupKey;
   }
@@ -328,12 +440,17 @@ public class DefaultGroupKeyGenerator implements GroupKeyGenerator {
    * @return group key.
    */
   private int updateRawKeyToGroupKeyMapping(IntArrayList rawKey) {
-    int groupKey = _arrayGroupKeyToId.getInt(rawKey);
-    if (groupKey == INVALID_ID) {
-      groupKey = _numGroupKeys++;
-      _arrayGroupKeyToId.put(rawKey, groupKey);
+    int id = _arrayGroupKeyToId.getInt(rawKey);
+    if (id == INVALID_ID) {
+      id = _numGroupKeys++;
+      _arrayGroupKeyToId.put(rawKey, id);
+
+      // We are in trim mode, so we need reverse map from id to group key
+      if (_trimMode == TrimMode.ON) {
+        _idToArrayGroupKey.put(id, rawKey);
+      }
     }
-    return groupKey;
+    return id;
   }
 
   /**

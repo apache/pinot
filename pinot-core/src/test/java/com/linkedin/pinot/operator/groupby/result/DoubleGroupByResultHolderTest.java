@@ -15,8 +15,13 @@
  */
 package com.linkedin.pinot.operator.groupby.result;
 
+import com.linkedin.pinot.common.utils.Pairs.*;
 import com.linkedin.pinot.core.operator.aggregation.groupby.DoubleGroupByResultHolder;
 import com.linkedin.pinot.core.operator.aggregation.groupby.GroupByResultHolder;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Random;
 import org.testng.Assert;
 import org.testng.annotations.BeforeSuite;
@@ -94,6 +99,22 @@ public class DoubleGroupByResultHolderTest {
   }
 
   /**
+   * Test for 'trimResults' method, with sort order from max to min.
+   */
+  @Test
+  void testMaxTrimResults() {
+    testTrimResults(false);
+  }
+
+  /**
+   * Test for 'trimResults' method, with sort order from min to max.
+   */
+  @Test
+  void testMinTrimResults() {
+    testTrimResults(true);
+  }
+
+  /**
    * Helper method to test values within resultHolder against the provided expected values array.
    *
    * @param resultHolder
@@ -106,6 +127,44 @@ public class DoubleGroupByResultHolderTest {
       double actual = resultHolder.getDoubleResult(i);
       Assert.assertEquals(actual, expected[i],
           "Value mis-match: Actual: " + actual + " Expected: " + expected[i] + " Random seed: " + RANDOM_SEED);
+    }
+  }
+
+  /**
+   * Helper method for testing trim results.
+   * Sets a max size on the result holder and adds more values than the max size of the result holder.
+   * Then asserts that the right results survive after trimming.
+   *
+   * @param minOrder
+   */
+  void testTrimResults(final boolean minOrder) {
+    GroupByResultHolder resultHolder =
+        new DoubleGroupByResultHolder(INITIAL_CAPACITY, INITIAL_CAPACITY, DEFAULT_VALUE, minOrder);
+    List<IntDoublePair> expected = new ArrayList<>(MAX_CAPACITY);
+
+    for (int i = 0; i < INITIAL_CAPACITY; i++) {
+      resultHolder.setValueForKey(i, _expected[i]);
+      expected.add(new IntDoublePair(i, _expected[i]));
+    }
+
+    // This will trigger the transition from array based to map based storage within the result holder.
+    resultHolder.ensureCapacity(MAX_CAPACITY);
+
+    for (int i = INITIAL_CAPACITY; i < MAX_CAPACITY; i++) {
+      resultHolder.setValueForKey(i, _expected[i]);
+      expected.add(new IntDoublePair(i, _expected[i]));
+    }
+
+    // Trim the results to INITIAL_CAPACITY.
+    resultHolder.trimResults(INITIAL_CAPACITY);
+
+    // Sort the input
+    Collections.sort(expected, new IntDoubleComparator(!minOrder));
+
+    // Ensure that all the correct group keys survive after trimming.
+    for (int i = 0; i < INITIAL_CAPACITY; i++) {
+      IntDoublePair pair = expected.get(i);
+      Assert.assertEquals(resultHolder.getDoubleResult(pair.getIntValue()), pair.getDoubleValue());
     }
   }
 }

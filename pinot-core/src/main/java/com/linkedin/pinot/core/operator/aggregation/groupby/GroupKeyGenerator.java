@@ -17,6 +17,7 @@ package com.linkedin.pinot.core.operator.aggregation.groupby;
 
 import com.linkedin.pinot.core.query.utils.Pair;
 import java.util.Iterator;
+import java.util.List;
 
 
 /**
@@ -78,6 +79,12 @@ public interface GroupKeyGenerator {
    * @return iterator of group keys.
    */
   Iterator<GroupKey> getUniqueGroupKeys();
+
+  /**
+   * Purge the given group keys.
+   * @param keysToPurge Group keys to purge
+   */
+  void purgeKeys(int[] keysToPurge);
 
   /**
    * This class encapsulates the integer group key and the string group key.
