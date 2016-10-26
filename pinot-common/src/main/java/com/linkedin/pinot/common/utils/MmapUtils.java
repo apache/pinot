@@ -245,6 +245,7 @@ public class MmapUtils {
     try {
       byteBuffer = ByteBuffer.allocateDirect(capacity);
     } catch (OutOfMemoryError e) {
+      DIRECT_BYTE_BUFFER_USAGE.addAndGet(-capacity);
       LOGGER.error("Ran out of direct memory while trying to allocate {} bytes (context {})", capacity, context, e);
       LOGGER.error("Allocation status {}", getTrackedAllocationStatus());
       Utils.rethrowException(e);
