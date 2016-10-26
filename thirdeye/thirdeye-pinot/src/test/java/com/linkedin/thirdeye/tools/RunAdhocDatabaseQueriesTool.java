@@ -80,6 +80,14 @@ public class RunAdhocDatabaseQueriesTool {
     }
   }
 
+  private void updateNotified() {
+    List<MergedAnomalyResultDTO> mergedResults = mergedResultDAO.findAll();
+    for (MergedAnomalyResultDTO mergedResult : mergedResults) {
+      mergedResult.setNotified(true);
+      mergedResultDAO.update(mergedResult);
+    }
+  }
+
   private void updateEmailConfigs() {
     List<EmailConfigurationDTO> emailConfigs = emailConfigurationDAO.findByCollection("login_additive");
     for (EmailConfigurationDTO emailConfig : emailConfigs) {
@@ -96,7 +104,7 @@ public class RunAdhocDatabaseQueriesTool {
       System.exit(1);
     }
     RunAdhocDatabaseQueriesTool dq = new RunAdhocDatabaseQueriesTool(persistenceFile);
-    dq.updateEmailConfigs();
+    dq.updateNotified();
   }
 
 }
