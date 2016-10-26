@@ -1,0 +1,524 @@
+﻿// Base styles for jTable.
+// All themes must inherit from jtable_theme_base.
+// Created by Halil İbrahim Kalkan
+// http://www.jtable.org
+
+// GENERAL MIXINGS ////////////////////////////////////////////////////////////
+
+.centered()
+{
+    text-align: center;
+    vertical-align: middle;
+}
+
+.clear-margin-padding()
+{
+    margin: 0px;
+    padding: 0px;
+}
+
+.clear-list-styles()
+{
+    .clear-margin-padding;
+    list-style: none;
+}
+
+.border-radius(@radius)
+{
+    -webkit-border-radius: @radius;
+    -moz-border-radius: @radius;
+    border-radius: @radius;
+}
+
+.text-shadow(@shadow)
+{
+    -webkit-text-shadow: @shadow;
+    text-shadow: @shadow;
+}
+
+.box-shadow(@shadow)
+{
+    -webkit-box-shadow: @shadow;
+    -moz-box-shadow: @shadow;
+    box-shadow: @shadow;
+}
+
+.opacity(@value)
+{
+    opacity: @value;
+    //for IE8 and earlier
+    @ieValue: @value * 100;
+    filter: alpha(opacity=@ieValue);
+}
+
+.vertical-gradient(@top_color, @bottom_color)
+{
+    background: @top_color; // Old browsers
+    background: -moz-linear-gradient(top, @top_color 0%, @bottom_color 100%); // FF3.6+
+    background: -webkit-gradient(linear, left top, left bottom, color-stop(0%,@top_color), color-stop(100%,@bottom_color)); // Chrome,Safari4+
+    background: -webkit-linear-gradient(top, @top_color 0%,@bottom_color 100%); // Chrome10+,Safari5.1+
+    background: -o-linear-gradient(top, @top_color 0%,@bottom_color 100%); // Opera 11.10+
+    background: -ms-linear-gradient(top, @top_color 0%,@bottom_color 100%); // IE10+
+    background: linear-gradient(to bottom, @top_color 0%,@bottom_color 100%); // W3C
+    filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='@{top_color}', endColorstr='@{bottom_color}',GradientType=0 ); // IE6-9
+}
+
+// Docking
+
+@default-dock-margin: 0px;
+
+.dock(top, @margin: @default-dock-margin)
+{
+    left: @margin;
+    top: @margin;
+    right: @margin;
+}
+
+.dock(right, @margin: @default-dock-margin)
+{
+    right: @margin;
+    top: @margin;
+    bottom: @margin;
+}
+
+.dock(bottom, @margin: @default-dock-margin)
+{
+    left: @margin;
+    right: @margin;
+    bottom: @margin;
+}
+
+.dock(left, @margin: @default-dock-margin)
+{
+    left: @margin;
+    top: @margin;
+    bottom: @margin;
+}
+
+.dock(top-left, @margin: @default-dock-margin)
+{
+    left: @margin;
+    top: @margin;
+}
+
+.dock(top-right, @margin: @default-dock-margin)
+{
+    top: @margin;
+    right: @margin;
+}
+
+.dock(bottom-right, @margin: @default-dock-margin)
+{
+    bottom: @margin;
+    right: @margin;
+}
+
+.dock(bottom-left, @margin: @default-dock-margin)
+{
+    bottom: @margin;
+    left: @margin;
+}
+
+.dock(@direction, @margin: @default-dock-margin)
+{
+    position: absolute;
+}
+
+// JTABLE THEME BASE STYLES ///////////////////////////////////////////////////
+
+.jtable_theme_base()
+{
+    div.jtable-main-container
+    {
+        position: relative;
+
+        div.jtable-title
+        {
+            position: relative;
+            text-align: left;
+
+            .jtable-close-button
+            {
+                .dock(right);
+            }
+
+			// Toolbar -------------------------------------------------------------
+
+			div.jtable-toolbar
+			{
+				.dock(bottom-right);
+
+				display: inline-block;
+				margin-right: 5px;
+
+				span.jtable-toolbar-item
+				{
+					position: relative;
+					display: inline-block;
+					margin: 0px 0px 0px 5px;
+					cursor: pointer;
+					font-size: 0.9em;
+					padding: 2px;
+					vertical-align: bottom;
+
+					span.jtable-toolbar-item-icon
+					{
+						display: inline-block;
+						margin: 2px;
+						vertical-align: middle;
+						width: 16px;
+						height: 16px;
+					}
+
+					span.jtable-toolbar-item-text
+					{
+						display: inline-block;
+						margin: 2px;
+						vertical-align: middle;
+					}
+				}
+			}
+
+			.jtable-close-button+div.jtable-toolbar
+			{
+				margin-right: 30px;
+			}
+        }
+
+        table.jtable
+        {
+            width: 100%;
+
+            thead
+            {
+                th
+                {
+                    vertical-align: middle;
+                    text-align: left;
+
+                    &.jtable-column-header
+                    {
+                        div.jtable-column-header-container
+                        {
+                            position: relative;
+
+                            span.jtable-column-header-text
+                            {
+                                display: inline-block;
+                            }
+
+                            div.jtable-column-resize-handler
+                            {
+                                position: absolute;
+                                height: 24px;
+                                width: 8px;
+                                right: -8px;
+                                top: -2px;
+                                z-index: 2;
+                                cursor: col-resize;
+                            }
+                        }
+                    }
+
+                    &.jtable-command-column-header
+                    {
+                        text-align: center;
+                    }
+
+                    &.jtable-column-header-selecting
+                    {
+                        text-align: center;
+                        width: 1%;
+
+                        input
+                        {
+                            cursor: pointer;
+                        }
+                    }
+
+                    &.jtable-column-header-sortable
+                    {
+                        cursor: pointer;
+                    }
+                }
+            }
+
+            tbody
+            {
+                tr
+                {
+                    > td
+                    {
+                        .jtable-command-button
+                        {
+                            .clear-margin-padding;
+                            cursor: pointer;
+                            border: none;
+                            display: inline;
+
+                            span
+                            {
+                                display: none;
+                            }
+                        }
+
+                        &.jtable-command-column
+                        {
+                            .centered;
+                        }
+
+                        &.jtable-selecting-column
+                        {
+                            .centered;
+
+                            input
+                            {
+                                cursor: pointer;
+                            }
+                        }
+                    }
+
+                    &.jtable-no-data-row
+                    {
+                        text-align: center;
+                    }
+
+                    &.jtable-row-created
+                    {
+                    }
+
+                    &.jtable-row-updated
+                    {
+                    }
+
+                    &.jtable-row-deleting
+                    {
+                    }
+                }
+            }
+        }
+
+        > div.jtable-bottom-panel
+        {
+            position: relative;
+            min-height: 24px;
+			text-align: left;
+
+            div.jtable-right-area
+            {
+                .dock(right);
+            }
+
+            .jtable-page-list
+            {
+                display: inline-block;
+
+                .jtable-page-number,
+                .jtable-page-number-space,
+                .jtable-page-number-first,
+                .jtable-page-number-last,
+                .jtable-page-number-previous,
+                .jtable-page-number-next,
+                .jtable-page-number-active
+                {
+                    padding: 2px 5px;
+                    display: inline-block;
+                    cursor: pointer;
+                }
+
+                .jtable-page-number-space,
+                .jtable-page-number-active,
+				.jtable-page-number-disabled
+                {
+                    cursor: default;
+                }
+            }
+
+            span.jtable-page-size-change
+            {
+                margin-left: 5px;
+            }
+
+			span.jtable-goto-page
+			{
+                margin-left: 5px;
+
+				input[type=text]
+				{
+					width:22px;
+				}
+			}
+
+			span.jtable-page-info
+			{
+				vertical-align: middle;
+			}
+        }
+
+        div.jtable-column-resize-bar
+        {
+            .opacity(0.5);
+            position: absolute;
+            display: none;
+            width: 1px;
+            background-color: #000;
+        }
+
+        div.jtable-column-selection-container
+        {
+            position: absolute;
+            display: none;
+            border: 1px solid #C8C8C8;
+            background: #fff;
+            color: #000;
+            z-index: 101;
+            padding: 5px;
+
+            ul.jtable-column-select-list
+            {
+                .clear-list-styles;
+
+                li
+                {
+                    margin: 0px;
+                    padding: 2px 0px;
+
+                    label
+                    {
+                        span
+                        {
+                            position: relative;
+                            top: -1px;
+                            margin-left: 4px;
+                        }
+                    }
+
+                    input[type="checkbox"]
+                    {
+                        cursor: pointer;
+                    }
+                }
+            }
+        }
+    }
+
+    form.jtable-dialog-form
+    {
+        div.jtable-input-field-container
+        {
+            padding: 2px 0px 3px 0px;
+            border-bottom: 1px solid #ddd;
+
+            &:last-child
+            {
+                border: none;
+            }
+        }
+
+        div.jtable-input-label
+        {
+            padding: 2px 3px;
+            font-size: 1.1em;
+            color: #666;
+        }
+
+        div.jtable-input
+        {
+            padding: 2px;
+        }
+
+        div.jtable-date-input
+        {
+            /* No additional style */
+        }
+
+        div.jtable-text-input
+        {
+            /* No additional style */
+        }
+
+        span.jtable-option-text-clickable
+        {
+            position: relative;
+            top: -2px;
+        }
+
+        div.jtable-textarea-input textarea
+        {
+            width: 300px;
+            min-height: 60px;
+        }
+
+        div.jtable-password-input
+        {
+        }
+
+        div.jtable-dropdown-input
+        {
+        }
+
+        div.jtable-radiobuttonlist-input
+        {
+        }
+
+        div.jtable-checkbox-input span,
+        div.jtable-radio-input span
+        {
+            padding-left: 4px;
+        }
+
+        div.jtable-radio-input input,
+        div.jtable-checkbox-input input,
+        span.jtable-option-text-clickable
+        {
+            cursor: pointer;
+        }
+    }
+
+    form.jtable-create-form
+    {
+    }
+
+    form.jtable-edit-form
+    {
+    }
+
+    div.jtable-busy-panel-background
+    {
+        .opacity(0.1);
+        z-index: 998;
+        position: absolute;
+        background-color: #000;
+
+		&.jtable-busy-panel-background-invisible
+		{
+			background-color: transparent;
+		}
+    }
+
+    div.jtable-busy-message
+    {
+        cursor: wait;
+        z-index: 999;
+        position: absolute;
+        margin: 5px;
+    }
+
+    div.jtable-contextmenu-overlay
+    {
+        position: fixed;
+        left: 0px;
+        top: 0px;
+        width: 100%;
+        height: 100%;
+        z-index: 100;
+    }
+
+    .jtable-delete-confirm-message
+    {
+    }
+
+    .jtable-row-ready-to-remove
+    {
+    }
+}

@@ -1,22 +1,32 @@
 package com.linkedin.thirdeye.datalayer.entity;
 
 public class IngraphMetricConfigIndex extends AbstractIndexEntity {
-  String name;
-  String alias;
+  String metric;
+  String metricAlias;
+  String dataset;
 
-  public String getAlias() {
-    return alias;
+  public String getMetric() {
+    return metric;
   }
 
-  public void setAlias(String alias) {
-    this.alias = alias;
+  public void setMetric(String metric) {
+    this.metric = metric;
   }
 
-  public String getName() {
-    return name;
+  public String getMetricAlias() {
+    return metricAlias;
   }
 
-  public void setName(String name) {
-    this.name = name;
+  public void setMetricAlias(String metricAlias) {
+    this.metricAlias = metricAlias;
   }
+
+  public String getDataset() {
+    return dataset;
+  }
+
+  public void setDataset(String dataset) {
+    this.dataset = dataset;
+  }
+
 }

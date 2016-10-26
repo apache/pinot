@@ -119,14 +119,16 @@ create index merged_anomaly_result_feedback_idx on merged_anomaly_result_index(a
 create index merged_anomaly_result_metric_idx on merged_anomaly_result_index(metric_id);
 create index merged_anomaly_result_start_time_idx on merged_anomaly_result_index(start_time);
 
-create table if not exists ingraph_metric_config (
-    name varchar(200) not null,
-    alias varchar(200) not null,
+create table if not exists ingraph_metric_config_index (
+    metric varchar(2000) not null,
+    metric_alias varchar(2000) not null,
+    dataset varchar(200) not null,
     base_id bigint(20) not null,
     create_time timestamp,
     update_time timestamp default current_timestamp,
     version int(10)
 ) ENGINE=InnoDB;
+ALTER TABLE `ingraph_metric_config_index` ADD UNIQUE `unique_index`(`metric`, `dataset`);
 
 create table if not exists webapp_config_index (
     name varchar(200) not null,

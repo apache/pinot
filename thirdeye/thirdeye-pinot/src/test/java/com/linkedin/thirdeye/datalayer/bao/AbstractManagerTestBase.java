@@ -42,6 +42,8 @@ public abstract class AbstractManagerTestBase {
   protected WebappConfigManager webappConfigDAO;
   protected DatasetConfigManager datasetConfigDAO;
   protected MetricConfigManager metricConfigDAO;
+  protected IngraphMetricConfigManager ingraphMetricConfigDAO;
+
   private ManagerProvider managerProvider;
   private PersistenceConfig configuration;
 
@@ -129,6 +131,8 @@ public abstract class AbstractManagerTestBase {
         .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.DatasetConfigManagerImpl.class);
     metricConfigDAO = (MetricConfigManager) managerProvider
         .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.MetricConfigManagerImpl.class);
+    ingraphMetricConfigDAO = (IngraphMetricConfigManager) managerProvider
+            .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.IngraphMetricConfigManagerImpl.class);
   }
 
   @AfterClass(alwaysRun = true)

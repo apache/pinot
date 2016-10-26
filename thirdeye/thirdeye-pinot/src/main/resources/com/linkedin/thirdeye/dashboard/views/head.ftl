@@ -53,8 +53,12 @@
     <script src="../../../assets/js/dashboard.js" defer></script>
     <script src="../../../assets/js/lib/self-service-email.js" defer></script>
     <script src="../../../assets/js/lib/experiments.js" defer></script>
+    
     <!-- Place new script files controlling the dahsboard above dashboard.js -->
     <!-- JSON Editor comes here-->
-  <link rel="stylesheet" href="../../../assets/jsonedit/jsoneditor.min.css"/>
-  <script src="../../../assets/jsonedit/jsoneditor.min.js" defer></script>
+    <link rel="stylesheet" href="../../../assets/jsonedit/jsoneditor.min.css"/>
+    <script src="../../../assets/jsonedit/jsoneditor.min.js" defer></script>
+  
+  <!-- Include one of jTable styles. -->
+
 </head>
