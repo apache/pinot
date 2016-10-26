@@ -15,22 +15,21 @@
  */
 package com.linkedin.pinot.common.utils.request;
 
+import com.google.common.base.Objects;
 import java.util.List;
 
 import com.linkedin.pinot.common.request.FilterOperator;
 
 
 public class FilterQueryTree {
-
   private final int id;
   private final String column;
   private final List<String> value;
   private final FilterOperator operator;
   private final List<FilterQueryTree> children;
 
-  public FilterQueryTree(String column, List<String> value, FilterOperator operator,
-      List<FilterQueryTree> children) {
-    this.id = this.hashCode();
+  public FilterQueryTree(String column, List<String> value, FilterOperator operator, List<FilterQueryTree> children) {
+    this.id = System.identityHashCode(this);
     this.column = column;
     this.value = value;
     this.operator = operator;
@@ -39,7 +38,6 @@ public class FilterQueryTree {
 
   public FilterQueryTree(int id, String column, List<String> value, FilterOperator operator,
       List<FilterQueryTree> children) {
-    super();
     this.id = id;
     this.column = column;
     this.value = value;
@@ -65,5 +63,28 @@ public class FilterQueryTree {
 
   public List<FilterQueryTree> getChildren() {
     return children;
+  }
+
+  public String toString() {
+    StringBuffer stringBuffer = new StringBuffer();
+    recursiveToStringIntoBuffer(0, stringBuffer);
+    return stringBuffer.toString();
+  }
+
+  private void recursiveToStringIntoBuffer(int indent, StringBuffer stringBuffer) {
+    for (int i = 0; i < indent; i++) {
+      stringBuffer.append(' ');
+    }
+    if (operator == FilterOperator.OR || operator == FilterOperator.AND) {
+      stringBuffer.append(operator).append(" (").append(id).append(")");
+    } else {
+      stringBuffer.append(column).append(" ").append(operator).append(" ").append(value).append(" (").append(id).append(")");
+    }
+    if (children != null) {
+      for (FilterQueryTree child : children) {
+        stringBuffer.append('\n');
+        child.recursiveToStringIntoBuffer(indent + 1, stringBuffer);
+      }
+    }
   }
 }
