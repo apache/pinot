@@ -17,6 +17,7 @@ import java.util.TimeZone;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
 
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.commons.mail.EmailException;
@@ -170,14 +171,20 @@ public class AlertTaskRunner implements TaskRunner {
       Map<DimensionMap, List<MergedAnomalyResultDTO>> groupedResults, List<String> dimensionNames)
       throws JobExecutionException {
 
-    long anomalyStartMillis = results.get(0).getStartTime();
-    long anomalyEndMillis = results.get(0).getEndTime();
-    for (MergedAnomalyResultDTO mergedAnomalyResultDTO : results) {
-      if (mergedAnomalyResultDTO.getStartTime() < anomalyStartMillis) {
-        anomalyStartMillis = mergedAnomalyResultDTO.getStartTime();
-      }
-      if (mergedAnomalyResultDTO.getEndTime() > anomalyEndMillis) {
-        anomalyEndMillis = mergedAnomalyResultDTO.getEndTime();
+    long anomalyStartMillis = 0;
+    long anomalyEndMillis = 0;
+    int anomalyResultSize = 0;
+    if (CollectionUtils.isNotEmpty(results)) {
+      anomalyResultSize = results.size();
+      anomalyStartMillis = results.get(0).getStartTime();
+      anomalyEndMillis = results.get(0).getEndTime();
+      for (MergedAnomalyResultDTO mergedAnomalyResultDTO : results) {
+        if (mergedAnomalyResultDTO.getStartTime() < anomalyStartMillis) {
+          anomalyStartMillis = mergedAnomalyResultDTO.getStartTime();
+        }
+        if (mergedAnomalyResultDTO.getEndTime() > anomalyEndMillis) {
+          anomalyEndMillis = mergedAnomalyResultDTO.getEndTime();
+        }
       }
     }
 
@@ -204,7 +211,7 @@ public class AlertTaskRunner implements TaskRunner {
       }
 
       templateData.put("groupedAnomalyResults", groupedResults);
-      templateData.put("anomalyCount", results.size());
+      templateData.put("anomalyCount", anomalyResultSize);
       templateData.put("startTime", anomalyStartMillis);
       templateData.put("endTime", anomalyEndMillis);
       templateData.put("reportGenerationTimeMillis", System.currentTimeMillis());

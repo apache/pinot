@@ -85,14 +85,15 @@ public class DetectionTaskRunner implements TaskRunner {
     }
 
     for (Map.Entry<DimensionKey, MetricTimeSeries> entry : res.entrySet()) {
+      DimensionKey dimensionKey = entry.getKey();
+      DimensionMap exploredDimensions = DimensionMap.fromDimensionKey(dimensionKey, collectionDimensions);
+
       if (entry.getValue().getTimeWindowSet().size() < 1) {
-        LOG.warn("Insufficient data for {} to run anomaly detection function", entry.getKey());
+        LOG.warn("Insufficient data for {} to run anomaly detection function", exploredDimensions);
         continue;
       }
 
       // Get current entry's knownAnomalies, which should have the same explored dimensions
-      DimensionKey dimensionKey = entry.getKey();
-      DimensionMap exploredDimensions = DimensionMap.fromDimensionKey(dimensionKey, collectionDimensions);
       List<RawAnomalyResultDTO> knownAnomaliesOfAnEntry = dimensionNamesToKnownAnomalies.get(exploredDimensions);
 
       try {
@@ -110,11 +111,11 @@ public class DetectionTaskRunner implements TaskRunner {
         // Handle results
         handleResults(resultsOfAnEntry);
 
-        LOG.info("{} has {} anomalies in window {} to {}", entry.getKey(), resultsOfAnEntry.size(),
+        LOG.info("{} has {} anomalies in window {} to {}", exploredDimensions, resultsOfAnEntry.size(),
             windowStart, windowEnd);
         anomalyCounter += resultsOfAnEntry.size();
       } catch (Exception e) {
-        LOG.error("Could not compute for {}", entry.getKey(), e);
+        LOG.error("Could not compute for {}", exploredDimensions, e);
       }
     }
     LOG.info("{} anomalies found in total", anomalyCounter);
