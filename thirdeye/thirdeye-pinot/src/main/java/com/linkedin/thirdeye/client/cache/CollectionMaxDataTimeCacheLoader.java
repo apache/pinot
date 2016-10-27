@@ -1,8 +1,12 @@
 package com.linkedin.thirdeye.client.cache;
 
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListenableFutureTask;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
 import org.joda.time.format.DateTimeFormat;
@@ -29,6 +33,7 @@ public class CollectionMaxDataTimeCacheLoader extends CacheLoader<String, Long> 
   private DatasetConfigManager datasetConfigDAO;
 
   private final Map<String, Long> collectionToPrevMaxDataTimeMap = new ConcurrentHashMap<String, Long>();
+  private final ExecutorService reloadExecutor = Executors.newSingleThreadExecutor();
 
   public CollectionMaxDataTimeCacheLoader(LoadingCache<PinotQuery, ResultSetGroup> resultSetGroupCache,
       DatasetConfigManager datasetConfigDAO) {
@@ -73,6 +78,14 @@ public class CollectionMaxDataTimeCacheLoader extends CacheLoader<String, Long> 
       maxTime = System.currentTimeMillis();
     }
     return maxTime;
+  }
+
+  @Override
+  public ListenableFuture<Long> reload(String collection, Long preMaxDataTime) {
+    ListenableFutureTask<Long> reloadTask = ListenableFutureTask.create(() -> load(collection));
+    reloadExecutor.execute(reloadTask);
+    LOGGER.info("Passively refreshing max data time of collection: {}", collection);
+    return reloadTask;
   }
 
   private long getPrevMaxDataTime(String collection, TimeSpec timeSpec) {
