@@ -56,6 +56,11 @@ public class ThirdEyeCacheRegistry {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ThirdEyeCacheRegistry.class);
 
+  // TODO: make default cache size configurable
+  private static final int DEFAULT_HEAP_PERCENTAGE_FOR_RESULTSETGROUP_CACHE = 50;
+  private static final int DEFAULT_LOWER_BOUND_OF_RESULTSETGROUP_CACHE_SIZE_IN_MB = 100;
+  private static final int DEFAULT_UPPER_BOUND_OF_RESULTSETGROUP_CACHE_SIZE_IN_MB = 8192;
+
   private static class Holder {
     static final ThirdEyeCacheRegistry INSTANCE = new ThirdEyeCacheRegistry();
   }
@@ -119,7 +124,7 @@ public class ThirdEyeCacheRegistry {
     LoadingCache<PinotQuery, ResultSetGroup> resultSetGroupCache = CacheBuilder.newBuilder()
         .removalListener(listener)
         .expireAfterAccess(1, TimeUnit.HOURS)
-        .maximumWeight(getApproximateMaxBucketNumber(50))
+        .maximumWeight(getApproximateMaxBucketNumber(DEFAULT_HEAP_PERCENTAGE_FOR_RESULTSETGROUP_CACHE))
         .weigher((pinotQuery, resultSetGroup) -> {
           int resultSetCount = resultSetGroup.getResultSetCount();
           int weight = 0;
@@ -306,7 +311,8 @@ public class ThirdEyeCacheRegistry {
    * The approximate weight is calculated by following rules:
    * 1. We estimate that a bucket, including its overhead, occupies 1 KB.
    * 2. Cache size (in bytes) = System's maxMemory * percentage
-   * 3. We also bound the cache size between 100MB and 8GB if max heap size is unavailable.
+   * 3. We also bound the cache size between DEFAULT_LOWER_BOUND_OF_RESULTSETGROUP_CACHE_SIZE_IN_MB and
+   *    DEFAULT_UPPER_BOUND_OF_RESULTSETGROUP_CACHE_SIZE_IN_MB if max heap size is unavailable.
    * 4. Weight (number of buckets) = cache size / 1KB.
    *
    * @param percentage the percentage of JVM max heap space
@@ -314,10 +320,13 @@ public class ThirdEyeCacheRegistry {
    */
   private static long getApproximateMaxBucketNumber(int percentage) {
     long jvmMaxMemoryInBytes = Runtime.getRuntime().maxMemory();
-    if (jvmMaxMemoryInBytes == Long.MAX_VALUE) {
-      jvmMaxMemoryInBytes = 8589934592L; // Upper bound: 8GB
-    } else if (jvmMaxMemoryInBytes < 104857600L) { // Lower bound: 100MB
-      jvmMaxMemoryInBytes = 104857600L;
+    if (jvmMaxMemoryInBytes == Long.MAX_VALUE) { // Check upper bound
+      jvmMaxMemoryInBytes = DEFAULT_UPPER_BOUND_OF_RESULTSETGROUP_CACHE_SIZE_IN_MB * 1048576L; // MB to Bytes
+    } else { // Check lower bound
+      long lowerBoundInBytes = DEFAULT_LOWER_BOUND_OF_RESULTSETGROUP_CACHE_SIZE_IN_MB * 1048576L; // MB to Bytes
+      if (jvmMaxMemoryInBytes < lowerBoundInBytes) {
+        jvmMaxMemoryInBytes = lowerBoundInBytes;
+      }
     }
     return (jvmMaxMemoryInBytes / 102400) * percentage;
   }
