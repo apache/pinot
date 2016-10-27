@@ -112,14 +112,27 @@ public class ThirdEyeCacheRegistry {
         LOGGER.info("Expired {}", notification.getKey().getPql());
       }
     };
-    // ResultSetGroup Cache
-    // TODO: have a limit on key size and maximum weight
-    LoadingCache<PinotQuery, ResultSetGroup> resultSetGroupCache =
-        CacheBuilder.newBuilder().removalListener(listener).expireAfterAccess(1, TimeUnit.HOURS)
-            .build(new ResultSetGroupCacheLoader(pinotThirdeyeClientConfig));
+
+    // ResultSetGroup Cache. The size of this cache is limited by the total number of buckets in all ResultSetGroup.
+    // We estimate that 1 bucket (including overhead) consumes 1KB and this cache is allowed to use up to 50% of max
+    // heap space.
+    LoadingCache<PinotQuery, ResultSetGroup> resultSetGroupCache = CacheBuilder.newBuilder()
+        .removalListener(listener)
+        .expireAfterAccess(1, TimeUnit.HOURS)
+        .maximumWeight(getApproximateMaxBucketNumber(50))
+        .weigher((pinotQuery, resultSetGroup) -> {
+          int resultSetCount = resultSetGroup.getResultSetCount();
+          int weight = 0;
+          for (int idx = 0; idx < resultSetCount; ++idx) {
+            com.linkedin.pinot.client.ResultSet resultSet = resultSetGroup.getResultSet(idx);
+            weight += (resultSet.getColumnCount() * resultSet.getRowCount());
+          }
+          return weight;
+        })
+        .build(new ResultSetGroupCacheLoader(pinotThirdeyeClientConfig));
     cacheRegistry.registerResultSetGroupCache(resultSetGroupCache);
 
-        // CollectionMaxDataTime Cache
+    // CollectionMaxDataTime Cache
     LoadingCache<String, Long> collectionMaxDataTimeCache = CacheBuilder.newBuilder()
         .build(new CollectionMaxDataTimeCacheLoader(resultSetGroupCache, datasetConfigDAO));
     cacheRegistry.registerCollectionMaxDataTimeCache(collectionMaxDataTimeCache);
@@ -285,6 +298,28 @@ public class ThirdEyeCacheRegistry {
 
   public void registerDashboardConfigsCache(LoadingCache<String, List<DashboardConfigDTO>> dashboardConfigsCache) {
     this.dashboardConfigsCache = dashboardConfigsCache;
+  }
+
+  /**
+   * Returns the suggested max weight for LoadingCache according to the given percentage of max heap space.
+   *
+   * The approximate weight is calculated by following rules:
+   * 1. We estimate that a bucket, including its overhead, occupies 1 KB.
+   * 2. Cache size (in bytes) = System's maxMemory * percentage
+   * 3. We also bound the cache size between 100MB and 8GB if max heap size is unavailable.
+   * 4. Weight (number of buckets) = cache size / 1KB.
+   *
+   * @param percentage the percentage of JVM max heap space
+   * @return the suggested max weight for LoadingCache
+   */
+  private static long getApproximateMaxBucketNumber(int percentage) {
+    long jvmMaxMemoryInBytes = Runtime.getRuntime().maxMemory();
+    if (jvmMaxMemoryInBytes == Long.MAX_VALUE) {
+      jvmMaxMemoryInBytes = 8589934592L; // Upper bound: 8GB
+    } else if (jvmMaxMemoryInBytes < 104857600L) { // Lower bound: 100MB
+      jvmMaxMemoryInBytes = 104857600L;
+    }
+    return (jvmMaxMemoryInBytes / 102400) * percentage;
   }
 
 }
