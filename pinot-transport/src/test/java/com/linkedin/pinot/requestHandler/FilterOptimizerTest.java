@@ -74,7 +74,7 @@ public class FilterOptimizerTest {
     }
 
     // 3-level test case
-    req = pql2Compiler.compileToBrokerRequest("SELECT * FROM T WHERE ((A = 4 OR (B = 5 OR D = 9)) OR (C=7)) OR D=8");
+    req = pql2Compiler.compileToBrokerRequest("SELECT * FROM T WHERE ((A = 4 OR (B = 5 OR D = 9)) OR (C=7)) OR E=8");
     tree = RequestUtils.generateFilterQueryTree(_optimizer.optimize(req));
     Assert.assertEquals(tree.getChildren().size(), 5);
     Assert.assertEquals(tree.getOperator(), FilterOperator.OR);
@@ -84,7 +84,7 @@ public class FilterOptimizerTest {
     }
 
     // Mixed case.
-    req = pql2Compiler.compileToBrokerRequest("SELECT * FROM T WHERE ((A = 4 OR (B = 5 AND D = 9)) OR (C=7)) OR D=8");
+    req = pql2Compiler.compileToBrokerRequest("SELECT * FROM T WHERE ((A = 4 OR (B = 5 AND D = 9)) OR (C=7)) OR E=8");
     tree = RequestUtils.generateFilterQueryTree(_optimizer.optimize(req));
     Assert.assertEquals(tree.getChildren().size(), 4);
     Assert.assertEquals(tree.getOperator(), FilterOperator.OR);
@@ -155,7 +155,7 @@ public class FilterOptimizerTest {
     if (depth == 1) {
       return "(A = " + depth + ")";
     } else {
-      return "(A = " + depth + " " + operator + " " + constructWhereClause(operator, depth-1) + ")";
+      return "(A" + depth + " = " + depth + " " + operator + " " + constructWhereClause(operator, depth-1) + ")";
     }
   }
 }

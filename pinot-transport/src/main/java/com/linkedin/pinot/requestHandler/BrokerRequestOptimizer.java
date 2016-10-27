@@ -25,7 +25,8 @@ import com.linkedin.pinot.common.utils.request.RequestUtils;
 
 public class BrokerRequestOptimizer {
   private static final List<? extends FilterQueryTreeOptimizer> FILTER_QUERY_TREE_OPTIMIZERS = Arrays.asList(
-      new FlattenNestedPredicatesFilterQueryTreeOptimizer()
+      new FlattenNestedPredicatesFilterQueryTreeOptimizer(),
+      new MultipleOrEqualitiesToInClauseFilterQueryTreeOptimizer()
   );
 
   /**
