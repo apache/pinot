@@ -213,21 +213,9 @@ public class AnomalyMergeExecutor implements Runnable {
     if (StringUtils.isNotBlank(exploreDimensions)) {
       timeSeriesRequest.setGroupByDimensions(Arrays.asList(exploreDimensions.trim().split(",")));
 
+      // Decorate filters according to dimensionMap
       DimensionMap exploredDimensions = anomalyMergedResult.getDimensions();
-      for (Map.Entry<String, String> entry : exploredDimensions.entrySet()) {
-        String dimensionName = entry.getKey();
-        String dimensionValue = entry.getValue();
-        filters.removeAll(dimensionName);
-        if (dimensionValue.equalsIgnoreCase("other")) {
-          filters.put(dimensionName, dimensionValue);
-          filters.put(dimensionName, dimensionValue.toLowerCase());
-          filters.put(dimensionName, "");
-        } else {
-          // Only add a specific dimension value filter if there are more values present for the same dimension
-          filters.put(dimensionName, dimensionValue);
-        }
-        LOG.info("Adding filter : [{} = {}] in the query", dimensionName, dimensionValue);
-      }
+      filters = ThirdEyeUtils.getFilterSetFromDimensionMap(exploredDimensions, filters);
     }
 
     LOG.info("Applying final filter : {}", filters.toString());
