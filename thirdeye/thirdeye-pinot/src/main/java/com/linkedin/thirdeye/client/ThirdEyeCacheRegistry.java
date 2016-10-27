@@ -121,6 +121,7 @@ public class ThirdEyeCacheRegistry {
 
         // CollectionMaxDataTime Cache
     LoadingCache<String, Long> collectionMaxDataTimeCache = CacheBuilder.newBuilder()
+        .refreshAfterWrite(5, TimeUnit.MINUTES)
         .build(new CollectionMaxDataTimeCacheLoader(resultSetGroupCache, datasetConfigDAO));
     cacheRegistry.registerCollectionMaxDataTimeCache(collectionMaxDataTimeCache);
 
@@ -186,7 +187,7 @@ public class ThirdEyeCacheRegistry {
           LOGGER.error("Exception while loading collections", e);
         }
       }
-    }, 5, 5, TimeUnit.MINUTES);
+    }, 30, 30, TimeUnit.MINUTES);
 
     ScheduledExecutorService hourlyService = Executors.newSingleThreadScheduledExecutor();
     hourlyService.scheduleAtFixedRate(new Runnable() {
