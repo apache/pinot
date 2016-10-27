@@ -56,6 +56,11 @@ public class ThirdEyeCacheRegistry {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ThirdEyeCacheRegistry.class);
 
+  // TODO: make default cache size configurable
+  private static final int DEFAULT_HEAP_PERCENTAGE_FOR_RESULTSETGROUP_CACHE = 50;
+  private static final int DEFAULT_LOWER_BOUND_OF_RESULTSETGROUP_CACHE_SIZE_IN_MB = 100;
+  private static final int DEFAULT_UPPER_BOUND_OF_RESULTSETGROUP_CACHE_SIZE_IN_MB = 8192;
+
   private static class Holder {
     static final ThirdEyeCacheRegistry INSTANCE = new ThirdEyeCacheRegistry();
   }
@@ -112,14 +117,29 @@ public class ThirdEyeCacheRegistry {
         LOGGER.info("Expired {}", notification.getKey().getPql());
       }
     };
-    // ResultSetGroup Cache
-    // TODO: have a limit on key size and maximum weight
-    LoadingCache<PinotQuery, ResultSetGroup> resultSetGroupCache =
-        CacheBuilder.newBuilder().removalListener(listener).expireAfterAccess(1, TimeUnit.HOURS)
-            .build(new ResultSetGroupCacheLoader(pinotThirdeyeClientConfig));
-    cacheRegistry.registerResultSetGroupCache(resultSetGroupCache);
 
-        // CollectionMaxDataTime Cache
+    // ResultSetGroup Cache. The size of this cache is limited by the total number of buckets in all ResultSetGroup.
+    // We estimate that 1 bucket (including overhead) consumes 1KB and this cache is allowed to use up to 50% of max
+    // heap space.
+    long maxBucketNumber = getApproximateMaxBucketNumber(DEFAULT_HEAP_PERCENTAGE_FOR_RESULTSETGROUP_CACHE);
+    LoadingCache<PinotQuery, ResultSetGroup> resultSetGroupCache = CacheBuilder.newBuilder()
+        .removalListener(listener)
+        .expireAfterAccess(1, TimeUnit.HOURS)
+        .maximumWeight(maxBucketNumber)
+        .weigher((pinotQuery, resultSetGroup) -> {
+          int resultSetCount = resultSetGroup.getResultSetCount();
+          int weight = 0;
+          for (int idx = 0; idx < resultSetCount; ++idx) {
+            com.linkedin.pinot.client.ResultSet resultSet = resultSetGroup.getResultSet(idx);
+            weight += (resultSet.getColumnCount() * resultSet.getRowCount());
+          }
+          return weight;
+        })
+        .build(new ResultSetGroupCacheLoader(pinotThirdeyeClientConfig));
+    cacheRegistry.registerResultSetGroupCache(resultSetGroupCache);
+    LOGGER.info("Max bucket number for ResultSetGroup cache is set to {}", maxBucketNumber);
+
+    // CollectionMaxDataTime Cache
     LoadingCache<String, Long> collectionMaxDataTimeCache = CacheBuilder.newBuilder()
         .build(new CollectionMaxDataTimeCacheLoader(resultSetGroupCache, datasetConfigDAO));
     cacheRegistry.registerCollectionMaxDataTimeCache(collectionMaxDataTimeCache);
@@ -285,6 +305,32 @@ public class ThirdEyeCacheRegistry {
 
   public void registerDashboardConfigsCache(LoadingCache<String, List<DashboardConfigDTO>> dashboardConfigsCache) {
     this.dashboardConfigsCache = dashboardConfigsCache;
+  }
+
+  /**
+   * Returns the suggested max weight for LoadingCache according to the given percentage of max heap space.
+   *
+   * The approximate weight is calculated by following rules:
+   * 1. We estimate that a bucket, including its overhead, occupies 1 KB.
+   * 2. Cache size (in bytes) = System's maxMemory * percentage
+   * 3. We also bound the cache size between DEFAULT_LOWER_BOUND_OF_RESULTSETGROUP_CACHE_SIZE_IN_MB and
+   *    DEFAULT_UPPER_BOUND_OF_RESULTSETGROUP_CACHE_SIZE_IN_MB if max heap size is unavailable.
+   * 4. Weight (number of buckets) = cache size / 1KB.
+   *
+   * @param percentage the percentage of JVM max heap space
+   * @return the suggested max weight for LoadingCache
+   */
+  private static long getApproximateMaxBucketNumber(int percentage) {
+    long jvmMaxMemoryInBytes = Runtime.getRuntime().maxMemory();
+    if (jvmMaxMemoryInBytes == Long.MAX_VALUE) { // Check upper bound
+      jvmMaxMemoryInBytes = DEFAULT_UPPER_BOUND_OF_RESULTSETGROUP_CACHE_SIZE_IN_MB * 1048576L; // MB to Bytes
+    } else { // Check lower bound
+      long lowerBoundInBytes = DEFAULT_LOWER_BOUND_OF_RESULTSETGROUP_CACHE_SIZE_IN_MB * 1048576L; // MB to Bytes
+      if (jvmMaxMemoryInBytes < lowerBoundInBytes) {
+        jvmMaxMemoryInBytes = lowerBoundInBytes;
+      }
+    }
+    return (jvmMaxMemoryInBytes / 102400) * percentage;
   }
 
 }
