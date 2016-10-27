@@ -121,10 +121,11 @@ public class ThirdEyeCacheRegistry {
     // ResultSetGroup Cache. The size of this cache is limited by the total number of buckets in all ResultSetGroup.
     // We estimate that 1 bucket (including overhead) consumes 1KB and this cache is allowed to use up to 50% of max
     // heap space.
+    long maxBucketNumber = getApproximateMaxBucketNumber(DEFAULT_HEAP_PERCENTAGE_FOR_RESULTSETGROUP_CACHE);
     LoadingCache<PinotQuery, ResultSetGroup> resultSetGroupCache = CacheBuilder.newBuilder()
         .removalListener(listener)
         .expireAfterAccess(1, TimeUnit.HOURS)
-        .maximumWeight(getApproximateMaxBucketNumber(DEFAULT_HEAP_PERCENTAGE_FOR_RESULTSETGROUP_CACHE))
+        .maximumWeight(maxBucketNumber)
         .weigher((pinotQuery, resultSetGroup) -> {
           int resultSetCount = resultSetGroup.getResultSetCount();
           int weight = 0;
@@ -136,6 +137,7 @@ public class ThirdEyeCacheRegistry {
         })
         .build(new ResultSetGroupCacheLoader(pinotThirdeyeClientConfig));
     cacheRegistry.registerResultSetGroupCache(resultSetGroupCache);
+    LOGGER.info("Max bucket number for ResultSetGroup cache is set to {}", maxBucketNumber);
 
     // CollectionMaxDataTime Cache
     LoadingCache<String, Long> collectionMaxDataTimeCache = CacheBuilder.newBuilder()
