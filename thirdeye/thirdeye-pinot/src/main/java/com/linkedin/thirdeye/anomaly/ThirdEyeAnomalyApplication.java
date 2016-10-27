@@ -98,6 +98,7 @@ public class ThirdEyeAnomalyApplication
           anomalyMergeExecutor.start();
         }
         if (config.isOnboard()) {
+          onboardPinotMetricsService = new OnboardPinotMetricsService(config);
           onboardPinotMetricsService.start();
         }
       }

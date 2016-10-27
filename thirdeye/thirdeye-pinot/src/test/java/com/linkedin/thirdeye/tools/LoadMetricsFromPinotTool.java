@@ -335,13 +335,11 @@ public class LoadMetricsFromPinotTool {
       }
 
       List<Long> metricIds = new ArrayList<>();
-      List<MetricConfigDTO> metricConfigs = new ArrayList<>();
       List<MetricExpression> metricExpressions = dashboardConfig.getMetricExpressions();
       for (MetricExpression metricExpression : metricExpressions) {
         String metric = metricExpression.getExpressionName();
         MetricConfigDTO metricConfig = metricConfigDAO.findByMetricAndDataset(metric, dataset);
         metricIds.add(metricConfig.getId());
-        metricConfigs.add(metricConfig);
       }
 
       DashboardConfigDTO dashboardConfigDTO = new DashboardConfigDTO();
@@ -350,7 +348,6 @@ public class LoadMetricsFromPinotTool {
       dashboardConfigDTO.setDatasetConfig(createdDataset);
       dashboardConfigDTO.setFilterClause(dashboardConfig.getFilterClause());
       dashboardConfigDTO.setMetricIds(metricIds);
-      dashboardConfigDTO.setMetrics(metricConfigs);
 
       LOG.info("Creating custom dashboard {} for dataset {}", dashboardName, dataset);
       dashboardConfigDAO.save(dashboardConfigDTO);
@@ -359,11 +356,9 @@ public class LoadMetricsFromPinotTool {
     // Create Default DashboardConfig
     List<MetricConfigDTO> allMetricConfigs = metricConfigDAO.findByDataset(dataset);
     List<Long> customDashboardMetricIds = new ArrayList<>();
-    List<MetricConfigDTO> customDashboardMetricConfigs = new ArrayList<>();
     for (MetricConfigDTO metricConfig : allMetricConfigs) {
       if (!metricConfig.isDerived()) {
         customDashboardMetricIds.add(metricConfig.getId());
-        customDashboardMetricConfigs.add(metricConfig);
       }
     }
     List<AnomalyFunctionDTO> anomalyFunctions = anomalyFunctionDAO.findAllByCollection(dataset);
@@ -377,7 +372,6 @@ public class LoadMetricsFromPinotTool {
     customDashboardConfigDTO.setDataset(dataset);
     customDashboardConfigDTO.setDatasetConfig(createdDataset);
     customDashboardConfigDTO.setMetricIds(customDashboardMetricIds);
-    customDashboardConfigDTO.setMetrics(customDashboardMetricConfigs);
     customDashboardConfigDTO.setAnomalyFunctionIds(anomalyFunctionIds);
 
     LOG.info("Creating default dashboard {} for dataset {}", dashboardName, dataset);

@@ -42,6 +42,7 @@ public abstract class AbstractManagerTestBase {
   protected WebappConfigManager webappConfigDAO;
   protected DatasetConfigManager datasetConfigDAO;
   protected MetricConfigManager metricConfigDAO;
+  protected DashboardConfigManager dashboardConfigDAO;
   private ManagerProvider managerProvider;
   private PersistenceConfig configuration;
 
@@ -129,6 +130,8 @@ public abstract class AbstractManagerTestBase {
         .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.DatasetConfigManagerImpl.class);
     metricConfigDAO = (MetricConfigManager) managerProvider
         .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.MetricConfigManagerImpl.class);
+    dashboardConfigDAO = (DashboardConfigManager) managerProvider
+        .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.DashboardConfigManagerImpl.class);
   }
 
   @AfterClass(alwaysRun = true)
@@ -209,12 +212,15 @@ public abstract class AbstractManagerTestBase {
     return datasetConfigDTO;
   }
 
-  protected MetricConfigDTO getTestMetricConfig(String collection, String metric) {
+  protected MetricConfigDTO getTestMetricConfig(String collection, String metric, Long id) {
     MetricConfigDTO metricConfigDTO = new MetricConfigDTO();
-    metricConfigDTO.setId(1L);
+    if (id != null) {
+      metricConfigDTO.setId(id);
+    }
     metricConfigDTO.setDataset(collection);
     metricConfigDTO.setDatatype(MetricType.LONG);
     metricConfigDTO.setName(metric);
+    metricConfigDTO.setAlias(metric);
     return metricConfigDTO;
   }
 }
