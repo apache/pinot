@@ -65,6 +65,8 @@ public class TaskGenerator {
   public List<MonitorTaskInfo> createMonitorTasks(MonitorJobContext monitorJobContext) {
     List<MonitorTaskInfo> tasks = new ArrayList<>();
 
+    // TODO: Currently generates 1 task for updating all the completed jobs
+    // We might need to create more tasks and assign only certain number of updations to each (say 5k)
     MonitorTaskInfo updateTaskInfo = new MonitorTaskInfo();
     updateTaskInfo.setMonitorType(MonitorType.UPDATE);
     tasks.add(updateTaskInfo);
