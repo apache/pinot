@@ -38,18 +38,17 @@ public class CacheResource {
   @POST
   @Path("/refresh")
   public Response refreshAllCaches() {
-    try {
-    CACHE_INSTANCE.getCollectionsCache().loadCollections();
 
-    List<String> collections = CACHE_INSTANCE.getCollectionsCache().getCollections();
-    for (String collection : collections) {
-      CACHE_INSTANCE.getCollectionMaxDataTimeCache().refresh(collection);
-      CACHE_INSTANCE.getDimensionFiltersCache().refresh(collection);
-      CACHE_INSTANCE.getDashboardsCache().refresh(collection);
-    }
-    } catch (Exception e) {
-      LOGGER.error("Exception while refresing caches", e);
-    }
+    refreshCollections();
+
+    refreshDatasetConfigCache();
+    refreshMetricConfigCache();
+    refreshDashoardConfigsCache();
+
+    refreshMaxDataTimeCache();
+    refreshDimensionFiltersCache();
+    refreshDashboardsCache();
+
     return Response.ok().build();
   }
 

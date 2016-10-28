@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.anomaly;
 
 import com.linkedin.thirdeye.dashboard.resources.AnomalyFunctionResource;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -14,6 +15,7 @@ import com.linkedin.thirdeye.anomaly.detection.DetectionJobScheduler;
 import com.linkedin.thirdeye.anomaly.merge.AnomalyMergeExecutor;
 import com.linkedin.thirdeye.anomaly.monitor.MonitorJobScheduler;
 import com.linkedin.thirdeye.anomaly.task.TaskDriver;
+import com.linkedin.thirdeye.autoload.pinot.metrics.AutoLoadPinotMetricsService;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
@@ -32,6 +34,7 @@ public class ThirdEyeAnomalyApplication
   private AlertJobScheduler alertJobScheduler = null;
   private AnomalyFunctionFactory anomalyFunctionFactory = null;
   private AnomalyMergeExecutor anomalyMergeExecutor = null;
+  private AutoLoadPinotMetricsService onboardPinotMetricsService = null;
 
   public static void main(final String[] args) throws Exception {
     List<String> argList = new ArrayList<>(Arrays.asList(args));
@@ -94,6 +97,10 @@ public class ThirdEyeAnomalyApplication
               new AnomalyMergeExecutor(executorService);
           anomalyMergeExecutor.start();
         }
+        if (config.isOnboard()) {
+          onboardPinotMetricsService = new AutoLoadPinotMetricsService(config);
+          onboardPinotMetricsService.start();
+        }
       }
 
       @Override
@@ -112,6 +119,9 @@ public class ThirdEyeAnomalyApplication
         }
         if (config.isMerger()) {
           anomalyMergeExecutor.stop();
+        }
+        if (config.isOnboard()) {
+          onboardPinotMetricsService.shutdown();
         }
       }
     });

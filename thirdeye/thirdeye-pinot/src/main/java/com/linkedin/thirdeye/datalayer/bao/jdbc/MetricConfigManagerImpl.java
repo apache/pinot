@@ -2,7 +2,6 @@ package com.linkedin.thirdeye.datalayer.bao.jdbc;
 
 import java.util.ArrayList;
 import java.util.List;
-
 import org.apache.commons.collections.CollectionUtils;
 
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
@@ -16,7 +15,6 @@ public class MetricConfigManagerImpl extends AbstractManagerImpl<MetricConfigDTO
   public MetricConfigManagerImpl() {
     super(MetricConfigDTO.class, MetricConfigBean.class);
   }
-
 
   @Override
   public List<MetricConfigDTO> findByDataset(String dataset) {
@@ -71,5 +69,6 @@ public class MetricConfigManagerImpl extends AbstractManagerImpl<MetricConfigDTO
     }
     return result;
   }
+
 
 }
