@@ -9,7 +9,7 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
   private boolean monitor = false;
   private boolean alert = false;
   private boolean merger = false;
-  private boolean onboard = false;
+  private boolean autoload = false;
 
   private long id;
   private String dashboardHost;
@@ -86,12 +86,12 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
     this.merger = merger;
   }
 
-  public boolean isOnboard() {
-    return onboard;
+  public boolean isAutoload() {
+    return autoload;
   }
 
-  public void setOnboard(boolean onboard) {
-    this.onboard = onboard;
+  public void setAutoload(boolean autoload) {
+    this.autoload = autoload;
   }
 
   public void setSmtpConfiguration(SmtpConfiguration smtpConfiguration) {
