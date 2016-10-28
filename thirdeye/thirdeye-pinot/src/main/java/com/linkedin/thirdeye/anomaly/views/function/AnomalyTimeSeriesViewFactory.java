@@ -43,12 +43,17 @@ public class AnomalyTimeSeriesViewFactory {
   }
 
   public AnomalyTimeSeriesView fromSpec(AnomalyFunctionDTO functionSpec) {
-    AnomalyTimeSeriesView anomalyTimeSeriesView;
+    AnomalyTimeSeriesView anomalyTimeSeriesView = null;
     String type = functionSpec.getType();
-    try {
-      String className = props.getProperty(type);
-      anomalyTimeSeriesView = (AnomalyTimeSeriesView) Class.forName(className).newInstance();
-    } catch (InstantiationException | IllegalAccessException | ClassNotFoundException e) {
+    if (props.containsKey(type)) {
+      try {
+        String className = props.getProperty(type);
+        anomalyTimeSeriesView = (AnomalyTimeSeriesView) Class.forName(className).newInstance();
+      } catch (InstantiationException | IllegalAccessException | ClassNotFoundException e) {
+        anomalyTimeSeriesView = null;
+      }
+    }
+    if (anomalyTimeSeriesView == null) {
       LOG.info("Unable to determine view type: {}, for anomaly function {}; using default w/w view.", type,
           functionSpec.getFunctionName());
       anomalyTimeSeriesView = new WeekOverWeekAnomalyTimeSeriesView();
