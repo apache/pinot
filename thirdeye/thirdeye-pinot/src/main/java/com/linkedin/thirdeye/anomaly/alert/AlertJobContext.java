@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.anomaly.alert;
 
-import org.joda.time.DateTime;
 
 import com.linkedin.thirdeye.anomaly.job.JobContext;
 import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;

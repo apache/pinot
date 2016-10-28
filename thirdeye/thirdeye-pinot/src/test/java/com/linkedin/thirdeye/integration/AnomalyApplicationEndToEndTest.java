@@ -201,7 +201,7 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
         monitorCount++;
       }
     }
-    Assert.assertTrue(monitorCount > 0);
+    Assert.assertEquals(monitorCount, 2);
 
     // check for job status
     jobs = jobDAO.findAll();

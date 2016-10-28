@@ -99,13 +99,12 @@ public class TestAnomalyTaskManager extends AbstractManagerTestBase {
     jobSpec.setStartTime(new DateTime().minusDays(20).getMillis());
     jobSpec.setEndTime(new DateTime().minusDays(10).getMillis());
     jobSpec.setTaskInfo(new ObjectMapper().writeValueAsString(getTestMonitorTaskInfo()));
-    jobSpec.setJob(anomalyJobSpec);
+    jobSpec.setJobId(anomalyJobSpec.getId());
     return jobSpec;
   }
 
   static MonitorTaskInfo getTestMonitorTaskInfo() {
     MonitorTaskInfo taskInfo = new MonitorTaskInfo();
-    taskInfo.setJobExecutionId(1L);
     taskInfo.setMonitorType(MonitorType.UPDATE);
     return taskInfo;
   }

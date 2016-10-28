@@ -169,8 +169,8 @@ public class DetectionJobScheduler implements JobScheduler, Runnable {
     }
     DetectionJobContext detectionJobContext = new DetectionJobContext();
     detectionJobContext.setAnomalyFunctionDAO(anomalyFunctionDAO);
-    detectionJobContext.setAnomalyJobDAO(anomalyJobDAO);
-    detectionJobContext.setAnomalyTaskDAO(anomalyTaskDAO);
+    detectionJobContext.setJobDAO(anomalyJobDAO);
+    detectionJobContext.setTaskDAO(anomalyTaskDAO);
     detectionJobContext.setDatasetConfigDAO(datasetConfigDAO);
     detectionJobContext.setMetricConfigDAO(metricConfigDAO);
     detectionJobContext.setAnomalyFunctionId(anomalyFunctionSpec.getId());
@@ -207,8 +207,8 @@ public class DetectionJobScheduler implements JobScheduler, Runnable {
 
     DetectionJobContext detectionJobContext = new DetectionJobContext();
     detectionJobContext.setAnomalyFunctionDAO(anomalyFunctionDAO);
-    detectionJobContext.setAnomalyJobDAO(anomalyJobDAO);
-    detectionJobContext.setAnomalyTaskDAO(anomalyTaskDAO);
+    detectionJobContext.setJobDAO(anomalyJobDAO);
+    detectionJobContext.setTaskDAO(anomalyTaskDAO);
     detectionJobContext.setDatasetConfigDAO(datasetConfigDAO);
     detectionJobContext.setMetricConfigDAO(metricConfigDAO);
     detectionJobContext.setAnomalyFunctionId(anomalyFunctionSpec.getId());

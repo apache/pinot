@@ -11,8 +11,8 @@ import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 
 public class TaskContext {
 
-  private JobManager anomalyJobDAO;
-  private TaskManager anomalyTaskDAO;
+  private JobManager jobDAO;
+  private TaskManager taskDAO;
   private RawAnomalyResultManager resultDAO;
   private MergedAnomalyResultManager mergedResultDAO;
   private AnomalyFunctionFactory anomalyFunctionFactory;
@@ -29,20 +29,20 @@ public class TaskContext {
     this.thirdEyeAnomalyConfiguration = thirdEyeAnomalyConfiguration;
   }
 
-  public JobManager getAnomalyJobDAO() {
-    return anomalyJobDAO;
+  public JobManager getJobDAO() {
+    return jobDAO;
   }
 
-  public void setAnomalyJobDAO(JobManager anomalyJobDAO) {
-    this.anomalyJobDAO = anomalyJobDAO;
+  public void setJobDAO(JobManager jobDAO) {
+    this.jobDAO = jobDAO;
   }
 
-  public TaskManager getAnomalyTaskDAO() {
-    return anomalyTaskDAO;
+  public TaskManager getTaskDAO() {
+    return taskDAO;
   }
 
-  public void setAnomalyTaskDAO(TaskManager anomalyTaskDAO) {
-    this.anomalyTaskDAO = anomalyTaskDAO;
+  public void setTaskDAO(TaskManager taskDAO) {
+    this.taskDAO = taskDAO;
   }
 
   public RawAnomalyResultManager getResultDAO() {

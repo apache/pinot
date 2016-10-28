@@ -6,12 +6,11 @@ import com.linkedin.thirdeye.datalayer.bao.EmailConfigurationManager;
 import com.linkedin.thirdeye.datalayer.bao.JobManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.TaskManager;
-import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 
 public abstract class JobContext {
 
-  private JobManager anomalyJobDAO;
-  private TaskManager anomalyTaskDAO;
+  private JobManager jobDAO;
+  private TaskManager taskDAO;
   private AnomalyFunctionManager anomalyFunctionDAO;
   private EmailConfigurationManager emailConfigurationDAO;
   private DatasetConfigManager datasetConfigDAO;
@@ -29,20 +28,20 @@ public abstract class JobContext {
     this.jobExecutionId = jobExecutionId;
   }
 
-  public JobManager getAnomalyJobDAO() {
-    return anomalyJobDAO;
+  public JobManager getJobDAO() {
+    return jobDAO;
   }
 
-  public void setAnomalyJobDAO(JobManager anomalyJobDAO) {
-    this.anomalyJobDAO = anomalyJobDAO;
+  public void setJobDAO(JobManager jobDAO) {
+    this.jobDAO = jobDAO;
   }
 
-  public TaskManager getAnomalyTaskDAO() {
-    return anomalyTaskDAO;
+  public TaskManager getTaskDAO() {
+    return taskDAO;
   }
 
-  public void setAnomalyTaskDAO(TaskManager anomalyTaskDAO) {
-    this.anomalyTaskDAO = anomalyTaskDAO;
+  public void setTaskDAO(TaskManager taskDAO) {
+    this.taskDAO = taskDAO;
   }
 
   public AnomalyFunctionManager getAnomalyFunctionDAO() {

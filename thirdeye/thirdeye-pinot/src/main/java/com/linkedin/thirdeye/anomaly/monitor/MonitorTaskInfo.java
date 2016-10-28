@@ -8,20 +8,11 @@ import com.linkedin.thirdeye.anomaly.task.TaskInfo;
 
 public class MonitorTaskInfo implements TaskInfo {
 
-  private Long jobExecutionId;
   private MonitorType monitorType;
   private int expireDaysAgo;
 
   public MonitorTaskInfo() {
 
-  }
-
-  public Long getJobExecutionId() {
-    return jobExecutionId;
-  }
-
-  public void setJobExecutionId(Long jobExecutionId) {
-    this.jobExecutionId = jobExecutionId;
   }
 
   public MonitorType getMonitorType() {
@@ -46,18 +37,18 @@ public class MonitorTaskInfo implements TaskInfo {
       return false;
     }
     MonitorTaskInfo mt = (MonitorTaskInfo) o;
-    return Objects.equals(jobExecutionId, mt.getJobExecutionId()) && Objects.equals(monitorType, mt.getMonitorType())
+    return Objects.equals(monitorType, mt.getMonitorType())
         && Objects.equals(expireDaysAgo, mt.getExpireDaysAgo());
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(jobExecutionId, monitorType, expireDaysAgo);
+    return Objects.hash(monitorType, expireDaysAgo);
   }
 
   @Override
   public String toString() {
-    return MoreObjects.toStringHelper(this).add("jobExecutionId", jobExecutionId).add("monitorType", monitorType)
+    return MoreObjects.toStringHelper(this).add("monitorType", monitorType)
         .add("expireDaysAgo", expireDaysAgo).toString();
   }
 }

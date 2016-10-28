@@ -34,8 +34,8 @@ public class AlertJobRunner implements Job {
   public static final String ALERT_JOB_MONITORING_WINDOW_START_TIME = "ALERT_JOB_MONITORING_WINDOW_START_TIME";
   public static final String ALERT_JOB_MONITORING_WINDOW_END_TIME = "ALERT_JOB_MONITORING_WINDOW_END_TIME";
 
-  private JobManager anomalyJobSpecDAO;
-  private TaskManager anomalyTasksSpecDAO;
+  private JobManager jobDAO;
+  private TaskManager taskDAO;
   private AlertJobContext alertJobContext;
 
   private TaskGenerator taskGenerator;
@@ -50,8 +50,8 @@ public class AlertJobRunner implements Job {
 
     alertJobContext = (AlertJobContext) jobExecutionContext.getJobDetail().getJobDataMap()
         .get(ALERT_JOB_CONTEXT);
-    anomalyJobSpecDAO = alertJobContext.getAnomalyJobDAO();
-    anomalyTasksSpecDAO = alertJobContext.getAnomalyTaskDAO();
+    jobDAO = alertJobContext.getJobDAO();
+    taskDAO = alertJobContext.getTaskDAO();
     EmailConfigurationManager emailConfigurationDAO = alertJobContext.getEmailConfigurationDAO();
     long alertConfigId = alertJobContext.getAlertConfigId();
 
@@ -98,15 +98,15 @@ public class AlertJobRunner implements Job {
   private long createJob(DateTime monitoringWindowStartTime, DateTime monitoringWindowEndTime) {
     Long jobExecutionId = null;
     try {
-      JobDTO anomalyJobSpec = new JobDTO();
-      anomalyJobSpec.setJobName(alertJobContext.getJobName());
-      anomalyJobSpec.setWindowStartTime(monitoringWindowStartTime.getMillis());
-      anomalyJobSpec.setWindowEndTime(monitoringWindowEndTime.getMillis());
-      anomalyJobSpec.setScheduleStartTime(System.currentTimeMillis());
-      anomalyJobSpec.setStatus(JobStatus.SCHEDULED);
-      jobExecutionId = anomalyJobSpecDAO.save(anomalyJobSpec);
+      JobDTO jobSpec = new JobDTO();
+      jobSpec.setJobName(alertJobContext.getJobName());
+      jobSpec.setWindowStartTime(monitoringWindowStartTime.getMillis());
+      jobSpec.setWindowEndTime(monitoringWindowEndTime.getMillis());
+      jobSpec.setScheduleStartTime(System.currentTimeMillis());
+      jobSpec.setStatus(JobStatus.SCHEDULED);
+      jobExecutionId = jobDAO.save(jobSpec);
 
-      LOG.info("Created alert job {} with jobExecutionId {}", anomalyJobSpec,
+      LOG.info("Created alert job {} with jobExecutionId {}", jobSpec,
           jobExecutionId);
     } catch (Exception e) {
       LOG.error("Exception in creating alert job", e);
@@ -129,17 +129,16 @@ public class AlertJobRunner implements Job {
         } catch (JsonProcessingException e) {
           LOG.error("Exception when converting AlertTaskInfo {} to jsonString", taskInfo, e);
         }
-        TaskDTO anomalyTaskSpec = new TaskDTO();
-        anomalyTaskSpec.setTaskType(TaskType.ALERT);
-        anomalyTaskSpec.setJobName(alertJobContext.getJobName());
-        anomalyTaskSpec.setStatus(TaskStatus.WAITING);
-        anomalyTaskSpec.setStartTime(System.currentTimeMillis());
-        anomalyTaskSpec.setTaskInfo(taskInfoJson);
-        JobDTO anomalyJobSpec = anomalyJobSpecDAO.findById(alertJobContext.getJobExecutionId());
-        anomalyTaskSpec.setJob(anomalyJobSpec);
-        long taskId = anomalyTasksSpecDAO.save(anomalyTaskSpec);
+        TaskDTO taskSpec = new TaskDTO();
+        taskSpec.setTaskType(TaskType.ALERT);
+        taskSpec.setJobName(alertJobContext.getJobName());
+        taskSpec.setStatus(TaskStatus.WAITING);
+        taskSpec.setStartTime(System.currentTimeMillis());
+        taskSpec.setTaskInfo(taskInfoJson);
+        taskSpec.setJobId(alertJobContext.getJobExecutionId());
+        long taskId = taskDAO.save(taskSpec);
         taskIds.add(taskId);
-        LOG.info("Created alert task {} with taskId {}", anomalyTaskSpec, taskId);
+        LOG.info("Created alert task {} with taskId {}", taskSpec, taskId);
       }
     } catch (Exception e) {
       LOG.error("Exception in creating alert tasks", e);

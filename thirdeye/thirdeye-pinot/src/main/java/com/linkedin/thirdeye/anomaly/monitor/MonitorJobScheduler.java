@@ -34,8 +34,8 @@ public class MonitorJobScheduler {
     LOG.info("Starting monitor service");
 
     monitorJobContext = new MonitorJobContext();
-    monitorJobContext.setAnomalyJobDAO(anomalyJobDAO);
-    monitorJobContext.setAnomalyTaskDAO(anomalyTaskDAO);
+    monitorJobContext.setJobDAO(anomalyJobDAO);
+    monitorJobContext.setTaskDAO(anomalyTaskDAO);
     monitorJobContext.setMonitorConfiguration(monitorConfiguration);
 
     monitorJobRunner = new MonitorJobRunner(monitorJobContext);

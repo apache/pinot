@@ -46,8 +46,8 @@ public class DetectionJobRunner implements Job {
   public static final String DETECTION_JOB_MONITORING_WINDOW_END_TIME = "DETECTION_JOB_MONITORING_WINDOW_END_TIME";
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
 
-  private JobManager anomalyJobSpecDAO;
-  private TaskManager anomalyTasksSpecDAO;
+  private JobManager jobDAO;
+  private TaskManager taskDAO;
   private AnomalyFunctionManager anomalyFunctionSpecDAO;
   private DatasetConfigManager datasetConfigDAO;
   private MetricConfigManager metricConfigDAO;
@@ -68,8 +68,8 @@ public class DetectionJobRunner implements Job {
 
     detectionJobContext = (DetectionJobContext) jobExecutionContext.getJobDetail().getJobDataMap()
         .get(DETECTION_JOB_CONTEXT);
-    anomalyJobSpecDAO = detectionJobContext.getAnomalyJobDAO();
-    anomalyTasksSpecDAO = detectionJobContext.getAnomalyTaskDAO();
+    jobDAO = detectionJobContext.getJobDAO();
+    taskDAO = detectionJobContext.getTaskDAO();
     anomalyFunctionSpecDAO = detectionJobContext.getAnomalyFunctionDAO();
     datasetConfigDAO = detectionJobContext.getDatasetConfigDAO();
     metricConfigDAO = detectionJobContext.getMetricConfigDAO();
@@ -142,15 +142,15 @@ public class DetectionJobRunner implements Job {
   private long createJob(DateTime monitoringWindowStartTime, DateTime monitoringWindowEndTime) {
     Long jobExecutionId = null;
     try {
-      JobDTO anomalyJobSpec = new JobDTO();
-      anomalyJobSpec.setJobName(detectionJobContext.getJobName());
-      anomalyJobSpec.setWindowStartTime(monitoringWindowStartTime.getMillis());
-      anomalyJobSpec.setWindowEndTime(monitoringWindowEndTime.getMillis());
-      anomalyJobSpec.setScheduleStartTime(System.currentTimeMillis());
-      anomalyJobSpec.setStatus(JobStatus.SCHEDULED);
-      jobExecutionId = anomalyJobSpecDAO.save(anomalyJobSpec);
+      JobDTO jobSpec = new JobDTO();
+      jobSpec.setJobName(detectionJobContext.getJobName());
+      jobSpec.setWindowStartTime(monitoringWindowStartTime.getMillis());
+      jobSpec.setWindowEndTime(monitoringWindowEndTime.getMillis());
+      jobSpec.setScheduleStartTime(System.currentTimeMillis());
+      jobSpec.setStatus(JobStatus.SCHEDULED);
+      jobExecutionId = jobDAO.save(jobSpec);
 
-      LOG.info("Created anomalyJobSpec {} with jobExecutionId {}", anomalyJobSpec,
+      LOG.info("Created anomalyJobSpec {} with jobExecutionId {}", jobSpec,
           jobExecutionId);
     } catch (Exception e) {
       LOG.error("Exception in creating detection job", e);
@@ -173,17 +173,16 @@ public class DetectionJobRunner implements Job {
         } catch (JsonProcessingException e) {
           LOG.error("Exception when converting DetectionTaskInfo {} to jsonString", taskInfo, e);
         }
-        TaskDTO anomalyTaskSpec = new TaskDTO();
-        anomalyTaskSpec.setTaskType(TaskType.ANOMALY_DETECTION);
-        anomalyTaskSpec.setJobName(detectionJobContext.getJobName());
-        anomalyTaskSpec.setStatus(TaskStatus.WAITING);
-        anomalyTaskSpec.setStartTime(System.currentTimeMillis());
-        anomalyTaskSpec.setTaskInfo(taskInfoJson);
-        JobDTO anomalyJobSpec = anomalyJobSpecDAO.findById(detectionJobContext.getJobExecutionId());
-        anomalyTaskSpec.setJob(anomalyJobSpec);
-        long taskId = anomalyTasksSpecDAO.save(anomalyTaskSpec);
+        TaskDTO taskSpec = new TaskDTO();
+        taskSpec.setTaskType(TaskType.ANOMALY_DETECTION);
+        taskSpec.setJobName(detectionJobContext.getJobName());
+        taskSpec.setStatus(TaskStatus.WAITING);
+        taskSpec.setStartTime(System.currentTimeMillis());
+        taskSpec.setTaskInfo(taskInfoJson);
+        taskSpec.setJobId(detectionJobContext.getJobExecutionId());
+        long taskId = taskDAO.save(taskSpec);
         taskIds.add(taskId);
-        LOG.info("Created anomalyTask {} with taskId {}", anomalyTaskSpec, taskId);
+        LOG.info("Created anomalyTask {} with taskId {}", taskSpec, taskId);
       }
     } catch (Exception e) {
       LOG.error("Exception in creating detection tasks", e);

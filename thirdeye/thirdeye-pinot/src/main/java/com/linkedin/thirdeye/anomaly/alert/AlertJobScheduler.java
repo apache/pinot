@@ -162,8 +162,8 @@ public class AlertJobScheduler implements JobScheduler, Runnable {
     }
 
     AlertJobContext alertJobContext = new AlertJobContext();
-    alertJobContext.setAnomalyJobDAO(anomalyJobDAO);
-    alertJobContext.setAnomalyTaskDAO(anomalyTaskDAO);
+    alertJobContext.setJobDAO(anomalyJobDAO);
+    alertJobContext.setTaskDAO(anomalyTaskDAO);
     alertJobContext.setEmailConfigurationDAO(emailConfigurationDAO);
     alertJobContext.setAlertConfigId(alertConfig.getId());
     alertJobContext.setJobName(jobKey);
@@ -196,8 +196,8 @@ public class AlertJobScheduler implements JobScheduler, Runnable {
     JobDetail job = JobBuilder.newJob(AlertJobRunner.class).withIdentity(jobKey).build();
 
     AlertJobContext alertJobContext = new AlertJobContext();
-    alertJobContext.setAnomalyJobDAO(anomalyJobDAO);
-    alertJobContext.setAnomalyTaskDAO(anomalyTaskDAO);
+    alertJobContext.setJobDAO(anomalyJobDAO);
+    alertJobContext.setTaskDAO(anomalyTaskDAO);
     alertJobContext.setEmailConfigurationDAO(emailConfigurationDAO);
     alertJobContext.setAlertConfigId(id);
     alertJobContext.setJobName(jobKey);
