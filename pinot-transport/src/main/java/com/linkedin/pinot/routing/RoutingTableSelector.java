@@ -17,6 +17,8 @@
 package com.linkedin.pinot.routing;
 
 import org.apache.commons.configuration.Configuration;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 
 
 public interface RoutingTableSelector {
@@ -26,7 +28,9 @@ public interface RoutingTableSelector {
    * @param realtimeTableName name of the realtime table (e.g. tableName_REALTIME)
    * @return
    */
-  public boolean shouldUseLLCRouting(final String realtimeTableName);
+  boolean shouldUseLLCRouting(final String realtimeTableName);
 
-  public void init(Configuration configuration);
+  void init(Configuration configuration, ZkHelixPropertyStore<ZNRecord> propertyStore);
+
+  void registerTable(String realtimeTableName);
 }

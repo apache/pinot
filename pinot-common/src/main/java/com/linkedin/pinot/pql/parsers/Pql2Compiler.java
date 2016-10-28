@@ -17,8 +17,6 @@ package com.linkedin.pinot.pql.parsers;
 
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.pql.parsers.pql2.ast.AstNode;
-import com.linkedin.pinot.pql.parsers.pql2.ast.BaseAstNode;
-import org.antlr.runtime.RecognitionException;
 import org.antlr.v4.runtime.ANTLRInputStream;
 import org.antlr.v4.runtime.BailErrorStrategy;
 import org.antlr.v4.runtime.CharStream;
@@ -28,19 +26,12 @@ import org.antlr.v4.runtime.TokenStream;
 import org.antlr.v4.runtime.UnbufferedTokenStream;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.ParseTreeWalker;
-import org.json.JSONObject;
 
 
 /**
  * PQL 2 compiler.
  */
-public class Pql2Compiler extends AbstractCompiler {
-  @Override
-  public JSONObject compile(String expression)
-      throws RecognitionException {
-    return null;
-  }
-
+public class Pql2Compiler implements AbstractCompiler {
   @Override
   public BrokerRequest compileToBrokerRequest(String expression) throws Pql2CompilationException {
     try {
@@ -70,10 +61,5 @@ public class Pql2Compiler extends AbstractCompiler {
     } catch (Exception e) {
       throw new Pql2CompilationException(e.getMessage());
     }
-  }
-
-  @Override
-  public String getErrorMessage(RecognitionException error) {
-    return null;
   }
 }

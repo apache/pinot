@@ -122,7 +122,7 @@ public class LoadMetricsFromPinotTool {
     dashboardConfigDAO = DaoProviderUtil
         .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.DashboardConfigManagerImpl.class);
     DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
-    DAO_REGISTRY.registerDAOs(anomalyFunctionDAO, null, null, null, null, null, datasetConfigDAO, metricConfigDAO, dashboardConfigDAO);
+    DAO_REGISTRY.registerDAOs(anomalyFunctionDAO, null, null, null, null, null, datasetConfigDAO, metricConfigDAO, dashboardConfigDAO, null);
   }
 
 

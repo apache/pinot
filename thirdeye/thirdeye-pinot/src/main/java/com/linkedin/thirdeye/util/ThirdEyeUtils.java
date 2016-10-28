@@ -95,8 +95,13 @@ public abstract class ThirdEyeUtils {
     for (Map.Entry<String, String> entry : dimensionMap.entrySet()) {
       String dimensionName = entry.getKey();
       String dimensionValue = entry.getValue();
-      filterToDecorate.removeAll(dimensionName);
-      filterToDecorate.put(dimensionName, dimensionValue);
+      // If dimension value is "OTHER", then we need to get all data and calculate "OTHER" part.
+      // In order to reproduce the data for "OTHER", the filter should remain as is.
+      if ( !dimensionValue.equalsIgnoreCase("OTHER") ) {
+        // Only add the specific dimension value to the filter because other dimension values will not be used
+        filterToDecorate.removeAll(dimensionName);
+        filterToDecorate.put(dimensionName, dimensionValue);
+      }
     }
 
     return filterToDecorate;

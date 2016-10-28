@@ -1,15 +1,12 @@
 package com.linkedin.thirdeye.datalayer.pojo;
 
 import com.linkedin.thirdeye.api.DimensionMap;
-import com.linkedin.thirdeye.datalayer.entity.RawAnomalyResultIndex;
-import com.linkedin.thirdeye.util.ThirdEyeUtils;
 import java.util.Objects;
 
 import org.apache.commons.lang.ObjectUtils;
 import org.joda.time.DateTime;
 
 import com.google.common.base.MoreObjects;
-import org.modelmapper.PropertyMap;
 
 
 public class RawAnomalyResultBean extends AbstractBean implements Comparable<RawAnomalyResultBean> {

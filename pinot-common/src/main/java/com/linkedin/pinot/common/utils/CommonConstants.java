@@ -162,6 +162,13 @@ public class CommonConstants {
     public static final int DEFAULT_BROKER_QUERY_PORT = 8099;
     public static final String KEY_OF_SERVER_NETTY_HOST = "pinot.server.netty.host";
 
+    public static final String HELIX_MANAGER_FLAPPING_TIME_WINDOW_KEY = "helixmanager.flappingTimeWindow";
+    public static final String HELIX_MANAGER_MAX_DISCONNECT_THRESHOLD_KEY = "helixmanager.maxDisconnectThreshold";
+    public static final String CONFIG_OF_HELIX_FLAPPING_TIMEWINDOW_MS = "pinot.server.flapping.timeWindowMs";
+    public static final String CONFIG_OF_HELIX_MAX_DISCONNECT_THRESHOLD = "pinot.server.flapping.maxDisconnectThreshold";
+    public static final String DEFAULT_HELIX_FLAPPING_TIMEWINDOW_MS = "1";
+    public static final String DEFAULT_HELIX_FLAPPING_MAX_DISCONNECT_THRESHOLD = "100";
+
   }
 
   public static class Server {
@@ -182,7 +189,6 @@ public class CommonConstants {
         "pinot.server.segment.minRetryDelayMillis";
     public static final String CONFIG_OF_SEGMENT_FORMAT_VERSION = "pinot.server.instance.segment.format.version";
     public static final String CONFIG_OF_ENABLE_DEFAULT_COLUMNS = "pinot.server.instance.enable.default.columns";
-    public static final String CONFIG_OF_HELIX_FLAPPING_TIMEWINDOW_MS = "pinot.server.flapping.timeWindowMs";
 
     public static final String DEFAULT_ADMIN_API_PORT = "8097";
     public static final String DEFAULT_READ_MODE = "heap";
@@ -199,7 +205,6 @@ public class CommonConstants {
         "com.linkedin.pinot.server.request.SimpleRequestHandlerFactory";
     public static final String DEFAULT_SEGMENT_LOAD_MAX_RETRY_COUNT = "5";
     public static final String DEFAULT_SEGMENT_LOAD_MIN_RETRY_DELAY_MILLIS = "60000";
-    public static final String DEFAULT_HELIX_FLAPPING_TIMEWINDOW_MS = "0";
     public static final String PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY = "pinot.server.segment.fetcher";
     public static final String DEFAULT_SEGMENT_FORMAT_VERSION = "v1";
     public static final String DEFAULT_STAR_TREE_FORMAT_VERSION = "OFF_HEAP";

@@ -84,6 +84,8 @@ public class OnboardPinotMetricsService implements Runnable {
         LOG.info("Checking dataset {}", dataset);
         DatasetConfigDTO datasetConfig = datasetConfigDAO.findByDataset(dataset);
 
+        // if dataset is in ingraph table
+
         // if new, add dataset, metrics, default dashboard
         Schema schema = allSchemas.get(dataset);
         if (datasetConfig == null) {

@@ -4,6 +4,7 @@ import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.EmailConfigurationManager;
+import com.linkedin.thirdeye.datalayer.bao.IngraphMetricConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.JobManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
@@ -20,6 +21,8 @@ public class DAORegistry {
   private static DatasetConfigManager datasetConfigDAO;
   private static MetricConfigManager metricConfigDAO;
   private static DashboardConfigManager dashboardConfigDAO;
+  private static IngraphMetricConfigManager ingraphMetricConfigDAO;
+
 
   private static class Holder {
     static final DAORegistry INSTANCE = new DAORegistry();
@@ -33,7 +36,7 @@ public class DAORegistry {
       EmailConfigurationManager emailConfigurationDAO, RawAnomalyResultManager rawAnomalyResultDAO,
       MergedAnomalyResultManager mergedAnomalyResultDAO, JobManager jobDAO,  TaskManager taskDAO,
       DatasetConfigManager datasetConfigDAO, MetricConfigManager metricConfigDAO,
-      DashboardConfigManager dashboardConfigDAO) {
+      DashboardConfigManager dashboardConfigDAO, IngraphMetricConfigManager ingraphMetricConfigDAO) {
 
     DAORegistry daoRegistry = DAORegistry.getInstance();
     daoRegistry.registerAnomalyFunctionDAO(anomalyFunctionDAO);
@@ -45,6 +48,8 @@ public class DAORegistry {
     daoRegistry.registerDatasetConfigDAO(datasetConfigDAO);
     daoRegistry.registerDashboardConfigDAO(dashboardConfigDAO);
     daoRegistry.registerMetricConfigDAO(metricConfigDAO);
+    daoRegistry.registerIngraphMetricConfigDAO(ingraphMetricConfigDAO);
+
   }
 
   public AnomalyFunctionManager getAnomalyFunctionDAO() {
@@ -117,6 +122,14 @@ public class DAORegistry {
 
   private void registerDashboardConfigDAO(DashboardConfigManager dashboardConfigDAO) {
     DAORegistry.dashboardConfigDAO = dashboardConfigDAO;
+  }
+  
+  public IngraphMetricConfigManager getIngraphMetricConfigDAO() {
+    return ingraphMetricConfigDAO;
+  }
+  
+  private void registerIngraphMetricConfigDAO(IngraphMetricConfigManager ingraphMetricConfigDAO) {
+    DAORegistry.ingraphMetricConfigDAO = ingraphMetricConfigDAO;
   }
 
 

@@ -103,7 +103,7 @@ public class FilterOptimizerTest {
     Assert.assertEquals(1, numOps);
     Assert.assertEquals(3, numLeaves);
 
-    final int maxNodesAtTopLevel = BrokerRequestOptimizer.MAX_OPTIMIZING_DEPTH;
+    final int maxNodesAtTopLevel = FlattenNestedPredicatesFilterQueryTreeOptimizer.MAX_OPTIMIZING_DEPTH;
     String whereClause = constructWhereClause(FilterOperator.OR, maxNodesAtTopLevel + 50);
     req = pql2Compiler.compileToBrokerRequest("SELECT * FROM T WHERE " + whereClause);
     tree = RequestUtils.generateFilterQueryTree(_optimizer.optimize(req));

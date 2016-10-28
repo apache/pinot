@@ -157,8 +157,8 @@ public class CleanupAndRegenerateAnomaliesTool {
       DateTime currentEnd = currentStart.plus(monitoringWindowSize);
 
       // Make the end time inclusive
-      end = new DateTime(cronExpression.getNextValidTimeAfter(end.toDate()));
-      while (currentEnd.isBefore(end)) {
+      DateTime endBoundary = new DateTime(cronExpression.getNextValidTimeAfter(end.toDate()));
+      while (currentEnd.isBefore(endBoundary)) {
         String monitoringWindowStart = ISODateTimeFormat.dateHourMinute().print(currentStart);
         String monitoringWindowEnd = ISODateTimeFormat.dateHourMinute().print(currentEnd);
 

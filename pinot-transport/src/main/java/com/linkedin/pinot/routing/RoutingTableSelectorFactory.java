@@ -17,6 +17,8 @@
 package com.linkedin.pinot.routing;
 
 import org.apache.commons.configuration.Configuration;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,7 +33,8 @@ public class RoutingTableSelectorFactory {
    * "class" indicates the class to load. If it is null, the load the default class. with the configuration as
    * constructor.
    */
-  public static RoutingTableSelector getRoutingTableSelector(Configuration config) {
+  public static RoutingTableSelector getRoutingTableSelector(Configuration config,
+      ZkHelixPropertyStore<ZNRecord> propertyStore) {
     RoutingTableSelector routingTableSelector = new PercentageBasedRoutingTableSelector();
     if (config == null) {
       LOGGER.warn("No config for routing table selector. Using default");
@@ -60,7 +63,7 @@ public class RoutingTableSelectorFactory {
       }
     }
 
-    routingTableSelector.init(config);
+    routingTableSelector.init(config, propertyStore);
 
     return routingTableSelector;
   }

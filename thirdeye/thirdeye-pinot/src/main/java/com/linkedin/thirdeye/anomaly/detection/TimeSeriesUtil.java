@@ -21,6 +21,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 
@@ -103,12 +104,25 @@ public abstract class TimeSeriesUtil {
       filters = HashMultimap.create();
     }
 
-    // Decorate the filter according to dimensionKeyString
+    // Decorate filters according to dimensionMap
     filters = ThirdEyeUtils.getFilterSetFromDimensionMap(dimensionMap, filters);
 
-    // groupByDimensions (i.e., exploreDimensions) should be empty when retrieving time series for anomalies, because
-    // each anomaly should have a time series with a specific set of dimension values, which is specified in filters.
+    boolean hasOTHERDimensionName = false;
+    for (String dimensionValue : dimensionMap.values()) {
+      if (!dimensionValue.equalsIgnoreCase("other")) {
+        hasOTHERDimensionName = true;
+        break;
+      }
+    }
+
+    // groupByDimensions (i.e., exploreDimensions) is empty by default because the query for getting the time series
+    // will have the decorated filters according to anomalies' explore dimensions.
+    // However, if there exists any dimension with value "OTHER, then we need to honor the origin groupBy in order to
+    // construct the data for OTHER
     List<String> groupByDimensions = Collections.emptyList();
+    if (hasOTHERDimensionName && StringUtils.isNotBlank(anomalyFunctionSpec.getExploreDimensions().trim())) {
+      groupByDimensions = Arrays.asList(anomalyFunctionSpec.getExploreDimensions().trim().split(","));
+    }
 
     return getTimeSeriesResponseImpl(anomalyFunction, timeGranularity, filters, groupByDimensions, viewWindowStart,
         viewWindowEnd);

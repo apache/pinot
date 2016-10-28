@@ -229,9 +229,18 @@ public class HelixServerStarter {
   }
 
   private void setupHelixSystemProperties(Configuration conf) {
-    System.setProperty("helixmanager.flappingTimeWindow",
-        conf.getString(CommonConstants.Server.CONFIG_OF_HELIX_FLAPPING_TIMEWINDOW_MS,
-            CommonConstants.Server.DEFAULT_HELIX_FLAPPING_TIMEWINDOW_MS));
+    // [PINOT-2435] [PINOT-3927] Disable helix detection of flapping connection
+    // Helix will shutdown and effectively remove the instance from cluster if
+    // it detects flapping while the process continues to run
+    // Helix ignores the value if it is <= 0. Hence, setting time window to small value
+    // and number of connection failures within that window to high value
+    System.setProperty(CommonConstants.Helix.HELIX_MANAGER_FLAPPING_TIME_WINDOW_KEY,
+        conf.getString(CommonConstants.Helix.CONFIG_OF_HELIX_FLAPPING_TIMEWINDOW_MS,
+            CommonConstants.Helix.DEFAULT_HELIX_FLAPPING_TIMEWINDOW_MS));
+
+    System.setProperty(CommonConstants.Helix.HELIX_MANAGER_MAX_DISCONNECT_THRESHOLD_KEY,
+        conf.getString(CommonConstants.Helix.CONFIG_OF_HELIX_MAX_DISCONNECT_THRESHOLD,
+            CommonConstants.Helix.DEFAULT_HELIX_FLAPPING_MAX_DISCONNECT_THRESHOLD));
   }
 
   public void stop() {

@@ -59,9 +59,7 @@ public class IntDoubleIndexedPriorityQueueTest {
    * @param minHeap Min or max mode
    */
   public void test(boolean minHeap) {
-    long seed = System.nanoTime();
-    Random random = new Random(seed);
-    final String randomSeedMsg = "Random seed: " + seed;
+    Random random = new Random(0);
 
     IntDoubleIndexedPriorityQueue pq = new IntDoubleIndexedPriorityQueue(NUM_RECORDS, minHeap);
     Int2DoubleOpenHashMap map = new Int2DoubleOpenHashMap(NUM_RECORDS);
@@ -97,11 +95,11 @@ public class IntDoubleIndexedPriorityQueueTest {
       Pairs.IntDoublePair actual = pq.poll();
       Pairs.IntDoublePair expected = list.get(i++);
 
-      Assert.assertEquals(actual.getIntValue(), expected.getIntValue(), randomSeedMsg);
-      Assert.assertEquals(actual.getDoubleValue(), expected.getDoubleValue(), randomSeedMsg);
+      Assert.assertEquals(actual.getIntValue(), expected.getIntValue());
+      Assert.assertEquals(actual.getDoubleValue(), expected.getDoubleValue());
     }
 
     // Assert that priority queue had expected number of elements.
-    Assert.assertEquals(i, list.size(), randomSeedMsg);
+    Assert.assertEquals(i, list.size());
   }
 }

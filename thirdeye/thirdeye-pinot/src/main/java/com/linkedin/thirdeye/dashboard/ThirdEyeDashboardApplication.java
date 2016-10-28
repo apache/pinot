@@ -8,7 +8,7 @@ import com.linkedin.thirdeye.dashboard.resources.CacheResource;
 import com.linkedin.thirdeye.dashboard.resources.DashboardResource;
 import com.linkedin.thirdeye.dashboard.resources.EmailResource;
 import com.linkedin.thirdeye.dashboard.resources.EntityManagerResource;
-
+import com.linkedin.thirdeye.dashboard.resources.IngraphMetricConfigResource;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import io.dropwizard.assets.AssetsBundle;
 import io.dropwizard.setup.Bootstrap;
@@ -50,6 +50,8 @@ public class ThirdEyeDashboardApplication
     env.jersey().register(new AnomalyResource(new AnomalyFunctionFactory(config.getFunctionConfigPath())));
     env.jersey().register(new EmailResource());
     env.jersey().register(new EntityManagerResource());
+    env.jersey().register(new IngraphMetricConfigResource());
+
   }
 
   public static void main(String[] args) throws Exception {

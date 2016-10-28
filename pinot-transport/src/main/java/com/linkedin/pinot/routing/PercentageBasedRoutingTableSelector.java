@@ -22,6 +22,8 @@ import java.util.Random;
 import java.util.Set;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationMap;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,7 +38,7 @@ public class PercentageBasedRoutingTableSelector implements RoutingTableSelector
   public PercentageBasedRoutingTableSelector() {
   }
 
-  public void init(Configuration configuration) {
+  public void init(Configuration configuration, ZkHelixPropertyStore<ZNRecord> propertyStore) {
     try {
       Configuration tablesConfig = configuration.subset(TABLE_KEY);
       if (tablesConfig == null || tablesConfig.isEmpty()) {
@@ -52,6 +54,11 @@ public class PercentageBasedRoutingTableSelector implements RoutingTableSelector
     } catch (Exception e) {
       LOGGER.warn("Could not parse get config for {}. Using no LLC routing", TABLE_KEY, e);
     }
+  }
+
+  @Override
+  public void registerTable(String realtimeTableName) {
+    // Nothing to do, since config is read at init time from the Pinot config
   }
 
   @Override

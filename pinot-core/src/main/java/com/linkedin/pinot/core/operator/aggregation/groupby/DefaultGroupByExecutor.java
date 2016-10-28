@@ -38,13 +38,15 @@ import java.util.List;
  * - Single/Multi valued columns.
  */
 public class DefaultGroupByExecutor implements GroupByExecutor {
-  private final DataBlockCache _singleValueBlockCache;
 
+  private static final double GROUP_BY_TRIM_FACTOR = 0.9;
+  private final DataBlockCache _singleValueBlockCache;
   private final GroupKeyGenerator _groupKeyGenerator;
   private final int _numAggrFunc;
   private final AggregationFunctionContext[] _aggrFuncContextArray;
   private final GroupByResultHolder[] _resultHolderArray;
   private final SegmentMetadata _segmentMetadata;
+  private final int _trimSize;
 
   private int[] _docIdToSVGroupKey;
   private int[][] _docIdToMVGroupKey;
@@ -56,11 +58,13 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
   /**
    * Constructor for the class.
    *
-   * @param indexSegment
-   * @param aggregationInfoList
-   * @param groupBy
+   * @param indexSegment Segment to process
+   * @param aggregationInfoList Aggregation info from broker request
+   * @param groupBy Group by from broker request
+   * @param numGroupsLimit Limit on number of aggregation groups returned in the result
    */
-  public DefaultGroupByExecutor(IndexSegment indexSegment, List<AggregationInfo> aggregationInfoList, GroupBy groupBy) {
+  public DefaultGroupByExecutor(IndexSegment indexSegment, List<AggregationInfo> aggregationInfoList, GroupBy groupBy,
+      int numGroupsLimit) {
     Preconditions.checkNotNull(indexSegment);
     Preconditions.checkNotNull(aggregationInfoList);
     Preconditions.checkArgument(aggregationInfoList.size() > 0);
@@ -71,16 +75,24 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     List<String> groupByColumnList = groupBy.getColumns();
     String[] groupByColumns = groupByColumnList.toArray(new String[groupByColumnList.size()]);
     _groupKeyGenerator = new DefaultGroupKeyGenerator(dataFetcher, groupByColumns);
-    int maxNumResults = _groupKeyGenerator.getGlobalGroupKeyUpperBound();
+
+    // Maximum number of results is the minimum of possible keys, and limit on number of groups
+    int maxNumResults = Math.min(_groupKeyGenerator.getGlobalGroupKeyUpperBound(), numGroupsLimit);
+
+    // When results are trimmed, drop bottom 10% of groups.
+    _trimSize = (int) (GROUP_BY_TRIM_FACTOR * maxNumResults);
+
     _hasMultiValuedColumns = _groupKeyGenerator.hasMultiValueGroupByColumn();
 
     _numAggrFunc = aggregationInfoList.size();
     _aggrFuncContextArray = new AggregationFunctionContext[_numAggrFunc];
     _resultHolderArray = new GroupByResultHolder[_numAggrFunc];
     _segmentMetadata = indexSegment.getSegmentMetadata();
+
     for (int i = 0; i < _numAggrFunc; i++) {
       AggregationInfo aggregationInfo = aggregationInfoList.get(i);
       String[] columns = aggregationInfo.getAggregationParams().get("column").trim().split(",");
+
       _aggrFuncContextArray[i] = new AggregationFunctionContext(
           aggregationInfo.getAggregationType(), columns, _segmentMetadata);
       _resultHolderArray[i] = ResultHolderFactory.getGroupByResultHolder(
@@ -131,6 +143,13 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     for (int i = 0; i < _numAggrFunc; i++) {
       _resultHolderArray[i].ensureCapacity(capacityNeeded);
       aggregateColumn(_aggrFuncContextArray[i], _resultHolderArray[i], length);
+
+      // Result holder limits the max number of group keys (default 100k), if the number of groups
+      // exceeds beyond that limit, groups with lower values (as per sort order) are trimmed.
+      // Once result holder trims those groups, the group key generator needs to purge them.
+
+      int[] trimmedKeys = _resultHolderArray[i].trimResults(_trimSize);
+      _groupKeyGenerator.purgeKeys(trimmedKeys);
     }
   }
 

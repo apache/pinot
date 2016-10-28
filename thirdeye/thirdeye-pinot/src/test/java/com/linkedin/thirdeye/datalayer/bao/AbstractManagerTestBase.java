@@ -7,8 +7,6 @@ import java.io.File;
 import java.io.FileReader;
 import java.net.URL;
 import java.sql.Connection;
-import java.util.SortedMap;
-import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 
 import jersey.repackaged.com.google.common.collect.Lists;
@@ -43,6 +41,8 @@ public abstract class AbstractManagerTestBase {
   protected DatasetConfigManager datasetConfigDAO;
   protected MetricConfigManager metricConfigDAO;
   protected DashboardConfigManager dashboardConfigDAO;
+  protected IngraphMetricConfigManager ingraphMetricConfigDAO;
+
   private ManagerProvider managerProvider;
   private PersistenceConfig configuration;
 
@@ -132,6 +132,8 @@ public abstract class AbstractManagerTestBase {
         .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.MetricConfigManagerImpl.class);
     dashboardConfigDAO = (DashboardConfigManager) managerProvider
         .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.DashboardConfigManagerImpl.class);
+    ingraphMetricConfigDAO = (IngraphMetricConfigManager) managerProvider
+            .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.IngraphMetricConfigManagerImpl.class);
   }
 
   @AfterClass(alwaysRun = true)
