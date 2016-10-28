@@ -19,6 +19,7 @@ import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.GroupBy;
 import com.linkedin.pinot.common.request.QuerySource;
 import com.linkedin.pinot.common.request.Selection;
+import com.linkedin.pinot.pql.parsers.Pql2CompilationException;
 
 
 /**
@@ -31,22 +32,68 @@ public class SelectAstNode extends BaseAstNode {
   private int _offset = -1;
   private int _topN = -1;
 
+  // Optional clauses can be given in any order, so we keep track of whether we've already seen one
+  private boolean _hasWhereClause = false;
+  private boolean _hasGroupByClause = false;
+  private boolean _hasHavingClause = false;
+  private boolean _hasOrderByClause = false;
+  private boolean _hasTopClause = false;
+  private boolean _hasLimitClause = false;
+
   public SelectAstNode() {
   }
 
   @Override
   public void addChild(AstNode childNode) {
     if (childNode instanceof LimitAstNode) {
+      if (_hasLimitClause) {
+        throw new Pql2CompilationException("More than one LIMIT clause specified!");
+      }
+
       LimitAstNode node = (LimitAstNode) childNode;
       _recordLimit = node.getCount();
       _offset = node.getOffset();
+      _hasLimitClause = true;
     } else if (childNode instanceof TableNameAstNode) {
       TableNameAstNode node = (TableNameAstNode) childNode;
       _tableName = node.getTableName();
       _resourceName = node.getResourceName();
     } else if (childNode instanceof TopAstNode) {
+      if (_hasTopClause) {
+        throw new Pql2CompilationException("More than one TOP clause specified!");
+      }
+
       TopAstNode node = (TopAstNode) childNode;
       _topN = node.getCount();
+      _hasTopClause = true;
+    } else if (childNode instanceof WhereAstNode) {
+      if (_hasWhereClause) {
+        throw new Pql2CompilationException("More than one WHERE clause specified!");
+      }
+
+      super.addChild(childNode);
+      _hasWhereClause = true;
+    } else if (childNode instanceof GroupByAstNode) {
+      if (_hasGroupByClause) {
+        throw new Pql2CompilationException("More than one GROUP BY clause specified!");
+      }
+
+      super.addChild(childNode);
+      _hasGroupByClause = true;
+    } else if (childNode instanceof HavingAstNode) {
+      if (_hasHavingClause) {
+        throw new Pql2CompilationException("More than one HAVING clause specified!");
+      }
+
+      super.addChild(childNode);
+      _hasHavingClause = true;
+    } else if (childNode instanceof OrderByAstNode) {
+      if (_hasOrderByClause) {
+        throw new Pql2CompilationException("More than one ORDER BY clause specified!");
+      }
+
+      super.addChild(childNode);
+      _hasOrderByClause = true;
     } else {
       super.addChild(childNode);
     }

@@ -49,11 +49,33 @@ public class Pql2CompilerTest {
   }
 
   @Test
+  public void testDuplicateClauses() {
+    Pql2Compiler compiler = new Pql2Compiler();
+    assertCompilationFails(compiler, "select top 5 count(*) from a top 8");
+    assertCompilationFails(compiler, "select count(*) from a where a = 1 limit 5 where b = 2");
+    assertCompilationFails(compiler, "select count(*) from a group by b limit 5 group by b");
+    assertCompilationFails(compiler, "select count(*) from a having sum(a) = 8 limit 5 having sum(a) = 9");
+    assertCompilationFails(compiler, "select count(*) from a order by b limit 5 order by c");
+    assertCompilationFails(compiler, "select count(*) from a limit 5 limit 5");
+  }
+
+  @Test
   public void testTopZero() throws Exception {
     Pql2Compiler compiler  = new Pql2Compiler();
     testTopZeroFor(compiler, "select count(*) from someTable where c = 5 group by X top 0", TopAstNode.DEFAULT_TOP_N, false);
     testTopZeroFor(compiler, "select count(*) from someTable where c = 5 group by X top 1", 1, false);
     testTopZeroFor(compiler, "select count(*) from someTable where c = 5 group by X top -1", TopAstNode.DEFAULT_TOP_N, true);
+  }
+
+  private void assertCompilationFails(Pql2Compiler compiler, String query) {
+    try {
+      compiler.compileToBrokerRequest(query);
+    } catch (Pql2CompilationException e) {
+      // Expected
+      return;
+    }
+
+    Assert.fail("Query " + query + " compiled successfully but was expected to fail compilation");
   }
 
   private void testTopZeroFor(Pql2Compiler compiler, String s, final int expectedTopN, boolean parseException) throws Exception {
