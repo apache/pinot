@@ -34,7 +34,7 @@ public class ThirdEyeAnomalyApplication
   private AlertJobScheduler alertJobScheduler = null;
   private AnomalyFunctionFactory anomalyFunctionFactory = null;
   private AnomalyMergeExecutor anomalyMergeExecutor = null;
-  private AutoLoadPinotMetricsService onboardPinotMetricsService = null;
+  private AutoLoadPinotMetricsService autoLoadPinotMetricsService = null;
 
   public static void main(final String[] args) throws Exception {
     List<String> argList = new ArrayList<>(Arrays.asList(args));
@@ -97,9 +97,9 @@ public class ThirdEyeAnomalyApplication
               new AnomalyMergeExecutor(executorService);
           anomalyMergeExecutor.start();
         }
-        if (config.isOnboard()) {
-          onboardPinotMetricsService = new AutoLoadPinotMetricsService(config);
-          onboardPinotMetricsService.start();
+        if (config.isAutoload()) {
+          autoLoadPinotMetricsService = new AutoLoadPinotMetricsService(config);
+          autoLoadPinotMetricsService.start();
         }
       }
 
@@ -120,8 +120,8 @@ public class ThirdEyeAnomalyApplication
         if (config.isMerger()) {
           anomalyMergeExecutor.stop();
         }
-        if (config.isOnboard()) {
-          onboardPinotMetricsService.shutdown();
+        if (config.isAutoload()) {
+          autoLoadPinotMetricsService.shutdown();
         }
       }
     });
