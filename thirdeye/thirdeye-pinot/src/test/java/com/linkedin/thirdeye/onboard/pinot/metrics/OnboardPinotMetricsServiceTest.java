@@ -2,13 +2,7 @@ package com.linkedin.thirdeye.onboard.pinot.metrics;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-
-import jersey.repackaged.com.google.common.collect.Lists;
-
-import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -19,28 +13,30 @@ import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.TimeGranularitySpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.thirdeye.client.DAORegistry;
-import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
 import com.linkedin.thirdeye.datalayer.bao.AbstractManagerTestBase;
 import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.IngraphMetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.pojo.DashboardConfigBean;
 
 public class OnboardPinotMetricsServiceTest  extends AbstractManagerTestBase {
 
   private OnboardPinotMetricsService testOnboardPinotMetricsService;
-  private Map<String, Schema> allSchemas = new HashMap<>();
   private String dataset = "test-collection";
+  private String ingraphDataset = "thirdeye-ingraph-metric";
   private Schema schema;
-  DatasetConfigDTO datasetConfig;
+  private Schema ingraphSchema;
+  DatasetConfigDTO datasetConfig = null;
+  DatasetConfigDTO ingraphDatasetConfig = null;
 
 
   private void setup() throws IOException {
     DAORegistry.registerDAOs(anomalyFunctionDAO, emailConfigurationDAO, rawResultDAO, mergedResultDAO,
-        jobDAO, taskDAO, datasetConfigDAO, metricConfigDAO, dashboardConfigDAO);
+        jobDAO, taskDAO, datasetConfigDAO, metricConfigDAO, dashboardConfigDAO, ingraphMetricConfigDAO);
     testOnboardPinotMetricsService = new OnboardPinotMetricsService();
     schema = Schema.fromInputSteam(ClassLoader.getSystemResourceAsStream("sample-pinot-schema.json"));
-    allSchemas.put(dataset, schema);
+    ingraphSchema = Schema.fromInputSteam(ClassLoader.getSystemResourceAsStream("thirdeye_ingraph_metric.json"));
   }
 
 
@@ -48,7 +44,7 @@ public class OnboardPinotMetricsServiceTest  extends AbstractManagerTestBase {
   public void testAddNewDataset() throws IOException {
     setup();
 
-    testOnboardPinotMetricsService.addNewDataset(dataset, schema);
+    testOnboardPinotMetricsService.addPinotDataset(dataset, schema, datasetConfig);
 
     Assert.assertEquals(datasetConfigDAO.findAll().size(), 1);
     datasetConfig = datasetConfigDAO.findByDataset(dataset);
@@ -80,7 +76,7 @@ public class OnboardPinotMetricsServiceTest  extends AbstractManagerTestBase {
   public void testRefreshDataset() throws Exception {
     DimensionFieldSpec dimensionFieldSpec = new DimensionFieldSpec("newDimension", DataType.STRING, true);
     schema.addField(dimensionFieldSpec);
-    testOnboardPinotMetricsService.refreshOldDataset(dataset, datasetConfig, schema);
+    testOnboardPinotMetricsService.addPinotDataset(dataset, schema, datasetConfig);
     Assert.assertEquals(datasetConfigDAO.findAll().size(), 1);
     DatasetConfigDTO newDatasetConfig1 = datasetConfigDAO.findByDataset(dataset);
     Assert.assertEquals(newDatasetConfig1.getDataset(), dataset);
@@ -88,7 +84,7 @@ public class OnboardPinotMetricsServiceTest  extends AbstractManagerTestBase {
 
     MetricFieldSpec metricFieldSpec = new MetricFieldSpec("newMetric", DataType.LONG);
     schema.addField(metricFieldSpec);
-    testOnboardPinotMetricsService.refreshOldDataset(dataset, newDatasetConfig1, schema);
+    testOnboardPinotMetricsService.addPinotDataset(dataset, schema, newDatasetConfig1);
 
     Assert.assertEquals(datasetConfigDAO.findAll().size(), 1);
     List<MetricConfigDTO> metricConfigs = metricConfigDAO.findByDataset(dataset);
@@ -102,6 +98,56 @@ public class OnboardPinotMetricsServiceTest  extends AbstractManagerTestBase {
 
     DashboardConfigDTO dashboardConfig = dashboardConfigDAO.
         findByName(DashboardConfigBean.DEFAULT_DASHBOARD_PREFIX + dataset);
+    Assert.assertEquals(dashboardConfig.getMetricIds(), metricIds);
+
+  }
+
+  @Test(dependsOnMethods = {"testRefreshDataset"})
+  public void  testAddNewIngraphDataset() throws Exception {
+    // add dataset to ingraph table
+    IngraphMetricConfigDTO ingraphMetricConfig1 = new IngraphMetricConfigDTO();
+    ingraphMetricConfig1.setDataset(ingraphDataset);
+    ingraphMetricConfig1.setMetric("m1");
+    ingraphMetricConfig1.setMetricAlias("m1");
+    ingraphMetricConfig1.setMetricDataType("FLOAT");
+    ingraphMetricConfigDAO.save(ingraphMetricConfig1);
+
+    IngraphMetricConfigDTO ingraphMetricConfig2 = new IngraphMetricConfigDTO();
+    ingraphMetricConfig2.setDataset(ingraphDataset);
+    ingraphMetricConfig2.setMetric("m2");
+    ingraphMetricConfig2.setMetricAlias("m2");
+    ingraphMetricConfig2.setMetricDataType("FLOAT");
+    ingraphMetricConfigDAO.save(ingraphMetricConfig2);
+
+    // test isIngraphDataset
+    boolean isIngraphDataset = testOnboardPinotMetricsService.isIngraphDataset(ingraphDataset);
+    Assert.assertTrue(isIngraphDataset);
+
+    // addIngraphDataset
+    testOnboardPinotMetricsService.addIngraphDataset(ingraphDataset, ingraphSchema, ingraphDatasetConfig);
+
+    // test dimensions, metrics, dashboard
+    Assert.assertEquals(datasetConfigDAO.findAll().size(), 2);
+    ingraphDatasetConfig = datasetConfigDAO.findByDataset(ingraphDataset);
+    Assert.assertEquals(ingraphDatasetConfig.getDataset(), ingraphDataset);
+    Assert.assertEquals(ingraphDatasetConfig.getDimensions(), ingraphSchema.getDimensionNames());
+    Assert.assertEquals(ingraphDatasetConfig.getTimeColumn(), ingraphSchema.getTimeColumnName());
+    TimeGranularitySpec timeGranularitySpec = ingraphSchema.getTimeFieldSpec().getOutgoingGranularitySpec();
+    Assert.assertEquals(ingraphDatasetConfig.getTimeUnit(), timeGranularitySpec.getTimeType());
+    Assert.assertEquals(ingraphDatasetConfig.getTimeDuration(), new Integer(timeGranularitySpec.getTimeUnitSize()));
+    Assert.assertEquals(ingraphDatasetConfig.getTimeFormat(), timeGranularitySpec.getTimeFormat());
+    Assert.assertEquals(ingraphDatasetConfig.getTimezone(), "UTC");
+
+    List<MetricConfigDTO> ingraphMetricConfigs = metricConfigDAO.findByDataset(ingraphDataset);
+    List<Long> metricIds = new ArrayList<>();
+    Assert.assertEquals(ingraphMetricConfigs.size(), 2);
+    for (MetricConfigDTO metricConfig : ingraphMetricConfigs) {
+      Assert.assertTrue(metricConfig.getName().equals("m1") || metricConfig.getName().equals("m2"));
+      metricIds.add(metricConfig.getId());
+    }
+
+    DashboardConfigDTO dashboardConfig = dashboardConfigDAO.
+        findByName(DashboardConfigBean.DEFAULT_DASHBOARD_PREFIX + ingraphDataset);
     Assert.assertEquals(dashboardConfig.getMetricIds(), metricIds);
 
   }

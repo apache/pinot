@@ -139,7 +139,7 @@ create table if not exists webapp_config_index (
     update_time timestamp default current_timestamp,
     version int(10)
 ) ENGINE=InnoDB;
-ALTER TABLE `webapp_config_index` ADD UNIQUE `unique_index`(`name`, `collection`, `type`);
+ALTER TABLE `webapp_config_index` ADD UNIQUE `webapp_config_unique_index`(`name`, `collection`, `type`);
 
 
 create table if not exists dataset_config_index (
