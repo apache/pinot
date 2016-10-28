@@ -18,7 +18,6 @@ import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.base.Joiner;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 
@@ -46,7 +45,6 @@ public class WeekOverWeekRuleFunction extends BaseAnomalyFunction {
   public static final String CHANGE_THRESHOLD = "changeThreshold";
   public static final String AVERAGE_VOLUME_THRESHOLD = "averageVolumeThreshold";
   public static final String DEFAULT_MESSAGE_TEMPLATE = "change : %.2f %%, currentVal : %.2f, baseLineVal : %.2f, threshold : %s, baseLineProp : %s";
-  private static final Joiner CSV = Joiner.on(",");
 
   public static String[] getPropertyKeys() {
     return new String [] {BASELINE, CHANGE_THRESHOLD, AVERAGE_VOLUME_THRESHOLD};
@@ -184,37 +182,5 @@ public class WeekOverWeekRuleFunction extends BaseAnomalyFunction {
       }
     }
     return false;
-  }
-
-  @Override
-  public AnomalyTimelinesView getPresentationTimeseries(MetricTimeSeries timeSeries, long bucketMillis, String metric,
-      long viewWindowStartTime, long viewWindowEndTime, List<RawAnomalyResultDTO> knownAnomalies) {
-
-    AnomalyTimelinesView anomalyTimelinesView = new AnomalyTimelinesView();
-
-    // Compute baseline for comparison
-    long baselineOffsetInMillis = TimeUnit.MILLISECONDS.convert(7, TimeUnit.DAYS);
-    try {
-      Properties props = getProperties();
-      String baselineProp = props.getProperty(BASELINE);
-      baselineOffsetInMillis = getBaselineOffsetInMillis(baselineProp);
-    } catch (IOException e) {
-      LOGGER.info("Cannot get function property when constructing presentation timeseires. Using WoW baseline values.");
-    }
-
-    // Construct AnomalyTimelinesView
-    int bucketCount = (int) ((viewWindowEndTime - viewWindowStartTime) / bucketMillis);
-    for (int i = 0; i < bucketCount; ++i) {
-      long currentBucketMillis = viewWindowStartTime + i * bucketMillis;
-      long baselineBucketMillis = currentBucketMillis - baselineOffsetInMillis;
-      TimeBucket timebucket =
-          new TimeBucket(currentBucketMillis, currentBucketMillis + bucketMillis, baselineBucketMillis,
-              baselineBucketMillis + bucketMillis);
-      anomalyTimelinesView.addTimeBuckets(timebucket);
-      anomalyTimelinesView.addCurrentValues(timeSeries.get(currentBucketMillis, metric).doubleValue());
-      anomalyTimelinesView.addBaselineValues(timeSeries.get(baselineBucketMillis, metric).doubleValue());
-    }
-
-    return anomalyTimelinesView;
   }
 }
