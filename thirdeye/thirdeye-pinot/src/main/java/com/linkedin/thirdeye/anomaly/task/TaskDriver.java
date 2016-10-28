@@ -50,8 +50,8 @@ public class TaskDriver {
     this.anomalyTaskDAO = DAO_REGISTRY.getTaskDAO();
     taskExecutorService = Executors.newFixedThreadPool(MAX_PARALLEL_TASK);
     taskContext = new TaskContext();
-    taskContext.setAnomalyJobDAO(DAO_REGISTRY.getJobDAO());
-    taskContext.setAnomalyTaskDAO(anomalyTaskDAO);
+    taskContext.setJobDAO(DAO_REGISTRY.getJobDAO());
+    taskContext.setTaskDAO(anomalyTaskDAO);
     taskContext.setResultDAO(DAO_REGISTRY.getRawAnomalyResultDAO());
     taskContext.setAnomalyFunctionFactory(anomalyFunctionFactory);
     taskContext.setMergedResultDAO(DAO_REGISTRY.getMergedAnomalyResultDAO());

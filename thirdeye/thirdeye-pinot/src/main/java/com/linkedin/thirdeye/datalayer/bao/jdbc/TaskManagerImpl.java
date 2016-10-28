@@ -5,15 +5,14 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
 import java.util.Set;
+
 import org.joda.time.DateTime;
 
 import com.google.inject.persist.Transactional;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
 import com.linkedin.thirdeye.datalayer.bao.TaskManager;
 import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
-import com.linkedin.thirdeye.datalayer.pojo.AbstractBean;
 import com.linkedin.thirdeye.datalayer.pojo.TaskBean;
 import com.linkedin.thirdeye.datalayer.util.Predicate;
 
@@ -36,7 +35,6 @@ public class TaskManagerImpl extends AbstractManagerImpl<TaskDTO> implements Tas
       return entity.getId();
     }
     TaskBean bean = (TaskBean) convertDTO2Bean(entity, TaskBean.class);
-    bean.setJobId(entity.getJob().getId());
     Long id = genericPojoDao.put(bean);
     entity.setId(id);
     return id;
@@ -115,5 +113,17 @@ public class TaskManagerImpl extends AbstractManagerImpl<TaskDTO> implements Tas
       deleteById(bean.getId());
     }
     return list.size();
+  }
+
+  @Override
+  @Transactional
+  public List<TaskDTO> findByStatusNotIn(TaskStatus status) {
+    Predicate statusPredicate = Predicate.NEQ("status", status.toString());
+    List<TaskBean> list = genericPojoDao.get(statusPredicate, TaskBean.class);
+    List<TaskDTO> result = new ArrayList<>();
+    for (TaskBean bean : list) {
+      result.add((TaskDTO) MODEL_MAPPER.map(bean, TaskDTO.class));
+    }
+    return result;
   }
 }

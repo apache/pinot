@@ -11,13 +11,4 @@ import com.linkedin.thirdeye.datalayer.pojo.TaskBean;
  */
 public class TaskDTO extends TaskBean {
 
-  private JobDTO job;
-
-  public JobDTO getJob() {
-    return job;
-  }
-
-  public void setJob(JobDTO job) {
-    this.job = job;
-  }
 }

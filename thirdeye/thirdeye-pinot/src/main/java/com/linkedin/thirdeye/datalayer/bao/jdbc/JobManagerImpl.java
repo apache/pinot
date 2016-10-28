@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.datalayer.bao.jdbc;
 
 import java.sql.Timestamp;
 import java.util.List;
+import java.util.Set;
 
 import org.joda.time.DateTime;
 
@@ -27,11 +28,13 @@ public class JobManagerImpl extends AbstractManagerImpl<JobDTO> implements JobMa
 
   @Override
   @Transactional
-  public void updateStatusAndJobEndTime(Long id, JobStatus status, Long jobEndTime) {
-    JobDTO anomalyJobSpec = findById(id);
-    anomalyJobSpec.setStatus(status);
-    anomalyJobSpec.setScheduleEndTime(jobEndTime);
-    update(anomalyJobSpec);
+  public void updateStatusAndJobEndTimeForJobIds(Set<Long> ids, JobStatus status, Long jobEndTime) {
+    for (Long id : ids) {
+      JobDTO anomalyJobSpec = findById(id);
+      anomalyJobSpec.setStatus(status);
+      anomalyJobSpec.setScheduleEndTime(jobEndTime);
+      update(anomalyJobSpec);
+    }
   }
 
   @Override
