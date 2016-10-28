@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.onboard.pinot.metrics;
+package com.linkedin.thirdeye.autoload.pinot.metrics;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -37,8 +37,8 @@ import com.linkedin.thirdeye.datalayer.pojo.DashboardConfigBean;
  * If the table is an ingraph table, it loads metrics from the ingraph table
  * It also looks for any changes in dimensions or metrics to the existing tables
  */
-public class OnboardPinotMetricsService implements Runnable {
-  private static final Logger LOG = LoggerFactory.getLogger(OnboardPinotMetricsService.class);
+public class AutoLoadPinotMetricsService implements Runnable {
+  private static final Logger LOG = LoggerFactory.getLogger(AutoLoadPinotMetricsService.class);
 
 
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
@@ -52,17 +52,17 @@ public class OnboardPinotMetricsService implements Runnable {
   private CacheResource cacheResource;
 
   private ScheduledExecutorService scheduledExecutorService;
-  private OnboardPinotMetricsUtils onboardPinotMetricsUtils;
+  private AutoLoadPinotMetricsUtils autoLoadPinotMetricsUtils;
 
   private List<String> allDatasets = new ArrayList<>();
   private Map<String, Schema> allSchemas = new HashMap<>();
 
-  public OnboardPinotMetricsService() {
+  public AutoLoadPinotMetricsService() {
   }
 
-  public OnboardPinotMetricsService(ThirdEyeConfiguration config) {
+  public AutoLoadPinotMetricsService(ThirdEyeConfiguration config) {
 
-    onboardPinotMetricsUtils = new OnboardPinotMetricsUtils(config);
+    autoLoadPinotMetricsUtils = new AutoLoadPinotMetricsUtils(config);
     scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
     cacheResource = new CacheResource();
   }
@@ -84,7 +84,7 @@ public class OnboardPinotMetricsService implements Runnable {
         DatasetConfigDTO datasetConfig = datasetConfigDAO.findByDataset(dataset);
         Schema schema = allSchemas.get(dataset);
 
-        if (isIngraphDataset(dataset)) {
+        if (ConfigGenerator.isIngraphDataset(schema)) {
           addIngraphDataset(dataset, schema, datasetConfig);
         } else {
           addPinotDataset(dataset, schema, datasetConfig);
@@ -97,14 +97,6 @@ public class OnboardPinotMetricsService implements Runnable {
     }
   }
 
-  public boolean isIngraphDataset(String dataset) {
-    boolean isIngraphDataset = false;
-    List<IngraphMetricConfigDTO> ingraphMetricConfigs = ingraphMetricConfigDAO.findByDataset(dataset);
-    if (CollectionUtils.isNotEmpty(ingraphMetricConfigs)) {
-      isIngraphDataset = true;
-    }
-    return isIngraphDataset;
-  }
 
   /**
    * Adds ingraph dataset to the thirdeye database
@@ -309,10 +301,10 @@ public class OnboardPinotMetricsService implements Runnable {
    */
   private void loadDatasets() throws IOException {
 
-    JsonNode tables = onboardPinotMetricsUtils.getAllTablesFromPinot();
+    JsonNode tables = autoLoadPinotMetricsUtils.getAllTablesFromPinot();
     for (JsonNode table : tables) {
       String dataset = table.asText();
-      Schema schema = onboardPinotMetricsUtils.getSchemaFromPinot(dataset);
+      Schema schema = autoLoadPinotMetricsUtils.getSchemaFromPinot(dataset);
       if (schema != null) {
         allDatasets.add(dataset);
         allSchemas.put(dataset, schema);

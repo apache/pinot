@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.onboard.pinot.metrics;
+package com.linkedin.thirdeye.autoload.pinot.metrics;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -16,8 +16,9 @@ import com.linkedin.thirdeye.datalayer.pojo.DashboardConfigBean;
 
 public class ConfigGenerator {
 
-  private static final String DEFAULT_METRIC_NAMES_COLUMN = "metricAlias";
-  private static final String DEFAULT_METRIC_VALUES_COLUMN = "value";
+  private static final String PDT_TIMEZONE = "US/Pacific";
+  private static final String DEFAULT_INGRAPH_METRIC_NAMES_COLUMN = "metricAlias";
+  private static final String DEFAULT_INGRAPH_METRIC_VALUES_COLUMN = "value";
 
   public static DatasetConfigDTO generateDatasetConfig(String dataset, Schema schema) {
     List<String> dimensions = schema.getDimensionNames();
@@ -32,7 +33,7 @@ public class ConfigGenerator {
     datasetConfigDTO.setTimeUnit(timeSpec.getTimeType());
     datasetConfigDTO.setTimeFormat(timeSpec.getTimeFormat());
     if (timeSpec.getTimeFormat().startsWith(TimeFormat.SIMPLE_DATE_FORMAT.toString())) {
-      datasetConfigDTO.setTimezone("US/Pacific");
+      datasetConfigDTO.setTimezone(PDT_TIMEZONE);
     }
     return datasetConfigDTO;
   }
@@ -40,8 +41,8 @@ public class ConfigGenerator {
   public static DatasetConfigDTO generateIngraphDatasetConfig(String dataset, Schema schema) {
     DatasetConfigDTO datasetConfigDTO = generateDatasetConfig(dataset, schema);
     datasetConfigDTO.setMetricAsDimension(true);
-    datasetConfigDTO.setMetricNamesColumn(DEFAULT_METRIC_NAMES_COLUMN);
-    datasetConfigDTO.setMetricValuesColumn(DEFAULT_METRIC_VALUES_COLUMN);
+    datasetConfigDTO.setMetricNamesColumn(DEFAULT_INGRAPH_METRIC_NAMES_COLUMN);
+    datasetConfigDTO.setMetricValuesColumn(DEFAULT_INGRAPH_METRIC_VALUES_COLUMN);
 
     return datasetConfigDTO;
   }
@@ -80,6 +81,16 @@ public class ConfigGenerator {
       metricIds.add(metricConfig.getId());
     }
     return metricIds;
+  }
+
+
+  public static boolean isIngraphDataset(Schema schema) {
+    boolean isIngraphDataset = false;
+    if (schema.getDimensionNames().contains(DEFAULT_INGRAPH_METRIC_NAMES_COLUMN)
+        && schema.getMetricNames().contains(DEFAULT_INGRAPH_METRIC_VALUES_COLUMN)) {
+      isIngraphDataset = true;
+    }
+    return isIngraphDataset;
   }
 
 }

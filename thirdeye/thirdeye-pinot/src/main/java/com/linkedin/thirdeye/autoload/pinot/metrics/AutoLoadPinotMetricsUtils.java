@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.onboard.pinot.metrics;
+package com.linkedin.thirdeye.autoload.pinot.metrics;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -19,7 +19,7 @@ import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClientConfig;
 import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
 
-public class OnboardPinotMetricsUtils {
+public class AutoLoadPinotMetricsUtils {
   private static final String PINOT_TABLES_ENDPOINT = "tables/";
   private static final String PINOT_SCHEMA_ENDPOINT = "schemas/%s";
   private static final String PINOT_SCHEMA_ENDPOINT_TEMPLATE = "tables/%s/schema";
@@ -28,9 +28,9 @@ public class OnboardPinotMetricsUtils {
   private CloseableHttpClient pinotControllerClient;
   private HttpHost pinotControllerHost;
 
-  private static final Logger LOG = LoggerFactory.getLogger(OnboardPinotMetricsUtils.class);
+  private static final Logger LOG = LoggerFactory.getLogger(AutoLoadPinotMetricsUtils.class);
 
-  public OnboardPinotMetricsUtils(ThirdEyeConfiguration config) {
+  public AutoLoadPinotMetricsUtils(ThirdEyeConfiguration config) {
     try {
       PinotThirdEyeClientConfig pinotThirdeyeClientConfig = PinotThirdEyeClientConfig.createThirdEyeClientConfig(config);
       this.pinotControllerClient = HttpClients.createDefault();

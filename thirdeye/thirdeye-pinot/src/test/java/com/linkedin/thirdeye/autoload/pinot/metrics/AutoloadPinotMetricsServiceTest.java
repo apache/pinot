@@ -1,8 +1,9 @@
-package com.linkedin.thirdeye.onboard.pinot.metrics;
+package com.linkedin.thirdeye.autoload.pinot.metrics;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -12,6 +13,8 @@ import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.TimeGranularitySpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import com.linkedin.thirdeye.autoload.pinot.metrics.AutoLoadPinotMetricsService;
+import com.linkedin.thirdeye.autoload.pinot.metrics.ConfigGenerator;
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.datalayer.bao.AbstractManagerTestBase;
 import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
@@ -20,9 +23,9 @@ import com.linkedin.thirdeye.datalayer.dto.IngraphMetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.pojo.DashboardConfigBean;
 
-public class OnboardPinotMetricsServiceTest  extends AbstractManagerTestBase {
+public class AutoloadPinotMetricsServiceTest  extends AbstractManagerTestBase {
 
-  private OnboardPinotMetricsService testOnboardPinotMetricsService;
+  private AutoLoadPinotMetricsService testAutoLoadPinotMetricsService;
   private String dataset = "test-collection";
   private String ingraphDataset = "thirdeye-ingraph-metric";
   private Schema schema;
@@ -34,7 +37,7 @@ public class OnboardPinotMetricsServiceTest  extends AbstractManagerTestBase {
   private void setup() throws IOException {
     DAORegistry.registerDAOs(anomalyFunctionDAO, emailConfigurationDAO, rawResultDAO, mergedResultDAO,
         jobDAO, taskDAO, datasetConfigDAO, metricConfigDAO, dashboardConfigDAO, ingraphMetricConfigDAO);
-    testOnboardPinotMetricsService = new OnboardPinotMetricsService();
+    testAutoLoadPinotMetricsService = new AutoLoadPinotMetricsService();
     schema = Schema.fromInputSteam(ClassLoader.getSystemResourceAsStream("sample-pinot-schema.json"));
     ingraphSchema = Schema.fromInputSteam(ClassLoader.getSystemResourceAsStream("thirdeye_ingraph_metric.json"));
   }
@@ -44,7 +47,7 @@ public class OnboardPinotMetricsServiceTest  extends AbstractManagerTestBase {
   public void testAddNewDataset() throws IOException {
     setup();
 
-    testOnboardPinotMetricsService.addPinotDataset(dataset, schema, datasetConfig);
+    testAutoLoadPinotMetricsService.addPinotDataset(dataset, schema, datasetConfig);
 
     Assert.assertEquals(datasetConfigDAO.findAll().size(), 1);
     datasetConfig = datasetConfigDAO.findByDataset(dataset);
@@ -76,7 +79,7 @@ public class OnboardPinotMetricsServiceTest  extends AbstractManagerTestBase {
   public void testRefreshDataset() throws Exception {
     DimensionFieldSpec dimensionFieldSpec = new DimensionFieldSpec("newDimension", DataType.STRING, true);
     schema.addField(dimensionFieldSpec);
-    testOnboardPinotMetricsService.addPinotDataset(dataset, schema, datasetConfig);
+    testAutoLoadPinotMetricsService.addPinotDataset(dataset, schema, datasetConfig);
     Assert.assertEquals(datasetConfigDAO.findAll().size(), 1);
     DatasetConfigDTO newDatasetConfig1 = datasetConfigDAO.findByDataset(dataset);
     Assert.assertEquals(newDatasetConfig1.getDataset(), dataset);
@@ -84,7 +87,7 @@ public class OnboardPinotMetricsServiceTest  extends AbstractManagerTestBase {
 
     MetricFieldSpec metricFieldSpec = new MetricFieldSpec("newMetric", DataType.LONG);
     schema.addField(metricFieldSpec);
-    testOnboardPinotMetricsService.addPinotDataset(dataset, schema, newDatasetConfig1);
+    testAutoLoadPinotMetricsService.addPinotDataset(dataset, schema, newDatasetConfig1);
 
     Assert.assertEquals(datasetConfigDAO.findAll().size(), 1);
     List<MetricConfigDTO> metricConfigs = metricConfigDAO.findByDataset(dataset);
@@ -120,11 +123,11 @@ public class OnboardPinotMetricsServiceTest  extends AbstractManagerTestBase {
     ingraphMetricConfigDAO.save(ingraphMetricConfig2);
 
     // test isIngraphDataset
-    boolean isIngraphDataset = testOnboardPinotMetricsService.isIngraphDataset(ingraphDataset);
+    boolean isIngraphDataset = ConfigGenerator.isIngraphDataset(ingraphSchema);
     Assert.assertTrue(isIngraphDataset);
 
     // addIngraphDataset
-    testOnboardPinotMetricsService.addIngraphDataset(ingraphDataset, ingraphSchema, ingraphDatasetConfig);
+    testAutoLoadPinotMetricsService.addIngraphDataset(ingraphDataset, ingraphSchema, ingraphDatasetConfig);
 
     // test dimensions, metrics, dashboard
     Assert.assertEquals(datasetConfigDAO.findAll().size(), 2);
