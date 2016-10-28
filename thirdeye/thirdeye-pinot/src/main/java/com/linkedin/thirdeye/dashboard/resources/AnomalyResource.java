@@ -2,6 +2,9 @@ package com.linkedin.thirdeye.dashboard.resources;
 
 import com.linkedin.thirdeye.anomaly.detection.TimeSeriesUtil;
 import com.linkedin.thirdeye.anomaly.views.AnomalyTimelinesView;
+import com.linkedin.thirdeye.anomaly.views.function.AnomalyTimeSeriesView;
+import com.linkedin.thirdeye.anomaly.views.function.AnomalyTimeSeriesViewFactory;
+import com.linkedin.thirdeye.anomaly.views.function.AnomalyTimeSeriesViewUtils;
 import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
@@ -9,8 +12,6 @@ import com.linkedin.thirdeye.client.timeseries.TimeSeriesResponse;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesResponseConverter;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.dashboard.views.TimeBucket;
-import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
-import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
 
 import java.io.IOException;
 import java.net.URLDecoder;
@@ -79,17 +80,17 @@ public class AnomalyResource {
   private RawAnomalyResultManager rawAnomalyResultDAO;
   private EmailConfigurationManager emailConfigurationDAO;
   private DatasetConfigManager datasetConfigDAO;
-  private AnomalyFunctionFactory anomalyFunctionFactory;
+  private AnomalyTimeSeriesViewFactory anomalyTimeSeriesViewFactory;
 
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
-  public AnomalyResource(AnomalyFunctionFactory anomalyFunctionFactory) {
+  public AnomalyResource(AnomalyTimeSeriesViewFactory anomalyTimeSeriesViewFactory) {
     this.anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
     this.rawAnomalyResultDAO = DAO_REGISTRY.getRawAnomalyResultDAO();
     this.anomalyMergedResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
     this.emailConfigurationDAO = DAO_REGISTRY.getEmailConfigurationDAO();
     this.datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
-    this.anomalyFunctionFactory = anomalyFunctionFactory;
+    this.anomalyTimeSeriesViewFactory = anomalyTimeSeriesViewFactory;
   }
 
   /************** CRUD for anomalies of a collection ********************************************************/
@@ -538,7 +539,7 @@ public class AnomalyResource {
     MergedAnomalyResultDTO anomalyResult = anomalyMergedResultDAO.findById(anomalyResultId);
     DimensionMap dimensions = anomalyResult.getDimensions();
     AnomalyFunctionDTO anomalyFunctionSpec = anomalyResult.getFunction();
-    BaseAnomalyFunction anomalyFunction = anomalyFunctionFactory.fromSpec(anomalyFunctionSpec);
+    AnomalyTimeSeriesView anomalyTimeSeriesView = anomalyTimeSeriesViewFactory.fromSpec(anomalyFunctionSpec);
 
     // Calculate view window start and end if they are not given by the user, which should be 0 if it is not given.
     // By default, the padding window size is half of the anomaly window.
@@ -568,7 +569,7 @@ public class AnomalyResource {
     viewWindowEndTime += bucketMillis;
 
     TimeSeriesResponse timeSeriesResponse =
-        TimeSeriesUtil.getTimeSeriesResponseForPresentation(anomalyFunction, dimensions, timeGranularity,
+        TimeSeriesUtil.getTimeSeriesResponseForPresentation(anomalyTimeSeriesView, dimensions, timeGranularity,
             viewWindowStartTime, viewWindowEndTime);
 
     TimeSeriesResponseConverter timeSeriesResponseConverter = TimeSeriesResponseConverter.getInstance();
@@ -581,7 +582,7 @@ public class AnomalyResource {
     if (ite.hasNext()) {
       MetricTimeSeries metricTimeSeries = ite.next();
       AnomalyTimelinesView anomalyTimelinesView =
-          anomalyFunction.getPresentationTimeseries(metricTimeSeries, bucketMillis, metricName, viewWindowStartTime, viewWindowEndTime, null);
+          anomalyTimeSeriesView.getTimeSeriesView(metricTimeSeries, bucketMillis, metricName, viewWindowStartTime, viewWindowEndTime, null);
 
       // Generate summary for frontend
       List<TimeBucket> timeBuckets = anomalyTimelinesView.getTimeBuckets();

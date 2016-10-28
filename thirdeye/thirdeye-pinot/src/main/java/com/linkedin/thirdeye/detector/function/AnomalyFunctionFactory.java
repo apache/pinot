@@ -56,12 +56,7 @@ public class AnomalyFunctionFactory {
       throw new IllegalArgumentException("Unsupported type " + type);
     }
     String className = props.getProperty(type);
-    // TODO: Remove the class PresentationalAnomalyFunction after fixing the issue
-    try {
-      anomalyFunction = (BaseAnomalyFunction) Class.forName(className).newInstance();
-    } catch (ClassNotFoundException e) {
-      anomalyFunction = new PresentationalAnomalyFunction();
-    }
+    anomalyFunction = (BaseAnomalyFunction) Class.forName(className).newInstance();
 
     anomalyFunction.init(functionSpec);
     return anomalyFunction;
