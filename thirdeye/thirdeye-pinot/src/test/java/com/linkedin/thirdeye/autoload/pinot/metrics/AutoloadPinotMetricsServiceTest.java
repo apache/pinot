@@ -44,7 +44,7 @@ public class AutoloadPinotMetricsServiceTest  extends AbstractManagerTestBase {
 
 
   @Test
-  public void testAddNewDataset() throws IOException {
+  public void testAddNewDataset() throws Exception {
     setup();
 
     testAutoLoadPinotMetricsService.addPinotDataset(dataset, schema, datasetConfig);

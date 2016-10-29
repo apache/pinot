@@ -21,7 +21,6 @@ import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
-import com.linkedin.thirdeye.dashboard.resources.CacheResource;
 import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.IngraphMetricConfigManager;
@@ -50,8 +49,6 @@ public class AutoLoadPinotMetricsService implements Runnable {
   private IngraphMetricConfigManager ingraphMetricConfigDAO = DAO_REGISTRY.getIngraphMetricConfigDAO();
 
 
-  private CacheResource cacheResource;
-
   private ScheduledExecutorService scheduledExecutorService;
   private AutoLoadPinotMetricsUtils autoLoadPinotMetricsUtils;
 
@@ -65,7 +62,6 @@ public class AutoLoadPinotMetricsService implements Runnable {
 
     autoLoadPinotMetricsUtils = new AutoLoadPinotMetricsUtils(config);
     scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
-    cacheResource = new CacheResource();
   }
 
   public void start() {
