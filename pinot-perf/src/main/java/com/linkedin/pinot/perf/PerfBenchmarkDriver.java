@@ -334,8 +334,16 @@ public class PerfBenchmarkDriver {
   }
 
   public JSONObject postQuery(String query) throws Exception {
+    return postQuery(query, null);
+  }
+
+  public JSONObject postQuery(String query, String optimizationFlags) throws Exception {
     final JSONObject json = new JSONObject();
     json.put("pql", query);
+
+    if (optimizationFlags != null && !optimizationFlags.isEmpty()) {
+      json.put("debugOptions", "optimizationFlags=" + optimizationFlags);
+    }
 
     final long start = System.currentTimeMillis();
     final URLConnection conn = new URL(brokerBaseApiUrl + "/query").openConnection();

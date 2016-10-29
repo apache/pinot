@@ -16,35 +16,68 @@
 package com.linkedin.pinot.perf;
 
 import com.google.common.util.concurrent.Uninterruptibles;
+import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import java.io.File;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import org.I0Itec.zkclient.ZkClient;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.json.JSONObject;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
+import org.openjdk.jmh.annotations.Fork;
 import org.openjdk.jmh.annotations.Mode;
 import org.openjdk.jmh.annotations.OutputTimeUnit;
+import org.openjdk.jmh.annotations.Param;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.profile.StackProfiler;
 import org.openjdk.jmh.runner.Runner;
-import org.openjdk.jmh.runner.options.Options;
+import org.openjdk.jmh.runner.options.ChainedOptionsBuilder;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 import org.openjdk.jmh.runner.options.TimeValue;
 
 
 @State(Scope.Benchmark)
+@Fork(value = 1, jvmArgs = {"-server", "-Xmx8G", "-XX:MaxDirectMemorySize=16G"})
 public class BenchmarkQueryEngine {
-  private static final int EXPECTED_NUM_DOCS_SCANNED = 25000000;
-  private static final int EXPECTED_TOTAL_DOCS_COUNT = 25000000;
-  private static final String QUERY = "select count(*) from sTest group by daysSinceEpoch";
-  private static final String TABLE_NAME = "sTest_OFFLINE";
-  private static final String DATA_DIRECTORY = "/Users/jfim/index_dir";
+  /** List of query patterns used in the benchmark */
+  private static final String[] QUERY_PATTERNS = new String[] {
+      "SELECT count(*) from myTable"
+  };
+
+  /** List of optimization flags to test,
+   * see {@link com.linkedin.pinot.requestHandler.OptimizationFlags#getOptimizationFlags(BrokerRequest)} for the syntax
+   * used here. */
+  @Param({"", "-multipleOrEqualitiesToInClause"})
+  public String optimizationFlags;
+
+  /** List of query patterns indices to run */
+  @Param({"0"})
+  public int queryPattern;
+
+  /** The table name which contains the offline data, for example "myTable_OFFLINE." */
+  private static final String TABLE_NAME = "myTable_OFFLINE";
+
+  /** The directory that contains the unpacked data, for example "/data"
+   *
+   * In that directory, there should be a "myTable_OFFLINE" directory which contains unpacked segments, so the
+   * directory for "/data" should look like "/data/myTable_OFFLINE/mySegment_0/metadata.properties"
+   */
+  private static final String DATA_DIRECTORY = "/home/someuser/data";
+
+  /**
+   * Whether or not to enable profiling information
+   */
+  private static final boolean ENABLE_PROFILING = false;
 
   PerfBenchmarkDriver _perfBenchmarkDriver;
+  boolean ranOnce = false;
 
   @Setup
   public void startPinot() throws Exception {
@@ -77,34 +110,60 @@ public class BenchmarkQueryEngine {
       _perfBenchmarkDriver.addSegment(segmentMetadata);
     }
 
-    System.out.println("Waiting for 10s for everything to be loaded");
-    Uninterruptibles.sleepUninterruptibly(10, TimeUnit.SECONDS);
+    ZkClient client = new ZkClient("localhost:2191", 10000, 10000, new ZNRecordSerializer());
+
+    ZNRecord record = client.readData("/PinotPerfTestCluster/EXTERNALVIEW/" + TABLE_NAME);
+    while (true) {
+      System.out.println("record = " + record);
+      Uninterruptibles.sleepUninterruptibly(10, TimeUnit.SECONDS);
+
+      int onlineSegmentCount = 0;
+      for (Map<String, String> instancesAndStates : record.getMapFields().values()) {
+        for (String state : instancesAndStates.values()) {
+          if (state.equals("ONLINE")) {
+            onlineSegmentCount++;
+            break;
+          }
+        }
+      }
+
+      System.out.println(onlineSegmentCount + " segments online out of " + segments.length);
+
+      if (onlineSegmentCount == segments.length) {
+        break;
+      }
+
+      record = client.readData("/PinotPerfTestCluster/EXTERNALVIEW/" + TABLE_NAME);
+    }
+
+    ranOnce = false;
+
+    System.out.println(
+        _perfBenchmarkDriver.postQuery(QUERY_PATTERNS[queryPattern], optimizationFlags).toString(2)
+    );
   }
 
   @Benchmark
   @BenchmarkMode({Mode.SampleTime})
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
   public int sendQueryToPinot() throws Exception {
-    JSONObject returnValue = _perfBenchmarkDriver.postQuery(QUERY);
-    if (returnValue.getInt("numDocsScanned") != EXPECTED_NUM_DOCS_SCANNED || returnValue.getInt("totalDocs") != EXPECTED_TOTAL_DOCS_COUNT) {
-      System.out.println("returnValue = " + returnValue);
-      throw new RuntimeException("Unexpected number of docs scanned/total docs");
-    }
+    JSONObject returnValue = _perfBenchmarkDriver.postQuery(QUERY_PATTERNS[queryPattern], optimizationFlags);
     return returnValue.getInt("totalDocs");
   }
 
   public static void main(String[] args) throws Exception {
-
-    Options opt = new OptionsBuilder()
+    ChainedOptionsBuilder opt = new OptionsBuilder()
         .include(BenchmarkQueryEngine.class.getSimpleName())
-        .forks(1)
-        .warmupTime(TimeValue.seconds(6))
-        .warmupIterations(10)
-        .measurementTime(TimeValue.seconds(6))
-        .measurementIterations(10)
-        .addProfiler(StackProfiler.class)
-        .build();
+        .warmupTime(TimeValue.seconds(30))
+        .warmupIterations(4)
+        .measurementTime(TimeValue.seconds(30))
+        .measurementIterations(20);
 
-    new Runner(opt).run();
+    if (ENABLE_PROFILING) {
+      opt = opt.addProfiler(StackProfiler.class,
+          "excludePackages=true;excludePackageNames=sun.,java.net.,io.netty.,org.apache.zookeeper.,org.eclipse.jetty.;lines=5;period=1;top=20");
+    }
+
+    new Runner(opt.build()).run();
   }
 }
