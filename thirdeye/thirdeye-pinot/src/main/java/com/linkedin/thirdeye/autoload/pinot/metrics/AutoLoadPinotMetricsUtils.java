@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URLEncoder;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpHost;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
@@ -126,5 +127,14 @@ public class AutoLoadPinotMetricsUtils {
       schemaRes.close();
     }
     return schema;
+  }
+
+  public boolean verifySchemaCorrectness(Schema schema) {
+    boolean isSchemaCorrect = true;
+    if (StringUtils.isBlank(schema.getSchemaName()) || schema.getTimeFieldSpec() == null
+        || schema.getTimeFieldSpec().getOutgoingGranularitySpec() == null) {
+      isSchemaCorrect = false;
+    }
+    return isSchemaCorrect;
   }
 }
