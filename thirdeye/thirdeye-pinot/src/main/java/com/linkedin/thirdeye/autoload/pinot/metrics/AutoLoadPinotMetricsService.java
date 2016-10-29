@@ -11,6 +11,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+
 import org.apache.commons.collections.CollectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -90,9 +91,7 @@ public class AutoLoadPinotMetricsService implements Runnable {
           addPinotDataset(dataset, schema, datasetConfig);
         }
       }
-      refreshCaches();
-
-    } catch (IOException e) {
+    } catch (Exception e) {
       LOG.error("Exception in loading datasets", e);
     }
   }
@@ -104,7 +103,7 @@ public class AutoLoadPinotMetricsService implements Runnable {
    * @param schema
    * @param datasetConfig
    */
-  public void addIngraphDataset(String dataset, Schema schema, DatasetConfigDTO datasetConfig) {
+  public void addIngraphDataset(String dataset, Schema schema, DatasetConfigDTO datasetConfig) throws Exception {
     LOG.info("Found ingraph dataset {}", dataset);
     if (datasetConfig == null) {
       DatasetConfigDTO datasetConfigDTO = ConfigGenerator.generateIngraphDatasetConfig(dataset, schema);
@@ -156,7 +155,7 @@ public class AutoLoadPinotMetricsService implements Runnable {
    * @param schema
    * @param datasetConfig
    */
-  public void addPinotDataset(String dataset, Schema schema, DatasetConfigDTO datasetConfig) {
+  public void addPinotDataset(String dataset, Schema schema, DatasetConfigDTO datasetConfig) throws Exception {
     if (datasetConfig == null) {
       LOG.info("Dataset {} is new, adding it to thirdeye", dataset);
       addNewDataset(dataset, schema);
@@ -171,7 +170,7 @@ public class AutoLoadPinotMetricsService implements Runnable {
    * @param dataset
    * @param schema
    */
-  private void addNewDataset(String dataset, Schema schema) {
+  private void addNewDataset(String dataset, Schema schema) throws Exception {
     List<MetricFieldSpec> metricSpecs = schema.getMetricFieldSpecs();
 
     // Create DatasetConfig
@@ -200,7 +199,7 @@ public class AutoLoadPinotMetricsService implements Runnable {
    * @param datasetConfig
    * @param schema
    */
-  private void refreshOldDataset(String dataset, DatasetConfigDTO datasetConfig, Schema schema) {
+  private void refreshOldDataset(String dataset, DatasetConfigDTO datasetConfig, Schema schema) throws Exception {
 
     if (datasetConfig.isMetricAsDimension()) {
       LOG.info("Skipping refresh for metricAsDimension dataset {}", dataset);
@@ -288,14 +287,6 @@ public class AutoLoadPinotMetricsService implements Runnable {
   }
 
   /**
-   * Refreshes thirdeye caches, for any changes we might have made in the refresh/load
-   */
-  private void refreshCaches() {
-    LOG.info("Refresh all caches");
-    cacheResource.refreshAllCaches();
-  }
-
-  /**
    * Reads all table names in pinot, and loads their schema
    * @throws IOException
    */
@@ -306,8 +297,12 @@ public class AutoLoadPinotMetricsService implements Runnable {
       String dataset = table.asText();
       Schema schema = autoLoadPinotMetricsUtils.getSchemaFromPinot(dataset);
       if (schema != null) {
-        allDatasets.add(dataset);
-        allSchemas.put(dataset, schema);
+        if (!autoLoadPinotMetricsUtils.verifySchemaCorrectness(schema)) {
+          LOG.info("Skipping {} due to incorrect schema", dataset);
+        } else {
+          allDatasets.add(dataset);
+          allSchemas.put(dataset, schema);
+        }
       }
     }
   }
