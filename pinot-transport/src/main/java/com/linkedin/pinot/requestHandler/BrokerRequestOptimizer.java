@@ -36,7 +36,8 @@ public class BrokerRequestOptimizer {
    * @return An optimized request
    */
   public BrokerRequest optimize(BrokerRequest brokerRequest) {
-    optimizeFilterQueryTree(brokerRequest);
+    OptimizationFlags optimizationFlags = OptimizationFlags.getOptimizationFlags(brokerRequest);
+    optimizeFilterQueryTree(brokerRequest, optimizationFlags);
 
     return brokerRequest;
   }
@@ -45,7 +46,7 @@ public class BrokerRequestOptimizer {
    * Optimizes the filter query tree of a broker request in place.
    * @param brokerRequest The broker request to optimize
    */
-  private void optimizeFilterQueryTree(BrokerRequest brokerRequest) {
+  private void optimizeFilterQueryTree(BrokerRequest brokerRequest, OptimizationFlags optimizationFlags) {
     FilterQueryTree filterQueryTree = null;
     FilterQuery q = brokerRequest.getFilterQuery();
 
@@ -55,8 +56,18 @@ public class BrokerRequestOptimizer {
 
     filterQueryTree = RequestUtils.buildFilterQuery(q.getId(), brokerRequest.getFilterSubQueryMap().getFilterQueryMap());
 
-    for (FilterQueryTreeOptimizer filterQueryTreeOptimizer : FILTER_QUERY_TREE_OPTIMIZERS) {
-      filterQueryTree = filterQueryTreeOptimizer.optimize(filterQueryTree);
+    if (optimizationFlags == null) {
+      for (FilterQueryTreeOptimizer filterQueryTreeOptimizer : FILTER_QUERY_TREE_OPTIMIZERS) {
+        filterQueryTree = filterQueryTreeOptimizer.optimize(filterQueryTree);
+      }
+    } else {
+      if (optimizationFlags.isOptimizationEnabled("filterQueryTree")) {
+        for (FilterQueryTreeOptimizer filterQueryTreeOptimizer : FILTER_QUERY_TREE_OPTIMIZERS) {
+          if (optimizationFlags.isOptimizationEnabled(filterQueryTreeOptimizer.getOptimizationName())) {
+            filterQueryTree = filterQueryTreeOptimizer.optimize(filterQueryTree);
+          }
+        }
+      }
     }
 
     RequestUtils.generateFilterFromTree(filterQueryTree, brokerRequest);

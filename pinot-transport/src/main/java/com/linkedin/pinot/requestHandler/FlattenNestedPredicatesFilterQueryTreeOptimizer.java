@@ -27,7 +27,7 @@ import java.util.List;
  * Optimizer that flattens nested logical operators of the same kind. For example, AND( a, AND (b, c)) is the same as
  * AND(a, b, c).
  */
-public class FlattenNestedPredicatesFilterQueryTreeOptimizer implements FilterQueryTreeOptimizer {
+public class FlattenNestedPredicatesFilterQueryTreeOptimizer extends FilterQueryTreeOptimizer {
   public static int MAX_OPTIMIZING_DEPTH = 5;
 
   @Override

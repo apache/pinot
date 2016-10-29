@@ -22,6 +22,12 @@ import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 /**
  * Interface for optimizations that can be done on the FilterQueryTree of a query.
  */
-public interface FilterQueryTreeOptimizer {
-  FilterQueryTree optimize(FilterQueryTree filterQueryTree);
+public abstract class FilterQueryTreeOptimizer {
+  private final String _optimizationName = OptimizationFlags.optimizationName(this.getClass());
+
+  public abstract FilterQueryTree optimize(FilterQueryTree filterQueryTree);
+
+  public String getOptimizationName() {
+    return _optimizationName;
+  }
 }

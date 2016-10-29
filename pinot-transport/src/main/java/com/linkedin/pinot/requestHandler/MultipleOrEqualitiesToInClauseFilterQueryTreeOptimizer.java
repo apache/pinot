@@ -35,7 +35,7 @@ import java.util.TreeSet;
  * Optimizer that collapses multiple OR clauses to IN clauses. For example, <code>a = 1 OR a = 2 OR a =
  * 3</code> gets turned to <code>a IN (1, 2, 3)</code>.
  */
-public class MultipleOrEqualitiesToInClauseFilterQueryTreeOptimizer implements FilterQueryTreeOptimizer {
+public class MultipleOrEqualitiesToInClauseFilterQueryTreeOptimizer extends FilterQueryTreeOptimizer {
   @Override
   public FilterQueryTree optimize(FilterQueryTree filterQueryTree) {
     return optimize(filterQueryTree, null);
