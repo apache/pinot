@@ -1,7 +1,7 @@
 function getHeatmap(tab) {
 
     var url = "/dashboard/data/heatmap?" + window.location.hash.substring(1);
-    getData(url, tab).done(function (data) {
+    getData(url, tab).done(function (heatMapData) {
 
         var templatePlaceHolder;
         switch(tab){
@@ -12,15 +12,38 @@ function getHeatmap(tab) {
                 templatePlaceHolder = $("#" + tab + "-display-chart-section")
         }
 
-        renderD3heatmap(data, tab, templatePlaceHolder);
+        renderD3heatmap(heatMapData, tab, templatePlaceHolder);
 
         heatMapEventListeners(tab);
+        hideLoader(tab);
 
+        var summaryUrl = "/dashboard/summary/autoDimensionOrder?" +
+            "dataset=" + hash.dataset +
+            "&baselineStart=" + hash.baselineStart +
+            "&baselineEnd=" + hash.baselineEnd +
+            "&currentStart=" + hash.currentStart +
+            "&currentEnd=" + hash.currentEnd +
+            "&dimensions=" + hash.dimensions +
+            "&topDimensions=3" +
+            "&oneSideError=true" +
+            "&summarySize=10" +
+            "&hierarchies=[[\"browser_name\", \"browser_version\"],[\"continent\",\"countryCode\"]]"
+        var metrics = hash.metrics.split(",")
+        for (var index = 0, len = metrics.length; index < len; index++) {
+            getSummaryData(summaryUrl, tab)
+        }
+
+        function getSummaryData(summaryUrl, tab){
+            summaryUrl += "&metric=" + metrics[index];
+            getDataCustomCallback(summaryUrl, tab).done(function (data) {
+                var summaryData = data;
+                renderHeatMapSummary(summaryData);
+            })
+        }
     });
 };
 
 function renderD3heatmap(data, tab, templatePlaceHolder) {
-
     //Error handling when data is falsy (empty, undefined or null)
     if (!data) {
         $("#" + tab + "-chart-area-error").empty()
@@ -34,8 +57,8 @@ function renderD3heatmap(data, tab, templatePlaceHolder) {
     }
 
     /* Handelbars template for treemap table */
-
-    var result_treemap_template = HandleBarsTemplates.template_treemap(data)
+    var templateData = {heatMapData : data}
+    var result_treemap_template = HandleBarsTemplates.template_treemap(templateData)
     templatePlaceHolder.html(result_treemap_template);
 
     //var invertColorMetrics
@@ -43,7 +66,7 @@ function renderD3heatmap(data, tab, templatePlaceHolder) {
     var baseForGtZero = 'rgba(0,0,255,'; //gt zero is default blue
     var invertColorMetrics = window.datasetConfig.invertColorMetrics;
 
-    var numMetrics = data["metrics"].length
+    var numMetrics = data["metrics"].length;
     for (var m = 0; m < numMetrics; m++) {
         var metric = data["metrics"][m];
 
@@ -130,7 +153,6 @@ function renderD3heatmap(data, tab, templatePlaceHolder) {
             var placeholder_0 = '#metric_' + metric + '_dim_' + d + '_treemap_0'
             var placeholder_1 = '#metric_' + metric + '_dim_' + d + '_treemap_1'
             var placeholder_2 = '#metric_' + metric + '_dim_' + d + '_treemap_2'
-
 
             var mousemove = function (d) {
 
@@ -263,7 +285,28 @@ function renderD3heatmap(data, tab, templatePlaceHolder) {
             drawTreemap(root_2, placeholder_2)
 
         }
+
     }
+}
+
+function renderHeatMapSummary(summaryData){
+
+    if (summaryData.responseRows == 0) {
+
+        var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' })
+        warning.append($('<p></p>', { html: 'There is no data available for this request.'  }))
+        $("#difference-summary" + summaryData.metricName).html(warning)
+        return
+    }
+
+    var data = {summaryData : summaryData}
+    var result_treemap_summary_template = HandleBarsTemplates.template_treemap_summary(data)
+    $("#difference-summary-" + summaryData.metricName).html(result_treemap_summary_template);
+
+    //Create dataTable instance of summary table
+    $("#heat-map-" + summaryData.metricName +"-difference-summary-table").DataTable({
+        "bSort" : false
+    });
 }
 
 function heatMapEventListeners(tab) {
@@ -324,4 +367,5 @@ function heatMapEventListeners(tab) {
             window.location.hash = encodeHashParameters(hash);
         }
     })
+
 }

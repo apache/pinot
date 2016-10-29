@@ -49,6 +49,7 @@
 <#include "tabs/compare-tab/metric-timeseries.ftl">
 <#include "tabs/compare-tab/tabular.ftl">
 <#include "tabs/compare-tab/heat-map.ftl">
+<#include "tabs/compare-tab/heat-map-summary.ftl">
 <#include "tabs/compare-tab/contributors.ftl">
 <#include "tabs/timeseries-tab/timeseries.ftl">
 <#include "tabs/anomalies-tab/anomalies.ftl">
@@ -58,6 +59,7 @@
 <#include "tabs/self-service-tab/self-service-existing-functions.ftl">
 <#include "tabs/self-service-tab/self-service-email.ftl">
 <#include "tabs/experimental/analyze-job.ftl">
+
 
 </body>
 

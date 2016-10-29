@@ -837,6 +837,21 @@ body a{
     cursor: pointer;
 }
 
+/* Heat-map summary related */
+.difference-summary{
+    position: relative;
+}
+
+.summary-header {
+    word-break: normal;
+    text-align: right;
+    font-size: 12px;
+
+}
+
+.thin-column{
+    width: 6rem;
+}
 
 
 /* Dashboard view related */
