@@ -188,13 +188,29 @@ public class HelixBrokerStarter {
     return brokerServerBuilder;
   }
 
-  private String getZkAddressForBroker(String zkServers, String helixClusterName) {
+  /**
+   * The zk string format should be 127.0.0.1:3000,127.0.0.1:3001/app/a which applies
+   * the /helixClusterName/PROPERTY_STORE after chroot to all servers.
+   * Expected output for this method is:
+   * 127.0.0.1:3000/app/a/helixClusterName/PROPERTY_STORE,127.0.0.1:3001/app/a/helixClusterName/PROPERTY_STORE
+   *
+   * @param zkServers
+   * @param helixClusterName
+   * @return the full property store path
+   *
+   * @see org.apache.zookeeper.Zookeeper#Zookeeper(String, int, org.apache.zookeeper.Watcher)
+   */
+  public static String getZkAddressForBroker(String zkServers, String helixClusterName) {
     List tokens = new ArrayList<String>();
-
-    for (String token : zkServers.split(",")) {
-      tokens.add(StringUtil.join("/", StringUtils.chomp(token, "/"), helixClusterName, PROPERTY_STORE));
+    String[] zkSplit = zkServers.split("/", 2);
+    String zkHosts = zkSplit[0];
+    String zkPathSuffix = StringUtil.join("/", helixClusterName, PROPERTY_STORE);
+    if (zkSplit.length > 1) {
+      zkPathSuffix = zkSplit[1] + "/" + zkPathSuffix;
     }
-
+    for (String token : zkHosts.split(",")) {
+      tokens.add(StringUtil.join("/", StringUtils.chomp(token, "/"), zkPathSuffix));
+    }
     return StringUtils.join(tokens, ",");
   }
 
