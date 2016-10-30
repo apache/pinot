@@ -18,6 +18,7 @@ package com.linkedin.pinot.core.data.readers;
 import com.linkedin.pinot.core.data.extractors.FieldExtractor;
 import com.linkedin.pinot.core.data.extractors.FieldExtractorFactory;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import java.io.File;
 
 
 public class RecordReaderFactory {
@@ -35,6 +36,8 @@ public class RecordReaderFactory {
 
     } else if (segmentCreationSpec.getFormat() == FileFormat.JSON) {
       return new JSONRecordReader(segmentCreationSpec.getInputFilePath(), segmentCreationSpec.getSchema());
+    } else if (segmentCreationSpec.getFormat() == FileFormat.PINOT) {
+      return new PinotSegmentRecordReader(new File(segmentCreationSpec.getInputFilePath()));
     }
 
     throw new UnsupportedOperationException("Unsupported input format: " + segmentCreationSpec.getFormat());

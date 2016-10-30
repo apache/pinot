@@ -175,7 +175,6 @@ public class SegmentGeneratorConfig {
     Preconditions.checkNotNull(inputFilePath);
     File inputFile = new File(inputFilePath);
     Preconditions.checkState(inputFile.exists(), "Input path {} does not exist.", inputFilePath);
-    Preconditions.checkState(inputFile.isFile(), "Input path {} is not a file.", inputFilePath);
     _inputFilePath = inputFile.getAbsolutePath();
   }
 
