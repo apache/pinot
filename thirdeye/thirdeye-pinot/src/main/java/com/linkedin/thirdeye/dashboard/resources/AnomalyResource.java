@@ -4,7 +4,6 @@ import com.linkedin.thirdeye.anomaly.detection.TimeSeriesUtil;
 import com.linkedin.thirdeye.anomaly.views.AnomalyTimelinesView;
 import com.linkedin.thirdeye.anomaly.views.function.AnomalyTimeSeriesView;
 import com.linkedin.thirdeye.anomaly.views.function.AnomalyTimeSeriesViewFactory;
-import com.linkedin.thirdeye.anomaly.views.function.AnomalyTimeSeriesViewUtils;
 import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
@@ -597,9 +596,9 @@ public class AnomalyResource {
       }
 
       return anomalyTimelinesView;
+    } else {
+      return new AnomalyTimelinesView();
     }
-
-    return null;
   }
 
 }
