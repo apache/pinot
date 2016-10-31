@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.anomaly.alert;
 
 import com.linkedin.thirdeye.api.DimensionMap;
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.net.URLEncoder;
@@ -18,7 +19,7 @@ import java.util.TreeMap;
 import java.util.stream.Collectors;
 
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.commons.mail.EmailException;
 import org.apache.commons.mail.HtmlEmail;
@@ -54,8 +55,9 @@ import freemarker.template.TemplateScalarModel;
 public class AlertTaskRunner implements TaskRunner {
 
   private static final Logger LOG = LoggerFactory.getLogger(AlertTaskRunner.class);
-  private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE =
-      ThirdEyeCacheRegistry.getInstance();
+  private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
+  private static final String DIMENSION_VALUE_SEPARATOR = ", ";
+  private static final String EQUALS = "=";
 
   private MergedAnomalyResultManager anomalyMergedResultDAO;
   private DatasetConfigManager datasetConfigDAO;
@@ -140,10 +142,7 @@ public class AlertTaskRunner implements TaskRunner {
     //        EmailHelper.writeTimeSeriesChart(alertConfig, timeOnTimeComparisonHandler, windowStart, windowEnd,
     //            collection, anomaliesWithLabels);
 
-    // get dimensions for rendering
-    List<String> dimensionNames = datasetConfigDAO.findByDataset(collection).getDimensions();
-
-    sendAlertForAnomalies(collection, results, groupedResults, dimensionNames);
+    sendAlertForAnomalies(collection, results, groupedResults);
     updateNotifiedStatus(results);
   }
 
@@ -168,7 +167,7 @@ public class AlertTaskRunner implements TaskRunner {
   }
 
   private void sendAlertForAnomalies(String collectionAlias, List<MergedAnomalyResultDTO> results,
-      Map<DimensionMap, List<MergedAnomalyResultDTO>> groupedResults, List<String> dimensionNames)
+      Map<DimensionMap, List<MergedAnomalyResultDTO>> groupedResults)
       throws JobExecutionException {
 
     long anomalyStartMillis = 0;
@@ -210,12 +209,11 @@ public class AlertTaskRunner implements TaskRunner {
         functionTypes.add(spec.getType());
       }
 
-      templateData.put("groupedAnomalyResults", groupedResults);
+      templateData.put("groupedAnomalyResults", convertToStringKeyBasedMap(groupedResults));
       templateData.put("anomalyCount", anomalyResultSize);
       templateData.put("startTime", anomalyStartMillis);
       templateData.put("endTime", anomalyEndMillis);
       templateData.put("reportGenerationTimeMillis", System.currentTimeMillis());
-      templateData.put("assignedDimensions", new AssignedDimensionsMethod(dimensionNames));
       templateData.put("dateFormat", dateFormatMethod);
       templateData.put("timeZone", timeZone);
       // http://stackoverflow.com/questions/13339445/feemarker-writing-images-to-html
@@ -246,48 +244,48 @@ public class AlertTaskRunner implements TaskRunner {
     LOG.info("Sent email with {} anomalies! {}", results.size(), alertConfig);
   }
 
+  /**
+   * Convert a map of "dimension map to merged anomalies" to a map of "human readable dimension string to merged
+   * anomalies".
+   *
+   * The dimension map is converted as follows. Assume that we have a dimension map (in Json string):
+   * {"country"="US","page_name"="front_page'}, then it is converted to this String: "country=US, page_name=front_page".
+   *
+   * @param groupedResults a map of dimensionMap to a group of merged anomaly results
+   * @return a map of "human readable dimension string to merged anomalies"
+   */
+  private Map<String, List<MergedAnomalyResultDTO>> convertToStringKeyBasedMap(
+      Map<DimensionMap, List<MergedAnomalyResultDTO>> groupedResults) {
+    // Sorted by dimension name and value pairs
+    Map<String, List<MergedAnomalyResultDTO>> freemarkerGroupedResults = new TreeMap<>();
+
+    if (MapUtils.isNotEmpty(groupedResults)) {
+      for (Map.Entry<DimensionMap, List<MergedAnomalyResultDTO>> entry : groupedResults.entrySet()) {
+        DimensionMap dimensionMap = entry.getKey();
+        String dimensionMapString;
+        if (MapUtils.isNotEmpty(dimensionMap)) {
+          StringBuilder sb = new StringBuilder();
+          String dimensionValueSeparator = "";
+          for (Map.Entry<String, String> dimensionMapEntry : dimensionMap.entrySet()) {
+            sb.append(dimensionValueSeparator).append(dimensionMapEntry.getKey());
+            sb.append(EQUALS).append(dimensionMapEntry.getValue());
+            dimensionValueSeparator = DIMENSION_VALUE_SEPARATOR;
+          }
+          dimensionMapString = sb.toString();
+        } else {
+          dimensionMapString = "ALL";
+        }
+        freemarkerGroupedResults.put(dimensionMapString, entry.getValue());
+      }
+    }
+
+    return freemarkerGroupedResults;
+  }
+
   private void updateNotifiedStatus(List<MergedAnomalyResultDTO> mergedResults) {
     for (MergedAnomalyResultDTO mergedResult : mergedResults) {
       mergedResult.setNotified(true);
       anomalyMergedResultDAO.update(mergedResult);
-    }
-  }
-
-  private class AssignedDimensionsMethod implements TemplateMethodModelEx {
-    private static final String UNASSIGNED_DIMENSION_VALUE = "*";
-    private static final String DIMENSION_VALUE_SEPARATOR = ",";
-    private static final String EQUALS = "=";
-    private final List<String> dimensionNames;
-
-    public AssignedDimensionsMethod(List<String> dimensionNames) {
-      this.dimensionNames = dimensionNames;
-    }
-
-    @Override
-    public Object exec(@SuppressWarnings("rawtypes") List arguments) throws TemplateModelException {
-      if (arguments.size() != 1) {
-        throw new TemplateModelException(
-            "Wrong arguments, expected single comma-separated dimension string");
-      }
-      TemplateScalarModel tsm = (TemplateScalarModel) arguments.get(0);
-      String dimensions = tsm.getAsString();
-      String[] split = dimensions.split(DIMENSION_VALUE_SEPARATOR, dimensionNames.size());
-      // TODO decide what to do if split.length doesn't match up, ie schema has changed
-      List<String> assignments = new ArrayList<>();
-      for (int i = 0; i < split.length; i++) {
-        String value = split[i];
-        if (!value.equals(UNASSIGNED_DIMENSION_VALUE)) { // TODO figure out actual constant /
-          // rewrite function API to only
-          // return assignments.
-          String dimension = dimensionNames.get(i);
-          assignments.add(dimension + EQUALS + value);
-        }
-      }
-      if (assignments.isEmpty()) {
-        return "ALL"; // TODO determine final message for no assigned dimensions
-      } else {
-        return StringUtils.join(assignments, DIMENSION_VALUE_SEPARATOR);
-      }
     }
   }
 

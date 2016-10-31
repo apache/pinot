@@ -29,9 +29,9 @@
           <th>Function</th>
         </tr>
         <#assign anomalySequenceIndex = 1>
-        <#list groupedAnomalyResults?keys as dimensionKey>
-          <#assign results = groupedAnomalyResults[dimensionKey]>
-          <#assign dimensionStr = assignedDimensions(dimensionKey)>
+        <#list groupedAnomalyResults?keys as dimensionMap>
+          <#assign results = groupedAnomalyResults[dimensionMap]>
+          <#assign dimensionStr = dimensionMap>
           <#list results as r>
             <tr>
               <#if r == results?first>

@@ -36,15 +36,16 @@ public class EntityMappingHolder {
     boolean foundTable = false;
     for (String tableNamePattern : new String[] {tableName.toLowerCase(),
         tableName.toUpperCase()}) {
-      ResultSet rs =
-          databaseMetaData.getColumns(catalog, schemaPattern, tableNamePattern, columnNamePattern);
-      while (rs.next()) {
-        foundTable = true;
-        String columnName = rs.getString(4);
-        ColumnInfo columnInfo = new ColumnInfo();
-        columnInfo.columnNameInDB = columnName.toLowerCase();
-        columnInfo.sqlType = rs.getInt(5);
-        columnInfoMap.put(columnName.toLowerCase(), columnInfo);
+      try (ResultSet rs =
+          databaseMetaData.getColumns(catalog, schemaPattern, tableNamePattern, columnNamePattern)) {
+        while (rs.next()) {
+          foundTable = true;
+          String columnName = rs.getString(4);
+          ColumnInfo columnInfo = new ColumnInfo();
+          columnInfo.columnNameInDB = columnName.toLowerCase();
+          columnInfo.sqlType = rs.getInt(5);
+          columnInfoMap.put(columnName.toLowerCase(), columnInfo);
+        }
       }
     }
     if (!foundTable) {
