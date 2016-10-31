@@ -251,7 +251,7 @@ public class AlertTaskRunner implements TaskRunner {
    * The dimension map is converted as follows. Assume that we have a dimension map (in Json string):
    * {"country"="US","page_name"="front_page'}, then it is converted to this String: "country=US, page_name=front_page".
    *
-   * @param groupedResults a map from dimension key to a group of merged anomaly results
+   * @param groupedResults a map of dimensionMap to a group of merged anomaly results
    * @return a map of "human readable dimension string to merged anomalies"
    */
   private Map<String, List<MergedAnomalyResultDTO>> convertToStringKeyBasedMap(
