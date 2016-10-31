@@ -7,9 +7,11 @@ import com.linkedin.thirdeye.dashboard.resources.AnomalyFunctionResource;
 import com.linkedin.thirdeye.dashboard.resources.AnomalyResource;
 import com.linkedin.thirdeye.dashboard.resources.CacheResource;
 import com.linkedin.thirdeye.dashboard.resources.DashboardResource;
+import com.linkedin.thirdeye.dashboard.resources.DatasetConfigResource;
 import com.linkedin.thirdeye.dashboard.resources.EmailResource;
 import com.linkedin.thirdeye.dashboard.resources.EntityManagerResource;
 import com.linkedin.thirdeye.dashboard.resources.IngraphMetricConfigResource;
+import com.linkedin.thirdeye.dashboard.resources.MetricConfigResource;
 import com.linkedin.thirdeye.dashboard.resources.SummaryResource;
 import io.dropwizard.assets.AssetsBundle;
 import io.dropwizard.setup.Bootstrap;
@@ -53,6 +55,8 @@ public class ThirdEyeDashboardApplication
     env.jersey().register(new EmailResource());
     env.jersey().register(new EntityManagerResource());
     env.jersey().register(new IngraphMetricConfigResource());
+    env.jersey().register(new MetricConfigResource());
+    env.jersey().register(new DatasetConfigResource());
     env.jersey().register(new SummaryResource());
   }
 
