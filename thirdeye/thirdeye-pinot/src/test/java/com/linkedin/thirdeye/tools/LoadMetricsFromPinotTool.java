@@ -261,7 +261,7 @@ public class LoadMetricsFromPinotTool {
       MetricConfigDTO metricConfigDTO = new MetricConfigDTO();
       String metric = metricFieldSpec.getName();
       metricConfigDTO.setName(metric);
-      metricConfigDTO.setAlias(metric);
+      metricConfigDTO.setAlias(ThirdEyeUtils.constructMetricAlias(dataset, metric));
       metricConfigDTO.setDataset(dataset);
       metricConfigDTO.setDatatype(MetricType.valueOf(metricFieldSpec.getDataType().toString()));
       if (collectionConfig != null) {
@@ -295,7 +295,7 @@ public class LoadMetricsFromPinotTool {
           MetricConfigDTO metricConfigDTO = new MetricConfigDTO();
           String metric = entry.getKey();
           metricConfigDTO.setName(metric);
-          metricConfigDTO.setAlias(metric);
+          metricConfigDTO.setAlias(ThirdEyeUtils.constructMetricAlias(dataset, metric));
           metricConfigDTO.setDataset(dataset);
           metricConfigDTO.setDatatype(MetricType.DOUBLE);
           if (CollectionUtils.isNotEmpty(collectionConfig.getInvertColorMetrics())
@@ -418,7 +418,7 @@ public class LoadMetricsFromPinotTool {
       MetricConfigDTO metricConfigDTO = new MetricConfigDTO();
       String metric = metricFieldSpec.getName();
       metricConfigDTO.setName(metric);
-      metricConfigDTO.setAlias(metric);
+      metricConfigDTO.setAlias(ThirdEyeUtils.constructMetricAlias(dataset, metric));
       metricConfigDTO.setDataset(dataset);
       metricConfigDTO.setDatatype(metricFieldSpec.getType());
       if (CollectionUtils.isNotEmpty(collectionConfig.getInvertColorMetrics())

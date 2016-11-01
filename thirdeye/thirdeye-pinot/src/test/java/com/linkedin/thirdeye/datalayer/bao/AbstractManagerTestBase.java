@@ -29,6 +29,7 @@ import com.linkedin.thirdeye.datalayer.dto.JobDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.util.ManagerProvider;
+import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 public abstract class AbstractManagerTestBase {
   protected AnomalyFunctionManager anomalyFunctionDAO;
@@ -222,7 +223,7 @@ public abstract class AbstractManagerTestBase {
     metricConfigDTO.setDataset(collection);
     metricConfigDTO.setDatatype(MetricType.LONG);
     metricConfigDTO.setName(metric);
-    metricConfigDTO.setAlias(metric);
+    metricConfigDTO.setAlias(ThirdEyeUtils.constructMetricAlias(collection, metric));
     return metricConfigDTO;
   }
 }

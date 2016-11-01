@@ -11,6 +11,7 @@ public class MetricConfigBean extends AbstractBean {
 
   public static double DEFAULT_THRESHOLD = 0.01;
   public static String DERIVED_METRIC_ID_PREFIX = "id";
+  public static final String ALIAS_JOINER = "::";
 
   private String name;
 

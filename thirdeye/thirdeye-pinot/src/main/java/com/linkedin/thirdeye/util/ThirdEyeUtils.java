@@ -295,4 +295,9 @@ public abstract class ThirdEyeUtils {
     return schema;
   }
 
+  public static String constructMetricAlias(String datasetName, String metricName) {
+    String alias = datasetName + MetricConfigBean.ALIAS_JOINER + metricName;
+    return alias;
+  }
+
 }

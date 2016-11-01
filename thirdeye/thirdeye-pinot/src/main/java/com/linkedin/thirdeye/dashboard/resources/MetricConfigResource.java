@@ -12,9 +12,6 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 
-import org.codehaus.jackson.JsonNode;
-import org.codehaus.jackson.map.ObjectMapper;
-import org.codehaus.jackson.node.ArrayNode;
 import org.codehaus.jackson.node.ObjectNode;
 
 import com.linkedin.thirdeye.api.MetricType;
@@ -22,6 +19,7 @@ import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.util.JsonResponseUtil;
+import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 @Path(value = "/thirdeye-admin/metric-config")
 @Produces(MediaType.APPLICATION_JSON)
@@ -38,7 +36,7 @@ public class MetricConfigResource {
 
   @GET
   @Path("/create")
-  public String createMetricConfig(@QueryParam("dataset") String dataset, @QueryParam("name") String name, @QueryParam("alias") String alias,
+  public String createMetricConfig(@QueryParam("dataset") String dataset, @QueryParam("name") String name,
       @QueryParam("metricType") String metricType, @QueryParam("active") boolean active, @QueryParam("derived") boolean derived,
       @QueryParam("derivedMetricExpression") String derivedMetricExpression, @QueryParam("inverseMetric") boolean inverseMetric,
       @QueryParam("cellSizeExpression") String cellSizeExpression, @QueryParam("rollupThreshold") Double rollupThreshold) {
@@ -46,7 +44,7 @@ public class MetricConfigResource {
       MetricConfigDTO metricConfigDTO = new MetricConfigDTO();
       metricConfigDTO.setDataset(dataset);
       metricConfigDTO.setName(name);
-      metricConfigDTO.setAlias(alias);
+      metricConfigDTO.setAlias(ThirdEyeUtils.constructMetricAlias(dataset, name));
       metricConfigDTO.setDatatype(MetricType.valueOf(metricType));
       metricConfigDTO.setActive(active);
       metricConfigDTO.setDerived(derived);
@@ -66,7 +64,7 @@ public class MetricConfigResource {
   @GET
   @Path("/update")
   public String updateMetricConfig(@NotNull @QueryParam("id") long metricConfigId, @QueryParam("dataset") String dataset, @QueryParam("name") String name,
-      @QueryParam("alias") String alias, @QueryParam("metricType") String metricType, @QueryParam("active") boolean active,
+      @QueryParam("metricType") String metricType, @QueryParam("active") boolean active,
       @QueryParam("derived") boolean derived, @QueryParam("derivedMetricExpression") String derivedMetricExpression,
       @QueryParam("inverseMetric") boolean inverseMetric, @QueryParam("cellSizeExpression") String cellSizeExpression,
       @QueryParam("rollupThreshold") Double rollupThreshold) {
@@ -75,7 +73,7 @@ public class MetricConfigResource {
       MetricConfigDTO metricConfigDTO = metricConfigDao.findById(metricConfigId);
       metricConfigDTO.setDataset(dataset);
       metricConfigDTO.setName(name);
-      metricConfigDTO.setAlias(alias);
+      metricConfigDTO.setAlias(ThirdEyeUtils.constructMetricAlias(dataset, name));
       metricConfigDTO.setDatatype(MetricType.valueOf(metricType));
       metricConfigDTO.setActive(active);
       metricConfigDTO.setDerived(derived);
@@ -113,5 +111,5 @@ public class MetricConfigResource {
     return rootNode.toString();
   }
 
-  
+
 }
