@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.dashboard;
 import com.linkedin.thirdeye.anomaly.views.function.AnomalyTimeSeriesViewFactory;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
+import com.linkedin.thirdeye.dashboard.resources.AdminResource;
 import com.linkedin.thirdeye.dashboard.resources.AnomalyFunctionResource;
 import com.linkedin.thirdeye.dashboard.resources.AnomalyResource;
 import com.linkedin.thirdeye.dashboard.resources.CacheResource;
@@ -57,6 +58,7 @@ public class ThirdEyeDashboardApplication
     env.jersey().register(new IngraphMetricConfigResource());
     env.jersey().register(new MetricConfigResource());
     env.jersey().register(new DatasetConfigResource());
+    env.jersey().register(new AdminResource());
     env.jersey().register(new SummaryResource());
   }
 
