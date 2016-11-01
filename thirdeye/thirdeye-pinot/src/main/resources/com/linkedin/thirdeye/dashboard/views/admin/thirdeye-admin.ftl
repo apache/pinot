@@ -19,6 +19,7 @@
 <script src="../../../assets/js/lib/ingraph-metric-config.js"></script>
 <script src="../../../assets/js/lib/metric-config.js"></script>
 <script src="../../../assets/js/lib/dataset-config.js"></script>
+<script src="../../../assets/js/lib/job-info.js"></script>
 
 <script type="text/javascript">
   $(document).ready(function() {
@@ -28,6 +29,9 @@
     
     var metric_config_template = $("#metric-config-template").html();
     metric_config_template_compiled = Handlebars.compile(metric_config_template);
+    
+    var job_info_template = $("#job-info-template").html();
+    job_info_template_compiled = Handlebars.compile(job_info_template);
     
     //register callbacks on tabs
     $('a[data-toggle="tab"]').on('shown.bs.tab', function (e) {
@@ -44,8 +48,10 @@
       if(tabId == "#dataset-config"){
       	listDatasetConfigs();
       }
+      if(tabId == "#job-info"){
+      	listJobs();
+      }
     })
-    
   });
 </script>
 </head>
@@ -55,8 +61,8 @@
 			<li class=""><a href="#ingraph-config" data-toggle="tab">Ingraph Metric</a></li>
 			<li class=""><a href="#dataset-config" data-toggle="tab">Dataset </a></li>
 			<li class=""><a href="#metric-config" data-toggle="tab">Metric</a></li>
+			<li class=""><a href="#job-info" data-toggle="tab">JobInfo</a></li>
 		</ul>
-
 		<div class="tab-content">
 			<div class="tab-pane" id="ingraph-config">
 			   <#include "ingraph-metric-config.ftl">
@@ -69,6 +75,10 @@
 			<div class="tab-pane" id="metric-config">
    			   <#include "metric-config.ftl">
 			   <div id="metric-config-place-holder"></div>
+			</div>
+			<div class="tab-pane" id="job-info">
+				<#include "job-info.ftl">
+			   <div id="job-info-place-holder"></div>
 			</div>
 		</div>
 	</div>
