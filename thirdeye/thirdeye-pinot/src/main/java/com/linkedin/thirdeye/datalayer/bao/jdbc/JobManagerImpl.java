@@ -57,7 +57,7 @@ public class JobManagerImpl extends AbstractManagerImpl<JobDTO> implements JobMa
 
   @Override
   public List<JobDTO> findNRecentJobs(int n) {
-    String parameterizedSQL = "order by startTime desc limit "+n;
+    String parameterizedSQL = "order by scheduleStartTime desc limit "+n;
     HashMap<String, Object> parameterMap = new HashMap<>();
     List<JobBean> list = genericPojoDao.executeParameterizedSQL(parameterizedSQL, parameterMap, JobBean.class);
     List<JobDTO> ret = new ArrayList<>();
