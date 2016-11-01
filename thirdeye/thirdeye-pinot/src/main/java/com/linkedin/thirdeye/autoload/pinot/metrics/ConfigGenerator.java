@@ -13,6 +13,7 @@ import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.IngraphMetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.pojo.DashboardConfigBean;
+import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 public class ConfigGenerator {
 
@@ -51,7 +52,7 @@ public class ConfigGenerator {
     MetricConfigDTO metricConfigDTO = new MetricConfigDTO();
     String metric = metricFieldSpec.getName();
     metricConfigDTO.setName(metric);
-    metricConfigDTO.setAlias(metric);
+    metricConfigDTO.setAlias(ThirdEyeUtils.constructMetricAlias(dataset, metric));
     metricConfigDTO.setDataset(dataset);
     metricConfigDTO.setDatatype(MetricType.valueOf(metricFieldSpec.getDataType().toString()));
     return metricConfigDTO;
@@ -60,7 +61,8 @@ public class ConfigGenerator {
   public static MetricConfigDTO generateIngraphMetricConfig(IngraphMetricConfigDTO ingraphMetricConfig) {
     MetricConfigDTO metricConfigDTO = new MetricConfigDTO();
     metricConfigDTO.setName(ingraphMetricConfig.getMetricAlias());
-    metricConfigDTO.setAlias(ingraphMetricConfig.getMetricAlias());
+    metricConfigDTO.setAlias(ThirdEyeUtils.constructMetricAlias(
+        ingraphMetricConfig.getDataset(), ingraphMetricConfig.getMetricAlias()));
     metricConfigDTO.setDataset(ingraphMetricConfig.getDataset());
     metricConfigDTO.setDatatype(MetricType.valueOf(ingraphMetricConfig.getMetricDataType()));
     return metricConfigDTO;

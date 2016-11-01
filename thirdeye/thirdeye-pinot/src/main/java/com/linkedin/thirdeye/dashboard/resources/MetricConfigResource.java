@@ -1,13 +1,11 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import javax.validation.constraints.NotNull;
-import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
@@ -21,6 +19,7 @@ import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.util.JsonResponseUtil;
+import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 @Path(value = "/thirdeye-admin/metric-config")
 @Produces(MediaType.APPLICATION_JSON)
@@ -36,7 +35,7 @@ public class MetricConfigResource {
 
   @GET
   @Path("/create")
-  public String createMetricConfig(@QueryParam("dataset") String dataset, @QueryParam("name") String name, @QueryParam("alias") String alias,
+  public String createMetricConfig(@QueryParam("dataset") String dataset, @QueryParam("name") String name,
       @QueryParam("metricType") String metricType, @QueryParam("active") boolean active, @QueryParam("derived") boolean derived,
       @QueryParam("functionType") String derivedFunctionType, @QueryParam("numerator") String numerator, @QueryParam("denominator") String denominator,
       @QueryParam("derivedMetricExpression") String derivedMetricExpression, @QueryParam("inverseMetric") boolean inverseMetric,
@@ -45,7 +44,7 @@ public class MetricConfigResource {
       MetricConfigDTO metricConfigDTO = new MetricConfigDTO();
       metricConfigDTO.setDataset(dataset);
       metricConfigDTO.setName(name);
-      metricConfigDTO.setAlias(alias);
+      metricConfigDTO.setAlias(ThirdEyeUtils.constructMetricAlias(dataset, name));
       metricConfigDTO.setDatatype(MetricType.valueOf(metricType));
       metricConfigDTO.setActive(active);
 
@@ -57,14 +56,11 @@ public class MetricConfigResource {
       // handle derived
       if (derived) {
         if (derivedMetricExpression == null && numerator != null && denominator != null) {
+          MetricConfigDTO numMetricConfigDTO = metricConfigDao.findByAliasAndDataset(numerator, dataset);
+          MetricConfigDTO denMetricConfigDTO = metricConfigDao.findByAliasAndDataset(denominator, dataset);
           if ("RATIO".equals(derivedFunctionType)) {
-            MetricConfigDTO numMetricConfigDTO = metricConfigDao.findByAliasAndDataset(numerator, dataset);
-            MetricConfigDTO denMetricConfigDTO = metricConfigDao.findByAliasAndDataset(denominator, dataset);
             derivedMetricExpression = String.format("id%s/id%s", numMetricConfigDTO.getId(), denMetricConfigDTO.getId());
-          }
-          if ("PERCENT".equals(derivedFunctionType)) {
-            MetricConfigDTO numMetricConfigDTO = metricConfigDao.findByAliasAndDataset(numerator, dataset);
-            MetricConfigDTO denMetricConfigDTO = metricConfigDao.findByAliasAndDataset(denominator, dataset);
+          } else if ("PERCENT".equals(derivedFunctionType)) {
             derivedMetricExpression = String.format("id%s*100/id%s", numMetricConfigDTO.getId(), denMetricConfigDTO.getId());
           }
         }
@@ -95,7 +91,7 @@ public class MetricConfigResource {
   @GET
   @Path("/update")
   public String updateMetricConfig(@NotNull @QueryParam("id") long metricConfigId, @QueryParam("dataset") String dataset, @QueryParam("name") String name,
-      @QueryParam("alias") String alias, @QueryParam("metricType") String metricType, @QueryParam("active") boolean active,
+      @QueryParam("metricType") String metricType, @QueryParam("active") boolean active,
       @QueryParam("derived") boolean derived, @QueryParam("derivedMetricExpression") String derivedMetricExpression,
       @QueryParam("inverseMetric") boolean inverseMetric, @QueryParam("cellSizeExpression") String cellSizeExpression,
       @QueryParam("rollupThreshold") Double rollupThreshold) {
@@ -104,7 +100,7 @@ public class MetricConfigResource {
       MetricConfigDTO metricConfigDTO = metricConfigDao.findById(metricConfigId);
       metricConfigDTO.setDataset(dataset);
       metricConfigDTO.setName(name);
-      metricConfigDTO.setAlias(alias);
+      metricConfigDTO.setAlias(ThirdEyeUtils.constructMetricAlias(dataset, name));
       metricConfigDTO.setDatatype(MetricType.valueOf(metricType));
       metricConfigDTO.setActive(active);
       metricConfigDTO.setDerived(derived);
