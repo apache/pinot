@@ -15,17 +15,35 @@ function showMetricDatasetSelection() {
       $("#metric-config-place-holder").html(result_metric_config_section);
       $("#metric-config-place-holder").show();
       $('#metric-dataset-selector').change(function() {
-        updateMetricConfigTable(this.value)
+        metrics = getMetricSet(this.value);
       })
     },
     error : function() {
       alert("Failed to load dataset list");
     }
   })
-
 }
 
-function updateMetricConfigTable(dataset) {
+function getMetricSet(dataset){
+  $.ajax({
+    type : "GET",
+    url : "/thirdeye-admin/metric-config/metrics?dataset=" + dataset,
+    data : "[]",
+    contentType : "application/json; charset=utf-8",
+    dataType : "json",
+    success : function(data) {
+      console.log(data["Records"])
+      updateMetricConfigTable(dataset, data["Records"])
+    },
+    error : function() {
+      alert("Failed to load dataset list");
+      return "[]";
+    }
+  })
+}
+function updateMetricConfigTable(dataset, metrics) {
+  console.log("metrics")
+  console.log(metrics)
   // hide all jtables
   $('.MetricConfigContainer').hide();
   // show the jtable for this dataset
@@ -63,7 +81,7 @@ function updateMetricConfigTable(dataset) {
       alias : {
         title : 'Alias'
       },
-      metricDataType : {
+      datatype : {
         title : 'Data Type',
         options : [ 'INT', 'LONG','FLOAT', 'DOUBLE' ]
       },
@@ -77,6 +95,21 @@ function updateMetricConfigTable(dataset) {
         defaultValue : false,
         options : [ false, true ]
       },
+      derivedFunctionType : {
+        title : 'FunctionType',
+        defaultValue : "---",
+        options : [ "PERCENT", "RATIO" ]
+      },
+      numerator : {
+        title : 'Numerator',
+        defaultValue : "---",
+        options : metrics
+      },
+      denominator : {
+        title : 'Denominator',
+        defaultValue : "---",
+        options : metrics
+      },
       derivedMetricExpression : {
         title : 'Expression'
       },
@@ -86,6 +119,10 @@ function updateMetricConfigTable(dataset) {
       },
       cellSizeExpression : {
         title : 'CellSize Expression',
+        visibility: 'hidden'
+      },
+      rollupThreshold : {
+        title : 'Rollup Threshold',
         visibility: 'hidden'
       }
     }

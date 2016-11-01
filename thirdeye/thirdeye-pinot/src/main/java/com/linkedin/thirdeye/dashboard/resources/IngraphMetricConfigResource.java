@@ -59,7 +59,7 @@ public class IngraphMetricConfigResource {
       int granularitySize = 5;
       String granularityUnit = "minutes";
       long numAvroRecords = 100;
-      long intervalPeriod = 3600;
+      long intervalPeriod = 3_600_000;
       ingraphMetricConfigDTO.setFabrics(fabrics);
       ingraphMetricConfigDTO.setGranularitySize(granularitySize);
       ingraphMetricConfigDTO.setGranularityUnit(granularityUnit);
