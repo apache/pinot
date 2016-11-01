@@ -96,6 +96,26 @@ function updateIngraphMetricConfigTable(dataset) {
             return moment(data.record.endTimeInMs).format('YYYY-MM-DD');
           return '';
         }
+      },
+      intervalPeriod : {
+        title : 'Interval Period',
+        visibility: 'hidden'
+      },
+      fabrics : {
+        title : 'Fabrics',
+        visibility: 'hidden'
+      },
+      granularitySize : {
+        title : 'Granularity Size',
+        visibility: 'hidden'
+      },
+      granularityUnit : {
+        title : 'Granularity Unit',
+        visibility: 'hidden'
+      },
+      numAvroRecords : {
+        title : 'Num Avro Records',
+        visibility: 'hidden'
       }
     }
   });

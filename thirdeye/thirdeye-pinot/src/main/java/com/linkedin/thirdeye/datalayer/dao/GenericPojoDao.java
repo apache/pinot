@@ -294,14 +294,12 @@ public class GenericPojoDao {
       }
     }, Collections.emptyList());
   }
-
   /**
    *
    * @param parameterizedSQL second part of the sql (omit select from table section)
    * @param parameterMap
    * @return
    */
-  @SuppressWarnings("unchecked")
   public <E extends AbstractBean> List<E> executeParameterizedSQL(String parameterizedSQL,
       Map<String, Object> parameterMap, Class<E> pojoClass) {
     return runTask(new QueryTask<List<E>>() {

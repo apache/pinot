@@ -1,7 +1,10 @@
 package com.linkedin.thirdeye.datalayer.bao.jdbc;
 
 import java.sql.Timestamp;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.joda.time.DateTime;
@@ -50,5 +53,18 @@ public class JobManagerImpl extends AbstractManagerImpl<JobDTO> implements JobMa
       deleteById(jobBean.getId());
     }
     return list.size();
+  }
+
+  @Override
+  public List<JobDTO> findNRecentJobs(int n) {
+    String parameterizedSQL = "order by startTime desc limit "+n;
+    HashMap<String, Object> parameterMap = new HashMap<>();
+    List<JobBean> list = genericPojoDao.executeParameterizedSQL(parameterizedSQL, parameterMap, JobBean.class);
+    List<JobDTO> ret = new ArrayList<>();
+    for(JobBean bean:list){
+      JobDTO dto = convertBean2DTO(bean, JobDTO.class);
+      ret.add(dto);
+    }
+    return ret;
   }
 }

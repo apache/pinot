@@ -1,20 +1,19 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import javax.validation.constraints.NotNull;
+import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 
-import org.codehaus.jackson.JsonNode;
-import org.codehaus.jackson.map.ObjectMapper;
-import org.codehaus.jackson.node.ArrayNode;
 import org.codehaus.jackson.node.ObjectNode;
 
 import com.linkedin.thirdeye.api.MetricType;
@@ -30,7 +29,6 @@ public class MetricConfigResource {
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
   private MetricConfigManager metricConfigDao;
-  SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
 
   public MetricConfigResource() {
     this.metricConfigDao = DAO_REGISTRY.getMetricConfigDAO();
@@ -40,6 +38,7 @@ public class MetricConfigResource {
   @Path("/create")
   public String createMetricConfig(@QueryParam("dataset") String dataset, @QueryParam("name") String name, @QueryParam("alias") String alias,
       @QueryParam("metricType") String metricType, @QueryParam("active") boolean active, @QueryParam("derived") boolean derived,
+      @QueryParam("functionType") String derivedFunctionType, @QueryParam("numerator") String numerator, @QueryParam("denominator") String denominator,
       @QueryParam("derivedMetricExpression") String derivedMetricExpression, @QueryParam("inverseMetric") boolean inverseMetric,
       @QueryParam("cellSizeExpression") String cellSizeExpression, @QueryParam("rollupThreshold") Double rollupThreshold) {
     try {
@@ -49,18 +48,48 @@ public class MetricConfigResource {
       metricConfigDTO.setAlias(alias);
       metricConfigDTO.setDatatype(MetricType.valueOf(metricType));
       metricConfigDTO.setActive(active);
-      metricConfigDTO.setDerived(derived);
-      metricConfigDTO.setDerivedMetricExpression(derivedMetricExpression);
+
       // optional ones
       metricConfigDTO.setCellSizeExpression(cellSizeExpression);
       metricConfigDTO.setInverseMetric(inverseMetric);
       metricConfigDTO.setRollupThreshold(rollupThreshold);
+
+      // handle derived
+      if (derived) {
+        if (derivedMetricExpression == null && numerator != null && denominator != null) {
+          if ("RATIO".equals(derivedFunctionType)) {
+            MetricConfigDTO numMetricConfigDTO = metricConfigDao.findByAliasAndDataset(numerator, dataset);
+            MetricConfigDTO denMetricConfigDTO = metricConfigDao.findByAliasAndDataset(denominator, dataset);
+            derivedMetricExpression = String.format("id%s/id%s", numMetricConfigDTO.getId(), denMetricConfigDTO.getId());
+          }
+          if ("PERCENT".equals(derivedFunctionType)) {
+            MetricConfigDTO numMetricConfigDTO = metricConfigDao.findByAliasAndDataset(numerator, dataset);
+            MetricConfigDTO denMetricConfigDTO = metricConfigDao.findByAliasAndDataset(denominator, dataset);
+            derivedMetricExpression = String.format("id%s*100/id%s", numMetricConfigDTO.getId(), denMetricConfigDTO.getId());
+          }
+        }
+        metricConfigDTO.setDerived(derived);
+        metricConfigDTO.setDerivedMetricExpression(derivedMetricExpression);
+      }
       Long id = metricConfigDao.save(metricConfigDTO);
       metricConfigDTO.setId(id);
       return JsonResponseUtil.buildResponseJSON(metricConfigDTO).toString();
     } catch (Exception e) {
       return JsonResponseUtil.buildErrorResponseJSON("Failed to create metric:" + name).toString();
     }
+  }
+
+  @GET
+  @Path("/metrics")
+  public String createMetricConfig(@NotNull @QueryParam("dataset") String dataset) {
+    Map<String, Object> filters = new HashMap<>();
+    filters.put("dataset", dataset);
+    List<MetricConfigDTO> metricConfigDTOs = metricConfigDao.findByParams(filters);
+    List<String> metrics = new ArrayList<>();
+    for (MetricConfigDTO metricConfigDTO : metricConfigDTOs) {
+      metrics.add(metricConfigDTO.getAlias());
+    }
+    return JsonResponseUtil.buildResponseJSON(metrics).toString();
   }
 
   @GET
@@ -113,5 +142,4 @@ public class MetricConfigResource {
     return rootNode.toString();
   }
 
-  
 }
