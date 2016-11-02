@@ -48,7 +48,7 @@ import com.linkedin.pinot.tools.admin.command.StreamAvroIntoKafkaCommand;
 import com.linkedin.pinot.tools.admin.command.UploadSegmentCommand;
 import com.linkedin.pinot.tools.admin.command.ValidateConfigCommand;
 import com.linkedin.pinot.tools.admin.command.VerifySegmentState;
-import com.linkedin.pinot.tools.segment.converter.PinotSegmentConverter;
+import com.linkedin.pinot.tools.segment.converter.PinotSegmentConvertCommand;
 
 
 /**
@@ -83,12 +83,13 @@ public class PinotAdministrator {
       @SubCommand(name = "ChangeNumReplicas", impl = ChangeNumReplicasCommand.class),
       @SubCommand(name = "ValidateConfig", impl = ValidateConfigCommand.class),
       @SubCommand(name = "VerifySegmentState", impl = VerifySegmentState.class),
-      @SubCommand(name = "PinotSegmentConverter", impl = PinotSegmentConverter.class)
+      @SubCommand(name = "ConvertPinotSegment", impl = PinotSegmentConvertCommand.class)
   })
   Command _subCommand;
   // @formatter:on
 
-  @Option(name = "-help", required = false, help = true, aliases={"-h", "--h", "--help"}, usage="Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
+      usage = "Print this message.")
   boolean _help = false;
   boolean _status = false;
 

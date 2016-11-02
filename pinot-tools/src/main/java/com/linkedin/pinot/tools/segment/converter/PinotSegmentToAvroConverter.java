@@ -15,107 +15,118 @@
  */
 package com.linkedin.pinot.tools.segment.converter;
 
-
-import java.io.File;
-
-import org.apache.avro.Schema;
-import org.apache.avro.SchemaBuilder;
-import org.apache.avro.SchemaBuilder.BaseFieldTypeBuilder;
-import org.apache.avro.SchemaBuilder.FieldAssembler;
-import org.apache.avro.SchemaBuilder.RecordBuilder;
-import org.apache.avro.file.DataFileWriter;
-import org.apache.avro.generic.GenericData;
-import org.apache.avro.generic.GenericDatumWriter;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.readers.PinotSegmentRecordReader;
+import java.io.File;
+import java.util.Arrays;
+import org.apache.avro.Schema;
+import org.apache.avro.SchemaBuilder;
+import org.apache.avro.SchemaBuilder.FieldAssembler;
+import org.apache.avro.file.DataFileWriter;
+import org.apache.avro.generic.GenericData.Record;
+import org.apache.avro.generic.GenericDatumWriter;
+
 
 /**
- * This converter converts a pinot segment to avro file
+ * The <code>PinotSegmentToAvroConverter</code> class is the tool to convert Pinot segment to AVRO format.
  */
-public class PinotSegmentToAvroConverter {
+public class PinotSegmentToAvroConverter implements PinotSegmentConverter {
+  private final String _segmentDir;
+  private final String _outputFile;
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(PinotSegmentToAvroConverter.class);
-  private static final String AVRO_FILE = "part-m-00000.avro";
-
-  private String segmentIndexDir;
-  private String outputDir;
-
-  public PinotSegmentToAvroConverter(String segmentIndexDir, String outputDir) {
-    this.segmentIndexDir = segmentIndexDir;
-    this.outputDir = outputDir;
+  public PinotSegmentToAvroConverter(String segmentDir, String outputFile) {
+    _segmentDir = segmentDir;
+    _outputFile = outputFile;
   }
 
-  public void convert() throws Exception {
+  @Override
+  public void convert()
+      throws Exception {
+    PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader(new File(_segmentDir));
+    try {
+      recordReader.init();
+      Schema avroSchema = buildAvroSchemaFromPinotSchema(recordReader.getSchema());
 
-    LOGGER.info("Reading segment dir {}", segmentIndexDir);
-    PinotSegmentRecordReader pinotSegmentRecordReader = new PinotSegmentRecordReader(new File(segmentIndexDir));
+      try (DataFileWriter<Record> recordWriter = new DataFileWriter<>(new GenericDatumWriter<Record>(avroSchema))) {
+        recordWriter.create(avroSchema, new File(_outputFile));
 
-    Schema avroSchema = constructAvroSchemaFromPinotSchema(pinotSegmentRecordReader.getSchema());
-    final GenericDatumWriter<GenericData.Record> datum = new GenericDatumWriter<GenericData.Record>(avroSchema);
-    DataFileWriter<GenericData.Record> recordWriter = new DataFileWriter<GenericData.Record>(datum);
-    recordWriter.create(avroSchema, new File(outputDir, AVRO_FILE));
+        while (recordReader.hasNext()) {
+          GenericRow row = recordReader.next();
+          Record record = new Record(avroSchema);
 
-    GenericData.Record outputRecord;
-    GenericRow row;
+          for (String field : row.getFieldNames()) {
+            Object value = row.getValue(field);
+            if (value instanceof Object[]) {
+              record.put(field, Arrays.asList((Object[]) value));
+            } else {
+              record.put(field, value);
+            }
+          }
 
-    pinotSegmentRecordReader.init();
-    while (pinotSegmentRecordReader.hasNext()) {
-      outputRecord = new GenericData.Record(avroSchema);
-      row = pinotSegmentRecordReader.next();
-      for (String fieldName : row.getFieldNames()) {
-        outputRecord.put(fieldName, row.getValue(fieldName));
+          recordWriter.append(record);
+        }
       }
-      recordWriter.append(outputRecord);
+    } finally {
+      recordReader.close();
     }
-
-    LOGGER.info("Writing to avro file at {}", outputDir);
-    pinotSegmentRecordReader.close();
-    recordWriter.close();
   }
 
-  private Schema constructAvroSchemaFromPinotSchema(com.linkedin.pinot.common.data.Schema schema) {
-    Schema avroSchema = null;
+  /**
+   * Helper method to build Avro schema from Pinot schema.
+   *
+   * @param pinotSchema Pinot schema.
+   * @return Avro schema.
+   */
+  private Schema buildAvroSchemaFromPinotSchema(com.linkedin.pinot.common.data.Schema pinotSchema) {
+    FieldAssembler<Schema> fieldAssembler = SchemaBuilder.record("record").fields();
 
-    RecordBuilder<Schema> recordBuilder = SchemaBuilder.record("record");
-    FieldAssembler<Schema> fieldAssembler = recordBuilder.fields();
-
-    for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
-      String fieldName = fieldSpec.getName();
+    for (FieldSpec fieldSpec : pinotSchema.getAllFieldSpecs()) {
       DataType dataType = fieldSpec.getDataType();
-      BaseFieldTypeBuilder<Schema> baseFieldTypeBuilder = fieldAssembler.name(fieldName).type().nullable();
-      switch (dataType) {
-        case BOOLEAN:
-          fieldAssembler = baseFieldTypeBuilder.booleanType().noDefault();
-          break;
-        case DOUBLE:
-          fieldAssembler = baseFieldTypeBuilder.doubleType().noDefault();
-          break;
-        case FLOAT:
-          fieldAssembler = baseFieldTypeBuilder.floatType().noDefault();
-          break;
-        case INT:
-          fieldAssembler = baseFieldTypeBuilder.intType().noDefault();
-          break;
-        case LONG:
-          fieldAssembler = baseFieldTypeBuilder.longType().noDefault();
-          break;
-        case STRING:
-          fieldAssembler = baseFieldTypeBuilder.stringType().noDefault();
-          break;
-        default:
-          break;
+      if (fieldSpec.isSingleValueField()) {
+        switch (dataType) {
+          case INT:
+            fieldAssembler = fieldAssembler.name(fieldSpec.getName()).type().intType().noDefault();
+            break;
+          case LONG:
+            fieldAssembler = fieldAssembler.name(fieldSpec.getName()).type().longType().noDefault();
+            break;
+          case FLOAT:
+            fieldAssembler = fieldAssembler.name(fieldSpec.getName()).type().floatType().noDefault();
+            break;
+          case DOUBLE:
+            fieldAssembler = fieldAssembler.name(fieldSpec.getName()).type().doubleType().noDefault();
+            break;
+          case STRING:
+            fieldAssembler = fieldAssembler.name(fieldSpec.getName()).type().stringType().noDefault();
+            break;
+          default:
+            throw new RuntimeException("Unsupported data type: " + dataType);
+        }
+      } else {
+        switch (dataType) {
+          case INT:
+            fieldAssembler = fieldAssembler.name(fieldSpec.getName()).type().array().items().intType().noDefault();
+            break;
+          case LONG:
+            fieldAssembler = fieldAssembler.name(fieldSpec.getName()).type().array().items().longType().noDefault();
+            break;
+          case FLOAT:
+            fieldAssembler = fieldAssembler.name(fieldSpec.getName()).type().array().items().floatType().noDefault();
+            break;
+          case DOUBLE:
+            fieldAssembler = fieldAssembler.name(fieldSpec.getName()).type().array().items().doubleType().noDefault();
+            break;
+          case STRING:
+            fieldAssembler = fieldAssembler.name(fieldSpec.getName()).type().array().items().stringType().noDefault();
+            break;
+          default:
+            throw new RuntimeException("Unsupported data type: " + dataType);
+        }
       }
     }
 
-    avroSchema = fieldAssembler.endRecord();
-    LOGGER.info("Avro Schema {}", avroSchema.toString(true));
-
-    return avroSchema;
+    return fieldAssembler.endRecord();
   }
-
 }
