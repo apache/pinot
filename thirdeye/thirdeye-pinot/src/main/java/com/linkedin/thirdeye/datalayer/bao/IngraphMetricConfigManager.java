@@ -7,7 +7,9 @@ import com.linkedin.thirdeye.datalayer.dto.IngraphMetricConfigDTO;
 
 public interface IngraphMetricConfigManager extends AbstractManager<IngraphMetricConfigDTO> {
 
-  List<IngraphMetricConfigDTO> findByDataset(String dataset);
+  List<IngraphMetricConfigDTO> findByDashboard(String dashboardName);
+  IngraphMetricConfigDTO findByDashboardAndMetricName(String dashboardName, String metricName);
+  IngraphMetricConfigDTO findByRrdName(String rrdName);
 
 
 }

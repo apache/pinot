@@ -3,14 +3,11 @@ package com.linkedin.thirdeye.autoload.pinot.metrics;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-
 
 import org.apache.commons.collections.CollectionUtils;
 import org.slf4j.Logger;
@@ -23,11 +20,9 @@ import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
 import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.IngraphMetricConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.IngraphMetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.pojo.DashboardConfigBean;
 
@@ -46,8 +41,9 @@ public class AutoLoadPinotMetricsService implements Runnable {
   private DatasetConfigManager datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
   private MetricConfigManager metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
   private DashboardConfigManager dashboardConfigDAO = DAO_REGISTRY.getDashboardConfigDAO();
-  private IngraphMetricConfigManager ingraphMetricConfigDAO = DAO_REGISTRY.getIngraphMetricConfigDAO();
 
+  private static final String DEFAULT_INGRAPH_METRIC_NAMES_COLUMN = "metricName";
+  private static final String DEFAULT_INGRAPH_METRIC_VALUES_COLUMN = "value";
 
   private ScheduledExecutorService scheduledExecutorService;
   private AutoLoadPinotMetricsUtils autoLoadPinotMetricsUtils;
@@ -78,12 +74,10 @@ public class AutoLoadPinotMetricsService implements Runnable {
 
       for (String dataset : allDatasets) {
         LOG.info("Checking dataset {}", dataset);
-        DatasetConfigDTO datasetConfig = datasetConfigDAO.findByDataset(dataset);
-        Schema schema = allSchemas.get(dataset);
 
-        if (ConfigGenerator.isIngraphDataset(schema)) {
-          addIngraphDataset(dataset, schema, datasetConfig);
-        } else {
+        Schema schema = allSchemas.get(dataset);
+        if (!isIngraphDataset(schema)) {
+          DatasetConfigDTO datasetConfig = datasetConfigDAO.findByDataset(dataset);
           addPinotDataset(dataset, schema, datasetConfig);
         }
       }
@@ -93,60 +87,9 @@ public class AutoLoadPinotMetricsService implements Runnable {
   }
 
 
-  /**
-   * Adds ingraph dataset to the thirdeye database
-   * @param dataset
-   * @param schema
-   * @param datasetConfig
-   */
-  public void addIngraphDataset(String dataset, Schema schema, DatasetConfigDTO datasetConfig) throws Exception {
-    LOG.info("Found ingraph dataset {}", dataset);
-    if (datasetConfig == null) {
-      DatasetConfigDTO datasetConfigDTO = ConfigGenerator.generateIngraphDatasetConfig(dataset, schema);
-      LOG.info("Creating dataset for {}", dataset);
-      datasetConfigDAO.save(datasetConfigDTO);
-    }
-
-    // find all ingraph metrics from the ingraph_metric_config
-    List<IngraphMetricConfigDTO> ingraphMetricConfigs = ingraphMetricConfigDAO.findByDataset(dataset);
-    Set<String> ingraphMetricNames = new HashSet<>();
-    for (IngraphMetricConfigDTO ingraphMetricConfig : ingraphMetricConfigs) {
-      ingraphMetricNames.add(ingraphMetricConfig.getMetricAlias());
-    }
-
-    // find all metric configs already in TE database
-    List<MetricConfigDTO> metricConfigs = metricConfigDAO.findByDataset(dataset);
-    Set<String> existingMetricNames = new HashSet<>();
-    for (MetricConfigDTO metricConfig : metricConfigs) {
-      existingMetricNames.add(metricConfig.getName());
-    }
-
-    // add ingraph metrics which are not yet in TE database
-    for (IngraphMetricConfigDTO ingraphMetricConfig : ingraphMetricConfigs) {
-      String metricAlias = ingraphMetricConfig.getMetricAlias();
-      if (!existingMetricNames.contains(metricAlias)) {
-        MetricConfigDTO metricConfigDTO = ConfigGenerator.generateIngraphMetricConfig(ingraphMetricConfig);
-        LOG.info("Creating metric {} for {}", metricAlias, dataset);
-        metricConfigDAO.save(metricConfigDTO);
-      }
-    }
-
-    // update default dashboard
-    List<Long> metricIds = ConfigGenerator.getMetricIdsFromMetricConfigs(metricConfigDAO.findByDataset(dataset));
-    String dashboardName = DashboardConfigBean.DEFAULT_DASHBOARD_PREFIX + dataset;
-    DashboardConfigDTO dashboardConfig = dashboardConfigDAO.findByName(dashboardName);
-    if (dashboardConfig == null) {
-      DashboardConfigDTO dashboardConfigDTO = ConfigGenerator.generateDefaultDashboardConfig(dataset, metricIds);
-      LOG.info("Creating default dashboard for dataset {}", dataset);
-      dashboardConfigDAO.save(dashboardConfigDTO);
-    } else {
-      dashboardConfig.setMetricIds(metricIds);
-      dashboardConfigDAO.update(dashboardConfig);
-    }
-  }
 
   /**
-   * Adds a non ingraph dataset to the thirdeye database
+   * Adds a dataset to the thirdeye database
    * @param dataset
    * @param schema
    * @param datasetConfig
@@ -301,6 +244,15 @@ public class AutoLoadPinotMetricsService implements Runnable {
         }
       }
     }
+  }
+
+  private boolean isIngraphDataset(Schema schema) {
+    boolean isIngraphDataset = false;
+    if ((schema.getDimensionNames().contains(DEFAULT_INGRAPH_METRIC_NAMES_COLUMN)
+        && schema.getMetricNames().contains(DEFAULT_INGRAPH_METRIC_VALUES_COLUMN))) {
+      isIngraphDataset = true;
+    }
+    return isIngraphDataset;
   }
 
 }
