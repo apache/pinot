@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.datalayer.bao;
 
+import com.google.common.collect.Lists;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 
@@ -7,11 +8,7 @@ import java.io.File;
 import java.io.FileReader;
 import java.net.URL;
 import java.sql.Connection;
-import java.sql.DatabaseMetaData;
-import java.sql.ResultSet;
 import java.util.concurrent.TimeUnit;
-
-import jersey.repackaged.com.google.common.collect.Lists;
 
 import org.apache.tomcat.jdbc.pool.DataSource;
 import org.joda.time.DateTime;
@@ -109,20 +106,6 @@ public abstract class AbstractManagerTestBase {
       URL deleteSchemaUrl = getClass().getResource("/schema/drop-tables.sql");
       ScriptRunner scriptRunner = new ScriptRunner(conn, false, false);
       scriptRunner.runScript(new FileReader(deleteSchemaUrl.getFile()));
-      DatabaseMetaData databaseMetaData = conn.getMetaData();
-      try (ResultSet rs =
-          databaseMetaData.getTables(null, null, null, null)) {
-        while (rs.next()) {
-          int count = rs.getMetaData().getColumnCount();
-          System.out.println(rs.getMetaData().getColumnName(2) + "=" + rs.getString(2));
-
-          for(int i=1;i<=count;i++){
-//            System.out.println(rs.getMetaData().getColumnName(i) + "=" + rs.getString(i));
-          }
-        }
-      } catch (Exception e) {
-
-      }
     }
     System.out.println("Cleaning database: done!");
   }

@@ -33,7 +33,7 @@ public class IngraphDashboardConfigResource {
 
   @GET
   @Path("/create")
-  public String createMetricConfig(@QueryParam("name") String name,
+  public String createDashboardConfig(@QueryParam("name") String name,
       @QueryParam("fabrics") String fabrics,
       @QueryParam("bootstrap") boolean bootstrap,
       @QueryParam("bootstrapStartTime") String bootstrapStartTime,
@@ -77,7 +77,7 @@ public class IngraphDashboardConfigResource {
 
   @GET
   @Path("/update")
-  public String updateMetricConfig(@NotNull @QueryParam("id") long ingraphDashboardConfigId,
+  public String updateDashboardConfig(@NotNull @QueryParam("id") long ingraphDashboardConfigId,
       @QueryParam("name") String name,
       @QueryParam("fabrics") String fabrics,
       @QueryParam("bootstrap") boolean bootstrap,
@@ -127,7 +127,7 @@ public class IngraphDashboardConfigResource {
 
   @GET
   @Path("/delete")
-  public String deleteMetricConfig(@NotNull @QueryParam("dashboard") String dashboard, @NotNull @QueryParam("id") Long dashboardConfigId) {
+  public String deleteDashboardConfig(@NotNull @QueryParam("dashboard") String dashboard, @NotNull @QueryParam("id") Long dashboardConfigId) {
     ingraphDashboardConfigDAO.deleteById(dashboardConfigId);
     return JsonResponseUtil.buildSuccessResponseJSON("Successully deleted " + dashboardConfigId).toString();
   }
