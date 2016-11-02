@@ -53,7 +53,7 @@ public abstract class AbstractManagerTestBase {
   private PersistenceConfig configuration;
 
   private DataSource ds;
-  private long dbId = System.currentTimeMillis();
+  private String dbId = System.currentTimeMillis() + "" + Math.random();
 
   @BeforeClass(alwaysRun = true) public void init() throws Exception {
     URL url = AbstractManagerTestBase.class.getResource("/persistence-local.yml");
