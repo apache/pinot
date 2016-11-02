@@ -81,13 +81,7 @@ public class RawAnomalyResultManagerImpl extends AbstractManagerImpl<RawAnomalyR
     Predicate functionIdPredicate = Predicate.EQ("functionId", functionId);
     Predicate finalPredicate =
         Predicate.AND(functionIdPredicate, Predicate.OR(endTimeTimePredicate, startTimePredicate));
-    List<RawAnomalyResultBean> list =
-        genericPojoDao.get(finalPredicate, RawAnomalyResultBean.class);
-    List<RawAnomalyResultDTO> result = new ArrayList<>();
-    for (RawAnomalyResultBean bean : list) {
-      result.add(createRawAnomalyDTOFromBean(bean));
-    }
-    return result;
+    return findByPredicate(finalPredicate);
   }
 
   public List<RawAnomalyResultDTO> findUnmergedByFunctionId(Long functionId) {
@@ -99,16 +93,15 @@ public class RawAnomalyResultManagerImpl extends AbstractManagerImpl<RawAnomalyR
         Predicate.EQ("merged", false), //
         Predicate.EQ("dataMissing", false) //
     );
-    List<RawAnomalyResultBean> list = genericPojoDao.get(predicate, RawAnomalyResultBean.class);
-    List<RawAnomalyResultDTO> result = new ArrayList<>();
-    for (RawAnomalyResultBean bean : list) {
-      result.add(createRawAnomalyDTOFromBean(bean));
-    }
-    return result;
+    return findByPredicate(predicate);
   }
 
   public List<RawAnomalyResultDTO> findByFunctionId(Long functionId) {
     Predicate predicate = Predicate.EQ("functionId", functionId);
+    return findByPredicate(predicate);
+  }
+
+  private List<RawAnomalyResultDTO> findByPredicate(Predicate predicate) {
     List<RawAnomalyResultBean> list = genericPojoDao.get(predicate, RawAnomalyResultBean.class);
     List<RawAnomalyResultDTO> result = new ArrayList<>();
     for (RawAnomalyResultBean bean : list) {

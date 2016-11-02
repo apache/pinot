@@ -22,6 +22,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import org.apache.commons.collections.CollectionUtils;
 
 
 public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAnomalyResultDTO>
@@ -44,6 +45,10 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
 
   private static final String FIND_BY_FUNCTION_AND_DIMENSIONS =
       "where functionId=:functionId " + "and dimensions=:dimensions order by endTime desc limit 1";
+
+  private static final String FIND_LATEST_CONFLICT_BY_FUNCTION_AND_DIMENSIONS =
+      "where functionId=:functionId " + "and dimensions=:dimensions "
+        + "and (startTime < :endTime and endTime > :startTime) " + "order by endTime desc limit 1";
 
   private static final String FIND_BY_FUNCTION_AND_NULL_DIMENSION =
       "where functionId=:functionId " + "and dimensions is null order by endTime desc";
@@ -115,6 +120,15 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
   }
 
   @Override
+  public List<MergedAnomalyResultDTO> findAllConflictByFunctionId(long functionId, long conflictWindowStart, long conflictWindowEnd) {
+    Predicate predicate =
+        Predicate.AND(Predicate.LE("startTime", conflictWindowEnd), Predicate.GE("endTime", conflictWindowStart),
+            Predicate.EQ("functionId", functionId));
+    List<MergedAnomalyResultBean> list = genericPojoDao.get(predicate, MergedAnomalyResultBean.class);
+    return batchConvertMergedAnomalyBean2DTO(list);
+  }
+
+  @Override
   public List<MergedAnomalyResultDTO> findByFunctionId(Long functionId) {
     Map<String, Object> filterParams = new HashMap<>();
     filterParams.put("functionId", functionId);
@@ -177,11 +191,30 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
 
     List<MergedAnomalyResultBean> list = genericPojoDao.executeParameterizedSQL(
         FIND_BY_FUNCTION_AND_DIMENSIONS, filterParams, MergedAnomalyResultBean.class);
-    List<MergedAnomalyResultDTO> result = batchConvertMergedAnomalyBean2DTO(list);
-    // TODO: Check list size instead of result size?
-    if (result.size() > 0) {
-      return result.get(0);
+    if (CollectionUtils.isNotEmpty(list)) {
+      MergedAnomalyResultDTO mergedAnomalyResultDTO = convertMergedAnomalyBean2DTO(list.get(0));
+      return mergedAnomalyResultDTO;
     }
+    return null;
+  }
+
+  @Override
+  public MergedAnomalyResultDTO findLatestConflictByFunctionIdDimensions(Long functionId, String dimensions,
+      long conflictWindowStart, long conflictWindowEnd) {
+    Map<String, Object> filterParams = new HashMap<>();
+    filterParams.put("functionId", functionId);
+    filterParams.put("dimensions", dimensions);
+    filterParams.put("startTime", conflictWindowStart);
+    filterParams.put("endTime", conflictWindowEnd);
+
+    List<MergedAnomalyResultBean> list = genericPojoDao.executeParameterizedSQL(
+        FIND_LATEST_CONFLICT_BY_FUNCTION_AND_DIMENSIONS, filterParams, MergedAnomalyResultBean.class);
+
+    if (CollectionUtils.isNotEmpty(list)) {
+      MergedAnomalyResultBean mostRecentConflictMergedAnomalyResultBean = list.get(0);
+      return convertMergedAnomalyBean2DTO(mostRecentConflictMergedAnomalyResultBean);
+    }
+
     return null;
   }
 
