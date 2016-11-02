@@ -10,7 +10,6 @@ import com.linkedin.pinot.common.data.TimeGranularitySpec.TimeFormat;
 import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.IngraphMetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.pojo.DashboardConfigBean;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
@@ -18,8 +17,6 @@ import com.linkedin.thirdeye.util.ThirdEyeUtils;
 public class ConfigGenerator {
 
   private static final String PDT_TIMEZONE = "US/Pacific";
-  private static final String DEFAULT_INGRAPH_METRIC_NAMES_COLUMN = "metricAlias";
-  private static final String DEFAULT_INGRAPH_METRIC_VALUES_COLUMN = "value";
 
   public static DatasetConfigDTO generateDatasetConfig(String dataset, Schema schema) {
     List<String> dimensions = schema.getDimensionNames();
@@ -39,14 +36,6 @@ public class ConfigGenerator {
     return datasetConfigDTO;
   }
 
-  public static DatasetConfigDTO generateIngraphDatasetConfig(String dataset, Schema schema) {
-    DatasetConfigDTO datasetConfigDTO = generateDatasetConfig(dataset, schema);
-    datasetConfigDTO.setMetricAsDimension(true);
-    datasetConfigDTO.setMetricNamesColumn(DEFAULT_INGRAPH_METRIC_NAMES_COLUMN);
-    datasetConfigDTO.setMetricValuesColumn(DEFAULT_INGRAPH_METRIC_VALUES_COLUMN);
-
-    return datasetConfigDTO;
-  }
 
   public static MetricConfigDTO generateMetricConfig(MetricFieldSpec metricFieldSpec, String dataset) {
     MetricConfigDTO metricConfigDTO = new MetricConfigDTO();
@@ -58,15 +47,6 @@ public class ConfigGenerator {
     return metricConfigDTO;
   }
 
-  public static MetricConfigDTO generateIngraphMetricConfig(IngraphMetricConfigDTO ingraphMetricConfig) {
-    MetricConfigDTO metricConfigDTO = new MetricConfigDTO();
-    metricConfigDTO.setName(ingraphMetricConfig.getMetricAlias());
-    metricConfigDTO.setAlias(ThirdEyeUtils.constructMetricAlias(
-        ingraphMetricConfig.getDataset(), ingraphMetricConfig.getMetricAlias()));
-    metricConfigDTO.setDataset(ingraphMetricConfig.getDataset());
-    metricConfigDTO.setDatatype(MetricType.valueOf(ingraphMetricConfig.getMetricDataType()));
-    return metricConfigDTO;
-  }
 
   public static DashboardConfigDTO generateDefaultDashboardConfig(String dataset, List<Long> metricIds) {
     DashboardConfigDTO dashboardConfigDTO = new DashboardConfigDTO();
@@ -86,13 +66,5 @@ public class ConfigGenerator {
   }
 
 
-  public static boolean isIngraphDataset(Schema schema) {
-    boolean isIngraphDataset = false;
-    if (schema.getDimensionNames().contains(DEFAULT_INGRAPH_METRIC_NAMES_COLUMN)
-        && schema.getMetricNames().contains(DEFAULT_INGRAPH_METRIC_VALUES_COLUMN)) {
-      isIngraphDataset = true;
-    }
-    return isIngraphDataset;
-  }
 
 }

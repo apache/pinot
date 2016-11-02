@@ -7,6 +7,8 @@ import java.io.File;
 import java.io.FileReader;
 import java.net.URL;
 import java.sql.Connection;
+import java.sql.DatabaseMetaData;
+import java.sql.ResultSet;
 import java.util.concurrent.TimeUnit;
 
 import jersey.repackaged.com.google.common.collect.Lists;
@@ -25,6 +27,8 @@ import com.linkedin.thirdeye.datalayer.bao.jdbc.AnomalyFunctionManagerImpl;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
+import com.linkedin.thirdeye.datalayer.dto.IngraphDashboardConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.IngraphMetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.JobDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
@@ -42,6 +46,7 @@ public abstract class AbstractManagerTestBase {
   protected DatasetConfigManager datasetConfigDAO;
   protected MetricConfigManager metricConfigDAO;
   protected DashboardConfigManager dashboardConfigDAO;
+  protected IngraphDashboardConfigManager ingraphDashboardConfigDAO;
   protected IngraphMetricConfigManager ingraphMetricConfigDAO;
 
   private ManagerProvider managerProvider;
@@ -104,6 +109,20 @@ public abstract class AbstractManagerTestBase {
       URL deleteSchemaUrl = getClass().getResource("/schema/drop-tables.sql");
       ScriptRunner scriptRunner = new ScriptRunner(conn, false, false);
       scriptRunner.runScript(new FileReader(deleteSchemaUrl.getFile()));
+      DatabaseMetaData databaseMetaData = conn.getMetaData();
+      try (ResultSet rs =
+          databaseMetaData.getTables(null, null, null, null)) {
+        while (rs.next()) {
+          int count = rs.getMetaData().getColumnCount();
+          System.out.println(rs.getMetaData().getColumnName(2) + "=" + rs.getString(2));
+
+          for(int i=1;i<=count;i++){
+//            System.out.println(rs.getMetaData().getColumnName(i) + "=" + rs.getString(i));
+          }
+        }
+      } catch (Exception e) {
+
+      }
     }
     System.out.println("Cleaning database: done!");
   }
@@ -133,6 +152,8 @@ public abstract class AbstractManagerTestBase {
         .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.MetricConfigManagerImpl.class);
     dashboardConfigDAO = (DashboardConfigManager) managerProvider
         .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.DashboardConfigManagerImpl.class);
+    ingraphDashboardConfigDAO = (IngraphDashboardConfigManager) managerProvider
+        .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.IngraphDashboardConfigManagerImpl.class);
     ingraphMetricConfigDAO = (IngraphMetricConfigManager) managerProvider
             .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.IngraphMetricConfigManagerImpl.class);
   }
@@ -225,5 +246,31 @@ public abstract class AbstractManagerTestBase {
     metricConfigDTO.setName(metric);
     metricConfigDTO.setAlias(ThirdEyeUtils.constructMetricAlias(collection, metric));
     return metricConfigDTO;
+  }
+
+  protected IngraphMetricConfigDTO getTestIngraphMetricConfig(String rrd, String metric, String dashboard) {
+    IngraphMetricConfigDTO ingraphMetricConfigDTO = new IngraphMetricConfigDTO();
+    ingraphMetricConfigDTO.setRrdName(rrd);
+    ingraphMetricConfigDTO.setMetricName(metric);
+    ingraphMetricConfigDTO.setDashboardName(dashboard);
+    ingraphMetricConfigDTO.setContainer("test");
+    ingraphMetricConfigDTO.setMetricDataType("test");
+    ingraphMetricConfigDTO.setMetricSourceType("test");
+    return ingraphMetricConfigDTO;
+  }
+
+  protected IngraphDashboardConfigDTO getTestIngraphDashboardConfig(String name) {
+    IngraphDashboardConfigDTO ingraphDashboardConfigDTO = new IngraphDashboardConfigDTO();
+    ingraphDashboardConfigDTO.setName(name);
+    ingraphDashboardConfigDTO.setFabrics("test");
+    ingraphDashboardConfigDTO.setFetchIntervalPeriod(3600_000);
+    ingraphDashboardConfigDTO.setMergeNumAvroRecords(100);
+    ingraphDashboardConfigDTO.setGranularitySize(5);
+    ingraphDashboardConfigDTO.setGranularityUnit(TimeUnit.MINUTES);
+    ingraphDashboardConfigDTO.setBootstrap(true);
+    DateTime now = new DateTime();
+    ingraphDashboardConfigDTO.setBootstrapStartTime(now.getMillis());
+    ingraphDashboardConfigDTO.setBootstrapEndTime(now.minusDays(30).getMillis());
+    return ingraphDashboardConfigDTO;
   }
 }
