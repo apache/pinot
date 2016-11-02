@@ -32,20 +32,27 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.lang.reflect.Field;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.lang.StringEscapeUtils;
+import org.codehaus.jackson.map.ObjectMapper;
 import org.joda.time.Duration;
 import org.joda.time.Interval;
+import org.json.JSONArray;
+import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -573,4 +580,62 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     return _hllLog2m;
   }
 
+  /**
+   * Converts segment metadata to json
+   * @param columnFilter list only  the columns in the set. Lists all the columns if
+   *                     the parameter value is null
+   * @return json representation of segment metadata
+   */
+  public JSONObject toJson(Set<String> columnFilter) {
+
+    JSONObject rootMeta = new JSONObject();
+    try {
+      rootMeta.put("segmentName", _segmentName);
+      rootMeta.put("schemaName", _schema != null ? _schema.getSchemaName() : JSONObject.NULL);
+      rootMeta.put("crc", _crc);
+      rootMeta.put("creationTime", _creationTime);
+      TimeZone timeZone = TimeZone.getTimeZone("UTC");
+      DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss:SSS' UTC'");
+      dateFormat.setTimeZone(timeZone);
+      String creationTimeStr = _creationTime != Long.MIN_VALUE  ? dateFormat.format(new Date(_creationTime)) : "";
+      rootMeta.put("creationeTimeReadable", creationTimeStr);
+      rootMeta.put("timeGranularitySec", _timeGranularity != null ? _timeGranularity.getStandardSeconds() : null);
+      rootMeta.put("startTimeMillis", _timeInterval.getStartMillis());
+      rootMeta.put("startTimeReadable", _timeInterval.getStart().toString());
+      rootMeta.put("endTimeMillis", _timeInterval.getEndMillis());
+      rootMeta.put("endTimeReadable", _timeInterval.getEnd().toString());
+
+      rootMeta.put("pushTimeMillis", _pushTime);
+      String pushTimeStr = _pushTime != Long.MIN_VALUE ? dateFormat.format(new Date(_pushTime)) : "";
+      rootMeta.put("pushTimeReadable", pushTimeStr);
+
+      rootMeta.put("refreshTime", _refreshTime);
+      String refreshTimeStr = _refreshTime != Long.MIN_VALUE ? dateFormat.format(new Date(_refreshTime)) : "";
+      rootMeta.put("refreshTimeStr", refreshTimeStr);
+
+      rootMeta.put("segmentVersion", _segmentVersion.toString());
+      rootMeta.put("hasStarTree", hasStarTree());
+      rootMeta.put("creatorName", _creatorName == null ? JSONObject.NULL : _creatorName);
+      rootMeta.put("paddingCharacter", String.valueOf(_paddingCharacter));
+      rootMeta.put("hllLog2m", _hllLog2m);
+
+      JSONArray columnsJson = new JSONArray();
+      ObjectMapper mapper = new ObjectMapper();
+
+      for (String column : _allColumns) {
+        if (columnFilter != null && !columnFilter.contains(column)) {
+          continue;
+        }
+        ColumnMetadata columnMetadata = _columnMetadataMap.get(column);
+        JSONObject columnJson = new JSONObject(mapper.writeValueAsString(columnMetadata));
+        columnsJson.put(columnJson);
+      }
+
+      rootMeta.put("columns", columnsJson);
+      return rootMeta;
+    } catch (Exception e) {
+      LOGGER.error("Failed to convert field to json for segment: {}", _segmentName, e);
+      throw new RuntimeException("Failed to convert segment metadata to json", e);
+    }
+  }
 }

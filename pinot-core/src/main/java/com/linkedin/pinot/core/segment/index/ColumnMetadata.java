@@ -28,13 +28,13 @@ import java.lang.reflect.Field;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.lang.StringEscapeUtils;
+import org.codehaus.jackson.annotate.JsonProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.*;
 import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.SEGMENT_PADDING_CHARACTER;
 import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.TIME_UNIT;
-
 
 public class ColumnMetadata {
   private static final Logger LOGGER = LoggerFactory.getLogger(ColumnMetadata.class);
@@ -50,8 +50,11 @@ public class ColumnMetadata {
   private final int stringColumnMaxLength;
   private final FieldType fieldType;
   private final boolean isSorted;
+  @JsonProperty
   private final boolean containsNulls;
+  @JsonProperty
   private final boolean hasDictionary;
+  @JsonProperty
   private final boolean hasInvertedIndex;
   private final boolean isSingleValue;
   private final int maxNumberOfMultiValues;
