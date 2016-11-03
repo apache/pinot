@@ -4,14 +4,10 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.client.ClientProtocolException;
-import org.joda.time.DateTime;
-import org.joda.time.format.ISODateTimeFormat;
-import org.quartz.CronExpression;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.collections.Lists;
@@ -39,8 +35,7 @@ public class CleanupAndRegenerateAnomaliesTool {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper(new YAMLFactory());
   private enum Mode {
     DELETE,
-    GENERATE_FOR_RANGE,
-    GENERATE_FOR_WINDOWS_IN_RANGE
+    GENERATE_FOR_RANGE, BACKFILL_FOR_RANGE
   }
   private String monitoringWindowStartTime;
   private String monitoringWindowEndTime;
@@ -117,6 +112,7 @@ public class CleanupAndRegenerateAnomaliesTool {
    * Regenerates anomalies for the whole given range as one monitoring window
    * @throws Exception
    */
+  @Deprecated
   private void regenerateAnomaliesInRange() throws Exception {
     LOG.info("Begin regenerate anomalies for entire range...");
     for (Long functionId : functionIds) {
@@ -136,37 +132,19 @@ public class CleanupAndRegenerateAnomaliesTool {
    * @throws Exception
    */
   private void regenerateAnomaliesForBucketsInRange() throws Exception {
-    LOG.info("Begin regenerate anomalies for each monitoring window in range...");
-
-    DateTime start = ISODateTimeFormat.dateTimeParser().parseDateTime(monitoringWindowStartTime);
-    DateTime end = ISODateTimeFormat.dateTimeParser().parseDateTime(monitoringWindowEndTime);
-
     for (Long functionId : functionIds) {
       AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(functionId);
-      boolean isActive = anomalyFunction.getIsActive();
-      if (!isActive) {
-        LOG.info("Skipping function {}", functionId);
+      if (!anomalyFunction.getIsActive()) {
+        LOG.info("Skipping deactivated function {}", functionId);
         continue;
       }
 
-      long monitoringWindowSize = TimeUnit.MILLISECONDS.convert(anomalyFunction.getWindowSize(),
-          anomalyFunction.getWindowUnit());
-      CronExpression cronExpression = new CronExpression(anomalyFunction.getCron());
+      LOG.info("Sending backfill function {} for range {} to {}", functionId, monitoringWindowStartTime, monitoringWindowEndTime);
 
-      DateTime currentStart = start;
-      DateTime currentEnd = currentStart.plus(monitoringWindowSize);
-
-      // Make the end time inclusive
-      DateTime endBoundary = new DateTime(cronExpression.getNextValidTimeAfter(end.toDate()));
-      while (currentEnd.isBefore(endBoundary)) {
-        String monitoringWindowStart = ISODateTimeFormat.dateHourMinute().print(currentStart);
-        String monitoringWindowEnd = ISODateTimeFormat.dateHourMinute().print(currentEnd);
-
-        runAdhocFunctionForWindow(functionId, monitoringWindowStart, monitoringWindowEnd);
-
-        currentStart = new DateTime(cronExpression.getNextValidTimeAfter(currentStart.toDate()));
-        currentEnd = currentStart.plus(monitoringWindowSize);
-      }
+      String response =
+          detectionResourceHttpUtils.runBackfillAnomalyFunction(String.valueOf(functionId), monitoringWindowStartTime,
+              monitoringWindowEndTime);
+      LOG.info("Response {}", response);
     }
   }
 
@@ -195,7 +173,6 @@ public class CleanupAndRegenerateAnomaliesTool {
       mergedAnomaliesDeleted++;
     }
   }
-
 
   public static void main(String[] args) throws Exception {
 
@@ -226,7 +203,7 @@ public class CleanupAndRegenerateAnomaliesTool {
     String startTimeIso = config.getStartTimeIso();
     String endTimeIso = config.getEndTimeIso();
     Mode runMode = Mode.valueOf(mode);
-    if ((runMode.equals(Mode.GENERATE_FOR_RANGE) || runMode.equals(Mode.GENERATE_FOR_WINDOWS_IN_RANGE))
+    if ((runMode.equals(Mode.GENERATE_FOR_RANGE) || runMode.equals(Mode.BACKFILL_FOR_RANGE))
         && (StringUtils.isBlank(startTimeIso) || StringUtils.isBlank(endTimeIso))) {
       LOG.error("StarteTime and endTime must be provided in generate mode");
       System.exit(1);
@@ -248,8 +225,8 @@ public class CleanupAndRegenerateAnomaliesTool {
     } else if (runMode.equals(Mode.GENERATE_FOR_RANGE)) {
       // GENERATE_FOR_RANGE mode regenerates anomalies for all active functions in functionIds or datasets
       tool.regenerateAnomaliesInRange();
-    } else if (runMode.equals(Mode.GENERATE_FOR_WINDOWS_IN_RANGE)) {
-      // GENERATE_FOR_WINDOWS_IN_RANGE mode regenerates anomalies for all active functions in functionIds or datasets
+    } else if (runMode.equals(Mode.BACKFILL_FOR_RANGE)) {
+      // BACKFILL_FOR_RANGE mode regenerates anomalies for all active functions in functionIds or datasets
       // It will honor the monitoring window size of the function, and run for all consecutive windows, one by one,
       // to cover the entire range provided as input
       tool.regenerateAnomaliesForBucketsInRange();

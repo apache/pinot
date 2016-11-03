@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.anomaly.detection;
 
 import com.google.common.collect.ArrayListMultimap;
 import com.linkedin.pinot.pql.parsers.utils.Pair;
+import com.linkedin.thirdeye.anomaly.merge.AnomalyMergeExecutor;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
@@ -33,6 +34,7 @@ import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 public class DetectionTaskRunner implements TaskRunner {
 
   private static final Logger LOG = LoggerFactory.getLogger(DetectionTaskRunner.class);
+  public static final String BACKFILL_PREFIX = "adhoc_";
 
   private TimeSeriesResponseConverter timeSeriesResponseConverter;
 
@@ -46,9 +48,14 @@ public class DetectionTaskRunner implements TaskRunner {
   private List<RawAnomalyResultDTO> existingRawAnomalies;
   private BaseAnomalyFunction anomalyFunction;
   private DatasetConfigManager datasetConfigDAO;
+  private AnomalyMergeExecutor syncAnomalyMergeExecutor;
 
   public DetectionTaskRunner() {
     timeSeriesResponseConverter = TimeSeriesResponseConverter.getInstance();
+    // syncAnomalyMergeExecutor is supposed to perform lightweight merge (i.e., anomalies that have the same function
+    // id and at the same dimensions) after each detection task. Consequently, a null thread pool is passed the merge
+    // executor on purpose in order to prevent unwanted
+    syncAnomalyMergeExecutor = new AnomalyMergeExecutor(null);
   }
 
   public List<TaskResult> execute(TaskInfo taskInfo, TaskContext taskContext) throws Exception {
@@ -79,6 +86,15 @@ public class DetectionTaskRunner implements TaskRunner {
         TimeSeriesUtil.getTimeSeriesResponseForAnomalyDetection(anomalyFunction, windowStart.getMillis(), windowEnd.getMillis());
 
     exploreDimensionsAndAnalyze(finalResponse);
+
+    // If the current job is a backfill (adhoc) detection job, then perform a lightweight merge right after the
+    // detection. Moreover, set notified flag to true so the merged anomalies do not induce alerts and emails.
+    String jobName = taskContext.getJobDAO().getJobNameByJobId(detectionTaskInfo.getJobExecutionId());
+    if (jobName != null && jobName.toLowerCase().startsWith(BACKFILL_PREFIX)) {
+      boolean isNotified = true;
+      syncAnomalyMergeExecutor.performSynchronousMergeBasedOnFunctionIdAndDimension(anomalyFunctionSpec, isNotified);
+    }
+
     return taskResult;
   }
 

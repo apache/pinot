@@ -218,7 +218,6 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
     return null;
   }
 
-
   @Override
   public MergedAnomalyResultDTO findLatestByFunctionIdOnly(Long functionId) {
     Map<String, Object> filterParams = new HashMap<>();

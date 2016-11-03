@@ -372,4 +372,48 @@ public class AnomalyMergeExecutor implements Runnable {
     return String.format("change : %.2f %%, currentVal : %.2f, baseLineVal : %.2f", severity * 100,
         currentVal, baseLineVal);
   }
+
+  /**
+   * Performs a light weight merge based on function id and dimensions. This method is supposed to be performed by
+   * anomaly detectors right after their anomaly detection. For complex merge logics which merge anomalies across
+   * different dimensions, function, metrics, etc., the tasks should be performed by a dedicated merger.
+   *
+   * The light weight merge logic works as follows:
+   *
+   * Step 1: find all unmerged raw (unprocessed) anomalies of the given function and group them according to their
+   *         dimensions
+   *
+   * Step 2: find the latest merged anomaly for each group of unmerged anomalies
+   *
+   * Step 3: perform time based merge
+   *
+   * Step 4: recompute anomaly score / weight
+   *
+   * Step 5: persist merged anomalies
+   */
+  public int performSynchronousMergeBasedOnFunctionIdAndDimension(AnomalyFunctionDTO functionSpec, boolean isNotified) {
+    if (functionSpec.getIsActive()) {
+      List<RawAnomalyResultDTO> unmergedResults = anomalyResultDAO.findUnmergedByFunctionId(functionSpec.getId());
+
+      if (unmergedResults.size() > 0) {
+        LOG.info("Running merge for function id : [{}], found [{}] raw anomalies", functionSpec.getId(),
+            unmergedResults.size());
+
+        // TODO : move merge config within the AnomalyFunction; Every function should have its own merge config.
+        AnomalyMergeConfig mergeConfig = new AnomalyMergeConfig();
+        mergeConfig.setSequentialAllowedGap(2 * 60 * 60_000); // 2 hours
+        mergeConfig.setMaxMergeDurationLength(-1); // no time based split
+        mergeConfig.setMergeStrategy(AnomalyMergeStrategy.FUNCTION_DIMENSIONS);
+
+        List<MergedAnomalyResultDTO> output = new ArrayList<>();
+        performMergeBasedOnFunctionIdAndDimensions(functionSpec, mergeConfig, unmergedResults, output);
+        for (MergedAnomalyResultDTO mergedAnomalyResultDTO : output) {
+          mergedAnomalyResultDTO.setNotified(isNotified);
+          updateMergedScoreAndPersist(mergedAnomalyResultDTO);
+        }
+        return output.size();
+      }
+    }
+    return 0;
+  }
 }
