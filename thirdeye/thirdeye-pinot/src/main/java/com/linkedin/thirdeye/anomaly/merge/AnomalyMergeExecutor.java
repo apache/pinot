@@ -5,7 +5,6 @@ import com.google.common.collect.Multimap;
 
 import com.linkedin.thirdeye.api.DimensionMap;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -122,8 +121,7 @@ public class AnomalyMergeExecutor implements Runnable {
               performMergeBasedOnFunctionId(function, mergeConfig, unmergedResults, output);
               break;
             case FUNCTION_DIMENSIONS:
-              performMergeBasedOnFunctionIdAndDimensions(function, mergeConfig, unmergedResults,
-                  output);
+              performMergeBasedOnFunctionIdAndDimensions(function, mergeConfig, unmergedResults, output);
               break;
             default:
               throw new IllegalArgumentException(
@@ -186,6 +184,7 @@ public class AnomalyMergeExecutor implements Runnable {
     }
   }
 
+  // TODO: Update severity according to history data
   private void updateMergedSeverity(MergedAnomalyResultDTO anomalyMergedResult) throws Exception {
     AnomalyFunctionDTO anomalyFunctionSpec = anomalyMergedResult.getFunction();
 
@@ -211,8 +210,6 @@ public class AnomalyMergeExecutor implements Runnable {
 
     String exploreDimensions = anomalyFunctionSpec.getExploreDimensions();
     if (StringUtils.isNotBlank(exploreDimensions)) {
-      timeSeriesRequest.setGroupByDimensions(Arrays.asList(exploreDimensions.trim().split(",")));
-
       // Decorate filters according to dimensionMap
       DimensionMap exploredDimensions = anomalyMergedResult.getDimensions();
       filters = ThirdEyeUtils.getFilterSetFromDimensionMap(exploredDimensions, filters);
@@ -341,13 +338,24 @@ public class AnomalyMergeExecutor implements Runnable {
       dimensionsResultMap.get(exploredDimensions).add(anomalyResult);
     }
     for (DimensionMap exploredDimensions : dimensionsResultMap.keySet()) {
-      MergedAnomalyResultDTO latestMergedResult =
-          mergedResultDAO.findLatestByFunctionIdDimensions(function.getId(), exploredDimensions.toString());
       List<RawAnomalyResultDTO> unmergedResultsByDimensions = dimensionsResultMap.get(exploredDimensions);
+      long anomalyWindowStart = Long.MAX_VALUE;
+      long anomalyWindowEnd = Long.MIN_VALUE;
+      for (RawAnomalyResultDTO unmergedResultsByDimension : unmergedResultsByDimensions) {
+        anomalyWindowStart = Math.min(anomalyWindowStart, unmergedResultsByDimension.getStartTime());
+        anomalyWindowEnd = Math.max(anomalyWindowEnd, unmergedResultsByDimension.getEndTime());
+      }
 
-      // TODO : get mergeConfig from function
+      // NOTE: We get "latest overlapped (Conflict)" merged anomaly instead of "latest" merged anomaly in order to
+      // prevent the merge results of current (online) detection interfere the merge results of back-fill (offline)
+      // detection.
+      MergedAnomalyResultDTO latestOverlappedMergedResult =
+          mergedResultDAO.findLatestConflictByFunctionIdDimensions(function.getId(), exploredDimensions.toString(),
+              anomalyWindowStart, anomalyWindowEnd);
+
+      // TODO : get mergeConfig from MergeStrategy
       List<MergedAnomalyResultDTO> mergedResults = AnomalyTimeBasedSummarizer
-          .mergeAnomalies(latestMergedResult, unmergedResultsByDimensions,
+          .mergeAnomalies(latestOverlappedMergedResult, unmergedResultsByDimensions,
               mergeConfig.getMaxMergeDurationLength(), mergeConfig.getSequentialAllowedGap());
       for (MergedAnomalyResultDTO mergedResult : mergedResults) {
         mergedResult.setFunction(function);

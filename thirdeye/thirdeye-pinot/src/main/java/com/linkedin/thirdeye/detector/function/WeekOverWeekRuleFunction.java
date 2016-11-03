@@ -4,6 +4,7 @@ import com.linkedin.pinot.pql.parsers.utils.Pair;
 import com.linkedin.thirdeye.anomaly.views.AnomalyTimelinesView;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.dashboard.views.TimeBucket;
+import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import java.io.IOException;
 import java.text.NumberFormat;
 import java.util.ArrayList;
@@ -69,7 +70,7 @@ public class WeekOverWeekRuleFunction extends BaseAnomalyFunction {
 
   @Override
   public List<RawAnomalyResultDTO> analyze(DimensionMap exploredDimensions, MetricTimeSeries timeSeries,
-      DateTime windowStart, DateTime windowEnd, List<RawAnomalyResultDTO> knownAnomalies)
+      DateTime windowStart, DateTime windowEnd, List<MergedAnomalyResultDTO> knownAnomalies)
       throws Exception {
     List<RawAnomalyResultDTO> anomalyResults = new ArrayList<>();
 

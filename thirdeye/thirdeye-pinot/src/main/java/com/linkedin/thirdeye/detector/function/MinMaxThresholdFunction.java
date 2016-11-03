@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.detector.function;
 
 import com.linkedin.thirdeye.api.DimensionMap;
+import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
@@ -37,7 +38,7 @@ public class MinMaxThresholdFunction extends BaseAnomalyFunction {
   @Override
   public List<RawAnomalyResultDTO> analyze(DimensionMap exploredDimensions,
       MetricTimeSeries timeSeries, DateTime windowStart, DateTime windowEnd,
-      List<RawAnomalyResultDTO> knownAnomalies) throws Exception {
+      List<MergedAnomalyResultDTO> knownAnomalies) throws Exception {
     List<RawAnomalyResultDTO> anomalyResults = new ArrayList<>();
     // Parse function properties
     Properties props = getProperties();

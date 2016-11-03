@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.detector.function;
 
 import com.linkedin.thirdeye.api.DimensionMap;
+import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import java.util.List;
 
 import org.joda.time.DateTime;
@@ -32,7 +33,7 @@ public interface AnomalyFunction {
    *         A list of anomalies that were not previously known.
    */
   List<RawAnomalyResultDTO> analyze(DimensionMap exploredDimensions, MetricTimeSeries timeSeries,
-      DateTime windowStart, DateTime windowEnd, List<RawAnomalyResultDTO> knownAnomalies)
+      DateTime windowStart, DateTime windowEnd, List<MergedAnomalyResultDTO> knownAnomalies)
       throws Exception;
 
   /**
