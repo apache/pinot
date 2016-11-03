@@ -23,7 +23,34 @@ import org.apache.commons.lang.StringUtils;
 
 public class StringUtil {
 
+  private static final String EMPTY_STRING = "";
+
   public static String join(String seperator, String...keys) {
     return StringUtils.join(keys, seperator);
+  }
+
+  /**
+   * Trim trailing null characters from a string.
+   * @param input Input to trim
+   * @return Trimmed input
+   */
+  public static String trimTrailingNulls(String input) {
+    if (input == null) {
+      return input;
+    }
+
+    int origEnd = input.length() - 1;
+    int end = origEnd;
+    while (end >= 0 && input.charAt(end) == '\0') {
+      end--;
+    }
+
+    if (end == origEnd) {
+      return input;
+    } else if (end < 0) {
+      return EMPTY_STRING;
+    } else {
+      return input.substring(0, end+1);
+    }
   }
 }
