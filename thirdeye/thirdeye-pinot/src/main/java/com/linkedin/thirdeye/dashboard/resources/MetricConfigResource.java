@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 
 import javax.validation.constraints.NotNull;
+import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
@@ -19,7 +20,9 @@ import org.slf4j.LoggerFactory;
 
 import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.client.DAORegistry;
+import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
+import com.linkedin.thirdeye.datalayer.dto.IngraphMetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.util.JsonResponseUtil;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
@@ -133,11 +136,13 @@ public class MetricConfigResource {
   @GET
   @Path("/list")
   @Produces(MediaType.APPLICATION_JSON)
-  public String viewMetricConfig(@NotNull @QueryParam("dataset") String dataset) {
+  public String viewMetricConfig(@NotNull @QueryParam("dataset") String dataset, @DefaultValue("0") @QueryParam("jtStartIndex") int jtStartIndex,
+      @DefaultValue("100") @QueryParam("jtPageSize") int jtPageSize) {
     Map<String, Object> filters = new HashMap<>();
     filters.put("dataset", dataset);
     List<MetricConfigDTO> metricConfigDTOs = metricConfigDao.findByParams(filters);
-    ObjectNode rootNode = JsonResponseUtil.buildResponseJSON(metricConfigDTOs);
+    List<MetricConfigDTO> subList = Utils.sublist(metricConfigDTOs, jtStartIndex, jtPageSize);
+    ObjectNode rootNode = JsonResponseUtil.buildResponseJSON(subList);
     return rootNode.toString();
   }
 

@@ -20,8 +20,10 @@ import org.slf4j.LoggerFactory;
 import com.google.common.collect.Lists;
 import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
 import com.linkedin.thirdeye.client.DAORegistry;
+import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.datalayer.bao.JobManager;
 import com.linkedin.thirdeye.datalayer.bao.TaskManager;
+import com.linkedin.thirdeye.datalayer.dto.IngraphMetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.JobDTO;
 import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
 import com.linkedin.thirdeye.util.JsonResponseUtil;
@@ -49,8 +51,7 @@ public class JobResource {
   public String listRecentJobs(@DefaultValue("0") @QueryParam("jtStartIndex") int jtStartIndex,
       @DefaultValue("10") @QueryParam("jtPageSize") int jtPageSize) {
     List<JobDTO> jobDTOs = jobDao.findNRecentJobs(jtStartIndex + jtPageSize);
-    jtPageSize = Math.min(jtPageSize, jobDTOs.size());
-    List<JobDTO> subList = Lists.newArrayList(jobDTOs).subList(jtStartIndex, jtPageSize);
+    List<JobDTO> subList = Utils.sublist(jobDTOs, jtStartIndex, jtPageSize);
     ObjectNode rootNode = JsonResponseUtil.buildResponseJSON(subList);
     return rootNode.toString();
   }

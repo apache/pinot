@@ -39,10 +39,10 @@ function updateIngraphMetricConfigTable(dataset) {
       dataType : 'json'
     },
     actions : {
-      listAction : '/thirdeye-admin/ingraph-metric-config/list?dataset=' + dataset,
-      createAction : '/thirdeye-admin/ingraph-metric-config/create?dataset=' + dataset,
-      updateAction : '/thirdeye-admin/ingraph-metric-config/update?dataset=' + dataset,
-      deleteAction : '/thirdeye-admin/ingraph-metric-config/delete?dataset=' + dataset
+      listAction : '/thirdeye-admin/ingraph-metric-config/list?dashboardName=' + dataset,
+      createAction : '/thirdeye-admin/ingraph-metric-config/create?dashboardName=' + dataset,
+      updateAction : '/thirdeye-admin/ingraph-metric-config/update?dashboardName=' + dataset,
+      deleteAction : '/thirdeye-admin/ingraph-metric-config/delete?dashboardName=' + dataset
     },
     formCreated : function(event, data) {
       data.form.css('width', '600px');
@@ -60,11 +60,14 @@ function updateIngraphMetricConfigTable(dataset) {
       container : {
         title : 'Container'
       },
-      metric : {
+      dashboardName : {
+        title : 'Dashboard'
+      },
+      metricName : {
         title : 'Metric  Name'
       },
-      metricAlias : {
-        title : 'Metric Alias'
+      rrdName : {
+        title : 'RRD'
       },
       metricDataType : {
         title : 'Metric Type',

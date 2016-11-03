@@ -16,6 +16,7 @@ import org.codehaus.jackson.node.ObjectNode;
 
 import com.google.common.collect.Lists;
 import com.linkedin.thirdeye.client.DAORegistry;
+import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.util.JsonResponseUtil;
@@ -126,11 +127,13 @@ public class DatasetConfigResource {
   @Path("/list")
   @Produces(MediaType.APPLICATION_JSON)
   public String viewDatsetConfig(@DefaultValue("0") @QueryParam("jtStartIndex") int jtStartIndex,
-      @DefaultValue("10") @QueryParam("jtPageSize") int jtPageSize) {
+      @DefaultValue("100") @QueryParam("jtPageSize") int jtPageSize) {
     List<DatasetConfigDTO> datasetConfigDTOs = datassetConfigDao.findAll();
-    List<DatasetConfigDTO> subList = Lists.newArrayList(datasetConfigDTOs).subList(jtStartIndex, jtStartIndex + jtPageSize);
+    List<DatasetConfigDTO> subList = Utils.sublist(datasetConfigDTOs, jtStartIndex, jtPageSize);
     ObjectNode rootNode = JsonResponseUtil.buildResponseJSON(subList);
     return rootNode.toString();
   }
+
+  
 
 }

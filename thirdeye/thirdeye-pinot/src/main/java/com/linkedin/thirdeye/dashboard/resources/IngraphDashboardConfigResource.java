@@ -18,7 +18,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.thirdeye.client.DAORegistry;
+import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.datalayer.bao.IngraphDashboardConfigManager;
+import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.IngraphDashboardConfigDTO;
 import com.linkedin.thirdeye.util.JsonResponseUtil;
 
@@ -141,9 +143,11 @@ public class IngraphDashboardConfigResource {
   @GET
   @Path("/list")
   @Produces(MediaType.APPLICATION_JSON)
-  public String viewDashboardConfigs() {
-    List<IngraphDashboardConfigDTO> ingraphMetricConfigDTOs = ingraphDashboardConfigDAO.findAll();
-    ObjectNode rootNode = JsonResponseUtil.buildResponseJSON(ingraphMetricConfigDTOs);
+  public String viewDashboardConfigs(@DefaultValue("0") @QueryParam("jtStartIndex") int jtStartIndex,
+      @DefaultValue("100") @QueryParam("jtPageSize") int jtPageSize) {
+    List<IngraphDashboardConfigDTO> ingraphDashboardConfigDTOs = ingraphDashboardConfigDAO.findAll();
+    List<IngraphDashboardConfigDTO> subList = Utils.sublist(ingraphDashboardConfigDTOs, jtStartIndex, jtPageSize);
+    ObjectNode rootNode = JsonResponseUtil.buildResponseJSON(subList);
     return rootNode.toString();
   }
 
