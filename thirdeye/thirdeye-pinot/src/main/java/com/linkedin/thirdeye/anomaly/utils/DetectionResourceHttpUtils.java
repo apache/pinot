@@ -14,6 +14,7 @@ public class DetectionResourceHttpUtils extends AbstractResourceHttpUtils {
 
   private static String DETECTION_JOB_ENDPOINT = "/api/detection-job/";
   private static String ADHOC = "/ad-hoc";
+  private static String BACKFILL = "/backfill";
 
   public DetectionResourceHttpUtils(String detectionHost, int detectionPort) {
     super(new HttpHost(detectionHost, detectionPort));
@@ -33,6 +34,13 @@ public class DetectionResourceHttpUtils extends AbstractResourceHttpUtils {
       throws ClientProtocolException, IOException {
     HttpPost req = new HttpPost(
         DETECTION_JOB_ENDPOINT + id + ADHOC + "?start=" + startTimeIso + "&end=" + endTimeIso);
+    return callJobEndpoint(req);
+  }
+
+  public String runBackfillAnomalyFunction(String id, String startTimeIso, String endTimeIso)
+      throws ClientProtocolException, IOException {
+    HttpPost req = new HttpPost(
+        DETECTION_JOB_ENDPOINT + id + BACKFILL + "?start=" + startTimeIso + "&end=" + endTimeIso);
     return callJobEndpoint(req);
   }
 }

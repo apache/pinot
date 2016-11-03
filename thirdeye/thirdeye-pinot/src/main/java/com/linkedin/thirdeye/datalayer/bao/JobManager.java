@@ -14,8 +14,12 @@ public interface JobManager extends AbstractManager<JobDTO>{
   void updateStatusAndJobEndTimeForJobIds(Set<Long> id, JobStatus status, Long jobEndTime);
 
   int deleteRecordsOlderThanDaysWithStatus(int days, JobStatus status);
-  
+
   List<JobDTO> findNRecentJobs(int n);
 
+  String getJobNameByJobId(long id);
 
+  JobDTO findLatestScheduledJobByName(String jobName);
+
+  JobDTO findLatestBackfillScheduledJobByFunctionId(long functionId, long backfillWindowStart, long backfillWindowEnd);
 }
