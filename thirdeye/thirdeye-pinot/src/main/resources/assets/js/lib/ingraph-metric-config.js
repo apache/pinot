@@ -73,49 +73,6 @@ function updateIngraphMetricConfigTable(dataset) {
       metricSourceType : {
         title : 'Source Type',
         options : [ 'COUNTER', 'GAUGE' ]
-      },
-      bootstrap : {
-        title : 'Bootstrap',
-        defaultValue : false,
-        options : [ false, true ]
-      },
-      startTime : {
-        title : 'Start Time',
-        type : 'date',
-        display : function(data) {
-          if (data.record && data.record.endTimeInMs)
-            return moment(data.record.startTimeInMs).format('YYYY-MM-DD');
-          return '';
-        }
-      },
-      endTime : {
-        title : 'End Time',
-        type : 'date',
-        display : function(data) {
-          if (data.record && data.record.startTimeInMs)
-            return moment(data.record.endTimeInMs).format('YYYY-MM-DD');
-          return '';
-        }
-      },
-      intervalPeriod : {
-        title : 'Interval Period',
-        visibility: 'hidden'
-      },
-      fabrics : {
-        title : 'Fabrics',
-        visibility: 'hidden'
-      },
-      granularitySize : {
-        title : 'Granularity Size',
-        visibility: 'hidden'
-      },
-      granularityUnit : {
-        title : 'Granularity Unit',
-        visibility: 'hidden'
-      },
-      numAvroRecords : {
-        title : 'Num Avro Records',
-        visibility: 'hidden'
       }
     }
   });

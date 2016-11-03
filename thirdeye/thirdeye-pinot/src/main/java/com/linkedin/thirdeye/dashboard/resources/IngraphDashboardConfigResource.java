@@ -1,9 +1,11 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
 import java.text.SimpleDateFormat;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import javax.validation.constraints.NotNull;
+import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
@@ -12,6 +14,8 @@ import javax.ws.rs.core.MediaType;
 
 import org.apache.commons.lang3.StringUtils;
 import org.codehaus.jackson.node.ObjectNode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.datalayer.bao.IngraphDashboardConfigManager;
@@ -21,6 +25,7 @@ import com.linkedin.thirdeye.util.JsonResponseUtil;
 @Path(value = "/thirdeye-admin/ingraph-dashboard-config")
 @Produces(MediaType.APPLICATION_JSON)
 public class IngraphDashboardConfigResource {
+  private static final Logger LOG = LoggerFactory.getLogger(IngraphDashboardConfigResource.class);
 
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
@@ -36,8 +41,8 @@ public class IngraphDashboardConfigResource {
   public String createDashboardConfig(@QueryParam("name") String name,
       @QueryParam("fabrics") String fabrics,
       @QueryParam("bootstrap") boolean bootstrap,
-      @QueryParam("bootstrapStartTime") String bootstrapStartTime,
-      @QueryParam("bootstrapEndTime") String bootstrapEndTime,
+      @QueryParam("startTime") String bootstrapStartTime,
+      @QueryParam("endTime") String bootstrapEndTime,
       @QueryParam("fetchIntervalPeriod") String fetchIntervalPeriod,
       @QueryParam("mergeNumAvroRecords") String mergeNumAvroRecords,
       @QueryParam("granularitySize") String granularitySize,
@@ -71,6 +76,7 @@ public class IngraphDashboardConfigResource {
       ingraphDashboardConfigDTO.setId(id);
       return JsonResponseUtil.buildResponseJSON(ingraphDashboardConfigDTO).toString();
     } catch (Exception e) {
+      LOG.error("Failed to create dashboard:{}", name, e);
       return JsonResponseUtil.buildErrorResponseJSON("Failed to create dashboard:" + name).toString();
     }
   }
@@ -135,8 +141,8 @@ public class IngraphDashboardConfigResource {
   @GET
   @Path("/list")
   @Produces(MediaType.APPLICATION_JSON)
-  public String viewDashboardConfig(@NotNull @QueryParam("dashboard") String dashboard) {
-    IngraphDashboardConfigDTO ingraphMetricConfigDTOs = ingraphDashboardConfigDAO.findByName(dashboard);
+  public String viewDashboardConfigs() {
+    List<IngraphDashboardConfigDTO> ingraphMetricConfigDTOs = ingraphDashboardConfigDAO.findAll();
     ObjectNode rootNode = JsonResponseUtil.buildResponseJSON(ingraphMetricConfigDTOs);
     return rootNode.toString();
   }
