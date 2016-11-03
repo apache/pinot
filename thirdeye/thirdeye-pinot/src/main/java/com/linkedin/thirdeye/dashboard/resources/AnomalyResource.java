@@ -34,6 +34,7 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
 import org.joda.time.format.ISODateTimeFormat;
@@ -575,11 +576,43 @@ public class AnomalyResource {
     Map<DimensionKey, MetricTimeSeries> res = timeSeriesResponseConverter.toMap(timeSeriesResponse,
         Utils.getSchemaDimensionNames(anomalyResult.getFunction().getCollection()));
 
-    // Currently, we assume that we get time series for one metric at a time
-    String metricName = anomalyFunctionSpec.getMetric();
-    Iterator<MetricTimeSeries> ite = res.values().iterator();
-    if (ite.hasNext()) {
-      MetricTimeSeries metricTimeSeries = ite.next();
+    if (MapUtils.isNotEmpty(res)) {
+      // Currently, we assume that we get time series for one metric at a time
+      String metricName = anomalyFunctionSpec.getMetric();
+
+      // For most anomalies, there should be only one time series due to its dimensions. The exception is the OTHER
+      // dimension, in which time series of different dimensions are returned due to the calculation of OTHER dimension.
+      // Therefore, we need to get the time series of OTHER dimension manually.
+      MetricTimeSeries metricTimeSeries = null;
+      if (res.size() == 1) {
+        Iterator<MetricTimeSeries> ite = res.values().iterator();
+        if (ite.hasNext()) {
+          metricTimeSeries = ite.next();
+        }
+      } else { // Retrieve the time series of OTHER dimension
+        Iterator<Map.Entry<DimensionKey, MetricTimeSeries>> ite = res.entrySet().iterator();
+        while (ite.hasNext()) {
+          Map.Entry<DimensionKey, MetricTimeSeries> entry = ite.next();
+          DimensionKey dimensionKey = entry.getKey();
+          boolean foundOTHER = false;
+          for (String dimensionValue : dimensionKey.getDimensionValues()) {
+            if (dimensionValue.equalsIgnoreCase("OTHER")) {
+              metricTimeSeries = entry.getValue();
+              foundOTHER = true;
+              break;
+            }
+          }
+          if (foundOTHER) {
+            break;
+          }
+        }
+        // Check if something goes wrong when we try to get the time series for OTHER dimension; in that case, we
+        // return an empty time series
+        if (metricTimeSeries == null) {
+          return new AnomalyTimelinesView();
+        }
+      }
+
       AnomalyTimelinesView anomalyTimelinesView =
           anomalyTimeSeriesView.getTimeSeriesView(metricTimeSeries, bucketMillis, metricName, viewWindowStartTime, viewWindowEndTime, null);
 
@@ -597,6 +630,8 @@ public class AnomalyResource {
 
       return anomalyTimelinesView;
     } else {
+      // If this case happened, there was something wrong with anomaly detection because we are not able to retrieve
+      // the timeseries for the given anomaly
       return new AnomalyTimelinesView();
     }
   }

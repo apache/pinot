@@ -76,8 +76,7 @@ public abstract class TimeSeriesUtil {
     TimeGranularity timeGranularity = new TimeGranularity(anomalyFunctionSpec.getBucketSize(),
         anomalyFunctionSpec.getBucketUnit());
 
-    return getTimeSeriesResponseImpl(anomalyFunctionSpec, startEndTimeRanges, timeGranularity, filters, groupByDimensions,
-        monitoringWindowStart, monitoringWindowEnd);
+    return getTimeSeriesResponseImpl(anomalyFunctionSpec, startEndTimeRanges, timeGranularity, filters, groupByDimensions);
   }
 
   /**
@@ -115,7 +114,7 @@ public abstract class TimeSeriesUtil {
 
     boolean hasOTHERDimensionName = false;
     for (String dimensionValue : dimensionMap.values()) {
-      if (!dimensionValue.equalsIgnoreCase("other")) {
+      if (dimensionValue.equalsIgnoreCase("other")) {
         hasOTHERDimensionName = true;
         break;
       }
@@ -130,13 +129,12 @@ public abstract class TimeSeriesUtil {
       groupByDimensions = Arrays.asList(anomalyFunctionSpec.getExploreDimensions().trim().split(","));
     }
 
-    return getTimeSeriesResponseImpl(anomalyFunctionSpec, startEndTimeRanges, timeGranularity, filters,
-        groupByDimensions, viewWindowStart, viewWindowEnd);
+    return getTimeSeriesResponseImpl(anomalyFunctionSpec, startEndTimeRanges, timeGranularity, filters, groupByDimensions);
   }
 
   private static TimeSeriesResponse getTimeSeriesResponseImpl(AnomalyFunctionDTO anomalyFunctionSpec,
       List<Pair<Long, Long>> startEndTimeRanges, TimeGranularity timeGranularity, Multimap<String, String> filters,
-      List<String> groupByDimensions, long monitoringWindowStart, long monitoringWindowEnd)
+      List<String> groupByDimensions)
       throws JobExecutionException, ExecutionException {
 
     TimeSeriesHandler timeSeriesHandler =
