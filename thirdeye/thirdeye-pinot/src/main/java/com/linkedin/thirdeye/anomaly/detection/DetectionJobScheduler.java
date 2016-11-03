@@ -210,6 +210,16 @@ public class DetectionJobScheduler implements JobScheduler, Runnable {
     LOG.info("Stopped function {}", jobKey);
   }
 
+  /**
+   * Performs a detection job, which is immediately triggered once, for the specified anomaly function on the given
+   * monitoring window.
+   *
+   * @param id id of the specified anomaly function
+   * @param windowStartTime start time of the given monitoring window
+   * @param windowEndTime end time of the given monitoring window
+   * @return the name of the detection job, which is composed of the prefix "adhoc", window start time, job scheduled
+   * time, function name, and function id; which are separated by symbol "_".
+   */
   public String runAdHoc(Long id, DateTime windowStartTime, DateTime windowEndTime) {
     AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionDAO.findById(id);
     if (anomalyFunctionSpec == null) {
@@ -318,27 +328,8 @@ public class DetectionJobScheduler implements JobScheduler, Runnable {
         return;
       }
 
-      // Check out if there exists any previous jobs
-      DateTime currentStart;
-      JobDTO previousJob = getPreviousJob(functionId, backfillStartTime.getMillis(), backfillEndTime.getMillis());
-      if (previousJob != null) {
-        long previousStartTime = previousJob.getWindowStartTime();
-        cleanUpJob(previousJob);
-        if (previousJob.getStatus().equals(JobConstants.JobStatus.COMPLETED)) {
-          // Schedule a job after previous job
-          currentStart = new DateTime(cronExpression.getNextValidTimeAfter(new Date(previousStartTime)));
-        } else {
-          // Reschedule the previous incomplete job
-          currentStart = new DateTime(previousStartTime);
-        }
-        LOG.info("Backfill starting from {} for functoin {} because a previous unfinished jobs is found.", currentStart,
-            functionId);
-      } else {
-        // Schedule a job starting from the beginning
-        currentStart = backfillStartTime;
-      }
-
       long monitoringWindowSize = TimeUnit.MILLISECONDS.convert(anomalyFunction.getWindowSize(), anomalyFunction.getWindowUnit());
+      DateTime currentStart = computeCurrentStartTime(functionId, cronExpression, backfillStartTime, backfillEndTime);
       DateTime currentEnd = currentStart.plus(monitoringWindowSize);
 
       // Make the end time inclusive
@@ -384,6 +375,39 @@ public class DetectionJobScheduler implements JobScheduler, Runnable {
   }
 
   /**
+   * Returns the start time of the first detection job for the current backfill. The start time is determined in the
+   * following:
+   * 1. If there exists any previously left detection job, then start backfill from that job.
+   *    1a. if that job is finished, then start a job next to it.
+   *    1b. if that job is unfinished, then restart that job.
+   * 2. If there exists no previous left job, then start the job from the beginning.
+   *
+   * @param cronExpression the cron expression that is used to calculate the alignment of start time.
+   * @return the start time for the first detection job of this backfilling.
+   */
+  private DateTime computeCurrentStartTime(long functionId, CronExpression cronExpression, DateTime backfillStartTime, DateTime backfillEndTime) {
+    DateTime currentStart;
+    JobDTO previousJob = getPreviousJob(functionId, backfillStartTime.getMillis(), backfillEndTime.getMillis());
+    if (previousJob != null) {
+      long previousStartTime = previousJob.getWindowStartTime();
+      cleanUpJob(previousJob);
+      if (previousJob.getStatus().equals(JobConstants.JobStatus.COMPLETED)) {
+        // Schedule a job after previous job
+        currentStart = new DateTime(cronExpression.getNextValidTimeAfter(new Date(previousStartTime)));
+      } else {
+        // Reschedule the previous incomplete job
+        currentStart = new DateTime(previousStartTime);
+      }
+      LOG.info("Backfill starting from {} for functoin {} because a previous unfinished jobs is found.", currentStart,
+          functionId);
+    } else {
+      // Schedule a job starting from the beginning
+      currentStart = backfillStartTime;
+    }
+    return currentStart;
+  }
+
+  /**
    * Sets unfinished (i.e., RUNNING, WAITING) tasks and job's status to FAILED
    * @param job
    */
@@ -405,7 +429,7 @@ public class DetectionJobScheduler implements JobScheduler, Runnable {
   }
 
   /**
-   * Returns the job of the given name with reties. This method is used to get the job that is just inserted to database
+   * Returns the job of the given name with retries. This method is used to get the job that is just inserted to database
    *
    * @param jobName
    * @return

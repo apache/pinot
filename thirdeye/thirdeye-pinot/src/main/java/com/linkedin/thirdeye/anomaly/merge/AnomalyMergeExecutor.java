@@ -391,7 +391,7 @@ public class AnomalyMergeExecutor implements Runnable {
    *
    * Step 5: persist merged anomalies
    */
-  public int performLightWeightMergeBasedOnFunctionIdAndDimension(AnomalyFunctionDTO functionSpec, boolean isNotified) {
+  public int performSynchronousMergeBasedOnFunctionIdAndDimension(AnomalyFunctionDTO functionSpec, boolean isNotified) {
     if (functionSpec.getIsActive()) {
       List<RawAnomalyResultDTO> unmergedResults = anomalyResultDAO.findUnmergedByFunctionId(functionSpec.getId());
 

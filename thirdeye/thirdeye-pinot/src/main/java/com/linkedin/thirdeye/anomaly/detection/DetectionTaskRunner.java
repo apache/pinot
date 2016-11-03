@@ -48,14 +48,14 @@ public class DetectionTaskRunner implements TaskRunner {
   private List<RawAnomalyResultDTO> existingRawAnomalies;
   private BaseAnomalyFunction anomalyFunction;
   private DatasetConfigManager datasetConfigDAO;
-  private AnomalyMergeExecutor lightAnomalyMergeExecutor;
+  private AnomalyMergeExecutor syncAnomalyMergeExecutor;
 
   public DetectionTaskRunner() {
     timeSeriesResponseConverter = TimeSeriesResponseConverter.getInstance();
-    // lightAnomalyMergeExecutor is supposed to perform lightweight merge (i.e., anomalies that have the same function
+    // syncAnomalyMergeExecutor is supposed to perform lightweight merge (i.e., anomalies that have the same function
     // id and at the same dimensions) after each detection task. Consequently, a null thread pool is passed the merge
     // executor on purpose in order to prevent unwanted
-    lightAnomalyMergeExecutor = new AnomalyMergeExecutor(null);
+    syncAnomalyMergeExecutor = new AnomalyMergeExecutor(null);
   }
 
   public List<TaskResult> execute(TaskInfo taskInfo, TaskContext taskContext) throws Exception {
@@ -92,7 +92,7 @@ public class DetectionTaskRunner implements TaskRunner {
     String jobName = taskContext.getJobDAO().getJobNameByJobId(detectionTaskInfo.getJobExecutionId());
     if (jobName != null && jobName.toLowerCase().startsWith(BACKFILL_PREFIX)) {
       boolean isNotified = true;
-      lightAnomalyMergeExecutor.performLightWeightMergeBasedOnFunctionIdAndDimension(anomalyFunctionSpec, isNotified);
+      syncAnomalyMergeExecutor.performSynchronousMergeBasedOnFunctionIdAndDimension(anomalyFunctionSpec, isNotified);
     }
 
     return taskResult;
