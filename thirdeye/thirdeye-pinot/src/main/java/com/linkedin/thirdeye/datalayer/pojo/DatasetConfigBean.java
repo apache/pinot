@@ -34,6 +34,9 @@ public class DatasetConfigBean extends AbstractBean {
 
   private String metricValuesColumn;
 
+  /** Autodiscover metrics in case of metricAsDimension */
+  private boolean autoDiscoverMetrics = false;
+
   private boolean active = true;
 
   private boolean additive = true;
@@ -122,6 +125,15 @@ public class DatasetConfigBean extends AbstractBean {
     this.metricValuesColumn = metricValuesColumn;
   }
 
+
+  public boolean isAutoDiscoverMetrics() {
+    return autoDiscoverMetrics;
+  }
+
+  public void setAutoDiscoverMetrics(boolean autoDiscoverMetrics) {
+    this.autoDiscoverMetrics = autoDiscoverMetrics;
+  }
+
   public boolean isActive() {
     return active;
   }
@@ -187,6 +199,7 @@ public class DatasetConfigBean extends AbstractBean {
         && Objects.equals(metricAsDimension, dc.isMetricAsDimension())
         && Objects.equals(metricNamesColumn, dc.getMetricNamesColumn())
         && Objects.equals(metricValuesColumn, dc.getMetricValuesColumn())
+        && Objects.equals(autoDiscoverMetrics, dc.isAutoDiscoverMetrics())
         && Objects.equals(active, dc.isActive())
         && Objects.equals(additive, dc.isAdditive())
         && Objects.equals(dimensionsHaveNoPreAggregation, dc.getDimensionsHaveNoPreAggregation())
@@ -198,7 +211,7 @@ public class DatasetConfigBean extends AbstractBean {
   @Override
   public int hashCode() {
     return Objects.hash(getId(), dataset, dimensions, timeColumn, timeUnit, timeDuration, timeFormat, timezone,
-        metricAsDimension, metricNamesColumn, metricValuesColumn, active, additive,
+        metricAsDimension, metricNamesColumn, metricValuesColumn, autoDiscoverMetrics, active, additive,
         dimensionsHaveNoPreAggregation, preAggregatedKeyword, nonAdditiveBucketSize, nonAdditiveBucketUnit);
   }
 
@@ -208,7 +221,7 @@ public class DatasetConfigBean extends AbstractBean {
         .add("dimensions", dimensions).add("timeUnit", timeUnit)
         .add("timeDuration", timeDuration).add("timeFormat", timeFormat).add("metricAsDimension", metricAsDimension)
         .add("metricNamesColumn", metricNamesColumn).add("metricValuesColumn", metricValuesColumn)
-        .add("active", active).add("additive", additive)
+        .add("autoDiscoverMetrics", autoDiscoverMetrics).add("active", active).add("additive", additive)
         .add("dimensionsHaveNoPreAggregation", dimensionsHaveNoPreAggregation)
         .add("preAggregatedKeyword", preAggregatedKeyword).add("nonAdditiveBucketSize", nonAdditiveBucketSize)
         .add("nonAdditiveBucketUnit", nonAdditiveBucketUnit).toString();
