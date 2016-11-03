@@ -89,6 +89,7 @@ public class ControllerStarter {
 
     final Context applicationContext = component.getContext().createChildContext();
 
+    LOGGER.info("Controller download url base: {}", config.generateVipUrl());
     LOGGER.info("Injecting configuration and resource manager to the API context");
     applicationContext.getAttributes().put(ControllerConf.class.toString(), config);
     applicationContext.getAttributes().put(PinotHelixResourceManager.class.toString(), helixResourceManager);
