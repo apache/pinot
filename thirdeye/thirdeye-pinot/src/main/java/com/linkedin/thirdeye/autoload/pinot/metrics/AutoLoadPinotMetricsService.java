@@ -14,9 +14,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.google.common.collect.Lists;
+import com.linkedin.pinot.client.ResultSet;
+import com.linkedin.pinot.client.ResultSetGroup;
+import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.thirdeye.client.DAORegistry;
+import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
+import com.linkedin.thirdeye.client.pinot.PinotQuery;
 import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
 import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
@@ -24,7 +30,7 @@ import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.datalayer.pojo.DashboardConfigBean;
+import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 /**
  * This is a service to onboard datasets automatically to thirdeye from pinot
@@ -141,12 +147,15 @@ public class AutoLoadPinotMetricsService implements Runnable {
   private void refreshOldDataset(String dataset, DatasetConfigDTO datasetConfig, Schema schema) throws Exception {
 
     if (datasetConfig.isMetricAsDimension()) {
-      LOG.info("Skipping refresh for metricAsDimension dataset {}", dataset);
+      LOG.info("Checking refresh for metricAsDimension dataset {}", dataset);
+      checkMetricAsDimensionDataset(datasetConfig, schema);
     } else {
       checkDimensionChanges(dataset, datasetConfig, schema);
       checkMetricChanges(dataset, datasetConfig, schema);
     }
   }
+
+
 
   private void checkDimensionChanges(String dataset, DatasetConfigDTO datasetConfig, Schema schema) {
 
@@ -208,7 +217,7 @@ public class AutoLoadPinotMetricsService implements Runnable {
     // add new metricIds to default dashboard
     if (CollectionUtils.isNotEmpty(metricsToAdd)) {
       LOG.info("Metrics to add {}", metricsToAdd);
-      String dashboardName = DashboardConfigBean.DEFAULT_DASHBOARD_PREFIX + dataset;
+      String dashboardName = ThirdEyeUtils.getDefaultDashboardName(dataset);
       DashboardConfigDTO dashboardConfig = dashboardConfigDAO.findByName(dashboardName);
       List<Long> metricIds = dashboardConfig.getMetricIds();
       metricIds.addAll(metricsToAdd);
@@ -253,6 +262,85 @@ public class AutoLoadPinotMetricsService implements Runnable {
       isIngraphDataset = true;
     }
     return isIngraphDataset;
+  }
+
+  private List<String> fetchMetricAsADimensionMetrics(String dataset, String metricNamesColumn) {
+    List<String> distinctMetricNames = new ArrayList<>();
+    ThirdEyeCacheRegistry CACHE_REGISTRY = ThirdEyeCacheRegistry.getInstance();
+    String sql = String.format("select count(*) from %s group by %s top 10", dataset, metricNamesColumn);
+    try {
+
+      ResultSetGroup result = CACHE_REGISTRY.getResultSetGroupCache().get(new PinotQuery(sql, dataset));
+      ResultSet resultSet = result.getResultSet(0);
+      int rowCount = resultSet.getRowCount();
+      for (int i = 0; i < rowCount; i++) {
+        String dimensionName = resultSet.getGroupKeyString(i, 0);
+        distinctMetricNames.add(dimensionName);
+      }
+
+      LOG.info("Distinct Metrics {}", distinctMetricNames);
+    } catch (Exception e) {
+      LOG.error("Exception in fetching metrics from pinot", e);
+    }
+    return distinctMetricNames;
+  }
+
+  private void checkMetricAsDimensionDataset(DatasetConfigDTO datasetConfigDTO, Schema schema) {
+    String dataset = datasetConfigDTO.getDataset();
+    String metricNamesColumn = datasetConfigDTO.getMetricNamesColumn();
+    String metricValuesColumn = datasetConfigDTO.getMetricValuesColumn();
+    FieldSpec metricValuesColumnFieldSpec = schema.getFieldSpecFor(metricValuesColumn);
+    String dashboardName = ThirdEyeUtils.getDefaultDashboardName(dataset);
+
+    // remove metricNamesColumn from dimensions if exists
+    List<String> dimensions = datasetConfigDTO.getDimensions();
+    if (dimensions.contains(metricNamesColumn)) {
+      dimensions.removeAll(Lists.newArrayList(metricNamesColumn));
+      datasetConfigDTO.setDimensions(dimensions);
+      datasetConfigDAO.update(datasetConfigDTO);
+    }
+
+    // remove metricValuesColumn from metrics if exists
+    MetricConfigDTO metricConfigDTO = metricConfigDAO.findByMetricAndDataset(metricValuesColumn, dataset);
+
+    if (metricConfigDTO != null) {
+      Long metricId = metricConfigDTO.getId();
+      metricConfigDAO.delete(metricConfigDTO);
+
+      // remove metricValuesColumn id from default dashboard
+      DashboardConfigDTO dashboardConfig = dashboardConfigDAO.findByName(dashboardName);
+      List<Long> dashboardMetricIds = dashboardConfig.getMetricIds();
+      dashboardMetricIds.removeAll(Lists.newArrayList(metricId));
+      LOG.info("Updating dashboard config for {}", dashboardName);
+      dashboardConfigDAO.update(dashboardConfig);
+    }
+
+    if (datasetConfigDTO.isAutoDiscoverMetrics()) {
+
+      // query pinot to fetch distinct metricNamesColumn
+      List<String> allDistinctMetricNames = fetchMetricAsADimensionMetrics(dataset, metricNamesColumn);
+
+      // create metrics for these metric names, if they dont exist
+      List<MetricConfigDTO> existingMetricConfigs = metricConfigDAO.findByDataset(dataset);
+      List<String> existingMetricNames = Lists.newArrayList();
+      for (MetricConfigDTO existingMetricConfig : existingMetricConfigs) {
+        existingMetricNames.add(existingMetricConfig.getName());
+      }
+      allDistinctMetricNames.removeAll(existingMetricNames);
+      for (String metricName : allDistinctMetricNames) {
+        LOG.info("Creating metric config for {}", metricName);
+        MetricFieldSpec metricFieldSpec = new MetricFieldSpec(metricName, metricValuesColumnFieldSpec.getDataType());
+        MetricConfigDTO metricConfig = ConfigGenerator.generateMetricConfig(metricFieldSpec, dataset);
+        metricConfigDAO.save(metricConfig);
+      }
+
+      // Add metrics to default dashboard
+      List<Long> allMetricIds = ConfigGenerator.getMetricIdsFromMetricConfigs(metricConfigDAO.findByDataset(dataset));
+      DashboardConfigDTO dashboardConfig = dashboardConfigDAO.findByName(dashboardName);
+      dashboardConfig.setMetricIds(allMetricIds);
+      LOG.info("Creating dashboard config for {}", dashboardName);
+      dashboardConfigDAO.update(dashboardConfig);
+    }
   }
 
 }

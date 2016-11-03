@@ -9,8 +9,8 @@ import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.TimeFieldSpec;
 import com.linkedin.pinot.common.data.TimeGranularitySpec;
-
 import com.linkedin.thirdeye.api.DimensionMap;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -43,6 +43,7 @@ import com.linkedin.thirdeye.client.cache.MetricDataset;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
+import com.linkedin.thirdeye.datalayer.pojo.DashboardConfigBean;
 import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
 
 
@@ -298,6 +299,11 @@ public abstract class ThirdEyeUtils {
   public static String constructMetricAlias(String datasetName, String metricName) {
     String alias = datasetName + MetricConfigBean.ALIAS_JOINER + metricName;
     return alias;
+  }
+
+  public static String getDefaultDashboardName(String dataset) {
+    String dashboardName = DashboardConfigBean.DEFAULT_DASHBOARD_PREFIX + dataset;
+    return dashboardName;
   }
 
 }
