@@ -17,6 +17,7 @@
 
 <!-- custom scripts -->
 <script src="../../../assets/js/lib/ingraph-metric-config.js"></script>
+<script src="../../../assets/js/lib/ingraph-dashboard-config.js"></script>
 <script src="../../../assets/js/lib/metric-config.js"></script>
 <script src="../../../assets/js/lib/dataset-config.js"></script>
 <script src="../../../assets/js/lib/job-info.js"></script>
@@ -39,8 +40,11 @@
       e.relatedTarget // previous active tab
       tabId = $(e.target).attr("href")
       $(tabId).tab('show')
-      if(tabId == "#ingraph-config"){
+      if(tabId == "#ingraph-metric-config"){
       	showIngraphDatasetSelection();
+      }
+      if(tabId == "#ingraph-dashboard-config"){
+        listIngraphDashboardConfigs();
       }
       if(tabId == "#metric-config"){
       	showMetricDatasetSelection();
@@ -58,15 +62,20 @@
 <body>
 	<div class="container-fluid">
 		<ul class="nav nav-tabs navbar-inverse">
-			<li class=""><a href="#ingraph-config" data-toggle="tab">Ingraph Metric</a></li>
+			<li class=""><a href="#ingraph-metric-config" data-toggle="tab">Ingraph Metric</a></li>
+			<li class=""><a href="#ingraph-dashboard-config" data-toggle="tab">Ingraph Dashboard</a></li>
 			<li class=""><a href="#dataset-config" data-toggle="tab">Dataset </a></li>
 			<li class=""><a href="#metric-config" data-toggle="tab">Metric</a></li>
 			<li class=""><a href="#job-info" data-toggle="tab">JobInfo</a></li>
 		</ul>
 		<div class="tab-content">
-			<div class="tab-pane" id="ingraph-config">
+			<div class="tab-pane" id="ingraph-metric-config">
 			   <#include "ingraph-metric-config.ftl">
 			   <div id="ingraph-metric-config-place-holder"></div>
+			</div>
+			<div class="tab-pane" id="ingraph-dashboard-config">
+			   <#include "ingraph-dashboard-config.ftl">
+			   <div id="ingraph-dashboard-config-place-holder"></div>
 			</div>
 			<div class="tab-pane" id="dataset-config">
 			 <#include "dataset-config.ftl">
