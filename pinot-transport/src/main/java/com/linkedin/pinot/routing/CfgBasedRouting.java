@@ -51,6 +51,12 @@ public class CfgBasedRouting implements RoutingTable {
   }
 
   @Override
+  public boolean routingTableExists(String tableName) {
+    Map<ServerInstance, SegmentIdSet> routingTableEntry = findServers(new RoutingTableLookupRequest(tableName, null));
+    return routingTableEntry != null && !routingTableEntry.isEmpty();
+  }
+
+  @Override
   public void start() {
     // Nothing to be done here
   }

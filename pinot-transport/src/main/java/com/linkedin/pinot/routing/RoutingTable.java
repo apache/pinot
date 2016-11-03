@@ -32,6 +32,14 @@ public interface RoutingTable {
   Map<ServerInstance, SegmentIdSet> findServers(RoutingTableLookupRequest request);
 
   /**
+   * Returns whether or not a routing table exists and is not empty for a given table.
+   *
+   * @param tableName The table name for which to check if a routing table exists
+   * @return true if the routing table exists and isn't empty
+   */
+  boolean routingTableExists(String tableName);
+
+  /**
    * Initialize and start the Routing table population
    */
   void start();

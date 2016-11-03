@@ -295,22 +295,17 @@ public class BrokerRequestHandler {
   private List<String> getMatchedTables(BrokerRequest request) {
     List<String> matchedTables = new ArrayList<String>();
     String tableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(request.getQuerySource().getTableName());
-    Map<ServerInstance, SegmentIdSet> routingMap = _routingTable.findServers(
-        new RoutingTableLookupRequest(tableName, extractRoutingOptionsFromBrokerRequest(request)));
-    if (routingMap != null && !routingMap.isEmpty()) {
+    if (_routingTable.routingTableExists(tableName)) {
       matchedTables.add(tableName);
     }
     tableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(request.getQuerySource().getTableName());
-    routingMap = _routingTable.findServers(
-        new RoutingTableLookupRequest(tableName, extractRoutingOptionsFromBrokerRequest(request)));
-    if (routingMap != null && !routingMap.isEmpty()) {
+    if (_routingTable.routingTableExists(tableName)) {
       matchedTables.add(tableName);
     }
     // For backward compatible
     if (matchedTables.isEmpty()) {
       tableName = request.getQuerySource().getTableName();
-      if (_routingTable.findServers(
-          new RoutingTableLookupRequest(tableName, extractRoutingOptionsFromBrokerRequest(request))) != null) {
+      if (_routingTable.routingTableExists(tableName)) {
         matchedTables.add(tableName);
       }
     }

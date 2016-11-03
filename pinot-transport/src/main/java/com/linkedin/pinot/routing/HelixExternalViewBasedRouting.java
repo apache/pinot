@@ -137,6 +137,12 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
     return serverToSegmentSetMaps.get(_random.nextInt(serverToSegmentSetMaps.size())).getRouting();
   }
 
+  @Override
+  public boolean routingTableExists(String tableName) {
+    return (_brokerRoutingTable.containsKey(tableName) && !_brokerRoutingTable.get(tableName).isEmpty()) ||
+        (_llcBrokerRoutingTable.containsKey(tableName) && !_llcBrokerRoutingTable.get(tableName).isEmpty());
+  }
+
   private List<ServerToSegmentSetMap> routeToLLC(String tableName) {
     if (_brokerMetrics != null) {
       _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.LLC_QUERY_COUNT, 1);
