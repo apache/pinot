@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.dashboard.resources;
 
 import java.util.List;
 import javax.validation.constraints.NotNull;
+import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
@@ -11,7 +12,9 @@ import javax.ws.rs.core.MediaType;
 import org.codehaus.jackson.node.ObjectNode;
 
 import com.linkedin.thirdeye.client.DAORegistry;
+import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.datalayer.bao.IngraphMetricConfigManager;
+import com.linkedin.thirdeye.datalayer.dto.IngraphDashboardConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.IngraphMetricConfigDTO;
 import com.linkedin.thirdeye.util.JsonResponseUtil;
 
@@ -92,9 +95,11 @@ public class IngraphMetricConfigResource {
   @GET
   @Path("/list")
   @Produces(MediaType.APPLICATION_JSON)
-  public String viewMetricConfig(@NotNull @QueryParam("dashboardName") String dashboardName) {
+  public String viewMetricConfig(@NotNull @QueryParam("dashboardName") String dashboardName, @DefaultValue("0") @QueryParam("jtStartIndex") int jtStartIndex,
+      @DefaultValue("100") @QueryParam("jtPageSize") int jtPageSize) {
     List<IngraphMetricConfigDTO> ingraphMetricConfigDTOs = ingraphMetricConfigDao.findByDashboard(dashboardName);
-    ObjectNode rootNode = JsonResponseUtil.buildResponseJSON(ingraphMetricConfigDTOs);
+    List<IngraphMetricConfigDTO> subList = Utils.sublist(ingraphMetricConfigDTOs, jtStartIndex, jtPageSize);
+    ObjectNode rootNode = JsonResponseUtil.buildResponseJSON(subList);
     return rootNode.toString();
   }
 

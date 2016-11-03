@@ -1,6 +1,6 @@
 function listIngraphDashboardConfigs() {
   $('#ingraph-dashboard-config-place-holder').jtable({
-    title : 'Dataset Configs' ,
+    title : 'Ingraph Dashboard Configs' ,
     paging : true, // Enable paging
     sorting : true, // Enable sorting
     ajaxSettings : {
@@ -71,5 +71,5 @@ function listIngraphDashboardConfigs() {
       }
     }
   });
-  $("#ingraph-dataset-config-place-holder" ).jtable('load');
+  $("#ingraph-dashboard-config-place-holder").jtable('load');
 }

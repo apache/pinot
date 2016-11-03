@@ -240,5 +240,11 @@ public class Utils {
   public static Map<String, Object> getMapFromObject(Object object) throws IOException {
     return getMapFromJson(getJsonFromObject(object));
   }
-
+  
+  public static <T extends Object> List<T> sublist(List<T> input, int startIndex, int length) {
+    startIndex = Math.min(startIndex, input.size());
+    int endIndex = Math.min(startIndex + length, input.size());
+    List<T> subList = Lists.newArrayList(input).subList(startIndex, endIndex);
+    return subList;
+  }
 }
