@@ -173,7 +173,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
     for (String segmentName : _tarDir.list()) {
       System.out.println("Uploading segment " + (i++) + " : " + segmentName);
       File file = new File(_tarDir, segmentName);
-      FileUploadUtils.sendSegmentFile("localhost", "8998", segmentName, new FileInputStream(file), file.length());
+      FileUploadUtils.sendSegmentFile("localhost", "8998", segmentName, file, file.length());
     }
 
     // Wait for all offline segments to be online
