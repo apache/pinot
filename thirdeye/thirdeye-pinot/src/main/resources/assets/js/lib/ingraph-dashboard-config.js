@@ -48,7 +48,7 @@ function listIngraphDashboardConfigs() {
         type : 'date',
         display : function(data) {
           if (data.record && data.record.bootstrapEndTime)
-            return moment(data.record.bootstrapStartTime).format('YYYY-MM-DD');
+            return moment(data.record.bootstrapEndTime).format('YYYY-MM-DD');
           return '';
         }
       },
