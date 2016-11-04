@@ -57,14 +57,7 @@ public class MetricConfigResource {
       populateMetricConfig(metricConfigDTO, dataset, name, metricType, active, derived, derivedFunctionType, numerator, denominator, derivedMetricExpression,
           inverseMetric, cellSizeExpression, rollupThreshold);
       Long id = metricConfigDao.save(metricConfigDTO);
-      DashboardConfigDTO dashboardConfigDTO =
-          dashboardConfigDAO.findByName(ThirdEyeUtils.getDefaultDashboardName(dataset));
-      if (dashboardConfigDTO != null) {
-        List<Long> metricIds = dashboardConfigDTO.getMetricIds();
-        metricIds.add(id);
-        dashboardConfigDTO.setMetricIds(metricIds);
-        dashboardConfigDAO.update(dashboardConfigDTO);
-      }
+
       metricConfigDTO.setId(id);
       return JsonResponseUtil.buildResponseJSON(metricConfigDTO).toString();
     } catch (Exception e) {
