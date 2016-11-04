@@ -18,10 +18,13 @@ import org.codehaus.jackson.node.ObjectNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.collect.Lists;
 import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.dashboard.Utils;
+import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
+import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.IngraphMetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.util.JsonResponseUtil;
@@ -35,9 +38,11 @@ public class MetricConfigResource {
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
   private MetricConfigManager metricConfigDao;
+  private DashboardConfigManager dashboardConfigDAO;
 
   public MetricConfigResource() {
     this.metricConfigDao = DAO_REGISTRY.getMetricConfigDAO();
+    this.dashboardConfigDAO = DAO_REGISTRY.getDashboardConfigDAO();
   }
 
   @GET
@@ -52,6 +57,14 @@ public class MetricConfigResource {
       populateMetricConfig(metricConfigDTO, dataset, name, metricType, active, derived, derivedFunctionType, numerator, denominator, derivedMetricExpression,
           inverseMetric, cellSizeExpression, rollupThreshold);
       Long id = metricConfigDao.save(metricConfigDTO);
+      DashboardConfigDTO dashboardConfigDTO =
+          dashboardConfigDAO.findByName(ThirdEyeUtils.getDefaultDashboardName(dataset));
+      if (dashboardConfigDTO != null) {
+        List<Long> metricIds = dashboardConfigDTO.getMetricIds();
+        metricIds.add(id);
+        dashboardConfigDTO.setMetricIds(metricIds);
+        dashboardConfigDAO.update(dashboardConfigDTO);
+      }
       metricConfigDTO.setId(id);
       return JsonResponseUtil.buildResponseJSON(metricConfigDTO).toString();
     } catch (Exception e) {
@@ -130,6 +143,14 @@ public class MetricConfigResource {
   @Path("/delete")
   public String deleteMetricConfig(@NotNull @QueryParam("dataset") String dataset, @NotNull @QueryParam("id") Long metricConfigId) {
     metricConfigDao.deleteById(metricConfigId);
+    DashboardConfigDTO dashboardConfigDTO =
+        dashboardConfigDAO.findByName(ThirdEyeUtils.getDefaultDashboardName(dataset));
+    if (dashboardConfigDTO != null) {
+      List<Long> metricIds = dashboardConfigDTO.getMetricIds();
+      metricIds.removeAll(Lists.newArrayList(metricConfigId));
+      dashboardConfigDTO.setMetricIds(metricIds);
+      dashboardConfigDAO.update(dashboardConfigDTO);
+    }
     return JsonResponseUtil.buildSuccessResponseJSON("Successully deleted " + metricConfigId).toString();
   }
 
