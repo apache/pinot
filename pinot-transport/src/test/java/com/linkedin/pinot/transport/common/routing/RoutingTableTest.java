@@ -474,7 +474,7 @@ public class RoutingTableTest {
       }
     }
 
-    Assert.assertTrue(4500 <= llcCount && 5500 <= llcCount, "Expected approximately 50% probability of picking LLC, got " + llcCount / 100.0 + " %");
+    Assert.assertTrue(4500 <= llcCount && llcCount <= 5500, "Expected approximately 50% probability of picking LLC, got " + llcCount / 100.0 + " %");
 
     tableConfig.getCustomConfigs().setCustomConfigs(Collections.singletonMap("routing.llc.percentage", "0"));
     fakePropertyStore.setContents("/PROPERTYSTORE/TABLES/fakeTable_REALTIME", AbstractTableConfig.toZnRecord(tableConfig));

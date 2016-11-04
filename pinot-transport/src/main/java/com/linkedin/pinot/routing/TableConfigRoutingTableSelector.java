@@ -96,7 +96,7 @@ public class TableConfigRoutingTableSelector implements RoutingTableSelector, IZ
     String tablePropertyStorePath = ZKMetadataProvider.constructPropertyStorePathForResourceConfig(realtimeTableName);
     _propertyStore.subscribeDataChanges(tablePropertyStorePath, this);
 
-    _tableRoutingRatioMap.put(realtimeTableName, getLlcRatio(realtimeTableName));
+    _tableRoutingRatioMap.put(realtimeTableName, getLlcRatio(realtimeTableName) / 100.0f);
   }
 
   @Override
@@ -105,7 +105,7 @@ public class TableConfigRoutingTableSelector implements RoutingTableSelector, IZ
     String realtimeTableName = zkPathParts.get(zkPathParts.size() - 1);
 
     // Update the ratio in place
-    _tableRoutingRatioMap.put(realtimeTableName, getLlcRatio(realtimeTableName));
+    _tableRoutingRatioMap.put(realtimeTableName, getLlcRatio(realtimeTableName) / 100.0f);
   }
 
   @Override
