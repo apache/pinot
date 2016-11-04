@@ -164,12 +164,13 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
 
   public void downloadAndReplaceSegment(final String segmentNameStr, LLCRealtimeSegmentZKMetadata llcSegmentMetadata) {
     final String uri = llcSegmentMetadata.getDownloadUrl();
-    File tempSegmentFolder = new File(_indexDir, "tmp-" + String.valueOf(System.currentTimeMillis()));
+    File tempSegmentFolder = new File(_indexDir, "tmp-" + segmentNameStr + "." + String.valueOf(System.currentTimeMillis()));
     File tempFile = new File(_indexDir, segmentNameStr + ".tar.gz");
     try {
       SegmentFetcherFactory.getSegmentFetcherBasedOnURI(uri).fetchSegmentToLocal(uri, tempFile);
       LOGGER.info("Downloaded file from {} to {}; Length of downloaded file: {}", uri, tempFile, tempFile.length());
       TarGzCompressionUtils.unTar(tempFile, tempSegmentFolder);
+      LOGGER.info("Uncompressed file {} into tmp dir {}", tempFile, tempSegmentFolder);
       FileUtils.deleteQuietly(tempFile);
       FileUtils.moveDirectory(tempSegmentFolder.listFiles()[0], new File(_indexDir, segmentNameStr));
       LOGGER.info("Replacing LLC Segment {}", segmentNameStr);
