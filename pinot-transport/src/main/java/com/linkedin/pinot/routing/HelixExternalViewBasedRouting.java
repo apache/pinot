@@ -209,6 +209,8 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
 
       _brokerRoutingTable.put(tableName, serverToSegmentSetMap);
       if (CommonConstants.Helix.TableType.REALTIME.equals(tableType)) {
+        _routingTableSelector.registerTable(tableName);
+
         try {
           List<ServerToSegmentSetMap> llcserverToSegmentSetMap = _realtimeLLCRoutingTableBuilder.computeRoutingTableFromExternalView(tableName, externalView, instanceConfigList);
 
@@ -227,8 +229,6 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
     } catch (Exception e) {
       LOGGER.error("Failed to update the TimeBoundaryService", e);
     }
-
-    _routingTableSelector.registerTable(tableName);
   }
 
   public void markDataResourceOffline(String tableName) {

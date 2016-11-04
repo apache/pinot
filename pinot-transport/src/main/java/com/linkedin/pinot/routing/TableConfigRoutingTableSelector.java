@@ -55,7 +55,7 @@ public class TableConfigRoutingTableSelector implements RoutingTableSelector, IZ
 
   private float getLlcRatio(String realtimeTableName) {
     RealtimeTableConfig tableConfig =
-        (RealtimeTableConfig) ZKMetadataProvider.getOfflineTableConfig(_propertyStore, realtimeTableName);
+        (RealtimeTableConfig) ZKMetadataProvider.getRealtimeTableConfig(_propertyStore, realtimeTableName);
 
     if (tableConfig == null) {
       LOGGER.warn("Failed to fetch table config for table {}", realtimeTableName);
