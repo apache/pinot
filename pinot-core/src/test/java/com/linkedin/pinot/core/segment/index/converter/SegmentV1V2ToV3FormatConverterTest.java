@@ -94,6 +94,9 @@ public class SegmentV1V2ToV3FormatConverterTest {
   @Test
   public void testConvert()
       throws Exception {
+
+    SegmentMetadataImpl beforeConversionMeta = new SegmentMetadataImpl(segmentDirectory);
+
     SegmentV1V2ToV3FormatConverter converter = new SegmentV1V2ToV3FormatConverter();
     converter.convert(segmentDirectory);
     File v3Location = SegmentDirectoryPaths.segmentDirectoryFor(segmentDirectory, SegmentVersion.v3);
@@ -119,7 +122,17 @@ public class SegmentV1V2ToV3FormatConverterTest {
 
     FileTime afterLoadTime = Files.getLastModifiedTime(v3Location.toPath());
     Assert.assertEquals(afterConversionTime, afterLoadTime);
+
+    // verify that SegmentMetadataImpl loaded from segmentDirectory correctly sets
+    // metadata information after conversion. This has impacted us while loading
+    // segments by triggering download. That's costly. That's also difficult to test
+    Assert.assertFalse(new File(segmentDirectory, V1Constants.MetadataKeys.METADATA_FILE_NAME).exists());
+    SegmentMetadataImpl metaAfterConversion = new SegmentMetadataImpl(segmentDirectory);
+    Assert.assertNotNull(metaAfterConversion);
+    Assert.assertFalse(metaAfterConversion.getCrc().equalsIgnoreCase(String.valueOf(Long.MIN_VALUE)));
+    Assert.assertEquals(metaAfterConversion.getCrc(), beforeConversionMeta.getCrc());
+    Assert.assertTrue(metaAfterConversion.getIndexCreationTime() != Long.MIN_VALUE);
+    Assert.assertEquals(metaAfterConversion.getIndexCreationTime(),
+        beforeConversionMeta.getIndexCreationTime());
   }
-
-
 }

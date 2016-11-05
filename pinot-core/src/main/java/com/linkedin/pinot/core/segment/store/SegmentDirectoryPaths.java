@@ -49,7 +49,7 @@ public class SegmentDirectoryPaths {
 
   public static @Nullable File findMetadataFile(@Nonnull File indexDir) {
     Preconditions.checkNotNull(indexDir);
-    Preconditions.checkArgument(indexDir.exists(), "Path: %s to does not exist", indexDir);
+    Preconditions.checkArgument(indexDir.exists(), "Path: %s does not exist", indexDir);
     if (! indexDir.isDirectory()) {
       return indexDir;
     }
@@ -63,6 +63,30 @@ public class SegmentDirectoryPaths {
     if (metadataFile.exists()) {
       return metadataFile;
     }
+    return null;
+  }
+
+  /**
+   * Find the creation metadata file in the segment directory path to
+   * handle different segment formats
+   * @param indexDir index directory to look for file
+   * @return creation metadata file or null if the file is not found
+   */
+  public static @Nullable File findCreationMetaFile(@Nonnull File indexDir) {
+    Preconditions.checkNotNull(indexDir);
+    Preconditions.checkArgument(indexDir.exists(), "Path %s does not exist", indexDir);
+
+    File creationMetaFile = new File(indexDir, V1Constants.SEGMENT_CREATION_META);
+    if (creationMetaFile.exists()) {
+      return creationMetaFile;
+    }
+
+    File v3Dir = segmentDirectoryFor(indexDir, SegmentVersion.v3);
+    creationMetaFile = new File(v3Dir, V1Constants.SEGMENT_CREATION_META);
+    if (creationMetaFile.exists()) {
+      return creationMetaFile;
+    }
+
     return null;
   }
 }

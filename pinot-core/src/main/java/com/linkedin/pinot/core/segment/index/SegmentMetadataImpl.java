@@ -92,7 +92,11 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     _schema = new Schema();
     _indexDir = new File(indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME).getAbsoluteFile().getParent();
     init();
-    loadCreationMeta(new File(indexDir, V1Constants.SEGMENT_CREATION_META));
+    File creationMetaFile = SegmentDirectoryPaths.findCreationMetaFile(indexDir);
+    if (creationMetaFile != null) {
+      loadCreationMeta(creationMetaFile);
+    }
+
     setTimeIntervalAndGranularity();
     LOGGER.debug("loaded metadata for {}", indexDir.getName());
   }
