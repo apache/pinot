@@ -1,9 +1,11 @@
 package com.linkedin.thirdeye.anomaly.merge;
 
-import com.google.common.collect.ArrayListMultimap;
-import com.google.common.collect.Multimap;
-
+import com.linkedin.pinot.pql.parsers.utils.Pair;
+import com.linkedin.thirdeye.anomaly.detection.TimeSeriesUtil;
 import com.linkedin.thirdeye.api.DimensionMap;
+import com.linkedin.thirdeye.api.MetricTimeSeries;
+import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
+import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -15,31 +17,22 @@ import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.client.DAORegistry;
-import com.linkedin.thirdeye.client.MetricExpression;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
-import com.linkedin.thirdeye.client.cache.MetricDataset;
 import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesHandler;
-import com.linkedin.thirdeye.client.timeseries.TimeSeriesRequest;
-import com.linkedin.thirdeye.client.timeseries.TimeSeriesResponse;
-import com.linkedin.thirdeye.client.timeseries.TimeSeriesRow;
-import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
-import com.linkedin.thirdeye.detector.function.AnomalyFunctionUtils;
-import com.linkedin.thirdeye.util.ThirdEyeUtils;
+
 
 /**
  * finds raw anomalies grouped by a strategy and merges them with an existing (in the same group) or
@@ -50,6 +43,7 @@ public class AnomalyMergeExecutor implements Runnable {
   private final RawAnomalyResultManager anomalyResultDAO;
   private final AnomalyFunctionManager anomalyFunctionDAO;
   private final ScheduledExecutorService executorService;
+  private final AnomalyFunctionFactory anomalyFunctionFactory;
 
   private final QueryCache queryCache;
   private final TimeSeriesHandler timeSeriesHandler;
@@ -59,13 +53,14 @@ public class AnomalyMergeExecutor implements Runnable {
 
   private final static Logger LOG = LoggerFactory.getLogger(AnomalyMergeExecutor.class);
 
-  public AnomalyMergeExecutor(ScheduledExecutorService executorService) {
+  public AnomalyMergeExecutor(ScheduledExecutorService executorService, AnomalyFunctionFactory anomalyFunctionFactory) {
     this.mergedResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
     this.anomalyResultDAO = DAO_REGISTRY.getRawAnomalyResultDAO();
     this.anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
     this.executorService = executorService;
     this.queryCache = CACHE_REGISTRY_INSTANCE.getQueryCache();
     this.timeSeriesHandler = new TimeSeriesHandler(queryCache);
+    this.anomalyFunctionFactory = anomalyFunctionFactory;
   }
 
   public void start() {
@@ -167,11 +162,11 @@ public class AnomalyMergeExecutor implements Runnable {
 
     mergedResult.setMessage(anomalyMessage);
 
-    // recompute severity
+    // recompute weight using anomaly function specific method
     try {
-      updateMergedSeverity(mergedResult);
+      updateMergedAnomalyWeight(mergedResult);
     } catch (Exception e) {
-      LOG.error("Could not recompute severity", e);
+      LOG.warn("Failed to compute merged weight using anomaly function specific method; average weight of raw anomalies is used: ", e);
     }
     try {
       // persist the merged result
@@ -184,128 +179,55 @@ public class AnomalyMergeExecutor implements Runnable {
     }
   }
 
-  // TODO: Update severity according to history data
-  private void updateMergedSeverity(MergedAnomalyResultDTO anomalyMergedResult) throws Exception {
+  private void updateMergedAnomalyWeight(MergedAnomalyResultDTO anomalyMergedResult) throws Exception {
     AnomalyFunctionDTO anomalyFunctionSpec = anomalyMergedResult.getFunction();
+    BaseAnomalyFunction anomalyFunction = anomalyFunctionFactory.fromSpec(anomalyFunctionSpec);
 
-    // create time series request
-    TimeSeriesRequest timeSeriesRequest = new TimeSeriesRequest();
-    timeSeriesRequest.setCollectionName(anomalyFunctionSpec.getCollection());
+    List<Pair<Long, Long>> startEndTimeRanges =
+        anomalyFunction.getDataRangeIntervals(anomalyMergedResult.getStartTime(), anomalyMergedResult.getEndTime());
 
-    List<MetricExpression> metricExpressions = Utils
-        .convertToMetricExpressions(anomalyFunctionSpec.getMetric(),
-            anomalyFunctionSpec.getMetricFunction(), anomalyFunctionSpec.getCollection());
-
-    timeSeriesRequest.setMetricExpressions(metricExpressions);
-    TimeGranularity timeBucket = new TimeGranularity(anomalyFunctionSpec.getBucketSize(),
+    TimeGranularity timeGranularity = new TimeGranularity(anomalyFunctionSpec.getBucketSize(),
         anomalyFunctionSpec.getBucketUnit());
-    timeSeriesRequest.setAggregationTimeGranularity(timeBucket);
 
-    timeSeriesRequest.setEndDateInclusive(false);
+    MetricTimeSeries metricTimeSeries =
+        TimeSeriesUtil.getTimeSeriesByDimension(anomalyFunctionSpec, startEndTimeRanges,
+            anomalyMergedResult.getDimensions(), timeGranularity);
 
-    Multimap<String, String> filters = ArrayListMultimap.create();
-    if (StringUtils.isNotBlank(anomalyFunctionSpec.getFilters())) {
-      filters.putAll(ThirdEyeUtils.getFilterSet(anomalyFunctionSpec.getFilters()));
+    if (metricTimeSeries != null) {
+      List<MergedAnomalyResultDTO> knownAnomalies = null;
+      if (anomalyFunction.useHistoryAnomaly()) {
+        knownAnomalies = getKnownMergedAnomalies(anomalyFunction, anomalyMergedResult.getStartTime(),
+            anomalyMergedResult.getEndTime());
+      }
+      anomalyFunction.updateMergedAnomalyInfo(anomalyMergedResult, metricTimeSeries,
+          new DateTime(anomalyMergedResult.getStartTime()), new DateTime(anomalyMergedResult.getEndTime()),
+          knownAnomalies);
     }
-
-    String exploreDimensions = anomalyFunctionSpec.getExploreDimensions();
-    if (StringUtils.isNotBlank(exploreDimensions)) {
-      // Decorate filters according to dimensionMap
-      DimensionMap exploredDimensions = anomalyMergedResult.getDimensions();
-      filters = ThirdEyeUtils.getFilterSetFromDimensionMap(exploredDimensions, filters);
-    }
-
-    LOG.info("Applying final filter : {}", filters.toString());
-    // Set filters including anomaly-dimension
-    timeSeriesRequest.setFilterSet(filters);
-
-    // TODO : fix the pinot query interface to accept time in millis
-    // Fetch current time series data
-    timeSeriesRequest.setStart(new DateTime(anomalyMergedResult.getStartTime()));
-    timeSeriesRequest.setEnd(new DateTime(anomalyMergedResult.getEndTime()));
-    TimeSeriesResponse responseCurrent = timeSeriesHandler.handle(timeSeriesRequest);
-
-    LOG.info("printing current start end millis : {} {}, joda {} {}", anomalyMergedResult.getStartTime(),
-        anomalyMergedResult.getEndTime(), new DateTime(anomalyMergedResult.getStartTime()),
-        new DateTime(anomalyMergedResult.getEndTime()));
-
-    // Fetch baseline time series data
-    long baselineOffset = AnomalyFunctionUtils.getBaselineOffset(anomalyFunctionSpec);
-    timeSeriesRequest.setStart(new DateTime(anomalyMergedResult.getStartTime() - baselineOffset));
-    timeSeriesRequest.setEnd(new DateTime(anomalyMergedResult.getEndTime() - baselineOffset));
-    TimeSeriesResponse responseBaseline = timeSeriesHandler.handle(timeSeriesRequest);
-
-    LOG.info("printing baseline start end millis : {} {}, joda {} {}", anomalyMergedResult.getStartTime() - baselineOffset,
-        anomalyMergedResult.getEndTime() - baselineOffset, new DateTime(anomalyMergedResult.getStartTime() - baselineOffset),
-        new DateTime(anomalyMergedResult.getEndTime() - baselineOffset));
-
-    Double currentValue;
-    Double baselineValue;
-
-
-    MetricDataset metricDataset =
-        new MetricDataset(anomalyFunctionSpec.getMetric(), anomalyFunctionSpec.getCollection());
-    MetricConfigDTO metricConfig = CACHE_REGISTRY_INSTANCE.getMetricConfigCache().get(metricDataset);
-    if (metricConfig.isDerived()) {
-
-      LOG.info("Found derived metric [{}], assigning avg value per bucket in the message",
-          anomalyFunctionSpec.getMetric());
-      currentValue = getAvgMetricValuePerBucket(responseCurrent, anomalyFunctionSpec.getMetric());
-      baselineValue = getAvgMetricValuePerBucket(responseBaseline, anomalyFunctionSpec.getMetric());
-    } else {
-      LOG.info("Assigning total value in the message for metric : [{}]",
-          anomalyFunctionSpec.getMetric());
-      currentValue = getMetricValueSum(responseCurrent, anomalyFunctionSpec.getMetric());
-      baselineValue = getMetricValueSum(responseBaseline, anomalyFunctionSpec.getMetric());
-    }
-
-    Double severity;
-    if (baselineValue != 0) {
-      severity = (currentValue - baselineValue) / baselineValue;
-      anomalyMergedResult.setWeight(severity);
-    } else {
-      LOG.error("Could not recompute severity for merged anomaly [{}], assigning weighted avg",
-          anomalyMergedResult.toString());
-    }
-    anomalyMergedResult
-        .setMessage(createMessage(anomalyMergedResult.getWeight(), currentValue, baselineValue));
   }
 
-  private Double getMetricValueSum(TimeSeriesResponse response, String metricName) {
-    Double totalVal = 0.0;
-    for (int i = 0; i < response.getNumRows(); i++) {
-      for (TimeSeriesRow.TimeSeriesMetric metricData : response.getRow(i).getMetrics()) {
-        if (metricName.equals(metricData.getMetricName())) {
-          totalVal += metricData.getValue();
-        }
-      }
-    }
-    return totalVal;
-  }
+  private List<MergedAnomalyResultDTO> getKnownMergedAnomalies(BaseAnomalyFunction anomalyFunction,
+      long monitoringWindowStart, long monitoringWindowEnd) {
 
-  /**
-   * Returns average metrics value (per bucket) for given time series
-   *
-   * @param response
-   * @param metricName
-   *
-   * @return
-   */
-  private Double getAvgMetricValuePerBucket(TimeSeriesResponse response, String metricName) {
-    Double totalVal = 0.0;
-    int numBuckets = 0;
-    for (int i = 0; i < response.getNumRows(); i++) {
-      for (TimeSeriesRow.TimeSeriesMetric metricData : response.getRow(i).getMetrics()) {
-        if (metricName.equals(metricData.getMetricName())) {
-          totalVal += metricData.getValue();
-          numBuckets++;
-        }
+    List<Pair<Long, Long>> startEndTimeRanges =
+        anomalyFunction.getDataRangeIntervals(monitoringWindowStart, monitoringWindowEnd);
+
+    List<MergedAnomalyResultDTO> results = new ArrayList<>();
+    for (Pair<Long, Long> startEndTimeRange : startEndTimeRanges) {
+      // we don't need the known anomalies on current window; we only need those on history data
+      if (monitoringWindowStart <= startEndTimeRange.getFirst()
+          && startEndTimeRange.getSecond() <= monitoringWindowEnd) {
+        continue;
+      }
+      try {
+        results.addAll(
+            mergedResultDAO.findAllConflictByFunctionId(anomalyFunction.getSpec().getId(), startEndTimeRange.getFirst(),
+                startEndTimeRange.getSecond()));
+      } catch (Exception e) {
+        LOG.error("Exception in getting existing anomalies", e);
       }
     }
-    if (numBuckets == 0) {
-      return totalVal;
-    }
-    return totalVal / numBuckets;
+
+    return results;
   }
 
   private void performMergeBasedOnFunctionId(AnomalyFunctionDTO function,

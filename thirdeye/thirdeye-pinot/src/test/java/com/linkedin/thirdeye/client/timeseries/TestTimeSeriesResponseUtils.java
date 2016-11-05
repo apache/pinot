@@ -23,13 +23,11 @@ import com.linkedin.thirdeye.client.timeseries.TimeSeriesRow.TimeSeriesMetric;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 
 public class TestTimeSeriesResponseUtils {
-  private static final TimeSeriesResponseConverter converter =
-      TimeSeriesResponseConverter.getInstance();
 
   @Test(dataProvider = "toMapProvider")
   public void toMap(String testName, TimeSeriesResponse response, List<String> schemaDimensions,
       Map<DimensionKey, MetricTimeSeries> expected) {
-    Map<DimensionKey, MetricTimeSeries> actual = converter.toMap(response, schemaDimensions);
+    Map<DimensionKey, MetricTimeSeries> actual = TimeSeriesResponseConverter.toMap(response, schemaDimensions);
     Assert.assertEquals(actual, expected);
   }
 

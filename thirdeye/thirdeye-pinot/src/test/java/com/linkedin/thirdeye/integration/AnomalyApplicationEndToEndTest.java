@@ -252,7 +252,7 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
 
   private void startMerger() throws Exception {
     ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
-    anomalyMergeExecutor = new AnomalyMergeExecutor(executorService);
+    anomalyMergeExecutor = new AnomalyMergeExecutor(executorService, null);
     executorService.scheduleWithFixedDelay(anomalyMergeExecutor, 0, 3, TimeUnit.SECONDS);
   }
 

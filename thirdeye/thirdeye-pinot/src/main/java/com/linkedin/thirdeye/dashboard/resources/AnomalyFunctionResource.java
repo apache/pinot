@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
+import com.linkedin.pinot.pql.parsers.utils.Pair;
 import com.linkedin.thirdeye.anomaly.detection.TimeSeriesUtil;
 import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.DimensionMap;
@@ -46,8 +47,6 @@ public class AnomalyFunctionResource {
 
   private static final Logger LOG = LoggerFactory.getLogger(AnomalyFunctionResource.class);
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
-  private static final TimeSeriesResponseConverter timeSeriesResponseConverter =
-      TimeSeriesResponseConverter.getInstance();
 
   private final Map<String, Object> anomalyFunctionMetadata = new HashMap<>();
   private final AnomalyFunctionFactory anomalyFunctionFactory;
@@ -114,17 +113,18 @@ public class AnomalyFunctionResource {
       throws Exception {
     // TODO: replace this with Job/Task framework and job tracker page
     BaseAnomalyFunction anomalyFunction = anomalyFunctionFactory.fromSpec(anomalyFunctionSpec);
-    TimeSeriesResponse finalResponse =
-        TimeSeriesUtil.getTimeSeriesResponseForAnomalyDetection(anomalyFunction, startTime, endTime);
+
+    List<Pair<Long, Long>> startEndTimeRanges = anomalyFunction.getDataRangeIntervals(startTime, endTime);
+
+    Map<DimensionKey, MetricTimeSeries> dimensionKeyMetricTimeSeriesMap =
+        TimeSeriesUtil.getTimeSeriesForAnomalyDetection(anomalyFunctionSpec, startEndTimeRanges);
 
     List<RawAnomalyResultDTO> anomalyResults = new ArrayList<>();
     List<RawAnomalyResultDTO> results = new ArrayList<>();
     List<String> collectionDimensions = DAO_REGISTRY.getDatasetConfigDAO()
         .findByDataset(anomalyFunctionSpec.getCollection()).getDimensions();
 
-    Map<DimensionKey, MetricTimeSeries> res =
-        timeSeriesResponseConverter.toMap(finalResponse, collectionDimensions);
-    for (Map.Entry<DimensionKey, MetricTimeSeries> entry : res.entrySet()) {
+    for (Map.Entry<DimensionKey, MetricTimeSeries> entry : dimensionKeyMetricTimeSeriesMap.entrySet()) {
       DimensionKey dimensionKey = entry.getKey();
       DimensionMap dimensionMap = DimensionMap.fromDimensionKey(dimensionKey, collectionDimensions);
       if (entry.getValue().getTimeWindowSet().size() < 2) {

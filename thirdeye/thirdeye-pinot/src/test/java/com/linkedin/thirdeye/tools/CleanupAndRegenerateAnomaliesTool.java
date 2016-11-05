@@ -131,7 +131,7 @@ public class CleanupAndRegenerateAnomaliesTool {
    * Regenerates anomalies for each window separately
    * @throws Exception
    */
-  private void regenerateAnomaliesForBucketsInRange() throws Exception {
+  private void regenerateAnomaliesForBucketsInRange(boolean forceBackfill) throws Exception {
     for (Long functionId : functionIds) {
       AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(functionId);
       if (!anomalyFunction.getIsActive()) {
@@ -143,7 +143,7 @@ public class CleanupAndRegenerateAnomaliesTool {
 
       String response =
           detectionResourceHttpUtils.runBackfillAnomalyFunction(String.valueOf(functionId), monitoringWindowStartTime,
-              monitoringWindowEndTime);
+              monitoringWindowEndTime, forceBackfill);
       LOG.info("Response {}", response);
     }
   }
@@ -216,6 +216,12 @@ public class CleanupAndRegenerateAnomaliesTool {
       System.exit(1);
     }
 
+    boolean doForceBackfill = false;
+    String forceBackfill = config.getForceBackfill();
+    if (StringUtils.isNotBlank(forceBackfill)) {
+      doForceBackfill = Boolean.parseBoolean(forceBackfill);
+    }
+
     CleanupAndRegenerateAnomaliesTool tool = new CleanupAndRegenerateAnomaliesTool(startTimeIso,
         endTimeIso, datasets, functionIds, persistenceFile, detectorHost, detectorPort);
 
@@ -229,7 +235,7 @@ public class CleanupAndRegenerateAnomaliesTool {
       // BACKFILL_FOR_RANGE mode regenerates anomalies for all active functions in functionIds or datasets
       // It will honor the monitoring window size of the function, and run for all consecutive windows, one by one,
       // to cover the entire range provided as input
-      tool.regenerateAnomaliesForBucketsInRange();
+      tool.regenerateAnomaliesForBucketsInRange(doForceBackfill);
     } else {
       LOG.error("Incorrect mode {}", mode);
       System.exit(1);

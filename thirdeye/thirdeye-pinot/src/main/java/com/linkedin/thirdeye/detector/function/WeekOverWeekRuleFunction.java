@@ -1,11 +1,8 @@
 package com.linkedin.thirdeye.detector.function;
 
 import com.linkedin.pinot.pql.parsers.utils.Pair;
-import com.linkedin.thirdeye.anomaly.views.AnomalyTimelinesView;
 import com.linkedin.thirdeye.api.DimensionMap;
-import com.linkedin.thirdeye.dashboard.views.TimeBucket;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import java.io.IOException;
 import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.List;
@@ -135,6 +132,54 @@ public class WeekOverWeekRuleFunction extends BaseAnomalyFunction {
       }
     }
     return anomalyResults;
+  }
+
+  @Override
+  public void updateMergedAnomalyInfo(MergedAnomalyResultDTO anomalyToUpdated, MetricTimeSeries timeSeries,
+      DateTime windowStart, DateTime windowEnd, List<MergedAnomalyResultDTO> knownAnomalies)
+      throws Exception {
+
+    String metric = getSpec().getMetric();
+    long windowStartInMillis = windowStart.getMillis();
+    long windowEndInMillis = windowEnd.getMillis();
+
+    // Compute baseline time range
+    Properties props = getProperties();
+    String baselineProp = props.getProperty(BASELINE);
+    long baselineOffsetMillis = getBaselineOffsetInMillis(baselineProp);
+    long baselineWindowStart = windowStartInMillis - baselineOffsetMillis;
+    long baselineWindowEnd = windowEndInMillis - baselineOffsetMillis;
+
+    // Wight of this time series equals the change ratio of the average value  of current and baseline values
+    double currentAverageValue = 0d;
+    double baselineAverageValue = 0d;
+    int currentBucketCount = 0;
+    int baselineBucketCount = 0;
+    for (long time : timeSeries.getTimeWindowSet()) {
+      double value = timeSeries.get(time, metric).doubleValue();
+      if (value != 0d) {
+        if (windowStartInMillis <= time && time <= windowEndInMillis) {
+          currentAverageValue += value;
+          ++currentBucketCount;
+        } else if (baselineWindowStart <= time && time <= baselineWindowEnd) {
+          baselineAverageValue += value;
+          ++baselineBucketCount;
+        } // else ignore unknown time key
+      }
+    }
+    if (currentBucketCount != 0d) {
+      currentAverageValue /= currentBucketCount;
+    }
+    if (baselineBucketCount != 0d) {
+      baselineAverageValue /= baselineBucketCount;
+    }
+    if (baselineAverageValue != 0d) {
+      double weight = currentAverageValue / baselineAverageValue;
+      anomalyToUpdated.setWeight(weight);
+    }
+    anomalyToUpdated.setMessage(
+        String.format("change : %.2f %%, currentVal : %.2f, baseLineVal : %.2f", anomalyToUpdated.getWeight() * 100,
+            currentAverageValue, baselineAverageValue));
   }
 
   private String getAnomalyResultMessage(double threshold, String baselineProp,

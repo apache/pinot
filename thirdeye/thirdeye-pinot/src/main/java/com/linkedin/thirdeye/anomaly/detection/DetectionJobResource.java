@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.anomaly.detection;
 import java.util.List;
 
 import javax.ws.rs.DELETE;
+import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
@@ -75,7 +76,7 @@ public class DetectionJobResource {
   @POST
   @Path("/{id}/backfill")
   public Response backfill(@PathParam("id") Long id, @QueryParam("start") String startTimeIso,
-      @QueryParam("end") String endTimeIso) throws Exception {
+      @QueryParam("end") String endTimeIso, @DefaultValue("false") @QueryParam("force") boolean force) throws Exception {
     DateTime startTime = null;
     DateTime endTime = null;
     if (StringUtils.isNotBlank(startTimeIso)) {
@@ -92,7 +93,7 @@ public class DetectionJobResource {
       new Thread(new Runnable() {
         @Override
         public void run() {
-          detectionJobScheduler.runBackfill(id, innerStartTime, innerEndTime);
+          detectionJobScheduler.runBackfill(id, innerStartTime, innerEndTime, force);
         }
       }).start();
     }

@@ -17,6 +17,8 @@ public class CleanupAndRegenerateAnomaliesConfig {
   // datasets to cleanup/regenerate if functionIds not provided.
   // will be ignored if functionIds provided
   private String datasets;
+  // forceBackfill previous backfill job if there exists any
+  private String forceBackfill;
 
   public String getPersistenceFile() {
     return persistenceFile;
@@ -60,6 +62,11 @@ public class CleanupAndRegenerateAnomaliesConfig {
   public void setFunctionIds(String functionIds) {
     this.functionIds = functionIds;
   }
-
+  public String getForceBackfill() {
+    return forceBackfill;
+  }
+  public void setForceBackfill(String forceBackfill) {
+    this.forceBackfill = forceBackfill;
+  }
 
 }

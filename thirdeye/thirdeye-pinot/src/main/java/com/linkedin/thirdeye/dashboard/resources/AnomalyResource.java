@@ -1,14 +1,12 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
+import com.linkedin.pinot.pql.parsers.utils.Pair;
 import com.linkedin.thirdeye.anomaly.detection.TimeSeriesUtil;
 import com.linkedin.thirdeye.anomaly.views.AnomalyTimelinesView;
 import com.linkedin.thirdeye.anomaly.views.function.AnomalyTimeSeriesView;
 import com.linkedin.thirdeye.anomaly.views.function.AnomalyTimeSeriesViewFactory;
-import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
-import com.linkedin.thirdeye.client.timeseries.TimeSeriesResponse;
-import com.linkedin.thirdeye.client.timeseries.TimeSeriesResponseConverter;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.dashboard.views.TimeBucket;
 
@@ -17,9 +15,7 @@ import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
@@ -34,7 +30,6 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
-import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
 import org.joda.time.format.ISODateTimeFormat;
@@ -568,72 +563,37 @@ public class AnomalyResource {
     // ThirdEye backend is end time exclusive, so one more bucket is appended to make end time inclusive for frontend.
     viewWindowEndTime += bucketMillis;
 
-    TimeSeriesResponse timeSeriesResponse =
-        TimeSeriesUtil.getTimeSeriesResponseForPresentation(anomalyTimeSeriesView, dimensions, timeGranularity,
-            viewWindowStartTime, viewWindowEndTime);
+    List<Pair<Long, Long>> startEndTimeRanges =
+        anomalyTimeSeriesView.getDataRangeIntervals(viewWindowStartTime, viewWindowEndTime);
 
-    TimeSeriesResponseConverter timeSeriesResponseConverter = TimeSeriesResponseConverter.getInstance();
-    Map<DimensionKey, MetricTimeSeries> res = timeSeriesResponseConverter.toMap(timeSeriesResponse,
-        Utils.getSchemaDimensionNames(anomalyResult.getFunction().getCollection()));
+    MetricTimeSeries metricTimeSeries =
+        TimeSeriesUtil.getTimeSeriesByDimension(anomalyFunctionSpec, startEndTimeRanges, dimensions, timeGranularity);
 
-    if (MapUtils.isNotEmpty(res)) {
-      // Currently, we assume that we get time series for one metric at a time
-      String metricName = anomalyFunctionSpec.getMetric();
-
-      // For most anomalies, there should be only one time series due to its dimensions. The exception is the OTHER
-      // dimension, in which time series of different dimensions are returned due to the calculation of OTHER dimension.
-      // Therefore, we need to get the time series of OTHER dimension manually.
-      MetricTimeSeries metricTimeSeries = null;
-      if (res.size() == 1) {
-        Iterator<MetricTimeSeries> ite = res.values().iterator();
-        if (ite.hasNext()) {
-          metricTimeSeries = ite.next();
-        }
-      } else { // Retrieve the time series of OTHER dimension
-        Iterator<Map.Entry<DimensionKey, MetricTimeSeries>> ite = res.entrySet().iterator();
-        while (ite.hasNext()) {
-          Map.Entry<DimensionKey, MetricTimeSeries> entry = ite.next();
-          DimensionKey dimensionKey = entry.getKey();
-          boolean foundOTHER = false;
-          for (String dimensionValue : dimensionKey.getDimensionValues()) {
-            if (dimensionValue.equalsIgnoreCase("OTHER")) {
-              metricTimeSeries = entry.getValue();
-              foundOTHER = true;
-              break;
-            }
-          }
-          if (foundOTHER) {
-            break;
-          }
-        }
-        // Check if something goes wrong when we try to get the time series for OTHER dimension; in that case, we
-        // return an empty time series
-        if (metricTimeSeries == null) {
-          return new AnomalyTimelinesView();
-        }
-      }
-
-      AnomalyTimelinesView anomalyTimelinesView =
-          anomalyTimeSeriesView.getTimeSeriesView(metricTimeSeries, bucketMillis, metricName, viewWindowStartTime, viewWindowEndTime, null);
-
-      // Generate summary for frontend
-      List<TimeBucket> timeBuckets = anomalyTimelinesView.getTimeBuckets();
-      if (timeBuckets.size() > 0) {
-        TimeBucket firstBucket = timeBuckets.get(0);
-        anomalyTimelinesView.addSummary("currentStart", Long.toString(firstBucket.getCurrentStart()));
-        anomalyTimelinesView.addSummary("baselineStart", Long.toString(firstBucket.getBaselineStart()));
-
-        TimeBucket lastBucket = timeBuckets.get(timeBuckets.size()-1);
-        anomalyTimelinesView.addSummary("currentEnd", Long.toString(lastBucket.getCurrentStart()));
-        anomalyTimelinesView.addSummary("baselineEnd", Long.toString(lastBucket.getBaselineEnd()));
-      }
-
-      return anomalyTimelinesView;
-    } else {
+    if (metricTimeSeries == null) {
       // If this case happened, there was something wrong with anomaly detection because we are not able to retrieve
       // the timeseries for the given anomaly
       return new AnomalyTimelinesView();
     }
+
+    // Known anomalies are ignored (the null parameter) because 1. we can reduce users' waiting time and 2. presentation
+    // data does not need to be as accurate as the one used for detecting anomalies
+    AnomalyTimelinesView anomalyTimelinesView =
+        anomalyTimeSeriesView.getTimeSeriesView(metricTimeSeries, bucketMillis, anomalyFunctionSpec.getMetric(),
+            viewWindowStartTime, viewWindowEndTime, null);
+
+    // Generate summary for frontend
+    List<TimeBucket> timeBuckets = anomalyTimelinesView.getTimeBuckets();
+    if (timeBuckets.size() > 0) {
+      TimeBucket firstBucket = timeBuckets.get(0);
+      anomalyTimelinesView.addSummary("currentStart", Long.toString(firstBucket.getCurrentStart()));
+      anomalyTimelinesView.addSummary("baselineStart", Long.toString(firstBucket.getBaselineStart()));
+
+      TimeBucket lastBucket = timeBuckets.get(timeBuckets.size()-1);
+      anomalyTimelinesView.addSummary("currentEnd", Long.toString(lastBucket.getCurrentStart()));
+      anomalyTimelinesView.addSummary("baselineEnd", Long.toString(lastBucket.getBaselineEnd()));
+    }
+
+    return anomalyTimelinesView;
   }
 
 }
