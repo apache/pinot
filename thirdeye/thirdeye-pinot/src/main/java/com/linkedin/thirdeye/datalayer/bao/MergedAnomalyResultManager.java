@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.datalayer.bao;
 
-import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import java.util.List;
 
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
@@ -23,7 +22,8 @@ public interface MergedAnomalyResultManager extends AbstractManager<MergedAnomal
 
   MergedAnomalyResultDTO findLatestByFunctionIdDimensions(Long functionId, String dimensions);
 
-  MergedAnomalyResultDTO findLatestConflictByFunctionIdDimensions(Long functionId, String dimensions, long conflictWindowStart, long conflictWindowEnd);
+  MergedAnomalyResultDTO findLatestConflictByFunctionIdDimensions(Long functionId, String dimensions,
+      long conflictWindowStart, long conflictWindowEnd, long sequentialAllowedGap);
 
   MergedAnomalyResultDTO findLatestByFunctionIdOnly(Long functionId);
 
