@@ -273,7 +273,7 @@ public class AnomalyMergeExecutor implements Runnable {
       // detection.
       MergedAnomalyResultDTO latestOverlappedMergedResult =
           mergedResultDAO.findLatestConflictByFunctionIdDimensions(function.getId(), exploredDimensions.toString(),
-              anomalyWindowStart, anomalyWindowEnd);
+              anomalyWindowStart, anomalyWindowEnd, mergeConfig.getSequentialAllowedGap());
 
       // TODO : get mergeConfig from MergeStrategy
       List<MergedAnomalyResultDTO> mergedResults = AnomalyTimeBasedSummarizer

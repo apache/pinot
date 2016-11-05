@@ -200,11 +200,11 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
 
   @Override
   public MergedAnomalyResultDTO findLatestConflictByFunctionIdDimensions(Long functionId, String dimensions,
-      long conflictWindowStart, long conflictWindowEnd) {
+      long conflictWindowStart, long conflictWindowEnd, long sequentialAllowedGap) {
     Map<String, Object> filterParams = new HashMap<>();
     filterParams.put("functionId", functionId);
     filterParams.put("dimensions", dimensions);
-    filterParams.put("startTime", conflictWindowStart);
+    filterParams.put("startTime", conflictWindowStart - sequentialAllowedGap);
     filterParams.put("endTime", conflictWindowEnd);
 
     List<MergedAnomalyResultBean> list = genericPojoDao.executeParameterizedSQL(
