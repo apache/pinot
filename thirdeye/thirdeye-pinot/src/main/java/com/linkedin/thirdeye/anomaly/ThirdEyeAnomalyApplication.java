@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.anomaly;
 
 import com.linkedin.thirdeye.dashboard.resources.AnomalyFunctionResource;
 
+import com.linkedin.thirdeye.util.SeverityComputationUtil;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -92,9 +93,13 @@ public class ThirdEyeAnomalyApplication
           .register(new AlertJobResource(alertJobScheduler, emailConfigurationDAO));
         }
         if (config.isMerger()) {
+          // anomalyFunctionFactory might have initiated if current machine is also a worker
+          if (anomalyFunctionFactory == null) {
+            anomalyFunctionFactory = new AnomalyFunctionFactory(config.getFunctionConfigPath());
+          }
           ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
           anomalyMergeExecutor =
-              new AnomalyMergeExecutor(executorService);
+              new AnomalyMergeExecutor(executorService, anomalyFunctionFactory);
           anomalyMergeExecutor.start();
         }
         if (config.isAutoload()) {

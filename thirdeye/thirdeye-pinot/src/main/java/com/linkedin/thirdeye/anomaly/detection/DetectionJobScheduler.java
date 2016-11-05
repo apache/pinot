@@ -1,7 +1,9 @@
 package com.linkedin.thirdeye.anomaly.detection;
 
+import com.linkedin.pinot.pql.parsers.utils.Pair;
 import com.linkedin.thirdeye.anomaly.job.JobConstants;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants;
+import com.linkedin.thirdeye.client.timeseries.TimeSeriesResponse;
 import com.linkedin.thirdeye.datalayer.dto.JobDTO;
 import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
 import java.text.ParseException;
@@ -302,8 +304,9 @@ public class DetectionJobScheduler implements JobScheduler, Runnable {
    * @param functionId the id of the anomaly function, which has to be an active function
    * @param backfillStartTime the start time for backfilling
    * @param backfillEndTime the end time for backfilling
+   * @param force set to false to resume from previous backfill if there exists any
    */
-  public void runBackfill(long functionId, DateTime backfillStartTime, DateTime backfillEndTime) {
+  public void runBackfill(long functionId, DateTime backfillStartTime, DateTime backfillEndTime, boolean force) {
     AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(functionId);
     boolean isActive = anomalyFunction.getIsActive();
     if (!isActive) {
@@ -329,7 +332,12 @@ public class DetectionJobScheduler implements JobScheduler, Runnable {
       }
 
       long monitoringWindowSize = TimeUnit.MILLISECONDS.convert(anomalyFunction.getWindowSize(), anomalyFunction.getWindowUnit());
-      DateTime currentStart = computeCurrentStartTime(functionId, cronExpression, backfillStartTime, backfillEndTime);
+      DateTime currentStart;
+      if (force) {
+        currentStart = backfillStartTime;
+      } else {
+        currentStart = computeResumeStartTime(functionId, cronExpression, backfillStartTime, backfillEndTime);
+      }
       DateTime currentEnd = currentStart.plus(monitoringWindowSize);
 
       // Make the end time inclusive
@@ -385,7 +393,7 @@ public class DetectionJobScheduler implements JobScheduler, Runnable {
    * @param cronExpression the cron expression that is used to calculate the alignment of start time.
    * @return the start time for the first detection job of this backfilling.
    */
-  private DateTime computeCurrentStartTime(long functionId, CronExpression cronExpression, DateTime backfillStartTime, DateTime backfillEndTime) {
+  private DateTime computeResumeStartTime(long functionId, CronExpression cronExpression, DateTime backfillStartTime, DateTime backfillEndTime) {
     DateTime currentStart;
     JobDTO previousJob = getPreviousJob(functionId, backfillStartTime.getMillis(), backfillEndTime.getMillis());
     if (previousJob != null) {

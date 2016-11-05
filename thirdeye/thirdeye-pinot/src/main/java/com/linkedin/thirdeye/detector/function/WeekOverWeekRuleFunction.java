@@ -137,6 +137,54 @@ public class WeekOverWeekRuleFunction extends BaseAnomalyFunction {
     return anomalyResults;
   }
 
+  @Override
+  public void updateMergedAnomalyInfo(MergedAnomalyResultDTO anomalyToUpdated, MetricTimeSeries timeSeries,
+      List<MergedAnomalyResultDTO> knownAnomalies)
+      throws Exception {
+
+    String metric = getSpec().getMetric();
+    long currentWindowStart = anomalyToUpdated.getStartTime();
+    long currentWindowEnd = anomalyToUpdated.getEndTime();
+
+    // Compute baseline time range
+    Properties props = getProperties();
+    String baselineProp = props.getProperty(BASELINE);
+    long baselineOffsetMillis = getBaselineOffsetInMillis(baselineProp);
+    long baselineWindowStart = currentWindowStart - baselineOffsetMillis;
+    long baselineWindowEnd = currentWindowEnd - baselineOffsetMillis;
+
+    // Wight of this time series equals the change ratio of the average value  of current and baseline values
+    double currentAverageValue = 0d;
+    double baselineAverageValue = 0d;
+    int currentBucketCount = 0;
+    int baselineBucketCount = 0;
+    for (long time : timeSeries.getTimeWindowSet()) {
+      double value = timeSeries.get(time, metric).doubleValue();
+      if (value != 0d) {
+        if (currentWindowStart <= time && time <= currentWindowEnd) {
+          currentAverageValue += value;
+          ++currentBucketCount;
+        } else if (baselineWindowStart <= time && time <= baselineWindowEnd) {
+          baselineAverageValue += value;
+          ++baselineBucketCount;
+        } // else ignore unknown time key
+      }
+    }
+    if (currentBucketCount != 0d) {
+      currentAverageValue /= currentBucketCount;
+    }
+    if (baselineBucketCount != 0d) {
+      baselineAverageValue /= baselineBucketCount;
+    }
+    if (baselineAverageValue != 0d) {
+      double weight = currentAverageValue / baselineAverageValue;
+      anomalyToUpdated.setWeight(weight);
+    }
+    anomalyToUpdated.setMessage(
+        String.format("change : %.2f %%, currentVal : %.2f, baseLineVal : %.2f", anomalyToUpdated.getWeight() * 100,
+            currentAverageValue, baselineAverageValue));
+  }
+
   private String getAnomalyResultMessage(double threshold, String baselineProp,
       double currentValue, double baselineValue) {
     double change = calculateChange(currentValue, baselineValue);

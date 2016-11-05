@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.detector.function;
 
+import com.linkedin.pinot.pql.parsers.utils.Pair;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import java.util.ArrayList;
@@ -29,10 +30,17 @@ public class MinMaxThresholdFunction extends BaseAnomalyFunction {
   public static final String DEFAULT_MESSAGE_TEMPLATE = "change : %.2f %%, currentVal : %.2f, min : %.2f, max : %.2f";
   public static final String MIN_VAL = "min";
   public static final String MAX_VAL = "max";
-  private static final Joiner CSV = Joiner.on(",");
 
   public static String[] getPropertyKeys() {
     return new String [] {MIN_VAL, MAX_VAL};
+  }
+
+  @Override
+  public List<Pair<Long, Long>> getDataRangeIntervals(Long monitoringWindowStartTime,
+      Long monitoringWindowEndTime) {
+    List<Pair<Long, Long>> startEndTimeIntervals = new ArrayList<>();
+    startEndTimeIntervals.add(new Pair<>(monitoringWindowStartTime, monitoringWindowEndTime));
+    return startEndTimeIntervals;
   }
 
   @Override
@@ -91,13 +99,61 @@ public class MinMaxThresholdFunction extends BaseAnomalyFunction {
         }
         anomalyResults.add(anomalyResult);
       }
-    } return anomalyResults;
+    }
+    return anomalyResults;
+  }
+
+  @Override
+  public void updateMergedAnomalyInfo(MergedAnomalyResultDTO anomalyToUpdated, MetricTimeSeries timeSeries,
+      List<MergedAnomalyResultDTO> knownAnomalies)
+      throws Exception {
+
+    // Get min / max props
+    Properties props = getProperties();
+    Double min = null;
+    if (props.containsKey(MIN_VAL)) {
+      min = Double.valueOf(props.getProperty(MIN_VAL));
+    }
+
+    Double max = null;
+    if (props.containsKey(MAX_VAL)) {
+      max = Double.valueOf(props.getProperty(MAX_VAL));
+    }
+
+    String metric = getSpec().getMetric();
+    long currentWindowStart = anomalyToUpdated.getStartTime();
+    long currentWindowEnd = anomalyToUpdated.getEndTime();
+
+    double currentAverageValue = 0d;
+    int currentBucketCount = 0;
+    double deviationFromThreshold = 0d;
+    for (long time : timeSeries.getTimeWindowSet()) {
+      double value = timeSeries.get(time, metric).doubleValue();
+      if (value != 0d) {
+        if (currentWindowStart <= time && time <= currentWindowEnd) {
+          currentAverageValue += value;
+          ++currentBucketCount;
+          deviationFromThreshold += getDeviationFromThreshold(value, min, max);
+        } // else ignore unknown time key
+      }
+    }
+
+    if (currentBucketCount != 0d) {
+      currentAverageValue /= currentBucketCount;
+      deviationFromThreshold /= currentBucketCount;
+    }
+    anomalyToUpdated.setScore(currentAverageValue);
+    anomalyToUpdated.setWeight(deviationFromThreshold);
+
+    String message =
+        String.format(DEFAULT_MESSAGE_TEMPLATE, deviationFromThreshold, currentAverageValue, min, max);
+    anomalyToUpdated.setMessage(message);
   }
 
   private double getDeviationFromThreshold(double currentValue, Double min, Double max) {
-    if ((min != null && currentValue < min)) {
+    if ((min != null && currentValue < min && min != 0d)) {
       return calculateChange(currentValue, min);
-    } else if (max != null && currentValue > max) {
+    } else if (max != null && currentValue > max && max != 0d) {
       return calculateChange(currentValue, max);
     }
     return 0;

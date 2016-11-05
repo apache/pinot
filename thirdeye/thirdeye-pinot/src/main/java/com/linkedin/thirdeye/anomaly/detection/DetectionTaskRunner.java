@@ -9,6 +9,7 @@ import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -36,8 +37,6 @@ public class DetectionTaskRunner implements TaskRunner {
   private static final Logger LOG = LoggerFactory.getLogger(DetectionTaskRunner.class);
   public static final String BACKFILL_PREFIX = "adhoc_";
 
-  private TimeSeriesResponseConverter timeSeriesResponseConverter;
-
   private MergedAnomalyResultManager mergedResultDAO;
   private RawAnomalyResultManager rawAnomalyDAO;
 
@@ -48,14 +47,8 @@ public class DetectionTaskRunner implements TaskRunner {
   private List<RawAnomalyResultDTO> existingRawAnomalies;
   private BaseAnomalyFunction anomalyFunction;
   private DatasetConfigManager datasetConfigDAO;
-  private AnomalyMergeExecutor syncAnomalyMergeExecutor;
 
   public DetectionTaskRunner() {
-    timeSeriesResponseConverter = TimeSeriesResponseConverter.getInstance();
-    // syncAnomalyMergeExecutor is supposed to perform lightweight merge (i.e., anomalies that have the same function
-    // id and at the same dimensions) after each detection task. Consequently, a null thread pool is passed the merge
-    // executor on purpose in order to prevent unwanted
-    syncAnomalyMergeExecutor = new AnomalyMergeExecutor(null);
   }
 
   public List<TaskResult> execute(TaskInfo taskInfo, TaskContext taskContext) throws Exception {
@@ -82,8 +75,10 @@ public class DetectionTaskRunner implements TaskRunner {
     knownMergedAnomalies = getKnownMergedAnomalies(anomalyFunction, windowStart.getMillis(), windowEnd.getMillis());
     existingRawAnomalies = getExistingRawAnomalies(anomalyFunction, windowStart.getMillis(), windowEnd.getMillis());
 
+    List<Pair<Long, Long>> startEndTimeRanges =
+        anomalyFunction.getDataRangeIntervals(windowStart.getMillis(), windowEnd.getMillis());
     TimeSeriesResponse finalResponse =
-        TimeSeriesUtil.getTimeSeriesResponseForAnomalyDetection(anomalyFunction, windowStart.getMillis(), windowEnd.getMillis());
+        TimeSeriesUtil.getTimeSeriesResponseForAnomalyDetection(anomalyFunctionSpec, startEndTimeRanges);
 
     exploreDimensionsAndAnalyze(finalResponse);
 
@@ -92,6 +87,10 @@ public class DetectionTaskRunner implements TaskRunner {
     String jobName = taskContext.getJobDAO().getJobNameByJobId(detectionTaskInfo.getJobExecutionId());
     if (jobName != null && jobName.toLowerCase().startsWith(BACKFILL_PREFIX)) {
       boolean isNotified = true;
+      // syncAnomalyMergeExecutor is supposed to perform lightweight merge (i.e., anomalies that have the same function
+      // id and at the same dimensions) after each detection task. Consequently, a null thread pool is passed the merge
+      // executor on purpose in order to prevent unwanted
+      AnomalyMergeExecutor syncAnomalyMergeExecutor = new AnomalyMergeExecutor(null, anomalyFunctionFactory);
       syncAnomalyMergeExecutor.performSynchronousMergeBasedOnFunctionIdAndDimension(anomalyFunctionSpec, isNotified);
     }
 
@@ -101,7 +100,7 @@ public class DetectionTaskRunner implements TaskRunner {
   private void exploreDimensionsAndAnalyze(TimeSeriesResponse finalResponse) {
     int anomalyCounter = 0;
     Map<DimensionKey, MetricTimeSeries> res =
-        timeSeriesResponseConverter.toMap(finalResponse, collectionDimensions);
+        TimeSeriesResponseConverter.toMap(finalResponse, collectionDimensions);
 
     // Sort the known anomalies by their dimension names
     ArrayListMultimap<DimensionMap, MergedAnomalyResultDTO> dimensionNamesToKnownMergedAnomalies = ArrayListMultimap.create();
@@ -125,13 +124,19 @@ public class DetectionTaskRunner implements TaskRunner {
 
       // Get current entry's knownMergedAnomalies, which should have the same explored dimensions
       List<MergedAnomalyResultDTO> knownMergedAnomaliesOfAnEntry = dimensionNamesToKnownMergedAnomalies.get(exploredDimensions);
-      List<MergedAnomalyResultDTO> historyMergedAnomalies = retainHistoryMergedAnomalies(windowStart.getMillis(), knownMergedAnomaliesOfAnEntry);
 
       try {
         // Run algorithm
         MetricTimeSeries metricTimeSeries = entry.getValue();
         LOG.info("Analyzing anomaly function with explored dimensions: {}, windowStart: {}, windowEnd: {}",
             exploredDimensions, windowStart, windowEnd);
+
+        List<MergedAnomalyResultDTO> historyMergedAnomalies;
+        if (anomalyFunction.useHistoryAnomaly()) {
+          historyMergedAnomalies = retainHistoryMergedAnomalies(windowStart.getMillis(), knownMergedAnomaliesOfAnEntry);
+        } else {
+          historyMergedAnomalies = Collections.emptyList();
+        }
 
         List<RawAnomalyResultDTO> resultsOfAnEntry = anomalyFunction
             .analyze(exploredDimensions, metricTimeSeries, windowStart, windowEnd, historyMergedAnomalies);

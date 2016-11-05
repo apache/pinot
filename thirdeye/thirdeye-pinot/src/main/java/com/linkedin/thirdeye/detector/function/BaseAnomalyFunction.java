@@ -8,7 +8,6 @@ import java.util.List;
 import java.util.Properties;
 
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,6 +38,14 @@ public abstract class BaseAnomalyFunction implements AnomalyFunction {
     return props;
   }
 
+  @Override
+  public List<Pair<Long, Long>> getDataRangeIntervals(Long monitoringWindowStartTime,
+      Long monitoringWindowEndTime) {
+    List<Pair<Long, Long>> startEndTimeIntervals = new ArrayList<>();
+    startEndTimeIntervals.add(new Pair<>(monitoringWindowStartTime, monitoringWindowEndTime));
+    return startEndTimeIntervals;
+  }
+
   /**
    * Returns unit change from baseline value
    * @param currentValue
@@ -50,22 +57,10 @@ public abstract class BaseAnomalyFunction implements AnomalyFunction {
   }
 
   /**
-   * Useful when multiple time intervals are needed for fetching current vs baseline data
-   *
-   * @param monitoringWindowStartTime inclusive
-   * @param monitoringWindowEndTime exclusive
-   *
-   * @return
+   * Returns true if this anomaly function uses the information of history anomalies
+   * @return true if this anomaly function uses the information of history anomalies
    */
-  public List<Pair<Long, Long>> getDataRangeIntervals(Long monitoringWindowStartTime,
-      Long monitoringWindowEndTime) {
-    List<Pair<Long, Long>> startEndTimeIntervals = new ArrayList<>();
-    startEndTimeIntervals.add(new Pair<>(monitoringWindowStartTime, monitoringWindowEndTime));
-
-    long baselineOffsetMillis = TimeUnit.MILLISECONDS.convert(7, TimeUnit.DAYS);
-    startEndTimeIntervals.add(
-        new Pair<>(monitoringWindowStartTime - baselineOffsetMillis, monitoringWindowEndTime - baselineOffsetMillis));
-
-    return startEndTimeIntervals;
+  public boolean useHistoryAnomaly() {
+    return false;
   }
 }

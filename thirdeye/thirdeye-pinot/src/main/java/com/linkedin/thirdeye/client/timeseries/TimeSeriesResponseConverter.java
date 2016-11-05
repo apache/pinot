@@ -41,7 +41,7 @@ public class TimeSeriesResponseConverter {
    * within the response input. The metrics returned in the MetricTimeSeries instances correspond to
    * the metric names as opposed to the full metric function (eg __COUNT instead of SUM(__COUNT))
    */
-  public Map<DimensionKey, MetricTimeSeries> toMap(TimeSeriesResponse response,
+  public static Map<DimensionKey, MetricTimeSeries> toMap(TimeSeriesResponse response,
       List<String> schemaDimensions) {
     DimensionKeyGenerator dimensionKeyGenerator = new DimensionKeyGenerator(schemaDimensions);
 
