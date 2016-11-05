@@ -22,6 +22,8 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.MProjectionOperator;
 import com.linkedin.pinot.core.operator.aggregation.AggregationOperator;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionUtils;
+import com.linkedin.pinot.core.startree.hll.HllConstants;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -59,6 +61,9 @@ public class AggregationPlanNode implements PlanNode {
       if (!aggregationInfo.getAggregationType().equalsIgnoreCase("count")) {
         String columns = aggregationInfo.getAggregationParams().get("column").trim();
         aggregationRelatedColumns.addAll(Arrays.asList(columns.split(",")));
+        if (aggregationInfo.getAggregationType().equalsIgnoreCase("fasthll")) {
+          aggregationRelatedColumns.add(columns + HllConstants.DEFAULT_HLL_DERIVE_COLUMN_SUFFIX);
+        }
       }
     }
     return aggregationRelatedColumns.toArray(new String[0]);
@@ -67,7 +72,7 @@ public class AggregationPlanNode implements PlanNode {
   @Override
   public Operator run() {
     MProjectionOperator projectionOperator = (MProjectionOperator) _projectionPlanNode.run();
-    return new AggregationOperator(_indexSegment, _brokerRequest.getAggregationsInfo(), projectionOperator);
+    return new AggregationOperator(_brokerRequest.getAggregationsInfo(), projectionOperator, _indexSegment.getSegmentMetadata().getTotalRawDocs());
   }
 
   @Override

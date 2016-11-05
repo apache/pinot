@@ -20,6 +20,7 @@ import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.common.DataFetcher;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
+import com.linkedin.pinot.core.operator.BaseOperator;
 import com.linkedin.pinot.core.operator.aggregation.DataBlockCache;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
@@ -31,7 +32,9 @@ import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.attribute.FileTime;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.configuration.Configuration;
@@ -127,7 +130,11 @@ public class HllIndexCreationTest {
       for (int i = 0; i < maxDocLength; i++) {
         docIdSet[i] = i;
       }
-      DataBlockCache blockCache = new DataBlockCache(new DataFetcher(indexSegment));
+      Map<String, BaseOperator> dataSourceMap = new HashMap<>();
+      for (String column : indexSegment.getColumnNames()) {
+        dataSourceMap.put(column, indexSegment.getDataSource(column));
+      }
+      DataBlockCache blockCache = new DataBlockCache(new DataFetcher(dataSourceMap));
       blockCache.initNewBlock(docIdSet, 0, maxDocLength);
 
       String[] strings = blockCache.getStringValueArrayForColumn("column1_hll");

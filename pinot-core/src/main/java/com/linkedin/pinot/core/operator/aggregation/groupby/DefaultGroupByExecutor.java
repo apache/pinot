@@ -19,8 +19,11 @@ import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.GroupBy;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.DataFetcher;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.operator.BaseOperator;
+import com.linkedin.pinot.core.operator.MProjectionOperator;
 import com.linkedin.pinot.core.operator.aggregation.AggregationFunctionContext;
 import com.linkedin.pinot.core.operator.aggregation.ResultHolderFactory;
 import com.linkedin.pinot.core.operator.aggregation.DataBlockCache;
@@ -28,6 +31,7 @@ import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunction
 import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunctionFactory;
 import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
 import java.util.List;
+import java.util.Map;
 
 
 /**
@@ -45,7 +49,6 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
   private final int _numAggrFunc;
   private final AggregationFunctionContext[] _aggrFuncContextArray;
   private final GroupByResultHolder[] _resultHolderArray;
-  private final SegmentMetadata _segmentMetadata;
   private final int _trimSize;
 
   private int[] _docIdToSVGroupKey;
@@ -54,27 +57,32 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
   private boolean _hasMultiValuedColumns = false;
   private boolean _inited = false;
   private boolean _finished = false;
+  private DataFetcher _dataFetcher;
 
   /**
    * Constructor for the class.
    *
-   * @param indexSegment Segment to process
    * @param aggregationInfoList Aggregation info from broker request
    * @param groupBy Group by from broker request
    * @param numGroupsLimit Limit on number of aggregation groups returned in the result
    */
-  public DefaultGroupByExecutor(IndexSegment indexSegment, List<AggregationInfo> aggregationInfoList, GroupBy groupBy,
+  public DefaultGroupByExecutor(MProjectionOperator projectionOperator, List<AggregationInfo> aggregationInfoList, GroupBy groupBy,
       int numGroupsLimit) {
-    Preconditions.checkNotNull(indexSegment);
+
     Preconditions.checkNotNull(aggregationInfoList);
     Preconditions.checkArgument(aggregationInfoList.size() > 0);
     Preconditions.checkNotNull(groupBy);
 
-    DataFetcher dataFetcher = new DataFetcher(indexSegment);
-    _singleValueBlockCache = new DataBlockCache(dataFetcher);
+    Map<String, BaseOperator> dataSourceMap = projectionOperator.getDataSourceMap();
+    _dataFetcher = new DataFetcher(dataSourceMap);
+
+    _singleValueBlockCache = new DataBlockCache(_dataFetcher);
+
     List<String> groupByColumnList = groupBy.getColumns();
     String[] groupByColumns = groupByColumnList.toArray(new String[groupByColumnList.size()]);
-    _groupKeyGenerator = new DefaultGroupKeyGenerator(dataFetcher, groupByColumns);
+
+
+    _groupKeyGenerator = new DefaultGroupKeyGenerator(_dataFetcher, groupByColumns);
 
     // Maximum number of results is the minimum of possible keys, and limit on number of groups
     int maxNumResults = Math.min(_groupKeyGenerator.getGlobalGroupKeyUpperBound(), numGroupsLimit);
@@ -87,14 +95,13 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     _numAggrFunc = aggregationInfoList.size();
     _aggrFuncContextArray = new AggregationFunctionContext[_numAggrFunc];
     _resultHolderArray = new GroupByResultHolder[_numAggrFunc];
-    _segmentMetadata = indexSegment.getSegmentMetadata();
 
     for (int i = 0; i < _numAggrFunc; i++) {
       AggregationInfo aggregationInfo = aggregationInfoList.get(i);
       String[] columns = aggregationInfo.getAggregationParams().get("column").trim().split(",");
 
       _aggrFuncContextArray[i] = new AggregationFunctionContext(
-          aggregationInfo.getAggregationType(), columns, _segmentMetadata);
+          aggregationInfo.getAggregationType(), columns);
       _resultHolderArray[i] = ResultHolderFactory.getGroupByResultHolder(
           _aggrFuncContextArray[i].getAggregationFunction(), maxNumResults);
     }
@@ -169,8 +176,9 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     Preconditions.checkState(aggrColumns.length == 1);
     String aggrColumn = aggrColumns[0];
     boolean isAggrColumnsingleValueField = true;
-    if (_segmentMetadata.getSchema().hasColumn(aggrColumn)) {
-      isAggrColumnsingleValueField = _segmentMetadata.getSchema().getFieldSpecFor(aggrColumn).isSingleValueField();
+    BlockMetadata blockMetadata = _dataFetcher.getBlockMetadataFor(aggrColumn);
+    if (blockMetadata != null) {
+      isAggrColumnsingleValueField = blockMetadata.isSingleValue();
     }
     switch (aggrFuncName) {
       case AggregationFunctionFactory.COUNT_AGGREGATION_FUNCTION:

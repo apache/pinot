@@ -38,11 +38,11 @@ public class MProjectionOperator extends BaseOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(MProjectionOperator.class);
 
   private final BReusableFilteredDocIdSetOperator _docIdSetOperator;
-  private final Map<String, DataSource> _columnToDataSourceMap;
+  private final Map<String, BaseOperator> _columnToDataSourceMap;
   private ProjectionBlock _currentBlock = null;
   private Map<String, Block> _blockMap;
 
-  public MProjectionOperator(Map<String, DataSource> dataSourceMap, BReusableFilteredDocIdSetOperator docIdSetOperator) {
+  public MProjectionOperator(Map<String, BaseOperator> dataSourceMap, BReusableFilteredDocIdSetOperator docIdSetOperator) {
     _docIdSetOperator = docIdSetOperator;
     _columnToDataSourceMap = dataSourceMap;
     _blockMap = new HashMap<>();
@@ -94,8 +94,12 @@ public class MProjectionOperator extends BaseOperator {
     return _currentBlock;
   }
 
-  public DataSource getDataSource(String column) {
+  public BaseOperator getDataSource(String column) {
     return _columnToDataSourceMap.get(column);
+  }
+  
+  public Map<String, BaseOperator> getDataSourceMap() {
+    return _columnToDataSourceMap;
   }
 
 }

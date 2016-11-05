@@ -45,6 +45,7 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.operator.BReusableFilteredDocIdSetOperator;
+import com.linkedin.pinot.core.operator.BaseOperator;
 import com.linkedin.pinot.core.operator.MProjectionOperator;
 import com.linkedin.pinot.core.operator.aggregation.AggregationOperator;
 import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
@@ -76,7 +77,7 @@ public class AggregationQueriesOnMultiValueColumnTest {
   private static File INDEX_DIR = new File(FileUtils.getTempDirectory() + File.separator + "AggregationQueriesOnMultiValueColumnTest");
 
   private IndexSegment _indexSegment;
-  private Map<String, DataSource> _dataSourceMap;
+  private Map<String, BaseOperator> _dataSourceMap;
 
   private BrokerRequest _brokerRequestNoFilter;
   private BrokerRequest _brokerRequestWithFilter;
@@ -126,7 +127,7 @@ public class AggregationQueriesOnMultiValueColumnTest {
   }
 
   private void setupDataSourceMap() {
-    _dataSourceMap = new HashMap<String, DataSource>();
+    _dataSourceMap = new HashMap<String, BaseOperator>();
     _dataSourceMap.put("column1", _indexSegment.getDataSource("column1"));
     _dataSourceMap.put("column2", _indexSegment.getDataSource("column2"));
     _dataSourceMap.put("column3", _indexSegment.getDataSource("column3"));
@@ -338,18 +339,19 @@ public class AggregationQueriesOnMultiValueColumnTest {
 
   private IntermediateResultsBlock getAggregationResultBlock(BrokerRequest brokerRequest) {
 
+    int totalRawDocs = _indexSegment.getSegmentMetadata().getTotalRawDocs();
     Operator filterOperator =
-        new MatchEntireSegmentOperator(_indexSegment.getSegmentMetadata().getTotalDocs());
+        new MatchEntireSegmentOperator(totalRawDocs);
     final BReusableFilteredDocIdSetOperator docIdSetOperator =
         new BReusableFilteredDocIdSetOperator(
             filterOperator,
-            _indexSegment.getSegmentMetadata().getTotalDocs(),
+            totalRawDocs,
             5000);
     final MProjectionOperator projectionOperator =
         new MProjectionOperator(_dataSourceMap, docIdSetOperator);
 
     final AggregationOperator aggregationOperator =
-        new AggregationOperator(_indexSegment, brokerRequest.getAggregationsInfo(), projectionOperator);
+        new AggregationOperator(brokerRequest.getAggregationsInfo(), projectionOperator, totalRawDocs);
 
     final IntermediateResultsBlock block =
         (IntermediateResultsBlock) aggregationOperator.nextBlock();

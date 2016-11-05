@@ -20,8 +20,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.operator.BaseOperator;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
-
 
 /**
  * DataFetcher is a higher level abstraction for data fetching. Given an index segment, DataFetcher can manage the
@@ -32,19 +32,33 @@ import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 public class DataFetcher {
   private static final BlockId BLOCK_ZERO = new BlockId(0);
 
-  private final IndexSegment _indexSegment;
-
-  private final Map<String, DataSource> _columnToDataSourceMap = new HashMap<>();
-  private final Map<String, Dictionary> _columnToDictionaryMap = new HashMap<>();
-  private final Map<String, BlockValSet> _columnToBlockValSetMap = new HashMap<>();
+  private final Map<String, BaseOperator> _columnToDataSourceMap;
+  private final Map<String, Block> _columnToBlockMap;
+  private final Map<String, Dictionary> _columnToDictionaryMap;
+  private final Map<String, BlockValSet> _columnToBlockValSetMap;
+  private final Map<String, BlockMetadata> _columnToBlockMetadataMap;
 
   /**
    * Constructor for DataFetcher.
    *
    * @param indexSegment index segment.
    */
-  public DataFetcher(IndexSegment indexSegment) {
-    _indexSegment = indexSegment;
+  public DataFetcher(Map<String, BaseOperator> columnToDataSourceMap) {
+    _columnToDataSourceMap = columnToDataSourceMap;
+    _columnToBlockMap = new HashMap<>();
+    _columnToDictionaryMap = new HashMap<>();
+    _columnToBlockValSetMap = new HashMap<>();
+    _columnToBlockMetadataMap = new HashMap<>();
+    for (String column : columnToDataSourceMap.keySet()) {
+      BaseOperator baseOperator = columnToDataSourceMap.get(column);
+      Block block = baseOperator.nextBlock(BLOCK_ZERO);
+      _columnToBlockMap.put(column, block);
+      _columnToDictionaryMap.put(column, block.getMetadata().getDictionary());
+      BlockValSet blockValSet = block.getBlockValueSet();
+      _columnToBlockValSetMap.put(column, blockValSet);
+      _columnToBlockMetadataMap.put(column,block.getMetadata());
+
+    }
   }
 
   /**
@@ -53,13 +67,13 @@ public class DataFetcher {
    * @param column column name.
    * @return data source associated with this column.
    */
-  public DataSource getDataSourceForColumn(String column) {
-    DataSource dataSource = _columnToDataSourceMap.get(column);
-    if (dataSource == null) {
-      dataSource = _indexSegment.getDataSource(column);
-      _columnToDataSourceMap.put(column, dataSource);
-    }
+  public BaseOperator getDataSourceForColumn(String column) {
+    BaseOperator dataSource = _columnToDataSourceMap.get(column);
     return dataSource;
+  }
+
+  public Block getBlockForColumn(String column) {
+    return _columnToBlockMap.get(column);
   }
 
   /**
@@ -70,10 +84,6 @@ public class DataFetcher {
    */
   public Dictionary getDictionaryForColumn(String column) {
     Dictionary dictionary = _columnToDictionaryMap.get(column);
-    if (dictionary == null) {
-      dictionary = getDataSourceForColumn(column).getDictionary();
-      _columnToDictionaryMap.put(column, dictionary);
-    }
     return dictionary;
   }
 
@@ -85,13 +95,12 @@ public class DataFetcher {
    */
   public BlockValSet getBlockValSetForColumn(String column) {
     BlockValSet blockValSet = _columnToBlockValSetMap.get(column);
-    if (blockValSet == null) {
-      blockValSet = getDataSourceForColumn(column).nextBlock(BLOCK_ZERO).getBlockValueSet();
-      _columnToBlockValSetMap.put(column, blockValSet);
-    }
     return blockValSet;
   }
 
+  public BlockMetadata getBlockMetadataFor(String column) {
+    return _columnToBlockMetadataMap.get(column);
+  }
   /**
    * Fetch the dictionary Ids for a single value column.
    *
@@ -102,8 +111,7 @@ public class DataFetcher {
    * @param outDictIds dictionary Id array buffer.
    * @param outStartPos output start position.
    */
-  public void fetchSingleDictIds(String column, int[] inDocIds, int inStartPos, int length, int[] outDictIds,
-      int outStartPos) {
+  public void fetchSingleDictIds(String column, int[] inDocIds, int inStartPos, int length, int[] outDictIds, int outStartPos) {
     BlockValSet blockValSet = getBlockValSetForColumn(column);
     blockValSet.readIntValues(inDocIds, inStartPos, length, outDictIds, outStartPos);
   }
@@ -118,10 +126,10 @@ public class DataFetcher {
    * @param outDictIdsArray dictionary Id array array buffer.
    * @param outStartPos output start position.
    * @param tempDictIdArray temporary holding dictIds read from BlockMultiValIterator.
-   *        Array size has to be >= max number of entries for this column.
+   *          Array size has to be >= max number of entries for this column.
    */
-  public void fetchMultiValueDictIds(String column, int[] inDocIds, int inStartPos, int length, int[][] outDictIdsArray,
-      int outStartPos, int[] tempDictIdArray) {
+  public void fetchMultiValueDictIds(String column, int[] inDocIds, int inStartPos, int length, int[][] outDictIdsArray, int outStartPos,
+      int[] tempDictIdArray) {
     BlockMultiValIterator iterator = (BlockMultiValIterator) getBlockValSetForColumn(column).iterator();
     for (int i = inStartPos; i < inStartPos + length; ++i) {
       iterator.skipTo(inDocIds[i]);
@@ -133,6 +141,7 @@ public class DataFetcher {
   /**
    * For a given multi-value column, trying to get the max number of
    * entries per row.
+   *
    * @param column
    * @return max number of entries for a given column.
    */
@@ -150,8 +159,7 @@ public class DataFetcher {
    * @param outValues value array buffer.
    * @param outStartPos output start position.
    */
-  public void fetchSingleIntValues(String column, int[] inDictIds, int inStartPos, int length, int[] outValues,
-      int outStartPos) {
+  public void fetchSingleIntValues(String column, int[] inDictIds, int inStartPos, int length, int[] outValues, int outStartPos) {
     Dictionary dictionary = getDictionaryForColumn(column);
     dictionary.readIntValues(inDictIds, inStartPos, length, outValues, outStartPos);
   }
@@ -166,8 +174,7 @@ public class DataFetcher {
    * @param outValues value array buffer.
    * @param outStartPos output start position.
    */
-  public void fetchSingleLongValues(String column, int[] inDictIds, int inStartPos, int length, long[] outValues,
-      int outStartPos) {
+  public void fetchSingleLongValues(String column, int[] inDictIds, int inStartPos, int length, long[] outValues, int outStartPos) {
     Dictionary dictionary = getDictionaryForColumn(column);
     dictionary.readLongValues(inDictIds, inStartPos, length, outValues, outStartPos);
   }
@@ -182,8 +189,7 @@ public class DataFetcher {
    * @param outValues value array buffer.
    * @param outStartPos output start position.
    */
-  public void fetchSingleFloatValues(String column, int[] inDictIds, int inStartPos, int length, float[] outValues,
-      int outStartPos) {
+  public void fetchSingleFloatValues(String column, int[] inDictIds, int inStartPos, int length, float[] outValues, int outStartPos) {
     Dictionary dictionary = getDictionaryForColumn(column);
     dictionary.readFloatValues(inDictIds, inStartPos, length, outValues, outStartPos);
   }
@@ -198,8 +204,7 @@ public class DataFetcher {
    * @param outValues value array buffer.
    * @param outStartPos output start position.
    */
-  public void fetchSingleDoubleValues(String column, int[] inDictIds, int inStartPos, int length, double[] outValues,
-      int outStartPos) {
+  public void fetchSingleDoubleValues(String column, int[] inDictIds, int inStartPos, int length, double[] outValues, int outStartPos) {
     Dictionary dictionary = getDictionaryForColumn(column);
     dictionary.readDoubleValues(inDictIds, inStartPos, length, outValues, outStartPos);
   }
@@ -214,8 +219,7 @@ public class DataFetcher {
    * @param outValues value array buffer.
    * @param outStartPos output start position.
    */
-  public void fetchSingleStringValues(String column, int[] inDictIds, int inStartPos, int length, String[] outValues,
-      int outStartPos) {
+  public void fetchSingleStringValues(String column, int[] inDictIds, int inStartPos, int length, String[] outValues, int outStartPos) {
     Dictionary dictionary = getDictionaryForColumn(column);
     dictionary.readStringValues(inDictIds, inStartPos, length, outValues, outStartPos);
   }
@@ -230,12 +234,14 @@ public class DataFetcher {
    * @param outValues value array buffer.
    * @param outStartPos output start position.
    */
-  public void fetchSingleHashCodes(String column, int[] inDictIds, int inStartPos, int length, double[] outValues,
-      int outStartPos) {
+  public void fetchSingleHashCodes(String column, int[] inDictIds, int inStartPos, int length, double[] outValues, int outStartPos) {
     Dictionary dictionary = getDictionaryForColumn(column);
     int inEndPos = inStartPos + length;
     for (int i = inStartPos; i < inEndPos; i++) {
       outValues[outStartPos++] = dictionary.get(inDictIds[i]).hashCode();
     }
   }
+
+
+
 }

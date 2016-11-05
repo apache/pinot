@@ -44,10 +44,11 @@ public class AggregationOperator extends BaseOperator {
   private List<AggregationInfo> _aggregationInfoList;
   private MProjectionOperator _projectionOperator;
 
-  private IndexSegment _indexSegment;
   private int _nextBlockCallCounter = 0;
 
   private int[] _reusableDocIdSet;
+
+  private final long _totalRawDocs;
 
   /**
    * Constructor for the class.
@@ -56,17 +57,15 @@ public class AggregationOperator extends BaseOperator {
    * @param aggregationsInfoList List of AggregationInfo (contains context for applying aggregation functions).
    * @param projectionOperator Projection
    */
-  public AggregationOperator(IndexSegment indexSegment, List<AggregationInfo> aggregationsInfoList,
-      MProjectionOperator projectionOperator) {
+  public AggregationOperator(List<AggregationInfo> aggregationsInfoList, MProjectionOperator projectionOperator, long totalRawDocs) {
 
-    Preconditions.checkNotNull(indexSegment);
     Preconditions.checkArgument((aggregationsInfoList != null) && (aggregationsInfoList.size() > 0));
     Preconditions.checkNotNull(projectionOperator);
 
-    _indexSegment = indexSegment;
     _aggregationInfoList = aggregationsInfoList;
     _projectionOperator = projectionOperator;
-    _aggregationExecutor = new DefaultAggregationExecutor(indexSegment, _aggregationInfoList);
+    _aggregationExecutor = new DefaultAggregationExecutor(projectionOperator, _aggregationInfoList);
+    _totalRawDocs = totalRawDocs;
   }
 
   /**
@@ -106,7 +105,7 @@ public class AggregationOperator extends BaseOperator {
             aggregationResults);
 
     resultBlock.setNumDocsScanned(numDocsScanned);
-    resultBlock.setTotalRawDocs(_indexSegment.getSegmentMetadata().getTotalRawDocs());
+    resultBlock.setTotalRawDocs(_totalRawDocs);
     resultBlock.setTimeUsedMs(System.currentTimeMillis() - startTimeMillis);
 
     return resultBlock;
