@@ -9,11 +9,7 @@ import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
 import org.joda.time.DateTime;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import com.google.common.base.Joiner;
-import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 
@@ -105,7 +101,7 @@ public class MinMaxThresholdFunction extends BaseAnomalyFunction {
 
   @Override
   public void updateMergedAnomalyInfo(MergedAnomalyResultDTO anomalyToUpdated, MetricTimeSeries timeSeries,
-      List<MergedAnomalyResultDTO> knownAnomalies)
+      DateTime windowStart, DateTime windowEnd, List<MergedAnomalyResultDTO> knownAnomalies)
       throws Exception {
 
     // Get min / max props
@@ -121,8 +117,8 @@ public class MinMaxThresholdFunction extends BaseAnomalyFunction {
     }
 
     String metric = getSpec().getMetric();
-    long currentWindowStart = anomalyToUpdated.getStartTime();
-    long currentWindowEnd = anomalyToUpdated.getEndTime();
+    long windowStartInMillis = windowStart.getMillis();
+    long windowEndInMillis = windowEnd.getMillis();
 
     double currentAverageValue = 0d;
     int currentBucketCount = 0;
@@ -130,7 +126,7 @@ public class MinMaxThresholdFunction extends BaseAnomalyFunction {
     for (long time : timeSeries.getTimeWindowSet()) {
       double value = timeSeries.get(time, metric).doubleValue();
       if (value != 0d) {
-        if (currentWindowStart <= time && time <= currentWindowEnd) {
+        if (windowStartInMillis <= time && time <= windowEndInMillis) {
           currentAverageValue += value;
           ++currentBucketCount;
           deviationFromThreshold += getDeviationFromThreshold(value, min, max);

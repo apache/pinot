@@ -1,11 +1,8 @@
 package com.linkedin.thirdeye.detector.function;
 
 import com.linkedin.pinot.pql.parsers.utils.Pair;
-import com.linkedin.thirdeye.anomaly.views.AnomalyTimelinesView;
 import com.linkedin.thirdeye.api.DimensionMap;
-import com.linkedin.thirdeye.dashboard.views.TimeBucket;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import java.io.IOException;
 import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.List;
@@ -139,19 +136,19 @@ public class WeekOverWeekRuleFunction extends BaseAnomalyFunction {
 
   @Override
   public void updateMergedAnomalyInfo(MergedAnomalyResultDTO anomalyToUpdated, MetricTimeSeries timeSeries,
-      List<MergedAnomalyResultDTO> knownAnomalies)
+      DateTime windowStart, DateTime windowEnd, List<MergedAnomalyResultDTO> knownAnomalies)
       throws Exception {
 
     String metric = getSpec().getMetric();
-    long currentWindowStart = anomalyToUpdated.getStartTime();
-    long currentWindowEnd = anomalyToUpdated.getEndTime();
+    long windowStartInMillis = windowStart.getMillis();
+    long windowEndInMillis = windowEnd.getMillis();
 
     // Compute baseline time range
     Properties props = getProperties();
     String baselineProp = props.getProperty(BASELINE);
     long baselineOffsetMillis = getBaselineOffsetInMillis(baselineProp);
-    long baselineWindowStart = currentWindowStart - baselineOffsetMillis;
-    long baselineWindowEnd = currentWindowEnd - baselineOffsetMillis;
+    long baselineWindowStart = windowStartInMillis - baselineOffsetMillis;
+    long baselineWindowEnd = windowEndInMillis - baselineOffsetMillis;
 
     // Wight of this time series equals the change ratio of the average value  of current and baseline values
     double currentAverageValue = 0d;
@@ -161,7 +158,7 @@ public class WeekOverWeekRuleFunction extends BaseAnomalyFunction {
     for (long time : timeSeries.getTimeWindowSet()) {
       double value = timeSeries.get(time, metric).doubleValue();
       if (value != 0d) {
-        if (currentWindowStart <= time && time <= currentWindowEnd) {
+        if (windowStartInMillis <= time && time <= windowEndInMillis) {
           currentAverageValue += value;
           ++currentBucketCount;
         } else if (baselineWindowStart <= time && time <= baselineWindowEnd) {

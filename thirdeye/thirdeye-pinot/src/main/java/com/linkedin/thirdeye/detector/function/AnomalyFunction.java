@@ -49,7 +49,8 @@ public interface AnomalyFunction {
       throws Exception;
 
   /**
-   * Computes the severity according to the current and baseline of the given timeSeries
+   * Computes the score and severity according to the current and baseline of the given timeSeries and stores the
+   * information to the merged anomaly. The start and end time of the time series is provided
    *
    * @param anomalyToUpdated
    *          the merged anomaly to be updated.
@@ -62,7 +63,7 @@ public interface AnomalyFunction {
    * @return the severity according to the current and baseline of the given timeSeries
    */
   void updateMergedAnomalyInfo(MergedAnomalyResultDTO anomalyToUpdated, MetricTimeSeries timeSeries,
-      List<MergedAnomalyResultDTO> knownAnomalies)
+      DateTime windowStart, DateTime windowEnd, List<MergedAnomalyResultDTO> knownAnomalies)
       throws Exception;
 
   /**

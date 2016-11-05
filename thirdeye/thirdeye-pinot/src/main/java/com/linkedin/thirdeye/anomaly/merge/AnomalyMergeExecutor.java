@@ -17,6 +17,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -161,11 +162,11 @@ public class AnomalyMergeExecutor implements Runnable {
 
     mergedResult.setMessage(anomalyMessage);
 
-    // recompute severity
+    // recompute weight using anomaly function specific method
     try {
-      updateMergedSeverity(mergedResult);
+      updateMergedAnomalyWeight(mergedResult);
     } catch (Exception e) {
-      LOG.error("Could not recompute severity", e);
+      LOG.warn("Failed to compute merged weight using anomaly function specific method; average weight of raw anomalies is used: ", e);
     }
     try {
       // persist the merged result
@@ -178,7 +179,7 @@ public class AnomalyMergeExecutor implements Runnable {
     }
   }
 
-  private void updateMergedSeverity(MergedAnomalyResultDTO anomalyMergedResult) throws Exception {
+  private void updateMergedAnomalyWeight(MergedAnomalyResultDTO anomalyMergedResult) throws Exception {
     AnomalyFunctionDTO anomalyFunctionSpec = anomalyMergedResult.getFunction();
     BaseAnomalyFunction anomalyFunction = anomalyFunctionFactory.fromSpec(anomalyFunctionSpec);
 
@@ -198,7 +199,9 @@ public class AnomalyMergeExecutor implements Runnable {
         knownAnomalies = getKnownMergedAnomalies(anomalyFunction, anomalyMergedResult.getStartTime(),
             anomalyMergedResult.getEndTime());
       }
-      anomalyFunction.updateMergedAnomalyInfo(anomalyMergedResult, metricTimeSeries, knownAnomalies);
+      anomalyFunction.updateMergedAnomalyInfo(anomalyMergedResult, metricTimeSeries,
+          new DateTime(anomalyMergedResult.getStartTime()), new DateTime(anomalyMergedResult.getEndTime()),
+          knownAnomalies);
     }
   }
 

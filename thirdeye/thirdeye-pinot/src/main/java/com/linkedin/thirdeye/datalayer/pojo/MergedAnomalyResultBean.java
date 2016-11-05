@@ -1,11 +1,9 @@
 package com.linkedin.thirdeye.datalayer.pojo;
 
 import com.linkedin.thirdeye.api.DimensionMap;
-import com.linkedin.thirdeye.datalayer.entity.MergedAnomalyResultIndex;
 import java.util.List;
 import java.util.Objects;
 import org.apache.commons.lang.ObjectUtils;
-import org.modelmapper.PropertyMap;
 
 
 public class MergedAnomalyResultBean extends AbstractBean
@@ -116,8 +114,7 @@ public class MergedAnomalyResultBean extends AbstractBean
   }
 
   /**
-   * Weight is Severity
-   * @return
+   * Weight is change ratio. The absolute value of weight is severity.
    */
   public double getWeight() {
     return weight;
