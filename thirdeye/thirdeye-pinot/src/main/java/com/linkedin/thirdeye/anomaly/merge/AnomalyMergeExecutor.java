@@ -190,7 +190,7 @@ public class AnomalyMergeExecutor implements Runnable {
         anomalyFunctionSpec.getBucketUnit());
 
     MetricTimeSeries metricTimeSeries =
-        TimeSeriesUtil.getTimeSeriesResponseForPresentation(anomalyFunctionSpec, startEndTimeRanges,
+        TimeSeriesUtil.getTimeSeriesByDimension(anomalyFunctionSpec, startEndTimeRanges,
             anomalyMergedResult.getDimensions(), timeGranularity);
 
     if (metricTimeSeries != null) {

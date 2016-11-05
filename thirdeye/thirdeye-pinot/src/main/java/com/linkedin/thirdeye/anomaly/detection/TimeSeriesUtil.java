@@ -44,7 +44,10 @@ public abstract class TimeSeriesUtil {
   }
 
   /**
-   * Returns the time series that are needed by the given anomaly function for detecting anomalies.
+   * Returns the set of metric time series that are needed by the given anomaly function for detecting anomalies.
+   *
+   * The time granularity is the granularity of the function's collection, i.e., the buckets are not aggregated,
+   * in order to increase the accuracy for detecting anomalies.
    *
    * @param anomalyFunctionSpec spec of the anomaly function
    * @param startEndTimeRanges the time ranges to retrieve the data for constructing the time series
@@ -53,8 +56,8 @@ public abstract class TimeSeriesUtil {
    * @throws JobExecutionException
    * @throws ExecutionException
    */
-  public static TimeSeriesResponse getTimeSeriesResponseForAnomalyDetection(AnomalyFunctionDTO anomalyFunctionSpec,
-      List<Pair<Long, Long>> startEndTimeRanges)
+  public static Map<DimensionKey, MetricTimeSeries> getTimeSeriesForAnomalyDetection(
+      AnomalyFunctionDTO anomalyFunctionSpec, List<Pair<Long, Long>> startEndTimeRanges)
       throws JobExecutionException, ExecutionException {
 
     String filterString = anomalyFunctionSpec.getFilters();
@@ -76,11 +79,23 @@ public abstract class TimeSeriesUtil {
     TimeGranularity timeGranularity = new TimeGranularity(anomalyFunctionSpec.getBucketSize(),
         anomalyFunctionSpec.getBucketUnit());
 
-    return getTimeSeriesResponseImpl(anomalyFunctionSpec, startEndTimeRanges, timeGranularity, filters, groupByDimensions);
+    TimeSeriesResponse timeSeriesResponse =
+      getTimeSeriesResponseImpl(anomalyFunctionSpec, startEndTimeRanges, timeGranularity, filters, groupByDimensions);
+
+    try {
+      Map<DimensionKey, MetricTimeSeries> dimensionKeyMetricTimeSeriesMap =
+          TimeSeriesResponseConverter.toMap(timeSeriesResponse, Utils.getSchemaDimensionNames(anomalyFunctionSpec.getCollection()));
+      return dimensionKeyMetricTimeSeriesMap;
+    } catch (Exception e) {
+      LOG.info("Failed to get schema dimensions for constructing dimension keys:", e.toString());
+      return Collections.emptyMap();
+    }
   }
 
   /**
-   * Returns the time series that were used by the given anomaly function for detecting the anomaly.
+   * Returns the metric time series that were given to the anomaly function for anomaly detection. If the dimension to
+   * retrieve is OTHER, this method retrieves all combinations of dimensions and calculate the metric time series for
+   * OTHER dimension on-the-fly.
    *
    * @param anomalyFunctionSpec spec of the anomaly function
    * @param startEndTimeRanges the time ranges to retrieve the data for constructing the time series
@@ -93,7 +108,7 @@ public abstract class TimeSeriesUtil {
    * @throws JobExecutionException
    * @throws ExecutionException
    */
-  public static MetricTimeSeries getTimeSeriesResponseForPresentation(AnomalyFunctionDTO anomalyFunctionSpec,
+  public static MetricTimeSeries getTimeSeriesByDimension(AnomalyFunctionDTO anomalyFunctionSpec,
       List<Pair<Long, Long>> startEndTimeRanges, DimensionMap dimensionMap, TimeGranularity timeGranularity)
       throws JobExecutionException, ExecutionException {
 
@@ -131,7 +146,7 @@ public abstract class TimeSeriesUtil {
     try {
       Map<DimensionKey, MetricTimeSeries> metricTimeSeriesMap = TimeSeriesResponseConverter.toMap(response,
           Utils.getSchemaDimensionNames(anomalyFunctionSpec.getCollection()));
-      return extractMetricTimeSeriesForPresentation(metricTimeSeriesMap);
+      return extractMetricTimeSeriesByDimension(metricTimeSeriesMap);
     } catch (Exception e) {
       LOG.warn("Unable to get schema dimension name for retrieving metric time series: {}", e.toString());
       return null;
@@ -151,7 +166,7 @@ public abstract class TimeSeriesUtil {
    *
    * @return the time series when the anomaly is detected
    */
-  private static MetricTimeSeries extractMetricTimeSeriesForPresentation(Map<DimensionKey, MetricTimeSeries> metricTimeSeriesMap) {
+  private static MetricTimeSeries extractMetricTimeSeriesByDimension(Map<DimensionKey, MetricTimeSeries> metricTimeSeriesMap) {
     MetricTimeSeries metricTimeSeries = null;
     if (MapUtils.isNotEmpty(metricTimeSeriesMap)) {
       // For most anomalies, there should be only one time series due to its dimensions. The exception is the OTHER

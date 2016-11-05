@@ -116,16 +116,15 @@ public class AnomalyFunctionResource {
 
     List<Pair<Long, Long>> startEndTimeRanges = anomalyFunction.getDataRangeIntervals(startTime, endTime);
 
-    TimeSeriesResponse finalResponse =
-        TimeSeriesUtil.getTimeSeriesResponseForAnomalyDetection(anomalyFunctionSpec, startEndTimeRanges);
+    Map<DimensionKey, MetricTimeSeries> dimensionKeyMetricTimeSeriesMap =
+        TimeSeriesUtil.getTimeSeriesForAnomalyDetection(anomalyFunctionSpec, startEndTimeRanges);
 
     List<RawAnomalyResultDTO> anomalyResults = new ArrayList<>();
     List<RawAnomalyResultDTO> results = new ArrayList<>();
     List<String> collectionDimensions = DAO_REGISTRY.getDatasetConfigDAO()
         .findByDataset(anomalyFunctionSpec.getCollection()).getDimensions();
 
-    Map<DimensionKey, MetricTimeSeries> res = TimeSeriesResponseConverter.toMap(finalResponse, collectionDimensions);
-    for (Map.Entry<DimensionKey, MetricTimeSeries> entry : res.entrySet()) {
+    for (Map.Entry<DimensionKey, MetricTimeSeries> entry : dimensionKeyMetricTimeSeriesMap.entrySet()) {
       DimensionKey dimensionKey = entry.getKey();
       DimensionMap dimensionMap = DimensionMap.fromDimensionKey(dimensionKey, collectionDimensions);
       if (entry.getValue().getTimeWindowSet().size() < 2) {

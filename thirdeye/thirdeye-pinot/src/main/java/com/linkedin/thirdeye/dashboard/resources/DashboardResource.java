@@ -1,6 +1,6 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
-import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClient;
+import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 
 import com.linkedin.thirdeye.util.SeverityComputationUtil;
@@ -566,6 +566,7 @@ public class DashboardResource {
     return response;
   }
 
+  // TODO: Move to AnomalyResources
   @POST
   @Path("/severity")
   public Response computeSeverity(@NotNull @QueryParam("collection") String collectionName,
@@ -580,11 +581,11 @@ public class DashboardResource {
     if (StringUtils.isNotBlank(endTimeIso)) {
       endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso);
     }
-    PinotThirdEyeClient thirdEyeClient = PinotThirdEyeClient.getDefaultTestClient();
+    ThirdEyeClient thirdEyeClient = CACHE_REGISTRY_INSTANCE.getQueryCache().getClient();
     SeverityComputationUtil util = new SeverityComputationUtil(thirdEyeClient, collectionName, metricName);
     long currentWindowStart = startTime.getMillis();
     long currentWindowEnd = endTime.getMillis();
-    String compareMode = "WO3WMean";
+    String compareMode = "WO4WMean";
 
     Map<String, Object> severity = util.computeSeverity(currentWindowStart, currentWindowEnd, compareMode);
 

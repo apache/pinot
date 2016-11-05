@@ -77,10 +77,10 @@ public class DetectionTaskRunner implements TaskRunner {
 
     List<Pair<Long, Long>> startEndTimeRanges =
         anomalyFunction.getDataRangeIntervals(windowStart.getMillis(), windowEnd.getMillis());
-    TimeSeriesResponse finalResponse =
-        TimeSeriesUtil.getTimeSeriesResponseForAnomalyDetection(anomalyFunctionSpec, startEndTimeRanges);
+    Map<DimensionKey, MetricTimeSeries> dimensionKeyMetricTimeSeriesMap =
+        TimeSeriesUtil.getTimeSeriesForAnomalyDetection(anomalyFunctionSpec, startEndTimeRanges);
 
-    exploreDimensionsAndAnalyze(finalResponse);
+    exploreDimensionsAndAnalyze(dimensionKeyMetricTimeSeriesMap);
 
     // If the current job is a backfill (adhoc) detection job, then perform a lightweight merge right after the
     // detection. Moreover, set notified flag to true so the merged anomalies do not induce alerts and emails.
@@ -97,10 +97,8 @@ public class DetectionTaskRunner implements TaskRunner {
     return taskResult;
   }
 
-  private void exploreDimensionsAndAnalyze(TimeSeriesResponse finalResponse) {
+  private void exploreDimensionsAndAnalyze(Map<DimensionKey, MetricTimeSeries> dimensionKeyMetricTimeSeriesMap) {
     int anomalyCounter = 0;
-    Map<DimensionKey, MetricTimeSeries> res =
-        TimeSeriesResponseConverter.toMap(finalResponse, collectionDimensions);
 
     // Sort the known anomalies by their dimension names
     ArrayListMultimap<DimensionMap, MergedAnomalyResultDTO> dimensionNamesToKnownMergedAnomalies = ArrayListMultimap.create();
@@ -113,7 +111,7 @@ public class DetectionTaskRunner implements TaskRunner {
       dimensionNamesToKnownRawAnomalies.put(existingRawAnomaly.getDimensions(), existingRawAnomaly);
     }
 
-    for (Map.Entry<DimensionKey, MetricTimeSeries> entry : res.entrySet()) {
+    for (Map.Entry<DimensionKey, MetricTimeSeries> entry : dimensionKeyMetricTimeSeriesMap.entrySet()) {
       DimensionKey dimensionKey = entry.getKey();
       DimensionMap exploredDimensions = DimensionMap.fromDimensionKey(dimensionKey, collectionDimensions);
 
