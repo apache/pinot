@@ -166,7 +166,11 @@ public class AnomalyMergeExecutor implements Runnable {
     try {
       updateMergedAnomalyWeight(mergedResult);
     } catch (Exception e) {
-      LOG.warn("Failed to compute merged weight using anomaly function specific method; average weight of raw anomalies is used: ", e);
+      AnomalyFunctionDTO function = mergedResult.getFunction();
+      LOG.warn(
+          "Failed to compute merged weight and the average weight of raw anomalies is used. Dataset: {}, Metric: {}, Function: {}, Time:{} - {}, Exception: {}",
+          function.getCollection(), function.getMetric(), function.getFunctionName(),
+          new DateTime(mergedResult.getStartTime()), new DateTime(mergedResult.getEndTime()), e);
     }
     try {
       // persist the merged result
