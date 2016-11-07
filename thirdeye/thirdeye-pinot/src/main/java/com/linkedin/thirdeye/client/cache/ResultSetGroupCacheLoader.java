@@ -20,7 +20,15 @@ import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClientConfig;
 
 public class ResultSetGroupCacheLoader extends CacheLoader<PinotQuery, ResultSetGroup> {
   private static final Logger LOG = LoggerFactory.getLogger(ResultSetGroupCacheLoader.class);
-  private static int MAX_CONNECTIONS = 25;
+  
+  private static int MAX_CONNECTIONS;
+  static {
+    try {
+      MAX_CONNECTIONS = Integer.parseInt(System.getProperty("max_pinot_connections", "25"));
+    } catch (Exception e) {
+      MAX_CONNECTIONS = 25;
+    }
+  }
   private Connection[] connections;
 
   private static final String BROKER_PREFIX = "Broker_";

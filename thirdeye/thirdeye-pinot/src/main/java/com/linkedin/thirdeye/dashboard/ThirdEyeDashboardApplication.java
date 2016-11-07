@@ -16,6 +16,8 @@ import com.linkedin.thirdeye.dashboard.resources.IngraphMetricConfigResource;
 import com.linkedin.thirdeye.dashboard.resources.JobResource;
 import com.linkedin.thirdeye.dashboard.resources.MetricConfigResource;
 import com.linkedin.thirdeye.dashboard.resources.SummaryResource;
+import com.linkedin.thirdeye.dashboard.resources.ThirdEyeResource;
+
 import io.dropwizard.assets.AssetsBundle;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
@@ -64,6 +66,8 @@ public class ThirdEyeDashboardApplication
     env.jersey().register(new JobResource());
     env.jersey().register(new AdminResource());
     env.jersey().register(new SummaryResource());
+    env.jersey().register(new ThirdEyeResource());
+
   }
 
   public static void main(String[] args) throws Exception {

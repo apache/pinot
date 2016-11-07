@@ -1,5 +1,4 @@
-<section id="metric-config-section" width="100%">
-	<script id="metric-config-template" type="text/x-handlebars-template">
+<script id="metric-config-template" type="text/x-handlebars-template">
 <div class="panel-body">
 	<form role="form">
 		<label for="metric-dataset-selector">Dataset </label> <Select id="metric-dataset-selector" name="dataset">
@@ -12,7 +11,6 @@
 <div class="MetricConfigContainer" id="MetricConfigContainer-{{this}}"></div>
 {{/each}}
 </script>
-</section>
 
 
 
