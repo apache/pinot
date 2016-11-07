@@ -19,7 +19,6 @@ import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.query.ReduceService;
 import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.response.InstanceResponse;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.response.broker.AggregationResult;
 import com.linkedin.pinot.common.response.broker.BrokerResponseNative;
@@ -54,13 +53,6 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
   private static String NUM_DOCS_SCANNED = "numDocsScanned";
   private static String TIME_USED_MS = "timeUsedMs";
   private static String TOTAL_DOCS = "totalDocs";
-
-  @Override
-  public BrokerResponseNative reduce(BrokerRequest brokerRequest,
-      Map<ServerInstance, InstanceResponse> instanceResponseMap) {
-    // This methods will be removed from the interface, so not implemented currently.
-    throw new RuntimeException("Method 'reduce' not implemented in class BrokerResponseNative");
-  }
 
   @Override
   public BrokerResponseNative reduceOnDataTable(BrokerRequest brokerRequest,

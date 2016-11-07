@@ -18,7 +18,6 @@ package com.linkedin.pinot.core.operator.blocks;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.response.ProcessingException;
-import com.linkedin.pinot.common.response.ResponseStatistics;
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.common.utils.DataTableBuilder;
 import com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema;
@@ -51,7 +50,6 @@ public class IntermediateResultsBlock implements Block {
   private List<ProcessingException> _processingExceptions;
   private long _numDocsScanned;
   private long _requestId = -1;
-  private List<ResponseStatistics> _segmentStatistics;
   private long _timeUsedMs;
   private long _totalRawDocs;
   private List<Map<String, Serializable>> _aggregationGroupByOperatorResult;
@@ -246,10 +244,6 @@ public class IntermediateResultsBlock implements Block {
     return _requestId;
   }
 
-  public List<ResponseStatistics> getSegmentStatistics() {
-    return _segmentStatistics;
-  }
-
   public long getTimeUsedMs() {
     return _timeUsedMs;
   }
@@ -268,10 +262,6 @@ public class IntermediateResultsBlock implements Block {
 
   public void setRequestId(long requestId) {
     _requestId = requestId;
-  }
-
-  public void setSegmentStatistics(List<ResponseStatistics> segmentStatistics) {
-    _segmentStatistics = segmentStatistics;
   }
 
   public void setTimeUsedMs(long timeUsedMs) {
