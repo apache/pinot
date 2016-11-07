@@ -368,10 +368,11 @@ public class PinotHelixResourceManager {
       } else {
         LOGGER.info("Trying to delete segment: {} from IdealStates", segmentId);
         HelixHelper.removeSegmentFromIdealState(_helixZkManager, tableName, segmentId);
+        res.message = "";
       }
       _segmentDeletionManager.deleteSegment(tableName, segmentId);
 
-      res.message = "Segment " + segmentId + " successfully deleted.";
+      res.message += "Segment " + segmentId + " successfully deleted.";
       res.status = ResponseStatus.success;
     } catch (final Exception e) {
       LOGGER.error("Caught exception while deleting segment {} of table {}", segmentId, tableName, e);
