@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.server.api.restlet;
+package com.linkedin.pinot.server.api.resources;
 
 import com.linkedin.pinot.common.restlet.resources.TableSizeInfo;
 import com.linkedin.pinot.common.segment.ReadMode;
@@ -28,39 +28,40 @@ import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 import com.linkedin.pinot.server.conf.ServerConf;
 import com.linkedin.pinot.server.integration.InstanceServerStarter;
 import com.linkedin.pinot.server.starter.ServerInstance;
-import com.linkedin.pinot.server.starter.helix.AdminApiService;
+import com.linkedin.pinot.server.starter.helix.AdminApiApplication;
 import com.linkedin.pinot.util.TestUtils;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
 import java.nio.file.Files;
 import java.util.concurrent.TimeUnit;
+import javax.ws.rs.client.Client;
+import javax.ws.rs.client.ClientBuilder;
+import javax.ws.rs.client.WebTarget;
+import javax.ws.rs.core.Response;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
-import org.codehaus.jackson.map.ObjectMapper;
-import org.restlet.Client;
-import org.restlet.Request;
-import org.restlet.Response;
-import org.restlet.data.Method;
-import org.restlet.data.Protocol;
-import org.restlet.data.Status;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.AfterTest;
-import org.testng.annotations.BeforeTest;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
 public class TableSizeResourceTest {
   public static final Logger LOGGER = LoggerFactory.getLogger(TableSizeResourceTest.class);
   private static final String AVRO_DATA = "data/test_data-mv.avro";
+  private static final String TABLE_NAME = "testTable";
+  private static final String TABLE_SIZE_PATH = "/tables/" + TABLE_NAME + "/size";
 
   ServerInstance serverInstance;
-  AdminApiService apiService;
+  AdminApiApplication apiService;
   private File INDEX_DIR;
   private IndexSegment indexSegment;
+  Client client;
+  WebTarget target;
 
-  @BeforeTest
+  @BeforeClass
   public void setupTest()
       throws Exception {
 
@@ -78,12 +79,16 @@ public class TableSizeResourceTest {
     serverInstance.init(serverConf, new MetricsRegistry());
     LOGGER.info("Trying to start ServerInstance!");
     serverInstance.start();
-    apiService = new AdminApiService(serverInstance);
+    apiService = new AdminApiApplication(serverInstance);
     apiService.start(Integer.parseInt(CommonConstants.Server.DEFAULT_ADMIN_API_PORT));
+    client = ClientBuilder.newClient();
+    target = client.target(apiService.getBaseUri().toString());
+    setupSegment();
   }
 
   @AfterTest
   public void tearDownTest() {
+    apiService.stop();
     serverInstance.shutDown();
     if (INDEX_DIR != null) {
       FileUtils.deleteQuietly(INDEX_DIR);
@@ -95,12 +100,8 @@ public class TableSizeResourceTest {
 
   @Test
   public void testTableSizeNotFound() {
-    Client client = new Client(Protocol.HTTP);
-    Request request = new Request(Method.GET, "http://localhost:" + CommonConstants.Server.DEFAULT_ADMIN_API_PORT +
-        "/table/unknownTable/size");
-    Response response = client.handle(request);
-    Assert.assertEquals(response.getStatus(), Status.CLIENT_ERROR_NOT_FOUND);
-
+    Response response = target.path("table/unknownTable/size").request().get(Response.class);
+    Assert.assertEquals(response.getStatus(), Response.Status.BAD_REQUEST.getStatusCode());
   }
 
   public void setupSegment()
@@ -112,7 +113,7 @@ public class TableSizeResourceTest {
     // intentionally changed this to TimeUnit.Hours to make it non-default for testing
     final SegmentGeneratorConfig config =
         SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "daysSinceEpoch",
-            TimeUnit.HOURS, "testTable");
+            TimeUnit.HOURS, TABLE_NAME);
     config.setSegmentNamePostfix("1");
     config.setTimeColumnName("daysSinceEpoch");
     final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
@@ -124,24 +125,37 @@ public class TableSizeResourceTest {
   }
 
   @Test
-  public void testTableSize()
-      throws Exception {
-    setupSegment();
-    Client client = new Client(Protocol.HTTP);
-    {
-      Request request = new Request(Method.GET, "http://localhost:" + CommonConstants.Server.DEFAULT_ADMIN_API_PORT +
-          "/table/testTable/size");
-      Response response = client.handle(request);
-      Assert.assertEquals(response.getStatus(),Status.SUCCESS_OK);
-      String body = response.getEntity().getText();
-      TableSizeInfo tableSizeInfo =
-          new ObjectMapper().readValue(body, TableSizeInfo.class);
-      Assert.assertEquals("testTable", tableSizeInfo.tableName);
-      Assert.assertEquals(1, tableSizeInfo.segments.size());
-      Assert.assertEquals(indexSegment.getSegmentName(), tableSizeInfo.segments.get(0).segmentName);
-      Assert.assertEquals(tableSizeInfo.segments.get(0).diskSizeInBytes,
-          indexSegment.getDiskSizeBytes());
-      Assert.assertEquals(tableSizeInfo.diskSizeInBytes, indexSegment.getDiskSizeBytes());
-    }
+  public void testTableSizeDetailed() {
+    TableSizeInfo tableSizeInfo = target.path(TABLE_SIZE_PATH).request().get(TableSizeInfo.class);
+
+    Assert.assertEquals(tableSizeInfo.tableName, TABLE_NAME);
+    Assert.assertEquals(tableSizeInfo.diskSizeInBytes, indexSegment.getDiskSizeBytes());
+    Assert.assertEquals(tableSizeInfo.segments.size(), 1);
+    Assert.assertEquals(tableSizeInfo.segments.get(0).segmentName, indexSegment.getSegmentName());
+    Assert.assertEquals(tableSizeInfo.segments.get(0).diskSizeInBytes,
+        indexSegment.getDiskSizeBytes());
+    Assert.assertEquals(tableSizeInfo.diskSizeInBytes, indexSegment.getDiskSizeBytes());
+  }
+
+  @Test
+  public void testTableSizeNoDetails() {
+    TableSizeInfo tableSizeInfo = target.path(TABLE_SIZE_PATH).queryParam("detailed", "false")
+        .request().get(TableSizeInfo.class);
+    Assert.assertEquals(tableSizeInfo.tableName, TABLE_NAME);
+    Assert.assertEquals(tableSizeInfo.diskSizeInBytes, indexSegment.getDiskSizeBytes());
+    Assert.assertEquals(tableSizeInfo.segments.size(), 0);
+  }
+
+  @Test
+  public void testTableSizeOld() {
+    TableSizeInfo tableSizeInfo = target.path("/table/" + TABLE_NAME + "/size").request().get(TableSizeInfo.class);
+
+    Assert.assertEquals(tableSizeInfo.tableName, TABLE_NAME);
+    Assert.assertEquals(tableSizeInfo.diskSizeInBytes, indexSegment.getDiskSizeBytes());
+    Assert.assertEquals(tableSizeInfo.segments.size(), 1);
+    Assert.assertEquals(tableSizeInfo.segments.get(0).segmentName, indexSegment.getSegmentName());
+    Assert.assertEquals(tableSizeInfo.segments.get(0).diskSizeInBytes,
+        indexSegment.getDiskSizeBytes());
+    Assert.assertEquals(tableSizeInfo.diskSizeInBytes, indexSegment.getDiskSizeBytes());
   }
 }

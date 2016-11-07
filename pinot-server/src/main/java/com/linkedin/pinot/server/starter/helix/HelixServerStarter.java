@@ -73,7 +73,7 @@ public class HelixServerStarter {
 
   private final String _helixClusterName;
   private final String _instanceId;
-  private AdminApiService adminApiService;
+  private AdminApiApplication _adminApiApplication;
 
   public HelixServerStarter(String helixClusterName, String zkServer, Configuration pinotHelixProperties)
       throws Exception {
@@ -117,8 +117,8 @@ public class HelixServerStarter {
     // Start restlet server for admin API endpoint
     int adminApiPort = pinotHelixProperties.getInt(CommonConstants.Server.CONFIG_OF_ADMIN_API_PORT,
         Integer.parseInt(CommonConstants.Server.DEFAULT_ADMIN_API_PORT));
-    adminApiService = new AdminApiService(_serverInstance);
-    adminApiService.start(adminApiPort);
+    _adminApiApplication = new AdminApiApplication(_serverInstance);
+    _adminApiApplication.start(adminApiPort);
     updateInstanceConfigInHelix(adminApiPort, false/*shutDownStatus*/);
 
     // Register message handler factory
@@ -244,7 +244,7 @@ public class HelixServerStarter {
   }
 
   public void stop() {
-    adminApiService.stop();
+    _adminApiApplication.stop();
     setShuttingDownStatus(true);
     try {
       Thread.sleep(5000);

@@ -13,27 +13,31 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.server.api.restlet;
+package com.linkedin.pinot.server.api.resources;
 
 import com.google.common.collect.ImmutableList;
 import com.linkedin.pinot.common.restlet.resources.SegmentSizeInfo;
 import com.linkedin.pinot.common.restlet.resources.TableSizeInfo;
-import com.linkedin.pinot.common.restlet.swagger.Description;
-import com.linkedin.pinot.common.restlet.swagger.HttpVerb;
-import com.linkedin.pinot.common.restlet.swagger.Parameter;
-import com.linkedin.pinot.common.restlet.swagger.Paths;
-import com.linkedin.pinot.common.restlet.swagger.Summary;
 import com.linkedin.pinot.core.data.manager.offline.InstanceDataManager;
 import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
 import com.linkedin.pinot.core.data.manager.offline.TableDataManager;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.server.starter.ServerInstance;
-import java.io.IOException;
-import org.codehaus.jackson.map.ObjectMapper;
-import org.restlet.data.MediaType;
-import org.restlet.data.Status;
-import org.restlet.representation.Representation;
-import org.restlet.representation.StringRepresentation;
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
+import io.swagger.annotations.ApiParam;
+import io.swagger.annotations.ApiResponse;
+import io.swagger.annotations.ApiResponses;
+import javax.inject.Inject;
+import javax.ws.rs.DefaultValue;
+import javax.ws.rs.GET;
+import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
+import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
+import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
 import org.restlet.resource.ServerResource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,46 +45,34 @@ import org.slf4j.LoggerFactory;
 /**
  * API to provide table sizes
  */
+@Api(tags = "Table")
+@Path("/")
 public class TableSizeResource extends ServerResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(TableSizeResource.class);
 
-  InstanceDataManager dataManager;
+  @Inject
+  ServerInstance serverInstance;
 
-  public TableSizeResource() {
-    ServerInstance serverInstance =
-        (ServerInstance) getApplication().getContext().getAttributes().get(ServerInstance.class.toString());
-    dataManager = (InstanceDataManager) serverInstance.getInstanceDataManager();
-  }
-
-  @Override
-  public Representation get() {
-    String tableName = (String) getRequest().getAttributes().get("tableName");
-    final String detailedStr = (String) getRequest().getAttributes().get("detailed");
-    return getTableSize(tableName, !"false".equalsIgnoreCase(detailedStr));
-  }
-
-  @HttpVerb("get")
-  @Description("Lists size of all the segments of the table")
-  @Summary("Show table storage size")
-  @Paths({"/table/{tableName}/size"})
-  public StringRepresentation getTableSize(
-      @Parameter(name="tableName", in = "path", description = "Table name (Ex: myTable_OFFLINE)")
-      String tableName,
-      @Parameter(name="detailed", in="query",
-          description = "true=List detailed segment sizes; false = list only table size",
-          required = false)
-      boolean detailed) {
+  @GET
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/tables/{tableName}/size")
+  @ApiOperation(value = "Show table storage size", notes = "Lists size of all the segments of the table")
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error"), @ApiResponse(code = 404, message = "Table not found")})
+  public TableSizeInfo getTableSize(
+      @ApiParam(value = "Table Name with type", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "Provide detailed information", required = false) @DefaultValue("true") @QueryParam("detailed") boolean detailed)
+      throws WebApplicationException {
+    InstanceDataManager dataManager = (InstanceDataManager) serverInstance.getInstanceDataManager();
 
     if (dataManager == null) {
-      setStatus(Status.SERVER_ERROR_INTERNAL, "Invalid server initialization");
-      return new StringRepresentation("{\"message\" : \"Server is incorrectly initialized\"}");
+      throw new WebApplicationException("Invalid server initialization", Response.Status.INTERNAL_SERVER_ERROR);
     }
 
     TableDataManager tableDataManager = dataManager.getTableDataManager(tableName);
     if (tableDataManager == null) {
-      return responseRepresentation(Status.CLIENT_ERROR_NOT_FOUND,"{\"message\" : \"Table " + tableName +
-          " is not found\"}");
+      throw new WebApplicationException("Table: " + tableName + " is not found", Response.Status.NOT_FOUND);
     }
+
     TableSizeInfo tableSizeInfo = new TableSizeInfo();
     tableSizeInfo.tableName = tableDataManager.getTableName();
     tableSizeInfo.diskSizeInBytes = 0L;
@@ -106,17 +98,21 @@ public class TableSizeResource extends ServerResource {
       }
     }
     //invalid to use the segmentDataManagers below
-
-    try {
-      return new StringRepresentation(new ObjectMapper().writeValueAsString(tableSizeInfo));
-    } catch (IOException e) {
-      return responseRepresentation(Status.SERVER_ERROR_INTERNAL,"{\"message\": \"Failed to convert data to json\"}");
-    }
+    return tableSizeInfo;
   }
-  private StringRepresentation responseRepresentation(Status status, String msg) {
-    setStatus(status);
-    StringRepresentation repr = new StringRepresentation(msg);
-    repr.setMediaType(MediaType.APPLICATION_JSON);
-    return repr;
+
+  // same as above but with /tables (plural) path for consistency.
+  // /table was by mistake. We will use plural from hereon
+  @GET
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/table/{tableName}/size")
+  @ApiOperation(value = "Show table storage size", notes = "Lists size of all the segments of the table")
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error"), @ApiResponse(code = 404, message = "Table not found")})
+  @Deprecated
+  public TableSizeInfo getTableSizeOld(
+      @ApiParam(value = "Table Name with type", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "Provide detailed information", required = false) @DefaultValue("true") @QueryParam("detailed") boolean detailed)
+      throws WebApplicationException {
+    return this.getTableSize(tableName, detailed);
   }
 }
