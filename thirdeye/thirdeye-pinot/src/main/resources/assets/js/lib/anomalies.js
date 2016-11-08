@@ -73,43 +73,55 @@ function getAnomalies(tab) {
         } else {
             getTimeseriesData();
         }
-
+        
         function getTimeseriesData(anomalyData) {
-
-            if(anomalyData){
-                var anomalyMetric = true;
-            }
-            var  anomalyData = anomalyData || [];
-            getData(timeSeriesUrl).done(function (timeSeriesData) {
-                //Error handling when data is falsy (empty, undefined or null)
-                if (!timeSeriesData) {
-                    $("#" + tab + "-chart-area-error").empty();
-                    var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' });
-                    warning.append($('<p></p>', { html: 'Something went wrong. Please try and reload the page. Error: metric timeseries data =' + timeSeriesData  }));
-                    $("#" + tab + "-chart-area-error").append(warning);
-                    $("#" + tab + "-chart-area-error").show();
-                    return
-                } else {
-                    $("#" + tab + "-chart-area-error").hide();
-                    $("#" + tab + "-display-chart-section").empty();
-                }
-                var placeholder = "#linechart-placeholder"
-                renderTimeseriesArea(timeSeriesData, tab);
-                drawMetricTimeSeries(timeSeriesData, anomalyData, tab, placeholder);
-
-                if (anomalyMetric) {
-                    $(".anomaly-metric-tip").hide();
-                    renderAnomalyThumbnails(anomalyData, tab);
-                }else{
-                    tipToUser(tab)
-                }
-
-                //anomalyFunctionId and hash.fnCompareWeeks are only present in hash when anomaly
-                // function run adhoc was requested on self service tab
-                //needs to be removed to be able to view other functions in later queries on the anomalies view
-                delete hash.anomalyFunctionId;
-                delete hash.fnCompareWeeks;
-            });
+          if(anomalyData) {
+             var anomalyMetric = true;
+          }
+          $("#" + tab + "-display-chart-section").empty();
+          if (anomalyMetric) {
+            $(".anomaly-metric-tip").hide();
+            renderAnomalyThumbnails(anomalyData, tab);
+          } else{
+            tipToUser(tab)
+          }
+          delete hash.anomalyFunctionId;
+          delete hash.fnCompareWeeks;
+          
+//            if(anomalyData){
+//                var anomalyMetric = true;
+//            }
+//            var  anomalyData = anomalyData || [];
+//            getData(timeSeriesUrl).done(function (timeSeriesData) {
+//                //Error handling when data is falsy (empty, undefined or null)
+//                if (!timeSeriesData) {
+//                    $("#" + tab + "-chart-area-error").empty();
+//                    var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' });
+//                    warning.append($('<p></p>', { html: 'Something went wrong. Please try and reload the page. Error: metric timeseries data =' + timeSeriesData  }));
+//                    $("#" + tab + "-chart-area-error").append(warning);
+//                    $("#" + tab + "-chart-area-error").show();
+//                    return
+//                } else {
+//                    $("#" + tab + "-chart-area-error").hide();
+//                    $("#" + tab + "-display-chart-section").empty();
+//                }
+//                var placeholder = "#linechart-placeholder"
+//                //renderTimeseriesArea(timeSeriesData, tab);
+//                //drawMetricTimeSeries(timeSeriesData, anomalyData, tab, placeholder);
+//
+//                if (anomalyMetric) {
+//                    $(".anomaly-metric-tip").hide();
+//                    renderAnomalyThumbnails(anomalyData, tab);
+//                }else{
+//                    tipToUser(tab)
+//                }
+//
+//                //anomalyFunctionId and hash.fnCompareWeeks are only present in hash when anomaly
+//                // function run adhoc was requested on self service tab
+//                //needs to be removed to be able to view other functions in later queries on the anomalies view
+//                delete hash.anomalyFunctionId;
+//                delete hash.fnCompareWeeks;
+//            });
         };
     });
 };
