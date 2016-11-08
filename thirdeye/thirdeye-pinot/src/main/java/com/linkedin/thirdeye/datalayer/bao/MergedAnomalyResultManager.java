@@ -6,21 +6,21 @@ import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 
 public interface MergedAnomalyResultManager extends AbstractManager<MergedAnomalyResultDTO> {
 
+  MergedAnomalyResultDTO findById(Long id, boolean loadRawAnomalies);
+
   List<MergedAnomalyResultDTO> getAllByTimeEmailIdAndNotifiedFalse(long startTime, long endTime,
       long emailId);
 
   List<MergedAnomalyResultDTO> findAllConflictByFunctionId(long functionId, long conflictWindowStart, long conflictWindowEnd);
 
   List<MergedAnomalyResultDTO> findByCollectionMetricDimensionsTime(String collection,
-      String metric, String dimensions, long startTime, long endTime);
+      String metric, String dimensions, long startTime, long endTime, boolean loadRawAnomalies);
 
   List<MergedAnomalyResultDTO> findByCollectionMetricTime(String collection, String metric,
-      long startTime, long endTime);
+      long startTime, long endTime, boolean loadRawAnomalies);
 
   List<MergedAnomalyResultDTO> findByCollectionTime(String collection, long startTime,
-      long endTime);
-
-  MergedAnomalyResultDTO findLatestByFunctionIdDimensions(Long functionId, String dimensions);
+      long endTime, boolean loadRawAnomalies);
 
   MergedAnomalyResultDTO findLatestConflictByFunctionIdDimensions(Long functionId, String dimensions,
       long conflictWindowStart, long conflictWindowEnd, long sequentialAllowedGap);
