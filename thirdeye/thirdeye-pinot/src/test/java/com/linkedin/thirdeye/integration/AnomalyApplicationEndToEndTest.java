@@ -97,9 +97,11 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
     cacheRegistry.registerQueryCache(mockQueryCache);
 
     MetricConfigDTO metricConfig = getTestMetricConfig(collection, metric, 1L);
+    // create metric config in cache
     LoadingCache<MetricDataset, MetricConfigDTO> mockMetricConfigCache = Mockito.mock(LoadingCache.class);
     Mockito.when(mockMetricConfigCache.get(new MetricDataset(metric, collection))).thenReturn(metricConfig);
     cacheRegistry.registerMetricConfigCache(mockMetricConfigCache);
+    // create dataset config in cache
     LoadingCache<String, DatasetConfigDTO> mockDatasetConfigCache = Mockito.mock(LoadingCache.class);
     Mockito.when(mockDatasetConfigCache.get(collection)).thenReturn(getTestDatasetConfig(collection));
     cacheRegistry.registerDatasetConfigCache(mockDatasetConfigCache);
@@ -120,6 +122,10 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
 
     // create test dataset config
     datasetConfigDAO.save(getTestDatasetConfig(collection));
+
+    // setup function factory for worker and merger
+    InputStream factoryStream = AnomalyApplicationEndToEndTest.class.getResourceAsStream(functionPropertiesFile);
+    anomalyFunctionFactory = new AnomalyFunctionFactory(factoryStream);
   }
 
 
@@ -214,8 +220,6 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
 
     // start task drivers
     startWorker();
-//    startWorker();
-//    startWorker();
 
     // check for change in task status to COMPLETED
     Thread.sleep(30000);
@@ -236,7 +240,7 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
     startMerger();
 
     // check merged anomalies
-    Thread.sleep(2000);
+    Thread.sleep(4000);
     List<MergedAnomalyResultDTO> mergedAnomalies = mergedResultDAO.findByFunctionId(functionId);
     Assert.assertTrue(mergedAnomalies.size() > 0);
 
@@ -255,7 +259,7 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
 
   private void startMerger() throws Exception {
     ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
-    anomalyMergeExecutor = new AnomalyMergeExecutor(executorService, null);
+    anomalyMergeExecutor = new AnomalyMergeExecutor(executorService, anomalyFunctionFactory);
     executorService.scheduleWithFixedDelay(anomalyMergeExecutor, 0, 3, TimeUnit.SECONDS);
   }
 
@@ -266,8 +270,6 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
 
 
   private void startWorker() throws Exception {
-    InputStream factoryStream = AnomalyApplicationEndToEndTest.class.getResourceAsStream(functionPropertiesFile);
-    anomalyFunctionFactory = new AnomalyFunctionFactory(factoryStream);
     taskDriver = new TaskDriver(thirdeyeAnomalyConfig, anomalyFunctionFactory);
     taskDriver.start();
   }
