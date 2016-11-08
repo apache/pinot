@@ -100,6 +100,9 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
     LoadingCache<MetricDataset, MetricConfigDTO> mockMetricConfigCache = Mockito.mock(LoadingCache.class);
     Mockito.when(mockMetricConfigCache.get(new MetricDataset(metric, collection))).thenReturn(metricConfig);
     cacheRegistry.registerMetricConfigCache(mockMetricConfigCache);
+    LoadingCache<String, DatasetConfigDTO> mockDatasetConfigCache = Mockito.mock(LoadingCache.class);
+    Mockito.when(mockDatasetConfigCache.get(collection)).thenReturn(getTestDatasetConfig(collection));
+    cacheRegistry.registerDatasetConfigCache(mockDatasetConfigCache);
 
     // Application config
     thirdeyeAnomalyConfig = new ThirdEyeAnomalyConfiguration();
