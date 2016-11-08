@@ -73,7 +73,7 @@ function getAnomalies(tab) {
         } else {
             getTimeseriesData();
         }
-        
+
         function getTimeseriesData(anomalyData) {
           if(anomalyData) {
              var anomalyMetric = true;
@@ -87,7 +87,7 @@ function getAnomalies(tab) {
           }
           delete hash.anomalyFunctionId;
           delete hash.fnCompareWeeks;
-          
+
 //            if(anomalyData){
 //                var anomalyMetric = true;
 //            }
@@ -569,11 +569,32 @@ function renderAnomalyThumbnails(data, tab) {
      function requestLineChart(i) {
          var startTime = data[i]["startTime"];
          var endTime = data[i]["endTime"];
-         var aggTimeGranularity = calcAggregateGranularity(hash.currentStart,hash.currentEnd);
+
+         var viewWindowStart = startTime;
+         var viewWindowEnd = endTime;
+
+         var aggTimeGranularity = calcAggregateGranularity(startTime, endTime);
+
+         var extensionWindowMillis;
+         switch (aggTimeGranularity) {
+             case "DAYS":
+                 extensionWindowMillis = 86400000;
+                 break;
+             case "HOURS":
+             default:
+                 var viewWindowSize = viewWindowEnd - viewWindowStart;
+                 var multiplier = Math.max(2, parseInt(viewWindowSize / 3600000));
+                 extensionWindowMillis = 3600000 * multiplier;
+         }
+
+         viewWindowStart -= extensionWindowMillis;
+         viewWindowEnd += extensionWindowMillis;
+
+
          var anomalyId = data[i]["id"]
          var placeholder= "#d3charts-" + i;
          var timeSeriesUrl = "/dashboard/anomaly-merged-result/timeseries/" + anomalyId
-             + "?aggTimeGranularity=" + aggTimeGranularity + "&start=" + hash.currentStart + "&end=" + hash.currentEnd;
+             + "?aggTimeGranularity=" + aggTimeGranularity + "&start=" + viewWindowStart + "&end=" + viewWindowEnd;
          var tab = hash.view;
 
         getDataCustomCallback(timeSeriesUrl, tab).done(function (timeSeriesData) {
