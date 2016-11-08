@@ -15,8 +15,8 @@
  */
 package com.linkedin.pinot.core.operator.docidsets;
 
-
 import com.linkedin.pinot.core.common.BlockDocIdSet;
+
 
 public interface FilterBlockDocIdSet extends BlockDocIdSet {
 
@@ -28,4 +28,5 @@ public interface FilterBlockDocIdSet extends BlockDocIdSet {
 
   void setEndDocId(int endDocId);
 
+  long getNumEntriesScannedInFilter();
 }

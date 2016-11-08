@@ -36,7 +36,7 @@ import com.linkedin.pinot.core.util.SortedRangeIntersection;
 
 public final class AndBlockDocIdSet implements FilterBlockDocIdSet {
   /**
-   * 
+   *
    */
   static final Logger LOGGER = LoggerFactory.getLogger(AndOperator.class);
   public final AtomicLong timeMeasure = new AtomicLong(0);
@@ -254,5 +254,14 @@ public final class AndBlockDocIdSet implements FilterBlockDocIdSet {
   public void setEndDocId(int endDocId) {
     maxDocId = Math.min(maxDocId, endDocId);
     updateMinMaxRange();
+  }
+
+  @Override
+  public long getNumEntriesScannedInFilter() {
+    long numEntriesScannedInFilter = 0L;
+    for (FilterBlockDocIdSet blockDocIdSet : blockDocIdSets) {
+      numEntriesScannedInFilter += blockDocIdSet.getNumEntriesScannedInFilter();
+    }
+    return numEntriesScannedInFilter;
   }
 }

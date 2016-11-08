@@ -15,62 +15,26 @@
  */
 package com.linkedin.pinot.core.operator.blocks;
 
-import com.linkedin.pinot.core.common.BlockDocIdSet;
-import com.linkedin.pinot.core.common.BlockDocIdValueSet;
 import com.linkedin.pinot.core.common.BlockId;
-import com.linkedin.pinot.core.common.BlockMetadata;
-import com.linkedin.pinot.core.common.BlockValSet;
-import com.linkedin.pinot.core.common.Predicate;
-import com.linkedin.pinot.core.operator.docidsets.DocIdSetBlock;
+import com.linkedin.pinot.core.operator.docidsets.FilterBlockDocIdSet;
 import com.linkedin.pinot.core.operator.docidsets.SizeBasedDocIdSet;
 
-public class MatchEntireSegmentDocIdSetBlock extends DocIdSetBlock {
+
+public class MatchEntireSegmentDocIdSetBlock extends BaseFilterBlock {
 
   private final int _totalDocs;
 
   public MatchEntireSegmentDocIdSetBlock(int totalDocs) {
-    super(null, totalDocs);
     _totalDocs = totalDocs;
   }
 
   @Override
-  public int[] getDocIdSet() {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public int getSearchableLength() {
-    return _totalDocs;
-  }
-
-  @Override
-  public boolean applyPredicate(Predicate predicate) {
-    return true;
-  }
-
-  @Override
-  public BlockId getId() {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public BlockValSet getBlockValueSet() {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public BlockDocIdValueSet getBlockDocIdValueSet() {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public BlockDocIdSet getBlockDocIdSet() {
+  public FilterBlockDocIdSet getFilteredBlockDocIdSet() {
     return new SizeBasedDocIdSet(_totalDocs);
   }
 
   @Override
-  public BlockMetadata getMetadata() {
-    throw new UnsupportedOperationException();
+  public BlockId getId() {
+    return null;
   }
-
 }

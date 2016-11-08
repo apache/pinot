@@ -32,6 +32,7 @@ import com.linkedin.pinot.core.query.aggregation.AggregationFunctionFactory;
  *
  *
  */
+@Deprecated
 public class BAggregationFunctionOperator extends BaseOperator {
 
   private final AggregationFunction _aggregationFunction;

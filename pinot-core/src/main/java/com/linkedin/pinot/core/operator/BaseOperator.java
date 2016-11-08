@@ -19,7 +19,6 @@ import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.util.trace.TraceContext;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,29 +29,41 @@ import org.slf4j.LoggerFactory;
 public abstract class BaseOperator implements Operator {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseOperator.class);
 
+  private final String _operatorName = getClass().getSimpleName();
+
   @Override
   public final Block nextBlock() {
     long start = System.currentTimeMillis();
     Block ret = getNextBlock();
     long end = System.currentTimeMillis();
-    LOGGER.trace("Time spent in {}: {}", getOperatorName(), (end - start));
-    TraceContext.logLatency(getOperatorName(), (end - start));
+    LOGGER.trace("Time spent in {}: {}", _operatorName, (end - start));
+    TraceContext.logLatency(_operatorName, (end - start));
     return ret;
   }
 
   @Override
-  public final Block nextBlock(BlockId BlockId) {
+  public final Block nextBlock(BlockId blockId) {
     long start = System.currentTimeMillis();
-    Block ret = getNextBlock(BlockId);
+    Block ret = getNextBlock(blockId);
     long end = System.currentTimeMillis();
-    LOGGER.trace("Time spent in {}: {}", getOperatorName(), (end - start));
-    TraceContext.logLatency(getOperatorName(), (end - start));
+    LOGGER.trace("Time spent in {}: {}", _operatorName, (end - start));
+    TraceContext.logLatency(_operatorName, (end - start));
     return ret;
   }
 
   public abstract Block getNextBlock();
 
-  public abstract Block getNextBlock(BlockId BlockId);
+  public abstract Block getNextBlock(BlockId blockId);
 
-  public abstract String getOperatorName();
+  @Deprecated
+  public String getOperatorName() {
+    // TODO: after the clean up, remove this method.
+    return null;
+  }
+
+  @Override
+  public ExecutionStatistics getExecutionStatistics() {
+    // TODO: after the clean up, make this method abstract.
+    return null;
+  }
 }

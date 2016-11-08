@@ -83,6 +83,12 @@ public class StarTreeDocIdSet implements FilterBlockDocIdSet {
   }
 
   @Override
+  public long getNumEntriesScannedInFilter() {
+    // Currently no one uses StarTreeDocIdSet.
+    return 0L;
+  }
+
+  @Override
   public BlockDocIdIterator iterator() {
     return new RangeBasedDocIdIterator(minDocId, maxDocId);
   }

@@ -39,13 +39,15 @@ import org.json.JSONObject;
  *
  * Supports serialization via JSON.
  */
-@JsonPropertyOrder({"selectionResults", "traceInfo", "numDocsScanned", "aggregationResults", "timeUsedMs", "segmentStatistics", "exceptions", "totalDocs"})
+@JsonPropertyOrder({"selectionResults", "aggregationResults", "exceptions", "numDocsScanned", "numEntriesScannedInFilter", "numEntriesScannedPostFilter", "totalDocs", "timeUsedMs", "segmentStatistics", "traceInfo"})
 public class BrokerResponseNative implements BrokerResponse {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
-  private long _numDocsScanned = 0;
-  private long _totalDocs = 0;
-  private long _timeUsedMs = 0;
+  private long _numDocsScanned = 0L;
+  private long _numEntriesScannedInFilter = 0L;
+  private long _numEntriesScannedPostFilter = 0L;
+  private long _totalDocs = 0L;
+  private long _timeUsedMs = 0L;
 
   private SelectionResults _selectionResults;
   private List<AggregationResult> _aggregationResults;
@@ -86,6 +88,26 @@ public class BrokerResponseNative implements BrokerResponse {
   @JsonProperty("numDocsScanned")
   public void setNumDocsScanned(long numDocsScanned) {
     _numDocsScanned = numDocsScanned;
+  }
+
+  @JsonProperty("numEntriesScannedInFilter")
+  public long getNumEntriesScannedInFilter() {
+    return _numEntriesScannedInFilter;
+  }
+
+  @JsonProperty("numEntriesScannedInFilter")
+  public void setNumEntriesScannedInFilter(long numEntriesScannedInFilter) {
+    _numEntriesScannedInFilter = numEntriesScannedInFilter;
+  }
+
+  @JsonProperty("numEntriesScannedPostFilter")
+  public long getNumEntriesScannedPostFilter() {
+    return _numEntriesScannedPostFilter;
+  }
+
+  @JsonProperty("numEntriesScannedPostFilter")
+  public void setNumEntriesScannedPostFilter(long numEntriesScannedPostFilter) {
+    _numEntriesScannedPostFilter = numEntriesScannedPostFilter;
   }
 
   @JsonProperty("totalDocs")

@@ -15,22 +15,6 @@
  */
 package com.linkedin.pinot.core.operator;
 
-import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.response.ProcessingException;
@@ -46,6 +30,19 @@ import com.linkedin.pinot.core.query.aggregation.CombineService;
 import com.linkedin.pinot.core.query.aggregation.groupby.AggregationGroupByOperatorService;
 import com.linkedin.pinot.core.util.trace.TraceCallable;
 import com.linkedin.pinot.core.util.trace.TraceRunnable;
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -78,8 +75,6 @@ public class MCombineOperator extends BaseOperator {
   private static int MIN_THREADS_PER_QUERY = 10;
   private static int MAX_THREADS_PER_QUERY = 10;
   private static int MIN_SEGMENTS_PER_THREAD = 10;
-
-  private IntermediateResultsBlock _mergedBlock;
 
   static {
     int numCores = Runtime.getRuntime().availableProcessors();
@@ -120,6 +115,7 @@ public class MCombineOperator extends BaseOperator {
   @Override
   public Block getNextBlock() {
     final long startTime = System.currentTimeMillis();
+    IntermediateResultsBlock mergedBlock = null;
     if (_isParallel) {
       final long queryEndTime = System.currentTimeMillis() + _timeOutMs;
       int numGroups = Math.max(MIN_THREADS_PER_QUERY,Math.min(MAX_THREADS_PER_QUERY, (_operators.size() + MIN_SEGMENTS_PER_THREAD - 1) / MIN_SEGMENTS_PER_THREAD));
@@ -202,52 +198,29 @@ public class MCombineOperator extends BaseOperator {
 
       // Get merge results.
       try {
-        _mergedBlock = mergedBlockFuture.get(queryEndTime - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+        mergedBlock = mergedBlockFuture.get(queryEndTime - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
       } catch (InterruptedException e) {
         LOGGER.error("InterruptedException ", e);
-        if (_mergedBlock == null) {
-          _mergedBlock = new IntermediateResultsBlock(e);
-        }
-        List<ProcessingException> exceptions = _mergedBlock.getExceptions();
-        if (exceptions == null) {
-          exceptions = new ArrayList<ProcessingException>();
-        }
-        exceptions.add(QueryException.getException(QueryException.FUTURE_CALL_ERROR, e));
-        _mergedBlock.setExceptionsList(exceptions);
+        mergedBlock = new IntermediateResultsBlock(QueryException.getException(QueryException.FUTURE_CALL_ERROR, e));
       } catch (ExecutionException e) {
         LOGGER.error("Execution Exception", e);
-        if (_mergedBlock == null) {
-          _mergedBlock = new IntermediateResultsBlock(e);
-        }
-        List<ProcessingException> exceptions = _mergedBlock.getExceptions();
-        if (exceptions == null) {
-          exceptions = new ArrayList<ProcessingException>();
-        }
-        exceptions.add(QueryException.getException(QueryException.MERGE_RESPONSE_ERROR, e));
-        _mergedBlock.setExceptionsList(exceptions);
+        mergedBlock = new IntermediateResultsBlock(QueryException.getException(QueryException.MERGE_RESPONSE_ERROR, e));
       } catch (TimeoutException e) {
         LOGGER.error("TimeoutException ", e);
-        if (_mergedBlock == null) {
-          _mergedBlock = new IntermediateResultsBlock(e);
-        }
-        List<ProcessingException> exceptions = _mergedBlock.getExceptions();
-        if (exceptions == null) {
-          exceptions = new ArrayList<ProcessingException>();
-        }
-        exceptions.add(QueryException.getException(QueryException.EXECUTION_TIMEOUT_ERROR, e));
-        _mergedBlock.setExceptionsList(exceptions);
+        mergedBlock =
+            new IntermediateResultsBlock(QueryException.getException(QueryException.EXECUTION_TIMEOUT_ERROR, e));
       }
-
     } else {
+      // TODO: remove this branch or add support to the new added operators.
       for (Operator operator : _operators) {
         if ((operator instanceof MAggregationOperator) || (operator instanceof MSelectionOrderByOperator)
             || (operator instanceof MSelectionOnlyOperator) || (operator instanceof MAggregationGroupByOperator)
             || (operator instanceof MCombineOperator)) {
           IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
-          if (_mergedBlock == null) {
-            _mergedBlock = block;
+          if (mergedBlock == null) {
+            mergedBlock = block;
           } else {
-            CombineService.mergeTwoBlocks(_brokerRequest, _mergedBlock, block);
+            CombineService.mergeTwoBlocks(_brokerRequest, mergedBlock, block);
           }
         } else {
           throw new UnsupportedOperationException("Unsupported Operator to be processed in MResultOperator : "
@@ -257,10 +230,23 @@ public class MCombineOperator extends BaseOperator {
     }
     if ((_brokerRequest.getAggregationsInfoSize() > 0) && (_brokerRequest.getGroupBy() != null)
         && (_brokerRequest.getGroupBy().getColumnsSize() > 0)) {
-      trimToSize(_brokerRequest, _mergedBlock);
+      trimToSize(_brokerRequest, mergedBlock);
     }
 
-    return _mergedBlock;
+    // Update execution statistics.
+    ExecutionStatistics executionStatistics = new ExecutionStatistics();
+    for (Operator operator : _operators) {
+      ExecutionStatistics executionStatisticsToMerge = operator.getExecutionStatistics();
+      if (executionStatisticsToMerge != null) {
+        executionStatistics.merge(executionStatisticsToMerge);
+      }
+    }
+    mergedBlock.setNumDocsScanned(executionStatistics.getNumDocsScanned());
+    mergedBlock.setNumEntriesScannedInFilter(executionStatistics.getNumEntriesScannedInFilter());
+    mergedBlock.setNumEntriesScannedPostFilter(executionStatistics.getNumEntriesScannedPostFilter());
+    mergedBlock.setTotalRawDocs(executionStatistics.getNumTotalRawDocs());
+
+    return mergedBlock;
   }
 
   private void trimToSize(BrokerRequest brokerRequest, IntermediateResultsBlock mergedBlock) {
@@ -272,13 +258,8 @@ public class MCombineOperator extends BaseOperator {
   }
 
   @Override
-  public Block getNextBlock(BlockId BlockId) {
+  public Block getNextBlock(BlockId blockId) {
     throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public String getOperatorName() {
-    return "MCombineOperator";
   }
 
   @Override
@@ -288,5 +269,4 @@ public class MCombineOperator extends BaseOperator {
     }
     return true;
   }
-
 }

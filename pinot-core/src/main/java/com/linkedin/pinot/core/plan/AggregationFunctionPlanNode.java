@@ -29,6 +29,7 @@ import com.linkedin.pinot.core.operator.query.BAggregationFunctionOperator;
  * AggregationFunctionPlanNode takes care of how to apply one aggregation
  * function for given data sources.
  */
+@Deprecated
 public class AggregationFunctionPlanNode implements PlanNode {
   private static final Logger LOGGER = LoggerFactory.getLogger("QueryPlanLog");
   private final AggregationInfo _aggregationInfo;

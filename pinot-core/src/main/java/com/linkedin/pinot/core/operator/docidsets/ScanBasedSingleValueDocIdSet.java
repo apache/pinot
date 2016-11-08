@@ -15,12 +15,11 @@
  */
 package com.linkedin.pinot.core.operator.docidsets;
 
-import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.operator.dociditerators.SVScanDocIdIterator;
+import com.linkedin.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
 import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluator;
-
 
 
 public class ScanBasedSingleValueDocIdSet implements FilterBlockDocIdSet {
@@ -69,7 +68,12 @@ public class ScanBasedSingleValueDocIdSet implements FilterBlockDocIdSet {
   }
 
   @Override
-  public BlockDocIdIterator iterator() {
+  public long getNumEntriesScannedInFilter() {
+    return blockValSetBlockDocIdIterator.getNumEntriesScanned();
+  }
+
+  @Override
+  public ScanBasedDocIdIterator iterator() {
     return blockValSetBlockDocIdIterator;
   }
 

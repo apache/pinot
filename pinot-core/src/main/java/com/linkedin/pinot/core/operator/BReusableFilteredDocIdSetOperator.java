@@ -15,12 +15,15 @@
  */
 package com.linkedin.pinot.core.operator;
 
+import com.google.common.base.Preconditions;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.Operator;
-import com.linkedin.pinot.core.operator.docidsets.DocIdSetBlock;
+import com.linkedin.pinot.core.operator.blocks.DocIdSetBlock;
+import com.linkedin.pinot.core.operator.docidsets.FilterBlockDocIdSet;
+import com.linkedin.pinot.core.operator.filter.BaseFilterOperator;
 import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
 
 /**
@@ -29,13 +32,6 @@ import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
  * for many ColumnarReaderDataSource.
  */
 public class BReusableFilteredDocIdSetOperator extends BaseOperator {
-
-  private final Operator _filterOperator;
-  private BlockDocIdIterator _currentBlockDocIdIterator;
-  private Block _currentBlock;
-  private int _currentDoc = 0;
-  private final int _maxSizeOfdocIdSet;
-  boolean inited = false;
   private static final ThreadLocal<int[]> DOC_ID_ARRAY = new ThreadLocal<int[]>() {
     @Override
     protected int[] initialValue() {
@@ -43,16 +39,23 @@ public class BReusableFilteredDocIdSetOperator extends BaseOperator {
     }
   };
 
+  private final BaseFilterOperator _filterOperator;
+  private final int _maxSizeOfDocIdSet;
+  private FilterBlockDocIdSet _filterBlockDocIdSet;
+  private BlockDocIdIterator _blockDocIdIterator;
+  private int _currentDocId = 0;
+
   /**
    * @param filterOperator
    * @param docSize
-   * @param maxSizeOfdocIdSet must be less than {@link DocIdSetPlanNode}. MAX_DOC_PER_CALL which is
+   * @param maxSizeOfDocIdSet must be less than {@link DocIdSetPlanNode}. MAX_DOC_PER_CALL which is
    *          10000
    */
   public BReusableFilteredDocIdSetOperator(Operator filterOperator, int docSize,
-      int maxSizeOfdocIdSet) {
-    _maxSizeOfdocIdSet = Math.min(maxSizeOfdocIdSet, DocIdSetPlanNode.MAX_DOC_PER_CALL);
-    _filterOperator = filterOperator;
+      int maxSizeOfDocIdSet) {
+    Preconditions.checkArgument(maxSizeOfDocIdSet <= DocIdSetPlanNode.MAX_DOC_PER_CALL);
+    _maxSizeOfDocIdSet = maxSizeOfDocIdSet;
+    _filterOperator = (BaseFilterOperator) filterOperator;
   }
 
   @Override
@@ -62,42 +65,36 @@ public class BReusableFilteredDocIdSetOperator extends BaseOperator {
   }
 
   @Override
-  public Block getNextBlock() {
+  public DocIdSetBlock getNextBlock() {
     // Handle limit 0 clause safely.
     // For limit 0, _docIdArray will be zero sized
-    if (_currentDoc == Constants.EOF) {
+    if (_currentDocId == Constants.EOF) {
       return null;
     }
     int[] docIdArray = DOC_ID_ARRAY.get();
-    if (!inited) {
-      inited = true;
-      _currentDoc = 0;
-      _currentBlock = _filterOperator.nextBlock();
-      _currentBlockDocIdIterator = _currentBlock.getBlockDocIdSet().iterator();
+    // Initialize filter block doc id set.
+    if (_filterBlockDocIdSet == null) {
+      _filterBlockDocIdSet = (FilterBlockDocIdSet) _filterOperator.nextBlock().getBlockDocIdSet();
+      _blockDocIdIterator = _filterBlockDocIdSet.iterator();
     }
     int pos = 0;
-    for (int i = 0; i < _maxSizeOfdocIdSet; i++) {
-      _currentDoc = _currentBlockDocIdIterator.next();
-      if (_currentDoc == Constants.EOF) {
+    for (int i = 0; i < _maxSizeOfDocIdSet; i++) {
+      _currentDocId = _blockDocIdIterator.next();
+      if (_currentDocId == Constants.EOF) {
         break;
       }
-      docIdArray[pos++] = _currentDoc;
+      docIdArray[pos++] = _currentDocId;
     }
-    DocIdSetBlock docIdSetBlock = null;
     if (pos > 0) {
-      docIdSetBlock = new DocIdSetBlock(docIdArray, pos);
+      return new DocIdSetBlock(docIdArray, pos);
+    } else {
+      return null;
     }
-    return docIdSetBlock;
   }
 
   @Override
-  public Block getNextBlock(BlockId BlockId) {
+  public Block getNextBlock(BlockId blockId) {
     throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public String getOperatorName() {
-    return "BReusableFilteredDocIdSetOperator";
   }
 
   @Override
@@ -106,4 +103,8 @@ public class BReusableFilteredDocIdSetOperator extends BaseOperator {
     return true;
   }
 
+  @Override
+  public ExecutionStatistics getExecutionStatistics() {
+    return new ExecutionStatistics(0L, _filterBlockDocIdSet.getNumEntriesScannedInFilter(), 0L, 0L);
+  }
 }

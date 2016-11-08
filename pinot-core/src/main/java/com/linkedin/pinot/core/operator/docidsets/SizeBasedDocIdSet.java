@@ -16,23 +16,49 @@
 package com.linkedin.pinot.core.operator.docidsets;
 
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
-import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.operator.dociditerators.SizeBasedDocIdIterator;
 
-public final class SizeBasedDocIdSet implements BlockDocIdSet {
-  private final int maxDocId;
+
+public final class SizeBasedDocIdSet implements FilterBlockDocIdSet {
+
+  private final int _maxDocId;
 
   public SizeBasedDocIdSet(int maxDocId) {
-    this.maxDocId = maxDocId;
+    this._maxDocId = maxDocId;
+  }
+
+  @Override
+  public int getMinDocId() {
+    return 0;
+  }
+
+  @Override
+  public int getMaxDocId() {
+    return _maxDocId;
+  }
+
+  @Override
+  public void setStartDocId(int startDocId) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public void setEndDocId(int endDocId) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public long getNumEntriesScannedInFilter() {
+    return 0L;
   }
 
   @Override
   public BlockDocIdIterator iterator() {
-    return new SizeBasedDocIdIterator(maxDocId);
+    return new SizeBasedDocIdIterator(_maxDocId);
   }
 
   @Override
-  public Object getRaw() {
-    throw new UnsupportedOperationException("cannot access raw in blockDocIds that are not backed by bitmaps");
+  public <T> T getRaw() {
+    throw new UnsupportedOperationException();
   }
 }
