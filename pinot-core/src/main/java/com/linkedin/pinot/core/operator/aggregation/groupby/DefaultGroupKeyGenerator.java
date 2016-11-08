@@ -16,11 +16,10 @@
 package com.linkedin.pinot.core.operator.aggregation.groupby;
 
 import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.BlockId;
+import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockMultiValIterator;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.DataFetcher;
-import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.operator.aggregation.ResultHolderFactory;
 import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
 import com.linkedin.pinot.core.query.aggregation.groupby.GroupByConstants;
@@ -58,7 +57,6 @@ import java.util.Iterator;
  */
 public class DefaultGroupKeyGenerator implements GroupKeyGenerator {
   private static final int INVALID_ID = -1;
-  private static final BlockId BLOCK_ZERO = new BlockId(0);
 
   public enum StorageType {
     ARRAY_BASED,
@@ -131,10 +129,12 @@ public class DefaultGroupKeyGenerator implements GroupKeyGenerator {
 
     boolean longOverflow = false;
     for (int i = 0; i < _numGroupByColumns; i++) {
-      DataSource dataSource = dataFetcher.getDataSourceForColumn(groupByColumns[i]);
+      Block block = dataFetcher.getBlockForColumn(groupByColumns[i]);
 
       // Store group-by column cardinalities and update cardinality product.
-      int cardinality = dataSource.getDataSourceMetadata().cardinality();
+      BlockMetadata blockMetadata = block.getMetadata();
+      _dictionaries[i] = blockMetadata.getDictionary();
+      int cardinality = _dictionaries[i].length();
       _cardinalities[i] = cardinality;
       if (!longOverflow) {
         if (_cardinalityProduct > Long.MAX_VALUE / cardinality) {
@@ -146,18 +146,17 @@ public class DefaultGroupKeyGenerator implements GroupKeyGenerator {
       }
 
       // Store single/multi value group-by columns, allocate reusable resources based on that.
-      boolean isSingleValueGroupByColumn = dataSource.getDataSourceMetadata().isSingleValue();
+      boolean isSingleValueGroupByColumn = blockMetadata.isSingleValue();
       _isSingleValueGroupByColumn[i] = isSingleValueGroupByColumn;
       if (!isSingleValueGroupByColumn) {
         _hasMultiValueGroupByColumn = true;
       }
-      _dictionaries[i] = dataSource.getDictionary();
-      Block block = dataSource.nextBlock(BLOCK_ZERO);
+
       if (isSingleValueGroupByColumn) {
         _singleBlockValSets[i] = block.getBlockValueSet();
         _reusableSingleDictIds[i] = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
       } else {
-        maxNumMultiValues = Math.max(maxNumMultiValues, block.getMetadata().getMaxNumberOfMultiValues());
+        maxNumMultiValues = Math.max(maxNumMultiValues, blockMetadata.getMaxNumberOfMultiValues());
         _multiValIterators[i] = (BlockMultiValIterator) block.getBlockValueSet().iterator();
       }
     }

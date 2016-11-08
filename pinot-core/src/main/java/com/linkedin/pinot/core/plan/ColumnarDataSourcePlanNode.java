@@ -21,6 +21,7 @@ import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.operator.BaseOperator;
 
 
 /**
@@ -43,7 +44,7 @@ public class ColumnarDataSourcePlanNode implements PlanNode {
   }
 
   @Override
-  public Operator run() {
+  public BaseOperator run() {
     DataSource dataSource = _indexSegment.getDataSource(_columnName);
     return dataSource;
   }

@@ -36,6 +36,7 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.operator.BReusableFilteredDocIdSetOperator;
+import com.linkedin.pinot.core.operator.BaseOperator;
 import com.linkedin.pinot.core.operator.MProjectionOperator;
 import com.linkedin.pinot.core.operator.UReplicatedProjectionOperator;
 import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
@@ -182,7 +183,7 @@ public class AggregationGroupByOperatorTest {
     Operator filterOperator = new MatchEntireSegmentOperator(_indexSegment.getSegmentMetadata().getTotalDocs());
     final BReusableFilteredDocIdSetOperator docIdSetOperator =
         new BReusableFilteredDocIdSetOperator(filterOperator, _indexSegment.getSegmentMetadata().getTotalDocs(), 5000);
-    final Map<String, DataSource> dataSourceMap = getDataSourceMap();
+    final Map<String, BaseOperator> dataSourceMap = getDataSourceMap();
 
     final MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
 
@@ -210,7 +211,7 @@ public class AggregationGroupByOperatorTest {
     Operator filterOperator = new MatchEntireSegmentOperator(_indexSegment.getSegmentMetadata().getTotalDocs());
     final BReusableFilteredDocIdSetOperator docIdSetOperator =
         new BReusableFilteredDocIdSetOperator(filterOperator, _indexSegment.getSegmentMetadata().getTotalDocs(), 5000);
-    final Map<String, DataSource> dataSourceMap = getDataSourceMap();
+    final Map<String, BaseOperator> dataSourceMap = getDataSourceMap();
 
     final MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
 
@@ -236,7 +237,7 @@ public class AggregationGroupByOperatorTest {
     Operator filterOperator1 = new MatchEntireSegmentOperator(_indexSegment.getSegmentMetadata().getTotalDocs());
     final BReusableFilteredDocIdSetOperator docIdSetOperator1 =
         new BReusableFilteredDocIdSetOperator(filterOperator1, _indexSegment.getSegmentMetadata().getTotalDocs(), 5000);
-    final Map<String, DataSource> dataSourceMap1 = getDataSourceMap();
+    final Map<String, BaseOperator> dataSourceMap1 = getDataSourceMap();
     final MProjectionOperator projectionOperator1 = new MProjectionOperator(dataSourceMap1, docIdSetOperator1);
 
     for (int i = 0; i < _numAggregations; ++i) {
@@ -270,7 +271,7 @@ public class AggregationGroupByOperatorTest {
     Operator filterOperator = new MatchEntireSegmentOperator(_indexSegment.getSegmentMetadata().getTotalDocs());
     final BReusableFilteredDocIdSetOperator docIdSetOperator =
         new BReusableFilteredDocIdSetOperator(filterOperator, _indexSegment.getSegmentMetadata().getTotalDocs(), 5000);
-    final Map<String, DataSource> dataSourceMap = getDataSourceMap();
+    final Map<String, BaseOperator> dataSourceMap = getDataSourceMap();
     final MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
 
     for (int i = 0; i < _numAggregations; ++i) {
@@ -294,7 +295,7 @@ public class AggregationGroupByOperatorTest {
     Operator filterOperator1 = new MatchEntireSegmentOperator(_indexSegment.getSegmentMetadata().getTotalDocs());
     final BReusableFilteredDocIdSetOperator docIdSetOperator1 =
         new BReusableFilteredDocIdSetOperator(filterOperator1, _indexSegment.getSegmentMetadata().getTotalDocs(), 5000);
-    final Map<String, DataSource> dataSourceMap1 = getDataSourceMap();
+    final Map<String, BaseOperator> dataSourceMap1 = getDataSourceMap();
     final MProjectionOperator projectionOperator1 = new MProjectionOperator(dataSourceMap1, docIdSetOperator1);
 
     for (int i = 0; i < _numAggregations; ++i) {
@@ -584,8 +585,8 @@ public class AggregationGroupByOperatorTest {
     return aggregationsInfo;
   }
 
-  private static Map<String, DataSource> getDataSourceMap() {
-    final Map<String, DataSource> dataSourceMap = new HashMap<String, DataSource>();
+  private static Map<String, BaseOperator> getDataSourceMap() {
+    final Map<String, BaseOperator> dataSourceMap = new HashMap<String, BaseOperator>();
     dataSourceMap.put("column11", _indexSegment.getDataSource("column11"));
     dataSourceMap.put("column12", _indexSegment.getDataSource("column12"));
     dataSourceMap.put("met_impressionCount", _indexSegment.getDataSource("met_impressionCount"));

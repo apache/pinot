@@ -25,6 +25,7 @@ import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.BReusableFilteredDocIdSetOperator;
+import com.linkedin.pinot.core.operator.BaseOperator;
 import com.linkedin.pinot.core.operator.MProjectionOperator;
 
 
@@ -40,31 +41,23 @@ public class ProjectionPlanNode implements PlanNode {
   private final DocIdSetPlanNode _docIdSetPlanNode;
   private MProjectionOperator _projectionOperator = null;
 
-  public ProjectionPlanNode(IndexSegment indexSegment, String[] strings, DocIdSetPlanNode docIdSetPlanNode) {
+  public ProjectionPlanNode(IndexSegment indexSegment, String[] columns, DocIdSetPlanNode docIdSetPlanNode) {
     _docIdSetPlanNode = docIdSetPlanNode;
-    for (String column : strings) {
+    for (String column : columns) {
       _dataSourcePlanNodeMap.put(column, new ColumnarDataSourcePlanNode(indexSegment, column, docIdSetPlanNode));
     }
-  }
-
-  public ProjectionPlanNode(IndexSegment indexSegment, DocIdSetPlanNode docIdSetPlanNode) {
-    _docIdSetPlanNode = docIdSetPlanNode;
-    for (String column : indexSegment.getColumnNames()) {
-      _dataSourcePlanNodeMap.put(column, new ColumnarDataSourcePlanNode(indexSegment, column, docIdSetPlanNode));
-    }
-
   }
 
   @Override
   public Operator run() {
     long start = System.currentTimeMillis();
-
     if (_projectionOperator == null) {
-      Map<String, DataSource> dataSourceMap = new HashMap<String, DataSource>();
+      Map<String, BaseOperator> dataSourceMap = new HashMap<String, BaseOperator>();
       BReusableFilteredDocIdSetOperator docIdSetOperator = (BReusableFilteredDocIdSetOperator) _docIdSetPlanNode.run();
-      long endTime1 = System.currentTimeMillis();
       for (String column : _dataSourcePlanNodeMap.keySet()) {
-        dataSourceMap.put(column, (DataSource) _dataSourcePlanNodeMap.get(column).run());
+        ColumnarDataSourcePlanNode columnarDataSourcePlanNode = _dataSourcePlanNodeMap.get(column);
+        BaseOperator operator = columnarDataSourcePlanNode.run();
+        dataSourceMap.put(column, operator);
       }
       _projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
     }

@@ -44,32 +44,31 @@ public class AggregationGroupByOperator extends BaseOperator {
   GroupByExecutor _groupByExecutor;
   private List<AggregationInfo> _aggregationInfoList;
   private MProjectionOperator _projectionOperator;
-  private IndexSegment _indexSegment;
   private int _nextBlockCallCounter = 0;
 
   private int[] _reusableDocIdSet;
+  private final long _totalRawDocs;
 
   /**
    * Constructor for the class.
    *
-   * @param indexSegment Index on which aggregation group by is to be performed.
    * @param aggregationsInfoList List of AggregationInfo (contains context for applying aggregation functions).
    * @param groupBy GroupBy to perform
    * @param projectionOperator Projection
    * @param numGroupsLimit Limit on number of aggregation groups returned in the result
    */
-  public AggregationGroupByOperator(IndexSegment indexSegment, List<AggregationInfo> aggregationsInfoList,
-      GroupBy groupBy, MProjectionOperator projectionOperator, int numGroupsLimit) {
+  public AggregationGroupByOperator(List<AggregationInfo> aggregationsInfoList,
+      GroupBy groupBy, MProjectionOperator projectionOperator, int numGroupsLimit, long totalRawDocs) {
 
-    Preconditions.checkNotNull(indexSegment);
     Preconditions.checkArgument((aggregationsInfoList != null) && (aggregationsInfoList.size() > 0));
     Preconditions.checkNotNull(groupBy);
     Preconditions.checkNotNull(projectionOperator);
 
-    _indexSegment = indexSegment;
     _aggregationInfoList = aggregationsInfoList;
     _projectionOperator = projectionOperator;
-    _groupByExecutor = new DefaultGroupByExecutor(indexSegment, aggregationsInfoList, groupBy, numGroupsLimit);
+    this._totalRawDocs = totalRawDocs;
+    _groupByExecutor = new DefaultGroupByExecutor(projectionOperator, aggregationsInfoList, groupBy, numGroupsLimit);
+
   }
 
   /**
@@ -106,7 +105,7 @@ public class AggregationGroupByOperator extends BaseOperator {
             aggregationGroupByResult);
 
     resultBlock.setNumDocsScanned(numDocsScanned);
-    resultBlock.setTotalRawDocs(_indexSegment.getSegmentMetadata().getTotalRawDocs());
+    resultBlock.setTotalRawDocs(_totalRawDocs);
     resultBlock.setTimeUsedMs(System.currentTimeMillis() - startTimeMillis);
 
     return resultBlock;

@@ -23,6 +23,7 @@ import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.BReusableFilteredDocIdSetOperator;
+import com.linkedin.pinot.core.operator.BaseOperator;
 import com.linkedin.pinot.core.operator.MProjectionOperator;
 import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
 import com.linkedin.pinot.core.operator.filter.MatchEntireSegmentOperator;
@@ -63,7 +64,7 @@ public abstract class BaseSelectionQueriesTest {
    *
    * @return data source map for the tests.
    */
-  abstract Map<String, DataSource> getDataSourceMap();
+  abstract Map<String, BaseOperator> getDataSourceMap();
 
   /**
    * Get the selection ONLY query.
@@ -109,7 +110,7 @@ public abstract class BaseSelectionQueriesTest {
   public void testSelectionOnlyIteration()
       throws Exception {
     IndexSegment indexSegment = getIndexSegment();
-    Map<String, DataSource> dataSourceMap = getDataSourceMap();
+    Map<String, BaseOperator> dataSourceMap = getDataSourceMap();
     Selection selectionOnlyQuery = getSelectionOnlyQuery();
 
     // Get selection result block.
@@ -146,7 +147,7 @@ public abstract class BaseSelectionQueriesTest {
   public void testSelectionOrderByIteration()
       throws Exception {
     IndexSegment indexSegment = getIndexSegment();
-    Map<String, DataSource> dataSourceMap = getDataSourceMap();
+    Map<String, BaseOperator> dataSourceMap = getDataSourceMap();
     Selection selectionOrderByQuery = getSelectionOrderByQuery();
 
     // Get selection result block.
