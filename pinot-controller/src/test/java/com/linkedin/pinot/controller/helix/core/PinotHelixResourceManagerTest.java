@@ -15,10 +15,23 @@
  */
 package com.linkedin.pinot.controller.helix.core;
 
+import com.google.common.util.concurrent.Uninterruptibles;
+import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.IndexingConfig;
+import com.linkedin.pinot.common.config.OfflineTableConfig;
+import com.linkedin.pinot.common.config.QuotaConfig;
+import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
+import com.linkedin.pinot.common.config.TableCustomConfig;
+import com.linkedin.pinot.common.config.Tenant;
+import com.linkedin.pinot.common.config.TenantConfig;
+import com.linkedin.pinot.common.utils.CommonConstants;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
+import org.apache.helix.model.IdealState;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -38,14 +51,14 @@ public class PinotHelixResourceManagerTest {
   private HelixManager helixZkManager;
   private HelixAdmin helixAdmin;
   private final int adminPortStart = 10000;
-  private final int numInstances = 3;
+  private final int numInstances = 10;
   @BeforeClass
   public void setUp()
       throws Exception {
     zkServer = ZkStarter.startLocalZkServer();
     final String instanceId = "localhost_helixController";
     pinotHelixResourceManager =
-        new PinotHelixResourceManager(ZK_SERVER, HELIX_CLUSTER_NAME, instanceId, null, 10000L, true, /*isUpdateStateModel=*/false);
+        new PinotHelixResourceManager(ZK_SERVER, HELIX_CLUSTER_NAME, instanceId, null, 10000L, false, /*isUpdateStateModel=*/false);
     pinotHelixResourceManager.start();
 
     final String helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(ZK_SERVER);
@@ -75,4 +88,72 @@ public class PinotHelixResourceManagerTest {
     }
   }
 
+  @Test
+  public void testRebuildBrokerResourceFromHelixTags() throws Exception {
+    AbstractTableConfig tableConfig = AbstractTableConfig.init(
+        ControllerRequestBuilderUtil.buildCreateOfflineTableJSON("faketable", "serverTenant", "brokerTenant", 3)
+            .toString());
+
+    Tenant tenant = new Tenant();
+    tenant.setTenantName("brokerTenant");
+    tenant.setTenantRole("BROKER");
+    tenant.setNumberOfInstances(3);
+    pinotHelixResourceManager.createBrokerTenant(tenant);
+    pinotHelixResourceManager.addTable(tableConfig);
+
+    // Check that the broker ideal state has 3 brokers assigned to it for faketable_OFFLINE
+    IdealState idealState = pinotHelixResourceManager.getHelixAdmin()
+        .getResourceIdealState(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
+    Assert.assertEquals(idealState.getInstanceStateMap("faketable_OFFLINE").size(), 3);
+
+    // Retag all instances current assigned to brokerTenant to be unassigned
+    Set<String> brokerInstances = pinotHelixResourceManager.getAllInstancesForBrokerTenant("brokerTenant");
+    for (String brokerInstance : brokerInstances) {
+      pinotHelixResourceManager.getHelixAdmin().removeInstanceTag(HELIX_CLUSTER_NAME, brokerInstance,
+          "brokerTenant_BROKER");
+      pinotHelixResourceManager.getHelixAdmin().addInstanceTag(HELIX_CLUSTER_NAME, brokerInstance,
+          CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE);
+    }
+
+    // Rebuilding the broker tenant should update the ideal state size
+    pinotHelixResourceManager.rebuildBrokerResourceFromHelixTags("faketable_OFFLINE");
+    idealState = pinotHelixResourceManager.getHelixAdmin()
+        .getResourceIdealState(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
+    Assert.assertEquals(idealState.getInstanceStateMap("faketable_OFFLINE").size(), 0);
+
+    // Tag five instances
+    int instancesRemainingToTag = 5;
+    List<String> instances = pinotHelixResourceManager.getAllInstanceNames();
+    for (String instance : instances) {
+      if (instance.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE)) {
+        pinotHelixResourceManager.getHelixAdmin()
+            .removeInstanceTag(HELIX_CLUSTER_NAME, instance, CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE);
+        pinotHelixResourceManager.getHelixAdmin()
+            .addInstanceTag(HELIX_CLUSTER_NAME, instance, "brokerTenant_BROKER");
+        instancesRemainingToTag--;
+        if (instancesRemainingToTag == 0) {
+          break;
+        }
+      }
+    }
+
+    // Rebuilding the broker tenant should update the ideal state size
+    pinotHelixResourceManager.rebuildBrokerResourceFromHelixTags("faketable_OFFLINE");
+    idealState = pinotHelixResourceManager.getHelixAdmin()
+        .getResourceIdealState(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
+    Assert.assertEquals(idealState.getInstanceStateMap("faketable_OFFLINE").size(), 5);
+
+    // Untag all instances for other tests
+    for (String instance : instances) {
+      if (instance.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE)) {
+        pinotHelixResourceManager.getHelixAdmin()
+            .removeInstanceTag(HELIX_CLUSTER_NAME, instance, "brokerTenant_BROKER");
+        pinotHelixResourceManager.getHelixAdmin()
+            .addInstanceTag(HELIX_CLUSTER_NAME, instance, CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE);
+      }
+    }
+
+    // Delete table
+    pinotHelixResourceManager.deleteOfflineTable("faketable");
+  }
 }
