@@ -16,8 +16,9 @@
 
 package com.linkedin.pinot.server.api.resources;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableList;
+import com.linkedin.pinot.common.restlet.resources.TableSegments;
+import com.linkedin.pinot.common.restlet.resources.TablesList;
 import com.linkedin.pinot.core.data.manager.offline.InstanceDataManager;
 import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
 import com.linkedin.pinot.core.data.manager.offline.TableDataManager;
@@ -49,24 +50,13 @@ public class TablesResource {
   @Inject
   ServerInstance serverInstance;
 
-  public static class TablesList {
-    List<String> tables;
-
-    public TablesList(@JsonProperty("tables") List<String> tables) {
-      this.tables = tables;
-    }
-
-    public List<String> getTables() {
-      return tables;
-    }
-  }
 
   @GET
   @Path("/tables")
   @Produces(MediaType.APPLICATION_JSON)
   //swagger annotations
   @ApiOperation(value = "List tables", notes = "List all the tables on this server")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success", response = TablesResource.TablesList.class),
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success", response = TablesList.class),
       @ApiResponse(code = 500, message = "Server initialization error", response = ErrorInfo.class)})
   public TablesList listTables() {
     InstanceDataManager dataManager = checkGetInstanceDataManager();
@@ -90,27 +80,11 @@ public class TablesResource {
     return dataManager;
   }
 
-  public static class TableSegments {
-    List<String> segments;
-
-    public TableSegments(@JsonProperty("segments") List<String> segments) {
-      this.segments = segments;
-    }
-
-    public List<String> getSegments() {
-      return segments;
-    }
-
-    public void setSegments(List<String> segments) {
-      this.segments = segments;
-    }
-  }
-
   @GET
   @Path("/tables/{tableName}/segments")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "List table segments", notes = "List segments of table hosted on this server")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success", response = TablesResource.TableSegments.class),
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success", response = TableSegments.class),
       @ApiResponse(code = 500, message = "Server initialization error", response = ErrorInfo.class)})
   public TableSegments listTableSegments(
       @ApiParam(value = "Table name including type", required = true, example = "myTable_OFFLINE")

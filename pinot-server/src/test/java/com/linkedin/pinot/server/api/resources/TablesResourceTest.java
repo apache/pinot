@@ -17,6 +17,8 @@
 package com.linkedin.pinot.server.api.resources;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.linkedin.pinot.common.restlet.resources.TableSegments;
+import com.linkedin.pinot.common.restlet.resources.TablesList;
 import java.io.IOException;
 import java.util.List;
 import javax.ws.rs.core.Response;
@@ -47,8 +49,8 @@ public class TablesResourceTest {
     Response response =
         testHelper.target.path("/tables").request().get(Response.class);
     String responseBody = response.readEntity(String.class);
-    TablesResource.TablesList tablesList =
-        new ObjectMapper().readValue(responseBody, TablesResource.TablesList.class);
+    TablesList tablesList =
+        new ObjectMapper().readValue(responseBody, TablesList.class);
     Assert.assertNotNull(tablesList);
     List<String> tables = tablesList.getTables();
     Assert.assertNotNull(tables);
@@ -59,9 +61,9 @@ public class TablesResourceTest {
   @Test
   public void getSegments() {
     {
-      TablesResource.TableSegments tableSegments =
+      TableSegments tableSegments =
           testHelper.target.path("/tables/" + ResourceTestHelper.DEFAULT_TABLE_NAME + "/segments").request()
-              .get(TablesResource.TableSegments.class);
+              .get(TableSegments.class);
       Assert.assertNotNull(tableSegments);
       Assert.assertNotNull(tableSegments.getSegments());
       Assert.assertEquals(tableSegments.getSegments().size(), 1);

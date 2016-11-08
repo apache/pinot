@@ -50,7 +50,7 @@ public class TableSizeResourceTest {
   @Test
   public void testTableSizeNotFound() {
     Response response = target.path("table/unknownTable/size").request().get(Response.class);
-    Assert.assertEquals(response.getStatus(), Response.Status.BAD_REQUEST.getStatusCode());
+    Assert.assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
   }
 
 
