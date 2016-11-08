@@ -438,7 +438,8 @@ public class AggregationGroupByWithDictionaryOperatorTest {
   }
 
   private void assertBrokerResponse(int numSegments, BrokerResponseNative brokerResponse) {
-    Assert.assertEquals(10001 * numSegments, brokerResponse.getNumDocsScanned());
+    // Commented out because new ExecutionStatistics does not apply to deprecated classes.
+    // Assert.assertEquals(10001 * numSegments, brokerResponse.getNumDocsScanned());
     final int groupSize = 15;
     assertBrokerResponse(brokerResponse, groupSize);
 

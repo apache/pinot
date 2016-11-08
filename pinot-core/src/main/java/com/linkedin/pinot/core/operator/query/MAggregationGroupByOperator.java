@@ -29,7 +29,7 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.BaseOperator;
 import com.linkedin.pinot.core.operator.MProjectionOperator;
 import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
-import com.linkedin.pinot.core.operator.docidsets.DocIdSetBlock;
+import com.linkedin.pinot.core.operator.blocks.DocIdSetBlock;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionFactory;
 
 
@@ -40,6 +40,7 @@ import com.linkedin.pinot.core.query.aggregation.AggregationFunctionFactory;
  *
  *
  */
+@Deprecated
 public class MAggregationGroupByOperator extends BaseOperator {
 
   private final IndexSegment _indexSegment;

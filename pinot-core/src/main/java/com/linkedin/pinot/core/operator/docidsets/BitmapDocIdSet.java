@@ -36,7 +36,7 @@ public class BitmapDocIdSet implements FilterBlockDocIdSet {
   private ImmutableRoaringBitmap answer;
 
   /**
-   * 
+   *
    * @param datasourceName
    * @param blockMetadata
    * @param startDocId inclusive
@@ -49,7 +49,7 @@ public class BitmapDocIdSet implements FilterBlockDocIdSet {
   }
 
   /**
-   * 
+   *
    * @param datasourceName
    * @param blockMetadata
    * @param startDocId inclusive
@@ -80,7 +80,7 @@ public class BitmapDocIdSet implements FilterBlockDocIdSet {
     //by default bitmap is created for the all documents (raw docs + agg docs of star tree).
     //we need to consider only bits between start/end docId
     //startDocId/endDocId is decided by the filter plan node based on starTree vs raw data
-    //TODO:check the performance penalty of removing this at runtime v/s <br/> 
+    //TODO:check the performance penalty of removing this at runtime v/s <br/>
     //changing the bitmap index creation (i.e create two separate bitmaps for raw docs and materialized docs)
     //this should be a no-op when we don't have star tree
     if (blockMetadata.getStartDocId() != startDocId) {
@@ -124,6 +124,11 @@ public class BitmapDocIdSet implements FilterBlockDocIdSet {
   @Override
   public void setEndDocId(int endDocId) {
     this.endDocId = endDocId;
+  }
+
+  @Override
+  public long getNumEntriesScannedInFilter() {
+    return 0L;
   }
 
   @Override

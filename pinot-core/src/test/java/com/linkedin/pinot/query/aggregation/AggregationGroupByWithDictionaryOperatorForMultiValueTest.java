@@ -411,7 +411,8 @@ public class AggregationGroupByWithDictionaryOperatorForMultiValueTest {
   }
 
   private void assertBrokerResponse(int numSegments, BrokerResponseNative brokerResponse) throws JSONException {
-    Assert.assertEquals(100000 * numSegments, brokerResponse.getNumDocsScanned());
+    // Commented out because new ExecutionStatistics does not apply to deprecated classes.
+    // Assert.assertEquals(100000 * numSegments, brokerResponse.getNumDocsScanned());
     final int groupSize = 15;
     verifyResponse(brokerResponse, groupSize);
 

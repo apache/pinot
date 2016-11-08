@@ -15,15 +15,12 @@
  */
 package com.linkedin.pinot.core.operator.docidsets;
 
-import java.util.List;
-import java.util.concurrent.atomic.AtomicLong;
-
-import org.apache.commons.lang3.tuple.Pair;
-
 import com.linkedin.pinot.common.utils.Pairs.IntPair;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.operator.blocks.BlockFactory;
 import com.linkedin.pinot.core.operator.dociditerators.SortedDocIdIterator;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
 
 
 public class SortedDocIdSet implements FilterBlockDocIdSet {
@@ -73,6 +70,11 @@ public class SortedDocIdSet implements FilterBlockDocIdSet {
   @Override
   public void setEndDocId(int endDocId) {
     this.endDocId = endDocId;
+  }
+
+  @Override
+  public long getNumEntriesScannedInFilter() {
+    return 0L;
   }
 
   @Override

@@ -15,24 +15,22 @@
  */
 package com.linkedin.pinot.core.operator.docidsets;
 
+import com.linkedin.pinot.common.utils.Pairs;
+import com.linkedin.pinot.core.common.BlockDocIdIterator;
+import com.linkedin.pinot.core.common.BlockDocIdSet;
+import com.linkedin.pinot.core.operator.dociditerators.BitmapDocIdIterator;
+import com.linkedin.pinot.core.operator.dociditerators.OrDocIdIterator;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
-
 import org.roaringbitmap.IntIterator;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
-import com.linkedin.pinot.core.common.BlockDocIdIterator;
-import com.linkedin.pinot.core.common.BlockDocIdSet;
-import com.linkedin.pinot.common.utils.Pairs;
-import com.linkedin.pinot.core.operator.dociditerators.BitmapDocIdIterator;
-import com.linkedin.pinot.core.operator.dociditerators.OrDocIdIterator;
-
 
 public final class OrBlockDocIdSet implements FilterBlockDocIdSet {
   /**
-   * 
+   *
    */
   final public AtomicLong timeMeasure = new AtomicLong(0);
   private List<FilterBlockDocIdSet> docIdSets;
@@ -141,4 +139,12 @@ public final class OrBlockDocIdSet implements FilterBlockDocIdSet {
     updateMinMaxRange();
   }
 
+  @Override
+  public long getNumEntriesScannedInFilter() {
+    long numEntriesScannedInFilter = 0L;
+    for (FilterBlockDocIdSet docIdSet : docIdSets) {
+      numEntriesScannedInFilter += docIdSet.getNumEntriesScannedInFilter();
+    }
+    return numEntriesScannedInFilter;
+  }
 }

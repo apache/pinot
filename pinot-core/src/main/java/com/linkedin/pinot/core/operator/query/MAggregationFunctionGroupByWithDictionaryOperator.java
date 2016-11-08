@@ -30,18 +30,14 @@ import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.BlockMultiValIterator;
 import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.core.common.BlockValIterator;
-import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.Operator;
-import com.linkedin.pinot.core.operator.MProjectionOperator;
-import com.linkedin.pinot.core.operator.UReplicatedProjectionOperator;
 import com.linkedin.pinot.core.operator.blocks.MatchEntireSegmentDocIdSetBlock;
 import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
-import com.linkedin.pinot.core.operator.docidsets.DocIdSetBlock;
+import com.linkedin.pinot.core.operator.blocks.DocIdSetBlock;
 import com.linkedin.pinot.core.query.aggregation.groupby.BitHacks;
 import com.linkedin.pinot.core.query.aggregation.groupby.GroupByConstants;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
-import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 
 
 /**
@@ -53,6 +49,7 @@ import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
  *
  *
  */
+@Deprecated
 public class MAggregationFunctionGroupByWithDictionaryOperator extends AggregationFunctionGroupByOperator {
 
   private int[] _groupKeyBitSize;
@@ -94,7 +91,7 @@ public class MAggregationFunctionGroupByWithDictionaryOperator extends Aggregati
     if (block == null) {
       return null;
     }
-    DocIdSetBlock docIdSetBlock = (DocIdSetBlock) block.getDocIdSetBlock();
+    DocIdSetBlock docIdSetBlock = block.getDocIdSetBlock();
     BlockDocIdIterator blockDocIdIterator = docIdSetBlock.getBlockDocIdSet().iterator();
     int docId = 0;
 
@@ -110,20 +107,10 @@ public class MAggregationFunctionGroupByWithDictionaryOperator extends Aggregati
         final Serializable[] aggregates = new Serializable[dictionaryLength];
         final BlockSingleValIterator blockValIterator = (BlockSingleValIterator) _groupByBlockValIterators[0];
 
-        // Special case: entire block matches
-        if (docIdSetBlock instanceof MatchEntireSegmentDocIdSetBlock) {
-          int rowCount = docIdSetBlock.getSearchableLength();
-          blockValIterator.reset();
-          for (int row = 0; row < rowCount; ++row) {
-            int index = blockValIterator.nextIntVal();
-            aggregates[index] = _aggregationFunction.aggregate(aggregates[index], row, _aggregationFunctionBlocks);
-          }
-        } else {
-          while ((docId = blockDocIdIterator.next()) != Constants.EOF) {
-            blockValIterator.skipTo(docId);
-            int index = blockValIterator.nextIntVal();
-            aggregates[index] = _aggregationFunction.aggregate(aggregates[index], docId, _aggregationFunctionBlocks);
-          }
+        while ((docId = blockDocIdIterator.next()) != Constants.EOF) {
+          blockValIterator.skipTo(docId);
+          int index = blockValIterator.nextIntVal();
+          aggregates[index] = _aggregationFunction.aggregate(aggregates[index], docId, _aggregationFunctionBlocks);
         }
 
         for (int i = 0; i < aggregates.length; i++) {

@@ -55,10 +55,5 @@ public abstract class BaseFilterOperator extends BaseOperator {
     return (BaseFilterBlock) nextBlock;
   }
 
-  @Override
-  public final String getOperatorName() {
-    return "BaseFilterOperator";
-  }
-
   public abstract BaseFilterBlock nextFilterBlock(BlockId blockId);
 }

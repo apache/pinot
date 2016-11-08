@@ -15,13 +15,13 @@
  */
 package com.linkedin.pinot.core.plan;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.BReusableFilteredDocIdSetOperator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 
 /**
  * DocIdSetPlanNode takes care creating BDocIdSetOperator.
@@ -58,8 +58,7 @@ public class DocIdSetPlanNode implements PlanNode {
     int totalRawDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
     long start = System.currentTimeMillis();
     if (_projectOp == null) {
-      _projectOp =
-          new BReusableFilteredDocIdSetOperator(_filterNode.run(), totalRawDocs, _maxDocPerCall);
+      _projectOp = new BReusableFilteredDocIdSetOperator(_filterNode.run(), totalRawDocs, _maxDocPerCall);
       long end = System.currentTimeMillis();
       LOGGER.debug("DocIdSetPlanNode.run took:" + (end - start));
       return _projectOp;

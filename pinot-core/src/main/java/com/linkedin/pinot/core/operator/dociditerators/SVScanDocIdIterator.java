@@ -32,6 +32,7 @@ public class SVScanDocIdIterator implements ScanBasedDocIdIterator {
   private int endDocId;
   private PredicateEvaluator evaluator;
   private String datasourceName;
+  private int _numEntriesScanned = 0;
 
   public SVScanDocIdIterator(String datasourceName, BlockValSet blockValSet, BlockMetadata blockMetadata,
       PredicateEvaluator evaluator) {
@@ -73,6 +74,7 @@ public class SVScanDocIdIterator implements ScanBasedDocIdIterator {
       return false;
     }
     valueIterator.skipTo(docId);
+    _numEntriesScanned++;
     int dictIdForCurrentDoc = valueIterator.nextIntVal();
     return evaluator.apply(dictIdForCurrentDoc);
   }
@@ -103,6 +105,7 @@ public class SVScanDocIdIterator implements ScanBasedDocIdIterator {
     }
     while (valueIterator.hasNext() && currentDocId < endDocId) {
       currentDocId = currentDocId + 1;
+      _numEntriesScanned++;
       int dictIdForCurrentDoc = valueIterator.nextIntVal();
       if (evaluator.apply(dictIdForCurrentDoc)) {
         // System.out.println("Returning deom " + this +"doc Id:"+ currentDocId + " dictId:"+
@@ -136,6 +139,7 @@ public class SVScanDocIdIterator implements ScanBasedDocIdIterator {
       docId = intIterator.next();
       if (docId >= startDocId) {
         valueIterator.skipTo(docId);
+        _numEntriesScanned++;
         if (evaluator.apply(valueIterator.nextIntVal())) {
           result.add(docId);
         }
@@ -144,4 +148,8 @@ public class SVScanDocIdIterator implements ScanBasedDocIdIterator {
     return result;
   }
 
+  @Override
+  public int getNumEntriesScanned() {
+    return _numEntriesScanned;
+  }
 }

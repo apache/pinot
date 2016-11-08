@@ -35,4 +35,10 @@ public interface ScanBasedDocIdIterator extends BlockDocIdIterator {
 
   MutableRoaringBitmap applyAnd(MutableRoaringBitmap answer);
 
+  /**
+   * Get number of entries scanned.
+   *
+   * @return number of entries scanned.
+   */
+  int getNumEntriesScanned();
 }

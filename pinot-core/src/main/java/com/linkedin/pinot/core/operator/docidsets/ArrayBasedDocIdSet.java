@@ -16,18 +16,18 @@
 package com.linkedin.pinot.core.operator.docidsets;
 
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
+import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.operator.dociditerators.ArrayBasedDocIdIterator;
 
-public final class ArrayBasedDocIdSet implements FilterBlockDocIdSet {
-  final int[] _docIdArray;
-  final int _searchableLength;
-  int _minDocId;
-  int _maxDocId;
+
+public final class ArrayBasedDocIdSet implements BlockDocIdSet {
+
+  private final int[] _docIdArray;
+  private final int _searchableLength;
+
   public ArrayBasedDocIdSet(int[] docIdArray, int searchableLength) {
     _docIdArray = docIdArray;
     _searchableLength = searchableLength;
-    _minDocId = 0;
-    _maxDocId  = searchableLength - 1;
   }
 
   @Override
@@ -36,28 +36,8 @@ public final class ArrayBasedDocIdSet implements FilterBlockDocIdSet {
   }
 
   @Override
-  public Object getRaw() {
+  public int[] getRaw() {
     return _docIdArray;
-  }
-
-  @Override
-  public int getMinDocId() {
-    return _docIdArray[0]; 
-  }
-
-  @Override
-  public int getMaxDocId() {
-    return _docIdArray[_searchableLength - 1]; 
-  }
-
-  @Override
-  public void setStartDocId(int startDocId) {
-    _minDocId  = Math.max(startDocId, _minDocId);
-  }
-
-  @Override
-  public void setEndDocId(int endDocId) {
-    _maxDocId  = Math.min(endDocId, _maxDocId);
   }
 
   public int size() {

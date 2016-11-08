@@ -15,27 +15,25 @@
  */
 package com.linkedin.pinot.core.operator.query;
 
-import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Collection;
-
-import com.linkedin.pinot.core.operator.BaseOperator;
-import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
-import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.linkedin.pinot.common.request.Selection;
 import com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema;
 import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.BlockId;
-import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.operator.BaseOperator;
+import com.linkedin.pinot.core.operator.ExecutionStatistics;
+import com.linkedin.pinot.core.operator.MProjectionOperator;
+import com.linkedin.pinot.core.operator.blocks.DocIdSetBlock;
+import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
+import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
 import com.linkedin.pinot.core.query.selection.SelectionFetcher;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorUtils;
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Collection;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -48,19 +46,20 @@ public class MSelectionOnlyOperator extends BaseOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(MSelectionOnlyOperator.class);
 
   private final IndexSegment _indexSegment;
-  private final Operator _projectionOperator;
+  private final MProjectionOperator _projectionOperator;
   private final Selection _selection;
   private final DataSchema _dataSchema;
   private final Block[] _blocks;
   private final String[] _selectionColumns;
   private final int _limitDocs;
   private final Collection<Serializable[]> _rowEvents;
+  private ExecutionStatistics _executionStatistics;
 
   public MSelectionOnlyOperator(IndexSegment indexSegment, Selection selection, Operator projectionOperator) {
     _indexSegment = indexSegment;
     _selection = selection;
     _limitDocs = _selection.getSize();
-    _projectionOperator = projectionOperator;
+    _projectionOperator = (MProjectionOperator) projectionOperator;
 
     _selectionColumns = SelectionOperatorUtils.extractSelectionRelatedColumns(_selection, _indexSegment);
     _dataSchema = SelectionOperatorUtils.extractDataSchema(_selectionColumns, indexSegment);
@@ -76,50 +75,53 @@ public class MSelectionOnlyOperator extends BaseOperator {
 
   @Override
   public Block getNextBlock() {
+    int numDocsScanned = 0;
 
-    final long startTime = System.currentTimeMillis();
-    long numDocsScanned = 0;
-    ProjectionBlock projectionBlock = null;
+    ProjectionBlock projectionBlock;
     while ((projectionBlock = (ProjectionBlock) _projectionOperator.nextBlock()) != null) {
-      for (int i = 0; i < _dataSchema.size(); ++i) {
+      for (int i = 0; i < _dataSchema.size(); i++) {
         _blocks[i] = projectionBlock.getBlock(_dataSchema.getColumnName(i));
       }
       SelectionFetcher selectionFetcher = new SelectionFetcher(_blocks, _dataSchema);
-      BlockDocIdIterator blockDocIdIterator = projectionBlock.getDocIdSetBlock().getBlockDocIdSet().iterator();
-      int docId;
-      while ((docId = blockDocIdIterator.next()) != Constants.EOF && _rowEvents.size() < _limitDocs) {
-        numDocsScanned++;
-        _rowEvents.add(selectionFetcher.getRow(docId));
+      DocIdSetBlock docIdSetBlock = projectionBlock.getDocIdSetBlock();
+      int numDocsToFetch = Math.min(docIdSetBlock.getSearchableLength(), _limitDocs - _rowEvents.size());
+      numDocsScanned += numDocsToFetch;
+      int[] docIdSet = docIdSetBlock.getDocIdSet();
+      for (int i = 0; i < numDocsToFetch; i++) {
+        _rowEvents.add(selectionFetcher.getRow(docIdSet[i]));
       }
       if (_rowEvents.size() == _limitDocs) {
         break;
       }
     }
 
-    final IntermediateResultsBlock resultBlock = new IntermediateResultsBlock();
+    // Create execution statistics.
+    long numEntriesScannedInFilter = _projectionOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
+    long numEntriesScannedPostFilter = numDocsScanned * _projectionOperator.getNumProjectionColumns();
+    long numTotalRawDocs = _indexSegment.getSegmentMetadata().getTotalRawDocs();
+    _executionStatistics =
+        new ExecutionStatistics(numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter,
+            numTotalRawDocs);
+
+    IntermediateResultsBlock resultBlock = new IntermediateResultsBlock();
     resultBlock.setSelectionResult(_rowEvents);
     resultBlock.setSelectionDataSchema(_dataSchema);
-    resultBlock.setNumDocsScanned(numDocsScanned);
-    resultBlock.setTotalRawDocs(_indexSegment.getSegmentMetadata().getTotalRawDocs());
-    final long endTime = System.currentTimeMillis();
-    resultBlock.setTimeUsedMs(endTime - startTime);
     return resultBlock;
-
   }
 
   @Override
-  public Block getNextBlock(BlockId BlockId) {
+  public Block getNextBlock(BlockId blockId) {
     throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public String getOperatorName() {
-    return "MSelectionOnlyOperator";
   }
 
   @Override
   public boolean close() {
     _projectionOperator.close();
     return true;
+  }
+
+  @Override
+  public ExecutionStatistics getExecutionStatistics() {
+    return _executionStatistics;
   }
 }

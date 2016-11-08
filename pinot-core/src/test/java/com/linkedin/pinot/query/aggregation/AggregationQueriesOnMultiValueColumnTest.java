@@ -164,7 +164,7 @@ public class AggregationQueriesOnMultiValueColumnTest {
 
     final IntermediateResultsBlock block1 = getAggregationResultBlock(brokerRequest);
     Assert.assertEquals(134090, ((MutableLongValue) block1.getAggregationResult().get(0)).longValue());
-    // Combine 
+    // Combine
     final IntermediateResultsBlock block2 = getAggregationResultBlock(brokerRequest);
     Assert.assertEquals(134090, ((MutableLongValue) block2.getAggregationResult().get(0)).longValue());
     CombineService.mergeTwoBlocks(brokerRequest, block1, block2);
@@ -182,7 +182,7 @@ public class AggregationQueriesOnMultiValueColumnTest {
 
     final IntermediateResultsBlock block1 = getAggregationResultBlock(brokerRequest);
     Assert.assertEquals(107243218420671.0, block1.getAggregationResult().get(0));
-    // Combine 
+    // Combine
     final IntermediateResultsBlock block2 = getAggregationResultBlock(brokerRequest);
     Assert.assertEquals(107243218420671.0, block2.getAggregationResult().get(0));
     CombineService.mergeTwoBlocks(brokerRequest, block1, block2);
@@ -202,7 +202,7 @@ public class AggregationQueriesOnMultiValueColumnTest {
     final IntermediateResultsBlock block1 = getAggregationResultBlock(brokerRequest);
     Assert.assertEquals(107243218420671.0, ((Pair) block1.getAggregationResult().get(0)).getFirst());
     Assert.assertEquals(134090L, ((Pair) block1.getAggregationResult().get(0)).getSecond());
-    // Combine 
+    // Combine
     final IntermediateResultsBlock block2 = getAggregationResultBlock(brokerRequest);
     Assert.assertEquals(107243218420671.0, ((Pair) block2.getAggregationResult().get(0)).getFirst());
     Assert.assertEquals(134090L, ((Pair) block2.getAggregationResult().get(0)).getSecond());
@@ -222,7 +222,7 @@ public class AggregationQueriesOnMultiValueColumnTest {
 
     final IntermediateResultsBlock block1 = getAggregationResultBlock(brokerRequest);
     Assert.assertEquals(201.0, block1.getAggregationResult().get(0));
-    // Combine 
+    // Combine
     final IntermediateResultsBlock block2 = getAggregationResultBlock(brokerRequest);
     Assert.assertEquals(201.0, block2.getAggregationResult().get(0));
     CombineService.mergeTwoBlocks(brokerRequest, block1, block2);
@@ -240,7 +240,7 @@ public class AggregationQueriesOnMultiValueColumnTest {
 
     final IntermediateResultsBlock block1 = getAggregationResultBlock(brokerRequest);
     Assert.assertEquals(2147483647.0, block1.getAggregationResult().get(0));
-    // Combine 
+    // Combine
     final IntermediateResultsBlock block2 = getAggregationResultBlock(brokerRequest);
     Assert.assertEquals(2147483647.0, block2.getAggregationResult().get(0));
     CombineService.mergeTwoBlocks(brokerRequest, block1, block2);
@@ -258,7 +258,7 @@ public class AggregationQueriesOnMultiValueColumnTest {
 
     final IntermediateResultsBlock block1 = getAggregationResultBlock(brokerRequest);
     Assert.assertEquals(359, ((IntOpenHashSet) block1.getAggregationResult().get(0)).size());
-    // Combine 
+    // Combine
     final IntermediateResultsBlock block2 = getAggregationResultBlock(brokerRequest);
     Assert.assertEquals(359, ((IntOpenHashSet) block2.getAggregationResult().get(0)).size());
     CombineService.mergeTwoBlocks(brokerRequest, block1, block2);
@@ -276,7 +276,7 @@ public class AggregationQueriesOnMultiValueColumnTest {
 
     final IntermediateResultsBlock block1 = getAggregationResultBlock(brokerRequest);
     Assert.assertEquals(376, ((HyperLogLog) block1.getAggregationResult().get(0)).cardinality());
-    // Combine 
+    // Combine
     final IntermediateResultsBlock block2 = getAggregationResultBlock(brokerRequest);
     Assert.assertEquals(376, ((HyperLogLog) block2.getAggregationResult().get(0)).cardinality());
     CombineService.mergeTwoBlocks(brokerRequest, block1, block2);
@@ -295,7 +295,7 @@ public class AggregationQueriesOnMultiValueColumnTest {
     final IntermediateResultsBlock block1 = getAggregationResultBlock(brokerRequest);
     DoubleArrayList doubleArrayList1 = (DoubleArrayList) block1.getAggregationResult().get(0);
     Assert.assertEquals(134090, doubleArrayList1.size());
-    // Combine 
+    // Combine
     final IntermediateResultsBlock block2 = getAggregationResultBlock(brokerRequest);
     DoubleArrayList doubleArrayList2 = (DoubleArrayList) block2.getAggregationResult().get(0);
     Assert.assertEquals(134090, doubleArrayList2.size());
@@ -321,7 +321,7 @@ public class AggregationQueriesOnMultiValueColumnTest {
     Assert.assertEquals(201, digest1.getMin());
     Assert.assertEquals(2147483647, digest1.getMax());
 
-    // Combine 
+    // Combine
     final IntermediateResultsBlock block2 = getAggregationResultBlock(brokerRequest);
     QuantileDigest digest2 = (QuantileDigest) block2.getAggregationResult().get(0);
     Assert.assertEquals(134090.0, digest2.getCount());
@@ -367,8 +367,9 @@ public class AggregationQueriesOnMultiValueColumnTest {
     LOGGER.debug("RunningTime : {}", resultBlock.getTimeUsedMs());
     LOGGER.debug("NumDocsScanned : {}", resultBlock.getNumDocsScanned());
     LOGGER.debug("TotalDocs : {}", resultBlock.getTotalRawDocs());
-    Assert.assertEquals(resultBlock.getNumDocsScanned(), 100000);
-    Assert.assertEquals(resultBlock.getTotalRawDocs(), 100000);
+    // Commented out because new ExecutionStatistics does not apply to deprecated classes.
+    // Assert.assertEquals(resultBlock.getNumDocsScanned(), 100000);
+    // Assert.assertEquals(resultBlock.getTotalRawDocs(), 100000);
     logReducedResults(resultBlock);
   }
 
@@ -380,8 +381,9 @@ public class AggregationQueriesOnMultiValueColumnTest {
     LOGGER.debug("RunningTime : {}", resultBlock.getTimeUsedMs());
     LOGGER.debug("NumDocsScanned : {}", resultBlock.getNumDocsScanned());
     LOGGER.debug("TotalDocs : {}", resultBlock.getTotalRawDocs());
-    Assert.assertEquals(resultBlock.getNumDocsScanned(), 56360);
-    Assert.assertEquals(resultBlock.getTotalRawDocs(), 100000);
+    // Commented out because new ExecutionStatistics does not apply to deprecated classes.
+    // Assert.assertEquals(resultBlock.getNumDocsScanned(), 56360);
+    // Assert.assertEquals(resultBlock.getTotalRawDocs(), 100000);
     logReducedResults(resultBlock);
   }
 

@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.operator;
 
+import com.linkedin.pinot.core.operator.blocks.DocIdSetBlock;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -34,8 +35,6 @@ import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
  *
  */
 public class MProjectionOperator extends BaseOperator {
-
-  private static final Logger LOGGER = LoggerFactory.getLogger(MProjectionOperator.class);
 
   private final BReusableFilteredDocIdSetOperator _docIdSetOperator;
   private final Map<String, BaseOperator> _columnToDataSourceMap;
@@ -67,29 +66,26 @@ public class MProjectionOperator extends BaseOperator {
   }
 
   @Override
-  public Block getNextBlock() {
-    Block docIdSetBlock = _docIdSetOperator.nextBlock();
-    _blockMap.put("_docIdSet", docIdSetBlock);
-    for (String column : _columnToDataSourceMap.keySet()) {
-      _blockMap.put(column, _columnToDataSourceMap.get(column).nextBlock(new BlockId(0)));
-    }
-    _currentBlock = new ProjectionBlock(_blockMap, docIdSetBlock);
-    if (_currentBlock.getDocIdSetBlock() == null) {
-      return null;
+  public ProjectionBlock getNextBlock() {
+    DocIdSetBlock docIdSetBlock = (DocIdSetBlock) _docIdSetOperator.nextBlock();
+    if (docIdSetBlock == null) {
+      _currentBlock = null;
+    } else {
+      _blockMap.put("_docIdSet", docIdSetBlock);
+      for (String column : _columnToDataSourceMap.keySet()) {
+        _blockMap.put(column, _columnToDataSourceMap.get(column).nextBlock(new BlockId(0)));
+      }
+      _currentBlock = new ProjectionBlock(_blockMap, docIdSetBlock);
     }
     return _currentBlock;
   }
 
   @Override
-  public Block getNextBlock(BlockId BlockId) {
+  public Block getNextBlock(BlockId blockId) {
     throw new UnsupportedOperationException("Not supported in MProjectionOperator!");
   }
 
-  @Override
-  public String getOperatorName() {
-    return "MProjectionOperator";
-  }
-
+  // TODO: remove this method.
   public ProjectionBlock getCurrentBlock() {
     return _currentBlock;
   }
@@ -97,9 +93,17 @@ public class MProjectionOperator extends BaseOperator {
   public BaseOperator getDataSource(String column) {
     return _columnToDataSourceMap.get(column);
   }
-  
+
   public Map<String, BaseOperator> getDataSourceMap() {
     return _columnToDataSourceMap;
   }
 
+  public int getNumProjectionColumns() {
+    return _columnToDataSourceMap.size();
+  }
+
+  @Override
+  public ExecutionStatistics getExecutionStatistics() {
+    return _docIdSetOperator.getExecutionStatistics();
+  }
 }

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.operator.docidsets;
+package com.linkedin.pinot.core.operator.blocks;
 
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdSet;
@@ -22,12 +22,13 @@ import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Predicate;
+import com.linkedin.pinot.core.operator.docidsets.ArrayBasedDocIdSet;
 
 
 public class DocIdSetBlock implements Block {
 
-  final int[] _docIdArray;
-  final int _searchableLength;
+  private final int[] _docIdArray;
+  private final int _searchableLength;
 
   public DocIdSetBlock(int[] docIdSet, int searchableLength) {
     _docIdArray = docIdSet;
@@ -71,5 +72,4 @@ public class DocIdSetBlock implements Block {
   public BlockMetadata getMetadata() {
     throw new UnsupportedOperationException();
   }
-
 }

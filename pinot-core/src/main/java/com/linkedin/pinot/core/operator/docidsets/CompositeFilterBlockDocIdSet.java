@@ -15,11 +15,11 @@
  */
 package com.linkedin.pinot.core.operator.docidsets;
 
+import com.linkedin.pinot.core.common.BlockDocIdIterator;
+import com.linkedin.pinot.core.operator.dociditerators.CompositeDocIdIterator;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.linkedin.pinot.core.common.BlockDocIdIterator;
-import com.linkedin.pinot.core.operator.dociditerators.CompositeDocIdIterator;
 
 public final class CompositeFilterBlockDocIdSet implements FilterBlockDocIdSet {
   private final int finalMaxDocId;
@@ -61,6 +61,15 @@ public final class CompositeFilterBlockDocIdSet implements FilterBlockDocIdSet {
   @Override
   public void setEndDocId(int endDocId) {
     throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public long getNumEntriesScannedInFilter() {
+    long numEntriesScannedInFilter = 0L;
+    for (FilterBlockDocIdSet blockDocIdSet : filterDocIdSets) {
+      numEntriesScannedInFilter += blockDocIdSet.getNumEntriesScannedInFilter();
+    }
+    return numEntriesScannedInFilter;
   }
 
   @Override

@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.plan;
 
+@Deprecated
 public enum AggregationGroupByImplementationType {
   NoDictionary,
   Dictionary,

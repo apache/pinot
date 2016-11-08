@@ -280,10 +280,7 @@ public class DataTable {
     // Used for empty results.
     dataTableSerDe = DataTableSerDeRegistry.getInstance().get();
     version = deriveVersionFromDataTableSerDe(dataTableSerDe);
-    metadata = new HashMap<String, String>();
-    metadata.put("numDocsScanned", "0");
-    metadata.put("totalDocs", "0");
-    metadata.put("timeUsedMs", "0");
+    metadata = new HashMap<>();
   }
 
   /**

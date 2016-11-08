@@ -227,7 +227,21 @@ public class MCombineGroupByOperator extends BaseOperator {
     List<Map<String, Serializable>> trimmedResults =
         aggregationGroupByOperatorService.trimToSize(resultsMap, numAggrFunctions);
 
-    return buildResultBlock(aggregationFunctions, trimmedResults, blocks);
+    IntermediateResultsBlock mergedBlock = buildResultBlock(aggregationFunctions, trimmedResults, blocks);
+    // Update execution statistics.
+    ExecutionStatistics executionStatistics = new ExecutionStatistics();
+    for (Operator operator : _operators) {
+      ExecutionStatistics executionStatisticsToMerge = operator.getExecutionStatistics();
+      if (executionStatisticsToMerge != null) {
+        executionStatistics.merge(executionStatisticsToMerge);
+      }
+    }
+    mergedBlock.setNumDocsScanned(executionStatistics.getNumDocsScanned());
+    mergedBlock.setNumEntriesScannedInFilter(executionStatistics.getNumEntriesScannedInFilter());
+    mergedBlock.setNumEntriesScannedPostFilter(executionStatistics.getNumEntriesScannedPostFilter());
+    mergedBlock.setTotalRawDocs(executionStatistics.getNumTotalRawDocs());
+
+    return mergedBlock;
   }
 
   /**
@@ -245,13 +259,7 @@ public class MCombineGroupByOperator extends BaseOperator {
     IntermediateResultsBlock resultBlock = new IntermediateResultsBlock(aggregationFunctions, null, true);
     List<ProcessingException> exceptions = null;
 
-    long numDocsScanned = 0;
-    long totalRawDocs = 0;
-
     for (IntermediateResultsBlock block : blocks) {
-      numDocsScanned += block.getNumDocsScanned();
-      totalRawDocs += block.getTotalRawDocs();
-
       List<ProcessingException> blockExceptions = block.getExceptions();
       if (blockExceptions != null) {
         if (exceptions == null) {
@@ -265,21 +273,13 @@ public class MCombineGroupByOperator extends BaseOperator {
       }
     }
 
-    resultBlock.setNumDocsScanned(numDocsScanned);
-    resultBlock.setTotalRawDocs(totalRawDocs);
     resultBlock.setExceptionsList(exceptions);
-
     return resultBlock;
   }
 
   @Override
-  public Block getNextBlock(BlockId BlockId) {
+  public Block getNextBlock(BlockId blockId) {
     throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public String getOperatorName() {
-    return "MCombineGroupByOperator";
   }
 
   @Override
