@@ -55,37 +55,9 @@ public class BitmapInvertedIndexReader implements InvertedIndexReader {
    */
   @Override
   public ImmutableRoaringBitmap getImmutable(int idx) {
-    SoftReference<ImmutableRoaringBitmap>[] bitmapArrayReference = null;
-    // Return the bitmap if it's still on heap
-    if (bitmaps != null) {
-      bitmapArrayReference = bitmaps.get();
-      if (bitmapArrayReference != null) {
-        SoftReference<ImmutableRoaringBitmap> bitmapReference = bitmapArrayReference[idx];
-        if (bitmapReference != null) {
-          ImmutableRoaringBitmap value = bitmapReference.get();
-          if (value != null) {
-            return value;
-          }
-        }
-      } else {
-        bitmapArrayReference = new SoftReference[numberOfBitmaps];
-        bitmaps = new SoftReference<SoftReference<ImmutableRoaringBitmap>[]>(bitmapArrayReference);
-      }
-    } else {
-      bitmapArrayReference = new SoftReference[numberOfBitmaps];
-      bitmaps = new SoftReference<SoftReference<ImmutableRoaringBitmap>[]>(bitmapArrayReference);
-    }
-    synchronized (this) {
-      ImmutableRoaringBitmap value;
-      if (bitmapArrayReference[idx] == null || bitmapArrayReference[idx].get() == null) {
-        value = buildRoaringBitmapForIndex(idx);
-        bitmapArrayReference[idx] = new SoftReference<ImmutableRoaringBitmap>(value);
-      } else {
-        value = bitmapArrayReference[idx].get();
-      }
-      return value;
-    }
-
+    //TODO: Change this to use guava cache and limit the number of entries we cache on a per server basis
+    //even without cache this is not a big problem
+    return buildRoaringBitmapForIndex(idx);
   }
 
   private synchronized ImmutableRoaringBitmap buildRoaringBitmapForIndex(final int index) {
