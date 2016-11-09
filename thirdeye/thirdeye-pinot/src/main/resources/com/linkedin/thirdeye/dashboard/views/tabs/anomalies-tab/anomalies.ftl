@@ -17,11 +17,9 @@
                         <div class="chart-info">
                         </div>
                         <div class="anomaly-info">
-
                         </div>
                         <div>
-                            <!--a class="anomaly-details-link blue" data-id="{{anomalyData/id}}">TODO: fix this link</a-->
-                          # {{anomalyData/id}}
+                            <a class="anomaly-details-link blue" data-id="{{anomalyData/id}}"># {{anomalyData/id}}</a>
                         </div>
                         <div>
                             <h3 style="margin-top:0px;">

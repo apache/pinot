@@ -2,6 +2,9 @@ var anomaliesDisplayData = "";
 var metricLineChart = "";
 var metricChangeChart = ""
 
+// This can be used on anomaly detail page
+var timeSeriesDataForAllAnomalies = {};
+
 function getFeedbackTypeString(feedbackType) {
     switch (feedbackType) {
         case 'ANOMALY':
@@ -14,6 +17,7 @@ function getFeedbackTypeString(feedbackType) {
             return feedbackType;
     }
 }
+
 function getFeedbackTypeFromString(feedbackTypeStr) {
     switch (feedbackTypeStr) {
         case 'Confirmed Anomaly':
@@ -601,9 +605,11 @@ function renderAnomalyThumbnails(data, tab) {
             var anomalyRegionData = [];
             anomalyRegionData.push({startTime: parseInt(startTime), endTime: parseInt(endTime), id: anomalyId, regionColor: '#eedddd'});
             drawAnomalyTimeSeries(timeSeriesData, anomalyRegionData, tab, placeholder)
+
+            // Caching it so that this can be reused on the details page
+            timeSeriesDataForAllAnomalies[data[i]["id"]] = timeSeriesData;
         })
      }
-
 }
 
 function attach_MetricTimeSeries_EventListeners(currentView){
@@ -664,8 +670,6 @@ function attach_MetricTimeSeries_EventListeners(currentView){
              })
          }
      }
-
-     //Set initial state of view
 
      //Show the first line on the timeseries
      var firstLegendLabel = $($(".time-series-metric-checkbox")[0])
