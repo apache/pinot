@@ -128,6 +128,16 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
   }
 
   @Override
+  public List<MergedAnomalyResultDTO> findAllConflictByFunctionIdDimensions(long functionId, long conflictWindowStart,
+      long conflictWindowEnd, String dimensions) {
+    Predicate predicate =
+        Predicate.AND(Predicate.LE("startTime", conflictWindowEnd), Predicate.GE("endTime", conflictWindowStart),
+            Predicate.EQ("functionId", functionId), Predicate.EQ("dimensions", dimensions));
+    List<MergedAnomalyResultBean> list = genericPojoDao.get(predicate, MergedAnomalyResultBean.class);
+    return batchConvertMergedAnomalyBean2DTO(list);
+  }
+
+  @Override
   public List<MergedAnomalyResultDTO> findByFunctionId(Long functionId) {
     Map<String, Object> filterParams = new HashMap<>();
     filterParams.put("functionId", functionId);
@@ -182,11 +192,11 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
 
   @Override
   public MergedAnomalyResultDTO findLatestConflictByFunctionIdDimensions(Long functionId, String dimensions,
-      long conflictWindowStart, long conflictWindowEnd, long sequentialAllowedGap) {
+      long conflictWindowStart, long conflictWindowEnd) {
     Map<String, Object> filterParams = new HashMap<>();
     filterParams.put("functionId", functionId);
     filterParams.put("dimensions", dimensions);
-    filterParams.put("startTime", conflictWindowStart - sequentialAllowedGap);
+    filterParams.put("startTime", conflictWindowStart);
     filterParams.put("endTime", conflictWindowEnd);
 
     List<MergedAnomalyResultBean> list = genericPojoDao.executeParameterizedSQL(
@@ -217,8 +227,7 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
 
 
   protected MergedAnomalyResultBean convertMergeAnomalyDTO2Bean(MergedAnomalyResultDTO entity) {
-    MergedAnomalyResultBean bean =
-        (MergedAnomalyResultBean) convertDTO2Bean(entity, MergedAnomalyResultBean.class);
+    MergedAnomalyResultBean bean = convertDTO2Bean(entity, MergedAnomalyResultBean.class);
     if (entity.getFeedback() != null) {
       if (entity.getFeedback().getId() == null) {
         AnomalyFeedbackBean feedbackBean =

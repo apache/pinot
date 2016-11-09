@@ -1,9 +1,7 @@
 package com.linkedin.thirdeye.anomaly.detection;
 
-import com.linkedin.pinot.pql.parsers.utils.Pair;
 import com.linkedin.thirdeye.anomaly.job.JobConstants;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants;
-import com.linkedin.thirdeye.client.timeseries.TimeSeriesResponse;
 import com.linkedin.thirdeye.datalayer.dto.JobDTO;
 import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
 import java.text.ParseException;
@@ -64,7 +62,8 @@ public class DetectionJobScheduler implements JobScheduler, Runnable {
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
   private static final int BACKFILL_MAX_RETRY = 3;
-  private static final int BACKFILL_SLEEP_TIME = 5_000;
+  private static final int BACKFILL_TASK_POLL_TIME = 5_000; // Period to check if a task is finished
+  private static final int BACKFILL_RESCHEDULE_TIME = 15_000; // Pause before reschedule a failed job
   private final Map<BackfillKey, Thread> existingBackfillJobs = new ConcurrentHashMap<>();
 
   public DetectionJobScheduler() {
@@ -363,7 +362,7 @@ public class DetectionJobScheduler implements JobScheduler, Runnable {
         if (!status) {
           // Reschedule the same job is it fails
           LOG.info("Failed to finish adhoc function {} for range {} to {}.", functionId, currentStart, currentEnd);
-          sleepSilently();
+          sleepSilently(BACKFILL_RESCHEDULE_TIME);
           LOG.info("Rerunning adhoc function {} for range {} to {}.", functionId, currentStart, currentEnd);
         } else {
           // Start the next job if the current job is succeeded
@@ -447,7 +446,7 @@ public class DetectionJobScheduler implements JobScheduler, Runnable {
     for (int i = 0; i < BACKFILL_MAX_RETRY; ++i) {
       job = anomalyJobDAO.findLatestScheduledJobByName(jobName);
       if (job == null) {
-        sleepSilently();
+        sleepSilently(BACKFILL_TASK_POLL_TIME);
         if (Thread.currentThread().interrupted()) {
           break;
         }
@@ -500,7 +499,7 @@ public class DetectionJobScheduler implements JobScheduler, Runnable {
           }
         }
         // keep waiting
-        sleepSilently();
+        sleepSilently(BACKFILL_TASK_POLL_TIME);
         if (Thread.currentThread().interrupted()) {
           return false;
         }
@@ -509,11 +508,11 @@ public class DetectionJobScheduler implements JobScheduler, Runnable {
   }
 
   /**
-   * Sleep for BACKFILL_SLEEP_TIME. Set interrupt flag if the thread is interrupted.
+   * Sleep for BACKFILL_TASK_POLL_TIME. Set interrupt flag if the thread is interrupted.
    */
-  private void sleepSilently() {
+  private void sleepSilently(long sleepDurationMillis) {
     try {
-      Thread.currentThread().sleep(BACKFILL_SLEEP_TIME);
+      Thread.currentThread().sleep(sleepDurationMillis);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     }

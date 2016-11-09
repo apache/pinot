@@ -13,6 +13,8 @@ public interface MergedAnomalyResultManager extends AbstractManager<MergedAnomal
 
   List<MergedAnomalyResultDTO> findAllConflictByFunctionId(long functionId, long conflictWindowStart, long conflictWindowEnd);
 
+  List<MergedAnomalyResultDTO> findAllConflictByFunctionIdDimensions(long functionId, long conflictWindowStart, long conflictWindowEnd, String dimensions);
+
   List<MergedAnomalyResultDTO> findByCollectionMetricDimensionsTime(String collection,
       String metric, String dimensions, long startTime, long endTime, boolean loadRawAnomalies);
 
@@ -23,7 +25,7 @@ public interface MergedAnomalyResultManager extends AbstractManager<MergedAnomal
       long endTime, boolean loadRawAnomalies);
 
   MergedAnomalyResultDTO findLatestConflictByFunctionIdDimensions(Long functionId, String dimensions,
-      long conflictWindowStart, long conflictWindowEnd, long sequentialAllowedGap);
+      long conflictWindowStart, long conflictWindowEnd);
 
   MergedAnomalyResultDTO findLatestByFunctionIdOnly(Long functionId);
 
