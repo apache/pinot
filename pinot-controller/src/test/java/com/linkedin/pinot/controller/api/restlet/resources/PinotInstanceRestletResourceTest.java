@@ -1,14 +1,15 @@
-package com.linkedin.pinot.controller.restlet.resources;
+package com.linkedin.pinot.controller.api.restlet.resources;
 
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
 import com.linkedin.pinot.controller.helix.ControllerTest;
 import java.io.IOException;
-import java.util.Collections;
 import org.json.JSONObject;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-import static org.testng.Assert.*;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.fail;
 
 
 /**

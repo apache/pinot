@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.controller.helix;
 
+import org.apache.avro.reflect.Nullable;
 import org.apache.commons.lang.StringUtils;
 
 import com.linkedin.pinot.common.utils.StringUtil;
@@ -144,6 +145,13 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "tables", tableName);
   }
 
+  public String forTableView(String tableName, String view, @Nullable String tableType) {
+    String url = StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "tables", tableName, view);
+    if (tableType != null) {
+      url += "?tableType=" + tableType;
+    }
+    return url;
+  }
   public static void main(String[] args) {
     System.out.println(ControllerRequestURLBuilder.baseUrl("localhost:8089").forResourceCreate());
     System.out.println(ControllerRequestURLBuilder.baseUrl("localhost:8089").forInstanceCreate());
