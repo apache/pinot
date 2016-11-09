@@ -186,15 +186,16 @@ public class ThirdEyeCacheRegistry {
     // as weeklyService starts before hourlyService finishes,
     // causing NPE in reading collectionsCache
 
-    cacheResource.refreshCollections();
-
-    cacheResource.refreshDatasetConfigCache();
-    cacheResource.refreshMetricConfigCache();
-    cacheResource.refreshDashoardConfigsCache();
-
-    cacheResource.refreshMaxDataTimeCache();
-    cacheResource.refreshDimensionFiltersCache();
-    cacheResource.refreshDashboardsCache();
+    // Start initial cache loading asynchronously to reduce application start time
+    Executors.newSingleThreadExecutor().submit(() -> {
+      cacheResource.refreshCollections();
+      cacheResource.refreshDatasetConfigCache();
+      cacheResource.refreshDashoardConfigsCache();
+      cacheResource.refreshDashboardsCache();
+      cacheResource.refreshDimensionFiltersCache();
+      cacheResource.refreshMetricConfigCache();
+      cacheResource.refreshMaxDataTimeCache();
+    });
 
     ScheduledExecutorService minuteService = Executors.newSingleThreadScheduledExecutor();
     minuteService.scheduleAtFixedRate(new Runnable() {
