@@ -29,6 +29,9 @@ function showAnomalyDetails(id) {
 }
 
 function renderAnomalyDetails(mergeAnomalyData) {
+    // Format float variables
+    mergeAnomalyData.score = getFormattedNumber(mergeAnomalyData.score, 4);
+    mergeAnomalyData.weight = getFormattedNumber(mergeAnomalyData.weight, 4);
     /* Handelbars template for anomaly details */
     var result_anomaly_details_template = HandleBarsTemplates.template_anomaly_details(mergeAnomalyData);
     $("#anomaly-details-box").remove();
