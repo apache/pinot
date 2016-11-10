@@ -19,5 +19,5 @@ public interface BlockDocIdSet {
 
   BlockDocIdIterator iterator();
 
-  <T extends Object> T getRaw();
+  <T> T getRaw();
 }

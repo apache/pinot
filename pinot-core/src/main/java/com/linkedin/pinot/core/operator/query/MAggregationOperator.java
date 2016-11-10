@@ -22,13 +22,12 @@ import java.util.List;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
-import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.BaseOperator;
 import com.linkedin.pinot.core.operator.MProjectionOperator;
 import com.linkedin.pinot.core.operator.blocks.AggregationResultBlock;
 import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
-import com.linkedin.pinot.core.operator.docidsets.DocIdSetBlock;
+import com.linkedin.pinot.core.operator.blocks.DocIdSetBlock;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionFactory;
 
 
@@ -39,6 +38,7 @@ import com.linkedin.pinot.core.query.aggregation.AggregationFunctionFactory;
  *
  *
  */
+@Deprecated
 public class MAggregationOperator extends BaseOperator {
 
   private final IndexSegment _indexSegment;

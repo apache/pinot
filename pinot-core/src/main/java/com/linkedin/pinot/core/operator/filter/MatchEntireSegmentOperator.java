@@ -15,20 +15,17 @@
  */
 package com.linkedin.pinot.core.operator.filter;
 
-import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
-import com.linkedin.pinot.core.common.Operator;
+import com.linkedin.pinot.core.operator.blocks.BaseFilterBlock;
 import com.linkedin.pinot.core.operator.blocks.MatchEntireSegmentDocIdSetBlock;
 
 
-public class MatchEntireSegmentOperator implements Operator {
+public class MatchEntireSegmentOperator extends BaseFilterOperator {
 
-  private int docs;
-  private int nextBlockCallCounter = 0;
+  private int _totalDocs;
 
-  public MatchEntireSegmentOperator(int docs) {
-    this.docs = docs;
-
+  public MatchEntireSegmentOperator(int totalDocs) {
+    _totalDocs = totalDocs;
   }
 
   @Override
@@ -42,17 +39,7 @@ public class MatchEntireSegmentOperator implements Operator {
   }
 
   @Override
-  public Block nextBlock() {
-    return nextBlock(new BlockId(0));
-  }
-
-  @Override
-  public Block nextBlock(BlockId BlockId) {
-    if (nextBlockCallCounter > 0) {
-      return null;
-    }
-    MatchEntireSegmentDocIdSetBlock block = new MatchEntireSegmentDocIdSetBlock(docs);
-    nextBlockCallCounter = nextBlockCallCounter + 1;
-    return block;
+  public BaseFilterBlock nextFilterBlock(BlockId blockId) {
+    return new MatchEntireSegmentDocIdSetBlock(_totalDocs);
   }
 }

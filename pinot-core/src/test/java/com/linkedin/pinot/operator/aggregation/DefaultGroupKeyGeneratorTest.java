@@ -23,6 +23,7 @@ import com.linkedin.pinot.core.common.DataFetcher;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import com.linkedin.pinot.core.operator.BaseOperator;
 import com.linkedin.pinot.core.operator.aggregation.groupby.DefaultGroupKeyGenerator;
 import com.linkedin.pinot.core.operator.aggregation.groupby.GroupKeyGenerator;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -114,7 +115,11 @@ public class DefaultGroupKeyGeneratorTest {
     IndexSegment indexSegment = Loaders.IndexSegment.load(new File(INDEX_DIR_PATH, SEGMENT_NAME), ReadMode.heap);
 
     // Get a data fetcher for the index segment.
-    _dataFetcher = new DataFetcher(indexSegment);
+    Map<String, BaseOperator> dataSourceMap = new HashMap<>();
+    for (String column : indexSegment.getColumnNames()) {
+      dataSourceMap.put(column, indexSegment.getDataSource(column));
+    }
+    _dataFetcher = new DataFetcher(dataSourceMap);
 
     // Generate a random test doc id set.
     int num1 = _random.nextInt(50);

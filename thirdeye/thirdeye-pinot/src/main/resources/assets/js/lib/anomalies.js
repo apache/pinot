@@ -2,6 +2,9 @@ var anomaliesDisplayData = "";
 var metricLineChart = "";
 var metricChangeChart = ""
 
+// This can be used on anomaly detail page
+var timeSeriesDataForAllAnomalies = {};
+
 function getFeedbackTypeString(feedbackType) {
     switch (feedbackType) {
         case 'ANOMALY':
@@ -14,6 +17,7 @@ function getFeedbackTypeString(feedbackType) {
             return feedbackType;
     }
 }
+
 function getFeedbackTypeFromString(feedbackTypeStr) {
     switch (feedbackTypeStr) {
         case 'Confirmed Anomaly':
@@ -75,41 +79,53 @@ function getAnomalies(tab) {
         }
 
         function getTimeseriesData(anomalyData) {
+          if(anomalyData) {
+             var anomalyMetric = true;
+          }
+          $("#" + tab + "-display-chart-section").empty();
+          if (anomalyMetric) {
+            $(".anomaly-metric-tip").hide();
+            renderAnomalyThumbnails(anomalyData, tab);
+          } else{
+            tipToUser(tab)
+          }
+          delete hash.anomalyFunctionId;
+          delete hash.fnCompareWeeks;
 
-            if(anomalyData){
-                var anomalyMetric = true;
-            }
-            var  anomalyData = anomalyData || [];
-            getData(timeSeriesUrl).done(function (timeSeriesData) {
-                //Error handling when data is falsy (empty, undefined or null)
-                if (!timeSeriesData) {
-                    $("#" + tab + "-chart-area-error").empty();
-                    var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' });
-                    warning.append($('<p></p>', { html: 'Something went wrong. Please try and reload the page. Error: metric timeseries data =' + timeSeriesData  }));
-                    $("#" + tab + "-chart-area-error").append(warning);
-                    $("#" + tab + "-chart-area-error").show();
-                    return
-                } else {
-                    $("#" + tab + "-chart-area-error").hide();
-                    $("#" + tab + "-display-chart-section").empty();
-                }
-                var placeholder = "#linechart-placeholder"
-                renderTimeseriesArea(timeSeriesData, tab);
-                drawMetricTimeSeries(timeSeriesData, anomalyData, tab, placeholder);
-
-                if (anomalyMetric) {
-                    $(".anomaly-metric-tip").hide();
-                    renderAnomalyThumbnails(anomalyData, tab);
-                }else{
-                    tipToUser(tab)
-                }
-
-                //anomalyFunctionId and hash.fnCompareWeeks are only present in hash when anomaly
-                // function run adhoc was requested on self service tab
-                //needs to be removed to be able to view other functions in later queries on the anomalies view
-                delete hash.anomalyFunctionId;
-                delete hash.fnCompareWeeks;
-            });
+//            if(anomalyData){
+//                var anomalyMetric = true;
+//            }
+//            var  anomalyData = anomalyData || [];
+//            getData(timeSeriesUrl).done(function (timeSeriesData) {
+//                //Error handling when data is falsy (empty, undefined or null)
+//                if (!timeSeriesData) {
+//                    $("#" + tab + "-chart-area-error").empty();
+//                    var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' });
+//                    warning.append($('<p></p>', { html: 'Something went wrong. Please try and reload the page. Error: metric timeseries data =' + timeSeriesData  }));
+//                    $("#" + tab + "-chart-area-error").append(warning);
+//                    $("#" + tab + "-chart-area-error").show();
+//                    return
+//                } else {
+//                    $("#" + tab + "-chart-area-error").hide();
+//                    $("#" + tab + "-display-chart-section").empty();
+//                }
+//                var placeholder = "#linechart-placeholder"
+//                //renderTimeseriesArea(timeSeriesData, tab);
+//                //drawMetricTimeSeries(timeSeriesData, anomalyData, tab, placeholder);
+//
+//                if (anomalyMetric) {
+//                    $(".anomaly-metric-tip").hide();
+//                    renderAnomalyThumbnails(anomalyData, tab);
+//                }else{
+//                    tipToUser(tab)
+//                }
+//
+//                //anomalyFunctionId and hash.fnCompareWeeks are only present in hash when anomaly
+//                // function run adhoc was requested on self service tab
+//                //needs to be removed to be able to view other functions in later queries on the anomalies view
+//                delete hash.anomalyFunctionId;
+//                delete hash.fnCompareWeeks;
+//            });
         };
     });
 };
@@ -316,7 +332,7 @@ function drawMetricTimeSeries(timeSeriesData, anomalyData, tab, placeholder) {
             colors: colors
         },
         zoom: {
-            enabled: true,
+            enabled: false,
             rescale: true
         },
         axis: {
@@ -470,7 +486,7 @@ function drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab, placeholder, op
 
          },
          zoom: {
-             enabled: true,
+             enabled: false,
              rescale: true
          },
          axis: {
@@ -557,20 +573,43 @@ function renderAnomalyThumbnails(data, tab) {
      function requestLineChart(i) {
          var startTime = data[i]["startTime"];
          var endTime = data[i]["endTime"];
-         var aggTimeGranularity = calcAggregateGranularity(hash.currentStart,hash.currentEnd);
+
+         var viewWindowStart = startTime;
+         var viewWindowEnd = endTime;
+
+         var aggTimeGranularity = calcAggregateGranularity(startTime, endTime);
+
+         var extensionWindowMillis;
+         switch (aggTimeGranularity) {
+             case "DAYS":
+                 extensionWindowMillis = 86400000;
+                 break;
+             case "HOURS":
+             default:
+                 var viewWindowSize = viewWindowEnd - viewWindowStart;
+                 var multiplier = Math.max(2, parseInt(viewWindowSize / 3600000));
+                 extensionWindowMillis = 3600000 * multiplier;
+         }
+
+         viewWindowStart -= extensionWindowMillis;
+         viewWindowEnd += extensionWindowMillis;
+
+
          var anomalyId = data[i]["id"]
          var placeholder= "#d3charts-" + i;
          var timeSeriesUrl = "/dashboard/anomaly-merged-result/timeseries/" + anomalyId
-             + "?aggTimeGranularity=" + aggTimeGranularity + "&start=" + hash.currentStart + "&end=" + hash.currentEnd;
+             + "?aggTimeGranularity=" + aggTimeGranularity + "&start=" + viewWindowStart + "&end=" + viewWindowEnd;
          var tab = hash.view;
 
         getDataCustomCallback(timeSeriesUrl, tab).done(function (timeSeriesData) {
             var anomalyRegionData = [];
             anomalyRegionData.push({startTime: parseInt(startTime), endTime: parseInt(endTime), id: anomalyId, regionColor: '#eedddd'});
             drawAnomalyTimeSeries(timeSeriesData, anomalyRegionData, tab, placeholder)
+
+            // Caching it so that this can be reused on the details page
+            timeSeriesDataForAllAnomalies[data[i]["id"]] = timeSeriesData;
         })
      }
-
 }
 
 function attach_MetricTimeSeries_EventListeners(currentView){
@@ -631,8 +670,6 @@ function attach_MetricTimeSeries_EventListeners(currentView){
              })
          }
      }
-
-     //Set initial state of view
 
      //Show the first line on the timeseries
      var firstLegendLabel = $($(".time-series-metric-checkbox")[0])
@@ -756,10 +793,16 @@ function tipToUser(tab) {
 
 //format integers with comma-grouping for thousands and round to 2 decimal numbers for floats
 function getFormattedNumber(number) {
+    return getFormattedNumber(number, 2);
+}
+
+//format integers with comma-grouping for thousands and round to "digits" decimal numbers for floats
+function getFormattedNumber(number, digits) {
     if (number % 1 == 0) {
         return d3.format(",")(number);
     } else {
-        return d3.format(",.2f")(number);
+        var formatString = ",." + digits + "f";
+        return d3.format(formatString)(number);
     }
 }
 

@@ -17,7 +17,6 @@
                         <div class="chart-info">
                         </div>
                         <div class="anomaly-info">
-
                         </div>
                         <div>
                             <a class="anomaly-details-link blue" data-id="{{anomalyData/id}}"># {{anomalyData/id}}</a>

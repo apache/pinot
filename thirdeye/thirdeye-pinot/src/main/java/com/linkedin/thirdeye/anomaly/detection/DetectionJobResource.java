@@ -1,7 +1,13 @@
 package com.linkedin.thirdeye.anomaly.detection;
 
+import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
+import com.linkedin.thirdeye.client.ThirdEyeClient;
+import com.linkedin.thirdeye.util.SeverityComputationUtil;
 import java.util.List;
 
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import javax.validation.constraints.NotNull;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
@@ -29,6 +35,7 @@ public class DetectionJobResource {
   private final DetectionJobScheduler detectionJobScheduler;
   private final AnomalyFunctionManager anomalyFunctionSpecDAO;
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
+  private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
 
   public DetectionJobResource(DetectionJobScheduler detectionJobScheduler) {
     this.detectionJobScheduler = detectionJobScheduler;
@@ -124,5 +131,63 @@ public class DetectionJobResource {
     detectionJobScheduler.stopJob(id);
     detectionJobScheduler.startJob(id);
     return Response.ok().build();
+  }
+
+  /**
+   * Returns the weight of the metric at the given window. The calculation of baseline (history) data is specified by
+   * seasonal period (in days) and season count. Seasonal period is the difference of duration from one window to the
+   * other. For instance, to use the data that is one week before current window, set seasonal period to 7. The season
+   * count specify how many seasons of history data to retrieve. If there are more than 1 season, then the baseline is
+   * the average of all seasons.
+   *
+   * Examples of the configuration of baseline:
+   * 1. Week-Over-Week: seasonalPeriodInDays = 7, seasonCount = 1
+   * 2. Week-Over-4-Weeks-Mean: seasonalPeriodInDays = 7, seasonCount = 4
+   * 3. Month-Over-Month: seasonalPeriodInDays = 30, seasonCount = 1
+   *
+   * @param collectionName the collection to which the metric belong
+   * @param metricName the metric name
+   * @param startTimeIso start time of current window, inclusive
+   * @param endTimeIso end time of current window, exclusive
+   * @param seasonalPeriodInDays the difference of duration between the start time of each window
+   * @param seasonCount the number of history windows
+   *
+   * @return the weight of the metric at the given window
+   * @throws Exception
+   */
+  @POST
+  @Path("/anomaly-weight")
+  public Response computeSeverity(@NotNull @QueryParam("collection") String collectionName,
+      @NotNull @QueryParam("metric") String metricName,
+      @NotNull @QueryParam("start") String startTimeIso, @NotNull @QueryParam("end") String endTimeIso,
+      @QueryParam("period") String seasonalPeriodInDays, @QueryParam("seasonCount") String seasonCount)
+      throws Exception {
+    DateTime startTime = null;
+    DateTime endTime = null;
+    if (StringUtils.isNotBlank(startTimeIso)) {
+      startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso);
+    }
+    if (StringUtils.isNotBlank(endTimeIso)) {
+      endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso);
+    }
+    long currentWindowStart = startTime.getMillis();
+    long currentWindowEnd = endTime.getMillis();
+
+    // Default is using one week data priors current values for calculating weight
+    long seasonalPeriodMillis = TimeUnit.DAYS.toMillis(7);
+    if (StringUtils.isNotBlank(seasonalPeriodInDays)) {
+      seasonalPeriodMillis = TimeUnit.DAYS.toMillis(Integer.parseInt(seasonalPeriodInDays));
+    }
+    int seasonCountInt = 1;
+    if (StringUtils.isNotBlank(seasonCount)) {
+      seasonCountInt = Integer.parseInt(seasonCount);
+    }
+
+    ThirdEyeClient thirdEyeClient = CACHE_REGISTRY_INSTANCE.getQueryCache().getClient();
+    SeverityComputationUtil util = new SeverityComputationUtil(thirdEyeClient, collectionName, metricName);
+    Map<String, Object> severity =
+        util.computeSeverity(currentWindowStart, currentWindowEnd, seasonalPeriodMillis, seasonCountInt);
+
+    return Response.ok(severity.toString(), MediaType.TEXT_PLAIN_TYPE).build();
   }
 }

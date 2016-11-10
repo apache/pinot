@@ -565,30 +565,4 @@ public class DashboardResource {
     }
     return response;
   }
-
-  // TODO: Move to AnomalyResources
-  @POST
-  @Path("/severity")
-  public Response computeSeverity(@NotNull @QueryParam("collection") String collectionName,
-      @NotNull @QueryParam("metric") String metricName,
-      @NotNull @QueryParam("start") String startTimeIso, @NotNull @QueryParam("end") String endTimeIso)
-      throws Exception {
-    DateTime startTime = null;
-    DateTime endTime = null;
-    if (StringUtils.isNotBlank(startTimeIso)) {
-      startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso);
-    }
-    if (StringUtils.isNotBlank(endTimeIso)) {
-      endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso);
-    }
-    ThirdEyeClient thirdEyeClient = CACHE_REGISTRY_INSTANCE.getQueryCache().getClient();
-    SeverityComputationUtil util = new SeverityComputationUtil(thirdEyeClient, collectionName, metricName);
-    long currentWindowStart = startTime.getMillis();
-    long currentWindowEnd = endTime.getMillis();
-    String compareMode = "WO4WMean";
-
-    Map<String, Object> severity = util.computeSeverity(currentWindowStart, currentWindowEnd, compareMode);
-
-    return Response.ok(severity.toString(), MediaType.TEXT_PLAIN_TYPE).build();
-  }
 }

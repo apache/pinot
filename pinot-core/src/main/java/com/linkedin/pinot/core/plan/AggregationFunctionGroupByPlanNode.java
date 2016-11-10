@@ -31,6 +31,7 @@ import com.linkedin.pinot.core.operator.query.MAggregationFunctionGroupByWithDic
  * AggregationFunctionGroupByPlanNode takes care of how to apply one aggregation
  * function and the groupby query to an IndexSegment.
  */
+@Deprecated
 public class AggregationFunctionGroupByPlanNode implements PlanNode {
 
   private static final Logger LOGGER = LoggerFactory.getLogger("QueryPlanLog");

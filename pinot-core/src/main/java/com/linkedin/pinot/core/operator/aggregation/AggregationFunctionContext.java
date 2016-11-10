@@ -33,8 +33,8 @@ public class AggregationFunctionContext {
    * @param aggFuncName
    * @param aggrColumns
    */
-  public AggregationFunctionContext(String aggFuncName, String[] aggrColumns, SegmentMetadata segmentMetadata) {
-    _aggregationFunction = AggregationFunctionFactory.getAggregationFunction(aggFuncName, segmentMetadata);
+  public AggregationFunctionContext(String aggFuncName, String[] aggrColumns) {
+    _aggregationFunction = AggregationFunctionFactory.getAggregationFunction(aggFuncName);
     _aggrColumns = aggrColumns;
   }
 

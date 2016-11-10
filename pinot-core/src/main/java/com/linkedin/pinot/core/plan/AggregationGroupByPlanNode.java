@@ -21,6 +21,8 @@ import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.MProjectionOperator;
 import com.linkedin.pinot.core.operator.aggregation.groupby.AggregationGroupByOperator;
+import com.linkedin.pinot.core.startree.hll.HllConstants;
+
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
@@ -55,6 +57,9 @@ public class AggregationGroupByPlanNode implements PlanNode {
       }
       String columns = aggregationInfo.getAggregationParams().get("column").trim();
       aggregationGroupByRelatedColumns.addAll(Arrays.asList(columns.split(",")));
+      if (aggregationInfo.getAggregationType().equalsIgnoreCase("fasthll")) {
+        aggregationGroupByRelatedColumns.add(columns + HllConstants.DEFAULT_HLL_DERIVE_COLUMN_SUFFIX);
+      }
     }
     aggregationGroupByRelatedColumns.addAll(_brokerRequest.getGroupBy().getColumns());
     return aggregationGroupByRelatedColumns.toArray(new String[aggregationGroupByRelatedColumns.size()]);
@@ -63,8 +68,8 @@ public class AggregationGroupByPlanNode implements PlanNode {
   @Override
   public Operator run() {
     MProjectionOperator projectionOperator = (MProjectionOperator) _projectionPlanNode.run();
-    return new AggregationGroupByOperator(_indexSegment, _brokerRequest.getAggregationsInfo(),
-        _brokerRequest.getGroupBy(), projectionOperator, _numAggrGroupsLimit);
+    return new AggregationGroupByOperator(_brokerRequest.getAggregationsInfo(), _brokerRequest.getGroupBy(), projectionOperator, _numAggrGroupsLimit,
+        _indexSegment.getSegmentMetadata().getTotalRawDocs());
   }
 
   @Override

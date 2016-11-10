@@ -36,6 +36,7 @@ import com.linkedin.pinot.core.query.aggregation.AggregationFunctionUtils;
  * AggregationGroupByOperatorPlanNode takes care of how to apply multiple aggregation
  * functions and groupBy query to an IndexSegment.
  */
+@Deprecated
 public class AggregationGroupByOperatorPlanNode implements PlanNode {
   private static final Logger LOGGER = LoggerFactory.getLogger("QueryPlanLog");
   private final IndexSegment _indexSegment;

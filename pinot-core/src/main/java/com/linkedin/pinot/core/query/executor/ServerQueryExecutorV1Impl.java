@@ -95,7 +95,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     }
     TimerContext.Timer queryProcessingTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.QUERY_PROCESSING);
 
-    DataTable instanceResponse;
+    DataTable dataTable;
     List<SegmentDataManager> queryableSegmentDataManagerList = null;
     InstanceRequest instanceRequest = queryRequest.getInstanceRequest();
     final long requestId = instanceRequest.getRequestId();
@@ -133,36 +133,36 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
         globalQueryPlan.execute();
       }
 
-      instanceResponse = globalQueryPlan.getInstanceResponse();
+      dataTable = globalQueryPlan.getInstanceResponse();
       queryProcessingTimer.stopAndRecord();
 
       LOGGER.debug("Searching Instance for Request Id - {}, browse took: {}", instanceRequest.getRequestId(),
           queryProcessingTimer.getDurationNs());
-      LOGGER.debug("InstanceResponse for Request Id - {} : {}", instanceRequest.getRequestId(), instanceResponse.toString());
-      instanceResponse.getMetadata().put("timeUsedMs", Long.toString(queryProcessingTimer.getDurationMs()));
-      instanceResponse.getMetadata().put("requestId", Long.toString(instanceRequest.getRequestId()));
-      instanceResponse.getMetadata().put("traceInfo", TraceContext.getTraceInfoOfRequestId(instanceRequest.getRequestId()));
+      LOGGER.debug("InstanceResponse for Request Id - {} : {}", instanceRequest.getRequestId(), dataTable.toString());
+      dataTable.getMetadata().put("timeUsedMs", Long.toString(queryProcessingTimer.getDurationMs()));
+      dataTable.getMetadata().put("requestId", Long.toString(instanceRequest.getRequestId()));
+      dataTable.getMetadata().put("traceInfo", TraceContext.getTraceInfoOfRequestId(instanceRequest.getRequestId()));
       LOGGER.info("Processed requestId {},reqSegments={},prunedToSegmentCount={},planTime={},planExecTime={},totalTimeUsed={},broker={}",
           requestId, nSegmentsInQuery, nPrunedSegments,
           planBuildTimer.getDurationMs(),
           timerContext.getPhaseDurationMs(ServerQueryPhase.QUERY_PLAN_EXECUTION),
           queryProcessingTimer.getDurationMs(),
           queryRequest.getBrokerId());
-      return instanceResponse;
+      return dataTable;
     } catch (Exception e) {
       _serverMetrics.addMeteredQueryValue(instanceRequest.getQuery(), ServerMeter.QUERY_EXECUTION_EXCEPTIONS, 1);
       LOGGER.error("Exception processing requestId {}", requestId, e);
-      instanceResponse = new DataTable();
-      instanceResponse.addException(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
+      dataTable = new DataTable();
+      dataTable.addException(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
       TraceContext.logException("ServerQueryExecutorV1Impl", "Exception occurs in processQuery");
       queryProcessingTimer.stopAndRecord();
 
       LOGGER.info("Searching Instance for Request Id - {}, browse took: {}, instanceResponse: {}", requestId,
-          queryProcessingTimer.getDurationMs(), instanceResponse.toString());
-      instanceResponse.getMetadata().put("timeUsedMs", Long.toString(queryProcessingTimer.getDurationNs()));
-      instanceResponse.getMetadata().put("requestId", Long.toString(instanceRequest.getRequestId()));
-      instanceResponse.getMetadata().put("traceInfo", TraceContext.getTraceInfoOfRequestId(instanceRequest.getRequestId()));
-      return instanceResponse;
+          queryProcessingTimer.getDurationMs(), dataTable.toString());
+      dataTable.getMetadata().put("timeUsedMs", Long.toString(queryProcessingTimer.getDurationNs()));
+      dataTable.getMetadata().put("requestId", Long.toString(instanceRequest.getRequestId()));
+      dataTable.getMetadata().put("traceInfo", TraceContext.getTraceInfoOfRequestId(instanceRequest.getRequestId()));
+      return dataTable;
     } finally {
       if (_instanceDataManager.getTableDataManager(instanceRequest.getQuery().getQuerySource().getTableName()) != null) {
         if (queryableSegmentDataManagerList != null) {

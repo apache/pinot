@@ -32,12 +32,11 @@ import com.linkedin.pinot.core.common.Predicate;
 public class ProjectionBlock implements Block {
 
   private final Map<String, Block> _blockMap;
-  private final Block _docIdSetBlock;
+  private final DocIdSetBlock _docIdSetBlock;
 
-  public ProjectionBlock(Map<String, Block> blockMap, Block docIdSetBlock) {
-    super();
-    this._blockMap = blockMap;
-    this._docIdSetBlock = docIdSetBlock;
+  public ProjectionBlock(Map<String, Block> blockMap, DocIdSetBlock docIdSetBlock) {
+    _blockMap = blockMap;
+    _docIdSetBlock = docIdSetBlock;
   }
 
   @Override
@@ -74,8 +73,7 @@ public class ProjectionBlock implements Block {
     return _blockMap.get(column);
   }
 
-  public Block getDocIdSetBlock() {
+  public DocIdSetBlock getDocIdSetBlock() {
     return _docIdSetBlock;
   }
-
 }

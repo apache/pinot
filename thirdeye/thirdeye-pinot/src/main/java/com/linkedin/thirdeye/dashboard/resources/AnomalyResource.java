@@ -47,7 +47,6 @@ import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
 import com.linkedin.thirdeye.constant.FeedbackStatus;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
-import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.EmailConfigurationManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
@@ -74,7 +73,6 @@ public class AnomalyResource {
   private MergedAnomalyResultManager anomalyMergedResultDAO;
   private RawAnomalyResultManager rawAnomalyResultDAO;
   private EmailConfigurationManager emailConfigurationDAO;
-  private DatasetConfigManager datasetConfigDAO;
   private AnomalyTimeSeriesViewFactory anomalyTimeSeriesViewFactory;
 
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
@@ -84,7 +82,6 @@ public class AnomalyResource {
     this.rawAnomalyResultDAO = DAO_REGISTRY.getRawAnomalyResultDAO();
     this.anomalyMergedResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
     this.emailConfigurationDAO = DAO_REGISTRY.getEmailConfigurationDAO();
-    this.datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
     this.anomalyTimeSeriesViewFactory = anomalyTimeSeriesViewFactory;
   }
 
@@ -97,6 +94,13 @@ public class AnomalyResource {
     }
     List<String> metrics = anomalyFunctionDAO.findDistinctMetricsByCollection(dataset);
     return metrics;
+  }
+
+  @GET
+  @Path("/anomalies/view/{anomaly_merged_result_id}")
+  public MergedAnomalyResultDTO getMergedAnomalyDetail(
+      @NotNull @PathParam("anomaly_merged_result_id") long mergedAnomalyId) {
+    return anomalyMergedResultDAO.findById(mergedAnomalyId);
   }
 
   // View merged anomalies for collection
@@ -134,14 +138,16 @@ public class AnomalyResource {
         }
       }
 
+      boolean loadRawAnomalies = false;
+
       if (StringUtils.isNotBlank(metric)) {
         if (StringUtils.isNotBlank(exploredDimensions)) {
-          anomalyResults = anomalyMergedResultDAO.findByCollectionMetricDimensionsTime(dataset, metric, exploredDimensions, startTime.getMillis(), endTime.getMillis());
+          anomalyResults = anomalyMergedResultDAO.findByCollectionMetricDimensionsTime(dataset, metric, exploredDimensions, startTime.getMillis(), endTime.getMillis(), loadRawAnomalies);
         } else {
-          anomalyResults = anomalyMergedResultDAO.findByCollectionMetricTime(dataset, metric, startTime.getMillis(), endTime.getMillis());
+          anomalyResults = anomalyMergedResultDAO.findByCollectionMetricTime(dataset, metric, startTime.getMillis(), endTime.getMillis(), loadRawAnomalies);
         }
       } else {
-        anomalyResults = anomalyMergedResultDAO.findByCollectionTime(dataset, startTime.getMillis(), endTime.getMillis());
+        anomalyResults = anomalyMergedResultDAO.findByCollectionTime(dataset, startTime.getMillis(), endTime.getMillis(), loadRawAnomalies);
       }
     } catch (Exception e) {
       LOG.error("Exception in fetching anomalies", e);
@@ -531,7 +537,8 @@ public class AnomalyResource {
       @QueryParam("end") long viewWindowEndTime)
       throws Exception {
 
-    MergedAnomalyResultDTO anomalyResult = anomalyMergedResultDAO.findById(anomalyResultId);
+    boolean loadRawAnomalies = false;
+    MergedAnomalyResultDTO anomalyResult = anomalyMergedResultDAO.findById(anomalyResultId, loadRawAnomalies);
     DimensionMap dimensions = anomalyResult.getDimensions();
     AnomalyFunctionDTO anomalyFunctionSpec = anomalyResult.getFunction();
     AnomalyTimeSeriesView anomalyTimeSeriesView = anomalyTimeSeriesViewFactory.fromSpec(anomalyFunctionSpec);

@@ -24,8 +24,13 @@ import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.readers.RecordReader;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import com.linkedin.pinot.core.operator.BReusableFilteredDocIdSetOperator;
+import com.linkedin.pinot.core.operator.BaseOperator;
+import com.linkedin.pinot.core.operator.MProjectionOperator;
 import com.linkedin.pinot.core.operator.aggregation.AggregationExecutor;
 import com.linkedin.pinot.core.operator.aggregation.DefaultAggregationExecutor;
+import com.linkedin.pinot.core.operator.blocks.MatchEntireSegmentDocIdSetBlock;
+import com.linkedin.pinot.core.operator.filter.MatchEntireSegmentOperator;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import java.io.File;
@@ -118,7 +123,15 @@ public class DefaultAggregationExecutorTest {
    */
   @Test
   void testAggregation() {
-    AggregationExecutor aggregationExecutor = new DefaultAggregationExecutor(_indexSegment, _aggregationInfoList);
+    Map<String, BaseOperator> dataSourceMap = new HashMap<>();
+    for (String column : _indexSegment.getColumnNames()) {
+      dataSourceMap.put(column, _indexSegment.getDataSource(column));
+    }
+    int totalRawDocs = _indexSegment.getSegmentMetadata().getTotalRawDocs();
+    MatchEntireSegmentOperator matchEntireSegmentOperator = new MatchEntireSegmentOperator(totalRawDocs);
+    BReusableFilteredDocIdSetOperator docIdSetOperator = new BReusableFilteredDocIdSetOperator(matchEntireSegmentOperator,totalRawDocs, 10000);
+    MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
+    AggregationExecutor aggregationExecutor = new DefaultAggregationExecutor(projectionOperator, _aggregationInfoList);
     aggregationExecutor.init();
     aggregationExecutor.aggregate(_docIdSet, 0, NUM_ROWS);
     aggregationExecutor.finish();

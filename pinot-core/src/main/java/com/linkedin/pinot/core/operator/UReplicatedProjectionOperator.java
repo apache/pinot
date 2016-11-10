@@ -30,6 +30,7 @@ import com.linkedin.pinot.core.common.Operator;
  *
  *
  */
+@Deprecated
 public class UReplicatedProjectionOperator extends BaseOperator {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(UReplicatedProjectionOperator.class);
@@ -70,5 +71,5 @@ public class UReplicatedProjectionOperator extends BaseOperator {
   public MProjectionOperator getProjectionOperator() {
     return _projectionOperator;
   }
-  
+
 }

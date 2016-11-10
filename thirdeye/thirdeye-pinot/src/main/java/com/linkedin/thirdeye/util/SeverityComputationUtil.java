@@ -5,7 +5,6 @@ import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.client.ThirdEyeResponse;
 import com.linkedin.thirdeye.dashboard.Utils;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,21 +32,24 @@ public class SeverityComputationUtil {
     this.metricName = metricName;
   }
 
-  public Map<String, Object> computeSeverity(long currentWindowStart, long currentWindowEnd, String compareMode) throws Exception {
+  public Map<String, Object> computeSeverity(long currentWindowStart, long currentWindowEnd, long seasonalPeriod,
+      long seasonCount)
+      throws Exception {
     // CURRENT
     ThirdEyeRequest thirdEyeRequest = createThirdEyeRequest(currentWindowStart, currentWindowEnd);
     double currentSum = getSum(thirdEyeRequest);
 
-    List<Pair<DateTime, DateTime>> intervals = getIntervals(currentWindowStart, currentWindowEnd, compareMode);
+    List<Pair<DateTime, DateTime>> intervals =
+        getHistoryIntervals(currentWindowStart, currentWindowEnd, seasonalPeriod, seasonCount);
     double baselineSum = 0;
     for (Pair<DateTime, DateTime> pair : intervals) {
       thirdEyeRequest = createThirdEyeRequest(pair.getLeft().getMillis(), pair.getRight().getMillis());
       baselineSum += getSum(thirdEyeRequest);
     }
     double baselineSumAvg = baselineSum / intervals.size();
-    double severity = (currentSum - baselineSumAvg) / baselineSumAvg;
+    double weight = (currentSum - baselineSumAvg) / baselineSumAvg;
     HashMap<String, Object> hashMap = Maps.newHashMap();
-    hashMap.put("severity", severity);
+    hashMap.put("weight", weight);
     hashMap.put("currentSum", currentSum);
     hashMap.put("baselineSumAvg", baselineSumAvg);
     return hashMap;
@@ -81,16 +83,12 @@ public class SeverityComputationUtil {
     return thirdEyeRequest;
   }
 
-  // TODO: Add more compare mode
-  private List<Pair<DateTime, DateTime>> getIntervals(long currentWindowStart, long currentWindowEnd, String compareMode) {
-    if (compareMode.equals("WO4WMean")) {
-      List<Pair<DateTime, DateTime>> intervals = new ArrayList<>();
-      intervals.add(ImmutablePair.of(new DateTime(currentWindowStart).minusDays(7), new DateTime(currentWindowEnd).minusDays(7)));
-      intervals.add(ImmutablePair.of(new DateTime(currentWindowStart).minusDays(14), new DateTime(currentWindowEnd).minusDays(14)));
-      intervals.add(ImmutablePair.of(new DateTime(currentWindowStart).minusDays(21), new DateTime(currentWindowEnd).minusDays(21)));
-      intervals.add(ImmutablePair.of(new DateTime(currentWindowStart).minusDays(28), new DateTime(currentWindowEnd).minusDays(28)));
-      return intervals;
+  private List<Pair<DateTime, DateTime>> getHistoryIntervals(long currentWindowStart, long currentWindowEnd,
+      long seasonalPeriod, long seasonCount) {
+    List<Pair<DateTime, DateTime>> intervals = new ArrayList<>();
+    for (int i = 1; i <= seasonCount; ++i) {
+      intervals.add(ImmutablePair.of(new DateTime(currentWindowStart).minus(seasonalPeriod * i), new DateTime(currentWindowEnd).minus(seasonalPeriod * i)));
     }
-    return Collections.emptyList();
+    return intervals;
   }
 }

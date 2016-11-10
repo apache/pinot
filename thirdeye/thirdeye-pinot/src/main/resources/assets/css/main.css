@@ -912,7 +912,7 @@ body a{
 
 .large-anomaly-box{
     background: linear-gradient(90deg,#f0f0f0 130px,rgba(240,240,240,0) calc(130px + 20%));/*#f0f0f0*/
-    height: 215px;
+    height: 300px;
     padding-left:0px;
     border: 1px solid #ddd;
     margin: 10px auto 0 auto;
@@ -943,7 +943,7 @@ body a{
     left: 12%;
     overflow: hidden;
     width: 70%;
-    height: 150px;
+    height: 250px;
     text-align: left;
     line-height: normal;
     -webkit-tap-highlight-color: rgba(0, 0, 0, 0);

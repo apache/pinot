@@ -29,7 +29,7 @@ import com.linkedin.pinot.core.common.BlockValIterator;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
-import com.linkedin.pinot.core.operator.docidsets.DocIdSetBlock;
+import com.linkedin.pinot.core.operator.blocks.DocIdSetBlock;
 import com.linkedin.pinot.core.query.aggregation.groupby.GroupByConstants;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
@@ -40,6 +40,7 @@ import com.linkedin.pinot.core.segment.index.readers.Dictionary;
  *
  *
  */
+@Deprecated
 public class MDefaultAggregationFunctionGroupByOperator extends AggregationFunctionGroupByOperator {
 
   private final BlockValIterator[] _groupByBlockValIterators;

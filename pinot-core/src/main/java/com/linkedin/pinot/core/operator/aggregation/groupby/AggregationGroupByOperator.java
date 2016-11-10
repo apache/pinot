@@ -19,17 +19,14 @@ import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.GroupBy;
 import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.BlockDocIdIterator;
-import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.BlockId;
-import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.BaseOperator;
+import com.linkedin.pinot.core.operator.ExecutionStatistics;
 import com.linkedin.pinot.core.operator.MProjectionOperator;
+import com.linkedin.pinot.core.operator.blocks.DocIdSetBlock;
 import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
 import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
-import com.linkedin.pinot.core.operator.docidsets.DocIdSetBlock;
-import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionFactory;
 import java.util.List;
 
@@ -41,35 +38,32 @@ import java.util.List;
  */
 public class AggregationGroupByOperator extends BaseOperator {
 
-  GroupByExecutor _groupByExecutor;
-  private List<AggregationInfo> _aggregationInfoList;
-  private MProjectionOperator _projectionOperator;
-  private IndexSegment _indexSegment;
+  private final GroupByExecutor _groupByExecutor;
+  private final List<AggregationInfo> _aggregationInfoList;
+  private final MProjectionOperator _projectionOperator;
+  private final long _numTotalRawDocs;
   private int _nextBlockCallCounter = 0;
-
-  private int[] _reusableDocIdSet;
+  private ExecutionStatistics _executionStatistics;
 
   /**
    * Constructor for the class.
    *
-   * @param indexSegment Index on which aggregation group by is to be performed.
    * @param aggregationsInfoList List of AggregationInfo (contains context for applying aggregation functions).
    * @param groupBy GroupBy to perform
    * @param projectionOperator Projection
    * @param numGroupsLimit Limit on number of aggregation groups returned in the result
+   * @param numTotalRawDocs Number of total raw documents.
    */
-  public AggregationGroupByOperator(IndexSegment indexSegment, List<AggregationInfo> aggregationsInfoList,
-      GroupBy groupBy, MProjectionOperator projectionOperator, int numGroupsLimit) {
-
-    Preconditions.checkNotNull(indexSegment);
+  public AggregationGroupByOperator(List<AggregationInfo> aggregationsInfoList, GroupBy groupBy,
+      MProjectionOperator projectionOperator, int numGroupsLimit, long numTotalRawDocs) {
     Preconditions.checkArgument((aggregationsInfoList != null) && (aggregationsInfoList.size() > 0));
     Preconditions.checkNotNull(groupBy);
     Preconditions.checkNotNull(projectionOperator);
 
-    _indexSegment = indexSegment;
+    _groupByExecutor = new DefaultGroupByExecutor(projectionOperator, aggregationsInfoList, groupBy, numGroupsLimit);
     _aggregationInfoList = aggregationsInfoList;
     _projectionOperator = projectionOperator;
-    _groupByExecutor = new DefaultGroupByExecutor(indexSegment, aggregationsInfoList, groupBy, numGroupsLimit);
+    _numTotalRawDocs = numTotalRawDocs;
   }
 
   /**
@@ -89,76 +83,29 @@ public class AggregationGroupByOperator extends BaseOperator {
     if (blockId.getId() > 0) {
       return null;
     }
-    final long startTimeMillis = System.currentTimeMillis();
+
     int numDocsScanned = 0;
 
     _groupByExecutor.init();
-    while (_projectionOperator.nextBlock() != null) {
-      ProjectionBlock currentBlock = _projectionOperator.getCurrentBlock();
-      Block block = currentBlock.getDocIdSetBlock();
-      numDocsScanned = processBlock(numDocsScanned, currentBlock, block);
+    ProjectionBlock projectionBlock;
+    while ((projectionBlock = (ProjectionBlock) _projectionOperator.nextBlock()) != null) {
+      DocIdSetBlock docIdSetBlock = projectionBlock.getDocIdSetBlock();
+      int searchableLength = docIdSetBlock.getSearchableLength();
+      numDocsScanned += searchableLength;
+      _groupByExecutor.process(docIdSetBlock.getDocIdSet(), 0, searchableLength);
     }
     _groupByExecutor.finish();
 
+    // Create execution statistics.
+    long numEntriesScannedInFilter = _projectionOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
+    long numEntriesScannedPostFilter = numDocsScanned * _projectionOperator.getNumProjectionColumns();
+    _executionStatistics =
+        new ExecutionStatistics(numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter,
+            _numTotalRawDocs);
+
     AggregationGroupByResult aggregationGroupByResult = _groupByExecutor.getResult();
-    final IntermediateResultsBlock resultBlock =
-        new IntermediateResultsBlock(AggregationFunctionFactory.getAggregationFunction(_aggregationInfoList),
-            aggregationGroupByResult);
-
-    resultBlock.setNumDocsScanned(numDocsScanned);
-    resultBlock.setTotalRawDocs(_indexSegment.getSegmentMetadata().getTotalRawDocs());
-    resultBlock.setTimeUsedMs(System.currentTimeMillis() - startTimeMillis);
-
-    return resultBlock;
-  }
-
-  /**
-   * Process a block of docIdSets. If the passed in block is an instance of DocIdSetBlock,
-   * get the docIdSet array directly from it. Else, iterate over all docIds and call the
-   * groupByExecutor after each 5k docIds.
-   *
-   * @param numDocsScanned
-   * @param currentBlock
-   * @param block
-   * @return
-   */
-  private int processBlock(int numDocsScanned, ProjectionBlock currentBlock, Block block) {
-    if (block instanceof DocIdSetBlock) {
-      DocIdSetBlock docIdSetBlock = (DocIdSetBlock) block;
-      int length = docIdSetBlock.getSearchableLength();
-
-      _groupByExecutor.process(docIdSetBlock.getDocIdSet(), 0, length);
-      numDocsScanned += length;
-    } else {
-      if (_reusableDocIdSet == null) {
-        _reusableDocIdSet = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-      }
-
-      BlockDocIdSet blockDocIdSet = currentBlock.getBlockDocIdSet();
-      BlockDocIdIterator iterator = blockDocIdSet.iterator();
-
-      int docId;
-      int pos = 0;
-      while ((docId = iterator.next()) != Constants.EOF) {
-        _reusableDocIdSet[pos++] = docId;
-        if (pos == DocIdSetPlanNode.MAX_DOC_PER_CALL) {
-          numDocsScanned += pos;
-          _groupByExecutor.process(_reusableDocIdSet, 0, pos);
-          pos = 0;
-        }
-      }
-
-      if (pos > 0) {
-        _groupByExecutor.process(_reusableDocIdSet, 0, pos);
-        numDocsScanned += pos;
-      }
-    }
-    return numDocsScanned;
-  }
-
-  @Override
-  public String getOperatorName() {
-    return "GroupByAggregationOperator";
+    return new IntermediateResultsBlock(AggregationFunctionFactory.getAggregationFunction(_aggregationInfoList),
+        aggregationGroupByResult);
   }
 
   @Override
@@ -171,5 +118,10 @@ public class AggregationGroupByOperator extends BaseOperator {
   public boolean close() {
     _projectionOperator.close();
     return true;
+  }
+
+  @Override
+  public ExecutionStatistics getExecutionStatistics() {
+    return _executionStatistics;
   }
 }

@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.anomaly.detection;
 import com.google.common.collect.ArrayListMultimap;
 import com.linkedin.pinot.pql.parsers.utils.Pair;
 import com.linkedin.thirdeye.anomaly.merge.AnomalyMergeExecutor;
+import com.linkedin.thirdeye.anomaly.utils.AnomalyUtils;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
@@ -24,8 +25,6 @@ import com.linkedin.thirdeye.anomaly.task.TaskResult;
 import com.linkedin.thirdeye.anomaly.task.TaskRunner;
 import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
-import com.linkedin.thirdeye.client.timeseries.TimeSeriesResponse;
-import com.linkedin.thirdeye.client.timeseries.TimeSeriesResponseConverter;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
@@ -71,9 +70,20 @@ public class DetectionTaskRunner implements TaskRunner {
 
     collectionDimensions = datasetConfigDAO.findByDataset(anomalyFunctionSpec.getCollection()).getDimensions();
 
-    // Get existing anomalies for this time range and this function id
-    knownMergedAnomalies = getKnownMergedAnomalies(anomalyFunction, windowStart.getMillis(), windowEnd.getMillis());
-    existingRawAnomalies = getExistingRawAnomalies(anomalyFunction, windowStart.getMillis(), windowEnd.getMillis());
+    // Get existing anomalies for this time range and this function id for all combinations of dimensions
+    if (anomalyFunction.useHistoryAnomaly()) {
+      // if this anomaly function uses history data, then we get all time ranges
+      knownMergedAnomalies = getKnownMergedAnomalies(anomalyFunctionSpec.getId(),
+          anomalyFunction.getDataRangeIntervals(windowStart.getMillis(), windowEnd.getMillis()));
+    } else {
+      // otherwise, we only get the merge anomaly for current window in order to remove duplicate raw anomalies
+      List<Pair<Long, Long>> currentTimeRange = new ArrayList<>();
+      currentTimeRange.add(new Pair<>(windowStart.getMillis(), windowEnd.getMillis()));
+      knownMergedAnomalies = getKnownMergedAnomalies(anomalyFunctionSpec.getId(), currentTimeRange);
+    }
+    // We always find existing raw anomalies to prevent duplicate raw anomalies are generated
+    existingRawAnomalies =
+        getExistingRawAnomalies(anomalyFunctionSpec.getId(), windowStart.getMillis(), windowEnd.getMillis());
 
     List<Pair<Long, Long>> startEndTimeRanges =
         anomalyFunction.getDataRangeIntervals(windowStart.getMillis(), windowEnd.getMillis());
@@ -86,12 +96,12 @@ public class DetectionTaskRunner implements TaskRunner {
     // detection. Moreover, set notified flag to true so the merged anomalies do not induce alerts and emails.
     String jobName = taskContext.getJobDAO().getJobNameByJobId(detectionTaskInfo.getJobExecutionId());
     if (jobName != null && jobName.toLowerCase().startsWith(BACKFILL_PREFIX)) {
-      boolean isNotified = true;
+      final boolean isBackfill = true;
       // syncAnomalyMergeExecutor is supposed to perform lightweight merge (i.e., anomalies that have the same function
       // id and at the same dimensions) after each detection task. Consequently, a null thread pool is passed the merge
       // executor on purpose in order to prevent unwanted
       AnomalyMergeExecutor syncAnomalyMergeExecutor = new AnomalyMergeExecutor(null, anomalyFunctionFactory);
-      syncAnomalyMergeExecutor.performSynchronousMergeBasedOnFunctionIdAndDimension(anomalyFunctionSpec, isNotified);
+      syncAnomalyMergeExecutor.synchronousMergeBasedOnFunctionIdAndDimension(anomalyFunctionSpec, isBackfill);
     }
 
     return taskResult;
@@ -100,12 +110,11 @@ public class DetectionTaskRunner implements TaskRunner {
   private void exploreDimensionsAndAnalyze(Map<DimensionKey, MetricTimeSeries> dimensionKeyMetricTimeSeriesMap) {
     int anomalyCounter = 0;
 
-    // Sort the known anomalies by their dimension names
+    // Sort the known merged and raw anomalies by their dimension names
     ArrayListMultimap<DimensionMap, MergedAnomalyResultDTO> dimensionNamesToKnownMergedAnomalies = ArrayListMultimap.create();
     for (MergedAnomalyResultDTO knownMergedAnomaly : knownMergedAnomalies) {
       dimensionNamesToKnownMergedAnomalies.put(knownMergedAnomaly.getDimensions(), knownMergedAnomaly);
     }
-
     ArrayListMultimap<DimensionMap, RawAnomalyResultDTO> dimensionNamesToKnownRawAnomalies = ArrayListMultimap.create();
     for (RawAnomalyResultDTO existingRawAnomaly : existingRawAnomalies) {
       dimensionNamesToKnownRawAnomalies.put(existingRawAnomaly.getDimensions(), existingRawAnomaly);
@@ -136,10 +145,13 @@ public class DetectionTaskRunner implements TaskRunner {
           historyMergedAnomalies = Collections.emptyList();
         }
 
+        LOG.info("Checking if any known anomalies overlap with the monitoring window of anomaly detection, which could result in unwanted holes in current values.");
+        AnomalyUtils.logAnomaliesOverlapWithWindow(windowStart, windowEnd, historyMergedAnomalies);
+
         List<RawAnomalyResultDTO> resultsOfAnEntry = anomalyFunction
             .analyze(exploredDimensions, metricTimeSeries, windowStart, windowEnd, historyMergedAnomalies);
 
-        // Remove any known anomalies
+        // Remove detected anomalies that have existed in database
         if (CollectionUtils.isNotEmpty(resultsOfAnEntry)) {
           List<RawAnomalyResultDTO> existingRawAnomaliesOfAnEntry =
               dimensionNamesToKnownRawAnomalies.get(exploredDimensions);
@@ -154,7 +166,7 @@ public class DetectionTaskRunner implements TaskRunner {
         // Handle results
         handleResults(resultsOfAnEntry);
 
-        LOG.info("{} has {} anomalies in window {} to {}", exploredDimensions, resultsOfAnEntry.size(),
+        LOG.info("Dimension {} has {} anomalies in window {} to {}", exploredDimensions, resultsOfAnEntry.size(),
             windowStart, windowEnd);
         anomalyCounter += resultsOfAnEntry.size();
       } catch (Exception e) {
@@ -167,17 +179,17 @@ public class DetectionTaskRunner implements TaskRunner {
   /**
    * Returns existing raw anomalies in the given monitoring window
    *
-   * @param anomalyFunction
+   * @param functionId the id of the anomaly function
    * @param monitoringWindowStart inclusive
    * @param monitoringWindowEnd inclusive but it doesn't matter
-   * @return known raw anomalies in monitoring window and history data
+   *
+   * @return known raw anomalies in the given window
    */
-  private List<RawAnomalyResultDTO> getExistingRawAnomalies(BaseAnomalyFunction anomalyFunction,
-      long monitoringWindowStart, long monitoringWindowEnd) {
+  private List<RawAnomalyResultDTO> getExistingRawAnomalies(long functionId, long monitoringWindowStart,
+      long monitoringWindowEnd) {
     List<RawAnomalyResultDTO> results = new ArrayList<>();
     try {
-      results.addAll(rawAnomalyDAO.findAllByTimeAndFunctionId(monitoringWindowStart, monitoringWindowEnd,
-          anomalyFunction.getSpec().getId()));
+      results.addAll(rawAnomalyDAO.findAllByTimeAndFunctionId(monitoringWindowStart, monitoringWindowEnd, functionId));
     } catch (Exception e) {
       LOG.error("Exception in getting existing anomalies", e);
     }
@@ -185,32 +197,24 @@ public class DetectionTaskRunner implements TaskRunner {
   }
 
   /**
-   * Returns 1. history merged anomalies and 2. existing merged anomalies that are overlapped with the given monitoring
-   * window and its history data
+   * Returns all known merged anomalies of the function id that are needed for anomaly detection, i.e., the merged
+   * anomalies that overlap with the monitoring window and baseline windows.
    *
-   * History and existing merged anomalies are defined as follows:
-   *   1. History merged anomalies are referring to the known merged anomalies that are located in training (history) data
-   *   2. Existing merged anomalies are referring to the known merged anomalies that are located in monitoring data
-   *
-   * @param anomalyFunction
-   * @param monitoringWindowStart inclusive
-   * @param monitoringWindowEnd inclusive but it doesn't matter
-   * @return known merged anomalies that are overlapped with monitoring window and history data
-   */
-  private List<MergedAnomalyResultDTO> getKnownMergedAnomalies(BaseAnomalyFunction anomalyFunction,
-      long monitoringWindowStart, long monitoringWindowEnd) {
+   * @param functionId the id of the anomaly function
+   * @param startEndTimeRanges the time ranges for retrieving the known merge anomalies
 
-    List<Pair<Long, Long>> startEndTimeRanges =
-        anomalyFunction.getDataRangeIntervals(monitoringWindowStart, monitoringWindowEnd);
+   * @return known merged anomalies of the function id that are needed for anomaly detection
+   */
+  public List<MergedAnomalyResultDTO> getKnownMergedAnomalies(long functionId, List<Pair<Long, Long>> startEndTimeRanges) {
 
     List<MergedAnomalyResultDTO> results = new ArrayList<>();
     for (Pair<Long, Long> startEndTimeRange : startEndTimeRanges) {
       try {
         results.addAll(
-            mergedResultDAO.findAllConflictByFunctionId(anomalyFunction.getSpec().getId(), startEndTimeRange.getFirst(),
+            mergedResultDAO.findAllConflictByFunctionId(functionId, startEndTimeRange.getFirst(),
                 startEndTimeRange.getSecond()));
       } catch (Exception e) {
-        LOG.error("Exception in getting existing anomalies", e);
+        LOG.error("Exception in getting merged anomalies", e);
       }
     }
 
@@ -218,17 +222,20 @@ public class DetectionTaskRunner implements TaskRunner {
   }
 
   /**
-   * Returns all anomalies that happen before the monitoring window
+   * Returns history anomalies of the monitoring window from the given known anomalies.
    *
-   * @param monitoringWindowStart
-   * @param knownAnomalies
-   * @return all anomalies that happen before the monitoring window
+   * Definition of history anomaly: An anomaly that starts before the monitoring window starts.
+   *
+   * @param monitoringWindowStart the start of the monitoring window
+   * @param knownAnomalies the list of known anomalies
+   *
+   * @return all history anomalies of the monitoring window
    */
   private List<MergedAnomalyResultDTO> retainHistoryMergedAnomalies(long monitoringWindowStart,
       List<MergedAnomalyResultDTO> knownAnomalies) {
     List<MergedAnomalyResultDTO> historyAnomalies = new ArrayList<>();
     for (MergedAnomalyResultDTO knownAnomaly : knownAnomalies) {
-      if (knownAnomaly.getEndTime() < monitoringWindowStart) {
+      if (knownAnomaly.getStartTime() < monitoringWindowStart) {
         historyAnomalies.add(knownAnomaly);
       }
     }
@@ -236,11 +243,15 @@ public class DetectionTaskRunner implements TaskRunner {
   }
 
   /**
-   * Returns all anomalies that overlap with the monitoring window
+   * Returns anomalies that overlap with the monitoring window from the given known anomalies
    *
-   * @param monitoringWindowStart
-   * @param knownAnomalies
-   * @return all anomalies that happen in the monitoring window
+   * Definition of existing anomaly: An anomaly that happens in the monitoring window
+   *
+   * @param monitoringWindowStart the start of the monitoring window
+   * @param monitoringWindowEnd the end of the monitoring window
+   * @param knownAnomalies the list of known anomalies
+   *
+   * @return anomalies that happen in the monitoring window from the given known anomalies
    */
   private List<MergedAnomalyResultDTO> retainExistingMergedAnomalies(long monitoringWindowStart, long monitoringWindowEnd,
       List<MergedAnomalyResultDTO> knownAnomalies) {

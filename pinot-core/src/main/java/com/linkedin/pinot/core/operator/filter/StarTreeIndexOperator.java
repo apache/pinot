@@ -343,6 +343,11 @@ public class StarTreeIndexOperator extends BaseFilterOperator {
           }
 
           @Override
+          public long getNumEntriesScannedInFilter() {
+            return 0L;
+          }
+
+          @Override
           public int getMinDocId() {
             return 0;
           }

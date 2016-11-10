@@ -19,7 +19,6 @@ import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.query.ReduceService;
 import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.response.InstanceResponse;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.response.broker.AggregationResult;
 import com.linkedin.pinot.common.response.broker.BrokerResponseNative;
@@ -51,72 +50,85 @@ import org.slf4j.LoggerFactory;
 public class BrokerReduceService implements ReduceService<BrokerResponseNative> {
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerReduceService.class);
 
-  private static String NUM_DOCS_SCANNED = "numDocsScanned";
-  private static String TIME_USED_MS = "timeUsedMs";
-  private static String TOTAL_DOCS = "totalDocs";
+  private static final String NUM_DOCS_SCANNED = "numDocsScanned";
+  private static final String NUM_ENTRIES_SCANNED_IN_FILTER = "numEntriesScannedInFilter";
+  private static final String NUM_ENTREIS_SCANNED_POST_FILTER = "numEntriesScannedPostFilter";
+  private static final String TOTAL_DOCS = "totalDocs";
 
-  @Override
-  public BrokerResponseNative reduce(BrokerRequest brokerRequest,
-      Map<ServerInstance, InstanceResponse> instanceResponseMap) {
-    // This methods will be removed from the interface, so not implemented currently.
-    throw new RuntimeException("Method 'reduce' not implemented in class BrokerResponseNative");
-  }
+  // Not used currently, but it records the time spent on server side.
+  private static final String TIME_USED_MS = "timeUsedMs";
 
   @Override
   public BrokerResponseNative reduceOnDataTable(BrokerRequest brokerRequest,
-      Map<ServerInstance, DataTable> instanceResponseMap) {
-    BrokerResponseNative brokerResponseNative = new BrokerResponseNative();
-
-    if (instanceResponseMap == null || instanceResponseMap.size() == 0) {
+      Map<ServerInstance, DataTable> dataTableMap) {
+    // Empty result.
+    if (dataTableMap == null || dataTableMap.size() == 0) {
       return BrokerResponseNative.EMPTY_RESULT;
     }
 
-    for (ServerInstance serverInstance : instanceResponseMap.keySet()
-        .toArray(new ServerInstance[instanceResponseMap.size()])) {
+    BrokerResponseNative brokerResponseNative = new BrokerResponseNative();
+    long numDocsScanned = 0L;
+    long numEntriesScannedInFilter = 0L;
+    long numEntriesScannedPostFilter = 0L;
+    long numTotalRawDocs = 0L;
 
-      DataTable instanceResponse = instanceResponseMap.get(serverInstance);
-      if (instanceResponse == null) {
+    Iterator<Map.Entry<ServerInstance, DataTable>> iterator = dataTableMap.entrySet().iterator();
+    while (iterator.hasNext()) {
+      Map.Entry<ServerInstance, DataTable> entry = iterator.next();
+      ServerInstance serverInstance = entry.getKey();
+      DataTable dataTable = dataTableMap.get(serverInstance);
+      if (dataTable == null) {
         continue;
       }
 
       // reduceOnTraceInfo (put it here so that trace info can show up even exception happens)
-      if (brokerRequest.isEnableTrace() && instanceResponse.getMetadata() != null) {
+      if (brokerRequest.isEnableTrace() && dataTable.getMetadata() != null) {
         brokerResponseNative.getTraceInfo()
-            .put(serverInstance.getHostname(), instanceResponse.getMetadata().get("traceInfo"));
+            .put(serverInstance.getHostname(), dataTable.getMetadata().get("traceInfo"));
       }
 
-      if (instanceResponse.getDataSchema() == null && instanceResponse.getMetadata() != null) {
-        for (String key : instanceResponse.getMetadata().keySet()) {
+      if (dataTable.getDataSchema() == null && dataTable.getMetadata() != null) {
+        for (String key : dataTable.getMetadata().keySet()) {
           if (key.startsWith(DataTable.EXCEPTION_METADATA_KEY)) {
             QueryProcessingException processingException = new QueryProcessingException();
             processingException.setErrorCode(Integer.parseInt(key.substring(9)));
-            processingException.setMessage(instanceResponse.getMetadata().get(key));
+            processingException.setMessage(dataTable.getMetadata().get(key));
             brokerResponseNative.getProcessingExceptions().add(processingException);
           }
         }
-        instanceResponseMap.remove(serverInstance);
+        iterator.remove();
         continue;
       }
 
-      // Reduce on numDocsScanned
-      brokerResponseNative.setNumDocsScanned(brokerResponseNative.getNumDocsScanned() + Long
-          .parseLong(instanceResponse.getMetadata().get(NUM_DOCS_SCANNED)));
-
-      // Reduce on totaDocs
-      brokerResponseNative.setTotalDocs(
-          brokerResponseNative.getTotalDocs() + Long.parseLong(instanceResponse.getMetadata().get(TOTAL_DOCS)));
-
-      if (Long.parseLong(instanceResponse.getMetadata().get(TIME_USED_MS)) > brokerResponseNative.getTimeUsedMs()) {
-        brokerResponseNative.setTimeUsedMs(Long.parseLong(instanceResponse.getMetadata().get(TIME_USED_MS)));
+      String numDocsScannedString = dataTable.getMetadata().get(NUM_DOCS_SCANNED);
+      if (numDocsScannedString != null) {
+        numDocsScanned += Long.parseLong(numDocsScannedString);
+      }
+      String numEntriesScannedInFilterString = dataTable.getMetadata().get(NUM_ENTRIES_SCANNED_IN_FILTER);
+      if (numEntriesScannedInFilterString != null) {
+        numEntriesScannedInFilter += Long.parseLong(numEntriesScannedInFilterString);
+      }
+      String numEntriesScannedPostFilterString = dataTable.getMetadata().get(NUM_ENTREIS_SCANNED_POST_FILTER);
+      if (numEntriesScannedPostFilterString != null) {
+        numEntriesScannedPostFilter += Long.parseLong(numEntriesScannedPostFilterString);
+      }
+      String numTotalRawDocsString = dataTable.getMetadata().get(TOTAL_DOCS);
+      if (numTotalRawDocsString != null) {
+        numTotalRawDocs += Long.parseLong(numTotalRawDocsString);
       }
     }
+
+    brokerResponseNative.setNumDocsScanned(numDocsScanned);
+    brokerResponseNative.setNumEntriesScannedInFilter(numEntriesScannedInFilter);
+    brokerResponseNative.setNumEntriesScannedPostFilter(numEntriesScannedPostFilter);
+    brokerResponseNative.setTotalDocs(numTotalRawDocs);
 
     try {
       if (brokerRequest.isSetSelections() && (brokerRequest.getSelections().getSelectionColumns() != null) && (
           brokerRequest.getSelections().getSelectionColumns().size() >= 0)) {
 
         // Reduce DataTable for selection query.
-        SelectionResults selectionResults = reduceOnSelectionResults(brokerRequest, instanceResponseMap);
+        SelectionResults selectionResults = reduceOnSelectionResults(brokerRequest, dataTableMap);
         brokerResponseNative.setSelectionResults(selectionResults);
         return brokerResponseNative;
       }
@@ -124,13 +136,13 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
       if (brokerRequest.isSetAggregationsInfo()) {
         if (!brokerRequest.isSetGroupBy()) {
           List<List<Serializable>> aggregationResultsList =
-              getShuffledAggregationResults(brokerRequest, instanceResponseMap);
+              getShuffledAggregationResults(brokerRequest, dataTableMap);
           brokerResponseNative.setAggregationResults(reduceOnAggregationResults(brokerRequest, aggregationResultsList));
         } else {
           AggregationGroupByOperatorService aggregationGroupByOperatorService =
               new AggregationGroupByOperatorService(brokerRequest.getAggregationsInfo(), brokerRequest.getGroupBy());
           brokerResponseNative.setAggregationResults(
-              reduceOnAggregationGroupByOperatorResults(aggregationGroupByOperatorService, instanceResponseMap));
+              reduceOnAggregationGroupByOperatorResults(aggregationGroupByOperatorService, dataTableMap));
         }
         return brokerResponseNative;
       }

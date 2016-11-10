@@ -15,23 +15,22 @@
  */
 package com.linkedin.pinot.core.operator.query;
 
-import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.request.Selection;
 import com.linkedin.pinot.common.request.SelectionSort;
-import com.linkedin.pinot.common.response.ProcessingException;
 import com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.BaseOperator;
+import com.linkedin.pinot.core.operator.ExecutionStatistics;
+import com.linkedin.pinot.core.operator.MProjectionOperator;
+import com.linkedin.pinot.core.operator.blocks.DocIdSetBlock;
 import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
 import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorService;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,17 +46,18 @@ public class MSelectionOrderByOperator extends BaseOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(MSelectionOrderByOperator.class);
 
   private final IndexSegment _indexSegment;
-  private final Operator _projectionOperator;
+  private final MProjectionOperator _projectionOperator;
   private final Selection _selection;
   private final SelectionOperatorService _selectionOperatorService;
   private final DataSchema _dataSchema;
   private final Block[] _blocks;
-  private final Set<String> _selectionColumns = new HashSet<String>();
+  private final Set<String> _selectionColumns = new HashSet<>();
+  private ExecutionStatistics _executionStatistics;
 
   public MSelectionOrderByOperator(IndexSegment indexSegment, Selection selection, Operator projectionOperator) {
     _indexSegment = indexSegment;
     _selection = selection;
-    _projectionOperator = projectionOperator;
+    _projectionOperator = (MProjectionOperator) projectionOperator;
 
     initColumnarDataSourcePlanNodeMap(indexSegment);
     _selectionOperatorService = new SelectionOperatorService(_selection, indexSegment);
@@ -86,63 +86,45 @@ public class MSelectionOrderByOperator extends BaseOperator {
 
   @Override
   public Block getNextBlock() {
+    int numDocsScanned = 0;
 
-    final long startTime = System.currentTimeMillis();
-
-    long numDocsScanned = 0;
-    ProjectionBlock projectionBlock = null;
-    try {
-      while ((projectionBlock = (ProjectionBlock) _projectionOperator.nextBlock()) != null) {
-        int j = 0;
-        for (int i = 0; i < _dataSchema.size(); ++i) {
-          _blocks[j++] = projectionBlock.getBlock(_dataSchema.getColumnName(i));
-        }
-
-        _selectionOperatorService.iterateOnBlocksWithOrdering(
-            projectionBlock.getDocIdSetBlock().getBlockDocIdSet().iterator(), _blocks);
+    ProjectionBlock projectionBlock;
+    while ((projectionBlock = (ProjectionBlock) _projectionOperator.nextBlock()) != null) {
+      for (int i = 0; i < _dataSchema.size(); i++) {
+        _blocks[i] = projectionBlock.getBlock(_dataSchema.getColumnName(i));
       }
-
-      numDocsScanned += _selectionOperatorService.getNumDocsScanned();
-
-      final IntermediateResultsBlock resultBlock = new IntermediateResultsBlock();
-      resultBlock.setSelectionResult(_selectionOperatorService.getRowEventsSet());
-      resultBlock.setSelectionDataSchema(_selectionOperatorService.getDataSchema());
-      resultBlock.setNumDocsScanned(numDocsScanned);
-      resultBlock.setTotalRawDocs(_indexSegment.getSegmentMetadata().getTotalRawDocs());
-      final long endTime = System.currentTimeMillis();
-      resultBlock.setTimeUsedMs(endTime - startTime);
-      return resultBlock;
-    } catch (Exception e) {
-      LOGGER.warn("Caught exception while processing selection operator", e);
-      final IntermediateResultsBlock resultBlock = new IntermediateResultsBlock();
-
-      List<ProcessingException> processingExceptions = new ArrayList<ProcessingException>();
-      ProcessingException exception = QueryException.QUERY_EXECUTION_ERROR.deepCopy();
-      exception.setMessage(e.getMessage());
-      processingExceptions.add(exception);
-
-      resultBlock.setExceptionsList(processingExceptions);
-      resultBlock.setNumDocsScanned(0);
-      resultBlock.setTotalRawDocs(_indexSegment.getSegmentMetadata().getTotalDocs());
-      resultBlock.setTimeUsedMs(System.currentTimeMillis() - startTime);
-      return resultBlock;
+      DocIdSetBlock docIdSetBlock = projectionBlock.getDocIdSetBlock();
+      _selectionOperatorService.iterateOnBlocksWithOrdering(docIdSetBlock.getBlockDocIdSet().iterator(), _blocks);
     }
 
+    // Create execution statistics.
+    numDocsScanned += _selectionOperatorService.getNumDocsScanned();
+    long numEntriesScannedInFilter = _projectionOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
+    long numEntriesScannedPostFilter = numDocsScanned * _projectionOperator.getNumProjectionColumns();
+    long numTotalRawDocs = _indexSegment.getSegmentMetadata().getTotalRawDocs();
+    _executionStatistics =
+        new ExecutionStatistics(numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter,
+            numTotalRawDocs);
+
+    IntermediateResultsBlock resultBlock = new IntermediateResultsBlock();
+    resultBlock.setSelectionResult(_selectionOperatorService.getRowEventsSet());
+    resultBlock.setSelectionDataSchema(_selectionOperatorService.getDataSchema());
+    return resultBlock;
   }
 
   @Override
-  public Block getNextBlock(BlockId BlockId) {
+  public Block getNextBlock(BlockId blockId) {
     throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public String getOperatorName() {
-    return "MSelectionOrderByOperator";
   }
 
   @Override
   public boolean close() {
     _projectionOperator.close();
     return true;
+  }
+
+  @Override
+  public ExecutionStatistics getExecutionStatistics() {
+    return _executionStatistics;
   }
 }

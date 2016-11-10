@@ -3,11 +3,17 @@ package com.linkedin.thirdeye.dashboard.resources;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
+import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.EmailConfigurationManager;
+import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.AbstractDTO;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
 
+import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -33,6 +39,9 @@ import org.slf4j.LoggerFactory;
 public class EntityManagerResource {
   private final AnomalyFunctionManager anomalyFunctionManager;
   private final EmailConfigurationManager emailConfigurationManager;
+  private final DashboardConfigManager dashboardConfigManager;
+  private final MetricConfigManager metricConfigManager;
+  private final DatasetConfigManager datasetConfigManager;
 
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
@@ -42,10 +51,13 @@ public class EntityManagerResource {
   public EntityManagerResource() {
     this.emailConfigurationManager = DAO_REGISTRY.getEmailConfigurationDAO();
     this.anomalyFunctionManager = DAO_REGISTRY.getAnomalyFunctionDAO();
+    this.dashboardConfigManager = DAO_REGISTRY.getDashboardConfigDAO();
+    this.metricConfigManager = DAO_REGISTRY.getMetricConfigDAO();
+    this.datasetConfigManager = DAO_REGISTRY.getDatasetConfigDAO();
   }
 
   private enum EntityType {
-    ANOMALY_FUNCTION, EMAIL_CONFIGURATION
+    ANOMALY_FUNCTION, EMAIL_CONFIGURATION, DASHBOARD_CONFIG, DATASET_CONFIG, METRIC_CONFIG
   }
 
   @GET
@@ -65,6 +77,15 @@ public class EntityManagerResource {
     case EMAIL_CONFIGURATION:
       results.addAll(emailConfigurationManager.findAll());
       break;
+    case DASHBOARD_CONFIG:
+      results.addAll(dashboardConfigManager.findAll());
+      break;
+    case DATASET_CONFIG:
+      results.addAll(datasetConfigManager.findAll());
+      break;
+    case METRIC_CONFIG:
+      results.addAll(metricConfigManager.findAll());
+      break;
     default:
       throw new WebApplicationException("Unknown entity type : " + entityType);
     }
@@ -76,7 +97,6 @@ public class EntityManagerResource {
     EntityType entityType = EntityType.valueOf(entityTypeStr);
     try {
       switch (entityType) {
-
       case ANOMALY_FUNCTION:
         AnomalyFunctionDTO anomalyFunctionDTO =
             OBJECT_MAPPER.readValue(jsonPayload, AnomalyFunctionDTO.class);
@@ -86,6 +106,18 @@ public class EntityManagerResource {
         EmailConfigurationDTO emailConfigurationDTO =
             OBJECT_MAPPER.readValue(jsonPayload, EmailConfigurationDTO.class);
         emailConfigurationManager.update(emailConfigurationDTO);
+        break;
+      case DASHBOARD_CONFIG:
+        DashboardConfigDTO dashboardConfigDTO = OBJECT_MAPPER.readValue(jsonPayload, DashboardConfigDTO.class);
+        dashboardConfigManager.update(dashboardConfigDTO);
+        break;
+      case DATASET_CONFIG:
+        DatasetConfigDTO datasetConfigDTO = OBJECT_MAPPER.readValue(jsonPayload, DatasetConfigDTO.class);
+        datasetConfigManager.update(datasetConfigDTO);
+        break;
+      case METRIC_CONFIG:
+        MetricConfigDTO metricConfigDTO = OBJECT_MAPPER.readValue(jsonPayload, MetricConfigDTO.class);
+        metricConfigManager.update(metricConfigDTO);
         break;
       }
     } catch (IOException e) {

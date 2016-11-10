@@ -22,6 +22,7 @@ import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.primitive.MutableLongValue;
 import com.linkedin.pinot.core.common.DataFetcher;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.operator.MProjectionOperator;
 import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunction;
 import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunctionFactory;
 import com.linkedin.pinot.core.operator.aggregation.function.PercentileestAggregationFunction;
@@ -48,25 +49,22 @@ public class DefaultAggregationExecutor implements AggregationExecutor {
 
   // Array of result holders, one for each aggregation.
   private final AggregationResultHolder[] _resultHolderArray;
-  private final SegmentMetadata _segmentMetadata;
 
   boolean _inited = false;
   boolean _finished = false;
 
-  public DefaultAggregationExecutor(IndexSegment indexSegment, List<AggregationInfo> aggregationInfoList) {
-    Preconditions.checkNotNull(indexSegment);
+  public DefaultAggregationExecutor(MProjectionOperator projectionOperator,List<AggregationInfo> aggregationInfoList) {
     Preconditions.checkNotNull(aggregationInfoList);
     Preconditions.checkArgument(aggregationInfoList.size() > 0);
 
-    _dataBlockCache = new DataBlockCache(new DataFetcher(indexSegment));
+    _dataBlockCache = new DataBlockCache(new DataFetcher(projectionOperator.getDataSourceMap()));
     _numAggrFunc = aggregationInfoList.size();
     _aggrFuncContextArray = new AggregationFunctionContext[_numAggrFunc];
-    _segmentMetadata = indexSegment.getSegmentMetadata();
     for (int i = 0; i < _numAggrFunc; i++) {
       AggregationInfo aggregationInfo = aggregationInfoList.get(i);
       String[] columns = aggregationInfo.getAggregationParams().get("column").trim().split(",");
       _aggrFuncContextArray[i] = new AggregationFunctionContext(
-          aggregationInfo.getAggregationType(), columns, _segmentMetadata);
+          aggregationInfo.getAggregationType(), columns);
     }
     _resultHolderArray = new AggregationResultHolder[_numAggrFunc];
   }
@@ -276,7 +274,7 @@ public class DefaultAggregationExecutor implements AggregationExecutor {
       case HLL_PREAGGREGATED:
         HyperLogLog hllPreaggregated = resultHolder.getResult();
         if (hllPreaggregated == null) {
-          return new HyperLogLog(_segmentMetadata.getHllLog2m());
+          return new HyperLogLog(HllConstants.DEFAULT_LOG2M);
         } else {
           return hllPreaggregated;
         }

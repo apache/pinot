@@ -25,7 +25,6 @@ import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.IngraphMetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.util.JsonResponseUtil;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
@@ -158,6 +157,25 @@ public class MetricConfigResource {
     List<MetricConfigDTO> subList = Utils.sublist(metricConfigDTOs, jtStartIndex, jtPageSize);
     ObjectNode rootNode = JsonResponseUtil.buildResponseJSON(subList);
     return rootNode.toString();
+  }
+
+  @GET
+  @Path("/view")
+  @Produces(MediaType.APPLICATION_JSON)
+  public MetricConfigDTO viewMetricConfigByIdOrName(@QueryParam("id") String id,
+      @QueryParam("dataset") String dataset,
+      @QueryParam("metric") String metric) {
+
+    MetricConfigDTO metricConfigDTO = null;
+    if (StringUtils.isBlank(id) && (StringUtils.isBlank(dataset) || StringUtils.isBlank(metric))) {
+      LOG.error("Must provide either id or metric+dataset {} {} {}", id, metric, dataset);
+    }
+    if (StringUtils.isNotBlank(id)) {
+      metricConfigDTO = metricConfigDao.findById(Long.valueOf(id));
+    } else {
+      metricConfigDTO = metricConfigDao.findByMetricAndDataset(metric, dataset);
+    }
+    return metricConfigDTO;
   }
 
 }

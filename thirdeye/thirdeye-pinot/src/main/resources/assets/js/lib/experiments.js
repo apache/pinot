@@ -67,8 +67,12 @@ function renderEntitySelector() {
 
 function buildNameForEntity(entity, entityType) {
   switch (entityType) {
-    case "WEBAPP_CONFIG":
-      return entity.id+" : "+ entity.name + " : " + entity.type;
+    case "DASHBOARD_CONFIG":
+      return entity.id+" : "+ entity.name;
+    case "DATASET_CONFIG":
+      return entity.id+" : "+ entity.dataset;
+    case "METRIC_CONFIG":
+      return entity.id+" : "+ entity.dataset + " : " + entity.name;
     case "ANOMALY_FUNCTION":
       return entity.id+ " : " + entity.functionName + " : " + entity.type;
     case "EMAIL_CONFIGURATION":

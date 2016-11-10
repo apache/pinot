@@ -15,18 +15,16 @@
  */
 package com.linkedin.pinot.core.operator.dociditerators;
 
-import java.util.Arrays;
-
-import org.roaringbitmap.IntIterator;
-import org.roaringbitmap.buffer.MutableRoaringBitmap;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockMultiValIterator;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluator;
+import java.util.Arrays;
+import org.roaringbitmap.IntIterator;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class MVScanDocIdIterator implements ScanBasedDocIdIterator {
@@ -40,6 +38,7 @@ public class MVScanDocIdIterator implements ScanBasedDocIdIterator {
   private PredicateEvaluator evaluator;
 
   private String datasourceName;
+  private int _numEntriesScanned = 0;
 
   public MVScanDocIdIterator(String datasourceName, BlockValSet blockValSet, BlockMetadata blockMetadata,
       PredicateEvaluator evaluator) {
@@ -82,6 +81,7 @@ public class MVScanDocIdIterator implements ScanBasedDocIdIterator {
       return false;
     }
     valueIterator.skipTo(docId);
+    _numEntriesScanned++;
     int length = valueIterator.nextIntVal(intArray);
     return evaluator.apply(intArray, length);
   }
@@ -113,6 +113,7 @@ public class MVScanDocIdIterator implements ScanBasedDocIdIterator {
     }
     while (valueIterator.hasNext() && currentDocId < endDocId) {
       currentDocId = currentDocId + 1;
+      _numEntriesScanned++;
       int length = valueIterator.nextIntVal(intArray);
       if (evaluator.apply(intArray, length)) {
         return currentDocId;
@@ -145,6 +146,7 @@ public class MVScanDocIdIterator implements ScanBasedDocIdIterator {
       docId = intIterator.next();
       if (docId >= startDocId) {
         valueIterator.skipTo(docId);
+        _numEntriesScanned++;
         length = valueIterator.nextIntVal(intArray);
         if (evaluator.apply(intArray, length)) {
           result.add(docId);
@@ -152,5 +154,10 @@ public class MVScanDocIdIterator implements ScanBasedDocIdIterator {
       }
     }
     return result;
+  }
+
+  @Override
+  public int getNumEntriesScanned() {
+    return _numEntriesScanned;
   }
 }

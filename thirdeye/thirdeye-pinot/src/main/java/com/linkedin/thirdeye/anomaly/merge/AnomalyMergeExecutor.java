@@ -2,11 +2,13 @@ package com.linkedin.thirdeye.anomaly.merge;
 
 import com.linkedin.pinot.pql.parsers.utils.Pair;
 import com.linkedin.thirdeye.anomaly.detection.TimeSeriesUtil;
+import com.linkedin.thirdeye.anomaly.utils.AnomalyUtils;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,9 +25,6 @@ import org.slf4j.LoggerFactory;
 
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.client.DAORegistry;
-import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
-import com.linkedin.thirdeye.client.cache.QueryCache;
-import com.linkedin.thirdeye.client.timeseries.TimeSeriesHandler;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
@@ -45,21 +44,32 @@ public class AnomalyMergeExecutor implements Runnable {
   private final ScheduledExecutorService executorService;
   private final AnomalyFunctionFactory anomalyFunctionFactory;
 
-  private final QueryCache queryCache;
-  private final TimeSeriesHandler timeSeriesHandler;
-
-  private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
   private final static Logger LOG = LoggerFactory.getLogger(AnomalyMergeExecutor.class);
+
+  private final static AnomalyMergeConfig DEFAULT_MERGE_CONFIG;
+  static {
+    DEFAULT_MERGE_CONFIG = new AnomalyMergeConfig();
+    DEFAULT_MERGE_CONFIG.setSequentialAllowedGap(2 * 60 * 60_000); // 2 hours
+    DEFAULT_MERGE_CONFIG.setMaxMergeDurationLength(-1); // no time based split
+    DEFAULT_MERGE_CONFIG.setMergeStrategy(AnomalyMergeStrategy.FUNCTION_DIMENSIONS);
+  }
+
+  private final static AnomalyMergeConfig DEFAULT_SYNCHRONIZED_MERGE_CONFIG;
+  static {
+    DEFAULT_SYNCHRONIZED_MERGE_CONFIG = new AnomalyMergeConfig();
+    DEFAULT_SYNCHRONIZED_MERGE_CONFIG.setSequentialAllowedGap(DEFAULT_MERGE_CONFIG.getSequentialAllowedGap());
+    DEFAULT_SYNCHRONIZED_MERGE_CONFIG.setMaxMergeDurationLength(DEFAULT_MERGE_CONFIG.getMaxMergeDurationLength());
+    // Synchronized merge always use FUNCTION_DIMENSIONS merge strategy
+    DEFAULT_SYNCHRONIZED_MERGE_CONFIG.setMergeStrategy(AnomalyMergeStrategy.FUNCTION_DIMENSIONS);
+  }
 
   public AnomalyMergeExecutor(ScheduledExecutorService executorService, AnomalyFunctionFactory anomalyFunctionFactory) {
     this.mergedResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
     this.anomalyResultDAO = DAO_REGISTRY.getRawAnomalyResultDAO();
     this.anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
     this.executorService = executorService;
-    this.queryCache = CACHE_REGISTRY_INSTANCE.getQueryCache();
-    this.timeSeriesHandler = new TimeSeriesHandler(queryCache);
     this.anomalyFunctionFactory = anomalyFunctionFactory;
   }
 
@@ -72,67 +82,28 @@ public class AnomalyMergeExecutor implements Runnable {
     executorService.shutdown();
   }
 
+  /**
+   * Performs asynchronous merge base on function id and dimensions.
+   */
   public void run() {
     ExecutorService taskExecutorService = Executors.newFixedThreadPool(5);
     List<Future<Integer>> taskCallbacks = new ArrayList<>();
+    List<AnomalyFunctionDTO> activeFunctions = anomalyFunctionDAO.findAllActiveFunctions();
 
+    // for each anomaly function, find raw unmerged results and perform merge
+    for (AnomalyFunctionDTO function : activeFunctions) {
+      Callable<Integer> task = () -> {
+        final boolean isBackfill = false;
+        // TODO : move merge config within the AnomalyFunction; Every function should have its own merge config.
+        return mergeAnomalies(function, DEFAULT_MERGE_CONFIG, isBackfill);
+      };
+      Future<Integer> taskFuture = taskExecutorService.submit(task);
+      taskCallbacks.add(taskFuture);
+    }
+
+    // wait till all the tasks complete
     try {
-      /**
-       * Step 0: find all active functions
-       *
-       * Step 1: for each function :
-       *        find all groups of raw (unprocessed) anomalies based on
-       *        merge strategy (FunctionId and/or dimensions)
-       *
-       * Step 2: For each such group, find the base mergedAnomaly
-       *
-       * Step 3: perform time based merge
-       *
-       * Step 4: Recompute anomaly score / weight
-       *
-       * Step 5: persist merged anomalies
-       */
-      List<AnomalyFunctionDTO> activeFunctions = anomalyFunctionDAO.findAllActiveFunctions();
-
-      // for each anomaly function, find raw unmerged results and perform merge
-      for (AnomalyFunctionDTO function : activeFunctions) {
-        Callable<Integer> task = () -> {
-          List<RawAnomalyResultDTO> unmergedResults =
-              anomalyResultDAO.findUnmergedByFunctionId(function.getId());
-          LOG.info("Running merge for function id : [{}], found [{}] raw anomalies",
-              function.getId(), unmergedResults.size());
-
-          // TODO : move merge config within the AnomalyFunction; Every function should have its own merge config.
-          AnomalyMergeConfig mergeConfig = new AnomalyMergeConfig();
-          mergeConfig.setSequentialAllowedGap(2 * 60 * 60_000); // 2 hours
-          mergeConfig.setMaxMergeDurationLength(-1); // no time based split
-          mergeConfig.setMergeStrategy(AnomalyMergeStrategy.FUNCTION_DIMENSIONS);
-
-          List<MergedAnomalyResultDTO> output = new ArrayList<>();
-
-          if (unmergedResults.size() > 0) {
-            switch (mergeConfig.getMergeStrategy()) {
-            case FUNCTION:
-              performMergeBasedOnFunctionId(function, mergeConfig, unmergedResults, output);
-              break;
-            case FUNCTION_DIMENSIONS:
-              performMergeBasedOnFunctionIdAndDimensions(function, mergeConfig, unmergedResults, output);
-              break;
-            default:
-              throw new IllegalArgumentException(
-                  "Merge strategy " + mergeConfig.getMergeStrategy() + " not supported");
-            }
-          }
-          for (MergedAnomalyResultDTO mergedAnomalyResultDTO : output) {
-            updateMergedScoreAndPersist(mergedAnomalyResultDTO);
-          }
-          return output.size();
-        };
-        Future<Integer> taskFuture = taskExecutorService.submit(task);
-        taskCallbacks.add(taskFuture);
-      }
       for (Future<Integer> future : taskCallbacks) {
-        // now wait till all the tasks complete
         future.get();
       }
     } catch (Exception e) {
@@ -140,7 +111,71 @@ public class AnomalyMergeExecutor implements Runnable {
     }
   }
 
-  private void updateMergedScoreAndPersist(MergedAnomalyResultDTO mergedResult) {
+  /**
+   * Performs a light weight merge based on function id and dimensions. This method is supposed to be performed by
+   * anomaly detectors right after their anomaly detection. For complex merge logics which merge anomalies across
+   * different dimensions, function, metrics, etc., the tasks should be performed by a dedicated merger.
+   *
+   * @param functionSpec the spec of the function that detects anomalies
+   * @param isBackfill set to true to disable the alert of the merged anomalies
+   *
+   * @return the number of merged anomalies after merging
+   */
+  public int synchronousMergeBasedOnFunctionIdAndDimension(AnomalyFunctionDTO functionSpec, boolean isBackfill) {
+    if (functionSpec.getIsActive()) {
+      return mergeAnomalies(functionSpec, DEFAULT_SYNCHRONIZED_MERGE_CONFIG, isBackfill);
+    } else {
+      return 0;
+    }
+  }
+
+  /**
+   * Merges raw anomalies according to the given merge configuration. The merge logic works as following:
+   *
+   * Step 1: for the given function, find all groups of raw (unprocessed) anomalies based on
+   *         merge strategy (FunctionId and/or dimensions)
+   *
+   * Step 2: For each such group, find the base mergedAnomaly
+   *
+   * Step 3: perform time based merge
+   *
+   * Step 4: Recompute anomaly score / weight
+   *
+   * Step 5: persist merged anomalies
+   *
+   * @param functionSpc the spec of the function that has unmerged anomalies
+   * @param mergeConfig the merge strategy
+   *
+   * @return the number of merged anomalies
+   */
+  private int mergeAnomalies(AnomalyFunctionDTO functionSpc, AnomalyMergeConfig mergeConfig, boolean isBackfill) {
+    List<RawAnomalyResultDTO> unmergedResults = anomalyResultDAO.findUnmergedByFunctionId(functionSpc.getId());
+
+    LOG.info("Running merge for function id : [{}], found [{}] raw anomalies", functionSpc.getId(), unmergedResults.size());
+
+    if (unmergedResults.size() > 0) {
+      List<MergedAnomalyResultDTO> output = new ArrayList<>();
+      switch (mergeConfig.getMergeStrategy()) {
+        case FUNCTION:
+          performMergeBasedOnFunctionId(functionSpc, mergeConfig, unmergedResults, output);
+          break;
+        case FUNCTION_DIMENSIONS:
+          performMergeBasedOnFunctionIdAndDimensions(functionSpc, mergeConfig, unmergedResults, output);
+          break;
+        default:
+          throw new IllegalArgumentException("Merge strategy " + mergeConfig.getMergeStrategy() + " not supported");
+      }
+      for (MergedAnomalyResultDTO mergedAnomalyResultDTO : output) {
+        mergedAnomalyResultDTO.setNotified(isBackfill);
+        updateMergedScoreAndPersist(mergedAnomalyResultDTO, mergeConfig);
+      }
+      return output.size();
+    } else {
+      return 0;
+    }
+  }
+
+  private void updateMergedScoreAndPersist(MergedAnomalyResultDTO mergedResult, AnomalyMergeConfig mergeConfig) {
     double weightedScoreSum = 0.0;
     double weightedWeightSum = 0.0;
     double totalBucketSize = 0.0;
@@ -164,11 +199,11 @@ public class AnomalyMergeExecutor implements Runnable {
 
     // recompute weight using anomaly function specific method
     try {
-      updateMergedAnomalyWeight(mergedResult);
+      updateMergedAnomalyWeight(mergedResult, mergeConfig);
     } catch (Exception e) {
       AnomalyFunctionDTO function = mergedResult.getFunction();
       LOG.warn(
-          "Failed to compute merged weight and the average weight of raw anomalies is used. Dataset: {}, Metric: {}, Function: {}, Time:{} - {}, Exception: {}",
+          "Unable to compute merged weight and the average weight of raw anomalies is used. Dataset: {}, Metric: {}, Function: {}, Time:{} - {}, Exception: {}",
           function.getCollection(), function.getMetric(), function.getFunctionName(),
           new DateTime(mergedResult.getStartTime()), new DateTime(mergedResult.getEndTime()), e);
     }
@@ -183,7 +218,15 @@ public class AnomalyMergeExecutor implements Runnable {
     }
   }
 
-  private void updateMergedAnomalyWeight(MergedAnomalyResultDTO anomalyMergedResult) throws Exception {
+  /**
+   * Uses function-specific method to re-computes the weight of merged anomaly.
+   *
+   * @param anomalyMergedResult the merged anomaly to be updated
+   * @param mergeConfig the merge configuration that was applied when merge the merged anomaly
+   * @throws Exception if error occurs when retrieving the time series for calculating the weight
+   */
+  private void updateMergedAnomalyWeight(MergedAnomalyResultDTO anomalyMergedResult, AnomalyMergeConfig mergeConfig)
+      throws Exception {
     AnomalyFunctionDTO anomalyFunctionSpec = anomalyMergedResult.getFunction();
     BaseAnomalyFunction anomalyFunction = anomalyFunctionFactory.fromSpec(anomalyFunctionSpec);
 
@@ -198,28 +241,58 @@ public class AnomalyMergeExecutor implements Runnable {
             anomalyMergedResult.getDimensions(), timeGranularity);
 
     if (metricTimeSeries != null) {
-      List<MergedAnomalyResultDTO> knownAnomalies = null;
+      DateTime windowStart = new DateTime(anomalyMergedResult.getStartTime());
+      DateTime windowEnd = new DateTime(anomalyMergedResult.getEndTime());
+
+      List<MergedAnomalyResultDTO> knownAnomalies = Collections.emptyList();
+
       if (anomalyFunction.useHistoryAnomaly()) {
-        knownAnomalies = getKnownMergedAnomalies(anomalyFunction, anomalyMergedResult.getStartTime(),
-            anomalyMergedResult.getEndTime());
+        switch (mergeConfig.getMergeStrategy()) {
+          case FUNCTION:
+            knownAnomalies = getHistoryMergedAnomalies(anomalyFunction, windowStart.getMillis(), windowEnd.getMillis());
+            break;
+          case FUNCTION_DIMENSIONS:
+            knownAnomalies = getHistoryMergedAnomalies(anomalyFunction, windowStart.getMillis(), windowEnd.getMillis(),
+                anomalyMergedResult.getDimensions());
+            break;
+          default:
+            throw new IllegalArgumentException("Merge strategy " + mergeConfig.getMergeStrategy() + " not supported");
+        }
+
+        if (knownAnomalies.size() > 0) {
+          LOG.info("Found {} history anomalies for computing the weight of current merged anomaly.", knownAnomalies.size());
+          LOG.info("Checking if any known anomalies overlap with the monitoring window of anomaly detection, which could result in unwanted holes in current values.");
+          AnomalyUtils.logAnomaliesOverlapWithWindow(windowStart, windowEnd, knownAnomalies);
+        }
       }
-      anomalyFunction.updateMergedAnomalyInfo(anomalyMergedResult, metricTimeSeries,
-          new DateTime(anomalyMergedResult.getStartTime()), new DateTime(anomalyMergedResult.getEndTime()),
+
+      anomalyFunction.updateMergedAnomalyInfo(anomalyMergedResult, metricTimeSeries, windowStart, windowEnd,
           knownAnomalies);
     }
   }
 
-  private List<MergedAnomalyResultDTO> getKnownMergedAnomalies(BaseAnomalyFunction anomalyFunction,
-      long monitoringWindowStart, long monitoringWindowEnd) {
+  /**
+   * Returns history merged anomalies of the function id that are needed for computing the weight of the new merged
+   * anomalies; history anomalies are anomalies that occurs before the window of current merged anomaly.
+   *
+   * @param anomalyFunction the anomaly function that detects the merged anomaly
+   * @param anomalyWindowStart the start of the merged anomaly
+   * @param anomalyWindowEnd the end of the merged anomaly
+   *
+   * @return history merged anomalies of the function id that are needed for computing the weight of the new merged
+   * anomalies
+   */
+  private List<MergedAnomalyResultDTO> getHistoryMergedAnomalies(BaseAnomalyFunction anomalyFunction,
+      long anomalyWindowStart, long anomalyWindowEnd) {
 
     List<Pair<Long, Long>> startEndTimeRanges =
-        anomalyFunction.getDataRangeIntervals(monitoringWindowStart, monitoringWindowEnd);
+        anomalyFunction.getDataRangeIntervals(anomalyWindowStart, anomalyWindowEnd);
 
     List<MergedAnomalyResultDTO> results = new ArrayList<>();
     for (Pair<Long, Long> startEndTimeRange : startEndTimeRanges) {
       // we don't need the known anomalies on current window; we only need those on history data
-      if (monitoringWindowStart <= startEndTimeRange.getFirst()
-          && startEndTimeRange.getSecond() <= monitoringWindowEnd) {
+      if (anomalyWindowStart <= startEndTimeRange.getFirst()
+          && startEndTimeRange.getSecond() <= anomalyWindowEnd) {
         continue;
       }
       try {
@@ -227,7 +300,46 @@ public class AnomalyMergeExecutor implements Runnable {
             mergedResultDAO.findAllConflictByFunctionId(anomalyFunction.getSpec().getId(), startEndTimeRange.getFirst(),
                 startEndTimeRange.getSecond()));
       } catch (Exception e) {
-        LOG.error("Exception in getting existing anomalies", e);
+        LOG.error("Unable to get history merged anomalies for function {} in the anomaly window {} -- {}: {}",
+            anomalyFunction.getSpec().getId(), anomalyWindowStart, anomalyWindowEnd, e);
+      }
+    }
+
+    return results;
+  }
+
+  /**
+   * Returns history merged anomalies of the function id that are needed for computing the weight of the new merged
+   * anomalies; history anomalies are anomalies that occurs before the window of current merged anomaly.
+   *
+   * @param anomalyFunction the anomaly function that detects the merged anomaly
+   * @param anomalyWindowStart the start of the merged anomaly
+   * @param anomalyWindowEnd the end of the merged anomaly
+   * @param dimensions the dimensions of the merge anomaly
+   *
+   * @return history merged anomalies of the function id that are needed for computing the weight of the new merged
+   * anomalies
+   */
+  private List<MergedAnomalyResultDTO> getHistoryMergedAnomalies(BaseAnomalyFunction anomalyFunction,
+      long anomalyWindowStart, long anomalyWindowEnd, DimensionMap dimensions) {
+
+    List<Pair<Long, Long>> startEndTimeRanges =
+        anomalyFunction.getDataRangeIntervals(anomalyWindowStart, anomalyWindowEnd);
+
+    List<MergedAnomalyResultDTO> results = new ArrayList<>();
+    for (Pair<Long, Long> startEndTimeRange : startEndTimeRanges) {
+      // we don't need the known anomalies on current window; we only need those on history data
+      if (anomalyWindowStart <= startEndTimeRange.getFirst()
+          && startEndTimeRange.getSecond() <= anomalyWindowEnd) {
+        continue;
+      }
+      try {
+        results.addAll(
+            mergedResultDAO.findAllConflictByFunctionIdDimensions(anomalyFunction.getSpec().getId(), startEndTimeRange.getFirst(),
+                startEndTimeRange.getSecond(), dimensions.toString()));
+      } catch (Exception e) {
+        LOG.error("Unable to get history merged anomalies for function {} on dimensions {} in the anomaly window {} -- {}: {}",
+            anomalyFunction.getSpec().getId(), dimensions.toString(), anomalyWindowStart, anomalyWindowEnd, e);
       }
     }
 
@@ -275,9 +387,11 @@ public class AnomalyMergeExecutor implements Runnable {
       // NOTE: We get "latest overlapped (Conflict)" merged anomaly instead of "latest" merged anomaly in order to
       // prevent the merge results of current (online) detection interfere the merge results of back-fill (offline)
       // detection.
+      // Moreover, the window start is modified by mergeConfig.getSequentialAllowedGap() in order to allow a gap between
+      // anomalies to be merged.
       MergedAnomalyResultDTO latestOverlappedMergedResult =
           mergedResultDAO.findLatestConflictByFunctionIdDimensions(function.getId(), exploredDimensions.toString(),
-              anomalyWindowStart, anomalyWindowEnd, mergeConfig.getSequentialAllowedGap());
+              anomalyWindowStart - mergeConfig.getSequentialAllowedGap(), anomalyWindowEnd);
 
       // TODO : get mergeConfig from MergeStrategy
       List<MergedAnomalyResultDTO> mergedResults = AnomalyTimeBasedSummarizer
@@ -297,49 +411,5 @@ public class AnomalyMergeExecutor implements Runnable {
   private String createMessage(double severity, Double currentVal, Double baseLineVal) {
     return String.format("change : %.2f %%, currentVal : %.2f, baseLineVal : %.2f", severity * 100,
         currentVal, baseLineVal);
-  }
-
-  /**
-   * Performs a light weight merge based on function id and dimensions. This method is supposed to be performed by
-   * anomaly detectors right after their anomaly detection. For complex merge logics which merge anomalies across
-   * different dimensions, function, metrics, etc., the tasks should be performed by a dedicated merger.
-   *
-   * The light weight merge logic works as follows:
-   *
-   * Step 1: find all unmerged raw (unprocessed) anomalies of the given function and group them according to their
-   *         dimensions
-   *
-   * Step 2: find the latest merged anomaly for each group of unmerged anomalies
-   *
-   * Step 3: perform time based merge
-   *
-   * Step 4: recompute anomaly score / weight
-   *
-   * Step 5: persist merged anomalies
-   */
-  public int performSynchronousMergeBasedOnFunctionIdAndDimension(AnomalyFunctionDTO functionSpec, boolean isNotified) {
-    if (functionSpec.getIsActive()) {
-      List<RawAnomalyResultDTO> unmergedResults = anomalyResultDAO.findUnmergedByFunctionId(functionSpec.getId());
-
-      if (unmergedResults.size() > 0) {
-        LOG.info("Running merge for function id : [{}], found [{}] raw anomalies", functionSpec.getId(),
-            unmergedResults.size());
-
-        // TODO : move merge config within the AnomalyFunction; Every function should have its own merge config.
-        AnomalyMergeConfig mergeConfig = new AnomalyMergeConfig();
-        mergeConfig.setSequentialAllowedGap(2 * 60 * 60_000); // 2 hours
-        mergeConfig.setMaxMergeDurationLength(-1); // no time based split
-        mergeConfig.setMergeStrategy(AnomalyMergeStrategy.FUNCTION_DIMENSIONS);
-
-        List<MergedAnomalyResultDTO> output = new ArrayList<>();
-        performMergeBasedOnFunctionIdAndDimensions(functionSpec, mergeConfig, unmergedResults, output);
-        for (MergedAnomalyResultDTO mergedAnomalyResultDTO : output) {
-          mergedAnomalyResultDTO.setNotified(isNotified);
-          updateMergedScoreAndPersist(mergedAnomalyResultDTO);
-        }
-        return output.size();
-      }
-    }
-    return 0;
   }
 }

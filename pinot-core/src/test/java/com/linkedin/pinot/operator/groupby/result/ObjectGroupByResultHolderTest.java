@@ -58,8 +58,7 @@ public class ObjectGroupByResultHolderTest {
    * @param minOrder Min ordering if true, max ordering else.
    */
   private void testTrimResults(final boolean minOrder) {
-    long seed = System.nanoTime();
-    Random random = new Random(seed);
+    Random random = new Random(0);
 
     GroupByResultHolder resultHolder = new ObjectGroupByResultHolder(INITIAL_CAPACITY, INITIAL_CAPACITY, minOrder);
     List<IntObjectPair> expected = new ArrayList<>(MAX_CAPACITY);

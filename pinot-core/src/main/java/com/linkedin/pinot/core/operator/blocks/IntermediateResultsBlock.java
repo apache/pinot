@@ -18,7 +18,6 @@ package com.linkedin.pinot.core.operator.blocks;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.response.ProcessingException;
-import com.linkedin.pinot.common.response.ResponseStatistics;
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.common.utils.DataTableBuilder;
 import com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema;
@@ -50,19 +49,23 @@ public class IntermediateResultsBlock implements Block {
   private List<Serializable> _aggregationResultList;
   private List<ProcessingException> _processingExceptions;
   private long _numDocsScanned;
-  private long _requestId = -1;
-  private List<ResponseStatistics> _segmentStatistics;
-  private long _timeUsedMs;
+  private long _numEntriesScannedInFilter;
+  private long _numEntriesScannedPostFilter;
   private long _totalRawDocs;
+  private long _requestId = -1;
   private List<Map<String, Serializable>> _aggregationGroupByOperatorResult;
   private AggregationGroupByResult _aggregationGroupByResult;
   private DataSchema _dataSchema;
   private Collection<Serializable[]> _selectionResult;
 
-  private static String REQUEST_ID = "requestId";
-  private static String NUM_DOCS_SCANNED = "numDocsScanned";
-  private static String TIME_USED_MS = "timeUsedMs";
-  private static String TOTAL_DOCS = "totalDocs";
+  @Deprecated
+  private long _timeUsedMs;
+
+  private static final String REQUEST_ID = "requestId";
+  private static final String NUM_DOCS_SCANNED = "numDocsScanned";
+  private static final String NUM_ENTRIES_SCANNED_IN_FILTER = "numEntriesScannedInFilter";
+  private static final String NUM_ENTRIES_SCANNED_POST_FILTER = "numEntriesScannedPostFilter";
+  private static final String TOTAL_DOCS = "totalDocs";
 
   public IntermediateResultsBlock(List<AggregationFunction> aggregationFunctionList,
       List<Serializable> aggregationResult) {
@@ -163,13 +166,14 @@ public class IntermediateResultsBlock implements Block {
   }
 
   public DataTable attachMetadataToDataTable(DataTable dataTable) {
-    dataTable.getMetadata().put(REQUEST_ID, _requestId + "");
-    dataTable.getMetadata().put(NUM_DOCS_SCANNED, _numDocsScanned + "");
-    dataTable.getMetadata().put(TIME_USED_MS, _timeUsedMs + "");
-    dataTable.getMetadata().put(TOTAL_DOCS, _totalRawDocs + "");
+    dataTable.getMetadata().put(REQUEST_ID, String.valueOf(_requestId));
+    dataTable.getMetadata().put(NUM_DOCS_SCANNED, String.valueOf(_numDocsScanned));
+    dataTable.getMetadata().put(NUM_ENTRIES_SCANNED_IN_FILTER, String.valueOf(_numEntriesScannedInFilter));
+    dataTable.getMetadata().put(NUM_ENTRIES_SCANNED_POST_FILTER, String.valueOf(_numEntriesScannedPostFilter));
+    dataTable.getMetadata().put(TOTAL_DOCS, String.valueOf(_totalRawDocs));
     if (_processingExceptions != null && _processingExceptions.size() > 0) {
-      for (int i = 0; i < _processingExceptions.size(); ++i) {
-        dataTable.addException(_processingExceptions.get(i));
+      for (ProcessingException exception : _processingExceptions) {
+        dataTable.addException(exception);
       }
     }
     return dataTable;
@@ -242,14 +246,19 @@ public class IntermediateResultsBlock implements Block {
     return _numDocsScanned;
   }
 
+  public long getNumEntriesScannedInFilter() {
+    return _numEntriesScannedInFilter;
+  }
+
+  public long getNumEntriesScannedPostFilter() {
+    return _numEntriesScannedPostFilter;
+  }
+
   public long getRequestId() {
     return _requestId;
   }
 
-  public List<ResponseStatistics> getSegmentStatistics() {
-    return _segmentStatistics;
-  }
-
+  @Deprecated
   public long getTimeUsedMs() {
     return _timeUsedMs;
   }
@@ -266,14 +275,19 @@ public class IntermediateResultsBlock implements Block {
     _numDocsScanned = numDocsScanned;
   }
 
+  public void setNumEntriesScannedInFilter(long numEntriesScannedInFilter) {
+    _numEntriesScannedInFilter = numEntriesScannedInFilter;
+  }
+
+  public void setNumEntriesScannedPostFilter(long numEntriesScannedPostFilter) {
+    _numEntriesScannedPostFilter = numEntriesScannedPostFilter;
+  }
+
   public void setRequestId(long requestId) {
     _requestId = requestId;
   }
 
-  public void setSegmentStatistics(List<ResponseStatistics> segmentStatistics) {
-    _segmentStatistics = segmentStatistics;
-  }
-
+  @Deprecated
   public void setTimeUsedMs(long timeUsedMs) {
     _timeUsedMs = timeUsedMs;
   }

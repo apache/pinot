@@ -22,10 +22,9 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.MProjectionOperator;
 import com.linkedin.pinot.core.operator.aggregation.AggregationOperator;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionUtils;
-import java.util.ArrayList;
+import com.linkedin.pinot.core.startree.hll.HllConstants;
 import java.util.Arrays;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,8 +35,6 @@ public class AggregationPlanNode implements PlanNode {
 
   private final IndexSegment _indexSegment;
   private final BrokerRequest _brokerRequest;
-  private final List<AggregationFunctionPlanNode> _aggregationFunctionPlanNodes =
-      new ArrayList<AggregationFunctionPlanNode>();
   private final ProjectionPlanNode _projectionPlanNode;
 
   public AggregationPlanNode(IndexSegment indexSegment, BrokerRequest query) {
@@ -45,40 +42,37 @@ public class AggregationPlanNode implements PlanNode {
     _brokerRequest = query;
     _projectionPlanNode = new ProjectionPlanNode(_indexSegment, getAggregationRelatedColumns(),
         new DocIdSetPlanNode(_indexSegment, _brokerRequest));
-    for (int i = 0; i < _brokerRequest.getAggregationsInfo().size(); ++i) {
-      AggregationInfo aggregationInfo = _brokerRequest.getAggregationsInfo().get(i);
+    for (AggregationInfo aggregationInfo : _brokerRequest.getAggregationsInfo()) {
       AggregationFunctionUtils.ensureAggregationColumnsAreSingleValued(aggregationInfo, _indexSegment);
-      boolean hasDictionary = AggregationFunctionUtils.isAggregationFunctionWithDictionary(aggregationInfo, _indexSegment);
-      _aggregationFunctionPlanNodes.add(new AggregationFunctionPlanNode(aggregationInfo, _projectionPlanNode, hasDictionary));
     }
   }
 
   private String[] getAggregationRelatedColumns() {
-    Set<String> aggregationRelatedColumns = new HashSet<String>();
+    Set<String> aggregationRelatedColumns = new HashSet<>();
     for (AggregationInfo aggregationInfo : _brokerRequest.getAggregationsInfo()) {
       if (!aggregationInfo.getAggregationType().equalsIgnoreCase("count")) {
         String columns = aggregationInfo.getAggregationParams().get("column").trim();
         aggregationRelatedColumns.addAll(Arrays.asList(columns.split(",")));
+        if (aggregationInfo.getAggregationType().equalsIgnoreCase("fasthll")) {
+          aggregationRelatedColumns.add(columns + HllConstants.DEFAULT_HLL_DERIVE_COLUMN_SUFFIX);
+        }
       }
     }
-    return aggregationRelatedColumns.toArray(new String[0]);
+    return aggregationRelatedColumns.toArray(new String[aggregationRelatedColumns.size()]);
   }
 
   @Override
   public Operator run() {
     MProjectionOperator projectionOperator = (MProjectionOperator) _projectionPlanNode.run();
-    return new AggregationOperator(_indexSegment, _brokerRequest.getAggregationsInfo(), projectionOperator);
+    return new AggregationOperator(_brokerRequest.getAggregationsInfo(), projectionOperator,
+        _indexSegment.getSegmentMetadata().getTotalRawDocs());
   }
 
   @Override
   public void showTree(String prefix) {
     LOGGER.debug(prefix + "Inner-Segment Plan Node :");
-    LOGGER.debug(prefix + "Operator: MAggregationOperator");
+    LOGGER.debug(prefix + "Operator: AggregationOperator");
     LOGGER.debug(prefix + "Argument 0: Projection - ");
     _projectionPlanNode.showTree(prefix + "    ");
-    for (int i = 0; i < _brokerRequest.getAggregationsInfo().size(); ++i) {
-      LOGGER.debug(prefix + "Argument " + (i + 1) + ": Aggregation  - ");
-      _aggregationFunctionPlanNodes.get(i).showTree(prefix + "    ");
-    }
   }
 }

@@ -36,6 +36,7 @@ import com.linkedin.pinot.core.query.aggregation.function.CountAggregationFuncti
  *
  *
  */
+@Deprecated
 public abstract class AggregationFunctionGroupByOperator extends BaseOperator {
 
   protected final AggregationFunction _aggregationFunction;

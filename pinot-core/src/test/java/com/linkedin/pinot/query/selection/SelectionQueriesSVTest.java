@@ -22,6 +22,7 @@ import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import com.linkedin.pinot.core.operator.BaseOperator;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
@@ -45,7 +46,7 @@ public class SelectionQueriesSVTest extends BaseSelectionQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "SelectionQueriesSVTest");
 
   private IndexSegment _indexSegment;
-  private Map<String, DataSource> _dataSourceMap;
+  private Map<String, BaseOperator> _dataSourceMap;
   private Selection _selectionOnlyQuery;
   private Selection _selectionOrderByQuery;
 
@@ -103,7 +104,7 @@ public class SelectionQueriesSVTest extends BaseSelectionQueriesTest {
   }
 
   @Override
-  Map<String, DataSource> getDataSourceMap() {
+  Map<String, BaseOperator> getDataSourceMap() {
     return _dataSourceMap;
   }
 
