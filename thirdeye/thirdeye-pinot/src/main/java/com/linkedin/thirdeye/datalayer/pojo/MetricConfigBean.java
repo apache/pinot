@@ -33,6 +33,8 @@ public class MetricConfigBean extends AbstractBean {
 
   private boolean active = true;
 
+  private String externalDashboardURL;
+
 
   public String getName() {
     return name;
@@ -114,6 +116,15 @@ public class MetricConfigBean extends AbstractBean {
     this.active = active;
   }
 
+
+  public String getExternalDashboardURL() {
+    return externalDashboardURL;
+  }
+
+  public void setExternalDashboardURL(String externalDashboardURL) {
+    this.externalDashboardURL = externalDashboardURL;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (!(o instanceof MetricConfigBean)) {
@@ -129,20 +140,21 @@ public class MetricConfigBean extends AbstractBean {
         && Objects.equals(rollupThreshold, mc.getRollupThreshold())
         && Objects.equals(inverseMetric, mc.isInverseMetric())
         && Objects.equals(cellSizeExpression, mc.getCellSizeExpression())
-        && Objects.equals(active, mc.isActive());
+        && Objects.equals(active, mc.isActive())
+        && Objects.equals(externalDashboardURL, mc.getExternalDashboardURL());
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(getId(), dataset, alias, derived, derivedMetricExpression, rollupThreshold,
-        inverseMetric, cellSizeExpression, active);
+        inverseMetric, cellSizeExpression, active, externalDashboardURL);
   }
 
   @Override
   public String toString() {
-    return MoreObjects.toStringHelper(this).add("id", getId()).add("dataset", dataset)
+    return MoreObjects.toStringHelper(this).add("id", getId()).add("name", name).add("dataset", dataset)
         .add("alias", alias).add("derived", derived).add("derivedMetricExpression", derivedMetricExpression)
         .add("rollupThreshold", rollupThreshold).add("cellSizeExpression", cellSizeExpression)
-        .add("active", active).toString();
+        .add("active", active).add("externalDashboardURL", externalDashboardURL).toString();
   }
 }
