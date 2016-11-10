@@ -15,10 +15,6 @@
  */
 package com.linkedin.pinot.common.data;
 
-import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.common.data.FieldSpec.FieldType;
-import com.linkedin.pinot.common.utils.EqualityUtils;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -30,13 +26,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import com.linkedin.pinot.common.data.FieldSpec.FieldType;
+import com.linkedin.pinot.common.utils.EqualityUtils;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /**
  * The <code>Schema</code> class is defined for each table to describe the details of the table's fields (columns).
@@ -327,6 +327,7 @@ public final class Schema {
     public SchemaBuilder addSingleValueDimension(@Nonnull String dimensionName, @Nonnull DataType dataType,
         @Nonnull Object defaultNullValue) {
       schema.addField(new DimensionFieldSpec(dimensionName, dataType, true, defaultNullValue));
+      validateColumnDefaultNullValue(dimensionName, dataType, defaultNullValue);
       return this;
     }
 
@@ -338,6 +339,7 @@ public final class Schema {
     public SchemaBuilder addMultiValueDimension(@Nonnull String dimensionName, @Nonnull DataType dataType,
         @Nonnull Object defaultNullValue) {
       schema.addField(new DimensionFieldSpec(dimensionName, dataType, false, defaultNullValue));
+      validateColumnDefaultNullValue(dimensionName, dataType, defaultNullValue);
       return this;
     }
 
@@ -349,6 +351,7 @@ public final class Schema {
     public SchemaBuilder addMetric(@Nonnull String metricName, @Nonnull DataType dataType,
         @Nonnull Object defaultNullValue) {
       schema.addField(new MetricFieldSpec(metricName, dataType, defaultNullValue));
+      validateColumnDefaultNullValue(metricName, dataType, defaultNullValue);
       return this;
     }
 
@@ -404,6 +407,7 @@ public final class Schema {
         @Nonnull TimeUnit incomingTimeUnit, @Nonnull DataType incomingDataType, @Nonnull Object defaultNullValue) {
       schema.addField(
           new TimeFieldSpec(incomingName, incomingDataType, incomingTimeUnitSize, incomingTimeUnit, defaultNullValue));
+      validateTimeDefaultNullValue(defaultNullValue);
       return this;
     }
 
@@ -423,6 +427,7 @@ public final class Schema {
       schema.addField(
           new TimeFieldSpec(incomingName, incomingDataType, incomingTimeUnitSize, incomingTimeUnit, outgoingName,
               outgoingDataType, outgoingTimeUnitSize, outgoingTimeUnit, defaultNullValue));
+      validateTimeDefaultNullValue(defaultNullValue);
       return this;
     }
 
@@ -434,6 +439,7 @@ public final class Schema {
     public SchemaBuilder addTime(@Nonnull TimeGranularitySpec incomingTimeGranularitySpec,
         @Nonnull Object defaultNullValue) {
       schema.addField(new TimeFieldSpec(incomingTimeGranularitySpec, defaultNullValue));
+      validateTimeDefaultNullValue(defaultNullValue);
       return this;
     }
 
@@ -446,12 +452,32 @@ public final class Schema {
     public SchemaBuilder addTime(@Nonnull TimeGranularitySpec incomingTimeGranularitySpec,
         @Nonnull TimeGranularitySpec outgoingTimeGranularitySpec, @Nonnull Object defaultNullValue) {
       schema.addField(new TimeFieldSpec(incomingTimeGranularitySpec, outgoingTimeGranularitySpec, defaultNullValue));
+      validateTimeDefaultNullValue(defaultNullValue);
       return this;
     }
 
     public Schema build() {
       return schema;
     }
+
+    private void validateColumnDefaultNullValue(@Nonnull String fieldName, @Nonnull DataType dataType,
+        @Nonnull Object defaultNullValue) {
+      try {
+        schema.getFieldSpecFor(fieldName).getDefaultNullValue();
+      } catch (Exception e) {
+        LOGGER.error("Invalid default null value {} for field {} of type {}", defaultNullValue, fieldName, dataType);
+        throw e;
+      }
+    }
+
+    private void validateTimeDefaultNullValue(@Nonnull Object defaultNullValue) {
+      try {
+        schema.getTimeFieldSpec().getDefaultNullValue();
+      } catch (Exception e) {
+        LOGGER.error("Invalid default value '{}' for time column", defaultNullValue);
+      }
+    }
+
   }
 
   @Override
