@@ -12,6 +12,8 @@ public class MetricConfigBean extends AbstractBean {
   public static double DEFAULT_THRESHOLD = 0.01;
   public static String DERIVED_METRIC_ID_PREFIX = "id";
   public static final String ALIAS_JOINER = "::";
+  public static final String URL_TEMPLATE_START_TIME = "startTime";
+  public static final String URL_TEMPLATE_END_TIME = "endTime";
 
   private String name;
 
@@ -33,7 +35,7 @@ public class MetricConfigBean extends AbstractBean {
 
   private boolean active = true;
 
-  private String externalDashboardURL;
+  private String externalDashboardURLTemplate;
 
 
   public String getName() {
@@ -117,12 +119,12 @@ public class MetricConfigBean extends AbstractBean {
   }
 
 
-  public String getExternalDashboardURL() {
-    return externalDashboardURL;
+  public String getExternalDashboardURLTemplate() {
+    return externalDashboardURLTemplate;
   }
 
-  public void setExternalDashboardURL(String externalDashboardURL) {
-    this.externalDashboardURL = externalDashboardURL;
+  public void setExternalDashboardURLTemplate(String externalDashboardURL) {
+    this.externalDashboardURLTemplate = externalDashboardURL;
   }
 
   @Override
@@ -141,13 +143,13 @@ public class MetricConfigBean extends AbstractBean {
         && Objects.equals(inverseMetric, mc.isInverseMetric())
         && Objects.equals(cellSizeExpression, mc.getCellSizeExpression())
         && Objects.equals(active, mc.isActive())
-        && Objects.equals(externalDashboardURL, mc.getExternalDashboardURL());
+        && Objects.equals(externalDashboardURLTemplate, mc.getExternalDashboardURLTemplate());
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(getId(), dataset, alias, derived, derivedMetricExpression, rollupThreshold,
-        inverseMetric, cellSizeExpression, active, externalDashboardURL);
+        inverseMetric, cellSizeExpression, active, externalDashboardURLTemplate);
   }
 
   @Override
@@ -155,6 +157,6 @@ public class MetricConfigBean extends AbstractBean {
     return MoreObjects.toStringHelper(this).add("id", getId()).add("name", name).add("dataset", dataset)
         .add("alias", alias).add("derived", derived).add("derivedMetricExpression", derivedMetricExpression)
         .add("rollupThreshold", rollupThreshold).add("cellSizeExpression", cellSizeExpression)
-        .add("active", active).add("externalDashboardURL", externalDashboardURL).toString();
+        .add("active", active).add("externalDashboardURL", externalDashboardURLTemplate).toString();
   }
 }
