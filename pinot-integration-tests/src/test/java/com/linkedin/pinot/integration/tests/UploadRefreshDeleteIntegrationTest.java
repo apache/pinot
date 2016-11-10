@@ -225,9 +225,9 @@ public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTe
     long nRows = -1;
     while (attempt < 10) {
       Thread.sleep(sleepTime);
-      nRows = getCurrentServingNumDocs(this.tableName);
+      nRows = getCurrentServingNumDocs(tableName);
       //nRows can either be the current value or the final value, not any other.
-      if (nRows == currentNrows) {
+      if (nRows == currentNrows || nRows == -1) {
         sleepTime *= 2;
         attempt++;
       } else  if (nRows == finalNrows) {

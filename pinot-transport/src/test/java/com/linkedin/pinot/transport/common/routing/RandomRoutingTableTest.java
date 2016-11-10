@@ -57,7 +57,7 @@ public class RandomRoutingTableTest {
     int totalRuns = 10000;
     RoutingTableBuilder routingStrategy = new BalancedRandomRoutingTableBuilder(10);
     HelixExternalViewBasedRouting routingTable =
-        new HelixExternalViewBasedRouting(null, new PercentageBasedRoutingTableSelector());
+        new HelixExternalViewBasedRouting(null, new PercentageBasedRoutingTableSelector(), null);
     Field offlineRTBField = HelixExternalViewBasedRouting.class.getDeclaredField("_offlineRoutingTableBuilder");
     offlineRTBField.setAccessible(true);
     offlineRTBField.set(routingTable, routingStrategy);

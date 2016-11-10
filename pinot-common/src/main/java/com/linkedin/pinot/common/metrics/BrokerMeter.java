@@ -51,10 +51,12 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
   LLC_QUERY_COUNT("queries", false),
   HLC_QUERY_COUNT("queries", false),
 
-
   // This metric is emitted when DataTableCustomSerDe falls back to Java based de-serialization.
   // This implies that we have identified an object for which we have not implemented custom ser/de.
-  DATA_TABLE_OBJECT_DESERIALIZATION("dataTableObjectDeserialization", true);
+  DATA_TABLE_OBJECT_DESERIALIZATION("dataTableObjectDeserialization", true),
+
+  ROUTING_TABLE_REBUILD_FAILURES("failures", false),
+  ;
 
   private final String brokerMeterName;
   private final String unit;
