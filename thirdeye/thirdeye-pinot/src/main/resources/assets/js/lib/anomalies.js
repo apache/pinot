@@ -332,7 +332,7 @@ function drawMetricTimeSeries(timeSeriesData, anomalyData, tab, placeholder) {
             colors: colors
         },
         zoom: {
-            enabled: true,
+            enabled: false,
             rescale: true
         },
         axis: {
@@ -486,7 +486,7 @@ function drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab, placeholder, op
 
          },
          zoom: {
-             enabled: true,
+             enabled: false,
              rescale: true
          },
          axis: {
