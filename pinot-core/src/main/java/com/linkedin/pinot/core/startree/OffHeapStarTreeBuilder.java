@@ -28,6 +28,7 @@ import com.linkedin.pinot.common.data.TimeFieldSpec;
 import com.linkedin.pinot.common.utils.Pairs.IntPair;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import java.io.BufferedOutputStream;
 import java.io.DataOutputStream;
 import java.io.File;
@@ -574,7 +575,7 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
 
     StarTreeDataTable dataSorter =
         new StarTreeDataTable(file, dimensionSizeBytes, metricSizeBytes, getSortOrder());
-    dataSorter.sort(startDocId, endDocId, 0, dimensionSizeBytes);
+    dataSorter.sort(startDocId, endDocId);
     if (debugMode) {
       LOG.info("AFTER SORTING");
       printFile(file, startDocId, endDocId);
@@ -807,8 +808,7 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
    * @param file
    * @return
    */
-  private Map<Integer, IntPair> groupBy(int startDocId, int endDocId, Integer dimension,
-      File file) {
+  private Int2ObjectMap<IntPair> groupBy(int startDocId, int endDocId, Integer dimension, File file) {
     StarTreeDataTable dataSorter =
         new StarTreeDataTable(file, dimensionSizeBytes, metricSizeBytes, getSortOrder());
     return dataSorter.groupByIntColumnCount(startDocId, endDocId, dimension);
