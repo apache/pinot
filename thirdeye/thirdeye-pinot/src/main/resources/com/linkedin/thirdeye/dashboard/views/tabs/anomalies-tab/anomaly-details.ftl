@@ -7,7 +7,12 @@
         </div>
         <div>
             <h3>{{metric}}</h3>
-                <span>score: {{score}}</span>
+                <div class="timestamp uk-clearfix">
+                  <span><div class="small-label">Start - End ({{returnUserTimeZone}}):</div>
+                    {{displayDateRange startTime endTime}}
+                  </span>
+                </div>
+                <span>score: {{score}}, </span>
                 <span>weight: {{weight}}</span>
                 <div><span>message: {{message}}</span></div>
         </div>

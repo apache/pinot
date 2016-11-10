@@ -793,10 +793,16 @@ function tipToUser(tab) {
 
 //format integers with comma-grouping for thousands and round to 2 decimal numbers for floats
 function getFormattedNumber(number) {
+    return getFormattedNumber(number, 2);
+}
+
+//format integers with comma-grouping for thousands and round to "digits" decimal numbers for floats
+function getFormattedNumber(number, digits) {
     if (number % 1 == 0) {
         return d3.format(",")(number);
     } else {
-        return d3.format(",.2f")(number);
+        var formatString = ",." + digits + "f";
+        return d3.format(formatString)(number);
     }
 }
 
