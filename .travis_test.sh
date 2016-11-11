@@ -25,6 +25,9 @@ fi
 # Only run tests for JDK 7
 if [ $TRAVIS_JDK_VERSION != 'oraclejdk7' ]; then
   echo 'Skip tests for version other than oraclejdk7.'
+
+  # Remove Pinot files from local Maven respository to avoid a useless cache rebuild
+  rm -rf ~/.m2/repository/com/linkedin/pinot
   exit 0
 fi
 
@@ -42,3 +45,8 @@ else
 fi
 
 bash <(cat .codecov_bash)
+
+# Remove Pinot files from local Maven respository to avoid a useless cache rebuild
+rm -rf ~/.m2/repository/com/linkedin/pinot
+
+exit 0

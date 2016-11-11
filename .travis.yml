@@ -16,6 +16,12 @@ matrix:
     - jdk: oraclejdk8
       env: RUN_INTEGRATION_TESTS=false
 
+cache:
+  directories:
+    - $HOME/.m2
+
+sudo: false
+
 install:
   - ./.travis_install.sh
 
