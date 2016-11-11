@@ -632,14 +632,19 @@ public class AnomalyResource {
     context.put(MetricConfigBean.URL_TEMPLATE_END_TIME, String.valueOf(endTime));
     StrSubstitutor strSubstitutor = new StrSubstitutor(context);
     Map<String, String> urlTemplates = metricConfigDTO.getExtSourceLinkInfo();
-    Map<String, String> extSourceUrls = new HashMap<>();
     for (Entry<String, String> entry : urlTemplates.entrySet()) {
       String sourceName = entry.getKey();
       String urlTemplate = entry.getValue();
-      String anomalyUrl = strSubstitutor.replace(urlTemplate);
-      extSourceUrls.put(sourceName, anomalyUrl);
+      String extSourceUrl = strSubstitutor.replace(urlTemplate);
+      urlTemplates.put(sourceName, extSourceUrl);
     }
-    return new JSONObject(extSourceUrls).toString();
+    return new JSONObject(urlTemplates).toString();
+  }
+
+  public static void main(String[] args) throws Exception {
+    AnomalyResource anomalyResource = new AnomalyResource(null);
+    String anomalyUrl = anomalyResource.getExternalDashboardUrlForMergedAnomaly(null);
+    System.out.println(anomalyUrl);
   }
 
 }
