@@ -567,6 +567,7 @@ function renderAnomalyThumbnails(data, tab) {
     attach_AnomalyTable_EventListeners()
 
     for(var i = 0, numAnomalies = data.length; i < numAnomalies; i++) {
+      $("#external-props-"+i).append("my_new_link");
         requestLineChart(i);
     }
 
