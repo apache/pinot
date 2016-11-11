@@ -255,54 +255,54 @@ public final class Schema {
     boolean isValid = true;
 
     // Log ALL the schema errors that may be present.
-    try {
       for (FieldSpec fieldSpec : fieldSpecMap.values()) {
         FieldType fieldType = fieldSpec.getFieldType();
         DataType dataType = fieldSpec.getDataType();
         String fieldName = fieldSpec.getName();
-        switch (fieldType) {
-          case DIMENSION:
-          case TIME:
-            switch (dataType) {
-              case INT:
-              case LONG:
-              case FLOAT:
-              case DOUBLE:
-              case STRING:
-                // Check getDefaultNullValue() does not throw exception.
-                fieldSpec.getDefaultNullValue();
-                break;
-              default:
-                ctxLogger.error("Unsupported data type: {} in dimension/time field: {}", dataType, fieldName);
-                isValid = false;
-                break;
-            }
-            break;
-          case METRIC:
-            switch (dataType) {
-              case INT:
-              case LONG:
-              case FLOAT:
-              case DOUBLE:
-                // Check getDefaultNullValue() does not throw exception.
-                fieldSpec.getDefaultNullValue();
-                break;
-              default:
-                ctxLogger.error("Unsupported data type: {} in metric field: {}", dataType, fieldName);
-                isValid = false;
-                break;
-            }
-            break;
-          default:
-            ctxLogger.error("Unsupported field type: {} for field: {}", fieldSpec.getDataType(), fieldName);
-            isValid = false;
-            break;
+        try {
+          switch (fieldType) {
+            case DIMENSION:
+            case TIME:
+              switch (dataType) {
+                case INT:
+                case LONG:
+                case FLOAT:
+                case DOUBLE:
+                case STRING:
+                  // Check getDefaultNullValue() does not throw exception.
+                  fieldSpec.getDefaultNullValue();
+                  break;
+                default:
+                  ctxLogger.error("Unsupported data type: {} in dimension/time field: {}", dataType, fieldName);
+                  isValid = false;
+                  break;
+              }
+              break;
+            case METRIC:
+              switch (dataType) {
+                case INT:
+                case LONG:
+                case FLOAT:
+                case DOUBLE:
+                  // Check getDefaultNullValue() does not throw exception.
+                  fieldSpec.getDefaultNullValue();
+                  break;
+                default:
+                  ctxLogger.error("Unsupported data type: {} in metric field: {}", dataType, fieldName);
+                  isValid = false;
+                  break;
+              }
+              break;
+            default:
+              ctxLogger.error("Unsupported field type: {} for field: {}", fieldSpec.getDataType(), fieldName);
+              isValid = false;
+              break;
+          }
+        } catch (Exception e) {
+          ctxLogger.error("Caught exception while validating field {} dataType {}", fieldName, dataType, e);
+          isValid = false;
         }
       }
-    } catch (Exception e) {
-      ctxLogger.error("Caught exception while validate the schema.", e);
-      isValid = false;
-    }
 
     return isValid;
   }
@@ -327,7 +327,6 @@ public final class Schema {
     public SchemaBuilder addSingleValueDimension(@Nonnull String dimensionName, @Nonnull DataType dataType,
         @Nonnull Object defaultNullValue) {
       schema.addField(new DimensionFieldSpec(dimensionName, dataType, true, defaultNullValue));
-      validateColumnDefaultNullValue(dimensionName, dataType, defaultNullValue);
       return this;
     }
 
@@ -339,7 +338,6 @@ public final class Schema {
     public SchemaBuilder addMultiValueDimension(@Nonnull String dimensionName, @Nonnull DataType dataType,
         @Nonnull Object defaultNullValue) {
       schema.addField(new DimensionFieldSpec(dimensionName, dataType, false, defaultNullValue));
-      validateColumnDefaultNullValue(dimensionName, dataType, defaultNullValue);
       return this;
     }
 
@@ -351,7 +349,6 @@ public final class Schema {
     public SchemaBuilder addMetric(@Nonnull String metricName, @Nonnull DataType dataType,
         @Nonnull Object defaultNullValue) {
       schema.addField(new MetricFieldSpec(metricName, dataType, defaultNullValue));
-      validateColumnDefaultNullValue(metricName, dataType, defaultNullValue);
       return this;
     }
 
@@ -407,7 +404,6 @@ public final class Schema {
         @Nonnull TimeUnit incomingTimeUnit, @Nonnull DataType incomingDataType, @Nonnull Object defaultNullValue) {
       schema.addField(
           new TimeFieldSpec(incomingName, incomingDataType, incomingTimeUnitSize, incomingTimeUnit, defaultNullValue));
-      validateTimeDefaultNullValue(defaultNullValue);
       return this;
     }
 
@@ -427,7 +423,6 @@ public final class Schema {
       schema.addField(
           new TimeFieldSpec(incomingName, incomingDataType, incomingTimeUnitSize, incomingTimeUnit, outgoingName,
               outgoingDataType, outgoingTimeUnitSize, outgoingTimeUnit, defaultNullValue));
-      validateTimeDefaultNullValue(defaultNullValue);
       return this;
     }
 
@@ -439,7 +434,6 @@ public final class Schema {
     public SchemaBuilder addTime(@Nonnull TimeGranularitySpec incomingTimeGranularitySpec,
         @Nonnull Object defaultNullValue) {
       schema.addField(new TimeFieldSpec(incomingTimeGranularitySpec, defaultNullValue));
-      validateTimeDefaultNullValue(defaultNullValue);
       return this;
     }
 
@@ -452,32 +446,15 @@ public final class Schema {
     public SchemaBuilder addTime(@Nonnull TimeGranularitySpec incomingTimeGranularitySpec,
         @Nonnull TimeGranularitySpec outgoingTimeGranularitySpec, @Nonnull Object defaultNullValue) {
       schema.addField(new TimeFieldSpec(incomingTimeGranularitySpec, outgoingTimeGranularitySpec, defaultNullValue));
-      validateTimeDefaultNullValue(defaultNullValue);
       return this;
     }
 
     public Schema build() {
+      if (!schema.validate(LOGGER)) {
+        throw new RuntimeException("Invalid schema");
+      }
       return schema;
     }
-
-    private void validateColumnDefaultNullValue(@Nonnull String fieldName, @Nonnull DataType dataType,
-        @Nonnull Object defaultNullValue) {
-      try {
-        schema.getFieldSpecFor(fieldName).getDefaultNullValue();
-      } catch (Exception e) {
-        LOGGER.error("Invalid default null value {} for field {} of type {}", defaultNullValue, fieldName, dataType);
-        throw e;
-      }
-    }
-
-    private void validateTimeDefaultNullValue(@Nonnull Object defaultNullValue) {
-      try {
-        schema.getTimeFieldSpec().getDefaultNullValue();
-      } catch (Exception e) {
-        LOGGER.error("Invalid default value '{}' for time column", defaultNullValue);
-      }
-    }
-
   }
 
   @Override
