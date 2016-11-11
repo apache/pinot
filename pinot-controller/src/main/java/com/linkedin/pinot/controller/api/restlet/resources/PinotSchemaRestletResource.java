@@ -150,7 +150,7 @@ public class PinotSchemaRestletResource extends BasePinotControllerRestletResour
     if (dataFile != null) {
       Schema schema = Schema.fromFile(dataFile);
       try {
-        if (schema.validate(LOGGER)) {
+        if (!schema.validate(LOGGER)) {
           throw new RuntimeException("Schema validation failed");
         }
         _pinotHelixResourceManager.addOrUpdateSchema(schema);
