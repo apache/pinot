@@ -294,12 +294,12 @@ public final class Schema {
               }
               break;
             default:
-              ctxLogger.error("Unsupported field type: {} for field: {}", fieldSpec.getDataType(), fieldName);
+              ctxLogger.error("Unsupported field type: {} for field: {}", dataType, fieldName);
               isValid = false;
               break;
           }
         } catch (Exception e) {
-          ctxLogger.error("Caught exception while validating field {} dataType {}", fieldName, dataType, e);
+          ctxLogger.error("Caught exception while validating {} field {} dataType {}", fieldType, fieldName, dataType, e);
           isValid = false;
         }
       }
