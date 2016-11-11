@@ -18,6 +18,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
@@ -36,6 +37,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.text.StrSubstitutor;
 import org.joda.time.DateTime;
 import org.joda.time.format.ISODateTimeFormat;
+import org.json.JSONObject;
 import org.quartz.CronExpression;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -617,7 +619,6 @@ public class AnomalyResource {
   @Path("/external-dashboard-url/{mergedAnomalyId}")
   public String getExternalDashboardUrlForMergedAnomaly(@NotNull @PathParam("mergedAnomalyId") Long mergedAnomalyId)
       throws Exception {
-    String anomalyUrl = null;
 
     MergedAnomalyResultDTO mergedAnomalyResultDTO = mergedAnomalyResultDAO.findById(mergedAnomalyId);
     String metric = mergedAnomalyResultDTO.getMetric();
@@ -630,17 +631,15 @@ public class AnomalyResource {
     context.put(MetricConfigBean.URL_TEMPLATE_START_TIME, String.valueOf(startTime));
     context.put(MetricConfigBean.URL_TEMPLATE_END_TIME, String.valueOf(endTime));
     StrSubstitutor strSubstitutor = new StrSubstitutor(context);
-    String urlTemplate = metricConfigDTO.getExternalDashboardURLTemplate();
-    anomalyUrl = strSubstitutor.replace(urlTemplate);
-
-    return anomalyUrl;
-
-  }
-
-  public static void main(String[] args) throws Exception {
-    AnomalyResource anomalyResource = new AnomalyResource(null);
-    String anomalyUrl = anomalyResource.getExternalDashboardUrlForMergedAnomaly(null);
-    System.out.println(anomalyUrl);
+    Map<String, String> urlTemplates = metricConfigDTO.getExtSourceLinkInfo();
+    Map<String, String> extSourceUrls = new HashMap<>();
+    for (Entry<String, String> entry : urlTemplates.entrySet()) {
+      String sourceName = entry.getKey();
+      String urlTemplate = entry.getValue();
+      String anomalyUrl = strSubstitutor.replace(urlTemplate);
+      extSourceUrls.put(sourceName, anomalyUrl);
+    }
+    return new JSONObject(extSourceUrls).toString();
   }
 
 }
