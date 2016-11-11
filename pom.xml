@@ -108,6 +108,24 @@
         <argLine> -Xms4g -Xmx4g -XX:MaxPermSize=512m -XX:MaxDirectMemorySize=10g -Dlog4j.configuration=log4j-nooutput.properties</argLine>
       </properties>
     </profile>
+    <!-- jfim: this profile is overridden in pinot-integration-tests -->
+    <profile>
+      <id>travis-integration-tests-only</id>
+      <activation>
+        <activeByDefault>false</activeByDefault>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <skipTests>true</skipTests>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
   </profiles>
 
   <repositories>
