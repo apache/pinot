@@ -38,7 +38,6 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.restlet.resource.ServerResource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,7 +46,7 @@ import org.slf4j.LoggerFactory;
  */
 @Api(tags = "Table")
 @Path("/")
-public class TableSizeResource extends ServerResource {
+public class TableSizeResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(TableSizeResource.class);
 
   @Inject
@@ -115,4 +114,5 @@ public class TableSizeResource extends ServerResource {
       throws WebApplicationException {
     return this.getTableSize(tableName, detailed);
   }
+
 }
