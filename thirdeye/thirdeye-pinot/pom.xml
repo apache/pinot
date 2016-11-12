@@ -150,6 +150,21 @@
       <artifactId>EvalEx</artifactId>
     </dependency>
 
+    <!-- Teradata dependency -->
+    <dependency>
+      <groupId>com.teradata</groupId>
+      <artifactId>tdgssconfig</artifactId>
+      <scope>system</scope>
+      <systemPath>${project.basedir}/src/main/resources/libs/tdgssconfig.jar</systemPath>
+    </dependency>
+
+    <dependency>
+      <groupId>com.teradata</groupId>
+      <artifactId>terajdbc4</artifactId>
+      <scope>system</scope>
+      <systemPath>${project.basedir}/src/main/resources/libs/terajdbc4.jar</systemPath>
+    </dependency>
+
     <!-- test dependencies -->
     <dependency>
       <groupId>org.mockito</groupId>

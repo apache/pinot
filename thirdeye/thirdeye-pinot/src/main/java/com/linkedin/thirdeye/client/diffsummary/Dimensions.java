@@ -46,6 +46,14 @@ public class Dimensions {
     return allDimensions();
   }
 
+  public boolean equals(Dimensions other) {
+    return names.equals(other);
+  }
+
+  public int hashCode() {
+    return names.hashCode();
+  }
+
   @Override
   public String toString() {
     return ToStringBuilder.reflectionToString(this, ToStringStyle.SIMPLE_STYLE);

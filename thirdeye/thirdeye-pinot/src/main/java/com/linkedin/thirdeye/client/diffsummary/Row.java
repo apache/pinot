@@ -4,7 +4,7 @@ import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 
 
-class Row {
+public class Row {
   Dimensions dimensions;
   DimensionValues dimensionValues;
   double baselineValue;

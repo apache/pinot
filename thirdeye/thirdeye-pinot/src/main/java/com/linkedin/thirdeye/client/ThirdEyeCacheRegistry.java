@@ -1,5 +1,9 @@
 package com.linkedin.thirdeye.client;
 
+import com.google.inject.Guice;
+import com.google.inject.Injector;
+import com.linkedin.thirdeye.client.diffsummary.teradata.QueryTera;
+import com.linkedin.thirdeye.client.diffsummary.teradata.TeradataSourceModel;
 import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -46,6 +50,7 @@ public class ThirdEyeCacheRegistry {
   private LoadingCache<String, String> dimensionFiltersCache;
   private CollectionsCache collectionsCache;
   private QueryCache queryCache;
+  private QueryTera queryTera;
 
   private static DatasetConfigManager datasetConfigDAO;
   private static MetricConfigManager metricConfigDAO;
@@ -177,6 +182,11 @@ public class ThirdEyeCacheRegistry {
     LoadingCache<String, List<DashboardConfigDTO>> dashboardConfigsCache = CacheBuilder.newBuilder()
         .build(new DashboardConfigCacheLoader(dashboardConfigDAO));
     cacheRegistry.registerDashboardConfigsCache(dashboardConfigsCache);
+
+    // Teradata cache
+    Injector injector = Guice.createInjector(new TeradataSourceModel());
+    QueryTera queryTera = injector.getInstance(QueryTera.class);
+    cacheRegistry.registerQueryTera(queryTera);
   }
 
   private static void initPeriodicCacheRefresh() {
@@ -278,8 +288,16 @@ public class ThirdEyeCacheRegistry {
     return queryCache;
   }
 
+  public QueryTera getQueryTera() {
+    return queryTera;
+  }
+
   public void registerQueryCache(QueryCache queryCache) {
     this.queryCache = queryCache;
+  }
+
+  public void registerQueryTera(QueryTera queryTera) {
+    this.queryTera = queryTera;
   }
 
   public LoadingCache<String, DatasetConfigDTO> getDatasetConfigCache() {
