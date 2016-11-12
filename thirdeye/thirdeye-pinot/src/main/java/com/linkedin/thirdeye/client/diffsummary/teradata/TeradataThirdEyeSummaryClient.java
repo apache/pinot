@@ -50,6 +50,7 @@ public class TeradataThirdEyeSummaryClient implements OLAPDataBaseClient {
 
   @Override
   public void setCollection(String collection) {
+    _tableName = collection;
   }
 
   @Override
@@ -79,40 +80,37 @@ public class TeradataThirdEyeSummaryClient implements OLAPDataBaseClient {
   @Override
   public Row getTopAggregatedValues() throws Exception {
     List<String> groupBy = Collections.emptyList();
-    Map<Dimensions, GroupByCallable> requestsBaseline = new HashMap<>();
-    Map<Dimensions, GroupByCallable> requestsCurrent = new HashMap<>();
-    Dimensions dim = new Dimensions(groupBy);
-    requestsBaseline.put(dim, constructCallable(groupBy, true));
-    requestsCurrent.put(dim, constructCallable(groupBy, false));
-    return constructAggregatedValues(requestsBaseline, requestsCurrent).get(0).get(0);
+    Map<List<String>, GroupByCallable> requestsBaseline = new HashMap<>();
+    Map<List<String>, GroupByCallable> requestsCurrent = new HashMap<>();
+    requestsBaseline.put(groupBy, constructCallable(groupBy, true));
+    requestsCurrent.put(groupBy, constructCallable(groupBy, false));
+    return constructAggregatedValues(null, requestsBaseline, requestsCurrent, false).get(0).get(0);
   }
 
   @Override
   public List<List<Row>> getAggregatedValuesOfDimension(Dimensions dimensions)
       throws Exception {
-    Map<Dimensions, GroupByCallable> requestsBaseline = new HashMap<>();
-    Map<Dimensions, GroupByCallable> requestsCurrent = new HashMap<>();
+    Map<List<String>, GroupByCallable> requestsBaseline = new HashMap<>();
+    Map<List<String>, GroupByCallable> requestsCurrent = new HashMap<>();
     for (int level = 0; level < dimensions.size(); ++level) {
       List<String> groupBy = Lists.newArrayList(dimensions.get(level));
-      Dimensions dim = new Dimensions(groupBy);
-      requestsBaseline.put(dim, constructCallable(groupBy, true));
-      requestsCurrent.put(dim, constructCallable(groupBy, false));
+      requestsBaseline.put(groupBy, constructCallable(groupBy, true));
+      requestsCurrent.put(groupBy, constructCallable(groupBy, false));
     }
-    return constructAggregatedValues(requestsBaseline, requestsCurrent);
+    return constructAggregatedValues(dimensions, requestsBaseline, requestsCurrent, true);
   }
 
   @Override
   public List<List<Row>> getAggregatedValuesOfLevels(Dimensions dimensions)
       throws Exception {
-    Map<Dimensions, GroupByCallable> requestsBaseline = new HashMap<>();
-    Map<Dimensions, GroupByCallable> requestsCurrent = new HashMap<>();
+    Map<List<String>, GroupByCallable> requestsBaseline = new HashMap<>();
+    Map<List<String>, GroupByCallable> requestsCurrent = new HashMap<>();
     for (int level = 0; level < dimensions.size()+1; ++level) {
       List<String> groupBy = Lists.newArrayList(dimensions.groupByStringsAtLevel(level));
-      Dimensions dim = new Dimensions(groupBy);
-      requestsBaseline.put(dim, constructCallable(groupBy, true));
-      requestsCurrent.put(dim, constructCallable(groupBy, false));
+      requestsBaseline.put(groupBy, constructCallable(groupBy, true));
+      requestsCurrent.put(groupBy, constructCallable(groupBy, false));
     }
-    return constructAggregatedValues(requestsBaseline, requestsCurrent);
+    return constructAggregatedValues(dimensions, requestsBaseline, requestsCurrent, false);
   }
 
   private GroupByCallable constructCallable(List<String> groupByString, Boolean isBase) {
@@ -123,56 +121,63 @@ public class TeradataThirdEyeSummaryClient implements OLAPDataBaseClient {
     }
   }
 
-  private List<List<Row>> constructAggregatedValues(Map<Dimensions, GroupByCallable> requestsBaseline,
-      Map<Dimensions, GroupByCallable> requestsCurrent) throws Exception {
-    Map<Dimensions, Future<Map<List<String>, Double>>> futureMapBaseline = new HashMap<>();
-    Map<Dimensions, Future<Map<List<String>, Double>>> futureMapCurrent = new HashMap<>();
-    for (Map.Entry<Dimensions, GroupByCallable> entry : requestsBaseline.entrySet()) {
+  private List<List<Row>> constructAggregatedValues(Dimensions dimensions,
+      Map<List<String>, GroupByCallable> requestsBaseline,
+      Map<List<String>, GroupByCallable> requestsCurrent,
+      Boolean isOfDimension) throws Exception {
+    Map<List<String>, Future<Map<List<String>, Double>>> futureMapBaseline = new HashMap<>();
+    Map<List<String>, Future<Map<List<String>, Double>>> futureMapCurrent = new HashMap<>();
+    for (Map.Entry<List<String>, GroupByCallable> entry : requestsBaseline.entrySet()) {
       futureMapBaseline.put(entry.getKey(), _executorService.submit(entry.getValue()));
     }
 
-    for (Map.Entry<Dimensions, GroupByCallable> entry : requestsCurrent.entrySet()) {
+    for (Map.Entry<List<String>, GroupByCallable> entry : requestsCurrent.entrySet()) {
       futureMapCurrent.put(entry.getKey(), _executorService.submit(entry.getValue()));
     }
 
     List<List<Row>> rowTable = new ArrayList<>();
-    for (Dimensions dimensions : futureMapCurrent.keySet()) {
-      List<Row> rows = new ArrayList<>();
-      if (!futureMapCurrent.containsKey(dimensions)) {
+    for (int i = 0; i < futureMapBaseline.size(); i++) {
+      rowTable.add(new ArrayList<>());
+    }
+    int k = 0;
+    for (List<String> groupBy : futureMapCurrent.keySet()) {
+      int ind = isOfDimension ? (k++) : groupBy.size();
+      List<Row> rows = rowTable.get(ind);
+      if (!futureMapCurrent.containsKey(groupBy)) {
         LOG.error("Mismatch of dimension between baseline and current value");
       }
-        Map<List<String>, Double> baseline = futureMapBaseline.get(dimensions).get(TIME_OUT_VALUE, TIME_OUT_UNIT);
-        Map<List<String>, Double> current = futureMapCurrent.get(dimensions).get(TIME_OUT_VALUE, TIME_OUT_UNIT);
+      Map<List<String>, Double> baseline = futureMapBaseline.get(groupBy).get(TIME_OUT_VALUE, TIME_OUT_UNIT);
+      Map<List<String>, Double> current = futureMapCurrent.get(groupBy).get(TIME_OUT_VALUE, TIME_OUT_UNIT);
 
-        Set<List<String>> allDimValues = new HashSet<>();
-        allDimValues.addAll(baseline.keySet());
-        allDimValues.addAll(current.keySet());
+      Set<List<String>> allDimValues = new HashSet<>();
+      allDimValues.addAll(baseline.keySet());
+      allDimValues.addAll(current.keySet());
 
-        for (List<String> values: allDimValues) {
-          DimensionValues dimensionValues = new DimensionValues(values);
-          Row oneRow = new Row();
-          oneRow.setDimensions(dimensions);
-          oneRow.setDimensionValues(dimensionValues);
-          if (current.containsKey(values)) {
-            oneRow.setCurrentValue(current.get(values));
-          } else {
-            oneRow.setCurrentValue(0.);
-          }
-          if (baseline.containsKey(values)) {
-            oneRow.setBaselineValue(baseline.get(values));
-          } else {
-            oneRow.setBaselineValue(0.);
-          }
-          rows.add(oneRow);
+      for (List<String> values: allDimValues) {
+        DimensionValues dimensionValues = new DimensionValues(values);
+        Row oneRow = new Row();
+        oneRow.setDimensions(dimensions);
+        oneRow.setDimensionValues(dimensionValues);
+        if (current.containsKey(values)) {
+          oneRow.setCurrentValue(current.get(values));
+        } else {
+          oneRow.setCurrentValue(0.);
         }
-
-      rowTable.add(rows);
+        if (baseline.containsKey(values)) {
+          oneRow.setBaselineValue(baseline.get(values));
+        } else {
+          oneRow.setBaselineValue(0.);
+        }
+        rows.add(oneRow);
+      }
     }
 
     return rowTable;
   }
 
   public static void main(String[] args) {
+
+    System.setProperty("dw.rootDir", "/Users/jswang/tmp/thirdeye-configs/prod-configs");
     Injector injector = Guice.createInjector(new TeradataSourceModel());
     QueryTera queryTera = injector.getInstance(QueryTera.class);
 
@@ -180,9 +185,9 @@ public class TeradataThirdEyeSummaryClient implements OLAPDataBaseClient {
 
     TeradataThirdEyeSummaryClient ttsc = new TeradataThirdEyeSummaryClient(queryTera, executorService);
 
-    String tableName = "dm_biz.wow_bookings";
-    DateTime b_start = new DateTime("2016-10-01T21:39:45.618-08:00");
-    DateTime b_end = new DateTime("2016-10-17T21:39:45.618-08:00");
+    String tableName = "dm_biz.yoy_bookings";
+    DateTime b_start = new DateTime("2015-10-01T21:39:45.618-08:00");
+    DateTime b_end = new DateTime("2015-10-28T21:39:45.618-08:00");
     DateTime c_start = new DateTime("2016-10-18T21:39:45.618-08:00");
     DateTime c_end = new DateTime("2016-10-25T21:39:45.618-08:00");
     ttsc.setBaselineStartInclusive(b_start);
@@ -193,18 +198,18 @@ public class TeradataThirdEyeSummaryClient implements OLAPDataBaseClient {
 
     List<String> d1 = new ArrayList<>();
     d1.add("poster_type");
-    d1.add("member_country_grp4");
+    d1.add("job_type");
     d1.add("job_tier");
+    d1.add("member_country_grp4");
     Dimensions dim = new Dimensions(d1);
     List<List<Row>> rowTable = null;
     try {
-      rowTable = ttsc.getAggregatedValuesOfLevels(dim);
+      rowTable = ttsc.getAggregatedValuesOfDimension(dim);
       rowTable.stream().forEach(e -> {
         e.stream().forEach(row -> System.out.println(row.toString()));
       });
-
-      Row topRow = ttsc.getTopAggregatedValues();
-      System.out.println(topRow.toString());
+//      Row topRow = ttsc.getTopAggregatedValues();
+//      System.out.println(topRow.toString());
     } catch (Exception e) {
       if (!executorService.isShutdown()) {
         executorService.shutdown();

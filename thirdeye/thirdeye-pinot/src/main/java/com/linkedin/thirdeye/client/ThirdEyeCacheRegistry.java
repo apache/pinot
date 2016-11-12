@@ -289,7 +289,10 @@ public class ThirdEyeCacheRegistry {
   }
 
   public QueryTera getQueryTera() {
-    return queryTera;
+    //TODO: ask Teradata team to whitelist our account for idle connection
+    Injector injector = Guice.createInjector(new TeradataSourceModel());
+    return injector.getInstance(QueryTera.class);
+//    return queryTera;
   }
 
   public void registerQueryCache(QueryCache queryCache) {

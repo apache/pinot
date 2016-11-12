@@ -152,17 +152,15 @@
 
     <!-- Teradata dependency -->
     <dependency>
-      <groupId>com.teradata</groupId>
+      <groupId>com.teradata.jdbc</groupId>
       <artifactId>tdgssconfig</artifactId>
-      <scope>system</scope>
-      <systemPath>${project.basedir}/src/main/resources/libs/tdgssconfig.jar</systemPath>
+      <version>15.10.00.22</version>
     </dependency>
 
     <dependency>
-      <groupId>com.teradata</groupId>
+      <groupId>com.teradata.jdbc</groupId>
       <artifactId>terajdbc4</artifactId>
-      <scope>system</scope>
-      <systemPath>${project.basedir}/src/main/resources/libs/terajdbc4.jar</systemPath>
+      <version>15.10.00.22</version>
     </dependency>
 
     <!-- test dependencies -->

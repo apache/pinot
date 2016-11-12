@@ -14,6 +14,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.stream.Collectors;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -26,11 +27,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-@Path(value = "/dashboard")
+@Path(value = "/teradashboard")
 public class TeradataSummaryResource {
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
 
-  private static final Logger LOG = LoggerFactory.getLogger(SummaryResource.class);
+  private static final Logger LOG = LoggerFactory.getLogger(TeradataSummaryResource.class);
   private static final String DEFAULT_TIMEZONE_ID = "UTC";
   private static final String DEFAULT_TOP_DIMENSIONS = "3";
   private static final String DEFAULT_HIERARCHIES = "[]";
@@ -66,9 +67,11 @@ public class TeradataSummaryResource {
 
       Dimensions dimensions;
       if (groupByDimensions == null || groupByDimensions.length() == 0 || groupByDimensions.equals("undefined")) {
-        List<String> allColumns = queryTera.getColumnNames(table);
-        allColumns.stream().filter(e -> (!e.toUpperCase().equals("METRIC")) || (!e.toUpperCase().equals("DATETIME_FLAG")));
-        dimensions = new Dimensions(queryTera.getColumnNames(table));
+        List<String> allColumns = queryTera.getColumnNames(table).stream()
+            .filter(
+                e -> (!e.toUpperCase().equals("METRIC")) && (!e.toUpperCase().equals("DATETIME_FLAG")))
+            .collect(Collectors.toList());
+        dimensions = new Dimensions(allColumns);
       } else {
         dimensions = new Dimensions(Arrays.asList(groupByDimensions.trim().split(",")));
       }
@@ -82,15 +85,14 @@ public class TeradataSummaryResource {
 
       Summary summary = new Summary(cube);
       response = summary.computeSummary(summarySize, doOneSideError, topDimensions);
-      if (!executorService.isShutdown()) {
-        executorService.shutdown();
-      }
+
     } catch (Exception e) {
       LOG.error("Exception while generating difference summary", e);
+      response = SummaryResponse.buildNotAvailableResponse();
+    } finally {
       if (!executorService.isShutdown()) {
         executorService.shutdown();
       }
-      response = SummaryResponse.buildNotAvailableResponse();
     }
     return OBJECT_MAPPER.writeValueAsString(response);
   }
@@ -98,7 +100,7 @@ public class TeradataSummaryResource {
   @GET
   @Path(value = "/summary/manualDimensionOrder")
   @Produces(MediaType.APPLICATION_JSON)
-  public String buildSummaryManualDimensionOrder(@QueryParam("dataset") String table,
+  public String buildSummaryManualDimensionOrder(@QueryParam("table") String table,
       @QueryParam("metric") String metric,
       @QueryParam("currentStart") Long currentStartInclusive,
       @QueryParam("currentEnd") Long currentEndExclusive,
@@ -123,8 +125,10 @@ public class TeradataSummaryResource {
 
       List<String> allDimensions;
       if (groupByDimensions == null || groupByDimensions.length() == 0 || groupByDimensions.equals("undefined")) {
-        allDimensions = queryTera.getColumnNames(table);
-        allDimensions.stream().filter(e -> (!e.toUpperCase().equals("METRIC")) || (!e.toUpperCase().equals("DATETIME_FLAG")));
+        allDimensions = queryTera.getColumnNames(table).stream()
+            .filter(
+                e -> (!e.toUpperCase().equals("METRIC")) && (!e.toUpperCase().equals("DATETIME_FLAG")))
+            .collect(Collectors.toList());
       } else {
         allDimensions = Arrays.asList(groupByDimensions.trim().split(","));
       }
@@ -143,6 +147,10 @@ public class TeradataSummaryResource {
     } catch (Exception e) {
       LOG.error("Exception while generating difference summary", e);
       response = SummaryResponse.buildNotAvailableResponse();
+    } finally {
+      if (!executorService.isShutdown()) {
+        executorService.shutdown();
+      }
     }
     return OBJECT_MAPPER.writeValueAsString(response);
   }

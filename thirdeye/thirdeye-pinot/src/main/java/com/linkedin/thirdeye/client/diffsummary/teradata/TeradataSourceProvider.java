@@ -15,9 +15,7 @@ public class TeradataSourceProvider implements Provider<DataSource> {
   private DataSource dataSource;
 
   public TeradataSourceProvider () {
-    //TODO: change this to actual persistence-tera directory
-//    String persistenceConfig = System.getProperty("dw.rootDir") + "/persistence-tera.yml";
-    String persistenceConfig = "/Users/jswang/tmp/thirdeye-configs/persistence-tera.yml";
+    String persistenceConfig = System.getProperty("dw.rootDir") + "/persistence-tera.yml";
     LOG.info("Loading Teradata persistence config from [{}]", persistenceConfig);
     File teraConfigFile = new File(persistenceConfig);
     PersistenceConfig configuration = DaoProviderUtil.createConfiguration(teraConfigFile);
