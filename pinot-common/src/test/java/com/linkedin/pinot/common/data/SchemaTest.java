@@ -15,10 +15,6 @@
  */
 package com.linkedin.pinot.common.data;
 
-import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.common.data.TimeGranularitySpec.TimeFormat;
-import com.linkedin.pinot.common.utils.SchemaUtils;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
@@ -28,6 +24,10 @@ import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import com.linkedin.pinot.common.data.TimeGranularitySpec.TimeFormat;
+import com.linkedin.pinot.common.utils.SchemaUtils;
 
 
 public class SchemaTest {
@@ -78,6 +78,7 @@ public class SchemaTest {
 
   @Test
   public void testSchemaBuilder() {
+    final Float defaultFloat = 0.5f;
     Schema schema = new Schema.SchemaBuilder()
         .addSingleValueDimension("svDimension", FieldSpec.DataType.INT)
         .addSingleValueDimension("svDimensionWithDefault", FieldSpec.DataType.INT, 10)
@@ -85,9 +86,9 @@ public class SchemaTest {
         .addMultiValueDimension("mvDimensionWithDefault", FieldSpec.DataType.STRING, "default")
         .addMetric("metric", FieldSpec.DataType.INT)
         .addMetric("metricWithDefault", FieldSpec.DataType.INT, 5)
-        .addMetric("derivedMetric", FieldSpec.DataType.STRING, 10, MetricFieldSpec.DerivedMetricType.HLL)
-        .addMetric("derivedMetricWithDefault", FieldSpec.DataType.STRING, 10, MetricFieldSpec.DerivedMetricType.HLL,
-            "default")
+        .addMetric("derivedMetric", FieldSpec.DataType.LONG, 10, MetricFieldSpec.DerivedMetricType.HLL)
+        .addMetric("derivedMetricWithDefault", DataType.FLOAT, 10, MetricFieldSpec.DerivedMetricType.HLL,
+            defaultFloat.toString())
         .addTime("time", TimeUnit.DAYS, FieldSpec.DataType.LONG)
         .build();
 
@@ -131,14 +132,14 @@ public class SchemaTest {
     fieldSpec = schema.getMetricSpec("derivedMetric");
     Assert.assertNotNull(fieldSpec);
     Assert.assertEquals(fieldSpec.isSingleValueField(), true);
-    Assert.assertEquals(fieldSpec.getDataType(), FieldSpec.DataType.STRING);
-    Assert.assertEquals(fieldSpec.getDefaultNullValue(), "null");
+    Assert.assertEquals(fieldSpec.getDataType(), FieldSpec.DataType.LONG);
+    Assert.assertEquals(fieldSpec.getDefaultNullValue(), new Long(0));
 
     fieldSpec = schema.getMetricSpec("derivedMetricWithDefault");
     Assert.assertNotNull(fieldSpec);
     Assert.assertEquals(fieldSpec.isSingleValueField(), true);
-    Assert.assertEquals(fieldSpec.getDataType(), FieldSpec.DataType.STRING);
-    Assert.assertEquals(fieldSpec.getDefaultNullValue(), "default");
+    Assert.assertEquals(fieldSpec.getDataType(), FieldSpec.DataType.FLOAT);
+    Assert.assertEquals(fieldSpec.getDefaultNullValue(), defaultFloat);
 
     fieldSpec = schema.getTimeFieldSpec();
     Assert.assertNotNull(fieldSpec);
