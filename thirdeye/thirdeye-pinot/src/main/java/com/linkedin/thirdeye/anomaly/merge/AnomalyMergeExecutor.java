@@ -166,7 +166,9 @@ public class AnomalyMergeExecutor implements Runnable {
           throw new IllegalArgumentException("Merge strategy " + mergeConfig.getMergeStrategy() + " not supported");
       }
       for (MergedAnomalyResultDTO mergedAnomalyResultDTO : output) {
-        mergedAnomalyResultDTO.setNotified(isBackfill);
+        if (isBackfill) {
+          mergedAnomalyResultDTO.setNotified(isBackfill);
+        } // else notified flag is left as is
         updateMergedScoreAndPersist(mergedAnomalyResultDTO, mergeConfig);
       }
       return output.size();
