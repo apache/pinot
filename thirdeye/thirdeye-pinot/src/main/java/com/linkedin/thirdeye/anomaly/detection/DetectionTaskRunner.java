@@ -92,17 +92,20 @@ public class DetectionTaskRunner implements TaskRunner {
 
     exploreDimensionsAndAnalyze(dimensionKeyMetricTimeSeriesMap);
 
-    // If the current job is a backfill (adhoc) detection job, then perform a lightweight merge right after the
-    // detection. Moreover, set notified flag to true so the merged anomalies do not induce alerts and emails.
+    boolean isBackfill = false;
+    // If the current job is a backfill (adhoc) detection job, set notified flag to true so the merged anomalies do not
+    // induce alerts and emails.
     String jobName = taskContext.getJobDAO().getJobNameByJobId(detectionTaskInfo.getJobExecutionId());
     if (jobName != null && jobName.toLowerCase().startsWith(BACKFILL_PREFIX)) {
-      final boolean isBackfill = true;
-      // syncAnomalyMergeExecutor is supposed to perform lightweight merge (i.e., anomalies that have the same function
-      // id and at the same dimensions) after each detection task. Consequently, a null thread pool is passed the merge
-      // executor on purpose in order to prevent unwanted
-      AnomalyMergeExecutor syncAnomalyMergeExecutor = new AnomalyMergeExecutor(null, anomalyFunctionFactory);
-      syncAnomalyMergeExecutor.synchronousMergeBasedOnFunctionIdAndDimension(anomalyFunctionSpec, isBackfill);
+      isBackfill = true;
     }
+
+    // TODO: Create AnomalyMergeExecutor in class level in order to reuse the resource
+    // syncAnomalyMergeExecutor is supposed to perform lightweight merges (i.e., anomalies that have the same function
+    // id and at the same dimensions) after each detection task. Consequently, a null thread pool is passed the merge
+    // executor on purpose in order to prevent an undesired asynchronous merge happens.
+    AnomalyMergeExecutor syncAnomalyMergeExecutor = new AnomalyMergeExecutor(null, anomalyFunctionFactory);
+    syncAnomalyMergeExecutor.synchronousMergeBasedOnFunctionIdAndDimension(anomalyFunctionSpec, isBackfill);
 
     return taskResult;
   }

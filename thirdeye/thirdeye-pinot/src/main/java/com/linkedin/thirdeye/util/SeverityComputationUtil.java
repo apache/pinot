@@ -42,11 +42,16 @@ public class SeverityComputationUtil {
     List<Pair<DateTime, DateTime>> intervals =
         getHistoryIntervals(currentWindowStart, currentWindowEnd, seasonalPeriod, seasonCount);
     double baselineSum = 0;
+    int count = 0;
     for (Pair<DateTime, DateTime> pair : intervals) {
       thirdEyeRequest = createThirdEyeRequest(pair.getLeft().getMillis(), pair.getRight().getMillis());
-      baselineSum += getSum(thirdEyeRequest);
+      double sum = getSum(thirdEyeRequest);
+      if (sum != 0d) {
+        ++count;
+        baselineSum += sum;
+      }
     }
-    double baselineSumAvg = baselineSum / intervals.size();
+    double baselineSumAvg = baselineSum / count;
     double weight = (currentSum - baselineSumAvg) / baselineSumAvg;
     HashMap<String, Object> hashMap = Maps.newHashMap();
     hashMap.put("weight", weight);
