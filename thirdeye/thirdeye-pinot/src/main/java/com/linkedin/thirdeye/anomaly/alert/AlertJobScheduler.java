@@ -37,6 +37,9 @@ import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
 public class AlertJobScheduler implements JobScheduler, Runnable {
 
   private static final Logger LOG = LoggerFactory.getLogger(AlertJobScheduler.class);
+  public static final int DEFAULT_ALERT_DELAY = 10;
+  public static final TimeUnit DEFAULT_ALERT_DELAY_UNIT = TimeUnit.MINUTES;
+
   private SchedulerFactory schedulerFactory;
   private Scheduler quartzScheduler;
   private ScheduledExecutorService scheduledExecutorService;
@@ -72,7 +75,7 @@ public class AlertJobScheduler implements JobScheduler, Runnable {
   public void start() throws SchedulerException {
     quartzScheduler.start();
 
-    scheduledExecutorService.scheduleWithFixedDelay(this, 0, 30, TimeUnit.MINUTES);
+    scheduledExecutorService.scheduleWithFixedDelay(this, 0, DEFAULT_ALERT_DELAY, DEFAULT_ALERT_DELAY_UNIT);
   }
 
   public void run() {
