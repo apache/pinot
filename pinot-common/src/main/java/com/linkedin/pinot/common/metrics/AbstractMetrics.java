@@ -100,8 +100,16 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    * @param duration The log time duration time value
    * @param timeUnit The log time duration time unit
    */
-  public void addTimedTableValue(final String tableName, ServerTimer timer, final long duration, final TimeUnit timeUnit) {
+  public void addTimedTableValue(final String tableName, T timer, final long duration, final TimeUnit timeUnit) {
     final String fullTimerName = _metricPrefix + tableName + "." + timer.getTimerName();
+    addValueToTimer(fullTimerName, duration, timeUnit);
+  }
+
+  /**
+   * Logs the timing for a global timer
+   */
+  public void addTimedValue(T timer, final long duration, final TimeUnit timeUnit) {
+    final String fullTimerName = _metricPrefix + timer.getTimerName();
     addValueToTimer(fullTimerName, duration, timeUnit);
   }
 

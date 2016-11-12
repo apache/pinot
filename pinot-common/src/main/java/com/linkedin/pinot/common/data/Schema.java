@@ -15,10 +15,6 @@
  */
 package com.linkedin.pinot.common.data;
 
-import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.common.data.FieldSpec.FieldType;
-import com.linkedin.pinot.common.utils.EqualityUtils;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -30,13 +26,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import com.linkedin.pinot.common.data.FieldSpec.FieldType;
+import com.linkedin.pinot.common.utils.EqualityUtils;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /**
  * The <code>Schema</code> class is defined for each table to describe the details of the table's fields (columns).
@@ -255,54 +255,54 @@ public final class Schema {
     boolean isValid = true;
 
     // Log ALL the schema errors that may be present.
-    try {
       for (FieldSpec fieldSpec : fieldSpecMap.values()) {
         FieldType fieldType = fieldSpec.getFieldType();
         DataType dataType = fieldSpec.getDataType();
         String fieldName = fieldSpec.getName();
-        switch (fieldType) {
-          case DIMENSION:
-          case TIME:
-            switch (dataType) {
-              case INT:
-              case LONG:
-              case FLOAT:
-              case DOUBLE:
-              case STRING:
-                // Check getDefaultNullValue() does not throw exception.
-                fieldSpec.getDefaultNullValue();
-                break;
-              default:
-                ctxLogger.error("Unsupported data type: {} in dimension/time field: {}", dataType, fieldName);
-                isValid = false;
-                break;
-            }
-            break;
-          case METRIC:
-            switch (dataType) {
-              case INT:
-              case LONG:
-              case FLOAT:
-              case DOUBLE:
-                // Check getDefaultNullValue() does not throw exception.
-                fieldSpec.getDefaultNullValue();
-                break;
-              default:
-                ctxLogger.error("Unsupported data type: {} in metric field: {}", dataType, fieldName);
-                isValid = false;
-                break;
-            }
-            break;
-          default:
-            ctxLogger.error("Unsupported field type: {} for field: {}", fieldSpec.getDataType(), fieldName);
-            isValid = false;
-            break;
+        try {
+          switch (fieldType) {
+            case DIMENSION:
+            case TIME:
+              switch (dataType) {
+                case INT:
+                case LONG:
+                case FLOAT:
+                case DOUBLE:
+                case STRING:
+                  // Check getDefaultNullValue() does not throw exception.
+                  fieldSpec.getDefaultNullValue();
+                  break;
+                default:
+                  ctxLogger.error("Unsupported data type: {} in dimension/time field: {}", dataType, fieldName);
+                  isValid = false;
+                  break;
+              }
+              break;
+            case METRIC:
+              switch (dataType) {
+                case INT:
+                case LONG:
+                case FLOAT:
+                case DOUBLE:
+                  // Check getDefaultNullValue() does not throw exception.
+                  fieldSpec.getDefaultNullValue();
+                  break;
+                default:
+                  ctxLogger.error("Unsupported data type: {} in metric field: {}", dataType, fieldName);
+                  isValid = false;
+                  break;
+              }
+              break;
+            default:
+              ctxLogger.error("Unsupported field type: {} for field: {}", dataType, fieldName);
+              isValid = false;
+              break;
+          }
+        } catch (Exception e) {
+          ctxLogger.error("Caught exception while validating {} field {} dataType {}", fieldType, fieldName, dataType, e);
+          isValid = false;
         }
       }
-    } catch (Exception e) {
-      ctxLogger.error("Caught exception while validate the schema.", e);
-      isValid = false;
-    }
 
     return isValid;
   }
@@ -450,6 +450,9 @@ public final class Schema {
     }
 
     public Schema build() {
+      if (!schema.validate(LOGGER)) {
+        throw new RuntimeException("Invalid schema");
+      }
       return schema;
     }
   }

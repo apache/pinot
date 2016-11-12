@@ -64,7 +64,7 @@ public class TimeOnTimeTest {
   // TABULAR
   private static TimeOnTimeComparisonRequest generateGroupByTimeRequest() {
     TimeOnTimeComparisonRequest comparisonRequest = new TimeOnTimeComparisonRequest();
-    String collection = "thirdeyeAbook_OFFLINE";
+    String collection = "thirdeyeAbook";
     comparisonRequest.setCollectionName(collection);
     comparisonRequest.setBaselineStart(new DateTime(2016, 4, 1, 00, 00));
     comparisonRequest.setBaselineEnd(new DateTime(2016, 4, 2, 00, 00));
@@ -83,7 +83,7 @@ public class TimeOnTimeTest {
   // HEATMAP
   private static TimeOnTimeComparisonRequest generateGroupByDimensionRequest() {
     TimeOnTimeComparisonRequest comparisonRequest = new TimeOnTimeComparisonRequest();
-    String collection = "thirdeyeAbook_OFFLINE";
+    String collection = "thirdeyeAbook";
     comparisonRequest.setCollectionName(collection);
     comparisonRequest.setBaselineStart(new DateTime(2016, 4, 1, 00, 00));
     comparisonRequest.setBaselineEnd(new DateTime(2016, 4, 1, 01, 00));
@@ -103,7 +103,7 @@ public class TimeOnTimeTest {
   // CONTRIBUTOR
   private static TimeOnTimeComparisonRequest generateGroupByTimeAndDimension() {
     TimeOnTimeComparisonRequest comparisonRequest = new TimeOnTimeComparisonRequest();
-    String collection = "thirdeyeAbook_OFFLINE";
+    String collection = "thirdeyeAbook";
     comparisonRequest.setCollectionName(collection);
     comparisonRequest.setBaselineStart(new DateTime(2016, 4, 1, 00, 00));
     comparisonRequest.setBaselineEnd(new DateTime(2016, 4, 2, 00, 00));

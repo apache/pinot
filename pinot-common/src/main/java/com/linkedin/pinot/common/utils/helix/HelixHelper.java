@@ -31,6 +31,7 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.PropertyKey.Builder;
 import org.apache.helix.ZNRecord;
+import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.HelixConfigScope.ConfigScopeProperty;
@@ -81,7 +82,9 @@ public class HelixHelper {
         String path = key.getPath();
         // Make a copy of the the idealState above to pass it to the updater, instead of querying again,
         // as the state my change between the queries.
-        IdealState idealStateCopy = new IdealState(idealState.getRecord());
+        ZNRecordSerializer znRecordSerializer = new ZNRecordSerializer();
+        IdealState idealStateCopy = new IdealState(
+            (ZNRecord) znRecordSerializer.deserialize(znRecordSerializer.serialize(idealState.getRecord())));
         IdealState updatedIdealState;
 
         try {

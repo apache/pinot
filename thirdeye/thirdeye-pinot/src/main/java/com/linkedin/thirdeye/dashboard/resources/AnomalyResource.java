@@ -14,8 +14,11 @@ import java.io.IOException;
 import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
@@ -31,8 +34,10 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.text.StrSubstitutor;
 import org.joda.time.DateTime;
 import org.joda.time.format.ISODateTimeFormat;
+import org.json.JSONObject;
 import org.quartz.CronExpression;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,13 +54,16 @@ import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.EmailConfigurationManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
+import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
+import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 @Path(value = "/dashboard")
@@ -73,6 +81,8 @@ public class AnomalyResource {
   private MergedAnomalyResultManager anomalyMergedResultDAO;
   private RawAnomalyResultManager rawAnomalyResultDAO;
   private EmailConfigurationManager emailConfigurationDAO;
+  private MetricConfigManager metricConfigDAO;
+  private MergedAnomalyResultManager mergedAnomalyResultDAO;
   private AnomalyTimeSeriesViewFactory anomalyTimeSeriesViewFactory;
 
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
@@ -82,6 +92,8 @@ public class AnomalyResource {
     this.rawAnomalyResultDAO = DAO_REGISTRY.getRawAnomalyResultDAO();
     this.anomalyMergedResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
     this.emailConfigurationDAO = DAO_REGISTRY.getEmailConfigurationDAO();
+    this.metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
+    this.mergedAnomalyResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
     this.anomalyTimeSeriesViewFactory = anomalyTimeSeriesViewFactory;
   }
 
@@ -601,6 +613,38 @@ public class AnomalyResource {
     }
 
     return anomalyTimelinesView;
+  }
+
+  @GET
+  @Path("/external-dashboard-url/{mergedAnomalyId}")
+  public String getExternalDashboardUrlForMergedAnomaly(@NotNull @PathParam("mergedAnomalyId") Long mergedAnomalyId)
+      throws Exception {
+
+    MergedAnomalyResultDTO mergedAnomalyResultDTO = mergedAnomalyResultDAO.findById(mergedAnomalyId);
+    String metric = mergedAnomalyResultDTO.getMetric();
+    String dataset = mergedAnomalyResultDTO.getCollection();
+    Long startTime = mergedAnomalyResultDTO.getStartTime();
+    Long endTime = mergedAnomalyResultDTO.getEndTime();
+    MetricConfigDTO metricConfigDTO = metricConfigDAO.findByMetricAndDataset(metric, dataset);
+
+    Map<String, String> context = new HashMap<>();
+    context.put(MetricConfigBean.URL_TEMPLATE_START_TIME, String.valueOf(startTime));
+    context.put(MetricConfigBean.URL_TEMPLATE_END_TIME, String.valueOf(endTime));
+    StrSubstitutor strSubstitutor = new StrSubstitutor(context);
+    Map<String, String> urlTemplates = metricConfigDTO.getExtSourceLinkInfo();
+    for (Entry<String, String> entry : urlTemplates.entrySet()) {
+      String sourceName = entry.getKey();
+      String urlTemplate = entry.getValue();
+      String extSourceUrl = strSubstitutor.replace(urlTemplate);
+      urlTemplates.put(sourceName, extSourceUrl);
+    }
+    return new JSONObject(urlTemplates).toString();
+  }
+
+  public static void main(String[] args) throws Exception {
+    AnomalyResource anomalyResource = new AnomalyResource(null);
+    String anomalyUrl = anomalyResource.getExternalDashboardUrlForMergedAnomaly(null);
+    System.out.println(anomalyUrl);
   }
 
 }

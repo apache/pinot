@@ -174,7 +174,7 @@ public class WeekOverWeekRuleFunction extends BaseAnomalyFunction {
       baselineAverageValue /= baselineBucketCount;
     }
     if (baselineAverageValue != 0d) {
-      double weight = currentAverageValue / baselineAverageValue;
+      double weight = (currentAverageValue / baselineAverageValue) - 1;
       anomalyToUpdated.setWeight(weight);
     }
     anomalyToUpdated.setMessage(

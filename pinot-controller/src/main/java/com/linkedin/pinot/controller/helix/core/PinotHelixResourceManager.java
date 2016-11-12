@@ -15,6 +15,9 @@
  */
 package com.linkedin.pinot.controller.helix.core;
 
+import com.google.common.base.Function;
+import com.linkedin.pinot.common.utils.retry.RetryPolicies;
+import com.linkedin.pinot.common.utils.retry.RetryPolicy;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -24,7 +27,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.Predicate;
 import org.apache.helix.AccessOption;
@@ -95,11 +97,13 @@ import com.linkedin.pinot.controller.helix.core.util.ZKMetadataUtils;
 import com.linkedin.pinot.controller.helix.starter.HelixConfig;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 
 public class PinotHelixResourceManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotHelixResourceManager.class);
   private static final long DEFAULT_EXTERNAL_VIEW_UPDATE_TIMEOUT_MILLIS = 120_000L; // 2 minutes
+  private static final RetryPolicy DEFAULT_RETRY_POLICY = RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 2.0f);
 
   private String _zkBaseUrl;
   private String _helixClusterName;
@@ -362,19 +366,20 @@ public class PinotHelixResourceManager {
     final PinotResourceManagerResponse res = new PinotResourceManagerResponse();
     try {
       IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableName);
-      if (idealState.getPartitionSet().contains(segmentId)) {
-        LOGGER.info("Trying to delete segment: {} from IdealStates", segmentId);
-        HelixHelper.removeSegmentFromIdealState(_helixZkManager, tableName, segmentId);
-      } else {
+      if (idealState == null || idealState.getPartitionSet() == null || !idealState.getPartitionSet().contains(segmentId)) {
         res.message = "Segment " + segmentId + " not in IDEALSTATE.";
         LOGGER.info("Segment: {} is not in IDEALSTATE", segmentId);
+      } else {
+        LOGGER.info("Trying to delete segment: {} from IdealStates", segmentId);
+        HelixHelper.removeSegmentFromIdealState(_helixZkManager, tableName, segmentId);
+        res.message = "";
       }
       _segmentDeletionManager.deleteSegment(tableName, segmentId);
 
-      res.message = "Segment successfully deleted.";
+      res.message += "Segment " + segmentId + " successfully deleted.";
       res.status = ResponseStatus.success;
     } catch (final Exception e) {
-      LOGGER.error("Caught exception while deleting segment", e);
+      LOGGER.error("Caught exception while deleting segment {} of table {}", segmentId, tableName, e);
       res.status = ResponseStatus.failure;
       res.message = e.getMessage();
     }
@@ -449,6 +454,59 @@ public class PinotHelixResourceManager {
     }
     res.status = ResponseStatus.success;
     return res;
+  }
+
+  public PinotResourceManagerResponse rebuildBrokerResourceFromHelixTags(final String tableName) {
+    // Get the broker tag for this table
+    String brokerTag = null;
+    TenantConfig tenantConfig = null;
+
+    try {
+      final TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
+      if (tableType == TableType.OFFLINE) {
+        tenantConfig = ZKMetadataProvider.getOfflineTableConfig(getPropertyStore(), tableName).getTenantConfig();
+      } else if (tableType == TableType.REALTIME) {
+        tenantConfig = ZKMetadataProvider.getRealtimeTableConfig(getPropertyStore(), tableName).getTenantConfig();
+      } else {
+        throw new RuntimeException("Don't know how to handle table of type " + tableType);
+      }
+    } catch (Exception e) {
+      LOGGER.warn("Caught exception while rebuilding broker resource from Helix tags for table {}", e, tableName);
+      return new PinotResourceManagerResponse(
+          "Failed to fetch broker tag for table " + tableName + " due to exception: " + e.getMessage(), false);
+    }
+
+    brokerTag = tenantConfig.getBroker();
+
+    // Look for all instances tagged with this broker tag
+    final Set<String> brokerInstances = getAllInstancesForBrokerTenant(brokerTag);
+
+    // Reset ideal state with the instance list
+    try {
+      HelixHelper.updateIdealState(getHelixZkManager(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE, new Function<IdealState, IdealState>() {
+        @Nullable
+        @Override
+        public IdealState apply(@Nullable IdealState idealState) {
+          Map<String, String> instanceStateMap = idealState.getInstanceStateMap(tableName);
+          if (instanceStateMap != null) {
+            instanceStateMap.clear();
+          }
+
+          for (String brokerInstance : brokerInstances) {
+            idealState.setPartitionState(tableName, brokerInstance, BrokerOnlineOfflineStateModel.ONLINE);
+          }
+
+          return idealState;
+        }
+      }, DEFAULT_RETRY_POLICY);
+
+      LOGGER.info("Successfully rebuilt brokerResource for table {}", tableName);
+      return new PinotResourceManagerResponse("Rebuilt brokerResource for table " + tableName, true);
+    } catch (Exception e) {
+      LOGGER.warn("Caught exception while rebuilding broker resource from Helix tags for table {}", e, tableName);
+      return new PinotResourceManagerResponse(
+          "Failed to rebuild brokerResource for table " + tableName + " due to exception: " + e.getMessage(), false);
+    }
   }
 
   private void addInstanceToBrokerIdealState(String brokerTenantTag, String instanceName) {

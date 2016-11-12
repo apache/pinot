@@ -108,6 +108,24 @@
         <argLine> -Xms4g -Xmx4g -XX:MaxPermSize=512m -XX:MaxDirectMemorySize=10g -Dlog4j.configuration=log4j-nooutput.properties</argLine>
       </properties>
     </profile>
+    <!-- jfim: this profile is overridden in pinot-integration-tests -->
+    <profile>
+      <id>travis-integration-tests-only</id>
+      <activation>
+        <activeByDefault>false</activeByDefault>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <skipTests>true</skipTests>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
   </profiles>
 
   <repositories>
@@ -529,11 +547,9 @@
         <version>3.0.0</version>
       </dependency>
       <dependency>
-        <groupId>org.glassfish.jersey</groupId>
-        <artifactId>jersey-bom</artifactId>
+        <groupId>org.glassfish.jersey.containers</groupId>
+        <artifactId>jersey-container-grizzly2-http</artifactId>
         <version>${jersey.version}</version>
-        <type>pom</type>
-        <scope>import</scope>
         <exclusions>
           <exclusion>
             <groupId>com.fasterxml.jackson.core</groupId>
@@ -546,10 +562,14 @@
         </exclusions>
       </dependency>
       <dependency>
-        <groupId>com.sun.jersey</groupId>
-        <artifactId>jersey-client</artifactId>
-        <version>1.19.2</version>
-        <scope>test</scope>
+        <groupId>org.glassfish.jersey.core</groupId>
+        <artifactId>jersey-server</artifactId>
+        <version>${jersey.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.glassfish.jersey.core</groupId>
+        <artifactId>jersey-common</artifactId>
+        <version>${jersey.version}</version>
       </dependency>
       <dependency>
         <groupId>org.glassfish.jersey.media</groupId>
@@ -569,6 +589,12 @@
             <artifactId>jackson-annotations</artifactId>
           </exclusion>
         </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>com.sun.jersey</groupId>
+        <artifactId>jersey-client</artifactId>
+        <version>1.19.2</version>
+        <scope>test</scope>
       </dependency>
       <dependency>
         <groupId>io.swagger</groupId>
@@ -711,6 +737,7 @@
             <systemPropertyVariables>
               <zookeeper.forceSync>no</zookeeper.forceSync>
             </systemPropertyVariables>
+            <reportFormat>plain</reportFormat>
           </configuration>
         </plugin>
         <plugin>

@@ -8,6 +8,8 @@ import com.linkedin.pinot.controller.api.ControllerRestApplication;
 import org.apache.commons.io.FileUtils;
 import org.restlet.data.Status;
 import org.restlet.representation.Representation;
+import org.restlet.representation.StringRepresentation;
+import org.restlet.resource.Post;
 import org.restlet.resource.Put;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,5 +60,32 @@ public class PinotTableTenantConfigs extends BasePinotControllerRestletResource 
       @Parameter(name = "tableName", in = "path", description = "The name of the table for which to update the tenant configuration", required = true)
       String tableName) {
     throw new UnsupportedOperationException("current tenant config updates are not supported");
+  }
+
+  @Override
+  @Post()
+  public Representation post(Representation entity) {
+    final String tableName = (String) getRequest().getAttributes().get("tableName");
+    try {
+      rebuildBrokerResourceFromHelixTags(tableName);
+      return new StringRepresentation("ok");
+    } catch (Exception e) {
+      setStatus(Status.SERVER_ERROR_INTERNAL);
+      return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
+    }
+  }
+
+  @HttpVerb("post")
+  @Summary("Rebuild broker mapping from Helix tags")
+  @Tags({"table", "tenant"})
+  @Paths({
+      "/tables/{tableName}/rebuildBrokerResourceFromHelixTags"
+  })
+  private Representation rebuildBrokerResourceFromHelixTags(
+      @Parameter(name = "tableName", in = "path", description = "The name of the table for which to rebuild the broker mapping", required = true)
+      String tableName
+  ) {
+    return new StringRepresentation(
+        _pinotHelixResourceManager.rebuildBrokerResourceFromHelixTags(tableName).toString());
   }
 }

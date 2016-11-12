@@ -22,15 +22,31 @@ if [ $? -ne 0 ]; then
   exit 0
 fi
 
-# Only run tests for JDK 8
+# Only run tests for JDK 7
 if [ $TRAVIS_JDK_VERSION != 'oraclejdk7' ]; then
   echo 'Skip tests for version other than oraclejdk7.'
+
+  # Remove Pinot files from local Maven respository to avoid a useless cache rebuild
+  rm -rf ~/.m2/repository/com/linkedin/pinot
   exit 0
 fi
 
-mvn test -B -P travis
-if [ $? -ne 0 ]; then
-  exit 1
+# Only run integration tests if needed
+if [ $RUN_INTEGRATION_TESTS != 'false' ]; then
+  mvn test -B -P travis,travis-integration-tests-only
+  if [ $? -ne 0 ]; then
+    exit 1
+  fi
+else
+  mvn test -B -P travis,travis-no-integration-tests
+  if [ $? -ne 0 ]; then
+    exit 1
+  fi
 fi
 
 bash <(cat .codecov_bash)
+
+# Remove Pinot files from local Maven respository to avoid a useless cache rebuild
+rm -rf ~/.m2/repository/com/linkedin/pinot
+
+exit 0

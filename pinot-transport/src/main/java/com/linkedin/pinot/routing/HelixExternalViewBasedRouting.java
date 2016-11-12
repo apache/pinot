@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
@@ -32,6 +33,7 @@ import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metrics.BrokerMeter;
 import com.linkedin.pinot.common.metrics.BrokerMetrics;
+import com.linkedin.pinot.common.metrics.BrokerTimer;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.NetUtil;
@@ -176,6 +178,9 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
     if (externalView == null) {
       return;
     }
+
+    long startTime = System.currentTimeMillis();
+
     int externalViewRecordVersion = externalView.getRecord().getVersion();
     if (_routingTableLastKnownZkVersionMap.containsKey(tableName)) {
       long lastKnownZkVersion = _routingTableLastKnownZkVersionMap.get(tableName);
@@ -228,6 +233,11 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
       _timeBoundaryService.updateTimeBoundaryService(externalView);
     } catch (Exception e) {
       LOGGER.error("Failed to update the TimeBoundaryService", e);
+    }
+
+    long updateTime = System.currentTimeMillis() - startTime;
+    if (_brokerMetrics != null) {
+      _brokerMetrics.addTimedValue(BrokerTimer.ROUTING_TABLE_UPDATE_TIME, updateTime, TimeUnit.MILLISECONDS);
     }
   }
 
