@@ -23,7 +23,7 @@ public class TimeSeriesTest {
   private static final ArrayList<String> ABOOK_DIMENSIONS =
       Lists.newArrayList("browserName", "contactsOrigin", "deviceName", "continent", "countryCode",
           "environment", "locale", "osName", "pageKey", "source", "sourceApp");
-  private static final String THIRDEYE_ABOOK_OFFLINE = "thirdeyeAbook_OFFLINE";
+  private static final String THIRDEYE_ABOOK = "thirdeyeAbook";
   private static final String COUNT = "__COUNT";
   private static final MetricFunction DEFAULT_METRIC_FUNCTION =
       new MetricFunction(MetricAggFunction.SUM, COUNT);
@@ -74,7 +74,7 @@ public class TimeSeriesTest {
 
   private static TimeSeriesRequest generateGroupByTimeRequest() {
     TimeSeriesRequest timeSeriesRequest = new TimeSeriesRequest();
-    timeSeriesRequest.setCollectionName(THIRDEYE_ABOOK_OFFLINE);
+    timeSeriesRequest.setCollectionName(THIRDEYE_ABOOK);
 
     timeSeriesRequest.setStart(START);
     timeSeriesRequest.setEnd(START.plusDays(1));
@@ -90,7 +90,7 @@ public class TimeSeriesTest {
 
   private static TimeSeriesRequest generateGroupByDimensionRequest() {
     TimeSeriesRequest timeSeriesRequest = new TimeSeriesRequest();
-    timeSeriesRequest.setCollectionName(THIRDEYE_ABOOK_OFFLINE);
+    timeSeriesRequest.setCollectionName(THIRDEYE_ABOOK);
     timeSeriesRequest.setStart(START);
     timeSeriesRequest.setEnd(START.plusHours(3));
 
@@ -105,7 +105,7 @@ public class TimeSeriesTest {
 
   private static TimeSeriesRequest generateGroupByTimeAndDimension() {
     TimeSeriesRequest timeSeriesRequest = new TimeSeriesRequest();
-    timeSeriesRequest.setCollectionName(THIRDEYE_ABOOK_OFFLINE);
+    timeSeriesRequest.setCollectionName(THIRDEYE_ABOOK);
     timeSeriesRequest.setStart(START);
     timeSeriesRequest.setEnd(START.plusHours(3));
     timeSeriesRequest.setGroupByDimensions(ABOOK_DIMENSIONS);

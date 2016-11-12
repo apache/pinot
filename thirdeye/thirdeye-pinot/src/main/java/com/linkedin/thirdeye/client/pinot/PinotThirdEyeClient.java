@@ -116,7 +116,7 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
        for (String pql : pqls) {
          LOG.debug("PQL isMetricAsDimension : {}", pql);
          ResultSetGroup result = CACHE_REGISTRY_INSTANCE.getResultSetGroupCache()
-             .get(new PinotQuery(pql, request.getCollection() + "_OFFLINE"));
+             .get(new PinotQuery(pql, request.getCollection()));
          resultSetGroups.add(result);
        }
     } else {
@@ -124,7 +124,7 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
       String sql = PqlUtils.getPql(request, dataTimeSpec);
       LOG.debug("PQL: {}", sql);
       ResultSetGroup result = CACHE_REGISTRY_INSTANCE.getResultSetGroupCache()
-          .get(new PinotQuery(sql, request.getCollection() + "_OFFLINE"));
+          .get(new PinotQuery(sql, request.getCollection()));
       resultSetGroups.add(result);
       if (LOG.isDebugEnabled()) {
         LOG.debug("Result for: {} {}", sql, format(result));
