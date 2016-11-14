@@ -63,6 +63,7 @@ public class CombineService {
         mergedBlock.setAggregationGroupByResult(combineAggregationGroupByResults1(brokerRequest,
             mergedBlock.getAggregationGroupByOperatorResult(), blockToMerge.getAggregationGroupByOperatorResult()));
       } else {
+        // TODO: use new aggregation functions to combine results.
         // Combine Aggregations
         List<AggregationFunction> aggregationFunctions =
             AggregationFunctionFactory.getAggregationFunction(brokerRequest);

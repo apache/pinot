@@ -16,12 +16,19 @@
     limitations under the License.
 
 -->
-<!DOCTYPE suite SYSTEM "http://testng.org/testng-1.0.dtd">
-<suite name="Suite" parallel="none">
-  <test name="Test">
+<suite name="pinot-core">
+  <test name="SingleValueQueriesTest">
     <classes>
-      <class name="com.linkedin.pinot.pql.TestPQL"/>
-      <class name="com.linkedin.pinot.AppTest"/>
+      <class name="com.linkedin.pinot.queries.BaseSingleValueQueriesTest"/>
+      <class name="com.linkedin.pinot.queries.AggregationSingleValueQueriesTest"/>
+      <class name="com.linkedin.pinot.queries.SelectionSingleValueQueriesTest"/>
     </classes>
-  </test> <!-- Test -->
-</suite> <!-- Suite -->
+  </test>
+  <test name="MultiValueQueriesTest">
+    <classes>
+      <class name="com.linkedin.pinot.queries.BaseMultiValueQueriesTest"/>
+      <class name="com.linkedin.pinot.queries.AggregationMultiValueQueriesTest"/>
+      <class name="com.linkedin.pinot.queries.SelectionMultiValueQueriesTest"/>
+    </classes>
+  </test>
+</suite>

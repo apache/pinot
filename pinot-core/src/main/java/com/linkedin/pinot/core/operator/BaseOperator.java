@@ -55,15 +55,12 @@ public abstract class BaseOperator implements Operator {
 
   public abstract Block getNextBlock(BlockId blockId);
 
-  @Deprecated
   public String getOperatorName() {
-    // TODO: after the clean up, remove this method.
-    return null;
+    return _operatorName;
   }
 
   @Override
   public ExecutionStatistics getExecutionStatistics() {
-    // TODO: after the clean up, make this method abstract.
-    return null;
+    throw new UnsupportedOperationException();
   }
 }

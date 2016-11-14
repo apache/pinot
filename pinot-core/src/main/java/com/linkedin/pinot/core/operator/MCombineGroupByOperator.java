@@ -26,7 +26,6 @@ import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.operator.aggregation.groupby.AggregationGroupByResult;
 import com.linkedin.pinot.core.operator.aggregation.groupby.GroupKeyGenerator;
 import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
-import com.linkedin.pinot.core.operator.query.MAggregationGroupByOperator;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionFactory;
 import com.linkedin.pinot.core.query.aggregation.groupby.AggregationGroupByOperatorService;
@@ -45,19 +44,7 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- *
- * Operator to combine the aggregation group by results.
- *
- * MCombineGroupByOperator will take the arguments below:
- *  1. BrokerRequest;
- *  2. Parallelism Parameters:
- *      ExecutorService;
- *  3. Inner-Segment Operators of type:
- *          {@link MAggregationGroupByOperator}
- *      Number of Operators is based on the pruned segments:
- *          one segment to one Operator.
- *
- *
+ * The <code>MCombineGroupByOperator</code> class is the operator to combine aggregation group-by results.
  */
 public class MCombineGroupByOperator extends BaseOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(MCombineGroupByOperator.class);
@@ -158,6 +145,7 @@ public class MCombineGroupByOperator extends BaseOperator {
     final List<AggregationInfo> aggregationsInfo = _brokerRequest.getAggregationsInfo();
     final int numAggrFunctions = aggregationsInfo.size();
 
+    // TODO: use new aggregation functions to combine results.
     final List<AggregationFunction> aggregationFunctions =
         AggregationFunctionFactory.getAggregationFunction(_brokerRequest);
 
