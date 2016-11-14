@@ -566,6 +566,17 @@ function renderAnomalyThumbnails(data, tab) {
 
     attach_AnomalyTable_EventListeners()
 
+    var urlParams = "dataset=" + hash.dataset + "&metric=" + hash.metric;
+    var metricUrl = "/thirdeye-admin/metric-config/view?" + urlParams;
+    console.log("metricUrl");
+    console.log(metricUrl);
+
+    //AJAX for anomaly result data
+    getData(metricUrl).done(function (metricConfig) {
+      console.log("metricConfig");
+      console.log(metricConfig);
+    });
+
     for(var i = 0, numAnomalies = data.length; i < numAnomalies; i++) {
       $("#external-props-"+i).append("my_new_link");
         requestLineChart(i);
