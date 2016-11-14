@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.datalayer.pojo;
 
+import java.util.Map;
 import java.util.Objects;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -35,7 +36,7 @@ public class MetricConfigBean extends AbstractBean {
 
   private boolean active = true;
 
-  private String externalDashboardURLTemplate;
+  private Map<String, String> extSourceLinkInfo;
 
 
   public String getName() {
@@ -118,13 +119,12 @@ public class MetricConfigBean extends AbstractBean {
     this.active = active;
   }
 
-
-  public String getExternalDashboardURLTemplate() {
-    return externalDashboardURLTemplate;
+  public Map<String, String> getExtSourceLinkInfo() {
+    return extSourceLinkInfo;
   }
 
-  public void setExternalDashboardURLTemplate(String externalDashboardURL) {
-    this.externalDashboardURLTemplate = externalDashboardURL;
+  public void setExtSourceLinkInfo(Map<String, String> extSourceLinkInfo) {
+    this.extSourceLinkInfo = extSourceLinkInfo;
   }
 
   @Override
@@ -143,13 +143,13 @@ public class MetricConfigBean extends AbstractBean {
         && Objects.equals(inverseMetric, mc.isInverseMetric())
         && Objects.equals(cellSizeExpression, mc.getCellSizeExpression())
         && Objects.equals(active, mc.isActive())
-        && Objects.equals(externalDashboardURLTemplate, mc.getExternalDashboardURLTemplate());
+        && Objects.equals(extSourceLinkInfo, mc.getExtSourceLinkInfo());
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(getId(), dataset, alias, derived, derivedMetricExpression, rollupThreshold,
-        inverseMetric, cellSizeExpression, active, externalDashboardURLTemplate);
+        inverseMetric, cellSizeExpression, active, extSourceLinkInfo);
   }
 
   @Override
@@ -157,6 +157,6 @@ public class MetricConfigBean extends AbstractBean {
     return MoreObjects.toStringHelper(this).add("id", getId()).add("name", name).add("dataset", dataset)
         .add("alias", alias).add("derived", derived).add("derivedMetricExpression", derivedMetricExpression)
         .add("rollupThreshold", rollupThreshold).add("cellSizeExpression", cellSizeExpression)
-        .add("active", active).add("externalDashboardURL", externalDashboardURLTemplate).toString();
+        .add("active", active).add("extSourceLinkInfo", extSourceLinkInfo).toString();
   }
 }

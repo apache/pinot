@@ -232,15 +232,16 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
     }
     Assert.assertTrue(completedCount > 0);
 
-    // check if anomalies present
+    // Raw anomalies of the same function and dimensions should have been merged by the worker, so we
+    // check if any raw anomalies present, whose existence means the worker fails the synchronous merge.
     List<RawAnomalyResultDTO> rawAnomalies = rawResultDAO.findUnmergedByFunctionId(functionId);
-    Assert.assertTrue(rawAnomalies.size() > 0);
+    Assert.assertTrue(rawAnomalies.size() == 0);
 
     // start merge
-    startMerger();
+    // startMerger();
 
     // check merged anomalies
-    Thread.sleep(4000);
+    // Thread.sleep(4000);
     List<MergedAnomalyResultDTO> mergedAnomalies = mergedResultDAO.findByFunctionId(functionId);
     Assert.assertTrue(mergedAnomalies.size() > 0);
 

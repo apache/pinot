@@ -27,7 +27,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.Predicate;
 import org.apache.helix.AccessOption;
@@ -98,6 +97,7 @@ import com.linkedin.pinot.controller.helix.core.util.ZKMetadataUtils;
 import com.linkedin.pinot.controller.helix.starter.HelixConfig;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 
 public class PinotHelixResourceManager {
@@ -366,19 +366,20 @@ public class PinotHelixResourceManager {
     final PinotResourceManagerResponse res = new PinotResourceManagerResponse();
     try {
       IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableName);
-      if (idealState.getPartitionSet().contains(segmentId)) {
-        LOGGER.info("Trying to delete segment: {} from IdealStates", segmentId);
-        HelixHelper.removeSegmentFromIdealState(_helixZkManager, tableName, segmentId);
-      } else {
+      if (idealState == null || idealState.getPartitionSet() == null || !idealState.getPartitionSet().contains(segmentId)) {
         res.message = "Segment " + segmentId + " not in IDEALSTATE.";
         LOGGER.info("Segment: {} is not in IDEALSTATE", segmentId);
+      } else {
+        LOGGER.info("Trying to delete segment: {} from IdealStates", segmentId);
+        HelixHelper.removeSegmentFromIdealState(_helixZkManager, tableName, segmentId);
+        res.message = "";
       }
       _segmentDeletionManager.deleteSegment(tableName, segmentId);
 
-      res.message = "Segment successfully deleted.";
+      res.message += "Segment " + segmentId + " successfully deleted.";
       res.status = ResponseStatus.success;
     } catch (final Exception e) {
-      LOGGER.error("Caught exception while deleting segment", e);
+      LOGGER.error("Caught exception while deleting segment {} of table {}", segmentId, tableName, e);
       res.status = ResponseStatus.failure;
       res.message = e.getMessage();
     }

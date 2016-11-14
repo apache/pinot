@@ -1,18 +1,5 @@
 package com.linkedin.pinot.controller.api.restlet.resources;
 
-import com.linkedin.pinot.common.config.AbstractTableConfig;
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.metrics.ControllerMeter;
-import com.linkedin.pinot.common.restlet.swagger.Response;
-import com.linkedin.pinot.common.restlet.swagger.Responses;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.controller.api.ControllerRestApplication;
-import com.linkedin.pinot.common.restlet.swagger.HttpVerb;
-import com.linkedin.pinot.common.restlet.swagger.Parameter;
-import com.linkedin.pinot.common.restlet.swagger.Paths;
-import com.linkedin.pinot.common.restlet.swagger.Summary;
-import com.linkedin.pinot.common.restlet.swagger.Tags;
 import java.io.File;
 import java.io.IOException;
 import java.util.Iterator;
@@ -33,6 +20,19 @@ import org.restlet.resource.Post;
 import org.restlet.resource.Put;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.metrics.ControllerMeter;
+import com.linkedin.pinot.common.restlet.swagger.HttpVerb;
+import com.linkedin.pinot.common.restlet.swagger.Parameter;
+import com.linkedin.pinot.common.restlet.swagger.Paths;
+import com.linkedin.pinot.common.restlet.swagger.Response;
+import com.linkedin.pinot.common.restlet.swagger.Responses;
+import com.linkedin.pinot.common.restlet.swagger.Summary;
+import com.linkedin.pinot.common.restlet.swagger.Tags;
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.controller.api.ControllerRestApplication;
 
 
 public class PinotSchemaRestletResource extends BasePinotControllerRestletResource {
@@ -150,6 +150,9 @@ public class PinotSchemaRestletResource extends BasePinotControllerRestletResour
     if (dataFile != null) {
       Schema schema = Schema.fromFile(dataFile);
       try {
+        if (!schema.validate(LOGGER)) {
+          throw new RuntimeException("Schema validation failed");
+        }
         _pinotHelixResourceManager.addOrUpdateSchema(schema);
         return new StringRepresentation(dataFile + " sucessfully added", MediaType.TEXT_PLAIN);
       } catch (Exception e) {
@@ -183,7 +186,8 @@ public class PinotSchemaRestletResource extends BasePinotControllerRestletResour
       return uploadSchema(schemaName);
     } catch (final Exception e) {
       LOGGER.error("Caught exception in file upload", e);
-      ControllerRestApplication.getControllerMetrics().addMeteredGlobalValue(ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);
+      ControllerRestApplication.getControllerMetrics().addMeteredGlobalValue(
+          ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);
       setStatus(Status.SERVER_ERROR_INTERNAL);
       return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
     }
