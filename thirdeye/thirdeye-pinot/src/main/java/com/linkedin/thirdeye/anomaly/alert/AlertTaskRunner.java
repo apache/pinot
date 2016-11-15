@@ -1,8 +1,11 @@
 package com.linkedin.thirdeye.anomaly.alert;
 
 import com.linkedin.thirdeye.api.DimensionMap;
+import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
+import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
+import com.linkedin.thirdeye.detector.email.filter.AlertFilter;
+import com.linkedin.thirdeye.detector.email.filter.AlertFilterType;
 import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.net.URLEncoder;
@@ -50,7 +53,9 @@ import freemarker.template.TemplateExceptionHandler;
 import freemarker.template.TemplateMethodModelEx;
 import freemarker.template.TemplateModelException;
 import freemarker.template.TemplateNumberModel;
-import freemarker.template.TemplateScalarModel;
+
+import static com.linkedin.thirdeye.anomaly.alert.AlertFilterHelper.FILTER_TYPE_KEY;
+
 
 public class AlertTaskRunner implements TaskRunner {
 
@@ -61,6 +66,7 @@ public class AlertTaskRunner implements TaskRunner {
 
   private MergedAnomalyResultManager anomalyMergedResultDAO;
   private DatasetConfigManager datasetConfigDAO;
+  private MetricConfigManager metricConfigDAO;
   private EmailConfigurationDTO alertConfig;
   private DateTime windowStart;
   private DateTime windowEnd;
@@ -81,6 +87,7 @@ public class AlertTaskRunner implements TaskRunner {
     List<TaskResult> taskResult = new ArrayList<>();
     anomalyMergedResultDAO = taskContext.getMergedResultDAO();
     datasetConfigDAO = taskContext.getDatasetConfigDAO();
+    metricConfigDAO = taskContext.getMetricConfigDAO();
     alertConfig = alertTaskInfo.getAlertConfig();
     windowStart = alertTaskInfo.getWindowStartTime();
     windowEnd = alertTaskInfo.getWindowEndTime();
@@ -150,15 +157,29 @@ public class AlertTaskRunner implements TaskRunner {
     if (results.size() == 0) {
       return results;
     }
-    /**
-     * TODO: configure filtration rule at metric level and fetch it from DB Find
-     * exact filtration rule to be applied based on metric / functionType parameters
-     * The logic of finding filtration rule will be abstracted to AnomalyFiltrationHelper
-     */
-    AnomalyFiltrationHelper.FiltrationRule filtrationRule = AnomalyFiltrationHelper.getFiltrationRule();
+
+    // Get filtration rule from metric configuration
+    MergedAnomalyResultDTO anyAnomaly = results.get(0);
+    MetricConfigDTO metricConfigDTO =
+        metricConfigDAO.findByMetricAndDataset(anyAnomaly.getMetric(), anyAnomaly.getCollection());
+    Map<String, String> alertFilterInfo = metricConfigDTO.getAlertFilterInfo();
+    if (alertFilterInfo == null) {
+      alertFilterInfo = Collections.emptyMap();
+    }
+    AlertFilter alertFilter;
+    if (alertFilterInfo.containsKey(FILTER_TYPE_KEY)) {
+      AlertFilterType type = AlertFilterType.valueOf(alertFilterInfo.get(FILTER_TYPE_KEY).toUpperCase());
+      alertFilter = AlertFilterHelper.getAlertFilter(type);
+      alertFilter.setParameters(alertFilterInfo);
+    } else {
+      // Every anomaly triggers an alert by default
+      alertFilter = AlertFilterHelper.getAlertFilter(AlertFilterType.DUMMY);
+    }
+    LOG.info("Using filter {} for metric {} of dataset {}", alertFilter, anyAnomaly.getMetric(),
+        anyAnomaly.getCollection());
 
     List<MergedAnomalyResultDTO> qualifiedAnomalies =
-        results.stream().filter(result -> filtrationRule.isQualified(result))
+        results.stream().filter(result -> alertFilter.isQualified(result))
             .collect(Collectors.toList());
     LOG.info(
         "Found [{}] anomalies qualified to alert after applying filtration rule on [{}] anomalies",
