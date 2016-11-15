@@ -52,16 +52,11 @@ public class IntermediateResultsBlock implements Block {
   private long _numEntriesScannedInFilter;
   private long _numEntriesScannedPostFilter;
   private long _totalRawDocs;
-  private long _requestId = -1;
   private List<Map<String, Serializable>> _aggregationGroupByOperatorResult;
   private AggregationGroupByResult _aggregationGroupByResult;
   private DataSchema _dataSchema;
   private Collection<Serializable[]> _selectionResult;
 
-  @Deprecated
-  private long _timeUsedMs;
-
-  private static final String REQUEST_ID = "requestId";
   private static final String NUM_DOCS_SCANNED = "numDocsScanned";
   private static final String NUM_ENTRIES_SCANNED_IN_FILTER = "numEntriesScannedInFilter";
   private static final String NUM_ENTRIES_SCANNED_POST_FILTER = "numEntriesScannedPostFilter";
@@ -166,7 +161,6 @@ public class IntermediateResultsBlock implements Block {
   }
 
   public DataTable attachMetadataToDataTable(DataTable dataTable) {
-    dataTable.getMetadata().put(REQUEST_ID, String.valueOf(_requestId));
     dataTable.getMetadata().put(NUM_DOCS_SCANNED, String.valueOf(_numDocsScanned));
     dataTable.getMetadata().put(NUM_ENTRIES_SCANNED_IN_FILTER, String.valueOf(_numEntriesScannedInFilter));
     dataTable.getMetadata().put(NUM_ENTRIES_SCANNED_POST_FILTER, String.valueOf(_numEntriesScannedPostFilter));
@@ -254,15 +248,6 @@ public class IntermediateResultsBlock implements Block {
     return _numEntriesScannedPostFilter;
   }
 
-  public long getRequestId() {
-    return _requestId;
-  }
-
-  @Deprecated
-  public long getTimeUsedMs() {
-    return _timeUsedMs;
-  }
-
   public long getTotalRawDocs() {
     return _totalRawDocs;
   }
@@ -281,15 +266,6 @@ public class IntermediateResultsBlock implements Block {
 
   public void setNumEntriesScannedPostFilter(long numEntriesScannedPostFilter) {
     _numEntriesScannedPostFilter = numEntriesScannedPostFilter;
-  }
-
-  public void setRequestId(long requestId) {
-    _requestId = requestId;
-  }
-
-  @Deprecated
-  public void setTimeUsedMs(long timeUsedMs) {
-    _timeUsedMs = timeUsedMs;
   }
 
   public void setTotalRawDocs(long totalRawDocs) {

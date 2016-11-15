@@ -103,11 +103,6 @@ public class RealtimeColumnDataSource extends DataSource {
   }
 
   @Override
-  public String getOperatorName() {
-    return "RealtimeColumnDataSource";
-  }
-
-  @Override
   public boolean close() {
     return true;
   }

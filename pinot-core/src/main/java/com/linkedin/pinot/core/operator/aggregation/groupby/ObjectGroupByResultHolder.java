@@ -72,6 +72,8 @@ public class ObjectGroupByResultHolder implements GroupByResultHolder {
       return;
     }
 
+    // TODO: if object is not comparable, result holder capacity might not be enough and might throw ArrayIndexOutOfBoundsException.
+    // TODO: need to revisit the logic because Set and HyperLogLog will not be comparable.
     // If object is not comparable, we cannot use a priority queue and cannot compare.
     if (capacity > _maxCapacity && (_resultArray[0] instanceof Comparable)) {
       switchToMapMode(capacity);

@@ -87,6 +87,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     // Maximum number of results is the minimum of possible keys, and limit on number of groups
     int maxNumResults = Math.min(_groupKeyGenerator.getGlobalGroupKeyUpperBound(), numGroupsLimit);
 
+    // TODO: revisit the trim factor. Usually the factor should be 5-10, and based on the 'TOP' limit.
     // When results are trimmed, drop bottom 10% of groups.
     _trimSize = (int) (GROUP_BY_TRIM_FACTOR * maxNumResults);
 

@@ -18,9 +18,22 @@ package com.linkedin.pinot.core.plan;
 import com.linkedin.pinot.core.common.Operator;
 
 
+/**
+ * The <code>PlanNode</code> is a single execution plan node inside the {@link Plan} tree.
+ */
 public interface PlanNode {
 
+  /**
+   * Get the execution operator associated with the plan node.
+   *
+   * @return execution operator.
+   */
   Operator run();
 
+  /**
+   * Log the tree structure under the plan node.
+   *
+   * @param prefix prefix for each line logged.
+   */
   void showTree(String prefix);
 }

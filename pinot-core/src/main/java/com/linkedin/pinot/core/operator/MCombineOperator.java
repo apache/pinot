@@ -17,15 +17,10 @@ package com.linkedin.pinot.core.operator;
 
 import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.response.ProcessingException;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
-import com.linkedin.pinot.core.operator.query.MAggregationGroupByOperator;
-import com.linkedin.pinot.core.operator.query.MAggregationOperator;
-import com.linkedin.pinot.core.operator.query.MSelectionOnlyOperator;
-import com.linkedin.pinot.core.operator.query.MSelectionOrderByOperator;
 import com.linkedin.pinot.core.query.aggregation.CombineService;
 import com.linkedin.pinot.core.query.aggregation.groupby.AggregationGroupByOperatorService;
 import com.linkedin.pinot.core.util.trace.TraceCallable;
@@ -46,27 +41,12 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * MCombineOperator will take the arguments below:
- *  1. BrokerRequest;
- *  2. Parallelism Parameters:
- *      ExecutorService;
- *  3. All the Inner-Segment Operators:
- *      For now only four types:
- *          {@link MSelectionOnlyOperator}
- *          {@link MSelectionOrderByOperator}
- *          {@link MAggregationOperator}
- *          {@link MAggregationGroupByOperator}
- *      Number of Operators is based on the pruned segments:
- *          one segment to one Operator.
- *
- *
+ * The <code>MCombineOperator</code> class is the operator to combine selection results and aggregation only results.
  */
 public class MCombineOperator extends BaseOperator {
-
   private static final Logger LOGGER = LoggerFactory.getLogger(MCombineOperator.class);
 
   private final List<Operator> _operators;
-  private final boolean _isParallel;
   private final BrokerRequest _brokerRequest;
   private final ExecutorService _executorService;
   private long _timeOutMs;
@@ -83,24 +63,12 @@ public class MCombineOperator extends BaseOperator {
     MAX_THREADS_PER_QUERY = Math.min(MAX_THREADS_PER_QUERY, (int)(numCores * .5));
   }
 
-  public MCombineOperator(List<Operator> retOperators, BrokerRequest brokerRequest) {
-    _operators = retOperators;
-    _isParallel = false;
-    _brokerRequest = brokerRequest;
-    _executorService = null;
-  }
-
-  public MCombineOperator(List<Operator> retOperators, ExecutorService executorService, long timeOutMs,
+  public MCombineOperator(List<Operator> operators, ExecutorService executorService, long timeOutMs,
       BrokerRequest brokerRequest) {
-    _operators = retOperators;
+    _operators = operators;
     _executorService = executorService;
     _brokerRequest = brokerRequest;
     _timeOutMs = timeOutMs;
-    if (_executorService != null) {
-      _isParallel = true;
-    } else {
-      _isParallel = false;
-    }
   }
 
   @Override
@@ -115,119 +83,100 @@ public class MCombineOperator extends BaseOperator {
   @Override
   public Block getNextBlock() {
     final long startTime = System.currentTimeMillis();
-    IntermediateResultsBlock mergedBlock = null;
-    if (_isParallel) {
-      final long queryEndTime = System.currentTimeMillis() + _timeOutMs;
-      int numGroups = Math.max(MIN_THREADS_PER_QUERY,Math.min(MAX_THREADS_PER_QUERY, (_operators.size() + MIN_SEGMENTS_PER_THREAD - 1) / MIN_SEGMENTS_PER_THREAD));
-      //ensure that the number of groups is not more than the number of segments
-      numGroups = Math.min(_operators.size(), numGroups);
-      final List<List<Operator>> operatorGroups = new ArrayList<List<Operator>>(numGroups);
-      for (int i = 0; i < numGroups; i++) {
-        operatorGroups.add(new ArrayList<Operator>());
-      }
-      for (int i = 0; i < _operators.size(); i++) {
-        operatorGroups.get(i % numGroups).add(_operators.get(i));
-      }
-      final BlockingQueue<Block> blockingQueue = new ArrayBlockingQueue<Block>(operatorGroups.size());
-      // Submit operators.
-      for (final List<Operator> operatorGroup : operatorGroups) {
-        _executorService.submit(new TraceRunnable() {
+    final long queryEndTime = System.currentTimeMillis() + _timeOutMs;
+    int numGroups = Math.max(MIN_THREADS_PER_QUERY,
+        Math.min(MAX_THREADS_PER_QUERY, (_operators.size() + MIN_SEGMENTS_PER_THREAD - 1) / MIN_SEGMENTS_PER_THREAD));
+    //ensure that the number of groups is not more than the number of segments
+    numGroups = Math.min(_operators.size(), numGroups);
+    final List<List<Operator>> operatorGroups = new ArrayList<List<Operator>>(numGroups);
+    for (int i = 0; i < numGroups; i++) {
+      operatorGroups.add(new ArrayList<Operator>());
+    }
+    for (int i = 0; i < _operators.size(); i++) {
+      operatorGroups.get(i % numGroups).add(_operators.get(i));
+    }
+    final BlockingQueue<Block> blockingQueue = new ArrayBlockingQueue<>(operatorGroups.size());
+    // Submit operators.
+    for (final List<Operator> operatorGroup : operatorGroups) {
+      _executorService.submit(new TraceRunnable() {
+        @Override
+        public void runJob() {
+          IntermediateResultsBlock mergedBlock = null;
+          try {
+            for (Operator operator : operatorGroup) {
+              IntermediateResultsBlock blockToMerge = (IntermediateResultsBlock) operator.nextBlock();
+              if (mergedBlock == null) {
+                mergedBlock = blockToMerge;
+              } else {
+                CombineService.mergeTwoBlocks(_brokerRequest, mergedBlock, blockToMerge);
+              }
+            }
+          } catch (Exception e) {
+            LOGGER.error("exception in the MCombine operator ", e);
+            mergedBlock = new IntermediateResultsBlock(e);
+          }
+          blockingQueue.offer(mergedBlock);
+        }
+      });
+    }
+    LOGGER.debug("Submitting operators to be run in parallel and it took:" + (System.currentTimeMillis() - startTime));
+
+    // Submit merger job:
+    Future<IntermediateResultsBlock> mergedBlockFuture =
+        _executorService.submit(new TraceCallable<IntermediateResultsBlock>() {
           @Override
-          public void runJob() {
+          public IntermediateResultsBlock callJob()
+              throws Exception {
+            int mergedBlocksNumber = 0;
             IntermediateResultsBlock mergedBlock = null;
-            try {
-              for (Operator operator : operatorGroup) {
-                IntermediateResultsBlock blockToMerge = (IntermediateResultsBlock) operator.nextBlock();
-                if (mergedBlock == null) {
-                  mergedBlock = blockToMerge;
-                } else {
-                  CombineService.mergeTwoBlocks(_brokerRequest, mergedBlock, blockToMerge);
+            while ((queryEndTime > System.currentTimeMillis()) && (mergedBlocksNumber < operatorGroups.size())) {
+              if (mergedBlock == null) {
+                mergedBlock = (IntermediateResultsBlock) blockingQueue.poll(queryEndTime - System.currentTimeMillis(),
+                    TimeUnit.MILLISECONDS);
+                if (mergedBlock != null) {
+                  mergedBlocksNumber++;
+                }
+                LOGGER.debug("Got response from operator 0 after: {}", (System.currentTimeMillis() - startTime));
+              } else {
+                IntermediateResultsBlock blockToMerge =
+                    (IntermediateResultsBlock) blockingQueue.poll(queryEndTime - System.currentTimeMillis(),
+                        TimeUnit.MILLISECONDS);
+                if (blockToMerge != null) {
+                  try {
+                    LOGGER.debug("Got response from operator {} after: {}", mergedBlocksNumber,
+                        (System.currentTimeMillis() - startTime));
+                    CombineService.mergeTwoBlocks(_brokerRequest, mergedBlock, blockToMerge);
+                    LOGGER.debug("Merged response from operator {} after: {}", mergedBlocksNumber,
+                        (System.currentTimeMillis() - startTime));
+                  } catch (Exception e) {
+                    mergedBlock.getExceptions()
+                        .add(QueryException.getException(QueryException.MERGE_RESPONSE_ERROR, e));
+                  }
+                  mergedBlocksNumber++;
                 }
               }
-            } catch (Exception e) {
-              LOGGER.error("exception in the MCombine operator ", e);
-              mergedBlock = new IntermediateResultsBlock(e);
             }
-            if (blockingQueue != null) {
-              blockingQueue.offer(mergedBlock);
-            }
+            return mergedBlock;
           }
         });
-      }
-      LOGGER
-          .debug("Submitting operators to be run in parallel and it took:" + (System.currentTimeMillis() - startTime));
 
-      // Submit merger job:
-      Future<IntermediateResultsBlock> mergedBlockFuture =
-          _executorService.submit(new TraceCallable<IntermediateResultsBlock>() {
-            @Override
-            public IntermediateResultsBlock callJob() throws Exception {
-              int mergedBlocksNumber = 0;
-              IntermediateResultsBlock mergedBlock = null;
-              while ((queryEndTime > System.currentTimeMillis()) && (mergedBlocksNumber < operatorGroups.size())) {
-                if (mergedBlock == null) {
-                  mergedBlock =
-                      (IntermediateResultsBlock) blockingQueue.poll(queryEndTime - System.currentTimeMillis(),
-                          TimeUnit.MILLISECONDS);
-                  if (mergedBlock != null) {
-                    mergedBlocksNumber++;
-                  }
-                  LOGGER.debug("Got response from operator 0 after: {}", (System.currentTimeMillis() - startTime));
-                } else {
-                  IntermediateResultsBlock blockToMerge =
-                      (IntermediateResultsBlock) blockingQueue.poll(queryEndTime - System.currentTimeMillis(),
-                          TimeUnit.MILLISECONDS);
-                  if (blockToMerge != null) {
-                    try {
-                      LOGGER.debug("Got response from operator {} after: {}", mergedBlocksNumber,
-                          (System.currentTimeMillis() - startTime));
-                      CombineService.mergeTwoBlocks(_brokerRequest, mergedBlock, blockToMerge);
-                      LOGGER.debug("Merged response from operator {} after: {}", mergedBlocksNumber,
-                          (System.currentTimeMillis() - startTime));
-                    } catch (Exception e) {
-                      mergedBlock.getExceptions().add(
-                          QueryException.getException(QueryException.MERGE_RESPONSE_ERROR, e));
-                    }
-                    mergedBlocksNumber++;
-                  }
-                }
-              }
-              return mergedBlock;
-            }
-          });
-
-      // Get merge results.
-      try {
-        mergedBlock = mergedBlockFuture.get(queryEndTime - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
-      } catch (InterruptedException e) {
-        LOGGER.error("InterruptedException ", e);
-        mergedBlock = new IntermediateResultsBlock(QueryException.getException(QueryException.FUTURE_CALL_ERROR, e));
-      } catch (ExecutionException e) {
-        LOGGER.error("Execution Exception", e);
-        mergedBlock = new IntermediateResultsBlock(QueryException.getException(QueryException.MERGE_RESPONSE_ERROR, e));
-      } catch (TimeoutException e) {
-        LOGGER.error("TimeoutException ", e);
-        mergedBlock =
-            new IntermediateResultsBlock(QueryException.getException(QueryException.EXECUTION_TIMEOUT_ERROR, e));
-      }
-    } else {
-      // TODO: remove this branch or add support to the new added operators.
-      for (Operator operator : _operators) {
-        if ((operator instanceof MAggregationOperator) || (operator instanceof MSelectionOrderByOperator)
-            || (operator instanceof MSelectionOnlyOperator) || (operator instanceof MAggregationGroupByOperator)
-            || (operator instanceof MCombineOperator)) {
-          IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
-          if (mergedBlock == null) {
-            mergedBlock = block;
-          } else {
-            CombineService.mergeTwoBlocks(_brokerRequest, mergedBlock, block);
-          }
-        } else {
-          throw new UnsupportedOperationException("Unsupported Operator to be processed in MResultOperator : "
-              + operator);
-        }
-      }
+    // Get merge results.
+    IntermediateResultsBlock mergedBlock;
+    try {
+      mergedBlock = mergedBlockFuture.get(queryEndTime - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+    } catch (InterruptedException e) {
+      LOGGER.error("Caught InterruptedException.", e);
+      mergedBlock = new IntermediateResultsBlock(QueryException.getException(QueryException.FUTURE_CALL_ERROR, e));
+    } catch (ExecutionException e) {
+      LOGGER.error("Caught ExecutionException.", e);
+      mergedBlock = new IntermediateResultsBlock(QueryException.getException(QueryException.MERGE_RESPONSE_ERROR, e));
+    } catch (TimeoutException e) {
+      LOGGER.error("Caught TimeoutException", e);
+      mergedBlock =
+          new IntermediateResultsBlock(QueryException.getException(QueryException.EXECUTION_TIMEOUT_ERROR, e));
     }
+
+    // Trim merged results.
     if ((_brokerRequest.getAggregationsInfoSize() > 0) && (_brokerRequest.getGroupBy() != null)
         && (_brokerRequest.getGroupBy().getColumnsSize() > 0)) {
       trimToSize(_brokerRequest, mergedBlock);

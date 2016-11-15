@@ -42,16 +42,13 @@ public class InstanceResponseBlock implements Block {
     try {
       _instanceResponseDataTable = intermediateResultsBlock.getDataTable();
     } catch (Exception e) {
-      LOGGER.warn("Caught exception while building InstanceResponseBlock", e);
+      LOGGER.error("Caught exception while building data table.", e);
+      throw new RuntimeException("Caught exception while building data table.", e);
     }
   }
 
   public DataTable getInstanceResponseDataTable() {
     return _instanceResponseDataTable;
-  }
-
-  public byte[] getInstanceResponseBytes() throws Exception {
-    return _instanceResponseDataTable.toBytes();
   }
 
   @Override
@@ -83,5 +80,4 @@ public class InstanceResponseBlock implements Block {
   public BlockMetadata getMetadata() {
     throw new UnsupportedOperationException();
   }
-
 }
