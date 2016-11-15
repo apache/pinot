@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.controller.api;
 
+import com.linkedin.pinot.controller.api.restlet.resources.TableViews;
 import org.restlet.Context;
 import org.restlet.Request;
 import org.restlet.Response;
@@ -93,7 +94,7 @@ public class ControllerRestApplication extends PinotRestletApplication {
     attachRoutesForClass(router, PinotTableSchema.class);
     attachRoutesForClass(router, PinotSegmentRestletResource.class);
     attachRoutesForClass(router, TableSize.class);
-
+    attachRoutesForClass(router, TableViews.class);
     // PUT
     attachRoutesForClass(router, PinotTableSegmentConfigs.class);
     attachRoutesForClass(router, PinotTableIndexingConfigs.class);
