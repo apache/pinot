@@ -14,7 +14,7 @@
 # limitations under the License.
 #
 
-!!com.linkedin.pinot.perf.PerfBenchmarkDriverConf
+!!com.linkedin.pinot.tools.perf.PerfBenchmarkDriverConf
 brokerPort: 8099
 cleanOnStartup: false
 clusterName: PinotPerfTestCluster

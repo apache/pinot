@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.perf;
+package com.linkedin.pinot.tools.perf;
 
 import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.DumperOptions.FlowStyle;
@@ -66,7 +66,7 @@ public class PerfBenchmarkDriverConf {
   //if the regenerateIndex is true, the indexes under this directory will be deleted and recreated from rawData.
   String indexDirectory;
 
-  //by default all files under indexDirectory will be uploaded to the controller if its not already present. 
+  //by default all files under indexDirectory will be uploaded to the controller if its not already present.
   //If the indexes are already uploaded, nothing
   boolean forceReloadIndex = false;
 

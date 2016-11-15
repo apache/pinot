@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.tools;
 
+import com.linkedin.pinot.tools.perf.PerfBenchmarkRunner;
 import java.lang.reflect.Field;
 
 import org.kohsuke.args4j.Argument;
@@ -35,6 +36,7 @@ public class PinotToolLauncher {
   @Argument(handler = SubCommandHandler.class, metaVar = "<subCommand>")
   @SubCommands({
       @SubCommand(name = "UpdateSegmentState", impl = UpdateSegmentState.class),
+      @SubCommand(name = "PerfBenchmarkRunner", impl = PerfBenchmarkRunner.class)
   })
   Command _subCommand;
   // @formatter:on
