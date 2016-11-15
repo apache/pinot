@@ -60,7 +60,8 @@ public class ObjectGroupByResultHolderTest {
   private void testTrimResults(final boolean minOrder) {
     Random random = new Random(0);
 
-    GroupByResultHolder resultHolder = new ObjectGroupByResultHolder(INITIAL_CAPACITY, INITIAL_CAPACITY, minOrder);
+    GroupByResultHolder resultHolder =
+        new ObjectGroupByResultHolder(INITIAL_CAPACITY, MAX_CAPACITY, INITIAL_CAPACITY, minOrder);
     List<IntObjectPair> expected = new ArrayList<>(MAX_CAPACITY);
 
     for (int i = 0; i < INITIAL_CAPACITY; i++) {
@@ -84,8 +85,8 @@ public class ObjectGroupByResultHolderTest {
 
     Collections.sort(expected, new Pairs.IntObjectComparator(!minOrder));
 
-    // Trim the results to INITIAL_CAPACITY.
-    resultHolder.trimResults(INITIAL_CAPACITY);
+    // Trim the results.
+    resultHolder.trimResults();
 
     // Ensure that all the correct group keys survive after trimming.
     for (int i = 0; i < INITIAL_CAPACITY; i++) {
