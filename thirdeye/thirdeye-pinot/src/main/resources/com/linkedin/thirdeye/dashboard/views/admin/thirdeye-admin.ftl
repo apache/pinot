@@ -18,11 +18,11 @@
 
 
 <!-- custom scripts -->
-<script src="../../../assets/js/lib/ingraph-metric-config.js"></script>
-<script src="../../../assets/js/lib/ingraph-dashboard-config.js"></script>
-<script src="../../../assets/js/lib/metric-config.js"></script>
-<script src="../../../assets/js/lib/dataset-config.js"></script>
-<script src="../../../assets/js/lib/job-info.js"></script>
+<script src="../../../assets/js/lib/thirdeye/ingraph-metric-config.js"></script>
+<script src="../../../assets/js/lib/thirdeye/ingraph-dashboard-config.js"></script>
+<script src="../../../assets/js/lib/thirdeye/metric-config.js"></script>
+<script src="../../../assets/js/lib/thirdeye/dataset-config.js"></script>
+<script src="../../../assets/js/lib/thirdeye/job-info.js"></script>
 
 <script src="../../../assets/js/lib/common/utility.js" defer></script>
 
