@@ -138,13 +138,14 @@ public class SegmentDeletionManager {
       if (_localDiskDir != null) {
         File fileToMove = new File(new File(_localDiskDir, rawTableName), segmentId);
         if (fileToMove.exists()) {
-          File deletedDir = new File(_localDiskDir, DELETED_SEGMENTS);
+          File targetDir = new File(new File(_localDiskDir, DELETED_SEGMENTS), rawTableName);
           try {
-            FileUtils.moveFileToDirectory(fileToMove, deletedDir, true);
-            LOGGER.info("Moved segment {} from {} to {}", segmentId, fileToMove.getAbsolutePath(), deletedDir.getAbsolutePath());
+            FileUtils.moveFileToDirectory(fileToMove, targetDir, true);
+            LOGGER.info("Moved segment {} from {} to {}", segmentId, fileToMove.getAbsolutePath(),
+                targetDir.getAbsolutePath());
           } catch (IOException e) {
             LOGGER.warn("Could not move segment {} from {} to {}", segmentId, fileToMove.getAbsolutePath(),
-                deletedDir.getAbsolutePath(), e);
+                targetDir.getAbsolutePath(), e);
           }
         } else {
           CommonConstants.Helix.TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
