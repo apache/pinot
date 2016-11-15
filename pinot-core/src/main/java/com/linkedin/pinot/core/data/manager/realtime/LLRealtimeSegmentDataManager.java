@@ -53,7 +53,7 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.realtime.converter.RealtimeSegmentConverter;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
-import com.linkedin.pinot.core.realtime.impl.kafka.KafkaHighLevelStreamProviderConfig;
+import com.linkedin.pinot.core.realtime.impl.kafka.KafkaLowLevelStreamProviderConfig;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaMessageDecoder;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaSimpleConsumerFactoryImpl;
 import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
@@ -646,8 +646,8 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
   }
 
   // TODO Make this a factory class.
-  protected KafkaHighLevelStreamProviderConfig createStreamProviderConfig() {
-    return new KafkaHighLevelStreamProviderConfig();
+  protected KafkaLowLevelStreamProviderConfig createStreamProviderConfig() {
+    return new KafkaLowLevelStreamProviderConfig();
   }
 
   // Assume that this is called only on OFFLINE to CONSUMING transition.
@@ -667,7 +667,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
 
     // TODO Validate configs
     IndexingConfig indexingConfig = _tableConfig.getIndexingConfig();
-    KafkaHighLevelStreamProviderConfig kafkaStreamProviderConfig = createStreamProviderConfig();
+    KafkaLowLevelStreamProviderConfig kafkaStreamProviderConfig = createStreamProviderConfig();
     kafkaStreamProviderConfig.init(tableConfig, instanceZKMetadata, schema);
     final String bootstrapNodes = indexingConfig.getStreamConfigs()
         .get(CommonConstants.Helix.DataSource.STREAM_PREFIX + "." + CommonConstants.Helix.DataSource.Realtime.Kafka.KAFKA_BROKER_LIST);
