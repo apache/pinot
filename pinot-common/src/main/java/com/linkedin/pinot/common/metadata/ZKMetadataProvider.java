@@ -135,6 +135,10 @@ public class ZKMetadataProvider {
     String realtimeTableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName);
     ZNRecord znRecord = propertyStore
         .get(constructPropertyStorePathForSegment(realtimeTableName, segmentName), null, AccessOption.PERSISTENT);
+    // It is possible that the segment metadata has just been deleted due to retention.
+    if (znRecord == null) {
+      return null;
+    }
     if (SegmentName.isHighLevelConsumerSegmentName(segmentName)) {
       return new RealtimeSegmentZKMetadata(znRecord);
     } else {
