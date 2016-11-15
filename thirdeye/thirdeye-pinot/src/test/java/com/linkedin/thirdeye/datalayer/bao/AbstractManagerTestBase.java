@@ -170,7 +170,6 @@ public abstract class AbstractManagerTestBase {
     emailConfiguration.setCollection(collection);
     emailConfiguration.setActive(true);
     emailConfiguration.setCron("0/10 * * * * ?");
-    emailConfiguration.setFilters(null);
     emailConfiguration.setFromAddress("thirdeye@linkedin.com");
     emailConfiguration.setMetric(metricName);
     emailConfiguration.setSendZeroAnomalyEmail(true);
