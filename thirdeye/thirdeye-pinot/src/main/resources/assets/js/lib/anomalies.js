@@ -603,7 +603,7 @@ function renderAnomalyThumbnails(data, extSourceLinkInfo, tab) {
            }
          }
          if (extSourceLinkInfo) {
-           $("#external-props-"+i).append(links);
+           $("#external-props-"+i).html(links);
          }
 
          var viewWindowStart = startTime;

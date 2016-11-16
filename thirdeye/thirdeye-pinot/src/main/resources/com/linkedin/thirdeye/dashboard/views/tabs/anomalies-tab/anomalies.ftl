@@ -18,9 +18,15 @@
                         </div>
                         <div class="anomaly-info">
                         </div>
+
+
                         <div>
-                            <a class="anomaly-details-link blue" data-id="{{anomalyData/id}}"># {{anomalyData/id}}</a>
+                        <table><tr>
+                            <td><a class="anomaly-details-link blue" data-id="{{anomalyData/id}}"># {{anomalyData/id}}</a></td>
+                            <td><div class="blue" id="external-props-{{anomalyIndex}}"></div></td>
+                        </tr></table>
                         </div>
+
 
                         <div>
                             <h3 style="margin-top:0px;">
@@ -84,9 +90,7 @@
                             style="height:148px; min-width:300px;"></span>
                     </div>
 
-                    <div class="blue">
-                      <a  id="external-props-{{anomalyIndex}}"></a>
-                    </div>
+
                 </div>
                 <div class="action-buttons" style="width: 18%; float: right; text-align: right; position: absolute;top: 40px; right: 10px; z-index:4;">
 

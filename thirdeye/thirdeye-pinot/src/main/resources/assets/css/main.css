@@ -62,7 +62,9 @@ body a{
 .blue {
     color: #1f77b4;
 }
-
+.blue a {
+    color: #1f77b4;
+}
 .thin-input{
    width:65px;
 }
