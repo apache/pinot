@@ -72,20 +72,34 @@ function getAnomalies(tab) {
                     }
                 }
                 anomaliesDisplayData = anomalyData;
-                getTimeseriesData(anomaliesDisplayData);
+
+                var metricConfigUrlParams = "dataset=" + hash.dataset + "&metric=" + hash.metrics;
+                var metricUrl = "/thirdeye-admin/metric-config/view?" + metricConfigUrlParams;
+
+                //AJAX for get metric config
+                var extSourceLinkInfo;
+                getData(metricUrl).done(function (metricConfig) {
+                  console.log("metricConfig");
+                  console.log(metricConfig);
+                  extSourceLinkInfo = metricConfig.extSourceLinkInfo;
+                  getTimeseriesData(anomaliesDisplayData, extSourceLinkInfo);
+                });
+
             });
+
+
         } else {
             getTimeseriesData();
         }
 
-        function getTimeseriesData(anomalyData) {
+        function getTimeseriesData(anomalyData, extSourceLinkInfo) {
           if(anomalyData) {
              var anomalyMetric = true;
           }
           $("#" + tab + "-display-chart-section").empty();
           if (anomalyMetric) {
             $(".anomaly-metric-tip").hide();
-            renderAnomalyThumbnails(anomalyData, tab);
+            renderAnomalyThumbnails(anomalyData, extSourceLinkInfo, tab);
           } else{
             tipToUser(tab)
           }
@@ -549,7 +563,7 @@ function drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab, placeholder, op
 
  } //end of drawAnomalyTimeSeries
 
-function renderAnomalyThumbnails(data, tab) {
+function renderAnomalyThumbnails(data, extSourceLinkInfo, tab) {
     //Error handling when data is falsy (empty, undefined or null)
     if (!data) {
         $("#" + tab + "-chart-area-error").empty()
@@ -566,25 +580,31 @@ function renderAnomalyThumbnails(data, tab) {
 
     attach_AnomalyTable_EventListeners()
 
-    var urlParams = "dataset=" + hash.dataset + "&metric=" + hash.metric;
-    var metricUrl = "/thirdeye-admin/metric-config/view?" + urlParams;
-    console.log("metricUrl");
-    console.log(metricUrl);
 
-    //AJAX for anomaly result data
-    getData(metricUrl).done(function (metricConfig) {
-      console.log("metricConfig");
-      console.log(metricConfig);
-    });
 
     for(var i = 0, numAnomalies = data.length; i < numAnomalies; i++) {
-      $("#external-props-"+i).append("my_new_link");
-        requestLineChart(i);
+      requestLineChart(i);
     }
 
      function requestLineChart(i) {
          var startTime = data[i]["startTime"];
          var endTime = data[i]["endTime"];
+
+         console.log("extSourceLinkInfo");
+         console.log(extSourceLinkInfo);
+         var links = "";
+         for (var source in extSourceLinkInfo) {
+           var template = extSourceLinkInfo[source];
+           if (template) {
+             template = template.replace("${startTime}", startTime);
+             template = template.replace("${endTime}", endTime);
+             source = "Link to " + source;
+             links = links + source.link(template) + "\n";
+           }
+         }
+         if (extSourceLinkInfo) {
+           $("#external-props-"+i).append(links);
+         }
 
          var viewWindowStart = startTime;
          var viewWindowEnd = endTime;

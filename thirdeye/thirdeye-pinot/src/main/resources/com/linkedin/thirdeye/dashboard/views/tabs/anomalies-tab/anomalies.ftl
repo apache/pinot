@@ -21,7 +21,7 @@
                         <div>
                             <a class="anomaly-details-link blue" data-id="{{anomalyData/id}}"># {{anomalyData/id}}</a>
                         </div>
-                        <div id="external-props-{{anomalyIndex}}"></div>
+
                         <div>
                             <h3 style="margin-top:0px;">
                                 {{anomalyData/metric}}
@@ -83,6 +83,10 @@
                            style="z-index:15; position: absolute; right: 50%"></i> <span
                             style="height:148px; min-width:300px;"></span>
                     </div>
+
+                    <div class="anomaly-details-link blue">
+                      <a  id="external-props-{{anomalyIndex}}"></a>
+                    </div>
                 </div>
                 <div class="action-buttons" style="width: 18%; float: right; text-align: right; position: absolute;top: 40px; right: 10px; z-index:4;">
 
@@ -123,7 +127,7 @@
                 </div>
 
                 <div id="function-details" style="position: absolute; right:15px; top: 140px; width: 170px; text-overflow: ellipsis;">
-                    <label>anomaly function details:</label>
+                    <label>Anomaly Function details:</label>
                     <div style="font-weight: 800;font-size:14px; ">{{anomalyData/function/functionName}}
                     </div>
                     <div style="font-weight: 800;font-size:14px; ">{{anomalyData/function/type}}
