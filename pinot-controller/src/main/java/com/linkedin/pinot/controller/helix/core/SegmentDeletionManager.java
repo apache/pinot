@@ -16,12 +16,12 @@
 package com.linkedin.pinot.controller.helix.core;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixAdmin;
@@ -29,9 +29,10 @@ import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.SegmentName;
 
 
 /**
@@ -48,6 +49,7 @@ public class SegmentDeletionManager {
   private final String _helixClusterName;
   private final HelixAdmin _helixAdmin;
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
+  private final String DELETED_SEGMENTS = "Deleted_Segments";
 
   SegmentDeletionManager(String localDiskDir, HelixAdmin helixAdmin, String helixClusterName, ZkHelixPropertyStore<ZNRecord> propertyStore) {
     _localDiskDir = localDiskDir;
@@ -132,25 +134,36 @@ public class SegmentDeletionManager {
         return;
       }
 
-      switch (TableNameBuilder.getTableTypeFromTableName(tableName)) {
-        case OFFLINE:
-          if (_localDiskDir != null) {
-            File fileToDelete = new File(new File(_localDiskDir, tableName), segmentId);
-            if (fileToDelete.exists()) {
-              FileUtils.deleteQuietly(fileToDelete);
-              LOGGER.info("Delete segment : " + segmentId + " from local directory : " + fileToDelete.getAbsolutePath());
-            } else {
-              LOGGER.warn("Not found local segment file for segment : " + segmentId);
-            }
-          } else {
-            LOGGER.info("localDiskDir is not configured, won't delete anything from disk");
+      final String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+      if (_localDiskDir != null) {
+        File fileToMove = new File(new File(_localDiskDir, rawTableName), segmentId);
+        if (fileToMove.exists()) {
+          File targetDir = new File(new File(_localDiskDir, DELETED_SEGMENTS), rawTableName);
+          try {
+            FileUtils.moveFileToDirectory(fileToMove, targetDir, true);
+            LOGGER.info("Moved segment {} from {} to {}", segmentId, fileToMove.getAbsolutePath(),
+                targetDir.getAbsolutePath());
+          } catch (IOException e) {
+            LOGGER.warn("Could not move segment {} from {} to {}", segmentId, fileToMove.getAbsolutePath(),
+                targetDir.getAbsolutePath(), e);
           }
-          break;
-        case REALTIME:
-          LOGGER.info("No local segment file for RealtimeSegment in Controller");
-          break;
-        default:
-          throw new UnsupportedOperationException("Not support ResourceType for semgnet - " + segmentId);
+        } else {
+          CommonConstants.Helix.TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
+          switch (tableType) {
+            case OFFLINE:
+              LOGGER.warn("Not found local segment file for segment {}" + fileToMove.getAbsolutePath());
+              break;
+            case REALTIME:
+              if (SegmentName.isLowLevelConsumerSegmentName(segmentId)) {
+                LOGGER.warn("Not found local segment file for segment {}" + fileToMove.getAbsolutePath());
+              }
+              break;
+            default:
+              LOGGER.warn("Unsupported table type {} when deleting segment {}", tableType, segmentId);
+          }
+        }
+      } else {
+        LOGGER.info("localDiskDir is not configured, won't delete segment {} from disk", segmentId);
       }
     } else {
       long effectiveDeletionDelay = Math.min(deletionDelay * 2, MAX_DELETION_DELAY_SECONDS);
