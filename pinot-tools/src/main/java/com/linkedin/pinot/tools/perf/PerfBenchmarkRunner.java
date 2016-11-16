@@ -102,11 +102,12 @@ public class PerfBenchmarkRunner extends AbstractBaseCommand implements Command 
     return true;
   }
 
-  public static void startAllButServer()
+  public void startAllButServer()
       throws Exception {
     PerfBenchmarkDriverConf perfBenchmarkDriverConf = new PerfBenchmarkDriverConf();
     perfBenchmarkDriverConf.setStartServer(false);
-    PerfBenchmarkDriver driver = new PerfBenchmarkDriver(perfBenchmarkDriverConf);
+    PerfBenchmarkDriver driver =
+        new PerfBenchmarkDriver(perfBenchmarkDriverConf, _tempDir, _loadMode, _segmentFormatVersion, false);
     driver.run();
   }
 
