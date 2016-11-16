@@ -84,7 +84,7 @@
                             style="height:148px; min-width:300px;"></span>
                     </div>
 
-                    <div class="anomaly-details-link blue">
+                    <div class="blue">
                       <a  id="external-props-{{anomalyIndex}}"></a>
                     </div>
                 </div>
