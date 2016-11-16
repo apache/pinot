@@ -19,13 +19,17 @@ package com.linkedin.pinot.server.api.resources;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.pinot.common.restlet.resources.TableSegments;
 import com.linkedin.pinot.common.restlet.resources.TablesList;
-import java.io.IOException;
+import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import java.util.List;
 import javax.ws.rs.core.Response;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.AssertJUnit.assertTrue;
+
 
 public class TablesResourceTest {
 
@@ -45,35 +49,56 @@ public class TablesResourceTest {
 
   @Test
   public void getTables()
-      throws IOException {
+      throws Exception {
     Response response =
         testHelper.target.path("/tables").request().get(Response.class);
     String responseBody = response.readEntity(String.class);
     TablesList tablesList =
         new ObjectMapper().readValue(responseBody, TablesList.class);
-    Assert.assertNotNull(tablesList);
+    assertNotNull(tablesList);
     List<String> tables = tablesList.getTables();
-    Assert.assertNotNull(tables);
-    Assert.assertEquals(tables.size(), 1);
-    Assert.assertEquals(tables.get(0), ResourceTestHelper.DEFAULT_TABLE_NAME);
+    assertNotNull(tables);
+    assertEquals(tables.size(), 1);
+    assertEquals(tables.get(0), ResourceTestHelper.DEFAULT_TABLE_NAME);
+
+    final String secondTable = "secondTable";
+    testHelper.addTable(secondTable);
+    IndexSegment secondSegment = testHelper.setupSegment(secondTable, ResourceTestHelper.DEFAULT_AVRO_DATA_FILE, "2");
+    tablesList = testHelper.target.path("/tables").request().get(TablesList.class);
+    assertNotNull(tablesList);
+    assertNotNull(tablesList.getTables());
+    assertEquals(tablesList.getTables().size(), 2);
+    assertTrue(tablesList.getTables().contains(ResourceTestHelper.DEFAULT_TABLE_NAME));
+    assertTrue(tablesList.getTables().contains(secondTable));
   }
 
   @Test
-  public void getSegments() {
+  public void getSegments()
+      throws Exception {
     {
       TableSegments tableSegments =
           testHelper.target.path("/tables/" + ResourceTestHelper.DEFAULT_TABLE_NAME + "/segments").request()
               .get(TableSegments.class);
-      Assert.assertNotNull(tableSegments);
-      Assert.assertNotNull(tableSegments.getSegments());
-      Assert.assertEquals(tableSegments.getSegments().size(), 1);
-      Assert.assertEquals(tableSegments.getSegments().get(0), testHelper.indexSegment.getSegmentName());
+      assertNotNull(tableSegments);
+      assertNotNull(tableSegments.getSegments());
+      assertEquals(tableSegments.getSegments().size(), 1);
+      assertEquals(tableSegments.getSegments().get(0), testHelper.indexSegment.getSegmentName());
+
+      IndexSegment secondSegment = testHelper
+          .setupSegment(ResourceTestHelper.DEFAULT_TABLE_NAME, ResourceTestHelper.DEFAULT_AVRO_DATA_FILE, "2");
+      tableSegments = testHelper.target.path("/tables/" + ResourceTestHelper.DEFAULT_TABLE_NAME + "/segments").request()
+          .get(TableSegments.class);
+      assertNotNull(tableSegments);
+      assertNotNull(tableSegments.getSegments());
+      assertEquals(tableSegments.getSegments().size(), 2);
+      assertTrue(tableSegments.getSegments().contains(testHelper.indexSegment.getSegmentName()));
+      assertTrue(tableSegments.getSegments().contains(secondSegment.getSegmentName()));
     }
     {
       // No such table
       Response response = testHelper.target.path("/tables/noSuchTable/segments").request().get(Response.class);
-      Assert.assertNotNull(response);
-      Assert.assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
+      assertNotNull(response);
+      assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
     }
   }
 }

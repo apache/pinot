@@ -18,6 +18,8 @@ package com.linkedin.pinot.server.api.resources;
 
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.core.data.manager.config.TableDataManagerConfig;
+import com.linkedin.pinot.core.data.manager.offline.FileBasedInstanceDataManager;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
@@ -32,11 +34,13 @@ import com.linkedin.pinot.server.starter.helix.AdminApiApplication;
 import com.linkedin.pinot.util.TestUtils;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.util.concurrent.TimeUnit;
 import javax.ws.rs.client.Client;
 import javax.ws.rs.client.ClientBuilder;
 import javax.ws.rs.client.WebTarget;
+import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
@@ -52,10 +56,10 @@ public class ResourceTestHelper {
   AdminApiApplication apiApplication;
   File INDEX_DIR;
   IndexSegment indexSegment;
-
+  ServerConf serverConf;
   Client client;
   WebTarget target;
-
+  PropertiesConfiguration config;
   /**
    * Sets up Pinot server instance, index directory for creation of segments, creates a default segment
    * and starts pinot admin api service
@@ -66,10 +70,10 @@ public class ResourceTestHelper {
     INDEX_DIR = Files.createTempDirectory(TableSizeResourceTest.class.getName() + "_segmentDir").toFile();
     File confFile = new File(
         TestUtils.getFileFromResourceUrl(InstanceServerStarter.class.getClassLoader().getResource("conf/pinot.properties")));
-    PropertiesConfiguration config = new PropertiesConfiguration();
+    config = new PropertiesConfiguration();
     config.setDelimiterParsingDisabled(false);
     config.load(confFile);
-    ServerConf serverConf = new ServerConf(config);
+    serverConf = new ServerConf(config);
 
     LOGGER.info("Trying to create a new ServerInstance!");
     serverInstance = new ServerInstance();
@@ -105,10 +109,10 @@ public class ResourceTestHelper {
 
   public IndexSegment setupSegment()
       throws Exception {
-    return setupSegment(DEFAULT_TABLE_NAME, DEFAULT_AVRO_DATA_FILE);
+    return setupSegment(DEFAULT_TABLE_NAME, DEFAULT_AVRO_DATA_FILE, "1");
   }
 
-  public IndexSegment setupSegment(String tableName, String avroDataFilePath)
+  public IndexSegment setupSegment(String tableName, String avroDataFilePath, String segmentNamePostfix)
       throws Exception {
     final String filePath =
         TestUtils
@@ -116,9 +120,9 @@ public class ResourceTestHelper {
 
     // intentionally changed this to TimeUnit.Hours to make it non-default for testing
     final SegmentGeneratorConfig config =
-        SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "daysSinceEpoch",
-            TimeUnit.HOURS, tableName);
-    config.setSegmentNamePostfix("1");
+        SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR,
+            "daysSinceEpoch", TimeUnit.HOURS, tableName);
+    config.setSegmentNamePostfix(segmentNamePostfix);
     config.setTimeColumnName("daysSinceEpoch");
     final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
     driver.init(config);
@@ -129,4 +133,16 @@ public class ResourceTestHelper {
     return indexSegment;
   }
 
+  public void addTable(String tableName)
+      throws IOException, ConfigurationException {
+    File directory = new File(INDEX_DIR, tableName);
+    FileUtils.forceMkdir(directory);
+    PropertiesConfiguration tableConfig = new PropertiesConfiguration();
+    tableConfig.setProperty("directory", tableName);
+    tableConfig.setProperty("name", tableName);
+    tableConfig.setProperty("dataManagerType", "offline");
+    tableConfig.setProperty("readMode", "heap");
+    FileBasedInstanceDataManager dataManager = (FileBasedInstanceDataManager)serverInstance.getInstanceDataManager();
+    dataManager.addTable(new TableDataManagerConfig(tableConfig));
+  }
 }
