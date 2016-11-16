@@ -171,7 +171,13 @@ public class HelixServerStarter {
               }
             });
 
-
+    _serverInstance.getServerMetrics().addCallbackGauge(
+        "memory.allocationFailureCount", new Callable<Long>() {
+              @Override
+              public Long call() throws Exception {
+                return (long) MmapUtils.getAllocationFailureCount();
+              }
+            });
   }
 
   private void updateInstanceConfigInHelix(int adminApiPort, boolean shuttingDown) {

@@ -49,6 +49,7 @@ public class MmapUtils {
   private static final AtomicLong DIRECT_BYTE_BUFFER_USAGE = new AtomicLong(0L);
   private static final AtomicLong MMAP_BUFFER_USAGE = new AtomicLong(0L);
   private static final AtomicInteger MMAP_BUFFER_COUNT = new AtomicInteger(0);
+  private static final AtomicInteger ALLOCATION_FAILURE_COUNT = new AtomicInteger(0);
   private static final long BYTES_IN_MEGABYTE = 1024L * 1024L;
   private static final Map<ByteBuffer, AllocationContext> BUFFER_TO_CONTEXT_MAP =
       Collections.synchronizedMap(new WeakIdentityHashMap<ByteBuffer, AllocationContext>());
@@ -245,6 +246,7 @@ public class MmapUtils {
     try {
       byteBuffer = ByteBuffer.allocateDirect(capacity);
     } catch (OutOfMemoryError e) {
+      ALLOCATION_FAILURE_COUNT.incrementAndGet();
       DIRECT_BYTE_BUFFER_USAGE.addAndGet(-capacity);
       LOGGER.error("Ran out of direct memory while trying to allocate {} bytes (context {})", capacity, context, e);
       LOGGER.error("Allocation status {}", getTrackedAllocationStatus());
@@ -292,6 +294,7 @@ public class MmapUtils {
       byteBuffer = randomAccessFile.getChannel().map(mode, position, size);
       MMAP_BUFFER_COUNT.incrementAndGet();
     } catch (Exception e) {
+      ALLOCATION_FAILURE_COUNT.incrementAndGet();
       LOGGER.error("Failed to mmap file (size {}, context {})", size, context, e);
       LOGGER.error("Allocation status {}", getTrackedAllocationStatus());
       Utils.rethrowException(e);
@@ -331,6 +334,13 @@ public class MmapUtils {
    */
   public static long getMmapBufferCount() {
     return MMAP_BUFFER_COUNT.get();
+  }
+
+  /**
+   * Returns the number of allocation failures since the application started.
+   */
+  public static int getAllocationFailureCount() {
+    return ALLOCATION_FAILURE_COUNT.get();
   }
 
   private static void clearSynchronizedMapEntrySetCache() {
