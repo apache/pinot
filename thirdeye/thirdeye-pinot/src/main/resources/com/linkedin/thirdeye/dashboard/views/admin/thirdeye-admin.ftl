@@ -18,11 +18,18 @@
 
 
 <!-- custom scripts -->
-<script src="../../../assets/js/lib/ingraph-metric-config.js"></script>
-<script src="../../../assets/js/lib/ingraph-dashboard-config.js"></script>
-<script src="../../../assets/js/lib/metric-config.js"></script>
-<script src="../../../assets/js/lib/dataset-config.js"></script>
-<script src="../../../assets/js/lib/job-info.js"></script>
+<script src="../../../assets/js/lib/thirdeye/ingraph-metric-config.js"></script>
+<script src="../../../assets/js/lib/thirdeye/ingraph-dashboard-config.js"></script>
+<script src="../../../assets/js/lib/thirdeye/metric-config.js"></script>
+<script src="../../../assets/js/lib/thirdeye/dataset-config.js"></script>
+<script src="../../../assets/js/lib/thirdeye/job-info.js"></script>
+
+<script src="../../../assets/js/lib/common/utility.js" defer></script>
+
+<!-- JSON Editor comes here-->
+<link rel="stylesheet" href="../../../assets/jsonedit/jsoneditor.min.css"/>
+<script src="../../../assets/jsonedit/jsoneditor.min.js" defer></script>
+<script src="../../../assets/js/lib/entity-editor.js"></script>
 
 <script type="text/javascript">
   $(document).ready(function() {
@@ -54,8 +61,11 @@
       if (tabId == "#dataset-config") {
         listDatasetConfigs();
       }
-      if (tabId == "#job-info") {
+      if(tabId == "#job-info"){
         listJobs();
+      }
+      if(tabId == "#entity-editor"){
+        renderConfigSelector();
       }
     })
   });
@@ -82,6 +92,7 @@
 					<li class=""><a href="#dataset-config" data-toggle="tab">Dataset </a></li>
 					<li class=""><a href="#metric-config" data-toggle="tab">Metric</a></li>
 					<li class=""><a href="#job-info" data-toggle="tab">JobInfo</a></li>
+          <li class=""><a href="#entity-editor" data-toggle="tab">Entity Editor</a></li>
 				</ul>
 
 				<ul class="nav navbar-nav navbar-right">
@@ -108,6 +119,9 @@
 			<div class="tab-pane" id="job-info">
 				<div id="job-info-place-holder"></div>
 			</div>
+			<div class="tab-pane" id="entity-editor">
+      	<div id="entity-editor-place-holder"></div>
+    	</div>
 		</div>
 	</div>
 </body>
