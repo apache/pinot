@@ -15,21 +15,25 @@
  */
 package com.linkedin.pinot.perf;
 
+import com.google.common.collect.Lists;
+import com.linkedin.pinot.tools.perf.PerfBenchmarkDriver;
+import com.linkedin.pinot.tools.perf.PerfBenchmarkDriverConf;
 import java.util.ArrayList;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.collect.Lists;
-
 
 public class PerfBenchmarkTest {
+  private PerfBenchmarkTest() {
+  }
+
   private static final Logger LOGGER = LoggerFactory.getLogger(PerfBenchmarkTest.class);
 
   private static void setupCluster(String dataDir, String offlineTableName) throws Exception {
     LOGGER.info("Setting up cluster");
-    PerfBenchmarkRunner.startComponents(true, true, true, false);
-    PerfBenchmarkRunner.startServerWithPreLoadedSegments(dataDir, Lists.newArrayList(offlineTableName), new ArrayList<String>());
+    PerfBenchmarkDriver.startComponents(true, true, true, false, null);
+    PerfBenchmarkRunner.startServerWithPreLoadedSegments(dataDir, Lists.newArrayList(offlineTableName),
+        new ArrayList<String>());
   }
 
   private static void runQueries(String queryFile) throws Exception {
