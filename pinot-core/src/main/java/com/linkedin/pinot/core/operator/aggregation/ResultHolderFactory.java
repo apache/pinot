@@ -20,28 +20,23 @@ import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunction
 import com.linkedin.pinot.core.operator.aggregation.groupby.DoubleGroupByResultHolder;
 import com.linkedin.pinot.core.operator.aggregation.groupby.GroupByResultHolder;
 import com.linkedin.pinot.core.operator.aggregation.groupby.ObjectGroupByResultHolder;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
- * Factory class to create ResultHolder appropriate for a given function.
- * Supports both, AggregationResultHolder as well as GroupByResultHolder.
+ * The <code>ResultHolderFactory</code> class is the factory to create {@link AggregationResultHolder} and
+ * {@link GroupByResultHolder} that appropriate for a given function.
  */
 public class ResultHolderFactory {
-  private static final Logger LOGGER = LoggerFactory.getLogger(ResultHolderFactory.class);
-
   private ResultHolderFactory() {
   }
 
   public static final int MAX_INITIAL_RESULT_HOLDER_CAPACITY = 10_000;
 
   /**
-   * Creates and returns the appropriate implementation of AggregationResultHolder,
-   * based on aggregation function.
+   * Get the appropriate implementation of {@link AggregationResultHolder} based on the aggregation function.
    *
-   * @param function Aggregation function
-   * @return Appropriate aggregation result holder
+   * @param function aggregation function.
+   * @return appropriate aggregation result holder.
    */
   public static AggregationResultHolder getAggregationResultHolder(AggregationFunction function) {
     String functionName = function.getName();
@@ -63,14 +58,15 @@ public class ResultHolderFactory {
   }
 
   /**
-   * Creates and returns the appropriate implementation of GroupByResultHolder,
-   * based on aggregation function.
+   * Get the appropriate implementation of {@link GroupByResultHolder} based on the aggregation function.
    *
-   * @param function Aggregation function
-   * @param capacityCap Max number of results
-   * @return Appropriate group by result holder
+   * @param function aggregation function.
+   * @param capacityCap maximum result holder capacity needed.
+   * @param trimSize maximum number of groups returned after trimming.
+   * @return appropriate group-by result holder.
    */
-  public static GroupByResultHolder getGroupByResultHolder(AggregationFunction function, int capacityCap) {
+  public static GroupByResultHolder getGroupByResultHolder(AggregationFunction function, int capacityCap,
+      int trimSize) {
     String functionName = function.getName();
 
     int initialCapacity = Math.min(capacityCap, MAX_INITIAL_RESULT_HOLDER_CAPACITY);
@@ -82,16 +78,16 @@ public class ResultHolderFactory {
       case AggregationFunctionFactory.COUNT_MV_AGGREGATION_FUNCTION:
       case AggregationFunctionFactory.MAX_MV_AGGREGATION_FUNCTION:
       case AggregationFunctionFactory.SUM_MV_AGGREGATION_FUNCTION:
-        return new DoubleGroupByResultHolder(initialCapacity, capacityCap, function.getDefaultValue(),
+        return new DoubleGroupByResultHolder(initialCapacity, capacityCap, trimSize, function.getDefaultValue(),
             false /* minOrder */);
 
       case AggregationFunctionFactory.MIN_AGGREGATION_FUNCTION:
       case AggregationFunctionFactory.MIN_MV_AGGREGATION_FUNCTION:
-        return new DoubleGroupByResultHolder(initialCapacity, capacityCap, function.getDefaultValue(),
+        return new DoubleGroupByResultHolder(initialCapacity, capacityCap, trimSize, function.getDefaultValue(),
             true /* minOrder */);
 
       default:
-        return new ObjectGroupByResultHolder(initialCapacity, capacityCap);
+        return new ObjectGroupByResultHolder(initialCapacity, capacityCap, trimSize);
     }
   }
 }

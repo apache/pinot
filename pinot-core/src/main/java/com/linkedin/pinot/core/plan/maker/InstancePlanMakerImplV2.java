@@ -40,16 +40,18 @@ import org.slf4j.LoggerFactory;
 public class InstancePlanMakerImplV2 implements PlanMaker {
   private static final Logger LOGGER = LoggerFactory.getLogger(InstancePlanMakerImplV2.class);
 
+  // TODO: Fix the runtime trimming and add back the number of aggregation groups limit.
+  // TODO: Need to revisit the runtime trimming solution. Current solution will remove group keys that should not be removed.
   // Limit on number of groups, beyond which results are truncated.
-  private static final String NUM_AGGR_GROUPS_LIMIT = "num.aggr.groups.limit";
-  private static final int DEFAULT_NUM_AGGR_GROUPS_LIMIT = 100_000;
-  private final int _numAggrGroupsLimit;
+  // private static final String NUM_AGGR_GROUPS_LIMIT = "num.aggr.groups.limit";
+  // private static final int DEFAULT_NUM_AGGR_GROUPS_LIMIT = 100_000;
+  private final int _numAggrGroupsLimit = Integer.MAX_VALUE;
 
   /**
    * Default constructor.
    */
   public InstancePlanMakerImplV2() {
-    _numAggrGroupsLimit = DEFAULT_NUM_AGGR_GROUPS_LIMIT;
+//    _numAggrGroupsLimit = DEFAULT_NUM_AGGR_GROUPS_LIMIT;
   }
 
   /**
@@ -61,9 +63,9 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
    * @param queryExecutorConfig query executor configuration.
    */
   public InstancePlanMakerImplV2(QueryExecutorConfig queryExecutorConfig) {
-    // Read the limit on number of aggregation groups in query result from config.
-    _numAggrGroupsLimit = queryExecutorConfig.getConfig().getInt(NUM_AGGR_GROUPS_LIMIT, DEFAULT_NUM_AGGR_GROUPS_LIMIT);
-    LOGGER.info("Maximum number of allowed groups for group-by query results: '{}'", _numAggrGroupsLimit);
+    // TODO: Read the limit on number of aggregation groups in query result from config.
+    // _numAggrGroupsLimit = queryExecutorConfig.getConfig().getInt(NUM_AGGR_GROUPS_LIMIT, DEFAULT_NUM_AGGR_GROUPS_LIMIT);
+    // LOGGER.info("Maximum number of allowed groups for group-by query results: '{}'", _numAggrGroupsLimit);
   }
 
   @Override

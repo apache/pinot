@@ -97,7 +97,7 @@ public class MaxAggregationFunctionTest {
 
     MaxAggregationFunction maxAggregationFunction = new MaxAggregationFunction();
     GroupByResultHolder resultHolder =
-        ResultHolderFactory.getGroupByResultHolder(maxAggregationFunction, MAX_NUM_GROUP_KEYS);
+        ResultHolderFactory.getGroupByResultHolder(maxAggregationFunction, MAX_NUM_GROUP_KEYS, MAX_NUM_GROUP_KEYS);
 
     maxAggregationFunction.aggregateGroupBySV(NUM_VALUES_TO_AGGREGATE, groupKeysForValues, resultHolder, valuesToAggregate);
 
