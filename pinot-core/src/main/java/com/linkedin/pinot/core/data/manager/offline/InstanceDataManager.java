@@ -15,17 +15,26 @@
  */
 package com.linkedin.pinot.core.data.manager.offline;
 
-import org.apache.helix.ZNRecord;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
-
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.data.DataManager;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
+import java.util.Collection;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 
 
 public interface InstanceDataManager extends DataManager {
-  TableDataManager getTableDataManager(String tableName);
+  /**
+   * Get table manager for given table
+   * @param tableName table name
+   * @return Table data manager for table, null if tableName does not exist
+   */
+  @Nullable TableDataManager getTableDataManager(String tableName);
+
+  @Nonnull Collection<TableDataManager> getTableDataManagers();
 
   void addSegment(ZkHelixPropertyStore<ZNRecord> propertyStore, AbstractTableConfig tableConfig,
       InstanceZKMetadata instanceZKMetadata, SegmentZKMetadata segmentZKMetadata, String serverInstance) throws Exception;

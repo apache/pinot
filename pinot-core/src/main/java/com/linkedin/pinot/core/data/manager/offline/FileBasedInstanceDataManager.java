@@ -103,6 +103,11 @@ public class FileBasedInstanceDataManager implements InstanceDataManager {
 
   }
 
+  public void addTable(TableDataManagerConfig tableConfig) {
+    TableDataManager tableDataManager = TableDataManagerProvider.getTableDataManager(tableConfig, null);
+    _tableDataManagerMap.put(tableConfig.getTableName(), tableDataManager);
+  }
+
   @Override
   public synchronized void start() {
     for (TableDataManager tableDataManager : _tableDataManagerMap.values()) {
@@ -146,6 +151,7 @@ public class FileBasedInstanceDataManager implements InstanceDataManager {
     _tableDataManagerMap.put(tableName, tableDataManager);
   }
 
+  @Override
   public Collection<TableDataManager> getTableDataManagers() {
     return _tableDataManagerMap.values();
   }
