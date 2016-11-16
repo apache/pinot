@@ -598,8 +598,8 @@ function renderAnomalyThumbnails(data, extSourceLinkInfo, tab) {
            if (template) {
              template = template.replace("${startTime}", startTime);
              template = template.replace("${endTime}", endTime);
-             source = "Link to " + source;
-             links = links + source.link(template) + "\n";
+             source = source.charAt(0) + source.slice(1).toLowerCase();
+             links = links + source.link(template) + " ";
            }
          }
          if (extSourceLinkInfo) {
