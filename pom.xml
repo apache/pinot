@@ -617,6 +617,10 @@
             <groupId>javax.ws.rs</groupId>
             <artifactId>jsr311-api</artifactId>
           </exclusion>
+          <exclusion>
+            <groupId>com.fasterxml.jackson.jaxrs</groupId>
+            <artifactId>jackson-jaxrs-json-provider</artifactId>
+          </exclusion>
         </exclusions>
       </dependency>
     </dependencies>
