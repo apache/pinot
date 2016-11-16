@@ -1,7 +1,15 @@
 package com.linkedin.thirdeye.anomaly.alert;
 
+import com.google.common.cache.LoadingCache;
 import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
 
+import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
+import com.linkedin.thirdeye.client.cache.QueryCache;
+import com.linkedin.thirdeye.constant.MetricAggFunction;
+import com.linkedin.thirdeye.dashboard.Utils;
+import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewHandler;
+import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewRequest;
+import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewResponse;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -12,6 +20,7 @@ import org.apache.commons.mail.EmailException;
 import org.apache.commons.mail.HtmlEmail;
 import org.jfree.chart.JFreeChart;
 import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 import org.quartz.JobExecutionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,13 +46,22 @@ public abstract class EmailHelper {
 
   private static final String EMAIL_REPORT_CHART_PREFIX = "email_report_chart_";
 
-  private static final long WEEK_MILLIS = TimeUnit.DAYS.toMillis(7); // TODO make w/w configurable.
+  private static final long HOUR_MILLIS = TimeUnit.HOURS.toMillis(1);
+  private static final long DAY_MILLIS = TimeUnit.DAYS.toMillis(1);
+  private static final long WEEK_MILLIS = TimeUnit.DAYS.toMillis(7);
+
   private static final int MINIMUM_GRAPH_WINDOW_HOURS = 24;
   private static final int MINIMUM_GRAPH_WINDOW_DAYS = 7;
 
   public static final String EMAIL_ADDRESS_SEPARATOR = ",";
 
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
+
+  private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
+  private static final LoadingCache<String, Long> collectionMaxDataTimeCache = CACHE_REGISTRY_INSTANCE.getCollectionMaxDataTimeCache();
+  private static final QueryCache queryCache = CACHE_REGISTRY_INSTANCE.getQueryCache();
+
+  private static final DatasetConfigManager datasetConfigManager = DAO_REGISTRY.getDatasetConfigDAO();
 
   private EmailHelper() {
 
@@ -170,5 +188,49 @@ public abstract class EmailHelper {
     } else {
       LOG.error("No email config provided for email with subject [{}]!", subject);
     }
+  }
+
+  public static ContributorViewResponse getContributorData(String collection, String metric, List<String> dimensions)
+      throws Exception {
+
+    ContributorViewRequest request = new ContributorViewRequest();
+    request.setCollection(collection);
+
+    List<MetricExpression> metricExpressions =
+        Utils.convertToMetricExpressions(metric, MetricAggFunction.SUM, collection);
+    request.setMetricExpressions(metricExpressions);
+    long currentEnd = System.currentTimeMillis();
+    long maxDataTime = collectionMaxDataTimeCache.get(collection);
+    if (currentEnd > maxDataTime) {
+      long delta = currentEnd - maxDataTime;
+      currentEnd = currentEnd - delta;
+    }
+
+    // align to nearest hour
+    currentEnd = currentEnd - (currentEnd % HOUR_MILLIS);
+
+    String aggTimeGranularity = "HOURS";
+    long currentStart = currentEnd - DAY_MILLIS;
+
+    DatasetConfigDTO datasetConfigDTO = datasetConfigManager.findByDataset(collection);
+    if (datasetConfigDTO.getTimeUnit().toString().equals("DAYS")) {
+      aggTimeGranularity = datasetConfigDTO.getTimeUnit().toString();
+      currentEnd = currentEnd - (currentEnd % DAY_MILLIS);
+      currentStart = currentEnd - WEEK_MILLIS;
+    }
+
+    long baselineStart = currentStart - WEEK_MILLIS ;
+    long baselineEnd = currentEnd - WEEK_MILLIS;
+
+    String timeZone = datasetConfigDTO.getTimezone();
+    request.setBaselineStart(new DateTime(baselineStart, DateTimeZone.forID(timeZone)));
+    request.setBaselineEnd(new DateTime(baselineEnd, DateTimeZone.forID(timeZone)));
+    request.setCurrentStart(new DateTime(currentStart, DateTimeZone.forID(timeZone)));
+    request.setCurrentEnd(new DateTime(currentEnd, DateTimeZone.forID(timeZone)));
+    request.setTimeGranularity(Utils.getAggregationTimeGranularity(aggTimeGranularity, collection));
+    request.setGroupByDimensions(dimensions);
+    ContributorViewHandler handler = new ContributorViewHandler(queryCache);
+    ContributorViewResponse response = handler.process(request);
+    return response;
   }
 }

@@ -116,4 +116,15 @@ public class EmailConfigurationManagerImpl extends AbstractManagerImpl<EmailConf
     }
     return result;
   }
+
+  @Override
+  public List<EmailConfigurationDTO> findAll() {
+    List<EmailConfigurationDTO> beanList = super.findAll();
+    List<EmailConfigurationDTO> result = new ArrayList<>();
+    for (EmailConfigurationBean bean : beanList) {
+      EmailConfigurationDTO dto = convertEmailConfigurationBean2DTO(bean);
+      result.add(dto);
+    }
+    return result;
+  }
 }

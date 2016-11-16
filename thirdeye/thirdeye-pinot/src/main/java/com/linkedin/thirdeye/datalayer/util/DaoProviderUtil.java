@@ -33,8 +33,8 @@ import com.linkedin.thirdeye.datalayer.entity.WebappConfigIndex;
 public abstract class DaoProviderUtil {
 
   private static DataSource dataSource;
+  private static ManagerProvider provider;
 
-  static ManagerProvider provider ;
   public static void init(File localConfigFile) {
     PersistenceConfig configuration = createConfiguration(localConfigFile);
     dataSource = new DataSource();
@@ -76,10 +76,6 @@ public abstract class DaoProviderUtil {
   public static <T extends AbstractManagerImpl<? extends AbstractDTO>> T getInstance(Class<T> c) {
     T instance = provider.getInstance(c);
     return instance;
-  }
-
-  public static DataSource getDataSource() {
-    return dataSource;
   }
 
   static class DataSourceModule extends AbstractModule {

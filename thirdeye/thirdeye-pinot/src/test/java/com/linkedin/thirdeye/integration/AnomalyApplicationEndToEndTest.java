@@ -249,6 +249,9 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
     jobs = jobDAO.findAll();
     int completedJobCount = 0;
     for (JobDTO job : jobs) {
+      if (!job.getStatus().equals(JobStatus.COMPLETED)) {
+        Thread.sleep(5_000);
+      }
       if (job.getStatus().equals(JobStatus.COMPLETED)) {
         completedJobCount ++;
       }

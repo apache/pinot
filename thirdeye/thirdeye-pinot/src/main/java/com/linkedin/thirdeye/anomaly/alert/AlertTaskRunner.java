@@ -1,8 +1,7 @@
 package com.linkedin.thirdeye.anomaly.alert;
 
 import com.linkedin.thirdeye.api.DimensionMap;
-import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
-import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
+import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewResponse;
 import com.linkedin.thirdeye.datalayer.pojo.AnomalyFunctionBean;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilter;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterType;
@@ -10,14 +9,15 @@ import java.io.ByteArrayOutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
 import java.util.TreeMap;
-import java.util.stream.Collectors;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
@@ -35,9 +35,6 @@ import com.linkedin.thirdeye.anomaly.task.TaskContext;
 import com.linkedin.thirdeye.anomaly.task.TaskInfo;
 import com.linkedin.thirdeye.anomaly.task.TaskResult;
 import com.linkedin.thirdeye.anomaly.task.TaskRunner;
-import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
-import com.linkedin.thirdeye.client.ThirdEyeClient;
-import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
@@ -54,24 +51,19 @@ import static com.linkedin.thirdeye.anomaly.alert.AlertFilterHelper.FILTER_TYPE_
 public class AlertTaskRunner implements TaskRunner {
 
   private static final Logger LOG = LoggerFactory.getLogger(AlertTaskRunner.class);
-  private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
   private static final String DIMENSION_VALUE_SEPARATOR = ", ";
   private static final String EQUALS = "=";
 
   private MergedAnomalyResultManager anomalyMergedResultDAO;
-  private MetricConfigManager metricConfigDAO;
   private EmailConfigurationDTO alertConfig;
   private DateTime windowStart;
   private DateTime windowEnd;
   private ThirdEyeAnomalyConfiguration thirdeyeConfig;
 
-  private QueryCache queryCache;
-
   public static final TimeZone DEFAULT_TIME_ZONE = TimeZone.getTimeZone("America/Los_Angeles");
   public static final String CHARSET = "UTF-8";
 
   public AlertTaskRunner() {
-    queryCache = CACHE_REGISTRY_INSTANCE.getQueryCache();
   }
 
   @Override
@@ -79,7 +71,6 @@ public class AlertTaskRunner implements TaskRunner {
     AlertTaskInfo alertTaskInfo = (AlertTaskInfo) taskInfo;
     List<TaskResult> taskResult = new ArrayList<>();
     anomalyMergedResultDAO = taskContext.getMergedResultDAO();
-    metricConfigDAO = taskContext.getMetricConfigDAO();
     alertConfig = alertTaskInfo.getAlertConfig();
     windowStart = alertTaskInfo.getWindowStartTime();
     windowEnd = alertTaskInfo.getWindowEndTime();
@@ -99,8 +90,6 @@ public class AlertTaskRunner implements TaskRunner {
 
   private void runTask() throws Exception {
     LOG.info("Starting email report {}", alertConfig.getId());
-
-    ThirdEyeClient client = queryCache.getClient();
 
     final String collection = alertConfig.getCollection();
 
@@ -222,18 +211,11 @@ public class AlertTaskRunner implements TaskRunner {
     DateTimeZone timeZone = DateTimeZone.forTimeZone(DEFAULT_TIME_ZONE);
     DateFormatMethod dateFormatMethod = new DateFormatMethod(timeZone);
 
-
-    if (alertConfig.isReportEnabled()) {
-
-    }
-
     HtmlEmail email = new HtmlEmail();
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
 
     try (Writer out = new OutputStreamWriter(baos, CHARSET)) {
       Configuration freemarkerConfig = new Configuration(Configuration.VERSION_2_3_21);
-      Template template = freemarkerConfig.getTemplate("merged-anomaly-report.ftl");
-
       freemarkerConfig.setClassForTemplateLoading(getClass(), "/com/linkedin/thirdeye/detector/");
       freemarkerConfig.setDefaultEncoding(CHARSET);
       freemarkerConfig.setTemplateExceptionHandler(TemplateExceptionHandler.RETHROW_HANDLER);
@@ -251,6 +233,24 @@ public class AlertTaskRunner implements TaskRunner {
       templateData.put("metric", metric);
       templateData.put("windowUnit", windowUnit);
       templateData.put("dashboardHost", thirdeyeConfig.getDashboardHost());
+
+      if (alertConfig.isReportEnabled() & alertConfig.getDimensions() != null) {
+        long reportStartTs = 0;
+        Map<String, Map<String, Map<String, Map<String, String>>>> metricDimensionValueReports;
+        List<ContributorViewResponse> reports = new ArrayList<>();
+        for (String dimension : alertConfig.getDimensions()) {
+          ContributorViewResponse report = EmailHelper.getContributorData(collectionAlias, alertConfig.getMetric(), Arrays.asList(dimension));
+          if(report != null) {
+            reports.add(report);
+          }
+        }
+        reportStartTs = reports.get(0).getTimeBuckets().get(0).getCurrentStart();
+        metricDimensionValueReports = getReportListByMetric(reports);
+        templateData.put("metricDimensionValueReports", metricDimensionValueReports);
+        templateData.put("reportStartDateTime", new DateTime(reportStartTs).toString());
+      }
+
+      Template template = freemarkerConfig.getTemplate("merged-anomaly-report.ftl");
       template.process(templateData, out);
     } catch (Exception e) {
       throw new JobExecutionException(e);
@@ -268,6 +268,40 @@ public class AlertTaskRunner implements TaskRunner {
       throw new JobExecutionException(e);
     }
     LOG.info("Sent email with {} anomalies! {}", results.size(), alertConfig);
+  }
+
+  // report list metric vs groupByKey vs dimensionVal vs timeBucket vs values
+  private static Map<String, Map<String, Map<String, Map<String, String>>>> getReportListByMetric(List<ContributorViewResponse> reports) {
+    Map<String, Map<String, Map<String, Map<String, String>>>> ultimateResult = new LinkedHashMap<>();
+    for (ContributorViewResponse report : reports) {
+      int valIndex = report.getResponseData().getSchema().getColumnsToIndexMapping().get("percentageChange");
+      int dimensionIndex = report.getResponseData().getSchema().getColumnsToIndexMapping().get("dimensionValue");
+
+      String metric = report.getMetrics().get(0);
+      String groupByDimension = report.getDimensions().get(0);
+      int numDimensions = report.getDimensionValuesMap().get(groupByDimension).size();
+      int numBuckets = report.getTimeBuckets().size();
+
+      Map<String, Map<String, Map<String, String>>> groupByDimensionValueMap = ultimateResult.get(metric);
+      if (groupByDimensionValueMap == null) {
+        groupByDimensionValueMap = new LinkedHashMap<>();
+      }
+
+      Map<String, Map<String, String>> dimensionValueMap = new LinkedHashMap<>();
+      for (int p = 0; p < numDimensions; p++) {
+        Map<String, String> valueMap = new LinkedHashMap<>();
+        String currentDimension = "";
+        for (int q = 0; q < numBuckets; q++) {
+          int index = p * numBuckets + q;
+          currentDimension = report.getResponseData().getResponseData().get(index)[dimensionIndex];
+          valueMap.put(String.valueOf(report.getTimeBuckets().get(q).getCurrentStart()), report.getResponseData().getResponseData().get(index)[valIndex]);
+        }
+        dimensionValueMap.put(currentDimension, valueMap);
+      }
+      groupByDimensionValueMap.put(groupByDimension, dimensionValueMap);
+      ultimateResult.put(metric, groupByDimensionValueMap);
+    }
+    return ultimateResult;
   }
 
   /**

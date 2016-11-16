@@ -1,9 +1,7 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
-import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 
-import com.linkedin.thirdeye.util.SeverityComputationUtil;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URLDecoder;
@@ -12,27 +10,22 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.TreeSet;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
-import javax.validation.constraints.NotNull;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
-import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 
-import javax.ws.rs.core.Response;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
-import org.joda.time.format.ISODateTimeFormat;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -67,7 +60,6 @@ import com.linkedin.thirdeye.dashboard.views.tabular.TabularViewHandler;
 import com.linkedin.thirdeye.dashboard.views.tabular.TabularViewRequest;
 import com.linkedin.thirdeye.dashboard.views.tabular.TabularViewResponse;
 import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
@@ -91,7 +83,6 @@ public class DashboardResource {
   private LoadingCache<String,String> dashboardsCache;
   private LoadingCache<String, String> dimensionFiltersCache;
 
-  private DatasetConfigManager datasetConfigDAO;
   private MetricConfigManager metricConfigDAO;
   private DashboardConfigManager dashboardConfigDAO;
 
@@ -101,7 +92,6 @@ public class DashboardResource {
     this.collectionMaxDataTimeCache = CACHE_REGISTRY_INSTANCE.getCollectionMaxDataTimeCache();
     this.dashboardsCache = CACHE_REGISTRY_INSTANCE.getDashboardsCache();
     this.dimensionFiltersCache = CACHE_REGISTRY_INSTANCE.getDimensionFiltersCache();
-    this.datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
     this.metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
     this.dashboardConfigDAO = DAO_REGISTRY.getDashboardConfigDAO();
   }
