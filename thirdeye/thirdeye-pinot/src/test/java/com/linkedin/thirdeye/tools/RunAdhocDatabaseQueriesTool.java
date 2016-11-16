@@ -1,27 +1,17 @@
 package com.linkedin.thirdeye.tools;
 
 import com.linkedin.thirdeye.anomaly.alert.AlertFilterHelper;
-import com.linkedin.thirdeye.detector.email.filter.AlertFilter;
 import com.linkedin.thirdeye.detector.email.filter.AlphaBetaAlertFilter;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 
 import java.util.Map;
-import java.util.Set;
-import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
-import com.google.common.collect.Lists;
-import com.linkedin.thirdeye.anomaly.utils.DetectionResourceHttpUtils;
-import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.autoload.pinot.metrics.ConfigGenerator;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
@@ -34,7 +24,6 @@ import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
@@ -117,7 +106,6 @@ public class RunAdhocDatabaseQueriesTool {
     }
   }
 
-
   private void createDashboard(String dataset) {
 
     String dashboardName = ThirdEyeUtils.getDefaultDashboardName(dataset);
@@ -126,21 +114,21 @@ public class RunAdhocDatabaseQueriesTool {
     dashboardConfigDAO.update(dashboardConfig);
   }
 
-  private void setAlertFilter(String dataset, List<String> metricList, Map<String, Map<String, String>> metricRuleMap,
-      Map<String, String> defaultAlertInfo) {
-    for (String metricName : metricList) {
-      MetricConfigDTO metricConfigDTO = metricConfigDAO.findByMetricAndDataset(metricName, dataset);
-      if (metricConfigDTO == null) {
-        LOG.warn("Unable to find metric {} in dataset {}", metricName, dataset);
-        continue;
-      } else {
-        Map<String, String> alertInfo = defaultAlertInfo;
+  private void setAlertFilterForFunctionInCollection(String collection, List<String> metricList,
+      Map<String, Map<String, String>> metricRuleMap, Map<String, String> defaultAlertFilter) {
+    List<AnomalyFunctionDTO> anomalyFunctionDTOs =
+        anomalyFunctionDAO.findAllByCollection(collection);
+    for (AnomalyFunctionDTO anomalyFunctionDTO : anomalyFunctionDTOs) {
+      String metricName = anomalyFunctionDTO.getMetric();
+      if (metricList.contains(metricName)) {
+        Map<String, String> alertFilter = defaultAlertFilter;
         if (metricRuleMap.containsKey(metricName)) {
-          alertInfo = metricRuleMap.get(metricName);
+          alertFilter = metricRuleMap.get(metricName);
         }
-        LOG.info("Adding alert filter {} to metric {} in dataset {}", alertInfo, metricName, dataset);
-        metricConfigDTO.setAlertFilterInfo(alertInfo);
-        metricConfigDAO.update(metricConfigDTO);
+        anomalyFunctionDTO.setAlertFilter(alertFilter);
+        anomalyFunctionDAO.update(anomalyFunctionDTO);
+        LOG.info("Add alert filter {} to function {} (dataset: {}, metric: {})", alertFilter,
+            anomalyFunctionDTO.getId(), collection, metricName);
       }
     }
   }

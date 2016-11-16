@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.anomaly.alert;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
+import com.linkedin.thirdeye.datalayer.pojo.AnomalyFunctionBean;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilter;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterType;
 import java.io.ByteArrayOutputStream;
@@ -158,11 +159,44 @@ public class AlertTaskRunner implements TaskRunner {
       return results;
     }
 
-    // Get filtration rule from metric configuration
-    MergedAnomalyResultDTO anyAnomaly = results.get(0);
-    MetricConfigDTO metricConfigDTO =
-        metricConfigDAO.findByMetricAndDataset(anyAnomaly.getMetric(), anyAnomaly.getCollection());
-    Map<String, String> alertFilterInfo = metricConfigDTO.getAlertFilterInfo();
+    // Function ID to Alert Filter
+    Map<Long, AlertFilter> functionAlertFilter = new HashMap<>();
+
+    List<MergedAnomalyResultDTO> qualifiedAnomalies = new ArrayList<>();
+    for (MergedAnomalyResultDTO result : results) {
+      // Lazy initiates alert filter for anomalies of the same anomaly function
+      AnomalyFunctionBean anomalyFunctionSpec = result.getFunction();
+      long functionId = anomalyFunctionSpec.getId();
+      AlertFilter alertFilter = functionAlertFilter.get(functionId);
+      if (alertFilter == null) {
+        // Get filtration rule from anomaly function configuration
+        alertFilter = initiateAlertFilter(anomalyFunctionSpec);
+        functionAlertFilter.put(functionId, alertFilter);
+        LOG.info("Using filter {} for anomaly function {} (dataset: {}, metric: {})", alertFilter,
+            functionId, anomalyFunctionSpec.getCollection(), anomalyFunctionSpec.getMetric());
+      }
+      if (alertFilter.isQualified(result)) {
+        qualifiedAnomalies.add(result);
+      }
+    }
+
+    LOG.info(
+        "Found [{}] anomalies qualified to alert after applying filtration rule on [{}] anomalies",
+        qualifiedAnomalies.size(), results.size());
+    return qualifiedAnomalies;
+  }
+
+  /**
+   * Initiates an alert filter for the given anomaly function.
+   *
+   * @param anomalyFunctionSpec the anomaly function that contains the alert filter spec.
+   *
+   * @return the alert filter specified by the alert filter spec or a dummy filter if the function
+   * does not have an alert filter spec or this method fails to initiates an alert filter from the
+   * spec.
+   */
+  private AlertFilter initiateAlertFilter(AnomalyFunctionBean anomalyFunctionSpec) {
+    Map<String, String> alertFilterInfo = anomalyFunctionSpec.getAlertFilter();
     if (alertFilterInfo == null) {
       alertFilterInfo = Collections.emptyMap();
     }
@@ -175,16 +209,7 @@ public class AlertTaskRunner implements TaskRunner {
       // Every anomaly triggers an alert by default
       alertFilter = AlertFilterHelper.getAlertFilter(AlertFilterType.DUMMY);
     }
-    LOG.info("Using filter {} for metric {} of dataset {}", alertFilter, anyAnomaly.getMetric(),
-        anyAnomaly.getCollection());
-
-    List<MergedAnomalyResultDTO> qualifiedAnomalies =
-        results.stream().filter(result -> alertFilter.isQualified(result))
-            .collect(Collectors.toList());
-    LOG.info(
-        "Found [{}] anomalies qualified to alert after applying filtration rule on [{}] anomalies",
-        qualifiedAnomalies.size(), results.size());
-    return qualifiedAnomalies;
+    return alertFilter;
   }
 
   private void sendAlertForAnomalies(String collectionAlias, List<MergedAnomalyResultDTO> results,

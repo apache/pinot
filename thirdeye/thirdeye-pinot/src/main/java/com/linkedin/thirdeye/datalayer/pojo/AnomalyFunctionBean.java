@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.datalayer.pojo;
 
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
@@ -49,6 +50,9 @@ public class AnomalyFunctionBean extends AbstractBean {
   private String filters;
 
   private long metricId;
+
+  private Map<String, String> alertFilter;
+
 
   public long getMetricId() {
     return metricId;
@@ -199,6 +203,14 @@ public class AnomalyFunctionBean extends AbstractBean {
     this.isActive = isActive;
   }
 
+  public Map<String, String> getAlertFilter() {
+    return alertFilter;
+  }
+
+  public void setAlertFilter(Map<String, String> alertFilter) {
+    this.alertFilter = alertFilter;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (!(o instanceof AnomalyFunctionBean)) {
@@ -217,14 +229,15 @@ public class AnomalyFunctionBean extends AbstractBean {
         && Objects.equals(windowDelay, af.getWindowDelay())
         && Objects.equals(windowDelayUnit, af.getWindowDelayUnit())
         && Objects.equals(exploreDimensions, af.getExploreDimensions())
-        && Objects.equals(filters, af.getFilters());
+        && Objects.equals(filters, af.getFilters())
+        && Objects.equals(alertFilter, af.getAlertFilter());
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(getId(), collection, metric, metricFunction, type, isActive, cron,
         properties, bucketSize, bucketUnit, windowSize, windowUnit, windowDelay, windowDelayUnit,
-        exploreDimensions, filters);
+        exploreDimensions, filters, alertFilter);
   }
 
   @Override
@@ -235,6 +248,6 @@ public class AnomalyFunctionBean extends AbstractBean {
         .add("bucketSize", bucketSize).add("bucketUnit", bucketUnit).add("windowSize", windowSize)
         .add("windowUnit", windowUnit).add("windowDelay", windowDelay)
         .add("windowDelayUnit", windowDelayUnit).add("exploreDimensions", exploreDimensions)
-        .add("filters", filters).toString();
+        .add("filters", filters).add("alertFilter", alertFilter).toString();
   }
 }
