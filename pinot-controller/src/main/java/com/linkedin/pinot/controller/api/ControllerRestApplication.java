@@ -125,26 +125,6 @@ public class ControllerRestApplication extends PinotRestletApplication {
 
     router.attach("/pql", PqlQueryResource.class);
 
-    final Restlet mainpage = new Restlet() {
-      @Override
-      public void handle(Request request, Response response) {
-        final StringBuilder stringBuilder = new StringBuilder();
-        stringBuilder.append("<html>");
-        stringBuilder.append("<head><title>Restlet Cluster Management page</title></head>");
-        stringBuilder.append("<body bgcolor=white>");
-        stringBuilder.append("<table border=\"0\">");
-        stringBuilder.append("<tr>");
-        stringBuilder.append("<td>");
-        stringBuilder.append("<h1>Rest cluster management interface V1</h1>");
-        stringBuilder.append("</td>");
-        stringBuilder.append("</tr>");
-        stringBuilder.append("</table>");
-        stringBuilder.append("</body>");
-        stringBuilder.append("</html>");
-        response.setEntity(new StringRepresentation(stringBuilder.toString(), MediaType.TEXT_HTML));
-      }
-    };
-
     try {
       final Directory webdir = new Directory(getContext(), CONSOLE_WEBAPP_ROOT_PATH);
       webdir.setDeeplyAccessible(true);

@@ -113,9 +113,6 @@ public class ScatterGatherImpl implements ScatterGather {
 
     CountDownLatch requestDispatchLatch = new CountDownLatch(mp.size());
 
-    //Use same thread to send request once the connection is available
-    ExecutorService executor = MoreExecutors.sameThreadExecutor();
-
     // async checkout of connections and then dispatch of request
     List<SingleRequestHandler> handlers = new ArrayList<SingleRequestHandler>(mp.size());
 
@@ -177,8 +174,6 @@ public class ScatterGatherImpl implements ScatterGather {
     Map<ServerInstance, SegmentIdSet> segmentIdToInstanceMap = request.getSegmentsServicesMap();
 
     Map<List<ServerInstance>, SegmentIdSet> instanceToSegmentMap = new HashMap<List<ServerInstance>, SegmentIdSet>();
-
-    BucketingSelection sel = request.getPredefinedSelection();
 
     for (ServerInstance serverInstance : segmentIdToInstanceMap.keySet()) {
       instanceToSegmentMap.put(Arrays.asList(serverInstance), segmentIdToInstanceMap.get(serverInstance));

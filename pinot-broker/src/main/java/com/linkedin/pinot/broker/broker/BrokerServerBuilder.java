@@ -140,11 +140,10 @@ public class BrokerServerBuilder {
     _resourceManager = new PooledNettyClientResourceManager(_eventLoopGroup, new HashedWheelTimer(), clientMetrics);
     _poolTimeoutExecutor = new ScheduledThreadPoolExecutor(50);
     // _requestSenderPool = MoreExecutors.sameThreadExecutor();
-    final ConnectionPoolConfig cfg = conf.getConnPool();
 
     _requestSenderPool = Executors.newCachedThreadPool();
 
-    ConnectionPoolConfig connPoolCfg = conf.getConnPool();
+    final ConnectionPoolConfig connPoolCfg = conf.getConnPool();
 
     _connPool = new KeyedPoolImpl<ServerInstance, NettyClientConnection>(connPoolCfg.getMinConnectionsPerServer(),
         connPoolCfg.getMaxConnectionsPerServer(), connPoolCfg.getIdleTimeoutMs(), connPoolCfg.getMaxBacklogPerServer(),

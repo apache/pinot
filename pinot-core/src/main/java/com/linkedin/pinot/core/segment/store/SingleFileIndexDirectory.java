@@ -78,7 +78,6 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
       throws IOException, ConfigurationException {
     super(segmentDirectory, metadata, readMode);
     indexFile = new File(segmentDirectory, DEFAULT_INDEX_FILE_NAME);
-    String context = allocationContext(indexFile, "single_file_index.read_write");
     if (! indexFile.exists()) {
       indexFile.createNewFile();
     }

@@ -159,7 +159,6 @@ public class MultipleOrEqualitiesToInClauseFilterQueryTreeOptimizer extends Filt
   private FilterQueryTree buildFilterQueryTreeForColumnAndValues(Map.Entry<String, Set<String>> columnAndValues) {
     // If there's only one value, turn it into an equality, otherwise turn it into an IN clause
     if (columnAndValues.getValue().size() == 1) {
-      Set<String> Values = columnAndValues.getValue();
       return new FilterQueryTree(columnAndValues.getKey(),
           elementListToDoubleTabSingletonList(columnAndValues.getValue()), FilterOperator.EQUALITY, null);
     } else {

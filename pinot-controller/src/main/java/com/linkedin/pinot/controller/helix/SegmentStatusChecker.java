@@ -263,8 +263,6 @@ public class SegmentStatusChecker {
   void setStatusToDefault() {
     // Fetch the list of tables
     List<String> allTableNames = _pinotHelixResourceManager.getAllPinotTableNames();
-    String helixClusterName = _pinotHelixResourceManager.getHelixClusterName();
-    HelixAdmin helixAdmin = _pinotHelixResourceManager.getHelixAdmin();
     // Synchronization provided by Controller Gauge to make sure that only one thread updates the gauge
     for (String tableName : allTableNames) {
       _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.NUMBER_OF_REPLICAS, 0);

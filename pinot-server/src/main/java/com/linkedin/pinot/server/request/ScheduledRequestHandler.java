@@ -80,8 +80,6 @@ public class ScheduledRequestHandler implements NettyServer.RequestHandler {
         timerContext.startNewPhaseTimerAtNs(ServerQueryPhase.REQUEST_DESERIALIZATION, queryStartTime);
     deserializationTimer.stopAndRecord();
 
-    final BrokerRequest brokerRequest = instanceRequest.getQuery();
-
     LOGGER.debug("Processing requestId:{},request={}", instanceRequest.getRequestId(), instanceRequest);
 
     ListenableFuture<DataTable> queryTask = queryScheduler.submit(queryRequest);

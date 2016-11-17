@@ -374,7 +374,6 @@ public class DataTable {
       out.write(variableSizeDataBytes);
     }
     byte[] byteArray = baos.toByteArray();
-    long end = System.currentTimeMillis();
     return byteArray;
   }
 
@@ -474,8 +473,6 @@ public class DataTable {
    * @return
    */
   private byte[] serializeObject(Object value) {
-    long start = System.nanoTime();
-
     byte[] bytes;
     final ByteArrayOutputStream bos = new ByteArrayOutputStream();
     ObjectOutput out = null;
@@ -494,7 +491,6 @@ public class DataTable {
       IOUtils.closeQuietly((Closeable) out);
       IOUtils.closeQuietly(bos);
     }
-    long end = System.nanoTime();
     return bytes;
   }
 
