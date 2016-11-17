@@ -17,6 +17,7 @@ package com.linkedin.pinot.core.data.manager.offline;
 
 import java.util.List;
 import java.util.concurrent.ExecutorService;
+import javax.annotation.Nullable;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import com.google.common.collect.ImmutableList;
@@ -110,7 +111,7 @@ public interface TableDataManager {
    * using the {@link #releaseSegment(SegmentDataManager) releaseSegment} method.
    * @return a segment by giving the name of this segment in this TableDataManager.
    */
-  SegmentDataManager acquireSegment(String segmentName);
+  @Nullable SegmentDataManager acquireSegment(String segmentName);
 
   /**
   *

@@ -20,8 +20,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.pinot.common.restlet.resources.TableSegments;
 import com.linkedin.pinot.common.restlet.resources.TablesList;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import java.util.List;
 import javax.ws.rs.core.Response;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -98,6 +102,67 @@ public class TablesResourceTest {
       // No such table
       Response response = testHelper.target.path("/tables/noSuchTable/segments").request().get(Response.class);
       assertNotNull(response);
+      assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
+    }
+  }
+
+  @Test
+  public void testSegmentMetadata()
+      throws JSONException {
+    final String urlFormat = "/tables/%s/segments/%s/metadata";
+    {
+      String response = testHelper.target.path(String.format(urlFormat, ResourceTestHelper.DEFAULT_TABLE_NAME,
+          testHelper.indexSegment.getSegmentMetadata().getName())).request().get(String.class);
+      JSONObject jsonMeta = new JSONObject(response);
+      SegmentMetadataImpl segmentMeta = (SegmentMetadataImpl) testHelper.indexSegment.getSegmentMetadata();
+      assertEquals(jsonMeta.getString("segmentName"), segmentMeta.getName());
+      assertEquals(jsonMeta.getString("crc"), segmentMeta.getCrc());
+      assertEquals(jsonMeta.getLong("creationTimeMillis"), segmentMeta.getIndexCreationTime());
+      assertEquals(jsonMeta.getString("paddingCharacter"), String.valueOf(segmentMeta.getPaddingCharacter()));
+      assertEquals(jsonMeta.getLong("refreshTimeMillis"), segmentMeta.getRefreshTime());
+      assertEquals(jsonMeta.getLong("pushTimeMillis"), segmentMeta.getPushTime());
+      assertTrue(jsonMeta.has("pushTimeReadable"));
+      assertTrue(jsonMeta.has("refreshTimeReadable"));
+      assertTrue(jsonMeta.has("startTimeReadable"));
+      assertTrue(jsonMeta.has("endTimeReadable"));
+      assertTrue(jsonMeta.has("creationTimeReadable"));
+      assertEquals(jsonMeta.getLong("startTimeMillis"), segmentMeta.getTimeInterval().getStartMillis());
+      assertEquals(jsonMeta.getLong("endTimeMillis"), segmentMeta.getTimeInterval().getEndMillis());
+
+      JSONArray columns = jsonMeta.getJSONArray("columns");
+      assertEquals(columns.length(), 0);
+    }
+    {
+      Response response = testHelper.target.path(String.format(urlFormat, ResourceTestHelper.DEFAULT_TABLE_NAME,
+          testHelper.indexSegment.getSegmentMetadata().getName()))
+          .queryParam("columns", "column1")
+          .queryParam("columns", "column2")
+          .request().get();
+      System.out.println(response.getStatus());
+      JSONObject jsonMeta = new JSONObject(response.readEntity(String.class));
+      JSONArray columns = jsonMeta.getJSONArray("columns");
+      assertEquals(columns.length(), 2);
+    }
+    {
+      String response = testHelper.target.path(String.format(urlFormat, ResourceTestHelper.DEFAULT_TABLE_NAME,
+          testHelper.indexSegment.getSegmentMetadata().getName()))
+          .queryParam("columns", "*")
+          .request().get(String.class);
+      JSONObject jsonMeta = new JSONObject(response);
+      JSONArray columns = jsonMeta.getJSONArray("columns");
+      assertEquals(columns.length(),
+          ((SegmentMetadataImpl) testHelper.indexSegment.getSegmentMetadata()).getAllColumns().size());
+    }
+    {
+      Response response = testHelper.target.path(String
+          .format(urlFormat, "UNKNOWN_TABLE", testHelper.indexSegment.getSegmentMetadata().getName()))
+          .request().get(Response.class);
+      assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
+    }
+    {
+      Response response = testHelper.target
+          .path(String.format(urlFormat, ResourceTestHelper.DEFAULT_TABLE_NAME, "UNKNOWN_SEGMENT"))
+          .request().get(Response.class);
       assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
     }
   }

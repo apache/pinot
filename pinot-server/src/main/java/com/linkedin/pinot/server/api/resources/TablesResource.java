@@ -1,4 +1,4 @@
-/**
+ /**
  * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,12 +16,13 @@
 
 package com.linkedin.pinot.server.api.resources;
 
-import com.google.common.collect.ImmutableList;
+ import com.google.common.collect.ImmutableList;
 import com.linkedin.pinot.common.restlet.resources.TableSegments;
 import com.linkedin.pinot.common.restlet.resources.TablesList;
 import com.linkedin.pinot.core.data.manager.offline.InstanceDataManager;
 import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
 import com.linkedin.pinot.core.data.manager.offline.TableDataManager;
+import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.server.starter.ServerInstance;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -30,16 +31,21 @@ import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import javax.inject.Inject;
+import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.slf4j.Logger;
+ import org.json.JSONException;
+ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Api(tags = "Table")
@@ -80,6 +86,14 @@ public class TablesResource {
     return dataManager;
   }
 
+  private TableDataManager checkGetTableDataManager(String tableName) {
+    InstanceDataManager dataManager = checkGetInstanceDataManager();
+    TableDataManager tableDataManager = dataManager.getTableDataManager(tableName);
+    if (tableDataManager == null) {
+      throw new WebApplicationException("Table " + tableName + " does not exist", Response.Status.NOT_FOUND);
+    }
+    return tableDataManager;
+  }
   @GET
   @Path("/tables/{tableName}/segments")
   @Produces(MediaType.APPLICATION_JSON)
@@ -89,11 +103,7 @@ public class TablesResource {
   public TableSegments listTableSegments(
       @ApiParam(value = "Table name including type", required = true, example = "myTable_OFFLINE")
       @PathParam("tableName") String tableName) {
-    InstanceDataManager dataManager = checkGetInstanceDataManager();
-    TableDataManager tableDataManager = dataManager.getTableDataManager(tableName);
-    if (tableDataManager == null) {
-      throw new WebApplicationException("Table " + tableName + " does not exist", Response.Status.NOT_FOUND);
-    }
+    TableDataManager tableDataManager = checkGetTableDataManager(tableName);
     ImmutableList<SegmentDataManager> segmentDataManagers = tableDataManager.acquireAllSegments();
     List<String> segments = new ArrayList<>(segmentDataManagers.size());
     for (SegmentDataManager segmentDataManager : segmentDataManagers) {
@@ -104,5 +114,49 @@ public class TablesResource {
     return new TableSegments(segments);
   }
 
+  @GET
+  @Path("/tables/{tableName}/segments/{segmentName}/metadata")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Provide segment metadata", notes = "Provide segments metadata for the segment on server")
+  @ApiResponses( value = {
+      @ApiResponse(code=200, message = "Success"),
+      @ApiResponse(code=500, message = "Internal server error", response = ErrorInfo.class),
+      @ApiResponse(code = 404, message = "Table or segment not found", response = ErrorInfo.class)
+  })
+  public String getSegmentMetadata(
+      @ApiParam(value = "Table name including type", required = true, example = "myTable_OFFLINE")
+      @PathParam("tableName") String tableName,
+      @ApiParam(value = "Segment Name", required = true)
+      @PathParam("segmentName") String segmentName,
+      @ApiParam(value = "column name", required = false, allowMultiple = true, defaultValue = "")
+      @QueryParam("columns") @DefaultValue("") List<String> columns
+      ) {
+    TableDataManager tableDataManager = checkGetTableDataManager(tableName);
+    SegmentDataManager segmentDataManager = null;
+    try {
+      segmentDataManager = tableDataManager.acquireSegment(segmentName);
+      if (segmentDataManager == null) {
+        throw new WebApplicationException(String.format("Table %s segments %s does not exist", tableName, segmentName),
+            Response.Status.NOT_FOUND);
+      }
+      SegmentMetadataImpl segmentMetadata = (SegmentMetadataImpl) segmentDataManager.getSegment().getSegmentMetadata();
+      Set<String> columnSet;
+      if (columns.size() == 1 && columns.get(0).equals("*")) {
+        columnSet = null;
+      } else {
+        columnSet = new HashSet<>(columns);
+      }
+      try {
+        return segmentMetadata.toJson(columnSet).toString();
+      } catch (JSONException e) {
+        LOGGER.error("Failed to convert table {} segment {} to json", tableName, segmentMetadata);
+        throw new WebApplicationException("Failed to convert segment metadata to json", Response.Status.INTERNAL_SERVER_ERROR);
+      }
+    } finally {
+      if (segmentDataManager != null) {
+        tableDataManager.releaseSegment(segmentDataManager);
+      }
+    }
+  }
 
 }
