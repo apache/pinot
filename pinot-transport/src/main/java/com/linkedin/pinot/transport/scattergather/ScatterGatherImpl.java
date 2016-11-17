@@ -426,19 +426,21 @@ public class ScatterGatherImpl implements ScatterGather {
       KeyedFuture<ServerInstance, NettyClientConnection> keyedFuture = null;
       boolean gotConnection = false;
       boolean error = true;
+      long timeRemainingMillis = _timeoutMS - (System.currentTimeMillis() - _startTime);
+      long timeWaitedMillis = 0;
       try {
         keyedFuture = _connPool.checkoutObject(_server);
 
         byte[] serializedRequest = _request.getRequestForService(_server, _segmentIds);
-        long timeRemaining = _timeoutMS - (System.currentTimeMillis() - _startTime);
         int ntries = 0;
         // Try a maximum of pool size objects.
         while (true) {
-          if (timeRemaining <= 0) {
+          if (timeRemainingMillis <= 0) {
             throw new TimeoutException("Timed out trying to connect to " + _server + "(timeout=" + _timeoutMS + "ms,ntries=" + ntries + ")");
           }
-          conn = keyedFuture.getOne(timeRemaining, TimeUnit.MILLISECONDS);
+          conn = keyedFuture.getOne(timeRemainingMillis, TimeUnit.MILLISECONDS);
           if (conn != null && conn.validate()) {
+            timeWaitedMillis = System.currentTimeMillis() - _startTime;
             gotConnection = true;
             break;
           }
@@ -459,13 +461,13 @@ public class ScatterGatherImpl implements ScatterGather {
             _connPool.destroyObject(_server, conn);
           }
           if (++ntries == MAX_CONN_RETRIES-1) {
-            throw new RuntimeException("Could not connect to " + _server + " after " + ntries + "attempts(timeRemaining=" + timeRemaining + "ms)");
+            throw new RuntimeException("Could not connect to " + _server + " after " + ntries + "attempts(timeRemaining=" + timeRemainingMillis + "ms)");
           }
           keyedFuture = _connPool.checkoutObject(_server);
-          timeRemaining = _timeoutMS - (System.currentTimeMillis() - _startTime);
+          timeRemainingMillis = _timeoutMS - (System.currentTimeMillis() - _startTime);
         }
         ByteBuf req = Unpooled.wrappedBuffer(serializedRequest);
-        _responseFuture = conn.sendRequest(req, _request.getRequestId(), timeRemaining);
+        _responseFuture = conn.sendRequest(req, _request.getRequestId(), timeRemainingMillis);
         _isSent.set(true);
         LOGGER.debug("Response Future is : {}", _responseFuture);
         error = false;
@@ -480,6 +482,10 @@ public class ScatterGatherImpl implements ScatterGather {
       } finally {
         _requestDispatchLatch.countDown();
         BrokerRequest brokerRequest = (BrokerRequest) _request.getBrokerRequest();
+        _brokerMetrics.addMeteredQueryValue(brokerRequest, BrokerMeter.REQUEST_CONNECTION_WAIT_TIME_IN_MILLIS, timeWaitedMillis);
+        if (timeRemainingMillis < 0) {
+          _brokerMetrics.addMeteredQueryValue(brokerRequest, BrokerMeter.REQUEST_CONNECTION_TIMEOUTS, 1);
+        }
         if (error) {
           if (gotConnection) {
             // We must have failed sometime when sending the request
