@@ -152,7 +152,7 @@ public class StarTreeClusterIntegrationTest extends ClusterTest {
       LOGGER.info("Uploading segment {}", segmentName);
       File file = new File(_tarredSegmentsDir, segmentName);
       FileUploadUtils.sendSegmentFile(ControllerTestUtils.DEFAULT_CONTROLLER_HOST,
-          ControllerTestUtils.DEFAULT_CONTROLLER_API_PORT, segmentName, new FileInputStream(file),
+          ControllerTestUtils.DEFAULT_CONTROLLER_API_PORT, segmentName, file,
           file.length());
     }
   }

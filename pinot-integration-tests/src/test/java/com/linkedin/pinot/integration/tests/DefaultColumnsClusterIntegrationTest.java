@@ -117,7 +117,7 @@ public class DefaultColumnsClusterIntegrationTest extends BaseClusterIntegration
     // Upload the segments.
     for (String segmentName : TAR_DIR.list()) {
       File file = new File(TAR_DIR, segmentName);
-      FileUploadUtils.sendSegmentFile("localhost", "8998", segmentName, new FileInputStream(file), file.length());
+      FileUploadUtils.sendSegmentFile("localhost", "8998", segmentName, file, file.length());
     }
 
     // Wait for all segments to be ONLINE.

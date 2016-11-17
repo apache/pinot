@@ -121,7 +121,7 @@ public class UploadSegmentCommand extends AbstractBaseAdminCommand implements Co
 
         LOGGER.info("Uploading segment {}", tgzFile.getName());
         FileUploadUtils
-            .sendSegmentFile(_controllerHost, _controllerPort, tgzFile.getName(), new FileInputStream(tgzFile),
+            .sendSegmentFile(_controllerHost, _controllerPort, tgzFile.getName(), tgzFile,
                 tgzFile.length());
       }
     } catch (Exception e) {

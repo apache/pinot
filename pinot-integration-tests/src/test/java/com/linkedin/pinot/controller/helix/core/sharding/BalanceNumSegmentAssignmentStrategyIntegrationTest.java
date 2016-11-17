@@ -114,4 +114,9 @@ public class BalanceNumSegmentAssignmentStrategyIntegrationTest extends UploadRe
   public void testRefresh(String tableName, SegmentVersion version) {
     // Ignore this inherited test
   }
+
+  @Test(enabled = false)
+  public void testRetry(String tableName, SegmentVersion version) {
+    // Ignore this inherited test
+  }
 }
