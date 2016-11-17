@@ -111,8 +111,8 @@ public class TableViewsTest extends ControllerTest {
   @DataProvider(name = "stateProvider")
   public Object[][] stateProvider() {
     Object[][] configs = {
-        { "idealstate"},
-        { "externalview"}
+        {TableViews.IDEALSTATE},
+        {TableViews.EXTERNALVIEW}
     };
     return configs;
   }
