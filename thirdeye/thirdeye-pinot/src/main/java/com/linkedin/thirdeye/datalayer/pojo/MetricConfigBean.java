@@ -38,8 +38,6 @@ public class MetricConfigBean extends AbstractBean {
 
   private Map<String, String> extSourceLinkInfo;
 
-  private Map<String, String> alertFilterInfo;
-
 
   public String getName() {
     return name;
@@ -129,14 +127,6 @@ public class MetricConfigBean extends AbstractBean {
     this.extSourceLinkInfo = extSourceLinkInfo;
   }
 
-  public Map<String, String> getAlertFilterInfo() {
-    return alertFilterInfo;
-  }
-
-  public void setAlertFilterInfo(Map<String, String> alertFilterInfo) {
-    this.alertFilterInfo = alertFilterInfo;
-  }
-
   @Override
   public boolean equals(Object o) {
     if (!(o instanceof MetricConfigBean)) {
@@ -153,14 +143,13 @@ public class MetricConfigBean extends AbstractBean {
         && Objects.equals(inverseMetric, mc.isInverseMetric())
         && Objects.equals(cellSizeExpression, mc.getCellSizeExpression())
         && Objects.equals(active, mc.isActive())
-        && Objects.equals(extSourceLinkInfo, mc.getExtSourceLinkInfo())
-        && Objects.equals(alertFilterInfo, mc.getAlertFilterInfo());
+        && Objects.equals(extSourceLinkInfo, mc.getExtSourceLinkInfo());
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(getId(), dataset, alias, derived, derivedMetricExpression, rollupThreshold,
-        inverseMetric, cellSizeExpression, active, extSourceLinkInfo, alertFilterInfo);
+        inverseMetric, cellSizeExpression, active, extSourceLinkInfo);
   }
 
   @Override
@@ -168,6 +157,6 @@ public class MetricConfigBean extends AbstractBean {
     return MoreObjects.toStringHelper(this).add("id", getId()).add("name", name).add("dataset", dataset)
         .add("alias", alias).add("derived", derived).add("derivedMetricExpression", derivedMetricExpression)
         .add("rollupThreshold", rollupThreshold).add("cellSizeExpression", cellSizeExpression).add("active", active)
-        .add("extSourceLinkInfo", extSourceLinkInfo).add("alertFilterInfo", alertFilterInfo).toString();
+        .add("extSourceLinkInfo", extSourceLinkInfo).toString();
   }
 }
