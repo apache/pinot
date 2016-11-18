@@ -42,12 +42,25 @@ import org.slf4j.LoggerFactory;
 
 public class TableViews extends BasePinotControllerRestletResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(TableViews.class);
+  public static final String IDEALSTATE = "idealstate";
+  public static final String EXTERNALVIEW = "externalview";
 
   @Get
   @Override
   public Representation get() {
     final String tableName = (String) getRequest().getAttributes().get("tableName");
-    final String view = (String) getRequest().getAttributes().get("view");
+    final int viewPositon = 3;
+
+    String[] path = getReference().getPath().split("/");
+    // first part is "" because paths start with /
+    if (path.length < (viewPositon + 1) ||
+        (!path[viewPositon].equalsIgnoreCase(EXTERNALVIEW) && !path[viewPositon].equalsIgnoreCase(IDEALSTATE))) {
+      // this is unexpected condition
+      LOGGER.error("Invalid path: {} while reading views", path);
+      return responseRepresentation(Status.SERVER_ERROR_INTERNAL, "{\"error\":\"Invalid reqeust path\"");
+    }
+
+    final String view = path[viewPositon];
     String tableTypeStr = getQuery().getValues("tableType");
 
     if (tableTypeStr == null) {
@@ -83,21 +96,14 @@ public class TableViews extends BasePinotControllerRestletResource {
 
   // we use name "view" to closely match underlying names and to not
   // confuse with table state of enable/disable
-  @HttpVerb("get")
-  @Summary("Get table idealstate or external view")
-  @Tags({"table"})
-  @Paths({"/tables/{tableName}/{view}"})
   private Representation getTableState(
-      @Parameter(name = "tableName", in = "path", description = "Table name(without type)", required = true)
       String tableName,
-      @Parameter(name="view", in = "path", description = "Table idealstate or external view", required = true)
       String view,
-      @Parameter(name = "tableType", in="query", description = "Table type", required = false)
       TableType tableType) {
     TableView tableView;
-    if (view.equalsIgnoreCase("idealstate")) {
+    if (view.equalsIgnoreCase(IDEALSTATE)) {
       tableView = getTableIdealState(tableName, tableType);
-    } else if (view.equalsIgnoreCase("externalview")) {
+    } else if (view.equalsIgnoreCase(EXTERNALVIEW)) {
       tableView = getTableExternalView(tableName, tableType);
     } else {
       return responseRepresentation(Status.CLIENT_ERROR_BAD_REQUEST,
@@ -119,7 +125,15 @@ public class TableViews extends BasePinotControllerRestletResource {
     }
   }
 
-  private TableView getTableExternalView(@Nonnull String tableNameOptType, @Nullable TableType tableType) {
+  @HttpVerb("get")
+  @Summary("Get table external view")
+  @Tags({"table"})
+  @Paths({"/tables/{tableName}/externalview"})
+  private TableView getTableExternalView(
+      @Parameter(name = "tableName", in = "path", description = "Table name(without type)", required = true)
+      @Nonnull String tableNameOptType,
+      @Parameter(name = "tableType", in="query", description = "Table type", required = false)
+      @Nullable TableType tableType) {
     TableView tableView = new TableView();
     if (tableType == null || tableType == TableType.OFFLINE) {
       tableView.offline = getExternalView(tableNameOptType, TableType.OFFLINE);
@@ -130,7 +144,15 @@ public class TableViews extends BasePinotControllerRestletResource {
     return tableView;
   }
 
-  private TableView getTableIdealState(String tableNameOptType, TableType tableType) {
+  @HttpVerb("get")
+  @Summary("Get table idealstate")
+  @Tags({"table"})
+  @Paths({"/tables/{tableName}/idealstate"})
+  private TableView getTableIdealState(
+      @Parameter(name = "tableName", in = "path", description = "Table name(without type)", required = true)
+      String tableNameOptType,
+      @Parameter(name = "tableType", in="query", description = "Table type", required = false)
+      TableType tableType) {
     TableView tableView = new TableView();
     if (tableType == null || tableType == TableType.OFFLINE) {
       tableView.offline = getIdealState(tableNameOptType, TableType.OFFLINE);
@@ -142,7 +164,8 @@ public class TableViews extends BasePinotControllerRestletResource {
   }
 
   public @Nullable
-  Map<String, Map<String, String>> getIdealState(@Nonnull String tableNameOptType, @Nullable TableType tableType) {
+  Map<String, Map<String, String>> getIdealState(@Nonnull String tableNameOptType,
+      @Parameter(name = "tableType", in="query", description = "Table type", required = false)@Nullable TableType tableType) {
     String tableName = getTableName(tableNameOptType, tableType);
     IdealState resourceIdealState = _pinotHelixResourceManager.getHelixAdmin()
         .getResourceIdealState(_pinotHelixResourceManager.getHelixClusterName(), tableName);

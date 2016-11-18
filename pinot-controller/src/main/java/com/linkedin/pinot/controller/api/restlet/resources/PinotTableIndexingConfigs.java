@@ -48,7 +48,10 @@ public class PinotTableIndexingConfigs extends BasePinotControllerRestletResourc
       setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
       return new StringRepresentation(error);
     }
-
+    if (entity == null) {
+      setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
+      return new StringRepresentation("{\"error\" : \"Request body is required\"}");
+    }
     try {
       return updateIndexingConfig(tableName, entity);
     } catch (final Exception e) {
