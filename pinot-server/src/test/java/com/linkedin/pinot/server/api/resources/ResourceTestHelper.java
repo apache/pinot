@@ -109,7 +109,8 @@ public class ResourceTestHelper {
 
   public IndexSegment setupSegment()
       throws Exception {
-    return setupSegment(DEFAULT_TABLE_NAME, DEFAULT_AVRO_DATA_FILE, "1");
+    indexSegment = setupSegment(DEFAULT_TABLE_NAME, DEFAULT_AVRO_DATA_FILE, "1");
+    return indexSegment;
   }
 
   public IndexSegment setupSegment(String tableName, String avroDataFilePath, String segmentNamePostfix)
@@ -128,9 +129,9 @@ public class ResourceTestHelper {
     driver.init(config);
     driver.build();
     File segmentDirectory = new File(INDEX_DIR, driver.getSegmentName());
-    indexSegment = ColumnarSegmentLoader.load(segmentDirectory, ReadMode.mmap);
-    serverInstance.getInstanceDataManager().addSegment(indexSegment.getSegmentMetadata(), null, null);
-    return indexSegment;
+    IndexSegment segment = ColumnarSegmentLoader.load(segmentDirectory, ReadMode.mmap);
+    serverInstance.getInstanceDataManager().addSegment(segment.getSegmentMetadata(), null, null);
+    return segment;
   }
 
   public void addTable(String tableName)
