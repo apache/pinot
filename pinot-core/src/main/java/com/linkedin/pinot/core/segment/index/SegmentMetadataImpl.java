@@ -52,6 +52,7 @@ import org.codehaus.jackson.map.ObjectMapper;
 import org.joda.time.Duration;
 import org.joda.time.Interval;
 import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -586,32 +587,41 @@ public class SegmentMetadataImpl implements SegmentMetadata {
    *                     the parameter value is null
    * @return json representation of segment metadata
    */
-  public JSONObject toJson(Set<String> columnFilter) {
+  public JSONObject toJson(@Nullable Set<String> columnFilter)
+      throws JSONException {
 
     JSONObject rootMeta = new JSONObject();
     try {
       rootMeta.put("segmentName", _segmentName);
       rootMeta.put("schemaName", _schema != null ? _schema.getSchemaName() : JSONObject.NULL);
       rootMeta.put("crc", _crc);
-      rootMeta.put("creationTime", _creationTime);
+      rootMeta.put("creationTimeMillis", _creationTime);
       TimeZone timeZone = TimeZone.getTimeZone("UTC");
       DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss:SSS' UTC'");
       dateFormat.setTimeZone(timeZone);
       String creationTimeStr = _creationTime != Long.MIN_VALUE  ? dateFormat.format(new Date(_creationTime)) : "";
-      rootMeta.put("creationeTimeReadable", creationTimeStr);
+      rootMeta.put("creationTimeReadable", creationTimeStr);
       rootMeta.put("timeGranularitySec", _timeGranularity != null ? _timeGranularity.getStandardSeconds() : null);
-      rootMeta.put("startTimeMillis", _timeInterval.getStartMillis());
-      rootMeta.put("startTimeReadable", _timeInterval.getStart().toString());
-      rootMeta.put("endTimeMillis", _timeInterval.getEndMillis());
-      rootMeta.put("endTimeReadable", _timeInterval.getEnd().toString());
+      if (_timeInterval == null) {
+        rootMeta.put("startTimeMillis", (String)null);
+        rootMeta.put("startTimeReadable", "null");
+        rootMeta.put("endTimeMillis", (String)null);
+        rootMeta.put("endTimeReadable", "null");
+
+      } else {
+        rootMeta.put("startTimeMillis", _timeInterval.getStartMillis());
+        rootMeta.put("startTimeReadable", _timeInterval.getStart().toString());
+        rootMeta.put("endTimeMillis", _timeInterval.getEndMillis());
+        rootMeta.put("endTimeReadable", _timeInterval.getEnd().toString());
+      }
 
       rootMeta.put("pushTimeMillis", _pushTime);
       String pushTimeStr = _pushTime != Long.MIN_VALUE ? dateFormat.format(new Date(_pushTime)) : "";
       rootMeta.put("pushTimeReadable", pushTimeStr);
 
-      rootMeta.put("refreshTime", _refreshTime);
+      rootMeta.put("refreshTimeMillis", _refreshTime);
       String refreshTimeStr = _refreshTime != Long.MIN_VALUE ? dateFormat.format(new Date(_refreshTime)) : "";
-      rootMeta.put("refreshTimeStr", refreshTimeStr);
+      rootMeta.put("refreshTimeReadable", refreshTimeStr);
 
       rootMeta.put("segmentVersion", _segmentVersion.toString());
       rootMeta.put("hasStarTree", hasStarTree());

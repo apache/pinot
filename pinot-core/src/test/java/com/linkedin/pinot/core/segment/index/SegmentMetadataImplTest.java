@@ -75,11 +75,11 @@ public class SegmentMetadataImplTest {
     Assert.assertEquals(jsonMeta.getLong("crc"), Long.valueOf(metadata.getCrc()).longValue());
     Assert.assertEquals(jsonMeta.getString("paddingCharacter"), String.valueOf(metadata.getPaddingCharacter()));
     Assert.assertEquals(jsonMeta.get("creatorName"), metadata.getCreatorName());
-    Assert.assertEquals(jsonMeta.get("creationTime"), metadata.getIndexCreationTime());
+    Assert.assertEquals(jsonMeta.get("creationTimeMillis"), metadata.getIndexCreationTime());
     Assert.assertEquals(jsonMeta.get("startTimeMillis"), metadata.getTimeInterval().getStartMillis());
     Assert.assertEquals(jsonMeta.get("endTimeMillis"), metadata.getTimeInterval().getEndMillis());
     Assert.assertEquals(jsonMeta.get("pushTimeMillis"), metadata.getPushTime());
-    Assert.assertEquals(jsonMeta.get("refreshTime"), metadata.getPushTime());
+    Assert.assertEquals(jsonMeta.get("refreshTimeMillis"), metadata.getPushTime());
     JSONArray jsonColumnList = jsonMeta.getJSONArray("columns");
     Assert.assertEquals(jsonColumnList.length(), metadata.getAllColumns().size());
     for (int i = 0; i < jsonColumnList.length(); i++) {
