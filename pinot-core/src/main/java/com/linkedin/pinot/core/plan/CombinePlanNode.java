@@ -94,7 +94,10 @@ public class CombinePlanNode implements PlanNode {
         });
       }
       try {
-        latch.await(TIME_OUT_IN_SECONDS_FOR_PARALLEL_RUN, TimeUnit.SECONDS);
+        // Check if count reached zero in the time limit.
+        if (!latch.await(TIME_OUT_IN_SECONDS_FOR_PARALLEL_RUN, TimeUnit.SECONDS)) {
+          throw new RuntimeException(QueryException.COMBINE_SEGMENT_PLAN_TIMEOUT_ERROR);
+        }
 
         // Check if all plans succeeded.
         if (globalQueue.size() == numPlanNodes) {
@@ -103,11 +106,10 @@ public class CombinePlanNode implements PlanNode {
           throw new RuntimeException(QueryException.SEGMENT_PLAN_EXECUTION_ERROR);
         }
       } catch (InterruptedException e) {
-        LOGGER.error("Did not finish executing all segment plans in {} seconds.", TIME_OUT_IN_SECONDS_FOR_PARALLEL_RUN,
-            e);
-        throw new RuntimeException(QueryException.COMBINE_SEGMENT_PLAN_TIMEOUT_ERROR);
+        throw new RuntimeException(QueryException.INTERNAL_ERROR);
       }
     }
+
     long end = System.currentTimeMillis();
     LOGGER.debug("CombinePlanNode.run took: {}ms", end - start);
 
