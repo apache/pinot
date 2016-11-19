@@ -20,6 +20,7 @@ import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.loader.LoaderUtils;
+import com.linkedin.pinot.core.segment.index.loader.V3RemoveIndexException;
 import com.linkedin.pinot.core.segment.store.ColumnIndexType;
 import com.linkedin.pinot.core.segment.store.SegmentDirectory;
 import java.io.File;
@@ -30,30 +31,24 @@ import org.slf4j.LoggerFactory;
 public class V3DefaultColumnHandler extends BaseDefaultColumnHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(V3DefaultColumnHandler.class);
 
-  private final SegmentDirectory.Writer segmentWriter;
+  private final SegmentDirectory.Writer _segmentWriter;
 
   public V3DefaultColumnHandler(File indexDir, Schema schema, SegmentMetadataImpl segmentMetadata,
       SegmentDirectory.Writer segmentWriter) {
     super(indexDir, schema, segmentMetadata);
-    this.segmentWriter = segmentWriter;
+    _segmentWriter = segmentWriter;
   }
 
-  /**
-   * {@inheritDoc}
-   */
   @Override
   protected void updateDefaultColumn(String column, DefaultColumnAction action)
       throws Exception {
     LOGGER.info("Starting default column action: {} on column: {}", action, column);
 
-    // Column indices cannot be removed for segment format v3.
+    // Column indices cannot be removed for segment format V3.
     // Throw exception to drop and re-download the segment.
     if (action.isRemoveAction()) {
-      String failureMessage =
-          "Default value indices for column: " + column + " cannot be removed for segment format v3, throw exception to"
-              + " drop and re-download the segment.";
-      LOGGER.error(failureMessage);
-      throw new RuntimeException(failureMessage);
+      throw new V3RemoveIndexException(
+          "Default value indices for column: " + column + " cannot be removed for V3 format segment.");
     }
 
     // Delete existing dictionary and forward index for the column. For V3, this is for error handling.
@@ -74,8 +69,8 @@ public class V3DefaultColumnHandler extends BaseDefaultColumnHandler {
       } else {
         forwardIndexFile = new File(indexDir, column + V1Constants.Indexes.UN_SORTED_MV_FWD_IDX_FILE_EXTENTION);
       }
-      LoaderUtils.writeIndexToV3Format(segmentWriter, column, dictionaryFile, ColumnIndexType.DICTIONARY);
-      LoaderUtils.writeIndexToV3Format(segmentWriter, column, forwardIndexFile, ColumnIndexType.FORWARD_INDEX);
+      LoaderUtils.writeIndexToV3Format(_segmentWriter, column, dictionaryFile, ColumnIndexType.DICTIONARY);
+      LoaderUtils.writeIndexToV3Format(_segmentWriter, column, forwardIndexFile, ColumnIndexType.FORWARD_INDEX);
     }
   }
 }

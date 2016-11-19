@@ -24,13 +24,9 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 public class LoaderUtils {
-  private static final Logger LOGGER = LoggerFactory.getLogger(LoaderUtils.class);
-
   private LoaderUtils() {
   }
 
@@ -51,20 +47,15 @@ public class LoaderUtils {
     try {
       if (segmentWriter.hasIndexFor(column, indexType)) {
         // Index already exists, try to reuse it.
-
         buffer = segmentWriter.getIndexFor(column, indexType);
         if (buffer.size() != fileLength) {
           // Existed index size is not equal to index file size.
           // Throw exception to drop and re-download the segment.
-
-          String failureMessage =
-              "V3 format segment already has " + indexType + " for column: " + column + " that cannot be removed.";
-          LOGGER.error(failureMessage);
-          throw new IllegalStateException(failureMessage);
+          throw new V3RemoveIndexException(
+              "V3 format segment already has " + indexType + " for column: " + column + " that cannot be reused.");
         }
       } else {
         // Index does not exist, create a new buffer for that.
-
         buffer = segmentWriter.newIndexFor(column, indexType, fileLength);
       }
 

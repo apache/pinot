@@ -16,6 +16,7 @@
 package com.linkedin.pinot.server.starter.helix;
 
 import com.linkedin.pinot.common.utils.SchemaUtils;
+import com.linkedin.pinot.core.segment.index.loader.V3RemoveIndexException;
 import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
@@ -124,8 +125,15 @@ public class SegmentFetcherAndLoader {
               // TODO Update zk metadata with CRC for this instance
               return;
             }
+          } catch (V3RemoveIndexException e) {
+            LOGGER.info(
+                "Unable to remove local index from V3 format segment: {}, table: {}, try to reload it from controller.",
+                segmentId, tableName, e);
+            FileUtils.deleteQuietly(new File(localSegmentDir));
+            localSegmentMetadata = null;
           } catch (Exception e) {
-            LOGGER.error("Failed to load {} of table {} from local, will try to reload it from controller!", segmentId, tableName, e);
+            LOGGER.error("Failed to load {} of table {} from local, will try to reload it from controller!", segmentId,
+                tableName, e);
             FileUtils.deleteQuietly(new File(localSegmentDir));
             localSegmentMetadata = null;
           }
