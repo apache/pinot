@@ -251,10 +251,12 @@ public class DashboardResource {
         currentEnd = currentEnd - delta;
         baselineEnd = baselineEnd - delta;
       }
-      request.setBaselineStart(new DateTime(baselineStart, DateTimeZone.forID(timeZone)));
-      request.setBaselineEnd(new DateTime(baselineEnd, DateTimeZone.forID(timeZone)));
-      request.setCurrentStart(new DateTime(currentStart, DateTimeZone.forID(timeZone)));
-      request.setCurrentEnd(new DateTime(currentEnd, DateTimeZone.forID(timeZone)));
+      DateTimeZone timeZoneForCollection = Utils.getDataTimeZone(collection);
+//      DateTimeZone timeZoneForCollection = DateTimeZone.forID(timeZone);
+      request.setBaselineStart(new DateTime(baselineStart, timeZoneForCollection));
+      request.setBaselineEnd(new DateTime(baselineEnd, timeZoneForCollection));
+      request.setCurrentStart(new DateTime(currentStart, timeZoneForCollection));
+      request.setCurrentEnd(new DateTime(currentEnd, timeZoneForCollection));
       if (filterJson != null && !filterJson.isEmpty()) {
         filterJson = URLDecoder.decode(filterJson, "UTF-8");
         request.setFilters(ThirdEyeUtils.convertToMultiMap(filterJson));
