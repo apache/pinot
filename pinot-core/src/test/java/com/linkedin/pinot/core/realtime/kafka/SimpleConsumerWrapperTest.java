@@ -224,7 +224,7 @@ public class SimpleConsumerWrapperTest {
         "theTopic"
     );
     SimpleConsumerWrapper consumerWrapper = SimpleConsumerWrapper.forMetadataConsumption(
-        simpleConsumerFactory, "abcd:1234,bcde:2345", "clientId");
+        simpleConsumerFactory, "abcd:1234,bcde:2345", "clientId", 10000L);
     assertEquals(consumerWrapper.getPartitionCount("theTopic", 10000L), 2);
   }
 
@@ -239,7 +239,7 @@ public class SimpleConsumerWrapperTest {
         "theTopic"
     );
     SimpleConsumerWrapper consumerWrapper = SimpleConsumerWrapper.forPartitionConsumption(
-        simpleConsumerFactory, "abcd:1234,bcde:2345", "clientId", "theTopic", 0);
+        simpleConsumerFactory, "abcd:1234,bcde:2345", "clientId", "theTopic", 0, 10000L);
     consumerWrapper.fetchMessages(12345L, 23456L, 10000);
   }
 
@@ -254,7 +254,7 @@ public class SimpleConsumerWrapperTest {
         "theTopic"
     );
     SimpleConsumerWrapper consumerWrapper = SimpleConsumerWrapper.forPartitionConsumption(
-        simpleConsumerFactory, "abcd:1234,bcde:2345", "clientId", "theTopic", 0);
+        simpleConsumerFactory, "abcd:1234,bcde:2345", "clientId", "theTopic", 0, 10000L);
     consumerWrapper.fetchPartitionOffset("smallest", 10000);
 
   }

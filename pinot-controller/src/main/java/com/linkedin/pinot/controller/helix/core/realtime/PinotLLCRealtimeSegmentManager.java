@@ -604,7 +604,7 @@ public class PinotLLCRealtimeSegmentManager {
 
   private long getPartitionOffset(final String topicName, final String bootstrapHosts, final String offsetCriteria, int partitionId) {
     SimpleConsumerWrapper kafkaConsumer = SimpleConsumerWrapper.forPartitionConsumption(new KafkaSimpleConsumerFactoryImpl(),
-        bootstrapHosts, "dummyClientId", topicName, partitionId);
+        bootstrapHosts, "dummyClientId", topicName, partitionId, KAFKA_PARTITION_OFFSET_FETCH_TIMEOUT_MILLIS);
     final long startOffset;
     try {
       startOffset = kafkaConsumer.fetchPartitionOffset(offsetCriteria, KAFKA_PARTITION_OFFSET_FETCH_TIMEOUT_MILLIS);

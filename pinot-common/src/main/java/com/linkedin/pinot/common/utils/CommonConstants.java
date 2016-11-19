@@ -112,6 +112,8 @@ public class CommonConstants {
           public static final String DECODER_CLASS = "kafka.decoder.class.name";
           public static final String DECODER_PROPS_PREFIX = "kafka.decoder.prop";
           public static final String KAFKA_CONSUMER_PROPS_PREFIX = "kafka.consumer.prop";
+          public static final String KAFKA_CONNECTION_TIMEOUT_MILLIS = "kafka.connection.timeout.ms";
+          public static final String KAFKA_FETCH_TIMEOUT_MILLIS = "kafka.fetch.timeout.ms";
           public static final String ZK_BROKER_URL = "kafka.zk.broker.url";
           public static final String KAFKA_BROKER_LIST = "kafka.broker.list";
 

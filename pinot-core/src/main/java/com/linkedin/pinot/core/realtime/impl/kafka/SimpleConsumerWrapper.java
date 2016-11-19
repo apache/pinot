@@ -72,6 +72,7 @@ public class SimpleConsumerWrapper implements Closeable {
   private final boolean _metadataOnlyConsumer;
   private final String _topic;
   private final int _partition;
+  private final long _connectTimeoutMillis;
   private final KafkaSimpleConsumerFactory _simpleConsumerFactory;
   private String[] _bootstrapHosts;
   private int[] _bootstrapPorts;
@@ -82,9 +83,10 @@ public class SimpleConsumerWrapper implements Closeable {
   private int _currentPort;
 
   private SimpleConsumerWrapper(KafkaSimpleConsumerFactory simpleConsumerFactory, String bootstrapNodes,
-      String clientId) {
+      String clientId, long connectTimeoutMillis) {
     _simpleConsumerFactory = simpleConsumerFactory;
     _clientId = clientId;
+    _connectTimeoutMillis = connectTimeoutMillis;
     _metadataOnlyConsumer = true;
     _simpleConsumer = null;
 
@@ -97,11 +99,12 @@ public class SimpleConsumerWrapper implements Closeable {
   }
 
   private SimpleConsumerWrapper(KafkaSimpleConsumerFactory simpleConsumerFactory, String bootstrapNodes,
-      String clientId, String topic, int partition) {
+      String clientId, String topic, int partition, long connectTimeoutMillis) {
     _simpleConsumerFactory = simpleConsumerFactory;
     _clientId = clientId;
     _topic = topic;
     _partition = partition;
+    _connectTimeoutMillis = connectTimeoutMillis;
     _metadataOnlyConsumer = false;
     _simpleConsumer = null;
 
@@ -414,15 +417,14 @@ public class SimpleConsumerWrapper implements Closeable {
     // Ensure that we're connected to the leader
     // TODO Improve error handling
 
-    final long endTime = System.currentTimeMillis() + timeoutMillis;
-
+    final long connectEndTime = System.currentTimeMillis() + _connectTimeoutMillis;
     while(_currentState.getStateValue() != ConsumerState.CONNECTED_TO_PARTITION_LEADER &&
-        System.currentTimeMillis() < endTime) {
+        System.currentTimeMillis() < connectEndTime) {
       _currentState.process();
     }
     if (_currentState.getStateValue() != ConsumerState.CONNECTED_TO_PARTITION_LEADER &&
-        endTime <= System.currentTimeMillis()) {
-      throw new TimeoutException();
+        connectEndTime <= System.currentTimeMillis()) {
+      throw new java.util.concurrent.TimeoutException();
     }
 
     FetchResponse fetchResponse = _simpleConsumer.fetch(new FetchRequestBuilder()
@@ -563,11 +565,12 @@ public class SimpleConsumerWrapper implements Closeable {
    * @param simpleConsumerFactory The SimpleConsumer factory to use
    * @param bootstrapNodes A comma separated list of Kafka broker nodes
    * @param clientId The Kafka client identifier, to be used to uniquely identify the client when tracing calls
+   * @param connectTimeoutMillis The timeout for connecting or re-establishing a connection to the Kafka cluster
    * @return A consumer wrapper
    */
   public static SimpleConsumerWrapper forMetadataConsumption(KafkaSimpleConsumerFactory simpleConsumerFactory,
-      String bootstrapNodes, String clientId) {
-    return new SimpleConsumerWrapper(simpleConsumerFactory, bootstrapNodes, clientId);
+      String bootstrapNodes, String clientId, long connectTimeoutMillis) {
+    return new SimpleConsumerWrapper(simpleConsumerFactory, bootstrapNodes, clientId, connectTimeoutMillis);
   }
 
   /**
@@ -578,11 +581,14 @@ public class SimpleConsumerWrapper implements Closeable {
    * @param bootstrapNodes A comma separated list of Kafka broker nodes
    * @param clientId The Kafka client identifier, to be used to uniquely identify the client when tracing calls
    * @param topic The Kafka topic to consume from
-   * @param partition The partition id to consume from   @return A consumer wrapper
+   * @param partition The partition id to consume from
+   * @param connectTimeoutMillis The timeout for connecting or re-establishing a connection to the Kafka cluster
+   * @return A consumer wrapper
    */
   public static SimpleConsumerWrapper forPartitionConsumption(KafkaSimpleConsumerFactory simpleConsumerFactory,
-      String bootstrapNodes, String clientId, String topic, int partition) {
-    return new SimpleConsumerWrapper(simpleConsumerFactory, bootstrapNodes, clientId, topic, partition);
+      String bootstrapNodes, String clientId, String topic, int partition, long connectTimeoutMillis) {
+    return new SimpleConsumerWrapper(simpleConsumerFactory, bootstrapNodes, clientId, topic, partition,
+        connectTimeoutMillis);
   }
 
   @Override

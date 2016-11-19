@@ -49,6 +49,7 @@ public class PinotTableIdealStateBuilder {
   public static final String ONLINE = "ONLINE";
   public static final String OFFLINE = "OFFLINE";
   public static final String DROPPED = "DROPPED";
+  private static final long KAFKA_CONNECTION_TIMEOUT_MILLIS = 10000L;
 
   /**
    *
@@ -223,7 +224,7 @@ public class PinotTableIdealStateBuilder {
     }
     SimpleConsumerWrapper consumerWrapper = SimpleConsumerWrapper.forMetadataConsumption(
         new KafkaSimpleConsumerFactoryImpl(), kafkaMetadata.getBootstrapHosts(),
-        PinotTableIdealStateBuilder.class.getSimpleName() + "-" + kafkaMetadata.getKafkaTopicName());
+        PinotTableIdealStateBuilder.class.getSimpleName() + "-" + kafkaMetadata.getKafkaTopicName(), KAFKA_CONNECTION_TIMEOUT_MILLIS);
 
     try {
       return consumerWrapper.getPartitionCount(kafkaMetadata.getKafkaTopicName(), /*maxWaitTimeMs=*/5000L);

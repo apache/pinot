@@ -37,6 +37,7 @@ import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import com.linkedin.pinot.common.metadata.stream.KafkaStreamMetadata;
 import com.linkedin.pinot.common.metrics.ServerGauge;
 import com.linkedin.pinot.common.metrics.ServerMeter;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
@@ -120,7 +121,6 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     }
   }
   private static final Logger LOGGER = LoggerFactory.getLogger(LLRealtimeSegmentDataManager.class);
-  private static final int KAFKA_MAX_FETCH_TIME_MILLIS = 1000;
   private static final long TIME_THRESHOLD_FOR_LOG_MINUTES = 1;
   private static final long TIME_EXTENSION_ON_EMPTY_SEGMENT_HOURS = 1;
   private static final int MSG_COUNT_THRESHOLD_FOR_LOG = 100000;
@@ -169,6 +169,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
   private final ServerSegmentCompletionProtocolHandler _protocolHandler;
   private final long _consumeStartTime;
   private final long _startOffset;
+  private final KafkaStreamMetadata _kafkaStreamMetadata;
 
   private long _lastLogTime = 0;
   private int _lastConsumedCount = 0;
@@ -246,7 +247,8 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
       Long highWatermark = null;
       try {
         Pair<Iterable<MessageAndOffset>, Long> messagesAndWatermark =
-            _consumerWrapper.fetchMessagesAndHighWatermark(_currentOffset, _endOffset, KAFKA_MAX_FETCH_TIME_MILLIS);
+            _consumerWrapper.fetchMessagesAndHighWatermark(_currentOffset, _endOffset,
+                _kafkaStreamMetadata.getKafkaFetchTimeoutMillis());
         messagesAndOffsets = messagesAndWatermark.getLeft();
         highWatermark = messagesAndWatermark.getRight();
       } catch (TimeoutException e) {
@@ -667,6 +669,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
 
     // TODO Validate configs
     IndexingConfig indexingConfig = _tableConfig.getIndexingConfig();
+    _kafkaStreamMetadata = new KafkaStreamMetadata(indexingConfig.getStreamConfigs());
     KafkaLowLevelStreamProviderConfig kafkaStreamProviderConfig = createStreamProviderConfig();
     kafkaStreamProviderConfig.init(tableConfig, instanceZKMetadata, schema);
     final String bootstrapNodes = indexingConfig.getStreamConfigs()
@@ -718,7 +721,8 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     // Create field extractor
     _fieldExtractor = (PlainFieldExtractor) FieldExtractorFactory.getPlainFieldExtractor(schema);
     _consumerWrapper = SimpleConsumerWrapper.forPartitionConsumption(new KafkaSimpleConsumerFactoryImpl(),
-        bootstrapNodes, _clientId, _kafkaTopic, _kafkaPartitionId);
+        bootstrapNodes, _clientId, _kafkaTopic, _kafkaPartitionId,
+        _kafkaStreamMetadata.getKafkaConnectionTimeoutMillis());
     _startOffset = _segmentZKMetadata.getStartOffset();
     _currentOffset = _startOffset;
     _resourceTmpDir = new File(resourceDataDir, "_tmp");
