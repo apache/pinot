@@ -2,7 +2,7 @@
 	<div class="col-md-12">
 		<div class="container top-buffer bottom-buffer">
 			<div class="table-responsive">
-				<table class="table" style="border-collapse: separate; border-spacing: 0em 1em">
+				<table class="table dashboard-table" style="border-collapse: separate; border-spacing: 0em 1em">
 					<thead>
 						<tr>
 							<th><div class="row-label">Sep 2nd, 2016</div></th>
@@ -35,7 +35,7 @@
 					<tbody>
 						<tr class="bg-white">
 							<td><div class="row-label">
-									<a href="#">Metric A</a>
+									<a href="#"><span class="metric-label">Metric A</span></a>
 								</div></td>
 							<td><div class="box"></div></td>
 							<td><div class="box box-anomaly">3</div></td>
@@ -64,7 +64,7 @@
 						</tr>
 						<tr class="bg-white">
 							<td><div class="row-label">
-									<a href="#">Metric B</a>
+									<a href="#"><span class="metric-label">Metric B</span></a>
 								</div></td>
 							<td><div class="box"></div></td>
 							<td><div class="box box-anomaly">3</div></td>
@@ -93,7 +93,7 @@
 						</tr>
 						<tr class="bg-white">
 							<td><div class="row-label">
-									<a href="#">Metric C</a>
+									<a href="#"><span class="metric-label">Metric C</span></a>
 								</div></td>
 							<td><div class="box"></div></td>
 							<td><div class="box box-anomaly">3</div></td>

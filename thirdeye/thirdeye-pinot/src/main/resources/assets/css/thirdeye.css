@@ -3,18 +3,38 @@ body {
 	font-size: 14px;
 	background-color: #F3F6F8;
 	color: #000000;
-	font-weight: regular;
 }
 
-.extra-light {
-	font-weight: 'Extra-Light'
-}
-
-.extra-large {
+.label-large-light {
+	font-weight: 100;
 	font-size: 23px;
+	margin-top: 5px;
+}
+.label-medium-light {
+	font-weight: 100;
+	font-size: 15px;
+	color: black;
+}
+
+.label-medium-semibold {
+	font-weight: 400;
+	font-size: 15px;
+	color: black;
+}
+
+.label-small-semibold {
+	font-weight: 400;
+	font-size: 11px;
+	color: #8C8C8C;
+}
+
+.metric-label {
+	font-weight: 400;
+	font-size: 13px;
 }
 
 .container-fluid {
+	
 }
 /* Underline From Center */
 .hvr-underline-from-center {
@@ -68,6 +88,15 @@ body {
 .navbar-inverse .navbar-inner {
 	background-image: none;
 	background-color: #222222;
+}
+
+.dashboard-tabs li.active a {
+	border-bottom: 4px solid #0073B0 !important;
+	color: #0073B0
+}
+
+.dashboard-tabs li a {
+	color: black;
 }
 
 .bg-black {
@@ -145,23 +174,84 @@ hr {
 	background: #FF9526;
 }
 
-.table>thead>tr>th, .table>tbody>tr>th, .table>tfoot>tr>th, .table>thead>tr>td,
-	.table>tbody>tr>td, .table>tfoot>tr>td {
+/* dashboard table css*/
+
+.dashboard-table>thead>tr>th, .dashboard-table>tbody>tr>th,
+	.dashboard-table>tfoot>tr>th, .dashboard-table>thead>tr>td,
+	.dashboard-table>tbody>tr>td, .dashboard-table>tfoot>tr>td {
 	padding-left: 2px;
 	border-top: none;
 }
 
-.table>thead>tr>th {
-	font-weight: 400;
-	font-size: 13px;
+.dashboard-table>thead>tr>th {
+	font-weight: 300;
+	font-size: 11px;
+	text-align: center;
 }
 
-.row-bale {
+/*Info table above heatmap*/
+.info-table {
+	border: 1px solid #ccc
+}
+.info-table>thead>tr>th, .info-table>tbody>tr>th,
+	.info-table>tfoot>tr>th, .info-table>thead>tr>td,
+	.info-table>tbody>tr>td, .info-table>tfoot>tr>td {
+	border: none;
+}
+
+.info-table>thead>tr>th {
+	font-weight: 100;
+	font-size: 11px;
+}
+
+/* analysis table css*/
+.analysis-table>thead>tr>th, .analysis-table>tbody>tr>th,
+	.analysis-table>tfoot>tr>th, .analysis-table>thead>tr>td,
+	.analysis-table>tbody>tr>td, .analysis-table>tfoot>tr>td {
 	
 }
 
-tr {
-	border-right: 1px solid #ccc;
+.analysis-table {
+	border: none !important;
+}
+
+.analysis-table>thead>tr>th {
+	font-weight: 300;
+	font-size: 11px;
+	text-align: center;
+	background-color: #E4E8EC;
+}
+
+.analysis-table>tbody>tr>td {
+	font-weight: 300;
+	font-size: 11px;
+	text-align: center;
+	background-color: white;
+	width: 50px;
+}
+
+.analysis-table>thead>tr>th.dim-label {
+	width: 100px;
+	background-color: #F3F6F8;
+	border: none !important;
+	font-weight: 400;
+}
+
+.analysis-table>tbody>tr>td.dim-label {
+	width: 100px;
+	background-color: #F3F6F8;
+	border: none !important;
+}
+.table-borderless td, .table-borderless th{
+	border: none !important;
+}
+.time-range {
+	font-weight: 300;
+	font-size: 15px;
+}
+
+.selectAutoWidth {
+	width: auto
 }
 /** C3 related*/
 .c3 .c3-axis-x path, .c3 .c3-axis-x line {
@@ -170,4 +260,18 @@ tr {
 
 .c3 .c3-axis-y path, .c3 .c3-axis-y line {
 	stroke: #979797;
+}
+
+/* heatmap background colors*/
+.heatmap {
+  display: block;
+  margin: auto;
+}
+
+text {
+  font-size: 11px;
+}
+
+rect {
+  fill: none;
 }

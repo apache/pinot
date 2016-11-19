@@ -1,33 +1,34 @@
-function renderAnomalies() {
-  
-  //METRIC SELECTION
-  var metrics = ["m1", "m2"];
+function renderAnomaliesTab() {
+
+  // METRIC SELECTION
+  var metrics = [ "m1", "m2" ];
   $('#metric-search-input').tokenfield({
-    autocomplete: {
-      source: metrics,
-      delay: 100
+    autocomplete : {
+      source : metrics,
+      delay : 100
     },
-    showAutocompleteOnFocus: true
+    showAutocompleteOnFocus : true
   })
-  
-  //TIME RANGE SELECTION
+
+  // TIME RANGE SELECTION
   var start = moment().subtract(6, 'days');
   var end = moment();
 
   function cb(start, end) {
-    $('#reportrange span').html(start.format('MMM D, ') + '<b>' + start.format('hh:mm a') + '</b>' + '  &mdash;  ' + 
-        end.format('MMM D, ') + '<b>' + end.format('hh:mm a') + '</b>' );
+    $('#anomalies-time-range span').addClass("time-range").html(start.format('MMM D, ') + start.format('hh:mm a') + '  &mdash;  ' + end.format('MMM D, ') + end.format('hh:mm a'));
   }
 
-  $('#reportrange').daterangepicker({
+  $('#anomalies-time-range').daterangepicker({
     startDate : start,
     endDate : end,
-    dateLimit: { days: 60 },
-    showDropdowns: true,
-    showWeekNumbers: true,
-    timePicker: true,
-    timePickerIncrement: 5,
-    timePicker12Hour: true,
+    dateLimit : {
+      days : 60
+    },
+    showDropdowns : true,
+    showWeekNumbers : true,
+    timePicker : true,
+    timePickerIncrement : 5,
+    timePicker12Hour : true,
     ranges : {
       'Last 24 Hours' : [ moment(), moment() ],
       'Yesterday' : [ moment().subtract(1, 'days'), moment().subtract(1, 'days') ],
@@ -36,15 +37,14 @@ function renderAnomalies() {
       'This Month' : [ moment().startOf('month'), moment().endOf('month') ],
       'Last Month' : [ moment().subtract(1, 'month').startOf('month'), moment().subtract(1, 'month').endOf('month') ]
     },
-    buttonClasses: ['btn', 'btn-sm'],
-    applyClass: 'btn-primary',
-    cancelClass: 'btn-default'
+    buttonClasses : [ 'btn', 'btn-sm' ],
+    applyClass : 'btn-primary',
+    cancelClass : 'btn-default'
   }, cb);
 
   cb(start, end);
-  
-  
-  //CHART GENERATION
+
+  // CHART GENERATION
   var chart = c3.generate({
     bindto : '#anomaly-chart',
     data : {
@@ -69,8 +69,7 @@ function renderAnomalies() {
     regions : [ {
       start : '2016-01-3',
       end : '2016-01-5'
-    }
-    ]
+    } ]
   });
 
 }
