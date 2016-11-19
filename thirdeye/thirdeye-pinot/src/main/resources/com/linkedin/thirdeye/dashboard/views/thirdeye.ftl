@@ -51,6 +51,8 @@
 <script src="../../../assets/js/lib/entity-editor.js"></script>
 
 
+<script src="../../assets/js/thirdeye/analysis.js"></script>
+<script src="../../assets/js/thirdeye/dashboard.js"></script>
 <script id="anomalies-template" type="text/x-handlebars-template">
   <#include "tabs/anomalies.ftl"/>
 </script>
@@ -87,30 +89,30 @@
     var job_info_template = $("#job-info-template").html();
     job_info_template_compiled = Handlebars.compile(job_info_template);
 
-    if (location.hash !== '') {
-      $('a[href="' + location.hash + '"]').tab('show');
-    }
-
     //register callbacks on tabs
-    $('a[data-toggle="tab"]').on('shown.bs.tab', function(e) {
+    $('#main-tabs a[data-toggle="tab"]').on('shown.bs.tab', function(e) {
+
       e.target // newly activated tab
       e.relatedTarget // previous active tab
       tabId = $(e.target).attr("href")
+      console.log("tab clicked " + tabId);
       $(tabId).tab('show')
       if (tabId == "#dashboard") {
         var result_dashboard_template_compiled = dashboard_template_compiled({});
         $("#dashboard-place-holder").html(result_dashboard_template_compiled);
+        renderDashboardTab();
       }
       if (tabId == "#anomalies") {
         var result_anomalies_template_compiled = anomalies_template_compiled({});
         $("#anomalies-place-holder").html(result_anomalies_template_compiled);
         $('.chosen-select').chosen();
         $('input[id="anomalies-date-range-selector"]').daterangepicker();
-        renderAnomalies();
+        renderAnomaliesTab();
       }
       if (tabId == "#analysis") {
         var result_analysis_template_compiled = analysis_template_compiled({});
         $("#analysis-place-holder").html(result_analysis_template_compiled);
+        renderAnalysisTab();
       }
 
       if (tabId == "#ingraph-metric-config") {
@@ -132,6 +134,9 @@
         renderConfigSelector();
       }
     })
+
+    $("#main-tabs a:first").tab('show')
+
   });
 </script>
 
@@ -150,13 +155,13 @@
 							<a class="navbar-brand" href="#">ThirdEye</a>
 						</div>
 						<div id="navbar" class="collapse navbar-collapse">
-							<ul class="nav navbar-nav">
+							<ul id="main-tabs" class="nav navbar-nav">
 								<li class=""><a class="hvr-underline-from-center" href="#dashboard" data-toggle="tab">Dashboard</a></li>
 								<li class=""><a class="hvr-underline-from-center" href="#anomalies" data-toggle="tab">Anomalies</a></li>
 								<li class=""><a class="hvr-underline-from-center" href="#analysis" data-toggle="tab">Root Cause Analysis</a></li>
 							</ul>
 
-							<ul class="nav navbar-nav navbar-right">
+							<ul id="admin-tabs" class="nav navbar-nav navbar-right">
 								<li><a href="#">Manage Anomalies</a></li>
 								<li class="dropdown"><a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Admin <span class="caret"></span></a>
 									<ul class="dropdown-menu">
