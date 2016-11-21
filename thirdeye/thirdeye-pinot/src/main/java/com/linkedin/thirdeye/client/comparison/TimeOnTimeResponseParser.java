@@ -11,25 +11,18 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.jfree.util.Log;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.collect.Range;
 import com.linkedin.thirdeye.api.TimeGranularity;
-import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.client.MetricFunction;
 import com.linkedin.thirdeye.client.ResponseParserUtils;
 import com.linkedin.thirdeye.client.ThirdEyeResponse;
 import com.linkedin.thirdeye.client.ThirdEyeResponseRow;
 import com.linkedin.thirdeye.client.comparison.Row.Builder;
 import com.linkedin.thirdeye.client.comparison.Row.Metric;
-import com.linkedin.thirdeye.constant.MetricAggFunction;
-import com.linkedin.thirdeye.dashboard.Utils;
-import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
-import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 public class TimeOnTimeResponseParser {
@@ -42,7 +35,6 @@ public class TimeOnTimeResponseParser {
   private final List<String> groupByDimensions;
 
   public static final Logger LOGGER = LoggerFactory.getLogger(TimeOnTimeResponseParser.class);
-  private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
   private Map<String, ThirdEyeResponseRow> baselineResponseMap;
   private Map<String, ThirdEyeResponseRow> currentResponseMap;
@@ -50,7 +42,6 @@ public class TimeOnTimeResponseParser {
   private int numMetrics;
   int numTimeBuckets;
   private List<Row> rows;
-  private MetricConfigManager metricConfigDAO;
   Map<String, Double> metricThresholds = new HashMap<>();
 
   public TimeOnTimeResponseParser(ThirdEyeResponse baselineResponse, ThirdEyeResponse currentResponse, List<Range<DateTime>> baselineRanges,
@@ -61,7 +52,6 @@ public class TimeOnTimeResponseParser {
     this.currentRanges = currentRanges;
     this.aggTimeGranularity = timeGranularity;
     this.groupByDimensions = groupByDimensions;
-    this.metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
 
     metricFunctions = baselineResponse.getMetricFunctions();
     metricThresholds = ThirdEyeUtils.getMetricThresholdsMap(metricFunctions);

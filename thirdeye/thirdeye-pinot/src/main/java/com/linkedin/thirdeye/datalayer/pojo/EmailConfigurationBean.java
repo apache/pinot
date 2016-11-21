@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.datalayer.pojo;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -7,12 +8,9 @@ import javax.validation.Valid;
 import javax.validation.constraints.NotNull;
 
 import org.hibernate.validator.constraints.Email;
-
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.base.MoreObjects;
-import com.google.common.collect.Multimap;
-import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
+@JsonIgnoreProperties(ignoreUnknown=true)
 public class EmailConfigurationBean extends AbstractBean {
 
   List<Long> functionIds;
@@ -61,7 +59,9 @@ public class EmailConfigurationBean extends AbstractBean {
 
   private boolean sendZeroAnomalyEmail;
 
-  private String filters;
+  private boolean reportEnabled;
+
+  private List<String> dimensions;
 
   private Integer windowDelay;
 
@@ -171,26 +171,8 @@ public class EmailConfigurationBean extends AbstractBean {
     this.active = active;
   }
 
-  public boolean getSendZeroAnomalyEmail() {
-    return sendZeroAnomalyEmail;
-  }
-
   public void setSendZeroAnomalyEmail(boolean sendZeroAnomalyEmail) {
     this.sendZeroAnomalyEmail = sendZeroAnomalyEmail;
-  }
-
-  public String getFilters() {
-    return filters;
-  }
-
-  @JsonIgnore
-  public Multimap<String, String> getFilterSet() {
-    return ThirdEyeUtils.getFilterSet(filters);
-  }
-
-  public void setFilters(String filters) {
-    String sortedFilters = ThirdEyeUtils.getSortedFilters(filters);
-    this.filters = sortedFilters;
   }
 
   public Integer getWindowDelay() {
@@ -209,13 +191,34 @@ public class EmailConfigurationBean extends AbstractBean {
     this.windowDelayUnit = windowDelayUnit;
   }
 
+  public List<String> getDimensions() {
+    return dimensions;
+  }
+
+  public void setDimensions(List<String> dimensions) {
+    this.dimensions = dimensions;
+  }
+
+  public boolean isReportEnabled() {
+    return reportEnabled;
+  }
+
+  public void setReportEnabled(boolean reportEnabled) {
+    this.reportEnabled = reportEnabled;
+  }
+
+  public boolean isSendZeroAnomalyEmail() {
+    return sendZeroAnomalyEmail;
+  }
+
   @Override
   public String toString() {
     return MoreObjects.toStringHelper(this).add("collection", collection).add("metric", metric)
         .add("fromAddress", fromAddress).add("toAddresses", toAddresses).add("cron", cron)
         .add("smtpHost", smtpHost).add("smtpPort", smtpPort).add("smtpUser", smtpUser)
         .add("windowSize", windowSize).add("windowUnit", windowUnit).add("isActive", active)
-        .add("sendZeroAnomalyEmail", sendZeroAnomalyEmail).add("filters", filters)
+        .add("sendZeroAnomalyEmail", sendZeroAnomalyEmail)
+        .add("includeReportByDimension", reportEnabled)
         .add("windowDelay", windowDelay).add("windowDelayUnit", windowDelayUnit).toString();
   }
 }
