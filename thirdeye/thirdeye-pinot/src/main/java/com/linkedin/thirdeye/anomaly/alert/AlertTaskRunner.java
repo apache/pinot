@@ -342,6 +342,7 @@ public class AlertTaskRunner implements TaskRunner {
     return freemarkerGroupedResults;
   }
 
+  // TODO : deprecate this, move last notified alert id in the alertConfig
   private void updateNotifiedStatus(List<MergedAnomalyResultDTO> mergedResults) {
     for (MergedAnomalyResultDTO mergedResult : mergedResults) {
       mergedResult.setNotified(true);
