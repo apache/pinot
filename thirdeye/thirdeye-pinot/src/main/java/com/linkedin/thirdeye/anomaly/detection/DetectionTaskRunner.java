@@ -9,6 +9,7 @@ import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
 
+import com.linkedin.thirdeye.detector.metric.transfer.MetricTransfer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -151,6 +152,13 @@ public class DetectionTaskRunner implements TaskRunner {
         LOG.info("Checking if any known anomalies overlap with the monitoring window of anomaly detection, which could result in unwanted holes in current values.");
         AnomalyUtils.logAnomaliesOverlapWithWindow(windowStart, windowEnd, historyMergedAnomalies);
 
+        String metricName = anomalyFunction.getSpec().getMetric();
+        // The following is just a place holder here
+        // Need to get a list of ScalingFactors from database (same way as get anomaly histories)
+        // Passed this as the last input parameter replace null
+        MetricTransfer.rescaleMetric(metricTimeSeries, metricName, null);
+
+        // Rescale the TimeSeriesMetric
         List<RawAnomalyResultDTO> resultsOfAnEntry = anomalyFunction
             .analyze(exploredDimensions, metricTimeSeries, windowStart, windowEnd, historyMergedAnomalies);
 
