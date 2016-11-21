@@ -16,8 +16,6 @@
 
 package com.linkedin.pinot.controller.helix.core.realtime;
 
-import com.linkedin.pinot.common.metrics.ControllerMetrics;
-import com.yammer.metrics.core.MetricsRegistry;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -34,6 +32,8 @@ import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
+import com.linkedin.pinot.common.metadata.stream.KafkaStreamMetadata;
+import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.controller.ControllerConf;
@@ -41,11 +41,8 @@ import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineSt
 import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoMoreInteractions;
-import static org.mockito.Mockito.when;
+import com.yammer.metrics.core.MetricsRegistry;
+import static org.mockito.Mockito.*;
 
 
 public class PinotLLCRealtimeSegmentManagerTest {
@@ -93,8 +90,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
       partitionSet.add(i);
     }
 
-    segmentManager.setupHelixEntries(topic, rtTableName, nPartitions, instances, nReplicas, startOffset,
-        DUMMY_HOST, null, true);
+    segmentManager.setupHelixEntries(topic, rtTableName, nPartitions, instances, nReplicas, startOffset, DUMMY_HOST,
+        null, true);
 
     Map<String, List<String>> assignmentMap = segmentManager._partitionAssignment.getListFields();
     Assert.assertEquals(assignmentMap.size(), nPartitions);
@@ -240,6 +237,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     final int committingPartition = 6;
     final long nextOffset = 3425666L;
     LLCRealtimeSegmentZKMetadata committingSegmentMetadata =  new LLCRealtimeSegmentZKMetadata(segmentManager._records.get(committingPartition));
+    segmentManager._paths.clear();
+    segmentManager._records.clear();
     boolean status = segmentManager.commitSegment(rawTableName, committingSegmentMetadata.getSegmentName(), nextOffset);
     segmentManager.verifyMetadataInteractions();
     Assert.assertTrue(status);
@@ -295,6 +294,80 @@ public class PinotLLCRealtimeSegmentManagerTest {
     Assert.assertEquals(oldsegStateMap.get(s1), PinotHelixSegmentOnlineOfflineStateModelGenerator.ONLINE_STATE);
     Assert.assertEquals(oldsegStateMap.get(s2), PinotHelixSegmentOnlineOfflineStateModelGenerator.ONLINE_STATE);
     Assert.assertEquals(oldsegStateMap.get(s3), PinotHelixSegmentOnlineOfflineStateModelGenerator.ONLINE_STATE);
+  }
+
+  @Test
+  public void testAutoReplaceConsumingSegment() throws Exception {
+    FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager(true, null);
+    final int nPartitions = 8;
+    final int nInstances = 3;
+    final int nReplicas = 2;
+
+    final String topic = "someTopic";
+    final String rtTableName = "table_REALTIME";
+    List<String> instances = getInstanceList(nInstances);
+    final String startOffset = KAFKA_OFFSET;
+
+    IdealState  idealState = PinotTableIdealStateBuilder.buildEmptyKafkaConsumerRealtimeIdealStateFor(rtTableName,
+        nReplicas);
+    segmentManager.setupHelixEntries(topic, rtTableName, nPartitions, instances, nReplicas, startOffset, DUMMY_HOST,
+        idealState, false);
+    // Add another segment for each partition
+    long now = System.currentTimeMillis();
+    List<String> existingSegments = new ArrayList<>(segmentManager._idealStateEntries.keySet());
+    final int partitionToBeFixed = 3;
+    final int emptyPartition = 5;
+    // existingSegments has one segment per partition, with sequence number 0.
+    // Add a new segment with seq 2 for all partitions except the two special ones.
+    // For partitionToBeFixed, do not add a new segment, we will auto-create seq 0.
+    // For emptyPartition, remove existing segment, so we will auto-create seq 1.
+    for (String segmentNameStr : existingSegments) {
+      LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
+      if (segmentName.getPartitionId() != partitionToBeFixed) {
+        if (segmentName.getPartitionId() == emptyPartition) {
+          segmentManager._idealStateEntries.remove(segmentNameStr);
+        } else {
+          LLCSegmentName newSegmentName = new LLCSegmentName(segmentName.getTableName(), segmentName.getPartitionId(),
+              segmentName.getSequenceNumber() + 1, now);
+          List<String> hosts = segmentManager._idealStateEntries.get(segmentNameStr);
+          segmentManager._idealStateEntries.put(newSegmentName.getSegmentName(), hosts);
+        }
+      }
+    }
+
+    List<Integer> nonConsumingPartitions = new ArrayList<>(1);
+    nonConsumingPartitions.add(partitionToBeFixed);
+    nonConsumingPartitions.add(emptyPartition);
+    final long partitionOffset = 0x259080984568L;
+    segmentManager._kafkaOffsetToReturn = partitionOffset;
+    existingSegments = new ArrayList<>(segmentManager._idealStateEntries.keySet());
+    segmentManager._paths.clear();
+    segmentManager._records.clear();
+    segmentManager.createConsumingSegment(rtTableName, nonConsumingPartitions, existingSegments, null);
+    Assert.assertEquals(segmentManager._paths.size(), 2);
+    Assert.assertEquals(segmentManager._records.size(), 2);
+    Assert.assertEquals(segmentManager._oldSegmentNameStr.size(), 2);
+    Assert.assertEquals(segmentManager._newSegmentNameStr.size(), 2);
+
+    LLCSegmentName fixedPartitionSegmentName;
+    LLCSegmentName emptyPartitionSegmentName;
+    String segmentNameStr = segmentManager._paths.get(0);
+    fixedPartitionSegmentName  = new LLCSegmentName(segmentNameStr);
+    if (fixedPartitionSegmentName.getPartitionId() == partitionToBeFixed) {
+      emptyPartitionSegmentName = new LLCSegmentName(segmentManager._paths.get(1));
+    } else {
+      emptyPartitionSegmentName = fixedPartitionSegmentName;
+      fixedPartitionSegmentName = new LLCSegmentName(segmentManager._paths.get(1));
+    }
+
+    Assert.assertEquals(emptyPartitionSegmentName.getSequenceNumber(), PinotLLCRealtimeSegmentManager.STARTING_SEQUENCE_NULMBER);
+    Assert.assertEquals(fixedPartitionSegmentName.getSequenceNumber(), PinotLLCRealtimeSegmentManager.STARTING_SEQUENCE_NULMBER+1);
+
+    for (ZNRecord znRecord : segmentManager._records) {
+      LLCRealtimeSegmentZKMetadata metadata = new LLCRealtimeSegmentZKMetadata(znRecord);
+      Assert.assertEquals(metadata.getNumReplicas(), 2);
+      Assert.assertEquals(metadata.getStartOffset(), partitionOffset);
+    }
   }
 
   @Test
@@ -379,16 +452,18 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     public String _realtimeTableName;
     public Map<String, List<String>> _idealStateEntries;
-    public List<String> _paths;
-    public List<ZNRecord> _records;
+    public List<String> _paths = new ArrayList<>(16);
+    public List<ZNRecord> _records = new ArrayList<>(16);
     public ZNRecord _partitionAssignment;
     public String _startOffset;
     public boolean _createNew;
     public int _nReplicas;
 
     public List<String> _newInstances;
-    public String _oldSegmentNameStr;
-    public String _newSegmentNameStr;
+    public List<String> _oldSegmentNameStr = new ArrayList<>(16);
+    public List<String> _newSegmentNameStr = new ArrayList<>(16);
+
+    public long _kafkaOffsetToReturn;
 
     public List<ZNRecord> _existingSegmentMetadata;
 
@@ -412,8 +487,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     @Override
     protected void writeSegmentsToPropertyStore(List<String> paths, List<ZNRecord> records) {
-      _paths = paths;
-      _records = records;
+      _paths.addAll(paths);
+      _records.addAll(records);
     }
 
     @Override
@@ -445,8 +520,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
         final String oldSegmentNameStr, final String newSegmentNameStr) {
       _realtimeTableName = realtimeTableName;
       _newInstances = newInstances;
-      _oldSegmentNameStr = oldSegmentNameStr;
-      _newSegmentNameStr = newSegmentNameStr;
+      _oldSegmentNameStr.add(oldSegmentNameStr);
+      _newSegmentNameStr.add(newSegmentNameStr);
       _nCallsToUpdateHelix++;
     }
 
@@ -480,6 +555,11 @@ public class PinotLLCRealtimeSegmentManagerTest {
       verify(segmentMetadata, times(1)).getVersion();
       verify(segmentMetadata, times(1)).getTotalRawDocs();
       verifyNoMoreInteractions(segmentMetadata);
+    }
+
+    @Override
+    protected long getPartitionOffset(KafkaStreamMetadata kafkaStreamMetadata, final String offsetCriteria, int partitionId) {
+      return _kafkaOffsetToReturn;
     }
 
     @Override

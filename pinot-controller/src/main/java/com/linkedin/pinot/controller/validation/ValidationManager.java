@@ -18,7 +18,6 @@ package com.linkedin.pinot.controller.validation;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -68,6 +67,7 @@ public class ValidationManager {
   private final ScheduledExecutorService _executorService;
   private final PinotHelixResourceManager _pinotHelixResourceManager;
   private final long _validationIntervalSeconds;
+  private final boolean _autoCreateOnError;
 
   /**
    * Constructs the validation manager.
@@ -80,6 +80,7 @@ public class ValidationManager {
     _validationMetrics = validationMetrics;
     _pinotHelixResourceManager = pinotHelixResourceManager;
     _validationIntervalSeconds = config.getValidationControllerFrequencyInSeconds();
+    _autoCreateOnError = true;
 
     _executorService = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
       @Override
@@ -141,28 +142,30 @@ public class ValidationManager {
       } else if (tableType.equals(TableType.REALTIME)) {
         List<RealtimeSegmentZKMetadata> realtimeSegmentZKMetadatas = ZKMetadataProvider.getRealtimeSegmentZKMetadataListForTable(propertyStore, tableName);
         boolean countHLCSegments = true;  // false if this table has ONLY LLC segments (i.e. fully migrated)
-        AbstractTableConfig tableConfig;
-        KafkaStreamMetadata streamMetadata;
+        AbstractTableConfig tableConfig = null;
+        KafkaStreamMetadata streamMetadata = null;
         try {
           tableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(tableName);
           streamMetadata = new KafkaStreamMetadata(tableConfig.getIndexingConfig().getStreamConfigs());
           if (streamMetadata.hasSimpleKafkaConsumerType() && !streamMetadata.hasHighLevelKafkaConsumerType()) {
             countHLCSegments = false;
           }
+          for (RealtimeSegmentZKMetadata realtimeSegmentZKMetadata : realtimeSegmentZKMetadatas) {
+            SegmentMetadata segmentMetadata = new SegmentMetadataImpl(realtimeSegmentZKMetadata);
+            segmentMetadataList.add(segmentMetadata);
+          }
+          // Update the gauge to contain the total document count in the segments
+          _validationMetrics.updateTotalDocumentsGauge(tableName, computeRealtimeTotalDocumentInSegments(segmentMetadataList,
+              countHLCSegments));
+          if (streamMetadata.hasSimpleKafkaConsumerType()) {
+            validateLLCSegments(tableName, tableConfig.getIndexingConfig().getStreamConfigs());
+          }
         } catch (Exception e) {
-          // TableConfig not present. skip it.
-          LOGGER.warn("Cannot get tableconfig for {}", tableName);
-          continue;
-        }
-        for (RealtimeSegmentZKMetadata realtimeSegmentZKMetadata : realtimeSegmentZKMetadatas) {
-          SegmentMetadata segmentMetadata = new SegmentMetadataImpl(realtimeSegmentZKMetadata);
-          segmentMetadataList.add(segmentMetadata);
-        }
-        // Update the gauge to contain the total document count in the segments
-        _validationMetrics.updateTotalDocumentsGauge(tableName, computeRealtimeTotalDocumentInSegments(segmentMetadataList,
-            countHLCSegments));
-        if (streamMetadata.hasSimpleKafkaConsumerType()) {
-          validateLLCSegments(tableName);
+          if (tableConfig == null) {
+            LOGGER.warn("Cannot get realtime tableconfig for {}", tableName);
+          } else if (streamMetadata == null) {
+            LOGGER.warn("Cannot get streamconfig for {}", tableName);
+          }
         }
       } else {
         LOGGER.warn("Ignoring table type {} for table {}", tableType, tableName);
@@ -172,41 +175,64 @@ public class ValidationManager {
   }
 
   // For LLC segments, validate that there is at least one segment in CONSUMING state for every partition.
-  void validateLLCSegments(final String realtimeTableName) {
+  void validateLLCSegments(final String realtimeTableName, Map<String, String> streamConfigs) {
     ZNRecord partitionAssignment = PinotLLCRealtimeSegmentManager.getInstance().getKafkaPartitionAssignment(
         realtimeTableName);
+    if (partitionAssignment == null) {
+      LOGGER.warn("No partition assignment found for table {}", realtimeTableName);
+      return;
+    }
     Map<String, List<String>> partitionToHostsMap = partitionAssignment.getListFields();
     // Keep a set of kafka partitions, and remove the partition when we find a segment in CONSUMING state in
     // that partition.
-    Set<Integer> kafkaPartitions = new HashSet<Integer>(partitionToHostsMap.size());
+    List<Integer> nonConsumingKafkaPartitions = new ArrayList<>(partitionToHostsMap.size());
     for (String partitionStr : partitionToHostsMap.keySet()) {
-      kafkaPartitions.add(Integer.valueOf(partitionStr));
+      nonConsumingKafkaPartitions.add(Integer.valueOf(partitionStr));
     }
 
     IdealState idealState =
         HelixHelper.getTableIdealState(_pinotHelixResourceManager.getHelixZkManager(), realtimeTableName);
+    if (!idealState.isEnabled()) {
+      // No validation to be done.
+      LOGGER.info("Skipping validation for {} since it is disabled", realtimeTableName);
+      return;
+    }
     // Walk through all segments in the idealState, looking for one that is CONSUMING state. When we find one
     // remove the kafka partition that the segment belongs to, from the kafka partition set.
+    // Make sure that there are at least some LLC segments in place. If there are no LLC segments, it is possible
+    // that this table is in the process of being disabled for LLC
     Set<String> segmentIds = idealState.getPartitionSet();
+    List<String> llcSegments = new ArrayList<>(segmentIds.size());
     for (String segmentId : segmentIds) {
       if (SegmentName.isLowLevelConsumerSegmentName(segmentId)) {
+        llcSegments.add(segmentId);
         Map<String, String> stateMap = idealState.getInstanceStateMap(segmentId);
         Iterator<String> iterator = stateMap.values().iterator();
         if (iterator.hasNext()) { // Should always be true.
           String value = iterator.next();
           if (value.equals(PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE)) {
             LLCSegmentName llcSegmentName = new LLCSegmentName(segmentId);
-            kafkaPartitions.remove(llcSegmentName.getPartitionId());
+            nonConsumingKafkaPartitions.remove(nonConsumingKafkaPartitions.indexOf(llcSegmentName.getPartitionId()));
           }
         }
       }
-    }
+     }
 
     // Kafka partition set now has all the partitions that do not have any segments in CONSUMING state.
-    for (Integer kafkaPartition : kafkaPartitions) {
-      LOGGER.warn("Table {}, kafka partition {} has no segments in CONSUMING state", realtimeTableName, kafkaPartition);
+    if (!llcSegments.isEmpty()) {
+      // Raise the metric only if there is at least one llc segment in the idealstate.
+      _validationMetrics.updateNumNonConsumingPartitionsMetric(realtimeTableName, nonConsumingKafkaPartitions.size());
+      // Recreate a segment for the partitions that are missing one.
+      for (Integer kafkaPartition : nonConsumingKafkaPartitions) {
+        LOGGER.warn("Table {}, kafka partition {} has no segments in CONSUMING state (out of {} llc segments)",
+            realtimeTableName, kafkaPartition, llcSegments.size());
+      }
+      if (_autoCreateOnError) {
+        PinotLLCRealtimeSegmentManager segmentManager = PinotLLCRealtimeSegmentManager.getInstance();
+        KafkaStreamMetadata kafkaStreamMetadata = new KafkaStreamMetadata(streamConfigs);
+        segmentManager.createConsumingSegment(realtimeTableName, nonConsumingKafkaPartitions, llcSegments, kafkaStreamMetadata);
+      }
     }
-    _validationMetrics.updateNumNonConsumingPartitionsMetric(realtimeTableName, kafkaPartitions.size());
   }
 
   // For offline segment pushes, validate that there are no missing segments, and update metrics

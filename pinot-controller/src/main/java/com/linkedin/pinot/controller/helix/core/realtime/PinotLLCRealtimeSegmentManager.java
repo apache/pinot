@@ -47,6 +47,7 @@ import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
+import com.linkedin.pinot.common.metadata.stream.KafkaStreamMetadata;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
@@ -68,6 +69,7 @@ import javax.annotation.Nullable;
 public class PinotLLCRealtimeSegmentManager {
   public static final Logger LOGGER = LoggerFactory.getLogger(PinotLLCRealtimeSegmentManager.class);
   private static final int KAFKA_PARTITION_OFFSET_FETCH_TIMEOUT_MILLIS = 10000;
+  protected static final int STARTING_SEQUENCE_NULMBER = 0; // Initial sequence number for new table segments
 
   private static PinotLLCRealtimeSegmentManager INSTANCE = null;
 
@@ -281,44 +283,32 @@ public class PinotLLCRealtimeSegmentManager {
     List<String> paths = new ArrayList<>(nPartitions);
     List<ZNRecord> records = new ArrayList<>(nPartitions);
     final long now = System.currentTimeMillis();
-    final int seqNum = 0; // Initial seq number for the segments
+    final int seqNum = STARTING_SEQUENCE_NULMBER;
 
     for (int i = 0; i < nPartitions; i++) {
-      SimpleConsumerWrapper kafkaConsumer = SimpleConsumerWrapper.forPartitionConsumption(new KafkaSimpleConsumerFactoryImpl(),
-          bootstrapHosts, "dummyClientId", topicName, i);
-      try {
-        final List instances = partitionMap.get(Integer.toString(i));
-        LLCRealtimeSegmentZKMetadata metadata = new LLCRealtimeSegmentZKMetadata();
-        final String rawTableName = TableNameBuilder.extractRawTableName(realtimeTableName);
-        LLCSegmentName llcSegmentName = new LLCSegmentName(rawTableName, i, seqNum, now);
-        final String segName = llcSegmentName.getSegmentName();
+      final List instances = partitionMap.get(Integer.toString(i));
+      LLCRealtimeSegmentZKMetadata metadata = new LLCRealtimeSegmentZKMetadata();
+      final String rawTableName = TableNameBuilder.extractRawTableName(realtimeTableName);
+      LLCSegmentName llcSegmentName = new LLCSegmentName(rawTableName, i, seqNum, now);
+      final String segName = llcSegmentName.getSegmentName();
 
-        metadata.setCreationTime(now);
+      metadata.setCreationTime(now);
 
-        final long startOffset;
-        try {
-          startOffset = kafkaConsumer.fetchPartitionOffset(initialOffset, KAFKA_PARTITION_OFFSET_FETCH_TIMEOUT_MILLIS);
-        } catch (TimeoutException e) {
-          LOGGER.warn("Timed out when fetching partition offsets for segment {}", segName);
-          throw new RuntimeException(e);
-        }
-        LOGGER.warn("Setting start offset for segment {} to {}", segName, startOffset);
-        metadata.setStartOffset(startOffset);
-        metadata.setEndOffset(Long.MAX_VALUE);
+      final long startOffset = getPartitionOffset(topicName, bootstrapHosts, initialOffset, i);
+      LOGGER.warn("Setting start offset for segment {} to {}", segName, startOffset);
+      metadata.setStartOffset(startOffset);
+      metadata.setEndOffset(Long.MAX_VALUE);
 
-        metadata.setNumReplicas(instances.size());
-        metadata.setTableName(rawTableName);
-        metadata.setSegmentName(segName);
-        metadata.setStatus(CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
+      metadata.setNumReplicas(instances.size());
+      metadata.setTableName(rawTableName);
+      metadata.setSegmentName(segName);
+      metadata.setStatus(CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
 
-        ZNRecord record = metadata.toZNRecord();
-        final String znodePath = ZKMetadataProvider.constructPropertyStorePathForSegment(realtimeTableName, segName);
-        paths.add(znodePath);
-        records.add(record);
-        idealStateEntries.put(segName, instances);
-      } finally {
-        IOUtils.closeQuietly(kafkaConsumer);
-      }
+      ZNRecord record = metadata.toZNRecord();
+      final String znodePath = ZKMetadataProvider.constructPropertyStorePathForSegment(realtimeTableName, segName);
+      paths.add(znodePath);
+      records.add(record);
+      idealStateEntries.put(segName, instances);
     }
 
     writeSegmentsToPropertyStore(paths, records);
@@ -459,24 +449,15 @@ public class PinotLLCRealtimeSegmentManager {
       throw new RuntimeException("Kafka partition assigment not found. Not committing segment");
     }
     List<String> newInstances = partitionAssignment.getListField(Integer.toString(partitionId));
-    final Map<String, List<String>> idealStateEntries = new HashMap<>(1);
 
     // Construct segment metadata and idealstate for the new segment
     final int newSeqNum = oldSeqNum + 1;
     final long newStartOffset = nextOffset;
     LLCSegmentName newHolder = new LLCSegmentName(oldSegmentName.getTableName(), partitionId, newSeqNum, now);
     final String newSegmentNameStr = newHolder.getSegmentName();
-    final LLCRealtimeSegmentZKMetadata newSegMetadata = new LLCRealtimeSegmentZKMetadata();
-    newSegMetadata.setCreationTime(System.currentTimeMillis());
-    newSegMetadata.setStartOffset(newStartOffset);
-    newSegMetadata.setNumReplicas(newInstances.size());
-    newSegMetadata.setTableName(rawTableName);
-    newSegMetadata.setSegmentName(newSegmentNameStr);
-    newSegMetadata.setStatus(CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
-    final ZNRecord newZnRecord = newSegMetadata.toZNRecord();
+    final ZNRecord newZnRecord =
+        makeZnRecordForNewSegment(rawTableName, newInstances.size(), newStartOffset, newSegmentNameStr);
     final String newZnodePath = ZKMetadataProvider.constructPropertyStorePathForSegment(realtimeTableName, newSegmentNameStr);
-
-    idealStateEntries.put(newSegmentNameStr, newInstances);
 
     List<String> paths = new ArrayList<>(2);
     paths.add(oldZnodePath);
@@ -612,5 +593,112 @@ public class PinotLLCRealtimeSegmentManager {
         break;
       }
     }
+  }
+
+  protected long getPartitionOffset(KafkaStreamMetadata kafkaStreamMetadata, final String offsetCriteria, int partitionId) {
+    final String topicName = kafkaStreamMetadata.getKafkaTopicName();
+    final String bootstrapHosts = kafkaStreamMetadata.getBootstrapHosts();
+
+    return getPartitionOffset(topicName, bootstrapHosts, offsetCriteria, partitionId);
+  }
+
+  private long getPartitionOffset(final String topicName, final String bootstrapHosts, final String offsetCriteria, int partitionId) {
+    SimpleConsumerWrapper kafkaConsumer = SimpleConsumerWrapper.forPartitionConsumption(new KafkaSimpleConsumerFactoryImpl(),
+        bootstrapHosts, "dummyClientId", topicName, partitionId);
+    final long startOffset;
+    try {
+      startOffset = kafkaConsumer.fetchPartitionOffset(offsetCriteria, KAFKA_PARTITION_OFFSET_FETCH_TIMEOUT_MILLIS);
+    } catch (TimeoutException e) {
+      LOGGER.warn("Timed out when fetching partition offsets for topic {} partition {}", topicName, partitionId);
+      throw new RuntimeException(e);
+    } finally {
+      IOUtils.closeQuietly(kafkaConsumer);
+    }
+    return startOffset;
+  }
+
+  /**
+   * Create a consuming segment for the kafka partitions that are missing one.
+   *
+   * @param realtimeTableName is the name of the realtime table (e.g. "table_REALTIME")
+   * @param nonConsumingPartitions is a list of integers (kafka partitions that do not have a consuming segment)
+   * @param llcSegments is a list of segment names in the ideal state as was observed last.
+   */
+  public void createConsumingSegment(String realtimeTableName, List<Integer> nonConsumingPartitions,
+      List<String> llcSegments, KafkaStreamMetadata kafkaStreamMetadata) {
+    List<LLCSegmentName> segmentNames = new ArrayList<>(llcSegments.size());
+    for (String segmentId: llcSegments) {
+      segmentNames.add(new LLCSegmentName(segmentId));
+    }
+
+    Collections.sort(segmentNames, Collections.reverseOrder());
+
+    Collections.sort(nonConsumingPartitions, Collections.reverseOrder());
+
+    final ZNRecord partitionAssignment = getKafkaPartitionAssignment(realtimeTableName);
+    final int nReplicas = partitionAssignment.getListField("0").size(); // Number of replicas of partition 0
+
+    final int nSegments = segmentNames.size();
+    int curPartition = nonConsumingPartitions.get(0);
+    for (int i = 0; i < nSegments; i++) {
+      final LLCSegmentName segmentName = segmentNames.get(i);
+      final int segmentPartitionId = segmentName.getPartitionId();
+      if (segmentPartitionId > curPartition) {
+        continue;
+      } else if (segmentPartitionId < curPartition) {
+        // We went past a partition that has no LLC segments. We can create one with sequence 1
+        int seqNum = STARTING_SEQUENCE_NULMBER;
+        List<String> instances = partitionAssignment.getListField(Integer.toString(curPartition));
+        long startOffset = getPartitionOffset(kafkaStreamMetadata, "smallest", curPartition);
+
+        createSegment(realtimeTableName, nReplicas, curPartition, seqNum, instances, startOffset);
+      } else {
+        int nextSeqNum = segmentName.getSequenceNumber() + 1;
+        List<String> instances = partitionAssignment.getListField(Integer.toString(curPartition));
+        long startOffset = getPartitionOffset(kafkaStreamMetadata, "smallest", curPartition);
+
+        createSegment(realtimeTableName, nReplicas, curPartition, nextSeqNum, instances, startOffset);
+      }
+      nonConsumingPartitions.remove(0);
+      if (nonConsumingPartitions.isEmpty()) {
+        break;
+      }
+      curPartition = nonConsumingPartitions.get(0);
+    }
+  }
+
+  private void createSegment(String realtimeTableName, int numReplicas, int partitionId, int seqNum,
+      List<String> serverInstances, long startOffset) {
+    LOGGER.info("Attempting to auto-create a segment for partition {} of table {}", partitionId, realtimeTableName);
+    final List<String> propStorePaths = new ArrayList<>(1);
+    final List<ZNRecord> propStoreEntries = new ArrayList<>(1);
+    long now = System.currentTimeMillis();
+    final String tableName = TableNameBuilder.extractRawTableName(realtimeTableName);
+    LLCSegmentName newSegmentName = new LLCSegmentName(tableName, partitionId, seqNum, now);
+    final String newSegmentNameStr = newSegmentName.getSegmentName();
+    final ZNRecord newZnRecord = makeZnRecordForNewSegment(realtimeTableName, numReplicas, startOffset,
+        newSegmentNameStr);
+    final String newZnodePath = ZKMetadataProvider
+        .constructPropertyStorePathForSegment(realtimeTableName, newSegmentNameStr);
+    propStorePaths.add(newZnodePath);
+    propStoreEntries.add(newZnRecord);
+
+    writeSegmentsToPropertyStore(propStorePaths, propStoreEntries);
+
+    updateHelixIdealState(realtimeTableName, serverInstances, null, newSegmentNameStr);
+
+    LOGGER.info("Successful auto-create of CONSUMING segment {}", newSegmentNameStr);
+  }
+
+  private ZNRecord makeZnRecordForNewSegment(String realtimeTableName, int numReplicas, long startOffset,
+      String newSegmentNameStr) {
+    final LLCRealtimeSegmentZKMetadata newSegMetadata = new LLCRealtimeSegmentZKMetadata();
+    newSegMetadata.setCreationTime(System.currentTimeMillis());
+    newSegMetadata.setStartOffset(startOffset);
+    newSegMetadata.setNumReplicas(numReplicas);
+    newSegMetadata.setTableName(realtimeTableName);
+    newSegMetadata.setSegmentName(newSegmentNameStr);
+    newSegMetadata.setStatus(CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
+    return newSegMetadata.toZNRecord();
   }
 }
