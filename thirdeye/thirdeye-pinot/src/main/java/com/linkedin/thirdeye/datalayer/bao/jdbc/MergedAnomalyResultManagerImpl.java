@@ -77,8 +77,7 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
         return 0;
       }
     } else {
-      MergedAnomalyResultBean mergeAnomalyBean =
-          convertMergeAnomalyDTO2Bean(mergedAnomalyResultDTO);
+      MergedAnomalyResultBean mergeAnomalyBean = convertMergeAnomalyDTO2Bean(mergedAnomalyResultDTO);
       return genericPojoDao.update(mergeAnomalyBean);
     }
   }
@@ -225,8 +224,7 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
     return null;
   }
 
-
-  protected MergedAnomalyResultBean convertMergeAnomalyDTO2Bean(MergedAnomalyResultDTO entity) {
+  public void updateAnomalyFeedback(MergedAnomalyResultDTO entity) {
     MergedAnomalyResultBean bean = convertDTO2Bean(entity, MergedAnomalyResultBean.class);
     if (entity.getFeedback() != null) {
       if (entity.getFeedback().getId() == null) {
@@ -234,9 +232,24 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
             (AnomalyFeedbackBean) convertDTO2Bean(entity.getFeedback(), AnomalyFeedbackBean.class);
         Long feedbackId = genericPojoDao.put(feedbackBean);
         entity.getFeedback().setId(feedbackId);
+      } else {
+        AnomalyFeedbackBean feedbackBean = genericPojoDao.get(entity.getFeedback().getId(), AnomalyFeedbackBean.class);
+        feedbackBean.setStatus(entity.getFeedback().getStatus());
+        feedbackBean.setFeedbackType(entity.getFeedback().getFeedbackType());
+        feedbackBean.setComment(entity.getFeedback().getComment());
+        genericPojoDao.update(feedbackBean);
       }
       bean.setAnomalyFeedbackId(entity.getFeedback().getId());
     }
+    genericPojoDao.update(bean);
+  }
+
+  protected MergedAnomalyResultBean convertMergeAnomalyDTO2Bean(MergedAnomalyResultDTO entity) {
+    MergedAnomalyResultBean bean = convertDTO2Bean(entity, MergedAnomalyResultBean.class);
+    if (entity.getFeedback() != null && entity.getFeedback().getId() != null) {
+        bean.setAnomalyFeedbackId(entity.getFeedback().getId());
+    }
+
     if (entity.getFunction() != null) {
       bean.setFunctionId(entity.getFunction().getId());
     }

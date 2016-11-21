@@ -81,7 +81,10 @@ function lineChartForSingleAnomaly(mergeAnomalyData) {
                 extensionWindowMillis = 3600000 * multiplier;
         }
         viewWindowStart -= extensionWindowMillis;
-        viewWindowEnd += extensionWindowMillis;
+        if ((viewWindowEnd + extensionWindowMillis < new Date().getTime())) {
+            viewWindowEnd += extensionWindowMillis;
+        }
+        
         var timeSeriesUrl = "/dashboard/anomaly-merged-result/timeseries/" + mergeAnomalyData.id
             + "?aggTimeGranularity=" + aggTimeGranularity + "&start=" + viewWindowStart + "&end=" + viewWindowEnd;
 
