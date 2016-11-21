@@ -258,9 +258,9 @@ public class AlertTaskRunner implements TaskRunner {
 
     // Send email
     try {
-      String alertEmailSubject = String
-          .format("Anomaly Alert!: %d anomalies detected for %s:%s", results.size(),
-              collectionAlias, alertConfig.getMetric());
+      String anomalyString = (results.size() == 1) ? "anomaly" : "anomalies";
+      String alertEmailSubject = String.format("Thirdeye: %s: %s - %d %s detected",
+          alertConfig.getMetric(), collectionAlias, results.size(), anomalyString);
       String alertEmailHtml = new String(baos.toByteArray(), CHARSET);
       EmailHelper.sendEmailWithHtml(email, thirdeyeConfig.getSmtpConfiguration(), alertEmailSubject,
           alertEmailHtml, alertConfig.getFromAddress(), alertConfig.getToAddresses());
