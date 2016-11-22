@@ -443,8 +443,6 @@ function drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab, placeholder, op
      }
 
      var lineChartPlaceholder = $(placeholder, currentView)[0];
-    console.log("lineChartPlaceholder")
-    console.log(lineChartPlaceholder)
      var lineChartData = {};
      var xTicksCurrent = [];
      var colors = {};
@@ -580,68 +578,74 @@ function renderAnomalyThumbnails(data, extSourceLinkInfo, tab) {
 
     attach_AnomalyTable_EventListeners()
 
-
-
-    for(var i = 0, numAnomalies = data.length; i < numAnomalies; i++) {
-      requestLineChart(i);
+    for (var i = 0, numAnomalies = data.length; i < numAnomalies; i++) {
+        requestLineChart(i);
+        applyExternalInfo(i);
     }
 
-     function requestLineChart(i) {
-         var startTime = data[i]["startTime"];
-         var endTime = data[i]["endTime"];
+    function applyExternalInfo(i) {
+        var startTime = data[i]["startTime"];
+        var endTime = data[i]["endTime"];
 
-         console.log("extSourceLinkInfo");
-         console.log(extSourceLinkInfo);
-         var links = "";
-         for (var source in extSourceLinkInfo) {
-           var template = extSourceLinkInfo[source];
-           if (template) {
-             template = template.replace("${startTime}", startTime);
-             template = template.replace("${endTime}", endTime);
-             source = source.charAt(0) + source.slice(1).toLowerCase();
-             links = links + source.link(template) + " ";
-           }
-         }
-         if (extSourceLinkInfo) {
-           $("#external-props-"+i).html(links);
-         }
+        var links = "";
+        for (var source in extSourceLinkInfo) {
+            var template = extSourceLinkInfo[source];
+            if (template) {
+                template = template.replace("${startTime}", startTime);
+                template = template.replace("${endTime}", endTime);
+                source = source.charAt(0) + source.slice(1).toLowerCase();
+                links = links + source.link(template) + " ";
+            }
+        }
+        if (extSourceLinkInfo) {
+            $("#external-props-" + i).html(links);
+        }
+    }
 
-         var viewWindowStart = startTime;
-         var viewWindowEnd = endTime;
+    function requestLineChart(i) {
+        var anomalyStartTime = data[i]["startTime"];
+        var anomalyEndTime = data[i]["endTime"];
 
-         var aggTimeGranularity = calcAggregateGranularity(startTime, endTime);
+        var aggTimeGranularity = calcAggregateGranularity(anomalyStartTime, anomalyEndTime);
 
-         var extensionWindowMillis;
-         switch (aggTimeGranularity) {
-             case "DAYS":
-                 extensionWindowMillis = 86400000;
-                 break;
-             case "HOURS":
-             default:
-                 var viewWindowSize = viewWindowEnd - viewWindowStart;
-                 var multiplier = Math.max(2, parseInt(viewWindowSize / 3600000));
-                 extensionWindowMillis = 3600000 * multiplier;
-         }
-
-         viewWindowStart -= extensionWindowMillis;
-         viewWindowEnd += extensionWindowMillis;
+        var extensionWindowMillis;
+        switch (aggTimeGranularity) {
+            case "DAYS":
+                extensionWindowMillis = 86400000;
+                break;
+            case "HOURS":
+            default:
+                var viewWindowSize = anomalyEndTime - anomalyStartTime;
+                var multiplier = Math.max(2, parseInt(viewWindowSize / (2 * 3600000)));
+                extensionWindowMillis = 3600000 * multiplier;
+        }
 
 
-         var anomalyId = data[i]["id"]
-         var placeholder= "#d3charts-" + i;
-         var timeSeriesUrl = "/dashboard/anomaly-merged-result/timeseries/" + anomalyId
-             + "?aggTimeGranularity=" + aggTimeGranularity + "&start=" + viewWindowStart + "&end=" + viewWindowEnd;
-         var tab = hash.view;
+        var viewWindowStart = anomalyStartTime - extensionWindowMillis;
+        var viewWindowEnd = anomalyEndTime + extensionWindowMillis;
+
+        var anomalyId = data[i]["id"];
+        var placeholder = "#d3charts-" + i;
+        var timeSeriesUrl = "/dashboard/anomaly-merged-result/timeseries/" + anomalyId
+            + "?aggTimeGranularity=" + aggTimeGranularity + "&start=" + viewWindowStart + "&end="
+            + viewWindowEnd;
+        var tab = hash.view;
 
         getDataCustomCallback(timeSeriesUrl, tab).done(function (timeSeriesData) {
+            var maxBucketTime = 0;
             var anomalyRegionData = [];
-            anomalyRegionData.push({startTime: parseInt(startTime), endTime: parseInt(endTime), id: anomalyId, regionColor: '#eedddd'});
+            anomalyRegionData.push({
+                startTime: parseInt(anomalyStartTime),
+                endTime: parseInt(anomalyEndTime),
+                id: anomalyId,
+                regionColor: '#eedddd'
+            });
             drawAnomalyTimeSeries(timeSeriesData, anomalyRegionData, tab, placeholder)
 
             // Caching it so that this can be reused on the details page
             timeSeriesDataForAllAnomalies[data[i]["id"]] = timeSeriesData;
         })
-     }
+    }
 }
 
 function attach_MetricTimeSeries_EventListeners(currentView){

@@ -3,9 +3,16 @@ package com.linkedin.thirdeye.tools.anomaly.report;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
+import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
+import com.linkedin.thirdeye.datalayer.bao.EmailConfigurationManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
+import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.EmailConfigurationManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.MergedAnomalyResultManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.MetricConfigManagerImpl;
+import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 import java.io.File;
 import java.text.DateFormat;
@@ -24,6 +31,10 @@ public class GenerateAnomalyReport {
   private static final NumberFormat nf = NumberFormat.getInstance();
 
   MergedAnomalyResultManager anomalyResultManager;
+  MetricConfigManager metricConfigManager;
+  EmailConfigurationManager emailConfigurationManager;
+  AnomalyFunctionManager anomalyFunctionManager;
+
   Date startTime;
   Date endTime;
   List<String> collections;
@@ -33,6 +44,9 @@ public class GenerateAnomalyReport {
       List<String> datasets, String dashboardUrl) {
     DaoProviderUtil.init(persistenceConfig);
     anomalyResultManager = DaoProviderUtil.getInstance(MergedAnomalyResultManagerImpl.class);
+    metricConfigManager = DaoProviderUtil.getInstance(MetricConfigManagerImpl.class);
+    emailConfigurationManager = DaoProviderUtil.getInstance(EmailConfigurationManagerImpl.class);
+
     this.startTime = startTime;
     this.endTime = endTime;
     this.collections = datasets;
@@ -40,6 +54,28 @@ public class GenerateAnomalyReport {
 
     System.out.println(
         "building report : " + startTime + " -- " + endTime + ", for collections " + datasets);
+  }
+
+  void listMetric() {
+    for(String collection : collections) {
+      List<MetricConfigDTO> metrics = metricConfigManager.findActiveByDataset(collection);
+      for ( MetricConfigDTO metric : metrics)
+      System.out.println(collection+ "," + metric.getName());
+    }
+  }
+
+  void updateEmailConfig() {
+    String recipients = "xyz@linkedin.com";
+    for(String collection : collections) {
+        List<EmailConfigurationDTO> emailConfigs = emailConfigurationManager.findByCollection(collection);
+      for(EmailConfigurationDTO emailConfigurationDTO : emailConfigs) {
+        if(emailConfigurationDTO.getFunctions().size() > 0) {
+          emailConfigurationDTO.setToAddresses(recipients);
+          emailConfigurationManager.update(emailConfigurationDTO);
+          System.out.println("Email updated " + emailConfigurationDTO.getMetric());
+        }
+      }
+    }
   }
 
   void buildReport() {
@@ -139,8 +175,11 @@ public class GenerateAnomalyReport {
             df.parse(config.getEndTimeIso()), persistenceFile,
             Arrays.asList(config.getDatasets().split(",")), config.getTeBaseUrl());
 
-    reportGenerator.buildReport();
+ //   reportGenerator.buildReport();
+//    reportGenerator.listMetric();
+    reportGenerator.updateEmailConfig();
     System.exit(-1);
+
   }
 
   static class AnomalyReportDTO {
