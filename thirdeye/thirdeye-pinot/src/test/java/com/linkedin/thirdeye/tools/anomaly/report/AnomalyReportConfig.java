@@ -3,9 +3,10 @@ package com.linkedin.thirdeye.tools.anomaly.report;
 public class AnomalyReportConfig {
   private String startTimeIso;
   private String endTimeIso;
-  private String persistenceConfigPath;
+  private String thirdEyeConfigDirectoryPath;
   private String datasets;
   private String teBaseUrl;
+  private String emailRecipients;
 
   public String getEndTimeIso() {
     return endTimeIso;
@@ -23,14 +24,6 @@ public class AnomalyReportConfig {
     this.endTimeIso = endTimeIso;
   }
 
-  public String getPersistenceConfigPath() {
-    return persistenceConfigPath;
-  }
-
-  public void setPersistenceConfigPath(String persistenceConfigPath) {
-    this.persistenceConfigPath = persistenceConfigPath;
-  }
-
   public String getStartTimeIso() {
     return startTimeIso;
   }
@@ -45,5 +38,21 @@ public class AnomalyReportConfig {
 
   public void setDatasets(String datasets) {
     this.datasets = datasets;
+  }
+
+  public String getThirdEyeConfigDirectoryPath() {
+    return thirdEyeConfigDirectoryPath;
+  }
+
+  public void setThirdEyeConfigDirectoryPath(String thirdEyeConfigDirectoryPath) {
+    this.thirdEyeConfigDirectoryPath = thirdEyeConfigDirectoryPath;
+  }
+
+  public String getEmailRecipients() {
+    return emailRecipients;
+  }
+
+  public void setEmailRecipients(String emailRecipients) {
+    this.emailRecipients = emailRecipients;
   }
 }
